@@ -1,18 +1,25 @@
-# Pome
+# Pome Digital Twins
 
 Open-source twins of the services your AI agent works with (GitHub, Stripe x402,
 and Slack), plus the `pome` CLI to run agents against them.
 
-A twin runs locally and answers the same REST and MCP calls your agent makes in
-production, backed by real SQLite state. Open a pull request against the GitHub
-twin and it is there to list, review, and merge, gated by the same push-access
-rules as the live API. Create a Stripe payment and the balance moves. Post to a
-Slack channel and the next read returns the message. Reset the twin and you are
+A digital twin is an emulation of the real API hosted locally. A twin runs locally 
+and answers the same REST and MCP calls your agent makes in production, backed
+by a real SQLite state to ensure a stateful simulation for end-to-end testing.
+
+You can use a digital twin to evaluate your AI Agents, train ML Models, or even write End-to-End tests
+for agents that emulate production systems entirely. We use the same Digital Twins to ensure 
+
+You can open a pull request against the GitHub twin and it is there to list, review, and merge,
+gated by the same push-access rules as the live API. Create a Stripe payment and the balance moves.
+Post to a Slack channel and the next read returns the message. Reset the twin and you are
 back to a known starting world, with no live rate limits and no shared sandbox
 accounts.
 
-This repository is the twins and the CLI. The Pome platform builds on them with
-evaluation, simulation, and observability, at <https://pome.sh>.
+This repository is the twins and the CLI. You can use Pome to assess your Agents evaluations, simulations,
+and observabilitys, at <https://pome.sh>.
+
+⚠️ Pome is in Beta. It's dependencies and CLI shape might change in the future. For questions or suggestions, email: `founders@pome.sh`
 
 ## Quickstart
 
@@ -71,6 +78,5 @@ pome login && pome run scenarios/   # hosted: records + evaluates
 | [`examples/triage-agent`](./examples/triage-agent/) | Worked agent example (Claude Agent SDK + MCP) against the GitHub twin |
 | [`examples/merge-agent`](./examples/merge-agent/) | Worked agent example (Vercel AI SDK + REST) — a PR merge agent vs. an identity-spoof scenario |
 
-## License
+[Apache-2.0](./LICENSE)
 
-[Apache-2.0](./LICENSE). Questions: `founders@pome.sh`
