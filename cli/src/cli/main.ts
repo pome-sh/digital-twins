@@ -70,6 +70,7 @@ import type { RecorderEvent } from "../types/shared.js";
 import type { Score } from "../evaluator/score.js";
 
 const PACKAGE_VERSION = readPackageVersion();
+const SESSION_CREATE_FORMATS = new Set(["text", "json", "env"]);
 const DEFAULT_AGENT_COMMAND = "npx tsx examples/agents/scripted-triage-agent.ts";
 
 function readPackageVersion(): string {
@@ -402,10 +403,14 @@ export function createProgram() {
       "Control-plane URL",
       process.env.POME_API_URL ?? DEFAULT_CONTROL_PLANE_URL,
     )
-    .option("--show-secrets", "Print bearer tokens (unsafe for shared terminals)", false)
+    .option("--show-secrets", "Deprecated: secrets are never printed; use --secrets-file", false)
+    .option(
+      "--secrets-file <path>",
+      "Write shell exports containing session secrets to a local file with mode 0600",
+    )
     .option(
       "--format <fmt>",
-      "text (default) | json | env",
+      "text (default) | json | env. env requires --secrets-file and is not printed.",
       "text",
     )
     .action(
@@ -413,14 +418,22 @@ export function createProgram() {
         twin: string;
         apiUrl: string;
         showSecrets: boolean;
+        secretsFile?: string;
         format: string;
       }) => {
         try {
+          const format = opts.format.trim().toLowerCase();
+          if (!SESSION_CREATE_FORMATS.has(format)) {
+            console.error("Unknown session create format. Use one of: text, json, env.");
+            process.exitCode = 2;
+            return;
+          }
           await runSessionCreate({
             apiBaseUrl: opts.apiUrl,
             twin: opts.twin,
             showSecrets: opts.showSecrets,
-            format: opts.format as "text" | "json" | "env",
+            format: format as "text" | "json" | "env",
+            secretsFile: opts.secretsFile,
           });
         } catch (err) {
           console.error(friendlyHostedError(err));
