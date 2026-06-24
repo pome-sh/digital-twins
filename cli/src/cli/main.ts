@@ -239,18 +239,18 @@ export function createProgram() {
 
   program
     .command("docs")
-    .argument("[topic]", "Topic id (e.g. getting-started, github, cli) — renders bundled docs in terminal")
+    .argument("[topic]", "Topic id (e.g. getting-started, github, cli) — prints the docs.pome.sh URL")
     .option(
       "--site <origin>",
       "Override docs site origin (default https://docs.pome.sh)",
     )
     .option(
       "--url",
-      "Print only the docs.pome.sh URL (no terminal rendering). Default when stdout is not a TTY.",
+      "Print docs.pome.sh URLs (default behavior; retained for compatibility).",
       false,
     )
     .description(
-      "Read narrative docs in the terminal (bundled Mintlify sources) or print stable docs.pome.sh URLs",
+      "Navigate canonical narrative docs on docs.pome.sh",
     )
     .action(async (topic: string | undefined, opts: { site?: string; url?: boolean }) => {
       await runDocsCommand(topic, { site: opts.site, urlOnly: Boolean(opts.url) });

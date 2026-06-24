@@ -40,7 +40,7 @@ pome session create --twin github
 
 Then open **Twins** on [app.pome.sh](https://app.pome.sh) — the session row should match the id from the CLI. Use `pome session list` and `pome session stop <session-id>` to manage sandboxes.
 
-For narrative docs, run `pome docs getting-started` (renders the page in your terminal from bundled Mintlify sources and shows the `docs.pome.sh` URL). `pome --help` / `pome help` list subcommands; see `docs/HELP-SURFACES.md` for how those surfaces relate.
+For narrative docs, run `pome docs getting-started` to print the canonical `docs.pome.sh` URL. `pome --help` / `pome help` list subcommands.
 
 ## Local development (this repository)
 
@@ -120,7 +120,7 @@ The same catalog drives `pome init` — running `pome scenarios github --copy` a
 
 ### `pome docs [topic]`
 
-Read Mintlify narrative docs **in the terminal** (Markdown/MDX shipped inside the package) with optional section navigation on a TTY, or print stable `docs.pome.sh` URLs. Sources are indexed in `src/cli/docs-topics.ts` — the CLI does not scrape the website.
+Print stable `docs.pome.sh` URLs for Mintlify narrative docs. The authored docs live in the `pome` repo; this package keeps only topic metadata for lookup.
 
 ```bash
 pome docs
@@ -128,7 +128,7 @@ pome docs getting-started
 pome docs github --url
 ```
 
-See `docs/HELP-SURFACES.md` for how `pome docs` relates to `pome --help`. Set `NO_COLOR=1` for plain output.
+Use `pome --help` for command reference and `pome docs [topic]` for the corresponding web docs URL.
 
 ### `pome session create|list|stop`
 
@@ -137,11 +137,12 @@ Hosted sandbox sessions (same API as the dashboard Twins page). Requires `pome l
 ```bash
 pome session create --twin github
 pome session create --twin stripe --format json
+pome session create --twin stripe --format env --secrets-file .pome-session.env
 pome session list
 pome session stop ses_...
 ```
 
-Secrets (`agent_token`, provider keys) are **redacted** by default. Use `--show-secrets` and/or `--format env` only on trusted terminals. `--format json` is intended for automation (`NO_COLOR` / non-TTY friendly).
+Secrets (`agent_token`, provider keys) are never printed to stdout/stderr. Use `--secrets-file <path>` to write shell exports to a local file with mode **0600**. `--format json` is intended for automation and stays redacted.
 
 ### `pome run <path>`
 
