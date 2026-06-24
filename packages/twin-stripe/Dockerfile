@@ -1,7 +1,7 @@
 # Build context is the monorepo root. This lets the image use the committed
 # workspace lockfile with --frozen-lockfile instead of resolving dependencies
 # from a standalone package context.
-FROM oven/bun:1@sha256:e10577f0db68676a7024391c6e5cb4b879ebd17188ab750cf10024a6d700e5c4b AS build
+FROM oven/bun:1@sha256:e10577f0db68676a7024391c6e5cb4b879ebd17188ab750cf10024a6d700e5c4 AS build
 WORKDIR /repo
 # better-sqlite3 is a native module that node-gyp must compile; the oven/bun
 # base image is slim and lacks a C++ toolchain by default.
