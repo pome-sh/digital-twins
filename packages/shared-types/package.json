@@ -8,6 +8,7 @@
   "exports": { ".": "./src/index.ts" },
   "files": ["dist", "src", "package.json"],
   "scripts": {
+    "build:runtime": "tsc -p tsconfig.runtime.json",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "build": "tsc -p tsconfig.build.json",
