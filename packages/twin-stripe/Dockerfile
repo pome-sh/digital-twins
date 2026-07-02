@@ -12,6 +12,11 @@ COPY package.json bun.lock ./
 COPY packages packages
 RUN bun install --frozen-lockfile
 RUN bun run --cwd packages/twin-stripe build
+# The runtime image should not include dev/test tooling from the workspace
+# install (for example Vitest/Vite). Reinstall production deps after the build
+# so the scanned/pushed image contains only runtime packages.
+RUN rm -rf node_modules \
+  && bun install --frozen-lockfile --production
 
 # Runtime is node, not bun: better-sqlite3's native binding is not yet
 # supported under bun (https://github.com/oven-sh/bun/issues/4290), so the
