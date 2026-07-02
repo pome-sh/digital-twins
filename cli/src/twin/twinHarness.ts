@@ -41,8 +41,8 @@ import {
   parseSeed as parseStripeSeed,
   registerStripeRoutes,
   StripeDomain,
-} from "../twin-stripe/index.js";
-import type { ResolvedSession } from "../twin-stripe/types.js";
+} from "@pome-sh/twin-stripe";
+import type { ResolvedSession } from "@pome-sh/twin-stripe";
 
 // The account every local Stripe scenario seeds under. The runner mints a JWT
 // whose `account_id` claim matches this, so `exportState` and the session
