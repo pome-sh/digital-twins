@@ -65,7 +65,7 @@ describe("REST / cluster A — branches & files", () => {
     const a = app();
     const aliceToken = await signTestToken({ login: "alice" });
     const put = await jsonReq(a, "PUT", "/repos/acme/api/contents/del.txt", { message: "add", content: "x\n" }, aliceToken);
-    expect(put.status).toBe(200);
+    expect(put.status).toBe(201);
     const sha = (put.body as { content: { sha: string } }).content.sha;
     const stale = await jsonReq(a, "DELETE", "/repos/acme/api/contents/del.txt", { message: "drop", sha: "WRONG" }, aliceToken);
     expect(stale.status).toBe(422);
@@ -97,6 +97,15 @@ describe("REST / cluster B — commits & diffs", () => {
     const response = await jsonReq(a, "GET", `/repos/acme/api/commits/${head}`);
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({ sha: head, stats: expect.any(Object) });
+  });
+
+  it("PUT /contents returns 201 on create and 200 on update (FDRS-596)", async () => {
+    const a = app();
+    const create = await jsonReq(a, "PUT", "/repos/acme/api/contents/newfile.ts", { message: "add", content: "1\n" });
+    expect(create.status).toBe(201);
+    const sha = (create.body as { content: { sha: string } }).content.sha;
+    const update = await jsonReq(a, "PUT", "/repos/acme/api/contents/newfile.ts", { message: "update", content: "2\n", sha });
+    expect(update.status).toBe(200);
   });
 
   it("GET /compare/:base...:head returns status + commits", async () => {
