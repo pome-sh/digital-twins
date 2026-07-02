@@ -39,7 +39,6 @@ jobs:
       contents: read
       packages: write
     outputs:
-      digest: ${{ steps.push.outputs.digest }}
       tags: ${{ steps.meta.outputs.tags }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -90,18 +89,18 @@ jobs:
           exit-code: '1'
           ignore-unfixed: true
           trivyignores: .trivyignore
-      # PR builds verify the Dockerfile compiles and pass the scan but never
-      # push to GHCR — only main / tag pushes publish. Without this gate the
-      # GITHUB_TOKEN from a fork or unauthorized actor could poison the image.
-      # `github.event_name` is the PR vs push signal that survives merge-queue
-      # retargeting. Layers are reused from the build step's buildx cache.
-      - uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
-        id: push
+      # Push the EXACT image built + scanned above (already loaded into the local
+      # daemon under every steps.meta.outputs.tags) — no second build, so the
+      # published artifact is byte-identical to the one Trivy scanned. PR builds
+      # verify + scan but never push; only main / tag pushes publish. Without
+      # this gate the GITHUB_TOKEN from a fork or unauthorized actor could poison
+      # the image. `github.event_name` is the PR-vs-push signal that survives
+      # merge-queue retargeting.
+      - name: Push scanned image
         if: ${{ github.event_name != 'pull_request' }}
-        with:
-          context: .
-          file: packages/twin-slack/Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/amd64
+        run: |
+          printf '%s\n' "${{ steps.meta.outputs.tags }}" | while IFS= read -r tag; do
+            [ -n "$tag" ] || continue
+            echo "pushing $tag"
+            docker push "$tag"
+          done
