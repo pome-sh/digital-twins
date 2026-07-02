@@ -7,6 +7,7 @@
   "types": "./src/index.ts",
   "exports": { ".": "./src/index.ts" },
   "scripts": {
+    "build:runtime": "tsc -p tsconfig.runtime.json",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
