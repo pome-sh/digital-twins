@@ -82,6 +82,65 @@ describe("redactEvent — regex scrubs in string values", () => {
   });
 });
 
+describe("redactEvent — provider secret shapes (FDRS-588 / FDRS-608)", () => {
+  it("redacts the 12-char body Stripe seed key sk_test_pome_default", () => {
+    const key = "sk_test_pome_default";
+    const out = redactEvent({ note: `stripe secret ${key} here` }) as { note: string };
+    expect(out.note).not.toContain(key);
+    expect(out.note).toContain("[REDACTED]");
+  });
+
+  it("redacts live Stripe secret keys (sk_live_...)", () => {
+    const key = "sk_live_" + "51H".repeat(8);
+    const out = redactEvent({ note: `key=${key}` }) as { note: string };
+    expect(out.note).not.toContain(key);
+    expect(out.note).toContain("[REDACTED]");
+  });
+
+  it("redacts Slack app-level tokens (xapp-...)", () => {
+    const key = "xapp-1-A01B2C3D4E5-" + "1".repeat(20) + "-deadbeef";
+    const out = redactEvent({ note: `token ${key}` }) as { note: string };
+    expect(out.note).not.toContain(key);
+    expect(out.note).toContain("[REDACTED]");
+  });
+
+  it("redacts Google API keys (AIza...)", () => {
+    const key = "AIza" + "SyD-abc123DEF456ghi789jklMNO_pqrstu";
+    const out = redactEvent({ note: `google ${key}` }) as { note: string };
+    expect(out.note).not.toContain(key);
+    expect(out.note).toContain("[REDACTED]");
+  });
+
+  it("fires inside nested tool_use / JSON shapes", () => {
+    const stripeKey = "sk_test_pome_default";
+    const input = {
+      type: "tool_use",
+      name: "create_charge",
+      input: {
+        args: { headers: { "x-stripe-key": stripeKey } },
+        list: [{ deep: { note: `use ${stripeKey}` } }],
+      },
+    };
+    const out = redactEvent(input) as typeof input;
+    expect(JSON.stringify(out)).not.toContain(stripeKey);
+    expect((out.input.args.headers as { "x-stripe-key": string })["x-stripe-key"]).toBe("[REDACTED]");
+    expect(out.input.list[0].deep.note).toContain("[REDACTED]");
+  });
+
+  it("does not over-redact benign lookalikes", () => {
+    // A task name that merely contains letters/underscores, no sk_test_/sk_live_ prefix.
+    expect(redactEvent({ msg: "task_test_pipeline_default" })).toEqual({
+      msg: "task_test_pipeline_default",
+    });
+    // "AIza" only redacts with a long body; a short word is untouched.
+    expect(redactEvent({ msg: "AIza short" })).toEqual({ msg: "AIza short" });
+    // A prose sentence with an apiVersion string stays intact.
+    expect(redactEvent({ msg: "The sky is blue and skills matter." })).toEqual({
+      msg: "The sky is blue and skills matter.",
+    });
+  });
+});
+
 describe("redactEvent — benign content untouched", () => {
   it("leaves plain strings alone", () => {
     expect(redactEvent({ msg: "hello world" })).toEqual({ msg: "hello world" });
