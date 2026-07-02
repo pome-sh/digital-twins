@@ -34,8 +34,8 @@ jobs:
           registry-url: https://registry.npmjs.org
       - run: bun install --frozen-lockfile
 
-      - name: Build publishable tarballs
-        run: node scripts/pack-publishable.mjs --out "$RUNNER_TEMP/tarballs"
+      - name: Build publishable tarballs and check SDK vendor
+        run: node scripts/pack-publishable.mjs --out "$RUNNER_TEMP/tarballs" --check-vendor
 
       - name: Guard — no `workspace:` specs survive into any published manifest
         run: |

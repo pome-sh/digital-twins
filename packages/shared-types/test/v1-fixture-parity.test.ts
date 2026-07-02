@@ -3,10 +3,11 @@
 // FDRS-613 — /v1 wire fixture-corpus parity.
 //
 // Every JSON fixture under `test/fixtures/v1/<schema>/` MUST parse successfully
-// under the twins schema keyed by its directory name. The SAME corpus is
-// fetched and parsed by pome-cloud's `shared-types-v1-parity` CI job against
-// the cloud schema, so a drift on either /v1 surface surfaces as a parse
-// failure on one side.
+// under the twins schema keyed by its directory name. The SAME corpus is fetched
+// and parsed by pome-cloud's `shared-types-v1-parity` CI job against the cloud
+// schema. This is intentionally parse-only: it catches represented required
+// fields, enum narrowing, and other fixture-level wire incompatibilities, but it
+// is not a proof of whole-schema equality.
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";

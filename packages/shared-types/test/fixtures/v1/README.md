@@ -3,8 +3,9 @@
 A shared, framework-agnostic JSON corpus of representative `/v1` wire payloads.
 It is the parity anchor between `pome-sh/pome-twins` (this repo, zod 4) and
 `pome-sh/pome-cloud` (zod 3). Both repos parse **the same JSON files** against
-their own copy of the schema; if a schema drifts on the `/v1` surface, one side
-starts failing to parse a fixture the other side still accepts.
+their own copy of the schema; if a represented payload becomes incompatible on
+either `/v1` surface, one side starts failing to parse a fixture the other side
+still accepts.
 
 ## Layout
 
@@ -24,10 +25,11 @@ bare JSON string. Every fixture MUST parse successfully under the mapped schema.
 ## Scope
 
 Deliberately scoped to the `/v1` wire surface (`planTier`, `createSession`,
-`usage`, `run`). It is **not** whole-file byte parity and it does **not** cover
+`usage`, `run`). It is **not** whole-file byte parity, whole-schema equality, or
+a guard for every possible loosening/removal, and it does **not** cover
 cloud-only billing schemas. Note the two repos pin different zod majors (twins
-`^4`, cloud `^3`), so byte-for-byte file parity is a non-goal — value-level
-parse parity via this corpus is the contract.
+`^4`, cloud `^3`), so byte-for-byte file parity is a non-goal — represented
+fixture parse parity via this corpus is the contract.
 
 ## How each repo consumes it
 

@@ -20,13 +20,24 @@
 //
 // Usage:
 //   node scripts/pack-publishable.mjs --out <dir>
-//   node scripts/pack-publishable.mjs --vendor   # also refresh packages/sdk/vendor + cli/vendor
+//   node scripts/pack-publishable.mjs --vendor        # refresh packages/sdk/vendor
+//   node scripts/pack-publishable.mjs --check-vendor  # fail if packages/sdk/vendor is stale
 //
 // Emits: <out>/pome-sh-shared-types-<v>.tgz, pome-sh-adapter-claude-sdk-<v>.tgz,
 //        pome-sh-sdk-<v>.tgz  (default <out> = dist-tarballs/ at repo root)
 
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -36,6 +47,7 @@ const args = process.argv.slice(2);
 const outIdx = args.indexOf("--out");
 const outDir = resolve(outIdx >= 0 ? args[outIdx + 1] : join(repoRoot, "dist-tarballs"));
 const doVendor = args.includes("--vendor");
+const checkVendor = args.includes("--check-vendor");
 
 const sh = (cmd, cwd, extraArgs) =>
   execFileSync(cmd, extraArgs, { cwd, stdio: ["ignore", "pipe", "inherit"], encoding: "utf8" });
@@ -56,6 +68,49 @@ function build(pkgDir) {
 function npmPack(cwd) {
   const out = sh("npm", cwd, ["pack", "--silent"]);
   return out.trim().split("\n").pop().trim();
+}
+
+function extractTgz(tgzPath) {
+  const dir = mkdtempSync(join(tmpdir(), "pome-pack-check-"));
+  sh("tar", dir, ["-xzf", tgzPath]);
+  return dir;
+}
+
+function listFiles(root, dir = root) {
+  return readdirSync(dir)
+    .flatMap((entry) => {
+      const path = join(dir, entry);
+      const rel = path.slice(root.length + 1);
+      if (statSync(path).isDirectory()) return listFiles(root, path);
+      return rel;
+    })
+    .sort();
+}
+
+function assertSamePackageContents(actualTgz, expectedTgz) {
+  const actualRoot = extractTgz(actualTgz);
+  const expectedRoot = extractTgz(expectedTgz);
+  try {
+    const actualPkg = join(actualRoot, "package");
+    const expectedPkg = join(expectedRoot, "package");
+    const actualFiles = listFiles(actualPkg);
+    const expectedFiles = listFiles(expectedPkg);
+    if (JSON.stringify(actualFiles) !== JSON.stringify(expectedFiles)) {
+      throw new Error(
+        `file list differs\nactual:   ${actualFiles.join(", ")}\nexpected: ${expectedFiles.join(", ")}`,
+      );
+    }
+    for (const file of actualFiles) {
+      const actualBytes = readFileSync(join(actualPkg, file));
+      const expectedBytes = readFileSync(join(expectedPkg, file));
+      if (!actualBytes.equals(expectedBytes)) {
+        throw new Error(`contents differ for ${file}`);
+      }
+    }
+  } finally {
+    rmSync(actualRoot, { recursive: true, force: true });
+    rmSync(expectedRoot, { recursive: true, force: true });
+  }
 }
 
 function stage(pkgDir, transform) {
@@ -123,6 +178,17 @@ if (doVendor) {
   }
   cpSync(join(outDir, sharedTypesTgz), join(vendorDir, sharedTypesTgz));
   console.error(`vendored ${sharedTypesTgz} into packages/sdk/vendor`);
+}
+
+if (checkVendor) {
+  const vendoredTgz = join(repoRoot, "packages/sdk/vendor", sharedTypesTgz);
+  if (!existsSync(vendoredTgz)) {
+    throw new Error(
+      `packages/sdk/vendor/${sharedTypesTgz} is missing. Run: node scripts/pack-publishable.mjs --vendor`,
+    );
+  }
+  assertSamePackageContents(vendoredTgz, join(outDir, sharedTypesTgz));
+  console.error(`verified packages/sdk/vendor/${sharedTypesTgz} matches a fresh shared-types pack`);
 }
 
 // ── @pome-sh/adapter-claude-sdk ───────────────────────────────────────────
