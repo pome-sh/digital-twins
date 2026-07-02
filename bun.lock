@@ -47,7 +47,7 @@
       "name": "@pome-sh/sdk",
       "version": "0.1.0",
       "dependencies": {
-        "@pome-sh/shared-types": "workspace:*",
+        "@pome-sh/shared-types": "file:./vendor/pome-sh-shared-types-0.4.0.tgz",
         "hono": "^4.10.7",
         "zod": "^4.1.13",
       },
@@ -67,7 +67,7 @@
     },
     "packages/shared-types": {
       "name": "@pome-sh/shared-types",
-      "version": "0.3.0",
+      "version": "0.4.0",
       "devDependencies": {
         "@types/node": "^25.0.3",
         "typescript": "^5.9.3",
@@ -769,6 +769,8 @@
     "zod": ["zod@4.4.3", "", {}, "sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ=="],
 
     "zod-to-json-schema": ["zod-to-json-schema@3.25.2", "", { "peerDependencies": { "zod": "^3.25.28 || ^4" } }, "sha512-O/PgfnpT1xKSDeQYSCfRI5Gy3hPf91mKVDuYLUHZJMiDFptvP41MSnWofm8dnCm0256ZNfZIM7DSzuSMAFnjHA=="],
+
+    "@pome-sh/sdk/@pome-sh/shared-types": ["@pome-sh/shared-types@./vendor/pome-sh-shared-types-0.4.0.tgz", { "peerDependencies": { "zod": "^4.1.13" } }, "sha512-2+3vxrwLbazQQcqqi4N7DmkCEAVJE9HLi4XPpRhvB9zmj2PSL9GCSfmIHXVMux3Q9otuij064UtlfpisgzzX6Q=="],
 
     "@vitest/coverage-v8/@vitest/utils": ["@vitest/utils@4.1.9", "", { "dependencies": { "@vitest/pretty-format": "4.1.9", "convert-source-map": "^2.0.0", "tinyrainbow": "^3.1.0" } }, "sha512-A51o8ymO5PpqlWNnBP9ZHPXDIpuMtTLlGSjN7la4US+LJzoUMyhwjA5QXlm39JexgwHKW4Xjs8Z2d3dLCXOeuA=="],
 
