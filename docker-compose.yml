@@ -29,8 +29,9 @@ x-twin-entrypoint: &twin-entrypoint
       mkdir -p /data
       if [ ! -f /data/secret ]; then
         node -e 'console.log(require("crypto").randomBytes(32).toString("hex"))' > /data/secret
-        chmod 600 /data/secret
       fi
+      # Host-side quickstart agents read this bind-mounted secret to mint JWTs.
+      chmod 644 /data/secret
       TWIN_AUTH_SECRET=$$(cat /data/secret)
     fi
     export TWIN_AUTH_SECRET
