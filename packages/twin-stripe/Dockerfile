@@ -23,7 +23,9 @@ ENV NODE_ENV=production
 ENV STRIPE_CLONE_HOST=0.0.0.0
 COPY --from=build /repo/node_modules ./node_modules
 COPY --from=build /repo/packages/shared-types ./packages/shared-types
+COPY --from=build /repo/packages/shared-types/node_modules ./packages/shared-types/node_modules
 COPY --from=build /repo/packages/twin-stripe/package.json ./packages/twin-stripe/package.json
+COPY --from=build /repo/packages/twin-stripe/node_modules ./packages/twin-stripe/node_modules
 COPY --from=build /repo/packages/twin-stripe/dist ./packages/twin-stripe/dist
 EXPOSE 3333
 CMD ["node", "packages/twin-stripe/dist/src/server.js"]
