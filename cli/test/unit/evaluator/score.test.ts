@@ -94,6 +94,8 @@ describe("scoreResults", () => {
     expect(score.failed).toBe(0);
     expect(score.skipped).toBe(1);
     expect(score.satisfaction).toBe(100); // 1 of 1 required passed
+    expect(score.can_pass).toBe(false);
+    expect(scoreStatus(score, 100)).toBe("unevaluated");
   });
 });
 

@@ -54,7 +54,8 @@ const ev = (o: Partial<Record<string, unknown>>): Record<string, unknown> => ({
 });
 
 // Golden fixtures per scenario slug. `correct` must satisfy every shipped [D]
-// criterion; `wrong` is a plausible failed-agent trace that satisfies none.
+// criterion; `wrong` is a plausible failed-agent trace that stays below the
+// pass threshold while still exercising understood matcher paths.
 const FIXTURES: Record<string, { correct: Fixture; wrong: Fixture }> = {
   "stripe-create-payment-intent": {
     correct: {

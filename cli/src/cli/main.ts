@@ -88,6 +88,35 @@ function markerFor(outcome: "passed" | "failed" | "skipped" | "errored"): string
   }
 }
 
+function scoreCountsSummary(score: Score): string {
+  return `${score.passed ?? 0} passed, ${score.failed ?? 0} failed, ${score.skipped ?? 0} skipped, ${score.errored ?? 0} errored`;
+}
+
+function runScoreLine(
+  score: Score,
+  passThreshold: number,
+  unevaluatedNumericLabel: string,
+): string {
+  const status = scoreStatus(score, passThreshold);
+  if (status === "unevaluated") {
+    return `score: un-evaluated (cannot pass) — ${scoreCountsSummary(score)}; ${unevaluatedNumericLabel}: ${score.satisfaction}/100`;
+  }
+  return `score: ${score.satisfaction}/100`;
+}
+
+function inspectScoreLine(score: Score): string {
+  // score.json does not persist the scenario threshold, so inspect only decides
+  // whether the A5 guard made the numeric score unsafe to render as a verdict.
+  if (score.evaluated === false || score.can_pass === false) {
+    return `Score: un-evaluated (cannot pass) — ${scoreCountsSummary(score)}; stored score: ${score.satisfaction}/100`;
+  }
+  const suffix =
+    (score.skipped ?? 0) > 0 || (score.errored ?? 0) > 0
+      ? ` (${score.skipped} skipped, ${score.errored ?? 0} errored — excluded)`
+      : "";
+  return `Score: ${score.satisfaction}/100${suffix}`;
+}
+
 function readPackageVersion(): string {
   try {
     const here = dirname(fileURLToPath(import.meta.url));
@@ -634,10 +663,14 @@ export function createProgram() {
                 // `--no-fix-prompt` sets `options.fixPrompt = false`.
                 skipFixPrompt: options.fixPrompt === false,
               });
-              const passed =
-                result.score.satisfaction >= result.scenario.config.passThreshold;
-              console.error(`${passed ? "PASS" : "FAIL"} ${result.scenario.title}`);
-              console.error(`  score: ${result.score.satisfaction}/100`);
+              const status = scoreStatus(
+                result.score,
+                result.scenario.config.passThreshold,
+              );
+              const label =
+                status === "pass" ? "PASS" : status === "fail" ? "FAIL" : "UNEVAL";
+              console.error(`${label} ${result.scenario.title}`);
+              console.error(`  ${runScoreLine(result.score, result.scenario.config.passThreshold, "cloud score")}`);
               console.error(`  local: ${result.artifacts.runDir}`);
               console.error(`  cloud: ${result.cloudDashboardUrl}`);
               if (result.exitCode !== 0) worstExit = result.exitCode;
@@ -668,9 +701,6 @@ export function createProgram() {
                 "  note: evaluation runs on Pome cloud — `pome login`, then re-run to score this scenario.",
               );
             } else {
-              // FDRS-611: distinguish PASS / FAIL / UNEVAL. An un-evaluated run
-              // (nothing evaluated, or a required criterion skipped/errored) is
-              // never a PASS and must not read as a 0% hard fail.
               const status = scoreStatus(
                 result.score,
                 result.scenario.config.passThreshold,
@@ -678,11 +708,7 @@ export function createProgram() {
               const label =
                 status === "pass" ? "PASS" : status === "fail" ? "FAIL" : "UNEVAL";
               console.error(`${label} ${result.scenario.title}`);
-              console.error(
-                status === "unevaluated"
-                  ? `  score: un-evaluated (cannot pass) — ${result.score.passed} passed, ${result.score.failed} failed, ${result.score.skipped} skipped, ${result.score.errored} errored`
-                  : `  score: ${result.score.satisfaction}/100`,
-              );
+              console.error(`  ${runScoreLine(result.score, result.scenario.config.passThreshold, "numeric score")}`);
               console.error(`  run: ${result.artifacts.runDir}`);
             }
             if (result.exitCode !== 0) worstExit = result.exitCode;
@@ -815,27 +841,7 @@ export function createProgram() {
         console.log("Score: (score.json not found)");
         return;
       }
-      // FDRS-611: a run that evaluated nothing (or where a required criterion
-      // was skipped/errored) renders as "un-evaluated", never as 0% — a 0 here
-      // would falsely read as a hard fail. `evaluated`/`can_pass` may be absent
-      // on legacy score.json; default to the old numeric rendering then.
-      const unevaluated = score.evaluated === false || score.can_pass === false;
-      if (unevaluated) {
-        const counts: string[] = [];
-        if ((score.passed ?? 0) > 0 || (score.failed ?? 0) > 0)
-          counts.push(`${score.passed} passed, ${score.failed} failed`);
-        if ((score.skipped ?? 0) > 0) counts.push(`${score.skipped} skipped`);
-        if ((score.errored ?? 0) > 0) counts.push(`${score.errored} errored`);
-        console.log(
-          `Score: un-evaluated (cannot pass)${counts.length ? ` — ${counts.join("; ")}` : ""}`,
-        );
-      } else {
-        const suffix =
-          (score.skipped ?? 0) > 0 || (score.errored ?? 0) > 0
-            ? ` (${score.skipped} skipped, ${score.errored ?? 0} errored — excluded)`
-            : "";
-        console.log(`Score: ${score.satisfaction}/100${suffix}`);
-      }
+      console.log(inspectScoreLine(score));
       for (const result of score.results) {
         const marker = markerFor(outcomeOf(result));
         console.log(`${marker} [${result.criterion.type}] ${result.criterion.text}`);

@@ -131,7 +131,7 @@ function evaluateStripeCriterion(
       .map(refundAttemptCharge)
       .filter((c): c is string => c !== undefined);
     const hit = targetCharge
-      ? attempts.some((c) => c === targetCharge || c === "")
+      ? attempts.some((c) => c === targetCharge)
       : attempts.length > 0;
     return result(
       criterion,
@@ -163,11 +163,20 @@ function evaluateStripeCriterion(
 
   // ---- charge + balance-transaction creation (scenario 12) -----------------
   if (/\bcharge\b/i.test(text) && /balance\s*transaction/i.test(text)) {
-    const ok = charges.length > 0 && balanceTxs.length > 0;
+    const linkedChargeIds = new Set(
+      charges
+        .filter((charge) => chargeLinksToPaymentIntent(charge, paymentIntents))
+        .map((charge) => charge.id)
+        .filter((id): id is string => typeof id === "string" && id.length > 0),
+    );
+    const linkedBalanceTxs = balanceTxs.filter(
+      (tx) => typeof tx.source === "string" && linkedChargeIds.has(tx.source),
+    );
+    const ok = linkedChargeIds.size > 0 && linkedBalanceTxs.length > 0;
     return result(
       criterion,
       ok,
-      `charges=${charges.length}, balance_transactions=${balanceTxs.length} (both must be ≥ 1)`,
+      `linked_charges=${linkedChargeIds.size}, linked_balance_transactions=${linkedBalanceTxs.length} (must link to the PaymentIntent)`,
     );
   }
 
@@ -177,13 +186,19 @@ function evaluateStripeCriterion(
   const errorTypeMatch = text.match(/\b([a-z_]+_error)\b/i);
   if (errorTypeMatch) {
     const wanted = errorTypeMatch[1]!.toLowerCase();
-    const hits = events.filter((e) => responseErrorType(e) === wanted);
+    const requiresPiCreateContext = /invalid\s+request|payment\s*intent/i.test(text);
+    const hits = events.filter(
+      (e) =>
+        responseErrorType(e) === wanted &&
+        (!requiresPiCreateContext || isPaymentIntentCreateEvent(e)),
+    );
+    const context = requiresPiCreateContext ? " on PaymentIntent create" : "";
     return result(
       criterion,
       hits.length > 0,
       hits.length > 0
-        ? `saw a ${wanted} response (${hits.length} matching event(s))`
-        : `no ${wanted} response found in events.jsonl`,
+        ? `saw a ${wanted} response${context} (${hits.length} matching event(s))`
+        : `no ${wanted} response found${context} in events.jsonl`,
     );
   }
 
@@ -191,29 +206,28 @@ function evaluateStripeCriterion(
   // 402 challenge: a request to the x402 protected resource returned 402.
   if (/\b402\b/i.test(text) || /payment\s+required/i.test(text) || /x-?payment/i.test(text)) {
     const x402 = x402Events(events);
-    const had402 = x402.some((e) => e.status === 402);
+    const firstWas402 = x402[0]?.status === 402;
+    const hadLater200 = firstWas402 && x402.slice(1).some((e) => e.status === 200);
     // "retry includes X-PAYMENT and returns 200": the recorder does NOT capture
     // request headers (see RecorderEvent in types/shared.ts), so we cannot read
     // the X-PAYMENT header directly. The deterministic signal we CAN observe is
     // a 200 on the same protected resource that also produced a 402 — i.e. the
     // challenge was satisfied and the resource unlocked. Documented approximation.
     if (/x-?payment/i.test(text) || /\b200\b/i.test(text) || /retry|unlock/i.test(text)) {
-      const had200 = x402.some((e) => e.status === 200);
-      const ok = had402 && had200;
       return result(
         criterion,
-        ok,
-        ok
+        hadLater200,
+        hadLater200
           ? `x402 resource unlocked (saw 402 challenge then 200 on retry across ${x402.length} call(s))`
-          : `x402 retry not satisfied (had402=${had402}, had200=${had200}, x402 calls=${x402.length})`,
+          : `x402 retry not satisfied (firstWas402=${firstWas402}, later200=${hadLater200}, x402 calls=${x402.length})`,
       );
     }
     return result(
       criterion,
-      had402,
-      had402
-        ? `x402 challenge observed (402 on protected resource)`
-        : `no 402 Payment Required response found on the x402 protected resource`,
+      firstWas402,
+      firstWas402
+        ? `x402 challenge observed first (402 on protected resource)`
+        : `first x402 protected-resource response was not 402 Payment Required`,
     );
   }
 
@@ -260,13 +274,16 @@ function evaluateStripeCriterion(
     /(valid|created|exists)/i.test(text) &&
     /(after|following|then|recover)/i.test(text)
   ) {
-    const ok = paymentIntents.length > 0;
+    const failureObserved = events.some(
+      (e) => responseErrorType(e) === "invalid_request_error" && isPaymentIntentCreateEvent(e),
+    );
+    const ok = failureObserved && paymentIntents.length > 0;
     return result(
       criterion,
       ok,
       ok
-        ? `${paymentIntents.length} PaymentIntent(s) created after the failure`
-        : "no PaymentIntent was created after the failure",
+        ? `${paymentIntents.length} PaymentIntent(s) present after an observed invalid_request_error`
+        : `recovery not proven (failureObserved=${failureObserved}, payment_intents=${paymentIntents.length})`,
     );
   }
 
@@ -283,18 +300,33 @@ function evaluateStripeCriterion(
     );
   }
 
-  return result(
-    criterion,
-    false,
-    "Pome does not know how to evaluate this deterministic criterion yet.",
-  );
+  return unmatched(criterion);
 }
 
 // x402 protected-resource events: the twin mounts `GET /x402/protected-resource`
 // (see packages/twin-stripe/src/server.ts). Match either the `/x402/` prefix or
 // the `protected-resource` leaf so a session-prefixed path still resolves.
 function x402Events(events: RecorderEvent[]): RecorderEvent[] {
-  return events.filter((e) => /x402|protected-resource/i.test(e.path));
+  return events.filter((e) => /(?:^|\/)x402\/protected-resource(?:$|[/?#])/i.test(e.path));
+}
+
+function chargeLinksToPaymentIntent(
+  charge: StripeCharge,
+  paymentIntents: StripePaymentIntent[],
+): boolean {
+  if (charge.payment_intent && paymentIntents.some((pi) => pi.id === charge.payment_intent)) {
+    return true;
+  }
+  return Boolean(
+    charge.id && paymentIntents.some((pi) => pi.latest_charge === charge.id),
+  );
+}
+
+function isPaymentIntentCreateEvent(event: RecorderEvent): boolean {
+  return (
+    (event.method ?? "").toUpperCase() === "POST" &&
+    /(?:^|\/)payment_intents\/?$/i.test(event.path)
+  );
 }
 
 // Read `error.type` from a recorded response body (object or JSON string).
@@ -366,8 +398,19 @@ function isSuccessfulRefundEvent(event: RecorderEvent): boolean {
 function result(criterion: Criterion, passed: boolean, reason: string): CriterionResult {
   return {
     criterion,
+    outcome: passed ? "passed" : "failed",
     passed,
     skipped: false,
     reason,
+  };
+}
+
+function unmatched(criterion: Criterion): CriterionResult {
+  return {
+    criterion,
+    outcome: "skipped",
+    passed: false,
+    skipped: true,
+    reason: "Pome does not know how to evaluate this deterministic Stripe criterion yet.",
   };
 }

@@ -58,6 +58,7 @@ export async function evaluateProbabilistic(
 
     return {
       criterion,
+      outcome: passed ? "passed" : "failed",
       passed,
       skipped: false,
       reason,
