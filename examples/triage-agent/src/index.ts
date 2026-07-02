@@ -71,7 +71,12 @@ Stop once every open issue has both a classification label and a reasoning comme
 
 const TASK = process.env.POME_TASK?.trim() || DEFAULT_TASK;
 
-await main();
+// Only run the agent when executed directly (`bun run src/index.ts`). Guarding
+// on `import.meta.main` keeps the module importable — e.g. by the secret-path
+// unit test — without kicking off a full agent run on import.
+if (import.meta.main) {
+  await main();
+}
 
 async function main() {
   const token = await resolveAuthToken();
@@ -250,15 +255,36 @@ async function resolveAuthToken(): Promise<string> {
   );
 }
 
-function readSecretFromDisk(): string {
+// Where the auto-generated twin secret lives on disk. `docker compose up`
+// writes each twin's secret to a PER-TWIN subdir — `./.pome-data/<twin>/secret`
+// (see docker-compose.yml: `./.pome-data/github:/data` mounted, entrypoint
+// writes `/data/secret`). This agent talks to the GitHub twin, so its secret is
+// `<repo-root>/.pome-data/github/secret`. We also probe the other twins and the
+// legacy flat `.pome-data/secret` layout (used when a single TWIN_AUTH_SECRET is
+// exported) as fallbacks. From this file the repo root is three levels up.
+export function secretCandidatePaths(): string[] {
   const explicit = process.env.POME_DATA_SECRET_PATH;
-  // Default location: <repo-root>/.pome-data/secret. From this file
-  // (examples/triage-agent/src/index.ts) the repo root is three levels up.
-  const candidates = [
-    explicit,
-    resolve(process.cwd(), ".pome-data/secret"),
-    resolve(__dirname, "../../../.pome-data/secret")
-  ].filter((p): p is string => Boolean(p));
+  const twin = process.env.POME_TWIN?.trim() || "github";
+  const repoRoot = resolve(__dirname, "../../..");
+  const bases = [repoRoot, process.cwd()];
+  const relatives = [
+    `.pome-data/${twin}/secret`,
+    ".pome-data/github/secret",
+    ".pome-data/stripe/secret",
+    ".pome-data/slack/secret",
+    ".pome-data/secret" // legacy flat layout / shared TWIN_AUTH_SECRET
+  ];
+  const candidates: string[] = [];
+  if (explicit) candidates.push(explicit);
+  for (const base of bases) {
+    for (const rel of relatives) candidates.push(resolve(base, rel));
+  }
+  // De-duplicate while preserving priority order.
+  return [...new Set(candidates)];
+}
+
+function readSecretFromDisk(): string {
+  const candidates = secretCandidatePaths();
 
   for (const path of candidates) {
     if (existsSync(path)) {
@@ -271,7 +297,7 @@ function readSecretFromDisk(): string {
   throw new Error(
     "Could not locate the twin auth secret.\n" +
       "Either:\n" +
-      "  • run `docker compose up` from the repo root (writes .pome-data/secret), or\n" +
+      "  • run `docker compose up` from the repo root (writes .pome-data/<twin>/secret), or\n" +
       "  • export TWIN_AUTH_SECRET (>= 32 chars), or\n" +
       "  • export POME_AUTH_TOKEN with a pre-minted JWT."
   );

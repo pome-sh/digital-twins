@@ -9,8 +9,8 @@ Install the `pome` command first. Until the first npm registry release ships,
 install from the GitHub source checkout.
 
 ```bash
-git clone --depth 1 https://github.com/pome-sh/pome.git
-cd pome/cli
+git clone --depth 1 https://github.com/pome-sh/pome-twins.git
+cd pome-twins/cli
 npm install
 npm install -g .
 pome --help
