@@ -68,6 +68,7 @@
     "@openrouter/ai-sdk-provider": "^2.9.0",
     "@pome-sh/correlator": "file:./vendor/pome-sh-correlator-0.1.0.tgz",
     "@pome-sh/shared-types": "file:./vendor/pome-sh-shared-types-0.3.0.tgz",
+    "@pome-sh/twin-stripe": "file:./vendor/pome-sh-twin-stripe-0.1.0.tgz",
     "ai": "^6.0.193",
     "better-sqlite3": "^12.5.0",
     "commander": "^15.0.0",
@@ -91,6 +92,7 @@
   },
   "bundleDependencies": [
     "@pome-sh/correlator",
-    "@pome-sh/shared-types"
+    "@pome-sh/shared-types",
+    "@pome-sh/twin-stripe"
   ]
 }

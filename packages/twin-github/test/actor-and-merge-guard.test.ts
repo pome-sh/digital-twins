@@ -29,7 +29,7 @@ async function seedBranchAndPR(app: ReturnType<typeof createGitHubCloneApp>, tok
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ message: "add note", content: "hi", branch })
   }));
-  expect(fileResp.status).toBe(200);
+  expect(fileResp.status).toBe(201);
 
   const prResp = await app.request(`${base}/repos/acme/api/pulls`, withAuth(token, {
     method: "POST",
