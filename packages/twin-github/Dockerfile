@@ -11,6 +11,7 @@ RUN apt-get update \
 COPY package.json bun.lock ./
 COPY packages packages
 RUN bun install --frozen-lockfile
+RUN bun run --cwd packages/shared-types build:runtime
 RUN bun run --cwd packages/twin-github build
 
 # Runtime is node, not bun: better-sqlite3's native binding is not yet
