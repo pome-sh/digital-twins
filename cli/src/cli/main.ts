@@ -23,6 +23,7 @@ import {
 } from "../recorder/inspect.js";
 import { runScenario } from "../runner/runScenario.js";
 import { runScenarioHosted } from "../runner/runScenarioHosted.js";
+import { outcomeOf, scoreStatus } from "../evaluator/score.js";
 import { HostedUsageError, exitCodeFor } from "../hosted/errors.js";
 import { resolveCredentials, clearLocalCredentials } from "./credentials.js";
 import { loginWithClerk } from "./login.js";
@@ -72,6 +73,20 @@ import type { Score } from "../evaluator/score.js";
 const PACKAGE_VERSION = readPackageVersion();
 const SESSION_CREATE_FORMATS = new Set(["text", "json", "env"]);
 const DEFAULT_AGENT_COMMAND = "npx tsx examples/agents/scripted-triage-agent.ts";
+
+// FDRS-591/611 per-criterion marker: ✓ passed, ✗ failed, - skipped, ! errored.
+function markerFor(outcome: "passed" | "failed" | "skipped" | "errored"): string {
+  switch (outcome) {
+    case "passed":
+      return "✓";
+    case "failed":
+      return "✗";
+    case "errored":
+      return "!";
+    default:
+      return "-";
+  }
+}
 
 function readPackageVersion(): string {
   try {
@@ -653,10 +668,21 @@ export function createProgram() {
                 "  note: evaluation runs on Pome cloud — `pome login`, then re-run to score this scenario.",
               );
             } else {
-              console.error(
-                `${result.score.satisfaction >= result.scenario.config.passThreshold ? "PASS" : "FAIL"} ${result.scenario.title}`
+              // FDRS-611: distinguish PASS / FAIL / UNEVAL. An un-evaluated run
+              // (nothing evaluated, or a required criterion skipped/errored) is
+              // never a PASS and must not read as a 0% hard fail.
+              const status = scoreStatus(
+                result.score,
+                result.scenario.config.passThreshold,
               );
-              console.error(`  score: ${result.score.satisfaction}/100`);
+              const label =
+                status === "pass" ? "PASS" : status === "fail" ? "FAIL" : "UNEVAL";
+              console.error(`${label} ${result.scenario.title}`);
+              console.error(
+                status === "unevaluated"
+                  ? `  score: un-evaluated (cannot pass) — ${result.score.passed} passed, ${result.score.failed} failed, ${result.score.skipped} skipped, ${result.score.errored} errored`
+                  : `  score: ${result.score.satisfaction}/100`,
+              );
               console.error(`  run: ${result.artifacts.runDir}`);
             }
             if (result.exitCode !== 0) worstExit = result.exitCode;
@@ -789,9 +815,29 @@ export function createProgram() {
         console.log("Score: (score.json not found)");
         return;
       }
-      console.log(`Score: ${score.satisfaction}/100`);
+      // FDRS-611: a run that evaluated nothing (or where a required criterion
+      // was skipped/errored) renders as "un-evaluated", never as 0% — a 0 here
+      // would falsely read as a hard fail. `evaluated`/`can_pass` may be absent
+      // on legacy score.json; default to the old numeric rendering then.
+      const unevaluated = score.evaluated === false || score.can_pass === false;
+      if (unevaluated) {
+        const counts: string[] = [];
+        if ((score.passed ?? 0) > 0 || (score.failed ?? 0) > 0)
+          counts.push(`${score.passed} passed, ${score.failed} failed`);
+        if ((score.skipped ?? 0) > 0) counts.push(`${score.skipped} skipped`);
+        if ((score.errored ?? 0) > 0) counts.push(`${score.errored} errored`);
+        console.log(
+          `Score: un-evaluated (cannot pass)${counts.length ? ` — ${counts.join("; ")}` : ""}`,
+        );
+      } else {
+        const suffix =
+          (score.skipped ?? 0) > 0 || (score.errored ?? 0) > 0
+            ? ` (${score.skipped} skipped, ${score.errored ?? 0} errored — excluded)`
+            : "";
+        console.log(`Score: ${score.satisfaction}/100${suffix}`);
+      }
       for (const result of score.results) {
-        const marker = result.skipped ? "-" : result.passed ? "✓" : "✗";
+        const marker = markerFor(outcomeOf(result));
         console.log(`${marker} [${result.criterion.type}] ${result.criterion.text}`);
         console.log(`  ${result.reason}`);
       }
