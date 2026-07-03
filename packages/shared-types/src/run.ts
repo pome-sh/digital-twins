@@ -16,7 +16,7 @@
 
 import { z } from "zod";
 import { twinIdSchema } from "./recorder-events.js";
-import { normalizeTaskVocabKeys } from "./task-vocab.js";
+import { LEGACY_CRITERION_KIND_MAP, normalizeTaskVocabKeys } from "./task-vocab.js";
 
 // Judge model is a free-form string (BYOK Flavor #1, OpenAI-compatible endpoint
 // passes through); not constrained at the schema level because the customer's
@@ -43,10 +43,12 @@ export const CRITERION_KINDS = ["code", "model"] as const;
 export const criterionKindSchema = z.enum(CRITERION_KINDS);
 export type CriterionKind = z.infer<typeof criterionKindSchema>;
 
+// Single source of truth for the D/P→code/model rename is
+// LEGACY_CRITERION_KIND_MAP in ./task-vocab.ts.
 const criterionKindInputSchema = z
   .enum(["D", "P", "code", "model"])
   .transform((kind): CriterionKind =>
-    kind === "D" ? "code" : kind === "P" ? "model" : kind,
+    kind === "D" || kind === "P" ? LEGACY_CRITERION_KIND_MAP[kind] : kind,
   );
 
 export const criterionSchema = z.object({

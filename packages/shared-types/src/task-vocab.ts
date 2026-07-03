@@ -24,12 +24,17 @@
  */
 
 /**
- * Old wire key → canonical wire key. This is the full W3 "scenario" surface of
- * the /v1 contract:
+ * Old wire key → canonical wire key for the RENAME-on-read surfaces of the
+ * /v1 contract (run / session / result wire objects):
  *   - `scenario_name` / `scenario_hash`   — Run rows + POST /v1/sessions/{id}/result
  *   - `scenario_source` / `scenario_id`   — POST /v1/sessions
  *   - `promoted_scenario_id`              — Run rows (M0.5 replay-loop linkage)
- *   - `scenario_step_id`                  — RecorderEvent rows (events.jsonl)
+ *
+ * DELIBERATELY NOT in this map: `scenario_step_id` on RecorderEvent rows
+ * (events.jsonl). The frozen v1 event row has PRESERVE semantics — the legacy
+ * key stays as-sent while readers additionally populate `task_step_id` — which
+ * is handled by the reader schemas in `./recorder-events.ts`, NOT by this
+ * delete-the-legacy-key map.
  */
 export const LEGACY_TASK_VOCAB_KEY_MAP = {
   scenario_name: "task_name",
@@ -37,7 +42,6 @@ export const LEGACY_TASK_VOCAB_KEY_MAP = {
   scenario_source: "task_source",
   scenario_id: "task_id",
   promoted_scenario_id: "promoted_task_id",
-  scenario_step_id: "task_step_id",
 } as const;
 
 /**
@@ -48,6 +52,14 @@ export const LEGACY_TASK_VOCAB_KEY_MAP = {
  *
  * Used as a `z.preprocess` step in front of the canonical object schemas —
  * this is the "tolerant reader" half of the 0.3.0 compatibility window.
+ *
+ * DO NOT apply this helper to recorder-event rows (events.jsonl). Event rows
+ * require `scenario_step_id` preserved as-sent (frozen v1 trace format), and
+ * this function's rename-and-delete semantics would strip that step linkage
+ * if the key were mapped. `scenario_step_id` is intentionally absent from
+ * `LEGACY_TASK_VOCAB_KEY_MAP`, so this function leaves it intact — event-row
+ * normalization lives in `recorderEventSchema` / `eventSchema`
+ * (`./recorder-events.ts`).
  */
 export function normalizeTaskVocabKeys(value: unknown): unknown {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {

@@ -71,6 +71,24 @@ describe("normalizeTaskVocabKeys", () => {
     normalizeTaskVocabKeys(input);
     expect(input).toEqual({ scenario_name: "old" });
   });
+
+  it("leaves scenario_step_id intact — event rows have PRESERVE semantics, not rename-and-delete", () => {
+    // Regression pin (FDRS-653 review): scenario_step_id must NOT be in
+    // LEGACY_TASK_VOCAB_KEY_MAP. If it were, applying this helper to an
+    // events.jsonl row (e.g. from the FDRS-654 cloud consumer work) would
+    // silently strip the frozen-v1 step linkage. Event-row normalization is
+    // recorderEventSchema/eventSchema's job (preserve + populate task_step_id).
+    expect(LEGACY_TASK_VOCAB_KEY_MAP).not.toHaveProperty("scenario_step_id");
+    const eventLikeRow = {
+      scenario_step_id: "step-2",
+      scenario_name: "still-renamed", // run/session keys still normalize
+      request_id: "req_1",
+    };
+    const out = normalizeTaskVocabKeys(eventLikeRow) as Record<string, unknown>;
+    expect(out.scenario_step_id).toBe("step-2");
+    expect(out).not.toHaveProperty("task_step_id");
+    expect(out.task_name).toBe("still-renamed");
+  });
 });
 
 // ─── criterion kind: D|P → code|model ────────────────────────────────────────

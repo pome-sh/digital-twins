@@ -46,6 +46,16 @@ and FDRS-398 (unified event union) sections below.
   ingest-side utilities (OTLP decode, redaction/allowlist processors, storage
   helpers, capture tooling) are cloud-owned consumers. The stale
   "pome-cloud mirrors this directory verbatim" claims are removed.
+- SCHEMA CLASS CHANGE (downstream SDK consumers): the tolerant-reader wrapping
+  changes the exported schema classes. `recorderEventSchema` is no longer a
+  bare `ZodObject` and `eventSchema` is no longer a bare
+  `ZodDiscriminatedUnion` (both are transform-wrapped); `runSchema`,
+  `submitResultRequestSchema`, and `createSessionRequestSchema` are
+  preprocess-wrapped. Object-schema methods (`.extend` / `.shape` / `.omit` /
+  `.pick` / `.options`) no longer exist on these five exports. `.parse` /
+  `.safeParse` / `z.infer` are unchanged, and no in-repo consumer used the
+  removed methods. `twinHttpEventSchema` and the other event-variant schemas
+  remain plain `ZodObject`s (discriminated-union members).
 
 ### Notes
 
