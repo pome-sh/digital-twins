@@ -193,6 +193,17 @@ During a run, Pome injects environment variables into the agent process, includi
 
 Artifacts live under `runs/<scenario>/<run-id>/` (`events.jsonl`, `score.json`, state snapshots, etc.). A legacy `tool_calls.jsonl` view of the same data is also written for back-compat.
 
+### `pome eval [run-dir]`
+
+Upload an existing raw trace directory (a `runs/<scenario>/<run-id>/` folder captured earlier) to Pome cloud for authoritative evaluation and print the score. No local scoring happens — the cloud is the judge (ADR-013).
+
+```bash
+pome eval                                   # evaluates the run recorded in runs/latest.json
+pome eval runs/01-bug-happy-path/<run-id>   # evaluate a specific run directory
+```
+
+Requires `pome login`, and a control plane that serves `POST /v1/eval-sessions`. The run dir must contain `events.jsonl`, `state_initial.json`, `state_final.json`, and `meta.json` (`signals.jsonl` is optional). The task name comes from `meta.json` and the agent identity from `pome.config.json` (`pome register agent`); override with `--task` / `--agent`. Re-running on an already-evaluated dir surfaces the cloud's stored result (idempotent finalize).
+
 ### `pome inspect <run|latest>`
 
 Print a human-readable report for a run.

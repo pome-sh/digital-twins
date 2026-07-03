@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import {
+  createEvalSessionResponseSchema,
+  type CreateEvalSessionResponse,
   createSessionResponseSchema,
   type CreateSessionResponse,
   type CriterionDef,
@@ -41,6 +43,18 @@ export interface CreateSessionInput {
    *  extracting JSON from the scenario markdown — required for the post-2026-05-22
    *  prose `## Seed State` shape, where the markdown has no fenced JSON block. */
   seed?: unknown;
+}
+
+// FDRS-655/656 — `pome eval <run-dir>` capture/eval split. The cloud mints
+// a twin-less "eval session" scoped to an agent + task name; the existing
+// upload-url routes and /finalize then work unchanged on that session.
+export interface CreateEvalSessionInput {
+  /** Agent identity — the slug written by `pome register agent` (or the
+   *  agt_ id / `--agent` override). Server resolves it under the API key's
+   *  team. */
+  agent: string;
+  /** Human-meaningful task label, e.g. the run's scenario slug. */
+  taskName: string;
 }
 
 export interface FetchOnTwinInput {
@@ -133,6 +147,12 @@ export interface FinalizeInput {
 
 export interface HostedClient {
   createSession(input: CreateSessionInput): Promise<CreateSessionResponse>;
+  /** FDRS-655/656 — POST /v1/eval-sessions. Mints a twin-less session for
+   *  uploading + finalizing an EXISTING raw trace directory (`pome eval`).
+   *  Requires a control plane that ships the FDRS-655 route. */
+  createEvalSession(
+    input: CreateEvalSessionInput,
+  ): Promise<CreateEvalSessionResponse>;
   listSessions(opts?: { limit?: number }): Promise<SessionPublic[]>;
   getSession(sessionId: string): Promise<SessionPublic>;
   fetchState(input: FetchOnTwinInput): Promise<unknown>;
@@ -294,6 +314,17 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
       }
       return postJson("/v1/sessions", body, (raw) =>
         createSessionResponseSchema.parse(raw),
+      );
+    },
+
+    async createEvalSession(input) {
+      // 404 from an older control plane surfaces as HostedOrchError with the
+      // cloud's own message; `pome eval` adds the upgrade hint at the CLI
+      // layer.
+      return postJson(
+        "/v1/eval-sessions",
+        { agent: input.agent, task_name: input.taskName },
+        (raw) => createEvalSessionResponseSchema.parse(raw),
       );
     },
 

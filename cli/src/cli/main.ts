@@ -33,6 +33,7 @@ import { runScenariosCommand } from "./scenarios.js";
 import { runMatrixCommand, type MatrixCommandOptions } from "./matrix.js";
 import { runMatrixHtmlCommand, type MatrixHtmlOptions } from "./matrix-html.js";
 import { runEvalReportCommand, type EvalReportOptions } from "./eval-report.js";
+import { runEvalCommand } from "./eval.js";
 import { runSkillsInstall } from "./skills.js";
 import {
   findTwin,
@@ -717,6 +718,42 @@ export function createProgram() {
 
         process.exitCode = worstExit;
       }
+    );
+
+  program
+    .command("eval")
+    .argument(
+      "[run-dir]",
+      "Existing run directory (runs/<scenario>/<run-id>). Omit to use <artifacts-dir>/latest.json.",
+    )
+    .option(
+      "--artifacts-dir <dir>",
+      "Directory whose latest.json picks the run when no run dir is given.",
+      "runs",
+    )
+    .option(
+      "--agent <slug>",
+      "Agent identity for the eval session. Defaults to agentSlug/agentId from pome.config.json.",
+    )
+    .option(
+      "--task <name>",
+      "Task name recorded on the eval session. Defaults to meta.json's scenario slug (then title).",
+    )
+    .option(
+      "--api-url <url>",
+      "Control-plane base URL.",
+      process.env.POME_API_URL ?? DEFAULT_CONTROL_PLANE_URL,
+    )
+    .description(
+      "Upload an existing raw trace directory to Pome cloud for evaluation and print the authoritative score (capture/eval split — no local scoring; requires a control plane with POST /v1/eval-sessions)",
+    )
+    .action(
+      async (
+        runDir: string | undefined,
+        opts: { artifactsDir: string; agent?: string; task?: string; apiUrl: string },
+      ) => {
+        await runEvalCommand(runDir, opts);
+      },
     );
 
   program
