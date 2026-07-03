@@ -12,11 +12,13 @@
 // unchanged on the minted session.
 //
 // Idempotent re-runs: the minted session id is persisted to
-// `<run-dir>/eval-session.json`. Re-running `pome eval` on the same dir
+// `<run-dir>/eval-session.json` together with the agent/task/api-url it was
+// minted for. Re-running `pome eval` on the same dir with the same identity
 // reuses that session, so /finalize's idempotent fast-path returns the
-// already-judged run instead of re-judging (and instead of erroring). If
-// the stored session has been reaped server-side, we mint a fresh session
-// and retry once.
+// already-judged run instead of re-judging (and instead of erroring). A
+// changed --agent/--task/--api-url invalidates the marker (fresh mint), and
+// a stored session that the server reaped (404/410) gets one fresh-mint
+// retry.
 
 import { readFile, stat, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -36,8 +38,8 @@ import {
   uploadRunBlobs,
   type UploadClient,
 } from "../hosted/uploadAndFinalize.js";
-import { readLatestRun, writeScoreJson } from "../recorder/artifacts.js";
-import { redactSecrets } from "../recorder/redaction.js";
+import { readLatestRun, toTwinHttpEvent, writeScoreJson } from "../recorder/artifacts.js";
+import { redactEvent, redactSecrets } from "../recorder/redaction.js";
 import { outcomeOf, scoreStatus, type Score } from "../evaluator/score.js";
 import { resolveCredentials } from "./credentials.js";
 import {
@@ -45,6 +47,8 @@ import {
   readProjectConfig,
   type ProjectConfig,
 } from "./project-config.js";
+import { markerFor, runScoreLine, scoreCountsSummary } from "./render.js";
+import type { RecorderEvent as LegacyGithubRecorderEvent } from "../twin/github/types.js";
 import type { FinalizeResponse } from "../types/shared.js";
 
 const EVAL_SESSION_FILE = "eval-session.json";
@@ -69,6 +73,16 @@ export interface RunMeta {
   exitCode: number | null;
 }
 
+function parseExitCode(value: unknown): number | null {
+  if (typeof value === "number" && Number.isInteger(value)) return value;
+  // Tolerate integer-like strings ("2") from hand-assembled meta.json —
+  // silently mapping them to null used to report a fabricated clean exit.
+  if (typeof value === "string" && /^-?\d+$/.test(value.trim())) {
+    return Number.parseInt(value.trim(), 10);
+  }
+  return null;
+}
+
 export function parseRunMeta(raw: unknown): RunMeta {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
     throw new HostedUsageError(
@@ -80,14 +94,13 @@ export function parseRunMeta(raw: unknown): RunMeta {
     const v = obj[key];
     return typeof v === "string" && v.trim().length > 0 ? v : null;
   };
-  const exitCode = obj.exit_code;
   return {
     runId: str("run_id"),
     scenario: str("scenario"),
     title: str("title"),
     startedAt: str("started_at"),
     completedAt: str("completed_at"),
-    exitCode: typeof exitCode === "number" && Number.isInteger(exitCode) ? exitCode : null,
+    exitCode: parseExitCode(obj.exit_code),
   };
 }
 
@@ -98,7 +111,7 @@ export function parseRunMeta(raw: unknown): RunMeta {
 export interface RunDirArtifacts {
   runDir: string;
   meta: RunMeta;
-  /** Raw file contents; redaction is re-applied at upload time. */
+  /** Raw file contents; wrapping + redaction re-applied at upload time. */
   eventsJsonl: string;
   stateInitialJson: string;
   stateFinalJson: string;
@@ -233,46 +246,104 @@ function configAgent(config: ProjectConfig | null): string | null {
   return null;
 }
 
+/** Walk up from the run dir first (in-project runs), then from the CWD
+ *  (external run dirs like `pome eval /tmp/some-run` invoked from a
+ *  configured project). Corrupt configs surface as named usage errors
+ *  instead of raw JSON.parse throws (exit 2). */
+async function discoverProjectConfig(
+  runDir: string,
+): Promise<ProjectConfig | null> {
+  const fromRunDir = await readConfigNamed(runDir);
+  if (fromRunDir) return fromRunDir;
+  return readConfigNamed(process.cwd());
+}
+
+async function readConfigNamed(startDir: string): Promise<ProjectConfig | null> {
+  try {
+    return (await readProjectConfig(startDir))?.config ?? null;
+  } catch (err) {
+    throw new HostedUsageError(
+      `pome eval: pome.config.json is corrupt — ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // eval-session persistence (idempotent re-runs)
 // ---------------------------------------------------------------------------
 
+/** Strip trailing slashes so `https://api.pome.sh` and `https://api.pome.sh/`
+ *  compare equal. */
+function normalizeApiUrl(url: string): string {
+  return url.replace(/\/+$/, "");
+}
+
 async function readStoredEvalSession(
   runDir: string,
   apiBaseUrl: string,
+  identity: EvalIdentity,
 ): Promise<string | null> {
+  let parsed: {
+    session_id?: unknown;
+    api_url?: unknown;
+    agent?: unknown;
+    task_name?: unknown;
+  };
   try {
-    const raw = await readFile(join(runDir, EVAL_SESSION_FILE), "utf8");
-    const parsed = JSON.parse(raw) as { session_id?: unknown; api_url?: unknown };
-    if (typeof parsed.session_id !== "string" || parsed.session_id.length === 0) {
-      return null;
-    }
-    // A session minted against a different control plane can't be finalized
-    // here — treat as absent and mint a new one.
-    if (typeof parsed.api_url === "string" && parsed.api_url !== apiBaseUrl) {
-      return null;
-    }
-    return parsed.session_id;
+    parsed = JSON.parse(
+      await readFile(join(runDir, EVAL_SESSION_FILE), "utf8"),
+    ) as typeof parsed;
   } catch {
     // Missing or corrupt marker → behave like a first run.
     return null;
   }
+  if (typeof parsed.session_id !== "string" || parsed.session_id.length === 0) {
+    return null;
+  }
+  // The marker must record WHAT the session was minted for. A missing or
+  // different api_url/agent/task means the stored session would misattribute
+  // this invocation's verdict — invalidate and mint fresh.
+  const matches =
+    typeof parsed.api_url === "string" &&
+    normalizeApiUrl(parsed.api_url) === normalizeApiUrl(apiBaseUrl) &&
+    parsed.agent === identity.agent &&
+    parsed.task_name === identity.taskName;
+  if (!matches) {
+    console.warn(
+      `[pome] ${EVAL_SESSION_FILE} was minted for a different agent/task/api-url — minting a fresh eval session`,
+    );
+    return null;
+  }
+  return parsed.session_id;
 }
 
 async function writeStoredEvalSession(
   runDir: string,
   sessionId: string,
   apiBaseUrl: string,
+  identity: EvalIdentity,
 ): Promise<void> {
   const payload = {
     session_id: sessionId,
     api_url: apiBaseUrl,
+    agent: identity.agent,
+    task_name: identity.taskName,
     created_at: new Date().toISOString(),
   };
   await writeFile(
     join(runDir, EVAL_SESSION_FILE),
     `${JSON.stringify(payload, null, 2)}\n`,
   ).catch(() => undefined); // best-effort: read-only run dirs still evaluate
+}
+
+/** True only for the "stored session no longer exists" shape (404/410 from
+ *  the control plane, or its "not found" message when a status is missing).
+ *  Transient 5xx orch errors must NOT trigger a fresh mint — re-judging an
+ *  already-evaluated dir would duplicate the run and the judge spend. */
+function isSessionGoneError(err: unknown): boolean {
+  if (!(err instanceof HostedOrchError)) return false;
+  if (err.status === 404 || err.status === 410) return true;
+  return err.status === undefined && /not found/i.test(err.message);
 }
 
 // ---------------------------------------------------------------------------
@@ -298,8 +369,8 @@ export interface RunEvalResult {
   taskName: string;
   agent: string;
   sessionId: string;
-  /** True when a stored eval-session was reused — /finalize's idempotent
-   *  fast-path returned the already-judged run. */
+  /** True when a stored eval-session was reused, so /finalize may have hit
+   *  its idempotent fast-path and returned an already-judged run. */
   reusedSession: boolean;
   cloudRunId: string;
   dashboardUrl: string;
@@ -314,13 +385,14 @@ export async function runEval(options: RunEvalOptions): Promise<RunEvalResult> {
   const config =
     options.projectConfig !== undefined
       ? options.projectConfig
-      : ((await readProjectConfig(runDir))?.config ?? null);
+      : await discoverProjectConfig(runDir);
 
-  const { agent, taskName } = deriveEvalIdentity(
+  const identity = deriveEvalIdentity(
     artifacts.meta,
     { agent: options.agent, task: options.task },
     config,
   );
+  const { agent, taskName } = identity;
 
   const client =
     options.client ??
@@ -329,12 +401,27 @@ export async function runEval(options: RunEvalOptions): Promise<RunEvalResult> {
       apiKey: options.hosted.apiKey,
     });
 
-  // Re-apply redaction before anything leaves the machine. events.jsonl and
-  // the state blobs are written pre-redacted by artifacts.ts, but `pome eval`
-  // also accepts hand-assembled dirs — redaction is idempotent, so this is
-  // cheap insurance, and it mirrors what the hosted runner uploads.
+  // Re-apply wrapping + redaction before anything leaves the machine.
+  // events.jsonl and the state blobs are written pre-redacted (and
+  // pre-wrapped) by artifacts.ts, but `pome eval` also accepts
+  // hand-assembled dirs — redaction is idempotent, and toTwinHttpEvent
+  // passes rows that already carry a `kind` through untouched, so this is
+  // cheap insurance that exactly mirrors what the hosted runner uploads
+  // (cloud's FDRS-398 schema gate rejects raw legacy rows).
+  const eventsJsonl =
+    artifacts.eventsJsonl
+      .split("\n")
+      .filter((line) => line.trim().length > 0)
+      .map((line) =>
+        JSON.stringify(
+          redactEvent(
+            toTwinHttpEvent(JSON.parse(line) as LegacyGithubRecorderEvent),
+          ),
+        ),
+      )
+      .join("\n") + "\n";
   const blobs = {
-    eventsJsonl: redactJsonl(artifacts.eventsJsonl),
+    eventsJsonl,
     stateInitialJson: JSON.stringify(
       redactSecrets(JSON.parse(artifacts.stateInitialJson)),
     ),
@@ -345,20 +432,28 @@ export async function runEval(options: RunEvalOptions): Promise<RunEvalResult> {
   };
 
   let reusedSession = false;
-  let sessionId = await readStoredEvalSession(runDir, options.hosted.baseUrl);
+  let sessionId = await readStoredEvalSession(
+    runDir,
+    options.hosted.baseUrl,
+    identity,
+  );
   if (sessionId) {
     reusedSession = true;
   } else {
     const minted = await client.createEvalSession({ agent, taskName });
     sessionId = minted.session_id;
-    await writeStoredEvalSession(runDir, sessionId, options.hosted.baseUrl);
+    await writeStoredEvalSession(runDir, sessionId, options.hosted.baseUrl, identity);
   }
 
   async function uploadAndFinalize(sid: string): Promise<FinalizeResponse> {
     const keys = await uploadRunBlobs(client, sid, blobs);
     return client.finalize(sid, {
       stopReason: "eval_upload",
-      exitCode: artifacts.meta.exitCode ?? 0,
+      // /finalize's schema requires an integer exit_code, so `null` (agent
+      // timed out, or meta.json lacked the field) cannot pass through.
+      // Send -1 as the explicit "unknown" sentinel — never a fabricated 0,
+      // which would report a clean agent exit the trace can't vouch for.
+      exitCode: artifacts.meta.exitCode ?? -1,
       durationMs: durationMsFrom(artifacts.meta),
       agentModel: "unknown",
       agentSdk: config ? normalizeConfigAgentSdk(config) : null,
@@ -383,20 +478,42 @@ export async function runEval(options: RunEvalOptions): Promise<RunEvalResult> {
   } catch (err) {
     // The stored session may have been reaped server-side (TTL) since the
     // last attempt. Mint a fresh session and retry ONCE — but only for
-    // reused sessions and only for orch-shaped failures; auth/quota/usage
-    // errors propagate untouched.
-    if (!reusedSession || !(err instanceof HostedOrchError)) throw err;
+    // reused sessions and ONLY for the 404/410 "session gone" shape.
+    // Transient orch errors (502/503) and auth/quota/usage errors propagate
+    // untouched: blind re-minting on a 502 would silently re-judge an
+    // already-evaluated dir (duplicate run + judge spend).
+    if (!reusedSession || !isSessionGoneError(err)) throw err;
     const minted = await client.createEvalSession({ agent, taskName });
     sessionId = minted.session_id;
     reusedSession = false;
-    await writeStoredEvalSession(runDir, sessionId, options.hosted.baseUrl);
+    await writeStoredEvalSession(runDir, sessionId, options.hosted.baseUrl, identity);
     finalized = await uploadAndFinalize(sessionId);
   }
 
-  // Persist the cloud-authoritative score next to the trace, exactly like
-  // hosted `pome run` does — `pome inspect` then renders the same verdict.
+  // Persist the cloud-authoritative score next to the trace, like hosted
+  // `pome run` does, so `pome inspect` renders the same verdict. Best-effort:
+  // a read-only run dir must not turn a fully successful (and paid) eval
+  // into an error after /finalize already returned.
   const score = scoreFromFinalizeResponse(finalized);
-  await writeScoreJson(runDir, score);
+  try {
+    await writeScoreJson(runDir, score);
+  } catch (err) {
+    console.warn(
+      `[pome] score.json write skipped (${
+        err instanceof Error ? err.message : String(err)
+      }); the cloud verdict below is unaffected`,
+    );
+  }
+
+  // Exit-code policy — DELIBERATE DIVERGENCE from hosted `pome run`
+  // (FDRS-618): `pome run` maps the raw cloud score (score >= threshold →
+  // 0), because pre-FDRS-618 cloud builds don't emit criteria_results and
+  // the cloud exit decision is documented as score-only. `pome eval` is a
+  // NEW command with no such compatibility surface, so it adopts the full
+  // FDRS-591/611 A5 guard up front: exit 0 ONLY when the run was evaluated,
+  // every criterion was judged (can_pass), AND the score clears the
+  // threshold. An UNEVAL verdict (e.g. all criteria skipped) exits 1.
+  const exitCode = scoreStatus(score, EVAL_PASS_THRESHOLD) === "pass" ? 0 : 1;
 
   return {
     taskName,
@@ -406,7 +523,7 @@ export async function runEval(options: RunEvalOptions): Promise<RunEvalResult> {
     cloudRunId: finalized.run_id,
     dashboardUrl: finalized.dashboard_url,
     score,
-    exitCode: finalized.score >= EVAL_PASS_THRESHOLD ? 0 : 1,
+    exitCode,
   };
 }
 
@@ -420,24 +537,6 @@ function durationMsFrom(meta: RunMeta): number {
 // ---------------------------------------------------------------------------
 // CLI wrapper (printing + exit codes)
 // ---------------------------------------------------------------------------
-
-// FDRS-591/611 per-criterion marker, same glyphs as `pome run`/`pome inspect`.
-function markerFor(outcome: "passed" | "failed" | "skipped" | "errored"): string {
-  switch (outcome) {
-    case "passed":
-      return "✓";
-    case "failed":
-      return "✗";
-    case "errored":
-      return "!";
-    default:
-      return "-";
-  }
-}
-
-function countsSummary(score: Score): string {
-  return `${score.passed ?? 0} passed, ${score.failed ?? 0} failed, ${score.skipped ?? 0} skipped, ${score.errored ?? 0} errored`;
-}
 
 export interface EvalCommandOptions {
   artifactsDir: string;
@@ -455,10 +554,19 @@ export async function runEvalCommand(
     if (runDirArg) {
       runDir = resolve(runDirArg);
     } else {
-      const latest = await readLatestRun(opts.artifactsDir);
-      if (!latest) {
+      const latestPath = join(opts.artifactsDir, "latest.json");
+      let latest: Awaited<ReturnType<typeof readLatestRun>>;
+      try {
+        latest = await readLatestRun(opts.artifactsDir);
+      } catch (err) {
+        // Corrupt latest.json is a usage problem (exit 5), not an orch one.
         throw new HostedUsageError(
-          `pome eval: no run directory given and ${join(opts.artifactsDir, "latest.json")} not found. Pass a run directory (runs/<scenario>/<run-id>).`,
+          `pome eval: ${latestPath} is corrupt — not valid JSON (${err instanceof Error ? err.message : String(err)}).`,
+        );
+      }
+      if (!latest || typeof latest.run_dir !== "string" || latest.run_dir.length === 0) {
+        throw new HostedUsageError(
+          `pome eval: no run directory given and ${latestPath} ${latest ? "has no run_dir field" : "not found"}. Pass a run directory (runs/<scenario>/<run-id>).`,
         );
       }
       runDir = resolve(latest.run_dir);
@@ -487,15 +595,9 @@ export async function runEvalCommand(
     const label =
       status === "pass" ? "PASS" : status === "fail" ? "FAIL" : "UNEVAL";
     console.error(`${label} ${result.taskName}`);
-    if (status === "unevaluated") {
-      console.error(
-        `  score: un-evaluated (cannot pass) — ${countsSummary(result.score)}; cloud score: ${result.score.satisfaction}/100`,
-      );
-    } else {
-      console.error(`  score: ${result.score.satisfaction}/100`);
-    }
+    console.error(`  ${runScoreLine(result.score, EVAL_PASS_THRESHOLD, "cloud score")}`);
     if (result.score.results.length > 0) {
-      console.error(`  criteria: ${countsSummary(result.score)}`);
+      console.error(`  criteria: ${scoreCountsSummary(result.score)}`);
       for (const criterionResult of result.score.results) {
         console.error(
           `  ${markerFor(outcomeOf(criterionResult))} [${criterionResult.criterion.type}] ${criterionResult.criterion.text}`,
@@ -503,8 +605,11 @@ export async function runEvalCommand(
       }
     }
     if (result.reusedSession) {
+      // Truthful in both cases: we can't observe whether /finalize took its
+      // idempotent fast-path (stored run) or judged for the first time after
+      // an earlier failed attempt on this session.
       console.error(
-        "  note: this run dir was already evaluated — showing the cloud's stored result (idempotent finalize).",
+        "  note: reused the eval session recorded in eval-session.json — if this dir was already judged, this is the cloud's stored result.",
       );
     }
     console.error(`  cloud: ${result.dashboardUrl}`);

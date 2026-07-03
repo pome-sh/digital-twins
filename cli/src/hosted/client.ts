@@ -209,7 +209,7 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
       if (res.status === 402 || res.status === 429) {
         throw new HostedQuotaError(msg, reqId);
       }
-      throw new HostedOrchError(msg, reqId);
+      throw new HostedOrchError(msg, reqId, res.status);
     }
     try {
       return parse(json);

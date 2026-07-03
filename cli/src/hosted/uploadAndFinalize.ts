@@ -222,7 +222,10 @@ export function scoreFromFinalizeResponse(finalized: FinalizeResponse): Score {
 export function redactJsonl(body: string): string {
   const lines = body.split("\n");
   const redacted = lines
-    .filter((line) => line.length > 0)
+    // Whitespace-only lines are dropped (not just empty ones) so validation
+    // (`validateJsonl`, which trims) and upload agree on what counts as a
+    // row — a " " line must never reach cloud as a non-JSON record.
+    .filter((line) => line.trim().length > 0)
     .map((line) => {
       try {
         return JSON.stringify(redactSecrets(JSON.parse(line)));

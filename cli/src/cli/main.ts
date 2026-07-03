@@ -34,6 +34,7 @@ import { runMatrixCommand, type MatrixCommandOptions } from "./matrix.js";
 import { runMatrixHtmlCommand, type MatrixHtmlOptions } from "./matrix-html.js";
 import { runEvalReportCommand, type EvalReportOptions } from "./eval-report.js";
 import { runEvalCommand } from "./eval.js";
+import { markerFor, runScoreLine, scoreCountsSummary } from "./render.js";
 import { runSkillsInstall } from "./skills.js";
 import {
   findTwin,
@@ -74,36 +75,6 @@ import type { Score } from "../evaluator/score.js";
 const PACKAGE_VERSION = readPackageVersion();
 const SESSION_CREATE_FORMATS = new Set(["text", "json", "env"]);
 const DEFAULT_AGENT_COMMAND = "npx tsx examples/agents/scripted-triage-agent.ts";
-
-// FDRS-591/611 per-criterion marker: ✓ passed, ✗ failed, - skipped, ! errored.
-function markerFor(outcome: "passed" | "failed" | "skipped" | "errored"): string {
-  switch (outcome) {
-    case "passed":
-      return "✓";
-    case "failed":
-      return "✗";
-    case "errored":
-      return "!";
-    default:
-      return "-";
-  }
-}
-
-function scoreCountsSummary(score: Score): string {
-  return `${score.passed ?? 0} passed, ${score.failed ?? 0} failed, ${score.skipped ?? 0} skipped, ${score.errored ?? 0} errored`;
-}
-
-function runScoreLine(
-  score: Score,
-  passThreshold: number,
-  unevaluatedNumericLabel: string,
-): string {
-  const status = scoreStatus(score, passThreshold);
-  if (status === "unevaluated") {
-    return `score: un-evaluated (cannot pass) — ${scoreCountsSummary(score)}; ${unevaluatedNumericLabel}: ${score.satisfaction}/100`;
-  }
-  return `score: ${score.satisfaction}/100`;
-}
 
 function inspectScoreLine(score: Score): string {
   // score.json does not persist the scenario threshold, so inspect only decides

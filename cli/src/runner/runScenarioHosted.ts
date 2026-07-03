@@ -247,10 +247,21 @@ export async function runScenarioHosted(
     // Upload orchestration lives in ../hosted/uploadAndFinalize.ts (FDRS-656)
     // so `pome eval` shares the exact best-effort semantics. Signals are
     // read + redacted here (the tmp file is runner-owned); empty payloads
-    // skip the upload inside uploadRunBlobs.
-    const signalsJsonl = redactJsonl(
-      await readFile(signalsPath, "utf8").catch(() => ""),
-    );
+    // skip the upload inside uploadRunBlobs. Read + redaction stay inside a
+    // guard so a redaction failure degrades to "signals skipped" — the
+    // pre-extraction contract — instead of aborting the whole hosted run.
+    let signalsJsonl = "";
+    try {
+      signalsJsonl = redactJsonl(
+        await readFile(signalsPath, "utf8").catch(() => ""),
+      );
+    } catch (err) {
+      console.warn(
+        `[pome] signals.jsonl upload skipped (${
+          err instanceof Error ? err.message : String(err)
+        }); continuing with signals_storage_key=null`,
+      );
+    }
     const uploaded = await uploadRunBlobs(client, session.session_id, {
       eventsJsonl,
       stateInitialJson,

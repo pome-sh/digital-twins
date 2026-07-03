@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -15,6 +15,7 @@ import {
   parseRunMeta,
   readRunDirArtifacts,
   runEval,
+  runEvalCommand,
   type EvalClient,
 } from "../../src/cli/eval.js";
 import { HostedAuthError, HostedOrchError, HostedUsageError } from "../../src/hosted/errors.js";
@@ -82,6 +83,16 @@ async function writeRunDir(
     await writeFile(join(runDir, "state_final.json"), '{"repositories": []}\n');
   }
   return runDir;
+}
+
+function markerJson(overrides: Record<string, unknown> = {}): string {
+  return JSON.stringify({
+    session_id: FAKE_SESSION_ID,
+    api_url: "http://no-cloud.invalid",
+    agent: "triage-bot",
+    task_name: "01-bug-happy-path",
+    ...overrides,
+  });
 }
 
 function makeEvalClient({
@@ -426,17 +437,14 @@ describe("pome eval upload + finalize flow (FDRS-656)", () => {
     const runDir = await writeRunDir(tmp);
     await writeFile(
       join(runDir, "eval-session.json"),
-      JSON.stringify({
-        session_id: "ses_stale",
-        api_url: "http://no-cloud.invalid",
-      }),
+      markerJson({ session_id: "ses_stale" }),
     );
     let finalizeCalls = 0;
     const { client, calls } = makeEvalClient({
       finalizeImpl: async (sessionId) => {
         finalizeCalls += 1;
         if (sessionId === "ses_stale") {
-          throw new HostedOrchError("Session not found.");
+          throw new HostedOrchError("Session not found.", "req_x", 404);
         }
         return {
           run_id: FAKE_RUN_ID,
@@ -471,7 +479,7 @@ describe("pome eval upload + finalize flow (FDRS-656)", () => {
     const runDir = await writeRunDir(tmp);
     await writeFile(
       join(runDir, "eval-session.json"),
-      JSON.stringify({
+      markerJson({
         session_id: "ses_other_plane",
         api_url: "http://other-cloud.invalid",
       }),
@@ -495,10 +503,7 @@ describe("pome eval upload + finalize flow (FDRS-656)", () => {
     const runDir = await writeRunDir(tmp);
     await writeFile(
       join(runDir, "eval-session.json"),
-      JSON.stringify({
-        session_id: "ses_stale",
-        api_url: "http://no-cloud.invalid",
-      }),
+      markerJson({ session_id: "ses_stale" }),
     );
     const { client, calls } = makeEvalClient({
       finalizeImpl: async () => {
@@ -556,6 +561,349 @@ describe("pome eval upload + finalize flow (FDRS-656)", () => {
     expect(bodies[EVENTS_URL]).not.toContain("redaction_fixture_secret_events");
     expect(bodies[STATE_INITIAL_URL]).not.toContain(
       "redaction_fixture_secret_state",
+    );
+  });
+});
+
+describe("pome eval review fixes (FDRS-656 follow-up)", () => {
+  let tmp: string;
+  const originalExitCode = process.exitCode;
+
+  beforeEach(async () => {
+    tmp = await mkdtemp(join(tmpdir(), "pome-eval-review-"));
+    vi.restoreAllMocks();
+    process.exitCode = undefined;
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    process.exitCode = originalExitCode;
+    await rm(tmp, { recursive: true, force: true });
+  });
+
+  it("transient 502 on a reused session surfaces — no silent re-mint/re-judge", async () => {
+    const runDir = await writeRunDir(tmp);
+    await writeFile(join(runDir, "eval-session.json"), markerJson());
+    const { client, calls } = makeEvalClient({
+      finalizeImpl: async () => {
+        throw new HostedOrchError("bad gateway", "req_y", 502);
+      },
+    });
+    mockPutFetch();
+
+    await expect(
+      runEval({
+        runDir,
+        agent: "triage-bot",
+        hosted: { baseUrl: "http://no-cloud.invalid", apiKey: "pme_test" },
+        client,
+        projectConfig: null,
+      }),
+    ).rejects.toThrow(/bad gateway/);
+    // The stored session must NOT be replaced: no fresh mint, one finalize.
+    expect(calls.create).toHaveLength(0);
+    expect(calls.finalize).toHaveLength(1);
+  });
+
+  it("marker minted for a different agent/task is invalidated (fresh mint)", async () => {
+    const runDir = await writeRunDir(tmp);
+    await writeFile(
+      join(runDir, "eval-session.json"),
+      markerJson({ session_id: "ses_old_identity", agent: "other-bot" }),
+    );
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const { client, calls } = makeEvalClient();
+    mockPutFetch();
+
+    const result = await runEval({
+      runDir,
+      agent: "triage-bot",
+      hosted: { baseUrl: "http://no-cloud.invalid", apiKey: "pme_test" },
+      client,
+      projectConfig: null,
+    });
+
+    expect(calls.create).toHaveLength(1);
+    expect(calls.finalize[0]!.sessionId).toBe(FAKE_SESSION_ID);
+    expect(result.reusedSession).toBe(false);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("different agent/task/api-url"),
+    );
+    // Marker rewritten with the current identity.
+    const marker = JSON.parse(
+      await readFile(join(runDir, "eval-session.json"), "utf8"),
+    );
+    expect(marker.agent).toBe("triage-bot");
+    expect(marker.task_name).toBe("01-bug-happy-path");
+  });
+
+  it("marker with a changed --task is invalidated (fresh mint)", async () => {
+    const runDir = await writeRunDir(tmp);
+    await writeFile(join(runDir, "eval-session.json"), markerJson());
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const { client, calls } = makeEvalClient();
+    mockPutFetch();
+
+    await runEval({
+      runDir,
+      agent: "triage-bot",
+      task: "renamed-task",
+      hosted: { baseUrl: "http://no-cloud.invalid", apiKey: "pme_test" },
+      client,
+      projectConfig: null,
+    });
+
+    expect(calls.create).toEqual([
+      { agent: "triage-bot", taskName: "renamed-task" },
+    ]);
+  });
+
+  it("marker missing api_url is treated as non-matching (fresh mint)", async () => {
+    const runDir = await writeRunDir(tmp);
+    const marker = JSON.parse(markerJson()) as Record<string, unknown>;
+    delete marker.api_url;
+    await writeFile(join(runDir, "eval-session.json"), JSON.stringify(marker));
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const { client, calls } = makeEvalClient();
+    mockPutFetch();
+
+    await runEval({
+      runDir,
+      agent: "triage-bot",
+      hosted: { baseUrl: "http://no-cloud.invalid", apiKey: "pme_test" },
+      client,
+      projectConfig: null,
+    });
+
+    expect(calls.create).toHaveLength(1);
+  });
+
+  it("api_url trailing-slash difference still matches the stored session", async () => {
+    const runDir = await writeRunDir(tmp);
+    await writeFile(
+      join(runDir, "eval-session.json"),
+      markerJson({ api_url: "http://no-cloud.invalid/" }),
+    );
+    const { client, calls } = makeEvalClient();
+    mockPutFetch();
+
+    const result = await runEval({
+      runDir,
+      agent: "triage-bot",
+      hosted: { baseUrl: "http://no-cloud.invalid", apiKey: "pme_test" },
+      client,
+      projectConfig: null,
+    });
+
+    expect(calls.create).toHaveLength(0);
+    expect(result.reusedSession).toBe(true);
+  });
+
+  it("UNEVAL verdict (all criteria skipped) exits 1 even at score 100", async () => {
+    const runDir = await writeRunDir(tmp);
+    const { client } = makeEvalClient({
+      finalizeImpl: async () => ({
+        run_id: FAKE_RUN_ID,
+        score: 100,
+        judge_model: "test-judge",
+        dashboard_url: `https://dashboard.example.com/runs/${FAKE_RUN_ID}`,
+        criteria_results: [
+          {
+            criterion: { type: "P", text: "agent acted reasonably" },
+            outcome: "skipped",
+            passed: false,
+            skipped: true,
+            reason: "no judge configured",
+          },
+        ],
+      }),
+    });
+    mockPutFetch();
+
+    const result = await runEval({
+      runDir,
+      agent: "triage-bot",
+      hosted: { baseUrl: "http://no-cloud.invalid", apiKey: "pme_test" },
+      client,
+      projectConfig: null,
+    });
+
+    // A5 guard: nothing was actually evaluated — cannot exit 0.
+    expect(result.score.evaluated).toBe(false);
+    expect(result.exitCode).toBe(1);
+  });
+
+  it("read-only run dir: score.json write is best-effort; verdict still returned", async () => {
+    const runDir = await writeRunDir(tmp);
+    await writeFile(join(runDir, "eval-session.json"), markerJson());
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const { client } = makeEvalClient();
+    mockPutFetch();
+
+    await chmod(runDir, 0o555);
+    try {
+      const result = await runEval({
+        runDir,
+        agent: "triage-bot",
+        hosted: { baseUrl: "http://no-cloud.invalid", apiKey: "pme_test" },
+        client,
+        projectConfig: null,
+      });
+      expect(result.score.satisfaction).toBe(100);
+      expect(result.exitCode).toBe(0);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("score.json write skipped"),
+      );
+    } finally {
+      await chmod(runDir, 0o755);
+    }
+  });
+
+  it("config discovered from cwd when the run dir is outside the project", async () => {
+    const projectDir = join(tmp, "project");
+    await mkdir(projectDir, { recursive: true });
+    await writeFile(
+      join(projectDir, "pome.config.json"),
+      JSON.stringify({ agentSlug: "cfg-bot" }),
+    );
+    const externalRoot = join(tmp, "external");
+    await mkdir(externalRoot, { recursive: true });
+    const runDir = await writeRunDir(externalRoot);
+    vi.spyOn(process, "cwd").mockReturnValue(projectDir);
+    const { client, calls } = makeEvalClient();
+    mockPutFetch();
+
+    await runEval({
+      runDir,
+      hosted: { baseUrl: "http://no-cloud.invalid", apiKey: "pme_test" },
+      client,
+      // no projectConfig injection — exercise discovery
+    });
+
+    expect(calls.create).toEqual([
+      { agent: "cfg-bot", taskName: "01-bug-happy-path" },
+    ]);
+  });
+
+  it("corrupt pome.config.json → named usage error", async () => {
+    const projectDir = join(tmp, "project-corrupt");
+    await mkdir(projectDir, { recursive: true });
+    await writeFile(join(projectDir, "pome.config.json"), "{nope");
+    const runDir = await writeRunDir(projectDir);
+    const { client } = makeEvalClient();
+    mockPutFetch();
+
+    const err = await runEval({
+      runDir,
+      agent: "triage-bot",
+      hosted: { baseUrl: "http://no-cloud.invalid", apiKey: "pme_test" },
+      client,
+    }).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(HostedUsageError);
+    expect((err as Error).message).toContain("pome.config.json is corrupt");
+  });
+
+  it("meta exit_code accepts integer-like strings; unknown sends -1, never 0", async () => {
+    const stringExitDir = await writeRunDir(tmp, {
+      meta: { ...META, exit_code: "2" },
+    });
+    const { client: c1, calls: calls1 } = makeEvalClient();
+    mockPutFetch();
+    await runEval({
+      runDir: stringExitDir,
+      agent: "triage-bot",
+      hosted: { baseUrl: "http://no-cloud.invalid", apiKey: "pme_test" },
+      client: c1,
+      projectConfig: null,
+    });
+    expect(calls1.finalize[0]!.input.exitCode).toBe(2);
+
+    const unknownExitRoot = join(tmp, "unknown-exit");
+    await mkdir(unknownExitRoot, { recursive: true });
+    const unknownExitDir = await writeRunDir(unknownExitRoot, {
+      meta: { ...META, exit_code: "not-a-number" },
+    });
+    const { client: c2, calls: calls2 } = makeEvalClient();
+    await runEval({
+      runDir: unknownExitDir,
+      agent: "triage-bot",
+      hosted: { baseUrl: "http://no-cloud.invalid", apiKey: "pme_test" },
+      client: c2,
+      projectConfig: null,
+    });
+    expect(calls2.finalize[0]!.input.exitCode).toBe(-1);
+  });
+
+  it("legacy event rows (no kind) are wrapped to TwinHttpEvent before upload", async () => {
+    const legacyRow = JSON.stringify({
+      ts: "2026-06-30T10:00:02.000Z",
+      run_id: "ses_original_run",
+      twin: "github",
+      request_id: "req_legacy",
+      method: "GET",
+      path: "/repos/acme/api",
+      status: 200,
+    });
+    const runDir = await writeRunDir(tmp, { eventsJsonl: `${legacyRow}\n` });
+
+    const bodies: Record<string, string> = {};
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
+      const urlStr = String(url);
+      if ((init as RequestInit | undefined)?.method === "PUT") {
+        bodies[urlStr] = await new Request(urlStr, init as RequestInit).text();
+        return new Response(null, { status: 200 });
+      }
+      throw new Error(`Unexpected fetch call to ${urlStr}`);
+    });
+    const { client } = makeEvalClient();
+
+    await runEval({
+      runDir,
+      agent: "triage-bot",
+      hosted: { baseUrl: "http://no-cloud.invalid", apiKey: "pme_test" },
+      client,
+      projectConfig: null,
+    });
+
+    const uploaded = JSON.parse(bodies[EVENTS_URL]!.trimEnd());
+    expect(uploaded.kind).toBe("TwinHttpEvent");
+    expect(uploaded.event_id).toBe("req_legacy");
+  });
+
+  it("corrupt latest.json → named usage error with exit 5", async () => {
+    const artifactsDir = join(tmp, "runs-corrupt");
+    await mkdir(artifactsDir, { recursive: true });
+    await writeFile(join(artifactsDir, "latest.json"), "{corrupt");
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await runEvalCommand(undefined, {
+      artifactsDir,
+      apiUrl: "http://no-cloud.invalid",
+    });
+
+    expect(process.exitCode).toBe(5);
+    expect(errSpy).toHaveBeenCalledWith(
+      expect.stringContaining("latest.json is corrupt"),
+    );
+  });
+
+  it("latest.json without run_dir → usage error with exit 5", async () => {
+    const artifactsDir = join(tmp, "runs-no-dir");
+    await mkdir(artifactsDir, { recursive: true });
+    await writeFile(join(artifactsDir, "latest.json"), JSON.stringify({ run_id: "x" }));
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await runEvalCommand(undefined, {
+      artifactsDir,
+      apiUrl: "http://no-cloud.invalid",
+    });
+
+    expect(process.exitCode).toBe(5);
+    expect(errSpy).toHaveBeenCalledWith(
+      expect.stringContaining("has no run_dir field"),
     );
   });
 });
