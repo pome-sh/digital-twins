@@ -525,7 +525,9 @@ export function createProgram() {
       "--local",
       "Self-host: run against an in-process twin and CAPTURE a raw trace only (an audit log — no score, no verdict, no judge). A verdict comes from the cloud: run `pome eval <run-dir>` on the captured trace, or `pome login` and run against Pome cloud.",
     )
-    .description("Run one or more Pome scenarios")
+    .description(
+      "Run one or more Pome scenarios. Refuses to start if the doctor wiring checks fail (see `pome doctor`); there is no --force.",
+    )
     .action(
       async (
         target: string,
@@ -580,6 +582,31 @@ export function createProgram() {
         } else if (options.hosted) {
           console.error("Note: --hosted is now the default; the flag is a deprecated no-op and will be removed in a future release.");
         }
+
+        // FDRS-641 — doctor preflight gate. A repo failing any applicable
+        // doctor check refuses to spawn the agent — BEFORE credentials are
+        // resolved and before any twin/session is provisioned. Local runs get
+        // the full engine (incl. local twin boot); hosted runs skip the local
+        // twin (the cloud provisions the session twin) but still gate on
+        // config, routing, and the egress floor. Deliberately no --force /
+        // --skip-checks escape: "never a false success" — pome will not run
+        // trials against a live API. (Design: CLI moments 03; engine:
+        // FDRS-634.)
+        {
+          const { runDoctorChecks } = await import("../doctor/checks.js");
+          const { renderDoctorReport } = await import("../doctor/render.js");
+          const doctorReport = await runDoctorChecks({ mode: useLocal ? "full" : "hosted" });
+          if (!doctorReport.ok) {
+            for (const line of renderDoctorReport(doctorReport)) console.error(line);
+            console.error("");
+            console.error(
+              "pome run: wiring check failed — refusing to spawn the agent. Fix the cause above and re-run (there is no --force).",
+            );
+            process.exitCode = 1;
+            return;
+          }
+        }
+
         try {
           hostedCreds = useLocal
             ? null
@@ -643,6 +670,20 @@ export function createProgram() {
             console.error(
               `  captured; run \`pome eval ${result.artifacts.runDir}\` for a cloud verdict.`,
             );
+            // FDRS-635 — name every host the egress floor refused, so a stray
+            // production call is a visible event, never a silent passthrough.
+            if (result.blockedEgress.length > 0) {
+              const refusals = result.blockedEgress.reduce((n, b) => n + b.count, 0);
+              const named = result.blockedEgress
+                .map((b) => `${b.host}:${b.port}${b.count > 1 ? ` ×${b.count}` : ""}`)
+                .join(", ");
+              console.error(
+                `  egress: refused ${refusals} tunnel(s) to non-allowlisted host(s) — ${named}`,
+              );
+              console.error(
+                "          twin + LLM traffic is unaffected; extend with POME_EGRESS_ALLOW=<host,…> if intentional.",
+              );
+            }
             if (result.exitCode !== 0) worstExit = result.exitCode;
           }
         }
@@ -650,6 +691,19 @@ export function createProgram() {
         process.exitCode = worstExit;
       }
     );
+
+  program
+    .command("doctor")
+    .description(
+      "Check the agent↔twin wiring: pome.config.json present + valid, twin reachable, requests routed to the twin (not a hardcoded production host), egress floor active. On failure prints one named cause (file:line where knowable) + one concrete fix and exits non-zero.",
+    )
+    .action(async () => {
+      const { runDoctorChecks } = await import("../doctor/checks.js");
+      const { renderDoctorReport } = await import("../doctor/render.js");
+      const report = await runDoctorChecks();
+      for (const line of renderDoctorReport(report)) console.error(line);
+      if (!report.ok) process.exitCode = 1;
+    });
 
   program
     .command("eval")
@@ -840,7 +894,15 @@ export function createProgram() {
       "--events-out <path>",
       "Path to events.jsonl. Created if missing; appended to otherwise.",
     )
-    .action(async (opts: { port: string; eventsOut?: string }) => {
+    .option(
+      "--allow <hosts>",
+      "FDRS-635: comma-separated egress allowlist patterns (exact host or *.suffix). The floor is deny-by-default: only these hosts + loopback are tunnelled; everything else gets 403.",
+    )
+    .option(
+      "--egress-out <path>",
+      "Path to egress.jsonl, the sidecar recording refused CONNECTs. Optional; the floor enforces regardless.",
+    )
+    .action(async (opts: { port: string; eventsOut?: string; allow?: string; egressOut?: string }) => {
       if (!opts.eventsOut) {
         console.error("pome capture-server: --events-out <path> is required");
         process.exitCode = 2;
@@ -853,7 +915,13 @@ export function createProgram() {
         return;
       }
       const { runCaptureServerCommand } = await import("../capture-server/run.js");
-      await runCaptureServerCommand({ port, eventsOut: opts.eventsOut });
+      const { parseAllowCsv } = await import("../capture-server/egress.js");
+      await runCaptureServerCommand({
+        port,
+        eventsOut: opts.eventsOut,
+        allowHosts: parseAllowCsv(opts.allow),
+        egressOut: opts.egressOut,
+      });
     });
 
   program
