@@ -363,10 +363,11 @@ describe("pome eval upload + finalize flow (FDRS-656)", () => {
     expect(result.cloudRunId).toBe(FAKE_RUN_ID);
     expect(result.reusedSession).toBe(false);
 
-    // Session marker + cloud score.json persisted next to the trace.
+    // FDRS-657 — the eval-session marker is persisted for idempotent
+    // re-upload, but the cloud verdict is EPHEMERAL: NO score.json is written
+    // next to the trace. Local artifacts stay trace/audit only.
     expect(existsSync(join(runDir, "eval-session.json"))).toBe(true);
-    const scoreJson = JSON.parse(await readFile(join(runDir, "score.json"), "utf8"));
-    expect(scoreJson.satisfaction).toBe(100);
+    expect(existsSync(join(runDir, "score.json"))).toBe(false);
   });
 
   it("uploads signals.jsonl and forwards signalsStorageKey when present", async () => {
@@ -733,10 +734,9 @@ describe("pome eval review fixes (FDRS-656 follow-up)", () => {
     expect(result.exitCode).toBe(1);
   });
 
-  it("read-only run dir: score.json write is best-effort; verdict still returned", async () => {
+  it("read-only run dir: verdict still returned; no score.json written", async () => {
     const runDir = await writeRunDir(tmp);
     await writeFile(join(runDir, "eval-session.json"), markerJson());
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const { client } = makeEvalClient();
     mockPutFetch();
 
@@ -749,11 +749,11 @@ describe("pome eval review fixes (FDRS-656 follow-up)", () => {
         client,
         projectConfig: null,
       });
+      // Verdict is returned for terminal display...
       expect(result.score.satisfaction).toBe(100);
       expect(result.exitCode).toBe(0);
-      expect(warn).toHaveBeenCalledWith(
-        expect.stringContaining("score.json write skipped"),
-      );
+      // ...and nothing is persisted (capture-only; no score.json ever).
+      expect(existsSync(join(runDir, "score.json"))).toBe(false);
     } finally {
       await chmod(runDir, 0o755);
     }
