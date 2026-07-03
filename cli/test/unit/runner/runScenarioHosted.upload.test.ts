@@ -95,6 +95,11 @@ function makeStubClient({
         provider_credentials: {},
       } as CreateSessionResponse;
     },
+    async createEvalSession() {
+      // FDRS-656 — never reached by runScenarioHosted; eval-command tests
+      // supply their own mock.
+      throw new HostedOrchError("no eval-session stubbed");
+    },
     async listSessions() {
       return [] as SessionPublic[];
     },
