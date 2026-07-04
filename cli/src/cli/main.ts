@@ -199,6 +199,28 @@ export function createProgram() {
     });
 
   program
+    .command("install")
+    .description(
+      "Wire this repo to pome with your own coding agent: checks auth (routes through pome login when needed), hands off to an interactive agent session — you approve its edits in the agent's own UI — then verifies with pome doctor. No coding agent on PATH → prints manual wiring steps + a paste-into-any-agent prompt.",
+    )
+    .option(
+      "--api-url <url>",
+      "Control-plane base URL.",
+      process.env.POME_API_URL ?? DEFAULT_CONTROL_PLANE_URL,
+    )
+    .option(
+      "--dashboard-url <url>",
+      "App URL for Clerk sign-in (must serve /cli/login).",
+      process.env.POME_DASHBOARD_URL ?? DEFAULT_DASHBOARD_URL,
+    )
+    .action(async (opts: { apiUrl: string; dashboardUrl: string }) => {
+      // Dynamic import mirrors the doctor/run commands: keep install's
+      // dependency graph out of every other command's startup path.
+      const { runInstall } = await import("./install.js");
+      await runInstall({ apiUrl: opts.apiUrl, dashboardUrl: opts.dashboardUrl });
+    });
+
+  program
     .command("login")
     .description("Sign in with Clerk and store a hosted team API key (macOS Keychain or ~/.pome/credentials.json)")
     .option(

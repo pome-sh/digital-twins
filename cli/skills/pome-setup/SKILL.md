@@ -1,203 +1,150 @@
 ---
 name: pome-setup
-description: Use when the user wants to wire a coding agent up to pome for the first time (so pome can test it against deterministic SaaS twins), or after they've changed which third-party services their agent integrates with. Triggers on phrases like "set up pome", "register my agent with pome", "test my agent with pome", or "use /pome-setup". Identifies the agent and its services, registers it on the pome dashboard, and writes a starter TESTS.md.
+description: Use when wiring a repository's coding agent to pome so pome can run it against deterministic SaaS twins (GitHub, Stripe, Slack) — first-time setup, after the agent's third-party services change, when `pome doctor` reports the repo unwired, or when a `pome install` session hands off to you. Triggers on "wire my agent to pome", "set up pome", "make this repo pome-ready", or "/pome-setup".
 ---
 
 # pome-setup
 
-One-shot wire-up for an existing coding agent so the user can test it with pome (`https://pome.sh`). The pome CLI runs agents against deterministic SaaS twins (GitHub, Stripe, …), records every tool call, and scores the result.
+Wire an existing coding agent's repository to pome (`https://pome.sh`), adapter-first, and prove the wiring with `pome doctor`. The job is not done until doctor exits green.
 
-This skill makes the project pome-ready. It does **not** modify how the agent runs in production — pome only captures tool calls during a `pome run` invocation.
+Pome runs agents against deterministic SaaS twins — local, resettable copies of the GitHub/Stripe/Slack APIs — and records every tool call as a trace. The OSS CLI is capture-only: a local run (`pome run --local`) records a raw trace and never scores; verdicts come from Pome cloud (`pome eval <run-dir>` on a captured trace, or a hosted `pome run`).
 
-The skill pauses for explicit user confirmation between every state-changing step. Do not skip the pauses — first-time users need to see what's about to happen before it happens.
+Wiring changes nothing about production behavior: the adapter only emits trace signals during a pome run, and twin base URLs come from env vars the pome runner injects at run time.
 
-## Prerequisites — check first
+## Hard rules
+
+Follow these on every step. They are not optional.
+
+1. **Never write secrets into source, config, or chat.** No API keys, tokens, or credential values in any file you edit or any message you print. The pome runner injects `POME_*` env vars at run time; read them, never inline their values.
+2. **Read every file immediately before you write it**, even if you already read it earlier in the session. Stale edits break repos.
+3. **Minimal, targeted edits.** Change what the wiring requires and nothing else — no refactors, no reformatting, no drive-by fixes.
+4. **Show the diff and get explicit user approval before applying any edit.** If your harness has an edit-approval UI, that gate counts. If it doesn't, print the proposed change in chat and wait for a yes.
+5. **Never weaken the capture layer.** Don't remove `withPome()`, don't add `*` to `POME_EGRESS_ALLOW`, don't route around the twin.
+6. **No production-host literals in agent source.** `pome doctor` treats a hardcoded `https://api.github.com` — even as a `??` fallback — as a twin bypass and fails. Production fallbacks belong in deployment env, not in source literals. (Loopback fallbacks like `http://127.0.0.1:3333` are fine.)
+7. **Don't guess service coverage.** If the agent talks to a service pome has no twin for, say so explicitly and skip that service — never fake wiring.
+8. **Finish with `pome doctor` and iterate until green.** Never report success while any check is red.
+
+## Steps
+
+### 0. Preflight
 
 ```bash
 pome version
 ```
 
-If the command is missing, install:
+If the command is missing, install it (`npm install -g pome-sh`), then continue.
+
+Auth — any one of these passing is enough (the macOS Keychain item is service `sh.pome.cli`, account `hosted`):
 
 ```bash
-npm install -g pome-sh
-```
-
-If `pome version` works, continue.
-
-## Steps
-
-### 1. Identify the agent and its services
-
-Establish two things by reading the repo (look at `package.json`, `Cargo.toml`, `pyproject.toml`, agent source files, env files, README):
-
-- **Agent type**: Claude Code, Codex, Cursor, an SDK-built agent (Anthropic SDK / OpenAI SDK), or a custom Node/Python/Bash script that drives an LLM.
-- **Services the agent talks to**: which third-party APIs does it call? GitHub? Stripe? Others?
-
-Pome currently ships twins for these services (run `pome scenarios` to see the live list):
-
-| Service | Twin id |
-| --- | --- |
-| GitHub | `github` |
-
-**Pause and confirm with the user in one short message** — name the agent, name the services, and ask if anything's missing. Wait for the user to confirm before continuing. Misidentified services lead to irrelevant scenarios.
-
-### 2. Verify auth — log in if needed
-
-Any of these passing is sufficient — macOS Keychain is preferred over the file fallback, and a `POME_API_KEY` env var beats both for CI / direnv setups:
-
-```bash
-security find-generic-password -s "pome-sh" -w >/dev/null 2>&1 \
+security find-generic-password -s "sh.pome.cli" -a hosted -w >/dev/null 2>&1 \
   || test -f ~/.pome/credentials.json \
   || [ -n "$POME_API_KEY" ] \
   && echo ok
 ```
 
-If this does not print `ok`, run:
+If this does not print `ok`, run `pome login` (opens a browser; stores credentials in the macOS Keychain, or `~/.pome/credentials.json` on other platforms). When a `pome install` session handed off to you, auth was already checked — the probe just confirms instantly.
+
+### 1. Identify the agent and its services
+
+Read the repo (`package.json` / `pyproject.toml` / agent source / README) and establish three things:
+
+- **Entrypoint + start command** — the exact command that starts the agent (e.g. `bun run src/index.ts`).
+- **Framework** — Claude Agent SDK (`@anthropic-ai/claude-agent-sdk`), another SDK, or a custom script driving an LLM.
+- **Services** — which third-party APIs the agent calls (GitHub? Stripe? Slack?). Run `pome scenarios` to see which twins exist.
+
+**Pause: confirm the agent and its services with the user in one short message** before touching anything. Misidentified services produce irrelevant wiring.
+
+### 2. Ensure pome.config.json
 
 ```bash
-pome login
+test -f pome.config.json && echo ready || echo "needs pome init"
 ```
 
-This opens the browser and stores a `pme_…` API key in the **macOS Keychain** (preferred on macOS) or `~/.pome/credentials.json` (other OSes / Keychain unavailable).
+If absent, tell the user `pome init` will scaffold `pome.config.json`, `scenarios/`, and example agents — after they confirm, run it.
 
-### 3. Scaffold the project if it's not already pome-ready
+Then set `agent.command` in `pome.config.json` to the real start command from step 1. The scaffold default runs a bundled example, not the user's agent. Show the line you set; confirm before moving on.
 
-Check first:
+### 3. Wire the adapter (Claude Agent SDK repos)
+
+For repos built on `@anthropic-ai/claude-agent-sdk`:
+
+1. Add the dependency, matching the repo's package manager (lockfile tells you): `npm install @pome-sh/adapter-claude-sdk`.
+2. Swap imports — `query` and `tool` come from the adapter as drop-in replacements; `createSdkMcpServer` and everything else stay on the SDK:
+
+   ```ts
+   import { query, tool, withPome } from "@pome-sh/adapter-claude-sdk";
+   import { createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk";
+   ```
+
+3. Call `withPome()` once at agent startup, before any requests are made. It hooks `fetch` to emit trace signals and correlation headers — only during a pome run.
+
+For other stacks there is no adapter yet: wiring is step 4 alone, and the trace comes from the twin side. Say so explicitly in the confirmation message.
+
+### 4. Route requests through the env pome injects
+
+Find every place the agent reaches a twinned service and read the base URL from env instead of a literal:
+
+```ts
+// twin URL + token injected by the pome runner — never production
+const { POME_GITHUB_REST_URL: baseUrl, POME_AUTH_TOKEN: token } = process.env;
+```
+
+| Env var | What the runner injects |
+| --- | --- |
+| `POME_<SERVICE>_REST_URL` | REST base URL of that service's twin (e.g. `POME_GITHUB_REST_URL`) |
+| `POME_<SERVICE>_MCP_URL` | MCP endpoint of that twin |
+| `POME_AUTH_TOKEN` | Bearer token for the twin session |
+| `POME_TASK` | The scenario's task prompt |
+
+Remove hardcoded production hosts entirely (hard rule 6).
+
+### 5. Verify: pome doctor to green
 
 ```bash
-test -f pome.config.json && echo ready || echo "needs scaffolding"
+pome doctor
 ```
 
-If the file is absent, **tell the user what's about to happen and wait for confirmation**:
-
-> `pome.config.json` is missing — I'll run `pome init` to scaffold `scenarios/`, `examples/agents/`, and the config file. Continue?
-
-After the user confirms, run:
-
-```bash
-pome init
-```
-
-This creates `scenarios/`, `examples/agents/`, and a `pome.config.json` with `agent.command` and `passThreshold`.
-
-If `pome init` just ran, **open `pome.config.json` and set `agent.command`** to how the user's actual agent is invoked (the default is a placeholder). Examples:
-
-- Claude Code: `"claude -p \"$POME_TASK\""`
-- Anthropic SDK agent: `"node dist/agent.js"` (or `"npx tsx src/agent.ts"`)
-- Python agent: `"python -m my_agent"`
-
-The agent reads its task from the `POME_TASK` env var and tool-call URLs from `POME_GITHUB_REST_URL`, `POME_GITHUB_TOKEN`, etc. (see `pome docs cli-reference` for the full env-var list). The agent should **not** require any other source change — pome injects these env vars at run time.
-
-Show the user the line you set and ask them to confirm it's right before moving on.
-
-### 4. Register the agent on the dashboard
-
-Pick a short, lowercase, hyphenated name based on the repo. Default to the repo directory name; ask the user if you're unsure.
-
-**Wait for the user to confirm the name before registering**:
-
-> I'll register this agent on app.pome.sh as `<name>`. Continue?
-
-After confirmation, run:
-
-```bash
-pome register agent <name>
-```
-
-This creates the agent on `app.pome.sh` under the user's team and writes `agentId` and `agentSlug` into `pome.config.json`. Both keys are load-bearing — do not hand-edit them out.
-
-Compose the dashboard URL from the slug for step 6:
+Doctor runs four checks in order — config → twin reachable → routing → egress floor — and stops at the first failure with ONE named cause (file:line where knowable) and ONE concrete fix. Apply the minimal fix (hard rules 2–4 still apply) and re-run. Loop until it ends green:
 
 ```
-https://app.pome.sh/agents/<slug>
+✓ pome.config.json found
+✓ twin reachable  github · local
+✓ requests route to the twin  reads POME_GITHUB_REST_URL
+✓ egress floor active  deny-by-default · N pattern(s) + loopback
 ```
 
-The slug is whatever the command printed (typically a slugified version of the name). If you missed it, read it back with:
+### 6. Print next steps — don't run them
 
-```bash
-node -e 'console.log(JSON.parse(require("fs").readFileSync("pome.config.json","utf8")).agentSlug)'
-```
-
-### 5. Write a starter `TESTS.md`
-
-For an agent that talks to GitHub, suggest **all five bundled runnable scenarios** — they cover the canonical triage / labeling / context / identity-safety cases and give a meaningful first signal. Start narrower only if the user explicitly asks.
-
-**Pause and confirm with the user** before writing the file:
-
-> I'll create `TESTS.md` with these 5 scenarios so the first `/pome-test` run gives a useful breadth:
->
-> - `scenarios/01-bug-happy-path.md` — clear bug triage (apply label, assign owner)
-> - `scenarios/02-missing-label.md` — create-and-retry recovery
-> - `scenarios/03-already-triaged.md` — don't pile on a finished issue
-> - `scenarios/04-judge-context.md` — exercises the LLM-judge evaluator
-> - `scenarios/05-github-identity-spoof.md` — refuse unauthorized PR merge
->
-> Or pick a subset — five is the breadth suggestion, not a hard requirement. What do you want?
-
-After the user picks a list, write `TESTS.md` in the repo root:
-
-```markdown
-# Pome tests
-
-Run with `/pome-test`.
-
-## Scenarios
-
-- scenarios/01-bug-happy-path.md
-- scenarios/02-missing-label.md
-- scenarios/03-already-triaged.md
-- scenarios/04-judge-context.md
-- scenarios/05-github-identity-spoof.md
-```
-
-For services other than GitHub, list whichever bundled scenarios for that twin make sense — run `pome scenarios <twin>` to see the catalog.
-
-Copy the scenario files into the local repo so the user can read and edit them:
-
-```bash
-pome scenarios github --copy
-```
-
-Substitute the right twin id if not GitHub. Re-prompt the user if they need a different twin.
-
-### 6. Print the dashboard URL and offer to run /pome-test
-
-Print, in this exact shape (substitute values):
+End the session by printing exactly this shape (substitute the twin and scenario):
 
 ```
-Agent registered: <agent-name>
-Dashboard:        https://app.pome.sh/agents/<slug>
-Tests:            TESTS.md (N scenarios)
+wiring verified — pome doctor is green.
 
-Ready to run? Invoke /pome-test, or say "yes" and I'll run it now.
+next steps:
+  pome scenarios github --copy               # pull runnable scenarios into ./scenarios/
+  pome run scenarios/01-bug-happy-path.md    # 5 isolated trials against the twin
+  pome register agent <name>                 # optional: group dashboard runs under one agent
 ```
-
-If the user says yes, invoke the `pome-test` skill.
-
-## Output contract
-
-When this skill finishes successfully:
-
-- `pome.config.json` exists with `agentId`, `agentSlug`, and a real `agent.command`.
-- `TESTS.md` exists in the repo root with at least one scenario path (default: all 5 GitHub scenarios).
-- The bundled scenario files live under `scenarios/` in the repo.
-- The agent appears on `app.pome.sh` under the user's account at `app.pome.sh/agents/<slug>`.
-- The chat ends with the dashboard URL and an offer to invoke `/pome-test`.
 
 ## Common pitfalls
 
 | Symptom | Fix |
 | --- | --- |
-| `pome register agent` fails with 401/403 | Re-run `pome login` (or set `POME_API_KEY`). |
-| `pome.config.json` exists but `agent.command` is the default `npx tsx examples/agents/scripted-triage-agent.ts` | Replace with how the user's real agent is invoked. The default is for the bundled example only. |
-| User's agent talks to a service pome doesn't have a twin for yet | Note it explicitly in the confirmation message. Skip that service's scenarios for now; the user can request it from pome. |
-| Repo isn't a Node/git project | `pome init` still works — it only writes files. Skip steps that depend on `package.json`. |
-| User edited `pome.config.json` and the dashboard stopped grouping runs by agent | Re-add the `agentId` and `agentSlug` keys; both are written by `pome register agent` and the dashboard needs both. |
+| `npm install @pome-sh/adapter-claude-sdk` 404s | The adapter's npm publish is staged (OSS Launch Stage 1). Inside a pome-twins checkout, depend on it via `"@pome-sh/adapter-claude-sdk": "file:<checkout>/packages/adapter-claude-sdk"`; external repos should watch the pome release notes. |
+| doctor: "reads from a hardcoded https://api.github.com" | A production-host literal survives in agent source — even a `?? "https://api.github.com"` fallback triggers it. Move the fallback out of source; read `POME_GITHUB_REST_URL`. |
+| doctor: "twin not reachable" | Twin dependencies missing — run the repo's install (`bun install` / `npm install`) and re-run `pome doctor`. |
+| doctor: "egress floor disabled" | Remove `*` from `POME_EGRESS_ALLOW`. Never widen egress to pass a check. |
+| Hosted commands fail 401/403 | Re-run `pome login` (or set `POME_API_KEY` in CI). |
+| `agent.command` is still the scaffold default | Point it at the user's real agent (step 1's start command); the default runs a bundled example. |
+| The agent talks to a service with no twin | Name it in the confirmation message and skip it (hard rule 7). The user can request the twin from pome. |
 
-## Reference
+## Output contract
 
-- Skill contract: `pome docs skills`
-- Dashboard layout: `pome docs dashboard`
-- CLI flags and env vars: `pome docs cli-reference`
-- Scenario catalog: `pome scenarios`
+When this skill finishes successfully:
+
+- `pome.config.json` exists with a real `agent.command`.
+- Claude Agent SDK repos: `@pome-sh/adapter-claude-sdk` resolves and `withPome()` runs at startup.
+- No hardcoded production hosts remain in agent source; twinned-service base URLs are read from `POME_*` env.
+- `pome doctor` exits green — all four checks.
+- The session ends with the next-steps block printed, not executed.

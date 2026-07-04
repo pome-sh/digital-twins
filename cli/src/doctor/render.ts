@@ -10,8 +10,18 @@ const CAUSE_COLUMN = "cause  ";
 const FIX_COLUMN = "fix    ";
 const CONTINUATION = " ".repeat(FIX_COLUMN.length);
 
-export function renderDoctorReport(report: DoctorReport): string[] {
-  const lines: string[] = ["checking your wiring …"];
+export interface RenderDoctorReportOptions {
+  /** First line of the report. `pome doctor` and the run gate keep the
+   *  moment-03 default; `pome install` passes moment 02's
+   *  "verifying the wiring …" (FDRS-642). */
+  header?: string;
+}
+
+export function renderDoctorReport(
+  report: DoctorReport,
+  options: RenderDoctorReportOptions = {},
+): string[] {
+  const lines: string[] = [options.header ?? "checking your wiring …"];
 
   for (const check of report.checks) {
     const glyph = check.status === "pass" ? "✓" : "✗";
