@@ -204,7 +204,11 @@ describe("socket boundary — error envelopes over a real socket", () => {
     const response = await fetch(`${baseUrl}/s/${TEST_SID}/definitely/not/a/route`, {
       headers: authHeaders()
     });
-    expect(response.status).toBe(unsupportedEnvelope.status);
+    // Pin the literal status independently of unsupportedEnvelope.status —
+    // both sides would otherwise derive from the same constant and a
+    // regression of the "loud 501" contract could self-verify.
+    expect(response.status).toBe(501);
+    expect(unsupportedEnvelope.status).toBe(501);
     const body = (await response.json()) as typeof unsupportedEnvelope.body;
     expect(body.message).toBe(unsupportedEnvelope.body.message);
     expect(body._twin.fidelity).toBe("unsupported");

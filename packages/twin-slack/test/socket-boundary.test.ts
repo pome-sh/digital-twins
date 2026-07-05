@@ -203,7 +203,11 @@ describe("socket boundary — error envelopes over a real socket", () => {
       method: "POST",
       headers: authHeaders()
     });
-    expect(response.status).toBe(unsupportedEnvelope.status);
+    // Pin the literal status independently of unsupportedEnvelope.status —
+    // both sides would otherwise derive from the same constant and a
+    // regression of the "loud 501" contract could self-verify.
+    expect(response.status).toBe(501);
+    expect(unsupportedEnvelope.status).toBe(501);
     const body = (await response.json()) as typeof unsupportedEnvelope.body;
     expect(body.ok).toBe(false);
     expect(body.error).toBe("unsupported_endpoint");
