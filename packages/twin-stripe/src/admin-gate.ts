@@ -111,7 +111,9 @@ export function createAdminGate(options: AdminGateOptions = {}): MiddlewareHandl
   return async (c, next) => {
     const adminToken = process.env.TWIN_ADMIN_TOKEN;
     if (adminToken && adminToken.length > 0) {
-      const provided = c.req.header("X-Admin-Token") ?? c.req.header("x-admin-token");
+      // Web Headers lookups are case-insensitive, so one lookup covers every
+      // casing a client might send.
+      const provided = c.req.header("X-Admin-Token");
       if (!provided) return forbidden();
       const a = Buffer.from(provided);
       const b = Buffer.from(adminToken);

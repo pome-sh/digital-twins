@@ -21,7 +21,16 @@ function findExternalIPv4(): string | undefined {
 
 const externalIp = findExternalIPv4();
 
-let server: ServerType;
+// The whole file runs under NODE_ENV=production (set once at module scope, no
+// mid-test mutation window for concurrently-running tests): prod disables the
+// unknown-remote fail-open tier, so the loopback 200 below proves the bridge
+// really resolved the peer address as loopback — a silently broken
+// getConnInfo integration (remote = undefined) would 403 instead of
+// fail-opening to 200.
+const previousNodeEnv = process.env.NODE_ENV;
+process.env.NODE_ENV = "production";
+
+let server: ServerType | undefined;
 let port = 0;
 
 beforeAll(async () => {
@@ -35,29 +44,24 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await new Promise<void>((done, fail) => {
-    server.close((err) => (err ? fail(err) : done()));
-  });
+  // vitest runs afterAll even when beforeAll rejects before serve() assigns
+  // `server`; guard so the real failure isn't buried under a TypeError.
+  const s = server;
+  if (s) {
+    await new Promise<void>((done, fail) => {
+      s.close((err) => (err ? fail(err) : done()));
+    });
+  }
+  if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+  else process.env.NODE_ENV = previousNodeEnv;
 });
 
 describe("admin gate over a real socket", () => {
   it("returns 200 for POST /admin/reset from a loopback client under NODE_ENV=production", async () => {
-    // Run the loopback case in production mode: prod disables the
-    // unknown-remote fail-open tier, so a 200 here proves the bridge really
-    // resolved the peer address as loopback. Under the default test env a
-    // silently broken getConnInfo integration (remote = undefined) would
-    // fail-open to 200 and this assertion could not tell the difference.
-    const prevNodeEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = "production";
-    try {
-      const res = await fetch(`http://127.0.0.1:${port}/admin/reset`, { method: "POST" });
-      expect(res.status).toBe(200);
-      const body = (await res.json()) as { ok: boolean };
-      expect(body.ok).toBe(true);
-    } finally {
-      if (prevNodeEnv === undefined) delete process.env.NODE_ENV;
-      else process.env.NODE_ENV = prevNodeEnv;
-    }
+    const res = await fetch(`http://127.0.0.1:${port}/admin/reset`, { method: "POST" });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { ok: boolean };
+    expect(body.ok).toBe(true);
   });
 
   it.skipIf(!externalIp)(
