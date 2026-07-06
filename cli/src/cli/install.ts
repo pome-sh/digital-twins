@@ -13,19 +13,35 @@
 //
 // No coding agent on PATH → print manual wiring steps + a paste-into-any-
 // agent prompt and exit 0 (the designed fallback, not a failure). Doctor
-// red after the session → named cause + fix, exit 1. The terminal-rendered
-// file-list + diff + [y/N] gate from moment 02 is deferred to FDRS-661; the
-// pome-setup skill written for this cut is the knowledge layer both reuse.
+// red after the session → named cause + fix, exit 1.
+//
+// FDRS-661 layers the terminal diff gate from moment 02 on top: when the
+// machine has Claude credentials, the default flow embeds the agent
+// HEADLESS (Claude Agent SDK driver on the user's own credentials + the
+// user's own `claude` binary), stages its edits in a shadow copy, and
+// renders the file list + unified diff in pome's terminal — the working
+// tree changes only on [y]. The interactive handoff above survives as the
+// fallback (no credentials, declined SDK download, or --interactive).
 
 import { execFile, spawn } from "node:child_process";
-import { accessSync, constants, statSync } from "node:fs";
+import { accessSync, constants, existsSync, statSync } from "node:fs";
 import { delimiter, join } from "node:path";
 import { createInterface } from "node:readline";
 import { promisify } from "node:util";
 
 import { HostedAuthError } from "../hosted/errors.js";
+import {
+  agentSdkDir,
+  detectClaudeLogin,
+  isAgentSdkProvisioned,
+  loadAgentSdk,
+  provisionAgentSdk,
+  type AgentSdkModule,
+} from "./agent-sdk.js";
 import { resolveCredentials } from "./credentials.js";
+import { runEmbeddedWiring } from "./embedded-wiring.js";
 import { loginWithClerk, type LoginOptions } from "./login.js";
+import { resolvePackageRoot } from "./resolve-package-root.js";
 import { runSkillsInstall } from "./skills.js";
 
 const execFileAsync = promisify(execFile);
@@ -56,6 +72,9 @@ export const PASTE_PROMPT = [
 export interface InstallOptions {
   apiUrl: string;
   dashboardUrl: string;
+  /** Force the interactive agent-session handoff (skip the headless
+   *  staged-diff flow). */
+  interactive?: boolean;
   /** Repo root the session wires. Defaults to process.cwd(). */
   cwd?: string;
   /** Test seam — forwarded to resolveCredentials. */
@@ -66,6 +85,13 @@ export interface InstallOptions {
   confirm?: (question: string) => Promise<boolean>;
   /** Test seam — defaults to loginWithClerk (opens a browser). */
   login?: (options: LoginOptions) => Promise<void>;
+  /** Test seam — defaults to detectClaudeLogin (keychain/credentials/env). */
+  hasClaudeLogin?: () => boolean;
+  /** Test seam — defaults to the consent-gated provision + import of the
+   *  Claude Agent SDK driver. */
+  acquireSdk?: (
+    confirm: (question: string) => Promise<boolean>,
+  ) => Promise<AgentSdkModule | null>;
 }
 
 export async function runInstall(options: InstallOptions): Promise<void> {
@@ -146,35 +172,109 @@ export async function runInstall(options: InstallOptions): Promise<void> {
     }
   }
 
-  // 4. Ensure the pome-setup skill is where the agent looks for it
-  // (~/.claude/skills/, symlinked to this install; skips if present).
-  console.error("");
-  await runSkillsInstall({});
-  if (process.exitCode === 2) {
-    // runSkillsInstall signals failure (no ~/.claude, packaging problem) via
-    // exitCode — the session would run without the skill, so hand the user
-    // the manual path instead. Keep exit 2: unlike the no-agent fallback,
-    // this is a real environment problem.
-    console.error("");
-    console.error("couldn't install the pome-setup skill — falling back to manual steps.");
-    printManualFallback();
-    return;
+  // 4. The default path: embed the agent headless and gate its edits behind
+  // pome's own terminal diff (moment 02). Falls back to the interactive
+  // handoff when the pieces aren't there or the user asked for it.
+  let stagedApplied = false;
+  if (!options.interactive) {
+    const hasLogin = options.hasClaudeLogin ?? (() => detectClaudeLogin());
+    if (!hasLogin()) {
+      console.error("");
+      console.error(
+        "no Claude login or ANTHROPIC_API_KEY found for the headless staged-diff flow —",
+      );
+      console.error("handing off to an interactive session instead.");
+    } else {
+      const skillSourceDir = packagedSkillDir();
+      const acquireSdk = options.acquireSdk ?? acquireAgentSdkWithConsent;
+      const sdk = skillSourceDir ? await acquireSdk(confirm) : null;
+      if (!skillSourceDir) {
+        console.error("");
+        console.error(
+          "bundled pome-setup skill missing from this install — using the interactive session.",
+        );
+      } else if (!sdk) {
+        console.error("continuing with the interactive session instead.");
+      } else {
+        console.error("");
+        console.error(
+          `wiring with ${agent.label} (headless) — nothing is written until you approve the diff.`,
+        );
+        const outcome = await runEmbeddedWiring({
+          cwd,
+          claudePath: agent.path,
+          skillSourceDir,
+          query: sdk.query,
+          confirm,
+        });
+        if (outcome.kind === "declined") {
+          console.error(
+            "aborted — nothing changed. re-run pome install to try again, or",
+          );
+          console.error("`pome install --interactive` to drive the session yourself.");
+          return;
+        }
+        if (outcome.kind === "no-diff") {
+          // Never a silent no-op: name the reason the session produced no
+          // applicable diff (Done-when bullet 2).
+          console.error("");
+          console.error("the session staged no changes — nothing to apply.");
+          console.error(`reason: ${outcome.reason}`);
+          console.error(
+            "re-run pome install, or `pome install --interactive` to drive the session yourself.",
+          );
+          process.exitCode = 1;
+          return;
+        }
+        if (outcome.kind === "session-error") {
+          console.error("");
+          console.error(outcome.reason);
+          console.error(
+            "re-run pome install, or `pome install --interactive` to drive the session yourself.",
+          );
+          process.exitCode = 1;
+          return;
+        }
+        // applied — the session never runs installs itself (no Bash in the
+        // staging tool set); dependencies it added land here, before doctor.
+        if (outcome.packageJsonChanged) {
+          await runPackageInstall(cwd);
+        }
+        stagedApplied = true;
+      }
+    }
   }
 
-  // 5. Hand off. stdio inherit = the user drives the agent in this terminal;
-  // the diff gate is the agent's own edit-approval UI (deliberately no
-  // --permission-mode override).
-  console.error("");
-  console.error(
-    `handing off to ${agent.label} — review and approve its edits in the session.`,
-  );
-  console.error("exit the session when the wiring is done; pome verifies it after.");
-  console.error("");
-  const sessionExit = await runAgentSession(agent.path, [KICKOFF_PROMPT], cwd);
-  if (sessionExit !== 0) {
+  if (!stagedApplied) {
+    // 4b. Interactive fallback — the FDRS-642 flow, unchanged: ensure the
+    // pome-setup skill where the agent looks for it (~/.claude/skills/),
+    // then hand this terminal to the agent; the diff gate is the agent's
+    // own edit-approval UI.
+    console.error("");
+    await runSkillsInstall({});
+    if (process.exitCode === 2) {
+      // runSkillsInstall signals failure (no ~/.claude, packaging problem) via
+      // exitCode — the session would run without the skill, so hand the user
+      // the manual path instead. Keep exit 2: unlike the no-agent fallback,
+      // this is a real environment problem.
+      console.error("");
+      console.error("couldn't install the pome-setup skill — falling back to manual steps.");
+      printManualFallback();
+      return;
+    }
+
+    console.error("");
     console.error(
-      `(${agent.label} exited ${sessionExit} — verifying anyway; doctor is the source of truth.)`,
+      `handing off to ${agent.label} — review and approve its edits in the session.`,
     );
+    console.error("exit the session when the wiring is done; pome verifies it after.");
+    console.error("");
+    const sessionExit = await runAgentSession(agent.path, [KICKOFF_PROMPT], cwd);
+    if (sessionExit !== 0) {
+      console.error(
+        `(${agent.label} exited ${sessionExit} — verifying anyway; doctor is the source of truth.)`,
+      );
+    }
   }
 
   // 6. The ending pome's terminal owns: doctor verify to green (moment 02).
@@ -280,6 +380,57 @@ function runAgentSession(
       resolvePromise(code ?? (signal ? 1 : 0));
     });
   });
+}
+
+/** The bundled pome-setup skill inside this pome install — the knowledge
+ *  layer the embedded session loads from the shadow's .claude/skills. */
+function packagedSkillDir(): string | null {
+  const root = resolvePackageRoot(import.meta.url);
+  if (!root) return null;
+  const dir = join(root, "skills", "pome-setup");
+  return existsSync(dir) ? dir : null;
+}
+
+/** Consent-gated one-time download of the Claude Agent SDK driver into
+ *  ~/.pome/agent-sdk (a few MB — the ~244 MB platform runtime is skipped;
+ *  the session runs on the user's own `claude` binary). */
+async function acquireAgentSdkWithConsent(
+  confirm: (question: string) => Promise<boolean>,
+): Promise<AgentSdkModule | null> {
+  const dir = agentSdkDir();
+  if (!isAgentSdkProvisioned(dir)) {
+    console.error("");
+    console.error("pome can run the wiring headless and show you one reviewable diff before");
+    console.error("anything is written. this needs a one-time download of the Claude Agent");
+    console.error(`SDK driver (a few MB) into ${dir}.`);
+    if (!(await confirm("download it now? [y/N] "))) return null;
+    if (!(await provisionAgentSdk(dir))) return null;
+  }
+  const sdk = await loadAgentSdk(dir);
+  if (!sdk) console.error("couldn't load the Claude Agent SDK driver.");
+  return sdk;
+}
+
+/** Install dependencies the staged diff added to package.json, with the
+ *  repo's own package manager (lockfile tells us which). */
+async function runPackageInstall(cwd: string): Promise<void> {
+  const pm = existsSync(join(cwd, "bun.lock")) || existsSync(join(cwd, "bun.lockb"))
+    ? "bun"
+    : existsSync(join(cwd, "pnpm-lock.yaml"))
+      ? "pnpm"
+      : existsSync(join(cwd, "yarn.lock"))
+        ? "yarn"
+        : "npm";
+  console.error("");
+  console.error(`package.json changed — running ${pm} install …`);
+  const exit = await new Promise<number>((resolvePromise, rejectPromise) => {
+    const child = spawn(pm, ["install"], { cwd, stdio: "inherit" });
+    child.once("error", rejectPromise);
+    child.once("exit", (code, signal) => resolvePromise(code ?? (signal ? 1 : 0)));
+  }).catch(() => 1);
+  if (exit !== 0) {
+    console.error(`(${pm} install exited ${exit} — doctor will name what's missing.)`);
+  }
 }
 
 function printManualFallback(): void {
