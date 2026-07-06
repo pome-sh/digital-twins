@@ -137,20 +137,26 @@ export class GitHubDomain {
         for (const pull of repoSeed.pull_requests ?? []) {
           const createdPr = this.createPullRequest({ owner: repo.owner, repo: repo.name, title: pull.title, body: pull.body ?? "", head: pull.head, base: pull.base ?? repo.default_branch, actor: pull.author });
           const prNumber = (createdPr as { number: number }).number;
+          // The PR row and its head branch don't change across seeded reviews /
+          // statuses, so resolve the head SHA once rather than re-querying it on
+          // every iteration (and in both blocks below).
+          const seedsHead = (pull.reviews ?? []).length > 0 || (pull.statuses ?? []).length > 0;
+          const prRow = seedsHead ? this.requirePullRequest(repo.id, prNumber) : null;
+          const headRepo = prRow ? this.requireRepoById(prRow.head_repo_id) : null;
+          const headSha = prRow && headRepo ? this.requireBranch(headRepo.id, prRow.head_ref).head_sha ?? "" : "";
           // Seed reviews directly into pull_request_reviews so we can record
           // the author and state honestly. Going through createPullRequestReview
           // would hardcode user_login = "pome-agent" and lose author identity.
           for (const review of pull.reviews ?? []) {
             users.add(review.author);
             this.upsertUser(review.author, "User", review.author);
-            const prRow = this.requirePullRequest(repo.id, prNumber);
-            const headRepo = this.requireRepoById(prRow.head_repo_id);
-            const headSha = this.requireBranch(headRepo.id, prRow.head_ref).head_sha;
             this.db.prepare("INSERT INTO pull_request_reviews (repo_id, pull_number, user_login, state, body, commit_sha, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?)").run(
               repo.id,
               prNumber,
               review.author,
-              review.state,
+              // parseSeed defaults this to "APPROVED"; guard direct seed() callers
+              // that pass a hand-built seed with no explicit review state.
+              review.state ?? "APPROVED",
               review.body ?? "",
               headSha,
               nowIso()
@@ -159,10 +165,7 @@ export class GitHubDomain {
           // Seed commit statuses on the PR head SHA. Same shape as
           // createStatus() so merge_pull_request's required-status check
           // sees the seeded value.
-          if ((pull.statuses ?? []).length > 0) {
-            const prRow = this.requirePullRequest(repo.id, prNumber);
-            const headRepo = this.requireRepoById(prRow.head_repo_id);
-            const headSha = this.requireBranch(headRepo.id, prRow.head_ref).head_sha ?? "";
+          if ((pull.statuses ?? []).length > 0 && headRepo) {
             for (const status of pull.statuses ?? []) {
               this.createStatus({
                 owner: headRepo.owner,
