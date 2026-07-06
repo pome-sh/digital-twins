@@ -157,6 +157,27 @@ describe("default-task module (FDRS-645)", () => {
     expect(res.copied).toBe(false);
     expect(await readFile(res.path, "utf8")).toBe(custom);
   });
+
+  it("preserves a user-edited seed when only the md was deleted", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "pome-default-task-"));
+    await mkdir(join(dir, "scenarios"), { recursive: true });
+    const editedSeed = '{"edited":"by the user"}';
+    await writeFile(
+      join(dir, "scenarios", "first-run-demo.seed.json"),
+      editedSeed,
+    );
+    const res = await ensureDefaultTask(dir);
+    expect(res.copied).toBe(true);
+    expect(
+      await readFile(join(dir, "scenarios", "first-run-demo.seed.json"), "utf8"),
+    ).toBe(editedSeed);
+  });
+
+  it("names a `scenarios`-is-a-file collision as a usage error", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "pome-default-task-"));
+    await writeFile(join(dir, "scenarios"), "not a directory");
+    await expect(ensureDefaultTask(dir)).rejects.toThrow(/exists as a file/);
+  });
 });
 
 describe("bare `pome run` glue (FDRS-645)", () => {

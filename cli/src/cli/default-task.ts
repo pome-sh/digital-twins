@@ -16,10 +16,11 @@
 // swapped for a user-facing one in the copy: the copy is the user's file —
 // authenticated runs are judged against the criteria declared in it.
 
-import { existsSync } from "node:fs";
+import { constants, existsSync, statSync } from "node:fs";
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DEMO_TASK_NAME, demoTaskPath } from "../demo/task.js";
+import { HostedUsageError } from "../hosted/errors.js";
 
 /** Design default k for "run yours" (moment 05: "Their agent · k=5"). */
 export const DEFAULT_TASK_TRIALS = 5;
@@ -109,6 +110,15 @@ export async function ensureDefaultTask(
     return { path: target, relativePath, copied: false, trialsApplied: true };
   }
 
+  // A `scenarios` path that exists as a FILE would make the mkdir below
+  // throw a raw EEXIST (exit 2). Name the actual problem as a usage error.
+  const dir = join(cwd, DEFAULT_TASK_DIR);
+  if (existsSync(dir) && !statSync(dir).isDirectory()) {
+    throw new HostedUsageError(
+      `\`${DEFAULT_TASK_DIR}\` exists as a file in this project — the bare \`pome run\` default drops its task into a ${DEFAULT_TASK_DIR}/ directory. Move the file aside, or pass a task path explicitly.`,
+    );
+  }
+
   const packagedMd = demoTaskPath();
   const packagedSeed = packagedMd.replace(/\.md$/, ".seed.json");
   if (!existsSync(packagedSeed)) {
@@ -122,11 +132,21 @@ export async function ensureDefaultTask(
   const raw = await readFile(packagedMd, "utf8");
   const pinned = withDefaultTrials(withUserCopyComment(raw));
 
-  await mkdir(join(cwd, DEFAULT_TASK_DIR), { recursive: true });
+  await mkdir(dir, { recursive: true });
   // Seed first, md last: the md's presence is the commit point (the parser
   // hard-requires the sidecar once the md's prose ## Seed State is seen), so
   // a crash between the two writes never strands a half-usable default.
-  await copyFile(packagedSeed, target.replace(/\.md$/, ".seed.json"));
+  // COPYFILE_EXCL: NO file under scenarios/ is ever overwritten — a user who
+  // deleted only the md but kept an edited seed keeps their seed.
+  try {
+    await copyFile(
+      packagedSeed,
+      target.replace(/\.md$/, ".seed.json"),
+      constants.COPYFILE_EXCL,
+    );
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+  }
   try {
     // "wx": never overwrite — if a concurrent run raced the copy in, theirs
     // wins and this invocation just runs it.
