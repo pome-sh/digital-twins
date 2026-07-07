@@ -12,7 +12,12 @@
 //      from that cloud evaluation. The CLI never scores locally.
 //   4. Errored trials are excluded from the verdict fraction; at-capacity
 //      402/429s render as honest labeled states (FDRS-662), never stack
-//      traces, never fabricated completions.
+//      traces, never fabricated completions. Any trial that errors after its
+//      session was minted best-effort ABANDONS that session with a machine
+//      error_code before the CLI exits (F-710 / F-664 decision 3), so the
+//      share view flips the slot to errored immediately instead of waiting
+//      out the staleness window; a capacity abort also abandons the
+//      minted-but-never-run remainder.
 //   5. Output ends with the no-login preview link
 //      {dashboard}/demo/<group_id>.
 
@@ -59,6 +64,7 @@ export type DemoTrialClient = Pick<
   | "requestStateUploadUrl"
   | "requestSignalsUploadUrl"
   | "finalize"
+  | "abandonSession"
 >;
 
 export interface RunDemoOptions {
@@ -161,8 +167,14 @@ export async function runDemo(options: RunDemoOptions): Promise<RunDemoResult> {
   for (let i = 0; i < trials; i += 1) {
     const session = sessions[i]!;
     const trialNumber = i + 1;
+    const client = trialClientFactory(session);
+    const progress = { finalized: false };
 
     let verdict: TrialVerdict;
+    // F-710 — the machine error_code the abandon carries when this trial's
+    // error also aborts the whole demo (capacity); the never-run remainder
+    // below reuses it so every orphaned slot names the same cause.
+    let abortCode: string | null = null;
     try {
       verdict = await runOneTrial({
         trialNumber,
@@ -172,16 +184,19 @@ export async function runDemo(options: RunDemoOptions): Promise<RunDemoResult> {
         artifactsDir,
         apiBase: options.apiBase,
         runScenarioFn,
-        client: trialClientFactory(session),
+        client,
         captureServerCommand: options.captureServerCommand,
         out,
         collectedFailures,
+        progress,
       });
     } catch (err) {
       if (err instanceof DemoCapacityError) {
+        abortCode = err.kind;
         capacityAbort = capacityLabel(err.kind);
         verdict = { kind: "errored", reason: "demo at capacity" };
       } else if (isJudgeCapQuota(err)) {
+        abortCode = "daily_judge_cap";
         capacityAbort = capacityLabel("daily_judge_cap");
         verdict = { kind: "errored", reason: "demo at capacity" };
       } else {
@@ -190,12 +205,31 @@ export async function runDemo(options: RunDemoOptions): Promise<RunDemoResult> {
           reason: shortReason(err instanceof Error ? err.message : String(err)),
         };
       }
+      // F-710 — flip the errored slot on the share view NOW instead of
+      // waiting out the staleness window (F-664 decision 3). Never after a
+      // successful finalize: a judged run row must not race an abandon.
+      if (!progress.finalized) {
+        await abandonQuietly(client, session.session_id, abortCode ?? "trial_crashed");
+      }
     }
 
     verdicts.push(verdict);
     out(trialLine(trialNumber, verdict));
 
-    if (capacityAbort) break;
+    if (capacityAbort) {
+      // F-710 — the abort orphans every minted-but-never-run session; abandon
+      // each with the same capacity code so the share view settles honestly
+      // instead of showing "running" ghosts for the staleness window.
+      for (let j = i + 1; j < trials; j += 1) {
+        const orphan = sessions[j]!;
+        await abandonQuietly(
+          trialClientFactory(orphan),
+          orphan.session_id,
+          abortCode ?? "unknown_capacity",
+        );
+      }
+      break;
+    }
   }
 
   if (capacityAbort) out(capacityAbort);
@@ -228,6 +262,9 @@ interface RunOneTrialInput {
   captureServerCommand?: RunScenarioOptions["captureServerCommand"];
   out: (line: string) => void;
   collectedFailures: string[];
+  /** F-710 — set once finalize succeeds, so the caller's error handling
+   *  never abandons a session that already has a judged run row. */
+  progress: { finalized: boolean };
 }
 
 async function runOneTrial(input: RunOneTrialInput): Promise<TrialVerdict> {
@@ -250,11 +287,15 @@ async function runOneTrial(input: RunOneTrialInput): Promise<TrialVerdict> {
   if (result.exitCode !== 0) {
     const capacityKind = parseCapacityMarker(result.agent.stderr);
     if (capacityKind) {
+      // The caller abandons this session (and the never-run remainder) with
+      // the capacity kind as it handles the abort.
       throw new DemoCapacityError(capacityKind, capacityLabel(capacityKind));
     }
     if (result.agent.timedOut) {
+      await abandonQuietly(input.client, input.session.session_id, "agent_timeout");
       return { kind: "errored", reason: "trial timed out" };
     }
+    await abandonQuietly(input.client, input.session.session_id, "agent_exit_nonzero");
     return {
       kind: "errored",
       reason: shortReason(lastLine(result.agent.stderr) ?? "agent failed"),
@@ -293,6 +334,7 @@ async function runOneTrial(input: RunOneTrialInput): Promise<TrialVerdict> {
     stateInitialStorageKey: uploaded.stateInitialKey ?? undefined,
     stateFinalStorageKey: uploaded.stateFinalKey ?? undefined,
   });
+  input.progress.finalized = true;
 
   const score = scoreFromFinalizeResponse(finalized);
   const status = scoreStatus(score, 100);
@@ -310,6 +352,23 @@ async function runOneTrial(input: RunOneTrialInput): Promise<TrialVerdict> {
   // Un-evaluated: the judge could not produce a verdict for this trace —
   // honest exclusion, not a fabricated word.
   return { kind: "errored", reason: "cloud could not evaluate the trace" };
+}
+
+/** F-710 — best-effort session abandon on a trial error path: flips the
+ *  share-view slot to errored with a machine error_code immediately (F-664
+ *  decision 3). SILENT by contract — a network failure or non-200 must change
+ *  neither the CLI's exit code nor its terminal output; server-side staleness
+ *  (F-664 decision 1) remains the fallback. */
+async function abandonQuietly(
+  client: DemoTrialClient,
+  sessionId: string,
+  errorCode: string,
+): Promise<void> {
+  try {
+    await client.abandonSession(sessionId, { errorCode });
+  } catch {
+    // swallowed — the read-path staleness demotion covers this session
+  }
 }
 
 function isJudgeCapQuota(err: unknown): boolean {
