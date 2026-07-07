@@ -21,7 +21,10 @@ jobs:
           bun-version: 1.3.10
       - run: node scripts/check-redaction-mirrors.mjs
       - run: node scripts/check-admin-gate-mirrors.mjs
+      - run: node scripts/check-copy-markers.mjs
+      - run: node scripts/lint-code-health.mjs
       - run: bun install --frozen-lockfile
+      - run: bun run lint:dead-code
       - run: bun run --filter '*' typecheck
       - run: bun run --filter '*' test
       - run: cd packages/twin-github && bun run test:coverage
