@@ -73,12 +73,17 @@ jobs:
           '
           node --input-type=module -e '
             import { existsSync, readFileSync } from "node:fs";
+            if (!existsSync("node_modules/@pome-sh/shared-types/trace-contract.json")) {
+              throw new Error("shared-types package missing trace-contract.json");
+            }
             for (const name of ["twin-github", "twin-slack", "twin-stripe"]) {
               const manifest = JSON.parse(readFileSync(`node_modules/@pome-sh/${name}/package.json`, "utf8"));
               const bin = manifest.bin?.[name];
               if (!bin || !existsSync(`node_modules/@pome-sh/${name}/${bin}`)) {
                 throw new Error(`${name} bin does not resolve`);
               }
+              const firstLine = readFileSync(`node_modules/@pome-sh/${name}/${bin}`, "utf8").split("\n")[0];
+              if (firstLine !== "#!/usr/bin/env node") throw new Error(`${name} bin target is missing node shebang`);
             }
           '
 
@@ -98,6 +103,9 @@ jobs:
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
+      # OIDC Trusted Publishing needs npm >= 11.5.1; Node 22 ships npm 10.
+      - name: Install npm with OIDC trusted publishing support
+        run: npm install -g npm@11.5.1
       - run: bun install --frozen-lockfile --filter '*'
       - run: node scripts/pack-publishable.mjs --out "$RUNNER_TEMP/tarballs"
       - name: Publish packages with provenance

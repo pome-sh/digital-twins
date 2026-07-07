@@ -12,7 +12,7 @@
     "./otel": "./src/otel/index.ts",
     "./redaction": "./src/redaction.ts"
   },
-  "files": ["dist", "src", "package.json"],
+  "files": ["dist", "src", "package.json", "trace-contract.json"],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/pome-sh/pome-twins.git",
