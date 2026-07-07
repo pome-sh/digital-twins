@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "workspaces": ["packages/*"],
-  "packageManager": "bun@1.3.10",
+  "packageManager": "bun@1.3.13",
   "scripts": {
     "preinstall": "node -e \"const ua=process.env.npm_config_user_agent||''; if (!ua.includes('bun/')) { console.error('Use bun install (this repo is bun-only).'); process.exit(1); }\"",
     "build": "bun run --filter '*' build",
