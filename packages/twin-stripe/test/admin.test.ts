@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "vitest";
 import { Hono } from "hono";
-import { createTwinStripeApp } from "../src/app.js";
-import { setClientIp } from "../src/admin-gate.js";
+import { createTwinStripeApp } from "../src/twin.js";
+import { setClientIp } from "@pome-sh/sdk/server";
 import { openTwinStripeDatabase } from "../src/db.js";
 import { DEFAULT_API_KEY, applySeed, defaultSeed } from "../src/seed.js";
 

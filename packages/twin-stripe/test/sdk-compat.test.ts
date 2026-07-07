@@ -7,34 +7,13 @@
 // the session at the root mount; cross-account isolation must hold.
 
 import { describe, expect, it } from "vitest";
-import type { Hono } from "hono";
-import type { ResolvedSession } from "../src/types.js";
-import { createTwinStripeApp } from "../src/app.js";
-import { StripeDomain } from "../src/domain/index.js";
+import { createTwinStripeApp } from "../src/twin.js";
 import { openTwinStripeDatabase } from "../src/db.js";
-import { listTools } from "../src/tools.js";
-import { registerStripeRoutes } from "../src/routes/index.js";
-import { applySeed, defaultSeed, DEFAULT_API_KEY, DEFAULT_SID } from "../src/seed.js";
+import { defaultSeed, DEFAULT_API_KEY, DEFAULT_SID } from "../src/seed.js";
 
 function bootApp() {
   const db = openTwinStripeDatabase(":memory:");
-  applySeed(db, defaultSeed());
-  let domain!: StripeDomain;
-  const app = createTwinStripeApp({
-    db,
-    runId: "sdk-compat",
-    toolCount: listTools().length,
-    extendSession: (session: Hono, ctx) => {
-      domain = new StripeDomain(ctx.db);
-      registerStripeRoutes(session, domain, ctx.recorder, ctx.runId);
-      return {
-        stateProvider: (_c, sess: ResolvedSession | undefined) => {
-          if (!sess) return {};
-          return domain.exportState(sess.account_id);
-        }
-      };
-    }
-  });
+  const app = createTwinStripeApp({ db, runId: "sdk-compat", seed: defaultSeed() });
   return { app, db };
 }
 
@@ -112,19 +91,13 @@ describe("F3 — SDK compatibility (root mount)", () => {
 
   it("cross-account isolation holds at the root mount", async () => {
     const db = openTwinStripeDatabase(":memory:");
-    applySeed(db, {
-      api_keys: [
-        { key: "sk_test_pome_a", sid: "a", account_id: "acct_a" },
-        { key: "sk_test_pome_b", sid: "b", account_id: "acct_b" }
-      ]
-    });
-    let domain!: StripeDomain;
     const app = createTwinStripeApp({
       db,
-      toolCount: listTools().length,
-      extendSession: (session: Hono, ctx) => {
-        domain = new StripeDomain(ctx.db);
-        registerStripeRoutes(session, domain, ctx.recorder, ctx.runId);
+      seed: {
+        api_keys: [
+          { key: "sk_test_pome_a", sid: "a", account_id: "acct_a" },
+          { key: "sk_test_pome_b", sid: "b", account_id: "acct_b" }
+        ]
       }
     });
 

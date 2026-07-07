@@ -25,12 +25,10 @@ import type {
   RefundRow,
   StateDelta,
 } from "../types.js";
-import { TwinError } from "../errors.js";
 import {
   PaymentIntentsDomain,
   type CreatePIInput,
   type ListPIsInput,
-  piUnexpectedState,
 } from "./payment-intents.js";
 import { ChargesDomain, type ListChargesInput } from "./charges.js";
 import { BalanceDomain, type ListBalanceTxInput } from "./balance.js";
@@ -280,26 +278,32 @@ export class StripeDomain {
    * Account-scoped state export. Used by `/_pome/state` to surface only
    * the calling session's data. Two sessions hitting `_pome/state` see
    * disjoint views of the same DB.
+   *
+   * Ordering is `created DESC, rowid DESC`: `created` has unix-second
+   * resolution, so rows minted within the same second tied and flipped
+   * order run-to-run (the F-683 export-race class). The insertion-order
+   * tiebreak keeps the export deterministic — same seed + same ops =>
+   * same state (test/state-export.test.ts).
    */
   exportState(accountId: string): unknown {
     const pis = this.db
       .prepare(
-        "SELECT * FROM payment_intents WHERE account_id = ? ORDER BY created DESC"
+        "SELECT * FROM payment_intents WHERE account_id = ? ORDER BY created DESC, rowid DESC"
       )
       .all(accountId) as PIRow[];
     const charges = this.db
-      .prepare("SELECT * FROM charges WHERE account_id = ? ORDER BY created DESC")
+      .prepare("SELECT * FROM charges WHERE account_id = ? ORDER BY created DESC, rowid DESC")
       .all(accountId) as ChargeRow[];
     const balanceTxs = this.db
       .prepare(
-        "SELECT * FROM balance_transactions WHERE account_id = ? ORDER BY created DESC"
+        "SELECT * FROM balance_transactions WHERE account_id = ? ORDER BY created DESC, rowid DESC"
       )
       .all(accountId) as BalanceTxRow[];
     const events = this.db
-      .prepare("SELECT * FROM events WHERE account_id = ? ORDER BY created DESC")
+      .prepare("SELECT * FROM events WHERE account_id = ? ORDER BY created DESC, rowid DESC")
       .all(accountId) as EventRow[];
     const refunds = this.db
-      .prepare("SELECT * FROM refunds WHERE account_id = ? ORDER BY created DESC")
+      .prepare("SELECT * FROM refunds WHERE account_id = ? ORDER BY created DESC, rowid DESC")
       .all(accountId) as RefundRow[];
     return {
       payment_intents: pis.map(paymentIntentJson),
@@ -316,13 +320,3 @@ function rowToRecord(row: Record<string, unknown>): Record<string, unknown> {
   // z.record(z.string(), z.unknown()) accepts it.
   return { ...row };
 }
-
-// Re-exports for convenience.
-export {
-  PaymentIntentsDomain,
-  ChargesDomain,
-  BalanceDomain,
-  EventsDomain,
-  piUnexpectedState,
-};
-export { TwinError };

@@ -7,11 +7,11 @@
 
 import type { Context } from "hono";
 import { z } from "zod";
-import { TwinError, stripeError } from "../errors.js";
 import {
   FAILURE_INJECTION_OVERRIDE_KEY,
   type FailureInjectionOverride,
-} from "../failure-injection.js";
+} from "@pome-sh/sdk/server";
+import { TwinError, stripeError } from "../errors.js";
 import type {
   Recorder,
   ResolvedSession,
@@ -197,13 +197,19 @@ export function respond(
     | undefined) ?? null;
   const finalStatus = override ? override.status : status;
   const finalBody = override ? override.body : responseBody;
+  // FDRS-402 / FDRS-653 stamping, engine parity (F-684): correlation_id
+  // persists the adapter's x-pome-correlation-id (falling back to the
+  // request id), and x-pome-scenario-step-id lands as the canonical
+  // task_step_id plus the legacy scenario_step_id key.
+  const stepId = c.req.header("x-pome-scenario-step-id") ?? null;
   recorder?.record({
     ts: new Date().toISOString(),
     run_id: runId,
     twin: "stripe",
     request_id: reqId,
-    correlation_id: reqId,
-    scenario_step_id: c.req.header("x-pome-scenario-step-id") ?? null,
+    correlation_id: c.req.header("x-pome-correlation-id") ?? reqId,
+    task_step_id: stepId,
+    scenario_step_id: stepId,
     step_id: null,
     tool_call_id: null,
     method: c.req.method,

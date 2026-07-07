@@ -6,32 +6,14 @@
 // that fires a second refund on an already-fully-refunded charge is caught by the
 // recorded tool call, not by a (server-rejected) refund row.
 import { describe, expect, it } from "vitest";
-import { createTwinStripeApp } from "../src/app.js";
-import { StripeDomain } from "../src/domain/index.js";
-import { registerStripeRoutes } from "../src/routes/index.js";
-import { createRecorder } from "../src/recorder.js";
-import { listTools } from "../src/tools.js";
-import type { Recorder, ResolvedSession } from "../src/types.js";
+import { createRecorderStore } from "@pome-sh/sdk/server";
+import { createTwinStripeApp } from "../src/twin.js";
 import { TEST_AUTH_SECRET, TEST_SID, signTestToken, withAuth } from "./_authHelper.js";
 
 async function appWithRecorder() {
   process.env.TWIN_AUTH_SECRET = TEST_AUTH_SECRET;
-  const recorder: Recorder = createRecorder();
-  const app = createTwinStripeApp({
-    runId: "trap-run",
-    recorder,
-    toolCount: listTools().length,
-    extendSession: (session, ctx) => {
-      const domain = new StripeDomain(ctx.db);
-      registerStripeRoutes(session, domain, recorder, ctx.runId);
-      return {
-        stateProvider: (_c, sess: ResolvedSession | undefined) =>
-          sess
-            ? domain.exportState(sess.account_id)
-            : { payment_intents: [], charges: [], balance_transactions: [], events: [] },
-      };
-    },
-  });
+  const recorder = createRecorderStore();
+  const app = createTwinStripeApp({ runId: "trap-run", recorder });
   const token = await signTestToken();
   const base = `/s/${TEST_SID}`;
   return { app, base, token, recorder };

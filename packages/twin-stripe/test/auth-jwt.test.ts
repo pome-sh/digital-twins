@@ -2,7 +2,7 @@
 import { createHmac } from "node:crypto";
 import { sign } from "hono/jwt";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createTwinStripeApp } from "../src/app.js";
+import { createTwinStripeApp } from "../src/twin.js";
 import { TEST_AUTH_SECRET, TEST_SID, signTestToken, withAuth } from "./_authHelper.js";
 
 const previousSecret = process.env.TWIN_AUTH_SECRET;

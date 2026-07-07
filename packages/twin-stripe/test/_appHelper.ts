@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// AGENT-B test bootstrap. Wraps AGENT-A's `createTwinStripeApp` with the
-// session-router extension hook from `routes/index.ts` so the 12 v1 routes
-// + MCP tools are mounted.
-//
-// All AGENT-B tests use `createStripeApp()` from this helper.
-import { createTwinStripeApp } from "../src/app.js";
+// Test bootstrap. Since F-684 the twin assembles on the @pome-sh/sdk engine
+// via `createTwinStripeApp` (src/twin.ts) — auth, recorder + redaction, MCP
+// dispatch, /_pome/*, admin gate, and failure injection are the engine's;
+// the helper only opens a db, seeds the default world, and hands back a
+// domain handle over the same db for direct assertions.
+import { createTwinStripeApp } from "../src/twin.js";
+import { openTwinStripeDatabase } from "../src/db.js";
 import { StripeDomain } from "../src/domain/index.js";
-import { listTools } from "../src/tools.js";
-import { registerStripeRoutes } from "../src/routes/index.js";
-import type { ResolvedSession } from "../src/types.js";
+import { defaultSeed } from "../src/seed.js";
+import type { ResolvedSession, TwinStripeDatabase } from "../src/types.js";
 import {
   TEST_ACCOUNT_ID,
   TEST_AUTH_SECRET,
@@ -19,39 +19,25 @@ import {
 } from "./_authHelper.js";
 
 export { TEST_ACCOUNT_ID, TEST_AUTH_SECRET, TEST_SID, signTestToken, withAuth };
+export type { ResolvedSession };
 
 export type StripeTestApp = {
   app: ReturnType<typeof createTwinStripeApp>;
   base: string;
   token: string;
   domain: StripeDomain;
+  db: TwinStripeDatabase;
 };
 
-/**
- * Build a fresh app + session token. AGENT-A's `createTwinStripeApp` owns
- * auth, idempotency, db, recorder, healthz/admin, and the MCP scaffolding
- * placeholder. AGENT-B's `extendSession` mounts the 12 v1 REST routes,
- * the real MCP tool dispatcher, and the `_pome/state` extension.
- */
+/** Build a fresh app + session token over an in-memory db with the default seed. */
 export async function createStripeApp(): Promise<StripeTestApp> {
   process.env.TWIN_AUTH_SECRET = TEST_AUTH_SECRET;
-  let domain!: StripeDomain;
-  const app = createTwinStripeApp({
-    runId: "test-run",
-    toolCount: listTools().length,
-    extendSession: (session, ctx) => {
-      domain = new StripeDomain(ctx.db);
-      registerStripeRoutes(session, domain, ctx.recorder, ctx.runId);
-      return {
-        stateProvider: (_c, sess: ResolvedSession | undefined) => {
-          if (!sess) return { payment_intents: [], charges: [], balance_transactions: [], events: [] };
-          return domain.exportState(sess.account_id);
-        }
-      };
-    }
-  });
+  const db = openTwinStripeDatabase(":memory:");
+  const app = createTwinStripeApp({ db, seed: defaultSeed(), runId: "test-run" });
+  // StripeDomain is stateless over the db; a second handle sees the same state.
+  const domain = new StripeDomain(db);
   const token = await signTestToken();
-  return { app, base: `/s/${TEST_SID}`, token, domain };
+  return { app, base: `/s/${TEST_SID}`, token, domain, db };
 }
 
 export async function rest(

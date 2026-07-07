@@ -213,13 +213,15 @@ function recordDedupeEvent(
 ) {
   if (!recorder) return;
   const reqId = requestId();
+  const stepId = c.req.header("x-pome-scenario-step-id") ?? null;
   recorder.record({
     ts: new Date().toISOString(),
     run_id: runId,
     twin: "stripe",
     request_id: reqId,
-    correlation_id: reqId,
-    scenario_step_id: c.req.header("x-pome-scenario-step-id") ?? null,
+    correlation_id: c.req.header("x-pome-correlation-id") ?? reqId,
+    task_step_id: stepId,
+    scenario_step_id: stepId,
     step_id: null,
     tool_call_id: null,
     method: c.req.method,

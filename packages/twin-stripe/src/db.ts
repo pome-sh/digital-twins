@@ -1,16 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
-import Database from "better-sqlite3";
-import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+//
+// Stripe twin schema — DDL + reset only (domain). The sqlite driver and the
+// pome pragma set live in the engine (`openTwinDatabase`, F-681); twins
+// never import a sqlite driver directly.
+//
+// All tables are created up front so domain modules do not need to migrate.
+// v1 ships with payment_intents, charges, balance_transactions, and events.
+// The remaining tables (customers, payment_methods, refunds, products,
+// prices, checkout_sessions, SPT, webhook_endpoints) are deferred to v2.
+import { openTwinDatabase } from "@pome-sh/sdk";
 import type { TwinStripeDatabase } from "./types.js";
 
-// All tables are created up front so AGENT-B (domain) and AGENT-C (x402) do
-// not need to migrate. v1 ships with payment_intents, charges,
-// balance_transactions, and events. The remaining tables (customers,
-// payment_methods, refunds, products, prices, checkout_sessions, SPT,
-// webhook_endpoints) are deferred to v2.
 const MIGRATION_SQL = `
--- ----- chassis tables (AGENT-A) -------------------------------------------
+-- ----- chassis tables -------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS api_keys (
   key TEXT PRIMARY KEY,
@@ -34,7 +36,7 @@ CREATE TABLE IF NOT EXISTS idempotency_keys (
   PRIMARY KEY (key, account_id, method, path)
 );
 
--- ----- v1 Stripe domain tables (AGENT-B fills in domain logic) ------------
+-- ----- v1 Stripe domain tables ---------------------------------------------
 
 CREATE TABLE IF NOT EXISTS payment_intents (
   id TEXT PRIMARY KEY,
@@ -136,18 +138,10 @@ DELETE FROM api_keys;
 export function openTwinStripeDatabase(
   path = process.env.STRIPE_CLONE_DB ?? ":memory:"
 ): TwinStripeDatabase {
-  if (path !== ":memory:") {
-    mkdirSync(dirname(path), { recursive: true });
-  }
-  const db = new Database(path);
-  migrate(db);
-  return db;
+  return openTwinDatabase(path, { migrate });
 }
 
 export function migrate(db: TwinStripeDatabase) {
-  db.pragma("busy_timeout = 5000");
-  db.pragma("journal_mode = WAL");
-  db.pragma("foreign_keys = ON");
   db.exec(MIGRATION_SQL);
 }
 

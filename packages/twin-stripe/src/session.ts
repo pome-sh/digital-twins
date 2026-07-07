@@ -1,25 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
+//
+// The x402 session surface (domain). Mounts the seller-side payment
+// middleware plus the hosted protected resource on the session router.
+// Only wired when the embedder knows the twin's own base URL (the
+// middleware settles payments by calling the twin's REST API over HTTP) —
+// the standalone server passes `http://127.0.0.1:<port>`, the CLI's
+// in-process harness passes its bound URL.
+
 import type { Hono } from "hono";
-import type { StripeDomain } from "./domain/index.js";
-import type { Recorder, ResolvedSession } from "./types.js";
-import type { StateProvider } from "./pome-routes.js";
-import { registerStripeRoutes } from "./routes/index.js";
+import type { ResolvedSession } from "./types.js";
 import { paymentMiddleware } from "./x402.js";
 
-export type RegisterStripeSessionRoutesOptions = {
-  domain: StripeDomain;
-  recorder: Recorder;
-  runId: string;
+export type RegisterX402RoutesOptions = {
   twinBaseUrl: string;
 };
 
-export function registerStripeSessionRoutes(
-  session: Hono,
-  opts: RegisterStripeSessionRoutesOptions,
-): { stateProvider: StateProvider } {
-  const { domain, recorder, runId, twinBaseUrl } = opts;
-
-  registerStripeRoutes(session, domain, recorder, runId);
+export function registerX402Routes(session: Hono, opts: RegisterX402RoutesOptions): void {
   session.use(
     paymentMiddleware(
       {
@@ -37,7 +33,7 @@ export function registerStripeSessionRoutes(
         },
       },
       {
-        twinBaseUrl,
+        twinBaseUrl: opts.twinBaseUrl,
         sid: (c) => {
           const sess = c.get("session") as ResolvedSession | undefined;
           return sess?.sid ?? "default";
@@ -56,13 +52,4 @@ export function registerStripeSessionRoutes(
       message: "Payment verified by the Stripe twin.",
     }),
   );
-
-  return {
-    stateProvider: (_c, sess: ResolvedSession | undefined) => {
-      if (!sess) {
-        return { payment_intents: [], charges: [], balance_transactions: [], events: [] };
-      }
-      return domain.exportState(sess.account_id);
-    },
-  };
 }
