@@ -14,15 +14,14 @@
     "lint:admin-gate-mirrors": "node scripts/check-admin-gate-mirrors.mjs",
     "lint:copy-markers": "node scripts/check-copy-markers.mjs",
     "lint:code-health": "node scripts/lint-code-health.mjs",
-    "lint:dead-code": "knip --no-config-hints"
+    "lint:dead-code": "bunx --bun knip --no-config-hints"
   },
   "engines": {
     "node": ">=20",
     "bun": ">=1.3.0"
   },
   "devDependencies": {
-    "bun-types": "^1.3.14",
-    "knip": "^6.25.0"
+    "bun-types": "^1.3.14"
   },
   "overrides": {
     "hono": "^4.12.27"
