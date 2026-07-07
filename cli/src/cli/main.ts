@@ -218,7 +218,11 @@ export function createProgram() {
   program
     .command("install")
     .description(
-      "Wire this repo to pome with your own coding agent: checks auth (routes through pome login when needed), hands off to an interactive agent session — you approve its edits in the agent's own UI — then verifies with pome doctor. No coding agent on PATH → prints manual wiring steps + a paste-into-any-agent prompt.",
+      "Wire this repo to pome with your own coding agent: checks auth (routes through pome login when needed), runs the wiring headless on your own Claude credentials, shows the full diff in this terminal, and applies it only on [y] — then verifies with pome doctor. --interactive hands off to a live agent session instead; no coding agent on PATH → prints manual wiring steps + a paste-into-any-agent prompt.",
+    )
+    .option(
+      "--interactive",
+      "Hand off to an interactive agent session (approve edits in the agent's own UI) instead of the headless staged-diff flow.",
     )
     .option(
       "--api-url <url>",
@@ -230,11 +234,15 @@ export function createProgram() {
       "App URL for Clerk sign-in (must serve /cli/login).",
       process.env.POME_DASHBOARD_URL ?? DEFAULT_DASHBOARD_URL,
     )
-    .action(async (opts: { apiUrl: string; dashboardUrl: string }) => {
+    .action(async (opts: { apiUrl: string; dashboardUrl: string; interactive?: boolean }) => {
       // Dynamic import mirrors the doctor/run commands: keep install's
       // dependency graph out of every other command's startup path.
       const { runInstall } = await import("./install.js");
-      await runInstall({ apiUrl: opts.apiUrl, dashboardUrl: opts.dashboardUrl });
+      await runInstall({
+        apiUrl: opts.apiUrl,
+        dashboardUrl: opts.dashboardUrl,
+        interactive: opts.interactive,
+      });
     });
 
   program
