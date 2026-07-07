@@ -12,6 +12,8 @@ COPY package.json bun.lock ./
 COPY packages packages
 RUN bun install --frozen-lockfile
 RUN bun run --cwd packages/shared-types build:runtime
+# The twin imports `@pome-sh/sdk/server`, resolved from the SDK's built dist.
+RUN bun run --cwd packages/sdk build
 RUN bun run --cwd packages/twin-github build
 # The runtime image should not include dev/test tooling or unrelated workspace
 # deps. Reinstall only this twin's production graph after the build, hoisted to

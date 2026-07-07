@@ -58,33 +58,8 @@ jobs:
           bun install --frozen-lockfile --filter '*'
           node scripts/pack-publishable.mjs --out "$RUNNER_TEMP/tarballs"
       - name: Use local package tarballs before first npm publish
-        run: |
-          node --input-type=module <<'NODE'
-          import { readdirSync, writeFileSync, readFileSync } from "node:fs";
-          import { join } from "node:path";
-
-          const tarballs = Object.fromEntries(
-            readdirSync(`${process.env.RUNNER_TEMP}/tarballs`)
-              .filter((name) => name.endsWith(".tgz"))
-              .map((name) => {
-                const pkgName = name
-                  .replace(/^pome-sh-/, "@pome-sh/")
-                  .replace(/-\d+\.\d+\.\d+.*\.tgz$/, "");
-                return [pkgName, `file:${join(process.env.RUNNER_TEMP, "tarballs", name)}`];
-              }),
-          );
-
-          const pkg = JSON.parse(readFileSync("package.json", "utf8"));
-          for (const name of [
-            "@pome-sh/shared-types",
-            "@pome-sh/twin-github",
-            "@pome-sh/twin-slack",
-            "@pome-sh/twin-stripe",
-          ]) {
-            pkg.dependencies[name] = tarballs[name];
-          }
-          writeFileSync("package.json", `${JSON.stringify(pkg, null, 2)}\n`);
-          NODE
+        working-directory: ${{ github.workspace }}
+        run: node scripts/use-local-pome-tarballs.mjs cli/package.json
       - run: bun install
       - run: bun run typecheck
       - run: bun run build
