@@ -94,6 +94,8 @@ function criterion(text: string, outcome: "passed" | "failed") {
 function fakeClient(
   finalizeFor: (sessionId: string) => FinalizeResponse | Error,
   finalizeCalls: Array<{ sessionId: string; input: unknown }>,
+  abandonCalls: Array<{ sessionId: string; errorCode?: string }> = [],
+  abandonError?: Error,
 ): (session: DemoSession) => DemoTrialClient {
   return (session) => ({
     requestEventsUploadUrl: vi.fn(async (sessionId: string) => {
@@ -111,6 +113,18 @@ function fakeClient(
       if (out instanceof Error) throw out;
       return out;
     }),
+    abandonSession: vi.fn(
+      async (sessionId: string, input?: { errorCode?: string }) => {
+        abandonCalls.push({ sessionId, errorCode: input?.errorCode });
+        if (abandonError) throw abandonError;
+        return {
+          session_id: sessionId,
+          state: "failed",
+          error_code: input?.errorCode ?? null,
+          abandoned: true,
+        };
+      },
+    ),
   });
 }
 
@@ -307,6 +321,228 @@ describe("runDemo (FDRS-643)", () => {
     expect(result.exitCode).toBe(4);
     const text = out.join("\n");
     expect(text).toContain("daily model budget is exhausted — try again tomorrow");
+  });
+
+  it("abandons the errored trial AND the never-run remainder when the gateway reports capacity mid-run (F-710)", async () => {
+    const out: string[] = [];
+    const abandonCalls: Array<{ sessionId: string; errorCode?: string }> = [];
+    const result = await runDemo({
+      apiBase: "https://api.example.com",
+      dashboardBase: "https://app.pome.sh",
+      trials: 3,
+      out: (line) => out.push(line),
+      agentCommand: "unused-in-test",
+      runScenarioFn: fakeRunScenario(
+        [
+          {
+            exitCode: 3,
+            stderr: "POME_DEMO_CAPACITY:daily_model_cap\nbudget exhausted\n",
+          },
+        ],
+        [],
+      ),
+      mintFn: (async (opts: { count: number }) => sessionsFixture(opts.count)) as never,
+      trialClientFactory: fakeClient(() => new Error("unreachable"), [], abandonCalls),
+      skipTwinWarmup: true,
+    });
+
+    // The erroring trial's slot flips to errored immediately, and the minted
+    // sessions the abort orphaned flip too — no 15-min dishonesty window.
+    expect(abandonCalls).toEqual([
+      { sessionId: "ses_1", errorCode: "daily_model_cap" },
+      { sessionId: "ses_2", errorCode: "daily_model_cap" },
+      { sessionId: "ses_3", errorCode: "daily_model_cap" },
+    ]);
+    expect(result.exitCode).toBe(4);
+  });
+
+  it("abandons with daily_judge_cap when finalize hits the judge cap; the finalized trial is never abandoned (F-710)", async () => {
+    const abandonCalls: Array<{ sessionId: string; errorCode?: string }> = [];
+    const result = await runDemo({
+      apiBase: "https://api.example.com",
+      dashboardBase: "https://app.pome.sh",
+      trials: 3,
+      out: () => undefined,
+      agentCommand: "unused-in-test",
+      runScenarioFn: fakeRunScenario([{ exitCode: 0 }], []),
+      mintFn: (async (opts: { count: number }) => sessionsFixture(opts.count)) as never,
+      trialClientFactory: fakeClient(
+        (sessionId) => {
+          if (sessionId === "ses_1") return finalizeResponse(100, passedResult());
+          return new HostedQuotaError("judge cap", "req_1", {
+            kind: "daily_judge_cap",
+          });
+        },
+        [],
+        abandonCalls,
+      ),
+      skipTwinWarmup: true,
+    });
+
+    expect(abandonCalls).toEqual([
+      { sessionId: "ses_2", errorCode: "daily_judge_cap" },
+      { sessionId: "ses_3", errorCode: "daily_judge_cap" },
+    ]);
+    expect(result.exitCode).toBe(0);
+  });
+
+  it("abandons a timed-out trial with agent_timeout and a failed agent with agent_exit_nonzero (F-710)", async () => {
+    const abandonCalls: Array<{ sessionId: string; errorCode?: string }> = [];
+    const result = await runDemo({
+      apiBase: "https://api.example.com",
+      dashboardBase: "https://app.pome.sh",
+      trials: 3,
+      out: () => undefined,
+      agentCommand: "unused-in-test",
+      runScenarioFn: fakeRunScenario(
+        [
+          { exitCode: 0 },
+          { exitCode: 3, timedOut: true },
+          { exitCode: 1, stderr: "boom\n" },
+        ],
+        [],
+      ),
+      mintFn: (async (opts: { count: number }) => sessionsFixture(opts.count)) as never,
+      trialClientFactory: fakeClient(
+        () => finalizeResponse(100, passedResult()),
+        [],
+        abandonCalls,
+      ),
+      skipTwinWarmup: true,
+    });
+
+    expect(abandonCalls).toEqual([
+      { sessionId: "ses_2", errorCode: "agent_timeout" },
+      { sessionId: "ses_3", errorCode: "agent_exit_nonzero" },
+    ]);
+    expect(result.exitCode).toBe(0);
+  });
+
+  it("abandons with trial_crashed when upload/finalize machinery throws a non-capacity error (F-710)", async () => {
+    const abandonCalls: Array<{ sessionId: string; errorCode?: string }> = [];
+    const result = await runDemo({
+      apiBase: "https://api.example.com",
+      dashboardBase: "https://app.pome.sh",
+      trials: 2,
+      out: () => undefined,
+      agentCommand: "unused-in-test",
+      runScenarioFn: fakeRunScenario([{ exitCode: 0 }], []),
+      mintFn: (async (opts: { count: number }) => sessionsFixture(opts.count)) as never,
+      trialClientFactory: fakeClient(
+        (sessionId) =>
+          sessionId === "ses_1"
+            ? new Error("storage exploded")
+            : finalizeResponse(100, passedResult()),
+        [],
+        abandonCalls,
+      ),
+      skipTwinWarmup: true,
+    });
+
+    // Non-capacity crash abandons that trial only; the demo continues.
+    expect(abandonCalls).toEqual([
+      { sessionId: "ses_1", errorCode: "trial_crashed" },
+    ]);
+    expect(result.verdicts).toHaveLength(2);
+    expect(result.exitCode).toBe(0);
+  });
+
+  it("never abandons a trial whose finalize succeeded, even when the cloud could not evaluate it (F-710)", async () => {
+    const abandonCalls: Array<{ sessionId: string; errorCode?: string }> = [];
+    const result = await runDemo({
+      apiBase: "https://api.example.com",
+      dashboardBase: "https://app.pome.sh",
+      trials: 1,
+      out: () => undefined,
+      agentCommand: "unused-in-test",
+      runScenarioFn: fakeRunScenario([{ exitCode: 0 }], []),
+      mintFn: (async (opts: { count: number }) => sessionsFixture(opts.count)) as never,
+      // criteria_results: [] → unevaluated → errored verdict, but the run
+      // row exists (finalize 200) — abandon must NOT fire.
+      trialClientFactory: fakeClient(
+        () => finalizeResponse(0, []),
+        [],
+        abandonCalls,
+      ),
+      skipTwinWarmup: true,
+    });
+
+    expect(result.verdicts[0]).toMatchObject({ kind: "errored" });
+    expect(abandonCalls).toEqual([]);
+    expect(result.exitCode).toBe(1);
+  });
+
+  it("never abandons when the crash happens AFTER finalize succeeded (F-710)", async () => {
+    const abandonCalls: Array<{ sessionId: string; errorCode?: string }> = [];
+    const result = await runDemo({
+      apiBase: "https://api.example.com",
+      dashboardBase: "https://app.pome.sh",
+      trials: 1,
+      out: () => undefined,
+      agentCommand: "unused-in-test",
+      runScenarioFn: fakeRunScenario([{ exitCode: 0 }], []),
+      mintFn: (async (opts: { count: number }) => sessionsFixture(opts.count)) as never,
+      // Finalize resolves (the run row exists) but the response is corrupt,
+      // so verdict synthesis throws afterwards — post-finalize crashes must
+      // render an errored trial WITHOUT racing an abandon against the row.
+      trialClientFactory: fakeClient(
+        () =>
+          ({
+            ...finalizeResponse(100, passedResult()),
+            criteria_results: "corrupt",
+          }) as never,
+        [],
+        abandonCalls,
+      ),
+      skipTwinWarmup: true,
+    });
+
+    expect(result.verdicts[0]).toMatchObject({ kind: "errored" });
+    expect(abandonCalls).toEqual([]);
+  });
+
+  it("abandon is best-effort: a failing abandon changes neither exit code nor terminal output (F-710)", async () => {
+    const outWithFailingAbandon: string[] = [];
+    const outBaseline: string[] = [];
+    const runOnce = (
+      out: string[],
+      abandonError?: Error,
+    ): ReturnType<typeof runDemo> =>
+      runDemo({
+        apiBase: "https://api.example.com",
+        dashboardBase: "https://app.pome.sh",
+        trials: 2,
+        out: (line) => out.push(line),
+        agentCommand: "unused-in-test",
+        runScenarioFn: fakeRunScenario(
+          [{ exitCode: 0 }, { exitCode: 3, timedOut: true }],
+          [],
+        ),
+        mintFn: (async (opts: { count: number }) => sessionsFixture(opts.count)) as never,
+        trialClientFactory: fakeClient(
+          () => finalizeResponse(100, passedResult()),
+          [],
+          [],
+          abandonError,
+        ),
+        skipTwinWarmup: true,
+      });
+
+    const failing = await runOnce(
+      outWithFailingAbandon,
+      new Error("network down"),
+    );
+    const baseline = await runOnce(outBaseline);
+
+    // The group id and wall-clock durations differ per invocation;
+    // everything else must be identical.
+    const normalize = (lines: string[]): string[] =>
+      lines.map((line) =>
+        line.replace(/grp_[\w-]+/g, "grp_X").replace(/\d+\.\ds/g, "Ts"),
+      );
+    expect(failing.exitCode).toBe(baseline.exitCode);
+    expect(normalize(outWithFailingAbandon)).toEqual(normalize(outBaseline));
+    expect(outWithFailingAbandon.join("\n")).not.toMatch(/abandon/i);
   });
 
   it("boots the packaged demo task's twin for the warm-up line (real seed parse)", async () => {
