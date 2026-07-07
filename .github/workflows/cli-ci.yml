@@ -51,3 +51,31 @@ jobs:
       - run: bun run typecheck
       - run: bun run build
       - run: bun run test
+
+  # F-713 — the artifact users actually install must boot a local twin: stage
+  # the publishable file set, npm pack (bundling cli/vendor/*.tgz), install
+  # the tarball into a clean temp project, then `pome run --local` boots the
+  # engine-based slack twin and GET /healthz must answer 200 with the frozen
+  # contract shape. Catches broken vendor hoisting that the workspace-based
+  # test job can never see.
+  packed-smoke:
+    name: packed CLI boots a local twin
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: cli
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.3.13
+      # Node 22 for the same better-sqlite3/node-gyp reason as the test job.
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+      - run: node scripts/verify-vendor.mjs
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      - run: node scripts/packed-smoke.mjs

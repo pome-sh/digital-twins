@@ -21,7 +21,11 @@
 // rows. The message-stream wrapper here is the surviving pome insertion
 // point in the SDK iterator.
 
-import { redactSecrets } from "./redaction.js";
+// F-713: redaction is consumed from the engine — the per-package
+// byte-identical mirror (src/redaction.ts) is deleted; @pome-sh/sdk is the
+// single implementation (packages/sdk/src/redaction.ts, tested in
+// packages/sdk/test/redaction.test.ts).
+import { redactSecrets } from "@pome-sh/sdk";
 import {
   newEventId,
   writeSubagentSpawnEvent,

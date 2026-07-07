@@ -12,9 +12,10 @@
 //   1. `tsc -p tsconfig.build.json` emits runnable `dist/` (JS + .d.ts).
 //   2. each package is copied into an isolated staging dir with a rewritten
 //      manifest whose main/types/exports point at `dist`, devDependencies are
-//      dropped, and (for @pome-sh/sdk) the `workspace:*` shared-types dep is
-//      replaced with the vendored `file:./vendor/<tgz>` + bundledDependencies
-//      so `npm pack` bundles a runnable shared-types.
+//      dropped, and unresolvable-off-workspace deps are replaced with vendored
+//      `file:./vendor/<tgz>` + bundledDependencies so `npm pack` bundles a
+//      runnable copy: @pome-sh/sdk vendors shared-types,
+//      @pome-sh/adapter-claude-sdk vendors the freshly packed sdk (F-713).
 //   3. `npm pack` runs in the staging dir (off-workspace, so `file:` resolves
 //      and bundledDependencies is honoured).
 //
@@ -22,6 +23,7 @@
 //   node scripts/pack-publishable.mjs --out <dir>
 //   node scripts/pack-publishable.mjs --vendor        # refresh packages/sdk/vendor
 //   node scripts/pack-publishable.mjs --check-vendor  # fail if packages/sdk/vendor is stale
+//   node scripts/pack-publishable.mjs --vendor-cli    # refresh the cli/vendor sdk tarball (F-713)
 //
 // Emits: <out>/pome-sh-shared-types-<v>.tgz, pome-sh-adapter-claude-sdk-<v>.tgz,
 //        pome-sh-sdk-<v>.tgz  (default <out> = dist-tarballs/ at repo root)
@@ -48,6 +50,7 @@ const outIdx = args.indexOf("--out");
 const outDir = resolve(outIdx >= 0 ? args[outIdx + 1] : join(repoRoot, "dist-tarballs"));
 const doVendor = args.includes("--vendor");
 const checkVendor = args.includes("--check-vendor");
+const doVendorCli = args.includes("--vendor-cli");
 
 const sh = (cmd, cwd, extraArgs) =>
   execFileSync(cmd, extraArgs, { cwd, stdio: ["ignore", "pipe", "inherit"], encoding: "utf8" });
@@ -164,9 +167,11 @@ const sharedTypesTgz = results.sharedTypes.tgz;
 
 // Optionally refresh the committed @pome-sh/sdk vendor copy.
 //
-// NOTE: this deliberately does NOT touch cli/vendor. The CLI's shared-types
-// re-vendor is a separately version-gated change (cli-version-gate.yml pins the
-// tgz SHA in cli/scripts/verify-vendor.mjs); it is tracked as a follow-up.
+// NOTE: `--vendor` deliberately does NOT touch cli/vendor. The CLI's
+// shared-types re-vendor is a separately version-gated change
+// (cli-version-gate.yml pins the tgz SHA in cli/scripts/verify-vendor.mjs).
+// The CLI's sdk tarball is refreshed by `--vendor-cli` below (F-713), which
+// is version-gated the same way.
 if (doVendor) {
   const vendorDir = join(repoRoot, "packages/sdk/vendor");
   mkdirSync(vendorDir, { recursive: true });
@@ -189,17 +194,6 @@ if (checkVendor) {
   }
   assertSamePackageContents(vendoredTgz, join(outDir, sharedTypesTgz));
   console.error(`verified packages/sdk/vendor/${sharedTypesTgz} matches a fresh shared-types pack`);
-}
-
-// ── @pome-sh/adapter-claude-sdk ───────────────────────────────────────────
-const adapterDir = join(repoRoot, "packages/adapter-claude-sdk");
-build(adapterDir);
-{
-  const { staging, version } = stage(adapterDir, (pkg) => distManifest(pkg));
-  const tgz = npmPack(staging);
-  cpSync(join(staging, tgz), join(outDir, tgz));
-  results.adapter = { tgz, version };
-  rmSync(staging, { recursive: true, force: true });
 }
 
 // ── @pome-sh/sdk (bundles vendored shared-types) ──────────────────────────
@@ -226,6 +220,83 @@ build(sdkDir);
   const tgz = npmPack(staging);
   cpSync(join(staging, tgz), join(outDir, tgz));
   results.sdk = { tgz, version };
+  rmSync(staging, { recursive: true, force: true });
+}
+const sdkTgz = results.sdk.tgz;
+
+// Optionally refresh the CLI's committed @pome-sh/sdk vendor copy (F-713).
+//
+// This is a CLI-context VARIANT of the sdk tarball, not the publishable one
+// above: its shared-types dep is the exact version (`0.6.0`) instead of
+// `file:./vendor/<tgz>` + bundledDependencies, because bun cannot resolve a
+// `file:` spec found inside an installed tarball (it has no base to resolve
+// against) while an exact-version spec resolves against the CLI's hoisted
+// root install — the same exact-version hoist mechanism the twin tarballs'
+// `workspace:*` shared-types/sdk deps use. cli/package.json pins the tarball
+// in dependencies + overrides + bundleDependencies. After refreshing, update
+// the sha256 in cli/scripts/verify-vendor.mjs (cli-version-gate covers
+// cli/vendor/**).
+if (doVendorCli) {
+  const { staging } = stage(sdkDir, (pkg) => {
+    const m = distManifest(pkg, {
+      "./server": { types: "./dist/server.d.ts", default: "./dist/server.js" },
+    });
+    m.files = ["dist", "package.json"];
+    m.dependencies = {
+      ...pkg.dependencies,
+      "@pome-sh/shared-types": results.sharedTypes.version,
+    };
+    delete m.bundledDependencies;
+    return m;
+  });
+  // The workspace `vendor/` dir was copied by stage(); the CLI variant hoists
+  // shared-types from cli/vendor instead of shipping its own copy.
+  rmSync(join(staging, "vendor"), { recursive: true, force: true });
+  const cliSdkTgz = npmPack(staging);
+  const cliVendorDir = join(repoRoot, "cli/vendor");
+  mkdirSync(cliVendorDir, { recursive: true });
+  for (const f of readdirSync(cliVendorDir)) {
+    if (/^pome-sh-sdk-.*\.tgz$/.test(f) && f !== cliSdkTgz) {
+      rmSync(join(cliVendorDir, f));
+    }
+  }
+  cpSync(join(staging, cliSdkTgz), join(cliVendorDir, cliSdkTgz));
+  rmSync(staging, { recursive: true, force: true });
+  console.error(`vendored ${cliSdkTgz} into cli/vendor (exact-version shared-types dep)`);
+}
+
+// ── @pome-sh/adapter-claude-sdk (bundles the vendored sdk, F-713) ─────────
+// The adapter consumes redaction from @pome-sh/sdk. In-repo that dep is
+// `workspace:*`; the published tarball must not carry a workspace: spec and
+// the sdk is npm-held, so the freshly packed sdk tgz is vendored + bundled
+// exactly like the sdk does with shared-types.
+const adapterDir = join(repoRoot, "packages/adapter-claude-sdk");
+build(adapterDir);
+{
+  const { staging, version } = stage(adapterDir, (pkg) => {
+    const m = distManifest(pkg);
+    m.files = ["dist", "vendor", "package.json", "README.md"];
+    m.dependencies = {
+      ...pkg.dependencies,
+      "@pome-sh/sdk": `file:./vendor/${sdkTgz}`,
+    };
+    m.bundledDependencies = ["@pome-sh/sdk"];
+    return m;
+  });
+  mkdirSync(join(staging, "vendor"), { recursive: true });
+  cpSync(join(outDir, sdkTgz), join(staging, "vendor", sdkTgz));
+  // Materialize node_modules by EXTRACTING the sdk tgz (not `npm install`):
+  // when the root manifest bundles a dep that itself bundles a dep (sdk →
+  // shared-types), Arborist plans a nested reify and re-resolves the sdk's
+  // `file:./vendor/<shared-types tgz>` spec, which 404s against the registry
+  // (shared-types is npm-held). The extracted tarball already contains the
+  // bundled shared-types subtree, and `npm pack` bundles it as-is.
+  const sdkNodeModulesDir = join(staging, "node_modules/@pome-sh/sdk");
+  mkdirSync(sdkNodeModulesDir, { recursive: true });
+  sh("tar", staging, ["-xzf", join(staging, "vendor", sdkTgz), "-C", sdkNodeModulesDir, "--strip-components=1"]);
+  const tgz = npmPack(staging);
+  cpSync(join(staging, tgz), join(outDir, tgz));
+  results.adapter = { tgz, version };
   rmSync(staging, { recursive: true, force: true });
 }
 

@@ -11,7 +11,7 @@ import type { HostedClient } from "./client.js";
 import type { FinalizeResponse } from "../types/shared.js";
 import type { Score } from "../score/view.js";
 import { outcomeOf } from "../score/view.js";
-import { redactSecrets } from "../recorder/redaction.js";
+import { redactSecrets } from "@pome-sh/sdk";
 
 /** The narrow client surface the upload orchestration needs. `pome eval`
  *  mocks exactly this in tests instead of the full HostedClient. */

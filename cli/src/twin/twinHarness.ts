@@ -30,7 +30,10 @@ import {
   openSlackTwinDatabase,
   SlackDomain,
 } from "@pome-sh/twin-slack";
-import type { Recorder as SlackRecorder } from "@pome-sh/twin-slack";
+// F-683/F-713: the slack twin runs on the @pome-sh/sdk engine (vendored into
+// cli/vendor); its app factory types the recorder as the engine's
+// RecorderStore (same structural {record, events} shape as the CLI recorder).
+import type { RecorderStore } from "@pome-sh/sdk/server";
 import {
   applySeed as applyStripeSeed,
   createFailureInjectionStore,
@@ -110,9 +113,9 @@ export async function bootTwin(opts: {
       const app = createSlackTwinApp({
         db,
         domain,
-        // One shared CLI recorder buffers events for every twin; the slack app
-        // types its param as the slack `Recorder` (same structural shape).
-        recorder: recorder as unknown as SlackRecorder,
+        // One shared CLI recorder buffers events for every twin; the engine
+        // types its param as `RecorderStore` (same structural shape).
+        recorder: recorder as unknown as RecorderStore,
         runId: opts.runId,
       }) as TwinHarness["app"];
       return {

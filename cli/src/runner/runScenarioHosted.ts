@@ -9,7 +9,7 @@ import {
   VERDICT_ARTIFACT_VERSION,
   writeVerdictArtifact,
 } from "../recorder/verdictArtifact.js";
-import { redactEvent, redactSecrets } from "../recorder/redaction.js";
+import { redactEvent, redactSecrets } from "@pome-sh/sdk";
 import { parseScenarioFile } from "../scenario/parseScenario.js";
 import { createHostedClient, type HostedClient } from "../hosted/client.js";
 import {

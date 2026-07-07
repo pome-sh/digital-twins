@@ -18,11 +18,13 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepublishOnly": "tsc -p tsconfig.build.json"
   },
+  "//sdk": "F-713: redaction comes from the engine — the per-package byte-identical mirror is deleted. In-repo `workspace:*` resolves to packages/sdk; scripts/pack-publishable.mjs rewrites it to the vendored `file:./vendor/<sdk tgz>` + bundledDependencies at pack time so the published tarball stays self-contained (@pome-sh/sdk is npm-held until OSS Launch Stage 1).",
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.219.0",
     "@opentelemetry/resources": "^2.0.0",
-    "@opentelemetry/sdk-trace-base": "^2.0.0"
+    "@opentelemetry/sdk-trace-base": "^2.0.0",
+    "@pome-sh/sdk": "workspace:*"
   },
   "peerDependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.197"

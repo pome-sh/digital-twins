@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { Scenario } from "../scenario/scenarioSchema.js";
 import type { RecorderEvent } from "@pome-sh/shared-types";
-import { redactEvent, redactSecrets } from "./redaction.js";
+import { redactEvent, redactSecrets } from "@pome-sh/sdk";
 
 // FDRS-399 / FDRS-398 — wrap a legacy RecorderEvent (or pass through any row
 // that already carries a `kind` discriminator) into the unified events.jsonl

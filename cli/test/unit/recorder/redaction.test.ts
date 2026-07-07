@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "vitest";
-import { redactEvent } from "../../../src/recorder/redaction.js";
+// F-713: the CLI consumes redaction from the VENDORED @pome-sh/sdk tarball
+// (cli/vendor). This suite now guards the shipped artifact: a stale or
+// regressed vendored engine fails here even though the engine's own suite
+// (packages/sdk/test/redaction.test.ts) is green in the workspace.
+import { redactEvent } from "@pome-sh/sdk";
 
 describe("redactEvent — hard-redacted header keys", () => {
   it("redacts Authorization (case-insensitive) to [REDACTED]", () => {

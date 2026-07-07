@@ -16,7 +16,7 @@ import { mkdir } from "node:fs/promises";
 import { createServer as createHttpServer, type Server, type IncomingMessage } from "node:http";
 import { connect as netConnect, type Socket } from "node:net";
 import { dirname } from "node:path";
-import { redactEvent } from "../recorder/redaction.js";
+import { redactEvent } from "@pome-sh/sdk";
 import { isHostAllowed, type EgressRefusedRow } from "./egress.js";
 
 export interface CaptureServerOptions {

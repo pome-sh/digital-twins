@@ -4,10 +4,13 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const canonical = "cli/src/recorder/redaction.ts";
+// F-713: the old canonical (cli/src/recorder/redaction.ts) and the
+// adapter-claude-sdk mirror are deleted — both consume redaction from
+// @pome-sh/sdk (packages/sdk/src/redaction.ts, the engine implementation).
+// The remaining per-twin mirrors stay byte-locked to each other until their
+// engine ports (F-682 github, F-684 stripe) delete them.
+const canonical = "packages/twin-github/src/redaction.ts";
 const mirrors = [
-  "packages/adapter-claude-sdk/src/redaction.ts",
-  "packages/twin-github/src/redaction.ts",
   "packages/twin-stripe/src/redaction.ts",
 ];
 

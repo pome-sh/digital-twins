@@ -3,10 +3,11 @@
 // Engine redaction (F-681). This is the twin-infra implementation applied by
 // the SDK recorder at every event emit and by the `/_pome/state` route, so a
 // twin cannot ship an unredacted tape by forgetting its own copy (the class
-// of bug where one twin redacts and another doesn't). The per-package
-// redaction.ts mirrors (canonical cli/src/recorder/redaction.ts) still cover
-// the not-yet-ported write sites; they are deleted in F-685/F-713 once every
-// consumer reads this module.
+// of bug where one twin redacts and another doesn't). Since F-713 the CLI and
+// @pome-sh/adapter-claude-sdk consume this module directly (their mirrors are
+// deleted); the remaining twin-github/twin-stripe redaction.ts mirrors cover
+// the not-yet-ported write sites and die with their engine ports (F-682/F-684
+// close out the F-685 gate flip).
 //
 // Two layers, both unconditional:
 //   1. Key-based: any field whose key matches the hard-redact list is replaced

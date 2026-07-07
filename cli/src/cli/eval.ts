@@ -39,7 +39,7 @@ import {
   type UploadClient,
 } from "../hosted/uploadAndFinalize.js";
 import { readLatestRun, toTwinHttpEvent } from "../recorder/artifacts.js";
-import { redactEvent, redactSecrets } from "../recorder/redaction.js";
+import { redactEvent, redactSecrets } from "@pome-sh/sdk";
 import {
   markerFor,
   outcomeOf,

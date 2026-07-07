@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { readFile, writeFile } from "node:fs/promises";
 import { eventSchema, type Event } from "../types/shared.js";
-import { redactEvent } from "../recorder/redaction.js";
+import { redactEvent } from "@pome-sh/sdk";
 
 // Post-run merge of the adapter signals JSONL into the canonical events.jsonl
 // (FDRS-411 + FDRS-412). This is a pure ts-sort/interleave step implemented

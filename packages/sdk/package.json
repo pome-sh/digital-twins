@@ -30,7 +30,7 @@
   },
   "bundledDependencies": ["@pome-sh/shared-types"],
   "peerDependencies": {
-    "@hono/node-server": "^1.19.6",
+    "@hono/node-server": "^1.19.6 || ^2.0.0",
     "better-sqlite3": "^12.5.0"
   },
   "peerDependenciesMeta": {
