@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { seedSchema } from "@pome-sh/twin-github";
+import { parseSeed, seedSchema } from "@pome-sh/twin-github";
 
 // Bundled scenario sidecars and legacy compile output used singular `assignee`
 // on issues; @pome-sh/twin-github's seedSchema expects `assignees[]`. Zod strips
@@ -38,8 +38,8 @@ function normalizeLegacyIssueAssignee(issue: unknown): unknown {
   return issue;
 }
 
-export function parseGitHubSeedState(input: unknown) {
-  const seed = seedSchema.parse(normalizeLegacyGitHubSeed(input));
+export function parseGitHubSeedState(input: unknown): ReturnType<typeof seedSchema.parse> {
+  const seed = seedSchema.parse(parseSeed(normalizeLegacyGitHubSeed(input)));
   if (seed.repositories.length === 0) {
     throw new Error("GitHub seed must contain at least one repository");
   }
