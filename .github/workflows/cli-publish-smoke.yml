@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - 'cli/**'
+      - 'packages/**'
+      - 'scripts/pack-publishable.mjs'
       - '.github/workflows/cli-publish-smoke.yml'
 
 concurrency:
@@ -26,10 +28,42 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
-      - run: node scripts/verify-vendor.mjs
+      - name: Build local @pome-sh package tarballs
+        working-directory: ${{ github.workspace }}
+        run: |
+          bun install --frozen-lockfile --filter '*'
+          node scripts/pack-publishable.mjs --out "$RUNNER_TEMP/tarballs"
+      - name: Use local package tarballs before first npm publish
+        run: |
+          node --input-type=module <<'NODE'
+          import { readdirSync, writeFileSync, readFileSync } from "node:fs";
+          import { join } from "node:path";
+
+          const tarballs = Object.fromEntries(
+            readdirSync(`${process.env.RUNNER_TEMP}/tarballs`)
+              .filter((name) => name.endsWith(".tgz"))
+              .map((name) => {
+                const pkgName = name
+                  .replace(/^pome-sh-/, "@pome-sh/")
+                  .replace(/-\d+\.\d+\.\d+.*\.tgz$/, "");
+                return [pkgName, `file:${join(process.env.RUNNER_TEMP, "tarballs", name)}`];
+              }),
+          );
+
+          const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+          for (const name of [
+            "@pome-sh/shared-types",
+            "@pome-sh/twin-github",
+            "@pome-sh/twin-slack",
+            "@pome-sh/twin-stripe",
+          ]) {
+            pkg.dependencies[name] = tarballs[name];
+          }
+          writeFileSync("package.json", `${JSON.stringify(pkg, null, 2)}\n`);
+          NODE
       # Match the release job: copyfile backend so bundleDependencies aren't
       # hard-linked (npm registry rejects hard-link tar entries with E415).
-      - run: bun install --frozen-lockfile --backend=copyfile
+      - run: bun install --backend=copyfile
       - run: bun run build
       - name: npm publish --dry-run (packs the real tarball)
         run: npm publish --dry-run --ignore-scripts 2>&1 | tee "$RUNNER_TEMP/pack.log"
