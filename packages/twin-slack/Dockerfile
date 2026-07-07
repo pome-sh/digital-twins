@@ -30,6 +30,10 @@ ENV SLACK_CLONE_HOST=0.0.0.0
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 COPY --from=build /repo/node_modules ./node_modules
 COPY --from=build /repo/packages/shared-types ./packages/shared-types
+# The twin's dist imports `@pome-sh/sdk`; ship the SDK's built output so the
+# workspace symlink in node_modules resolves at runtime.
+COPY --from=build /repo/packages/sdk/package.json ./packages/sdk/package.json
+COPY --from=build /repo/packages/sdk/dist ./packages/sdk/dist
 COPY --from=build /repo/packages/twin-slack/package.json ./packages/twin-slack/package.json
 COPY --from=build /repo/packages/twin-slack/dist ./packages/twin-slack/dist
 EXPOSE 3333
