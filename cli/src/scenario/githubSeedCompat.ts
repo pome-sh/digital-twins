@@ -39,5 +39,9 @@ function normalizeLegacyIssueAssignee(issue: unknown): unknown {
 }
 
 export function parseGitHubSeedState(input: unknown) {
-  return seedSchema.parse(normalizeLegacyGitHubSeed(input));
+  const seed = seedSchema.parse(normalizeLegacyGitHubSeed(input));
+  if (seed.repositories.length === 0) {
+    throw new Error("GitHub seed must contain at least one repository");
+  }
+  return seed;
 }

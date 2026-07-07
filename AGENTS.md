@@ -30,7 +30,7 @@ section in the same PR.
 
 | Invariant | Enforced by |
 | --- | --- |
-| bun only | root `preinstall` (`only-allow bun`) |
+| bun only | root `preinstall` checks `npm_config_user_agent` for Bun |
 | CLI capture-only (no local eval/scoring) | `cli/scripts/no-eval-in-oss.mjs` in [`.github/workflows/cli-ci.yml`](.github/workflows/cli-ci.yml) |
 | No cloud imports in OSS packages | [`scripts/lint-no-cloud-imports.sh`](scripts/lint-no-cloud-imports.sh) |
 | Mirror byte parity (until M6) | [`scripts/check-redaction-mirrors.mjs`](scripts/check-redaction-mirrors.mjs), [`scripts/check-admin-gate-mirrors.mjs`](scripts/check-admin-gate-mirrors.mjs) |

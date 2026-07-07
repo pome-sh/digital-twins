@@ -46,4 +46,10 @@ describe("githubSeedCompat", () => {
       repositories: [{ issues: [{ assignees: ["bob"] }] }],
     });
   });
+
+  it("rejects empty repository seeds before booting a twin", () => {
+    expect(() => parseGitHubSeedState({ repositories: [] })).toThrow(
+      "GitHub seed must contain at least one repository",
+    );
+  });
 });

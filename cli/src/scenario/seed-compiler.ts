@@ -28,7 +28,7 @@ Rules:
 5. Do not invent entities not mentioned. If the prose describes one issue, output exactly one issue.
 6. Issue \`number\` is required and must be set (use #N if the prose says so, otherwise start at 1).
 7. PR \`number\` is optional; set it when the prose says "#N".
-8. Issue \`assignee\` is a single string or null — not an array.
+8. Issue \`assignees\` is an array of login strings; use [] when unassigned.
 9. Use fenced code blocks in the prose to indicate the exact content of \`files[].content\`. Preserve trailing newlines verbatim.`;
 
 export interface CompileResult {
