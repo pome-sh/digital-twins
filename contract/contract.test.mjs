@@ -12,8 +12,8 @@
 // The suite body lives in ./suite.mjs (FDRS-681) so the identical assertions
 // also run against the sdk-booted proof entry (./sdk-boot.test.mjs).
 //
-// Prerequisite: `bun run --filter '@pome-sh/shared-types' build:runtime` and
-// `bun run --filter '@pome-sh/twin-*' build` (the root `test:contract` script
+// Prerequisite: `npm run --filter '@pome-sh/shared-types' build:runtime` and
+// `npm run --filter '@pome-sh/twin-*' build` (the root `test:contract` script
 // chains all three).
 
 import { describe } from "node:test";
