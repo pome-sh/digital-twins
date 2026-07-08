@@ -1,3 +1,4 @@
+// file-size: engine surface grew with the per-twin pins (F-682/F-684); the F-685 sweep in this stack splits boot/dispatch helpers into server-helpers.ts
 // SPDX-License-Identifier: Apache-2.0
 //
 // `@pome-sh/sdk/server` — boot a `TwinDefinition` into a Hono app and
