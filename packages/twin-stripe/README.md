@@ -277,8 +277,7 @@ deterministic-enough for tests but not identical to real Stripe.
 
 ## Pome Cloud (twin selector)
 
-Once `pome-sh/pome-cloud` ships the matching FDRS-275/276 changes, the
-hosted dashboard exposes a **stripe x402** button next to GitHub.
-Clicking it spawns a per-session Vercel Sandbox running this exact
-package. The agent in your session sees the same surface this README
-describes; URLs are path-routed (`https://twins.pome.sh/s/<sid>/...`).
+The hosted dashboard exposes a **Stripe x402** button next to GitHub.
+Clicking it spawns a per-session Vercel Sandbox running this exact package.
+The agent in your session sees the same surface this README describes; URLs
+are path-routed (`https://twins.pome.sh/s/<sid>/...`).
