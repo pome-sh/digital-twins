@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Moved from packages/twin-slack/test (F-683): the secret-resolution
+// mechanism is the engine's, so its unit coverage lives with the engine.
 import { afterEach, describe, expect, it } from "vitest";
 import { resolveAuthSecret } from "../src/auth.js";
 

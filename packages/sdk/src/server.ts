@@ -20,20 +20,23 @@
 // `/s/:sid/*`. The SDK refuses to boot if any user route shadows the
 // `/_pome/*` or `/mcp/*` prefixes (OQ-B6 invariant).
 
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { z } from "zod";
 import {
   RESERVED_SESSION_PREFIXES,
+  toolInputSchema,
   type RecorderHandle,
   type ToolSpec,
   type TwinDefinition,
 } from "./index.js";
 import { bearerAuth, requireAdminAuth } from "./auth.js";
+import { createAdminGate } from "./admin-gate.js";
+import { makeToolCallContext } from "./tool-context.js";
 import { twinBuildInfo } from "./build-info.js";
 import { handleMcpJsonRpc, mcpMethodNotAllowed } from "./mcp-jsonrpc.js";
 import { createRecorderHandle, type RecorderStore } from "./recorder.js";
 import { redactSecrets } from "./redaction.js";
-import { TwinError, UnknownToolError } from "./errors.js";
+import { TwinError, UnknownToolError, envelopeFor } from "./errors.js";
 
 export { createRecorderHandle, createRecorderStore } from "./recorder.js";
 export type { RecorderStore, ErrorEnvelopeFn } from "./recorder.js";
@@ -175,22 +178,42 @@ export function createApp<TDb, TSeed, TDomain>(
     })
   );
 
-  // 7. Admin sub-app
+  // Per-twin body reader for the engine-owned JSON surfaces. Default is
+  // strict JSON (malformed → SyntaxError into the twin's errorEnvelope);
+  // twins with frozen tolerant/form parsing (slack, stripe) declare theirs.
+  const readBody = definition.bodyReader ?? ((c: Context) => readJson(c.req.raw));
+
+  // 7. Admin sub-app. Gate mechanism is the engine's; a twin with a frozen
+  //    403 body declares it via `admin.forbidden` (F-683).
+  const adminForbidden = definition.admin?.forbidden;
   const adminApp = new Hono();
-  adminApp.use("*", requireAdminAuth());
+  adminApp.use(
+    "*",
+    adminForbidden
+      ? createAdminGate({
+          forbidden: () => {
+            const envelope = adminForbidden();
+            return Response.json(envelope.body, { status: envelope.status });
+          },
+        })
+      : requireAdminAuth()
+  );
+  const adminEnvelope = definition.admin?.errorEnvelope;
   adminApp.post(
     "/reset",
-    recorder.handle({ mutation: true }, async () => {
+    recorder.handle({ mutation: true, errorEnvelope: adminEnvelope }, async () => {
       if (!definition.admin?.reset) {
         throw new TwinError("admin.reset is not configured for this twin", 501);
       }
-      const body = (await definition.admin.reset({ domain })) ?? { ok: true };
-      return { status: 200, body };
+      let delta: unknown = null;
+      const reportDelta = (d: unknown) => { delta = d; };
+      const body = (await definition.admin.reset({ domain, reportDelta })) ?? { ok: true };
+      return { status: 200, body, delta: delta as never };
     })
   );
   adminApp.post(
     "/seed",
-    recorder.handle({ mutation: true }, async (c) => {
+    recorder.handle({ mutation: true, errorEnvelope: adminEnvelope }, async (c) => {
       if (!definition.admin?.seed) {
         throw new TwinError("admin.seed is not configured for this twin", 501);
       }
@@ -200,10 +223,12 @@ export function createApp<TDb, TSeed, TDomain>(
           501
         );
       }
-      const raw = await readJson(c.req.raw);
+      const raw = await readBody(c);
       const parsed = definition.seed.parse(raw) as TSeed;
-      const body = (await definition.admin.seed({ domain, seed: parsed })) ?? { ok: true };
-      return { status: 200, body };
+      let delta: unknown = null;
+      const reportDelta = (d: unknown) => { delta = d; };
+      const body = (await definition.admin.seed({ domain, seed: parsed, reportDelta })) ?? { ok: true };
+      return { status: 200, body, delta: delta as never };
     })
   );
   root.route("/admin", adminApp);
@@ -213,30 +238,39 @@ export function createApp<TDb, TSeed, TDomain>(
   const session = new Hono();
   session.use("*", bearerAuth(definition.auth));
 
+  // Session-wide middleware slot — the pre-port `session.use("*")` position,
+  // mounted BEFORE the engine's MCP / `/_pome/*` routes so twin middleware
+  // (stripe failure-injection, idempotency) covers MCP dispatch too.
+  if (definition.middleware) {
+    definition.middleware(session, { domain, recorder, runId, twin: definition.id });
+  }
+
   session.get("/healthz", (c) => c.json({ ok: true, sid: c.req.param("sid") }));
+  // `pomeHealth` extras replace the default {version, fidelity} for twins
+  // with a frozen /_pome/health shape (slack: bare {ok, twin}).
+  const pomeHealthExtras =
+    definition.pomeHealth ??
+    (() => ({ version: definition.version, fidelity: definition.fidelity.default }));
   session.get("/_pome/health", (c) =>
-    c.json({
-      ok: true,
-      twin: definition.id,
-      version: definition.version,
-      fidelity: definition.fidelity.default,
-    })
+    c.json({ ok: true, twin: definition.id, ...pomeHealthExtras({ recorder }) })
   );
-  session.get(
-    "/_pome/state",
-    recorder.handle({ mutation: false }, async () => {
+  // NOT recorder-wrapped: no pre-port twin recorded /_pome/state fetches on
+  // the tape (F-683 review pin) — the export is a read-side probe, and
+  // recording it would embed the full state as an event response_body.
+  session.get("/_pome/state", async (c) => {
+    try {
       if (!definition.state) {
-        throw new TwinError(
-          "state introspection is not configured for this twin",
-          501
-        );
+        throw new TwinError("state introspection is not configured for this twin", 501);
       }
       const state = await definition.state({ domain });
       // Central redaction: the state export feeds cloud-side scoring and the
       // CLI trace; a twin must not be able to leak secrets by omission.
-      return { status: 200, body: redactSecrets(state) };
-    })
-  );
+      return c.json(redactSecrets(state) as never);
+    } catch (err) {
+      const envelope = (definition.errorEnvelope ?? envelopeFor)(err);
+      return c.json(envelope.body as never, envelope.status as never);
+    }
+  });
   session.get("/_pome/events", (c) => c.json(recorder.events()));
 
   // 9. MCP routes from tool registry. `/mcp` is the streamable-HTTP
@@ -250,7 +284,8 @@ export function createApp<TDb, TSeed, TDomain>(
       tools: definition.tools.map((tool) => ({
         name: tool.name,
         description: tool.description,
-        input_schema: z.toJSONSchema(tool.schema),
+        input_schema: toolInputSchema(tool),
+        ...(tool.annotations ? { annotations: tool.annotations } : {}),
       })),
     })
   );
@@ -259,23 +294,46 @@ export function createApp<TDb, TSeed, TDomain>(
     recorder.handle({ mutation: false }, async (c) => {
       const name = c.req.param("name") ?? "";
       const tool = findTool(definition, name);
-      const args = await readJson(c.req.raw);
+      const args = await readBody(c);
       const parsed = tool.schema.parse(args ?? {});
-      const result = await tool.handler(domain, parsed);
-      return { status: 200, body: result, mutation: tool.mutation };
+      const call = makeToolCallContext(c);
+      const result = await tool.handler(domain, parsed, call.ctx);
+      return { status: 200, body: result, mutation: tool.mutation, delta: call.delta() };
     })
   );
   session.post(
     "/mcp/call",
     recorder.handle({ mutation: false }, async (c) => {
-      const raw = await readJson(c.req.raw);
-      const call = z
-        .object({ tool: z.string().min(1), arguments: jsonRecord.default({}) })
-        .parse(raw);
+      const raw = await readBody(c);
+      let call: { tool: string; arguments: Record<string, unknown> };
+      if (definition.legacyMcp?.aliases) {
+        // Frozen slack surface: {name}/{params} alias {tool}/{arguments};
+        // a body naming no tool answers the twin's own envelope (400
+        // invalid_arguments) instead of the strict-parse error.
+        const rec = (raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {}) as Record<string, unknown>;
+        const name = rec.tool ?? rec.name;
+        if (typeof name !== "string" || name.length === 0) {
+          const missing = definition.legacyMcp.missingTool;
+          if (missing) {
+            const envelope = missing();
+            return { status: envelope.status, body: envelope.body };
+          }
+          z.object({ tool: z.string().min(1) }).parse(rec); // throws the strict-parse error
+        }
+        call = {
+          tool: name as string,
+          arguments: (rec.arguments ?? rec.params ?? {}) as Record<string, unknown>,
+        };
+      } else {
+        call = z
+          .object({ tool: z.string().min(1), arguments: jsonRecord.default({}) })
+          .parse(raw) as { tool: string; arguments: Record<string, unknown> };
+      }
       const tool = findTool(definition, call.tool);
       const parsed = tool.schema.parse(call.arguments);
-      const result = await tool.handler(domain, parsed);
-      return { status: 200, body: result, mutation: tool.mutation };
+      const toolCall = makeToolCallContext(c);
+      const result = await tool.handler(domain, parsed, toolCall.ctx);
+      return { status: 200, body: result, mutation: tool.mutation, delta: toolCall.delta() };
     })
   );
 

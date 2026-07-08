@@ -31,16 +31,43 @@ export type ErrorEnvelopeFn = (err: unknown) => { status: number; body: unknown 
 export interface RecorderStore {
   record(event: RecorderEvent): void;
   events(): RecorderEvent[];
+  /** Event count without the O(N) copy `events()` makes. Optional for custom stores. */
+  count?(): number;
+  /** Events dropped by a bounded store (stripe pins a 10k cap + dropped counter). */
+  dropped?(): number;
 }
 
-export function createRecorderStore(): RecorderStore {
+export interface RecorderStoreOptions {
+  /**
+   * Bound the in-memory tape: past `maxEvents` the store drops the OLDEST
+   * event and increments the `dropped()` counter (stripe's pre-port
+   * D-ENG-10/E-10 recorder behavior). Default: unbounded (github/slack).
+   */
+  maxEvents?: number;
+}
+
+export function createRecorderStore(options: RecorderStoreOptions = {}): RecorderStore {
   const items: RecorderEvent[] = [];
+  const cap = options.maxEvents !== undefined ? Math.max(1, options.maxEvents) : undefined;
+  let droppedCount = 0;
   return {
     record(event) {
       items.push(event);
+      if (cap !== undefined) {
+        while (items.length > cap) {
+          items.shift();
+          droppedCount += 1;
+        }
+      }
     },
     events() {
       return [...items];
+    },
+    count() {
+      return items.length;
+    },
+    dropped() {
+      return droppedCount;
     },
   };
 }
@@ -71,13 +98,24 @@ export function createRecorderHandle(options: RecorderHandleOptions): RecorderHa
     fidelity: "semantic" | "unsupported",
     error: string | null
   ) {
+    const requestId = `req_${randomUUID()}`;
+    // FDRS-402 / FDRS-653 stamping (F-683: engine parity with the per-twin
+    // recorders it replaces): correlation_id persists the adapter's
+    // x-pome-correlation-id (falling back to the request id), and the task
+    // author's x-pome-scenario-step-id lands as the canonical task_step_id
+    // plus the legacy scenario_step_id key (frozen v1 trace format —
+    // preserve semantics, tolerant readers accept either).
+    const stepId = c.req.header("x-pome-scenario-step-id") ?? null;
     // Redaction is unconditional at the engine layer (F-681): every event
     // that reaches any store — including custom stores — is already scrubbed.
     store.record(redactEvent({
       ts: new Date().toISOString(),
       run_id: options.runId,
       twin: options.twin,
-      request_id: `req_${randomUUID()}`,
+      request_id: requestId,
+      correlation_id: c.req.header("x-pome-correlation-id") ?? requestId,
+      task_step_id: stepId,
+      scenario_step_id: stepId,
       step_id: null,
       tool_call_id: null,
       method: c.req.method,
@@ -100,7 +138,8 @@ export function createRecorderHandle(options: RecorderHandleOptions): RecorderHa
     events() {
       return store.events();
     },
-    handle({ mutation, fidelity = "semantic" }, fn) {
+    handle({ mutation, fidelity = "semantic", errorEnvelope: perCallEnvelope }, fn) {
+      const projectError = perCallEnvelope ?? errorEnvelope;
       return async (c) => {
         const started = Date.now();
         let requestBody: unknown = null;
@@ -108,7 +147,7 @@ export function createRecorderHandle(options: RecorderHandleOptions): RecorderHa
           requestBody =
             c.req.method === "GET" || c.req.method === "HEAD"
               ? null
-              : await c.req.raw.clone().json().catch(() => null);
+              : await readRequestJson(c);
           const result = await fn(c);
           const effectiveMutation = result.mutation ?? mutation;
           const errorMsg =
@@ -116,7 +155,7 @@ export function createRecorderHandle(options: RecorderHandleOptions): RecorderHa
           emit(c, started, requestBody, result, effectiveMutation, fidelity, errorMsg);
           return c.json(result.body as never, result.status as never);
         } catch (caught) {
-          const envelope = errorEnvelope(caught);
+          const envelope = projectError(caught);
           // Failed routes never mutated state — record as state_mutation=false
           // regardless of the declared flag. Per recording-spec § state_mutation,
           // the field reflects whether the request *did* mutate state.
@@ -137,6 +176,17 @@ export function createRecorderHandle(options: RecorderHandleOptions): RecorderHa
       };
     },
   };
+}
+
+// `clone()` throws synchronously once the body stream is disturbed — e.g.
+// after the form token resolver's parseBody() read a form-encoded POST
+// (F-683). A consumed or non-JSON body records as null, never a 500.
+async function readRequestJson(c: Context): Promise<unknown> {
+  try {
+    return await c.req.raw.clone().json();
+  } catch {
+    return null;
+  }
 }
 
 function extractMessage(body: unknown): string | undefined {
