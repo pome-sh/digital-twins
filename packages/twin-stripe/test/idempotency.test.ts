@@ -6,7 +6,7 @@
 // body) returns 400 with code idempotency_key_in_use.
 import { describe, expect, it } from "vitest";
 import type { Hono } from "hono";
-import { createTwinStripeApp } from "../src/app.js";
+import { createTwinStripeApp } from "../src/twin.js";
 import { openTwinStripeDatabase } from "../src/db.js";
 import { applySeed, defaultSeed, DEFAULT_API_KEY, DEFAULT_SID } from "../src/seed.js";
 import { createStripeApp, rest, type StripeTestApp } from "./_appHelper.js";
@@ -21,8 +21,8 @@ function buildApp() {
 
   const app = createTwinStripeApp({
     db,
-    extendSession(session: Hono) {
-      session.post("/v1/echo", async (c) => {
+    extendRoutes(routes: Hono) {
+      routes.post("/v1/echo", async (c) => {
         counter += 1;
         const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
         return c.json({ id: `obj_${counter}`, echo: body, counter }, 200);
@@ -180,8 +180,8 @@ describe("Idempotency-Key middleware", () => {
     let handlerInvocations = 0;
     const app = createTwinStripeApp({
       db,
-      extendSession(session: Hono) {
-        session.post("/v1/echo_strict", async (c) => {
+      extendRoutes(routes: Hono) {
+        routes.post("/v1/echo_strict", async (c) => {
           handlerInvocations += 1;
           const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
           if (body.required !== true) {

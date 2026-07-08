@@ -7,14 +7,8 @@
 // events anything created by session A.
 
 import { describe, expect, it } from "vitest";
-import type { Hono } from "hono";
-import type { ResolvedSession } from "../src/types.js";
-import { createTwinStripeApp } from "../src/app.js";
-import { StripeDomain } from "../src/domain/index.js";
+import { createTwinStripeApp } from "../src/twin.js";
 import { openTwinStripeDatabase } from "../src/db.js";
-import { listTools } from "../src/tools.js";
-import { registerStripeRoutes } from "../src/routes/index.js";
-import { applySeed } from "../src/seed.js";
 
 const KEY_A = "sk_test_pome_a";
 const KEY_B = "sk_test_pome_b";
@@ -24,26 +18,14 @@ const SID_B = "b";
 function bootSharedDbApp() {
   const db = openTwinStripeDatabase(":memory:");
   // Two api keys → two sessions in the same DB.
-  applySeed(db, {
-    api_keys: [
-      { key: KEY_A, sid: SID_A, account_id: `acct_${SID_A}` },
-      { key: KEY_B, sid: SID_B, account_id: `acct_${SID_B}` }
-    ]
-  });
-  let domain!: StripeDomain;
   const app = createTwinStripeApp({
     db,
     runId: "scope-test",
-    toolCount: listTools().length,
-    extendSession: (session: Hono, ctx) => {
-      domain = new StripeDomain(ctx.db);
-      registerStripeRoutes(session, domain, ctx.recorder, ctx.runId);
-      return {
-        stateProvider: (_c, sess: ResolvedSession | undefined) => {
-          if (!sess) return {};
-          return domain.exportState(sess.account_id);
-        }
-      };
+    seed: {
+      api_keys: [
+        { key: KEY_A, sid: SID_A, account_id: `acct_${SID_A}` },
+        { key: KEY_B, sid: SID_B, account_id: `acct_${SID_B}` }
+      ]
     }
   });
   return { app, db };

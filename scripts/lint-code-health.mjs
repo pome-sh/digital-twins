@@ -13,6 +13,7 @@ const BARREL_PATHS = [
   "packages/twin-github/src/index.ts",
   "packages/twin-slack/src/index.ts",
   "packages/twin-stripe/src/index.ts",
+  "packages/twin-stripe/src/domain/index.ts",
   "packages/adapter-claude-sdk/src/index.ts",
 ];
 

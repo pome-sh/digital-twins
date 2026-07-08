@@ -11,8 +11,11 @@
 // is indistinguishable from one created by `simulateCryptoDeposit` /
 // `POST /v1/refunds` on read.
 import { z } from "zod";
+import {
+  failureInjectionRuleSchema,
+  type FailureInjectionStore,
+} from "@pome-sh/sdk/server";
 import { mintApiKey } from "./api-keys.js";
-import { failureInjectionRuleSchema, type FailureInjectionStore } from "./failure-injection.js";
 import { ensureStripeTables } from "./domain/schema.js";
 import type { SeedState, TwinStripeDatabase } from "./types.js";
 

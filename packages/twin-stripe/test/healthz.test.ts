@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "vitest";
-import { createTwinStripeApp } from "../src/app.js";
+import { createTwinStripeApp } from "../src/twin.js";
 
 describe("/healthz", () => {
   it("returns 200 with the snapshot probe shape", async () => {

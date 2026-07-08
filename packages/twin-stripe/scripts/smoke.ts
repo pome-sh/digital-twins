@@ -115,7 +115,7 @@ async function main() {
       const body = await r.json() as Record<string, unknown>;
       assertOk(body.twin === "stripe", `1. healthz twin=${body.twin}, expected "stripe"`);
       assertOk(body.implementation === "stripe_clone", `1. implementation=${body.implementation}`);
-      assertOk(body.tools === 12, `1. tools=${body.tools}, expected 12`);
+      assertOk(body.tools === 15, `1. tools=${body.tools}, expected 15`);
       log("ok", `healthz: tools=${body.tools}, fidelity=${body.fidelity}, tthw=${(body.tthw_seconds as number).toFixed(2)}s`);
     }
 

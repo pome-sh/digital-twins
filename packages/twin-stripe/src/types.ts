@@ -1,21 +1,24 @@
 // SPDX-License-Identifier: Apache-2.0
-import type Database from "better-sqlite3";
+import type { TwinDatabase } from "@pome-sh/sdk";
+import type { FailureInjectionRule } from "@pome-sh/sdk/server";
 import type { RecorderEvent } from "@pome-sh/shared-types";
 
-export type TwinStripeDatabase = Database.Database;
+// The engine's driver wrapper is the only database surface a twin sees
+// (F-681/F-684): prepare/exec/pragma/transaction/close.
+export type TwinStripeDatabase = TwinDatabase;
 
 // ----- Recorder -------------------------------------------------------------
 //
 // RecorderEvent is the canonical wedge surface (FDRS-318). Re-exported from
 // shared-types so this twin can't drift its on-wire event shape from the
-// CLI / cloud parsers.
+// CLI / cloud parsers. The recorder mechanism lives in the engine since
+// F-684; domain routes only need the `record` sink (the engine's
+// RecorderHandle satisfies it structurally).
 
 export type { RecorderEvent, StateDelta } from "@pome-sh/shared-types";
 
 export type Recorder = {
   record(event: RecorderEvent): void;
-  events(): RecorderEvent[];
-  dropped(): number;
 };
 
 // Internal helper: the fidelity values respond() and the error envelope emit.
@@ -26,16 +29,10 @@ export type StripeFidelity = "semantic" | "unsupported";
 
 // ----- Seed -----------------------------------------------------------------
 
-export type FailureInjectionMode = "before_handler" | "after_handler";
-
-export type FailureInjectionRule = {
-  method: string;
-  path: string;
-  attempt: number;
-  mode: FailureInjectionMode;
-  status: number;
-  body: unknown;
-};
+// Failure injection graduated into the engine (F-684 ruling): the rule
+// store + middleware are generic twin mechanism; the rule payloads stay in
+// the stripe seed. Re-exported so seed consumers keep one import site.
+export type { FailureInjectionMode, FailureInjectionRule } from "@pome-sh/sdk/server";
 
 // Forward-declared row shapes for the seed collections live in `seed.ts`
 // (they're zod-inferred there). The `SeedState` type here uses loose
@@ -231,17 +228,14 @@ export type RefundRow = {
   created: number;
 };
 
-// ----- Bearer claims --------------------------------------------------------
+// ----- Bearer session -------------------------------------------------------
 
-export interface SessionClaims {
-  sid: string;
-  account_id?: string;
-  exp?: number;
-}
-
+// The shape the engine's bearerAuth resolves for stripe: the F-712 hooks
+// (resolveCredential / providerSession / sessionExtras in twin.ts) all
+// stamp `account_id` + `via` onto the generic engine session.
 export type ResolvedSession = {
   sid: string;
   account_id: string;
   // Track auth shape so handlers can branch if needed (e.g., metadata).
-  via: "jwt" | "api_key";
+  via?: "jwt" | "api_key";
 };
