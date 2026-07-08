@@ -64,7 +64,7 @@
     "@ai-sdk/gateway": "^3.0.143",
     "@ai-sdk/google": "^3.0.80",
     "@ai-sdk/openai": "^3.0.67",
-    "@anthropic-ai/sdk": "^0.109.0",
+    "@anthropic-ai/sdk": "^0.110.0",
     "@hono/node-server": "^2.0.6",
     "@openrouter/ai-sdk-provider": "^2.9.0",
     "@pome-sh/shared-types": "0.6.0",
