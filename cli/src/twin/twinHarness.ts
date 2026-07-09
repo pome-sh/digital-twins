@@ -54,8 +54,8 @@ export type TwinHarness = {
   /** Extra JWT claims the runner mints into the agent token (e.g. Stripe's
    *  `account_id`, so the token resolves to the account the seed lives in). */
   extraClaims?: Record<string, unknown>;
-  /** Release the SQLite handle. */
-  close(): void;
+  /** Flush durable recorder (if any) and release the SQLite handle. */
+  close(): void | Promise<void>;
 };
 
 export class UnsupportedTwinError extends Error {
@@ -73,8 +73,19 @@ export async function bootTwin(opts: {
   seedState: unknown;
   runId: string;
   twinBaseUrl?: string;
+  /**
+   * F-698: when set, twin HTTP events stream to this NDJSON path via the
+   * twin-core durable recorder (same file capture-server appends to).
+   */
+  eventsPath?: string;
 }): Promise<TwinHarness> {
-  const recorder = createRecorder();
+  const recorder = createRecorder({ eventsPath: opts.eventsPath });
+
+  const closeRecorderAndDb = async (dbClose: () => void) => {
+    await recorder.flush?.();
+    await recorder.close?.();
+    dbClose();
+  };
 
   switch (opts.twin) {
     case "github": {
@@ -90,7 +101,7 @@ export async function bootTwin(opts: {
         envName: "GITHUB",
         exportState: () => exportGitHubCloneState(db),
         events: () => recorder.events(),
-        close: () => (db as { close(): void }).close(),
+        close: () => closeRecorderAndDb(() => (db as { close(): void }).close()),
       };
     }
 
@@ -114,7 +125,7 @@ export async function bootTwin(opts: {
         envName: "SLACK",
         exportState: () => domain.exportState(),
         events: () => recorder.events(),
-        close: () => db.close(),
+        close: () => closeRecorderAndDb(() => db.close()),
       };
     }
 
@@ -140,7 +151,7 @@ export async function bootTwin(opts: {
         exportState: () => domain.exportState(STRIPE_LOCAL_ACCOUNT_ID),
         events: () => recorder.events(),
         extraClaims: { account_id: STRIPE_LOCAL_ACCOUNT_ID },
-        close: () => db.close(),
+        close: () => closeRecorderAndDb(() => db.close()),
       };
     }
 
