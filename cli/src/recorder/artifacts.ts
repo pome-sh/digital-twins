@@ -2,31 +2,16 @@
 import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { toTwinHttpEventRow } from "@pome-sh/sdk/server";
 import type { Scenario } from "../scenario/scenarioSchema.js";
 import type { RecorderEvent } from "@pome-sh/shared-types";
 import { redactEvent, redactSecrets } from "./redaction.js";
 import { META_SPEC_VERSION, resolveTwinPackageVersions } from "./specMeta.js";
 
-// FDRS-399 / FDRS-398 — wrap a legacy RecorderEvent (or pass through any row
-// that already carries a `kind` discriminator) into the unified events.jsonl
-// shape. Reuses `request_id` as `event_id` so within-run lookups stay stable
-// across the legacy and unified views.
-//
-// Exported so `runScenarioHosted` can apply the same wrap before uploading
-// events.jsonl to cloud storage. Without it, cloud's FDRS-398 schema gate
-// rejects the upload as "legacy single-shape RecorderEvent".
-export function toTwinHttpEvent(event: RecorderEvent): RecorderEvent & { kind: "TwinHttpEvent"; event_id: string; parent_id: null } {
-  const maybeKind = (event as { kind?: unknown }).kind;
-  if (typeof maybeKind === "string") {
-    return event as RecorderEvent & { kind: "TwinHttpEvent"; event_id: string; parent_id: null };
-  }
-  return {
-    ...event,
-    kind: "TwinHttpEvent",
-    event_id: event.request_id,
-    parent_id: null,
-  };
-}
+// FDRS-399 / FDRS-398 — wrap a legacy RecorderEvent into the unified
+// events.jsonl shape. Delegates to twin-core `toTwinHttpEventRow` so durable
+// stream rows and finalize appends stay byte-identical (F-698).
+export const toTwinHttpEvent = toTwinHttpEventRow;
 
 export type RunArtifacts = {
   runId: string;
