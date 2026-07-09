@@ -490,15 +490,29 @@ export async function serve<TDb, TSeed, TDomain>(
       () => resolve(bound)
     );
   });
-  return {
-    app,
-    close: async () => {
-      await new Promise<void>((resolve, reject) => {
-        server.close((err?: Error) => (err ? reject(err) : resolve()));
-      });
+  let closed = false;
+  const close = async () => {
+    if (closed) {
       await closeRecorder();
-    },
+      return;
+    }
+    closed = true;
+    process.off("SIGINT", onSignal);
+    process.off("SIGTERM", onSignal);
+    await new Promise<void>((resolve, reject) => {
+      server.close((err?: Error) => (err ? reject(err) : resolve()));
+    });
+    await closeRecorder();
   };
+  // Twin boot scripts (`await serve(...)`) never call close() themselves.
+  // Drain the durable recorder on graceful process signals so hosted twins
+  // with POME_RECORDER_EVENTS_PATH set do not lose the last accepted events.
+  function onSignal() {
+    void close().finally(() => process.exit(0));
+  }
+  process.once("SIGINT", onSignal);
+  process.once("SIGTERM", onSignal);
+  return { app, close };
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
