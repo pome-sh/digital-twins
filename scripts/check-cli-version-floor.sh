@@ -23,15 +23,24 @@ if [[ -z "$published_version" ]]; then
 fi
 
 # Plain x.y.z numeric compare — pome-sh has never published prerelease tags.
+# Fail closed on anything that isn't plain x.y.z (a prerelease suffix would
+# turn segments into NaN and slip past a naive compare).
 behind="$(node -e "
-  const parse = v => v.split('.').map(Number);
+  const parse = v => {
+    const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(v);
+    if (!m) { console.error('unparseable version: ' + v); process.exit(2); }
+    return m.slice(1).map(Number);
+  };
   const [l, p] = [parse('$local_version'), parse('$published_version')];
   for (let i = 0; i < 3; i++) {
     if (l[i] > p[i]) { console.log('no'); process.exit(0); }
     if (l[i] < p[i]) { console.log('yes'); process.exit(0); }
   }
   console.log('no');
-")"
+")" || {
+  echo "❌ Refusing to certify: version is not plain x.y.z (local $local_version, npm $published_version)." >&2
+  exit 2
+}
 
 if [[ "$behind" == "yes" ]]; then
   cat >&2 <<EOF
