@@ -144,7 +144,9 @@ async function runPome(input: { target: string; scaffold: string }): Promise<str
     "run",
     resolve(CLI_ROOT, SCENARIO_PATH),
     "--agent",
-    `${TSX_BIN} ${resolve(CLI_ROOT, AGENT_FIXTURE)}`,
+    // Quoted: pome run re-tokenizes this string (splitCommand honors quotes),
+    // so unquoted absolute paths would split on whitespace-containing checkouts.
+    `"${TSX_BIN}" "${resolve(CLI_ROOT, AGENT_FIXTURE)}"`,
     "--artifacts-dir",
     artifactsDir,
   ];

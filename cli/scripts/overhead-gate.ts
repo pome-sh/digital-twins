@@ -199,7 +199,9 @@ async function runPome(input: { noCapture: boolean; target: string; scaffold: st
     "run",
     resolve(CLI_ROOT, SCENARIO_PATH),
     "--agent",
-    `${TSX_BIN} ${resolve(CLI_ROOT, AGENT_SCRIPT)}`,
+    // Quoted: pome run re-tokenizes this string (splitCommand honors quotes),
+    // so unquoted absolute paths would split on whitespace-containing checkouts.
+    `"${TSX_BIN}" "${resolve(CLI_ROOT, AGENT_SCRIPT)}"`,
     "--artifacts-dir",
     artifactsDir,
   ];
