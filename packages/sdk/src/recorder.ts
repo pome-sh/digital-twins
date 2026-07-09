@@ -54,7 +54,14 @@
 // boot paths do not switch to it in this contract PR.
 
 import { randomUUID } from "node:crypto";
-import { createWriteStream, fsync, mkdirSync, type WriteStream } from "node:fs";
+import {
+  closeSync,
+  createWriteStream,
+  fsync,
+  mkdirSync,
+  openSync,
+  type WriteStream,
+} from "node:fs";
 import { dirname } from "node:path";
 import type { Context } from "hono";
 import type { RecorderEvent, TwinId } from "@pome-sh/shared-types";
@@ -142,9 +149,9 @@ export interface FileBackedRecorderStoreOptions extends RecorderStoreOptions {
    */
   path: string;
   /**
-   * When true (default), each `record()` waits for the write callback before
-   * returning from the queued write path used by `flush()`. Does not fsync
-   * per event unless `fsync: true`.
+   * When true, each accepted write is `fsync`'d after the append so a
+   * `kill -9` loses at most the in-flight event. Default false in the
+   * F-720 skeleton (opt-in); F-698 flips the production default to true.
    */
   fsync?: boolean;
 }
@@ -170,7 +177,11 @@ export function createFileBackedRecorderStore(
   const doFsync = options.fsync === true;
 
   mkdirSync(dirname(options.path), { recursive: true });
-  const writer: WriteStream = createWriteStream(options.path, { flags: "a" });
+  // Open the fd synchronously so fsync never races createWriteStream's
+  // async open (which can leave `writer.fd` undefined and silently skip
+  // durability on the first write).
+  const fd = openSync(options.path, "a");
+  const writer: WriteStream = createWriteStream(options.path, { fd, autoClose: false });
   const pending = new Set<Promise<void>>();
 
   function enqueueWrite(line: string): void {
@@ -184,16 +195,17 @@ export function createFileBackedRecorderStore(
           resolve();
           return;
         }
-        const fd = (writer as WriteStream & { fd?: number }).fd;
-        if (typeof fd !== "number") {
-          resolve();
-          return;
-        }
         fsync(fd, (fsyncErr) => (fsyncErr ? reject(fsyncErr) : resolve()));
       });
     });
     pending.add(write);
     void write.finally(() => pending.delete(write));
+  }
+
+  async function flush(): Promise<void> {
+    while (pending.size > 0) {
+      await Promise.all([...pending]);
+    }
   }
 
   return {
@@ -219,20 +231,25 @@ export function createFileBackedRecorderStore(
     dropped() {
       return droppedCount;
     },
-    async flush() {
-      while (pending.size > 0) {
-        await Promise.all([...pending]);
-      }
-    },
+    flush,
     async close() {
       if (closed) {
-        await this.flush?.();
+        await flush();
         return;
       }
       closed = true;
-      await this.flush?.();
+      await flush();
       await new Promise<void>((resolve, reject) => {
-        writer.end((err: Error | null | undefined) => (err ? reject(err) : resolve()));
+        writer.end((err: Error | null | undefined) => {
+          try {
+            closeSync(fd);
+          } catch (closeErr) {
+            reject(err ?? (closeErr as Error));
+            return;
+          }
+          if (err) reject(err);
+          else resolve();
+        });
       });
     },
   };

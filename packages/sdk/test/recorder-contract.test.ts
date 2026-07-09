@@ -119,6 +119,21 @@ describe("recorder write-through contract (F-720)", () => {
     await store.close?.();
   });
 
+  it("file-backed fsync path does not silently skip durability on first write", async () => {
+    // Regression: createWriteStream's async open left writer.fd undefined,
+    // so fsync was skipped. Sync openSync + explicit fd must keep the first
+    // fsync'd record on disk after flush.
+    const dir = await mkdtemp(join(tmpdir(), "pome-recorder-"));
+    tmpDirs.push(dir);
+    const path = join(dir, "events.jsonl");
+    const store = createFileBackedRecorderStore({ path, fsync: true });
+    store.record(sampleEvent({ request_id: "req_first_fsync" }));
+    await store.flush?.();
+    const raw = await readFile(path, "utf8");
+    expect(raw).toContain("req_first_fsync");
+    await store.close?.();
+  });
+
   it("redacts before any store.record — including custom stores", async () => {
     const seen: RecorderEvent[] = [];
     const custom: RecorderStore = {
