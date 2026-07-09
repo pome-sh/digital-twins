@@ -150,8 +150,18 @@ void main().catch((err) => {
         );
       }
 
+      const exited = new Promise<void>((resolvePromise) =>
+        child.once("exit", () => resolvePromise())
+      );
       killChild();
-      await new Promise<void>((resolvePromise) => child.once("exit", () => resolvePromise()));
+      if (child.exitCode === null) {
+        await Promise.race([
+          exited,
+          new Promise<void>((_, reject) =>
+            setTimeout(() => reject(new Error("child did not exit after SIGKILL")), 5_000)
+          ),
+        ]);
+      }
 
       const raw = await readFile(eventsPath, "utf8");
       // Tolerate a trailing partial line from SIGKILL mid-write; complete
