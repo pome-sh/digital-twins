@@ -16,9 +16,10 @@ RUN npm run build:runtime -w @pome-sh/shared-types
 RUN npm run build -w @pome-sh/sdk
 RUN npm run build -w @pome-sh/twin-slack
 # The runtime image should not include dev/test tooling or unrelated workspace
-# deps. Reinstall only production deps after the build.
+# deps. Reinstall only this twin's production graph (plus workspace deps it
+# links: sdk, shared-types) — not every packages/* workspace.
 RUN rm -rf node_modules packages/*/node_modules \
-  && npm ci --omit=dev
+  && npm ci --omit=dev -w @pome-sh/twin-slack
 
 FROM node:24-trixie-slim@sha256:9022946fb57e6fb6a2503931470deba4b49db02bfc8f587f93007fd33ef54415 AS runtime
 WORKDIR /repo
