@@ -144,6 +144,8 @@ export async function bootTwin(opts: {
         runId: opts.runId,
         seed: parseStripeSeed(opts.seedState),
         twinBaseUrl: opts.twinBaseUrl ?? "http://127.0.0.1:3333",
+      } as Parameters<typeof createTwinStripeApp>[0] & {
+        seed: ReturnType<typeof parseStripeSeed>;
       }) as TwinHarness["app"];
       return {
         app,
