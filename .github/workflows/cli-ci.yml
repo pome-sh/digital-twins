@@ -70,8 +70,11 @@ jobs:
       # rewritten manifest, then freezes install with npm ci (same pattern as
       # the pre-publish npm flow). Commit cli/package-lock.json after first
       # @pome-sh/* publish and switch to committed-lock npm ci.
+      # --ignore-scripts on lock-only: `prepare` runs `tsc` before node_modules
+      # exists and fails with missing commander/ai types. `npm ci` then installs
+      # deps and runs prepare with a complete tree.
       - run: |
-          npm install --package-lock-only
+          npm install --package-lock-only --ignore-scripts
           npm ci
       - run: npm run typecheck
       - run: npm run build

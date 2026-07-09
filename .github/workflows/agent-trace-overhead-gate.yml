@@ -73,7 +73,8 @@ jobs:
         run: |
           # No committed cli/package-lock.json until @pome-sh/* are on npm;
           # generate a lockfile from the rewritten manifest then freeze.
-          npm install --package-lock-only
+          # --ignore-scripts on lock-only: prepare/tsc runs before deps exist.
+          npm install --package-lock-only --ignore-scripts
           npm ci
           npm run build
       - name: Run agent-trace overhead gate (PR/FAQ #1)

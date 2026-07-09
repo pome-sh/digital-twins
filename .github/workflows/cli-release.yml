@@ -62,7 +62,8 @@ jobs:
       # and switch to committed-lock npm ci.
       - if: steps.package-deps.outputs.ready == 'true'
         run: |
-          npm install --package-lock-only
+          # --ignore-scripts on lock-only: prepare/tsc runs before deps exist.
+          npm install --package-lock-only --ignore-scripts
           npm ci
       - name: Guard against hard-link tarball (E415)
         if: steps.package-deps.outputs.ready == 'true'
