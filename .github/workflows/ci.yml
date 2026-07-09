@@ -23,6 +23,7 @@ jobs:
           cache-dependency-path: package-lock.json
       - run: node scripts/check-copy-markers.mjs
       - run: node scripts/lint-code-health.mjs
+      - run: bash scripts/lint-no-cloud-imports.sh
       - run: npm ci
       - run: npm run lint:dead-code
       # F-692 / D9 — one repo-wide capture-only gate, scanning cli/src/**,
@@ -39,33 +40,11 @@ jobs:
       # instead of a second plain `npm test` pass for that workspace.
       - run: npm test -w @pome-sh/shared-types -w @pome-sh/sdk -w @pome-sh/adapter-claude-sdk -w @pome-sh/twin-slack -w @pome-sh/twin-stripe
       - run: npm run test:coverage -w @pome-sh/twin-github
+      # Black-box twin runtime-contract suite (FDRS-711). Spawns the BUILT twins
+      # via plain `node` — Node 24 to match the GHCR runtime image — and asserts
+      # the control-plane surface frozen in CONTRACT.md. Reuses the build above
+      # so `@pome-sh/sdk/server` (dist) resolves when the contract runner boots
+      # the twins.
+      - run: npm run test:contract
       # Twin Fidelity Watch (tools/fidelity) moved to pome-cloud
       # (packages/fidelity-watch) — it owns status.pome.sh now.
-
-  lint-no-cloud-imports:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - run: bash scripts/lint-no-cloud-imports.sh
-
-  # Black-box twin runtime-contract suite (FDRS-711). Spawns the BUILT twins
-  # via plain `node` — Node 24 to match the GHCR runtime image — and asserts
-  # the control-plane surface frozen in CONTRACT.md.
-  contract:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: package-lock.json
-      - run: npm ci
-      # Build sibling packages so `@pome-sh/sdk/server` (dist) resolves when the
-      # contract runner builds and boots the twins.
-      - run: npm run build
-      - run: npm run test:contract

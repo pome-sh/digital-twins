@@ -14,20 +14,13 @@ name: agent-trace-overhead-gate
 # CAS adapter layer as present. The resulting trace is uploaded as a build
 # artifact so reviewers can eyeball a real adapter run.
 #
-# Paths filter scopes the gate to changes that could plausibly affect proxy
-# latency or events.jsonl shape — the CLI runtime, the in-process
-# twin-github runtime, and the CAS adapter package. Doc-only / unrelated
-# changes don't pay the CI cost.
+# Not a PR required check: the p99 latency gate is expensive and sensitive to
+# runner noise. Keep coverage on main + manual dispatch. Paths filter scopes
+# the gate to changes that could plausibly affect proxy latency or
+# events.jsonl shape — the CLI runtime, the in-process twin-github runtime,
+# and the CAS adapter package.
 
 on:
-  pull_request:
-    paths:
-      - 'cli/**'
-      - 'packages/twin-github/**'
-      - 'packages/adapter-claude-sdk/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/agent-trace-overhead-gate.yml'
   push:
     branches: [main]
     paths:
@@ -41,7 +34,7 @@ on:
 
 concurrency:
   group: agent-trace-overhead-gate-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: false
 
 jobs:
   gate:

@@ -30,7 +30,8 @@ Releases are automated by `.github/workflows/cli-release.yml` (Changesets +
 npm OIDC Trusted Publishing). To ship a CLI change:
 
 1. Add a changeset: `cd cli && npm run changeset` (pick patch/minor/major, write a
-   one-line user-facing summary). This satisfies the `cli-version-gate`.
+   one-line user-facing summary). This satisfies the CLI version-bump gate in
+   `cli-ci`.
 2. **Never hand-edit `cli/package.json` `version`** and never write a
    `chore(cli): vX.Y.Z` commit — the release bot owns versioning. It opens a
    "Version Packages" PR that consumes changesets, bumps the version, and

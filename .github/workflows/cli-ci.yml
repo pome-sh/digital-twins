@@ -12,6 +12,7 @@ on:
       - 'package-lock.json'
       - 'scripts/pack-publishable.mjs'
       - 'scripts/use-local-pome-tarballs.mjs'
+      - 'scripts/check-cli-version-bump.sh'
       - '.github/workflows/cli-ci.yml'
   push:
     branches: [main]
@@ -26,6 +27,7 @@ on:
       - 'package-lock.json'
       - 'scripts/pack-publishable.mjs'
       - 'scripts/use-local-pome-tarballs.mjs'
+      - 'scripts/check-cli-version-bump.sh'
       - '.github/workflows/cli-ci.yml'
   workflow_dispatch:
 
@@ -44,6 +46,16 @@ jobs:
         working-directory: cli
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          # Full history so the CLI version-bump gate can diff against the PR base.
+          fetch-depth: 0
+      # Former cli-version-gate.yml — keep the policy check, drop the separate
+      # required status. Skips cleanly when cli/src/** and cli/vendor/** are
+      # untouched (see scripts/check-cli-version-bump.sh).
+      - name: CLI version bump or changeset required
+        if: ${{ github.event_name == 'pull_request' }}
+        working-directory: ${{ github.workspace }}
+        run: BASE_REF="origin/${{ github.event.pull_request.base.ref }}" scripts/check-cli-version-bump.sh
       # FDRS-652/658 — Node 24, not 20. `npm ci` builds better-sqlite3,
       # whose install falls through to `node-gyp@latest`; that node-gyp bundles
       # an undici needing `webidl.util.markAsUncloneable`, absent from Node 20's

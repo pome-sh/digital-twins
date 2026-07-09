@@ -1,11 +1,13 @@
-name: twin-slack image
+name: twin image
 on:
   push:
     branches: [main]
     tags: ['v*']
   pull_request:
     paths:
+      - 'packages/twin-github/**'
       - 'packages/twin-slack/**'
+      - 'packages/twin-stripe/**'
       - 'packages/shared-types/**'
       - 'packages/*/package.json'
       - 'package.json'
@@ -13,24 +15,21 @@ on:
       - '.dockerignore'
       - '.trivyignore'
       - 'scripts/ci/wait-for-workflow.sh'
+      - 'scripts/ci/sign-image-digests.sh'
       - '.github/workflows/ci.yml'
-      - '.github/workflows/twin-slack-image.yml'
+      - '.github/workflows/twin-image.yml'
   workflow_dispatch:
 
 jobs:
   # Package typecheck/test live in `ci` (npm test --workspaces). This workflow
   # waits for that SHA's `ci` run before building/scanning/pushing so a red
-  # twin cannot still ship a rolling `slack` tag to GHCR (FDRS-586) without
-  # re-running the same vitest suite.
-  publish:
+  # twin cannot still ship a rolling tag to GHCR (FDRS-586) without
+  # re-running the same vitest suite. Wait once, then matrix the three twins.
+  wait-ci:
     runs-on: ubuntu-latest
     permissions:
       actions: read
       contents: read
-      id-token: write
-      packages: write
-    outputs:
-      signed-digests: ${{ steps.sign.outputs.signed_digests }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Wait for ci workflow on this SHA
@@ -39,6 +38,22 @@ jobs:
           # PRs use the merge commit as github.sha; ci runs against the head SHA.
           GITHUB_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
         run: bash scripts/ci/wait-for-workflow.sh ci.yml
+
+  publish:
+    name: ${{ matrix.twin }}
+    needs: wait-ci
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        twin: [github, slack, stripe]
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+      packages: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
       - uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
         with:
@@ -49,29 +64,29 @@ jobs:
         id: meta
         with:
           # One shared package, one image per twin distinguished by tag
-          # prefix: ghcr.io/pome-sh/twins:slack (rolling), :slack-<version>,
-          # :slack-<sha>. `latest=false` — a single `latest` can't span three
+          # prefix: ghcr.io/pome-sh/twins:<twin> (rolling), :<twin>-<version>,
+          # :<twin>-<sha>. `latest=false` — a single `latest` can't span three
           # twins in one package.
           images: ghcr.io/pome-sh/twins
           flavor: |
             latest=false
           tags: |
-            type=raw,value=slack,enable={{is_default_branch}}
-            type=semver,pattern=slack-{{version}}
-            type=semver,pattern=slack-v{{version}}
-            type=sha,prefix=slack-,format=short
+            type=raw,value=${{ matrix.twin }},enable={{is_default_branch}}
+            type=semver,pattern=${{ matrix.twin }}-{{version}}
+            type=semver,pattern=${{ matrix.twin }}-v{{version}}
+            type=sha,prefix=${{ matrix.twin }}-,format=short
       # Build once and load into the local daemon so Trivy can scan the exact
       # image before it is pushed. Also tag it locally for the scan ref.
       - uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         id: build
         with:
           context: .
-          file: packages/twin-slack/Dockerfile
+          file: packages/twin-${{ matrix.twin }}/Dockerfile
           load: true
           push: false
           tags: |
             ${{ steps.meta.outputs.tags }}
-            twin-slack:scan
+            twin-${{ matrix.twin }}:scan
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64
       # Fail the publish on fixable HIGH/CRITICAL CVEs. `ignore-unfixed` drops
@@ -80,7 +95,7 @@ jobs:
       - name: Scan image for vulnerabilities (Trivy)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: twin-slack:scan
+          image-ref: twin-${{ matrix.twin }}:scan
           format: table
           severity: HIGH,CRITICAL
           exit-code: '1'
@@ -89,9 +104,9 @@ jobs:
       - name: Generate image SBOM
         uses: anchore/sbom-action@f8bdd1d8ac5e901a77a92f111440fdb1b593736b # v0.20.6
         with:
-          image: twin-slack:scan
+          image: twin-${{ matrix.twin }}:scan
           format: spdx-json
-          output-file: twin-slack.spdx.json
+          output-file: twin-${{ matrix.twin }}.spdx.json
           upload-artifact: true
       - uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
         if: ${{ github.event_name != 'pull_request' }}
@@ -116,4 +131,4 @@ jobs:
         env:
           IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
         run: |
-          bash scripts/ci/sign-image-digests.sh "Signed twin-slack image digests" twin-slack.spdx.json
+          bash scripts/ci/sign-image-digests.sh "Signed twin-${{ matrix.twin }} image digests" twin-${{ matrix.twin }}.spdx.json
