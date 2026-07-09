@@ -46,8 +46,14 @@
 // `close()`: optional. When present, flushes pending writes, releases the
 // backing resource, and is idempotent. After `close()`, further `record()`
 // calls are undefined (stores should throw or no-op). Callers must await
-// `close()` (or at least `flush()`) before upload/finalize so the partial
-// tape on disk matches `events()`.
+// `close()` (or at least `flush()`) before upload/finalize so every accepted
+// write has either landed on disk or surfaced as a flush/close error.
+//
+// Bounded stores (`maxEvents`): the cap applies only to the in-memory mirror
+// used by `events()` / `GET /_pome/events` (memory pressure). The durable
+// NDJSON tape is append-only and retains every accepted write — including
+// rows later dropped from the heap mirror — so crash-safe upload reads the
+// tape, not `events()`.
 //
 // Default runtime behavior: `createRecorderStore()` remains heap-only.
 // `createFileBackedRecorderStore()` is the durable skeleton for F-698; twin
@@ -106,6 +112,8 @@ export interface RecorderStoreOptions {
    * Bound the in-memory tape: past `maxEvents` the store drops the OLDEST
    * event and increments the `dropped()` counter (stripe's pre-port
    * D-ENG-10/E-10 recorder behavior). Default: unbounded (github/slack).
+   * For file-backed stores this does **not** truncate the NDJSON tape —
+   * durability stays append-only; only `events()` is capped.
    */
   maxEvents?: number;
 }
@@ -161,8 +169,10 @@ export interface FileBackedRecorderStoreOptions extends RecorderStoreOptions {
  *
  * Keeps an in-memory mirror for `events()` / `count()` (same API as the heap
  * store) and appends each accepted redacted `RecorderEvent` as one NDJSON
- * line. `flush()` drains pending writes; with `fsync: true` it also
- * `fsync`s the fd so a `kill -9` loses at most the in-flight event.
+ * line. `flush()` drains pending writes and rethrows the first append/fsync
+ * failure; with `fsync: true` it also `fsync`s the fd so a `kill -9` loses
+ * at most the in-flight event. `maxEvents` caps only the heap mirror — the
+ * NDJSON tape stays append-only.
  *
  * Twin boot paths still default to `createRecorderStore()` — wiring this
  * store into production servers/CLI is F-698.
@@ -183,6 +193,9 @@ export function createFileBackedRecorderStore(
   const fd = openSync(options.path, "a");
   const writer: WriteStream = createWriteStream(options.path, { fd, autoClose: false });
   const pending = new Set<Promise<void>>();
+  // First append/fsync failure is retained so a later flush()/close() still
+  // reports it even after the rejected promise leaves `pending`.
+  let writeFailure: Error | null = null;
 
   function enqueueWrite(line: string): void {
     const write = new Promise<void>((resolve, reject) => {
@@ -199,12 +212,32 @@ export function createFileBackedRecorderStore(
       });
     });
     pending.add(write);
-    void write.finally(() => pending.delete(write));
+    // Handle rejection here so a failed write before flush() is not an
+    // unhandled rejection, and so flush() can still surface the error after
+    // the promise has left `pending`.
+    void write.then(
+      () => {
+        pending.delete(write);
+      },
+      (err: unknown) => {
+        pending.delete(write);
+        if (!writeFailure) {
+          writeFailure = err instanceof Error ? err : new Error(String(err));
+        }
+      }
+    );
   }
 
   async function flush(): Promise<void> {
     while (pending.size > 0) {
-      await Promise.all([...pending]);
+      // allSettled: individual failures are already captured in writeFailure;
+      // awaiting a rejected member of `pending` must not short-circuit drain.
+      await Promise.allSettled([...pending]);
+    }
+    if (writeFailure) {
+      const err = writeFailure;
+      writeFailure = null;
+      throw err;
     }
   }
 

@@ -7,14 +7,33 @@
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { recorderEventSchema, type RecorderEvent } from "@pome-sh/shared-types";
-import {
+
+// Optional fsync override so we can assert flush() rethrows a prior failure
+// after the rejected promise has left `pending` (ESM blocks spyOn on node:fs).
+const fsMocks = vi.hoisted(() => ({
+  fsync:
+    null as null | ((fd: number, cb: (err: NodeJS.ErrnoException | null) => void) => void),
+}));
+
+vi.mock("node:fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs")>();
+  return {
+    ...actual,
+    fsync: (fd: number, cb: (err: NodeJS.ErrnoException | null) => void) => {
+      if (fsMocks.fsync) return fsMocks.fsync(fd, cb);
+      return actual.fsync(fd, cb);
+    },
+  };
+});
+
+const {
   createFileBackedRecorderStore,
   createRecorderHandle,
   createRecorderStore,
-  type RecorderStore,
-} from "../src/recorder.js";
+} = await import("../src/recorder.js");
+type RecorderStore = import("../src/recorder.js").RecorderStore;
 
 const tmpDirs: string[] = [];
 
@@ -205,5 +224,44 @@ describe("recorder write-through contract (F-720)", () => {
     const store = createFileBackedRecorderStore({ path: join(dir, "events.jsonl") });
     await store.close?.();
     expect(() => store.record(sampleEvent())).toThrow(/after close/);
+  });
+
+  it("flush surfaces a prior fsync failure after the promise left pending", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "pome-recorder-"));
+    tmpDirs.push(dir);
+    const path = join(dir, "events.jsonl");
+    fsMocks.fsync = (_fd, cb) => {
+      queueMicrotask(() => cb(new Error("simulated fsync failure")));
+    };
+    try {
+      const store = createFileBackedRecorderStore({ path, fsync: true });
+      store.record(sampleEvent({ request_id: "req_fail" }));
+      // Let the write+fsync callbacks settle and leave `pending` before flush.
+      await new Promise((r) => setTimeout(r, 30));
+      await expect(store.flush?.()).rejects.toThrow(/simulated fsync failure/);
+    } finally {
+      fsMocks.fsync = null;
+    }
+  });
+
+  it("bounded file-backed store caps events() but keeps all rows on disk", async () => {
+    // maxEvents is a heap-mirror bound (memory pressure), not a durable-tape
+    // truncate. Crash-safe upload reads the NDJSON file, not events().
+    const dir = await mkdtemp(join(tmpdir(), "pome-recorder-"));
+    tmpDirs.push(dir);
+    const path = join(dir, "events.jsonl");
+    const store = createFileBackedRecorderStore({ path, maxEvents: 1 });
+    store.record(sampleEvent({ request_id: "req_old" }));
+    store.record(sampleEvent({ request_id: "req_new" }));
+    expect(store.events()).toHaveLength(1);
+    expect(store.events()[0]?.request_id).toBe("req_new");
+    expect(store.dropped?.()).toBe(1);
+    await store.flush?.();
+    await store.close?.();
+    const raw = await readFile(path, "utf8");
+    const lines = raw.split("\n").filter((l) => l.length > 0);
+    expect(lines).toHaveLength(2);
+    expect(raw).toContain("req_old");
+    expect(raw).toContain("req_new");
   });
 });
