@@ -13,6 +13,7 @@ on:
       - 'scripts/pack-publishable.mjs'
       - 'scripts/use-local-pome-tarballs.mjs'
       - 'scripts/check-cli-version-bump.sh'
+      - 'scripts/check-cli-version-floor.sh'
       - '.github/workflows/cli-ci.yml'
   push:
     branches: [main]
@@ -28,6 +29,7 @@ on:
       - 'scripts/pack-publishable.mjs'
       - 'scripts/use-local-pome-tarballs.mjs'
       - 'scripts/check-cli-version-bump.sh'
+      - 'scripts/check-cli-version-floor.sh'
       - '.github/workflows/cli-ci.yml'
   workflow_dispatch:
 
@@ -56,6 +58,11 @@ jobs:
         if: ${{ github.event_name == 'pull_request' }}
         working-directory: ${{ github.workspace }}
         run: BASE_REF="origin/${{ github.event.pull_request.base.ref }}" scripts/check-cli-version-bump.sh
+      # F-724 — cli/package.json must never sit behind npm's published latest;
+      # publishing from a regressed base retags `latest` backwards.
+      - name: CLI version not behind npm latest
+        working-directory: ${{ github.workspace }}
+        run: scripts/check-cli-version-floor.sh
       # FDRS-652/658 — Node 24, not 20. `npm ci` builds better-sqlite3,
       # whose install falls through to `node-gyp@latest`; that node-gyp bundles
       # an undici needing `webidl.util.markAsUncloneable`, absent from Node 20's

@@ -80,6 +80,12 @@ jobs:
             exit 1
           fi
           echo "E415 hard-link check OK: $tgz"
+      # F-724 — last line of defense: never publish (or open a Version PR)
+      # from a version base behind npm's published latest.
+      - name: CLI version not behind npm latest
+        if: steps.package-deps.outputs.ready == 'true'
+        working-directory: ${{ github.workspace }}
+        run: scripts/check-cli-version-floor.sh
       - name: Changesets — version PR or publish
         if: steps.package-deps.outputs.ready == 'true'
         uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0
