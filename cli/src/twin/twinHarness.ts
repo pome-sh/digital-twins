@@ -57,6 +57,12 @@ export type TwinHarness = {
   /** Extra JWT claims the runner mints into the agent token (e.g. Stripe's
    *  `account_id`, so the token resolves to the account the seed lives in). */
   extraClaims?: Record<string, unknown>;
+  /**
+   * Durability barrier for the twin recorder without closing the DB.
+   * Call before finalize/merge so pending TwinHttpEvent rows land on disk
+   * before `events.jsonl` is rewritten.
+   */
+  flush(): void | Promise<void>;
   /** Flush durable recorder (if any) and release the SQLite handle. */
   close(): void | Promise<void>;
 };
@@ -84,8 +90,11 @@ export async function bootTwin(opts: {
 }): Promise<TwinHarness> {
   const recorder = createRecorder({ eventsPath: opts.eventsPath });
 
-  const closeRecorderAndDb = async (dbClose: () => void) => {
+  const flushRecorder = async () => {
     await recorder.flush?.();
+  };
+  const closeRecorderAndDb = async (dbClose: () => void) => {
+    await flushRecorder();
     await recorder.close?.();
     dbClose();
   };
@@ -104,6 +113,7 @@ export async function bootTwin(opts: {
         envName: "GITHUB",
         exportState: () => exportGitHubCloneState(db),
         events: () => recorder.events(),
+        flush: () => flushRecorder(),
         close: () => closeRecorderAndDb(() => (db as { close(): void }).close()),
       };
     }
@@ -128,6 +138,7 @@ export async function bootTwin(opts: {
         envName: "SLACK",
         exportState: () => domain.exportState(),
         events: () => recorder.events(),
+        flush: () => flushRecorder(),
         close: () => closeRecorderAndDb(() => db.close()),
       };
     }
@@ -178,6 +189,7 @@ export async function bootTwin(opts: {
         exportState: () => domain.exportState(STRIPE_LOCAL_ACCOUNT_ID),
         events: () => recorder.events(),
         extraClaims: { account_id: STRIPE_LOCAL_ACCOUNT_ID },
+        flush: () => flushRecorder(),
         close: () => closeRecorderAndDb(() => db.close()),
       };
     }

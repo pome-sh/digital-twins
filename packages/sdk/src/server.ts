@@ -498,8 +498,7 @@ export async function serve<TDb, TSeed, TDomain>(
       return;
     }
     closed = true;
-    process.off("SIGINT", onSignal);
-    process.off("SIGTERM", onSignal);
+    unregisterServeShutdown(close);
     await new Promise<void>((resolve, reject) => {
       server.close((err?: Error) => (err ? reject(err) : resolve()));
     });
@@ -508,12 +507,34 @@ export async function serve<TDb, TSeed, TDomain>(
   // Twin boot scripts (`await serve(...)`) never call close() themselves.
   // Drain the durable recorder on graceful process signals so hosted twins
   // with POME_RECORDER_EVENTS_PATH set do not lose the last accepted events.
-  function onSignal() {
-    void close().finally(() => process.exit(0));
-  }
+  // Shared registry: every served twin flushes before a single process.exit,
+  // so multi-twin processes cannot lose sibling recorder tapes.
+  registerServeShutdown(close);
+  return { app, close };
+}
+
+/** Active `serve({ port })` close hooks — drained together on SIGINT/SIGTERM. */
+const serveShutdownHooks = new Set<() => Promise<void>>();
+let serveSignalHandlersInstalled = false;
+
+function registerServeShutdown(close: () => Promise<void>): void {
+  serveShutdownHooks.add(close);
+  if (serveSignalHandlersInstalled) return;
+  serveSignalHandlersInstalled = true;
+  const onSignal = () => {
+    void (async () => {
+      const hooks = [...serveShutdownHooks];
+      serveShutdownHooks.clear();
+      await Promise.allSettled(hooks.map((hook) => hook()));
+      process.exit(0);
+    })();
+  };
   process.once("SIGINT", onSignal);
   process.once("SIGTERM", onSignal);
-  return { app, close };
+}
+
+function unregisterServeShutdown(close: () => Promise<void>): void {
+  serveShutdownHooks.delete(close);
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

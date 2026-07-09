@@ -196,6 +196,9 @@ export async function runScenario(options: RunScenarioOptions) {
       preflight: true
     });
     if (preflight.exitCode !== 0) {
+      // Flush durable twin rows before finalize/merge so pending TwinHttpEvent
+      // lines are on disk before events.jsonl is rewritten (not only in finally).
+      await harness.flush();
       const stateFinal = await harness.exportState();
       const { artifacts, exitCode } = await writeRun({
         artifactsDir,
@@ -223,6 +226,7 @@ export async function runScenario(options: RunScenarioOptions) {
       env,
       timeoutSeconds: scenario.config.timeout
     });
+    await harness.flush();
     const stateFinal = await harness.exportState();
     const { artifacts, exitCode } = await writeRun({
       artifactsDir,

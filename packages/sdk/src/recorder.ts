@@ -174,16 +174,27 @@ export const POME_RECORDER_EVENTS_PATH = "POME_RECORDER_EVENTS_PATH";
 
 /**
  * Wrap a legacy `RecorderEvent` into the unified `TwinHttpEvent` NDJSON row
- * shape used by uploaded `events.jsonl` (FDRS-398). Pass-through when `kind`
- * is already present. Disk rows from the durable store use this shape so
- * finalize/upload does not need a second wrap for crash-streamed events.
+ * shape used by uploaded `events.jsonl` (FDRS-398). Pass-through only when
+ * `kind` is already `"TwinHttpEvent"`; any other kind is re-wrapped so the
+ * durable tape never persists a mismatched discriminator. Disk rows from the
+ * durable store use this shape so finalize/upload does not need a second wrap
+ * for crash-streamed events.
  */
 export function toTwinHttpEventRow(
   event: RecorderEvent
 ): RecorderEvent & { kind: "TwinHttpEvent"; event_id: string; parent_id: null } {
   const maybeKind = (event as { kind?: unknown }).kind;
-  if (typeof maybeKind === "string") {
-    return event as RecorderEvent & { kind: "TwinHttpEvent"; event_id: string; parent_id: null };
+  if (maybeKind === "TwinHttpEvent") {
+    const existing = event as RecorderEvent & {
+      kind: "TwinHttpEvent";
+      event_id?: string;
+      parent_id?: null;
+    };
+    return {
+      ...existing,
+      event_id: typeof existing.event_id === "string" ? existing.event_id : event.request_id,
+      parent_id: null,
+    };
   }
   return {
     ...event,

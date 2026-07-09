@@ -36,6 +36,7 @@ const {
   createFileBackedRecorderStore,
   createRecorderHandle,
   createRecorderStore,
+  toTwinHttpEventRow,
 } = await import("../src/recorder.js");
 type RecorderStore = import("../src/recorder.js").RecorderStore;
 
@@ -250,6 +251,25 @@ describe("recorder write-through contract (F-720)", () => {
     } finally {
       fsMocks.fsync = null;
     }
+  });
+
+  it("toTwinHttpEventRow re-wraps non-TwinHttpEvent kinds", () => {
+    const legacyShaped = {
+      ...sampleEvent({ request_id: "req_legacy" }),
+      kind: "LlmCallEvent",
+    } as unknown as RecorderEvent;
+    const wrapped = toTwinHttpEventRow(legacyShaped);
+    expect(wrapped.kind).toBe("TwinHttpEvent");
+    expect(wrapped.event_id).toBe("req_legacy");
+    expect(wrapped.parent_id).toBeNull();
+    const already = toTwinHttpEventRow({
+      ...sampleEvent({ request_id: "req_ok" }),
+      kind: "TwinHttpEvent",
+      event_id: "req_ok",
+      parent_id: null,
+    } as RecorderEvent);
+    expect(already.kind).toBe("TwinHttpEvent");
+    expect(already.event_id).toBe("req_ok");
   });
 
   it("bounded file-backed store caps events() but keeps all rows on disk", async () => {

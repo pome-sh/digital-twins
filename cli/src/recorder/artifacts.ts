@@ -148,7 +148,15 @@ async function readExistingEventIds(eventsPath: string): Promise<Set<string>> {
     for (const line of raw.split("\n")) {
       if (!line.trim()) continue;
       try {
-        const row = JSON.parse(line) as { event_id?: unknown; request_id?: unknown };
+        const row = JSON.parse(line) as {
+          kind?: unknown;
+          event_id?: unknown;
+          request_id?: unknown;
+        };
+        // Only TwinHttpEvent rows participate in finalize dedupe. Other kinds
+        // (LlmCallEvent, HookEvent, …) may carry request_id/event_id values
+        // that must not suppress a twin HTTP row.
+        if (row.kind !== "TwinHttpEvent") continue;
         if (typeof row.event_id === "string") ids.add(row.event_id);
         if (typeof row.request_id === "string") ids.add(row.request_id);
       } catch {
