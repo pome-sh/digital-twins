@@ -137,15 +137,23 @@ export async function runTwinStartCommand(
   const mcpUrl = `${restUrl}/mcp`;
   const server = serve({ fetch: harness.app.fetch, port, hostname: "127.0.0.1" });
 
-  await mkdir(".pome", { recursive: true });
-  await writeFile(
-    ".pome/twin-status.json",
-    JSON.stringify(
-      { name, url: restUrl, rest_url: restUrl, mcp_url: mcpUrl, auth_token: token },
-      null,
-      2,
-    ),
-  );
+  try {
+    await mkdir(".pome", { recursive: true });
+    await writeFile(
+      ".pome/twin-status.json",
+      JSON.stringify(
+        { name, url: restUrl, rest_url: restUrl, mcp_url: mcpUrl, auth_token: token },
+        null,
+        2,
+      ),
+    );
+  } catch (err) {
+    // Boot fails loudly or not at all: without this, the rejection leaves a
+    // bound listener keeping the process alive behind the error message.
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await harness.close();
+    throw err;
+  }
 
   console.log(`Pome ${name} twin listening at ${restUrl}`);
   if (resolved.source === "persisted") {
@@ -169,6 +177,13 @@ export async function runTwinStartCommand(
   // recorder and releases the SQLite handle via the harness.
   const shutdown = () => {
     void (async () => {
+      // `close()` alone waits for in-flight keep-alive connections, so a
+      // stuck client would turn Ctrl-C into a hang: sever connections first,
+      // and keep an unref'd hard deadline in case a close callback never
+      // resolves anyway.
+      const hardExit = setTimeout(() => process.exit(1), 10_000);
+      hardExit.unref();
+      (server as { closeAllConnections?: () => void }).closeAllConnections?.();
       await new Promise<void>((resolve) => server.close(() => resolve()));
       await harness.close();
       process.exit(0);
