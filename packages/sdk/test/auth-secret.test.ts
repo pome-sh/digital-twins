@@ -44,7 +44,7 @@ describe("ensureTwinAuthSecret", () => {
   let logSpy: ReturnType<typeof vi.spyOn>;
 
   const secretFile = () => join(dataDir, "secret");
-  const logged = () => logSpy.mock.calls.map((call) => call.join(" ")).join("\n");
+  const logged = () => logSpy.mock.calls.map((call: unknown[]) => call.join(" ")).join("\n");
   const readSecretFile = () => readFileSync(secretFile(), "utf8");
   const fileExists = () => {
     try {
