@@ -48,7 +48,7 @@ describe("pome twin start (e2e)", () => {
       await writeFile(join(dataDir, "secret"), `${PERSISTED_SECRET}\n`);
 
       const port = await freePort();
-      const env = { ...process.env, POME_TWIN_DATA_DIR: dataDir };
+      const env: NodeJS.ProcessEnv = { ...process.env, POME_TWIN_DATA_DIR: dataDir };
       delete env.TWIN_AUTH_SECRET; // the persisted-file branch under test
       child = spawn(TSX_BIN, [MAIN_TS, "twin", "start", "github", "--port", String(port)], {
         cwd,
