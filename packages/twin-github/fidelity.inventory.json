@@ -122,7 +122,7 @@
       "name": "create_label",
       "heat": "warm",
       "fidelity": "semantic",
-      "justification": "Warm (ruled F-729, G4): taxonomy authoring is a rare chain and the vendor labels toolset is opt-in. Fidelity semantic > shape target → tier-mismatch ledger (additive-only, no demotion this milestone)."
+      "justification": "Warm (ruled F-729, G4): taxonomy authoring, a rare side step off TC:issue-triage; MCP: vendor label writes are opt-in. Fidelity semantic > shape target → tier-mismatch ledger (additive-only, no demotion this milestone)."
     },
     {
       "name": "list_issue_labels",
@@ -248,7 +248,7 @@
       "name": "compare_commits",
       "heat": "warm",
       "fidelity": "shape",
-      "justification": "Warm (ruled F-729): occasional cross-branch inspection off the hot chains. Shape is exactly at target."
+      "justification": "Warm (ruled F-729): occasional cross-branch inspection off the TC:code-read chain. Shape is exactly at target."
     },
     {
       "name": "get_pull_request_diff",
@@ -296,25 +296,25 @@
       "name": "list_milestones",
       "heat": "warm",
       "fidelity": "semantic",
-      "justification": "Warm (ruled F-729, G2): appears on triage-filter chains (warm over cold), but no vendor tool. Fidelity semantic > shape target → tier-mismatch ledger (additive-only, no demotion this milestone)."
+      "justification": "Warm (ruled F-729, G2): adjacent to TC:issue-triage (triage-filter reads), warm over cold; MCP: no vendor milestone tools. Fidelity semantic > shape target → tier-mismatch ledger (additive-only, no demotion this milestone)."
     },
     {
       "name": "create_milestone",
       "heat": "warm",
       "fidelity": "semantic",
-      "justification": "Warm (ruled F-729, G2): no vendor tool, weak chain. Fidelity semantic > shape target → tier-mismatch ledger (additive-only, no demotion this milestone)."
+      "justification": "Warm (ruled F-729, G2): weak chain adjacent to TC:issue-triage; MCP: no vendor milestone tools. Fidelity semantic > shape target → tier-mismatch ledger (additive-only, no demotion this milestone)."
     },
     {
       "name": "update_milestone",
       "heat": "warm",
       "fidelity": "semantic",
-      "justification": "Warm (ruled F-729, G2): no vendor tool, weak chain. Fidelity semantic > shape target → tier-mismatch ledger (additive-only, no demotion this milestone)."
+      "justification": "Warm (ruled F-729, G2): weak chain adjacent to TC:issue-triage; MCP: no vendor milestone tools. Fidelity semantic > shape target → tier-mismatch ledger (additive-only, no demotion this milestone)."
     },
     {
       "name": "delete_milestone",
       "heat": "warm",
       "fidelity": "semantic",
-      "justification": "Warm (ruled F-729, G2): no vendor tool, weak chain. Fidelity semantic > shape target → tier-mismatch ledger (additive-only, no demotion this milestone)."
+      "justification": "Warm (ruled F-729, G2): weak chain adjacent to TC:issue-triage; MCP: no vendor milestone tools. Fidelity semantic > shape target → tier-mismatch ledger (additive-only, no demotion this milestone)."
     },
     {
       "name": "create_commit_status",
@@ -362,7 +362,7 @@
       "name": "create_release",
       "heat": "warm",
       "fidelity": "semantic",
-      "justification": "Warm (ruled F-729, G4): no vendor write tool, rarer chain. Fidelity semantic > shape target → tier-mismatch ledger (additive-only, no demotion this milestone)."
+      "justification": "Warm (ruled F-729, G4): rarer chain adjacent to TC:release-notes; MCP: no vendor write tool. Fidelity semantic > shape target → tier-mismatch ledger (additive-only, no demotion this milestone)."
     },
     {
       "name": "get_me",
@@ -374,7 +374,7 @@
       "name": "add_collaborator",
       "heat": "warm",
       "fidelity": "semantic",
-      "justification": "Warm (ruled F-729, G4): admin-flavored and rare. Fidelity semantic > shape target → tier-mismatch ledger (additive-only, no demotion this milestone)."
+      "justification": "Warm (ruled F-729, G4): admin-flavored and rare; MCP: no vendor tool. Fidelity semantic > shape target → tier-mismatch ledger (additive-only, no demotion this milestone)."
     },
     {
       "name": "search_commits",
@@ -490,7 +490,7 @@
       "name": "POST /repos/:owner/:repo/labels",
       "heat": "warm",
       "fidelity": "semantic",
-      "justification": "Warm (ruled F-729, G4, create_label counterpart): taxonomy authoring is rare; vendor label writes are opt-in. Fidelity semantic > shape target → tier-mismatch ledger. Row added by F-735 (doc-drift fix)."
+      "justification": "Warm (ruled F-729, G4, create_label counterpart): taxonomy authoring, a rare side step off TC:issue-triage; MCP: vendor label writes are opt-in. Fidelity semantic > shape target → tier-mismatch ledger. Row added by F-735 (doc-drift fix)."
     },
     {
       "name": "GET /repos/:owner/:repo/issues/:number/labels",
@@ -532,7 +532,7 @@
       "name": "PUT /repos/:owner/:repo/collaborators/:username",
       "heat": "warm",
       "fidelity": "semantic",
-      "justification": "Warm (ruled F-729, G4, add_collaborator counterpart): admin-flavored and rare. Fidelity semantic > shape target → tier-mismatch ledger (additive-only, no demotion this milestone)."
+      "justification": "Warm (ruled F-729, G4, add_collaborator counterpart): admin-flavored and rare; MCP: no vendor tool. Fidelity semantic > shape target → tier-mismatch ledger (additive-only, no demotion this milestone)."
     },
     {
       "name": "GET /repos/:owner/:repo/pulls",
@@ -628,7 +628,7 @@
       "name": "GET /repos/:owner/:repo/compare/:basehead",
       "heat": "warm",
       "fidelity": "shape",
-      "justification": "Warm (ruled F-729): occasional cross-branch inspection off the hot chains. Shape is exactly at target."
+      "justification": "Warm (ruled F-729): occasional cross-branch inspection off the TC:code-read chain. Shape is exactly at target."
     },
     {
       "name": "POST /repos/:owner/:repo/statuses/:sha",
@@ -658,25 +658,25 @@
       "name": "GET /repos/:owner/:repo/milestones",
       "heat": "warm",
       "fidelity": "semantic",
-      "justification": "Warm (ruled F-729, G2): triage-filter chains keep milestones warm over cold; no vendor tool. Fidelity semantic > shape target → tier-mismatch ledger (additive-only, no demotion this milestone)."
+      "justification": "Warm (ruled F-729, G2): adjacent to TC:issue-triage (triage-filter reads), warm over cold; MCP: no vendor milestone tools. Fidelity semantic > shape target → tier-mismatch ledger (additive-only, no demotion this milestone)."
     },
     {
       "name": "POST /repos/:owner/:repo/milestones",
       "heat": "warm",
       "fidelity": "semantic",
-      "justification": "Warm (ruled F-729, G2): no vendor tool, weak chain. Fidelity semantic > shape target → tier-mismatch ledger (additive-only, no demotion this milestone)."
+      "justification": "Warm (ruled F-729, G2): weak chain adjacent to TC:issue-triage; MCP: no vendor milestone tools. Fidelity semantic > shape target → tier-mismatch ledger (additive-only, no demotion this milestone)."
     },
     {
       "name": "PATCH /repos/:owner/:repo/milestones/:number",
       "heat": "warm",
       "fidelity": "semantic",
-      "justification": "Warm (ruled F-729, G2): no vendor tool, weak chain. Fidelity semantic > shape target → tier-mismatch ledger (additive-only, no demotion this milestone)."
+      "justification": "Warm (ruled F-729, G2): weak chain adjacent to TC:issue-triage; MCP: no vendor milestone tools. Fidelity semantic > shape target → tier-mismatch ledger (additive-only, no demotion this milestone)."
     },
     {
       "name": "DELETE /repos/:owner/:repo/milestones/:number",
       "heat": "warm",
       "fidelity": "semantic",
-      "justification": "Warm (ruled F-729, G2): no vendor tool, weak chain. Fidelity semantic > shape target → tier-mismatch ledger (additive-only, no demotion this milestone)."
+      "justification": "Warm (ruled F-729, G2): weak chain adjacent to TC:issue-triage; MCP: no vendor milestone tools. Fidelity semantic > shape target → tier-mismatch ledger (additive-only, no demotion this milestone)."
     },
     {
       "name": "GET /repos/:owner/:repo/tags",
@@ -706,7 +706,7 @@
       "name": "POST /repos/:owner/:repo/releases",
       "heat": "warm",
       "fidelity": "semantic",
-      "justification": "Warm (ruled F-729, G4, create_release counterpart): no vendor write tool, rarer chain. Fidelity semantic > shape target → tier-mismatch ledger (additive-only, no demotion this milestone)."
+      "justification": "Warm (ruled F-729, G4, create_release counterpart): rarer chain adjacent to TC:release-notes; MCP: no vendor write tool. Fidelity semantic > shape target → tier-mismatch ledger (additive-only, no demotion this milestone)."
     },
     {
       "name": "GET /user",
