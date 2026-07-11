@@ -218,7 +218,8 @@ export class BillingDomain {
   /**
    * Update: metadata merges per-key (empty/null unsets — Stripe's metadata
    * contract, same as customers), cancel_at_period_end flips. A canceled
-   * subscription refuses updates like real Stripe.
+   * subscription accepts metadata-only updates and refuses everything else,
+   * like real Stripe.
    */
   updateSubscription(
     accountId: string,
@@ -226,11 +227,13 @@ export class BillingDomain {
     input: UpdateSubscriptionInput
   ): SubscriptionRow {
     const existing = this.requireSubscription(accountId, id);
-    if (existing.status === "canceled") {
+    if (existing.status === "canceled" && input.cancel_at_period_end !== undefined) {
+      // Real Stripe's message; it carries no `code`, but the twin envelope
+      // requires one, so a named code rides along (documented shape choice).
       throw new TwinError(
         "invalid_request_error",
-        "resource_missing",
-        "A canceled subscription can only update its metadata.",
+        "subscription_canceled",
+        "You cannot update a subscription that is `canceled` or `incomplete_expired`.",
         { param: "subscription", statusCode: 400 }
       );
     }

@@ -211,7 +211,7 @@ describe("subscriptions (warm, shape)", () => {
     expect(second.body.cancel_at_period_end).toBe(true);
   });
 
-  it("DELETE cancels immediately; re-cancel is idempotent; update then refuses", async () => {
+  it("DELETE cancels immediately; re-cancel is idempotent; canceled allows metadata-only updates", async () => {
     const app = await createStripeApp();
     const { sub } = await createSubscription(app);
     const canceled = await rest(app, "DELETE", `/v1/subscriptions/${sub.body.id}`);
@@ -224,10 +224,20 @@ describe("subscriptions (warm, shape)", () => {
     expect(again.status).toBe(200);
     expect(again.body.canceled_at).toBe(canceled.body.canceled_at);
 
-    const update = await rest(app, "POST", `/v1/subscriptions/${sub.body.id}`, {
+    // Real Stripe: a canceled subscription still accepts metadata updates…
+    const metadataOnly = await rest(app, "POST", `/v1/subscriptions/${sub.body.id}`, {
       metadata: { a: "b" },
     });
-    expect(update.status).toBe(400);
+    expect(metadataOnly.status).toBe(200);
+    expect(metadataOnly.body.metadata).toEqual({ a: "b" });
+    expect(metadataOnly.body.status).toBe("canceled");
+
+    // …but refuses everything else.
+    const nonMetadata = await rest(app, "POST", `/v1/subscriptions/${sub.body.id}`, {
+      cancel_at_period_end: true,
+    });
+    expect(nonMetadata.status).toBe(400);
+    expect(nonMetadata.body.error.code).toBe("subscription_canceled");
   });
 
   it("list excludes canceled by default; status=all lifts the filter", async () => {

@@ -376,7 +376,7 @@
       "name": "POST /s/:sid/v1/subscriptions/:id",
       "heat": "warm",
       "fidelity": "shape",
-      "justification": "TC:subscription-billing (ruled F-729): per-key metadata merge + cancel_at_period_end flip; canceled subscriptions refuse updates. F-734."
+      "justification": "TC:subscription-billing (ruled F-729): per-key metadata merge + cancel_at_period_end flip; canceled subscriptions accept metadata-only updates like real Stripe. F-734."
     },
     {
       "name": "DELETE /s/:sid/v1/subscriptions/:id",

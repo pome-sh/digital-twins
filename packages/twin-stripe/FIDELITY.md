@@ -80,7 +80,7 @@ in the package README. Changing any of those is a breaking change for
 | `POST /s/:sid/v1/subscriptions` | warm | shape | `billing-shape.test.ts` | `customer` (live) + `items[][price]` required, both referentially checked. Created `active` immediately — no invoice minted, no event emitted (shape tier). |
 | `GET /s/:sid/v1/subscriptions/:id` | warm | shape | `billing-shape.test.ts` | `items.data[].price` is the expanded Price object, like real Stripe. |
 | `GET /s/:sid/v1/subscriptions` | warm | shape | `billing-shape.test.ts` | Excludes canceled by default; `status=canceled` selects them, `status=all` lifts the filter; `customer` filter. |
-| `POST /s/:sid/v1/subscriptions/:id` | warm | shape | `billing-shape.test.ts` | Update: metadata merges per-key (empty value unsets), `cancel_at_period_end` flips. Canceled subscriptions refuse updates. |
+| `POST /s/:sid/v1/subscriptions/:id` | warm | shape | `billing-shape.test.ts` | Update: metadata merges per-key (empty value unsets), `cancel_at_period_end` flips. Canceled subscriptions accept metadata-only updates and refuse everything else, like real Stripe. |
 | `DELETE /s/:sid/v1/subscriptions/:id` | warm | shape | `billing-shape.test.ts` | Immediate cancel: `status → canceled`, `canceled_at`/`ended_at` stamped. Idempotent; no proration, no final invoice (shape tier). |
 | `GET /s/:sid/v1/invoices/:id` | warm | shape | `billing-shape.test.ts` | Always 404 `resource_missing`: invoices are reads-only (F-729 ruling point 2) and nothing in the twin mints one. |
 | `GET /s/:sid/v1/invoices` | warm | shape | `billing-shape.test.ts` | Always the empty Stripe list envelope — see the invoice note under Known divergences. |
