@@ -221,6 +221,9 @@ describe("update_pull_request_branch (semantic merge)", () => {
   it("merges base into a fork head across remapped commit SHAs", () => {
     const domain = seededDomain();
     domain.forkRepository({ ...repo, organization: "forks" });
+    // The PR's own change: delete a file on the fork head.
+    const forkReadme = domain.getFileContents({ owner: "forks", repo: "api", path: "README.md" }) as { sha: string };
+    domain.deleteFile({ owner: "forks", repo: "api", branch: "main", path: "README.md", message: "Fork delete", sha: forkReadme.sha });
     domain.pushFiles({ ...repo, branch: "main", message: "Base drift", files: [{ path: "fork-drift.txt", content: "drift\n" }] });
     const pr = domain.createPullRequest({ ...repo, title: "Fork merge", head: "forks:main", base: "main" });
     const oldHeadSha = pr.head.sha!;
@@ -230,9 +233,11 @@ describe("update_pull_request_branch (semantic merge)", () => {
     expect(forkCommits[0].commit.message).toBe("Merge branch 'main' into main");
     expect(forkCommits[0].parents[0].sha).toBe(oldHeadSha);
     expect(domain.getFileContents({ owner: "forks", repo: "api", path: "fork-drift.txt", ref: "main" })).toMatchObject({ path: "fork-drift.txt" });
+    // A real merge base is found across the fork's remapped SHA space, so the
+    // file the PR deleted is NOT resurrected from base.
+    expect(() => domain.getFileContents({ owner: "forks", repo: "api", path: "README.md", ref: "main" })).toThrow("Not Found");
 
-    // The merge base is found across the fork's remapped SHA space, so a
-    // second call with no new base commits is a no-op, not another merge.
+    // ...and a second call with no new base commits is a no-op, not another merge.
     const headAfterFirst = domain.getPullRequest({ ...repo, pull_number: pr.number }).head.sha;
     domain.updatePullRequestBranch({ ...repo, pull_number: pr.number });
     expect(domain.getPullRequest({ ...repo, pull_number: pr.number }).head.sha).toBe(headAfterFirst);
