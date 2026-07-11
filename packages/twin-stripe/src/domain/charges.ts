@@ -16,6 +16,14 @@ export type CreateChargeInput = {
   amount: number;
   currency: string;
   balance_transaction_id?: string | null;
+  /** Card charges (F-731): the PM used and its serialized card details. */
+  payment_method_id?: string | null;
+  payment_method_details_json?: string | null;
+  /** Declined card attempts mint a `failed` charge, like real Stripe. */
+  status?: "succeeded" | "failed";
+  failure_code?: string | null;
+  failure_decline_code?: string | null;
+  failure_message?: string | null;
 };
 
 export type ListChargesInput = {
@@ -33,26 +41,41 @@ export class ChargesDomain {
     ensureStripeTables(db);
   }
 
-  /** Mint a fresh `succeeded` + `captured` charge attached to a PI. */
+  /**
+   * Mint a fresh charge attached to a PI. Defaults to `succeeded` +
+   * `captured` (the settle paths); a declined card attempt passes
+   * `status: "failed"` and the failure columns instead.
+   */
   createForPI(accountId: string, input: CreateChargeInput): ChargeRow {
     const id = newId("charge");
     const now = nowUnix();
+    const status = input.status ?? "succeeded";
+    const succeeded = status === "succeeded";
     this.db
       .prepare(
         `INSERT INTO charges (
           id, account_id, payment_intent_id, amount, amount_captured, amount_refunded,
-          status, balance_transaction_id, captured, currency, created
-        ) VALUES (?, ?, ?, ?, ?, 0, 'succeeded', ?, 1, ?, ?)`
+          status, balance_transaction_id, captured, currency, created,
+          payment_method_id, payment_method_details_json,
+          failure_code, failure_decline_code, failure_message
+        ) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         id,
         accountId,
         input.payment_intent_id,
         input.amount,
-        input.amount,
+        succeeded ? input.amount : 0,
+        status,
         input.balance_transaction_id ?? null,
+        succeeded ? 1 : 0,
         input.currency,
-        now
+        now,
+        input.payment_method_id ?? null,
+        input.payment_method_details_json ?? null,
+        input.failure_code ?? null,
+        input.failure_decline_code ?? null,
+        input.failure_message ?? null
       );
     return this.requireById(accountId, id);
   }
