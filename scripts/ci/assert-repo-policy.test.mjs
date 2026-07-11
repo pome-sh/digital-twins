@@ -79,6 +79,33 @@ function main() {
   {
     const r = runAssert(
       baseProtection({
+        required_pull_request_reviews: { required_approving_review_count: 0 },
+      }),
+    );
+    assert(r.status === 1, "zero approving reviews must fail");
+  }
+
+  {
+    const r = runAssert(
+      baseProtection({
+        required_conversation_resolution: { enabled: false },
+      }),
+    );
+    assert(r.status === 1, "disabled conversation resolution must fail");
+  }
+
+  {
+    const r = runAssert(
+      baseProtection({
+        allow_deletions: { enabled: true },
+      }),
+    );
+    assert(r.status === 1, "branch deletion enabled must fail");
+  }
+
+  {
+    const r = runAssert(
+      baseProtection({
         required_status_checks: {
           strict: true,
           contexts: ["typecheck-test"],
@@ -108,6 +135,14 @@ function main() {
     assert(
       /assert-repo-policy\.test\.mjs/.test(y),
       "repo-policy must run offline validator tests",
+    );
+    const liveStep = y.match(
+      /- name: Assert live branch protection([\s\S]*?)\n\s+run:\s*\|/,
+    );
+    assert(liveStep, "repo-policy must contain the live protection step");
+    assert(
+      /if:\s*github\.event_name != 'pull_request'/.test(liveStep[1]),
+      "live protection step must never receive REPO_POLICY_TOKEN on PRs",
     );
   }
 

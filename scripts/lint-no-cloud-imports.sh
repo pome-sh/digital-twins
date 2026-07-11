@@ -8,7 +8,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PATTERN='(from[[:space:]]+|import[[:space:]]+|import\(|require\()[[:space:]]*['\''"]@?pome-cloud(/|['\''"])'
+PATTERN='(from[[:space:]]+|import[[:space:]]+|import[[:space:]]*\(|require[[:space:]]*\()[[:space:]]*['\''"]@?pome-cloud(/|['\''"])'
 
 SCAN_DIRS=()
 for dir in packages cli/src cli/scripts scripts; do

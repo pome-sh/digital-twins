@@ -24,14 +24,15 @@ permissions:
 jobs:
   assert:
     name: assert main protection
-    # Fork PRs get a read-only token and cannot see base-repo secrets.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Regression-test policy validator
         run: node scripts/ci/assert-repo-policy.test.mjs
       - name: Assert live branch protection
+        # Never expose the Administration:read PAT to code from a PR branch.
+        # Schedule/dispatch runs use the workflow and script from default branch.
+        if: github.event_name != 'pull_request'
         env:
           GITHUB_TOKEN: ${{ secrets.REPO_POLICY_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
@@ -39,11 +40,6 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -z "${GITHUB_TOKEN:-}" ]]; then
-            if [[ "${EVENT_NAME}" == "pull_request" ]]; then
-              echo "REPO_POLICY_TOKEN unset — live assert skipped on PR; offline validator tests ran above."
-              echo "Maintainers: add a fine-grained PAT (Administration: Read-only) as Actions secret REPO_POLICY_TOKEN for schedule/dispatch drift checks."
-              exit 0
-            fi
             echo "::error::REPO_POLICY_TOKEN is required for ${EVENT_NAME} drift checks (GITHUB_TOKEN cannot read branch protection)."
             exit 1
           fi
