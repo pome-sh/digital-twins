@@ -10,35 +10,45 @@ import { toolDefinitions } from "../src/tools.js";
 const TOOL_NAMES = toolDefinitions.map((t) => t.name);
 
 describe("MCP tools", () => {
-  it("listTools returns 15 tools", async () => {
+  it("listTools returns 25 tools", async () => {
     const app = await createStripeApp();
     const tools = await rest(app, "GET", "/mcp/tools");
     expect(tools.status).toBe(200);
-    expect(tools.body.tools).toHaveLength(15);
+    expect(tools.body.tools).toHaveLength(25);
     const names = tools.body.tools.map((t: any) => t.name).sort();
     expect(names).toEqual(
       [
+        "attach_payment_method",
         "cancel_payment_intent",
         "confirm_payment_intent",
+        "create_customer",
         "create_payment_intent",
+        "create_payment_method",
         "create_refund",
+        "delete_customer",
+        "detach_payment_method",
         "list_balance_transactions",
         "list_charges",
+        "list_customer_payment_methods",
+        "list_customers",
         "list_events",
         "list_payment_intents",
         "list_refunds",
         "retrieve_balance",
         "retrieve_charge",
+        "retrieve_customer",
         "retrieve_event",
         "retrieve_payment_intent",
+        "retrieve_payment_method",
         "retrieve_refund",
         "simulate_crypto_deposit",
+        "update_customer",
       ].sort()
     );
   });
 
   it("every tool is callable through /mcp/call", async () => {
-    expect(TOOL_NAMES).toHaveLength(15);
+    expect(TOOL_NAMES).toHaveLength(25);
     for (const name of TOOL_NAMES) {
       const app = await createStripeApp();
       const args = await argsFor(app, name);
@@ -93,8 +103,39 @@ async function argsFor(
     case "list_balance_transactions":
     case "list_events":
     case "list_refunds":
+    case "list_customers":
     case "retrieve_balance":
       return {};
+    case "create_customer":
+      return { name: "Ada Lovelace", email: "ada@example.com" };
+    case "retrieve_customer":
+    case "update_customer":
+    case "delete_customer":
+    case "list_customer_payment_methods": {
+      const customer = await callTool(app, "create_customer", { name: "Ada" });
+      if (name === "update_customer") return { id: customer.body.id, name: "Ada L" };
+      if (name === "list_customer_payment_methods") return { customer: customer.body.id };
+      return { id: customer.body.id };
+    }
+    case "create_payment_method":
+      return {
+        type: "card",
+        card: { number: "4242424242424242", exp_month: 12, exp_year: 2032, cvc: "123" },
+      };
+    case "retrieve_payment_method":
+    case "detach_payment_method":
+    case "attach_payment_method": {
+      const pm = await callTool(app, "create_payment_method", {
+        type: "card",
+        card: { number: "4242424242424242", exp_month: 12, exp_year: 2032 },
+      });
+      if (name === "retrieve_payment_method") return { id: pm.body.id };
+      const customer = await callTool(app, "create_customer", { name: "Ada" });
+      if (name === "attach_payment_method") return { id: pm.body.id, customer: customer.body.id };
+      // detach: attach first so the detach succeeds.
+      await callTool(app, "attach_payment_method", { id: pm.body.id, customer: customer.body.id });
+      return { id: pm.body.id };
+    }
     case "create_refund": {
       const charge = await settleCharge(app);
       return { charge };

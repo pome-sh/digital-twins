@@ -357,12 +357,17 @@ export function depositAddressFromId(id: string): string {
  *
  * `accountId` scopes results to the calling session's account so two
  * sessions sharing a DB file cannot see each other's rows.
+ *
+ * `extraWheres` lets a caller inject table-specific predicates (e.g. the
+ * customers table's `deleted = 0`, payment_methods' `customer_id = ?`)
+ * without teaching this generic helper every column name.
  */
 export function listPaginated<T extends { id: string; created: number }>(
   db: TwinStripeDatabase,
   table: string,
   accountId: string,
-  input: ListPIsInput & { type?: string; payment_intent?: string; customer?: string }
+  input: ListPIsInput & { type?: string; payment_intent?: string; customer?: string },
+  extraWheres: Array<{ sql: string; args: unknown[] }> = []
 ): { rows: T[]; hasMore: boolean; limit: number } {
   const limitRaw = input.limit ?? 10;
   const limit = Math.min(100, Math.max(1, Math.floor(limitRaw)));
@@ -407,6 +412,10 @@ export function listPaginated<T extends { id: string; created: number }>(
   if (input.payment_intent) {
     wheres.push("payment_intent_id = ?");
     args.push(input.payment_intent);
+  }
+  for (const extra of extraWheres) {
+    wheres.push(extra.sql);
+    args.push(...extra.args);
   }
 
   const where = `WHERE ${wheres.join(" AND ")}`;
