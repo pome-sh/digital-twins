@@ -2,7 +2,7 @@
   "twin": "stripe",
   "package": "@pome-sh/twin-stripe",
   "updated": "2026-07-11",
-  "notes": "Both tables lint 1:1 against FIDELITY.md; FIDELITY_MATRIX.md stays a legacy pinned matrix. The refunds chain is implemented but undocumented — declared in doc_drift until F-733 reconciles the docs. Heat tiers await the F-729 rubric ruling.",
+  "notes": "Both tables lint 1:1 against FIDELITY.md; FIDELITY_MATRIX.md stays a legacy pinned matrix. The refunds chain is implemented but undocumented — declared in doc_drift until F-733 reconciles the docs. The customer-management chain (F-732) carries its ruled heat (hot, F-729); the remaining pre-M5 surfaces stay unclassified until their owning tickets (F-731 payments, F-733 refunds docs, F-734 warm set) land.",
   "tools": [
     {
       "name": "create_payment_intent",
@@ -93,6 +93,66 @@
       "heat": "unclassified",
       "fidelity": "semantic",
       "justification": "Implemented and tested in code but absent from the FIDELITY.md tables; doc reconciliation owned by F-733."
+    },
+    {
+      "name": "create_customer",
+      "heat": "hot",
+      "fidelity": "semantic",
+      "justification": "TC:customer-mgmt (ruled F-729): customer management is the precondition of nearly every collection chain. Vendor MCP has meta-tools only; task chain wins per rubric."
+    },
+    {
+      "name": "retrieve_customer",
+      "heat": "hot",
+      "fidelity": "semantic",
+      "justification": "TC:customer-mgmt (ruled F-729)."
+    },
+    {
+      "name": "update_customer",
+      "heat": "hot",
+      "fidelity": "semantic",
+      "justification": "TC:customer-mgmt (ruled F-729); Stripe per-key metadata merge modeled semantically."
+    },
+    {
+      "name": "delete_customer",
+      "heat": "hot",
+      "fidelity": "semantic",
+      "justification": "TC:customer-mgmt (ruled F-729); soft delete serves the {deleted: true} stub and detaches PMs like real Stripe."
+    },
+    {
+      "name": "list_customers",
+      "heat": "hot",
+      "fidelity": "semantic",
+      "justification": "TC:customer-mgmt (ruled F-729); cursor pagination + email filter."
+    },
+    {
+      "name": "list_customer_payment_methods",
+      "heat": "hot",
+      "fidelity": "semantic",
+      "justification": "TC:card-on-file (ruled F-729): the customer-scoped PM list is the hot read; the top-level PM list stays cold."
+    },
+    {
+      "name": "create_payment_method",
+      "heat": "hot",
+      "fidelity": "semantic",
+      "justification": "TC:card-on-file (ruled F-729): card PMs from test card numbers; PAN never stored. Card-mode PI confirm lands in F-731."
+    },
+    {
+      "name": "retrieve_payment_method",
+      "heat": "hot",
+      "fidelity": "semantic",
+      "justification": "TC:card-on-file (ruled F-729)."
+    },
+    {
+      "name": "attach_payment_method",
+      "heat": "hot",
+      "fidelity": "semantic",
+      "justification": "TC:card-on-file (ruled F-729): one customer per PM; a detached PM can never be reattached (Stripe lifecycle rule)."
+    },
+    {
+      "name": "detach_payment_method",
+      "heat": "hot",
+      "fidelity": "semantic",
+      "justification": "TC:card-on-file (ruled F-729)."
     }
   ],
   "rest": [
@@ -185,6 +245,66 @@
       "heat": "unclassified",
       "fidelity": "semantic",
       "justification": "Implemented and tested in code but absent from the FIDELITY.md tables; doc reconciliation owned by F-733."
+    },
+    {
+      "name": "POST /s/:sid/v1/customers",
+      "heat": "hot",
+      "fidelity": "semantic",
+      "justification": "TC:customer-mgmt (ruled F-729): customer management is the precondition of nearly every collection chain."
+    },
+    {
+      "name": "GET /s/:sid/v1/customers/:id",
+      "heat": "hot",
+      "fidelity": "semantic",
+      "justification": "TC:customer-mgmt (ruled F-729); deleted customers serve the {deleted: true} stub like real Stripe."
+    },
+    {
+      "name": "GET /s/:sid/v1/customers",
+      "heat": "hot",
+      "fidelity": "semantic",
+      "justification": "TC:customer-mgmt (ruled F-729); cursor pagination + email filter, deleted rows excluded."
+    },
+    {
+      "name": "POST /s/:sid/v1/customers/:id",
+      "heat": "hot",
+      "fidelity": "semantic",
+      "justification": "TC:customer-mgmt (ruled F-729); Stripe per-key metadata merge (empty value unsets)."
+    },
+    {
+      "name": "DELETE /s/:sid/v1/customers/:id",
+      "heat": "hot",
+      "fidelity": "semantic",
+      "justification": "TC:customer-mgmt (ruled F-729); soft delete detaches the customer's PMs in the same transaction."
+    },
+    {
+      "name": "GET /s/:sid/v1/customers/:id/payment_methods",
+      "heat": "hot",
+      "fidelity": "semantic",
+      "justification": "TC:card-on-file (ruled F-729): the customer-scoped PM list is the hot read; the top-level GET /v1/payment_methods stays cold (loud 501)."
+    },
+    {
+      "name": "POST /s/:sid/v1/payment_methods",
+      "heat": "hot",
+      "fidelity": "semantic",
+      "justification": "TC:card-on-file (ruled F-729): card PMs from test card numbers (Luhn + expiry card_errors); PAN never stored."
+    },
+    {
+      "name": "GET /s/:sid/v1/payment_methods/:id",
+      "heat": "hot",
+      "fidelity": "semantic",
+      "justification": "TC:card-on-file (ruled F-729)."
+    },
+    {
+      "name": "POST /s/:sid/v1/payment_methods/:id/attach",
+      "heat": "hot",
+      "fidelity": "semantic",
+      "justification": "TC:card-on-file (ruled F-729): one customer per PM; a detached PM can never be reattached."
+    },
+    {
+      "name": "POST /s/:sid/v1/payment_methods/:id/detach",
+      "heat": "hot",
+      "fidelity": "semantic",
+      "justification": "TC:card-on-file (ruled F-729)."
     }
   ],
   "doc_drift": [

@@ -4,14 +4,25 @@
 // Mirrors twin-github/src/serializers.ts in spirit — pure functions,
 // row in / object out.
 
-import type { PIRow, ChargeRow, BalanceTxRow, EventRow, RefundRow } from "./types.js";
+import type {
+  PIRow,
+  ChargeRow,
+  BalanceTxRow,
+  CustomerRow,
+  EventRow,
+  PaymentMethodRow,
+  RefundRow,
+} from "./types.js";
 import type {
   ApiList,
   BalanceTransaction,
   Balance,
   Charge,
+  Customer,
   DeepPartial,
+  DeletedCustomer,
   PaymentIntent,
+  PaymentMethod,
   Refund,
   StripeEvent,
 } from "./upstream-types.js";
@@ -181,6 +192,77 @@ export function refundJson(row: RefundRow) {
     status: row.status,
     transfer_reversal: null,
   } satisfies DeepPartial<Refund>;
+}
+
+export function customerJson(row: CustomerRow) {
+  return {
+    id: row.id,
+    object: "customer",
+    address: null,
+    balance: 0,
+    created: row.created,
+    currency: null,
+    default_source: null,
+    delinquent: false,
+    description: row.description,
+    discount: null,
+    email: row.email,
+    invoice_settings: {
+      custom_fields: null,
+      default_payment_method: null,
+      footer: null,
+      rendering_options: null,
+    },
+    livemode: false,
+    metadata: parseJson(row.metadata_json, {}),
+    name: row.name,
+    phone: row.phone,
+    preferred_locales: [],
+    shipping: null,
+    tax_exempt: "none",
+    test_clock: null,
+  } satisfies DeepPartial<Customer>;
+}
+
+/**
+ * Real Stripe serves this stub for DELETE and for every retrieve of a
+ * deleted customer — three fields, nothing else.
+ */
+export function deletedCustomerJson(row: CustomerRow) {
+  return {
+    id: row.id,
+    object: "customer",
+    deleted: true,
+  } satisfies DeepPartial<DeletedCustomer>;
+}
+
+export function paymentMethodJson(row: PaymentMethodRow) {
+  return {
+    id: row.id,
+    object: "payment_method",
+    billing_details: {
+      address: { city: null, country: null, line1: null, line2: null, postal_code: null, state: null },
+      email: null,
+      name: null,
+      phone: null,
+    },
+    card: {
+      brand: row.card_brand,
+      exp_month: row.card_exp_month,
+      exp_year: row.card_exp_year,
+      fingerprint: row.card_fingerprint,
+      funding: "credit",
+      last4: row.card_last4,
+    },
+    created: row.created,
+    customer: row.customer_id,
+    livemode: false,
+    metadata: {},
+    // Twin row `type` is a free `string`; upstream `PaymentMethod.type` is a
+    // literal union. Narrow for the type anchor only (FDRS-454), runtime
+    // value ("card") unchanged.
+    type: row.type as PaymentMethod["type"],
+  } satisfies DeepPartial<PaymentMethod>;
 }
 
 export function balanceTransactionJson(row: BalanceTxRow) {

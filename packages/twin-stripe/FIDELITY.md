@@ -5,7 +5,7 @@
 page documents exactly which surfaces are faithful to real Stripe today,
 at what tier, and how fidelity is verified.
 
-Last verified: 2026-05-09.
+Last verified: 2026-07-11.
 Stripe API version pinned: `2026-03-04.preview`.
 
 ## What "fidelity" means here
@@ -41,7 +41,7 @@ build depends on (port `:3333`, `/healthz`, `STRIPE_CLONE_HOST`,
 in the package README. Changing any of those is a breaking change for
 `pome-cloud` and requires a matching cloud consumer PR.
 
-## REST routes (v1 = 12 semantic + everything else loud 501)
+## REST routes (v1 = 22 semantic + everything else loud 501)
 
 | Route | Tier | Tests | Notes |
 | --- | --- | --- | --- |
@@ -57,11 +57,21 @@ in the package README. Changing any of those is a breaking change for
 | `GET /s/:sid/v1/balance_transactions` | semantic | `balance.test.ts` | Ledger entries. |
 | `GET /s/:sid/v1/events/:id` | semantic | `events.test.ts` | |
 | `GET /s/:sid/v1/events` | semantic | `events.test.ts` | Filter by `type`, `created`. **No webhook delivery in v1** — agents poll this. |
+| `POST /s/:sid/v1/customers` | semantic | `customers.test.ts` | F-732 (heat: hot, ruled F-729). Every field optional, like real Stripe. Emits `customer.created`. |
+| `GET /s/:sid/v1/customers/:id` | semantic | `customers.test.ts` | Deleted customers serve the `{deleted: true}` stub, like real Stripe. |
+| `GET /s/:sid/v1/customers` | semantic | `customers.test.ts` | Cursor pagination on `(created, id)`; `email` filter; deleted rows excluded. |
+| `POST /s/:sid/v1/customers/:id` | semantic | `customers.test.ts` | Update. Metadata merges per-key; an empty value unsets the key (Stripe's metadata contract). |
+| `DELETE /s/:sid/v1/customers/:id` | semantic | `customers.test.ts` | Soft delete; detaches the customer's payment methods in the same transaction. Idempotent. |
+| `GET /s/:sid/v1/customers/:id/payment_methods` | semantic | `payment-methods.test.ts` | The hot card-on-file read. `type` filter. 404 for deleted customers. |
+| `POST /s/:sid/v1/payment_methods` | semantic | `payment-methods.test.ts` | Card only (F-731 adds card PIs). Test card numbers → brand/last4; Luhn + expiry `card_error`s; PAN never stored. |
+| `GET /s/:sid/v1/payment_methods/:id` | semantic | `payment-methods.test.ts` | Top-level `GET /v1/payment_methods` (list) stays loud 501 per the F-729 ruling. |
+| `POST /s/:sid/v1/payment_methods/:id/attach` | semantic | `payment-methods.test.ts` | One customer per PM; a previously-detached PM can never be reattached. Emits `payment_method.attached`. |
+| `POST /s/:sid/v1/payment_methods/:id/detach` | semantic | `payment-methods.test.ts` | Emits `payment_method.detached`. |
 
-Anything else under `/v1/*` (`/v1/customers`,
-`/v1/setup_intents`, `/v1/checkout/*`, `/v1/products`, `/v1/prices`,
-`/v1/webhook_endpoints`, `/v1/payment_methods`, `/v1/shared_payment/*`,
-`/v1/profiles`, etc.) returns:
+Anything else under `/v1/*` (`/v1/setup_intents`, `/v1/checkout/*`,
+`/v1/products`, `/v1/prices`, `/v1/webhook_endpoints`,
+`/v1/shared_payment/*`, `/v1/profiles`, the top-level
+`GET /v1/payment_methods` list, etc.) returns:
 
 ```json
 {
@@ -82,7 +92,7 @@ Anything else under `/v1/*` (`/v1/customers`,
 
 HTTP status: 501.
 
-## MCP tools (12 — names match `stripe-node` method names)
+## MCP tools (25 live; 22 documented — names match `stripe-node` method names)
 
 | Tool | Backing route | Tier |
 | --- | --- | --- |
@@ -98,6 +108,16 @@ HTTP status: 501.
 | `list_balance_transactions` | GET /v1/balance_transactions | semantic |
 | `retrieve_event` | GET /v1/events/:id | semantic |
 | `list_events` | GET /v1/events | semantic |
+| `create_customer` | POST /v1/customers | semantic |
+| `retrieve_customer` | GET /v1/customers/:id | semantic |
+| `update_customer` | POST /v1/customers/:id | semantic |
+| `delete_customer` | DELETE /v1/customers/:id | semantic |
+| `list_customers` | GET /v1/customers | semantic |
+| `list_customer_payment_methods` | GET /v1/customers/:id/payment_methods | semantic |
+| `create_payment_method` | POST /v1/payment_methods | semantic |
+| `retrieve_payment_method` | GET /v1/payment_methods/:id | semantic |
+| `attach_payment_method` | POST /v1/payment_methods/:id/attach | semantic |
+| `detach_payment_method` | POST /v1/payment_methods/:id/detach | semantic |
 
 Every MCP tool is callable via both `POST /s/:sid/mcp/call` (with
 `{tool, arguments}` body) and `POST /s/:sid/mcp/tools/:name` (with the

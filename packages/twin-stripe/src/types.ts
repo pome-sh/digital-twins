@@ -213,6 +213,32 @@ export type EventRow = {
   api_version: string;
 };
 
+export type CustomerRow = {
+  id: string;
+  account_id: string;
+  name: string | null;
+  email: string | null;
+  description: string | null;
+  phone: string | null;
+  metadata_json: string;
+  deleted: 0 | 1;
+  created: number;
+};
+
+export type PaymentMethodRow = {
+  id: string;
+  account_id: string;
+  type: string;
+  card_brand: string;
+  card_last4: string;
+  card_exp_month: number;
+  card_exp_year: number;
+  card_fingerprint: string;
+  customer_id: string | null;
+  detached: 0 | 1;
+  created: number;
+};
+
 export type RefundStatus = "succeeded" | "pending" | "failed" | "canceled";
 
 export type RefundRow = {

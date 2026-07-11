@@ -3,11 +3,14 @@
 // fidelity:parity — declarative parity scenario for twin-stripe (F-730).
 // The runner lives in @pome-sh/sdk/parity; this file is scenario data only:
 // the crypto-deposit money chain (create PI → confirm → settle → charge →
-// refund → ledger → events) plus a second PI for the cancel path, covering
-// every MCP tool in fidelity.inventory.json — including the refunds chain
-// that is live in code but still absent from FIDELITY.md (declared as
-// doc_drift, reconciliation owned by F-733). The loud-501 probe pins the
-// Stripe-shaped unsupported envelope on /v1/customers.
+// refund → ledger → events), a second PI for the cancel path, and the
+// customer-management chain (F-732: customer CRUD + card-on-file
+// attach/detach), covering every MCP tool in fidelity.inventory.json —
+// including the refunds chain that is live in code but still absent from
+// FIDELITY.md (declared as doc_drift, reconciliation owned by F-733). The
+// loud-501 probe pins the Stripe-shaped unsupported envelope on
+// /v1/checkout/sessions (it moved off /v1/customers when F-732 made
+// customers a supported surface).
 
 import { join } from "node:path";
 import { loadFidelityInventory, runParityCli, type ParityStep } from "@pome-sh/sdk/parity";
@@ -69,6 +72,55 @@ const steps: ParityStep[] = [
     },
   },
   { tool: "cancel_payment_intent", arguments: (state) => ({ id: state.pi2 }) },
+  // Customer-management chain (F-732): CRUD + card-on-file attach/detach.
+  {
+    tool: "create_customer",
+    arguments: { name: "Parity Customer", email: "parity@example.com", metadata: { a: "1" } },
+    capture: (body, state) => {
+      state.customer = (body as { id?: string }).id;
+    },
+  },
+  { tool: "retrieve_customer", arguments: (state) => ({ id: state.customer }) },
+  {
+    tool: "update_customer",
+    arguments: (state) => ({ id: state.customer, name: "Parity Customer II", metadata: { a: "", b: "2" } }),
+    verify: (body) => {
+      const metadata = (body as { metadata?: Record<string, string> }).metadata ?? {};
+      if (metadata.a !== undefined) return "metadata key 'a' should have been unset by the empty value";
+      if (metadata.b !== "2") return "metadata key 'b' should have been merged in";
+      return undefined;
+    },
+  },
+  { tool: "list_customers", arguments: { limit: 10 } },
+  {
+    tool: "create_payment_method",
+    arguments: { type: "card", card: { number: "4242424242424242", exp_month: 12, exp_year: 2032 } },
+    capture: (body, state) => {
+      state.pm = (body as { id?: string }).id;
+    },
+  },
+  { tool: "retrieve_payment_method", arguments: (state) => ({ id: state.pm }) },
+  {
+    tool: "attach_payment_method",
+    arguments: (state) => ({ id: state.pm, customer: state.customer }),
+    verify: (body) =>
+      (body as { customer?: string | null }).customer ? undefined : "attach should set customer",
+  },
+  {
+    tool: "list_customer_payment_methods",
+    arguments: (state) => ({ customer: state.customer }),
+    verify: (body) =>
+      ((body as { data?: unknown[] }).data?.length ?? 0) === 1
+        ? undefined
+        : "customer should list exactly the attached PM",
+  },
+  {
+    tool: "detach_payment_method",
+    arguments: (state) => ({ id: state.pm }),
+    verify: (body) =>
+      (body as { customer?: string | null }).customer === null ? undefined : "detach should clear customer",
+  },
+  { tool: "delete_customer", arguments: (state) => ({ id: state.customer }) },
 ];
 
 await runParityCli({
@@ -78,6 +130,6 @@ await runParityCli({
   liveToolNames: listTools().map((tool) => tool.name),
   steps,
   restProbes: [
-    { surface: "unsupported-rest", path: "/v1/customers", status: 501, expectUnsupportedEnvelope: true },
+    { surface: "unsupported-rest", path: "/v1/checkout/sessions", status: 501, expectUnsupportedEnvelope: true },
   ],
 });

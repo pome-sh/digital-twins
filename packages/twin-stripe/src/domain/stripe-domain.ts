@@ -21,7 +21,9 @@ import type {
   PIRow,
   ChargeRow,
   BalanceTxRow,
+  CustomerRow,
   EventRow,
+  PaymentMethodRow,
   RefundRow,
   StateDelta,
 } from "../types.js";
@@ -38,13 +40,26 @@ import {
   type CreateRefundInput,
   type ListRefundsInput,
 } from "./refunds.js";
+import {
+  CustomersDomain,
+  type CustomerFieldsInput,
+  type ListCustomersInput,
+} from "./customers.js";
+import {
+  PaymentMethodsDomain,
+  type CreatePaymentMethodInput,
+  type ListCustomerPaymentMethodsInput,
+} from "./payment-methods.js";
 import { ensureStripeTables, resetStripeTables } from "./schema.js";
 import {
   paymentIntentJson,
   chargeJson,
   balanceTransactionJson,
   balanceJson,
+  customerJson,
+  deletedCustomerJson,
   eventJson,
+  paymentMethodJson,
   refundJson,
   serializedList,
 } from "../serializers.js";
@@ -55,6 +70,8 @@ export class StripeDomain {
   readonly balance: BalanceDomain;
   readonly events: EventsDomain;
   readonly refunds: RefundsDomain;
+  readonly customers: CustomersDomain;
+  readonly paymentMethods: PaymentMethodsDomain;
 
   constructor(readonly db: TwinStripeDatabase) {
     ensureStripeTables(db);
@@ -63,6 +80,8 @@ export class StripeDomain {
     this.balance = new BalanceDomain(db);
     this.events = new EventsDomain(db);
     this.refunds = new RefundsDomain(db);
+    this.customers = new CustomersDomain(db);
+    this.paymentMethods = new PaymentMethodsDomain(db);
   }
 
   /** Reset Stripe-domain state. Used by `/admin/reset`. */
@@ -233,6 +252,128 @@ export class StripeDomain {
     return serializedList(rows.map(refundJson), hasMore, limit, "/v1/refunds");
   }
 
+  // ---------- Customers ----------
+
+  createCustomer(
+    accountId: string,
+    input: CustomerFieldsInput
+  ): { body: unknown; delta: StateDelta } {
+    const row = this.customers.create(accountId, input);
+    this.events.create(accountId, { type: "customer.created", object: customerJson(row) });
+    return {
+      body: customerJson(row),
+      delta: { before: null, after: rowToRecord(row) },
+    };
+  }
+
+  /** Deleted customers serve the `{deleted: true}` stub, like real Stripe. */
+  retrieveCustomer(accountId: string, id: string) {
+    const row = this.customers.requireById(accountId, id);
+    return row.deleted ? deletedCustomerJson(row) : customerJson(row);
+  }
+
+  updateCustomer(
+    accountId: string,
+    id: string,
+    input: CustomerFieldsInput
+  ): { body: unknown; delta: StateDelta } {
+    const before = this.customers.requireLive(accountId, id);
+    const row = this.customers.update(accountId, id, input);
+    this.events.create(accountId, { type: "customer.updated", object: customerJson(row) });
+    return {
+      body: customerJson(row),
+      delta: { before: rowToRecord(before), after: rowToRecord(row) },
+    };
+  }
+
+  deleteCustomer(accountId: string, id: string): { body: unknown; delta: StateDelta } {
+    const before = this.customers.requireById(accountId, id);
+    const { row, alreadyDeleted } = this.customers.delete(accountId, id);
+    if (!alreadyDeleted) {
+      this.events.create(accountId, { type: "customer.deleted", object: deletedCustomerJson(row) });
+    }
+    return {
+      body: deletedCustomerJson(row),
+      delta: { before: rowToRecord(before), after: rowToRecord(row) },
+    };
+  }
+
+  listCustomers(accountId: string, input: ListCustomersInput) {
+    const { rows, hasMore, limit } = this.customers.list(accountId, input);
+    return serializedList(rows.map(customerJson), hasMore, limit, "/v1/customers");
+  }
+
+  listCustomerPaymentMethods(
+    accountId: string,
+    customerId: string,
+    input: ListCustomerPaymentMethodsInput
+  ) {
+    // 404 for unknown AND deleted customers — a deleted customer has no
+    // payment-method sub-resource anymore.
+    this.customers.requireLive(accountId, customerId);
+    const { rows, hasMore, limit } = this.paymentMethods.listForCustomer(
+      accountId,
+      customerId,
+      input
+    );
+    return serializedList(
+      rows.map(paymentMethodJson),
+      hasMore,
+      limit,
+      `/v1/customers/${customerId}/payment_methods`
+    );
+  }
+
+  // ---------- Payment methods ----------
+
+  createPaymentMethod(
+    accountId: string,
+    input: CreatePaymentMethodInput
+  ): { body: unknown; delta: StateDelta } {
+    const row = this.paymentMethods.create(accountId, input);
+    return {
+      body: paymentMethodJson(row),
+      delta: { before: null, after: rowToRecord(row) },
+    };
+  }
+
+  retrievePaymentMethod(accountId: string, id: string) {
+    return paymentMethodJson(this.paymentMethods.requireById(accountId, id));
+  }
+
+  attachPaymentMethod(
+    accountId: string,
+    id: string,
+    customerId: string
+  ): { body: unknown; delta: StateDelta } {
+    // Resolve the customer first so a missing/deleted customer 404s before
+    // any PM lifecycle error fires.
+    this.customers.requireLive(accountId, customerId);
+    const before = this.paymentMethods.requireById(accountId, id);
+    const row = this.paymentMethods.attach(accountId, id, customerId);
+    this.events.create(accountId, {
+      type: "payment_method.attached",
+      object: paymentMethodJson(row),
+    });
+    return {
+      body: paymentMethodJson(row),
+      delta: { before: rowToRecord(before), after: rowToRecord(row) },
+    };
+  }
+
+  detachPaymentMethod(accountId: string, id: string): { body: unknown; delta: StateDelta } {
+    const before = this.paymentMethods.requireById(accountId, id);
+    const row = this.paymentMethods.detach(accountId, id);
+    this.events.create(accountId, {
+      type: "payment_method.detached",
+      object: paymentMethodJson(row),
+    });
+    return {
+      body: paymentMethodJson(row),
+      delta: { before: rowToRecord(before), after: rowToRecord(row) },
+    };
+  }
+
   // ---------- Charges ----------
 
   retrieveCharge(accountId: string, id: string) {
@@ -305,12 +446,22 @@ export class StripeDomain {
     const refunds = this.db
       .prepare("SELECT * FROM refunds WHERE account_id = ? ORDER BY created DESC, rowid DESC")
       .all(accountId) as RefundRow[];
+    const customers = this.db
+      .prepare("SELECT * FROM customers WHERE account_id = ? ORDER BY created DESC, rowid DESC")
+      .all(accountId) as CustomerRow[];
+    const paymentMethods = this.db
+      .prepare(
+        "SELECT * FROM payment_methods WHERE account_id = ? ORDER BY created DESC, rowid DESC"
+      )
+      .all(accountId) as PaymentMethodRow[];
     return {
       payment_intents: pis.map(paymentIntentJson),
       charges: charges.map(chargeJson),
       balance_transactions: balanceTxs.map(balanceTransactionJson),
       events: events.map(eventJson),
       refunds: refunds.map(refundJson),
+      customers: customers.map((row) => (row.deleted ? deletedCustomerJson(row) : customerJson(row))),
+      payment_methods: paymentMethods.map(paymentMethodJson),
     };
   }
 }

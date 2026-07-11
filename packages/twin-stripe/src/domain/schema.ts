@@ -107,15 +107,54 @@ CREATE INDEX IF NOT EXISTS idx_refunds_charge ON refunds(charge_id);
 CREATE INDEX IF NOT EXISTS idx_refunds_payment_intent ON refunds(payment_intent_id);
 CREATE INDEX IF NOT EXISTS idx_refunds_created ON refunds(created);
 CREATE INDEX IF NOT EXISTS idx_refunds_account_id ON refunds(account_id);
+
+CREATE TABLE IF NOT EXISTS customers (
+  id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL,
+  name TEXT,
+  email TEXT,
+  description TEXT,
+  phone TEXT,
+  metadata_json TEXT NOT NULL DEFAULT '{}',
+  deleted INTEGER NOT NULL DEFAULT 0,
+  created INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_customers_created ON customers(created);
+CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email);
+CREATE INDEX IF NOT EXISTS idx_customers_account_id ON customers(account_id);
+
+CREATE TABLE IF NOT EXISTS payment_methods (
+  id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL,
+  type TEXT NOT NULL,
+  card_brand TEXT NOT NULL,
+  card_last4 TEXT NOT NULL,
+  card_exp_month INTEGER NOT NULL,
+  card_exp_year INTEGER NOT NULL,
+  card_fingerprint TEXT NOT NULL,
+  customer_id TEXT,
+  detached INTEGER NOT NULL DEFAULT 0,
+  created INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_payment_methods_customer ON payment_methods(customer_id);
+CREATE INDEX IF NOT EXISTS idx_payment_methods_created ON payment_methods(created);
+CREATE INDEX IF NOT EXISTS idx_payment_methods_account_id ON payment_methods(account_id);
 `;
 
 // Delete order matters for foreign-key cascades: refunds → charges → PIs.
+// payment_methods reference customers by plain column (no FK), but clear
+// them before customers anyway so a mid-reset read never sees an attached
+// PM whose customer row is gone.
 const STRIPE_TABLES = [
   "refunds",
   "events",
   "balance_transactions",
   "charges",
   "payment_intents",
+  "payment_methods",
+  "customers",
 ];
 
 /**
