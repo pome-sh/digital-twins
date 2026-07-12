@@ -79,16 +79,31 @@
 // Blanked spans are replaced character-for-character with spaces (newlines
 // preserved), so byte offsets and reported line numbers are exact.
 //
+// NESTED FUNCTIONS DON'T COUNT: before the exit scan, the bodies of function
+// expressions DEFINED inside the catch clause (`=> { … }` arrow blocks and
+// `function [name](…) { … }` expressions) are masked out. A `return` inside
+// `catch (e) { const f = () => { return; }; log(e); }` exits f when f is later
+// CALLED — it is not an exit path of the catch clause itself, so that clause
+// is flagged. A top-level `throw`/`return`/`reject(` after such a definition
+// still counts. (A nested statement try/catch is NOT masked: its handler runs
+// inline at the catch's own level, so an exit there is a real exit path.)
+//
 // LIMITATIONS (honest): this is a structural scanner, not a data-flow analyzer.
-// A body that contains `return` inside a NESTED try/catch counts for the OUTER
-// catch too — acceptable: the requirement is that the body has a definite exit
-// path, and a nested handler that itself throws/returns provides one. A body
-// that computes an error result and falls through to a shared `return` after
-// the try/catch reads as a violation even when legitimate — that shape is what
-// the fingerprint ALLOWLIST is for. The regex-vs-division token heuristic can
-// misread a degenerate `a++ / b` (previous token seen is `+`) as a regex start;
-// the engine has no such code and the gate favors a rule a reviewer can verify
-// by eye over a full parser.
+// A CONDITIONAL exit is accepted BY DESIGN:
+//   catch (err) { if (shouldRethrow(err)) throw err; console.error(err); }
+// passes, because an exit token exists at the clause's own level even though
+// the else-path falls through. Deciding whether EVERY branch exits requires
+// full control-flow analysis — out of scope for a dependency-free pre-`npm ci`
+// lint; a conditional swallow is deliberate, visible, reviewable code, and its
+// semantics belong to the PR reviewer, not this gate. Concise method shorthand
+// in an object literal (`{ m() { return 1; } }`) inside a catch body is not
+// masked (only arrow blocks and `function` expressions are); the engine has no
+// such shape inside a catch. A body that computes an error result and falls
+// through to a shared `return` after the try/catch reads as a violation even
+// when legitimate — that shape is what the fingerprint ALLOWLIST is for. The
+// regex-vs-division token heuristic can misread a degenerate `a++ / b`
+// (previous token seen is `+`) as a regex start; the engine has no such code
+// and the gate favors a rule a reviewer can verify by eye over a full parser.
 
 import { readdir, readFile, stat } from "node:fs/promises";
 import { existsSync } from "node:fs";
@@ -123,10 +138,11 @@ const ALLOWLIST = [
 ];
 
 // A catch clause body must contain at least one of these to prove it has a
-// definite failure-exit path (matched against the stripped body). `throw` and
-// `return` must be the KEYWORD — not preceded by `.` (property access such as
-// `gen.throw(e)`) and not a prefix of a longer identifier (`throwaway`,
-// `returnValue`). `reject(` must be a bare call, not `.reject(`.
+// definite failure-exit path (matched against the stripped body AFTER nested
+// function-expression bodies are masked — see maskNestedFunctionBodies).
+// `throw` and `return` must be the KEYWORD — not preceded by `.` (property
+// access such as `gen.throw(e)`) and not a prefix of a longer identifier
+// (`throwaway`, `returnValue`). `reject(` must be a bare call, not `.reject(`.
 const EXIT_PATTERNS = [
   /(^|[^.\w$])throw(?![\w$])/,
   /(^|[^.\w$])return(?![\w$])/,
@@ -180,7 +196,10 @@ async function scanFile(file, root, violations) {
     if (openBrace === -1) continue; // not a statement catch clause
     const body = extractBraceBlock(stripped, openBrace);
     if (body === null) continue; // unbalanced (truncated file) — nothing to judge
-    if (EXIT_PATTERNS.some((re) => re.test(body))) continue;
+    // An exit inside a function DEFINED in the catch body doesn't exit the
+    // catch — mask nested function bodies before looking for exit tokens.
+    const exitScanText = maskNestedFunctionBodies(body);
+    if (EXIT_PATTERNS.some((re) => re.test(exitScanText))) continue;
     const normalizedBody = body.replace(/\s+/g, " ").trim();
     if (ALLOWLIST.some((a) => a.file === rel && normalizedBody.includes(a.bodyIncludes))) continue;
     const line = lineNumberAt(stripped, kwIndex);
@@ -234,6 +253,80 @@ function extractBraceBlock(text, openIndex) {
     }
   }
   return null;
+}
+
+// Openers of nested function-expression bodies inside a (stripped) catch body:
+// an arrow block `=> {` (the `{` may follow whitespace), or a `function`
+// KEYWORD (`function (…) {`, `function name(…) {`, `function* (…) {`) — same
+// non-dot/non-identifier guard as the other keyword matchers.
+const NESTED_FN_RE = /=>\s*\{|(^|[^.\w$])function(?![\w$])/g;
+
+/**
+ * Blank the bodies of function expressions defined INSIDE a catch clause body
+ * (arrow `=> { … }` blocks and `function [name](…) { … }` expressions), brace-
+ * matched, so an exit token inside them is not credited to the catch clause
+ * itself: that code runs only if the function is later called. The masked text
+ * is used ONLY for exit detection; the unmasked body still drives allowlist
+ * fingerprinting. Input is stripped source, so literal braces can't mislead
+ * the matcher. Nested functions inside an already-masked block are skipped by
+ * resuming the scan past the block.
+ */
+function maskNestedFunctionBodies(body) {
+  const out = body.split("");
+  NESTED_FN_RE.lastIndex = 0;
+  let m;
+  while ((m = NESTED_FN_RE.exec(body)) !== null) {
+    let open = -1;
+    if (m[0].startsWith("=>")) {
+      open = m.index + m[0].length - 1; // the `{` ending the arrow match
+    } else {
+      // `function` keyword: skip optional `*`, optional name, then require a
+      // balanced-paren parameter list followed by `{`.
+      let j = m.index + m[0].length;
+      while (j < body.length && /\s/.test(body[j])) j++;
+      if (body[j] === "*") {
+        j++;
+        while (j < body.length && /\s/.test(body[j])) j++;
+      }
+      while (j < body.length && /[\w$]/.test(body[j])) j++; // optional name
+      while (j < body.length && /\s/.test(body[j])) j++;
+      if (body[j] !== "(") continue;
+      let depth = 0;
+      while (j < body.length) {
+        if (body[j] === "(") depth++;
+        else if (body[j] === ")") {
+          depth--;
+          if (depth === 0) {
+            j++;
+            break;
+          }
+        }
+        j++;
+      }
+      while (j < body.length && /\s/.test(body[j])) j++;
+      if (body[j] !== "{") continue;
+      open = j;
+    }
+    // Brace-match the function body and blank its interior.
+    let depth = 0;
+    let close = -1;
+    for (let k = open; k < body.length; k++) {
+      if (body[k] === "{") depth++;
+      else if (body[k] === "}") {
+        depth--;
+        if (depth === 0) {
+          close = k;
+          break;
+        }
+      }
+    }
+    if (close === -1) continue; // unbalanced — leave as-is
+    for (let k = open + 1; k < close; k++) {
+      if (out[k] !== "\n") out[k] = " ";
+    }
+    NESTED_FN_RE.lastIndex = close; // resume past the masked block
+  }
+  return out.join("");
 }
 
 function lineNumberAt(text, index) {

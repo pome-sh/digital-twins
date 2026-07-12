@@ -220,6 +220,50 @@ describe("no-catch-and-continue gate (SDK engine)", () => {
       expect(violations.some((v: string) => v.includes("bad.ts"))).toBe(true);
     });
 
+    it("flags a catch whose only exits live inside NESTED function bodies", async () => {
+      await write(
+        "bad.ts",
+        [
+          "export function f() {",
+          "  try {",
+          "    risky();",
+          "  } catch (e) {",
+          "    const g = () => {",
+          "      return 1;", // exits g when called later — not the catch
+          "    };",
+          "    const h = function named() {",
+          "      throw e;", // ditto
+          "    };",
+          "    log(e, g, h);",
+          "  }",
+          "}",
+        ].join("\n") + "\n",
+      );
+      const violations = await findViolations(tmp);
+      expect(violations.some((v: string) => v.includes("bad.ts"))).toBe(true);
+    });
+
+    it("accepts a top-level throw after a nested function definition", async () => {
+      await write(
+        "ok.ts",
+        [
+          "export function f() {",
+          "  try {",
+          "    risky();",
+          "  } catch (e) {",
+          "    const cleanup = () => {",
+          "      log(e);",
+          "    };",
+          "    cleanup();",
+          "    throw e;", // the catch's OWN exit — must still count
+          "  }",
+          "}",
+        ].join("\n") + "\n",
+      );
+      const violations = await findViolations(tmp);
+      expect(violations).toEqual([]);
+    });
+
     it("handles a destructured catch binding ({ message })", async () => {
       await write(
         "mixed.ts",
