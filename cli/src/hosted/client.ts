@@ -30,8 +30,8 @@ export interface HostedClientConfig {
   /** Per-request timeout. Defaults to 30s; the cloud's own twin spawn is
    *  ~2s cold but we leave headroom for GHCR pulls.  */
   timeoutMs?: number;
-  /** Overall time allowed for an accepted asynchronous finalize to reach a
-   * terminal state. Defaults to five minutes. */
+  /** Overall time allowed for finalize request + asynchronous polling to
+   * reach a terminal state. Defaults to five minutes. */
   finalizeTimeoutMs?: number;
   /** Initial async-finalize polling delay. Defaults to 500ms. */
   finalizePollInitialDelayMs?: number;
@@ -252,6 +252,8 @@ export interface HostedClient {
 // @pome-sh/shared-types 0.6.1. The CLI intentionally remains installable
 // against 0.6.0 until that package batch has published.
 // Scored finalize responses stay non-strict so additive M7 keys strip.
+const finalizeScoredResponseSchema = finalizeResponseSchema.strip();
+
 const finalizeStatusUrlSchema = z
   .string()
   .min(1)
@@ -303,18 +305,34 @@ const finalizeStatusResponseSchema = z.discriminatedUnion("status", [
   z.object({
     ...finalizeStatusIdentitySchema,
     status: z.literal("completed"),
-    result: finalizeResponseSchema,
+    result: finalizeScoredResponseSchema,
   }).strict(),
 ]);
 
 type FinalizeAcceptedResponse = z.infer<typeof finalizeAcceptedResponseSchema>;
 type FinalizeStatusResponse = z.infer<typeof finalizeStatusResponseSchema>;
 
+class RetryableFinalizeStatusError extends HostedOrchError {
+  constructor(
+    error: HostedOrchError,
+    public readonly retryAfterMs: number | null,
+  ) {
+    super(error.message, error.requestId, error.status);
+    this.name = "RetryableFinalizeStatusError";
+  }
+}
+
 export function createHostedClient(config: HostedClientConfig): HostedClient {
   const timeoutMs = config.timeoutMs ?? 30_000;
   const finalizeTimeoutMs = config.finalizeTimeoutMs ?? 5 * 60_000;
-  const finalizePollInitialDelayMs = config.finalizePollInitialDelayMs ?? 500;
-  const finalizePollMaxDelayMs = config.finalizePollMaxDelayMs ?? 5_000;
+  const finalizePollInitialDelayMs = Math.max(
+    1,
+    config.finalizePollInitialDelayMs ?? 500,
+  );
+  const finalizePollMaxDelayMs = Math.max(
+    finalizePollInitialDelayMs,
+    config.finalizePollMaxDelayMs ?? 5_000,
+  );
   const authHeaders: Record<string, string> =
     config.authScheme === "bearer"
       ? { authorization: `Bearer ${config.apiKey}` }
@@ -329,7 +347,11 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
     try {
       json = text.length ? JSON.parse(text) : {};
     } catch {
-      throw new HostedOrchError(`non-JSON response (status ${res.status})`);
+      throw new HostedOrchError(
+        `non-JSON response (status ${res.status})`,
+        undefined,
+        res.status,
+      );
     }
     if (!res.ok) {
       // Cloud's REST envelope is `{ error: { type, message, request_id } }`.
@@ -357,7 +379,9 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
       return parse(json, res);
     } catch (err) {
       throw new HostedOrchError(
-        `unexpected response shape: ${err instanceof Error ? err.message : String(err)}`
+        `unexpected response shape: ${err instanceof Error ? err.message : String(err)}`,
+        undefined,
+        res.status,
       );
     }
   }
@@ -370,16 +394,19 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
       headers?: Record<string, string>;
       signal?: AbortSignal;
       acceptedStatuses?: readonly number[];
+      requestTimeoutMs?: number;
     },
   ): Promise<T> {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    const timer = setTimeout(
+      () => ctrl.abort(),
+      options?.requestTimeoutMs ?? timeoutMs,
+    );
     const abortFromCaller = () => ctrl.abort(options?.signal?.reason);
     options?.signal?.addEventListener("abort", abortFromCaller, { once: true });
     if (options?.signal?.aborted) abortFromCaller();
-    let res: Response;
     try {
-      res = await fetch(`${config.baseUrl}${path}`, {
+      const res = await fetch(`${config.baseUrl}${path}`, {
         method: "POST",
         headers: {
           ...authHeaders,
@@ -389,7 +416,28 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
         body: JSON.stringify(body),
         signal: ctrl.signal,
       });
+      if (
+        res.ok &&
+        options?.acceptedStatuses &&
+        !options.acceptedStatuses.includes(res.status)
+      ) {
+        throw new HostedOrchError(
+          `unexpected HTTP status ${res.status}`,
+          undefined,
+          res.status,
+        );
+      }
+      // Keep the timeout and caller cancellation active while consuming the
+      // body. fetch() resolves after headers, before a streamed body finishes.
+      return await readResponse(res, parse);
     } catch (err) {
+      if (
+        err instanceof HostedAuthError ||
+        err instanceof HostedQuotaError ||
+        err instanceof HostedOrchError
+      ) {
+        throw err;
+      }
       throw new HostedOrchError(
         err instanceof Error ? err.message : "network error"
       );
@@ -397,18 +445,6 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
       clearTimeout(timer);
       options?.signal?.removeEventListener("abort", abortFromCaller);
     }
-    if (
-      res.ok &&
-      options?.acceptedStatuses &&
-      !options.acceptedStatuses.includes(res.status)
-    ) {
-      throw new HostedOrchError(
-        `unexpected HTTP status ${res.status}`,
-        undefined,
-        res.status,
-      );
-    }
-    return readResponse(res, parse);
   }
 
   async function getJsonBearer<T>(
@@ -468,18 +504,39 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
     return Number.isNaN(at) ? null : Math.max(0, at - Date.now());
   }
 
+  function nextFinalizePollDelayMs(
+    currentDelayMs: number,
+    serverDelayMs: number | null,
+  ): number {
+    if (serverDelayMs !== null) {
+      // Retry-After: 0 is legal, but accepting it literally on every response
+      // creates a hot authenticated loop. The configured initial delay is the
+      // lower bound for server hints.
+      return Math.max(serverDelayMs, finalizePollInitialDelayMs);
+    }
+    return Math.min(
+      Math.max(currentDelayMs * 2, finalizePollInitialDelayMs),
+      finalizePollMaxDelayMs,
+    );
+  }
+
   async function sleepForPoll(ms: number, signal?: AbortSignal): Promise<void> {
     if (signal?.aborted) {
       throw new HostedOrchError("finalize aborted");
     }
     if (ms <= 0) return;
     await new Promise<void>((resolve, reject) => {
+      let settled = false;
       const timer = setTimeout(() => {
+        settled = true;
         signal?.removeEventListener("abort", onAbort);
         resolve();
       }, ms);
       const onAbort = () => {
+        if (settled) return;
+        settled = true;
         clearTimeout(timer);
+        signal?.removeEventListener("abort", onAbort);
         reject(new HostedOrchError("finalize aborted"));
       };
       signal?.addEventListener("abort", onAbort, { once: true });
@@ -515,16 +572,51 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
     const abortFromCaller = () => ctrl.abort(signal?.reason);
     signal?.addEventListener("abort", abortFromCaller, { once: true });
     if (signal?.aborted) abortFromCaller();
-    let res: Response;
     try {
-      res = await fetch(url, {
+      const res = await fetch(url, {
         method: "GET",
         headers: authHeaders,
         signal: ctrl.signal,
+        // Node fetch preserves custom x-api-key headers across a cross-origin
+        // redirect. Refuse redirects so same-origin validation remains true
+        // for the server that actually receives tenant credentials.
+        redirect: "manual",
       });
+      if (res.status >= 300 && res.status < 400) {
+        throw new HostedOrchError(
+          "finalize status request must not redirect",
+          undefined,
+          res.status,
+        );
+      }
+      const delay = retryAfterMs(res.headers.get("retry-after"));
+      // Keep both timeout signals active until the full body is consumed.
+      let status: FinalizeStatusResponse;
+      try {
+        status = await readResponse(res, (raw) =>
+          finalizeStatusResponseSchema.parse(raw),
+        );
+      } catch (err) {
+        if (
+          err instanceof HostedOrchError &&
+          err.status !== undefined &&
+          err.status >= 500
+        ) {
+          throw new RetryableFinalizeStatusError(err, delay);
+        }
+        throw err;
+      }
+      return { status, retryAfterMs: delay };
     } catch (err) {
       if (signal?.aborted) {
         throw new HostedOrchError("finalize aborted");
+      }
+      if (
+        err instanceof HostedAuthError ||
+        err instanceof HostedQuotaError ||
+        err instanceof HostedOrchError
+      ) {
+        throw err;
       }
       throw new HostedOrchError(
         err instanceof Error ? err.message : "network error",
@@ -533,20 +625,15 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
       clearTimeout(timer);
       signal?.removeEventListener("abort", abortFromCaller);
     }
-    const delay = retryAfterMs(res.headers.get("retry-after"));
-    const status = await readResponse(res, (raw) =>
-      finalizeStatusResponseSchema.parse(raw),
-    );
-    return { status, retryAfterMs: delay };
   }
 
   async function pollFinalize(
     accepted: FinalizeAcceptedResponse,
+    deadline: number,
     signal?: AbortSignal,
   ): Promise<FinalizeResponse> {
     const statusUrl = resolveFinalizeStatusUrl(accepted.status_url);
 
-    const deadline = Date.now() + finalizeTimeoutMs;
     let delayMs = finalizePollInitialDelayMs;
     while (true) {
       const remainingBeforeDelay = deadline - Date.now();
@@ -559,11 +646,31 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
       if (remainingBeforeRequest <= 0) {
         throw new HostedOrchError("asynchronous finalize timed out");
       }
-      const polled = await getFinalizeStatus(
-        statusUrl,
-        signal,
-        Math.min(timeoutMs, remainingBeforeRequest),
-      );
+      let polled: Awaited<ReturnType<typeof getFinalizeStatus>>;
+      try {
+        polled = await getFinalizeStatus(
+          statusUrl,
+          signal,
+          Math.min(timeoutMs, remainingBeforeRequest),
+        );
+      } catch (err) {
+        if (signal?.aborted) throw err;
+        if (
+          err instanceof HostedOrchError &&
+          (err.status === undefined || err.status >= 500)
+        ) {
+          // The evaluation is durable. A transient status transport failure
+          // must not turn a still-running evaluation into a CLI failure.
+          delayMs = nextFinalizePollDelayMs(
+            delayMs,
+            err instanceof RetryableFinalizeStatusError
+              ? err.retryAfterMs
+              : null,
+          );
+          continue;
+        }
+        throw err;
+      }
       if (
         polled.status.evaluation_id !== accepted.evaluation_id ||
         polled.status.run_id !== accepted.run_id
@@ -588,12 +695,7 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
         }
         throw new HostedOrchError(`${type}: ${message}`);
       }
-      delayMs =
-        polled.retryAfterMs ??
-        Math.min(
-          Math.max(delayMs * 2, finalizePollInitialDelayMs),
-          finalizePollMaxDelayMs,
-        );
+      delayMs = nextFinalizePollDelayMs(delayMs, polled.retryAfterMs);
     }
   }
 
@@ -796,6 +898,7 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
     },
 
     async finalize(sessionId, input, options) {
+      const deadline = Date.now() + finalizeTimeoutMs;
       const body: Record<string, unknown> = {
         stop_reason: input.stopReason,
         exit_code: input.exitCode,
@@ -826,15 +929,16 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
         (raw, response) =>
           response.status === 202
             ? finalizeAcceptedResponseSchema.parse(raw)
-            : finalizeResponseSchema.parse(raw),
+            : finalizeScoredResponseSchema.parse(raw),
         {
           headers: { prefer: "respond-async" },
           signal: options?.signal,
           acceptedStatuses: [200, 201, 202],
+          requestTimeoutMs: Math.min(timeoutMs, finalizeTimeoutMs),
         },
       );
       return "status_url" in initial
-        ? pollFinalize(initial, options?.signal)
+        ? pollFinalize(initial, deadline, options?.signal)
         : initial;
     },
 

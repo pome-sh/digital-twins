@@ -10,7 +10,7 @@
 //     continue; errored rows are excluded from the verdict fraction;
 //   - group exit code: 0 iff ≥1 trial completed AND every completed trial
 //     passed; 1 when a completed trial failed; 2 when nothing completed;
-//   - the default hosted client carries the explicit 60s finalize timeout.
+//   - the default hosted client carries a 60s per-request transport timeout.
 
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -800,7 +800,7 @@ describe("runTrialGroup — dashboard link + client construction", () => {
     );
   });
 
-  it("constructs the default client with the explicit 60s finalize timeout ([DECISION])", async () => {
+  it("constructs the default client with a 60s request timeout and the default durable evaluation budget", async () => {
     const scenarioPath = await scenarioFixture();
     const fake = makeFakeClient();
     vi.mocked(createHostedClient).mockReturnValueOnce(fake.client);
@@ -826,7 +826,6 @@ describe("runTrialGroup — dashboard link + client construction", () => {
       baseUrl: "https://api.example",
       apiKey: "pme_k",
       timeoutMs: 60_000,
-      finalizeTimeoutMs: 60_000,
     });
   });
 });

@@ -17,6 +17,18 @@ function mockFetch(impl: typeof fetch) {
   return vi.spyOn(globalThis, "fetch").mockImplementation(impl as any);
 }
 
+function responseWhoseBodyWaitsForAbort(signal: AbortSignal | null | undefined) {
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      const onAbort = () =>
+        controller.error(new DOMException("Aborted", "AbortError"));
+      signal?.addEventListener("abort", onAbort, { once: true });
+      if (signal?.aborted) onAbort();
+    },
+  });
+  return new Response(body, { status: 200 });
+}
+
 describe("HostedClient.createSession", () => {
   it("POSTs base64-encoded scenario_source with X-API-KEY and returns the parsed response", async () => {
     const fetchMock = mockFetch(async (url, init) => {
@@ -432,6 +444,8 @@ describe("HostedClient.finalize", () => {
           score: 100,
           judge_model: "gpt-4o-mini",
           dashboard_url: "https://dashboard.example.com/runs/run_xyz",
+          evaluator_version: "m7",
+          all_skipped: false,
         }),
         { status: 201, headers: { "content-type": "application/json" } },
       );
@@ -458,6 +472,7 @@ describe("HostedClient.finalize", () => {
       judge_model: "gpt-4o-mini",
       dashboard_url: "https://dashboard.example.com/runs/run_xyz",
     });
+    expect(out).not.toHaveProperty("evaluator_version");
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 
@@ -515,6 +530,7 @@ describe("HostedClient.finalize", () => {
       if (String(url) === statusUrl) {
         expect(init?.method).toBe("GET");
         expect(new Headers(init?.headers).get("x-api-key")).toBe(KEY);
+        expect(init?.redirect).toBe("manual");
       }
       return response!;
     });
@@ -579,6 +595,103 @@ describe("HostedClient.finalize", () => {
     await client.finalize("ses_abc", finalizeInput);
 
     expect(Date.now() - started).toBeGreaterThanOrEqual(8);
+  });
+
+  it("does not let repeated Retry-After zero responses create a hot poll loop", async () => {
+    const statusPath = `/v1/sessions/ses_abc/evaluation`;
+    const responses = [
+      new Response(
+        JSON.stringify({
+          evaluation_id: "ev_1",
+          run_id: "run_async",
+          status: "queued",
+          status_url: statusPath,
+        }),
+        { status: 202 },
+      ),
+      new Response(
+        JSON.stringify({
+          evaluation_id: "ev_1",
+          run_id: "run_async",
+          status: "running",
+        }),
+        { status: 200, headers: { "retry-after": "0" } },
+      ),
+      new Response(
+        JSON.stringify({
+          evaluation_id: "ev_1",
+          run_id: "run_async",
+          status: "completed",
+          result: {
+            run_id: "run_async",
+            score: 100,
+            dashboard_url: "https://app.pome.sh/runs/run_async",
+          },
+        }),
+        { status: 200 },
+      ),
+    ];
+    mockFetch(async () => responses.shift()!);
+    const client = createHostedClient({
+      baseUrl: BASE,
+      apiKey: KEY,
+      finalizePollInitialDelayMs: 15,
+      finalizePollMaxDelayMs: 15,
+    });
+    const started = Date.now();
+
+    await client.finalize("ses_abc", finalizeInput);
+
+    expect(Date.now() - started).toBeGreaterThanOrEqual(25);
+  });
+
+  it("retries transient poll failures while the durable evaluation is running", async () => {
+    const statusPath = `/v1/sessions/ses_abc/evaluation`;
+    const responses = [
+      new Response(
+        JSON.stringify({
+          evaluation_id: "ev_1",
+          run_id: "run_async",
+          status: "queued",
+          status_url: statusPath,
+        }),
+        { status: 202 },
+      ),
+      new Response(
+        JSON.stringify({
+          error: { type: "unavailable", message: "status store unavailable" },
+        }),
+        { status: 503, headers: { "retry-after": "0.03" } },
+      ),
+      new Response(
+        JSON.stringify({
+          evaluation_id: "ev_1",
+          run_id: "run_async",
+          status: "completed",
+          result: {
+            run_id: "run_async",
+            score: 100,
+            dashboard_url: "https://app.pome.sh/runs/run_async",
+          },
+        }),
+        { status: 200 },
+      ),
+    ];
+    const fetchMock = mockFetch(async () => responses.shift()!);
+    const client = createHostedClient({
+      baseUrl: BASE,
+      apiKey: KEY,
+      finalizePollInitialDelayMs: 1,
+      finalizePollMaxDelayMs: 2,
+    });
+    const started = Date.now();
+
+    await expect(client.finalize("ses_abc", finalizeInput)).resolves.toMatchObject({
+      run_id: "run_async",
+      score: 100,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(25);
   });
 
   it("surfaces a terminal evaluation failure", async () => {
@@ -693,6 +806,68 @@ describe("HostedClient.finalize", () => {
     );
   });
 
+  it("keeps the request timeout active while reading the initial response body", async () => {
+    mockFetch(async (_url, init) =>
+      responseWhoseBodyWaitsForAbort(init?.signal),
+    );
+    const client = createHostedClient({
+      baseUrl: BASE,
+      apiKey: KEY,
+      timeoutMs: 10,
+    });
+
+    await expect(client.finalize("ses_abc", finalizeInput)).rejects.toBeInstanceOf(
+      HostedOrchError,
+    );
+  });
+
+  it("includes the initial response body in the overall finalize deadline", async () => {
+    mockFetch(async (_url, init) =>
+      responseWhoseBodyWaitsForAbort(init?.signal),
+    );
+    const client = createHostedClient({
+      baseUrl: BASE,
+      apiKey: KEY,
+      timeoutMs: 500,
+      finalizeTimeoutMs: 20,
+    });
+    const started = Date.now();
+
+    await expect(client.finalize("ses_abc", finalizeInput)).rejects.toBeInstanceOf(
+      HostedOrchError,
+    );
+    expect(Date.now() - started).toBeLessThan(300);
+  });
+
+  it("keeps the request timeout active while reading a poll response body", async () => {
+    const statusPath = `/v1/sessions/ses_abc/evaluation`;
+    mockFetch(async (_url, init) => {
+      if (init?.method === "POST") {
+        return new Response(
+          JSON.stringify({
+            evaluation_id: "ev_1",
+            run_id: "run_async",
+            status: "queued",
+            status_url: statusPath,
+          }),
+          { status: 202 },
+        );
+      }
+      return responseWhoseBodyWaitsForAbort(init?.signal);
+    });
+    const client = createHostedClient({
+      baseUrl: BASE,
+      apiKey: KEY,
+      timeoutMs: 10,
+      finalizeTimeoutMs: 100,
+      finalizePollInitialDelayMs: 0,
+    });
+
+    await expect(client.finalize("ses_abc", finalizeInput)).rejects.toBeInstanceOf(
+      HostedOrchError,
+    );
+  });
+
   it("supports caller cancellation during polling", async () => {
     const statusPath = `/v1/sessions/ses_abc/evaluation`;
     mockFetch(async () =>
@@ -787,6 +962,36 @@ describe("HostedClient.finalize", () => {
       "configured API origin",
     );
     expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("rejects status endpoint redirects without following or retrying them", async () => {
+    const statusPath = `/v1/sessions/ses_abc/evaluation`;
+    const responses = [
+      new Response(
+        JSON.stringify({
+          evaluation_id: "ev_1",
+          run_id: "run_async",
+          status: "queued",
+          status_url: statusPath,
+        }),
+        { status: 202 },
+      ),
+      new Response(null, {
+        status: 302,
+        headers: { location: "https://attacker.example/evaluation" },
+      }),
+    ];
+    const fetchMock = mockFetch(async () => responses.shift()!);
+    const client = createHostedClient({
+      baseUrl: BASE,
+      apiKey: KEY,
+      finalizePollInitialDelayMs: 1,
+    });
+
+    await expect(client.finalize("ses_abc", finalizeInput)).rejects.toThrow(
+      "must not redirect",
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("rejects mismatched evaluation identifiers while polling", async () => {
