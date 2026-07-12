@@ -1,5 +1,14 @@
 # @pome-sh/shared-types — CHANGELOG
 
+## 0.6.1
+
+### Added
+
+- Accepted and status response schemas for asynchronous managed evaluation
+  finalization (`Prefer: respond-async`), including relative same-origin
+  `status_url` paths and `{ type, message, details? }` failure errors, plus
+  the legacy scored-response fallback.
+
 ## 0.6.0
 
 First npm-published release (F-714).

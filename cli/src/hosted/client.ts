@@ -15,6 +15,7 @@ import {
   type Lane,
   type Step,
 } from "../types/shared.js";
+import { z } from "zod";
 import {
   HostedAuthError,
   HostedOrchError,
@@ -29,6 +30,13 @@ export interface HostedClientConfig {
   /** Per-request timeout. Defaults to 30s; the cloud's own twin spawn is
    *  ~2s cold but we leave headroom for GHCR pulls.  */
   timeoutMs?: number;
+  /** Overall time allowed for finalize request + asynchronous polling to
+   * reach a terminal state. Defaults to five minutes. */
+  finalizeTimeoutMs?: number;
+  /** Initial async-finalize polling delay. Defaults to 500ms. */
+  finalizePollInitialDelayMs?: number;
+  /** Maximum async-finalize polling delay. Defaults to 5s. */
+  finalizePollMaxDelayMs?: number;
   /** FDRS-643 — how the credential travels. "x-api-key" (default) is the
    *  team-key contract. "bearer" sends `Authorization: Bearer <apiKey>` for
    *  the session-token surface (upload-url/finalize accept a sid-scoped JWT
@@ -184,6 +192,11 @@ export interface FinalizeInput {
   signalsStorageKey?: string;
 }
 
+export interface FinalizeOptions {
+  /** Cancels the finalize POST, any status request, or a pending poll delay. */
+  signal?: AbortSignal;
+}
+
 export interface HostedClient {
   createSession(input: CreateSessionInput): Promise<CreateSessionResponse>;
   /** FDRS-655/656 — POST /v1/eval-sessions. Mints a twin-less session for
@@ -200,6 +213,7 @@ export interface HostedClient {
   finalize(
     sessionId: string,
     input: FinalizeInput,
+    options?: FinalizeOptions,
   ): Promise<FinalizeResponse>;
   /**
    * @deprecated Use `finalize` instead. `/v1/sessions/:id/result` is a shim
@@ -234,8 +248,91 @@ export interface HostedClient {
   deleteSession(sessionId: string, bestEffort?: boolean): Promise<void>;
 }
 
+// Keep these readers wire-identical to the additive exports in
+// @pome-sh/shared-types 0.6.1. The CLI intentionally remains installable
+// against 0.6.0 until that package batch has published.
+// Scored finalize responses stay non-strict so additive M7 keys strip.
+const finalizeScoredResponseSchema = finalizeResponseSchema.strip();
+
+const finalizeStatusUrlSchema = z
+  .string()
+  .min(1)
+  .refine(
+    (value) => {
+      if (value.startsWith("/") && !value.startsWith("//")) return true;
+      try {
+        new URL(value);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    { message: "Invalid status_url" },
+  );
+
+const finalizeAcceptedResponseSchema = z.object({
+  evaluation_id: z.string().min(1),
+  run_id: z.string().min(1),
+  status: z.literal("queued"),
+  status_url: finalizeStatusUrlSchema,
+}).strict();
+
+const finalizeStatusIdentitySchema = {
+  evaluation_id: z.string().min(1),
+  run_id: z.string().min(1),
+};
+
+const finalizeFailureErrorSchema = z.object({
+  type: z.string().min(1),
+  message: z.string().min(1),
+  details: z.record(z.string(), z.unknown()).optional(),
+}).strict();
+
+const finalizeStatusResponseSchema = z.discriminatedUnion("status", [
+  z.object({
+    ...finalizeStatusIdentitySchema,
+    status: z.literal("queued"),
+  }).strict(),
+  z.object({
+    ...finalizeStatusIdentitySchema,
+    status: z.literal("running"),
+  }).strict(),
+  z.object({
+    ...finalizeStatusIdentitySchema,
+    status: z.literal("failed"),
+    error: finalizeFailureErrorSchema,
+  }).strict(),
+  z.object({
+    ...finalizeStatusIdentitySchema,
+    status: z.literal("completed"),
+    result: finalizeScoredResponseSchema,
+  }).strict(),
+]);
+
+type FinalizeAcceptedResponse = z.infer<typeof finalizeAcceptedResponseSchema>;
+type FinalizeStatusResponse = z.infer<typeof finalizeStatusResponseSchema>;
+
+class RetryableFinalizeStatusError extends HostedOrchError {
+  constructor(
+    error: HostedOrchError,
+    public readonly retryAfterMs: number | null,
+  ) {
+    super(error.message, error.requestId, error.status);
+    this.name = "RetryableFinalizeStatusError";
+  }
+}
+
 export function createHostedClient(config: HostedClientConfig): HostedClient {
   const timeoutMs = config.timeoutMs ?? 30_000;
+  const finalizeTimeoutMs = config.finalizeTimeoutMs ?? 5 * 60_000;
+  const finalizePollInitialDelayMs = Math.max(
+    1,
+    config.finalizePollInitialDelayMs ?? 500,
+  );
+  const finalizePollMaxDelayMs = Math.max(
+    finalizePollInitialDelayMs,
+    config.finalizePollMaxDelayMs ?? 5_000,
+  );
   const authHeaders: Record<string, string> =
     config.authScheme === "bearer"
       ? { authorization: `Bearer ${config.apiKey}` }
@@ -243,14 +340,18 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
 
   async function readResponse<T>(
     res: Response,
-    parse: (raw: unknown) => T
+    parse: (raw: unknown, response: Response) => T
   ): Promise<T> {
     const text = await res.text();
     let json: unknown;
     try {
       json = text.length ? JSON.parse(text) : {};
     } catch {
-      throw new HostedOrchError(`non-JSON response (status ${res.status})`);
+      throw new HostedOrchError(
+        `non-JSON response (status ${res.status})`,
+        undefined,
+        res.status,
+      );
     }
     if (!res.ok) {
       // Cloud's REST envelope is `{ error: { type, message, request_id } }`.
@@ -275,10 +376,12 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
       throw new HostedOrchError(msg, reqId, res.status);
     }
     try {
-      return parse(json);
+      return parse(json, res);
     } catch (err) {
       throw new HostedOrchError(
-        `unexpected response shape: ${err instanceof Error ? err.message : String(err)}`
+        `unexpected response shape: ${err instanceof Error ? err.message : String(err)}`,
+        undefined,
+        res.status,
       );
     }
   }
@@ -286,35 +389,68 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
   async function postJson<T>(
     path: string,
     body: unknown,
-    parse: (raw: unknown) => T
+    parse: (raw: unknown, response: Response) => T,
+    options?: {
+      headers?: Record<string, string>;
+      signal?: AbortSignal;
+      acceptedStatuses?: readonly number[];
+      requestTimeoutMs?: number;
+    },
   ): Promise<T> {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-    let res: Response;
+    const timer = setTimeout(
+      () => ctrl.abort(),
+      options?.requestTimeoutMs ?? timeoutMs,
+    );
+    const abortFromCaller = () => ctrl.abort(options?.signal?.reason);
+    options?.signal?.addEventListener("abort", abortFromCaller, { once: true });
+    if (options?.signal?.aborted) abortFromCaller();
     try {
-      res = await fetch(`${config.baseUrl}${path}`, {
+      const res = await fetch(`${config.baseUrl}${path}`, {
         method: "POST",
         headers: {
           ...authHeaders,
           "content-type": "application/json",
+          ...options?.headers,
         },
         body: JSON.stringify(body),
         signal: ctrl.signal,
       });
+      if (
+        res.ok &&
+        options?.acceptedStatuses &&
+        !options.acceptedStatuses.includes(res.status)
+      ) {
+        throw new HostedOrchError(
+          `unexpected HTTP status ${res.status}`,
+          undefined,
+          res.status,
+        );
+      }
+      // Keep the timeout and caller cancellation active while consuming the
+      // body. fetch() resolves after headers, before a streamed body finishes.
+      return await readResponse(res, parse);
     } catch (err) {
+      if (
+        err instanceof HostedAuthError ||
+        err instanceof HostedQuotaError ||
+        err instanceof HostedOrchError
+      ) {
+        throw err;
+      }
       throw new HostedOrchError(
         err instanceof Error ? err.message : "network error"
       );
     } finally {
       clearTimeout(timer);
+      options?.signal?.removeEventListener("abort", abortFromCaller);
     }
-    return readResponse(res, parse);
   }
 
   async function getJsonBearer<T>(
     url: string,
     bearer: string,
-    parse: (raw: unknown) => T
+    parse: (raw: unknown, response: Response) => T
   ): Promise<T> {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -337,7 +473,7 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
 
   async function getJsonWithApiKey<T>(
     path: string,
-    parse: (raw: unknown) => T,
+    parse: (raw: unknown, response: Response) => T,
   ): Promise<T> {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -356,6 +492,211 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
       clearTimeout(timer);
     }
     return readResponse(res, parse);
+  }
+
+  function retryAfterMs(value: string | null): number | null {
+    if (value === null) return null;
+    const seconds = Number(value);
+    if (Number.isFinite(seconds) && seconds >= 0) {
+      return seconds * 1_000;
+    }
+    const at = Date.parse(value);
+    return Number.isNaN(at) ? null : Math.max(0, at - Date.now());
+  }
+
+  function nextFinalizePollDelayMs(
+    currentDelayMs: number,
+    serverDelayMs: number | null,
+  ): number {
+    if (serverDelayMs !== null) {
+      // Retry-After: 0 is legal, but accepting it literally on every response
+      // creates a hot authenticated loop. The configured initial delay is the
+      // lower bound for server hints.
+      return Math.max(serverDelayMs, finalizePollInitialDelayMs);
+    }
+    return Math.min(
+      Math.max(currentDelayMs * 2, finalizePollInitialDelayMs),
+      finalizePollMaxDelayMs,
+    );
+  }
+
+  async function sleepForPoll(ms: number, signal?: AbortSignal): Promise<void> {
+    if (signal?.aborted) {
+      throw new HostedOrchError("finalize aborted");
+    }
+    if (ms <= 0) return;
+    await new Promise<void>((resolve, reject) => {
+      let settled = false;
+      const timer = setTimeout(() => {
+        settled = true;
+        signal?.removeEventListener("abort", onAbort);
+        resolve();
+      }, ms);
+      const onAbort = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        signal?.removeEventListener("abort", onAbort);
+        reject(new HostedOrchError("finalize aborted"));
+      };
+      signal?.addEventListener("abort", onAbort, { once: true });
+      // Re-check after subscribe — abort between the early check and
+      // addEventListener would otherwise hang until the delay elapses.
+      if (signal?.aborted) onAbort();
+    });
+  }
+
+  function resolveFinalizeStatusUrl(statusUrl: string): URL {
+    const apiOrigin = new URL(config.baseUrl).origin;
+    let resolved: URL;
+    try {
+      resolved = new URL(statusUrl, apiOrigin);
+    } catch {
+      throw new HostedOrchError("finalize status_url is not a valid URL");
+    }
+    if (resolved.origin !== apiOrigin) {
+      throw new HostedOrchError(
+        "finalize status_url must use the configured API origin",
+      );
+    }
+    return resolved;
+  }
+
+  async function getFinalizeStatus(
+    url: URL,
+    signal: AbortSignal | undefined,
+    requestTimeoutMs: number,
+  ): Promise<{ status: FinalizeStatusResponse; retryAfterMs: number | null }> {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), requestTimeoutMs);
+    const abortFromCaller = () => ctrl.abort(signal?.reason);
+    signal?.addEventListener("abort", abortFromCaller, { once: true });
+    if (signal?.aborted) abortFromCaller();
+    try {
+      const res = await fetch(url, {
+        method: "GET",
+        headers: authHeaders,
+        signal: ctrl.signal,
+        // Node fetch preserves custom x-api-key headers across a cross-origin
+        // redirect. Refuse redirects so same-origin validation remains true
+        // for the server that actually receives tenant credentials.
+        redirect: "manual",
+      });
+      if (res.status >= 300 && res.status < 400) {
+        throw new HostedOrchError(
+          "finalize status request must not redirect",
+          undefined,
+          res.status,
+        );
+      }
+      const delay = retryAfterMs(res.headers.get("retry-after"));
+      // Keep both timeout signals active until the full body is consumed.
+      let status: FinalizeStatusResponse;
+      try {
+        status = await readResponse(res, (raw) =>
+          finalizeStatusResponseSchema.parse(raw),
+        );
+      } catch (err) {
+        if (
+          err instanceof HostedOrchError &&
+          err.status !== undefined &&
+          err.status >= 500
+        ) {
+          throw new RetryableFinalizeStatusError(err, delay);
+        }
+        throw err;
+      }
+      return { status, retryAfterMs: delay };
+    } catch (err) {
+      if (signal?.aborted) {
+        throw new HostedOrchError("finalize aborted");
+      }
+      if (
+        err instanceof HostedAuthError ||
+        err instanceof HostedQuotaError ||
+        err instanceof HostedOrchError
+      ) {
+        throw err;
+      }
+      throw new HostedOrchError(
+        err instanceof Error ? err.message : "network error",
+      );
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", abortFromCaller);
+    }
+  }
+
+  async function pollFinalize(
+    accepted: FinalizeAcceptedResponse,
+    deadline: number,
+    signal?: AbortSignal,
+  ): Promise<FinalizeResponse> {
+    const statusUrl = resolveFinalizeStatusUrl(accepted.status_url);
+
+    let delayMs = finalizePollInitialDelayMs;
+    while (true) {
+      const remainingBeforeDelay = deadline - Date.now();
+      if (remainingBeforeDelay <= 0) {
+        throw new HostedOrchError("asynchronous finalize timed out");
+      }
+      await sleepForPoll(Math.min(delayMs, remainingBeforeDelay), signal);
+
+      const remainingBeforeRequest = deadline - Date.now();
+      if (remainingBeforeRequest <= 0) {
+        throw new HostedOrchError("asynchronous finalize timed out");
+      }
+      let polled: Awaited<ReturnType<typeof getFinalizeStatus>>;
+      try {
+        polled = await getFinalizeStatus(
+          statusUrl,
+          signal,
+          Math.min(timeoutMs, remainingBeforeRequest),
+        );
+      } catch (err) {
+        if (signal?.aborted) throw err;
+        if (
+          err instanceof HostedOrchError &&
+          (err.status === undefined || err.status >= 500)
+        ) {
+          // The evaluation is durable. A transient status transport failure
+          // must not turn a still-running evaluation into a CLI failure.
+          delayMs = nextFinalizePollDelayMs(
+            delayMs,
+            err instanceof RetryableFinalizeStatusError
+              ? err.retryAfterMs
+              : null,
+          );
+          continue;
+        }
+        throw err;
+      }
+      if (
+        polled.status.evaluation_id !== accepted.evaluation_id ||
+        polled.status.run_id !== accepted.run_id
+      ) {
+        throw new HostedOrchError(
+          "finalize status identifiers do not match the accepted evaluation",
+        );
+      }
+
+      if (polled.status.status === "completed") {
+        if (polled.status.result.run_id !== accepted.run_id) {
+          throw new HostedOrchError(
+            "finalize result run_id does not match the accepted evaluation",
+          );
+        }
+        return polled.status.result;
+      }
+      if (polled.status.status === "failed") {
+        const { type, message, details } = polled.status.error;
+        if (type === "quota_exceeded") {
+          throw new HostedQuotaError(message, undefined, details);
+        }
+        throw new HostedOrchError(`${type}: ${message}`);
+      }
+      delayMs = nextFinalizePollDelayMs(delayMs, polled.retryAfterMs);
+    }
   }
 
   return {
@@ -556,7 +897,8 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
       );
     },
 
-    async finalize(sessionId, input) {
+    async finalize(sessionId, input, options) {
+      const deadline = Date.now() + finalizeTimeoutMs;
       const body: Record<string, unknown> = {
         stop_reason: input.stopReason,
         exit_code: input.exitCode,
@@ -581,11 +923,23 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
       if (input.signalsStorageKey !== undefined) {
         body.signals_storage_key = input.signalsStorageKey;
       }
-      return postJson(
+      const initial = await postJson(
         `/v1/sessions/${encodeURIComponent(sessionId)}/finalize`,
         body,
-        (raw) => finalizeResponseSchema.parse(raw),
+        (raw, response) =>
+          response.status === 202
+            ? finalizeAcceptedResponseSchema.parse(raw)
+            : finalizeScoredResponseSchema.parse(raw),
+        {
+          headers: { prefer: "respond-async" },
+          signal: options?.signal,
+          acceptedStatuses: [200, 201, 202],
+          requestTimeoutMs: Math.min(timeoutMs, finalizeTimeoutMs),
+        },
       );
+      return "status_url" in initial
+        ? pollFinalize(initial, deadline, options?.signal)
+        : initial;
     },
 
     async submitResult(sessionId, input) {

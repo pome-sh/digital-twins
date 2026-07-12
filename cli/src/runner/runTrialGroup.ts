@@ -63,9 +63,7 @@ import {
 } from "./groupRender.js";
 import type { CreateSessionResponse } from "../types/shared.js";
 
-/** Explicit finalize timeout for -n runs ([DECISION]) — the hosted client
- *  defaults to 30s; the judge measured 5-8s, 60s is belt-and-braces (same
- *  constant `pome demo` locked for its trial finalizes). */
+/** Per-request transport timeout. Durable evaluation has a separate budget. */
 export const GROUP_FINALIZE_TIMEOUT_MS = 60_000;
 
 /** FDRS-663 — a lazy mint can quota-fail even though a trial just finished:
