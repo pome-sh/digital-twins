@@ -9,10 +9,14 @@
 // clean. So every statement-level `catch` clause body in the engine must do
 // ONE of three things — no exceptions the reviewer has to trust:
 //
-//   • `throw`   — rethrow (possibly wrapped); the failure keeps propagating.
-//   • `return`  — hand back an explicit error response / envelope, or a
-//                 DOCUMENTED sentinel (`undefined` / `null`) the caller checks.
-//   • `reject(` — settle the surrounding Promise as failed.
+//   • `throw`   — the KEYWORD (a `.throw(…)` property call, e.g. on a
+//                 generator, does NOT count — nor does an identifier like
+//                 `throwaway`); the failure keeps propagating.
+//   • `return`  — the KEYWORD (`returnValue` / `.return(` do not count): hand
+//                 back an explicit error response / envelope, or a DOCUMENTED
+//                 sentinel (`undefined` / `null`) the caller checks.
+//   • `reject(` — a BARE `reject(…)` call (not `.reject(`): settle the
+//                 surrounding Promise as failed.
 //
 // A catch body that does none of these is "catch-and-continue": execution falls
 // out of the block and keeps going as if nothing broke. That is the exact bug
@@ -35,11 +39,13 @@
 //     factors into a `try { return … } catch { return null }` helper.
 //
 // Both are genuine error handling, NOT log-and-continue/empty swallows, so they
-// are listed here (keyed `relpath:line`) rather than papered over. To reach
-// true zero-allowlist a reviewer can extract the mcp result into a helper that
-// returns the outcome, and reuse recorder.ts's read-or-null helper in
-// failure-injection — then delete these two lines. NOTE: the keys are line
-// numbers; if either file is edited above the catch, update the line here.
+// are listed here rather than papered over. Entries are keyed by FILE plus a
+// CONTENT FINGERPRINT — a distinctive substring that must appear in that catch
+// clause's (whitespace-normalized, literal-stripped) body — NOT by line number,
+// so the entry survives edits elsewhere in the file and cannot be satisfied by
+// an unrelated catch. To reach true zero-allowlist a reviewer can extract the
+// mcp result into a helper that returns the outcome, and reuse recorder.ts's
+// read-or-null helper in failure-injection — then delete the two entries.
 //
 // SCOPE — deliberately narrow, to stay a zero-false-positive structural gate:
 //
@@ -49,27 +55,40 @@
 //   • Only STATEMENT try/catch. Promise `.catch(cb)` handlers are a different
 //     construct with their own idioms (e.g. `.json().catch(() => ({}))` in
 //     parity.ts is a legitimate default-on-parse-fail) and are NOT flagged.
-//     The `\bcatch\b\s*(\(...\))?\s*\{` shape only matches a catch *clause*,
-//     never a `.catch(` method call (the `.` before it fails the `\b`... — and
-//     the method form is `catch(` with an arg list, not `catch {` / `catch (e) {`).
+//     The finder requires the character before `catch` to be neither `.` nor
+//     an identifier character, then an OPTIONAL balanced-paren binding (plain
+//     `catch {`, `catch (e) {`, destructured `catch ({ message }) {`), then a
+//     `{` — so `.catch(cb)` (dotted) and any bare `catch(…)` call whose
+//     argument list is not followed by a block are never treated as a clause.
 //
-// The keyword scan runs against a comment-and-literal-STRIPPED copy of the
-// source (line/block comments, single/double/template strings, and regex
-// literals are blanked to spaces, newlines preserved) so:
-//   • a comment that says the word "catch" / "return" / "throw" never trips or
-//     satisfies the gate (there are several: index.ts, server.ts, ...), and
-//   • a brace, backtick, or quote inside a string/regex can't desync the
-//     brace matcher.
-// Stripping preserves byte offsets 1:1, so reported line numbers are exact.
+// The scan runs against a comment-and-literal-STRIPPED copy of the source so a
+// comment or string that says "catch" / "return" / "throw" never trips or
+// satisfies the gate, and a brace/quote inside a literal can't desync the brace
+// matcher. Stripping is a single mode-stack state machine that handles:
+//   • line + block comments;
+//   • single/double-quoted strings;
+//   • TEMPLATE LITERALS with full `${}` nesting — template text is blanked,
+//     but code inside a `${ … }` expression (including nested templates) is
+//     kept and scanned, so a catch clause inside a template expression is
+//     judged like any other;
+//   • regex literals, detected by the preceding TOKEN (not just the previous
+//     character): a `/` starts a regex at start-of-input, after an opening
+//     punctuator/operator, or after a keyword such as `return` / `case` /
+//     `typeof` — so `return /a{2}/` is stripped and its braces can't corrupt
+//     brace matching, while `a / b` stays division.
+// Blanked spans are replaced character-for-character with spaces (newlines
+// preserved), so byte offsets and reported line numbers are exact.
 //
 // LIMITATIONS (honest): this is a structural scanner, not a data-flow analyzer.
 // A body that contains `return` inside a NESTED try/catch counts for the OUTER
 // catch too — acceptable: the requirement is that the body has a definite exit
 // path, and a nested handler that itself throws/returns provides one. A body
 // that computes an error result and falls through to a shared `return` after
-// the try/catch would read as compliant even though the `return` is outside the
-// clause; the engine doesn't do this, and the gate favors a rule a reviewer can
-// verify by eye over a heuristic that guesses intent.
+// the try/catch reads as a violation even when legitimate — that shape is what
+// the fingerprint ALLOWLIST is for. The regex-vs-division token heuristic can
+// misread a degenerate `a++ / b` (previous token seen is `+`) as a regex start;
+// the engine has no such code and the gate favors a rule a reviewer can verify
+// by eye over a full parser.
 
 import { readdir, readFile, stat } from "node:fs/promises";
 import { existsSync } from "node:fs";
@@ -87,23 +106,38 @@ const SCANNED_EXT_RE = /\.ts$/;
 // gate fixtures (this file's own unit test does exactly that in a tmp dir).
 const SKIP_DIR_NAMES = new Set(["node_modules", "dist", "test", "tests", "__fixtures__", "fixtures"]);
 
-// ALLOWLIST (D4): `relpath:line` of a catch clause that is a reviewed,
-// documented exception. See the module header for why each is here and how to
-// remove it. Target: EMPTY. Fix (or refactor) the catch; don't grow this list.
-const ALLOWLIST = new Set([
-  "packages/sdk/src/mcp-jsonrpc.ts:182",
-  "packages/sdk/src/failure-injection.ts:163",
-]);
+// ALLOWLIST (D4): reviewed, documented assign-and-fall-through exceptions.
+// `file` is the repo-root-relative path; `bodyIncludes` is a distinctive
+// substring that must appear in the catch clause's whitespace-normalized,
+// literal-stripped body. See the module header for why each is here and how
+// to remove it. Target: EMPTY. Fix (or refactor) the catch; don't grow this.
+const ALLOWLIST = [
+  {
+    file: "packages/sdk/src/mcp-jsonrpc.ts",
+    bodyIncludes: "toolError = err instanceof Error",
+  },
+  {
+    file: "packages/sdk/src/failure-injection.ts",
+    bodyIncludes: "requestBody = null",
+  },
+];
 
 // A catch clause body must contain at least one of these to prove it has a
-// definite failure-exit path (matched against stripped source).
-const EXIT_PATTERNS = [/\bthrow\b/, /\breturn\b/, /\breject\s*\(/];
+// definite failure-exit path (matched against the stripped body). `throw` and
+// `return` must be the KEYWORD — not preceded by `.` (property access such as
+// `gen.throw(e)`) and not a prefix of a longer identifier (`throwaway`,
+// `returnValue`). `reject(` must be a bare call, not `.reject(`.
+const EXIT_PATTERNS = [
+  /(^|[^.\w$])throw(?![\w$])/,
+  /(^|[^.\w$])return(?![\w$])/,
+  /(^|[^.\w$])reject\s*\(/,
+];
 
-// Matches a STATEMENT catch clause header up to (and including) its opening
-// brace: `catch {`, `catch (e) {`, `catch (e: unknown) {`. The `\bcatch\b`
-// never matches `.catch(` (method call): that form has no `{` after the arg
-// list, and the `(` opens an argument list, not an optional binding.
-const CATCH_CLAUSE_RE = /\bcatch\b\s*(?:\([^)]*\))?\s*\{/g;
+// Candidate catch KEYWORDS: `catch` not preceded by `.` or an identifier char
+// (excludes `.catch(` promise handlers and identifiers like `mycatch`), not
+// followed by an identifier char (excludes `catchAll`). Whether a candidate is
+// a real catch CLAUSE is decided structurally by findCatchBodyBrace().
+const CATCH_KEYWORD_RE = /(^|[^.\w$])catch(?![\w$])/g;
 
 /**
  * Scan the SDK engine for catch-and-continue clauses. Returns a list of
@@ -138,20 +172,51 @@ async function scanFile(file, root, violations) {
   const source = await readFile(file, "utf8");
   const stripped = stripCommentsAndLiterals(source);
 
-  CATCH_CLAUSE_RE.lastIndex = 0;
+  CATCH_KEYWORD_RE.lastIndex = 0;
   let match;
-  while ((match = CATCH_CLAUSE_RE.exec(stripped)) !== null) {
-    // Index of the `{` that opens the clause body (end of the matched header).
-    const openBrace = match.index + match[0].length - 1;
+  while ((match = CATCH_KEYWORD_RE.exec(stripped)) !== null) {
+    const kwIndex = match.index + match[1].length;
+    const openBrace = findCatchBodyBrace(stripped, kwIndex + "catch".length);
+    if (openBrace === -1) continue; // not a statement catch clause
     const body = extractBraceBlock(stripped, openBrace);
     if (body === null) continue; // unbalanced (truncated file) — nothing to judge
     if (EXIT_PATTERNS.some((re) => re.test(body))) continue;
-    const line = lineNumberAt(stripped, match.index);
-    if (ALLOWLIST.has(`${rel}:${line}`)) continue;
+    const normalizedBody = body.replace(/\s+/g, " ").trim();
+    if (ALLOWLIST.some((a) => a.file === rel && normalizedBody.includes(a.bodyIncludes))) continue;
+    const line = lineNumberAt(stripped, kwIndex);
     violations.push(
       `${rel}:${line}: catch clause body does not throw, return, or reject — a catch-and-continue in the twin engine silently swallows the failure and keeps executing. Rethrow it, return an error response/envelope (or a documented undefined/null sentinel), or reject the surrounding Promise.`,
     );
   }
+}
+
+/**
+ * Given the index just past a candidate `catch` keyword, decide whether it is
+ * a statement catch CLAUSE and return the index of the `{` opening its body,
+ * or -1. Accepts an optional balanced-paren binding — `catch {`, `catch (e) {`,
+ * `catch ({ message }) {`, `catch (e: unknown) {` — with nested parens/braces
+ * inside the binding handled by paren counting.
+ */
+function findCatchBodyBrace(text, from) {
+  const n = text.length;
+  let i = from;
+  while (i < n && /\s/.test(text[i])) i++;
+  if (text[i] === "(") {
+    let depth = 0;
+    while (i < n) {
+      if (text[i] === "(") depth++;
+      else if (text[i] === ")") {
+        depth--;
+        if (depth === 0) {
+          i++;
+          break;
+        }
+      }
+      i++;
+    }
+    while (i < n && /\s/.test(text[i])) i++;
+  }
+  return text[i] === "{" ? i : -1;
 }
 
 /**
@@ -179,34 +244,141 @@ function lineNumberAt(text, index) {
   return line;
 }
 
+// Marker token: a string/template/regex literal just ended — it is a VALUE, so
+// a following `/` is division, never a regex start. (Contains a space, so it
+// can never collide with a real token.)
+const VALUE_TOKEN = " value";
+
+// Keywords after which a `/` begins a regex literal (a value is expected next,
+// not a binary operand).
+const REGEX_PRECEDING_KEYWORDS = new Set([
+  "return",
+  "throw",
+  "typeof",
+  "case",
+  "in",
+  "of",
+  "delete",
+  "void",
+  "instanceof",
+  "new",
+  "do",
+  "else",
+  "yield",
+  "await",
+]);
+
 /**
- * Blank out comments, string/template literals, and regex literals — replacing
- * their characters with spaces and preserving newlines — so byte offsets stay
- * 1:1 with the source and the brace/keyword scan sees only real code tokens.
- *
- * A single character-level state machine. Regex-vs-division is disambiguated by
- * the previous significant character (a `/` starts a regex only where a value
- * cannot already have appeared).
+ * A `/` begins a regex literal (not division) when the previous significant
+ * TOKEN is: nothing (start of input / start of a `${}` expression), a keyword
+ * from REGEX_PRECEDING_KEYWORDS, or an opening punctuator / operator. After an
+ * identifier, a number, a closing bracket, `.`, or a just-ended literal
+ * (VALUE_TOKEN), a `/` is division.
+ */
+function regexAllowedAfter(token) {
+  if (token === "") return true;
+  if (token === VALUE_TOKEN) return false;
+  if (REGEX_PRECEDING_KEYWORDS.has(token)) return true;
+  return token.length === 1 && "([{,;:!&|?=+-*%<>~^".includes(token);
+}
+
+/**
+ * From `src[start] === "/"` presumed to open a regex literal, return the index
+ * just past the closing `/` and its flags, or -1 if no closing `/` on the same
+ * line (then it wasn't a regex). Char classes may contain unescaped `/`.
+ */
+function scanRegexEnd(src, start) {
+  const n = src.length;
+  let j = start + 1;
+  let inClass = false;
+  while (j < n) {
+    const c = src[j];
+    if (c === "\\") {
+      j += 2;
+      continue;
+    }
+    if (c === "\n") return -1; // regex literals can't span lines
+    if (c === "[") inClass = true;
+    else if (c === "]") inClass = false;
+    else if (c === "/" && !inClass) {
+      j++;
+      while (j < n && /[a-z]/i.test(src[j])) j++; // trailing flags
+      return j;
+    }
+    j++;
+  }
+  return -1;
+}
+
+/**
+ * Blank out comments, string literals, template-literal TEXT, and regex
+ * literals — replacing their characters with spaces, preserving newlines — so
+ * byte offsets stay 1:1 with the source and the brace/keyword scan sees only
+ * real code tokens. Code inside template `${}` expressions is KEPT (and
+ * scanned), with a mode stack tracking arbitrary template/expression nesting;
+ * the `${` and its matching `}` are blanked so output braces stay balanced.
  */
 function stripCommentsAndLiterals(src) {
-  const out = new Array(src.length);
-  let i = 0;
-  let prevSig = ""; // last emitted significant (non-whitespace) source char
   const n = src.length;
+  const out = new Array(n);
+  // Mode stack: { type: "template" } while inside template TEXT;
+  // { type: "expr", depth } while inside a `${ … }` expression (depth counts
+  // nested code braces so the `}` that closes the `${` is identified exactly).
+  const stack = [];
+  let word = ""; // identifier/keyword/number token being accumulated
+  let prevToken = ""; // last completed significant token ("" at start)
 
   const blank = (from, to) => {
     for (let k = from; k < to; k++) out[k] = src[k] === "\n" ? "\n" : " ";
   };
-  const keep = (k) => {
-    out[k] = src[k];
-    if (!/\s/.test(src[k])) prevSig = src[k];
+  const endWord = () => {
+    if (word !== "") {
+      prevToken = word;
+      word = "";
+    }
   };
+  const noteValue = () => {
+    endWord();
+    prevToken = VALUE_TOKEN;
+  };
+  const currentToken = () => (word !== "" ? word : prevToken);
 
+  let i = 0;
   while (i < n) {
+    const mode = stack.length > 0 ? stack[stack.length - 1] : null;
+
+    // ── Template TEXT: blank everything until `` ` `` (pop) or `${` (push expr).
+    if (mode !== null && mode.type === "template") {
+      const ch = src[i];
+      if (ch === "\\") {
+        blank(i, Math.min(n, i + 2));
+        i += 2;
+        continue;
+      }
+      if (ch === "`") {
+        blank(i, i + 1);
+        stack.pop();
+        noteValue(); // the whole template is a value
+        i++;
+        continue;
+      }
+      if (ch === "$" && src[i + 1] === "{") {
+        blank(i, i + 2); // blank `${` — its matching `}` is blanked on pop
+        stack.push({ type: "expr", depth: 0 });
+        endWord();
+        prevToken = ""; // expression starts fresh: a leading `/` is a regex
+        i += 2;
+        continue;
+      }
+      blank(i, i + 1);
+      i++;
+      continue;
+    }
+
+    // ── CODE (top level, or inside a `${}` expression).
     const ch = src[i];
     const next = i + 1 < n ? src[i + 1] : "";
 
-    // Line comment.
     if (ch === "/" && next === "/") {
       let j = i + 2;
       while (j < n && src[j] !== "\n") j++;
@@ -214,7 +386,6 @@ function stripCommentsAndLiterals(src) {
       i = j;
       continue;
     }
-    // Block comment.
     if (ch === "/" && next === "*") {
       let j = i + 2;
       while (j < n && !(src[j] === "*" && src[j + 1] === "/")) j++;
@@ -223,8 +394,7 @@ function stripCommentsAndLiterals(src) {
       i = j;
       continue;
     }
-    // String / template literal.
-    if (ch === '"' || ch === "'" || ch === "`") {
+    if (ch === '"' || ch === "'") {
       const quote = ch;
       let j = i + 1;
       while (j < n) {
@@ -232,65 +402,58 @@ function stripCommentsAndLiterals(src) {
           j += 2;
           continue;
         }
-        if (src[j] === quote) {
+        if (src[j] === quote || src[j] === "\n") {
           j++;
           break;
         }
         j++;
       }
       blank(i, j);
-      prevSig = quote; // a literal is a value; a following `/` is division
+      noteValue();
       i = j;
       continue;
     }
-    // Regex literal — only where a `/` cannot be a division operator.
-    if (ch === "/" && regexAllowedAfter(prevSig)) {
-      let j = i + 1;
-      let inClass = false;
-      let closed = false;
-      while (j < n) {
-        const c = src[j];
-        if (c === "\\") {
-          j += 2;
-          continue;
-        }
-        if (c === "\n") break; // regex can't span lines — bail, treat as not-regex
-        if (c === "[") inClass = true;
-        else if (c === "]") inClass = false;
-        else if (c === "/" && !inClass) {
-          j++;
-          closed = true;
-          break;
-        }
-        j++;
-      }
-      if (closed) {
-        // consume trailing flags (a-z)
-        while (j < n && /[a-z]/i.test(src[j])) j++;
+    if (ch === "`") {
+      blank(i, i + 1);
+      stack.push({ type: "template" });
+      endWord();
+      i++;
+      continue;
+    }
+    if (mode !== null && mode.type === "expr" && ch === "}" && mode.depth === 0) {
+      blank(i, i + 1); // the `}` closing the `${` — keep output braces balanced
+      stack.pop();
+      noteValue(); // back in template text; the interpolation was a value
+      i++;
+      continue;
+    }
+    if (ch === "/" && regexAllowedAfter(currentToken())) {
+      const j = scanRegexEnd(src, i);
+      if (j !== -1) {
         blank(i, j);
-        prevSig = "/"; // the regex is a value
+        noteValue();
         i = j;
         continue;
       }
-      // Not actually a regex (unterminated on the line) — treat `/` as code.
+      // No closing `/` on the line — not a regex after all; fall through.
     }
 
-    keep(i);
+    // Plain code character: keep it, update expr brace depth + token tracking.
+    if (mode !== null && mode.type === "expr") {
+      if (ch === "{") mode.depth++;
+      else if (ch === "}") mode.depth--;
+    }
+    out[i] = ch;
+    if (/[A-Za-z0-9_$]/.test(ch)) word += ch;
+    else if (/\s/.test(ch)) endWord();
+    else {
+      endWord();
+      prevToken = ch;
+    }
     i++;
   }
 
   return out.join("");
-}
-
-/**
- * A `/` begins a regex literal (not division) when the previous significant
- * character is empty (start of input) or a punctuator after which a value —
- * not a binary operand — is expected. After an identifier, number, `)`, `]`,
- * `}`, or `.` a `/` is division.
- */
-function regexAllowedAfter(prevSig) {
-  if (prevSig === "") return true;
-  return "([{,;:!&|?=+-*%<>~^".includes(prevSig);
 }
 
 // Run as a script (not when imported by the test).
