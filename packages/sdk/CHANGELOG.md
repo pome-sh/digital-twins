@@ -1,5 +1,17 @@
 # @pome-sh/sdk
 
+## 0.4.0 — 2026-07-13
+
+Publish the `ensureTwinAuthSecret` server helper so the digest-pinned twin
+snapshot build (which installs the published SDK, not the workspace copy) can
+compile the twins that now call it on non-loopback boot.
+
+- New export `ensureTwinAuthSecret(twin, host)` from `@pome-sh/sdk/server`
+  (added workspace-side in #109; `twin-{github,slack,stripe}` call it and now
+  pin `@pome-sh/sdk@0.4.0`).
+
+No breaking changes.
+
 ## 0.3.1 — 2026-07-10
 
 SQLite driver swapped from `better-sqlite3` to the `node:sqlite` builtin
