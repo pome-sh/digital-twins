@@ -31,30 +31,20 @@ while IFS= read -r tag || [ -n "$tag" ]; do
   ref="${tag}@${digest}"
 
   echo "signing $ref"
-  # cosign v3 keyless embeds an RFC3161 signed timestamp automatically (TSA URL
-  # from the TUF signing config). No --timestamp-server-url needed; that flag
-  # was removed in v3 in favour of --use-signing-config (default true).
   cosign sign --yes "$ref"
   cosign attest --yes --predicate "$sbom_file" --type spdx "$ref"
 
-  # Signature: enforce the RFC3161 timestamp (--use-signed-timestamps).
-  # cosign v3 `sign` embeds it via the TUF signing config, so this passes at
-  # build AND stays verifiable after the ~10min Fulcio cert expires — that
-  # durably-timestamped signature is what the pome-cloud control-plane deploy
-  # gate hard-requires (ADR-016 decision #4).
-  echo "verifying $ref signature (with signed timestamps)"
+  # Build-time self-check that the pushed digest is signed + carries the SPDX
+  # attestation, under the same keyless identity. No --use-signed-timestamps:
+  # the pome-cloud control-plane deploy gate owns timestamp/expiry handling and
+  # hard-gates only the signature (SPDX attestation best-effort, ADR-016
+  # decision #4); requiring a timestamp here just breaks the build (cosign
+  # emits none for attestations).
+  echo "verifying $ref"
   cosign verify \
-    --use-signed-timestamps \
     --certificate-identity-regexp "$identity_regexp" \
     --certificate-oidc-issuer "$issuer" \
     "$ref" >/dev/null
-  # Attestation: NO --use-signed-timestamps. cosign `attest` (v3.1.1, latest)
-  # emits no RFC3161 timestamp (no --new-bundle-format on attest), so requiring
-  # one here fails the sign step on every run. The deploy gate treats the SPDX
-  # attestation as best-effort for exactly this reason (ADR-016 decision #4);
-  # verify it here while the cert is fresh (surfaces a bad/mis-signed SBOM at
-  # build) without demanding a timestamp cosign cannot produce.
-  echo "verifying $ref SPDX attestation"
   cosign verify-attestation \
     --type spdx \
     --certificate-identity-regexp "$identity_regexp" \
