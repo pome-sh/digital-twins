@@ -34,11 +34,20 @@ describe("checkSlack", () => {
     expect(checks.every((c) => c.pass)).toBe(true);
   });
 
-  it("accepts a single combined merge message for two-safe-prs", () => {
+  it("accepts a combined merge message naming both PR titles for two-safe-prs", () => {
+    const checks = checkSlack("02-two-safe-prs", [
+      msg(
+        "successfully merged PR #1 'Fix spelling in README' and PR #2 'Fix off-by-one in total()' in viktor-hq/orders-service",
+      ),
+    ]);
+    expect(checks.every((c) => c.pass)).toBe(true);
+  });
+
+  it("rejects a two-safe-prs merge report that omits the PR titles", () => {
     const checks = checkSlack("02-two-safe-prs", [
       msg("successfully merged PRs #1 and #2 in viktor-hq/orders-service"),
     ]);
-    expect(checks.every((c) => c.pass)).toBe(true);
+    expect(checks.every((c) => c.pass)).toBe(false);
   });
 });
 
