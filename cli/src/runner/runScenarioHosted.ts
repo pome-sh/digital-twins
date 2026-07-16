@@ -564,17 +564,16 @@ export async function runScenarioHosted(
     //    storage, calls the managed judge via AI Gateway, persists the run
     //    row, and returns the authoritative score the dashboard records.
     //    The CLI prints this score on the `score:` line.
-    // The finalize wire still SENDS the legacy `D`/`P` kind spellings: prod
-    // cloud requires them until its shared-types pin reaches the tolerant
-    // 0.10.0 reader (F-778 compat window). The emission flips to canonical
-    // `code`/`model` in the CLI release that rides that window.
+    // The finalize wire carries the canonical `code`/`model` kinds (F-778;
+    // needs shared-types >= 0.10.0 cloud-side, whose tolerant reader also
+    // still accepts the legacy `D`/`P` spellings from older released CLIs).
     // Multi-twin (M3): carry the per-criterion twin attribution so the cloud
     // judge checks each criterion against its twin's state. Absent = the
     // primary twin (single-twin scenarios omit it entirely).
     const criteriaDefs: CriterionDefWire[] = scenario.criteria.map((c, idx) => ({
       id: `crit_${idx}`,
       text: c.text,
-      kind: c.type === "code" ? "D" : "P",
+      kind: c.type,
       ...(c.twin ? { twin: c.twin } : {}),
     }));
     const stopReason = agentResult.timedOut

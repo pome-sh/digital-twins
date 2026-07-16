@@ -784,8 +784,8 @@ describe("runScenarioHosted ADR-013 score reporting", () => {
       criteria: { id: string; text: string; kind: string }[];
     };
     expect(sent.criteria).toEqual([
-      { id: "crit_0", text: "Issue exists", kind: "D" },
-      { id: "crit_1", text: "Agent acted reasonably", kind: "P" },
+      { id: "crit_0", text: "Issue exists", kind: "code" },
+      { id: "crit_1", text: "Agent acted reasonably", kind: "model" },
     ]);
   });
 

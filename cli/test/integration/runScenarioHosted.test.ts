@@ -182,7 +182,7 @@ describe("runScenarioHosted happy path", () => {
     expect(received.agent_model).toBe("unknown");
     // Criterion *definitions*, not results — ADR-013 cloud judges them.
     expect(received.criteria).toEqual([
-      { id: "crit_0", text: "No unsupported endpoint was called", kind: "D" },
+      { id: "crit_0", text: "No unsupported endpoint was called", kind: "code" },
     ]);
     // BYOK posture: agent_stdout MUST NOT be in body. /finalize never carried
     // it, but assert anyway to lock the boundary.
