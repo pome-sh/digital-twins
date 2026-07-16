@@ -30,9 +30,9 @@ import {
 import { HostedOrchError, HostedTrialError } from "../hosted/errors.js";
 import type {
   CreateSessionResponse,
-  CriterionDefInput,
   RecorderEvent,
 } from "../types/shared.js";
+import type { CriterionDefWire } from "../hosted/client.js";
 import type { RecorderEvent as LegacyGithubRecorderEvent } from "@pome-sh/shared-types";
 import type { Scenario } from "../scenario/scenarioSchema.js";
 import type { Score } from "../hosted/evalResultView.js";
@@ -571,7 +571,7 @@ export async function runScenarioHosted(
     // Multi-twin (M3): carry the per-criterion twin attribution so the cloud
     // judge checks each criterion against its twin's state. Absent = the
     // primary twin (single-twin scenarios omit it entirely).
-    const criteriaDefs: CriterionDefInput[] = scenario.criteria.map((c, idx) => ({
+    const criteriaDefs: CriterionDefWire[] = scenario.criteria.map((c, idx) => ({
       id: `crit_${idx}`,
       text: c.text,
       kind: c.type === "code" ? "D" : "P",

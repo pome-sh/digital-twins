@@ -291,10 +291,10 @@ describe("@pome-sh/shared-types barrel export surface (F-754)", () => {
     expect(Object.keys(api).sort()).toEqual([...EXPECTED_EXPORTS]);
   });
 
-  it("guards the TYPE surface (54 types/interfaces)", () => {
+  it("guards the TYPE surface (53 types/interfaces)", () => {
     // The real guard is the type-only import + _TypeSurfaceAssert tuple above,
     // enforced at typecheck time. This assertion just anchors the count at
     // runtime so the guard's scope is visible in test output.
-    expect(TYPE_SURFACE_SIZE).toBe(52);
+    expect(TYPE_SURFACE_SIZE).toBe(53);
   });
 });
