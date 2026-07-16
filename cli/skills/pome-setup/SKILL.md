@@ -131,7 +131,7 @@ next steps:
 
 | Symptom | Fix |
 | --- | --- |
-| `npm install @pome-sh/adapter-claude-sdk` 404s | The adapter's npm publish is staged (OSS Launch Stage 1). Inside a pome-twins checkout, depend on it via `"@pome-sh/adapter-claude-sdk": "file:<checkout>/packages/adapter-claude-sdk"`; external repos should watch the pome release notes. |
+| `npm install @pome-sh/adapter-claude-sdk` fails | Confirm registry access (`npm view @pome-sh/adapter-claude-sdk version`). Inside a pome-twins checkout you can also pin `"@pome-sh/adapter-claude-sdk": "file:<checkout>/packages/adapter-claude-sdk"` while iterating on unpublished workspace changes. |
 | doctor: "reads from a hardcoded https://api.github.com" | A production-host literal survives in agent source — even a `?? "https://api.github.com"` fallback triggers it. Move the fallback out of source; read `POME_GITHUB_REST_URL`. |
 | doctor: "twin not reachable" | Twin dependencies missing — run the repo's install (`npm install` / `npm install`) and re-run `pome doctor`. |
 | doctor: "egress floor disabled" | Remove `*` from `POME_EGRESS_ALLOW`. Never widen egress to pass a check. |

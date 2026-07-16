@@ -50,7 +50,6 @@ import { normalizeRegisterTwins, runRegisterAgent } from "./register.js";
 import { resolvePackageRoot } from "./resolve-package-root.js";
 import {
   ClaudeManagedDeferredError,
-  ClaudeSdkDeferredError,
   writeSdkScaffold,
 } from "./init-sdk.js";
 import {
@@ -138,15 +137,6 @@ export function createProgram() {
         process.exitCode = 2;
         return;
       }
-      if (sdk === "claude") {
-        // Deferred until @pome-sh/adapter-claude-sdk publishes to npm
-        // (OSS Launch Stage 1). The scaffolded file would import a package
-        // that 404s on `npm install`. Mirror the claude-managed short-circuit:
-        // bail before touching the filesystem.
-        console.error(new ClaudeSdkDeferredError().message);
-        process.exitCode = 2;
-        return;
-      }
 
       await mkdir("scenarios", { recursive: true });
       await mkdir("examples/agents", { recursive: true });
@@ -164,29 +154,20 @@ export function createProgram() {
         "  3. pome run scenarios/01-bug-happy-path.md\n" +
         "\n" +
         "Optional follow-ups:\n" +
-        "  - pome init --sdk claude         # scaffold a Claude Agent SDK starter (gated on @pome-sh/adapter-claude-sdk npm publish — see Stage 1)\n" +
+        "  - pome init --sdk claude         # scaffold a Claude Agent SDK starter\n" +
         "  - pome scenarios stripe --copy   # add Stripe payment scenarios when needed\n" +
         "\n" +
         "See `pome docs getting-started` for a narrative walkthrough.";
 
       if (sdk) {
-        try {
-          const scaffold = await writeSdkScaffold(sdk);
-          agentBlock = {
-            sdk: scaffold.agentSdkValue,
-            command: scaffold.agentCommand,
-          };
-          postInitMessage =
-            `Pome initialized with --sdk ${sdk}. Scaffolded ${scaffold.exampleAgentRelativePath}.\n` +
-            scaffold.postInstallHint;
-        } catch (err) {
-          if (err instanceof ClaudeManagedDeferredError) {
-            console.error(err.message);
-            process.exitCode = 2;
-            return;
-          }
-          throw err;
-        }
+        const scaffold = await writeSdkScaffold(sdk);
+        agentBlock = {
+          sdk: scaffold.agentSdkValue,
+          command: scaffold.agentCommand,
+        };
+        postInitMessage =
+          `Pome initialized with --sdk ${sdk}. Scaffolded ${scaffold.exampleAgentRelativePath}.\n` +
+          scaffold.postInstallHint;
       }
 
       const existingConfig = await readProjectConfig(process.cwd());

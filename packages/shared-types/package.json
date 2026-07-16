@@ -28,8 +28,8 @@
     "build:runtime": "tsc -p tsconfig.runtime.json",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "build": "tsc -p tsconfig.build.json",
-    "prepublishOnly": "tsc -p tsconfig.build.json",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "prepublishOnly": "npm run build",
     "emit:trace-contract": "node scripts/emit-trace-contract.mjs",
     "check:trace-contract": "node scripts/emit-trace-contract.mjs --check"
   },

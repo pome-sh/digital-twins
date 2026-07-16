@@ -1,19 +1,15 @@
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
-
 type ToolCall = {
   tool: string;
   arguments: Record<string, unknown>;
 };
 
-const env = await loadEnv(resolve("../discord/.env"));
-const apiKey = process.env.ANTHROPIC_API_KEY ?? env.ANTHROPIC_API_KEY;
-const model = process.env.ANTHROPIC_MODEL ?? env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6";
+const apiKey = process.env.ANTHROPIC_API_KEY;
+const model = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6";
 const mcpUrl = process.env.GITHUB_MCP_URL ?? process.env.GITHUB_CLONE_MCP_URL ?? process.env.POME_GITHUB_MCP_URL ?? "http://127.0.0.1:3333/s/demo/mcp";
 const mcpToken = process.env.GITHUB_MCP_TOKEN ?? await localSessionToken(mcpUrl);
 
 if (!apiKey) {
-  throw new Error("ANTHROPIC_API_KEY is missing. Put it in discord/.env or export it before running this agent.");
+  throw new Error("ANTHROPIC_API_KEY is missing. Export it before running this agent.");
 }
 
 async function main() {
@@ -74,19 +70,6 @@ async function askClaudeForPlan(task: string, availableTools: Array<{ name: stri
   const data = await response.json() as { content?: Array<{ type: string; text?: string }> };
   const text = data.content?.find((block) => block.type === "text")?.text ?? "[]";
   return JSON.parse(stripJsonFence(text)) as ToolCall[];
-}
-
-async function loadEnv(path: string) {
-  const output: Record<string, string> = {};
-  const text = await readFile(path, "utf8").catch(() => "");
-  for (const line of text.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const index = trimmed.indexOf("=");
-    if (index === -1) continue;
-    output[trimmed.slice(0, index)] = trimmed.slice(index + 1);
-  }
-  return output;
 }
 
 class GitHubTwinClient {

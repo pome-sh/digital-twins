@@ -18,13 +18,11 @@ afterEach(async () => {
 });
 
 describe("pome init --sdk", () => {
-  it("--sdk claude exits non-zero with the deferral message and writes no scaffold", async () => {
-    // Deferred until @pome-sh/adapter-claude-sdk publishes to npm. Mirror the
-    // claude-managed shape: clear error, no half-initialized project.
+  it("--sdk claude scaffolds the Claude Agent SDK starter and sets agent.sdk", async () => {
     const projectDir = await mkdtemp(join(tmpdir(), "pome-init-sdk-"));
     tempDirs.push(projectDir);
     process.chdir(projectDir);
-    const errSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
 
     await createProgram().parseAsync([
       "node",
@@ -34,17 +32,20 @@ describe("pome init --sdk", () => {
       "claude",
     ]);
 
-    expect(process.exitCode).toBe(2);
-    const messages = errSpy.mock.calls.map((c) => String(c[0])).join("\n");
-    expect(messages).toContain("@pome-sh/adapter-claude-sdk");
-    expect(messages).toContain("pome init");
-    // Bail before touching the filesystem so a failed `--sdk claude` doesn't
-    // leave a half-scaffolded project the user has to clean up.
-    expect(existsSync("pome.config.json")).toBe(false);
-    expect(existsSync("scenarios")).toBe(false);
-    expect(existsSync("runs")).toBe(false);
-    expect(existsSync("examples/agents/claude-sdk-agent.ts")).toBe(false);
-    process.exitCode = 0;
+    expect(process.exitCode ?? 0).toBe(0);
+    expect(existsSync("examples/agents/claude-sdk-agent.ts")).toBe(true);
+    const agentSource = readFileSync("examples/agents/claude-sdk-agent.ts", "utf8");
+    expect(agentSource).toContain('@pome-sh/adapter-claude-sdk');
+    expect(agentSource).toContain("withPome()");
+    expect(agentSource).toContain("POME_GITHUB_REST_URL");
+
+    const cfg = JSON.parse(readFileSync("pome.config.json", "utf8")) as {
+      agent: { sdk?: string; command?: string };
+    };
+    expect(cfg.agent.sdk).toBe("claude");
+    expect(cfg.agent.command).toBe(
+      "npx tsx examples/agents/claude-sdk-agent.ts",
+    );
   });
 
   it("rejects unknown --sdk values with a clear error and non-zero exit", async () => {
@@ -114,17 +115,13 @@ describe("pome init --sdk", () => {
     );
   });
 
-  it("rerunning a plain project with --sdk claude leaves the existing config untouched", async () => {
-    // Pre-deferral this test verified the upgrade path. With `--sdk claude`
-    // now deferred, a rerun must NOT silently mutate the existing config.
+  it("rerunning a plain project with --sdk claude upgrades agent.sdk/command", async () => {
     const projectDir = await mkdtemp(join(tmpdir(), "pome-init-sdk-upgrade-"));
     tempDirs.push(projectDir);
     process.chdir(projectDir);
     vi.spyOn(console, "error").mockImplementation(() => undefined);
 
     await createProgram().parseAsync(["node", "pome", "init"]);
-    const beforeSdk = readFileSync("pome.config.json", "utf8");
-
     await createProgram().parseAsync([
       "node",
       "pome",
@@ -133,8 +130,14 @@ describe("pome init --sdk", () => {
       "claude",
     ]);
 
-    expect(process.exitCode).toBe(2);
-    expect(readFileSync("pome.config.json", "utf8")).toBe(beforeSdk);
-    process.exitCode = 0;
+    expect(process.exitCode ?? 0).toBe(0);
+    const cfg = JSON.parse(readFileSync("pome.config.json", "utf8")) as {
+      agent: { sdk?: string; command?: string };
+    };
+    expect(cfg.agent.sdk).toBe("claude");
+    expect(cfg.agent.command).toBe(
+      "npx tsx examples/agents/claude-sdk-agent.ts",
+    );
+    expect(existsSync("examples/agents/claude-sdk-agent.ts")).toBe(true);
   });
 });

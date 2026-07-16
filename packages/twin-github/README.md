@@ -213,7 +213,7 @@ curl -s -X POST http://127.0.0.1:3333/admin/seed \
 
 ## Claude Agent Example
 
-`examples/claude-github-agent.ts` is a tiny Claude-powered GitHub agent. It reads `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL` from `../discord/.env` or from the process environment.
+`examples/claude-github-agent.ts` is a tiny Claude-powered GitHub agent. It reads `ANTHROPIC_API_KEY` and optional `ANTHROPIC_MODEL` from the process environment.
 
 Run against local:
 
