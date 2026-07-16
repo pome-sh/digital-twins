@@ -421,19 +421,24 @@ describe("pome run --hosted (e2e via spawn)", () => {
       (receivedResult as Record<string, unknown>).signals_storage_key,
     ).toBe("team-tm_test/session-ses_e2e/signals.jsonl");
 
-    // The uploaded signals blob carries the turn rows, cache token counts
-    // intact after the redact + gzip round trip. Every row must parse (the
-    // redactJsonl line filter must not have corrupted the JSONL) and be an
-    // LlmTurnEvent. NOTE: runScenarioHosted runs the agent command twice — a
-    // ≤10s preflight probe then the real run — against the same signals file,
-    // so the fixture's two turns appear once per invocation; assert on the
-    // distinct turns present, not an exact count.
+    // The uploaded signals blob carries the real run's turn rows, cache token
+    // counts intact after the redact + gzip round trip. Every row must parse
+    // (the redactJsonl line filter must not have corrupted the JSONL) and be an
+    // LlmTurnEvent. F-771 — the ≤10s preflight probe appends its own turns to
+    // the same signals file first; the runner truncates that file before the
+    // real run, so the uploaded blob contains the real run's 2 turns ONLY
+    // (turn_index 0 and 1), never the preflight's duplicate pair.
     expect(uploadedBlobs.signals, "signals.jsonl was not uploaded").toBeDefined();
     const signalRows = uploadedBlobs.signals
       .trim()
       .split("\n")
       .map((line) => JSON.parse(line));
     expect(signalRows.every((row) => row.kind === "LlmTurnEvent")).toBe(true);
+    expect(
+      signalRows,
+      "signals blob must count the real run's turns only (preflight excluded)",
+    ).toHaveLength(2);
+    expect(signalRows.map((row) => row.turn_index).sort()).toEqual([0, 1]);
     const turn0 = signalRows.find((row) => row.turn_index === 0);
     const turn1 = signalRows.find((row) => row.turn_index === 1);
     expect(turn0, "turn_index 0 row missing from signals blob").toMatchObject({
