@@ -66,7 +66,7 @@ jobs:
       # Node 24 — the repo's engines floor (node:sqlite twins, PR #85/F-719).
       # The old reason (better-sqlite3's node-gyp needing Node 24 APIs) died
       # with F-704; the floor itself stands.
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
           cache: npm
