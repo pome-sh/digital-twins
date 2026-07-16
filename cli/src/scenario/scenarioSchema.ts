@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 import { seedSchema as githubSeedStateSchema } from "@pome-sh/twin-github";
-// Criterion kinds are owned by the published contract. `criterionSchema`
-// accepts the legacy `D`/`P` spellings and normalizes them to `code`/`model`,
-// so existing scenario files keep parsing. The former local `["D","P"]` fork is
+// Criterion kinds are owned by the published contract. The markdown marker
+// grammar is `[code]`/`[model]` (F-778); `criterionSchema`'s tolerant input
+// (legacy `D`/`P` enum values) exists only for 0.3.0-era persisted artifacts,
+// never for scenario markdown. The former local criterion-kind fork is
 // retired here (M6 — one published contract).
 import { criterionSchema } from "@pome-sh/shared-types";
 import { z } from "zod";

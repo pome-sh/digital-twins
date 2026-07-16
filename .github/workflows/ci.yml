@@ -23,6 +23,9 @@ jobs:
           cache-dependency-path: package-lock.json
       - run: node scripts/check-copy-markers.mjs
       - run: node scripts/lint-code-health.mjs
+      # F-778 — the legacy D/P criterion markers are retired; fail on any
+      # reintroduction outside the parser's own legacy-detection code.
+      - run: node scripts/lint-legacy-criterion-markers.mjs
       # F-745 / D4 — no catch-and-continue in the SDK twin engine
       # (packages/sdk/src): every statement catch must throw, return an
       # error/sentinel, or reject. Dependency-free, runs before `npm ci`.
