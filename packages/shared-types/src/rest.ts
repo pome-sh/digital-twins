@@ -288,6 +288,10 @@ export const criterionDefSchema = z.object({
   twin: z.string().min(1).optional(),
 });
 export type CriterionDef = z.infer<typeof criterionDefSchema>;
+// Writer-side shape of the finalize wire during the F-778 compat window: a
+// producer may still send the legacy "D"/"P" spellings (released CLIs do);
+// readers always see the canonical CriterionDef after parse.
+export type CriterionDefInput = z.input<typeof criterionDefSchema>;
 
 // POST /v1/agents — register an agent (vercel-link shape). The server is
 // canonical for the slug; the CLI persists whatever id/slug it returns.

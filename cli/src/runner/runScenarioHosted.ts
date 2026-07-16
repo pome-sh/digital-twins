@@ -30,7 +30,7 @@ import {
 import { HostedOrchError, HostedTrialError } from "../hosted/errors.js";
 import type {
   CreateSessionResponse,
-  CriterionDef,
+  CriterionDefInput,
   RecorderEvent,
 } from "../types/shared.js";
 import type { RecorderEvent as LegacyGithubRecorderEvent } from "@pome-sh/shared-types";
@@ -564,12 +564,14 @@ export async function runScenarioHosted(
     //    storage, calls the managed judge via AI Gateway, persists the run
     //    row, and returns the authoritative score the dashboard records.
     //    The CLI prints this score on the `score:` line.
-    // `CriterionDef.kind` on the finalize request is still the legacy `D`/`P`
-    // wire vocabulary; map the canonical `code`/`model` kind back for the wire.
+    // The finalize wire still SENDS the legacy `D`/`P` kind spellings: prod
+    // cloud requires them until its shared-types pin reaches the tolerant
+    // 0.10.0 reader (F-778 compat window). The emission flips to canonical
+    // `code`/`model` in the CLI release that rides that window.
     // Multi-twin (M3): carry the per-criterion twin attribution so the cloud
-    // judge checks each [D:<twin>] against that twin's state. Absent = the
+    // judge checks each criterion against its twin's state. Absent = the
     // primary twin (single-twin scenarios omit it entirely).
-    const criteriaDefs: CriterionDef[] = scenario.criteria.map((c, idx) => ({
+    const criteriaDefs: CriterionDefInput[] = scenario.criteria.map((c, idx) => ({
       id: `crit_${idx}`,
       text: c.text,
       kind: c.type === "code" ? "D" : "P",

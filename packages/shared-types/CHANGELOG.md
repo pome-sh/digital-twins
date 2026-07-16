@@ -18,6 +18,13 @@
   legacy-spelling exception of the F-778 zero-residue migration (read-only
   input normalization; no writer may emit `D` / `P`).
 
+### Added
+
+- `CriterionDefInput` (type-only) — the writer-side shape of the finalize
+  wire during the compat window (`kind: "D" | "P" | "code" | "model"`).
+  Producers that still emit the legacy spellings type their payloads with
+  this; readers keep seeing the canonical `CriterionDef` after parse.
+
 ## 0.9.0
 
 ### Removed

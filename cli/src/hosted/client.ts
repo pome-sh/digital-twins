@@ -4,7 +4,7 @@ import {
   type CreateEvalSessionResponse,
   createSessionResponseSchema,
   type CreateSessionResponse,
-  type CriterionDef,
+  type CriterionDefInput,
   finalizeResponseSchema,
   type FinalizeResponse,
   sessionPublicSchema,
@@ -220,8 +220,10 @@ export interface FinalizeInput {
   agentModel: string;
   agentSdk?: string | null;
   // Criterion *definitions* (not results). Cloud judges these against the
-  // recorded trace/state and returns the authoritative score.
-  criteria: CriterionDef[];
+  // recorded trace/state and returns the authoritative score. Writer-side
+  // input type: the CLI may send legacy "D"/"P" kinds during the F-778
+  // compat window; cloud normalizes to "code"/"model" on parse.
+  criteria: CriterionDefInput[];
   scenarioName: string;
   scenarioHash: string;
   scenarioPrompt: string;

@@ -36,6 +36,7 @@ import type {
   CreateSessionRequest,
   CreateSessionResponse,
   CriterionDef,
+  CriterionDefInput,
   FinalizeAcceptedResponse,
   FinalizeCompletedStatusResponse,
   FinalizeFailedStatusResponse,
@@ -93,6 +94,7 @@ type _TypeSurfaceAssert = [
   CreateSessionRequest,
   CreateSessionResponse,
   CriterionDef,
+  CriterionDefInput,
   FinalizeAcceptedResponse,
   FinalizeCompletedStatusResponse,
   FinalizeFailedStatusResponse,
@@ -135,7 +137,7 @@ type _TypeSurfaceAssert = [
 // Compile-time anchor: exactly one tuple entry per guarded type. The literal
 // type on the left fails to compile if an entry is added or removed above
 // without updating the count.
-const TYPE_SURFACE_SIZE: _TypeSurfaceAssert["length"] = 52;
+const TYPE_SURFACE_SIZE: _TypeSurfaceAssert["length"] = 53;
 
 // Runtime value exports (types are erased and cannot appear on `Object.keys`).
 const EXPECTED_EXPORTS = [
