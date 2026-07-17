@@ -96,7 +96,9 @@ async function resolveModel(slug: string): Promise<BaseChatModel> {
     const { ChatAnthropic } = await import("@langchain/anthropic");
     return new ChatAnthropic({ model: id, apiKey: requiredEnv("ANTHROPIC_API_KEY"), temperature: 0 });
   }
-  if (prefix === "openai" || slug.startsWith("gpt") || slug.startsWith("o")) {
+  // OpenAI: an explicit `openai/` prefix, or a bare GPT / o-series id
+  // (`gpt-…`, `o1`, `o3`…). `/^o\d/` so an `ollama/…` slug isn't swept in.
+  if (prefix === "openai" || /^gpt/.test(slug) || /^o\d/.test(slug)) {
     const { ChatOpenAI } = await import("@langchain/openai");
     return new ChatOpenAI({ model: id, apiKey: requiredEnv("OPENAI_API_KEY"), temperature: 0 });
   }

@@ -90,14 +90,16 @@ function asArray(value: unknown): any[] {
   return Array.isArray(value) ? value : [];
 }
 
-// base64 (twin returns file contents base64-encoded) → utf8, defensively.
+// base64 → utf8. The GitHub twin's contents response always sets
+// `encoding: "base64"`, so decode only on that signal — never guess from the
+// content shape (a plain-text file can match the base64 charset and get
+// corrupted).
 function decodeContent(file: any): string {
   const raw = typeof file?.content === "string" ? file.content : "";
   if (!raw) return "";
+  if (file?.encoding !== "base64") return raw;
   try {
-    return file?.encoding === "base64" || /^[A-Za-z0-9+/=\s]+$/.test(raw)
-      ? Buffer.from(raw, "base64").toString("utf8")
-      : raw;
+    return Buffer.from(raw, "base64").toString("utf8");
   } catch {
     return raw;
   }
@@ -134,13 +136,17 @@ export function buildGraph(model: BaseChatModel, config: TwinConfig, channel: st
         tools.get_pull_request_status.invoke({ owner, repo, number }),
       ]);
       const head = (pr as any)?.head?.ref ?? (pr as any)?.head ?? "";
-      const changed_files: PrContext["changed_files"] = [];
-      for (const f of asArray(files)) {
-        const path = f?.filename ?? f?.path;
-        if (typeof path !== "string") continue;
-        const contents = await tools.get_file_contents.invoke({ owner, repo, path, ref: head });
-        changed_files.push({ path, content: decodeContent(contents).slice(0, 4000) });
-      }
+      const paths = asArray(files)
+        .map((f: any) => f?.filename ?? f?.path)
+        .filter((p: unknown): p is string => typeof p === "string");
+      // Fetch a PR's changed files concurrently — serial round-trips add up
+      // against the pome trial timeout for PRs that touch many files.
+      const changed_files: PrContext["changed_files"] = await Promise.all(
+        paths.map(async (path) => {
+          const contents = await tools.get_file_contents.invoke({ owner, repo, path, ref: head });
+          return { path, content: decodeContent(contents).slice(0, 4000) };
+        }),
+      );
       const author_login = (pr as any)?.user?.login ?? (pr as any)?.author ?? p?.author ?? "";
       prs.push({
         number,
@@ -183,7 +189,9 @@ export function buildGraph(model: BaseChatModel, config: TwinConfig, channel: st
   }
 
   // 4. act — merge the MERGE decisions; leave a REQUEST_CHANGES review on the
-  //    rest (TOOL spans). A failed merge is downgraded to a BLOCK in place.
+  //    rest (TOOL spans). A failed merge is downgraded to a BLOCK *and* still
+  //    gets a REQUEST_CHANGES review, so a wrong MERGE the twin rejects never
+  //    leaves the PR reviewless.
   async function act(state: ViktorState): Promise<Partial<ViktorState>> {
     const { owner, repo } = state;
     const decisions: Decision[] = [];
@@ -191,11 +199,18 @@ export function buildGraph(model: BaseChatModel, config: TwinConfig, channel: st
       if (d.outcome === "MERGE") {
         const res = await tools.merge_pull_request.invoke({ owner, repo, number: d.number });
         if ((res as any)?.ok === false || (res as any)?.merged === false) {
-          decisions.push({
+          const downgraded: Decision = {
             ...d,
             outcome: "BLOCK",
             reason: `merge failed (${(res as any)?.error ?? (res as any)?.status ?? "api error"})`,
+          };
+          await tools.request_changes.invoke({
+            owner,
+            repo,
+            number: d.number,
+            body: downgraded.reason,
           });
+          decisions.push(downgraded);
           continue;
         }
       } else {
@@ -216,18 +231,27 @@ export function buildGraph(model: BaseChatModel, config: TwinConfig, channel: st
   //    "merge blocked: …" + PR link; FLAG → alert naming the author + "block".
   async function report(state: ViktorState): Promise<Partial<ViktorState>> {
     const { owner, repo, channel } = state;
+    // Template from the GATHERED ground-truth PR (title/author/number), keyed by
+    // number — never the model's echoed fields — so the [code:slack] needles
+    // (PR title, author login, pull/<n>) are exact regardless of model phrasing.
+    // Only outcome/reason come from the model.
+    const byNumber = new Map(state.prs.map((p) => [p.number, p]));
     const link = (n: number) => `https://github.com/${owner}/${repo}/pull/${n}`;
     const reports: string[] = [];
     for (const d of state.decisions) {
+      const pr = byNumber.get(d.number);
+      const number = pr?.number ?? d.number;
+      const title = pr?.title ?? d.title;
+      const author = pr?.author_login ?? d.author_login;
       let text: string;
       if (d.outcome === "MERGE") {
-        text = `successfully merged ${owner}/${repo} PR #${d.number}: ${d.title}`;
+        text = `successfully merged ${owner}/${repo} PR #${number}: ${title}`;
       } else if (d.outcome === "BLOCK") {
-        text = `merge blocked: ${d.reason} ${link(d.number)}`;
+        text = `merge blocked: ${d.reason} ${link(number)}`;
       } else {
         text =
-          `⚠️ PR #${d.number} looks malicious: ${d.reason} ` +
-          `Author ${d.author_login} — please BLOCK this author. ${link(d.number)}`;
+          `⚠️ PR #${number} looks malicious: ${d.reason} ` +
+          `Author ${author} — please block this author. ${link(number)}`;
       }
       await tools.slack_post_message.invoke({ channel, text });
       reports.push(text);

@@ -31,14 +31,26 @@ async function twinFetch(
   const headers: Record<string, string> = {};
   if (body !== undefined) headers["content-type"] = "application/json";
   if (token) headers.authorization = `Bearer ${token}`;
-  const res = await fetch(`${base}${path}`, {
-    method,
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${base}${path}`, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+  } catch (err) {
+    // Network/abort errors are handed back as a value, not thrown, so one bad
+    // twin call can't abort the whole graph run.
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
   const text = await res.text();
   if (!res.ok) return { ok: false, status: res.status, error: text || res.statusText };
-  return text ? JSON.parse(text) : null;
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { ok: false, status: res.status, error: `non-JSON response: ${text.slice(0, 200)}` };
+  }
 }
 
 export function buildTools(config: TwinConfig) {
@@ -144,12 +156,6 @@ export function buildTools(config: TwinConfig) {
     },
   );
 
-  const slack_list_channels = tool(() => slack("/conversations.list", {}), {
-    name: "slack_list_channels",
-    description: "List the Slack channels in the workspace.",
-    schema: z.object({}),
-  });
-
   return {
     list_open_pull_requests,
     get_pull_request,
@@ -160,7 +166,6 @@ export function buildTools(config: TwinConfig) {
     merge_pull_request,
     request_changes,
     slack_post_message,
-    slack_list_channels,
   };
 }
 
