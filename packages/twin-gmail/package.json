@@ -38,7 +38,7 @@
     "dev": "tsx src/server.ts",
     "start": "node dist/src/server.js",
     "prepack": "npm run build",
-    "test": "node --test test/gate0-fixtures.test.mjs && vitest run test/domain.test.ts test/mcp.test.ts test/rest.test.ts test/official-client.test.ts",
+    "test": "node --test test/gate0-fixtures.test.mjs && vitest run test/domain.test.ts test/mcp.test.ts test/rest.test.ts test/agent-path.test.ts test/official-client.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "fidelity:parity": "tsx scripts/fidelity-parity.ts"
   },
