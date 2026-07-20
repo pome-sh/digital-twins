@@ -39,6 +39,9 @@ const PRODUCTION_HOSTS: ReadonlyArray<{ host: string; envVar: string }> = [
   { host: "api.stripe.com", envVar: "POME_STRIPE_REST_URL" },
   { host: "hooks.slack.com", envVar: "POME_SLACK_REST_URL" },
   { host: "slack.com/api", envVar: "POME_SLACK_REST_URL" },
+  // Gmail only — do not flag Calendar/Drive/etc. on googleapis hosts.
+  { host: "gmail.googleapis.com", envVar: "POME_GMAIL_REST_URL" },
+  { host: "www.googleapis.com/gmail/", envVar: "POME_GMAIL_REST_URL" },
 ];
 
 const WIRING_ENV_REGEX = /POME_[A-Z0-9]+_(?:REST_URL|MCP_URL|API_BASE)/;

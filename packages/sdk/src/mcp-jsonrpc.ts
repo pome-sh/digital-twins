@@ -7,7 +7,14 @@
 
 import { randomUUID } from "node:crypto";
 import type { Context } from "hono";
-import { toolInputSchema, type RecorderEvent, type RecorderHandle, type ToolSpec, type TwinDefinition } from "./index.js";
+import {
+  toolInputSchema,
+  toolListExtras,
+  type RecorderEvent,
+  type RecorderHandle,
+  type ToolSpec,
+  type TwinDefinition,
+} from "./index.js";
 import { UnknownToolError, envelopeFor } from "./errors.js";
 import { makeToolCallContext } from "./tool-context.js";
 
@@ -105,7 +112,7 @@ async function dispatch<TDb, TSeed, TDomain>(
               name: tool.name,
               description: tool.description,
               inputSchema: toolInputSchema(tool),
-              ...(tool.annotations ? { annotations: tool.annotations } : {}),
+              ...toolListExtras(tool),
             })),
           },
         };
@@ -159,7 +166,11 @@ async function handleToolsCall<TDb, TSeed, TDomain>(
   let responseBody: unknown;
   let toolError: string | null = null;
   let mutation = false;
-  let mcpResult: { content: { type: "text"; text: string }[]; isError?: boolean };
+  let mcpResult: {
+    content: { type: "text"; text: string }[];
+    isError?: boolean;
+    structuredContent?: unknown;
+  };
 
   if (!tool) {
     const envelope = projectError(new UnknownToolError(name));
@@ -178,7 +189,18 @@ async function handleToolsCall<TDb, TSeed, TDomain>(
       status = 200;
       responseBody = value;
       mutation = tool.mutation;
-      mcpResult = { content: [{ type: "text", text: JSON.stringify(value) }] };
+      // Only tools that declare `outputSchema` get `structuredContent` —
+      // existing twins omit both and stay byte-identical on the wire.
+      mcpResult = {
+        content: [
+          {
+            type: "text",
+            text: tool.contentText ? tool.contentText(value) : JSON.stringify(value),
+          },
+        ],
+        ...(tool.outputSchema !== undefined ? { structuredContent: value } : {}),
+        ...(tool.includeIsError ? { isError: false } : {}),
+      };
     } catch (err) {
       const envelope = projectError(err);
       status = envelope.status;
@@ -188,14 +210,21 @@ async function handleToolsCall<TDb, TSeed, TDomain>(
     }
   }
 
+  const delta = status < 400 ? call.delta() : null;
+  // Align with REST rest-routes-kit: when a handler reports reportDelta(null)
+  // (no-op mutation), state_mutation must be false. Twins that never call
+  // reportDelta keep ToolSpec.mutation as the recorder truth.
+  const effectiveMutation =
+    status < 400 && mutation && (!call.reportedDelta() || delta !== null);
+
   deps.recorder.record(
     buildEventCore(c, deps, {
       started,
       status,
       requestBody: { tool: name, arguments: args },
       responseBody,
-      mutation: status < 400 && mutation,
-      delta: status < 400 ? call.delta() : null,
+      mutation: effectiveMutation,
+      delta,
       error: toolError,
     })
   );

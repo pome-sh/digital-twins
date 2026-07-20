@@ -44,6 +44,12 @@ export interface ParityRestProbe {
   status: number;
   /** Assert the body carries a `fidelity: "unsupported"` marker. */
   expectUnsupportedEnvelope?: boolean;
+  /** Optional request body for mutating probes (e.g. messages.send). */
+  body?: string;
+  /** Extra request headers (authorization is always set by the runner). */
+  headers?: Record<string, string>;
+  /** Extra body assertion; return a problem string to fail the probe. */
+  verify?: (body: unknown) => string | undefined;
 }
 
 export interface ParityAppLike {
@@ -140,9 +146,17 @@ export async function runFidelityParity(options: RunParityOptions): Promise<Pari
   }
 
   for (const probe of options.restProbes ?? []) {
+    const headers: Record<string, string> = {
+      authorization: `Bearer ${token}`,
+      ...probe.headers,
+    };
+    if (probe.body !== undefined && !headers["content-type"] && !headers["Content-Type"]) {
+      headers["content-type"] = "application/json";
+    }
     const response = await options.app.request(`${base}${probe.path}`, {
       method: probe.method ?? "GET",
-      headers: { authorization: `Bearer ${token}` },
+      headers,
+      ...(probe.body !== undefined ? { body: probe.body } : {}),
     });
     const body: unknown = await response.json().catch(() => ({}));
     if (response.status !== probe.status) {
@@ -151,6 +165,8 @@ export async function runFidelityParity(options: RunParityOptions): Promise<Pari
     if (probe.expectUnsupportedEnvelope && !JSON.stringify(body).includes('"fidelity":"unsupported"')) {
       failures.push(`${probe.surface}: body does not carry the fidelity:"unsupported" envelope`);
     }
+    const problem = probe.verify?.(body);
+    if (problem) failures.push(`${probe.surface}: ${problem}`);
     report.push({ surface: probe.surface, status: response.status, body });
   }
 
