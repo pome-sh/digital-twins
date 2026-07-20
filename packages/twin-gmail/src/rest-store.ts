@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { invalidArgument, notFound, unsupported } from "./errors.js";
-import { parseSearchQuery } from "./search.js";
+import { validateSearchQuery } from "./search.js";
 import { addHistory, assertLabels, nextId, semanticMessage } from "./storage.js";
 import type { GmailDomain } from "./domain.js";
 import type { GmailTwinDatabase, SeedFilter, SemanticMessage } from "./types.js";
@@ -260,8 +260,8 @@ export class GmailRestStore {
     };
     if (count.count >= 1000) invalidArgument("Filter limit exceeded");
     assertLabels(this.db, mailboxId, [...(action.addLabelIds ?? []), ...(action.removeLabelIds ?? [])]);
-    if (criteria.query) parseSearchQuery(criteria.query);
-    if (criteria.negatedQuery) parseSearchQuery(criteria.negatedQuery);
+    if (criteria.query) validateSearchQuery(criteria.query);
+    if (criteria.negatedQuery) validateSearchQuery(criteria.negatedQuery);
     const id = nextId(this.db, mailboxId, "filter_counter", "filter");
     this.db
       .prepare("INSERT INTO filters(mailbox_id, id, criteria_json, action_json) VALUES (?, ?, ?, ?)")

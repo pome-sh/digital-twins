@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { z } from "zod";
+import { validateSearchQuery } from "./search.js";
 import type { GmailStateSeed } from "./types.js";
 
 const email = z.string().trim().email().transform((value) => value.toLowerCase());
@@ -150,6 +151,18 @@ export const gmailSeedSchema = z
             code: "custom",
             message: `Filter forwarding is unsupported: ${mailbox.email}`,
           });
+        }
+        for (const key of ["query", "negatedQuery"] as const) {
+          const value = filter.criteria[key];
+          if (!value) continue;
+          try {
+            validateSearchQuery(value);
+          } catch (error) {
+            ctx.addIssue({
+              code: "custom",
+              message: `Invalid filter ${key} in ${mailbox.email}: ${(error as Error).message}`,
+            });
+          }
         }
       }
     }

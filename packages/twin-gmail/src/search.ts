@@ -69,6 +69,56 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 type Token = { value: string; quoted?: boolean };
 
+/**
+ * Parse a Gmail query and reject operators/values that would throw at match time
+ * (unknown fields, categories, and invalid date/size/duration literals).
+ */
+export function validateSearchQuery(query: string): SearchNode {
+  const node = parseSearchQuery(query);
+  const walk = (current: SearchNode): void => {
+    switch (current.type) {
+      case "and":
+      case "or":
+        for (const child of current.children) walk(child);
+        return;
+      case "not":
+        walk(current.child);
+        return;
+      case "around":
+        return;
+      case "term":
+        assertSearchTerm(current.field, current.value);
+        return;
+    }
+  };
+  walk(node);
+  return node;
+}
+
+function assertSearchTerm(field: string | undefined, value: string): void {
+  if (!field) return;
+  if (!KNOWN_FIELDS.has(field)) {
+    throw new Error(`Unsupported search operator: ${field}`);
+  }
+  if (field === "category") {
+    if (!CATEGORY_LABELS[value.toLocaleLowerCase("en-US")]) {
+      throw new Error(`Unsupported search category: ${value}`);
+    }
+    return;
+  }
+  if (field === "after" || field === "newer" || field === "before" || field === "older") {
+    parseDate(value);
+    return;
+  }
+  if (field === "newer_than" || field === "older_than") {
+    parseDuration(value);
+    return;
+  }
+  if (field === "size" || field === "larger" || field === "smaller") {
+    parseSize(value);
+  }
+}
+
 export function parseSearchQuery(query: string): SearchNode {
   if (Buffer.byteLength(query) > MAX_QUERY_BYTES) throw new Error("Search query exceeds limit");
   const tokens = tokenize(query);

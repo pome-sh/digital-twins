@@ -47,6 +47,22 @@ describe("Gmail domain", () => {
     expect(identityFromSession({ sid: "s", gmail_email: "USER@Example.COM" }).email).toBe("user@example.com");
     expect(resolveUserEmail("me", { sid: "s", gmail_email: sender })).toBe(sender);
     expect(() => resolveUserEmail(recipient, { sid: "s", gmail_email: sender })).toThrow();
+    expect(() =>
+      parseSeed({
+        primaryMailbox: {
+          email: sender,
+          filters: [{ criteria: { query: "category:meetings" }, action: { addLabelIds: ["STARRED"] } }],
+        },
+      })
+    ).toThrow(/Unsupported search category/);
+    expect(() =>
+      parseSeed({
+        primaryMailbox: {
+          email: sender,
+          filters: [{ criteria: { negatedQuery: "myop:value" }, action: { addLabelIds: ["STARRED"] } }],
+        },
+      })
+    ).toThrow(/Unsupported search operator/);
   });
 
   it("round-trips exact canonical MIME bytes", () => {
