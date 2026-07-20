@@ -189,7 +189,77 @@ describe("pinned @googleapis/gmail smoke", () => {
       );
       expect(history.data.historyId).toBeTruthy();
       expect(history.data.history?.length).toBeGreaterThan(0);
+
+      const sentDirect = await client.users.messages.send(
+        {
+          userId: "me",
+          requestBody: { raw: encodeGmailRaw(mime("Send direct")) },
+        },
+        options
+      );
+      expect(sentDirect.data.labelIds).toContain("SENT");
+
+      const imported = await client.users.messages.import(
+        {
+          userId: "me",
+          requestBody: { raw: encodeGmailRaw(mime("Import me")), labelIds: ["INBOX", "UNREAD"] },
+          internalDateSource: "dateHeader",
+        },
+        options
+      );
+      expect(imported.data.labelIds).toEqual(expect.arrayContaining(["INBOX", "UNREAD"]));
+
+      await client.users.messages.batchModify(
+        {
+          userId: "me",
+          requestBody: {
+            ids: [imported.data.id!],
+            addLabelIds: [label.data.id!],
+          },
+        },
+        options
+      );
+      const afterBatch = await client.users.messages.get(
+        { userId: "me", id: imported.data.id!, format: "minimal" },
+        options
+      );
+      expect(afterBatch.data.labelIds).toContain(label.data.id!);
+
+      const trashed = await client.users.messages.trash({ userId: "me", id: imported.data.id! }, options);
+      expect(trashed.data.labelIds).toContain("TRASH");
+      expect(trashed.data.labelIds).not.toContain("INBOX");
+      const untrashed = await client.users.messages.untrash({ userId: "me", id: imported.data.id! }, options);
+      expect(untrashed.data.labelIds).not.toContain("TRASH");
+
+      const filter = await client.users.settings.filters.create(
+        {
+          userId: "me",
+          requestBody: {
+            criteria: { subject: "Official filter" },
+            action: { addLabelIds: ["STARRED"] },
+          },
+        },
+        options
+      );
+      expect(filter.data.id).toBeTruthy();
+      const filters = await client.users.settings.filters.list({ userId: "me" }, options);
+      expect(filters.data.filter?.some((row) => row.id === filter.data.id)).toBe(true);
+      const forwarding = await client.users.settings.forwardingAddresses.list({ userId: "me" }, options);
+      expect(Array.isArray(forwarding.data.forwardingAddresses ?? [])).toBe(true);
+      const sendAs = await client.users.settings.sendAs.list({ userId: "me" }, options);
+      expect(sendAs.data.sendAs?.some((row) => row.sendAsEmail === EMAIL || row.isPrimary)).toBe(true);
+
+      await client.users.messages.batchDelete(
+        {
+          userId: "me",
+          requestBody: { ids: [mediaWrite.data.id!] },
+        },
+        options
+      );
+      await expect(
+        client.users.messages.get({ userId: "me", id: mediaWrite.data.id! }, options)
+      ).rejects.toMatchObject({ code: 404 });
     },
-    20_000
+    30_000
   );
 });
