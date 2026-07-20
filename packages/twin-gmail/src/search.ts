@@ -30,6 +30,43 @@ const MAX_QUERY_BYTES = 4096;
 const MAX_TOKENS = 256;
 const MAX_DEPTH = 20;
 
+/** Operators supported by the twin search grammar (unknowns are rejected). */
+const KNOWN_FIELDS = new Set([
+  "from",
+  "to",
+  "cc",
+  "bcc",
+  "deliveredto",
+  "list",
+  "subject",
+  "rfc822msgid",
+  "filename",
+  "after",
+  "newer",
+  "before",
+  "older",
+  "newer_than",
+  "older_than",
+  "size",
+  "larger",
+  "smaller",
+  "label",
+  "category",
+  "in",
+  "is",
+  "has",
+]);
+
+/** Gmail `category:` aliases → system label ids. */
+const CATEGORY_LABELS: Record<string, string> = {
+  primary: "CATEGORY_PERSONAL",
+  personal: "CATEGORY_PERSONAL",
+  social: "CATEGORY_SOCIAL",
+  promotions: "CATEGORY_PROMOTIONS",
+  updates: "CATEGORY_UPDATES",
+  forums: "CATEGORY_FORUMS",
+};
+
 type Token = { value: string; quoted?: boolean };
 
 export function parseSearchQuery(query: string): SearchNode {
@@ -198,6 +235,9 @@ function matchesTerm(
   const value = rawValue.toLocaleLowerCase("en-US");
   const contains = (candidate: string) => matchText(candidate, value, exact);
   if (!field) return contains(searchable(document));
+  if (!KNOWN_FIELDS.has(field)) {
+    throw new Error(`Unsupported search operator: ${field}`);
+  }
   if (field === "from") return contains(document.from);
   if (field === "to") return document.to.some(contains);
   if (field === "cc") return document.cc.some(contains);
@@ -219,11 +259,17 @@ function matchesTerm(
   if (field === "larger") return document.size > parseSize(value);
   if (field === "smaller") return document.size < parseSize(value);
   if (field === "label") return hasLabel(document, value);
-  if (field === "category") return hasLabel(document, `category_${value}`);
+  if (field === "category") return matchesCategory(value, document);
   if (field === "in") return matchesFolder(value, document);
   if (field === "is") return matchesStatus(value, document);
   if (field === "has") return matchesHas(value, document);
-  return contains(`${field}:${searchable(document)}`);
+  throw new Error(`Unsupported search operator: ${field}`);
+}
+
+function matchesCategory(value: string, document: SearchDocument): boolean {
+  const mapped = CATEGORY_LABELS[value.toLocaleLowerCase("en-US")];
+  if (!mapped) throw new Error(`Unsupported search category: ${value}`);
+  return hasLabel(document, mapped);
 }
 
 function matchesFolder(value: string, document: SearchDocument): boolean {
@@ -258,6 +304,8 @@ function hasLabel(document: SearchDocument, value: string): boolean {
 }
 
 function searchable(document: SearchDocument): string {
+  // Strip tags with a linear scan — avoid backtracking regex on hostile HTML.
+  const htmlText = stripHtmlTags(document.html);
   return [
     document.from,
     ...document.to,
@@ -265,9 +313,28 @@ function searchable(document: SearchDocument): string {
     ...document.bcc,
     document.subject,
     document.text,
-    document.html.replace(/<[^>]*>/g, " "),
+    htmlText,
     ...document.attachmentNames,
   ].join(" ");
+}
+
+function stripHtmlTags(value: string): string {
+  let out = "";
+  let inTag = false;
+  for (let index = 0; index < value.length; index += 1) {
+    const char = value[index]!;
+    if (char === "<") {
+      inTag = true;
+      continue;
+    }
+    if (char === ">" && inTag) {
+      inTag = false;
+      out += " ";
+      continue;
+    }
+    if (!inTag) out += char;
+  }
+  return out;
 }
 
 function matchText(candidate: string, value: string, exact: boolean): boolean {
