@@ -18,6 +18,41 @@ export type GmailStateExport = {
   sendAs: unknown[];
 };
 
+/** Bounded, redacted entity collections used on recorder `state_delta`. */
+export type GmailStateDeltaView = {
+  schemaVersion: 1;
+  deliveryMode?: string;
+  mailboxes?: unknown[];
+  counters?: unknown[];
+  threads?: unknown[];
+  messages?: unknown[];
+  drafts?: unknown[];
+  labels?: unknown[];
+  messageLabels?: unknown[];
+  attachments?: unknown[];
+  history?: unknown[];
+  filters?: unknown[];
+  forwardingAddresses?: unknown[];
+  sendAs?: unknown[];
+};
+
+const ENTITY_COLLECTIONS = [
+  "mailboxes",
+  "counters",
+  "threads",
+  "messages",
+  "drafts",
+  "labels",
+  "messageLabels",
+  "attachments",
+  "history",
+  "filters",
+  "forwardingAddresses",
+  "sendAs",
+] as const;
+
+type EntityCollection = (typeof ENTITY_COLLECTIONS)[number];
+
 export function exportGmailState(db: GmailTwinDatabase): GmailStateExport {
   const delivery = db.prepare("SELECT value FROM gmail_config WHERE key = 'delivery_mode'").get() as
     | { value: string }
@@ -121,11 +156,95 @@ export function exportGmailState(db: GmailTwinDatabase): GmailStateExport {
   };
 }
 
-export function gmailStateDelta(before: GmailStateExport, after: GmailStateExport): {
-  before: GmailStateExport;
-  after: GmailStateExport;
-} {
-  return { before, after };
+/**
+ * Build a bounded `state_delta` with only changed entities.
+ * Message summaries omit plaintext text/html/raw/MIME bodies.
+ */
+export function gmailStateDelta(
+  before: GmailStateExport,
+  after: GmailStateExport
+): { before: GmailStateDeltaView | null; after: GmailStateDeltaView | null } {
+  const beforeView: GmailStateDeltaView = { schemaVersion: 1 };
+  const afterView: GmailStateDeltaView = { schemaVersion: 1 };
+  let changed = false;
+
+  if (before.deliveryMode !== after.deliveryMode) {
+    beforeView.deliveryMode = before.deliveryMode;
+    afterView.deliveryMode = after.deliveryMode;
+    changed = true;
+  }
+
+  for (const collection of ENTITY_COLLECTIONS) {
+    const beforeMap = indexEntities(before[collection] as unknown[], collection);
+    const afterMap = indexEntities(after[collection] as unknown[], collection);
+    const keys = new Set([...beforeMap.keys(), ...afterMap.keys()]);
+    const beforeChanged: unknown[] = [];
+    const afterChanged: unknown[] = [];
+    for (const key of [...keys].sort()) {
+      const left = beforeMap.get(key);
+      const right = afterMap.get(key);
+      if (stableStringify(left) === stableStringify(right)) continue;
+      if (left !== undefined) beforeChanged.push(summarizeEntity(collection, left));
+      if (right !== undefined) afterChanged.push(summarizeEntity(collection, right));
+    }
+    if (beforeChanged.length || afterChanged.length) {
+      beforeView[collection] = beforeChanged;
+      afterView[collection] = afterChanged;
+      changed = true;
+    }
+  }
+
+  if (!changed) return { before: null, after: null };
+  return { before: beforeView, after: afterView };
+}
+
+function indexEntities(items: unknown[], collection: EntityCollection): Map<string, Record<string, unknown>> {
+  const map = new Map<string, Record<string, unknown>>();
+  for (const item of items) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as Record<string, unknown>;
+    map.set(entityKey(collection, row), row);
+  }
+  return map;
+}
+
+function entityKey(collection: EntityCollection, row: Record<string, unknown>): string {
+  const mailbox = String(row.mailboxEmail ?? row.email ?? "");
+  switch (collection) {
+    case "mailboxes":
+      return String(row.email ?? "").toLowerCase();
+    case "counters":
+      return mailbox.toLowerCase();
+    case "messageLabels":
+      return `${mailbox.toLowerCase()}:${row.messageId}:${row.labelId}`;
+    case "attachments":
+      return `${mailbox.toLowerCase()}:${row.messageId}:${row.id}`;
+    case "forwardingAddresses":
+    case "sendAs":
+      return `${mailbox.toLowerCase()}:${String(row.email ?? "").toLowerCase()}`;
+    default:
+      return `${mailbox.toLowerCase()}:${row.id}`;
+  }
+}
+
+function summarizeEntity(collection: EntityCollection, row: Record<string, unknown>): Record<string, unknown> {
+  if (collection !== "messages") return { ...row };
+  // Bounded semantic summary — never include plaintext bodies, snippets, or MIME.
+  const {
+    text: _text,
+    html: _html,
+    headers: _headers,
+    snippet: _snippet,
+    ...rest
+  } = row;
+  return {
+    ...rest,
+    bodyOmitted: true,
+  };
+}
+
+function stableStringify(value: unknown): string {
+  return JSON.stringify(value ?? null);
 }
 
 function rows(db: GmailTwinDatabase, sql: string, jsonColumns: string[] = []): unknown[] {

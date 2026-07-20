@@ -4,11 +4,28 @@ import type { RecorderEvent } from "@pome-sh/sdk";
 
 export type BinaryProjection = { sha256: string; size: number };
 
+const BODY_KEYS = new Set([
+  "raw",
+  "canonicalraw",
+  "canonical_raw",
+  "attachmentdata",
+  "attachment_data",
+  "content",
+  "data",
+  "text",
+  "html",
+  "textbody",
+  "htmlbody",
+  "plaintextbody",
+  "body",
+]);
+
 export function projectGmailRecording(event: RecorderEvent): RecorderEvent {
   return {
     ...event,
     request_body: projectValue(event.request_body),
     response_body: projectValue(event.response_body),
+    state_delta: projectValue(event.state_delta) as RecorderEvent["state_delta"],
     error: projectValue(event.error) as RecorderEvent["error"],
   };
 }
@@ -27,16 +44,7 @@ function projectValue(value: unknown, key = ""): unknown {
 }
 
 function shouldProject(key: string): boolean {
-  const normalized = key.toLowerCase();
-  return (
-    normalized === "raw" ||
-    normalized === "canonicalraw" ||
-    normalized === "canonical_raw" ||
-    normalized === "attachmentdata" ||
-    normalized === "attachment_data" ||
-    normalized === "content" ||
-    normalized === "data"
-  );
+  return BODY_KEYS.has(key.toLowerCase());
 }
 
 function digestEncoded(value: string, key: string): BinaryProjection {
