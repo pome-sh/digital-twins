@@ -64,9 +64,21 @@ describe("scanAgentSources", () => {
       "legacy.ts": 'fetch("https://www.googleapis.com/gmail/v1/users/me/messages");',
     });
     expect((await scanAgentSources(legacy)).hardcoded).toMatchObject({
-      host: "www.googleapis.com",
+      host: "www.googleapis.com/gmail/",
       envVar: "POME_GMAIL_REST_URL",
     });
+  });
+
+  it("does not flag non-Gmail googleapis hosts (Calendar/Drive/etc.)", async () => {
+    const calendar = await fixture({
+      "cal.ts": 'fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events");',
+    });
+    expect((await scanAgentSources(calendar)).hardcoded).toBeNull();
+
+    const drive = await fixture({
+      "drive.ts": 'fetch("https://www.googleapis.com/drive/v3/files");',
+    });
+    expect((await scanAgentSources(drive)).hardcoded).toBeNull();
   });
 
   it("ignores hosts that only appear in comments", async () => {
