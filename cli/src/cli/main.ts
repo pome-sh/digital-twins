@@ -1085,7 +1085,10 @@ export function createProgram() {
   twin
     .command("start")
     .argument("<name>", "Twin name (github | slack | stripe | gmail)")
-    .option("--port <port>", "Port to bind (default: $PORT or 3333)")
+    .option(
+      "--port <port>",
+      "Port to bind (default: $PORT, else GMAIL_TWIN_PORT/3336 for gmail, else 3333)",
+    )
     .description(
       "Start a standalone twin as a long-lived foreground server (Ctrl-C to stop)",
     )

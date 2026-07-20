@@ -10,7 +10,7 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { resolveStandaloneAuthSecret } from "../../src/twin/twinStart.js";
+import { defaultPortFor, resolveStandaloneAuthSecret } from "../../src/twin/twinStart.js";
 
 const PERSISTED = "0123456789abcdef0123456789abcdef";
 
@@ -68,5 +68,22 @@ describe("resolveStandaloneAuthSecret", () => {
     // must fall through to ephemeral rather than throw on ENOENT.
     const resolved = resolveStandaloneAuthSecret("definitely-not-a-twin", {});
     expect(resolved.source).toBe("ephemeral");
+  });
+});
+
+describe("defaultPortFor", () => {
+  it("honors PORT for every twin", () => {
+    expect(defaultPortFor("gmail", { PORT: "4000", GMAIL_TWIN_PORT: "3336" })).toBe("4000");
+    expect(defaultPortFor("github", { PORT: "4001" })).toBe("4001");
+  });
+
+  it("defaults gmail to GMAIL_TWIN_PORT or 3336", () => {
+    expect(defaultPortFor("gmail", { GMAIL_TWIN_PORT: "3340" })).toBe("3340");
+    expect(defaultPortFor("gmail", {})).toBe("3336");
+  });
+
+  it("defaults non-gmail twins to 3333", () => {
+    expect(defaultPortFor("github", {})).toBe("3333");
+    expect(defaultPortFor("slack", {})).toBe("3333");
   });
 });

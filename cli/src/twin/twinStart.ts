@@ -90,6 +90,16 @@ function defaultSeedFor(twin: string): unknown {
   }
 }
 
+/** Resolve listen port for `pome twin start` when `--port` is omitted. */
+export function defaultPortFor(
+  twin: string,
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  if (env.PORT) return env.PORT;
+  if (twin === "gmail") return env.GMAIL_TWIN_PORT ?? "3336";
+  return "3333";
+}
+
 export async function runTwinStartCommand(
   name: string,
   options: { port?: string },
@@ -99,9 +109,9 @@ export async function runTwinStartCommand(
       `Unknown twin '${name}'. Supported: ${SUPPORTED_STANDALONE_TWINS.join(", ")}.`,
     );
   }
-  // `PORT` fallback keeps the spawn surface env-drivable (the contract
-  // suite injects PORT, same as the packaged twin entries).
-  const portRaw = options.port ?? process.env.PORT ?? "3333";
+  // `PORT` wins when set (contract suite / packaged entries). Gmail defaults
+  // to 3336 via GMAIL_TWIN_PORT; other twins keep 3333.
+  const portRaw = options.port ?? defaultPortFor(name, process.env);
   const port = Number(portRaw);
   // Port 0 (ephemeral) is rejected: every printed URL and the status-file
   // token would name a port nobody can discover from outside the process.
