@@ -368,7 +368,8 @@ function searchable(document: SearchDocument): string {
   ].join(" ");
 }
 
-function stripHtmlTags(value: string): string {
+/** Linear HTML tag strip — safe for untrusted MIME (no ReDoS). */
+export function stripHtmlTags(value: string): string {
   let out = "";
   let inTag = false;
   for (let index = 0; index < value.length; index += 1) {
@@ -463,7 +464,10 @@ function makeImplicitOr(node: SearchNode): SearchNode {
 }
 
 function normalizeMessageId(value: string): string {
-  return value.trim().replace(/^<|>$/g, "").toLowerCase();
+  let normalized = value.trim();
+  if (normalized.startsWith("<")) normalized = normalized.slice(1);
+  if (normalized.endsWith(">")) normalized = normalized.slice(0, -1);
+  return normalized.toLowerCase();
 }
 
 function escapeRegExp(value: string): string {

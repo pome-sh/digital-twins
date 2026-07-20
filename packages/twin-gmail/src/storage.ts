@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { invalidArgument, notFound } from "./errors.js";
 import { mimeSha256, normalizeSubject, parseMime } from "./mime.js";
+import { stripHtmlTags } from "./search.js";
 import type { GmailTwinDatabase, MessageRow, SemanticMessage } from "./types.js";
 
 export const SYSTEM_LABELS = [
@@ -113,7 +114,7 @@ export function insertStoredMessage(
         ]);
   const date = parsed.date === new Date(0).toISOString() ? nextTimestamp(db, mailboxId) : parsed.date;
   const internalDate = Date.parse(date);
-  const snippet = (parsed.text || parsed.html.replace(/<[^>]*>/g, " ")).replace(/\s+/g, " ").trim().slice(0, 200);
+  const snippet = (parsed.text || stripHtmlTags(parsed.html)).replace(/\s+/g, " ").trim().slice(0, 200);
   const exists = db.prepare("SELECT 1 FROM threads WHERE mailbox_id = ? AND id = ?").get(mailboxId, threadId);
   if (!exists) {
     db.prepare("INSERT INTO threads(mailbox_id, id, created_at, updated_at) VALUES (?, ?, ?, ?)").run(

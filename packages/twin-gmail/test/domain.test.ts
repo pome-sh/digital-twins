@@ -213,7 +213,25 @@ describe("Gmail domain", () => {
 
   
   
-  it("maps category:primary and rejects unknown search operators", () => {
+  it("builds snippets with linear HTML strip (no ReDoS regex)", () => {
+    const { gmail } = domain();
+    const adversarial = `<${"a".repeat(50_000)}`;
+    const message = gmail.insertMessage(
+      sender,
+      composeMime({
+        from: sender,
+        to: [recipient],
+        subject: "Html strip",
+        html: `<p>SNIPPET-VISIBLE ${adversarial}</p>`,
+        date: "2025-01-01T12:00:00.000Z",
+        messageId: "html-strip@test",
+      })
+    );
+    expect(message.snippet).toContain("SNIPPET-VISIBLE");
+    expect(message.snippet).not.toContain("<");
+  });
+
+    it("maps category:primary and rejects unknown search operators", () => {
     const { gmail } = domain();
     const message = gmail.insertMessage(sender, raw("Category"));
     gmail.modifyMessageLabels(sender, message.id, ["CATEGORY_PERSONAL"]);

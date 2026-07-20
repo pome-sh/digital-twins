@@ -321,7 +321,10 @@ function messageIds(value: string): string[] {
 }
 
 function normalizeMessageId(value: string): string {
-  return value.trim().replace(/^<|>$/g, "");
+  let normalized = value.trim();
+  if (normalized.startsWith("<")) normalized = normalized.slice(1);
+  if (normalized.endsWith(">")) normalized = normalized.slice(0, -1);
+  return normalized;
 }
 
 function normalizeDate(value: string | undefined): string {

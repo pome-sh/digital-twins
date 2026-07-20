@@ -15,7 +15,13 @@ export {
 } from "./mime.js";
 export { gmailTools } from "./mcp.js";
 export { projectGmailRecording } from "./recording.js";
-export { compileSearchToSql, matchesSearch, parseSearchQuery, validateSearchQuery } from "./search.js";
+export {
+  compileSearchToSql,
+  matchesSearch,
+  parseSearchQuery,
+  stripHtmlTags,
+  validateSearchQuery,
+} from "./search.js";
 export { defaultSeedState, gmailSeedSchema, loadSeedFromEnv, parseSeed } from "./seed.js";
 export { exportGmailState, gmailStateDelta } from "./state.js";
 export { createGmailTwinApp, gmailTwinDefinition, registerGmailRoutes } from "./twin.js";
