@@ -22,7 +22,7 @@ Pinned limits enforced by seed, MIME, search, REST list/batch, and MCP pageSize.
 | List `maxResults` | default `100`, max `500` | REST messages/threads/drafts/history |
 | History page size | default `100`, max `500` | Same `maxResults` cap as other lists |
 | MCP `pageSize` | default `20`, max `50` | `search_threads` / `list_drafts` / `list_labels` |
-| State export message bodies | always digested | `/_pome/state` never includes plaintext text/html/headers/snippet (sha256 digests only); collections capped at `2000` rows; body-omission flag set when mailbox exceeds `500` messages |
+| State export message bodies | always digested | `/_pome/state` never includes plaintext text/html/headers/snippet (sha256 digests only); collections capped at `2000` rows; **history** keeps the newest 2000 when truncated (messages/attachments/labels keep oldest-first); body-omission flag set when mailbox exceeds `500` messages |
 | SQLite bind parameters | parameterized only | Query text is never interpolated |
 | Packaged boot | ≤ 3s | Contract gate (later) |
 

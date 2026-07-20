@@ -112,6 +112,8 @@ export function exportGmailState(db: GmailTwinDatabase): GmailStateExport {
     "attachments",
     truncatedCollections
   );
+  // Prefer the newest history window when capping — oldest-first slice would
+  // drop recent mutations that agents/debuggers need from `/_pome/state`.
   const history = cappedCollection(
     rows(
       db,
@@ -123,7 +125,8 @@ export function exportGmailState(db: GmailTwinDatabase): GmailStateExport {
       ["labelIds"]
     ),
     "history",
-    truncatedCollections
+    truncatedCollections,
+    { preferNewest: true }
   );
 
   return {
@@ -225,14 +228,25 @@ function digestField(value: unknown): { sha256: string; size: number } | null {
   };
 }
 
+/** Cap export rows; `preferNewest` keeps the trailing window (used for history). */
+export function capExportRows(
+  items: unknown[],
+  cap: number = STATE_EXPORT_COLLECTION_CAP,
+  preferNewest = false
+): unknown[] {
+  if (items.length <= cap) return items;
+  return preferNewest ? items.slice(-cap) : items.slice(0, cap);
+}
+
 function cappedCollection(
   items: unknown[],
   name: string,
-  truncatedCollections: string[]
+  truncatedCollections: string[],
+  options: { preferNewest?: boolean } = {}
 ): unknown[] {
   if (items.length <= STATE_EXPORT_COLLECTION_CAP) return items;
   truncatedCollections.push(name);
-  return items.slice(0, STATE_EXPORT_COLLECTION_CAP);
+  return capExportRows(items, STATE_EXPORT_COLLECTION_CAP, options.preferNewest === true);
 }
 
 /**

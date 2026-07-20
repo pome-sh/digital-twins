@@ -32,6 +32,7 @@ export {
   parseSeed,
 } from "./seed.js";
 export {
+  capExportRows,
   exportGmailState,
   gmailStateDelta,
   STATE_EXPORT_COLLECTION_CAP,
