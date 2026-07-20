@@ -5,6 +5,7 @@ import {
   composeMime,
   defaultSeedState,
   encodeGmailRaw,
+  gmailStateDelta,
   identityFromSession,
   openGmailTwinDatabase,
   parseSeed,
@@ -147,14 +148,71 @@ describe("Gmail domain", () => {
   it("projects MIME and attachment payloads before recording", () => {
     const event = {
       request_body: { raw: Buffer.from("secret mime").toString("base64url"), attachmentData: "YmluYXJ5" },
-      response_body: null,
+      response_body: { plaintextBody: "MIME-CANARY-plaintext", html: "<p>MIME-CANARY-html</p>" },
+      state_delta: {
+        before: null,
+        after: { messages: [{ id: "m1", text: "MIME-CANARY-delta", html: "<b>x</b>" }] },
+      },
       error: null,
-    } as RecorderEvent;
+    } as unknown as RecorderEvent;
     const projected = projectGmailRecording(event);
-    expect(JSON.stringify(projected)).not.toContain("secret");
+    const tape = JSON.stringify(projected);
+    expect(tape).not.toContain("secret");
+    expect(tape).not.toContain("MIME-CANARY");
     expect(projected.request_body).toMatchObject({
       raw: { sha256: expect.any(String), size: 11 },
       attachmentData: { sha256: expect.any(String), size: 6 },
     });
+  });
+
+  it("emits bounded state_delta summaries without plaintext bodies", () => {
+    const { gmail } = domain();
+    const before = gmail.exportState();
+    const canary = "STATE-DELTA-MIME-CANARY";
+    gmail.insertMessage(sender, raw("Delta", canary));
+    const delta = gmailStateDelta(before, gmail.exportState());
+    const tape = JSON.stringify(delta);
+    expect(tape).not.toContain(canary);
+    for (const message of [...(delta.before?.messages ?? []), ...(delta.after?.messages ?? [])]) {
+      expect(message).not.toHaveProperty("text");
+      expect(message).not.toHaveProperty("html");
+      expect(message).not.toHaveProperty("snippet");
+      expect(message).toMatchObject({ bodyOmitted: true });
+    }
+    expect(delta.after?.messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ subject: "Delta", bodyOmitted: true }),
+      ])
+    );
+    expect(delta.before?.messages ?? []).toEqual([]);
+  });
+
+  it("maps category:primary and rejects unknown search operators", () => {
+    const { gmail } = domain();
+    const message = gmail.insertMessage(sender, raw("Category"));
+    gmail.modifyMessageLabels(sender, message.id, ["CATEGORY_PERSONAL"]);
+    expect(gmail.searchMessages(sender, "category:primary")).toHaveLength(1);
+    expect(() => gmail.searchMessages(sender, "xyzzy:nope")).toThrow(/Unsupported search operator/);
+    expect(() => gmail.searchMessages(sender, "category:not-a-real-bucket")).toThrow(
+      /Unsupported search category/
+    );
+  });
+
+  it("records history for filter-applied label changes", () => {
+    const { gmail } = domain();
+    gmail.seed({
+      ...defaultSeedState(),
+      deliveryMode: "sender-only",
+      primaryMailbox: {
+        email: sender,
+        filters: [{ criteria: { subject: "Filtered" }, action: { addLabelIds: ["STARRED"] } }],
+      },
+    });
+    const message = gmail.insertMessage(sender, raw("Filtered"), { incoming: true });
+    expect(message.labelIds).toContain("STARRED");
+    const history = gmail.listHistory(sender, "0");
+    expect(history.history.some((event) => event.type === "labelAdded" && event.labelIds.includes("STARRED"))).toBe(
+      true
+    );
   });
 });

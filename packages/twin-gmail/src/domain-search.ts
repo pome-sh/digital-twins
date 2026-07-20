@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { unsupported } from "./errors.js";
 import { matchesSearch, parseSearchQuery, type SearchDocument } from "./search.js";
-import { assertLabels, semanticMessage } from "./storage.js";
+import { addHistory, assertLabels, semanticMessage } from "./storage.js";
 import type { GmailTwinDatabase, SemanticMessage } from "./types.js";
 
 export function applyInboundFilters(db: GmailTwinDatabase, mailboxId: number, messageId: string): void {
@@ -33,14 +33,23 @@ export function applyInboundFilters(db: GmailTwinDatabase, mailboxId: number, me
         !matchesSearch(parseSearchQuery(criteria.negatedQuery), document, now));
     if (!matches) continue;
     assertLabels(db, mailboxId, [...(action.addLabelIds ?? []), ...(action.removeLabelIds ?? [])]);
+    const beforeLabels = new Set(message.labelIds);
+    const removed: string[] = [];
+    const added: string[] = [];
     for (const label of action.removeLabelIds ?? []) {
-      db.prepare("DELETE FROM message_labels WHERE mailbox_id = ? AND message_id = ? AND label_id = ?")
+      const result = db
+        .prepare("DELETE FROM message_labels WHERE mailbox_id = ? AND message_id = ? AND label_id = ?")
         .run(mailboxId, messageId, label);
+      if (result.changes > 0 && beforeLabels.has(label)) removed.push(label);
     }
     for (const label of action.addLabelIds ?? []) {
-      db.prepare("INSERT OR IGNORE INTO message_labels(mailbox_id, message_id, label_id) VALUES (?, ?, ?)")
+      const result = db
+        .prepare("INSERT OR IGNORE INTO message_labels(mailbox_id, message_id, label_id) VALUES (?, ?, ?)")
         .run(mailboxId, messageId, label);
+      if (result.changes > 0 && !beforeLabels.has(label)) added.push(label);
     }
+    if (added.length) addHistory(db, mailboxId, messageId, message.threadId, "labelAdded", added);
+    if (removed.length) addHistory(db, mailboxId, messageId, message.threadId, "labelRemoved", removed);
   }
 }
 
