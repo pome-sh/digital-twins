@@ -1,3 +1,4 @@
+// file-size: GmailDomain is the single coordinator for mailbox/message/draft/history ops — splitting would scatter cross-table transactions and history recording across modules.
 // SPDX-License-Identifier: Apache-2.0
 import { invalidArgument, notFound } from "./errors.js";
 import { canonicalRaw, composeMime, decodeGmailRaw, parseMime, stripBcc } from "./mime.js";
