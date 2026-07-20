@@ -64,7 +64,7 @@
     "@ai-sdk/google": "^4.0.9",
     "@ai-sdk/openai": "^4.0.8",
     "@anthropic-ai/sdk": "^0.110.0",
-    "@hono/node-server": "^2.0.6",
+    "@hono/node-server": "^2.0.10",
     "@openrouter/ai-sdk-provider": "^3.0.0",
     "@pome-sh/sdk": "0.4.0",
     "@pome-sh/shared-types": "0.10.0",
@@ -78,10 +78,10 @@
     "zod": "^4.1.13"
   },
   "devDependencies": {
-    "@changesets/changelog-github": "^0.5.1",
+    "@changesets/changelog-github": "^0.7.0",
     "@changesets/cli": "^2.31.0",
     "@types/node": "^26.0.1",
-    "tsx": "^4.21.0",
+    "tsx": "^4.23.1",
     "typescript": "^5.9.3",
     "vitest": "^4.1.10"
   },

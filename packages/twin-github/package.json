@@ -46,7 +46,7 @@
     "fidelity:parity": "tsx scripts/fidelity-parity.ts"
   },
   "dependencies": {
-    "@hono/node-server": "^2.0.8",
+    "@hono/node-server": "^2.0.10",
     "@pome-sh/sdk": "0.4.0",
     "@pome-sh/shared-types": "0.6.0",
     "hono": "^4.12.27",
@@ -57,7 +57,7 @@
     "@octokit/openapi-types": "^27.0.0",
     "@types/node": "^26.1.0",
     "@vitest/coverage-v8": "^4.1.10",
-    "tsx": "^4.21.0",
+    "tsx": "^4.23.1",
     "typescript": "^5.9.3",
     "vitest": "^4.1.10"
   },

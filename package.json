@@ -23,7 +23,7 @@
     "npm": ">=11.5.1"
   },
   "devDependencies": {
-    "knip": "^5.66.0"
+    "knip": "^6.27.0"
   },
   "overrides": {
     "hono": "^4.12.27"
