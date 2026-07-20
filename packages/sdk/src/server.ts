@@ -357,7 +357,9 @@ export function createApp<TDb, TSeed, TDomain>(
       const parsed = tool.schema.parse(args ?? {});
       const call = makeToolCallContext(c);
       const result = await tool.handler(domain, parsed, call.ctx);
-      return { status: 200, body: result, mutation: tool.mutation, delta: call.delta() };
+      const delta = call.delta();
+      const mutation = tool.mutation && (!call.reportedDelta() || delta !== null);
+      return { status: 200, body: result, mutation, delta };
     })
   );
   session.post(
@@ -392,7 +394,9 @@ export function createApp<TDb, TSeed, TDomain>(
       const parsed = tool.schema.parse(call.arguments);
       const toolCall = makeToolCallContext(c);
       const result = await tool.handler(domain, parsed, toolCall.ctx);
-      return { status: 200, body: result, mutation: tool.mutation, delta: toolCall.delta() };
+      const delta = toolCall.delta();
+      const mutation = tool.mutation && (!toolCall.reportedDelta() || delta !== null);
+      return { status: 200, body: result, mutation, delta };
     })
   );
 

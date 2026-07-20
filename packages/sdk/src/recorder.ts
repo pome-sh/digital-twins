@@ -484,9 +484,13 @@ async function readRequestJson(c: Context): Promise<unknown> {
 }
 
 function extractMessage(body: unknown): string | undefined {
-  if (body && typeof body === "object" && "message" in body) {
-    const message = (body as { message?: unknown }).message;
-    return typeof message === "string" ? message : undefined;
+  if (!body || typeof body !== "object") return undefined;
+  const record = body as { message?: unknown; error?: unknown };
+  if (typeof record.message === "string") return record.message;
+  // Gmail (and other Google-style) envelopes nest under `{ error: { message } }`.
+  if (record.error && typeof record.error === "object") {
+    const nested = (record.error as { message?: unknown }).message;
+    if (typeof nested === "string") return nested;
   }
   return undefined;
 }

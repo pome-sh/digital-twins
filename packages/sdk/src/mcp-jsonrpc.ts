@@ -210,14 +210,21 @@ async function handleToolsCall<TDb, TSeed, TDomain>(
     }
   }
 
+  const delta = status < 400 ? call.delta() : null;
+  // Align with REST rest-routes-kit: when a handler reports reportDelta(null)
+  // (no-op mutation), state_mutation must be false. Twins that never call
+  // reportDelta keep ToolSpec.mutation as the recorder truth.
+  const effectiveMutation =
+    status < 400 && mutation && (!call.reportedDelta() || delta !== null);
+
   deps.recorder.record(
     buildEventCore(c, deps, {
       started,
       status,
       requestBody: { tool: name, arguments: args },
       responseBody,
-      mutation: status < 400 && mutation,
-      delta: status < 400 ? call.delta() : null,
+      mutation: effectiveMutation,
+      delta,
       error: toolError,
     })
   );
