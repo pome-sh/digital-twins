@@ -939,13 +939,20 @@
     }
   ],
   "performanceBudgets": {
-    "note": "Pinned from LIMITS.md; enforced by seed/MIME/search/REST list-batch/MCP pageSize.",
+    "note": "Pinned from LIMITS.md; enforced by seed/MIME/search/REST list-batch/MCP pageSize/state export.",
     "maxRawMimeBytes": 36700160,
     "maxDecodedMimeBytes": 36700160,
     "maxAttachmentBytes": 36700160,
     "maxBatchIds": 1000,
     "maxSearchQueryBytes": 4096,
+    "maxSearchTokens": 256,
+    "maxSearchNesting": 20,
+    "maxSearchBranches": 256,
+    "maxSearchMailboxMessages": 10000,
     "maxListPageSize": 500,
+    "maxMcpPageSize": 50,
+    "maxStateExportFullMessageBodies": 500,
+    "maxStateExportCollectionRows": 2000,
     "packagedBootSeconds": 3
   }
 }

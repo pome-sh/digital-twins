@@ -29,6 +29,14 @@ export type SearchDocument = {
 const MAX_QUERY_BYTES = 4096;
 const MAX_TOKENS = 256;
 const MAX_DEPTH = 20;
+const MAX_BRANCHES = 256;
+
+/**
+ * Hard mailbox-size budget for the intentional in-memory search evaluator.
+ * Search hydrates semantic rows in process; exceeding this fails loudly before OOM.
+ * Parameterized SQL compile of the AST remains a dedicated follow-up.
+ */
+export const SEARCH_MAILBOX_MESSAGE_BUDGET = 10_000;
 
 /** Operators supported by the twin search grammar (unknowns are rejected). */
 const KNOWN_FIELDS = new Set([
@@ -116,6 +124,10 @@ function assertSearchTerm(field: string | undefined, value: string): void {
   }
   if (field === "size" || field === "larger" || field === "smaller") {
     parseSize(value);
+    return;
+  }
+  if (field === "has") {
+    assertHasOperator(value);
   }
 }
 
@@ -243,7 +255,21 @@ export function parseSearchQuery(query: string): SearchNode {
 
   const root = parseExpression(0);
   if (position !== tokens.length) throw new Error("Unexpected search token");
+  if (countBranches(root) > MAX_BRANCHES) throw new Error("Search query has too many branches");
   return root;
+}
+
+function countBranches(node: SearchNode): number {
+  switch (node.type) {
+    case "and":
+    case "or":
+      return node.children.reduce((sum, child) => sum + countBranches(child), 0);
+    case "not":
+      return countBranches(node.child);
+    case "around":
+    case "term":
+      return 1;
+  }
 }
 
 export function matchesSearch(node: SearchNode, document: SearchDocument, nowMs = Date.now()): boolean {
@@ -338,13 +364,25 @@ function matchesStatus(value: string, document: SearchDocument): boolean {
   return hasLabel(document, value);
 }
 
+function assertHasOperator(value: string): void {
+  const normalized = value.toLocaleLowerCase("en-US");
+  if (normalized.endsWith("-star")) {
+    throw new Error(
+      `Unsupported colored-star operator: has:${value}; twin maps only STARRED via is:starred`
+    );
+  }
+}
+
 function matchesHas(value: string, document: SearchDocument): boolean {
-  if (value === "attachment") return document.attachmentNames.length > 0;
-  if (value === "userlabels") return document.userLabelCount > 0;
-  if (value === "nouserlabels") return document.userLabelCount === 0;
-  if (value.endsWith("-star")) return hasLabel(document, value);
-  if (value === "youtube") return /youtube\.com|youtu\.be/i.test(searchable(document));
-  if (["drive", "document"].includes(value)) return /drive\.google\.com|docs\.google\.com/i.test(searchable(document));
+  const normalized = value.toLocaleLowerCase("en-US");
+  assertHasOperator(normalized);
+  if (normalized === "attachment") return document.attachmentNames.length > 0;
+  if (normalized === "userlabels") return document.userLabelCount > 0;
+  if (normalized === "nouserlabels") return document.userLabelCount === 0;
+  if (normalized === "youtube") return /youtube\.com|youtu\.be/i.test(searchable(document));
+  if (["drive", "document"].includes(normalized)) {
+    return /drive\.google\.com|docs\.google\.com/i.test(searchable(document));
+  }
   return false;
 }
 

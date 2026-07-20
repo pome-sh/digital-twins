@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { invalidArgument, notFound } from "./errors.js";
 import { canonicalRaw, composeMime, decodeGmailRaw, parseMime, stripBcc } from "./mime.js";
-import { parseSearchQuery, matchesSearch } from "./search.js";
+import { validateSearchQuery, matchesSearch, SEARCH_MAILBOX_MESSAGE_BUDGET } from "./search.js";
 import { defaultSeedState, parseSeed, type ParsedGmailStateSeed } from "./seed.js";
 import {
   addHistory,
@@ -423,7 +423,19 @@ export class GmailDomain {
 
   searchMessages(email: string, query = "", options: { includeTrash?: boolean } = {}): SemanticMessage[] {
     const mailboxId = this.mailboxId(email);
-    const ast = parseSearchQuery(query);
+    const ast = validateSearchQuery(query);
+    const messageCount = (
+      this.db.prepare("SELECT COUNT(*) AS count FROM messages WHERE mailbox_id = ?").get(mailboxId) as {
+        count: number;
+      }
+    ).count;
+    // Intentional in-memory bound: hydrate + JS predicate. Fail loud before OOM.
+    // SQL compile of the AST (`compileSearchToSql`) is deferred until budgets land in prod paths.
+    if (messageCount > SEARCH_MAILBOX_MESSAGE_BUDGET) {
+      invalidArgument(
+        `Mailbox exceeds in-memory search budget (${SEARCH_MAILBOX_MESSAGE_BUDGET} messages); reduce mailbox size or wait for SQL-backed search`
+      );
+    }
     const rows = this.db
       .prepare("SELECT id FROM messages WHERE mailbox_id = ? ORDER BY internal_date DESC, id DESC")
       .all(mailboxId) as Array<{ id: string }>;

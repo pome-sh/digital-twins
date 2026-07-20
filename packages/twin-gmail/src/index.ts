@@ -19,6 +19,7 @@ export {
   compileSearchToSql,
   matchesSearch,
   parseSearchQuery,
+  SEARCH_MAILBOX_MESSAGE_BUDGET,
   stripHtmlTags,
   validateSearchQuery,
 } from "./search.js";
@@ -30,7 +31,12 @@ export {
   loadSeedFromEnv,
   parseSeed,
 } from "./seed.js";
-export { exportGmailState, gmailStateDelta } from "./state.js";
+export {
+  exportGmailState,
+  gmailStateDelta,
+  STATE_EXPORT_COLLECTION_CAP,
+  STATE_EXPORT_FULL_MESSAGE_BUDGET,
+} from "./state.js";
 export { createGmailTwinApp, gmailTwinDefinition, registerGmailRoutes } from "./twin.js";
 export type {
   DeliveryMode,
