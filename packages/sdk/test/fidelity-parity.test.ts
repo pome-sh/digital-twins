@@ -67,11 +67,20 @@ describe("runFidelityParity", () => {
       steps: TOY_STEPS,
       restProbes: [
         { surface: "unsupported-rest", path: "/nope/not-a-route", status: 501, expectUnsupportedEnvelope: true },
+        {
+          surface: "rest-with-body",
+          method: "POST",
+          path: "/items",
+          status: 201,
+          body: JSON.stringify({ item: "parity-body" }),
+          verify: (body) =>
+            (body as { total?: number }).total === 2 ? undefined : "expected total 2 after body probe",
+        },
       ],
     });
     expect(result.failures).toEqual([]);
     expect(result.ok).toBe(true);
-    expect(result.report).toHaveLength(3);
+    expect(result.report).toHaveLength(4);
   });
 
   it("fails when the inventory misses a live tool", async () => {
