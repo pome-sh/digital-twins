@@ -1,15 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import type { Context } from "hono";
 import type { SessionValue } from "@pome-sh/sdk/server";
 import { GmailError, invalidArgument, unsupported } from "./errors.js";
 import { resolveUserEmail } from "./identity.js";
+import {
+  decodePageToken,
+  encodePageToken,
+  normalizeListBinding,
+} from "./page-tokens.js";
 
 export type MessageFormat = "minimal" | "full" | "raw" | "metadata";
 export type JsonObject = Record<string, unknown>;
 
-const TOKEN_VERSION = 1;
-const TOKEN_KEY = process.env.POME_GMAIL_PAGE_TOKEN_SECRET ?? "pome-gmail-page-token-v1";
+export { normalizeListBinding };
 
 export function emailFromContext(c: Context): string {
   return resolveUserEmail(routeParam(c, "userId"), c.get("session") as SessionValue | undefined);
@@ -94,13 +97,6 @@ export function rejectClassification(body: JsonObject): void {
   }
 }
 
-export function normalizeListBinding(route: string, email: string, values: JsonObject): string {
-  const canonical = Object.entries(values)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, value]) => [key, Array.isArray(value) ? [...value].sort() : value]);
-  return createHash("sha256").update(JSON.stringify([route, email.toLowerCase(), canonical])).digest("hex");
-}
-
 export function paginate<T>(
   items: T[],
   options: { maxResults: number; pageToken?: string; binding: string; snapshot: string }
@@ -117,44 +113,6 @@ export function paginate<T>(
       ? { nextPageToken: encodePageToken(nextOffset, options.binding, options.snapshot) }
       : {}),
   };
-}
-
-function encodePageToken(offset: number, binding: string, snapshot: string): string {
-  const payload = Buffer.from(
-    JSON.stringify({ v: TOKEN_VERSION, o: offset, b: binding, s: snapshot }),
-    "utf8"
-  ).toString("base64url");
-  const signature = createHmac("sha256", TOKEN_KEY).update(payload).digest("base64url");
-  return `${payload}.${signature}`;
-}
-
-function decodePageToken(token: string, binding: string, snapshot: string): number {
-  const [payload, signature, extra] = token.split(".");
-  if (!payload || !signature || extra) invalidArgument("Invalid page token");
-  const expected = createHmac("sha256", TOKEN_KEY).update(payload).digest();
-  let actual: Buffer;
-  try {
-    actual = Buffer.from(signature, "base64url");
-  } catch {
-    invalidArgument("Invalid page token");
-  }
-  if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) invalidArgument("Invalid page token");
-  try {
-    const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as JsonObject;
-    if (
-      parsed.v !== TOKEN_VERSION ||
-      parsed.b !== binding ||
-      parsed.s !== snapshot ||
-      !Number.isInteger(parsed.o) ||
-      (parsed.o as number) < 0
-    ) {
-      invalidArgument("Invalid page token");
-    }
-    return parsed.o as number;
-  } catch (error) {
-    if (error instanceof GmailError) throw error;
-    invalidArgument("Invalid page token");
-  }
 }
 
 export function asInputError<T>(fn: () => T): T {

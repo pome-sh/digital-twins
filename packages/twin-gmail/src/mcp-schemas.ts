@@ -16,6 +16,7 @@ const labelColorSchema = z
 const attachmentInputSchema = z
   .object({
     content: z.string().regex(/^[A-Za-z0-9+/]*={0,2}$/),
+    contentId: z.string().max(998).optional(),
     filename: z.string().optional(),
     id: z.string().optional(),
     inline: z.boolean().optional(),

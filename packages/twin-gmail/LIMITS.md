@@ -1,9 +1,8 @@
 # Domain limits
 
-Phase 2 pins the limits enforced by strict seed, MIME, and search parsing.
-REST-specific batch, pagination, and upload policy remains for Phase 3.
+Pinned limits enforced by seed, MIME, search, REST list/batch, and MCP pageSize.
 
-| Limit | Placeholder | Notes |
+| Limit | Value | Notes |
 | --- | --- | --- |
 | Raw MIME bytes (accept) | `36700160` | Checked before parse and after base64url decode |
 | Decoded MIME bytes | `36700160` | Canonical raw upper bound |
@@ -17,10 +16,23 @@ REST-specific batch, pagination, and upload policy remains for Phase 3.
 | Search query bytes / tokens / nesting / branches | `4096` / `256` / `20` / `256` | Shared AST for domain + filters |
 | Labels per mailbox / per message | `5000` / `100` in seeds | |
 | Filters per mailbox | `1000` in seeds | `action.forward` → 501 (no forwarding delivery) |
-| Batch modify/delete ID count | TBD | |
-| List `maxResults` / MCP `pageSize` | Discovery / tool schema | e.g. MCP search/list_drafts default 20, max 50 |
-| SQLite bind parameters / query complexity | TBD | Parameterized SQL only |
-| History page size | TBD | |
+| Batch modify/delete ID count | `1000` | Enforced on `batchModify` / `batchDelete` |
+| List `maxResults` | default `100`, max `500` | REST messages/threads/drafts/history |
+| History page size | default `100`, max `500` | Same `maxResults` cap as other lists |
+| MCP `pageSize` | default `20`, max `50` | `search_threads` / `list_drafts` / `list_labels` |
+| SQLite bind parameters | parameterized only | Query text is never interpolated |
 | Packaged boot | ≤ 3s | Contract gate (later) |
+
+## Page tokens
+
+Opaque page tokens are HMAC-signed and bound to mailbox email, route, normalized
+query/filter, and the mailbox history high-water mark. The signing key resolves as:
+
+1. `POME_GMAIL_PAGE_TOKEN_SECRET` when set
+2. else a key derived from `TWIN_AUTH_SECRET`
+3. else a per-process ephemeral secret
+
+There is no forgeable public default string. Cross-mailbox, cross-query, and stale
+snapshot tokens fail with `invalidArgument`.
 
 See `performanceBudgets` in [`fidelity.inventory.json`](fidelity.inventory.json).

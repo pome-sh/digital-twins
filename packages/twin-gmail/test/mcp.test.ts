@@ -246,6 +246,165 @@ describe("Gmail MCP frozen contract", () => {
   });
 });
 
+describe("MCP page tokens", () => {
+  it("rejects cross-query and stale snapshot tokens", async () => {
+    const app = createGmailTwinApp({
+      seed: {
+        ...seed(),
+        primaryMailbox: {
+          ...seed().primaryMailbox,
+          messages: [
+            ...seed().primaryMailbox.messages,
+            {
+              id: "msg_b",
+              threadId: "thread_b",
+              from: "bob@example.com",
+              to: [email],
+              subject: "Second",
+              text: "Other body",
+              date: "2026-07-19T12:01:00.000Z",
+              messageId: "b@example.com",
+              labels: ["INBOX"],
+            },
+            {
+              id: "msg_c",
+              threadId: "thread_c",
+              from: "carol@example.com",
+              to: [email],
+              subject: "Third",
+              text: "Third body",
+              date: "2026-07-19T12:02:00.000Z",
+              messageId: "c@example.com",
+              labels: ["INBOX"],
+            },
+          ],
+        },
+      },
+    });
+
+    const first = await call(app, 1, "search_threads", { query: "", pageSize: 1 });
+    expect(first.result.isError).toBe(false);
+    const token = first.result.structuredContent?.nextPageToken as string;
+    expect(token).toMatch(/\./);
+
+    const crossQuery = await call(app, 2, "search_threads", {
+      query: "from:bob@example.com",
+      pageSize: 1,
+      pageToken: token,
+    });
+    expect(crossQuery.result.isError).toBe(true);
+
+    const second = await call(app, 3, "search_threads", {
+      query: "",
+      pageSize: 1,
+      pageToken: token,
+    });
+    expect(second.result.isError).toBe(false);
+
+    await call(app, 4, "label_message", {
+      messageId: "msg_seed",
+      labelIds: ["STARRED"],
+    });
+    const stale = await call(app, 5, "search_threads", {
+      query: "",
+      pageSize: 1,
+      pageToken: token,
+    });
+    expect(stale.result.isError).toBe(true);
+  });
+
+  it("rejects a page token minted for a different mailbox email", async () => {
+    const otherEmail = "other@pome-twin.test";
+    const otherToken = await sign(
+      {
+        sid,
+        team_id: "tm_gmail",
+        gmail_email: otherEmail,
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      },
+      secret
+    );
+    const app = createGmailTwinApp({
+      seed: {
+        ...seed(),
+        mailboxes: [
+          {
+            email: otherEmail,
+            messages: [
+              {
+                id: "msg_other_a",
+                threadId: "thread_other_a",
+                from: "alice@example.com",
+                to: [otherEmail],
+                subject: "Other A",
+                text: "A",
+                date: "2026-07-19T12:00:00.000Z",
+                messageId: "other-a@example.com",
+                labels: ["INBOX"],
+              },
+              {
+                id: "msg_other_b",
+                threadId: "thread_other_b",
+                from: "bob@example.com",
+                to: [otherEmail],
+                subject: "Other B",
+                text: "B",
+                date: "2026-07-19T12:01:00.000Z",
+                messageId: "other-b@example.com",
+                labels: ["INBOX"],
+              },
+            ],
+          },
+        ],
+        primaryMailbox: {
+          ...seed().primaryMailbox,
+          messages: [
+            ...seed().primaryMailbox.messages,
+            {
+              id: "msg_b",
+              threadId: "thread_b",
+              from: "bob@example.com",
+              to: [email],
+              subject: "Second",
+              text: "Other body",
+              date: "2026-07-19T12:01:00.000Z",
+              messageId: "b@example.com",
+              labels: ["INBOX"],
+            },
+          ],
+        },
+      },
+    });
+
+    const first = await call(app, 1, "search_threads", { query: "", pageSize: 1 });
+    const pageToken = first.result.structuredContent?.nextPageToken as string;
+    expect(pageToken.length).toBeGreaterThan(0);
+
+    const foreign = (await (
+      await app.request(
+        `${base}/mcp`,
+        {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${otherToken}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 2,
+            method: "tools/call",
+            params: {
+              name: "search_threads",
+              arguments: { query: "", pageSize: 1, pageToken },
+            },
+          }),
+        }
+      )
+    ).json()) as { result: { isError?: boolean } };
+    expect(foreign.result.isError).toBe(true);
+  });
+});
+
 describe("MCP/REST cross-surface parity", () => {
   it("shares search, get, draft, and label state with REST", async () => {
     const app = createGmailTwinApp({ seed: seed() });

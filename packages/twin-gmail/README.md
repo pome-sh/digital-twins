@@ -66,7 +66,8 @@ the launch set). Three extra preview tools seen live are **out of launch scope**
 ## Limits
 
 See [`LIMITS.md`](LIMITS.md). Defaults/maxima from discovery are frozen in
-`rest-surface.json`; local twin caps will be pinned with tests in later PRs.
+`rest-surface.json`. Page tokens are HMAC-bound to mailbox/query/snapshot; set
+`POME_GMAIL_PAGE_TOKEN_SECRET` or rely on `TWIN_AUTH_SECRET` (see LIMITS.md).
 
 ## Development
 

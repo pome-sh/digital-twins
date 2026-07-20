@@ -446,6 +446,11 @@ export class GmailDomain {
     return exportGmailState(this.db);
   }
 
+  /** Snapshot high-water for opaque page tokens (mailbox history counter). */
+  currentHistoryIdFor(email: string): string {
+    return String(this.currentHistoryId(this.mailboxId(email)));
+  }
+
   private requireDraft(mailboxId: number, draftId: string): DraftRow {
     const row = this.db
       .prepare("SELECT * FROM drafts WHERE mailbox_id = ? AND id = ?")

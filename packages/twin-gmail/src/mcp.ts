@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import type { ToolCallContext, ToolSpec } from "@pome-sh/sdk";
 import { z } from "zod";
 import canonicalListing from "../fixtures/mcp-tools-list.canonical.json" with { type: "json" };
@@ -25,6 +24,11 @@ import {
   type SearchThreadsInput,
   type ThreadLabelsInput,
 } from "./mcp-schemas.js";
+import {
+  decodePageToken,
+  encodePageToken,
+  normalizeListBinding,
+} from "./page-tokens.js";
 import { gmailStateDelta } from "./state.js";
 import type { SemanticMessage } from "./types.js";
 
@@ -48,8 +52,6 @@ type ToolImplementation = {
 };
 
 const canonicalTools = canonicalListing.result.tools as CanonicalTool[];
-const PAGE_TOKEN_KEY =
-  process.env.POME_GMAIL_PAGE_TOKEN_SECRET ?? "pome-gmail-page-token-v1";
 
 const implementations: Record<ToolName, ToolImplementation> = {
   create_draft: {
@@ -67,11 +69,13 @@ const implementations: Record<ToolName, ToolImplementation> = {
           text: input.body,
           html: input.htmlBody,
           replyToMessageId: input.replyToMessageId,
-          attachments: input.attachments?.map((attachment) => ({
+          attachments: input.attachments?.map((attachment, index) => ({
             filename: attachment.filename ?? "",
             mimeType: attachment.mimeType,
             disposition: attachment.inline ? "inline" : "attachment",
-            contentId: attachment.inline ? attachment.filename : undefined,
+            contentId: attachment.inline
+              ? (attachment.contentId ?? attachment.filename ?? attachment.id ?? `inline-${index + 1}`)
+              : undefined,
             data: attachment.content,
           })),
         });
@@ -85,7 +89,7 @@ const implementations: Record<ToolName, ToolImplementation> = {
       const input = args as ListDraftsInput;
       const email = identityFromSession(ctx.session).email;
       const drafts = domain.listDrafts(email, input.query ?? "");
-      const page = paginate("drafts", drafts, input.pageSize, input.pageToken, {
+      const page = paginate(domain, email, "drafts.list", drafts, input.pageSize, input.pageToken, {
         query: input.query ?? "",
         view: input.view ?? "DRAFT_VIEW_FULL",
       });
@@ -122,7 +126,7 @@ const implementations: Record<ToolName, ToolImplementation> = {
       const threads = domain.searchThreads(email, input.query ?? "", {
         includeTrash: input.includeTrash,
       });
-      const page = paginate("threads", threads, input.pageSize, input.pageToken, {
+      const page = paginate(domain, email, "threads.search", threads, input.pageSize, input.pageToken, {
         includeTrash: input.includeTrash ?? false,
         query: input.query ?? "",
         view: input.view ?? "THREAD_VIEW_MINIMAL",
@@ -147,7 +151,9 @@ const implementations: Record<ToolName, ToolImplementation> = {
       const input = args as ListLabelsInput;
       const email = identityFromSession(ctx.session).email;
       const page = paginate(
-        "labels",
+        domain,
+        email,
+        "labels.list",
         domain.listUserLabels(email),
         input.pageSize,
         input.pageToken,
@@ -346,66 +352,26 @@ function normalizeMessageFormat(
 }
 
 function paginate<T>(
-  kind: string,
+  domain: GmailDomain,
+  email: string,
+  route: string,
   items: T[],
   requestedSize: number | undefined,
   token: string | undefined,
-  filter: unknown
+  filter: Record<string, unknown>
 ): { items: T[]; nextPageToken: string } {
   const size = requestedSize ?? 20;
-  const offset = token ? decodePageToken(token, kind, filter) : 0;
+  const snapshot = domain.currentHistoryIdFor(email);
+  const binding = normalizeListBinding(route, email, filter);
+  const offset = token ? decodePageToken(token, binding, snapshot) : 0;
   if (offset > items.length) invalidArgument("Invalid pageToken");
   const page = items.slice(offset, offset + size);
   const nextOffset = offset + page.length;
   return {
     items: page,
     nextPageToken:
-      nextOffset < items.length ? encodePageToken(kind, nextOffset, filter) : "",
+      nextOffset < items.length ? encodePageToken(nextOffset, binding, snapshot) : "",
   };
-}
-
-function encodePageToken(kind: string, offset: number, filter: unknown): string {
-  const payload = Buffer.from(
-    JSON.stringify({ v: 1, kind, offset, filter: filterHash(filter) })
-  ).toString("base64url");
-  const signature = createHmac("sha256", PAGE_TOKEN_KEY)
-    .update(payload)
-    .digest("base64url");
-  return `${payload}.${signature}`;
-}
-
-function decodePageToken(token: string, kind: string, filter: unknown): number {
-  try {
-    const [payload, signature, extra] = token.split(".");
-    if (!payload || !signature || extra) invalidArgument("Invalid pageToken");
-    const expected = createHmac("sha256", PAGE_TOKEN_KEY).update(payload).digest();
-    const actual = Buffer.from(signature, "base64url");
-    if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
-      invalidArgument("Invalid pageToken");
-    }
-    const decoded = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
-      v?: unknown;
-      kind?: unknown;
-      offset?: unknown;
-      filter?: unknown;
-    };
-    if (
-      decoded.v !== 1 ||
-      decoded.kind !== kind ||
-      !Number.isSafeInteger(decoded.offset) ||
-      (decoded.offset as number) < 0 ||
-      decoded.filter !== filterHash(filter)
-    ) {
-      invalidArgument("Invalid pageToken");
-    }
-    return decoded.offset as number;
-  } catch {
-    invalidArgument("Invalid pageToken");
-  }
-}
-
-function filterHash(filter: unknown): string {
-  return createHash("sha256").update(JSON.stringify(filter)).digest("base64url").slice(0, 22);
 }
 
 function dateOnly(timestamp: number): string {
