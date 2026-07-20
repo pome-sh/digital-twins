@@ -6,7 +6,7 @@ import {
   type FidelityInventory,
   type ParityStep,
 } from "@pome-sh/sdk/parity";
-import { createGmailTwinApp, gmailTools } from "../src/index.js";
+import { composeMime, createGmailTwinApp, encodeGmailRaw, gmailTools } from "../src/index.js";
 
 const email = "pome-agent@pome-twin.test";
 const launchToolNames = gmailTools.map((tool) => tool.name);
@@ -106,6 +106,17 @@ const steps: ParityStep[] = [
   { tool: "create_label", arguments: { displayName: "Parity Complete" } },
 ];
 
+const sendRaw = encodeGmailRaw(
+  composeMime({
+    from: email,
+    to: ["parity-recipient@example.com"],
+    subject: "Parity send probe",
+    text: "Sent by fidelity:parity REST probe",
+    date: "2026-07-20T01:00:00.000Z",
+    messageId: "parity-send@pome-twin.test",
+  }),
+);
+
 await runParityCli({
   app: createGmailTwinApp({ seed }),
   twin: "gmail",
@@ -114,6 +125,94 @@ await runParityCli({
   steps,
   claims: { team_id: "tm_gmail", gmail_email: email },
   restProbes: [
+    {
+      surface: "users.getProfile",
+      method: "GET",
+      path: "/gmail/v1/users/me/profile",
+      status: 200,
+      verify: (body) => {
+        const profile = body as { emailAddress?: string; historyId?: string };
+        if (profile.emailAddress !== email) return `expected emailAddress ${email}`;
+        if (!profile.historyId) return "expected historyId";
+        return undefined;
+      },
+    },
+    {
+      surface: "users.messages.list",
+      method: "GET",
+      path: "/gmail/v1/users/me/messages?maxResults=10",
+      status: 200,
+      verify: (body) => {
+        const list = body as { messages?: Array<{ id: string }> };
+        if (!list.messages?.some((message) => message.id === "msg_seed")) {
+          return "expected seeded msg_seed in messages.list";
+        }
+        return undefined;
+      },
+    },
+    {
+      surface: "users.messages.get",
+      method: "GET",
+      path: "/gmail/v1/users/me/messages/msg_seed?format=metadata",
+      status: 200,
+      verify: (body) => {
+        const message = body as { id?: string; threadId?: string };
+        if (message.id !== "msg_seed" || message.threadId !== "thread_seed") {
+          return "expected msg_seed / thread_seed";
+        }
+        return undefined;
+      },
+    },
+    {
+      surface: "users.messages.send",
+      method: "POST",
+      path: "/gmail/v1/users/me/messages/send",
+      status: 200,
+      body: JSON.stringify({ raw: sendRaw }),
+      verify: (body) => {
+        const message = body as { id?: string; labelIds?: string[] };
+        if (!message.id) return "expected sent message id";
+        if (!message.labelIds?.includes("SENT")) return "expected SENT label";
+        return undefined;
+      },
+    },
+    {
+      surface: "users.drafts.list",
+      method: "GET",
+      path: "/gmail/v1/users/me/drafts",
+      status: 200,
+      verify: (body) => {
+        const drafts = body as { drafts?: Array<{ id: string }> };
+        if (!drafts.drafts?.some((draft) => draft.id === "draft_seed")) {
+          return "expected seeded draft_seed";
+        }
+        return undefined;
+      },
+    },
+    {
+      surface: "users.labels.list",
+      method: "GET",
+      path: "/gmail/v1/users/me/labels",
+      status: 200,
+      verify: (body) => {
+        const labels = body as { labels?: Array<{ id?: string; name?: string }> };
+        if (!labels.labels?.some((label) => label.id === "Label_seed" || label.name === "Parity Seed")) {
+          return "expected Parity Seed label";
+        }
+        return undefined;
+      },
+    },
+    {
+      surface: "users.history.list",
+      method: "GET",
+      path: "/gmail/v1/users/me/history?startHistoryId=0",
+      status: 200,
+      verify: (body) => {
+        const history = body as { historyId?: string };
+        if (!history.historyId) return "expected historyId";
+        return undefined;
+      },
+    },
     {
       surface: "named-gap:users.watch",
       method: "POST",
