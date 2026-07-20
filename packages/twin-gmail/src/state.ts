@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
+import { createHash } from "node:crypto";
 import type { GmailTwinDatabase } from "./types.js";
+
+/** Above this message count, collection rows are capped/summarized for `/_pome/state`. */
+export const STATE_EXPORT_FULL_MESSAGE_BUDGET = 500;
+/** Soft cap on exported history/attachment/message-label rows for large mailboxes. */
+export const STATE_EXPORT_COLLECTION_CAP = 2_000;
 
 export type GmailStateExport = {
   schemaVersion: 1;
@@ -16,6 +22,12 @@ export type GmailStateExport = {
   filters: unknown[];
   forwardingAddresses: unknown[];
   sendAs: unknown[];
+  /** Bounding metadata for `/_pome/state` (bodies always digested). */
+  exportBounds: {
+    messageBodiesOmitted: boolean;
+    largeMailbox: boolean;
+    truncatedCollections: string[];
+  };
 };
 
 /** Bounded, redacted entity collections used on recorder `state_delta`. */
@@ -57,6 +69,63 @@ export function exportGmailState(db: GmailTwinDatabase): GmailStateExport {
   const delivery = db.prepare("SELECT value FROM gmail_config WHERE key = 'delivery_mode'").get() as
     | { value: string }
     | undefined;
+  const totalMessages = (
+    db.prepare("SELECT COUNT(*) AS count FROM messages").get() as { count: number }
+  ).count;
+  const largeMailbox = totalMessages > STATE_EXPORT_FULL_MESSAGE_BUDGET;
+  const truncatedCollections: string[] = [];
+
+  const messages = rows(
+    db,
+    `SELECT mb.email AS mailboxEmail, m.id, m.thread_id AS threadId,
+      m.rfc_message_id AS rfcMessageId, m.internal_date AS internalDate,
+      m.sent_at AS sentAt, m.from_address AS "from", m.to_json AS "to",
+      m.cc_json AS cc, m.bcc_json AS bcc, m.delivered_to AS deliveredTo,
+      m.subject, m.snippet, m.text_body AS text, m.html_body AS html,
+      m.headers_json AS headers, m.size_estimate AS sizeEstimate,
+      b.sha256 AS rawSha256, b.size AS rawSize
+     FROM messages m JOIN mailboxes mb ON mb.id = m.mailbox_id
+     JOIN message_blobs b ON b.mailbox_id = m.mailbox_id AND b.message_id = m.id
+     ORDER BY mb.email COLLATE NOCASE, m.internal_date, m.id`,
+    ["to", "cc", "bcc", "headers"]
+  ).map((row) => boundMessageExport(row as Record<string, unknown>));
+
+  const messageLabels = cappedCollection(
+    rows(
+      db,
+      `SELECT mb.email AS mailboxEmail, ml.message_id AS messageId, ml.label_id AS labelId
+       FROM message_labels ml JOIN mailboxes mb ON mb.id = ml.mailbox_id
+       ORDER BY mb.email COLLATE NOCASE, ml.message_id, ml.label_id`
+    ),
+    "messageLabels",
+    truncatedCollections
+  );
+  const attachments = cappedCollection(
+    rows(
+      db,
+      `SELECT mb.email AS mailboxEmail, a.message_id AS messageId, a.id,
+        a.part_index AS partIndex, a.filename, a.mime_type AS mimeType,
+        a.disposition, a.content_id AS contentId, a.sha256, a.size
+       FROM attachments a JOIN mailboxes mb ON mb.id = a.mailbox_id
+       ORDER BY mb.email COLLATE NOCASE, a.message_id, a.part_index`
+    ),
+    "attachments",
+    truncatedCollections
+  );
+  const history = cappedCollection(
+    rows(
+      db,
+      `SELECT mb.email AS mailboxEmail, CAST(h.id AS TEXT) AS id,
+        h.message_id AS messageId, h.thread_id AS threadId, h.event_type AS type,
+        h.label_ids_json AS labelIds, h.created_at AS timestamp
+       FROM history h JOIN mailboxes mb ON mb.id = h.mailbox_id
+       ORDER BY mb.email COLLATE NOCASE, h.id`,
+      ["labelIds"]
+    ),
+    "history",
+    truncatedCollections
+  );
+
   return {
     schemaVersion: 1,
     deliveryMode: delivery?.value ?? "sender-only",
@@ -81,20 +150,7 @@ export function exportGmailState(db: GmailTwinDatabase): GmailStateExport {
        FROM threads t JOIN mailboxes mb ON mb.id = t.mailbox_id
        ORDER BY mb.email COLLATE NOCASE, t.id`
     ),
-    messages: rows(
-      db,
-      `SELECT mb.email AS mailboxEmail, m.id, m.thread_id AS threadId,
-        m.rfc_message_id AS rfcMessageId, m.internal_date AS internalDate,
-        m.sent_at AS sentAt, m.from_address AS "from", m.to_json AS "to",
-        m.cc_json AS cc, m.bcc_json AS bcc, m.delivered_to AS deliveredTo,
-        m.subject, m.snippet, m.text_body AS text, m.html_body AS html,
-        m.headers_json AS headers, m.size_estimate AS sizeEstimate,
-        b.sha256 AS rawSha256, b.size AS rawSize
-       FROM messages m JOIN mailboxes mb ON mb.id = m.mailbox_id
-       JOIN message_blobs b ON b.mailbox_id = m.mailbox_id AND b.message_id = m.id
-       ORDER BY mb.email COLLATE NOCASE, m.internal_date, m.id`,
-      ["to", "cc", "bcc", "headers"]
-    ),
+    messages: cappedCollection(messages, "messages", truncatedCollections),
     drafts: rows(
       db,
       `SELECT mb.email AS mailboxEmail, d.id, d.message_id AS messageId,
@@ -109,29 +165,9 @@ export function exportGmailState(db: GmailTwinDatabase): GmailStateExport {
        FROM labels l JOIN mailboxes mb ON mb.id = l.mailbox_id
        ORDER BY mb.email COLLATE NOCASE, l.id`
     ),
-    messageLabels: rows(
-      db,
-      `SELECT mb.email AS mailboxEmail, ml.message_id AS messageId, ml.label_id AS labelId
-       FROM message_labels ml JOIN mailboxes mb ON mb.id = ml.mailbox_id
-       ORDER BY mb.email COLLATE NOCASE, ml.message_id, ml.label_id`
-    ),
-    attachments: rows(
-      db,
-      `SELECT mb.email AS mailboxEmail, a.message_id AS messageId, a.id,
-        a.part_index AS partIndex, a.filename, a.mime_type AS mimeType,
-        a.disposition, a.content_id AS contentId, a.sha256, a.size
-       FROM attachments a JOIN mailboxes mb ON mb.id = a.mailbox_id
-       ORDER BY mb.email COLLATE NOCASE, a.message_id, a.part_index`
-    ),
-    history: rows(
-      db,
-      `SELECT mb.email AS mailboxEmail, CAST(h.id AS TEXT) AS id,
-        h.message_id AS messageId, h.thread_id AS threadId, h.event_type AS type,
-        h.label_ids_json AS labelIds, h.created_at AS timestamp
-       FROM history h JOIN mailboxes mb ON mb.id = h.mailbox_id
-       ORDER BY mb.email COLLATE NOCASE, h.id`,
-      ["labelIds"]
-    ),
+    messageLabels,
+    attachments,
+    history,
     filters: rows(
       db,
       `SELECT mb.email AS mailboxEmail, f.id, f.criteria_json AS criteria, f.action_json AS action
@@ -153,7 +189,50 @@ export function exportGmailState(db: GmailTwinDatabase): GmailStateExport {
        FROM send_as s JOIN mailboxes mb ON mb.id = s.mailbox_id
        ORDER BY mb.email COLLATE NOCASE, s.email COLLATE NOCASE`
     ),
+    exportBounds: {
+      messageBodiesOmitted: true,
+      largeMailbox,
+      truncatedCollections,
+    },
   };
+}
+
+function boundMessageExport(row: Record<string, unknown>): Record<string, unknown> {
+  const {
+    text,
+    html,
+    headers,
+    snippet,
+    ...rest
+  } = row;
+  // Always omit plaintext text/html/snippet/headers from `/_pome/state` —
+  // digests only. Large mailboxes additionally truncate collection rows.
+  return {
+    ...rest,
+    bodyOmitted: true,
+    textSha256: digestField(text),
+    htmlSha256: digestField(html),
+    snippetSha256: digestField(snippet),
+    headerCount: Array.isArray(headers) ? headers.length : 0,
+  };
+}
+
+function digestField(value: unknown): { sha256: string; size: number } | null {
+  if (typeof value !== "string" || value.length === 0) return null;
+  return {
+    sha256: createHash("sha256").update(value, "utf8").digest("hex"),
+    size: Buffer.byteLength(value, "utf8"),
+  };
+}
+
+function cappedCollection(
+  items: unknown[],
+  name: string,
+  truncatedCollections: string[]
+): unknown[] {
+  if (items.length <= STATE_EXPORT_COLLECTION_CAP) return items;
+  truncatedCollections.push(name);
+  return items.slice(0, STATE_EXPORT_COLLECTION_CAP);
 }
 
 /**

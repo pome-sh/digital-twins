@@ -158,7 +158,7 @@ describe("Gmail domain", () => {
         from: sender,
         to: [recipient],
         subject: "Attachment",
-        text: "body",
+        text: "body-plaintext-export",
         date: "2025-01-01T12:00:00.000Z",
         messageId: "attachment@test",
         attachments: [{ filename: "a.bin", data: attachment }],
@@ -167,6 +167,9 @@ describe("Gmail domain", () => {
     const state = gmail.exportState();
     const serialized = JSON.stringify(state);
     expect(serialized).not.toContain("binary-canary");
+    expect(serialized).not.toContain("body-plaintext-export");
+    expect(state.exportBounds.messageBodiesOmitted).toBe(true);
+    expect(state.messages[0]).toMatchObject({ bodyOmitted: true, subject: "Attachment" });
     expect(state).toHaveProperty("attachments");
     expect(state).toHaveProperty("messages");
     expect(gmail.exportState()).toEqual(state);
