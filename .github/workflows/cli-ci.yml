@@ -7,6 +7,7 @@ on:
       - 'packages/sdk/**'
       - 'packages/twin-github/**'
       - 'packages/twin-gmail/**'
+      - 'packages/twin-linear/**'
       - 'packages/twin-slack/**'
       - 'packages/twin-stripe/**'
       - 'package.json'
@@ -24,6 +25,7 @@ on:
       - 'packages/sdk/**'
       - 'packages/twin-github/**'
       - 'packages/twin-gmail/**'
+      - 'packages/twin-linear/**'
       - 'packages/twin-slack/**'
       - 'packages/twin-stripe/**'
       - 'package.json'
@@ -131,7 +133,7 @@ jobs:
           test -f node_modules/@pome-sh/cli/dist/src/cli/main.js
           # bundled packages made it into the tarball (must match
           # bundleDependencies in cli/package.json):
-          for t in sdk shared-types twin-gmail twin-github twin-slack twin-stripe; do
+          for t in sdk shared-types twin-gmail twin-github twin-linear twin-slack twin-stripe; do
             ls node_modules/@pome-sh/cli/node_modules/@pome-sh/$t/package.json \
               || { echo "MISSING bundled @pome-sh/$t in published tarball"; exit 1; }
           done

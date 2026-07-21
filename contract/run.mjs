@@ -44,6 +44,7 @@ if (status === 0) status = run("npm", ["run", "build", "-w", "@pome-sh/twin-gith
 if (status === 0) status = run("npm", ["run", "build", "-w", "@pome-sh/twin-slack"]);
 if (status === 0) status = run("npm", ["run", "build", "-w", "@pome-sh/twin-stripe"]);
 if (status === 0) status = run("npm", ["run", "build", "-w", "@pome-sh/twin-gmail"]);
+if (status === 0) status = run("npm", ["run", "build", "-w", "@pome-sh/twin-linear"]);
 if (status === 0) status = run("node", ["--test", "contract/contract.test.mjs", "contract/sdk-boot.test.mjs"]);
 
 const removed = cleanRuntimeJs(SHARED_SRC);

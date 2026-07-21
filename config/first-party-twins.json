@@ -3,6 +3,7 @@
     "github",
     "slack",
     "stripe",
-    "gmail"
+    "gmail",
+    "linear"
   ]
 }

@@ -174,6 +174,64 @@ export const PER_TWIN = {
     },
     unknownRoot: { status: 404 },
   },
+  linear: {
+    healthzFidelity: "semantic",
+    sessionHealthz: { status: 200 },
+    adminSeedGarbage: {
+      status: 400,
+      check: (b) => b.errors?.[0]?.extensions?.code === "BAD_USER_INPUT",
+    },
+    noAuth: {
+      status: 401,
+      check: (b) => b.errors?.[0]?.extensions?.code === "AUTHENTICATION_ERROR",
+    },
+    wrongSid: {
+      status: 401,
+      check: (b) => b.errors?.[0]?.extensions?.code === "AUTHENTICATION_ERROR",
+    },
+    expired: {
+      status: 401,
+      check: (b) => b.errors?.[0]?.extensions?.code === "AUTHENTICATION_ERROR",
+    },
+    // Linear accepts prefix-less JWTs (`allowRawBearer: true`) and also
+    // resolves seeded personal tokens such as `lin_test_admin`.
+    rawToken: { status: 200 },
+    mcpCallUnknown: {
+      status: 404,
+      check: (b) => b.errors?.[0]?.extensions?.code === "NOT_FOUND",
+    },
+    aliasTool: "list_issues",
+    adminSeedForm: {
+      status: 400,
+      check: (b) => b.errors?.[0]?.extensions?.code === "BAD_USER_INPUT",
+    },
+    adminSeedMalformed: {
+      status: 400,
+      check: (b) => b.errors?.[0]?.extensions?.code === "BAD_USER_INPUT",
+    },
+    mcpCallAlias: {
+      status: 400,
+      check: (b) => b.errors?.[0]?.extensions?.code === "BAD_USER_INPUT",
+    },
+    mcpCallForm: {
+      status: 400,
+      check: (b) => b.errors?.[0]?.extensions?.code === "BAD_USER_INPUT",
+    },
+    mcpCallMalformed: {
+      status: 400,
+      check: (b) => b.errors?.[0]?.extensions?.code === "BAD_USER_INPUT",
+    },
+    pomeHealthKeys: ["fidelity", "ok", "twin", "version"],
+    // `{}` is a valid Linear seed (defaults applied), so admin/seed commits a
+    // real before/after state delta on the tape.
+    adminSeedTape: "delta-object",
+    unknownSession: {
+      status: 501,
+      check: (b) => b.fidelity === "unsupported",
+    },
+    // Root session mount (`mountSessionAtRoot`) hits the auth wall first.
+    unknownRoot: { status: 401 },
+  },
 };
 
 function checkBody(expectation, body, label) {
