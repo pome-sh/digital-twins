@@ -26,20 +26,30 @@ export function registerOAuthRoutes(
       return c.html(errorPage("Missing redirect URI", "The redirect_uri parameter is required."), 400);
     }
 
-    const oauthApp = commands.getOAuthApp(clientId);
-    if (commands.listOAuthApps().length > 0) {
-      if (!oauthApp) {
-        return c.html(errorPage("Application not found", `The client_id '${escapeHtml(clientId)}' is not registered.`), 400);
-      }
-      if (!matchesRedirectUri(redirectUri, oauthApp.redirectUris)) {
-        return c.html(errorPage("Redirect URI mismatch", "The redirect_uri is not registered for this app."), 400);
-      }
+    const oauthApp = requireRegisteredOAuthApp(commands, clientId);
+    if (!oauthApp) {
+      return c.html(
+        errorPage(
+          "Application not found",
+          clientId
+            ? `The client_id '${escapeHtml(clientId)}' is not registered.`
+            : "No OAuth applications are registered in this twin."
+        ),
+        400
+      );
     }
-    const actor = requestedActor ?? oauthApp?.actor ?? "user";
-    if (requestedActor && oauthApp && requestedActor !== oauthApp.actor) {
+    if (!matchesRedirectUri(redirectUri, oauthApp.redirectUris)) {
+      return c.html(errorPage("Redirect URI mismatch", "The redirect_uri is not registered for this app."), 400);
+    }
+    const pkceError = validatePkceParams(codeChallenge, codeChallengeMethod);
+    if (pkceError) {
+      return c.html(errorPage("Invalid PKCE parameters", pkceError), 400);
+    }
+    const actor = requestedActor ?? oauthApp.actor ?? "user";
+    if (requestedActor && requestedActor !== oauthApp.actor) {
       return c.html(errorPage("Invalid actor", `This app is configured for actor=${oauthApp.actor}.`), 400);
     }
-    const requestedScopes = normalizeScopes(scope, oauthApp?.scopes ?? ["read"]);
+    const requestedScopes = normalizeScopes(scope, oauthApp.scopes ?? ["read"]);
     const invalidScopes = scopesOutsideApp(requestedScopes, oauthApp);
     if (invalidScopes.length > 0) {
       return c.html(
@@ -49,7 +59,7 @@ export function registerOAuthRoutes(
     }
 
     const title = actor === "app" ? "Install Linear App" : "Authorize Linear App";
-    const appName = oauthApp?.name ?? "Linear App";
+    const appName = oauthApp.name;
     const buttons =
       actor === "app"
         ? userButton({
@@ -58,7 +68,7 @@ export function registerOAuthRoutes(
             name: `Install ${appName}`,
             email: requestedScopes.join(", "),
             hidden: {
-              user_ref: oauthApp?.appUserId ?? "",
+              user_ref: oauthApp.appUserId ?? "",
               actor,
               redirect_uri: redirectUri,
               scope: requestedScopes.join(" "),
@@ -111,15 +121,19 @@ export function registerOAuthRoutes(
     const codeChallenge = bodyStr(body.code_challenge);
     const codeChallengeMethod = bodyStr(body.code_challenge_method);
 
-    const oauthApp = commands.getOAuthApp(clientId);
-    if (commands.listOAuthApps().length > 0) {
-      if (!oauthApp) return c.html(errorPage("Application not found", "The OAuth app is not registered."), 400);
-      if (!matchesRedirectUri(redirectUri, oauthApp.redirectUris)) {
-        return c.html(errorPage("Redirect URI mismatch", "The redirect_uri is not registered for this app."), 400);
-      }
+    const oauthApp = requireRegisteredOAuthApp(commands, clientId);
+    if (!oauthApp) {
+      return c.html(errorPage("Application not found", "The OAuth app is not registered."), 400);
     }
-    const actor = requestedActor ?? oauthApp?.actor ?? "user";
-    if (requestedActor && oauthApp && requestedActor !== oauthApp.actor) {
+    if (!matchesRedirectUri(redirectUri, oauthApp.redirectUris)) {
+      return c.html(errorPage("Redirect URI mismatch", "The redirect_uri is not registered for this app."), 400);
+    }
+    const pkceError = validatePkceParams(codeChallenge, codeChallengeMethod);
+    if (pkceError) {
+      return c.html(errorPage("Invalid PKCE parameters", pkceError), 400);
+    }
+    const actor = requestedActor ?? oauthApp.actor ?? "user";
+    if (requestedActor && requestedActor !== oauthApp.actor) {
       return c.html(errorPage("Invalid actor", `This app is configured for actor=${oauthApp.actor}.`), 400);
     }
     const invalidScopes = scopesOutsideApp(scopes, oauthApp);
@@ -136,7 +150,7 @@ export function registerOAuthRoutes(
         : commands.listUsers().find((u) => !u.app);
     const appUser =
       actor === "app"
-        ? (oauthApp?.appUserId ? commands.getUser(oauthApp.appUserId) : user)
+        ? (oauthApp.appUserId ? commands.getUser(oauthApp.appUserId) : user)
         : user;
     if (!appUser) {
       return c.html(errorPage("No Linear actor", "No matching user or app actor is available."), 400);
@@ -144,7 +158,7 @@ export function registerOAuthRoutes(
 
     const code = token("lin_code");
     commands.storePendingCode(code, {
-      appId: oauthApp?.id ?? null,
+      appId: oauthApp.id,
       clientId,
       redirectUri,
       scopes,
@@ -165,13 +179,12 @@ export function registerOAuthRoutes(
     const body = await c.req.parseBody();
     const grantType = bodyStr(body.grant_type);
     const clientAuth = clientCredentials(c.req.header("Authorization"), body);
-    const oauthApp = commands.getOAuthApp(clientAuth.clientId);
-
-    if (commands.listOAuthApps().length > 0) {
-      if (!oauthApp) return oauthError("invalid_client", "The OAuth app is not registered.");
-      if (!constantTimeSecretEqual(clientAuth.clientSecret, oauthApp.clientSecret)) {
-        return oauthError("invalid_client", "Invalid client credentials.");
-      }
+    const oauthApp = requireRegisteredOAuthApp(commands, clientAuth.clientId);
+    if (!oauthApp) {
+      return oauthError("invalid_client", "The OAuth app is not registered.");
+    }
+    if (!constantTimeSecretEqual(clientAuth.clientSecret, oauthApp.clientSecret)) {
+      return oauthError("invalid_client", "Invalid client credentials.");
     }
 
     if (grantType === "authorization_code") {
@@ -207,7 +220,7 @@ export function registerOAuthRoutes(
       if (!existing || existing.type !== "oauth_refresh" || existing.revoked) {
         return oauthError("invalid_grant", "Refresh token is invalid.");
       }
-      if (existing.appId !== (oauthApp?.id ?? null)) {
+      if (existing.appId !== oauthApp.id) {
         return oauthError("invalid_grant", "Refresh token was not issued to this OAuth app.");
       }
       commands.revokeToken(refreshToken);
@@ -222,20 +235,20 @@ export function registerOAuthRoutes(
     }
 
     if (grantType === "client_credentials") {
-      if (oauthApp && oauthApp.actor !== "app") {
+      if (oauthApp.actor !== "app") {
         return oauthError("unauthorized_client", "The OAuth app is not configured for app actor tokens.");
       }
-      const scopes = normalizeScopes(bodyStr(body.scope), oauthApp?.scopes ?? ["read"]);
+      const scopes = normalizeScopes(bodyStr(body.scope), oauthApp.scopes ?? ["read"]);
       const invalidScopes = scopesOutsideApp(scopes, oauthApp);
       if (invalidScopes.length > 0) {
         return oauthError("invalid_scope", `The app is not registered for scopes: ${invalidScopes.join(", ")}.`);
       }
       const appUserId =
-        oauthApp?.appUserId ?? commands.listUsers().find((user) => user.app)?.id ?? null;
+        oauthApp.appUserId ?? commands.listUsers().find((user) => user.app)?.id ?? null;
       return c.json(
         commands.issueOAuthTokens({
           userId: appUserId,
-          appId: oauthApp?.id ?? null,
+          appId: oauthApp.id,
           actor: "app",
           scopes,
           includeRefresh: false,
@@ -303,6 +316,28 @@ function normalizeScopes(value: string, fallback: string[]): string[] {
   return parts.length ? parts : [...fallback];
 }
 
+function requireRegisteredOAuthApp(
+  commands: LinearCommands,
+  clientId: string
+): LinearOAuthApp | null {
+  if (!clientId) return null;
+  return commands.getOAuthApp(clientId) ?? null;
+}
+
+function validatePkceParams(challenge: string, method: string): string | null {
+  if (!challenge && !method) return null;
+  if (challenge && !method) {
+    return "code_challenge_method is required when code_challenge is set.";
+  }
+  if (!challenge && method) {
+    return "code_challenge is required when code_challenge_method is set.";
+  }
+  if (method !== "S256" && method !== "plain") {
+    return "Unsupported code_challenge_method. Only S256 and plain are accepted.";
+  }
+  return null;
+}
+
 function verifyPkce(
   challenge: string | null,
   method: string | null,
@@ -314,7 +349,11 @@ function verifyPkce(
     const hashed = createHash("sha256").update(verifier).digest("base64url");
     return hashed === challenge;
   }
-  return verifier === challenge;
+  if (method === "plain") {
+    return verifier === challenge;
+  }
+  // Unknown / missing method with a stored challenge must fail closed.
+  return false;
 }
 
 function matchesRedirectUri(redirectUri: string, allowed: string[]): boolean {
