@@ -79,6 +79,28 @@ describe("Linear domain", () => {
     expect(linearStateDelta(beforeSecond, afterSecond)).toBeNull();
   });
 
+  it("clears completed_at when reopening a Done issue to Todo", async () => {
+    const { commands } = domain();
+    const issue = commands.getIssue("issue_todo")!;
+    const done = commands.getWorkflowState("Done", "ENG")!;
+    const todo = commands.getWorkflowState("Todo", "ENG")!;
+
+    const completed = await commands.updateIssue(
+      issue.id,
+      { stateId: done.id },
+      { email: DEFAULT_LINEAR_EMAIL }
+    );
+    expect(completed.completedAt).toBeTruthy();
+
+    const reopened = await commands.updateIssue(
+      issue.id,
+      { stateId: todo.id },
+      { email: DEFAULT_LINEAR_EMAIL }
+    );
+    expect(reopened.completedAt).toBeNull();
+    expect(reopened.canceledAt).toBeNull();
+  });
+
   it("allocates sequential ENG-N identifiers from the team sequence", async () => {
     const { commands } = domain();
     const team = commands.getTeam("ENG")!;

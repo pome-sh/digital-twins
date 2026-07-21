@@ -393,8 +393,8 @@ export class LinearCommands {
           project_id = CASE WHEN ? THEN ? ELSE project_id END,
           cycle_id = CASE WHEN ? THEN ? ELSE cycle_id END,
           archived_at = CASE WHEN ? THEN ? ELSE archived_at END,
-          canceled_at = COALESCE(?, canceled_at),
-          completed_at = COALESCE(?, completed_at),
+          canceled_at = CASE WHEN ? THEN ? ELSE canceled_at END,
+          completed_at = CASE WHEN ? THEN ? ELSE completed_at END,
           started_at = CASE WHEN ? THEN ? ELSE started_at END,
           due_date = CASE WHEN ? THEN ? ELSE due_date END,
           updated_at = ?
@@ -416,7 +416,10 @@ export class LinearCommands {
         patch.cycle_id ?? null,
         "archivedAt" in input ? 1 : 0,
         patch.archived_at ?? null,
+        // Must CASE-clear timestamps on reopen — COALESCE(null, completed_at) would keep Done stamps.
+        "stateId" in input ? 1 : 0,
         patch.canceled_at ?? null,
+        "stateId" in input ? 1 : 0,
         patch.completed_at ?? null,
         "stateId" in input ? 1 : 0,
         patch.started_at ?? null,
