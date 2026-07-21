@@ -70,6 +70,7 @@
     "@pome-sh/shared-types": "0.11.0",
     "@pome-sh/twin-gmail": "0.1.0",
     "@pome-sh/twin-github": "0.2.1",
+    "@pome-sh/twin-linear": "0.1.0",
     "@pome-sh/twin-slack": "0.2.1",
     "@pome-sh/twin-stripe": "0.2.4",
     "ai": "^7.0.18",
@@ -94,6 +95,7 @@
     "@pome-sh/shared-types",
     "@pome-sh/twin-gmail",
     "@pome-sh/twin-github",
+    "@pome-sh/twin-linear",
     "@pome-sh/twin-slack",
     "@pome-sh/twin-stripe"
   ]

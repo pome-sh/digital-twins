@@ -200,6 +200,21 @@ export const SCENARIO_TWINS: ScenarioTwin[] = [
       },
     ],
   },
+  {
+    id: "linear",
+    label: "Linear twin",
+    description:
+      "Issue triage, comments, and project workflows against a deterministic Linear clone.",
+    scenarios: [
+      {
+        filename: "24-linear-issue-triage.md",
+        title: "Linear issue triage",
+        summary:
+          "List backlog issues, move one into progress, and leave a triage comment.",
+        runnable: true,
+      },
+    ],
+  },
 ];
 
 export function findTwin(id: string): ScenarioTwin | null {
