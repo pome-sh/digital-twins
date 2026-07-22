@@ -116,15 +116,29 @@ export async function deleteComment(
   domain.requireScopes(actor, ["write"]);
   const comment = domain.requireComment(id);
   const issue = domain.requireIssue(comment.issueId);
+  // Full reply tree (SQLite FK may be off). Nested threads are root → reply → reply.
+  const treeIds = (
+    domain.db
+      .prepare(
+        `WITH RECURSIVE tree(id) AS (
+           SELECT id FROM comments WHERE id = ?
+           UNION ALL
+           SELECT c.id FROM comments c INNER JOIN tree t ON c.parent_id = t.id
+         )
+         SELECT id FROM tree`
+      )
+      .all(comment.id) as Array<{ id: string }>
+  ).map((row) => row.id);
+  const placeholders = treeIds.map(() => "?").join(", ");
   domain.db
     .prepare(
-      "DELETE FROM agent_activities WHERE session_id IN (SELECT id FROM agent_sessions WHERE comment_id = ?)"
+      `DELETE FROM agent_activities WHERE session_id IN (
+         SELECT id FROM agent_sessions WHERE comment_id IN (${placeholders})
+       )`
     )
-    .run(comment.id);
-  domain.db.prepare("DELETE FROM agent_sessions WHERE comment_id = ?").run(comment.id);
-  // Cascade replies explicitly (SQLite FK may be off); children first.
-  domain.db.prepare("DELETE FROM comments WHERE parent_id = ?").run(comment.id);
-  domain.db.prepare("DELETE FROM comments WHERE id = ?").run(comment.id);
+    .run(...treeIds);
+  domain.db.prepare(`DELETE FROM agent_sessions WHERE comment_id IN (${placeholders})`).run(...treeIds);
+  domain.db.prepare(`DELETE FROM comments WHERE id IN (${placeholders})`).run(...treeIds);
   await emitWebhook(domain, {
     type: "Comment",
     action: "remove",
