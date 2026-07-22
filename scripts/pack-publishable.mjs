@@ -33,6 +33,7 @@ const packageDirs = [
   "packages/twin-slack",
   "packages/twin-stripe",
   "packages/twin-gmail",
+  "packages/twin-linear",
 ];
 
 const sh = (cmd, cwd, extraArgs) =>

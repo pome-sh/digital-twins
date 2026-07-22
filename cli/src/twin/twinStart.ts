@@ -24,9 +24,10 @@ import { sign } from "hono/jwt";
 import { defaultSeedState as defaultSlackSeedState } from "@pome-sh/twin-slack";
 import { defaultSeed as defaultStripeSeed } from "@pome-sh/twin-stripe";
 import { defaultSeedState as defaultGmailSeedState } from "@pome-sh/twin-gmail";
+import { defaultSeedState as defaultLinearSeedState } from "@pome-sh/twin-linear";
 import { bootTwin } from "./twinHarness.js";
 
-export const SUPPORTED_STANDALONE_TWINS = ["github", "slack", "stripe", "gmail"] as const;
+export const SUPPORTED_STANDALONE_TWINS = ["github", "slack", "stripe", "gmail", "linear"] as const;
 
 /** The fixed session id a standalone twin serves under (`/s/standalone`). */
 const STANDALONE_SID = "standalone";
@@ -83,6 +84,8 @@ function defaultSeedFor(twin: string): unknown {
       return defaultStripeSeed();
     case "gmail":
       return defaultGmailSeedState();
+    case "linear":
+      return defaultLinearSeedState();
     default:
       // github: bootTwin's adapter seeds the default world when the seed is
       // undefined (pre-existing standalone behavior).
@@ -97,6 +100,7 @@ export function defaultPortFor(
 ): string {
   if (env.PORT) return env.PORT;
   if (twin === "gmail") return env.GMAIL_TWIN_PORT ?? "3336";
+  if (twin === "linear") return env.LINEAR_TWIN_PORT ?? "3337";
   return "3333";
 }
 

@@ -45,6 +45,13 @@ import {
   openGmailTwinDatabase,
   parseSeed as parseGmailSeed,
 } from "@pome-sh/twin-gmail";
+import {
+  createLinearTwinApp,
+  DEFAULT_LINEAR_EMAIL,
+  LinearCommands,
+  openLinearTwinDatabase,
+  parseSeed as parseLinearSeed,
+} from "@pome-sh/twin-linear";
 
 // The account every local Stripe scenario seeds under. The runner mints a JWT
 // whose `account_id` claim matches this, so `exportState` and the session
@@ -79,7 +86,7 @@ export class UnsupportedTwinError extends Error {
   constructor(public readonly twin: string) {
     super(
       `Self-hosted local runs do not support the '${twin}' twin yet. ` +
-        `Supported: github, slack, stripe, gmail.`,
+        `Supported: github, slack, stripe, gmail, linear.`,
     );
     this.name = "UnsupportedTwinError";
   }
@@ -231,6 +238,32 @@ export async function bootTwin(opts: {
         events: () => recorder.events(),
         extraClaims: { gmail_email: seed.primaryMailbox.email },
         tokenEnvName: "POME_GMAIL_TOKEN",
+        flush: () => flushRecorder(),
+        close: () => closeRecorderAndDb(() => db.close()),
+      };
+    }
+
+    case "linear": {
+      const db = openLinearTwinDatabase(":memory:");
+      const seed = parseLinearSeed(opts.seedState);
+      const domain = new LinearCommands(db);
+      const app = createLinearTwinApp({
+        db,
+        seed,
+        recorder,
+        runId: opts.runId,
+      }) as TwinHarness["app"];
+      const primaryEmail =
+        seed.users.find((user) => user.admin)?.email ??
+        seed.users[0]?.email ??
+        DEFAULT_LINEAR_EMAIL;
+      return {
+        app,
+        envName: "LINEAR",
+        exportState: () => domain.exportState(),
+        events: () => recorder.events(),
+        extraClaims: { linear_email: primaryEmail },
+        tokenEnvName: "POME_LINEAR_TOKEN",
         flush: () => flushRecorder(),
         close: () => closeRecorderAndDb(() => db.close()),
       };

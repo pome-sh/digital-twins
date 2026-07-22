@@ -39,6 +39,7 @@ const TWINS = [
   cliStart("slack", "SLACK_CLONE_DB"),
   cliStart("stripe", "STRIPE_CLONE_DB"),
   cliStart("gmail", "GMAIL_TWIN_DB"),
+  cliStart("linear", "LINEAR_TWIN_DB"),
 ];
 
 for (const twin of TWINS) {

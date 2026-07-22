@@ -5,7 +5,7 @@
   "workspaces": ["packages/*"],
   "packageManager": "npm@11.5.1",
   "scripts": {
-    "build": "npm run build -w @pome-sh/shared-types && npm run build -w @pome-sh/sdk && npm run build -w @pome-sh/adapter-claude-sdk && npm run build -w @pome-sh/twin-github && npm run build -w @pome-sh/twin-slack && npm run build -w @pome-sh/twin-stripe && npm run build -w @pome-sh/twin-gmail",
+    "build": "npm run build -w @pome-sh/shared-types && npm run build -w @pome-sh/sdk && npm run build -w @pome-sh/adapter-claude-sdk && npm run build -w @pome-sh/twin-github && npm run build -w @pome-sh/twin-slack && npm run build -w @pome-sh/twin-stripe && npm run build -w @pome-sh/twin-gmail && npm run build -w @pome-sh/twin-linear",
     "test": "npm run test --workspaces --if-present",
     "test:contract": "node contract/run.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present",

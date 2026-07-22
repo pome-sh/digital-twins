@@ -45,7 +45,8 @@ jobs:
           npm view @pome-sh/twin-github@0.2.1 version &&
           npm view @pome-sh/twin-slack@0.2.1 version &&
           npm view @pome-sh/twin-stripe@0.2.4 version &&
-          npm view @pome-sh/twin-gmail@0.1.0 version
+          npm view @pome-sh/twin-gmail@0.1.0 version &&
+          npm view @pome-sh/twin-linear@0.1.0 version
           ready=$?
           set -e
           if [ "$ready" -eq 0 ]; then
