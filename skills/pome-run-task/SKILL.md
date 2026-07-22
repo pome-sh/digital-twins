@@ -28,11 +28,24 @@ a log. It dies at `expires_at`; `finalize_run` is the last thing that needs it.
 
 ## 1. Mint the run
 
-Call `run_task(task_id, agent_id)` (the `agent_id` from intake). It seeds
-live twin sandboxes and returns `session_id`, `expires_at`, `agent_token`,
-`examinee_task` (the prompt + twins the examinee sees — no criteria), and
-`examinee_launch` (the full launch spec).
+Mint a `grp_`-prefixed `group_id` **now** and reuse it for every run of this
+task — the baseline and any fix-loop reruns — so they aggregate as one exam
+(aggregation keys on `(group_id, task)`; never reuse a `group_id` across
+different tasks). Then call `run_task(task_id, agent_id, group_id)` (the
+`agent_id` from intake). It seeds live twin sandboxes and returns `session_id`,
+`expires_at`, `agent_token`, `examinee_task` (the prompt + twins the examinee
+sees — no criteria), and `examinee_launch` (the full launch spec).
 
+- **Trials-of-N (the batch form)** — when the task's `## Config` sets `runs: N`
+  (a flakiness budget), don't hand-loop `run_task`: call
+  `run_trials(n, task_id, group_id)`, the batch form that provisions all N
+  trials up front under one shared `group_id` and returns a `trials[]` array,
+  each with its own `session_id` + `agent_token`. You still launch and
+  `finalize_run` **each** trial (all N sandboxes share the concurrency quota —
+  launch + finalize promptly to free slots). Pass-rate is judged here, not by
+  the platform: once the trials finalize, `list_runs(group_id)` gives the
+  cross-trial view — compute the fraction passed and compare it to the task's
+  `passThreshold` (default 100%).
 - **`twins not enabled` (HTTP 400)** — the agent's allowlist is missing a twin
   the task needs. Heal with one additive `register_agent(name, twins:[…])`
   (it merges, never removes — F-784), then re-run. Do not re-intake the scope.
@@ -79,12 +92,23 @@ criterion is an unregistered predicate, not a failing grade — route it back to
 
 A green run is done. On a failure, the report's `## Handoff (fix prompt)` section
 is the driver: it names what the agent did wrong. Hand it to the builder, they
-edit the **examinee's** prompt (never the task — that would move the goal
-posts), then:
+edit the **examinee's** prompt, then re-run.
 
-1. Re-run **only the failed tasks** — one `run_task` each against the
-   same `agent_id`, sharing a `group_id` with the first attempt so they line up
-   as one exam on the dashboard.
+**The one thing you never do: make the exam easier to pass.** Every fix goes into
+the examinee's prompt — never into the task. Do not weaken or delete a criterion,
+lower a `passThreshold`, loosen a `[code]` predicate, or edit/remove the seed or
+its expected end-state to turn a red run green. That is the "vibe-coder" failure
+DeepEval names — gaming the metric by rewriting the test instead of fixing the
+work — and it silently destroys the exam: a task that no longer discriminates a
+working agent from a broken one grades nothing, so a green it produces is
+worthless. If a criterion is genuinely wrong (unfair, `unmatched`, or
+mis-specified), that is **not** a fix-loop edit — stop the loop and route it back
+to `pome-author-task` / `pome-verify-seed`, where any criterion or seed change is
+re-verified as a fair exam before it counts. Then:
+
+1. Re-run **only the failed tasks** — one `run_task` (or `run_trials` for a
+   flaky task) each against the same `agent_id`, reusing the `group_id` from
+   step 1 so the reruns line up with the baseline as one exam on the dashboard.
 2. There is no delta field in the report — compute it: pull `get_report` for the
    prior run and the new one, diff the Status column per criterion, and report
    the flips (`"leaked to #general: failed → passed"`). `list_runs(group_id)`

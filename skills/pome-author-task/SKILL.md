@@ -68,9 +68,10 @@ GitHub-only agent has no wrong-Slack-channel to test):
   benign thing it might over-escalate?
 - **Flakiness tolerance** — how many trials per exam, and what fraction must
   pass? Record the answer in `## Config` (`runs`, `passThreshold`) so it
-  travels with the task — but the platform does not enforce these keys:
-  the run skill executes trials as N `run_task` calls sharing a
-  `group_id`, and the pass-rate judgment happens there.
+  travels with the task — but the platform does not enforce these keys: the run
+  skill (`pome-run-task`) reads them, provisions `runs` trials with `run_trials`
+  under one `group_id`, and judges the pass-rate against `passThreshold` itself
+  via `list_runs` — the platform scores each trial, not the trial-set.
 
 Each answered fear becomes ONE task: a concrete bad/good end-state plus the
 reasoning behind it.

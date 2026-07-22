@@ -49,7 +49,7 @@ verbatim from the frozen control MCP contract v1.0:
 | --- | --- |
 | `pome register` | `register_agent` via the control MCP — the **one** "register an agent" verb (the CLI command remains for CLI-era users; both land the same registration) |
 | `pome run <task>` | `run_task` (mints the session) → launch the examinee → `finalize_run` the instant it idles → `get_report` |
-| `pome run -n 3` (N trials) | `run_task` ×3, all sharing one `group_id`, `finalize_run` each; `list_runs(group_id)` is the cross-run view |
+| `pome run -n 3` (N trials) | `run_trials(n, task_id)` — the batch form that provisions all N under one shared `group_id` (or `run_task` ×N reusing one `group_id`); `finalize_run` each; `list_runs(group_id)` is the cross-run view |
 | Local task files on disk | `save_task` into your team catalog on first use; browse with `list_tasks` (no cross-team library) |
 | "Where are my results?" | `get_report(run_id)` / `list_runs`, and the dashboard on `app.pome.sh` |
 

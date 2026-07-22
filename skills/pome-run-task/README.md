@@ -59,9 +59,11 @@ https://mcp.pome.sh/mcp`) so the `run_task` / `finalize_run` / `get_report` /
 
 ## The run loop
 
-1. **Mint** — `run_task(task_id, agent_id)` → `session_id`,
+1. **Mint** — `run_task(task_id, agent_id, group_id)` → `session_id`,
    `agent_token` (SENSITIVE, memory-only), `examinee_task`, `examinee_launch`.
-   Heal a `twins not enabled` 400 with one additive `register_agent` (F-784).
+   Mint the `group_id` upfront so reruns aggregate as one exam; for a `runs: N`
+   task use `run_trials(n, task_id, group_id)`, the batch form. Heal a
+   `twins not enabled` 400 with one additive `register_agent` (F-784).
 2. **Launch** — dispatch on the Runtime line: managed agent → `ant`
    (`references/launch-managed-agent.md`); anything else → REST
    (`references/launch-rest.md`). The launcher assembles from `examinee_launch`,
@@ -73,7 +75,9 @@ https://mcp.pome.sh/mcp`) so the `run_task` / `finalize_run` / `get_report` /
    `hosted`, the `app.pome.sh` link.
 5. **Fix loop** — on a failure, hand the report's `## Handoff (fix prompt)` to the
    builder; they edit the **examinee** prompt; re-run only the failed tasks
-   (same `agent_id`, shared `group_id`); diff the two reports and show the delta.
+   (same `agent_id`, reusing the `group_id`); diff the two reports and show the
+   delta. Anti-cheat guardrail: never weaken a criterion/`passThreshold` or edit
+   the seed to force a green — a criterion fix goes back through author/verify.
 
 ## Test evidence
 
