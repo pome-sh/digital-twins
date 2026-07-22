@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { RecorderEvent } from "@pome-sh/sdk";
 
+// Keys are compared after normalizing away non-alphanumerics (see `shouldRedact`),
+// so entries here are the normalized forms. This projection is a twin-specific
+// backstop; the SDK's `redactEvent` runs afterward and covers the common keys —
+// `codeverifier` (PKCE) is the one field it does not, so it must stay here.
 const SECRET_KEYS = new Set([
-  "client_secret",
   "clientsecret",
-  "access_token",
   "accesstoken",
-  "refresh_token",
   "refreshtoken",
   "token",
   "secret",
   "authorization",
-  "code_verifier",
   "codeverifier",
   "password",
 ]);
