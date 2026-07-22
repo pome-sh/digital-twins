@@ -120,6 +120,68 @@ describe("Linear webhooks", () => {
     expect(logged.some((row) => row.webhookId === webhookId && row.event === "Issue")).toBe(true);
   });
 
+  it("rejects non-http webhook URLs and credentials in the URL", () => {
+    const db = openLinearTwinDatabase(":memory:");
+    const commands = new LinearCommands(db);
+    commands.seed(seedWithoutWebhooks());
+    expect(() => commands.createWebhook({ url: "file:///tmp/hooks" })).toThrow(
+      /http or https/i
+    );
+    expect(() =>
+      commands.createWebhook({ url: "http://user:secret@127.0.0.1:9/hooks" })
+    ).toThrow(/credentials/i);
+  });
+
+  it("records an error when the webhook URL redirects (no follow)", async () => {
+    deliveries = [];
+    let redirectServer: Server | undefined;
+    try {
+      redirectServer = createServer((_req, res) => {
+        res.writeHead(302, { Location: receiverUrl });
+        res.end();
+      });
+      await new Promise<void>((resolve) => redirectServer!.listen(0, "127.0.0.1", resolve));
+      const redirectUrl = `http://127.0.0.1:${(redirectServer.address() as AddressInfo).port}/redir`;
+
+      const db = openLinearTwinDatabase(":memory:");
+      const commands = new LinearCommands(db);
+      commands.seed(seedWithoutWebhooks());
+      commands.createWebhook({
+        url: redirectUrl,
+        resourceTypes: ["Issue"],
+        teamId: "team_eng",
+      });
+      await commands.createIssue(
+        { teamId: "team_eng", title: "Redirect should fail closed" },
+        { email: "admin@pome-twin.test" }
+      );
+
+      for (let i = 0; i < 20; i += 1) {
+        const logged = commands.exportState().webhookDeliveries as Array<{
+          error: string | null;
+          status: number | null;
+        }>;
+        if (logged.some((row) => row.error)) break;
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+
+      const logged = commands.exportState().webhookDeliveries as Array<{
+        error: string | null;
+        status: number | null;
+      }>;
+      expect(logged.some((row) => typeof row.error === "string" && row.error.length > 0)).toBe(
+        true
+      );
+      expect(deliveries.length).toBe(0);
+    } finally {
+      if (redirectServer) {
+        await new Promise<void>((resolve, reject) =>
+          redirectServer!.close((error) => (error ? reject(error) : resolve()))
+        );
+      }
+    }
+  });
+
   it("returns 501 for unsupported routes without side effects", async () => {
     const db = openLinearTwinDatabase(":memory:");
     const app = createLinearTwinApp({

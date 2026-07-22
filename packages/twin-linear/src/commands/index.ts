@@ -38,6 +38,7 @@ import {
   type LinearWorkflowState,
   type LinearWorkflowStateType,
 } from "../types.js";
+import { assertWebhookUrl } from "../webhook-url.js";
 import { dispatchLinearWebhook } from "../webhooks/dispatch.js";
 
 export type ActorContext = {
@@ -453,6 +454,7 @@ export class LinearCommands {
   }
 
   async deleteIssue(id: string, actor: ActorContext = {}): Promise<LinearIssue> {
+    this.requireScopes(actor, ["write"]);
     const issue = this.requireIssue(id);
     const viewer = this.resolveViewer(actor);
     this.db.prepare("DELETE FROM agent_activities WHERE session_id IN (SELECT id FROM agent_sessions WHERE issue_id = ?)").run(issue.id);
@@ -472,6 +474,7 @@ export class LinearCommands {
   }
 
   async archiveIssue(id: string, actor: ActorContext = {}): Promise<LinearIssue> {
+    this.requireScopes(actor, ["write"]);
     const issue = this.requireIssue(id);
     const now = this.tick();
     this.db.prepare("UPDATE issues SET archived_at = ?, updated_at = ? WHERE id = ?").run(now, now, issue.id);
@@ -488,6 +491,7 @@ export class LinearCommands {
   }
 
   async unarchiveIssue(id: string, actor: ActorContext = {}): Promise<LinearIssue> {
+    this.requireScopes(actor, ["write"]);
     const issue = this.requireIssue(id);
     const now = this.tick();
     this.db.prepare("UPDATE issues SET archived_at = NULL, updated_at = ? WHERE id = ?").run(now, issue.id);
@@ -638,6 +642,7 @@ export class LinearCommands {
     input: { name?: string; color?: string; description?: string | null },
     actor: ActorContext = {}
   ): Promise<LinearIssueLabel> {
+    this.requireScopes(actor, ["write"]);
     const label = this.requireLabel(id);
     const now = this.tick();
     this.db
@@ -669,6 +674,7 @@ export class LinearCommands {
   }
 
   async deleteLabel(id: string, actor: ActorContext = {}): Promise<string> {
+    this.requireScopes(actor, ["write"]);
     const label = this.requireLabel(id);
     this.db.prepare("DELETE FROM issue_label_links WHERE label_id = ?").run(label.id);
     this.db.prepare("DELETE FROM issue_labels WHERE id = ?").run(label.id);
@@ -683,6 +689,7 @@ export class LinearCommands {
   }
 
   async addIssueLabel(issueId: string, labelId: string, actor: ActorContext = {}): Promise<LinearIssue> {
+    this.requireScopes(actor, ["write"]);
     const issue = this.requireIssue(issueId);
     const label = this.requireLabel(labelId, issue.teamId);
     if (issue.labelIds.includes(label.id)) return issue;
@@ -706,6 +713,7 @@ export class LinearCommands {
   }
 
   async removeIssueLabel(issueId: string, labelId: string, actor: ActorContext = {}): Promise<LinearIssue> {
+    this.requireScopes(actor, ["write"]);
     const issue = this.requireIssue(issueId);
     const label = this.requireLabel(labelId, issue.teamId);
     if (!issue.labelIds.includes(label.id)) return issue;
@@ -740,12 +748,16 @@ export class LinearCommands {
     return this.listProjects().find((p) => p.id === ref || p.name === ref) ?? null;
   }
 
-  createProject(input: {
-    name: string;
-    teamId?: string | null;
-    description?: string | null;
-    state?: LinearProjectState;
-  }): LinearProject {
+  createProject(
+    input: {
+      name: string;
+      teamId?: string | null;
+      description?: string | null;
+      state?: LinearProjectState;
+    },
+    actor: ActorContext = {}
+  ): LinearProject {
+    this.requireScopes(actor, ["write"]);
     const team = input.teamId ? this.requireTeam(input.teamId) : null;
     const now = this.tick();
     const id = this.nextId("project");
@@ -760,8 +772,10 @@ export class LinearCommands {
 
   updateProject(
     id: string,
-    input: { name?: string; description?: string | null; state?: LinearProjectState }
+    input: { name?: string; description?: string | null; state?: LinearProjectState },
+    actor: ActorContext = {}
   ): LinearProject {
+    this.requireScopes(actor, ["write"]);
     const project = this.requireProject(id);
     const now = this.tick();
     this.db
@@ -823,6 +837,8 @@ export class LinearCommands {
     },
     actor: ActorContext = {}
   ): LinearWebhook {
+    this.requireScopes(actor, ["write"]);
+    const url = assertWebhookUrl(input.url);
     const team = input.teamId ? this.requireTeam(input.teamId) : null;
     const viewer = this.resolveViewer(actor);
     const now = this.tick();
@@ -836,7 +852,7 @@ export class LinearCommands {
       .run(
         id,
         input.label ?? "Local webhook",
-        input.url,
+        url,
         input.enabled === false ? 0 : 1,
         JSON.stringify(input.resourceTypes ?? ["Issue", "Comment"]),
         team?.id ?? null,
@@ -849,7 +865,8 @@ export class LinearCommands {
     return this.getWebhook(id)!;
   }
 
-  deleteWebhook(id: string): string {
+  deleteWebhook(id: string, actor: ActorContext = {}): string {
+    this.requireScopes(actor, ["write"]);
     const webhook = this.requireWebhook(id);
     this.db.prepare("DELETE FROM webhook_deliveries WHERE webhook_id = ?").run(webhook.id);
     this.db.prepare("DELETE FROM webhooks WHERE id = ?").run(webhook.id);
@@ -906,6 +923,7 @@ export class LinearCommands {
     input: { issueId: string; agentUserId?: string; plan?: string | null; externalUrl?: string | null },
     actor: ActorContext = {}
   ): Promise<LinearAgentSession> {
+    this.requireScopes(actor, ["write"]);
     const issue = this.requireIssue(input.issueId);
     const viewer = this.resolveViewer(actor);
     const agent =
@@ -935,6 +953,8 @@ export class LinearCommands {
     input: { commentId: string; agentUserId?: string; plan?: string | null; externalUrl?: string | null },
     actor: ActorContext = {}
   ): Promise<LinearAgentSession> {
+    // comments:create covers mention-triggered sessions from createComment; write covers GraphQL.
+    this.requireScopes(actor, ["comments:create"]);
     const comment = this.requireComment(input.commentId);
     const issue = this.requireIssue(comment.issueId);
     const viewer = this.resolveViewer(actor);
@@ -955,8 +975,10 @@ export class LinearCommands {
 
   updateAgentSession(
     id: string,
-    input: { state?: string; plan?: string | null; externalUrl?: string | null }
+    input: { state?: string; plan?: string | null; externalUrl?: string | null },
+    actor: ActorContext = {}
   ): LinearAgentSession {
+    this.requireScopes(actor, ["write"]);
     const session = this.requireAgentSession(id);
     const now = this.tick();
     this.db
@@ -984,6 +1006,7 @@ export class LinearCommands {
     input: { sessionId: string; type: string; body: string; ephemeral?: boolean },
     actor: ActorContext = {}
   ): Promise<LinearAgentActivity> {
+    this.requireScopes(actor, ["write"]);
     assertBody(input.body);
     const session = this.requireAgentSession(input.sessionId);
     const viewer = this.resolveViewer(actor);

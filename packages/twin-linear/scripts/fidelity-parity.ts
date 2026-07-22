@@ -60,6 +60,7 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
+const surfaceOpCount = surfaceOps.length;
 console.log(
-  `twin-linear fidelity:parity ok — ${liveToolNames.length} MCP tools, ${surfaceOps.length} GraphQL/OAuth surfaces`,
+  `twin-linear fidelity:parity ok — ${liveToolNames.length} MCP tools, ${surfaceOpCount} GraphQL surface ops`,
 );

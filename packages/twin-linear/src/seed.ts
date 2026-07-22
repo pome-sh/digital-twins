@@ -8,6 +8,7 @@ import {
   DEFAULT_SCOPES,
   type LinearStateSeed,
 } from "./types.js";
+import { webhookUrlError } from "./webhook-url.js";
 
 const datetime = z.string().datetime({ offset: true });
 const email = z.string().trim().email().transform((v) => v.toLowerCase());
@@ -333,10 +334,9 @@ export const linearSeedSchema = z
     }
 
     for (const webhook of seed.webhooks) {
-      try {
-        new URL(webhook.url);
-      } catch {
-        ctx.addIssue({ code: "custom", message: `Invalid webhook URL: ${webhook.url}` });
+      const urlError = webhookUrlError(webhook.url);
+      if (urlError) {
+        ctx.addIssue({ code: "custom", message: urlError });
       }
       if (webhook.team && !resolveTeam(webhook.team)) {
         ctx.addIssue({ code: "custom", message: `Webhook team not found: ${webhook.team}` });

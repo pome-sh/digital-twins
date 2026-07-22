@@ -61,6 +61,7 @@ export async function dispatchLinearWebhook(
         method: "POST",
         headers,
         body,
+        redirect: "error",
         signal: AbortSignal.timeout(10_000),
       });
       status = res.status;

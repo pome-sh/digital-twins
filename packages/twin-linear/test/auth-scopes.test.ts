@@ -57,6 +57,55 @@ describe("strictScopes", () => {
     expect(issue.title).toBe("Scoped create");
   });
 
+  it("blocks delete/archive/label/webhook/project when actor has only read", async () => {
+    const db = openLinearTwinDatabase(":memory:");
+    const commands = new LinearCommands(db);
+    commands.seed(testSeed({ strictScopes: true }));
+    const readActor = { email: "admin@pome-twin.test", scopes: ["read"] };
+    const issue = commands.getIssue("issue_todo")!;
+    const label = commands.getLabel("Bug")!;
+
+    await expect(commands.deleteIssue(issue.id, readActor)).rejects.toThrow(
+      /Missing required Linear scope/
+    );
+    await expect(commands.archiveIssue(issue.id, readActor)).rejects.toThrow(
+      /Missing required Linear scope/
+    );
+    await expect(commands.addIssueLabel(issue.id, label.id, readActor)).rejects.toThrow(
+      /Missing required Linear scope/
+    );
+    expect(() =>
+      commands.createWebhook({ url: "http://127.0.0.1:9999/hooks" }, readActor)
+    ).toThrow(/Missing required Linear scope/);
+    expect(() =>
+      commands.createProject({ name: "Scoped Project", teamId: "team_eng" }, readActor)
+    ).toThrow(/Missing required Linear scope/);
+  });
+
+  it("allows write-scoped mutators and leaves default strictScopes off", async () => {
+    const writeDb = openLinearTwinDatabase(":memory:");
+    const writeCommands = new LinearCommands(writeDb);
+    writeCommands.seed(testSeed({ strictScopes: true }));
+    const writeActor = { email: "admin@pome-twin.test", scopes: ["write"] };
+    const issue = writeCommands.getIssue("issue_todo")!;
+    const archived = await writeCommands.archiveIssue(issue.id, writeActor);
+    expect(archived.archivedAt).toBeTruthy();
+    const project = writeCommands.createProject(
+      { name: "Write Project", teamId: "team_eng" },
+      writeActor
+    );
+    expect(project.name).toBe("Write Project");
+
+    const openDb = openLinearTwinDatabase(":memory:");
+    const openCommands = new LinearCommands(openDb);
+    openCommands.seed(testSeed({ strictScopes: false }));
+    const created = await openCommands.createIssue(
+      { teamId: "team_eng", title: "Open scopes" },
+      { email: "admin@pome-twin.test", scopes: ["read"] }
+    );
+    expect(created.title).toBe("Open scopes");
+  });
+
   it("surfaces scope failures as GraphQL error extensions", async () => {
     process.env.TWIN_AUTH_SECRET = "linear-scopes-test-secret-32chars!!";
     const db = openLinearTwinDatabase(":memory:");

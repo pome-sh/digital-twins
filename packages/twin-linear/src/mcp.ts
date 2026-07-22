@@ -452,12 +452,17 @@ const implementations: Record<
     mutation: true,
     handler: (commands, args, ctx) =>
       mutate(commands, ctx, () => {
+        const actor = actorFrom(ctx);
         if (args.id) {
-          const project = commands.updateProject(String(args.id), {
-            name: args.name as string | undefined,
-            description: "description" in args ? ((args.description as string | null) ?? null) : undefined,
-            state: args.state as LinearProjectState | undefined,
-          });
+          const project = commands.updateProject(
+            String(args.id),
+            {
+              name: args.name as string | undefined,
+              description: "description" in args ? ((args.description as string | null) ?? null) : undefined,
+              state: args.state as LinearProjectState | undefined,
+            },
+            actor
+          );
           return {
             id: project.id,
             name: project.name,
@@ -467,12 +472,15 @@ const implementations: Record<
           };
         }
         if (!args.name) throw new Error("name is required when creating a project (omit id)");
-        const project = commands.createProject({
-          name: String(args.name),
-          teamId: (args.team as string | undefined) ?? null,
-          description: (args.description as string | undefined) ?? null,
-          state: (args.state as LinearProjectState | undefined) ?? "planned",
-        });
+        const project = commands.createProject(
+          {
+            name: String(args.name),
+            teamId: (args.team as string | undefined) ?? null,
+            description: (args.description as string | undefined) ?? null,
+            state: (args.state as LinearProjectState | undefined) ?? "planned",
+          },
+          actor
+        );
         return {
           id: project.id,
           name: project.name,

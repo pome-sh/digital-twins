@@ -551,7 +551,8 @@ export function createRootValue(ctx: GraphQLRuntimeContext): Record<string, unkn
       );
       return payload({ webhook: formatWebhook(webhook) });
     },
-    webhookDelete: ({ id }: { id: string }) => payload({ entityId: commands.deleteWebhook(id) }),
+    webhookDelete: ({ id }: { id: string }) =>
+      payload({ entityId: commands.deleteWebhook(id, actor) }),
     agentSessionCreateOnIssue: async ({ input }: { input: Record<string, unknown> }) => {
       const session = await commands.createAgentSessionOnIssue(
         {
@@ -577,11 +578,15 @@ export function createRootValue(ctx: GraphQLRuntimeContext): Record<string, unkn
       return payload({ agentSession: formatAgentSession(session) });
     },
     agentSessionUpdate: ({ id, input }: { id?: string; input: Record<string, unknown> }) => {
-      const session = commands.updateAgentSession(String(id ?? input.id), {
-        state: input.state as string | undefined,
-        plan: "plan" in input ? ((input.plan as string | null) ?? null) : undefined,
-        externalUrl: "externalUrl" in input ? ((input.externalUrl as string | null) ?? null) : undefined,
-      });
+      const session = commands.updateAgentSession(
+        String(id ?? input.id),
+        {
+          state: input.state as string | undefined,
+          plan: "plan" in input ? ((input.plan as string | null) ?? null) : undefined,
+          externalUrl: "externalUrl" in input ? ((input.externalUrl as string | null) ?? null) : undefined,
+        },
+        actor
+      );
       return payload({ agentSession: formatAgentSession(session) });
     },
     agentActivityCreate: async ({ input }: { input: Record<string, unknown> }) => {

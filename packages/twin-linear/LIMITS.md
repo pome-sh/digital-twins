@@ -20,6 +20,23 @@ Pinned limits enforced by seed, GraphQL, MCP, and OAuth paths.
 
 See `performanceBudgets` in [`fidelity.inventory.json`](fidelity.inventory.json).
 
+## Scopes
+
+- OAuth/API token **scope denial is opt-in fidelity**: set `seed.strictScopes: true`.
+  The default (`false`) matches other twins — auth gate is always on; fine-grained
+  Linear scopes are not enforced unless a scenario opts in.
+- When `strictScopes` is on, write mutators call `requireScopes` (`write`,
+  `issues:create`, `comments:create`; `admin` bypasses). JWT / `lin_pome_*`
+  sessions receive the full default scope set.
+
+## Webhooks
+
+- Outbound delivery is for trusted lab callbacks (often `127.0.0.1`). Private /
+  loopback destinations are allowed on purpose.
+- URLs must be `http`/`https` without embedded credentials.
+- Delivery `fetch` refuses redirects (`redirect: "error"`) so a public URL cannot
+  bounce into link-local/metadata targets.
+
 ## Recording notes
 
 - GraphQL and MCP writes go through `recorder.handle` / `reportDelta`.
