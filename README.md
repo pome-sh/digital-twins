@@ -5,8 +5,8 @@
 [![npm: @pome-sh/cli](https://img.shields.io/npm/v/%40pome-sh%2Fcli?label=%40pome-sh%2Fcli)](https://www.npmjs.com/package/@pome-sh/cli)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
 
-Open-source digital twins of GitHub, Stripe, Slack, and Gmail: 112 MCP tools
-plus broad frozen REST surfaces across all four, with the `pome` CLI to run your AI agents
+Open-source digital twins of GitHub, Stripe, Slack, Gmail, and Linear: 130 MCP
+tools plus broad frozen REST and GraphQL surfaces, with the `pome` CLI to run your AI agents
 against them locally and capture every trace.
 
 A digital twin is a local emulation of a production API. It intercepts and
@@ -42,6 +42,9 @@ resettable.
   of it on the next read.
 * **Gmail:** Search/read threads, draft replies, label messages, and exercise a
   frozen Gmail v1 REST/upload surface without Google OAuth or live delivery.
+* **Linear:** Create and triage issues, comment, and move them across workflow
+  states over a real GraphQL surface — the first GraphQL twin — with OAuth
+  (PKCE) and signed webhooks, all deterministic and offline.
 
 ---
 
@@ -57,11 +60,12 @@ For questions or suggestions, email: `founders@pome.sh`
 Prerequisites: [Node.js ≥ 24](https://nodejs.org/). Nothing else — no
 installs, no git clone.
 
-Start a twin (GitHub, Stripe, Slack, or Gmail):
+Start a twin (GitHub, Stripe, Slack, Gmail, or Linear):
 
 ```bash
 npx @pome-sh/cli twin start github         # GitHub twin on http://127.0.0.1:3333
 npx @pome-sh/cli twin start gmail --port 3336
+npx @pome-sh/cli twin start linear --port 3337
 curl http://127.0.0.1:3333/healthz
 ```
 
@@ -116,10 +120,11 @@ reference lives in the [CLI README](./cli/README.md) and at
 | [`twin-stripe`](./packages/twin-stripe/) | **26** (all semantic) | 43 | Card + x402 crypto PaymentIntents, customers, payment methods, refunds, charges, balance, events; billing surfaces at shape tier ([FIDELITY](./packages/twin-stripe/FIDELITY.md)) |
 | [`twin-slack`](./packages/twin-slack/) | **11** (all semantic) | 50 | Channels, messages, threads, reactions, search, users, pins, scheduled messages ([FIDELITY](./packages/twin-slack/FIDELITY.md)) |
 | [`twin-gmail`](./packages/twin-gmail/) | **10** (captured first-party launch set) | Frozen broad Gmail v1 set | Messages, drafts, threads, labels, history, settings, media/multipart uploads; no OAuth, Pub/Sub, or external delivery ([contract](./packages/twin-gmail/README.md)) |
+| [`twin-linear`](./packages/twin-linear/) | **18** (curated launch subset) | GraphQL + OAuth (PKCE) + signed webhooks | Issues, comments, teams, projects, cycles, labels, workflow states — the first GraphQL twin ([FIDELITY](./packages/twin-linear/FIDELITY.md)) |
 
 Each twin documents its surface, route by route, in its `FIDELITY.md`; the
 tier definitions live in the engine-level
-[endpoint-tier rubric](./packages/sdk/ENDPOINT-TIERS.md). All four honor the
+[endpoint-tier rubric](./packages/sdk/ENDPOINT-TIERS.md). All five honor the
 frozen v1.2.0 runtime contract in [`CONTRACT.md`](./CONTRACT.md), verified by
 a black-box suite (`npm run test:contract`) that both pome-cloud and the CLI
 rely on. Published twin images are cosign-signed and ship SBOM attestations.
@@ -142,7 +147,8 @@ pome login && pome run scenarios/   # hosted: records + evaluates in one go
 ## The scenario library
 
 `pome init` ships a bundled scenario library: GitHub issue triage and PR flows,
-Stripe x402 payment and refund flows, Slack messaging, and Gmail inbox/MCP parity. Several are
+Stripe x402 payment and refund flows, Slack messaging, Gmail inbox/MCP parity, and Linear
+issue triage. Several are
 adversarial — they probe whether your agent can be talked into spoofing an
 identity, following an injected prompt, merging a backdoored PR, fabricating
 green CI, or re-refunding a charge because someone asked nicely. Browse them
@@ -172,7 +178,7 @@ npm start
 
 ## Build your own twin
 
-The four twins are thin domain plugins on [`@pome-sh/sdk`](./packages/sdk/).
+The five twins are thin domain plugins on [`@pome-sh/sdk`](./packages/sdk/).
 The engine supplies the mechanism — HTTP mounting, bearer auth, the trace
 recorder with secret redaction, MCP dispatch, SQLite state, and the admin
 reset/seed gate — so a twin is just its domain logic and tools:
@@ -203,7 +209,7 @@ Everything ships to npm with provenance (Trusted Publishing):
 | Package | Role |
 | --- | --- |
 | [`@pome-sh/cli`](https://www.npmjs.com/package/@pome-sh/cli) | The `pome` CLI |
-| [`@pome-sh/twin-github`](https://www.npmjs.com/package/@pome-sh/twin-github) [`/twin-stripe`](https://www.npmjs.com/package/@pome-sh/twin-stripe) [`/twin-slack`](https://www.npmjs.com/package/@pome-sh/twin-slack) [`/twin-gmail`](https://www.npmjs.com/package/@pome-sh/twin-gmail) | The four twins |
+| [`@pome-sh/twin-github`](https://www.npmjs.com/package/@pome-sh/twin-github) [`/twin-stripe`](https://www.npmjs.com/package/@pome-sh/twin-stripe) [`/twin-slack`](https://www.npmjs.com/package/@pome-sh/twin-slack) [`/twin-gmail`](https://www.npmjs.com/package/@pome-sh/twin-gmail) [`/twin-linear`](https://www.npmjs.com/package/@pome-sh/twin-linear) | The five twins |
 | [`@pome-sh/sdk`](https://www.npmjs.com/package/@pome-sh/sdk) | The twin engine (`defineTwin()`) |
 | [`@pome-sh/shared-types`](https://www.npmjs.com/package/@pome-sh/shared-types) | Zod schemas and the trace contract |
 | [`@pome-sh/adapter-claude-sdk`](https://www.npmjs.com/package/@pome-sh/adapter-claude-sdk) | Wire a Claude Agent SDK agent to a Pome run |
@@ -212,7 +218,7 @@ Everything ships to npm with provenance (Trusted Publishing):
 
 | Path | Role |
 | --- | --- |
-| [`packages/twin-{github,stripe,slack,gmail}`](./packages/) | The four twins (REST + MCP, SQLite) — each with package-level fidelity documentation |
+| [`packages/twin-{github,stripe,slack,gmail,linear}`](./packages/) | The five twins (REST/GraphQL + MCP, SQLite) — each with package-level fidelity documentation |
 | [`packages/sdk`](./packages/sdk/) | The twin engine — build your own twin with `defineTwin()` |
 | [`packages/shared-types`](./packages/shared-types/) | Zod schemas and trace contracts |
 | [`packages/adapter-claude-sdk`](./packages/adapter-claude-sdk/) | Wire a Claude Agent SDK agent to a Pome run |

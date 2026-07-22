@@ -5,7 +5,7 @@ Deterministic Linear-shaped twin for agent testing (Pome).
 **Status: OSS release candidate.** This package includes the deterministic
 SQLite workspace model, strict seed/reset APIs, GraphQL + OAuth surfaces,
 bounded semantic state export, recording projection, and the captured
-twenty-tool first-party MCP contract.
+eighteen-tool first-party MCP contract.
 
 ## Auth identity (frozen)
 
@@ -40,14 +40,24 @@ See [`fixtures/README.md`](fixtures/README.md) for capture provenance.
 `get_issue_status`, `list_issue_labels`, `create_issue_label`, `list_projects`,
 `get_project`, `save_project`, `list_cycles`, `search_documentation`.
 
-Order and names are frozen from the current official Linear MCP listing
-(`save_*` upserts). Documents tools are **out of launch scope** (named cold
-in the inventory). GraphQL still exposes `issueCreate`/`issueUpdate` for SDK
+These 18 are a **curated launch subset** of the official Linear MCP surface
+(which currently exposes ~50+ tools); order and names are frozen to match it
+(`save_*` upserts). Everything outside the subset is a named gap below, not a
+silent success. GraphQL still exposes `issueCreate`/`issueUpdate` for SDK
 parity.
 
 ## Named gaps (not fake success)
 
-- Documents MCP tools — out of Gate 0 launch set
+MCP tool families outside the 18-tool launch subset are not implemented:
+
+- Documents (`*_document`), initiatives (`*_initiative*`), milestones
+  (`*_milestone`), releases (`*_release*`), attachments (`*_attachment*`),
+  git diffs / PR review (`*_diff*`, `merge_diff`, `submit_diff_review`),
+  status updates (`*_status_update`), agent skills (`*_agent_skill*`),
+  `delete_comment`, and `list_project_labels`
+- Implemented tools cover a subset of the real parameters (e.g. `save_issue`
+  omits `estimate`/`milestone`/`parentId`/relations; `save_comment` is
+  issue-only with no threaded `parentId`)
 - Full Linear GraphQL schema tail — loud unsupported / 501
 - External webhook delivery beyond logged attempts
 
