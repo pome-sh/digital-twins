@@ -31,11 +31,18 @@ See `performanceBudgets` in [`fidelity.inventory.json`](fidelity.inventory.json)
 
 ## Webhooks
 
-- Outbound delivery is for trusted lab callbacks (often `127.0.0.1`). Private /
-  loopback destinations are allowed on purpose.
+- Outbound delivery enforces a **default-deny SSRF policy**: loopback, private,
+  link-local (incl. the `169.254.169.254` cloud metadata endpoint), unique-local,
+  and other non-public destinations are refused at dispatch time, validated
+  against the host's *resolved* addresses (a public name that resolves to an
+  internal IP is blocked too). Refused attempts are logged with
+  `error: "blocked_destination"` and never leave the process.
+- Loopback/private delivery for trusted lab callbacks (often `127.0.0.1`) is
+  opt-in via `LINEAR_TWIN_ALLOW_PRIVATE_WEBHOOKS=1` — an operator/deployment
+  trust decision, never settable by the agent under test.
 - URLs must be `http`/`https` without embedded credentials.
-- Delivery `fetch` refuses redirects (`redirect: "error"`) so a public URL cannot
-  bounce into link-local/metadata targets.
+- Delivery `fetch` also refuses redirects (`redirect: "error"`) so an allowed
+  public URL cannot bounce into link-local/metadata targets.
 
 ## Recording notes
 

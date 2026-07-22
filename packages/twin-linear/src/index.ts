@@ -10,6 +10,11 @@ export {
 } from "./errors.js";
 export { looksLikeLinearToken, resolveLinearCredential } from "./auth-credential.js";
 export { assertWebhookUrl, webhookUrlError } from "./webhook-url.js";
+export {
+  isBlockedIp,
+  privateWebhooksAllowed,
+  webhookDestinationBlocked,
+} from "./webhook-policy.js";
 export { linearTools, LINEAR_MCP_TOOL_COUNT } from "./mcp.js";
 export { projectLinearRecording } from "./recording.js";
 export {

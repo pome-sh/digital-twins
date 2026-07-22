@@ -18,6 +18,9 @@ let deliveries: Array<{ body: string; headers: Record<string, string | string[] 
 
 beforeAll(async () => {
   process.env.TWIN_AUTH_SECRET = SECRET;
+  // The test receiver binds 127.0.0.1; opt in to loopback delivery (the SSRF
+  // default-deny policy blocks it otherwise — covered by webhook-policy.test.ts).
+  process.env.LINEAR_TWIN_ALLOW_PRIVATE_WEBHOOKS = "1";
   receiver = createServer((req: IncomingMessage, res: ServerResponse) => {
     const chunks: Buffer[] = [];
     req.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
@@ -36,6 +39,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  delete process.env.LINEAR_TWIN_ALLOW_PRIVATE_WEBHOOKS;
   if (receiver) {
     await new Promise<void>((resolve, reject) =>
       receiver.close((error) => (error ? reject(error) : resolve()))
@@ -130,6 +134,37 @@ describe("Linear webhooks", () => {
     expect(() =>
       commands.createWebhook({ url: "http://user:secret@127.0.0.1:9/hooks" })
     ).toThrow(/credentials/i);
+  });
+
+  it("default-deny: refuses delivery to internal destinations (SSRF guard)", async () => {
+    deliveries = [];
+    delete process.env.LINEAR_TWIN_ALLOW_PRIVATE_WEBHOOKS;
+    try {
+      const db = openLinearTwinDatabase(":memory:");
+      const commands = new LinearCommands(db);
+      commands.seed(seedWithoutWebhooks());
+      // Cloud metadata endpoint — a classic SSRF target.
+      commands.createWebhook({
+        url: "http://169.254.169.254/latest/meta-data/",
+        resourceTypes: ["Issue"],
+        teamId: "team_eng",
+      });
+      await commands.createIssue(
+        { teamId: "team_eng", title: "Should never leave the process" },
+        { email: "admin@pome-twin.test" }
+      );
+
+      const logged = commands.exportState().webhookDeliveries as Array<{
+        error: string | null;
+        status: number | null;
+      }>;
+      expect(logged.length).toBe(1);
+      expect(logged[0]!.error).toBe("blocked_destination");
+      expect(logged[0]!.status).toBeNull();
+      expect(deliveries.length).toBe(0);
+    } finally {
+      process.env.LINEAR_TWIN_ALLOW_PRIVATE_WEBHOOKS = "1";
+    }
   });
 
   it("records an error when the webhook URL redirects (no follow)", async () => {

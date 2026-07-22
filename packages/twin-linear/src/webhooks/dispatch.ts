@@ -2,6 +2,7 @@
 import { createHmac } from "node:crypto";
 import type { LinearCommands } from "../commands/index.js";
 import type { LinearUser, LinearWebhook } from "../types.js";
+import { webhookDestinationBlocked } from "../webhook-policy.js";
 
 export type LinearWebhookEvent = {
   type: string;
@@ -57,19 +58,26 @@ export async function dispatchLinearWebhook(
 
     let status: number | null = null;
     let error: string | null = null;
-    try {
-      const res = await fetch(webhook.url, {
-        method: "POST",
-        headers,
-        body,
-        redirect: "error",
-        signal: AbortSignal.timeout(10_000),
-      });
-      status = res.status;
-    } catch (err) {
-      // Normalize to a stable classification — raw fetch error messages are
-      // platform/Node-version specific and would make exported state non-deterministic.
-      error = err instanceof Error && err.name === "TimeoutError" ? "timeout" : "delivery_failed";
+    // Default-deny SSRF guard: refuse loopback/private/link-local (incl. cloud
+    // metadata) destinations before any request leaves the process. redirect:"error"
+    // only covers redirect-based bypasses; this covers the initial request too.
+    if (await webhookDestinationBlocked(webhook.url)) {
+      error = "blocked_destination";
+    } else {
+      try {
+        const res = await fetch(webhook.url, {
+          method: "POST",
+          headers,
+          body,
+          redirect: "error",
+          signal: AbortSignal.timeout(10_000),
+        });
+        status = res.status;
+      } catch (err) {
+        // Normalize to a stable classification — raw fetch error messages are
+        // platform/Node-version specific and would make exported state non-deterministic.
+        error = err instanceof Error && err.name === "TimeoutError" ? "timeout" : "delivery_failed";
+      }
     }
 
     commands.recordWebhookDelivery({
