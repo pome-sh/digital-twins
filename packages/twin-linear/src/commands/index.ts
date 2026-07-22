@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { resetDatabase } from "../db.js";
 import { badUserInput, notFound } from "../errors.js";
-import { byteLength, linearId, linearIdFromCounter, slugify, token } from "../ids.js";
+import { byteLength, linearIdFromCounter, slugify, token } from "../ids.js";
 import { defaultSeedState, parseSeed, type ParsedLinearStateSeed } from "../seed.js";
 import { exportLinearState, type LinearStateExport } from "../state.js";
 import {
@@ -34,7 +34,6 @@ import {
   type LinearTwinDatabase,
   type LinearUser,
   type LinearWebhook,
-  type LinearWebhookDelivery,
   type LinearWorkflowState,
   type LinearWorkflowStateType,
 } from "../types.js";
@@ -192,12 +191,10 @@ export class LinearCommands {
   }
 
   getWorkflowState(ref: string, teamRef?: string): LinearWorkflowState | null {
+    // When a team is given, stay scoped to it — never fall back to another
+    // team's states (that would let an issue adopt a foreign workflow state).
     const states = this.listWorkflowStates(teamRef);
-    return (
-      states.find((s) => s.id === ref || s.name === ref || s.type === ref) ??
-      this.listWorkflowStates().find((s) => s.id === ref || s.name === ref) ??
-      null
-    );
+    return states.find((s) => s.id === ref || s.name === ref || s.type === ref) ?? null;
   }
 
   listIssues(filter: {
@@ -217,12 +214,10 @@ export class LinearCommands {
       else issues = [];
     }
     if (filter.assignee) {
-      if (filter.assignee === "me") {
-        // caller should pass resolved user; treat as no-op filter if unresolved
-      } else {
-        const user = this.getUser(filter.assignee);
-        issues = user ? issues.filter((i) => i.assigneeId === user.id) : [];
-      }
+      // Callers must resolve "me" to a concrete user before filtering. A literal
+      // "me" (or any unknown ref) matches nobody rather than silently returning all.
+      const user = this.getUser(filter.assignee);
+      issues = user ? issues.filter((i) => i.assigneeId === user.id) : [];
     }
     if (filter.state) {
       const state = this.getWorkflowState(filter.state, filter.team);
@@ -259,9 +254,7 @@ export class LinearCommands {
     const number = this.nextIssueNumber(team.id);
     const id = this.nextId("issue");
     const identifier = `${team.key}-${number}`;
-    const labelIds = (input.labelIds ?? [])
-      .map((ref) => this.requireLabel(ref, team.id).id)
-      .filter(Boolean);
+    const labelIds = (input.labelIds ?? []).map((ref) => this.requireLabel(ref, team.id).id);
     const assigneeId = input.assigneeId ? this.requireUser(input.assigneeId).id : null;
     const delegateId = input.delegateId ? this.requireUser(input.delegateId).id : null;
     const projectId = input.projectId ? this.requireProject(input.projectId, team.id).id : null;
@@ -1040,6 +1033,14 @@ export class LinearCommands {
     return row ? mapAgentActivity(row) : null;
   }
 
+  listAgentActivities(sessionId: string): LinearAgentActivity[] {
+    return (
+      this.db
+        .prepare("SELECT * FROM agent_activities WHERE session_id = ? ORDER BY created_at, id")
+        .all(sessionId) as AgentActivityRow[]
+    ).map(mapAgentActivity);
+  }
+
   listOAuthApps(): LinearOAuthApp[] {
     return (this.db.prepare("SELECT * FROM oauth_apps ORDER BY created_at").all() as OAuthAppRow[]).map(
       mapOAuthApp
@@ -1183,10 +1184,6 @@ export class LinearCommands {
       scope: input.scopes.join(" "),
       ...(refreshToken ? { refresh_token: refreshToken } : {}),
     };
-  }
-
-  issueWebhookPayloadIssue(issue: LinearIssue): Record<string, unknown> {
-    return this.issueWebhookPayload(issue);
   }
 
   // --- internals ---
@@ -1591,8 +1588,14 @@ export class LinearCommands {
     return this.getLabel(ref, teamId) ?? notFound(`Label not found: ${ref}`);
   }
 
-  private requireProject(ref: string, _teamId?: string): LinearProject {
-    return this.getProject(ref) ?? notFound(`Project not found: ${ref}`);
+  private requireProject(ref: string, teamId?: string): LinearProject {
+    const project = this.getProject(ref) ?? notFound(`Project not found: ${ref}`);
+    // A team-scoped issue may only link to org-level projects or projects on its
+    // own team — never another team's project.
+    if (teamId && project.teamId && project.teamId !== teamId) {
+      notFound(`Project not found in team: ${ref}`);
+    }
+    return project;
   }
 
   private requireCycle(ref: string, teamId?: string): LinearCycle {
@@ -2016,6 +2019,3 @@ function mapAgentActivity(row: AgentActivityRow): LinearAgentActivity {
     updatedAt: row.updated_at,
   };
 }
-
-// silence unused import when tree-shaken in some builds
-void linearId;
