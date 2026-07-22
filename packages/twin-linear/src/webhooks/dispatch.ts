@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 import { createHmac } from "node:crypto";
-import { linearId } from "../ids.js";
 import type { LinearCommands } from "../commands/index.js";
 import type { LinearUser, LinearWebhook } from "../types.js";
 
@@ -22,7 +21,9 @@ export async function dispatchLinearWebhook(
   const webhooks = commands.listWebhooks().filter((webhook) => matchesWebhook(commands, webhook, event));
 
   for (const webhook of webhooks) {
-    const deliveryId = linearId();
+    // Deterministic delivery id from the shared logical counter — a random id
+    // would leak into /_pome/state and break run-to-run determinism.
+    const deliveryId = commands.nextId("webhook_delivery");
     const payload = {
       action: event.action,
       type: event.type,
@@ -66,7 +67,9 @@ export async function dispatchLinearWebhook(
       });
       status = res.status;
     } catch (err) {
-      error = err instanceof Error ? err.message : String(err);
+      // Normalize to a stable classification — raw fetch error messages are
+      // platform/Node-version specific and would make exported state non-deterministic.
+      error = err instanceof Error && err.name === "TimeoutError" ? "timeout" : "delivery_failed";
     }
 
     commands.recordWebhookDelivery({
