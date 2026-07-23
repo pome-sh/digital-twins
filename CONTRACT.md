@@ -80,7 +80,7 @@ Probed against the pre-engine builds (`3cd86eb`); the contract suite asserts eve
 
 - Packaged entry: `packages/twin-gmail/dist/src/server.js`; `GET /healthz`
   must answer within the shared three-second bound with `twin: "gmail"`,
-  `implementation: "gmail_twin"`, `fidelity: "semantic"`, and `tools: 10`.
+  `implementation: "gmail_twin"`, `fidelity: "semantic"`, and `tools: 13`.
 - Session identity is the normalized `gmail_email` JWT claim. Missing claims
   default locally to `pome-agent@pome-twin.test`; hosted issuers must mint the
   claim. `POME_GMAIL_TOKEN` is an alias of `POME_AUTH_TOKEN`. There is no
@@ -92,7 +92,7 @@ Probed against the pre-engine builds (`3cd86eb`); the contract suite asserts eve
   `INVALID_ARGUMENT`.
 - `GET /s/:sid/_pome/health` has exactly
   `fidelity, ok, twin, version`; `GET /s/:sid/healthz` is enabled.
-- MCP advertises exactly the captured ten launch tools. Legacy unknown-tool
+- MCP advertises exactly the captured thirteen launch tools. Legacy unknown-tool
   calls return 404 `NOT_FOUND`; strict alias/form/malformed bodies return 400
   `INVALID_ARGUMENT`.
 - Unknown session routes return 501 `UNIMPLEMENTED`; unknown root routes return
@@ -103,7 +103,7 @@ Probed against the pre-engine builds (`3cd86eb`); the contract suite asserts eve
 
 - Packaged entry: `packages/twin-linear/dist/src/server.js`; `GET /healthz`
   must answer within the shared three-second bound with `twin: "linear"`,
-  `implementation: "linear_twin"`, `fidelity: "semantic"`, and `tools: 20`.
+  `implementation: "linear_twin"`, `fidelity: "semantic"`, and `tools: 22`.
 - Session identity is the normalized `linear_email` JWT claim. Missing claims
   default locally to `admin@pome-twin.test`; hosted issuers must mint the
   claim. `POME_LINEAR_TOKEN` is an alias of `POME_AUTH_TOKEN`. There is no
@@ -120,7 +120,7 @@ Probed against the pre-engine builds (`3cd86eb`); the contract suite asserts eve
   `BAD_USER_INPUT`.
 - `GET /s/:sid/_pome/health` has exactly
   `fidelity, ok, twin, version`; `GET /s/:sid/healthz` is enabled.
-- MCP advertises exactly the captured twenty launch tools. Legacy unknown-tool
+- MCP advertises exactly the captured twenty-two launch tools. Legacy unknown-tool
   calls return 404 `NOT_FOUND`; strict alias/form/malformed bodies return 400
   `BAD_USER_INPUT`.
 - Unknown session routes return 501 with `fidelity: "unsupported"`; unknown
