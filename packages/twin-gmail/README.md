@@ -86,6 +86,45 @@ Gmail follows the same SDK chassis as GitHub / Slack / Stripe:
 
 Intentional differences: no Google OAuth (Pome JWT only); watch/stop 501; Stripe-style idempotency/failure-injection middleware is Stripe-only.
 
+## Runtime contract (for snapshot consumers)
+
+`pome-cloud` builds a Vercel Sandbox snapshot from this package's signed source
+artifact. The following constraints must hold for that build to succeed and for
+the resulting snapshot to boot. Changing any of these is a breaking change for
+hosted; land the producer change here first, then open the cloud consumer PR
+that pins and verifies the new signed digest.
+
+### Build
+
+- Package is `npm install`-able from `package.json` alone (no `workspace:*`
+  protocols, no package-manager-specific deps; no committed lockfile is required, the snapshot
+  build regenerates one on each rebuild)
+- `npm run build` exits 0 and emits `dist/src/server.js`
+- Built output is loadable under Node 24 — the snapshot runs `runtime: "node24"`.
+  SQLite is the built-in `node:sqlite` (via the sdk's `openTwinDatabase()`) —
+  no native modules, no compiler toolchain.
+
+### Runtime
+
+- Server entry: `node dist/src/server.js` (cwd = package root)
+- Listens on `:3336` by default (`GMAIL_TWIN_PORT`, then the native default)
+- **Hosted normalizes the port to `PORT=3333`.** The server honors the `PORT`
+  env var first (`PORT` → `GMAIL_TWIN_PORT` → `3336`); the pome-cloud
+  control-plane sets `PORT=3333` at spawn for every twin, so the native `3336`
+  default is only used for standalone local runs.
+- Honors `GMAIL_TWIN_HOST=0.0.0.0` env (default `127.0.0.1` is unreachable via
+  Vercel Sandbox port forwarding)
+- `GET /healthz` returns 200 within ~3s of process start (the snapshot build
+  sleeps 3s after `node dist/src/server.js` before probing)
+- Seed via `POME_SEED_JSON` (strict Gmail seed schema)
+- Bearer auth at `Authorization: Bearer <jwt>` — Pome session JWT, not a Google
+  OAuth access token
+
+### Cloud consumer coordination
+
+- Bumping any of the above = publish a signed twin digest and open the matching
+  `pome-cloud` consumer PR.
+
 ## Development
 
 ```bash
