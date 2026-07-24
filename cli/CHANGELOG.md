@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.5.0
+
+### Minor Changes
+
+- [#209](https://github.com/pome-sh/digital-twins/pull/209) [`61c9852`](https://github.com/pome-sh/digital-twins/commit/61c9852a1938707fbef66f55a61e7d7578965205) Thanks [@AFFFPupu](https://github.com/AFFFPupu)! - Retire the Gen-1 `pome install` and `pome skills` CLI wiring commands (F-893,
+  follow-up to F-859). `pome install` no longer runs a headless coding-agent
+  wiring session — its knowledge layer was the `pome-setup` skill, which F-859
+  turned into a redirect tombstone, so the wiring stopped running. It now prints
+  the Gen-2 wiring path (`claude mcp add --transport http pome https://mcp.pome.sh/mcp`
+  - `npx skills add pome-sh/digital-twins`, then the `pome-intake` / REST-launch
+    preflight) and exits 0; old invocations with the removed flags still land on the
+    redirect. The `pome skills` / `pome skills install` command is removed — it only
+    symlinked the two tombstone skills into `~/.claude/skills/`; install the Gen-2
+    coach set with `npx skills add pome-sh/digital-twins`. The bundled `cli/skills/`
+    tombstone sources are no longer packed with the CLI.
+
+### Patch Changes
+
+- [#208](https://github.com/pome-sh/digital-twins/pull/208) [`4222e36`](https://github.com/pome-sh/digital-twins/commit/4222e3608254e131ad93f4608b0bb092c3a2ad1f) Thanks [@AFFFPupu](https://github.com/AFFFPupu)! - Add the `existing-agent` ("Bring your own agent") topic to the `pome docs`
+  index (F-858), so `pome docs existing-agent` opens the new docs.pome.sh entry
+  path for connecting an already-built local agent (register → `pome.json` as a
+  side effect).
+
+- [#206](https://github.com/pome-sh/digital-twins/pull/206) [`ce59dde`](https://github.com/pome-sh/digital-twins/commit/ce59dde1b8e4722d6207b24846cc2fbc6f0383f2) Thanks [@AFFFPupu](https://github.com/AFFFPupu)! - Retire the Gen-1 `/pome-setup` and `/pome-test` skills to redirect pointers
+  (F-859). `pome skills install`'s post-install banner and the `pome skills`
+  help text now say the skills are retired and point to the Gen-2 coach set
+  (`npx skills add pome-sh/digital-twins`) instead of advertising them as the
+  way to wire and test an agent.
+
 ## 0.4.0
 
 ### Minor Changes
