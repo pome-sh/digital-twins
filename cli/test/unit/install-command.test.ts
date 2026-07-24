@@ -24,7 +24,7 @@ describe("pome install (F-893 redirect)", () => {
   });
 
   function captured(): string {
-    return errSpy.mock.calls.map((c) => String(c[0])).join("\n");
+    return errSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
   }
 
   it("prints the Gen-2 wiring path and exits 0", () => {
