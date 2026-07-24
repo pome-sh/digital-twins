@@ -45,18 +45,10 @@ export const DOCS_TOPICS: DocsTopic[] = [
     path: "/docs/how-pome-works",
     keywords: ["twins", "scenarios", "runs", "scoring", "artifacts", "loop"],
   },
-  {
-    id: "skills-setup",
-    title: "/setup",
-    path: "/docs/skills/setup",
-    keywords: ["pome-setup", "setup", "/setup", "register", "wire"],
-  },
-  {
-    id: "skills-test",
-    title: "/test-with-pome",
-    path: "/docs/skills/test-with-pome",
-    keywords: ["pome-test", "test-with-pome", "/test-with-pome", "run scenarios", "eval"],
-  },
+  // F-889 dropped the Gen-1 /setup and /test-with-pome skill pages from the
+  // docs nav; F-893 retired the CLI commands that pointed at them. Their live
+  // keywords (register/wire → existing-agent, setup → getting-started,
+  // run/eval → cli-run/cli) are covered by the topics that remain.
   {
     id: "dashboard",
     title: "Pome Dashboard",

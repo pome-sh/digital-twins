@@ -27,7 +27,6 @@ import { runDocsCommand } from "./docs.js";
 import { runCompileSeeds } from "./compile-seeds.js";
 import { runScenariosCommand } from "./scenarios.js";
 import { runEvalCommand } from "./eval.js";
-import { runSkillsInstall } from "./skills.js";
 import {
   copyAnnounceLine,
   ensureDefaultTask,
@@ -200,32 +199,18 @@ export function createProgram() {
 
   program
     .command("install")
+    // F-893 — the Gen-1 agent-driven wiring is retired; this is a redirect to
+    // the Gen-2 path. allowUnknownOption + allowExcessArguments keep old
+    // invocations (`pome install --interactive`, `--api-url …`) landing on the
+    // redirect instead of erroring on a now-removed flag or stray operand.
+    .allowUnknownOption()
+    .allowExcessArguments()
     .description(
-      "Wire this repo to pome with your own coding agent: checks auth (routes through pome login when needed), runs the wiring headless on your own Claude credentials, shows the full diff in this terminal, and applies it only on [y] — then verifies with pome doctor. --interactive hands off to a live agent session instead; no coding agent on PATH → prints manual wiring steps + a paste-into-any-agent prompt.",
+      "Retired (F-893). Prints the Gen-2 wiring path: `claude mcp add … pome` + `npx skills add pome-sh/digital-twins`, then the pome-intake / REST-launch preflight.",
     )
-    .option(
-      "--interactive",
-      "Hand off to an interactive agent session (approve edits in the agent's own UI) instead of the headless staged-diff flow.",
-    )
-    .option(
-      "--api-url <url>",
-      "Control-plane base URL.",
-      process.env.POME_API_URL ?? DEFAULT_CONTROL_PLANE_URL,
-    )
-    .option(
-      "--dashboard-url <url>",
-      "App URL for Clerk sign-in (must serve /cli/login).",
-      process.env.POME_DASHBOARD_URL ?? DEFAULT_DASHBOARD_URL,
-    )
-    .action(async (opts: { apiUrl: string; dashboardUrl: string; interactive?: boolean }) => {
-      // Dynamic import mirrors the doctor/run commands: keep install's
-      // dependency graph out of every other command's startup path.
+    .action(async () => {
       const { runInstall } = await import("./install.js");
-      await runInstall({
-        apiUrl: opts.apiUrl,
-        dashboardUrl: opts.dashboardUrl,
-        interactive: opts.interactive,
-      });
+      runInstall();
     });
 
   program
@@ -344,40 +329,9 @@ export function createProgram() {
       if (code !== 0) process.exitCode = code;
     });
 
-  const skills = program
-    .command("skills")
-    .description(
-      "Manage the bundled pome agent skills (/pome-setup, /pome-test — retired; use `npx skills add pome-sh/digital-twins`)",
-    );
-
-  skills
-    .command("install")
-    .description(
-      "Install the retired /pome-setup and /pome-test redirect pointers into ~/.claude/skills/ (Gen-2 set: `npx skills add pome-sh/digital-twins`)",
-    )
-    .option(
-      "--copy",
-      "Copy each skill instead of symlinking (CI, Windows without symlink permission)",
-      false,
-    )
-    .option(
-      "--force",
-      "Overwrite an existing install of the same skill",
-      false,
-    )
-    .option(
-      "--dest <dir>",
-      "Install into <dir> instead of ~/.claude/skills/ (testing and advanced users)",
-    )
-    .action(
-      async (opts: { copy: boolean; force: boolean; dest?: string }) => {
-        await runSkillsInstall({
-          copy: opts.copy,
-          force: opts.force,
-          dest: opts.dest,
-        });
-      },
-    );
+  // F-893 — `pome skills` / `pome skills install` retired. It only symlinked
+  // the two Gen-1 tombstone skills into ~/.claude/skills/; the Gen-2 coach set
+  // installs via `npx skills add pome-sh/digital-twins`.
 
   const register = program
     .command("register")
