@@ -7,10 +7,13 @@ ONLY on the failure named in its row — no founder rescue otherwise (Done-when 
 
 1. **Registration** (upstream — F-858, not this skill)
    - Input: a foreign repo with the agent's code.
-   - Coach: confirm the agent is registered — a `pome.json` (with `twins`) is
-     present and `register_agent` has run. This skill only verifies the manifest
-     is there and enters the chain.
-   - Artifact: `pome.json` at the repo root; an `agent_id` on the platform.
+   - Coach: confirm the agent is registered via the **CLI** — a local repo, so
+     `pome register agent`, **not** MCP `register_agent` (see the pome router's
+     "One register verb"): a `pome.json` (with `twins`) and a populated
+     `.pome/link.json` are present. This skill only verifies the manifest is
+     there and enters the chain.
+   - Artifact: `pome.json` + `.pome/link.json` at the repo root; an `agent_id`
+     on the platform.
    - Stops if: no `pome.json` → route back to the entry path.
 
 2. **Suggestion** (`pome-suggest-tasks`)

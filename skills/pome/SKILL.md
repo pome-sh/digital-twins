@@ -31,7 +31,7 @@ browser): `claude mcp add --transport http pome https://mcp.pome.sh/mcp`.
 | --- | --- |
 | A **Claude managed-agent YAML** (pasted, or "test my managed agent") | `pome-intake` — collect the clone scope, register via `intake_clone_scope`, report twin coverage |
 | A **registered own agent** — a repo with a `pome.json` but **no task yet** ("test my agent" / "what should I test?", `tasks/` empty and `list_tasks` empty) | `pome-suggest-tasks` — read the manifest (`twins`) + the agent's prompt/code, propose grounded candidates, interview to pick one, then the authoring chain |
-| A **local repo agent / self-hosted process** (talks REST, no managed-agent YAML) | The local-examinee path: register once with `register_agent(name, twins)`, then `pome-run-task` — `run_task` mints the session and the launch spec; launch the process yourself via the REST launcher (`pome-run-task/references/launch-rest.md`), which **preflights the wiring** (config → twin reachable → routing → egress floor, the `pome doctor` checks) before it launches |
+| A **local repo agent / self-hosted process** (talks REST, no managed-agent YAML) | The local-examinee path: register with the **CLI** — `pome register agent <name> [--twins …]`, which writes `pome.json` + `.pome/link.json` and sets local transport (the MCP `register_agent` does **not** — see **One register verb** below). Then `pome-run-task` — `run_task` mints the session and the launch spec; launch the process yourself via the REST launcher (`pome-run-task/references/launch-rest.md`), which **preflights the wiring** (config → twin reachable → routing → egress floor, the `pome doctor` checks) before it launches |
 | "**What should I test?**" / a worry to turn into a graded check | `pome-author-task` — library-first authoring, `[code]`/`[model]` criteria, validate → dry-run → `save_task` |
 | A drafted task, first run coming up ("is my seed right?") | `pome-verify-seed` — fair-exam triage before anything runs |
 | A verified task to execute ("run my tasks", "how did my agent do?") | `pome-run-task` — mint, launch, `finalize_run` on idle, narrate `get_report` |
@@ -48,6 +48,35 @@ When in doubt, ask one question — "is your agent a Claude managed agent, or a
 process you run yourself?" — and route on the answer. The full journey is
 intake → author → verify → run; enter wherever the builder actually is.
 
+## One register verb — CLI vs MCP
+
+There is one *concept* — register an agent — reached by two surfaces that are
+**not** interchangeable. Route by whether a local repo is in play; never
+silently swap one for the other:
+
+- **Local repo present** (a `pome.json`-bearing repo the builder runs
+  themselves — the self-hosted / REST examinee) → the **CLI**:
+  `pome register agent <name> [--twins …]`. Only the CLI resolves the hosted
+  identity **and** writes the local wiring — the canonical `agent.slug` into
+  `pome.json` and the gitignored `.pome/link.json` id cache — so the local
+  run/doctor path resolves the agent and its transport. The MCP tool writes
+  neither.
+- **No local repo** (a Claude managed agent → `pome-intake` /
+  `intake_clone_scope`, or a purely hosted registration with nothing on disk to
+  link) → the MCP `register_agent`.
+
+**If a paste-prompt or the builder spells out the CLI command, run it
+verbatim.** Do not substitute the MCP `register_agent` "because it's the same
+registration" — it is not. Registering a local repo agent through the MCP alone
+leaves `.pome/link.json` unpopulated and the transport wrong, and a second
+`pome register agent` is then needed to repair both (the 2026-07-24 cold-walk
+regression, F-903).
+
+Once an agent is registered, `register_agent(name, twins:[…])` from the run path
+is still the right call for **additive twin enablement** on an
+already-registered agent — it merges the allowlist (F-784), it is not a fresh
+registration.
+
 ## This is not the CLI
 
 The `pome` CLI records traces locally; evaluation and scoring are hosted. If
@@ -56,7 +85,7 @@ verbatim from the frozen control MCP contract v1.0:
 
 | CLI-era habit | Hosted (coach) equivalent |
 | --- | --- |
-| `pome register` | `register_agent` via the control MCP — the **one** "register an agent" verb (the CLI command remains for CLI-era users; both land the same registration) |
+| `pome register agent` | **Not** a synonym for MCP `register_agent` — route by context (see **One register verb** above). A local repo keeps the CLI (it writes `pome.json` + `.pome/link.json` and sets local transport); only a no-repo / managed agent uses the MCP tool. |
 | `pome run <task>` | `run_task` (mints the session) → launch the examinee → `finalize_run` the instant it idles → `get_report` |
 | `pome run -n 3` (N trials) | `run_trials(n, task_id)` — the batch form that provisions all N under one shared `group_id` (or `run_task` ×N reusing one `group_id`); `finalize_run` each; `list_runs(group_id)` is the cross-run view |
 | Local task files on disk | `save_task` into your team catalog on first use; browse with `list_tasks` (no cross-team library) |
