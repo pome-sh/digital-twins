@@ -1,0 +1,31 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard"
+  ],
+  "schedule": ["* 0-5 1,15 * *"],
+  "timezone": "Etc/UTC",
+  "prConcurrentLimit": 1,
+  "prHourlyLimit": 0,
+  "rebaseWhen": "conflicted",
+  "packageRules": [
+    {
+      "description": "Batch every non-major update (npm, docker, github-actions) into a single PR so we never see more than one routine dependency PR at a time.",
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest", "lockFileMaintenance"],
+      "groupName": "all non-major dependencies",
+      "groupSlug": "all-non-major"
+    },
+    {
+      "description": "Do NOT bump actions/setup-node to v7 — v7 changed how registry-url writes .npmrc and breaks OIDC Trusted Publishing (ENEEDAUTH). Pinned to v6.x. See .github/workflows/sdk-publish.yml and actions/setup-node#1551.",
+      "matchDepNames": ["actions/setup-node"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "description": "Security fixes are not held for the fortnightly window.",
+    "schedule": ["at any time"],
+    "labels": ["security"]
+  }
+}
