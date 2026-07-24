@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { openGmailTwinDatabase } from "../src/index.js";
 import { checkFault, gmailFaultSchema } from "../src/faults.js";
-import { GmailError } from "../src/errors.js";
+import { GmailError, gmailErrorEnvelope } from "../src/errors.js";
 
 function dbWithFault(fault: unknown) {
   const db = openGmailTwinDatabase(":memory:");
@@ -39,5 +39,14 @@ describe("rate-limited fault", () => {
 
   it("rejects an unknown fault name", () => {
     expect(() => gmailFaultSchema.parse({ name: "kaboom" })).toThrow();
+  });
+});
+
+describe("429 envelope", () => {
+  it("maps 429 to RESOURCE_EXHAUSTED", () => {
+    const env = gmailErrorEnvelope(new GmailError(429, "rateLimitExceeded", "slow down"));
+    expect(env.status).toBe(429);
+    expect((env.body as any).error.status).toBe("RESOURCE_EXHAUSTED");
+    expect((env.body as any).error.errors[0].reason).toBe("rateLimitExceeded");
   });
 });
