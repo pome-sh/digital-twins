@@ -31,7 +31,7 @@ const FILE_SIZE_ALLOWLIST = new Set([
   "cli/src/cli/embedded-wiring.ts",
   "cli/src/cli/install.ts",
   "cli/src/hosted/client.ts",
-  "cli/src/runner/runScenarioHosted.ts",
+  "cli/src/runner/runTaskHosted.ts",
   "packages/shared-types/src/otel/fixtures/data.ts",
   "packages/twin-github/src/serializers.ts",
   "packages/twin-github/src/tools.ts",

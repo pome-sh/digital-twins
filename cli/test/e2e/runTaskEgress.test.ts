@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-635 — E2E test that `pome run` (via `runScenario`) enforces the
+// FDRS-635 — E2E test that `pome run` (via `runTask`) enforces the
 // deny-by-default egress floor end-to-end: the agent's CONNECT to a
 // non-allowlisted host is refused with 403 (asserted inside the fixture),
 // loopback tunnels still work, twin traffic is unaffected, and the refused
@@ -10,7 +10,7 @@ import { createServer as createNetServer, type Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { runScenario } from "../../src/runner/runScenario.js";
+import { runTask } from "../../src/runner/runTask.js";
 import { captureServerForTests } from "../fixtures/captureServerForTests.js";
 
 function listenEphemeral(server: ReturnType<typeof createNetServer>): Promise<number> {
@@ -30,7 +30,7 @@ function appendAllowlist(existing: string | undefined, names: string[]): string 
   return [...values].join(",");
 }
 
-describe("runScenario — egress floor wiring (FDRS-635)", () => {
+describe("runTask — egress floor wiring (FDRS-635)", () => {
   let echoPort = 0;
   let echoCloser: (() => Promise<void>) | null = null;
 
@@ -66,8 +66,8 @@ describe("runScenario — egress floor wiring (FDRS-635)", () => {
     ]);
 
     try {
-      const result = await runScenario({
-        scenarioPath: "tasks/01-bug-happy-path.md",
+      const result = await runTask({
+        taskPath: "tasks/01-bug-happy-path.md",
         agentCommand: `npx tsx ${probePath}`,
         artifactsDir,
         captureServerCommand: captureServerForTests,

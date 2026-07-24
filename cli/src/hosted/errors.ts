@@ -13,7 +13,7 @@
 //   - F0-5c: `pome logout && pome run` was returning exit 2 instead of 3
 //     because credential-resolution failure threw a plain Error.
 //   - F18: hosted sub-threshold runs sometimes returned exit 3 because
-//     `runScenarioHosted.ts` mapped any non-zero agent exit to exit 3,
+//     `runTaskHosted.ts` mapped any non-zero agent exit to exit 3,
 //     stealing the auth slot.
 //
 // FDRS-636 — trial groups (`pome run -n k`, k>1) map the WHOLE GROUP to one

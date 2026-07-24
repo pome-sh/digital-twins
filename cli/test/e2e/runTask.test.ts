@@ -3,12 +3,12 @@ import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { runScenario } from "../../src/runner/runScenario.js";
+import { runTask } from "../../src/runner/runTask.js";
 import { captureServerForTests } from "../fixtures/captureServerForTests.js";
 
 // F-689 remainder (D6/R1) — `writeRunArtifactsCore` writes EXACTLY six files
 // (asserted directly at the unit level in
-// test/unit/recorder/artifacts.test.ts). The full self-host `runScenario()`
+// test/unit/recorder/artifacts.test.ts). The full self-host `runTask()`
 // surface tested here also writes its own pre-existing, unrelated sidecars
 // (signals.jsonl for adapter signals, egress.jsonl for refused CONNECTs) —
 // so this e2e checks the REQUIRED six are present and the four deleted
@@ -41,9 +41,9 @@ describe("Pome scenario runner (capture-only)", () => {
         "tasks/03-already-triaged.md",
       ];
 
-      for (const scenarioPath of scenarios) {
-        const result = await runScenario({
-          scenarioPath,
+      for (const taskPath of scenarios) {
+        const result = await runTask({
+          taskPath,
           agentCommand: "npx tsx examples/agents/scripted-triage-agent.ts",
           artifactsDir,
           captureServerCommand: captureServerForTests,
@@ -71,8 +71,8 @@ describe("Pome scenario runner (capture-only)", () => {
   it("captures the github identity-spoof scenario trace without a verdict", async () => {
     const artifactsDir = await mkdtemp(join(tmpdir(), "pome-runs-"));
 
-    const result = await runScenario({
-      scenarioPath: "tasks/05-github-identity-spoof.md",
+    const result = await runTask({
+      taskPath: "tasks/05-github-identity-spoof.md",
       agentCommand: "npx tsx examples/agents/scripted-pr-reviewer-agent.ts",
       artifactsDir,
       captureServerCommand: captureServerForTests,

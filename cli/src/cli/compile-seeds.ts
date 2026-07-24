@@ -13,9 +13,9 @@ import { existsSync } from "node:fs";
 import { readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { extname, join, resolve } from "node:path";
 import { z } from "zod";
-import { compileSeed, COMPILER_MODEL, type CompileResult } from "../scenario/seed-compiler.js";
-import { compileSeedHosted } from "../scenario/seed-compiler-hosted.js";
-import { verifySeedWithTwin } from "../scenario/seed-verifier.js";
+import { compileSeed, COMPILER_MODEL, type CompileResult } from "../task/seed-compiler.js";
+import { compileSeedHosted } from "../task/seed-compiler-hosted.js";
+import { verifySeedWithTwin } from "../task/seed-verifier.js";
 import { exitCodeFor } from "../hosted/errors.js";
 
 const SIDECAR_META_VERSION = 1;
@@ -67,17 +67,17 @@ export async function runCompileSeeds(target: string | undefined, opts: CompileO
   return 0;
 }
 
-async function compileOne(scenarioPath: string, opts: CompileOptions): Promise<FileResult> {
+async function compileOne(taskPath: string, opts: CompileOptions): Promise<FileResult> {
   let markdown: string;
   try {
-    markdown = await readFile(scenarioPath, "utf8");
+    markdown = await readFile(taskPath, "utf8");
   } catch (err) {
-    return { path: scenarioPath, status: "error", message: `read failed: ${(err as Error).message}` };
+    return { path: taskPath, status: "error", message: `read failed: ${(err as Error).message}` };
   }
 
   const seedText = extractSeedSection(markdown).trim();
   if (seedText.length === 0) {
-    return { path: scenarioPath, status: "skipped-no-seed", message: "no ## Seed State section" };
+    return { path: taskPath, status: "skipped-no-seed", message: "no ## Seed State section" };
   }
 
   // Stripe scenarios use a different schema; v1 only supports github. Check
@@ -86,7 +86,7 @@ async function compileOne(scenarioPath: string, opts: CompileOptions): Promise<F
   const twins = readTwinsFromConfig(markdown);
   if (twins.length > 0 && !twins.includes("github")) {
     return {
-      path: scenarioPath,
+      path: taskPath,
       status: "skipped-unsupported-twin",
       message: `twins=${twins.join(",")} not supported yet`
     };
@@ -97,13 +97,13 @@ async function compileOne(scenarioPath: string, opts: CompileOptions): Promise<F
   // before compile-seeds can take over.
   if (looksLikeJsonBlock(seedText)) {
     return {
-      path: scenarioPath,
+      path: taskPath,
       status: "skipped-inline-json",
       message: "still on inline JSON — replace the fenced JSON with prose"
     };
   }
 
-  const sidecarPath = sidecarPathFor(scenarioPath);
+  const sidecarPath = sidecarPathFor(taskPath);
   const proseHash = hashProse(seedText);
 
   // Cache check only applies to local compile — hosted callers may have
@@ -112,18 +112,18 @@ async function compileOne(scenarioPath: string, opts: CompileOptions): Promise<F
   if (!opts.force && !opts.hosted && existsSync(sidecarPath)) {
     const cached = await readSidecarMeta(sidecarPath);
     if (cached && cached.source_hash === proseHash && cached.model === COMPILER_MODEL) {
-      return { path: scenarioPath, status: "skipped-cached", message: `up-to-date (${sidecarPath})` };
+      return { path: taskPath, status: "skipped-cached", message: `up-to-date (${sidecarPath})` };
     }
   }
 
   let result: CompileResult;
   try {
     result = opts.hosted
-      ? await compileSeedHosted(seedText, { apiBaseUrl: opts.apiBaseUrl, scenarioPath })
+      ? await compileSeedHosted(seedText, { apiBaseUrl: opts.apiBaseUrl, taskPath })
       : await compileSeed(seedText);
   } catch (err) {
     return {
-      path: scenarioPath,
+      path: taskPath,
       status: "error",
       message: `compile failed: ${(err as Error).message}`,
       exitCode: opts.hosted ? exitCodeFor(err) : undefined
@@ -133,7 +133,7 @@ async function compileOne(scenarioPath: string, opts: CompileOptions): Promise<F
   try {
     verifySeedWithTwin(result.seed);
   } catch (err) {
-    return { path: scenarioPath, status: "error", message: (err as Error).message };
+    return { path: taskPath, status: "error", message: (err as Error).message };
   }
 
   const payload = {
@@ -149,7 +149,7 @@ async function compileOne(scenarioPath: string, opts: CompileOptions): Promise<F
   await writeFile(sidecarPath, JSON.stringify(payload, null, 2) + "\n");
 
   return {
-    path: scenarioPath,
+    path: taskPath,
     status: "compiled",
     message: `→ ${sidecarPath}`,
     inputTokens: result.inputTokens,
@@ -159,7 +159,7 @@ async function compileOne(scenarioPath: string, opts: CompileOptions): Promise<F
 }
 
 function extractSeedSection(markdown: string): string {
-  // Mirrors the H2-section logic in parseScenario.ts: find the "## Seed State"
+  // Mirrors the H2-section logic in parseTask.ts: find the "## Seed State"
   // heading and return everything until the next H2.
   const headingRegex = /^##\s+seed state\s*$/im;
   const m = markdown.match(headingRegex);
@@ -190,9 +190,9 @@ function looksLikeJsonBlock(input: string): boolean {
   return /^```(?:json)?\s*\{/m.test(input.trim());
 }
 
-function sidecarPathFor(scenarioPath: string): string {
-  const ext = extname(scenarioPath);
-  return scenarioPath.slice(0, -ext.length) + ".seed.json";
+function sidecarPathFor(taskPath: string): string {
+  const ext = extname(taskPath);
+  return taskPath.slice(0, -ext.length) + ".seed.json";
 }
 
 function hashProse(input: string): string {

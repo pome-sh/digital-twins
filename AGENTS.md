@@ -24,11 +24,13 @@ live at **https://docs.pome.sh**.
   `npm ci` / `npm install`.
 - **Vocabulary: the product term is "task"** — "scenario" is retired (F-778,
   F-860, F-892). Never introduce "scenario" in new code, docs, or CLI copy.
-  The shipped CLI command (`pome tasks`) and scaffold (`./tasks/`) completed the
-  rename in F-892 — `pome scenarios` survives only as a hidden deprecated alias.
-  The remaining sanctioned survivors are `scenario_*` wire keys (server contract,
-  W3/FDRS-653) and the CLI's internal runner/schema symbols (`runScenario*`,
-  `parseScenario`, `Scenario`, `scenarioSchema` — a follow-up mechanical pass).
+  F-892 completed the CLI rename end-to-end: the command (`pome tasks`), scaffold
+  (`./tasks/`), and the internal runner/schema surface (`src/task/`, `runTask*`,
+  the `Task` type, `parseTask`, `taskSchema`). `pome scenarios` survives only as
+  a hidden deprecated alias. The ONLY remaining sanctioned survivors are the
+  serialized `scenario` / `scenario_*` keys — the run-artifact `scenario` key and
+  the finalize/result wire fields (server contract; flip with W3/FDRS-653) — and
+  the in-memory carriers whose value flows straight into them.
 - **The CLI (`cli/`) is not a root workspace** — use `cd cli && npm ...`, not
   `npm run -w` from the root.
 - **`cli/pnpm-workspace.yaml` is not pnpm** — it is only the changesets/manypkg

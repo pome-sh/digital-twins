@@ -94,7 +94,7 @@ export interface HostedClientConfig {
 }
 
 export interface CreateSessionInput {
-  scenarioSource: string;
+  taskSource: string;
   twins: string[];
   /** Omit for one-off sessions; reuse only when intentionally replaying a create after network uncertainty. */
   idempotencyKey?: string;
@@ -151,8 +151,8 @@ export interface FetchOnTwinInput {
 }
 
 export interface SubmitResultInput {
-  scenarioName: string;
-  scenarioHash: string;
+  taskName: string;
+  taskHash: string;
   durationMs: number;
   agentModel: string;
   satisfactionScore: number;
@@ -236,9 +236,9 @@ export interface FinalizeInput {
   // parse. z.input keeps this compiling against both the published 0.9.x
   // contract (D/P only) and the tolerant 0.10.0 reader.
   criteria: CriterionDefWire[];
-  scenarioName: string;
-  scenarioHash: string;
-  scenarioPrompt: string;
+  taskName: string;
+  taskHash: string;
+  taskPrompt: string;
   expectedBehavior: string;
   // Optional storage-key overrides. When omitted, cloud loads from the
   // conventional `team-<>/session-<>/<filename>` paths populated by the
@@ -786,7 +786,7 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
     async createSession(input) {
       const body: Record<string, unknown> = {
         twins: input.twins,
-        scenario_source: Buffer.from(input.scenarioSource, "utf8").toString(
+        scenario_source: Buffer.from(input.taskSource, "utf8").toString(
           "base64",
         ),
       };
@@ -1013,9 +1013,9 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
         agent_model: input.agentModel,
         agent_sdk: normalizeAgentSdk(input.agentSdk),
         criteria: input.criteria,
-        scenario_name: input.scenarioName,
-        scenario_hash: input.scenarioHash,
-        scenario_prompt: input.scenarioPrompt,
+        scenario_name: input.taskName,
+        scenario_hash: input.taskHash,
+        scenario_prompt: input.taskPrompt,
         expected_behavior: input.expectedBehavior,
       };
       if (input.traceStorageKey !== undefined) {
@@ -1059,8 +1059,8 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
       return postJson(
         `/v1/sessions/${encodeURIComponent(sessionId)}/result`,
         {
-          scenario_name: input.scenarioName,
-          scenario_hash: input.scenarioHash,
+          scenario_name: input.taskName,
+          scenario_hash: input.taskHash,
           duration_ms: input.durationMs,
           agent_model: input.agentModel,
           satisfaction_score: input.satisfactionScore,

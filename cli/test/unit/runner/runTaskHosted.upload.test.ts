@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Unit tests for the events.jsonl upload orchestration in runScenarioHosted.
+// Unit tests for the events.jsonl upload orchestration in runTaskHosted.
 // Covers FDRS-357 Task 11: happy path, requestEventsUploadUrl throws, PUT 5xx.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -12,7 +12,7 @@ const identityMock = vi.hoisted(() => ({
 }));
 vi.mock("../../../src/cli/agent-identity.js", () => identityMock);
 
-import { runScenarioHosted } from "../../../src/runner/runScenarioHosted.js";
+import { runTaskHosted } from "../../../src/runner/runTaskHosted.js";
 import type { HostedClient } from "../../../src/hosted/client.js";
 import { HostedOrchError } from "../../../src/hosted/errors.js";
 import type {
@@ -22,7 +22,7 @@ import type {
   SubmitResultResponse,
 } from "../../../src/types/shared.js";
 
-// Minimal passing scenario fixture that parseScenario can handle.
+// Minimal passing scenario fixture that parseTask can handle.
 const TRIVIAL_PASSING_SCENARIO =
   "# Trivial\n\n## Prompt\nPretend prompt.\n\n## Success Criteria\n- [code] No unsupported endpoint was called\n";
 
@@ -113,7 +113,7 @@ function makeStubClient({
       } as CreateSessionResponse;
     },
     async createEvalSession() {
-      // FDRS-656 — never reached by runScenarioHosted; eval-command tests
+      // FDRS-656 — never reached by runTaskHosted; eval-command tests
       // supply their own mock.
       throw new HostedOrchError("no eval-session stubbed");
     },
@@ -137,7 +137,7 @@ function makeStubClient({
       } satisfies FinalizeResponse;
     },
     async submitResult() {
-      // Not called from runScenarioHosted any more; left as a stub to satisfy
+      // Not called from runTaskHosted any more; left as a stub to satisfy
       // the deprecated-but-still-exposed HostedClient surface.
       return {
         run_id: FAKE_RUN_ID,
@@ -194,7 +194,7 @@ function makeStubClient({
   };
 }
 
-describe("runScenarioHosted events.jsonl upload orchestration (FDRS-357)", () => {
+describe("runTaskHosted events.jsonl upload orchestration (FDRS-357)", () => {
   let tmp: string;
 
   beforeEach(async () => {
@@ -247,8 +247,8 @@ describe("runScenarioHosted events.jsonl upload orchestration (FDRS-357)", () =>
       throw new Error(`Unexpected fetch call to ${urlStr}`);
     });
 
-    const scenarioPath = join(tmp, "scn.md");
-    await writeFile(scenarioPath, TRIVIAL_PASSING_SCENARIO, "utf8");
+    const taskPath = join(tmp, "scn.md");
+    await writeFile(taskPath, TRIVIAL_PASSING_SCENARIO, "utf8");
     // Stub agent writes a single fake HookEvent to the signals path the
     // runner injected via POME_ADAPTER_SIGNALS_PATH. JSON-stringify so
     // path escaping works on Windows too.
@@ -257,8 +257,8 @@ describe("runScenarioHosted events.jsonl upload orchestration (FDRS-357)", () =>
     const agentScript = `require('fs').appendFileSync(process.env.POME_ADAPTER_SIGNALS_PATH, ${JSON.stringify(`${stubSignal}\n`)}); console.log('ok');`;
     const stubAgent = `node -e ${JSON.stringify(agentScript)}`;
 
-    const result = await runScenarioHosted({
-      scenarioPath,
+    const result = await runTaskHosted({
+      taskPath,
       agentCommand: stubAgent,
       artifactsDir: join(tmp, "runs"),
       hosted: { baseUrl: "http://no-cloud.invalid", apiKey: "pme_test" },
@@ -310,12 +310,12 @@ describe("runScenarioHosted events.jsonl upload orchestration (FDRS-357)", () =>
       throw new Error(`Unexpected fetch call to ${urlStr}`);
     });
 
-    const scenarioPath = join(tmp, "scn.md");
-    await writeFile(scenarioPath, TRIVIAL_PASSING_SCENARIO, "utf8");
+    const taskPath = join(tmp, "scn.md");
+    await writeFile(taskPath, TRIVIAL_PASSING_SCENARIO, "utf8");
     const stubAgent = `node -e ${JSON.stringify("console.log('done')")}`;
 
-    const result = await runScenarioHosted({
-      scenarioPath,
+    const result = await runTaskHosted({
+      taskPath,
       agentCommand: stubAgent,
       artifactsDir: join(tmp, "runs"),
       hosted: { baseUrl: "http://no-cloud.invalid", apiKey: "pme_test" },
@@ -360,12 +360,12 @@ describe("runScenarioHosted events.jsonl upload orchestration (FDRS-357)", () =>
       throw new Error(`Unexpected fetch call to ${urlStr}`);
     });
 
-    const scenarioPath = join(tmp, "scn.md");
-    await writeFile(scenarioPath, TRIVIAL_PASSING_SCENARIO, "utf8");
+    const taskPath = join(tmp, "scn.md");
+    await writeFile(taskPath, TRIVIAL_PASSING_SCENARIO, "utf8");
     const stubAgent = `node -e ${JSON.stringify("console.log('done')")}`;
 
-    const result = await runScenarioHosted({
-      scenarioPath,
+    const result = await runTaskHosted({
+      taskPath,
       agentCommand: stubAgent,
       artifactsDir: join(tmp, "runs"),
       hosted: { baseUrl: "http://no-cloud.invalid", apiKey: "pme_test" },
@@ -432,12 +432,12 @@ describe("runScenarioHosted events.jsonl upload orchestration (FDRS-357)", () =>
       throw new Error(`Unexpected fetch call to ${urlStr}`);
     });
 
-    const scenarioPath = join(tmp, "scn.md");
-    await writeFile(scenarioPath, TRIVIAL_PASSING_SCENARIO, "utf8");
+    const taskPath = join(tmp, "scn.md");
+    await writeFile(taskPath, TRIVIAL_PASSING_SCENARIO, "utf8");
     const stubAgent = `node -e ${JSON.stringify("console.log('done')")}`;
 
-    const result = await runScenarioHosted({
-      scenarioPath,
+    const result = await runTaskHosted({
+      taskPath,
       agentCommand: stubAgent,
       artifactsDir: join(tmp, "runs"),
       hosted: { baseUrl: "http://no-cloud.invalid", apiKey: "pme_test" },
@@ -477,11 +477,11 @@ describe("runScenarioHosted events.jsonl upload orchestration (FDRS-357)", () =>
       throw new Error(`Unexpected fetch call to ${String(url)}`);
     });
 
-    const scenarioPath = join(tmp, "scn.md");
-    await writeFile(scenarioPath, TRIVIAL_PASSING_SCENARIO, "utf8");
+    const taskPath = join(tmp, "scn.md");
+    await writeFile(taskPath, TRIVIAL_PASSING_SCENARIO, "utf8");
 
-    const result = await runScenarioHosted({
-      scenarioPath,
+    const result = await runTaskHosted({
+      taskPath,
       agentCommand: `node -e ${JSON.stringify("console.log('done')")}`,
       artifactsDir: join(tmp, "runs"),
       hosted: { baseUrl: "http://no-cloud.invalid", apiKey: "pme_test" },
@@ -523,11 +523,11 @@ describe("runScenarioHosted events.jsonl upload orchestration (FDRS-357)", () =>
       throw new Error(`Unexpected fetch call to ${urlStr}`);
     });
 
-    const scenarioPath = join(tmp, "scn.md");
-    await writeFile(scenarioPath, TRIVIAL_PASSING_SCENARIO, "utf8");
+    const taskPath = join(tmp, "scn.md");
+    await writeFile(taskPath, TRIVIAL_PASSING_SCENARIO, "utf8");
 
-    const result = await runScenarioHosted({
-      scenarioPath,
+    const result = await runTaskHosted({
+      taskPath,
       agentCommand: `node -e ${JSON.stringify("console.log('done')")}`,
       artifactsDir: join(tmp, "runs"),
       hosted: { baseUrl: "http://no-cloud.invalid", apiKey: "pme_test" },
@@ -553,12 +553,12 @@ describe("runScenarioHosted events.jsonl upload orchestration (FDRS-357)", () =>
       throw new Error(`Unexpected fetch call to ${String(url)}`);
     });
 
-    const scenarioPath = join(tmp, "scn.md");
-    await writeFile(scenarioPath, TRIVIAL_PASSING_SCENARIO, "utf8");
+    const taskPath = join(tmp, "scn.md");
+    await writeFile(taskPath, TRIVIAL_PASSING_SCENARIO, "utf8");
     const stubAgent = `node -e ${JSON.stringify("console.log('done')")}`;
 
-    const result = await runScenarioHosted({
-      scenarioPath,
+    const result = await runTaskHosted({
+      taskPath,
       agentCommand: stubAgent,
       artifactsDir: join(tmp, "runs"),
       hosted: { baseUrl: "http://no-cloud.invalid", apiKey: "pme_test" },
@@ -589,12 +589,12 @@ describe("runScenarioHosted events.jsonl upload orchestration (FDRS-357)", () =>
       throw new Error(`Unexpected fetch call to ${urlStr}`);
     });
 
-    const scenarioPath = join(tmp, "scn.md");
-    await writeFile(scenarioPath, TRIVIAL_PASSING_SCENARIO, "utf8");
+    const taskPath = join(tmp, "scn.md");
+    await writeFile(taskPath, TRIVIAL_PASSING_SCENARIO, "utf8");
     const stubAgent = `node -e ${JSON.stringify("console.log('done')")}`;
 
-    const result = await runScenarioHosted({
-      scenarioPath,
+    const result = await runTaskHosted({
+      taskPath,
       agentCommand: stubAgent,
       artifactsDir: join(tmp, "runs"),
       hosted: { baseUrl: "http://no-cloud.invalid", apiKey: "pme_test" },
@@ -614,13 +614,13 @@ describe("runScenarioHosted events.jsonl upload orchestration (FDRS-357)", () =>
       },
     });
 
-    // Scenario uses a prose ## Seed State section (the post-2026-05-22 shape)
+    // Task uses a prose ## Seed State section (the post-2026-05-22 shape)
     // with a sibling .seed.json sidecar. Without forwarding, cloud would 422
     // trying to extract JSON from the prose markdown.
-    const scenarioPath = join(tmp, "scn.md");
+    const taskPath = join(tmp, "scn.md");
     const sidecarPath = join(tmp, "scn.seed.json");
     await writeFile(
-      scenarioPath,
+      taskPath,
       "# Trivial\n\n## Prompt\np\n\n## Success Criteria\n- [code] No unsupported endpoint was called\n\n## Seed State\nA GitHub-shaped twin with one repo.\n",
       "utf8",
     );
@@ -632,8 +632,8 @@ describe("runScenarioHosted events.jsonl upload orchestration (FDRS-357)", () =>
     };
     await writeFile(sidecarPath, JSON.stringify(sidecarSeed), "utf8");
 
-    await runScenarioHosted({
-      scenarioPath,
+    await runTaskHosted({
+      taskPath,
       agentCommand: `node -e ${JSON.stringify("console.log('done')")}`,
       artifactsDir: join(tmp, "runs"),
       hosted: { baseUrl: "http://no-cloud.invalid", apiKey: "pme_test" },
@@ -671,11 +671,11 @@ describe("runScenarioHosted events.jsonl upload orchestration (FDRS-357)", () =>
     await import("node:fs/promises").then((fs) =>
       fs.mkdir(scenarioDir, { recursive: true }),
     );
-    const scenarioPath = join(scenarioDir, "scn.md");
-    await writeFile(scenarioPath, TRIVIAL_PASSING_SCENARIO, "utf8");
+    const taskPath = join(scenarioDir, "scn.md");
+    await writeFile(taskPath, TRIVIAL_PASSING_SCENARIO, "utf8");
 
-    await runScenarioHosted({
-      scenarioPath,
+    await runTaskHosted({
+      taskPath,
       agentCommand: `node -e ${JSON.stringify("console.log('done')")}`,
       artifactsDir: join(tmp, "runs"),
       hosted: { baseUrl: "http://no-cloud.invalid", apiKey: "pme_test" },
@@ -689,7 +689,7 @@ describe("runScenarioHosted events.jsonl upload orchestration (FDRS-357)", () =>
   });
 });
 
-describe("runScenarioHosted ADR-013 score reporting", () => {
+describe("runTaskHosted ADR-013 score reporting", () => {
   let tmp: string;
   const SAVED_ENV: Record<string, string | undefined> = {};
   const LLM_KEYS = ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "POME_LLM_API_KEY"] as const;
@@ -718,7 +718,7 @@ describe("runScenarioHosted ADR-013 score reporting", () => {
   });
 
   it("reports cloud's satisfaction_score on PASS regardless of LLM-key absence (the regression this PR fixes)", async () => {
-    // Scenario with a probabilistic criterion. Pre-fix, the local evaluator
+    // Task with a probabilistic criterion. Pre-fix, the local evaluator
     // would skip this criterion (no LLM key) and pull satisfaction below
     // the passThreshold (100). Post-fix, the local evaluator is never called
     // — cloud's score wins.
@@ -738,12 +738,12 @@ describe("runScenarioHosted ADR-013 score reporting", () => {
       throw new Error(`Unexpected fetch call to ${String(url)}`);
     });
 
-    const scenarioPath = join(tmp, "scn.md");
-    await writeFile(scenarioPath, scenarioWithProbabilistic, "utf8");
+    const taskPath = join(tmp, "scn.md");
+    await writeFile(taskPath, scenarioWithProbabilistic, "utf8");
     const stubAgent = `node -e ${JSON.stringify("console.log('done')")}`;
 
-    const result = await runScenarioHosted({
-      scenarioPath,
+    const result = await runTaskHosted({
+      taskPath,
       agentCommand: stubAgent,
       artifactsDir: join(tmp, "runs"),
       hosted: { baseUrl: "http://no-cloud.invalid", apiKey: "pme_test" },
@@ -775,11 +775,11 @@ describe("runScenarioHosted ADR-013 score reporting", () => {
       throw new Error(`Unexpected fetch call to ${String(url)}`);
     });
 
-    const scenarioPath = join(tmp, "scn.md");
-    await writeFile(scenarioPath, scenarioWithBoth, "utf8");
+    const taskPath = join(tmp, "scn.md");
+    await writeFile(taskPath, scenarioWithBoth, "utf8");
 
-    await runScenarioHosted({
-      scenarioPath,
+    await runTaskHosted({
+      taskPath,
       agentCommand: `node -e ${JSON.stringify("console.log('done')")}`,
       artifactsDir: join(tmp, "runs"),
       hosted: { baseUrl: "http://no-cloud.invalid", apiKey: "pme_test" },
@@ -807,11 +807,11 @@ describe("runScenarioHosted ADR-013 score reporting", () => {
       throw new Error(`Unexpected fetch call to ${String(url)}`);
     });
 
-    const scenarioPath = join(tmp, "scn.md");
-    await writeFile(scenarioPath, TRIVIAL_PASSING_SCENARIO, "utf8");
+    const taskPath = join(tmp, "scn.md");
+    await writeFile(taskPath, TRIVIAL_PASSING_SCENARIO, "utf8");
 
-    const result = await runScenarioHosted({
-      scenarioPath,
+    const result = await runTaskHosted({
+      taskPath,
       agentCommand: `node -e ${JSON.stringify("console.log('done')")}`,
       artifactsDir: join(tmp, "runs"),
       hosted: { baseUrl: "http://no-cloud.invalid", apiKey: "pme_test" },

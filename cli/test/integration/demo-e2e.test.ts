@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-643 — `pome demo` end-to-end against a STUB cloud: real runScenario
+// FDRS-643 — `pome demo` end-to-end against a STUB cloud: real runTask
 // (in-process github twin + real capture-server child), the REAL bundled
 // demo agent spawned as `npx tsx src/cli/main.ts demo-agent`, and a scripted
 // control plane serving mint / gateway (strict-schema-validated) /

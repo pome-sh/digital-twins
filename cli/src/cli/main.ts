@@ -16,8 +16,8 @@ import {
   renderEvents,
   renderTraceHealth,
 } from "../recorder/inspect.js";
-import { runScenario } from "../runner/runScenario.js";
-import { runScenarioHosted } from "../runner/runScenarioHosted.js";
+import { runTask } from "../runner/runTask.js";
+import { runTaskHosted } from "../runner/runTaskHosted.js";
 import { effectiveTrialCount, parseTrialsFlag } from "../runner/trialCount.js";
 import { runScoreLine, scoreStatus } from "../hosted/evalResultView.js";
 import { HostedUsageError, exitCodeFor } from "../hosted/errors.js";
@@ -71,8 +71,8 @@ import {
   discoverRunSet,
   loadTrialEvents,
 } from "../hosted/evalResultCache.js";
-import type { Scenario } from "../scenario/scenarioSchema.js";
-import { parseScenarioFile } from "../scenario/parseScenario.js";
+import type { Task } from "../task/taskSchema.js";
+import { parseTaskFile } from "../task/parseTask.js";
 import type { RecorderEvent } from "../types/shared.js";
 
 const PACKAGE_VERSION = readPackageVersion();
@@ -708,10 +708,10 @@ export function createProgram() {
               // config's `runs` field (both capped at 20). k>1 takes the
               // trial-group path; k=1 stays EXACTLY the single-run path
               // below (no group is ever stamped for it).
-              const scenarioForRuns = await parseScenarioFile(file);
+              const taskForRuns = await parseTaskFile(file);
               const k = effectiveTrialCount(
                 trialsFlag,
-                scenarioForRuns.config.runs,
+                taskForRuns.config.runs,
               );
               if (k > 1) {
                 const { runTrialGroup } = await import(
@@ -731,7 +731,7 @@ export function createProgram() {
                         : file
                     } -n ${k}`;
                 const groupResult = await runTrialGroup({
-                  scenarioPath: file,
+                  taskPath: file,
                   agentCommand,
                   agentCommandSource: options.agent
                     ? "--agent"
@@ -756,8 +756,8 @@ export function createProgram() {
                 continue;
               }
 
-              const result = await runScenarioHosted({
-                scenarioPath: file,
+              const result = await runTaskHosted({
+                taskPath: file,
                 agentCommand,
                 artifactsDir: options.artifactsDir,
                 hosted: { baseUrl: hostedCreds.apiBaseUrl, apiKey: hostedCreds.apiKey },
@@ -786,8 +786,8 @@ export function createProgram() {
             // no score, no verdict, no judge. Let exceptions (file-not-found,
             // parse errors, agent failures) propagate to Commander's top-level
             // handler.
-            const result = await runScenario({
-              scenarioPath: file,
+            const result = await runTask({
+              taskPath: file,
               agentCommand,
               artifactsDir: options.artifactsDir,
               // Commander negates --no-* flags: `--no-capture` → `capture: false`.
@@ -862,7 +862,7 @@ export function createProgram() {
 
   // Hidden: the bundled demo agent `pome demo` spawns as its trial child
   // through the real capture path (FDRS-643). Reads the POME_* env contract
-  // injected by runScenario plus POME_DEMO_* gateway coordinates.
+  // injected by runTask plus POME_DEMO_* gateway coordinates.
   program
     .command("demo-agent", { hidden: true })
     .description("Internal: the bundled demo agent process (spawned by `pome demo`).")
@@ -958,7 +958,7 @@ export function createProgram() {
       } else {
         const health = computeTraceHealth({
           events: eventsResult.events,
-          scenarioUsesTwin: meta.twins.length > 0,
+          taskUsesTwin: meta.twins.length > 0,
         });
         for (const line of renderTraceHealth(health)) console.log(line);
         for (const line of renderEvents(eventsResult.events)) console.log(line);
@@ -982,11 +982,11 @@ export function createProgram() {
     .description(
       "Assemble a paste-into-IDE fix prompt (no LLM call, no network). With no args, reads the latest FAILED run set under ./runs: the persisted cloud verdicts (verdict.json) become grouped failure signatures over the raw traces, in one prompt. Point it at a trial run dir to target that set, or use the legacy `<events.jsonl> <task.md>` form for a single trace.",
     )
-    .action(async (target?: string, scenarioArg?: string) => {
+    .action(async (target?: string, taskArg?: string) => {
       // Legacy 2-arg form: <events.jsonl> <scenario.md> — unchanged
       // (CAPTURE-ONLY, FDRS-657: raw trace + declared criteria, no verdict).
       if (target !== undefined && target.endsWith(".jsonl")) {
-        if (!scenarioArg) {
+        if (!taskArg) {
           console.error(
             "The events.jsonl form needs the task file: pome fix-prompt <events.jsonl> <task.md>",
           );
@@ -995,7 +995,7 @@ export function createProgram() {
         }
         const [eventsRaw, scenario] = await Promise.all([
           readFile(resolve(target), "utf8"),
-          parseScenarioFile(resolve(scenarioArg)),
+          parseTaskFile(resolve(taskArg)),
         ]);
         const events: RecorderEvent[] = eventsRaw
           .split("\n")
@@ -1005,7 +1005,7 @@ export function createProgram() {
         console.log(buildFixPrompt({ events, scenario }));
         return;
       }
-      if (scenarioArg !== undefined) {
+      if (taskArg !== undefined) {
         console.error(
           "The second argument only applies to the events.jsonl form: pome fix-prompt <events.jsonl> <task.md>",
         );
@@ -1033,9 +1033,9 @@ export function createProgram() {
         return;
       }
       const set = discovery.set;
-      let scenario: Scenario | null = null;
+      let scenario: Task | null = null;
       try {
-        scenario = await parseScenarioFile(resolve(set.scenarioPath));
+        scenario = await parseTaskFile(resolve(set.taskPath));
       } catch {
         // Task file moved/edited since the run — the prompt degrades to the
         // verdict-embedded criteria.

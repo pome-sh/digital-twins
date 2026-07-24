@@ -15,7 +15,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createProgram } from "../../src/cli/main.js";
 import { runTrialGroup } from "../../src/runner/runTrialGroup.js";
-import { runScenarioHosted } from "../../src/runner/runScenarioHosted.js";
+import { runTaskHosted } from "../../src/runner/runTaskHosted.js";
 
 vi.mock("../../src/runner/runTrialGroup.js", () => ({
   GROUP_FINALIZE_TIMEOUT_MS: 60_000,
@@ -27,8 +27,8 @@ vi.mock("../../src/runner/runTrialGroup.js", () => ({
   })),
 }));
 
-vi.mock("../../src/runner/runScenarioHosted.js", () => ({
-  runScenarioHosted: vi.fn(async () => ({
+vi.mock("../../src/runner/runTaskHosted.js", () => ({
+  runTaskHosted: vi.fn(async () => ({
     scenario: { title: "Fixture", slug: "scn", config: { passThreshold: 100 } },
     runId: "ses_1",
     cloudRunId: "run_1",
@@ -67,7 +67,7 @@ const WIRED_AGENT_SOURCE = [
   "export { baseUrl };",
 ].join("\n");
 
-async function fixtureRepo(scenarioSource: string): Promise<string> {
+async function fixtureRepo(taskSource: string): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "pome-run-n-"));
   await mkdir(join(dir, "src"), { recursive: true });
   await mkdir(join(dir, "tasks"), { recursive: true });
@@ -76,7 +76,7 @@ async function fixtureRepo(scenarioSource: string): Promise<string> {
     JSON.stringify({ agent: { slug: "fixture-agent" }, command: 'node -e "process.exit(0)"' }, null, 2),
   );
   await writeFile(join(dir, "src/agent.ts"), WIRED_AGENT_SOURCE);
-  await writeFile(join(dir, "tasks/scn.md"), scenarioSource, "utf8");
+  await writeFile(join(dir, "tasks/scn.md"), taskSource, "utf8");
   return dir;
 }
 
@@ -95,7 +95,7 @@ describe("pome run -n (FDRS-636)", () => {
     process.exitCode = undefined;
     process.env.POME_API_KEY = "pme_test_env_key";
     vi.mocked(runTrialGroup).mockClear();
-    vi.mocked(runScenarioHosted).mockClear();
+    vi.mocked(runTaskHosted).mockClear();
   });
 
   afterEach(() => {
@@ -118,7 +118,7 @@ describe("pome run -n (FDRS-636)", () => {
       expect(process.exitCode).toBe(5);
       expect(stderr.join("\n")).toMatch(/1-20/);
       expect(runTrialGroup).not.toHaveBeenCalled();
-      expect(runScenarioHosted).not.toHaveBeenCalled();
+      expect(runTaskHosted).not.toHaveBeenCalled();
     },
   );
 
@@ -137,7 +137,7 @@ describe("pome run -n (FDRS-636)", () => {
     await run("tasks/scn.md", "-n", "5");
 
     expect(process.exitCode ?? 0).toBe(0);
-    expect(runScenarioHosted).not.toHaveBeenCalled();
+    expect(runTaskHosted).not.toHaveBeenCalled();
     expect(runTrialGroup).toHaveBeenCalledTimes(1);
     const options = vi.mocked(runTrialGroup).mock.calls[0]![0];
     expect(options.trials).toBe(5);
@@ -154,7 +154,7 @@ describe("pome run -n (FDRS-636)", () => {
 
     expect(runTrialGroup).toHaveBeenCalledTimes(1);
     expect(vi.mocked(runTrialGroup).mock.calls[0]![0].trials).toBe(3);
-    expect(runScenarioHosted).not.toHaveBeenCalled();
+    expect(runTaskHosted).not.toHaveBeenCalled();
   }, 30_000);
 
   it("the runs-field default is capped at 20", async () => {
@@ -180,7 +180,7 @@ describe("pome run -n (FDRS-636)", () => {
     await run("tasks/scn.md");
 
     expect(runTrialGroup).not.toHaveBeenCalled();
-    expect(runScenarioHosted).toHaveBeenCalledTimes(1);
+    expect(runTaskHosted).toHaveBeenCalledTimes(1);
     expect(process.exitCode ?? 0).toBe(0);
   }, 30_000);
 
@@ -190,7 +190,7 @@ describe("pome run -n (FDRS-636)", () => {
     await run("tasks/scn.md", "-n", "1");
 
     expect(runTrialGroup).not.toHaveBeenCalled();
-    expect(runScenarioHosted).toHaveBeenCalledTimes(1);
+    expect(runTaskHosted).toHaveBeenCalledTimes(1);
   }, 30_000);
 
   it("the group exit code propagates as the command's exit code", async () => {

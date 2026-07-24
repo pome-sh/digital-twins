@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { compileSeedHosted } from "../../src/scenario/seed-compiler-hosted.js";
+import { compileSeedHosted } from "../../src/task/seed-compiler-hosted.js";
 import { HostedAuthError, HostedOrchError, HostedQuotaError } from "../../src/hosted/errors.js";
 
 const VALID_SEED = {
@@ -71,7 +71,7 @@ describe("compileSeedHosted", () => {
     // an env-vs-input divergence that doesn't happen in production.
     const result = await compileSeedHosted("prose body", {
       apiBaseUrl: "https://api.pome.test",
-      scenarioPath: "scenarios/x.md"
+      taskPath: "scenarios/x.md"
     });
 
     expect(calls).toHaveLength(1);

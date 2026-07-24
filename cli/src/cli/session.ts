@@ -153,7 +153,7 @@ export async function runSessionCreate(opts: {
 
   const session = await client.createSession({
     twins,
-    scenarioSource: "# ..\n",
+    taskSource: "# ..\n",
     idempotencyKey: randomUUID(),
     agentId: identity.agentId,
     agentVersion: identity.agentVersion,

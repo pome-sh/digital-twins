@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // FDRS-636 — `pome run -n k` end-to-end against a STUB cloud, in the pattern
-// of demo-e2e.test.ts: the REAL runTrialGroup + runScenarioHosted machinery
+// of demo-e2e.test.ts: the REAL runTrialGroup + runTaskHosted machinery
 // (per-trial preflight, agent subprocess, state/events capture, presigned
 // uploads, finalize/abandon, teardown DELETE) with a scripted control plane.
 // Everything short of the real cloud + a real judge — the founder's Phase G
@@ -190,8 +190,8 @@ describe("pome run -n k end-to-end against a stub cloud (FDRS-636)", () => {
   it("mints k upfront (shared group_id, fresh idempotency keys) → sequential trials → verdict table + summary + reliability link", async () => {
     cloud = await startStubCloud();
     const tmp = await mkdtemp(join(tmpdir(), "pome-group-e2e-"));
-    const scenarioPath = join(tmp, "scn.md");
-    await writeFile(scenarioPath, SCENARIO, "utf8");
+    const taskPath = join(tmp, "scn.md");
+    await writeFile(taskPath, SCENARIO, "utf8");
     const out: string[] = [];
 
     // The trial agent keys its behavior off POME_RUN_ID (= the trial's
@@ -201,7 +201,7 @@ describe("pome run -n k end-to-end against a stub cloud (FDRS-636)", () => {
     )}`;
 
     const result = await runTrialGroup({
-      scenarioPath,
+      taskPath,
       agentCommand: agent,
       agentCommandSource: "pome.config.json",
       trials: 3,
@@ -280,7 +280,7 @@ describe("pome run -n k end-to-end against a stub cloud (FDRS-636)", () => {
     // artifacts-dir-aware fix-prompt command + the literal re-run command.
     expect(text).toContain("fix & green: hand the failure signatures to your coding agent —");
     expect(text).toContain(`pome fix-prompt ${join(tmp, "runs")}`);
-    expect(text).toContain(`after the fix lands, re-run the task:  pome run ${scenarioPath} -n 3`);
+    expect(text).toContain(`after the fix lands, re-run the task:  pome run ${taskPath} -n 3`);
 
     // And fix-prompt's discovery reassembles this exact run set from disk.
     // Membership, not order: FDRS-663 runs trials in parallel, so within-set

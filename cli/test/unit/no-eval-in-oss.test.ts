@@ -54,7 +54,7 @@ describe("no-eval-in-oss gate (repo-wide)", () => {
     it("catches a reintroduced deterministic matcher import", async () => {
       await writeFile(
         join(tmp, "cli", "src", "cli", "bad.ts"),
-        'import { evaluateScenario } from "../evaluator/deterministic.js";\n',
+        'import { evaluateTask } from "../evaluator/deterministic.js";\n',
       );
       const violations = await findViolations(tmp);
       expect(violations.some((v: string) => v.includes("bad.ts"))).toBe(true);

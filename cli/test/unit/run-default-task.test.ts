@@ -23,9 +23,9 @@ import {
   withUserCopyComment,
 } from "../../src/cli/default-task.js";
 import { DEMO_TASK_NAME, demoTaskPath } from "../../src/demo/task.js";
-import { parseScenario, parseScenarioFile } from "../../src/scenario/parseScenario.js";
+import { parseTask, parseTaskFile } from "../../src/task/parseTask.js";
 import { runTrialGroup } from "../../src/runner/runTrialGroup.js";
-import { runScenarioHosted } from "../../src/runner/runScenarioHosted.js";
+import { runTaskHosted } from "../../src/runner/runTaskHosted.js";
 
 vi.mock("../../src/runner/runTrialGroup.js", () => ({
   GROUP_FINALIZE_TIMEOUT_MS: 60_000,
@@ -37,8 +37,8 @@ vi.mock("../../src/runner/runTrialGroup.js", () => ({
   })),
 }));
 
-vi.mock("../../src/runner/runScenarioHosted.js", () => ({
-  runScenarioHosted: vi.fn(async () => ({
+vi.mock("../../src/runner/runTaskHosted.js", () => ({
+  runTaskHosted: vi.fn(async () => ({
     scenario: { title: "Fixture", slug: "scn", config: { passThreshold: 100 } },
     runId: "ses_1",
     cloudRunId: "run_1",
@@ -100,7 +100,7 @@ describe("default-task module (FDRS-645)", () => {
     ) as unknown;
     const pinned = withDefaultTrials(raw);
     expect(pinned.applied).toBe(true);
-    const parsed = parseScenario(pinned.content, DEMO_TASK_NAME, sidecar);
+    const parsed = parseTask(pinned.content, DEMO_TASK_NAME, sidecar);
     expect(parsed.config.runs).toBe(DEFAULT_TASK_TRIALS);
     // Everything the judge definition is regenerated from is untouched.
     expect(parsed.title).toBe(DEMO_TASK_NAME);
@@ -139,7 +139,7 @@ describe("default-task module (FDRS-645)", () => {
     expect(existsSync(join(dir, "tasks", "first-run-demo.seed.json"))).toBe(true);
 
     // The dropped copy parses with the real parser: sidecar honored, k pinned.
-    const parsed = await parseScenarioFile(first.path);
+    const parsed = await parseTaskFile(first.path);
     expect(parsed.config.runs).toBe(DEFAULT_TASK_TRIALS);
     expect(parsed.slug).toBe(DEMO_TASK_NAME);
 
@@ -195,7 +195,7 @@ describe("bare `pome run` glue (FDRS-645)", () => {
     process.exitCode = undefined;
     process.env.POME_API_KEY = "pme_test_env_key";
     vi.mocked(runTrialGroup).mockClear();
-    vi.mocked(runScenarioHosted).mockClear();
+    vi.mocked(runTaskHosted).mockClear();
   });
 
   afterEach(() => {
@@ -222,11 +222,11 @@ describe("bare `pome run` glue (FDRS-645)", () => {
     expect(err).toContain("copied the demo task into");
     for (const line of runYoursFrameLines()) expect(err).toContain(line);
 
-    expect(runScenarioHosted).not.toHaveBeenCalled();
+    expect(runTaskHosted).not.toHaveBeenCalled();
     expect(runTrialGroup).toHaveBeenCalledTimes(1);
     const options = vi.mocked(runTrialGroup).mock.calls[0]![0];
     expect(options.trials).toBe(DEFAULT_TASK_TRIALS);
-    expect(options.scenarioPath.endsWith(join("tasks", "first-run-demo.md"))).toBe(true);
+    expect(options.taskPath.endsWith(join("tasks", "first-run-demo.md"))).toBe(true);
   }, 30_000);
 
   it("second bare run reuses the copy without re-announcing", async () => {
@@ -261,7 +261,7 @@ describe("bare `pome run` glue (FDRS-645)", () => {
     );
     await run();
     expect(runTrialGroup).not.toHaveBeenCalled();
-    expect(runScenarioHosted).toHaveBeenCalledTimes(1);
+    expect(runTaskHosted).toHaveBeenCalledTimes(1);
   }, 30_000);
 
   it("an explicit path never announces, frames, or drops the copy", async () => {
@@ -275,7 +275,7 @@ describe("bare `pome run` glue (FDRS-645)", () => {
     const err = stderr.join("\n");
     expect(err).not.toContain("copied the demo task into");
     expect(err).not.toContain(runYoursFrameLines()[0]);
-    expect(runScenarioHosted).toHaveBeenCalledTimes(1);
+    expect(runTaskHosted).toHaveBeenCalledTimes(1);
   }, 30_000);
 
   it("a failing doctor gate refuses before the frame ever prints", async () => {
@@ -288,6 +288,6 @@ describe("bare `pome run` glue (FDRS-645)", () => {
     expect(err).toContain("wiring check failed");
     expect(err).not.toContain(runYoursFrameLines()[0]);
     expect(runTrialGroup).not.toHaveBeenCalled();
-    expect(runScenarioHosted).not.toHaveBeenCalled();
+    expect(runTaskHosted).not.toHaveBeenCalled();
   }, 30_000);
 });

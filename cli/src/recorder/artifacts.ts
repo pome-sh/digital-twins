@@ -3,7 +3,7 @@ import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { toTwinHttpEventRow } from "@pome-sh/sdk/server";
-import type { Scenario } from "../scenario/scenarioSchema.js";
+import type { Task } from "../task/taskSchema.js";
 import type { RecorderEvent } from "@pome-sh/shared-types";
 import { redactEvent, redactSecrets } from "./redaction.js";
 import { META_SPEC_VERSION, resolveTwinPackageVersions } from "./specMeta.js";
@@ -21,7 +21,7 @@ export type RunArtifacts = {
 export type RunArtifactCoreInput = {
   artifactsDir: string;
   runId: string;
-  scenario: Scenario;
+  scenario: Task;
   startedAt: string;
   completedAt: string;
   stdout: string;

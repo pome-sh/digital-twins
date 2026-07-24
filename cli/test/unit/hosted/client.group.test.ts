@@ -41,7 +41,7 @@ describe("HostedClient.createSession — group fields (FDRS-636)", () => {
     });
     const client = createHostedClient({ baseUrl: BASE, apiKey: KEY });
     const out = await client.createSession({
-      scenarioSource: "x",
+      taskSource: "x",
       twins: ["github"],
       groupId: "grp_useandom26T198340PX75",
       idempotencyKey: "idem-1",
@@ -57,7 +57,7 @@ describe("HostedClient.createSession — group fields (FDRS-636)", () => {
       return new Response(SESSION_RESPONSE, { status: 201 });
     });
     const client = createHostedClient({ baseUrl: BASE, apiKey: KEY });
-    await client.createSession({ scenarioSource: "x", twins: ["github"] });
+    await client.createSession({ taskSource: "x", twins: ["github"] });
   });
 });
 

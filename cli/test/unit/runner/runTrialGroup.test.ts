@@ -5,7 +5,7 @@
 //   - all k sessions minted UPFRONT with ONE shared `grp_` + nanoid21 id
 //     stamped on every mint body, and a FRESH idempotency key per mint;
 //   - trials run SEQUENTIALLY against the pre-minted sessions
-//     (runScenarioHosted stays the isolation unit, abandonOnFailure on);
+//     (runTaskHosted stays the isolation unit, abandonOnFailure on);
 //   - an errored trial renders as an errored row and the remaining trials
 //     continue; errored rows are excluded from the verdict fraction;
 //   - group exit code: 0 iff ≥1 trial completed AND every completed trial
@@ -29,9 +29,9 @@ import {
   runTrialGroup,
 } from "../../../src/runner/runTrialGroup.js";
 import type {
-  RunScenarioHostedOptions,
-  RunScenarioHostedResult,
-} from "../../../src/runner/runScenarioHosted.js";
+  RunTaskHostedOptions,
+  RunTaskHostedResult,
+} from "../../../src/runner/runTaskHosted.js";
 import type { Score } from "../../../src/hosted/evalResultView.js";
 
 vi.mock("../../../src/hosted/client.js", async (importOriginal) => {
@@ -180,7 +180,7 @@ function trialResult(input: {
   exitCode: number;
   durationMs: number;
   failedTexts?: string[];
-}): RunScenarioHostedResult {
+}): RunTaskHostedResult {
   return {
     runId: input.sessionId,
     cloudRunId: `run_${input.sessionId}`,
@@ -199,12 +199,12 @@ beforeEach(() => {
 
 describe("runTrialGroup — upfront minting (FDRS-636)", () => {
   it("mints all k sessions upfront with one shared grp_ id and fresh idempotency keys, then runs trials sequentially", async () => {
-    const scenarioPath = await scenarioFixture();
+    const taskPath = await scenarioFixture();
     const cloud = makeFakeClient();
-    const trialCalls: RunScenarioHostedOptions[] = [];
+    const trialCalls: RunTaskHostedOptions[] = [];
 
     const result = await runTrialGroup({
-      scenarioPath,
+      taskPath,
       agentCommand: "node agent.js",
       trials: 3,
       hosted: { baseUrl: "https://api.example", apiKey: "pme_k" },
@@ -212,7 +212,7 @@ describe("runTrialGroup — upfront minting (FDRS-636)", () => {
       agentModel: "claude-x",
       out: () => {},
       client: cloud.client,
-      runScenarioHostedFn: async (options) => {
+      runTaskHostedFn: async (options) => {
         trialCalls.push(options);
         cloud.events.push("trial");
         return trialResult({
@@ -259,11 +259,11 @@ describe("runTrialGroup — upfront minting (FDRS-636)", () => {
   });
 
   it("k=1 is never routed here — the group runner refuses it", async () => {
-    const scenarioPath = await scenarioFixture();
+    const taskPath = await scenarioFixture();
     const cloud = makeFakeClient();
     await expect(
       runTrialGroup({
-        scenarioPath,
+        taskPath,
         agentCommand: "node agent.js",
         trials: 1,
         hosted: { baseUrl: "https://api.example", apiKey: "pme_k" },
@@ -276,20 +276,20 @@ describe("runTrialGroup — upfront minting (FDRS-636)", () => {
   });
 
   it("a failed mint rolls back the already-minted sessions and rethrows before any trial runs", async () => {
-    const scenarioPath = await scenarioFixture();
+    const taskPath = await scenarioFixture();
     const cloud = makeFakeClient({ failMintAt: 2 });
     let trialsRun = 0;
 
     await expect(
       runTrialGroup({
-        scenarioPath,
+        taskPath,
         agentCommand: "node agent.js",
         trials: 3,
         hosted: { baseUrl: "https://api.example", apiKey: "pme_k" },
         dashboardBaseUrl: "https://app.pome.sh",
         out: () => {},
         client: cloud.client,
-        runScenarioHostedFn: async () => {
+        runTaskHostedFn: async () => {
           trialsRun += 1;
           throw new Error("unreachable");
         },
@@ -303,19 +303,19 @@ describe("runTrialGroup — upfront minting (FDRS-636)", () => {
 
 describe("runTrialGroup — errored trials (FDRS-636)", () => {
   it("an errored trial renders as an errored row, the rest continue, and the fraction excludes it", async () => {
-    const scenarioPath = await scenarioFixture();
+    const taskPath = await scenarioFixture();
     const cloud = makeFakeClient();
     const out: string[] = [];
 
     const result = await runTrialGroup({
-      scenarioPath,
+      taskPath,
       agentCommand: "node agent.js",
       trials: 3,
       hosted: { baseUrl: "https://api.example", apiKey: "pme_k" },
       dashboardBaseUrl: "https://app.pome.sh",
       out: (line) => out.push(line),
       client: cloud.client,
-      runScenarioHostedFn: async (options) => {
+      runTaskHostedFn: async (options) => {
         const sid = options.premintedSession!.session_id;
         if (sid === "ses_2") {
           throw new HostedTrialError("agent timed out", "agent_timeout");
@@ -338,19 +338,19 @@ describe("runTrialGroup — errored trials (FDRS-636)", () => {
   });
 
   it("a non-trial error (auth/orch mid-group) still renders as errored and later trials continue", async () => {
-    const scenarioPath = await scenarioFixture();
+    const taskPath = await scenarioFixture();
     const cloud = makeFakeClient();
     const out: string[] = [];
 
     const result = await runTrialGroup({
-      scenarioPath,
+      taskPath,
       agentCommand: "node agent.js",
       trials: 2,
       hosted: { baseUrl: "https://api.example", apiKey: "pme_k" },
       dashboardBaseUrl: "https://app.pome.sh",
       out: (line) => out.push(line),
       client: cloud.client,
-      runScenarioHostedFn: async (options) => {
+      runTaskHostedFn: async (options) => {
         const sid = options.premintedSession!.session_id;
         if (sid === "ses_1") throw new HostedOrchError("twin pod restarted\nmid-run");
         return trialResult({ sessionId: sid, satisfaction: 96, exitCode: 0, durationMs: 12_100 });
@@ -365,19 +365,19 @@ describe("runTrialGroup — errored trials (FDRS-636)", () => {
   });
 
   it("exit 1 when a completed trial failed; failing criteria feed the start-there line", async () => {
-    const scenarioPath = await scenarioFixture();
+    const taskPath = await scenarioFixture();
     const cloud = makeFakeClient();
     const out: string[] = [];
 
     const result = await runTrialGroup({
-      scenarioPath,
+      taskPath,
       agentCommand: "node agent.js",
       trials: 3,
       hosted: { baseUrl: "https://api.example", apiKey: "pme_k" },
       dashboardBaseUrl: "https://app.pome.sh",
       out: (line) => out.push(line),
       client: cloud.client,
-      runScenarioHostedFn: async (options) => {
+      runTaskHostedFn: async (options) => {
         const sid = options.premintedSession!.session_id;
         if (sid === "ses_1") {
           return trialResult({ sessionId: sid, satisfaction: 100, exitCode: 0, durationMs: 1000 });
@@ -400,18 +400,18 @@ describe("runTrialGroup — errored trials (FDRS-636)", () => {
   });
 
   it("exit 2 when no trial completed", async () => {
-    const scenarioPath = await scenarioFixture();
+    const taskPath = await scenarioFixture();
     const cloud = makeFakeClient();
 
     const result = await runTrialGroup({
-      scenarioPath,
+      taskPath,
       agentCommand: "node agent.js",
       trials: 2,
       hosted: { baseUrl: "https://api.example", apiKey: "pme_k" },
       dashboardBaseUrl: "https://app.pome.sh",
       out: () => {},
       client: cloud.client,
-      runScenarioHostedFn: async () => {
+      runTaskHostedFn: async () => {
         throw new HostedTrialError("agent preflight failed", "preflight_failed");
       },
     });
@@ -511,14 +511,14 @@ function makeQuotaCloud(input: {
 
 describe("runTrialGroup — quota-bounded mint + bounded parallelism (FDRS-663)", () => {
   it("a quota error mid-mint bounds the group instead of aborting: k=5 completes at concurrency 3", async () => {
-    const scenarioPath = await scenarioFixture();
+    const taskPath = await scenarioFixture();
     const cloud = makeQuotaCloud({ limit: 3 });
     const out: string[] = [];
     let activeTrials = 0;
     let peakTrials = 0;
 
     const result = await runTrialGroup({
-      scenarioPath,
+      taskPath,
       agentCommand: "node agent.js",
       trials: 5,
       hosted: { baseUrl: "https://api.example", apiKey: "pme_k" },
@@ -526,12 +526,12 @@ describe("runTrialGroup — quota-bounded mint + bounded parallelism (FDRS-663)"
       out: (line) => out.push(line),
       client: cloud.client,
       sleepFn: async () => {},
-      runScenarioHostedFn: async (options) => {
+      runTaskHostedFn: async (options) => {
         activeTrials += 1;
         peakTrials = Math.max(peakTrials, activeTrials);
         await new Promise((r) => setTimeout(r, 10));
         activeTrials -= 1;
-        // runScenarioHosted deletes its own session in its finally — that is
+        // runTaskHosted deletes its own session in its finally — that is
         // what frees the quota slot for the next lazy mint.
         cloud.release(options.premintedSession!.session_id);
         return trialResult({
@@ -566,7 +566,7 @@ describe("runTrialGroup — quota-bounded mint + bounded parallelism (FDRS-663)"
   });
 
   it("a lazy mint that quota-fails on delete-propagation lag retries after a pause and completes", async () => {
-    const scenarioPath = await scenarioFixture();
+    const taskPath = await scenarioFixture();
     // Attempts 1-2 mint, attempt 3 hits the limit (bound=2), attempt 4 is the
     // first lazy mint — forced to fail once as if the freed slot hasn't
     // propagated — and attempt 5 succeeds.
@@ -574,7 +574,7 @@ describe("runTrialGroup — quota-bounded mint + bounded parallelism (FDRS-663)"
     const sleeps: number[] = [];
 
     const result = await runTrialGroup({
-      scenarioPath,
+      taskPath,
       agentCommand: "node agent.js",
       trials: 3,
       hosted: { baseUrl: "https://api.example", apiKey: "pme_k" },
@@ -584,7 +584,7 @@ describe("runTrialGroup — quota-bounded mint + bounded parallelism (FDRS-663)"
       sleepFn: async (ms) => {
         sleeps.push(ms);
       },
-      runScenarioHostedFn: async (options) => {
+      runTaskHostedFn: async (options) => {
         await new Promise((r) => setTimeout(r, 5));
         cloud.release(options.premintedSession!.session_id);
         return trialResult({
@@ -603,7 +603,7 @@ describe("runTrialGroup — quota-bounded mint + bounded parallelism (FDRS-663)"
   });
 
   it("a lazy mint that never clears quota errors that trial (excluded) and the rest still count", async () => {
-    const scenarioPath = await scenarioFixture();
+    const taskPath = await scenarioFixture();
     // Bound discovery at attempt 3; the lazy mint for trial 3 quota-fails on
     // every one of its attempts.
     const lazyAttempts = Array.from(
@@ -614,7 +614,7 @@ describe("runTrialGroup — quota-bounded mint + bounded parallelism (FDRS-663)"
     const out: string[] = [];
 
     const result = await runTrialGroup({
-      scenarioPath,
+      taskPath,
       agentCommand: "node agent.js",
       trials: 3,
       hosted: { baseUrl: "https://api.example", apiKey: "pme_k" },
@@ -622,7 +622,7 @@ describe("runTrialGroup — quota-bounded mint + bounded parallelism (FDRS-663)"
       out: (line) => out.push(line),
       client: cloud.client,
       sleepFn: async () => {},
-      runScenarioHostedFn: async (options) => {
+      runTaskHostedFn: async (options) => {
         cloud.release(options.premintedSession!.session_id);
         return trialResult({
           sessionId: options.premintedSession!.session_id,
@@ -641,13 +641,13 @@ describe("runTrialGroup — quota-bounded mint + bounded parallelism (FDRS-663)"
   });
 
   it("a quota error on the very first mint still aborts the group (nothing to bound)", async () => {
-    const scenarioPath = await scenarioFixture();
+    const taskPath = await scenarioFixture();
     const cloud = makeQuotaCloud({ limit: 0 });
     let trialsRun = 0;
 
     await expect(
       runTrialGroup({
-        scenarioPath,
+        taskPath,
         agentCommand: "node agent.js",
         trials: 3,
         hosted: { baseUrl: "https://api.example", apiKey: "pme_k" },
@@ -655,7 +655,7 @@ describe("runTrialGroup — quota-bounded mint + bounded parallelism (FDRS-663)"
         out: () => {},
         client: cloud.client,
         sleepFn: async () => {},
-        runScenarioHostedFn: async () => {
+        runTaskHostedFn: async () => {
           trialsRun += 1;
           throw new Error("unreachable");
         },
@@ -665,12 +665,12 @@ describe("runTrialGroup — quota-bounded mint + bounded parallelism (FDRS-663)"
   });
 
   it("trial rows render in trial order even when later trials finish first", async () => {
-    const scenarioPath = await scenarioFixture();
+    const taskPath = await scenarioFixture();
     const cloud = makeQuotaCloud({ limit: 2 });
     const out: string[] = [];
 
     await runTrialGroup({
-      scenarioPath,
+      taskPath,
       agentCommand: "node agent.js",
       trials: 2,
       hosted: { baseUrl: "https://api.example", apiKey: "pme_k" },
@@ -678,7 +678,7 @@ describe("runTrialGroup — quota-bounded mint + bounded parallelism (FDRS-663)"
       out: (line) => out.push(line),
       client: cloud.client,
       sleepFn: async () => {},
-      runScenarioHostedFn: async (options) => {
+      runTaskHostedFn: async (options) => {
         const sid = options.premintedSession!.session_id;
         // Trial 1 is slow; trial 2 finishes well before it.
         await new Promise((r) => setTimeout(r, sid === "ses_1" ? 40 : 1));
@@ -702,19 +702,19 @@ describe("runTrialGroup — quota-bounded mint + bounded parallelism (FDRS-663)"
 
 describe("runTrialGroup — dashboard link + client construction", () => {
   it("derives the reliability link from the dashboard base + /runs/task/<taskName>", async () => {
-    const scenarioPath = await scenarioFixture();
+    const taskPath = await scenarioFixture();
     const cloud = makeFakeClient();
     const out: string[] = [];
 
     const result = await runTrialGroup({
-      scenarioPath,
+      taskPath,
       agentCommand: "node agent.js",
       trials: 2,
       hosted: { baseUrl: "https://api.example", apiKey: "pme_k" },
       dashboardBaseUrl: "https://app.pome.sh/",
       out: (line) => out.push(line),
       client: cloud.client,
-      runScenarioHostedFn: async (options) =>
+      runTaskHostedFn: async (options) =>
         trialResult({
           sessionId: options.premintedSession!.session_id,
           satisfaction: 100,
@@ -735,7 +735,7 @@ describe("runTrialGroup — dashboard link + client construction", () => {
   // run set's reliability view, never the agent-less empty state. ?group is
   // forward-compat: the page honors it in M1.
   it("prints /agents/<slug>/tasks/<name>?group=grp_… when the manifest slug resolves", async () => {
-    const scenarioPath = await scenarioFixture();
+    const taskPath = await scenarioFixture();
     identityMock.resolveRunAgentIdentity.mockResolvedValueOnce({
       agentId: "agt_123",
       agentSlug: "triage-bot",
@@ -744,7 +744,7 @@ describe("runTrialGroup — dashboard link + client construction", () => {
     const out: string[] = [];
 
     const result = await runTrialGroup({
-      scenarioPath,
+      taskPath,
       agentCommand: "node agent.js",
       trials: 2,
       hosted: { baseUrl: "https://api.example", apiKey: "pme_k" },
@@ -752,7 +752,7 @@ describe("runTrialGroup — dashboard link + client construction", () => {
       out: (line) => out.push(line),
       client: cloud.client,
       groupId: "grp_C6ptcAyN31L5v58zfmYFq",
-      runScenarioHostedFn: async (options) =>
+      runTaskHostedFn: async (options) =>
         trialResult({
           sessionId: options.premintedSession!.session_id,
           satisfaction: 100,
@@ -770,19 +770,19 @@ describe("runTrialGroup — dashboard link + client construction", () => {
   });
 
   it("appends ?agent=<agentId> when the manifest resolves an id but no slug (page groups per agent)", async () => {
-    const scenarioPath = await scenarioFixture();
+    const taskPath = await scenarioFixture();
     identityMock.resolveRunAgentIdentity.mockResolvedValueOnce({ agentId: "agt_123" });
     const cloud = makeFakeClient();
 
     const result = await runTrialGroup({
-      scenarioPath,
+      taskPath,
       agentCommand: "node agent.js",
       trials: 2,
       hosted: { baseUrl: "https://api.example", apiKey: "pme_k" },
       dashboardBaseUrl: "https://app.pome.sh",
       out: () => {},
       client: cloud.client,
-      runScenarioHostedFn: async (options) =>
+      runTaskHostedFn: async (options) =>
         trialResult({
           sessionId: options.premintedSession!.session_id,
           satisfaction: 100,
@@ -797,18 +797,18 @@ describe("runTrialGroup — dashboard link + client construction", () => {
   });
 
   it("constructs the default client with a 60s request timeout and the default durable evaluation budget", async () => {
-    const scenarioPath = await scenarioFixture();
+    const taskPath = await scenarioFixture();
     const fake = makeFakeClient();
     vi.mocked(createHostedClient).mockReturnValueOnce(fake.client);
 
     await runTrialGroup({
-      scenarioPath,
+      taskPath,
       agentCommand: "node agent.js",
       trials: 2,
       hosted: { baseUrl: "https://api.example", apiKey: "pme_k" },
       dashboardBaseUrl: "https://app.pome.sh",
       out: () => {},
-      runScenarioHostedFn: async (options) =>
+      runTaskHostedFn: async (options) =>
         trialResult({
           sessionId: options.premintedSession!.session_id,
           satisfaction: 100,

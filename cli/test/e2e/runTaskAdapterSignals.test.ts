@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { runScenario } from "../../src/runner/runScenario.js";
+import { runTask } from "../../src/runner/runTask.js";
 import { captureServerForTests } from "../fixtures/captureServerForTests.js";
 
 // FDRS-411 e2e: a fake CAS-style adapter agent writes M0 HookEvent rows to
@@ -12,13 +12,13 @@ import { captureServerForTests } from "../fixtures/captureServerForTests.js";
 // pointing at <runDir>/signals.jsonl, (b) leave signals.jsonl populated
 // post-run, and (c) merge those rows into events.jsonl so the merged file
 // is the canonical view for downstream consumers.
-describe("runScenario + POME_ADAPTER_SIGNALS_PATH", () => {
+describe("runTask + POME_ADAPTER_SIGNALS_PATH", () => {
   it(
     "injects POME_ADAPTER_SIGNALS_PATH and merges signals.jsonl into events.jsonl",
     async () => {
       const artifactsDir = await mkdtemp(join(tmpdir(), "pome-runs-"));
-      const result = await runScenario({
-        scenarioPath: "tasks/01-bug-happy-path.md",
+      const result = await runTask({
+        taskPath: "tasks/01-bug-happy-path.md",
         captureServerCommand: captureServerForTests,
         agentCommand: "npx tsx test/fixtures/adapter-signals-agent.ts",
         artifactsDir,
@@ -62,8 +62,8 @@ describe("runScenario + POME_ADAPTER_SIGNALS_PATH", () => {
     "tolerates an agent that never touches POME_ADAPTER_SIGNALS_PATH (empty signals.jsonl)",
     async () => {
       const artifactsDir = await mkdtemp(join(tmpdir(), "pome-runs-"));
-      const result = await runScenario({
-        scenarioPath: "tasks/01-bug-happy-path.md",
+      const result = await runTask({
+        taskPath: "tasks/01-bug-happy-path.md",
         captureServerCommand: captureServerForTests,
         agentCommand: "npx tsx examples/agents/scripted-triage-agent.ts",
         artifactsDir,

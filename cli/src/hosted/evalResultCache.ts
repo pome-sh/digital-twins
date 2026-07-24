@@ -155,7 +155,7 @@ export interface RunSet {
   groupId: string | null;
   taskName: string;
   /** The scenario path recorded at run time (first trial's). */
-  scenarioPath: string;
+  taskPath: string;
   /** Trials sorted by finalized_at ascending. */
   trials: TrialVerdict[];
   latestFinalizedAt: string;
@@ -181,7 +181,7 @@ export function groupRunSets(trials: TrialVerdict[]): RunSet[] {
     sets.push({
       groupId: bucket[0]!.verdict.group_id,
       taskName: bucket[0]!.verdict.task_name,
-      scenarioPath: bucket[0]!.verdict.scenario_path,
+      taskPath: bucket[0]!.verdict.scenario_path,
       trials: bucket,
       latestFinalizedAt: last.verdict.finalized_at,
       anyFailed: bucket.some((t) => !t.verdict.passed),

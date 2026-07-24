@@ -8,9 +8,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { writeRunArtifactsCore } from "../../../src/recorder/artifacts.js";
-import type { Scenario } from "../../../src/scenario/scenarioSchema.js";
+import type { Task } from "../../../src/task/taskSchema.js";
 
-function fakeScenario(): Scenario {
+function fakeTask(): Task {
   return {
     slug: "fdrs-399-artifacts-test",
     title: "FDRS-399 artifacts test",
@@ -22,13 +22,13 @@ function fakeScenario(): Scenario {
       passThreshold: 100,
     },
     successCriteria: [],
-  } as unknown as Scenario;
+  } as unknown as Task;
 }
 
 describe("writeRunArtifactsCore — events.jsonl", () => {
   it("preserves rows already written to events.jsonl (append, not truncate)", async () => {
     const root = await mkdtemp(join(tmpdir(), "pome-art-"));
-    const scenario = fakeScenario();
+    const scenario = fakeTask();
     const runId = "run_test";
     const runDir = join(root, scenario.slug, runId);
     await mkdir(runDir, { recursive: true });
@@ -93,7 +93,7 @@ describe("writeRunArtifactsCore — events.jsonl", () => {
 
   it("does not duplicate TwinHttpEvent rows already streamed by the durable recorder (F-698)", async () => {
     const root = await mkdtemp(join(tmpdir(), "pome-art-"));
-    const scenario = fakeScenario();
+    const scenario = fakeTask();
     const runId = "run_durable_dedupe";
     const runDir = join(root, scenario.slug, runId);
     await mkdir(runDir, { recursive: true });
@@ -164,7 +164,7 @@ describe("writeRunArtifactsCore — events.jsonl", () => {
 
   it("does not treat non-TwinHttpEvent request_id as a streamed twin event (F-698)", async () => {
     const root = await mkdtemp(join(tmpdir(), "pome-art-"));
-    const scenario = fakeScenario();
+    const scenario = fakeTask();
     const runId = "run_cross_kind_dedupe";
     const runDir = join(root, scenario.slug, runId);
     await mkdir(runDir, { recursive: true });
@@ -240,7 +240,7 @@ describe("writeRunArtifactsCore — events.jsonl", () => {
 describe("writeRunArtifactsCore — file-set contract (F-689 / D6)", () => {
   it("writes exactly meta.json, events.jsonl, state_initial.json, state_final.json, stdout.txt, stderr.log", async () => {
     const root = await mkdtemp(join(tmpdir(), "pome-art-"));
-    const scenario = fakeScenario();
+    const scenario = fakeTask();
     const runId = "run_test_fileset";
     const runDir = join(root, scenario.slug, runId);
 
@@ -273,7 +273,7 @@ describe("writeRunArtifactsCore — file-set contract (F-689 / D6)", () => {
 
   it("meta.json carries spec_version and twin_versions for the run's twins (D18.1)", async () => {
     const root = await mkdtemp(join(tmpdir(), "pome-art-"));
-    const scenario = fakeScenario();
+    const scenario = fakeTask();
     const runId = "run_test_meta";
     const runDir = join(root, scenario.slug, runId);
 
@@ -296,7 +296,7 @@ describe("writeRunArtifactsCore — file-set contract (F-689 / D6)", () => {
       twin_versions: Record<string, string>;
     };
     expect(meta.spec_version).toBe(1);
-    // fakeScenario() declares twins: ["github"] — only that twin's pinned
+    // fakeTask() declares twins: ["github"] — only that twin's pinned
     // package version should be present.
     expect(Object.keys(meta.twin_versions)).toEqual(["github"]);
     expect(meta.twin_versions.github).toMatch(/^\d+\.\d+\.\d+/);
