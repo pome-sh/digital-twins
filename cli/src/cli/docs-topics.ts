@@ -37,6 +37,10 @@ export const DOCS_TOPICS: DocsTopic[] = [
       "register",
       "pome.json",
       "connect",
+      // Migrated from the retired skills-setup topic (F-893): wiring your own
+      // agent is now the "bring your own agent" path. ("pome-setup" / "setup"
+      // already resolve to getting-started via its "setup" keyword.)
+      "wire",
     ],
   },
   {
@@ -45,18 +49,14 @@ export const DOCS_TOPICS: DocsTopic[] = [
     path: "/docs/how-pome-works",
     keywords: ["twins", "scenarios", "runs", "scoring", "artifacts", "loop"],
   },
-  {
-    id: "skills-setup",
-    title: "/setup",
-    path: "/docs/skills/setup",
-    keywords: ["pome-setup", "setup", "/setup", "register", "wire"],
-  },
-  {
-    id: "skills-test",
-    title: "/test-with-pome",
-    path: "/docs/skills/test-with-pome",
-    keywords: ["pome-test", "test-with-pome", "/test-with-pome", "run scenarios", "eval"],
-  },
+  // F-889 dropped the Gen-1 /setup and /test-with-pome skill pages from the
+  // docs nav; F-893 retired the CLI commands that pointed at them. The two
+  // topic entries are gone, but their still-live keywords are MIGRATED onto the
+  // surviving replacement topics so `pome docs <kw>` keeps routing:
+  //   wire → existing-agent;  test-with-pome / pome-test → cli-run;
+  //   eval → cli (the CLI reference index — no dedicated eval page exists).
+  //   (setup / pome-setup / register / run scenarios / /setup all already
+  //   resolve via existing substrings — see the tests.)
   {
     id: "dashboard",
     title: "Pome Dashboard",
@@ -97,13 +97,30 @@ export const DOCS_TOPICS: DocsTopic[] = [
     id: "cli",
     title: "Command Line Interface",
     path: "/docs/cli",
-    keywords: ["commands", "flags", "pome run", "reference"],
+    // "eval" migrated from the retired skills-test topic (F-893): there is no
+    // dedicated `pome eval` docs page, and it is a distinct workflow from
+    // `pome inspect`, so it routes to the CLI reference index that documents
+    // every command rather than to a sibling command's page.
+    keywords: ["commands", "flags", "pome run", "reference", "eval"],
   },
   {
     id: "cli-run",
     title: "pome run",
     path: "/docs/cli/run",
-    keywords: ["run", "scenario", "agent", "flags", "artifacts", "default", "demo task", "run yours"],
+    keywords: [
+      "run",
+      "scenario",
+      "agent",
+      "flags",
+      "artifacts",
+      "default",
+      "demo task",
+      "run yours",
+      // Migrated from the retired skills-test topic (F-893): running tasks is
+      // how you test an agent with pome.
+      "test-with-pome",
+      "pome-test",
+    ],
   },
   {
     id: "cli-session",

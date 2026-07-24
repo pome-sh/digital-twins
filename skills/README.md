@@ -46,10 +46,12 @@ elsewhere (e.g. the pome-cloud docs site) are mirrors or pointers. Historical
 test evidence (fixtures, kept e2e transcripts) stays in the pome-cloud repo
 under `apps/docs/docs/skills/`.
 
-The Gen-1 CLI-era skills in [`cli/skills/`](../cli/skills/) (`pome-setup`,
-`pome-test`, installed by `pome skills install`) were **retired at F-859 (M2)**:
-their `SKILL.md` files are now tombstones that redirect to this set (`pome-setup`
-→ `pome-intake` + the REST-launch preflight; `pome-test` → `pome-run-task`).
+The Gen-1 CLI-era skills `pome-setup` / `pome-test` (once installed by the
+`pome skills install` command, and injected by `pome install`) were **retired at
+F-859 (M2)** as redirect tombstones pointing here, then **removed outright at
+F-893**: the `pome skills` command is gone, `pome install` now just prints the
+Gen-2 wiring path (`pome-setup` → `pome-intake` + the REST-launch preflight;
+`pome-test` → `pome-run-task`).
 Their rescue-worthy assets landed here — the `pome doctor` preflight and the
 adapter/`withPome()` REST wiring depth in
 [`pome-run-task/references/launch-rest.md`](./pome-run-task/references/launch-rest.md),

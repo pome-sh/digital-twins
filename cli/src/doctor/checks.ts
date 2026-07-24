@@ -213,7 +213,7 @@ async function checkRouting(configDir: string): Promise<DoctorCheck> {
       cause: `no POME_*_REST_URL / POME_*_MCP_URL read and no @pome-sh adapter found in the ${scan.filesScanned} source file(s) under ${relative(process.cwd(), configDir) || "."} — the agent has no path to the twin.`,
       fix: [
         'wire the adapter: import { withPome } from "@pome-sh/adapter-claude-sdk"; call withPome() at startup;',
-        "read the twin base URL from POME_GITHUB_REST_URL (injected by the runner) — or run pome install to have your coding agent wire it.",
+        "read the twin base URL from POME_GITHUB_REST_URL (injected by the runner) — or let your own coding agent wire it with the Gen-2 skills (`npx skills add pome-sh/digital-twins`).",
       ].join("\n"),
     };
   }

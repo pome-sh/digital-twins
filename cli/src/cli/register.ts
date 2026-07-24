@@ -32,7 +32,6 @@ import {
   writeLinkCache,
 } from "./link-cache.js";
 import {
-  readManifest,
   readRequiredManifest,
   writeManifest,
   type ManifestRead,
@@ -209,56 +208,6 @@ export async function runRegisterAgent(opts: RegisterAgentOptions): Promise<void
       "Enabled services: not reported by this pome cloud (older control plane) — twin scoping may not have taken effect.",
     );
   }
-}
-
-// ── `pome install` registration seam ────────────────────────────────────────
-
-export interface EnsureAgentRegisteredOptions extends InteractiveSeams {
-  apiBaseUrl: string;
-  /** Where to look for the manifest. Defaults to process.cwd(). */
-  cwd?: string;
-  /** Test seam — forwarded to resolveCredentials. */
-  credentialsPath?: string;
-}
-
-export type EnsureAgentRegisteredResult =
-  | { status: "registered"; agentId: string; agentSlug: string }
-  | { status: "already-registered"; agentId: string; agentSlug?: string }
-  | { status: "no-config" };
-
-/** Idempotent registration for `pome install`: a repo already linked under the
- *  caller's team keeps its id (no network, no duplicate); a fresh repo registers
- *  under the manifest name (or the config directory's basename). */
-export async function ensureAgentRegistered(
-  opts: EnsureAgentRegisteredOptions,
-): Promise<EnsureAgentRegisteredResult> {
-  const manifestRead = await readManifest(opts.cwd ?? process.cwd());
-  if (!manifestRead) return { status: "no-config" };
-
-  const projectDir = dirname(manifestRead.path);
-  const creds = await resolveCredentials({
-    apiBaseUrl: opts.apiBaseUrl,
-    credentialsPath: opts.credentialsPath,
-  });
-
-  const cachedId = resolveCachedAgentId(await readLinkCache(projectDir), creds.teamId);
-  if (cachedId) {
-    return {
-      status: "already-registered",
-      agentId: cachedId,
-      agentSlug: manifestRead.manifest.agent.slug,
-    };
-  }
-
-  const name = manifestRead.manifest.agent.name ?? basename(projectDir);
-  const agent = await createAndPersistAgent({
-    creds,
-    name,
-    manifestRead,
-    projectDir,
-    seams: resolveSeams(opts),
-  });
-  return { status: "registered", agentId: agent.id, agentSlug: agent.slug };
 }
 
 function stripControlCharacters(value: string): string {
