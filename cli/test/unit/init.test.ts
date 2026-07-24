@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -32,7 +32,11 @@ describe("pome init", () => {
     expect(githubTwin).not.toBeNull();
     expect(existsSync("pome.json")).toBe(true);
     // The manifest is valid: it carries a slug derived from the project dir.
-    expect(JSON.parse(readFileSync("pome.json", "utf8")).agent.slug).toMatch(/^[a-z0-9-]+$/);
+    const freshManifest = JSON.parse(readFileSync("pome.json", "utf8"));
+    expect(freshManifest.agent.slug).toMatch(/^[a-z0-9-]+$/);
+    // The starter path always creates tasks/, so the manifest points at it
+    // (F-904 — forward-compatible with F-865's bare `pome run` resolution).
+    expect(freshManifest.tasks).toBe("tasks");
     for (const task of runnableTasks(githubTwin!)) {
       expect(existsSync(join("tasks", task.filename))).toBe(true);
     }
@@ -78,5 +82,91 @@ describe("pome init", () => {
           .join(", ")}`,
       ).toEqual([]);
     }
+  });
+
+  async function initIn(
+    setup: (dir: string) => void,
+    args: string[],
+  ): Promise<{ dir: string; exitCode: number | string | undefined; messages: string }> {
+    const dir = await mkdtemp(join(tmpdir(), "pome-init-"));
+    tempDirs.push(dir);
+    process.chdir(dir);
+    setup(dir);
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const priorExit = process.exitCode;
+    process.exitCode = undefined;
+    await createProgram().parseAsync(["node", "pome", ...args]);
+    const exitCode = process.exitCode;
+    process.exitCode = priorExit;
+    return {
+      dir,
+      exitCode,
+      messages: errSpy.mock.calls.map((c) => String(c[0])).join("\n"),
+    };
+  }
+
+  it("skips the starter library in an existing project (package.json present)", async () => {
+    await initIn(
+      (dir) => writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "my-agent" })),
+      ["init"],
+    );
+
+    // No 28-file dump: neither the task library nor the sample agents land.
+    expect(existsSync("tasks")).toBe(false);
+    expect(existsSync("examples")).toBe(false);
+    // The manifest is still written...
+    expect(existsSync("pome.json")).toBe(true);
+    const manifest = JSON.parse(readFileSync("pome.json", "utf8"));
+    expect(manifest.agent.slug).toMatch(/^[a-z0-9-]+$/);
+    // ...but `command` is omitted — the BYO user supplies their own launcher.
+    expect(manifest.command).toBeUndefined();
+    // No task directory exists, so no `tasks` key is claimed.
+    expect(manifest.tasks).toBeUndefined();
+  });
+
+  it("writes the tasks key when an existing project already has a tasks dir", async () => {
+    await initIn((dir) => {
+      writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "my-agent" }));
+      mkdirSync(join(dir, "tasks"));
+      writeFileSync(join(dir, "tasks", "my-real-task.md"), "# a task\n");
+    }, ["init"]);
+
+    const manifest = JSON.parse(readFileSync("pome.json", "utf8"));
+    expect(manifest.tasks).toBe("tasks");
+    // The user's own task file is untouched; no starter library dumped over it.
+    expect(existsSync("tasks/my-real-task.md")).toBe(true);
+    expect(existsSync("tasks/01-bug-happy-path.md")).toBe(false);
+  });
+
+  it("--starter forces the full library even in an existing project", async () => {
+    await initIn(
+      (dir) => writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "my-agent" })),
+      ["init", "--starter"],
+    );
+
+    const githubTwin = findTwin("github");
+    for (const task of runnableTasks(githubTwin!)) {
+      expect(existsSync(join("tasks", task.filename))).toBe(true);
+    }
+    expect(existsSync("examples/agents/scripted-triage-agent.ts")).toBe(true);
+    expect(JSON.parse(readFileSync("pome.json", "utf8")).command).toContain(
+      "scripted-triage-agent.ts",
+    );
+  });
+
+  it("--bare skips the library in an otherwise-fresh dir", async () => {
+    await initIn(() => undefined, ["init", "--bare"]);
+
+    expect(existsSync("tasks")).toBe(false);
+    expect(existsSync("examples")).toBe(false);
+    expect(existsSync("pome.json")).toBe(true);
+    expect(JSON.parse(readFileSync("pome.json", "utf8")).command).toBeUndefined();
+  });
+
+  it("rejects --bare and --starter together", async () => {
+    const { exitCode } = await initIn(() => undefined, ["init", "--bare", "--starter"]);
+    expect(exitCode).toBe(2);
+    expect(existsSync("pome.json")).toBe(false);
   });
 });
