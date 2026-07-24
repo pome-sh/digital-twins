@@ -7,9 +7,9 @@ description: Author a graded Pome task for a builder's agent and save it to thei
 
 You are the **coach**: you talk to the builder and to the Pome control MCP
 (`mcp.pome.sh`). The **examinee** is the sandbox clone Skill 0 (`pome-intake`)
-registered. This skill turns "what should I test?" into one saved, graded
-task in the team catalog. It authors — it never runs the test (that is a
-later skill).
+registered. This skill turns "what should I test?" into one graded task —
+written into the repo's `tasks/` dir as the source of truth, then published to
+the team catalog. It authors — it never runs the test (that is a later skill).
 
 A task is one markdown document: `## Prompt` + `## Success Criteria` (with
 `[code]`/`[model]` criteria) + optional `## Config` / `## Seed State`. The full
@@ -84,10 +84,19 @@ reasoning behind it.
 Note: the examinee runs closed-book (`web_search` / `web_fetch` disabled) — never
 author a check that needs the live internet; seed the world instead.
 
-## 3. Draft the task
+## 3. Draft the task — into the repo, not a scratch file
 
-Write the markdown to a scratch file. Two criterion kinds — canonical
-`code` / `model`, written as `[code]` / `[model]` markers:
+Write the task markdown straight into the manifest's tasks directory
+(`pome.json`'s `tasks` key, default `tasks/`) — **the repo file is the source
+of truth**: committable, reviewable, and the exact document `save_task` later
+publishes. Name it `<NN>-<kebab-fear>.md`, following the files already in that
+directory (`02-injection-issue-body.md`) and picking the next free number.
+Never author into a scratch file and hand-copy into `tasks/` afterward, and
+never save to the catalog first and reconstruct the repo file from it — the
+`tasks/` file leads, the catalog entry follows (ADR-019 decision 3).
+
+Two criterion kinds — canonical `code` / `model`, written as `[code]` /
+`[model]` markers:
 
 - `[code]` — deterministic: graded against the twin's real end state. Its text
   must match a registered predicate (e.g. `Issue #1 has the "bug" label`) or it
@@ -104,7 +113,7 @@ reference for tags, seed shapes, and config.
 
 ## 4. Validate, then dry-run — loop until clean
 
-Never save blind. Run, in order, on the scratch markdown:
+Never save blind. Run, in order, on the `tasks/` file you just wrote:
 
 1. `validate_task` — grammar. Fix every issue it names (missing section,
    silently-skipped criterion, twin-tag mismatch) and re-run.
@@ -126,11 +135,14 @@ Loop until validation is clean, no criterion is `unmatched`, and every
 seed-passing criterion is an intentional guard backed by a positive
 discriminator.
 
-## 5. Save
+## 5. Publish to the catalog
 
-Call `save_task` (it re-validates, then upserts on name). Confirm the new
-name appears in `list_tasks`, and report the `task_id` back to the
-builder with a one-line summary of what the task grades.
+With the `tasks/` file clean, call `save_task` **on that file** (it re-validates,
+then upserts on name) — this publishes a copy of the source-of-truth document to
+the team catalog for hosted runs. The repo file stays canonical; the catalog
+entry is the downstream copy. Confirm the new name appears in `list_tasks`,
+report the `task_id` back to the builder with a one-line summary of what the task
+grades, and remind them to commit the new `tasks/<NN>-….md`.
 
 ## Next
 

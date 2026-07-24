@@ -64,8 +64,10 @@ needed, move on.
 ## Hand off
 
 **Next:** `pome-author-task` (Skill 1) with the chosen candidate — its prompt,
-the fear, the target twin, and the bad/good end-state. Author-task drafts,
-validates, dry-runs `verify_seed`, and saves; it does **not** re-interview from a
-blank page — it starts from this candidate. The full one-session journey
+the fear, the target twin, and the bad/good end-state. Author-task writes the
+task into the repo's `tasks/` dir (the source of truth), validates, dry-runs
+`verify_seed`, then publishes it to the catalog with `save_task`; it does **not**
+re-interview from a blank page — it starts from this candidate. The full
+one-session journey
 (registration → suggestion → authoring → verified seed → run → report) is the
 cold walk in [`references/cold-walk.md`](references/cold-walk.md).
