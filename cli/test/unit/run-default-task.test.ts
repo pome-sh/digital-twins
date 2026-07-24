@@ -278,6 +278,26 @@ describe("bare `pome run` glue (FDRS-645)", () => {
     expect(runTaskHosted).toHaveBeenCalledTimes(1);
   }, 30_000);
 
+  it("a bare manifest (no command) errors with guidance instead of spawning a missing scaffold", async () => {
+    // F-904: `pome init` in an existing project writes no `command`. `pome run`
+    // must not silently fall back to the starter scaffold it never created.
+    const dir = await mkdtemp(join(tmpdir(), "pome-run-bare-"));
+    process.chdir(dir);
+    await writeFile(
+      join(dir, "pome.json"),
+      JSON.stringify({ agent: { slug: "byo-agent" } }, null, 2),
+    );
+    await mkdir(join(dir, "tasks"), { recursive: true });
+    await writeFile(join(dir, "tasks", "scn.md"), EXPLICIT_SCENARIO);
+
+    await run("tasks/scn.md");
+
+    expect(process.exitCode).toBe(2);
+    expect(stderr.join("\n")).toContain("No agent command configured");
+    expect(runTaskHosted).not.toHaveBeenCalled();
+    expect(runTrialGroup).not.toHaveBeenCalled();
+  }, 30_000);
+
   it("a failing doctor gate refuses before the frame ever prints", async () => {
     const dir = await fixtureRepo({ wired: false });
     process.chdir(dir);

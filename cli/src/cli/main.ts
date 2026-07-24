@@ -77,7 +77,8 @@ import type { RecorderEvent } from "../types/shared.js";
 
 const PACKAGE_VERSION = readPackageVersion();
 const SESSION_CREATE_FORMATS = new Set(["text", "json", "env"]);
-const DEFAULT_AGENT_COMMAND = "npx tsx examples/agents/scripted-triage-agent.ts";
+const DEFAULT_AGENT_FILE = "examples/agents/scripted-triage-agent.ts";
+const DEFAULT_AGENT_COMMAND = `npx tsx ${DEFAULT_AGENT_FILE}`;
 const MANIFEST_SCHEMA_URL = "https://pome.sh/schemas/v1/pome.json";
 
 function readPackageVersion(): string {
@@ -671,8 +672,20 @@ export function createProgram() {
 
         const manifestRead = await readManifest(process.cwd()).catch(() => null);
         const configCommand = manifestRead?.manifest.command;
-        const agentCommand =
-          options.agent ?? configCommand ?? DEFAULT_AGENT_COMMAND;
+        const resolvedCommand = options.agent ?? configCommand;
+        // Bare `pome init` (existing project) writes no `command`. Don't
+        // silently fall back to the starter scaffold it never created — a
+        // spawn of a missing file gives a cryptic error. Use the default only
+        // when that file actually exists; otherwise fail with guidance.
+        if (resolvedCommand === undefined && !existsSync(DEFAULT_AGENT_FILE)) {
+          console.error(
+            'No agent command configured. Set "command" in pome.json to your ' +
+              'agent\'s launch command, or pass --agent "<command>".',
+          );
+          process.exitCode = 2;
+          return;
+        }
+        const agentCommand = resolvedCommand ?? DEFAULT_AGENT_COMMAND;
         let worstExit = 0;
 
         // Hosted is the default. Self-host runs against an in-process twin via

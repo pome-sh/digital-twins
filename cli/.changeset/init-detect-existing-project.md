@@ -13,3 +13,8 @@ their own launch command, and if a `tasks/` directory already exists it records
 starter drop is unchanged, and now also records `tasks: "tasks"`. Two override
 flags: `--bare` forces manifest-only anywhere, `--starter` forces the full
 library even in an existing project.
+
+Relatedly, `pome run` no longer silently falls back to the starter scaffold
+(`examples/agents/scripted-triage-agent.ts`) when no `command` is configured and
+that file does not exist — it now fails with a clear "set command / pass
+--agent" message instead of a cryptic missing-file spawn error.
