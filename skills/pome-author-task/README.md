@@ -2,7 +2,7 @@
 
 Author a graded Pome task for a builder's agent and save it to their team
 catalog: library-first adaptation, a fear-driven interview, then a
-validate → dry-run → save loop. The skill itself is [`SKILL.md`](./SKILL.md); the
+write-to-repo → validate → dry-run → publish loop. The skill itself is [`SKILL.md`](./SKILL.md); the
 task grammar it links to is
 [`references/task-format.md`](./references/task-format.md).
 
@@ -45,12 +45,15 @@ https://mcp.pome.sh/mcp`) so the `list_tasks` / `validate_task` /
    (`save_task` upserts on name — never overwrite someone else's).
 2. **Interview** — fear surfaces: worst fear / prompt-injection / wrong-channel /
    severity misjudgment; only the ones the covered twins can exercise.
-3. **Draft** — task markdown, `[code]` / `[model]` criteria; grammar lives in
-   the reference, not inlined.
-4. **Validate + dry-run** — `validate_task` → `verify_seed` → `evaluate_criteria`,
-   loop until validation is clean and no criterion is `unmatched` or
-   pre-satisfied.
-5. **Save** — `save_task`, confirm the new name in `list_tasks`.
+3. **Draft into the repo** — write the task markdown into the manifest's
+   `tasks/` dir (the source of truth, not a scratch file), `[code]` / `[model]`
+   criteria; grammar lives in the reference, not inlined.
+4. **Validate + dry-run** — `validate_task` → `verify_seed` → `evaluate_criteria`
+   on that repo file, loop until validation is clean and no criterion is
+   `unmatched` or pre-satisfied.
+5. **Publish** — `save_task` copies the repo file to the team catalog; confirm
+   the new name in `list_tasks` and commit the `tasks/…md` (ADR-019 decision 3:
+   file first, catalog follows).
 
 ## Test evidence
 
