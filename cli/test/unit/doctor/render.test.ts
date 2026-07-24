@@ -13,7 +13,7 @@ describe("renderDoctorReport", () => {
       ok: true,
       checks: [
         { id: "config", status: "pass", label: "pome.config.json found" },
-        { id: "twin", status: "pass", label: "twin reachable", detail: "github · local" },
+        { id: "twin", status: "pass", label: "twin boots locally", detail: "github · health + session ok" },
         { id: "routing", status: "pass", label: "requests route to the twin", detail: "reads POME_GITHUB_REST_URL" },
         { id: "egress", status: "pass", label: "egress floor active", detail: "deny-by-default · 6 pattern(s) + loopback" },
       ],
@@ -22,9 +22,47 @@ describe("renderDoctorReport", () => {
     const text = renderDoctorReport(report).join("\n");
     expect(text).toContain("checking your wiring …");
     expect(text).toContain("✓ pome.config.json found");
-    expect(text).toContain("✓ twin reachable  github · local");
+    expect(text).toContain("✓ twin boots locally  github · health + session ok");
     expect(text).not.toContain("cause");
     expect(text).not.toContain("your agent would hit production");
+  });
+
+  it("omits the preflight pass-note by default, but appends it when passNote is set (F-906)", () => {
+    const report: DoctorReport = {
+      ok: true,
+      checks: [
+        { id: "config", status: "pass", label: "pome.json found" },
+        { id: "twin", status: "pass", label: "twin boots locally", detail: "github · health + session ok" },
+      ],
+    };
+
+    // The run/install consumers render without the note.
+    expect(renderDoctorReport(report).join("\n")).not.toContain("POME_PREFLIGHT");
+
+    // `pome doctor` opts in — a green report is not "the agent can launch".
+    const text = renderDoctorReport(report, { passNote: true }).join("\n");
+    expect(text).toContain("a green check means the wiring is right, not that your agent runs");
+    expect(text).toContain("pome doctor never launches it");
+    expect(text).toContain("POME_PREFLIGHT=1");
+  });
+
+  it("never shows the pass-note on a failing report, even when passNote is set", () => {
+    const report: DoctorReport = {
+      ok: false,
+      checks: [
+        {
+          id: "config",
+          status: "fail",
+          label: "pome manifest not found",
+          cause: "no pome.json or pome.yaml found.",
+          fix: "run pome init, then re-run pome doctor",
+        },
+      ],
+    };
+
+    const text = renderDoctorReport(report, { passNote: true }).join("\n");
+    expect(text).not.toContain("POME_PREFLIGHT");
+    expect(text).toContain("until this passes, your agent would hit production.");
   });
 
   it("renders one cause/fix card and the production warning on failure", () => {
@@ -32,7 +70,7 @@ describe("renderDoctorReport", () => {
       ok: false,
       checks: [
         { id: "config", status: "pass", label: "pome.config.json found" },
-        { id: "twin", status: "pass", label: "twin reachable", detail: "github · local" },
+        { id: "twin", status: "pass", label: "twin boots locally", detail: "github · health + session ok" },
         {
           id: "routing",
           status: "fail",

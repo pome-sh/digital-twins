@@ -132,7 +132,7 @@ async function checkTwinReachable(_configDir: string): Promise<DoctorCheck> {
   const fail = (cause: string): DoctorCheck => ({
     id: "twin",
     status: "fail",
-    label: "twin not reachable",
+    label: "local twin check failed",
     cause,
     fix: "npm install (twin dependencies), then re-run pome doctor — if it persists, file an issue with the error above",
   });
@@ -178,7 +178,16 @@ async function checkTwinReachable(_configDir: string): Promise<DoctorCheck> {
       );
     }
 
-    return { id: "twin", status: "pass", label: "twin reachable", detail: "github · local" };
+    // "boots locally", not "reachable": this check brings a throwaway twin up
+    // on an ephemeral port and tears it down — it does NOT prove a twin is
+    // listening now. Overstating that (the F-906 cold walk read "reachable" as
+    // "a twin is up") is exactly what this wording avoids.
+    return {
+      id: "twin",
+      status: "pass",
+      label: "twin boots locally",
+      detail: "github · health + session ok",
+    };
   } catch (err) {
     return fail(`could not reach the locally served twin: ${firstLine(err)}`);
   } finally {
