@@ -1,0 +1,17 @@
+{
+  "_meta": {
+    "version": 1,
+    "source_hash": "sha256:hand-authored",
+    "model": "hand-authored",
+    "compiled_at": "2026-07-24T00:00:00.000Z"
+  },
+  "primaryMailbox": {
+    "email": "pome-agent@pome-twin.test",
+    "displayName": "Pome Agent"
+  },
+  "deliveryMode": "sender-only",
+  "clock": "2026-07-24T00:00:00.000Z",
+  "faults": [
+    { "name": "rate-limited", "target": "messages.send", "succeedFirst": 2, "throttleFor": 3, "retryAfterSeconds": 1 }
+  ]
+}
