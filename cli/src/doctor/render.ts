@@ -15,6 +15,13 @@ export interface RenderDoctorReportOptions {
    *  moment-03 default; `pome install` passes moment 02's
    *  "verifying the wiring …" (FDRS-642). */
   header?: string;
+  /** F-906 — when the report passes, append a one-line caveat that a green
+   *  doctor verifies wiring, not that the examinee's own code launches: the
+   *  preflight probe (POME_PREFLIGHT=1) early-returns the agent before its
+   *  body runs, so a launch-fatal bug there surfaces only on a real run.
+   *  Opt-in so only `pome doctor` shows it — the `run`/`install` consumers
+   *  print the report as a gate, not as a self-diagnosis. */
+  passNote?: boolean;
 }
 
 export function renderDoctorReport(
@@ -41,6 +48,17 @@ export function renderDoctorReport(
     lines.push("");
     lines.push("until this passes, your agent would hit production.");
     lines.push("pome will not run trials against a live API.");
+  } else if (options.passNote) {
+    lines.push("");
+    lines.push(
+      "note: this checks the wiring, not that your agent launches cleanly — the",
+    );
+    lines.push(
+      "preflight probe exits your agent early (POME_PREFLIGHT=1), so a startup bug",
+    );
+    lines.push(
+      "in its own code (e.g. a TDZ crash) can still surface only on a real run.",
+    );
   }
 
   return lines;
