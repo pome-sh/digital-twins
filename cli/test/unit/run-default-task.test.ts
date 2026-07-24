@@ -290,4 +290,86 @@ describe("bare `pome run` glue (FDRS-645)", () => {
     expect(runTrialGroup).not.toHaveBeenCalled();
     expect(runTaskHosted).not.toHaveBeenCalled();
   }, 30_000);
+
+  // F-865 — a MIGRATED project declares its task directory in the manifest;
+  // bare `pome run` runs that whole declared set instead of the demo drop.
+  async function fixtureRepoWithTasks(
+    taskFiles: Record<string, string>,
+    tasksKey = "tasks",
+  ): Promise<string> {
+    const dir = await fixtureRepo();
+    await writeFile(
+      join(dir, "pome.json"),
+      JSON.stringify(
+        {
+          agent: { slug: "fixture-agent" },
+          command: 'node -e "process.exit(0)"',
+          tasks: tasksKey,
+        },
+        null,
+        2,
+      ),
+    );
+    await mkdir(join(dir, tasksKey), { recursive: true });
+    for (const [name, body] of Object.entries(taskFiles)) {
+      await writeFile(join(dir, tasksKey, name), body);
+    }
+    return dir;
+  }
+
+  it("bare run with manifest.tasks runs the whole declared set, no demo drop", async () => {
+    const dir = await fixtureRepoWithTasks({
+      "01-a.md": EXPLICIT_SCENARIO,
+      "02-b.md": EXPLICIT_SCENARIO,
+    });
+    process.chdir(dir);
+    await run();
+
+    expect(process.exitCode ?? 0).toBe(0);
+    // One hosted run per declared file; the demo trial-group path never fires.
+    expect(runTaskHosted).toHaveBeenCalledTimes(2);
+    expect(runTrialGroup).not.toHaveBeenCalled();
+    // No demo drop and no "run yours" framing on the migrated path.
+    expect(existsSync(join(dir, "tasks", "first-run-demo.md"))).toBe(false);
+    const err = stderr.join("\n");
+    expect(err).not.toContain("copied the demo task into");
+    expect(err).not.toContain(runYoursFrameLines()[0]);
+    expect(err).toContain('resolved 2 task(s) from pome.json (tasks: "tasks")');
+  }, 30_000);
+
+  it("a declared-but-missing tasks dir errors (exit 5), never the demo drop", async () => {
+    const dir = await fixtureRepo();
+    await writeFile(
+      join(dir, "pome.json"),
+      JSON.stringify(
+        {
+          agent: { slug: "fixture-agent" },
+          command: 'node -e "process.exit(0)"',
+          tasks: "does-not-exist",
+        },
+        null,
+        2,
+      ),
+    );
+    process.chdir(dir);
+    await run();
+
+    expect(process.exitCode).toBe(5);
+    expect(existsSync(join(dir, "tasks", "first-run-demo.md"))).toBe(false);
+    expect(runTaskHosted).not.toHaveBeenCalled();
+    expect(runTrialGroup).not.toHaveBeenCalled();
+  }, 30_000);
+
+  it("an empty declared tasks dir notes 0 tasks and no-ops (exit 0)", async () => {
+    const dir = await fixtureRepoWithTasks({});
+    process.chdir(dir);
+    await run();
+
+    expect(process.exitCode ?? 0).toBe(0);
+    const err = stderr.join("\n");
+    expect(err).toContain("no task .md files found in tasks/");
+    expect(runTaskHosted).not.toHaveBeenCalled();
+    expect(runTrialGroup).not.toHaveBeenCalled();
+    expect(existsSync(join(dir, "tasks", "first-run-demo.md"))).toBe(false);
+  }, 30_000);
 });
