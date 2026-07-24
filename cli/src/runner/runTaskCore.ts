@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { Scenario } from "../scenario/scenarioSchema.js";
+import type { Task } from "../task/taskSchema.js";
 import { writeRunArtifactsCore } from "../recorder/artifacts.js";
 import type { RecorderEvent } from "@pome-sh/shared-types";
 
 export interface WriteRunInput {
   artifactsDir: string;
   runId: string;
-  scenario: Scenario;
+  scenario: Task;
   startedAt: string;
   completedAt: string;
   agentStdout: string;

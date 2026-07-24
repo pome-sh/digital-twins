@@ -67,7 +67,7 @@ describe("pome init --sdk", () => {
     expect(messages).toContain('Unknown --sdk value "made-up"');
     // Validation happens before any filesystem writes.
     expect(existsSync("pome.json")).toBe(false);
-    expect(existsSync("scenarios")).toBe(false);
+    expect(existsSync("tasks")).toBe(false);
     expect(existsSync("runs")).toBe(false);
     expect(existsSync("examples/agents/claude-sdk-agent.ts")).toBe(false);
     process.exitCode = 0;
@@ -92,7 +92,7 @@ describe("pome init --sdk", () => {
     expect(messages).toContain("Claude Managed Agent is not yet supported");
     // The deferred SDK is rejected before starter files/directories are copied.
     expect(existsSync("pome.json")).toBe(false);
-    expect(existsSync("scenarios")).toBe(false);
+    expect(existsSync("tasks")).toBe(false);
     expect(existsSync("runs")).toBe(false);
     expect(existsSync("examples/agents/claude-sdk-agent.ts")).toBe(false);
     process.exitCode = 0;

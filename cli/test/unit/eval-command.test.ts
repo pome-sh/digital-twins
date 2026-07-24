@@ -2,7 +2,7 @@
 // Unit tests for `pome eval <run-dir>` (FDRS-656): run-dir validation with
 // per-file named errors, meta.json parsing / agent+task derivation, and the
 // upload+finalize flow against a mocked EvalClient (matching the stub
-// patterns in runScenarioHosted.upload.test.ts).
+// patterns in runTaskHosted.upload.test.ts).
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { existsSync } from "node:fs";
@@ -363,7 +363,7 @@ describe("pome eval upload + finalize flow (FDRS-656)", () => {
     const input = calls.finalize[0]!.input;
     expect(input.stopReason).toBe("eval_upload");
     expect(input.criteria).toEqual([]);
-    expect(input.scenarioName).toBe("01-bug-happy-path");
+    expect(input.taskName).toBe("01-bug-happy-path");
     expect(input.exitCode).toBe(0);
     expect(input.durationMs).toBe(30_000);
     expect(input.traceStorageKey).toBe(EVENTS_KEY);

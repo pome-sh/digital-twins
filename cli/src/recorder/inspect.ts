@@ -82,11 +82,11 @@ export type TraceHealthLayer = {
 
 export type TraceHealthInput = {
   events: Event[];
-  // Scenario-level signals. All optional — when unknown the heuristic
+  // Task-level signals. All optional — when unknown the heuristic
   // gracefully degrades to "presence implies expected".
-  scenarioUsesTwin?: boolean;
-  scenarioExpectsLlm?: boolean;
-  scenarioExpectsCas?: boolean;
+  taskUsesTwin?: boolean;
+  taskExpectsLlm?: boolean;
+  taskExpectsCas?: boolean;
 };
 
 export function computeTraceHealth(input: TraceHealthInput): TraceHealthLayer[] {
@@ -97,7 +97,7 @@ export function computeTraceHealth(input: TraceHealthInput): TraceHealthLayer[] 
   // never warns). When the scenario manifest declares LLM usage we expect at
   // least one row even with zero observed; absence then surfaces as a warning
   // ("capture-server may not have started").
-  const proxyExpected = input.scenarioExpectsLlm
+  const proxyExpected = input.taskExpectsLlm
     ? 1
     : counts.LlmCallEvent > 0
       ? 1
@@ -115,7 +115,7 @@ export function computeTraceHealth(input: TraceHealthInput): TraceHealthLayer[] 
 
   // twin layer — TwinHttpEvent rows. A scenario always declares ≥1 twin in
   // `config.twins`, so when we know the scenario we expect ≥1 row.
-  const twinExpectedBool = input.scenarioUsesTwin ?? counts.TwinHttpEvent > 0;
+  const twinExpectedBool = input.taskUsesTwin ?? counts.TwinHttpEvent > 0;
   const twinExpected = twinExpectedBool ? 1 : 0;
   const twin: TraceHealthLayer = {
     name: "twin",
@@ -138,7 +138,7 @@ export function computeTraceHealth(input: TraceHealthInput): TraceHealthLayer[] 
     counts.SubagentSpawnEvent +
     counts.HookEvent +
     counts.LlmTurnEvent;
-  const casExpected = input.scenarioExpectsCas ? 1 : casCount > 0 ? 1 : 0;
+  const casExpected = input.taskExpectsCas ? 1 : casCount > 0 ? 1 : 0;
   const cas: TraceHealthLayer = {
     name: "CAS adapter",
     count: casCount,

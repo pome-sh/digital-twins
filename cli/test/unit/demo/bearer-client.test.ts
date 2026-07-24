@@ -48,9 +48,9 @@ describe("createHostedClient authScheme: bearer (FDRS-643)", () => {
       durationMs: 1000,
       agentModel: "demo-gateway",
       criteria: [],
-      scenarioName: "first-run-demo",
-      scenarioHash: "",
-      scenarioPrompt: "",
+      taskName: "first-run-demo",
+      taskHash: "",
+      taskPrompt: "",
       expectedBehavior: "",
     });
     expect(out.run_id).toBe("run_1");
@@ -123,9 +123,9 @@ describe("createHostedClient authScheme: bearer (FDRS-643)", () => {
         durationMs: 1,
         agentModel: "demo-gateway",
         criteria: [],
-        scenarioName: "first-run-demo",
-        scenarioHash: "",
-        scenarioPrompt: "",
+        taskName: "first-run-demo",
+        taskHash: "",
+        taskPrompt: "",
         expectedBehavior: "",
       })
       .catch((e: unknown) => e);

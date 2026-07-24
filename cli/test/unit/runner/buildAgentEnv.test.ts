@@ -3,7 +3,7 @@ import {
   createSessionResponseSchema,
   type CreateSessionResponse,
 } from "@pome-sh/shared-types";
-import { buildAgentEnv } from "../../../src/runner/runScenarioHosted.js";
+import { buildAgentEnv } from "../../../src/runner/runTaskHosted.js";
 import { rawBodyHadPerTwin } from "../../../src/hosted/client.js";
 
 // Regression: single-twin runs against an OLD cloud (no `per_twin` in the wire

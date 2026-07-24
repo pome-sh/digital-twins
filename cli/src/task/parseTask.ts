@@ -16,24 +16,24 @@ import {
 import { parseGitHubSeedState } from "./githubSeedCompat.js";
 import {
   criterionSchema,
-  scenarioConfigSchema,
-  scenarioSchema,
+  taskConfigSchema,
+  taskSchema,
   slackSeedStateSchema,
   stripeSeedStateSchema,
   type Criterion,
-  type Scenario,
-  type ScenarioConfig,
+  type Task,
+  type TaskConfig,
   type SeedEnvelope,
   type SeedState
-} from "./scenarioSchema.js";
+} from "./taskSchema.js";
 
-export async function parseScenarioFile(path: string): Promise<Scenario> {
+export async function parseTaskFile(path: string): Promise<Task> {
   const markdown = await readFile(path, "utf8");
   const sidecarSeed = await readSidecarSeed(path);
-  return parseScenario(markdown, slugFromPath(path), sidecarSeed, path);
+  return parseTask(markdown, slugFromPath(path), sidecarSeed, path);
 }
 
-export function parseScenario(markdown: string, slug = "scenario", sidecarSeed?: unknown, scenarioPath?: string): Scenario {
+export function parseTask(markdown: string, slug = "scenario", sidecarSeed?: unknown, taskPath?: string): Task {
   const title = markdown.match(/^#\s+(.+)$/m)?.[1]?.trim() ?? slug;
   const sections = splitSections(markdown);
   const prompt = sections.get("prompt") ?? sections.get("task") ?? "";
@@ -41,11 +41,11 @@ export function parseScenario(markdown: string, slug = "scenario", sidecarSeed?:
   const configText = sections.get("config") ?? "";
   const seedText = sections.get("seed state") ?? "";
 
-  const config = configText.trim() ? scenarioConfigSchema.parse(parseFencedYaml(configText)) : scenarioConfigSchema.parse({});
+  const config = configText.trim() ? taskConfigSchema.parse(parseFencedYaml(configText)) : taskConfigSchema.parse({});
   const criteria = parseCriteria(criteriaText, config.twins);
-  const seedState = resolveSeedState({ sidecarSeed, seedText, config, scenarioPath });
+  const seedState = resolveSeedState({ sidecarSeed, seedText, config, taskPath });
 
-  return scenarioSchema.parse({
+  return taskSchema.parse({
     slug,
     title,
     setup: sections.get("setup") ?? "",
@@ -57,7 +57,7 @@ export function parseScenario(markdown: string, slug = "scenario", sidecarSeed?:
   });
 }
 
-function resolveSeedState(args: { sidecarSeed: unknown; seedText: string; config: ScenarioConfig; scenarioPath?: string }): SeedState | SeedEnvelope {
+function resolveSeedState(args: { sidecarSeed: unknown; seedText: string; config: TaskConfig; taskPath?: string }): SeedState | SeedEnvelope {
   // Multi-twin (M3): the seed is a per-twin envelope, decided from `config.twins`
   // alone (envelope-iff-multi-twin — never by sniffing the seed shape).
   if (args.config.twins.length > 1) {
@@ -68,7 +68,7 @@ function resolveSeedState(args: { sidecarSeed: unknown; seedText: string; config
   // validated against the in-memory twin. The `_meta` key (source hash,
   // model, etc.) is stripped before schema parsing.
   if (args.sidecarSeed !== undefined) {
-    return parseSeedStateForScenario(stripSidecarMeta(args.sidecarSeed), args.config);
+    return parseSeedStateForTask(stripSidecarMeta(args.sidecarSeed), args.config);
   }
   if (args.seedText.trim()) {
     const raw = stripFence(args.seedText);
@@ -77,10 +77,10 @@ function resolveSeedState(args: { sidecarSeed: unknown; seedText: string; config
     // got here, the sidecar is missing — tell the user what to do instead of
     // letting JSON.parse surface "Unexpected token 'A'".
     if (!/^[\[{]/.test(raw)) {
-      throw new Error(missingSidecarMessage(args.scenarioPath));
+      throw new Error(missingSidecarMessage(args.taskPath));
     }
     try {
-      return parseSeedStateForScenario(JSON.parse(raw), args.config);
+      return parseSeedStateForTask(JSON.parse(raw), args.config);
     } catch (err) {
       if (err instanceof SyntaxError) {
         throw new Error(`Inline JSON seed in ## Seed State is malformed: ${err.message}`);
@@ -100,8 +100,8 @@ function resolveSeedState(args: { sidecarSeed: unknown; seedText: string; config
 function resolveMultiTwinSeedState(args: {
   sidecarSeed: unknown;
   seedText: string;
-  config: ScenarioConfig;
-  scenarioPath?: string;
+  config: TaskConfig;
+  taskPath?: string;
 }): SeedEnvelope {
   const twins = args.config.twins;
   let raw: unknown | undefined;
@@ -110,7 +110,7 @@ function resolveMultiTwinSeedState(args: {
   } else if (args.seedText.trim()) {
     const text = stripFence(args.seedText);
     if (!/^[\[{]/.test(text)) {
-      throw new Error(missingSidecarMessage(args.scenarioPath));
+      throw new Error(missingSidecarMessage(args.taskPath));
     }
     try {
       raw = JSON.parse(text);
@@ -182,10 +182,10 @@ function defaultSeedForTwin(twin: string): SeedState {
   return seedSchema.parse(defaultSeedState());
 }
 
-function missingSidecarMessage(scenarioPath: string | undefined): string {
-  const pathLabel = scenarioPath ?? "<task>.md";
-  const sidecarLabel = scenarioPath
-    ? scenarioPath.replace(/\.md$/i, ".seed.json")
+function missingSidecarMessage(taskPath: string | undefined): string {
+  const pathLabel = taskPath ?? "<task>.md";
+  const sidecarLabel = taskPath
+    ? taskPath.replace(/\.md$/i, ".seed.json")
     : "<task>.seed.json";
   return [
     `Task has a prose ## Seed State section but no compiled sidecar (${sidecarLabel}). Run:`,
@@ -204,9 +204,9 @@ function stripSidecarMeta(seed: unknown): unknown {
   return seed;
 }
 
-async function readSidecarSeed(scenarioPath: string): Promise<unknown | undefined> {
-  const sidecarPath = scenarioPath.replace(/\.md$/i, ".seed.json");
-  if (sidecarPath === scenarioPath || !existsSync(sidecarPath)) return undefined;
+async function readSidecarSeed(taskPath: string): Promise<unknown | undefined> {
+  const sidecarPath = taskPath.replace(/\.md$/i, ".seed.json");
+  if (sidecarPath === taskPath || !existsSync(sidecarPath)) return undefined;
   const raw = await readFile(sidecarPath, "utf8");
   try {
     return JSON.parse(raw);
@@ -310,7 +310,7 @@ function parseCriteria(input: string, twins: string[]): Criterion[] {
  *  flat `seedState` as-is; multi-twin scenarios return that twin's slice of the
  *  per-twin envelope (decided from `config.twins`, per the envelope-iff-multi-twin
  *  rule). Used by the local runner to seed each twin harness. */
-export function seedStateForTwin(scenario: Scenario, twin: string): unknown {
+export function seedStateForTwin(scenario: Task, twin: string): unknown {
   if (scenario.config.twins.length > 1) {
     return (scenario.seedState as SeedEnvelope)[twin];
   }
@@ -324,7 +324,7 @@ function parseFencedYaml(input: string) {
 // FDRS-365: scenario seed shape is FLAT per twin, disambiguated by config.twins.
 // Stripe-only scenarios parse with the Stripe schema; everything else (default
 // `["github"]`, or explicit github) parses with the GitHub schema.
-function parseSeedStateForScenario(input: unknown, config: ScenarioConfig): SeedState {
+function parseSeedStateForTask(input: unknown, config: TaskConfig): SeedState {
   if (isStripeOnly(config.twins)) return stripeSeedStateSchema.parse(input);
   if (isSlackOnly(config.twins)) return slackSeedStateSchema.parse(input);
   if (isGmailOnly(config.twins)) return gmailSeedSchema.parse(input);
@@ -340,7 +340,7 @@ function defaultSeedStateForConfig(twins: string[]): SeedState {
   }
   if (isSlackOnly(twins)) {
     // Empty Slack seed — the twin's own `parseSeed`/`defaultSeedState` fills the
-    // world at boot. Scenarios always ship a sidecar, so this is just the
+    // world at boot. Tasks always ship a sidecar, so this is just the
     // schema-valid floor.
     return slackSeedStateSchema.parse({});
   }
@@ -381,7 +381,7 @@ function slugFromPath(path: string) {
     .replace(/^-|-$/g, "");
 }
 
-export function formatScenarioError(error: unknown, filePath: string) {
+export function formatTaskError(error: unknown, filePath: string) {
   if (error instanceof z.ZodError) {
     return `Invalid task ${filePath}: ${error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ")}`;
   }

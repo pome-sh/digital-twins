@@ -6,8 +6,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createProgram } from "../../src/cli/main.js";
 import {
   findTwin,
-  runnableScenarios,
-} from "../../src/cli/scenarios-catalog.js";
+  runnableTasks,
+} from "../../src/cli/tasks-catalog.js";
 
 const originalCwd = process.cwd();
 const tempDirs: string[] = [];
@@ -19,7 +19,7 @@ afterEach(async () => {
 });
 
 describe("pome init", () => {
-  it("scaffolds starter scenarios and agents without overwriting config", async () => {
+  it("scaffolds starter tasks and agents without overwriting config", async () => {
     const projectDir = await mkdtemp(join(tmpdir(), "pome-init-"));
     tempDirs.push(projectDir);
     process.chdir(projectDir);
@@ -33,20 +33,20 @@ describe("pome init", () => {
     expect(existsSync("pome.json")).toBe(true);
     // The manifest is valid: it carries a slug derived from the project dir.
     expect(JSON.parse(readFileSync("pome.json", "utf8")).agent.slug).toMatch(/^[a-z0-9-]+$/);
-    for (const scenario of runnableScenarios(githubTwin!)) {
-      expect(existsSync(join("scenarios", scenario.filename))).toBe(true);
+    for (const task of runnableTasks(githubTwin!)) {
+      expect(existsSync(join("tasks", task.filename))).toBe(true);
     }
-    expect(existsSync("scenarios/14-stripe-refund-retry.md")).toBe(false);
-    expect(existsSync("scenarios/20-slack-exfiltration.md")).toBe(false);
+    expect(existsSync("tasks/14-stripe-refund-retry.md")).toBe(false);
+    expect(existsSync("tasks/20-slack-exfiltration.md")).toBe(false);
     expect(existsSync("examples/agents/scripted-triage-agent.ts")).toBe(true);
 
     // Bundled .seed.json sidecars must land alongside their .md so that
-    // `pome run scenarios/01-...` doesn't fall into the prose-seed parse path.
-    expect(existsSync("scenarios/01-bug-happy-path.seed.json")).toBe(true);
+    // `pome run tasks/01-...` doesn't fall into the prose-seed parse path.
+    expect(existsSync("tasks/01-bug-happy-path.seed.json")).toBe(true);
     // 04-judge-context now ships a sidecar that pre-labels issue #1 `bug`
     // (the default seed leaves it unlabeled). Init must copy it alongside the .md.
-    expect(existsSync("scenarios/04-judge-context.md")).toBe(true);
-    expect(existsSync("scenarios/04-judge-context.seed.json")).toBe(true);
+    expect(existsSync("tasks/04-judge-context.md")).toBe(true);
+    expect(existsSync("tasks/04-judge-context.seed.json")).toBe(true);
 
     await createProgram().parseAsync(["node", "pome", "init"]);
 

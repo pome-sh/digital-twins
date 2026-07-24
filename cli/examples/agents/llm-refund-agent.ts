@@ -102,7 +102,7 @@ async function callStripeTool(name: string, input: any) {
   throw new Error(`Unknown tool ${name}`);
 }
 
-// Hero bug surfaced by scenarios/14-stripe-refund-retry.md: this agent intentionally
+// Hero bug surfaced by tasks/14-stripe-refund-retry.md: this agent intentionally
 // never sends an `Idempotency-Key` header on POST /v1/refunds. When the twin's
 // failure-injection middleware drops the first response, the LLM-driven retry
 // creates a second refund row — exactly the double-charge bug Pome is built to catch.

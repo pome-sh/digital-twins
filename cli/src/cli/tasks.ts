@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * `pome scenarios` — browse the bundled task library and optionally
+ * `pome tasks` — browse the bundled task library and optionally
  * copy a twin's runnable tasks into the current project.
  *
- * Discovery only — no network. Source files live under `scenarios/` in
+ * Discovery only — no network. Source files live under `tasks/` in
  * the published tarball; `resolvePackageRoot` locates them whether the
  * CLI was started from `dist/` (published) or `src/` (dev).
  */
@@ -13,20 +13,20 @@ import { join, resolve } from "node:path";
 
 import { resolvePackageRoot } from "./resolve-package-root.js";
 import {
-  SCENARIO_TWINS,
+  TASK_TWINS,
   findTwin,
-  runnableScenarios,
-  type CatalogScenario,
-  type ScenarioTwin,
-} from "./scenarios-catalog.js";
+  runnableTasks,
+  type CatalogTask,
+  type TaskTwin,
+} from "./tasks-catalog.js";
 
-export interface ScenariosCommandOptions {
+export interface TasksCommandOptions {
   copy?: boolean;
   force?: boolean;
   dest?: string;
 }
 
-const DEFAULT_DEST_DIR = "scenarios";
+const DEFAULT_DEST_DIR = "tasks";
 
 function useColor(): boolean {
   return Boolean(process.stdout.isTTY && !process.env.NO_COLOR);
@@ -40,13 +40,13 @@ function bold(s: string): string {
   return useColor() ? `\x1b[1m${s}\x1b[0m` : s;
 }
 
-export async function runScenariosCommand(
+export async function runTasksCommand(
   twinArg: string | undefined,
-  opts: ScenariosCommandOptions,
+  opts: TasksCommandOptions,
 ): Promise<void> {
   if (!twinArg) {
     if (opts.copy || opts.force || opts.dest) {
-      console.error("Specify a twin to copy from, e.g. `pome scenarios github --copy`.");
+      console.error("Specify a twin to copy from, e.g. `pome tasks github --copy`.");
       process.exitCode = 2;
       return;
     }
@@ -56,58 +56,58 @@ export async function runScenariosCommand(
 
   const twin = findTwin(twinArg);
   if (!twin) {
-    const available = SCENARIO_TWINS.map((t) => t.id).join(", ");
+    const available = TASK_TWINS.map((t) => t.id).join(", ");
     console.error(
-      `Unknown twin "${twinArg}". Available: ${available}. Run \`pome scenarios\` for the index.`,
+      `Unknown twin "${twinArg}". Available: ${available}. Run \`pome tasks\` for the index.`,
     );
     process.exitCode = 2;
     return;
   }
 
   if (opts.copy) {
-    await copyTwinScenarios(twin, {
+    await copyTwinTasks(twin, {
       destDir: opts.dest ?? DEFAULT_DEST_DIR,
       force: Boolean(opts.force),
     });
     return;
   }
 
-  printTwinScenarios(twin);
+  printTwinTasks(twin);
 }
 
 function printTwinIndex(): void {
   console.log(bold("Pome tasks"));
   console.log(dim("Bundled task library, grouped by twin."));
   console.log("");
-  for (const twin of SCENARIO_TWINS) {
-    const count = runnableScenarios(twin).length;
+  for (const twin of TASK_TWINS) {
+    const count = runnableTasks(twin).length;
     console.log(`  ${bold(twin.id)} ${dim(`(${count} tasks)`)} — ${twin.label}`);
     console.log(`    ${dim(twin.description)}`);
   }
   console.log("");
   console.log(
-    dim("Run `pome scenarios <twin>` to list tasks, or add `--copy` to drop them into ./scenarios/."),
+    dim("Run `pome tasks <twin>` to list tasks, or add `--copy` to drop them into ./tasks/."),
   );
 }
 
-function printTwinScenarios(twin: ScenarioTwin): void {
-  const runnable = runnableScenarios(twin);
+function printTwinTasks(twin: TaskTwin): void {
+  const runnable = runnableTasks(twin);
   console.log(bold(`Pome tasks — ${twin.label}`));
   console.log(dim(`${runnable.length} tasks bundled with this CLI.`));
   console.log("");
-  for (const scenario of runnable) {
-    console.log(`  ${bold(scenario.filename)}`);
-    console.log(`    ${dim(scenario.title)} — ${scenario.summary}`);
+  for (const task of runnable) {
+    console.log(`  ${bold(task.filename)}`);
+    console.log(`    ${dim(task.title)} — ${task.summary}`);
   }
   console.log("");
   console.log(
     dim(
-      `Copy locally: \`pome scenarios ${twin.id} --copy\` (or \`--copy --dest <dir>\`).`,
+      `Copy locally: \`pome tasks ${twin.id} --copy\` (or \`--copy --dest <dir>\`).`,
     ),
   );
   console.log(
     dim(
-      `Run one: \`pome run scenarios/${runnable[0]?.filename ?? "01-bug-happy-path.md"}\`.`,
+      `Run one: \`pome run tasks/${runnable[0]?.filename ?? "01-bug-happy-path.md"}\`.`,
     ),
   );
 }
@@ -123,8 +123,8 @@ interface CopyOutcome {
   missingSources: string[];
 }
 
-export async function copyTwinScenarios(
-  twin: ScenarioTwin,
+export async function copyTwinTasks(
+  twin: TaskTwin,
   opts: CopyOptions,
 ): Promise<void> {
   const root = resolvePackageRoot(import.meta.url);
@@ -136,12 +136,12 @@ export async function copyTwinScenarios(
     return;
   }
 
-  const sourceDir = join(root, "scenarios");
+  const sourceDir = join(root, "tasks");
   const destDir = resolve(process.cwd(), opts.destDir);
   await mkdir(destDir, { recursive: true });
 
-  const outcome = await copyScenarioFiles({
-    scenarios: runnableScenarios(twin),
+  const outcome = await copyTaskFiles({
+    tasks: runnableTasks(twin),
     sourceDir,
     destDir,
     force: opts.force,
@@ -178,31 +178,31 @@ export async function copyTwinScenarios(
   }
 }
 
-async function copyScenarioFiles(input: {
-  scenarios: CatalogScenario[];
+async function copyTaskFiles(input: {
+  tasks: CatalogTask[];
   sourceDir: string;
   destDir: string;
   force: boolean;
 }): Promise<CopyOutcome> {
   const outcome: CopyOutcome = { copied: [], skipped: [], missingSources: [] };
-  for (const scenario of input.scenarios) {
-    const src = join(input.sourceDir, scenario.filename);
-    const dest = join(input.destDir, scenario.filename);
+  for (const task of input.tasks) {
+    const src = join(input.sourceDir, task.filename);
+    const dest = join(input.destDir, task.filename);
     if (!existsSync(src)) {
-      outcome.missingSources.push(scenario.filename);
+      outcome.missingSources.push(task.filename);
       continue;
     }
     if (existsSync(dest) && !input.force) {
-      outcome.skipped.push(scenario.filename);
+      outcome.skipped.push(task.filename);
     } else {
       await copyFile(src, dest);
-      outcome.copied.push(scenario.filename);
+      outcome.copied.push(task.filename);
     }
 
     // Sidecar seeds (`<name>.seed.json`) are optional — tasks that use
     // default seed state don't have one. Missing source is silent; missing
     // dest is copied; existing dest follows the same --force rule as the .md.
-    const sidecar = scenario.filename.replace(/\.md$/i, ".seed.json");
+    const sidecar = task.filename.replace(/\.md$/i, ".seed.json");
     const sidecarSrc = join(input.sourceDir, sidecar);
     const sidecarDest = join(input.destDir, sidecar);
     if (!existsSync(sidecarSrc)) continue;

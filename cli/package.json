@@ -33,7 +33,7 @@
   "files": [
     "dist",
     "examples",
-    "scenarios",
+    "tasks",
     "LICENSE",
     "package.json",
     "README.md"

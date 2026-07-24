@@ -121,9 +121,9 @@ for (const twin of canonical) {
 }
 
 const catalogIds = [
-  ...read("cli/src/cli/scenarios-catalog.ts").matchAll(/^\s{4}id:\s*"([a-z][a-z0-9-]*)",$/gm),
+  ...read("cli/src/cli/tasks-catalog.ts").matchAll(/^\s{4}id:\s*"([a-z][a-z0-9-]*)",$/gm),
 ].map((match) => match[1]);
-compare("cli/src/cli/scenarios-catalog.ts SCENARIO_TWINS", catalogIds);
+compare("cli/src/cli/tasks-catalog.ts TASK_TWINS", catalogIds);
 
 if (failures.length > 0) {
   console.error("First-party twin registration drift:");

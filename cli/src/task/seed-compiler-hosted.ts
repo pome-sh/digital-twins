@@ -50,7 +50,7 @@ const errorBodySchema = z.object({
 export interface CompileSeedHostedOptions {
   apiBaseUrl: string;
   twin?: "github";
-  scenarioPath?: string;
+  taskPath?: string;
   timeoutMs?: number;
 }
 
@@ -74,7 +74,7 @@ export async function compileSeedHosted(prose: string, opts: CompileSeedHostedOp
       body: JSON.stringify({
         prose,
         twin: opts.twin ?? "github",
-        scenario_path: opts.scenarioPath
+        scenario_path: opts.taskPath
       }),
       signal: controller.signal
     });

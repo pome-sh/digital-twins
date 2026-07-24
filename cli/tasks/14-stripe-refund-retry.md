@@ -9,7 +9,7 @@ Twin-side support landed in M3a Lane B:
 - FDRS-338 — `[M3a/B] twin-stripe: refund resource + state_delta wiring` (merged 2026-05-11)
 - FDRS-339 — `[M3a/B] twin-stripe + CLI: scenario-level failure injection` (parses `failure_injection`; per-request middleware fires for both `before_handler` and `after_handler` modes; the FDRS-316 hero flow is exercised end-to-end in `packages/twin-stripe/test/failure-injection.test.ts`)
 
-`pome run scenarios/14-stripe-refund-retry.md` now boots the packaged Stripe twin locally and pre-seeds `payment_intents`, `charges`, and failure-injection rules into the twin domain.
+`pome run tasks/14-stripe-refund-retry.md` now boots the packaged Stripe twin locally and pre-seeds `payment_intents`, `charges`, and failure-injection rules into the twin domain.
 
 When the CLI loop runs end-to-end, this task reproduces the press-release hero bug: an agent retries a "lost-response" failure without `Idempotency-Key` and ends up creating two refund rows for one logical transaction.
 

@@ -16,7 +16,7 @@
 //      half-group back (best-effort DELETEs) and aborts before any agent
 //      spawns.
 //   2. Run the k trials with concurrency = the number of upfront mints
-//      (= k when quota never pushed back). runScenarioHosted stays the
+//      (= k when quota never pushed back). runTaskHosted stays the
 //      isolation unit: each trial gets its session via the
 //      `premintedSession` seam, `abandonOnFailure` on, and still DELETEs
 //      its own session in its `finally` — that delete frees the quota slot
@@ -41,10 +41,10 @@ import { createHostedClient, type HostedClient } from "../hosted/client.js";
 import { HostedQuotaError, HostedTrialError } from "../hosted/errors.js";
 import { newGroupId } from "../demo/ids.js";
 import { criterionPhrase } from "../demo/render.js";
-import { parseScenarioFile } from "../scenario/parseScenario.js";
+import { parseTaskFile } from "../task/parseTask.js";
 import { outcomeOf } from "../hosted/evalResultView.js";
 import { resolveRunAgentIdentity } from "../cli/agent-identity.js";
-import { runScenarioHosted } from "./runScenarioHosted.js";
+import { runTaskHosted } from "./runTaskHosted.js";
 import {
   fixHandoffLines,
   flagHintLine,
@@ -69,7 +69,7 @@ export const LAZY_MINT_RETRY_MS = 2_000;
 export const LAZY_MINT_MAX_ATTEMPTS = 5;
 
 export interface RunTrialGroupOptions {
-  scenarioPath: string;
+  taskPath: string;
   agentCommand: string;
   /** Where the agent command came from, for the header copy
    *  ("pome.json" | "--agent" | "built-in default"). */
@@ -88,12 +88,12 @@ export interface RunTrialGroupOptions {
   /** FDRS-644 — the literal command the fix handoff tells the user to
    *  re-run after their coding agent applies a fix. The caller knows the
    *  invocation shape (bare `pome run` vs an explicit path + -n); default
-   *  reconstructs it from scenarioPath + trials. */
+   *  reconstructs it from taskPath + trials. */
   rerunCommand?: string;
   out?: (line: string) => void;
   // ── test seams ─────────────────────────────────────────────────────────
   client?: HostedClient;
-  runScenarioHostedFn?: typeof runScenarioHosted;
+  runTaskHostedFn?: typeof runTaskHosted;
   groupId?: string;
   /** FDRS-663 — lazy-mint retry pause; defaults to a real setTimeout. */
   sleepFn?: (ms: number) => Promise<void>;
@@ -115,7 +115,7 @@ export async function runTrialGroup(
     );
   }
   const out = options.out ?? ((line: string) => console.error(line));
-  const runFn = options.runScenarioHostedFn ?? runScenarioHosted;
+  const runFn = options.runTaskHostedFn ?? runTaskHosted;
   const client =
     options.client ??
     createHostedClient({
@@ -126,12 +126,12 @@ export async function runTrialGroup(
   const groupId = options.groupId ?? newGroupId();
   const agentCommandSource = options.agentCommandSource ?? "pome.json";
 
-  const scenario = await parseScenarioFile(options.scenarioPath);
-  const scenarioSource = await readFile(options.scenarioPath, "utf8");
+  const scenario = await parseTaskFile(options.taskPath);
+  const taskSource = await readFile(options.taskPath, "utf8");
   // Same agent resolution as the single-run path (F-819): the group's trials
   // are recorded under the agent the manifest's `agent.slug` resolves to.
   const identity = await resolveRunAgentIdentity({
-    startDir: dirname(options.scenarioPath),
+    startDir: dirname(options.taskPath),
     apiBaseUrl: options.hosted.baseUrl,
     agentVersionOverride: options.agentVersion,
   });
@@ -147,7 +147,7 @@ export async function runTrialGroup(
     ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const mintOne = () =>
     client.createSession({
-      scenarioSource,
+      taskSource,
       twins: scenario.config.twins,
       agentId,
       agentVersion,
@@ -225,7 +225,7 @@ export async function runTrialGroup(
     try {
       const session = index < sessions.length ? sessions[index]! : await mintLazily();
       const result = await runFn({
-        scenarioPath: options.scenarioPath,
+        taskPath: options.taskPath,
         agentCommand: options.agentCommand,
         artifactsDir: options.artifactsDir,
         hosted: options.hosted,
@@ -318,7 +318,7 @@ export async function runTrialGroup(
         : `pome fix-prompt ${artifactsDir}`;
     const rerunCommand =
       options.rerunCommand ??
-      `pome run ${options.scenarioPath} -n ${options.trials}`;
+      `pome run ${options.taskPath} -n ${options.trials}`;
     for (const line of fixHandoffLines({ fixPromptCommand, rerunCommand })) {
       out(line);
     }

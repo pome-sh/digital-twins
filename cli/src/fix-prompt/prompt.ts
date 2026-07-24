@@ -14,7 +14,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { CriterionResult, RecorderEvent } from "../types/shared.js";
-import type { Criterion, Scenario } from "../scenario/scenarioSchema.js";
+import type { Criterion, Task } from "../task/taskSchema.js";
 import { redactEvent, redactSecrets } from "../recorder/redaction.js";
 import { outcomeOf } from "../hosted/evalResultView.js";
 import type { VerdictArtifact } from "../hosted/evalResultCache.js";
@@ -53,7 +53,7 @@ export function escapeTagContent(text: string): string {
 
 export interface FixPromptContext {
   events: RecorderEvent[];
-  scenario: Scenario;
+  scenario: Task;
 }
 
 function truncateBody(body: unknown): unknown {
@@ -104,14 +104,14 @@ function renderCriteria(criteria: Criterion[]): string {
 export function buildFixUserPrompt(ctx: FixPromptContext): string {
   const criteria = redactSecrets(renderCriteria(ctx.scenario.criteria)) as string;
   const trace = renderEvents(ctx.events.map((event) => redactEvent(event)));
-  const scenarioTitle = redactSecrets(ctx.scenario.title) as string;
-  const scenarioPrompt = redactSecrets(ctx.scenario.prompt) as string;
+  const taskTitle = redactSecrets(ctx.scenario.title) as string;
+  const taskPrompt = redactSecrets(ctx.scenario.prompt) as string;
 
   return `## Task
-${scenarioTitle}
+${taskTitle}
 
 ## Task prompt (what the agent was told to do)
-${scenarioPrompt}
+${taskPrompt}
 
 ## Criteria the run had to satisfy
 ${escapeTagContent(criteria)}
@@ -144,7 +144,7 @@ export interface GroupFixPromptContext {
   groupId: string | null;
   /** Parsed task file when it still resolves. Null degrades the prompt to
    *  the verdict-embedded criteria (the file may have moved since the run). */
-  scenario: Scenario | null;
+  scenario: Task | null;
   /** Completed trials of the run set (verdict.json present), run order. */
   trials: TrialFixInput[];
 }

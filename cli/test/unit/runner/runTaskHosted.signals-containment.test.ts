@@ -30,14 +30,14 @@ vi.mock("../../../src/hosted/uploadAndFinalize.js", async (importOriginal) => {
   };
 });
 
-const { runScenarioHosted } = await import(
-  "../../../src/runner/runScenarioHosted.js"
+const { runTaskHosted } = await import(
+  "../../../src/runner/runTaskHosted.js"
 );
 
 const TRIVIAL_PASSING_SCENARIO =
   "# Trivial\n\n## Prompt\nPretend prompt.\n\n## Success Criteria\n- [code] No unsupported endpoint was called\n";
 
-describe("runScenarioHosted signals redaction containment", () => {
+describe("runTaskHosted signals redaction containment", () => {
   let tmp: string;
 
   beforeEach(async () => {
@@ -115,11 +115,11 @@ describe("runScenarioHosted signals redaction containment", () => {
       throw new Error(`Unexpected fetch call to ${String(url)}`);
     });
 
-    const scenarioPath = join(tmp, "scn.md");
-    await writeFile(scenarioPath, TRIVIAL_PASSING_SCENARIO, "utf8");
+    const taskPath = join(tmp, "scn.md");
+    await writeFile(taskPath, TRIVIAL_PASSING_SCENARIO, "utf8");
 
-    const result = await runScenarioHosted({
-      scenarioPath,
+    const result = await runTaskHosted({
+      taskPath,
       agentCommand: `node -e ${JSON.stringify("console.log('done')")}`,
       artifactsDir: join(tmp, "runs"),
       hosted: { baseUrl: "http://no-cloud.invalid", apiKey: "pme_test" },

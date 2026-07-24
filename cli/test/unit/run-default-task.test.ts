@@ -23,9 +23,9 @@ import {
   withUserCopyComment,
 } from "../../src/cli/default-task.js";
 import { DEMO_TASK_NAME, demoTaskPath } from "../../src/demo/task.js";
-import { parseScenario, parseScenarioFile } from "../../src/scenario/parseScenario.js";
+import { parseTask, parseTaskFile } from "../../src/task/parseTask.js";
 import { runTrialGroup } from "../../src/runner/runTrialGroup.js";
-import { runScenarioHosted } from "../../src/runner/runScenarioHosted.js";
+import { runTaskHosted } from "../../src/runner/runTaskHosted.js";
 
 vi.mock("../../src/runner/runTrialGroup.js", () => ({
   GROUP_FINALIZE_TIMEOUT_MS: 60_000,
@@ -37,8 +37,8 @@ vi.mock("../../src/runner/runTrialGroup.js", () => ({
   })),
 }));
 
-vi.mock("../../src/runner/runScenarioHosted.js", () => ({
-  runScenarioHosted: vi.fn(async () => ({
+vi.mock("../../src/runner/runTaskHosted.js", () => ({
+  runTaskHosted: vi.fn(async () => ({
     scenario: { title: "Fixture", slug: "scn", config: { passThreshold: 100 } },
     runId: "ses_1",
     cloudRunId: "run_1",
@@ -100,7 +100,7 @@ describe("default-task module (FDRS-645)", () => {
     ) as unknown;
     const pinned = withDefaultTrials(raw);
     expect(pinned.applied).toBe(true);
-    const parsed = parseScenario(pinned.content, DEMO_TASK_NAME, sidecar);
+    const parsed = parseTask(pinned.content, DEMO_TASK_NAME, sidecar);
     expect(parsed.config.runs).toBe(DEFAULT_TASK_TRIALS);
     // Everything the judge definition is regenerated from is untouched.
     expect(parsed.title).toBe(DEMO_TASK_NAME);
@@ -135,11 +135,11 @@ describe("default-task module (FDRS-645)", () => {
     const first = await ensureDefaultTask(dir);
     expect(first.copied).toBe(true);
     expect(first.trialsApplied).toBe(true);
-    expect(existsSync(join(dir, "scenarios", "first-run-demo.md"))).toBe(true);
-    expect(existsSync(join(dir, "scenarios", "first-run-demo.seed.json"))).toBe(true);
+    expect(existsSync(join(dir, "tasks", "first-run-demo.md"))).toBe(true);
+    expect(existsSync(join(dir, "tasks", "first-run-demo.seed.json"))).toBe(true);
 
     // The dropped copy parses with the real parser: sidecar honored, k pinned.
-    const parsed = await parseScenarioFile(first.path);
+    const parsed = await parseTaskFile(first.path);
     expect(parsed.config.runs).toBe(DEFAULT_TASK_TRIALS);
     expect(parsed.slug).toBe(DEMO_TASK_NAME);
 
@@ -150,9 +150,9 @@ describe("default-task module (FDRS-645)", () => {
 
   it("never clobbers a user-edited copy", async () => {
     const dir = await mkdtemp(join(tmpdir(), "pome-default-task-"));
-    await mkdir(join(dir, "scenarios"), { recursive: true });
+    await mkdir(join(dir, "tasks"), { recursive: true });
     const custom = "# first-run-demo\n\n## Prompt\nmine now\n\n## Success Criteria\n- [code] x\n\n## Config\n```yaml\nruns: 2\n```\n";
-    await writeFile(join(dir, "scenarios", "first-run-demo.md"), custom);
+    await writeFile(join(dir, "tasks", "first-run-demo.md"), custom);
     const res = await ensureDefaultTask(dir);
     expect(res.copied).toBe(false);
     expect(await readFile(res.path, "utf8")).toBe(custom);
@@ -160,22 +160,22 @@ describe("default-task module (FDRS-645)", () => {
 
   it("preserves a user-edited seed when only the md was deleted", async () => {
     const dir = await mkdtemp(join(tmpdir(), "pome-default-task-"));
-    await mkdir(join(dir, "scenarios"), { recursive: true });
+    await mkdir(join(dir, "tasks"), { recursive: true });
     const editedSeed = '{"edited":"by the user"}';
     await writeFile(
-      join(dir, "scenarios", "first-run-demo.seed.json"),
+      join(dir, "tasks", "first-run-demo.seed.json"),
       editedSeed,
     );
     const res = await ensureDefaultTask(dir);
     expect(res.copied).toBe(true);
     expect(
-      await readFile(join(dir, "scenarios", "first-run-demo.seed.json"), "utf8"),
+      await readFile(join(dir, "tasks", "first-run-demo.seed.json"), "utf8"),
     ).toBe(editedSeed);
   });
 
-  it("names a `scenarios`-is-a-file collision as a usage error", async () => {
+  it("names a `tasks`-is-a-file collision as a usage error", async () => {
     const dir = await mkdtemp(join(tmpdir(), "pome-default-task-"));
-    await writeFile(join(dir, "scenarios"), "not a directory");
+    await writeFile(join(dir, "tasks"), "not a directory");
     await expect(ensureDefaultTask(dir)).rejects.toThrow(/exists as a file/);
   });
 });
@@ -195,7 +195,7 @@ describe("bare `pome run` glue (FDRS-645)", () => {
     process.exitCode = undefined;
     process.env.POME_API_KEY = "pme_test_env_key";
     vi.mocked(runTrialGroup).mockClear();
-    vi.mocked(runScenarioHosted).mockClear();
+    vi.mocked(runTaskHosted).mockClear();
   });
 
   afterEach(() => {
@@ -215,18 +215,18 @@ describe("bare `pome run` glue (FDRS-645)", () => {
     await run();
 
     expect(process.exitCode ?? 0).toBe(0);
-    expect(existsSync(join(dir, "scenarios", "first-run-demo.md"))).toBe(true);
-    expect(existsSync(join(dir, "scenarios", "first-run-demo.seed.json"))).toBe(true);
+    expect(existsSync(join(dir, "tasks", "first-run-demo.md"))).toBe(true);
+    expect(existsSync(join(dir, "tasks", "first-run-demo.seed.json"))).toBe(true);
 
     const err = stderr.join("\n");
     expect(err).toContain("copied the demo task into");
     for (const line of runYoursFrameLines()) expect(err).toContain(line);
 
-    expect(runScenarioHosted).not.toHaveBeenCalled();
+    expect(runTaskHosted).not.toHaveBeenCalled();
     expect(runTrialGroup).toHaveBeenCalledTimes(1);
     const options = vi.mocked(runTrialGroup).mock.calls[0]![0];
     expect(options.trials).toBe(DEFAULT_TASK_TRIALS);
-    expect(options.scenarioPath.endsWith(join("scenarios", "first-run-demo.md"))).toBe(true);
+    expect(options.taskPath.endsWith(join("tasks", "first-run-demo.md"))).toBe(true);
   }, 30_000);
 
   it("second bare run reuses the copy without re-announcing", async () => {
@@ -254,28 +254,28 @@ describe("bare `pome run` glue (FDRS-645)", () => {
   it("a user-edited copy's runs field drives the default (runs: 1 → single-run path)", async () => {
     const dir = await fixtureRepo();
     process.chdir(dir);
-    await mkdir(join(dir, "scenarios"), { recursive: true });
+    await mkdir(join(dir, "tasks"), { recursive: true });
     await writeFile(
-      join(dir, "scenarios", "first-run-demo.md"),
+      join(dir, "tasks", "first-run-demo.md"),
       "# first-run-demo\n\n## Prompt\nmine\n\n## Success Criteria\n- [code] x\n\n## Config\n```yaml\nruns: 1\n```\n",
     );
     await run();
     expect(runTrialGroup).not.toHaveBeenCalled();
-    expect(runScenarioHosted).toHaveBeenCalledTimes(1);
+    expect(runTaskHosted).toHaveBeenCalledTimes(1);
   }, 30_000);
 
   it("an explicit path never announces, frames, or drops the copy", async () => {
     const dir = await fixtureRepo();
     process.chdir(dir);
-    await mkdir(join(dir, "scenarios"), { recursive: true });
-    await writeFile(join(dir, "scenarios", "scn.md"), EXPLICIT_SCENARIO);
-    await run("scenarios/scn.md");
+    await mkdir(join(dir, "tasks"), { recursive: true });
+    await writeFile(join(dir, "tasks", "scn.md"), EXPLICIT_SCENARIO);
+    await run("tasks/scn.md");
 
-    expect(existsSync(join(dir, "scenarios", "first-run-demo.md"))).toBe(false);
+    expect(existsSync(join(dir, "tasks", "first-run-demo.md"))).toBe(false);
     const err = stderr.join("\n");
     expect(err).not.toContain("copied the demo task into");
     expect(err).not.toContain(runYoursFrameLines()[0]);
-    expect(runScenarioHosted).toHaveBeenCalledTimes(1);
+    expect(runTaskHosted).toHaveBeenCalledTimes(1);
   }, 30_000);
 
   it("a failing doctor gate refuses before the frame ever prints", async () => {
@@ -288,6 +288,6 @@ describe("bare `pome run` glue (FDRS-645)", () => {
     expect(err).toContain("wiring check failed");
     expect(err).not.toContain(runYoursFrameLines()[0]);
     expect(runTrialGroup).not.toHaveBeenCalled();
-    expect(runScenarioHosted).not.toHaveBeenCalled();
+    expect(runTaskHosted).not.toHaveBeenCalled();
   }, 30_000);
 });

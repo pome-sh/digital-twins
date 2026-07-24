@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Multi-twin (M3) local runner mechanism: `runScenario` boots one bootTwin
+// Multi-twin (M3) local runner mechanism: `runTask` boots one bootTwin
 // harness per config twin, all sharing ONE recorder so their events land in a
 // single stream, and the runner (not the harness) owns the recorder's
 // lifecycle. This covers the shared-recorder wiring in isolation without the

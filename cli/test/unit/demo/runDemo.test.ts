@@ -9,12 +9,12 @@ import { runDemo, type DemoTrialClient } from "../../../src/demo/runDemo.js";
 import { DemoCapacityError } from "../../../src/demo/capacity.js";
 import { HostedQuotaError } from "../../../src/hosted/errors.js";
 import type { DemoSession } from "../../../src/demo/mint.js";
-import type { runScenario } from "../../../src/runner/runScenario.js";
+import type { runTask } from "../../../src/runner/runTask.js";
 import type { FinalizeResponse } from "../../../src/types/shared.js";
 
-type RunScenarioFn = typeof runScenario;
-type RunScenarioResult = Awaited<ReturnType<RunScenarioFn>>;
-type RunScenarioOpts = Parameters<RunScenarioFn>[0];
+type RunTaskFn = typeof runTask;
+type RunTaskResult = Awaited<ReturnType<RunTaskFn>>;
+type RunTaskOpts = Parameters<RunTaskFn>[0];
 
 function sessionsFixture(count: number): DemoSession[] {
   return Array.from({ length: count }, (_, i) => ({
@@ -36,12 +36,12 @@ async function artifactsDirWithBlobs(): Promise<string> {
   return dir;
 }
 
-function fakeRunScenario(
+function fakeRunTask(
   perTrial: Array<{ exitCode: number; stderr?: string; timedOut?: boolean }>,
-  seenOptions: RunScenarioOpts[],
-): RunScenarioFn {
+  seenOptions: RunTaskOpts[],
+): RunTaskFn {
   let call = 0;
-  return (async (options: RunScenarioOpts) => {
+  return (async (options: RunTaskOpts) => {
     seenOptions.push(options);
     const spec = perTrial[Math.min(call, perTrial.length - 1)]!;
     call += 1;
@@ -58,8 +58,8 @@ function fakeRunScenario(
       },
       exitCode: spec.exitCode,
       blockedEgress: [],
-    } as unknown as RunScenarioResult;
-  }) as RunScenarioFn;
+    } as unknown as RunTaskResult;
+  }) as RunTaskFn;
 }
 
 function passedResult(): FinalizeResponse["criteria_results"] {
@@ -149,7 +149,7 @@ function finalizeResponse(
 describe("runDemo (FDRS-643)", () => {
   it("threads one grp_ id through every mint, runs k trials, renders verdict words + preview link", async () => {
     const out: string[] = [];
-    const seenOptions: RunScenarioOpts[] = [];
+    const seenOptions: RunTaskOpts[] = [];
     const finalizeCalls: Array<{ sessionId: string; input: unknown }> = [];
     const mintFn = vi.fn(async (opts: { groupId: string; count: number }) =>
       sessionsFixture(opts.count),
@@ -161,7 +161,7 @@ describe("runDemo (FDRS-643)", () => {
       trials: 5,
       out: (line) => out.push(line),
       agentCommand: "unused-in-test",
-      runScenarioFn: fakeRunScenario(
+      runTaskFn: fakeRunTask(
         [
           { exitCode: 0 },
           { exitCode: 0 },
@@ -197,7 +197,7 @@ describe("runDemo (FDRS-643)", () => {
     // Each trial got ITS session's gateway coordinates + the egress valve.
     expect(seenOptions).toHaveLength(5);
     seenOptions.forEach((options, i) => {
-      expect(options.scenarioPath.endsWith("first-run-demo.md")).toBe(true);
+      expect(options.taskPath.endsWith("first-run-demo.md")).toBe(true);
       expect(options.extraAgentEnv).toMatchObject({
         POME_DEMO_LLM_URL: `https://api.example.com/v1/demo/sessions/ses_${i + 1}/llm`,
         POME_DEMO_TOKEN: `jwt.tok${i + 1}.sig`,
@@ -218,7 +218,7 @@ describe("runDemo (FDRS-643)", () => {
     for (const call of finalizeCalls) {
       expect(call.input).toMatchObject({
         criteria: [],
-        scenarioName: "first-run-demo",
+        taskName: "first-run-demo",
         stopReason: "completed",
       });
     }
@@ -241,14 +241,14 @@ describe("runDemo (FDRS-643)", () => {
 
   it("renders an honest labeled state and exits 4 when the mint is at capacity", async () => {
     const out: string[] = [];
-    const runScenarioFn = vi.fn();
+    const runTaskFn = vi.fn();
     const result = await runDemo({
       apiBase: "https://api.example.com",
       dashboardBase: "https://app.pome.sh",
       trials: 5,
       out: (line) => out.push(line),
       agentCommand: "unused-in-test",
-      runScenarioFn: runScenarioFn as never,
+      runTaskFn: runTaskFn as never,
       mintFn: (async () => {
         throw new DemoCapacityError(
           "demo_ip_mint_cap",
@@ -260,7 +260,7 @@ describe("runDemo (FDRS-643)", () => {
     });
 
     expect(result.exitCode).toBe(4);
-    expect(runScenarioFn).not.toHaveBeenCalled();
+    expect(runTaskFn).not.toHaveBeenCalled();
     const text = out.join("\n");
     expect(text).toContain("limit for this network — try again tomorrow");
     expect(text).not.toMatch(/at Object|\.ts:\d+/); // no stack traces
@@ -268,14 +268,14 @@ describe("runDemo (FDRS-643)", () => {
 
   it("stops launching trials when finalize hits the daily judge cap, keeping earlier verdicts", async () => {
     const out: string[] = [];
-    const seenOptions: RunScenarioOpts[] = [];
+    const seenOptions: RunTaskOpts[] = [];
     const result = await runDemo({
       apiBase: "https://api.example.com",
       dashboardBase: "https://app.pome.sh",
       trials: 5,
       out: (line) => out.push(line),
       agentCommand: "unused-in-test",
-      runScenarioFn: fakeRunScenario([{ exitCode: 0 }], seenOptions),
+      runTaskFn: fakeRunTask([{ exitCode: 0 }], seenOptions),
       mintFn: (async (opts: { count: number }) => sessionsFixture(opts.count)) as never,
       trialClientFactory: fakeClient((sessionId) => {
         if (sessionId === "ses_1") return finalizeResponse(100, passedResult());
@@ -301,14 +301,14 @@ describe("runDemo (FDRS-643)", () => {
 
   it("treats an agent capacity marker (gateway 402 mid-trial) as a demo-wide honest stop", async () => {
     const out: string[] = [];
-    const seenOptions: RunScenarioOpts[] = [];
+    const seenOptions: RunTaskOpts[] = [];
     const result = await runDemo({
       apiBase: "https://api.example.com",
       dashboardBase: "https://app.pome.sh",
       trials: 5,
       out: (line) => out.push(line),
       agentCommand: "unused-in-test",
-      runScenarioFn: fakeRunScenario(
+      runTaskFn: fakeRunTask(
         [
           {
             exitCode: 3,
@@ -337,7 +337,7 @@ describe("runDemo (FDRS-643)", () => {
       trials: 3,
       out: (line) => out.push(line),
       agentCommand: "unused-in-test",
-      runScenarioFn: fakeRunScenario(
+      runTaskFn: fakeRunTask(
         [
           {
             exitCode: 3,
@@ -369,7 +369,7 @@ describe("runDemo (FDRS-643)", () => {
       trials: 3,
       out: () => undefined,
       agentCommand: "unused-in-test",
-      runScenarioFn: fakeRunScenario([{ exitCode: 0 }], []),
+      runTaskFn: fakeRunTask([{ exitCode: 0 }], []),
       mintFn: (async (opts: { count: number }) => sessionsFixture(opts.count)) as never,
       trialClientFactory: fakeClient(
         (sessionId) => {
@@ -399,7 +399,7 @@ describe("runDemo (FDRS-643)", () => {
       trials: 3,
       out: () => undefined,
       agentCommand: "unused-in-test",
-      runScenarioFn: fakeRunScenario(
+      runTaskFn: fakeRunTask(
         [
           { exitCode: 0 },
           { exitCode: 3, timedOut: true },
@@ -431,7 +431,7 @@ describe("runDemo (FDRS-643)", () => {
       trials: 2,
       out: () => undefined,
       agentCommand: "unused-in-test",
-      runScenarioFn: fakeRunScenario([{ exitCode: 0 }], []),
+      runTaskFn: fakeRunTask([{ exitCode: 0 }], []),
       mintFn: (async (opts: { count: number }) => sessionsFixture(opts.count)) as never,
       trialClientFactory: fakeClient(
         (sessionId) =>
@@ -460,7 +460,7 @@ describe("runDemo (FDRS-643)", () => {
       trials: 1,
       out: () => undefined,
       agentCommand: "unused-in-test",
-      runScenarioFn: fakeRunScenario([{ exitCode: 0 }], []),
+      runTaskFn: fakeRunTask([{ exitCode: 0 }], []),
       mintFn: (async (opts: { count: number }) => sessionsFixture(opts.count)) as never,
       // criteria_results: [] → unevaluated → errored verdict, but the run
       // row exists (finalize 200) — abandon must NOT fire.
@@ -485,7 +485,7 @@ describe("runDemo (FDRS-643)", () => {
       trials: 1,
       out: () => undefined,
       agentCommand: "unused-in-test",
-      runScenarioFn: fakeRunScenario([{ exitCode: 0 }], []),
+      runTaskFn: fakeRunTask([{ exitCode: 0 }], []),
       mintFn: (async (opts: { count: number }) => sessionsFixture(opts.count)) as never,
       // Finalize resolves (the run row exists) but the response is corrupt,
       // so verdict synthesis throws afterwards — post-finalize crashes must
@@ -519,7 +519,7 @@ describe("runDemo (FDRS-643)", () => {
         trials: 2,
         out: (line) => out.push(line),
         agentCommand: "unused-in-test",
-        runScenarioFn: fakeRunScenario(
+        runTaskFn: fakeRunTask(
           [{ exitCode: 0 }, { exitCode: 3, timedOut: true }],
           [],
         ),
@@ -558,7 +558,7 @@ describe("runDemo (FDRS-643)", () => {
       trials: 1,
       out: (line) => out.push(line),
       agentCommand: "unused-in-test",
-      runScenarioFn: fakeRunScenario([{ exitCode: 0 }], []),
+      runTaskFn: fakeRunTask([{ exitCode: 0 }], []),
       mintFn: (async (opts: { count: number }) => sessionsFixture(opts.count)) as never,
       trialClientFactory: fakeClient(() => finalizeResponse(100, passedResult()), []),
       // REAL warm-up: parses src/demo/first-run-demo.md + its hand-written

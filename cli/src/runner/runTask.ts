@@ -4,7 +4,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve as resolvePath, sep as pathSep } from "node:path";
 import { sign } from "hono/jwt";
-import { parseScenarioFile, seedStateForTwin } from "../scenario/parseScenario.js";
+import { parseTaskFile, seedStateForTwin } from "../task/parseTask.js";
 import { bootTwin, type TwinHarness } from "../twin/twinHarness.js";
 import { createRecorder } from "../recorder/recorder.js";
 import { redactSecrets } from "../recorder/redaction.js";
@@ -13,7 +13,7 @@ import { runAgentCommand } from "./agentRunner.js";
 import { egressArgs, spawnCaptureServerChild } from "./captureServerChild.js";
 import { buildEgressAllowlist, readBlockedEgress, type BlockedEgress } from "../capture-server/egress.js";
 import { mergeAdapterSignalsIntoEvents } from "./mergeAdapterSignals.js";
-import { writeRunNoScore } from "./runScenarioCore.js";
+import { writeRunNoScore } from "./runTaskCore.js";
 
 // Promisify a Hono/node server `close()` so teardown can await in-flight
 // handlers draining before the twin's DB handle is released.
@@ -33,8 +33,8 @@ export type CaptureServerCommand = {
   prefixArgs: string[];
 };
 
-export type RunScenarioOptions = {
-  scenarioPath: string;
+export type RunTaskOptions = {
+  taskPath: string;
   agentCommand: string;
   artifactsDir?: string;
   captureServerCommand?: CaptureServerCommand;
@@ -57,8 +57,8 @@ export type RunScenarioOptions = {
   egressExtraHosts?: readonly string[];
 };
 
-export async function runScenario(options: RunScenarioOptions) {
-  const scenario = await parseScenarioFile(options.scenarioPath);
+export async function runTask(options: RunTaskOptions) {
+  const scenario = await parseTaskFile(options.taskPath);
   const runId = `run_${randomUUID()}`;
   const artifactsDir = options.artifactsDir ?? "runs";
   const startedAt = new Date().toISOString();

@@ -29,7 +29,7 @@ Gmail is first-party too:
 ```bash
 npx @pome-sh/cli twin start gmail --port 3336
 # prints POME_GMAIL_REST_URL, POME_GMAIL_MCP_URL, and POME_GMAIL_TOKEN
-pome scenarios gmail --copy
+pome tasks gmail --copy
 ```
 
 `POME_GMAIL_TOKEN` is the same Pome session JWT as `POME_AUTH_TOKEN`; it is not
@@ -40,16 +40,16 @@ local/OSS package release.
 
 ```bash
 pome login                       # one-time; opens the dashboard to sign in
-pome init                        # scaffolds scenarios/, examples/agents/, runs/, pome.config.json
+pome init                        # scaffolds tasks/, examples/agents/, runs/, pome.config.json
 pome register agent my-agent     # scopes runs to this project
-pome run scenarios/01-bug-happy-path.md --agent "npx tsx examples/agents/scripted-triage-agent.ts"
+pome run tasks/01-bug-happy-path.md --agent "npx tsx examples/agents/scripted-triage-agent.ts"
 pome inspect latest              # trace/audit view of the last run
 ```
 
 To capture a trace without the cloud (self-host), then get a verdict later:
 
 ```bash
-pome run --local scenarios/01-bug-happy-path.md   # captures a raw trace only — no verdict
+pome run --local tasks/01-bug-happy-path.md   # captures a raw trace only — no verdict
 pome eval runs/01-bug-happy-path/<run-id>         # uploads it for a cloud verdict
 ```
 

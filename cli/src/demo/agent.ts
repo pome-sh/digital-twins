@@ -4,12 +4,12 @@
 // calls served by pome's anonymous demo gateway (FDRS-637).
 //
 // It is spawned by `pome demo` as `pome demo-agent`, a child of the REAL
-// capture path (runScenario): the runner injects the standard POME_* twin
+// capture path (runTask): the runner injects the standard POME_* twin
 // contract plus the demo-specific vars below, and HTTP(S)_PROXY pointing at
 // the capture-server so the gateway calls land in events.jsonl as genuine
 // LlmCallEvent rows.
 //
-// Env contract (beyond runScenario's standard POME_* set):
+// Env contract (beyond runTask's standard POME_* set):
 //   POME_DEMO_LLM_URL    — {POME_API_BASE}/v1/demo/sessions/{sid}/llm
 //   POME_DEMO_TOKEN      — the trial session's demo_token (Bearer)
 //   POME_DEMO_TASK_NAME  — server-allowlisted task name ("first-run-demo")

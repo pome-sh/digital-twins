@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Shared presigned-upload + finalize-score orchestration for cloud sessions
-// (ADR-013). Extracted verbatim from runScenarioHosted.ts (FDRS-656) so
+// (ADR-013). Extracted verbatim from runTaskHosted.ts (FDRS-656) so
 // `pome eval <run-dir>` reuses the exact same best-effort PUT semantics
 // without duplicating them. Behavior-preserving for the hosted run path:
 // warning text, the 30s PUT timeout, and the null-key fallbacks all match
@@ -346,7 +346,7 @@ export function scoreFromFinalizeResponse(finalized: FinalizeResponse): Score {
 
 /** Redact a JSONL payload line-by-line before upload. Lines that fail to
  *  parse as JSON are redacted as raw strings. Moved verbatim from
- *  runScenarioHosted.ts (FDRS-656). */
+ *  runTaskHosted.ts (FDRS-656). */
 export function redactJsonl(body: string): string {
   const lines = body.split("\n");
   const redacted = lines

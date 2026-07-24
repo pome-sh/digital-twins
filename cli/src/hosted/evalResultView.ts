@@ -103,7 +103,7 @@ export function scoreStatus(score: Score, passThreshold: number): ScoreStatus {
   return score.satisfaction >= passThreshold ? "pass" : "fail";
 }
 
-export function scenarioPassed(score: Score, passThreshold: number): boolean {
+export function taskPassed(score: Score, passThreshold: number): boolean {
   return scoreStatus(score, passThreshold) === "pass";
 }
 

@@ -69,7 +69,7 @@ const EVAL_PASS_THRESHOLD = 100;
  *  `deriveEvalIdentity` so the error can name the flag that fixes it. */
 export interface RunMeta {
   runId: string | null;
-  /** Scenario slug (`meta.json` key: `scenario`) — the default task name. */
+  /** Task slug (`meta.json` key: `scenario`) — the default task name. */
   scenario: string | null;
   title: string | null;
   startedAt: string | null;
@@ -496,9 +496,9 @@ export async function runEval(options: RunEvalOptions): Promise<RunEvalResult> {
       // owns them (FDRS-655). Cloud's finalize schema defaults all scenario
       // fields, so empty strings are accepted.
       criteria: [],
-      scenarioName: taskName,
-      scenarioHash: "",
-      scenarioPrompt: "",
+      taskName: taskName,
+      taskHash: "",
+      taskPrompt: "",
       expectedBehavior: "",
       traceStorageKey: keys.eventsKey ?? undefined,
       stateInitialStorageKey: keys.stateInitialKey ?? undefined,
