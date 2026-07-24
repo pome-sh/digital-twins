@@ -43,8 +43,6 @@ import { query, tool, withPome } from "@pome-sh/adapter-claude-sdk";
 import { sign } from "hono/jwt";
 import { z } from "zod";
 
-withPome();
-
 const TWIN_BASE_URL = process.env.POME_TWIN_BASE_URL ?? "http://127.0.0.1:3333";
 // `pome twin start` serves the fixed session `/s/standalone`.
 const SID = process.env.POME_TWIN_SID ?? "standalone";
@@ -77,8 +75,6 @@ changes that are not in the files. Stop once every open pull request has a
 summary comment.`;
 
 const TASK = process.env.POME_TASK?.trim() || DEFAULT_TASK;
-
-await main();
 
 async function main() {
   const token = await resolveAuthToken();
@@ -381,4 +377,20 @@ function logAssistantMessage(msg: { message: { content?: Array<unknown> } }) {
 
 function trimSlash(url: string): string {
   return url.endsWith("/") ? url.slice(0, -1) : url;
+}
+
+// Only run the agent when executed directly (`npx tsx src/index.ts`). Guarding
+// on `import.meta.main` keeps the module importable without kicking off a full
+// agent run — and keeps the `withPome()` fetch-hook out of import-time side
+// effects.
+//
+// This block MUST stay at the bottom of the module. `main()` reaches
+// `new TwinMcpClient(...)` immediately, and `class` declarations sit in the
+// temporal dead zone until the module body evaluates them — invoking `main()`
+// from above the class definition throws `Cannot access 'TwinMcpClient' before
+// initialization`. Hoisted `function` declarations are unaffected, which is why
+// the POME_PREFLIGHT path (an early return) masked this.
+if (import.meta.main) {
+  withPome();
+  await main();
 }
