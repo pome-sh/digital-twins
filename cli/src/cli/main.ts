@@ -378,6 +378,8 @@ export function createProgram() {
         try {
           await runRegisterAgent({
             apiBaseUrl: opts.apiUrl,
+            dashboardBaseUrl:
+              process.env.POME_DASHBOARD_URL ?? DEFAULT_DASHBOARD_URL,
             name,
             force: opts.force,
             twins: normalizeRegisterTwins(opts.twins),
