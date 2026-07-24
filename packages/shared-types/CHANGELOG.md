@@ -1,6 +1,6 @@
 # @pome-sh/shared-types — CHANGELOG
 
-## Unreleased
+## 0.12.2 — 2026-07-24
 
 ### Added
 
