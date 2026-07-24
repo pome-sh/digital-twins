@@ -15,6 +15,15 @@ export interface RenderDoctorReportOptions {
    *  moment-03 default; `pome install` passes moment 02's
    *  "verifying the wiring …" (FDRS-642). */
   header?: string;
+  /** F-906 — when the report passes, append a caveat that a green check means
+   *  the wiring is right, not that the examinee runs cleanly. `pome doctor`
+   *  never launches the agent; and a `pome run` preflight probe launches it
+   *  with POME_PREFLIGHT=1, which most scaffolds honour by exiting before
+   *  their real work path — so a bug on that skipped path (as in F-900)
+   *  surfaces only on a full trial run. Opt-in so only `pome doctor` shows it
+   *  — the `run`/`install` consumers print the report as a gate, not as a
+   *  self-diagnosis. */
+  passNote?: boolean;
 }
 
 export function renderDoctorReport(
@@ -41,6 +50,18 @@ export function renderDoctorReport(
     lines.push("");
     lines.push("until this passes, your agent would hit production.");
     lines.push("pome will not run trials against a live API.");
+  } else if (options.passNote) {
+    lines.push("");
+    lines.push(
+      "note: a green check means the wiring is right, not that your agent runs",
+    );
+    lines.push(
+      "cleanly — pome doctor never launches it, and a run's preflight probe exits",
+    );
+    lines.push(
+      "it early (POME_PREFLIGHT=1), so a bug on the code path they skip surfaces",
+    );
+    lines.push("only on a full trial run.");
   }
 
   return lines;

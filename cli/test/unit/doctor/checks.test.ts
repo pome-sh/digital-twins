@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // FDRS-634 — unit tests for the doctor check engine.
 //
-// Four checks, in order: config present+valid → twin reachable → routing →
+// Four checks, in order: config present+valid → twin boots locally → routing →
 // egress floor. The engine stops at the first failure so the report carries
 // exactly ONE named cause + one concrete fix ("never a false success" wants
 // one clear next step, not a wall of maybes).
