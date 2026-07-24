@@ -1,0 +1,9 @@
+{
+  "$schema": "https://pome.sh/schemas/v1/pome.json",
+  "agent": { "slug": "gmail-retry-notify" },
+  "command": "npm start",
+  "twins": ["gmail"],
+  "tasks": "tasks",
+  "artifacts_dir": "runs",
+  "pass_threshold": 100
+}
