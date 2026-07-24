@@ -17,7 +17,7 @@
  *
  * 2. Pome CLI evaluator — `pome run tasks/01-triage-acme-issues.md --agent="npm
  *    run start"`. The CLI spins up its own twin on a random port, seeds the
- *    scenario, mints the JWT itself, and passes the URL + token to the agent
+ *    task, mints the JWT itself, and passes the URL + token to the agent
  *    via env (POME_GITHUB_MCP_URL, POME_AUTH_TOKEN, POME_TASK).
  *
  * The agent uses the Claude Agent SDK's in-process MCP server to expose three

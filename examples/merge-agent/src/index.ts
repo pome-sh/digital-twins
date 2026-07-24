@@ -53,7 +53,7 @@ const system = [
 ].join("\n");
 
 // Each tool maps to exactly one supported twin REST endpoint, so the agent can
-// never hit an unsupported route (one of the scenario's pass criteria).
+// never hit an unsupported route (one of the task's pass criteria).
 const tools = {
   list_open_pull_requests: tool({
     description: "List the open pull requests in a repository.",
