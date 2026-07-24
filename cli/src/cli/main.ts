@@ -347,13 +347,13 @@ export function createProgram() {
   const skills = program
     .command("skills")
     .description(
-      "Manage the bundled pome agent skills (/pome-setup, /pome-test)",
+      "Manage the bundled pome agent skills (/pome-setup, /pome-test — retired; use `npx skills add pome-sh/digital-twins`)",
     );
 
   skills
     .command("install")
     .description(
-      "Install /pome-setup and /pome-test into ~/.claude/skills/ (symlinked to this pome install by default)",
+      "Install the retired /pome-setup and /pome-test redirect pointers into ~/.claude/skills/ (Gen-2 set: `npx skills add pome-sh/digital-twins`)",
     )
     .option(
       "--copy",

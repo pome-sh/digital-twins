@@ -53,8 +53,33 @@ pome run --local scenarios/01-bug-happy-path.md   # captures a raw trace only �
 pome eval runs/01-bug-happy-path/<run-id>         # uploads it for a cloud verdict
 ```
 
-See [docs.pome.sh](https://docs.pome.sh) for the task library, exit-code
-contract, authentication, the Stripe/Slack twins, and everything else.
+See [docs.pome.sh](https://docs.pome.sh) for the task library, authentication,
+the Stripe/Slack twins, and everything else.
+
+## CI one-shot — the exit-code contract
+
+`pome run <task>` is the CI one-shot: one hosted, scored run, and its **exit
+code is the verdict**. Gate CI on it directly.
+
+| Exit code | Meaning |
+| --- | --- |
+| `0` | pass (hosted/scored run), or trace captured (`--local`, not scored) |
+| `1` | ran and scored **below** the pass threshold |
+| `2` | twin / orchestration error (network, 5xx, twin spawn failed) |
+| `3` | auth error (401/403) — `pome login` again, or set `POME_API_KEY` in CI |
+| `4` | quota exceeded (402/429) |
+| `5` | usage error (bad flags, missing task file) |
+
+Two rules CI must honor:
+
+- **`--local` is not a verdict.** A `--local` run captures a raw trace and never
+  scores, so its exit `0` means "trace captured," not "passed." Never gate CI on
+  a `--local` exit code — score it later with `pome eval <run-dir>`.
+- **Trial groups map as a whole.** `pome run -n k` (k>1) collapses the whole
+  group to one code: `0` = at least one trial completed and every completed
+  trial passed; `1` = at least one completed trial failed its threshold; `2` =
+  no trial completed. Errored trials are excluded from the verdict fraction and
+  never drag a passing group below `0` on their own.
 
 ## Development
 

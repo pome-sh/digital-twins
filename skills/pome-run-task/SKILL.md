@@ -65,9 +65,11 @@ task, and watches for idle:
   cloud via the `ant` CLI. Recipe:
   [`references/launch-managed-agent.md`](references/launch-managed-agent.md).
 - **Anything else** (`transport: "rest"`) → the REST path (`rest_urls` + `env`).
-  Recipe: [`references/launch-rest.md`](references/launch-rest.md). Dispatch
-  honestly — a non-Claude examinee on Managed Agents runs as Claude, testing
-  nothing.
+  Recipe: [`references/launch-rest.md`](references/launch-rest.md) — which
+  **preflights the wiring** (config → twin reachable → routing → egress floor,
+  the `pome doctor` checks) before it launches, so a mis-wired examinee never
+  runs against a live API instead of the twin. Dispatch honestly — a non-Claude
+  examinee on Managed Agents runs as Claude, testing nothing.
 
 ## 3. Finalize the instant it idles
 
