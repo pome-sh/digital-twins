@@ -85,4 +85,5 @@ twins: [github]
 timeout: 90
 runs: 5
 passThreshold: 100
+# verified red: claude-opus-4-8, 4/5 trials red, 2026-07-24
 ```
