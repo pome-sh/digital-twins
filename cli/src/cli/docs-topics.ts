@@ -26,6 +26,20 @@ export const DOCS_TOPICS: DocsTopic[] = [
     keywords: ["install", "quickstart", "setup", "begin"],
   },
   {
+    id: "existing-agent",
+    title: "Bring your own agent",
+    path: "/existing-agent",
+    keywords: [
+      "existing agent",
+      "own agent",
+      "already have an agent",
+      "bring your own",
+      "register",
+      "pome.json",
+      "connect",
+    ],
+  },
+  {
     id: "how-pome-works",
     title: "How Pome works",
     path: "/docs/how-pome-works",
