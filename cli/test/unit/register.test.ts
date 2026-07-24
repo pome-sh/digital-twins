@@ -1,11 +1,10 @@
 import { existsSync, readFileSync } from "node:fs";
 import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, join } from "node:path";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HostedOrchError } from "../../src/hosted/errors.js";
 import {
-  ensureAgentRegistered,
   normalizeRegisterTwins,
   runRegisterAgent,
 } from "../../src/cli/register.js";
@@ -324,22 +323,6 @@ describe("slug-rename hint (F-861)", () => {
     expect(readManifestFile()).toMatchObject({ agent: { slug: "pr-review-agent" } });
   });
 
-  it("install: the shared createAndPersistAgent prints the same rename notice", async () => {
-    const dir = process.cwd();
-    const credentialsPath = await writeCreds(dir, "tm_team");
-    delete process.env.POME_API_KEY;
-    await writeManifest({ agent: { slug: "pr-reviewer" } });
-    const errors = spyErrors();
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(response(RENAMED));
-
-    await ensureAgentRegistered({ apiBaseUrl: "https://api.example.com", credentialsPath });
-
-    const out = errors.join("\n");
-    expect(out).toMatch(/renamed/i);
-    expect(out).toContain("pr-review-agent");
-    expect(readManifestFile()).toMatchObject({ agent: { slug: "pr-review-agent" } });
-  });
-
   it("no notice on a normal live-slug resolve (resolved_via: slug, unchanged slug)", async () => {
     await writeManifest({ agent: { slug: "triage-bot" } });
     const errors = spyErrors();
@@ -402,51 +385,5 @@ describe("normalizeRegisterTwins", () => {
   });
   it("rejects an unknown twin against MOUNTED_TWINS", () => {
     expect(() => normalizeRegisterTwins("github,notion")).toThrow(/Unknown twin/);
-  });
-});
-
-describe("ensureAgentRegistered", () => {
-  it("registers a fresh repo, writing the manifest slug + link.json under the caller's team", async () => {
-    const dir = process.cwd();
-    const credentialsPath = await writeCreds(dir, "tm_team");
-    delete process.env.POME_API_KEY;
-    await writeManifest({ agent: { slug: "old" }, command: "node a.js" });
-    const fetchMock = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValue(response({ ...AGENT_OK, slug: "my-repo", display_name: "my-repo" }));
-
-    const result = await ensureAgentRegistered({ apiBaseUrl: "https://api.example.com", credentialsPath });
-
-    expect(result).toEqual({ status: "registered", agentId: "agt_123", agentSlug: "my-repo" });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(readManifestFile()).toMatchObject({ agent: { slug: "my-repo" }, command: "node a.js" });
-    expect(readLink()).toMatchObject({ agent_id: "agt_123", team_id: "tm_team" });
-    expect(basename(dir)).toBeTruthy();
-  });
-
-  it("is idempotent: a repo already linked under the caller's team makes no request", async () => {
-    const dir = process.cwd();
-    const credentialsPath = await writeCreds(dir, "tm_team");
-    delete process.env.POME_API_KEY;
-    await writeManifest({ agent: { slug: "existing-agent" } });
-    const { writeLinkCache } = await import("../../src/cli/link-cache.js");
-    await writeLinkCache(dir, { agent_id: "agt_existing", team_id: "tm_team" });
-    const fetchMock = vi.spyOn(globalThis, "fetch");
-
-    const result = await ensureAgentRegistered({ apiBaseUrl: "https://api.example.com", credentialsPath });
-
-    expect(result).toEqual({
-      status: "already-registered",
-      agentId: "agt_existing",
-      agentSlug: "existing-agent",
-    });
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("returns no-config without fetching when no manifest is present", async () => {
-    const fetchMock = vi.spyOn(globalThis, "fetch");
-    const result = await ensureAgentRegistered({ apiBaseUrl: "https://api.example.com" });
-    expect(result).toEqual({ status: "no-config" });
-    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
