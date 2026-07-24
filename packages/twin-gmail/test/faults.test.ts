@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "vitest";
-import { openGmailTwinDatabase } from "../src/index.js";
+import { GmailDomain, openGmailTwinDatabase } from "../src/index.js";
 import { checkFault, gmailFaultSchema } from "../src/faults.js";
 import { GmailError, gmailErrorEnvelope } from "../src/errors.js";
+import { defaultSeedState, parseSeed } from "../src/seed.js";
 
 function dbWithFault(fault: unknown) {
   const db = openGmailTwinDatabase(":memory:");
@@ -48,5 +49,34 @@ describe("429 envelope", () => {
     expect(env.status).toBe(429);
     expect((env.body as any).error.status).toBe("RESOURCE_EXHAUSTED");
     expect((env.body as any).error.errors[0].reason).toBe("rateLimitExceeded");
+  });
+});
+
+describe("seed integration", () => {
+  it("default seed has no faults", () => {
+    expect(parseSeed(defaultSeedState()).faults).toEqual([]);
+  });
+
+  it("domain.seed persists faults and gate reads them", () => {
+    const db = openGmailTwinDatabase(":memory:");
+    const gmail = new GmailDomain(db);
+    gmail.seed({
+      primaryMailbox: { email: "agent@pome-twin.test" },
+      faults: [{ name: "rate-limited", target: "messages.send", succeedFirst: 1, throttleFor: 1 }],
+    } as never);
+    expect(() => checkFault(db, "messages.send")).not.toThrow(); // call 1 ok
+    expect(() => checkFault(db, "messages.send")).toThrow(); // call 2 throttled
+  });
+
+  it("reset clears the fault counter", () => {
+    const db = openGmailTwinDatabase(":memory:");
+    const gmail = new GmailDomain(db);
+    gmail.seed({
+      primaryMailbox: { email: "agent@pome-twin.test" },
+      faults: [{ name: "rate-limited", succeedFirst: 0, throttleFor: 1 }],
+    } as never);
+    expect(() => checkFault(db, "messages.send")).toThrow(); // call 1 throttled
+    gmail.resetToDefault(); // clears counter + faults
+    expect(() => checkFault(db, "messages.send")).not.toThrow();
   });
 });
