@@ -14,8 +14,8 @@
  *    same TWIN_AUTH_SECRET in both terminals and the agent mints its own
  *    bearer JWT. The agent talks to http://127.0.0.1:3333/s/standalone/mcp.
  *
- * 2. Pome CLI evaluator — `pome run <scenario>.md --agent="npm run start"`.
- *    The CLI spins up its own twin on a random port, seeds the scenario, mints
+ * 2. Pome CLI evaluator — `pome run <task>.md --agent="npm run start"`.
+ *    The CLI spins up its own twin on a random port, seeds the task, mints
  *    the JWT itself, and passes the URL + token to the agent via env
  *    (POME_GITHUB_MCP_URL, POME_AUTH_TOKEN, POME_TASK).
  *

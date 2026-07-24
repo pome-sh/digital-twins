@@ -1,6 +1,6 @@
 # Triage open issues in acme/api
 
-The bundled happy-path scenario for the triage agent. The default Pome twin
+The bundled happy-path task for the triage agent. The default Pome twin
 seed ships one open issue (`#1` — a 500 error after deploy in `acme/api`). The
 agent should read it, classify it as a `bug`, apply the label, and post a
 one-sentence reasoning comment.

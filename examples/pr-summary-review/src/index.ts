@@ -23,8 +23,8 @@
  *    the agent mints its own bearer JWT. The agent talks to the twin at
  *    http://127.0.0.1:3333/s/standalone/mcp.
  *
- * 2. Pome CLI evaluator — `pome run <scenario>.md`. The CLI boots its own twin,
- *    seeds the scenario, mints the JWT, and injects POME_GITHUB_MCP_URL /
+ * 2. Pome CLI evaluator — `pome run <task>.md`. The CLI boots its own twin,
+ *    seeds the task, mints the JWT, and injects POME_GITHUB_MCP_URL /
  *    POME_AUTH_TOKEN / POME_TASK.
  *
  * Claude credentials are resolved from ANTHROPIC_API_KEY, falling back to
