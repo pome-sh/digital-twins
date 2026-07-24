@@ -37,7 +37,7 @@ jobs:
     outputs:
       twins: ${{ steps.detect.outputs.twins }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       - name: Select twin matrix
@@ -97,7 +97,7 @@ jobs:
       actions: read
       contents: read
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Wait for ci + secret-scan workflows on this SHA
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -125,7 +125,7 @@ jobs:
       id-token: write
       packages: write
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
       - uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
         with:
@@ -196,8 +196,17 @@ jobs:
       # cosign v3 `attest --type spdx` rejected the anchore SBOM predicate
       # ("invalid attestation: decoding json"), failing the sign step on every
       # v3 run and producing NO attestation. v2 signs + attests cleanly.
+      #
+      # `cosign-release` MUST stay pinned to a v2.x binary. The installer
+      # action's DEFAULT cosign version tracks the action major (v3.x installer
+      # → cosign v2 default; v4.x installer → cosign v3 default), so a Dependabot
+      # bump of the action alone (as in #167) silently drifts the binary to v3
+      # and reintroduces the failure above. Pinning the binary here decouples us
+      # from the action version.
       - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
         if: ${{ github.event_name != 'pull_request' }}
+        with:
+          cosign-release: 'v2.6.4'
       # Push the EXACT image built + scanned above (already loaded into the local
       # daemon under every steps.meta.outputs.tags) — no second build, so the
       # published artifact is byte-identical to the one Trivy scanned. PR builds
