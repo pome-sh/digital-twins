@@ -29,9 +29,12 @@ ONLY on the failure named in its row — no founder rescue otherwise (Done-when 
 
 4. **Authoring** (`pome-author-task`)
    - Input: the chosen candidate.
-   - Coach: draft the task markdown, `validate_task`, dry-run `verify_seed`,
-     `evaluate_criteria`, then `save_task`.
-   - Artifact: a saved task (`task_id`) in the team catalog.
+   - Coach: write the task markdown into the repo's `tasks/` dir (the source of
+     truth), `validate_task`, dry-run `verify_seed`, `evaluate_criteria`, then
+     `save_task` to publish that file to the catalog (ADR-019 decision 3: file
+     first, catalog follows — never the reverse).
+   - Artifact: a committed `tasks/<NN>-….md` source file plus its published
+     catalog entry (`task_id`).
    - Stops if: `validate_task` errors or a `code` criterion is `unmatched` → fix
      with the builder, never save blind.
 
