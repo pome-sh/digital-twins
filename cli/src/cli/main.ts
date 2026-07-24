@@ -418,7 +418,7 @@ export function createProgram() {
     )
     .option(
       "--twins <list>",
-      "Comma-separated services this agent may exercise (e.g. github,slack). Default: the cloud's default enablement.",
+      "Comma-separated services this agent may exercise (e.g. github,slack), unioned with the manifest's twins. Default: the manifest's twins, else the cloud's default enablement.",
     )
     .description(
       "Create a cloud agent under the current team and write agent.slug to pome.json",
