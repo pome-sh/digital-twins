@@ -1,0 +1,25 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard"
+  ],
+  "schedule": ["on the 1st and 15th day of the month before 5am"],
+  "timezone": "Etc/UTC",
+  "prConcurrentLimit": 1,
+  "prHourlyLimit": 0,
+  "rebaseWhen": "conflicted",
+  "packageRules": [
+    {
+      "description": "Batch every non-major update (npm, docker, github-actions) into a single PR so we never see more than one routine dependency PR at a time.",
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest", "lockFileMaintenance"],
+      "groupName": "all non-major dependencies",
+      "groupSlug": "all-non-major"
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "description": "Security fixes are not held for the fortnightly window.",
+    "schedule": ["at any time"],
+    "labels": ["security"]
+  }
+}
