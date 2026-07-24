@@ -54,8 +54,9 @@ export const DOCS_TOPICS: DocsTopic[] = [
   // topic entries are gone, but their still-live keywords are MIGRATED onto the
   // surviving replacement topics so `pome docs <kw>` keeps routing:
   //   wire → existing-agent;  test-with-pome / pome-test → cli-run;
-  //   eval → cli-inspect.  (setup / pome-setup / register / run scenarios / and
-  //   /setup all already resolve via existing substrings — see the tests.)
+  //   eval → cli (the CLI reference index — no dedicated eval page exists).
+  //   (setup / pome-setup / register / run scenarios / /setup all already
+  //   resolve via existing substrings — see the tests.)
   {
     id: "dashboard",
     title: "Pome Dashboard",
@@ -96,7 +97,11 @@ export const DOCS_TOPICS: DocsTopic[] = [
     id: "cli",
     title: "Command Line Interface",
     path: "/docs/cli",
-    keywords: ["commands", "flags", "pome run", "reference"],
+    // "eval" migrated from the retired skills-test topic (F-893): there is no
+    // dedicated `pome eval` docs page, and it is a distinct workflow from
+    // `pome inspect`, so it routes to the CLI reference index that documents
+    // every command rather than to a sibling command's page.
+    keywords: ["commands", "flags", "pome run", "reference", "eval"],
   },
   {
     id: "cli-run",
@@ -139,9 +144,7 @@ export const DOCS_TOPICS: DocsTopic[] = [
     id: "cli-inspect",
     title: "pome inspect",
     path: "/docs/cli/inspect",
-    // "eval" migrated from the retired skills-test topic (F-893): `pome eval`
-    // surfaces the same verdict/score this topic documents.
-    keywords: ["inspect", "score", "trace", "artifacts", "verdicts", "eval"],
+    keywords: ["inspect", "score", "trace", "artifacts", "verdicts"],
   },
   {
     id: "cli-init",

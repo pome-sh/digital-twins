@@ -39,7 +39,9 @@ describe("pome docs helpers", () => {
     expect(findTopic("test-with-pome", DOCS_TOPICS)?.id).toBe("cli-run");
     expect(findTopic("/test-with-pome", DOCS_TOPICS)?.id).toBe("cli-run");
     expect(findTopic("pome-test", DOCS_TOPICS)?.id).toBe("cli-run");
-    expect(findTopic("eval", DOCS_TOPICS)?.id).toBe("cli-inspect");
+    // `pome eval` has no dedicated docs page and is a different workflow from
+    // `pome inspect`, so it routes to the CLI reference index, not cli-inspect.
+    expect(findTopic("eval", DOCS_TOPICS)?.id).toBe("cli");
     // Already-resolving keywords (via existing substrings) must not regress.
     expect(findTopic("register", DOCS_TOPICS)?.id).toBe("existing-agent");
     expect(findTopic("pome-setup", DOCS_TOPICS)).not.toBeNull();
