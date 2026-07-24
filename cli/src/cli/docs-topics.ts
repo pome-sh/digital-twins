@@ -131,9 +131,11 @@ export const DOCS_TOPICS: DocsTopic[] = [
   {
     id: "cli-tasks",
     title: "pome tasks",
-    // F-892 — `path` still points at /docs/cli/scenarios: the docs.pome.sh page
-    // is renamed by the M4 docs door, not here. Repoint once that lands.
-    path: "/docs/cli/scenarios",
+    // F-912 — the M4 docs door renamed the docs.pome.sh page from
+    // /docs/cli/scenarios to /docs/cli/tasks (a redirect keeps the old URL
+    // alive), so `path` now points at the new route. The "scenarios" keyword
+    // stays so `pome docs scenarios` still resolves to this topic.
+    path: "/docs/cli/tasks",
     keywords: ["tasks", "scenarios", "catalog", "copy", "library", "twin"],
   },
   {
