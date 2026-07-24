@@ -2,7 +2,7 @@
 
 ## Setup
 
-The repo `acme/api` already has an open bug (issue #1) labeled `bug` from the default seed. This task does not provide a custom `## Seed State` block — both self-host (`runScenario`) and hosted (`runScenarioHosted`) fall back to the GitHub twin's `defaultSeedState()`, so the run state is identical in both modes.
+The repo `acme/api` already has an open bug (issue #1) labeled `bug` from the default seed. This task does not provide a custom `## Seed State` block — both self-host (`runTask`) and hosted (`runTaskHosted`) fall back to the GitHub twin's `defaultSeedState()`, so the run state is identical in both modes.
 
 ## Prompt
 
