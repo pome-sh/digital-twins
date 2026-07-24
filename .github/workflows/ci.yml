@@ -92,6 +92,12 @@ jobs:
           # them. Typecheck each against the just-built adapter so a zod-4 / SDK
           # `tool()` typing regression can't sit latent again.
           npm run typecheck:examples
+          # F-900 — tsc cannot see a temporal-dead-zone crash: typecheck:examples
+          # was green while every real launch of examples/triage-agent died with
+          # `Cannot access 'TwinMcpClient' before initialization` (top-level
+          # `await main()` ran above the class it uses). Launch each example for
+          # real (POME_PREFLIGHT unset) and fail if it crashes on load.
+          npm run smoke:examples
           # twin-github runs with coverage thresholds (90% lines/funcs/statements)
           # instead of a second plain `npm test` pass for that workspace.
           npm test -w @pome-sh/shared-types -w @pome-sh/sdk -w @pome-sh/adapter-claude-sdk -w @pome-sh/twin-slack -w @pome-sh/twin-stripe -w @pome-sh/twin-gmail -w @pome-sh/twin-linear

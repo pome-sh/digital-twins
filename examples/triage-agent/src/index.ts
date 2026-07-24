@@ -66,16 +66,6 @@ Stop once every open issue has both a classification label and a reasoning comme
 
 const TASK = process.env.POME_TASK?.trim() || DEFAULT_TASK;
 
-// Only run the agent when executed directly (`npx tsx src/index.ts`). Guarding
-// on `import.meta.main` keeps the module importable — e.g. by the auth-token
-// unit test — without kicking off a full agent run on import.
-if (import.meta.main) {
-  // Install the pome fetch-hook only for a real run — keeps the module free of
-  // import-time side effects (the auth-token unit test imports it).
-  withPome();
-  await main();
-}
-
 async function main() {
   const token = await resolveAuthToken();
 
@@ -331,4 +321,21 @@ function logAssistantMessage(msg: { message: { content?: Array<unknown> } }) {
 
 function trimSlash(url: string): string {
   return url.endsWith("/") ? url.slice(0, -1) : url;
+}
+
+// Only run the agent when executed directly (`npx tsx src/index.ts`). Guarding
+// on `import.meta.main` keeps the module importable — e.g. by the auth-token
+// unit test — without kicking off a full agent run on import.
+//
+// This block MUST stay at the bottom of the module. `main()` reaches
+// `new TwinMcpClient(...)` immediately, and `class` declarations sit in the
+// temporal dead zone until the module body evaluates them — invoking `main()`
+// from above the class definition throws `Cannot access 'TwinMcpClient' before
+// initialization`. Hoisted `function` declarations are unaffected, which is why
+// the POME_PREFLIGHT path (an early return) masked this.
+if (import.meta.main) {
+  // Install the pome fetch-hook only for a real run — keeps the module free of
+  // import-time side effects (the auth-token unit test imports it).
+  withPome();
+  await main();
 }
