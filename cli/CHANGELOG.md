@@ -1,5 +1,53 @@
 # Changelog
 
+## 0.6.0
+
+### Minor Changes
+
+- [#223](https://github.com/pome-sh/digital-twins/pull/223) [`d02d19e`](https://github.com/pome-sh/digital-twins/commit/d02d19eb9a1e075118be3a789c516e44b3e15e47) Thanks [@AFFFPupu](https://github.com/AFFFPupu)! - Wire the manifest `tasks` key into bare `pome run` (F-865). A migrated project
+  that declares a task directory (`tasks: "tasks"` in `pome.json`) now has bare
+  `pome run` run that whole declared set — exactly like `pome run <that-dir>`,
+  each file at its own `runs`/`-n` — instead of ignoring it and dropping the
+  `tasks/first-run-demo.md` demo. Un-migrated projects (no manifest, or no
+  `tasks` key) keep today's "that was ours, run yours" demo default unchanged. A
+  declared-but-missing directory errors as a usage error (exit 5) rather than
+  silently falling back to the demo; an empty declared directory prints a
+  "0 tasks found" note and exits 0.
+
+- [#213](https://github.com/pome-sh/digital-twins/pull/213) [`22e38d7`](https://github.com/pome-sh/digital-twins/commit/22e38d7337f1ffa27b2f3db9419b92f373d15414) Thanks [@AFFFPupu](https://github.com/AFFFPupu)! - Complete the `scenario` → `task` rename in the shipped CLI (F-892). `pome
+scenarios` is now `pome tasks`; the old name survives as a hidden deprecated
+  alias that still works and prints a one-line pointer. The scaffold directory
+  and bare-`pome run` demo drop moved from `scenarios/` to `tasks/` (`pome init`,
+  `pome tasks --copy`, and the "run yours" default all use `tasks/` now), and the
+  bundled library ships under `tasks/`. The internal runner/schema surface was
+  renamed in the same pass (`src/scenario/` → `src/task/`, `runScenario*` →
+  `runTask*`, the `Scenario`/`ScenarioConfig` types → `Task`/`TaskConfig`,
+  `parseScenario`, `scenarioSchema`, and the camelCase wire carriers). No behavior
+  change — the persisted/on-wire keys (`scenario` in run artifacts,
+  `scenario_*` finalize/result fields, the `/v1/scenarios/compile-seed` route)
+  keep their string literals; those flip later with the W3 wire-vocab rename.
+
+### Patch Changes
+
+- [#222](https://github.com/pome-sh/digital-twins/pull/222) [`2f9e6d7`](https://github.com/pome-sh/digital-twins/commit/2f9e6d7310ff86554ce34884227c456e84bde7e1) Thanks [@AFFFPupu](https://github.com/AFFFPupu)! - Re-word `pome doctor`'s twin check so it no longer overstates liveness (F-906).
+  The check boots a throwaway local twin, probes its health + session routes, and
+  tears it down — it never proves a twin is listening — so the pass line now reads
+  `✓ twin boots locally  github · health + session ok` (was `✓ twin reachable`,
+  which read as "a twin is up"); the failure label is `local twin check failed`.
+  `pome doctor` also prints a note on a green report that a green check means the
+  wiring is right, not that the examinee runs cleanly: `pome doctor` never
+  launches the agent, and a `pome run` preflight probe launches it with
+  `POME_PREFLIGHT=1`, which most scaffolds honour by exiting before their real
+  work path — so a bug on that skipped path surfaces only on a full trial run. The
+  note is opt-in, so the `run`/`install` gates are unchanged.
+
+- [#221](https://github.com/pome-sh/digital-twins/pull/221) [`ad1583d`](https://github.com/pome-sh/digital-twins/commit/ad1583da6b3d77dec02865934dcadf0dcb2162a2) Thanks [@AFFFPupu](https://github.com/AFFFPupu)! - `pome register agent` now prints a `Dashboard:` line deep-linking the registered
+  agent's page (`<dashboard>/agents/<slug>`) as the final handoff (F-905). The base
+  resolves from `POME_DASHBOARD_URL` (default `https://app.pome.sh`), matching the
+  runner's reliability-page handoff. This makes the docs.pome.sh onboarding walk —
+  which asks for "the dashboard line register printed" — agree with reality; before
+  this, register printed four lines and no URL.
+
 ## 0.5.0
 
 ### Minor Changes
