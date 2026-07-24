@@ -48,6 +48,7 @@ const SMOKE_ENV = {
   POME_GITHUB_REST_URL: "http://127.0.0.1:59321",
   POME_GITHUB_MCP_URL: "http://127.0.0.1:59321/s/smoke/mcp",
   POME_SLACK_REST_URL: "http://127.0.0.1:59321",
+  POME_GMAIL_REST_URL: "http://127.0.0.1:59321",
   // triage-agent / pr-summary-* accept a pre-minted bearer token verbatim, so
   // resolveAuthToken() returns immediately and reaches `new TwinMcpClient(...)`
   // (the TDZ site) instead of throwing on missing auth.

@@ -1,6 +1,6 @@
 # Twin Runtime Contract
 
-**Version 1.3.0** — Linear contract added 2026-07-21; Gmail contract added 2026-07-20; boot-secret self-generation added 2026-07-10 (F-708). Verified by the black-box suite in [`contract/`](./contract/).
+**Version 1.4.0** — Gmail named fault seeds added 2026-07-24 (F-917); Linear contract added 2026-07-21; Gmail contract added 2026-07-20; boot-secret self-generation added 2026-07-10 (F-708). Verified by the black-box suite in [`contract/`](./contract/).
 
 This document enumerates everything pome-cloud (and the pome CLI) may rely on when booting and driving a twin. **Changing any item below is a breaking contract change**: update this document and the suite in the same PR, then open the matching pome-cloud consumer PR that pins and verifies the new signed twin artifact (rule of record: `packages/twin-github/README.md`, runtime-contract section).
 
@@ -98,6 +98,13 @@ Probed against the pre-engine builds (`3cd86eb`); the contract suite asserts eve
 - Unknown session routes return 501 `UNIMPLEMENTED`; unknown root routes return
   404. `users.watch`, `users.stop`, resumable uploads, forwarding delivery,
   Calendar processing, and deleted writes remain loud no-side-effect 501 gaps.
+- Gmail seeds accept an optional `faults` array of named fault primitives
+  (default `[]`). The `rate-limited` primitive throttles a target operation
+  (default `messages.send`) by call count: the first `succeedFirst` matching
+  calls succeed, the next `throttleFor` return **429 `RESOURCE_EXHAUSTED`**
+  (retry hint in the body; **no `Retry-After` header**), then calls recover. The
+  counter is per twin instance and cleared by `POST /admin/reset`. The default
+  seed carries no faults, so default behavior is unchanged (additive; F-917).
 
 ### Linear 1.3.0 pins
 

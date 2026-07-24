@@ -1,5 +1,13 @@
 # @pome-sh/shared-types — CHANGELOG
 
+## Unreleased
+
+### Added
+
+- Gmail seed `faults` field (F-917): an optional array of named fault primitives
+  (`rate-limited`) mirroring twin-gmail. Optional, default `[]` — no change for
+  existing seeds or the pre-F-917 cloud.
+
 ## 0.12.1
 
 ### Added

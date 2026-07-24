@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { z } from "zod";
+import { gmailFaultSchema } from "./faults.js";
 import { validateSearchQuery } from "./search-parse.js";
 import type { GmailStateSeed, SeedMailbox } from "./types.js";
 
@@ -125,6 +126,7 @@ export const gmailSeedSchema = z
     mailboxes: z.array(mailboxSchema).max(100).default([]),
     deliveryMode: z.enum(["sender-only", "seeded-mailboxes"]).default("sender-only"),
     clock: z.string().datetime({ offset: true }).default("2025-01-01T00:00:00.000Z"),
+    faults: z.array(gmailFaultSchema).max(50).default([]),
   })
   .strict()
   .superRefine((seed, ctx) => {

@@ -111,6 +111,7 @@ function googleStatus(status: number): string {
   if (status === 401) return "UNAUTHENTICATED";
   if (status === 403) return "PERMISSION_DENIED";
   if (status === 404) return "NOT_FOUND";
+  if (status === 429) return "RESOURCE_EXHAUSTED";
   if (status === 409) return "ALREADY_EXISTS";
   if (status === 501) return "UNIMPLEMENTED";
   return "INTERNAL";
