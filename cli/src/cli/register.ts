@@ -42,6 +42,10 @@ const SCHEMA_URL = "https://pome.sh/schemas/v1/pome.json";
 
 interface RegisterAgentOptions extends InteractiveSeams {
   apiBaseUrl: string;
+  /** Dashboard base for the post-register deep link (POME_DASHBOARD_URL /
+   *  DEFAULT_DASHBOARD_URL — resolved at the main.ts boundary, like the runner's
+   *  reliability-page handoff). */
+  dashboardBaseUrl: string;
   name: string;
   force: boolean;
   twins?: string[];
@@ -208,6 +212,12 @@ export async function runRegisterAgent(opts: RegisterAgentOptions): Promise<void
       "Enabled services: not reported by this pome cloud (older control plane) — twin scoping may not have taken effect.",
     );
   }
+
+  // Deep-link the registered agent's dashboard page. `/agents/<slug>` is the
+  // same IA the runner's reliability handoff relies on (/agents/<slug>/tasks/…),
+  // so this lands on the agent, not a generic root.
+  const base = opts.dashboardBaseUrl.replace(/\/$/, "");
+  console.error(`Dashboard: ${base}/agents/${encodeURIComponent(agent.slug)}`);
 }
 
 function stripControlCharacters(value: string): string {
