@@ -10,6 +10,14 @@ The **examinee** is a sandbox clone of their production agent — same YAML, onl
 `mcp_servers[].url` swapped to Pome twins. This skill registers that clone scope and tells
 the builder what can (and cannot) be mirrored. It runs no tests.
 
+This is the **no-local-repo** registration surface: a Claude managed agent whose
+clone scope lives in the platform, registered via `intake_clone_scope`. If the
+builder instead has a `pome.json`-bearing repo they run themselves (a
+self-hosted / REST examinee), that registers through the **CLI**
+(`pome register agent`, which writes `pome.json` + `.pome/link.json` and sets
+local transport) — route back to the pome router's "One register verb", don't
+intake it here.
+
 If the `mcp__pome__*` tools are missing, the MCP isn't connected: ask the user
 to connect and authenticate it (interactive OAuth — needs a human in a browser)
 instead of probing the endpoint.
