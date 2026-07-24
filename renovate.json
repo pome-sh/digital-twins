@@ -4,7 +4,7 @@
     "config:recommended",
     ":dependencyDashboard"
   ],
-  "schedule": ["on the 1st and 15th day of the month before 5am"],
+  "schedule": ["* 0-5 1,15 * *"],
   "timezone": "Etc/UTC",
   "prConcurrentLimit": 1,
   "prHourlyLimit": 0,
@@ -15,6 +15,12 @@
       "matchUpdateTypes": ["minor", "patch", "pin", "digest", "lockFileMaintenance"],
       "groupName": "all non-major dependencies",
       "groupSlug": "all-non-major"
+    },
+    {
+      "description": "Do NOT bump actions/setup-node to v7 — v7 changed how registry-url writes .npmrc and breaks OIDC Trusted Publishing (ENEEDAUTH). Pinned to v6.x. See .github/workflows/sdk-publish.yml and actions/setup-node#1551.",
+      "matchDepNames": ["actions/setup-node"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
     }
   ],
   "vulnerabilityAlerts": {
