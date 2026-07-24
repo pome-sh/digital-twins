@@ -14,7 +14,7 @@ on team **AFFF's workspace**. Runs are visible on `app.pome.sh`.
   `task_OJue2tyNX-EpAoAC3k51`). Seed pre-loads open issue #1 for the coupon bug;
   `#support` gets a *new* report of the *same* bug.
 - **Examinee runtime**: Claude managed agent on Anthropic's Managed Agents cloud,
-  assembled from `run_scenario`'s `examinee_launch` (network clamped to
+  assembled from `run_task`'s `examinee_launch` (network clamped to
   `twins.pome.sh`, `web_search`/`web_fetch` off, `always_allow` on every
   `mcp_toolset`, a vault `static_bearer` per twin URL). Ephemeral per trial —
   torn down after each `finalize_run`.
@@ -70,7 +70,7 @@ pristine; a stronger model may or may not remove the last flake.
 
 1. Register two agents on Pome: `register_agent(name="support-triage-v1",
    twins=["github","slack"])` and the same for `-v2`.
-2. For each, `run_trials(scenario_id, agent_id, n=5)`; assemble each trial's
+2. For each, `run_trials(task_id, agent_id, n=5)`; assemble each trial's
    clone from `examinee_launch` (env clamp, vault `static_bearer` per twin URL,
    `always_allow` on every `mcp_toolset`, web tools off), model
    `claude-sonnet-5`, `system` = that version's prompt; kick off with
