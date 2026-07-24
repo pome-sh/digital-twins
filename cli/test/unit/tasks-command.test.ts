@@ -7,8 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createProgram } from "../../src/cli/main.js";
 import {
   findTwin,
-  runnableScenarios,
-} from "../../src/cli/scenarios-catalog.js";
+  runnableTasks,
+} from "../../src/cli/tasks-catalog.js";
 
 const originalCwd = process.cwd();
 const tempDirs: string[] = [];
@@ -43,18 +43,18 @@ afterEach(async () => {
 });
 
 async function inTempDir(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "pome-scenarios-"));
+  const dir = await mkdtemp(join(tmpdir(), "pome-tasks-"));
   tempDirs.push(dir);
   process.chdir(dir);
   return dir;
 }
 
-describe("pome scenarios", () => {
+describe("pome tasks", () => {
   it("lists available twins when no twin is given", async () => {
     await inTempDir();
     const captured = captureConsole();
 
-    await createProgram().parseAsync(["node", "pome", "scenarios"]);
+    await createProgram().parseAsync(["node", "pome", "tasks"]);
 
     const out = captured.log.concat(captured.error).join("\n");
     expect(out.toLowerCase()).toContain("github");
@@ -63,11 +63,11 @@ describe("pome scenarios", () => {
     expect(out.toLowerCase()).toContain("gmail");
   });
 
-  it("lists runnable github scenarios and omits the seed", async () => {
+  it("lists runnable github tasks and omits the seed", async () => {
     await inTempDir();
     const captured = captureConsole();
 
-    await createProgram().parseAsync(["node", "pome", "scenarios", "github"]);
+    await createProgram().parseAsync(["node", "pome", "tasks", "github"]);
 
     const out = captured.log.concat(captured.error).join("\n");
     expect(out).toContain("01-bug-happy-path.md");
@@ -77,13 +77,13 @@ describe("pome scenarios", () => {
     expect(out).not.toContain("00-default-seed.md");
   });
 
-  it("lists runnable stripe, slack, and gmail scenarios", async () => {
+  it("lists runnable stripe, slack, and gmail tasks", async () => {
     await inTempDir();
     const captured = captureConsole();
 
-    await createProgram().parseAsync(["node", "pome", "scenarios", "stripe"]);
-    await createProgram().parseAsync(["node", "pome", "scenarios", "slack"]);
-    await createProgram().parseAsync(["node", "pome", "scenarios", "gmail"]);
+    await createProgram().parseAsync(["node", "pome", "tasks", "stripe"]);
+    await createProgram().parseAsync(["node", "pome", "tasks", "slack"]);
+    await createProgram().parseAsync(["node", "pome", "tasks", "gmail"]);
 
     const out = captured.log.concat(captured.error).join("\n");
     expect(out).toContain("14-stripe-refund-retry.md");
@@ -101,7 +101,7 @@ describe("pome scenarios", () => {
     await createProgram().parseAsync([
       "node",
       "pome",
-      "scenarios",
+      "tasks",
       "nope-twin",
     ]);
 
@@ -110,111 +110,111 @@ describe("pome scenarios", () => {
     expect(out.toLowerCase()).toContain("github");
   });
 
-  it("--copy copies the runnable github scenarios into ./scenarios/", async () => {
+  it("--copy copies the runnable github tasks into ./tasks/", async () => {
     const dir = await inTempDir();
     captureConsole();
 
     await createProgram().parseAsync([
       "node",
       "pome",
-      "scenarios",
+      "tasks",
       "github",
       "--copy",
     ]);
 
-    const scenariosDir = join(dir, "scenarios");
+    const tasksDir = join(dir, "tasks");
     const githubTwin = findTwin("github");
     expect(githubTwin).not.toBeNull();
-    const githubScenarios = runnableScenarios(githubTwin!);
-    for (const scenario of githubScenarios) {
-      expect(existsSync(join(scenariosDir, scenario.filename))).toBe(true);
+    const githubTasks = runnableTasks(githubTwin!);
+    for (const task of githubTasks) {
+      expect(existsSync(join(tasksDir, task.filename))).toBe(true);
     }
-    expect(readdirSync(scenariosDir).filter((f) => f.endsWith(".md"))).toHaveLength(
-      githubScenarios.length,
+    expect(readdirSync(tasksDir).filter((f) => f.endsWith(".md"))).toHaveLength(
+      githubTasks.length,
     );
-    expect(existsSync(join(scenariosDir, "00-default-seed.md"))).toBe(false);
+    expect(existsSync(join(tasksDir, "00-default-seed.md"))).toBe(false);
 
     // Sidecar .seed.json files must be copied alongside the .md so `pome run`
     // doesn't fall back to parsing the prose ## Seed State section.
-    expect(existsSync(join(scenariosDir, "01-bug-happy-path.seed.json"))).toBe(
+    expect(existsSync(join(tasksDir, "01-bug-happy-path.seed.json"))).toBe(
       true,
     );
-    expect(existsSync(join(scenariosDir, "05-github-identity-spoof.seed.json"))).toBe(
+    expect(existsSync(join(tasksDir, "05-github-identity-spoof.seed.json"))).toBe(
       true,
     );
     // 04-judge-context now ships a sidecar that pre-labels issue #1 `bug`
-    // (the default seed leaves it unlabeled, which broke the scenario). --copy
+    // (the default seed leaves it unlabeled, which broke the task). --copy
     // must bring the sidecar alongside the .md.
-    expect(existsSync(join(scenariosDir, "04-judge-context.seed.json"))).toBe(
+    expect(existsSync(join(tasksDir, "04-judge-context.seed.json"))).toBe(
       true,
     );
   });
 
-  it("--copy copies non-github twin scenarios on demand", async () => {
+  it("--copy copies non-github twin tasks on demand", async () => {
     const dir = await inTempDir();
     captureConsole();
 
     await createProgram().parseAsync([
       "node",
       "pome",
-      "scenarios",
+      "tasks",
       "stripe",
       "--copy",
     ]);
 
-    const scenariosDir = join(dir, "scenarios");
-    expect(existsSync(join(scenariosDir, "14-stripe-refund-retry.md"))).toBe(true);
-    expect(existsSync(join(scenariosDir, "19-stripe-rerefund-persuasion.md"))).toBe(
+    const tasksDir = join(dir, "tasks");
+    expect(existsSync(join(tasksDir, "14-stripe-refund-retry.md"))).toBe(true);
+    expect(existsSync(join(tasksDir, "19-stripe-rerefund-persuasion.md"))).toBe(
       true,
     );
-    expect(existsSync(join(scenariosDir, "01-bug-happy-path.md"))).toBe(false);
+    expect(existsSync(join(tasksDir, "01-bug-happy-path.md"))).toBe(false);
   });
 
   it("--copy preserves existing files (no overwrite without --force)", async () => {
     const dir = await inTempDir();
     captureConsole();
 
-    const scenariosDir = join(dir, "scenarios");
-    await mkdir(scenariosDir, { recursive: true });
+    const tasksDir = join(dir, "tasks");
+    await mkdir(tasksDir, { recursive: true });
     const stamped = "# Local edit — do not overwrite\n";
-    await writeFile(join(scenariosDir, "01-bug-happy-path.md"), stamped);
+    await writeFile(join(tasksDir, "01-bug-happy-path.md"), stamped);
 
     await createProgram().parseAsync([
       "node",
       "pome",
-      "scenarios",
+      "tasks",
       "github",
       "--copy",
     ]);
 
-    expect(readFileSync(join(scenariosDir, "01-bug-happy-path.md"), "utf8")).toBe(
+    expect(readFileSync(join(tasksDir, "01-bug-happy-path.md"), "utf8")).toBe(
       stamped,
     );
-    expect(existsSync(join(scenariosDir, "03-already-triaged.md"))).toBe(true);
+    expect(existsSync(join(tasksDir, "03-already-triaged.md"))).toBe(true);
   });
 
   it("--copy --force overwrites existing files", async () => {
     const dir = await inTempDir();
     captureConsole();
 
-    const scenariosDir = join(dir, "scenarios");
-    await mkdir(scenariosDir, { recursive: true });
+    const tasksDir = join(dir, "tasks");
+    await mkdir(tasksDir, { recursive: true });
     await writeFile(
-      join(scenariosDir, "01-bug-happy-path.md"),
+      join(tasksDir, "01-bug-happy-path.md"),
       "# stale local copy\n",
     );
 
     await createProgram().parseAsync([
       "node",
       "pome",
-      "scenarios",
+      "tasks",
       "github",
       "--copy",
       "--force",
     ]);
 
     const written = readFileSync(
-      join(scenariosDir, "01-bug-happy-path.md"),
+      join(tasksDir, "01-bug-happy-path.md"),
       "utf8",
     );
     expect(written).not.toBe("# stale local copy\n");
@@ -228,15 +228,52 @@ describe("pome scenarios", () => {
     await createProgram().parseAsync([
       "node",
       "pome",
-      "scenarios",
+      "tasks",
       "github",
       "--copy",
       "--dest",
-      "custom-scenarios",
+      "custom-tasks",
     ]);
 
-    const customDir = join(dir, "custom-scenarios");
+    const customDir = join(dir, "custom-tasks");
     expect(existsSync(join(customDir, "01-bug-happy-path.md"))).toBe(true);
-    expect(existsSync(join(dir, "scenarios"))).toBe(false);
+    expect(existsSync(join(dir, "tasks"))).toBe(false);
+  });
+
+  // F-892 — `pome scenarios` is a hidden deprecated alias: it still runs the
+  // command but prints a one-line pointer to `pome tasks`.
+  describe("deprecated `pome scenarios` alias", () => {
+    it("still lists twins and prints the rename pointer", async () => {
+      await inTempDir();
+      const captured = captureConsole();
+
+      await createProgram().parseAsync(["node", "pome", "scenarios"]);
+
+      const out = captured.log.concat(captured.error).join("\n");
+      expect(out.toLowerCase()).toContain("github");
+      const err = captured.error.join("\n");
+      expect(err).toContain("`pome scenarios` was renamed to `pome tasks`");
+    });
+
+    it("still copies into ./tasks/ (same behavior as `pome tasks`)", async () => {
+      const dir = await inTempDir();
+      captureConsole();
+
+      await createProgram().parseAsync([
+        "node",
+        "pome",
+        "scenarios",
+        "github",
+        "--copy",
+      ]);
+
+      expect(existsSync(join(dir, "tasks", "01-bug-happy-path.md"))).toBe(true);
+    });
+
+    it("is hidden from the help output", async () => {
+      const help = createProgram().helpInformation();
+      expect(help).toContain("tasks ");
+      expect(help).not.toContain("scenarios ");
+    });
   });
 });

@@ -37,8 +37,8 @@ describe("Pome scenario runner (capture-only)", () => {
     async () => {
       const artifactsDir = await mkdtemp(join(tmpdir(), "pome-runs-"));
       const scenarios = [
-        "scenarios/01-bug-happy-path.md",
-        "scenarios/03-already-triaged.md",
+        "tasks/01-bug-happy-path.md",
+        "tasks/03-already-triaged.md",
       ];
 
       for (const scenarioPath of scenarios) {
@@ -72,7 +72,7 @@ describe("Pome scenario runner (capture-only)", () => {
     const artifactsDir = await mkdtemp(join(tmpdir(), "pome-runs-"));
 
     const result = await runScenario({
-      scenarioPath: "scenarios/05-github-identity-spoof.md",
+      scenarioPath: "tasks/05-github-identity-spoof.md",
       agentCommand: "npx tsx examples/agents/scripted-pr-reviewer-agent.ts",
       artifactsDir,
       captureServerCommand: captureServerForTests,

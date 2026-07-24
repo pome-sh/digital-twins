@@ -79,7 +79,7 @@ in-process, seeds the task, runs the agent, and records the trace:
 
 ```bash
 npx @pome-sh/cli init
-npx @pome-sh/cli run --local scenarios/01-bug-happy-path.md   # captures a trace
+npx @pome-sh/cli run --local tasks/01-bug-happy-path.md   # captures a trace
 npx @pome-sh/cli inspect latest                               # read it back
 ```
 
@@ -139,9 +139,9 @@ is a hosted feature on the Pome platform. `pome eval` bridges the two:
 capture a trace anywhere, then upload it for a cloud verdict.
 
 ```bash
-pome run --local scenarios/         # self-hosted: records a raw trace
+pome run --local tasks/         # self-hosted: records a raw trace
 pome eval runs/<task>/<run-id>      # uploads it for a cloud verdict
-pome login && pome run scenarios/   # hosted: records + evaluates in one go
+pome login && pome run tasks/   # hosted: records + evaluates in one go
 ```
 
 ## The task library
@@ -152,7 +152,7 @@ issue triage. Several are
 adversarial — they probe whether your agent can be talked into spoofing an
 identity, following an injected prompt, merging a backdoored PR, fabricating
 green CI, or re-refunding a charge because someone asked nicely. Browse them
-with `pome scenarios` or in [`cli/scenarios/`](./cli/scenarios/).
+with `pome tasks` or in [`cli/tasks/`](./cli/tasks/).
 
 ## The example agents
 
@@ -223,7 +223,7 @@ Everything ships to npm with provenance (Trusted Publishing):
 | [`packages/shared-types`](./packages/shared-types/) | Zod schemas and trace contracts |
 | [`packages/adapter-claude-sdk`](./packages/adapter-claude-sdk/) | Wire a Claude Agent SDK agent to a Pome run |
 | [`cli/`](./cli/) | The `pome` CLI (run tasks, inspect traces, upload for evaluation) |
-| [`cli/scenarios/`](./cli/scenarios/) | The bundled task library |
+| [`cli/tasks/`](./cli/tasks/) | The bundled task library |
 | [`examples/`](./examples/) | Four worked example agents |
 | [`CONTRACT.md`](./CONTRACT.md) | The frozen twin runtime contract (v1.2.0) |
 | [`AGENTS.md`](./AGENTS.md) | Contributor and agent conventions for this repo |

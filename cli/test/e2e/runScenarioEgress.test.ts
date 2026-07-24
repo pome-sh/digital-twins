@@ -67,7 +67,7 @@ describe("runScenario — egress floor wiring (FDRS-635)", () => {
 
     try {
       const result = await runScenario({
-        scenarioPath: "scenarios/01-bug-happy-path.md",
+        scenarioPath: "tasks/01-bug-happy-path.md",
         agentCommand: `npx tsx ${probePath}`,
         artifactsDir,
         captureServerCommand: captureServerForTests,

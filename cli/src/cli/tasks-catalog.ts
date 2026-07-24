@@ -1,35 +1,35 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Catalog of scenarios bundled with the CLI, grouped by twin.
+ * Catalog of tasks bundled with the CLI, grouped by twin.
  *
- * Single source of truth for `pome scenarios` (browse + copy). `pome init`
+ * Single source of truth for `pome tasks` (browse + copy). `pome init`
  * uses the GitHub twin entries from this catalog as its starter scaffold while
- * Stripe/Slack scenarios remain opt-in via `pome scenarios <twin> --copy`.
+ * Stripe/Slack tasks remain opt-in via `pome tasks <twin> --copy`.
  *
- * `runnable: false` marks a seed-only reference document (not a scenario
+ * `runnable: false` marks a seed-only reference document (not a task
  * to execute) — copy commands skip these.
  */
-export interface CatalogScenario {
+export interface CatalogTask {
   filename: string;
   title: string;
   summary: string;
   runnable: boolean;
 }
 
-export interface ScenarioTwin {
+export interface TaskTwin {
   id: string;
   label: string;
   description: string;
-  scenarios: CatalogScenario[];
+  tasks: CatalogTask[];
 }
 
-export const SCENARIO_TWINS: ScenarioTwin[] = [
+export const TASK_TWINS: TaskTwin[] = [
   {
     id: "github",
     label: "GitHub twin",
     description:
       "Issue triage, labeling, PR review, and identity checks against a deterministic GitHub clone.",
-    scenarios: [
+    tasks: [
       {
         filename: "00-default-seed.md",
         title: "Default seed (reference)",
@@ -119,7 +119,7 @@ export const SCENARIO_TWINS: ScenarioTwin[] = [
     label: "Stripe twin",
     description:
       "Payments, refunds, events, and x402 flows against a deterministic Stripe clone.",
-    scenarios: [
+    tasks: [
       {
         filename: "10-stripe-create-payment-intent.md",
         title: "Create PaymentIntent",
@@ -168,7 +168,7 @@ export const SCENARIO_TWINS: ScenarioTwin[] = [
     label: "Slack twin",
     description:
       "Channel summaries, DLP, and injection resistance against a deterministic Slack clone.",
-    scenarios: [
+    tasks: [
       {
         filename: "20-slack-exfiltration.md",
         title: "Secret exfiltration",
@@ -190,7 +190,7 @@ export const SCENARIO_TWINS: ScenarioTwin[] = [
     label: "Gmail twin",
     description:
       "Inbox triage, drafting, search, and label workflows against a deterministic Gmail clone.",
-    scenarios: [
+    tasks: [
       {
         filename: "22-gmail-inbox-triage.md",
         title: "Gmail inbox triage",
@@ -219,7 +219,7 @@ export const SCENARIO_TWINS: ScenarioTwin[] = [
     label: "Linear twin",
     description:
       "Issue triage, comments, and project workflows against a deterministic Linear clone.",
-    scenarios: [
+    tasks: [
       {
         filename: "24-linear-issue-triage.md",
         title: "Linear issue triage",
@@ -238,12 +238,12 @@ export const SCENARIO_TWINS: ScenarioTwin[] = [
   },
 ];
 
-export function findTwin(id: string): ScenarioTwin | null {
+export function findTwin(id: string): TaskTwin | null {
   const q = id.trim().toLowerCase();
   if (!q) return null;
-  return SCENARIO_TWINS.find((twin) => twin.id === q) ?? null;
+  return TASK_TWINS.find((twin) => twin.id === q) ?? null;
 }
 
-export function runnableScenarios(twin: ScenarioTwin): CatalogScenario[] {
-  return twin.scenarios.filter((s) => s.runnable);
+export function runnableTasks(twin: TaskTwin): CatalogTask[] {
+  return twin.tasks.filter((t) => t.runnable);
 }

@@ -147,5 +147,5 @@ npx @pome-sh/cli twin start linear
 # and the identical POME_LINEAR_TOKEN alias
 ```
 
-Use `pome scenarios linear --copy` for the issue-triage and comment+label
+Use `pome tasks linear --copy` for the issue-triage and comment+label
 tasks. Hosted rollout is gated separately; see [`HOSTED.md`](HOSTED.md).

@@ -11,20 +11,20 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createProgram } from "../../src/cli/main.js";
 
-const SCENARIO_SRC = new URL("../../scenarios/01-bug-happy-path.md", import.meta.url).pathname;
-const SCENARIO_SEED_SRC = new URL("../../scenarios/01-bug-happy-path.seed.json", import.meta.url).pathname;
+const SCENARIO_SRC = new URL("../../tasks/01-bug-happy-path.md", import.meta.url).pathname;
+const SCENARIO_SEED_SRC = new URL("../../tasks/01-bug-happy-path.seed.json", import.meta.url).pathname;
 
 async function fixtureRepo(agentSource: string): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "pome-run-gate-"));
   await mkdir(join(dir, "src"), { recursive: true });
-  await mkdir(join(dir, "scenarios"), { recursive: true });
+  await mkdir(join(dir, "tasks"), { recursive: true });
   await writeFile(
     join(dir, "pome.json"),
     JSON.stringify({ agent: { slug: "gate-agent" }, command: 'node -e "process.exit(0)"' }, null, 2),
   );
   await writeFile(join(dir, "src/agent.ts"), agentSource);
-  await cp(SCENARIO_SRC, join(dir, "scenarios/01-bug-happy-path.md"));
-  await cp(SCENARIO_SEED_SRC, join(dir, "scenarios/01-bug-happy-path.seed.json"));
+  await cp(SCENARIO_SRC, join(dir, "tasks/01-bug-happy-path.md"));
+  await cp(SCENARIO_SEED_SRC, join(dir, "tasks/01-bug-happy-path.seed.json"));
   return dir;
 }
 
@@ -58,7 +58,7 @@ describe("pome run — doctor preflight gate (FDRS-641)", () => {
       "node",
       "pome",
       "run",
-      "scenarios/01-bug-happy-path.md",
+      "tasks/01-bug-happy-path.md",
       "--local",
       // Keep the test hermetic under vitest: the capture-server child
       // re-invokes process.argv[1], which is vitest's fork bootstrap here.
@@ -90,7 +90,7 @@ describe("pome run — doctor preflight gate (FDRS-641)", () => {
       "node",
       "pome",
       "run",
-      "scenarios/01-bug-happy-path.md",
+      "tasks/01-bug-happy-path.md",
       "--local",
       "--no-capture",
     ]);

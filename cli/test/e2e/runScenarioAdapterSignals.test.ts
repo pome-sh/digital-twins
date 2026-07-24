@@ -18,7 +18,7 @@ describe("runScenario + POME_ADAPTER_SIGNALS_PATH", () => {
     async () => {
       const artifactsDir = await mkdtemp(join(tmpdir(), "pome-runs-"));
       const result = await runScenario({
-        scenarioPath: "scenarios/01-bug-happy-path.md",
+        scenarioPath: "tasks/01-bug-happy-path.md",
         captureServerCommand: captureServerForTests,
         agentCommand: "npx tsx test/fixtures/adapter-signals-agent.ts",
         artifactsDir,
@@ -63,7 +63,7 @@ describe("runScenario + POME_ADAPTER_SIGNALS_PATH", () => {
     async () => {
       const artifactsDir = await mkdtemp(join(tmpdir(), "pome-runs-"));
       const result = await runScenario({
-        scenarioPath: "scenarios/01-bug-happy-path.md",
+        scenarioPath: "tasks/01-bug-happy-path.md",
         captureServerCommand: captureServerForTests,
         agentCommand: "npx tsx examples/agents/scripted-triage-agent.ts",
         artifactsDir,

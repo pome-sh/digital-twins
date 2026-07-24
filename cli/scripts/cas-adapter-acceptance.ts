@@ -36,7 +36,7 @@ import { createServer as createNetServer, type Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-const SCENARIO_PATH = process.env.CAS_ACCEPTANCE_SCENARIO ?? "scenarios/01-bug-happy-path.md";
+const SCENARIO_PATH = process.env.CAS_ACCEPTANCE_SCENARIO ?? "tasks/01-bug-happy-path.md";
 const AGENT_FIXTURE =
   process.env.CAS_ACCEPTANCE_AGENT ??
   // Resolved relative to `cli/` since `pome run` invokes the agent with cwd=cli.

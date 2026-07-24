@@ -70,13 +70,13 @@ const WIRED_AGENT_SOURCE = [
 async function fixtureRepo(scenarioSource: string): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "pome-run-n-"));
   await mkdir(join(dir, "src"), { recursive: true });
-  await mkdir(join(dir, "scenarios"), { recursive: true });
+  await mkdir(join(dir, "tasks"), { recursive: true });
   await writeFile(
     join(dir, "pome.json"),
     JSON.stringify({ agent: { slug: "fixture-agent" }, command: 'node -e "process.exit(0)"' }, null, 2),
   );
   await writeFile(join(dir, "src/agent.ts"), WIRED_AGENT_SOURCE);
-  await writeFile(join(dir, "scenarios/scn.md"), scenarioSource, "utf8");
+  await writeFile(join(dir, "tasks/scn.md"), scenarioSource, "utf8");
   return dir;
 }
 
@@ -114,7 +114,7 @@ describe("pome run -n (FDRS-636)", () => {
     async (bad) => {
       const dir = await fixtureRepo(SCENARIO);
       process.chdir(dir);
-      await run("scenarios/scn.md", "-n", bad);
+      await run("tasks/scn.md", "-n", bad);
       expect(process.exitCode).toBe(5);
       expect(stderr.join("\n")).toMatch(/1-20/);
       expect(runTrialGroup).not.toHaveBeenCalled();
@@ -125,7 +125,7 @@ describe("pome run -n (FDRS-636)", () => {
   it("-n with --local is a usage error — trial groups are hosted-only", async () => {
     const dir = await fixtureRepo(SCENARIO);
     process.chdir(dir);
-    await run("scenarios/scn.md", "-n", "3", "--local");
+    await run("tasks/scn.md", "-n", "3", "--local");
     expect(process.exitCode).toBe(5);
     expect(stderr.join("\n")).toMatch(/hosted/i);
     expect(runTrialGroup).not.toHaveBeenCalled();
@@ -134,7 +134,7 @@ describe("pome run -n (FDRS-636)", () => {
   it("-n 5 dispatches the hosted path to runTrialGroup with trials=5", async () => {
     const dir = await fixtureRepo(SCENARIO);
     process.chdir(dir);
-    await run("scenarios/scn.md", "-n", "5");
+    await run("tasks/scn.md", "-n", "5");
 
     expect(process.exitCode ?? 0).toBe(0);
     expect(runScenarioHosted).not.toHaveBeenCalled();
@@ -150,7 +150,7 @@ describe("pome run -n (FDRS-636)", () => {
   it("the scenario config's runs field is the default k (runs: 3 → 3 trials)", async () => {
     const dir = await fixtureRepo(scenarioWithRuns(3));
     process.chdir(dir);
-    await run("scenarios/scn.md");
+    await run("tasks/scn.md");
 
     expect(runTrialGroup).toHaveBeenCalledTimes(1);
     expect(vi.mocked(runTrialGroup).mock.calls[0]![0].trials).toBe(3);
@@ -160,7 +160,7 @@ describe("pome run -n (FDRS-636)", () => {
   it("the runs-field default is capped at 20", async () => {
     const dir = await fixtureRepo(scenarioWithRuns(50));
     process.chdir(dir);
-    await run("scenarios/scn.md");
+    await run("tasks/scn.md");
 
     expect(runTrialGroup).toHaveBeenCalledTimes(1);
     expect(vi.mocked(runTrialGroup).mock.calls[0]![0].trials).toBe(20);
@@ -169,7 +169,7 @@ describe("pome run -n (FDRS-636)", () => {
   it("-n overrides the config runs field", async () => {
     const dir = await fixtureRepo(scenarioWithRuns(2));
     process.chdir(dir);
-    await run("scenarios/scn.md", "-n", "4");
+    await run("tasks/scn.md", "-n", "4");
 
     expect(vi.mocked(runTrialGroup).mock.calls[0]![0].trials).toBe(4);
   }, 30_000);
@@ -177,7 +177,7 @@ describe("pome run -n (FDRS-636)", () => {
   it("no -n and runs default (1) keeps EXACTLY today's single-run path", async () => {
     const dir = await fixtureRepo(SCENARIO);
     process.chdir(dir);
-    await run("scenarios/scn.md");
+    await run("tasks/scn.md");
 
     expect(runTrialGroup).not.toHaveBeenCalled();
     expect(runScenarioHosted).toHaveBeenCalledTimes(1);
@@ -187,7 +187,7 @@ describe("pome run -n (FDRS-636)", () => {
   it("-n 1 also keeps the single-run path (a group of 1 would flip the reliability page off its latest-k fallback)", async () => {
     const dir = await fixtureRepo(scenarioWithRuns(5));
     process.chdir(dir);
-    await run("scenarios/scn.md", "-n", "1");
+    await run("tasks/scn.md", "-n", "1");
 
     expect(runTrialGroup).not.toHaveBeenCalled();
     expect(runScenarioHosted).toHaveBeenCalledTimes(1);
@@ -202,7 +202,7 @@ describe("pome run -n (FDRS-636)", () => {
     });
     const dir = await fixtureRepo(SCENARIO);
     process.chdir(dir);
-    await run("scenarios/scn.md", "-n", "2");
+    await run("tasks/scn.md", "-n", "2");
     expect(process.exitCode).toBe(1);
   }, 30_000);
 });

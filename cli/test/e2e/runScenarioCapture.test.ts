@@ -68,7 +68,7 @@ describe("runScenario — capture-server wiring (FDRS-399)", () => {
     let capturedPid = -1;
     try {
       const result = await runScenario({
-        scenarioPath: "scenarios/01-bug-happy-path.md",
+        scenarioPath: "tasks/01-bug-happy-path.md",
         agentCommand: `npx tsx ${probePath}`,
         artifactsDir,
         captureServerCommand: captureServerForTests,

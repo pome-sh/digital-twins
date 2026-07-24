@@ -38,9 +38,9 @@ interface FileResult {
 }
 
 export async function runCompileSeeds(target: string | undefined, opts: CompileOptions): Promise<number> {
-  const files = await resolveScenarioFiles(target ?? "scenarios");
+  const files = await resolveTaskFiles(target ?? "tasks");
   if (files.length === 0) {
-    console.error(`No task .md files found at ${target ?? "scenarios"}.`);
+    console.error(`No task .md files found at ${target ?? "tasks"}.`);
     return 2;
   }
 
@@ -219,7 +219,7 @@ async function readSidecarMeta(path: string): Promise<{ source_hash: string; mod
   }
 }
 
-async function resolveScenarioFiles(target: string): Promise<string[]> {
+async function resolveTaskFiles(target: string): Promise<string[]> {
   const abs = resolve(target);
   if (!existsSync(abs)) throw new Error(`Path not found: ${target}`);
   const st = await stat(abs);
