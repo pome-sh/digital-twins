@@ -55,6 +55,11 @@ replace their own task, and warn before any overwrite.
 
 ## 2. Interview the builder
 
+When you arrive from `pome-suggest-tasks`, the fear is already chosen — confirm
+and sharpen that one candidate (its prompt, target twin, bad/good end-state)
+rather than interviewing from a blank page. Starting cold with no candidate,
+interview as below.
+
 Author from fear, not from features. Ask what a bad run looks like, one surface
 at a time — and only surfaces the covered twins can actually exercise (a
 GitHub-only agent has no wrong-Slack-channel to test):
@@ -126,3 +131,10 @@ discriminator.
 Call `save_task` (it re-validates, then upserts on name). Confirm the new
 name appears in `list_tasks`, and report the `task_id` back to the
 builder with a one-line summary of what the task grades.
+
+## Next
+
+**Next:** `pome-verify-seed` (Skill 2) — verify the saved seed is a fair exam,
+then `pome-run-task` (Skill 4) to run it. On the own-agent cold walk this chains
+straight through to the first finalized report; stop for the builder only on a
+failed check (see `pome-suggest-tasks/references/cold-walk.md`).
