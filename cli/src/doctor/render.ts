@@ -15,12 +15,14 @@ export interface RenderDoctorReportOptions {
    *  moment-03 default; `pome install` passes moment 02's
    *  "verifying the wiring …" (FDRS-642). */
   header?: string;
-  /** F-906 — when the report passes, append a one-line caveat that a green
-   *  doctor verifies wiring, not that the examinee's own code launches: the
-   *  preflight probe (POME_PREFLIGHT=1) early-returns the agent before its
-   *  body runs, so a launch-fatal bug there surfaces only on a real run.
-   *  Opt-in so only `pome doctor` shows it — the `run`/`install` consumers
-   *  print the report as a gate, not as a self-diagnosis. */
+  /** F-906 — when the report passes, append a caveat that a green check means
+   *  the wiring is right, not that the examinee runs cleanly. `pome doctor`
+   *  never launches the agent; and a `pome run` preflight probe launches it
+   *  with POME_PREFLIGHT=1, which most scaffolds honour by exiting before
+   *  their real work path — so a bug on that skipped path (as in F-900)
+   *  surfaces only on a full trial run. Opt-in so only `pome doctor` shows it
+   *  — the `run`/`install` consumers print the report as a gate, not as a
+   *  self-diagnosis. */
   passNote?: boolean;
 }
 
@@ -51,14 +53,15 @@ export function renderDoctorReport(
   } else if (options.passNote) {
     lines.push("");
     lines.push(
-      "note: this checks the wiring, not that your agent launches cleanly — the",
+      "note: a green check means the wiring is right, not that your agent runs",
     );
     lines.push(
-      "preflight probe exits your agent early (POME_PREFLIGHT=1), so a startup bug",
+      "cleanly — pome doctor never launches it, and a run's preflight probe exits",
     );
     lines.push(
-      "in its own code (e.g. a TDZ crash) can still surface only on a real run.",
+      "it early (POME_PREFLIGHT=1), so a bug on the code path they skip surfaces",
     );
+    lines.push("only on a full trial run.");
   }
 
   return lines;

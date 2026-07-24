@@ -41,7 +41,8 @@ describe("renderDoctorReport", () => {
 
     // `pome doctor` opts in — a green report is not "the agent can launch".
     const text = renderDoctorReport(report, { passNote: true }).join("\n");
-    expect(text).toContain("this checks the wiring, not that your agent launches cleanly");
+    expect(text).toContain("a green check means the wiring is right, not that your agent runs");
+    expect(text).toContain("pome doctor never launches it");
     expect(text).toContain("POME_PREFLIGHT=1");
   });
 
