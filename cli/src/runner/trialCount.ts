@@ -2,7 +2,7 @@
 // FDRS-636 — trial-count resolution for `pome run -n k`.
 //
 // [DECISION 2026-07-05]: -n is an integer 1..20 on the hosted run path. The
-// DEFAULT is the scenario config's `runs` field (scenarioConfigSchema parses
+// DEFAULT is the scenario config's `runs` field (taskConfigSchema parses
 // it, defaulting 1; nothing consumed it before this ticket) — -n overrides;
 // both are capped at 20. k=1 keeps EXACTLY today's single-run behavior (no
 // group is ever stamped — a group of 1 would flip the reliability page off

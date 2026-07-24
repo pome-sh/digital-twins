@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-399 — E2E test that `pome run` (via `runScenario`) spawns the
+// FDRS-399 — E2E test that `pome run` (via `runTask`) spawns the
 // capture-server child, routes the agent's outbound traffic through it
 // via HTTPS_PROXY, and ends up with both LlmCallEvent (proxy-captured)
 // and TwinHttpEvent (twin traffic, NO_PROXY bypass) rows in events.jsonl —
@@ -11,7 +11,7 @@ import { createServer as createNetServer, type Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { runScenario } from "../../src/runner/runScenario.js";
+import { runTask } from "../../src/runner/runTask.js";
 import { captureServerForTests } from "../fixtures/captureServerForTests.js";
 
 function listenEphemeral(server: ReturnType<typeof createNetServer>): Promise<number> {
@@ -31,7 +31,7 @@ function appendAllowlist(existing: string | undefined, name: string): string {
   return [...values].join(",");
 }
 
-describe("runScenario — capture-server wiring (FDRS-399)", () => {
+describe("runTask — capture-server wiring (FDRS-399)", () => {
   let echoPort = 0;
   let echoCloser: (() => Promise<void>) | null = null;
 
@@ -67,8 +67,8 @@ describe("runScenario — capture-server wiring (FDRS-399)", () => {
 
     let capturedPid = -1;
     try {
-      const result = await runScenario({
-        scenarioPath: "scenarios/01-bug-happy-path.md",
+      const result = await runTask({
+        taskPath: "tasks/01-bug-happy-path.md",
         agentCommand: `npx tsx ${probePath}`,
         artifactsDir,
         captureServerCommand: captureServerForTests,

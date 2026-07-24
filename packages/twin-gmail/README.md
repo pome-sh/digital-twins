@@ -145,6 +145,6 @@ npx @pome-sh/cli twin start gmail
 # and the identical POME_GMAIL_TOKEN alias
 ```
 
-Use `pome scenarios gmail --copy` for the inbox-triage and captured first-party
+Use `pome tasks gmail --copy` for the inbox-triage and captured first-party
 MCP parity tasks. Hosted rollout is gated separately; see
 [`HOSTED.md`](HOSTED.md).

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-636 — runScenarioHosted's trial seams against a fake cloud:
+// FDRS-636 — runTaskHosted's trial seams against a fake cloud:
 //
 //   - `premintedSession` skips the runner's own POST /v1/sessions (trial
 //     groups mint all k upfront) while the `finally` teardown still DELETEs
@@ -11,7 +11,7 @@
 //   - the abandon lands BEFORE the teardown DELETE, so error_code is
 //     recorded while the session row is still open;
 //   - default mode (no flag) keeps today's behavior: agent timeout still
-//     finalizes (covered by runScenarioHosted.test.ts, re-asserted here).
+//     finalizes (covered by runTaskHosted.test.ts, re-asserted here).
 
 import { describe, it, expect, afterEach } from "vitest";
 import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -20,7 +20,7 @@ import { join } from "node:path";
 import { serve, type ServerType } from "@hono/node-server";
 import { Hono } from "hono";
 import { sign as signJwt } from "hono/jwt";
-import { runScenarioHosted } from "../../src/runner/runScenarioHosted.js";
+import { runTaskHosted } from "../../src/runner/runTaskHosted.js";
 import { HostedTrialError } from "../../src/hosted/errors.js";
 import type { CreateSessionResponse } from "../../src/types/shared.js";
 
@@ -149,7 +149,7 @@ async function premintedFor(port: number): Promise<CreateSessionResponse> {
   };
 }
 
-describe("runScenarioHosted trial seams (FDRS-636)", () => {
+describe("runTaskHosted trial seams (FDRS-636)", () => {
   let cloud: FakeCloud | undefined;
   let tmp: string | undefined;
 
@@ -162,7 +162,7 @@ describe("runScenarioHosted trial seams (FDRS-636)", () => {
     }
   });
 
-  async function scenarioPath(source: string): Promise<string> {
+  async function taskPath(source: string): Promise<string> {
     tmp = await mkdtemp(join(tmpdir(), "pome-trial-seam-"));
     const p = join(tmp, "scn.md");
     await writeFile(p, source, "utf8");
@@ -171,10 +171,10 @@ describe("runScenarioHosted trial seams (FDRS-636)", () => {
 
   it("premintedSession skips the runner's own mint and still DELETEs on teardown", async () => {
     cloud = await startFakeCloud();
-    const path = await scenarioPath(SCENARIO);
+    const path = await taskPath(SCENARIO);
 
-    const result = await runScenarioHosted({
-      scenarioPath: path,
+    const result = await runTaskHosted({
+      taskPath: path,
       agentCommand: `node -e ${JSON.stringify("console.log('done')")}`,
       artifactsDir: join(tmp!, "runs"),
       hosted: { baseUrl: `http://127.0.0.1:${cloud.port}`, apiKey: "pme_test" },
@@ -192,15 +192,15 @@ describe("runScenarioHosted trial seams (FDRS-636)", () => {
 
   it("abandonOnFailure + non-zero agent exit → abandon(agent_exit_nonzero), no finalize, HostedTrialError", async () => {
     cloud = await startFakeCloud();
-    const path = await scenarioPath(SCENARIO);
+    const path = await taskPath(SCENARIO);
 
     // Preflight (POME_PREFLIGHT=1) succeeds; the real run exits 1.
     const agent = `node -e ${JSON.stringify("process.exit(process.env.POME_PREFLIGHT ? 0 : 1)")}`;
 
     let thrown: unknown;
     try {
-      await runScenarioHosted({
-        scenarioPath: path,
+      await runTaskHosted({
+        taskPath: path,
         agentCommand: agent,
         artifactsDir: join(tmp!, "runs"),
         hosted: { baseUrl: `http://127.0.0.1:${cloud.port}`, apiKey: "pme_test" },
@@ -221,7 +221,7 @@ describe("runScenarioHosted trial seams (FDRS-636)", () => {
 
   it("abandonOnFailure + preflight failure → abandon(preflight_failed), no finalize; reason names the stderr tail and forensics land in artifactsDir (FDRS-667)", async () => {
     cloud = await startFakeCloud();
-    const path = await scenarioPath(SCENARIO);
+    const path = await taskPath(SCENARIO);
     // Mimics the first-publish e2e: the example's preflight throws its named
     // cause to stderr and exits 1. That cause must surface in the errored
     // trial row instead of a bare "agent preflight failed".
@@ -230,8 +230,8 @@ describe("runScenarioHosted trial seams (FDRS-636)", () => {
     )}`;
 
     await expect(
-      runScenarioHosted({
-        scenarioPath: path,
+      runTaskHosted({
+        taskPath: path,
         agentCommand: agent,
         artifactsDir: join(tmp!, "runs"),
         hosted: { baseUrl: `http://127.0.0.1:${cloud.port}`, apiKey: "pme_test" },
@@ -259,15 +259,15 @@ describe("runScenarioHosted trial seams (FDRS-636)", () => {
 
   it("injects POME_TWIN_BASE_URL = session twin_url so loopback-fallback agents pass hosted preflight (FDRS-667)", async () => {
     cloud = await startFakeCloud();
-    const path = await scenarioPath(SCENARIO);
+    const path = await taskPath(SCENARIO);
     const expected = `http://127.0.0.1:${cloud.port}/s/${SESSION_ID}`;
     // Exits 0 (both preflight and run) only when the env mirrors self-host.
     const agent = `node -e ${JSON.stringify(
       `process.exit(process.env.POME_TWIN_BASE_URL === '${expected}' ? 0 : 1)`,
     )}`;
 
-    const result = await runScenarioHosted({
-      scenarioPath: path,
+    const result = await runTaskHosted({
+      taskPath: path,
       agentCommand: agent,
       artifactsDir: join(tmp!, "runs"),
       hosted: { baseUrl: `http://127.0.0.1:${cloud.port}`, apiKey: "pme_test" },
@@ -282,7 +282,7 @@ describe("runScenarioHosted trial seams (FDRS-636)", () => {
 
   it("abandonOnFailure + preflight HANG past its cap → abandon(preflight_failed) quoting the 10s cap, not the scenario timeout", async () => {
     cloud = await startFakeCloud();
-    const path = await scenarioPath(PREFLIGHT_HANG_SCENARIO);
+    const path = await taskPath(PREFLIGHT_HANG_SCENARIO);
     // Preflight hangs forever (killed at the min(10, timeout)=10s cap); the
     // real run would exit 0, but it must never be reached.
     const agent = `node -e ${JSON.stringify(
@@ -290,8 +290,8 @@ describe("runScenarioHosted trial seams (FDRS-636)", () => {
     )}`;
 
     await expect(
-      runScenarioHosted({
-        scenarioPath: path,
+      runTaskHosted({
+        taskPath: path,
         agentCommand: agent,
         artifactsDir: join(tmp!, "runs"),
         hosted: { baseUrl: `http://127.0.0.1:${cloud.port}`, apiKey: "pme_test" },
@@ -313,15 +313,15 @@ describe("runScenarioHosted trial seams (FDRS-636)", () => {
 
   it("abandonOnFailure + agent timeout → abandon(agent_timeout), no finalize", async () => {
     cloud = await startFakeCloud();
-    const path = await scenarioPath(FAST_TIMEOUT_SCENARIO);
+    const path = await taskPath(FAST_TIMEOUT_SCENARIO);
     // Preflight exits 0 instantly; the real run outlives the 1s timeout.
     const agent = `node -e ${JSON.stringify(
       "if (process.env.POME_PREFLIGHT) process.exit(0); setTimeout(() => {}, 5000)",
     )}`;
 
     await expect(
-      runScenarioHosted({
-        scenarioPath: path,
+      runTaskHosted({
+        taskPath: path,
         agentCommand: agent,
         artifactsDir: join(tmp!, "runs"),
         hosted: { baseUrl: `http://127.0.0.1:${cloud.port}`, apiKey: "pme_test" },
@@ -336,11 +336,11 @@ describe("runScenarioHosted trial seams (FDRS-636)", () => {
 
   it("abandonOnFailure + machinery crash (twin state 500) → abandon(trial_crashed), original error rethrown", async () => {
     cloud = await startFakeCloud({ stateStatus: 500 });
-    const path = await scenarioPath(SCENARIO);
+    const path = await taskPath(SCENARIO);
 
     await expect(
-      runScenarioHosted({
-        scenarioPath: path,
+      runTaskHosted({
+        taskPath: path,
         agentCommand: `node -e ${JSON.stringify("console.log('done')")}`,
         artifactsDir: join(tmp!, "runs"),
         hosted: { baseUrl: `http://127.0.0.1:${cloud.port}`, apiKey: "pme_test" },
@@ -356,11 +356,11 @@ describe("runScenarioHosted trial seams (FDRS-636)", () => {
 
   it("default mode (k=1 path) is untouched: agent failure still finalizes, no abandon", async () => {
     cloud = await startFakeCloud();
-    const path = await scenarioPath(SCENARIO);
+    const path = await taskPath(SCENARIO);
     const agent = `node -e ${JSON.stringify("process.exit(process.env.POME_PREFLIGHT ? 0 : 1)")}`;
 
-    const result = await runScenarioHosted({
-      scenarioPath: path,
+    const result = await runTaskHosted({
+      taskPath: path,
       agentCommand: agent,
       artifactsDir: join(tmp!, "runs"),
       hosted: { baseUrl: `http://127.0.0.1:${cloud.port}`, apiKey: "pme_test" },

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { parseScenarioFile } from "../../src/scenario/parseScenario.js";
+import { parseTaskFile } from "../../src/task/parseTask.js";
 
 const SCENARIO_MARKDOWN = `# Test scenario
 
@@ -45,7 +45,7 @@ const SIDECAR_SEED = {
   ]
 };
 
-describe("parseScenarioFile sidecar handling", () => {
+describe("parseTaskFile sidecar handling", () => {
   it("loads seed from .seed.json sidecar when present, ignoring prose", async () => {
     const dir = await mkdtemp(join(tmpdir(), "pome-sidecar-"));
     const mdPath = join(dir, "scenario.md");
@@ -53,7 +53,7 @@ describe("parseScenarioFile sidecar handling", () => {
     await writeFile(mdPath, SCENARIO_MARKDOWN);
     await writeFile(sidecarPath, JSON.stringify(SIDECAR_SEED));
 
-    const scenario = await parseScenarioFile(mdPath);
+    const scenario = await parseTaskFile(mdPath);
 
     expect(scenario.seedState).toBeDefined();
     const ghSeed = scenario.seedState as { repositories: Array<{ owner: string; name: string }> };
@@ -73,7 +73,7 @@ describe("parseScenarioFile sidecar handling", () => {
     );
     await writeFile(mdPath, mdWithInline);
 
-    const scenario = await parseScenarioFile(mdPath);
+    const scenario = await parseTaskFile(mdPath);
     const ghSeed = scenario.seedState as { repositories: Array<{ owner: string }> };
     expect(ghSeed.repositories[0]!.owner).toBe("legacy");
   });
@@ -85,6 +85,6 @@ describe("parseScenarioFile sidecar handling", () => {
     await writeFile(mdPath, SCENARIO_MARKDOWN);
     await writeFile(sidecarPath, "{ not json");
 
-    await expect(parseScenarioFile(mdPath)).rejects.toThrow(/Sidecar seed.*not valid JSON/);
+    await expect(parseTaskFile(mdPath)).rejects.toThrow(/Sidecar seed.*not valid JSON/);
   });
 });

@@ -40,7 +40,7 @@ describe("HostedClient.createSession", () => {
       const body = JSON.parse(String(init?.body));
       expect(body).toEqual({
         twins: ["github"],
-        scenario_source: Buffer.from("# Scenario\n\n[code] true\n").toString("base64"),
+        scenario_source: Buffer.from("# Task\n\n[code] true\n").toString("base64"),
       });
       return new Response(
         JSON.stringify({
@@ -57,7 +57,7 @@ describe("HostedClient.createSession", () => {
     });
     const client = createHostedClient({ baseUrl: BASE, apiKey: KEY });
     const out = await client.createSession({
-      scenarioSource: "# Scenario\n\n[code] true\n",
+      taskSource: "# Task\n\n[code] true\n",
       twins: ["github"],
     });
     expect(out.session_id).toBe("ses_abc");
@@ -74,7 +74,7 @@ describe("HostedClient.createSession", () => {
     );
     const client = createHostedClient({ baseUrl: BASE, apiKey: KEY });
     await expect(
-      client.createSession({ scenarioSource: "x", twins: ["github"] })
+      client.createSession({ taskSource: "x", twins: ["github"] })
     ).rejects.toBeInstanceOf(HostedAuthError);
   });
 
@@ -86,7 +86,7 @@ describe("HostedClient.createSession", () => {
     );
     const client = createHostedClient({ baseUrl: BASE, apiKey: KEY });
     await expect(
-      client.createSession({ scenarioSource: "x", twins: ["github"] })
+      client.createSession({ taskSource: "x", twins: ["github"] })
     ).rejects.toBeInstanceOf(HostedQuotaError);
   });
 
@@ -98,7 +98,7 @@ describe("HostedClient.createSession", () => {
     );
     const client = createHostedClient({ baseUrl: BASE, apiKey: KEY });
     await expect(
-      client.createSession({ scenarioSource: "x", twins: ["github"] })
+      client.createSession({ taskSource: "x", twins: ["github"] })
     ).rejects.toBeInstanceOf(HostedOrchError);
   });
 
@@ -114,7 +114,7 @@ describe("HostedClient.createSession", () => {
     }));
     const client = createHostedClient({ baseUrl: BASE, apiKey: KEY, timeoutMs: 5 });
     await expect(
-      client.createSession({ scenarioSource: "x", twins: ["github"] })
+      client.createSession({ taskSource: "x", twins: ["github"] })
     ).rejects.toBeInstanceOf(HostedOrchError);
   });
 
@@ -140,7 +140,7 @@ describe("HostedClient.createSession", () => {
       repositories: [{ owner: "acme", name: "api", labels: [{ name: "bug" }] }],
     };
     await client.createSession({
-      scenarioSource: "x",
+      taskSource: "x",
       twins: ["github"],
       seed,
     });
@@ -165,7 +165,7 @@ describe("HostedClient.createSession", () => {
       );
     });
     const client = createHostedClient({ baseUrl: BASE, apiKey: KEY });
-    await client.createSession({ scenarioSource: "x", twins: ["github"] });
+    await client.createSession({ taskSource: "x", twins: ["github"] });
     expect("seed" in captured).toBe(false);
   });
 
@@ -188,7 +188,7 @@ describe("HostedClient.createSession", () => {
     });
     const client = createHostedClient({ baseUrl: BASE, apiKey: KEY });
     await client.createSession({
-      scenarioSource: "x",
+      taskSource: "x",
       twins: ["github"],
       agentId: "agt_registered",
     });
@@ -204,7 +204,7 @@ describe("HostedClient.createSession", () => {
     );
     const client = createHostedClient({ baseUrl: BASE, apiKey: KEY });
     await expect(
-      client.createSession({ scenarioSource: "x", twins: ["github"] })
+      client.createSession({ taskSource: "x", twins: ["github"] })
     ).rejects.toBeInstanceOf(HostedOrchError);
   });
 
@@ -217,7 +217,7 @@ describe("HostedClient.createSession", () => {
     );
     const client = createHostedClient({ baseUrl: BASE, apiKey: KEY });
     await expect(
-      client.createSession({ scenarioSource: "x", twins: ["github"] })
+      client.createSession({ taskSource: "x", twins: ["github"] })
     ).rejects.toBeInstanceOf(HostedOrchError);
   });
 });
@@ -299,8 +299,8 @@ describe("HostedClient.submitResult", () => {
     });
     const client = createHostedClient({ baseUrl: BASE, apiKey: KEY });
     const out = await client.submitResult("ses_abc", {
-      scenarioName: "00-default-seed",
-      scenarioHash: "a".repeat(64),
+      taskName: "00-default-seed",
+      taskHash: "a".repeat(64),
       durationMs: 1234,
       agentModel: "unknown",
       satisfactionScore: 100,
@@ -333,8 +333,8 @@ describe("HostedClient.submitResult", () => {
     });
     const client = createHostedClient({ baseUrl: BASE, apiKey: KEY });
     await client.submitResult("ses_abc", {
-      scenarioName: "00-default-seed",
-      scenarioHash: "a".repeat(64),
+      taskName: "00-default-seed",
+      taskHash: "a".repeat(64),
       durationMs: 1234,
       agentModel: "unknown",
       satisfactionScore: 100,
@@ -366,8 +366,8 @@ describe("HostedClient.submitResult", () => {
     });
     const client = createHostedClient({ baseUrl: BASE, apiKey: KEY });
     const input = {
-      scenarioName: "00-default-seed",
-      scenarioHash: "a".repeat(64),
+      taskName: "00-default-seed",
+      taskHash: "a".repeat(64),
       durationMs: 1234,
       agentModel: "unknown",
       satisfactionScore: 100,
@@ -408,9 +408,9 @@ describe("HostedClient.finalize", () => {
     durationMs: 1,
     agentModel: "unknown",
     criteria: [] as { id: string; text: string; kind: "code" | "model" }[],
-    scenarioName: "n",
-    scenarioHash: "",
-    scenarioPrompt: "",
+    taskName: "n",
+    taskHash: "",
+    taskPrompt: "",
     expectedBehavior: "",
   };
 
@@ -460,9 +460,9 @@ describe("HostedClient.finalize", () => {
       criteria: [
         { id: "crit_0", text: "No unsupported endpoint was called", kind: "code" },
       ],
-      scenarioName: "00-default-seed",
-      scenarioHash: "a".repeat(64),
-      scenarioPrompt: "do the thing",
+      taskName: "00-default-seed",
+      taskHash: "a".repeat(64),
+      taskPrompt: "do the thing",
       expectedBehavior: "the thing got done",
       traceStorageKey: "team-tm_x/session-ses_abc/events.jsonl",
     });
@@ -1048,9 +1048,9 @@ describe("HostedClient.finalize", () => {
       durationMs: 1,
       agentModel: "unknown",
       criteria: [],
-      scenarioName: "n",
-      scenarioHash: "",
-      scenarioPrompt: "",
+      taskName: "n",
+      taskHash: "",
+      taskPrompt: "",
       expectedBehavior: "",
     });
     expect("trace_storage_key" in captured).toBe(false);
@@ -1079,9 +1079,9 @@ describe("HostedClient.finalize", () => {
       durationMs: 1,
       agentModel: "unknown",
       criteria: [] as { id: string; text: string; kind: "code" | "model" }[],
-      scenarioName: "n",
-      scenarioHash: "",
-      scenarioPrompt: "",
+      taskName: "n",
+      taskHash: "",
+      taskPrompt: "",
       expectedBehavior: "",
     };
     await client.finalize("ses_abc", { ...base, agentSdk: "  claude-agent-sdk  " });
@@ -1111,9 +1111,9 @@ describe("HostedClient.finalize", () => {
       durationMs: 1,
       agentModel: "unknown",
       criteria: [],
-      scenarioName: "n",
-      scenarioHash: "",
-      scenarioPrompt: "",
+      taskName: "n",
+      taskHash: "",
+      taskPrompt: "",
       expectedBehavior: "",
     });
     expect(out.judge_model).toBeNull();
@@ -1134,9 +1134,9 @@ describe("HostedClient.finalize", () => {
         durationMs: 1,
         agentModel: "unknown",
         criteria: [],
-        scenarioName: "n",
-        scenarioHash: "",
-        scenarioPrompt: "",
+        taskName: "n",
+        taskHash: "",
+        taskPrompt: "",
         expectedBehavior: "",
       }),
     ).rejects.toBeInstanceOf(HostedAuthError);
@@ -1490,9 +1490,9 @@ describe("FDRS-643 live-run regressions", () => {
       agentModel: "unknown",
       agentSdk: null,
       criteria: [],
-      scenarioName: "first-run-demo",
-      scenarioHash: "a".repeat(64),
-      scenarioPrompt: "p",
+      taskName: "first-run-demo",
+      taskHash: "a".repeat(64),
+      taskPrompt: "p",
       expectedBehavior: "e",
       traceStorageKey: "team-tm_x/session-ses_abc/events.jsonl",
     });

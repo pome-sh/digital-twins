@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-405 — E2E test that `runScenario({ noCapture: true })` skips spawning
+// FDRS-405 — E2E test that `runTask({ noCapture: true })` skips spawning
 // the capture-server child and the agent inherits NO HTTP_PROXY. The result
 // must still produce TwinHttpEvent rows (twin traffic is unaffected), but
 // must NOT produce LlmCallEvent rows (no proxy = no CONNECT-tunnel capture).
@@ -15,7 +15,7 @@ import { createServer as createNetServer, type Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { runScenario } from "../../src/runner/runScenario.js";
+import { runTask } from "../../src/runner/runTask.js";
 
 function listenEphemeral(server: ReturnType<typeof createNetServer>): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -28,7 +28,7 @@ function listenEphemeral(server: ReturnType<typeof createNetServer>): Promise<nu
   });
 }
 
-describe("runScenario — noCapture (FDRS-405)", () => {
+describe("runTask — noCapture (FDRS-405)", () => {
   let echoPort = 0;
   let echoCloser: (() => Promise<void>) | null = null;
 
@@ -63,8 +63,8 @@ describe("runScenario — noCapture (FDRS-405)", () => {
     // happened to prove the env was not injected.
     let spawnedPid: number | null = null;
     try {
-      const result = await runScenario({
-        scenarioPath: "scenarios/01-bug-happy-path.md",
+      const result = await runTask({
+        taskPath: "tasks/01-bug-happy-path.md",
         agentCommand: `npx tsx ${probePath}`,
         artifactsDir,
         noCapture: true,

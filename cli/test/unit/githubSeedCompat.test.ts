@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeLegacyGitHubSeed, parseGitHubSeedState } from "../../src/scenario/githubSeedCompat.js";
+import { normalizeLegacyGitHubSeed, parseGitHubSeedState } from "../../src/task/githubSeedCompat.js";
 
 describe("githubSeedCompat", () => {
   it("maps legacy issue assignee to assignees before seedSchema parse", () => {

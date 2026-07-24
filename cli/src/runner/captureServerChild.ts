@@ -149,7 +149,7 @@ function defaultBinArgs(
   return [script, "capture-server", "--port", "0", "--events-out", eventsOut, ...egressArgs(allowHosts, egressOut)];
 }
 
-// Shared by defaultBinArgs and runScenario's test-override path so the two
+// Shared by defaultBinArgs and runTask's test-override path so the two
 // spawn shapes can't drift.
 export function egressArgs(
   allowHosts?: readonly string[],

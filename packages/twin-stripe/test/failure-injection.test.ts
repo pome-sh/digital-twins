@@ -196,7 +196,7 @@ describe("Failure injection — POST /admin/seed + per-request middleware", () =
   });
 
   it("FDRS-316 vertical-slice gate: 14-stripe-refund-retry.md hero bug reproduces (after_handler, attempt 1)", async () => {
-    // This mirrors `cli/scenarios/14-stripe-refund-retry.md` exactly:
+    // This mirrors `cli/tasks/14-stripe-refund-retry.md` exactly:
     // the agent has no Idempotency-Key, the twin's failure-injection middleware
     // fires for attempt 1 in `after_handler` mode → refund row #1 IS persisted
     // but the client sees 402; agent retries without Idempotency-Key → refund

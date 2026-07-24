@@ -3,7 +3,7 @@
 //
 // [DECISION 2026-07-05]: -n is an integer 1..20 on the hosted run path;
 // the default comes from the scenario config's `runs` field (which
-// scenarioConfigSchema already parses, defaulting 1, but nothing consumed
+// taskConfigSchema already parses, defaulting 1, but nothing consumed
 // until now); both are capped at 20.
 
 import { describe, expect, it } from "vitest";

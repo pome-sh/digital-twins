@@ -45,7 +45,7 @@ Prerequisites: [Node.js ≥ 24](https://nodejs.org/). No install, no clone.
 
 ```bash
 npx @pome-sh/cli init                                  # scaffold tasks + example agent
-npx @pome-sh/cli run --local scenarios/01-bug-happy-path.md   # boots a twin, runs it, records a trace
+npx @pome-sh/cli run --local tasks/01-bug-happy-path.md   # boots a twin, runs it, records a trace
 npx @pome-sh/cli inspect latest                        # read the trace back
 ```
 
@@ -65,14 +65,14 @@ against a task's pass/fail criteria is a hosted feature; `pome eval` uploads a
 captured trace for a cloud verdict.
 
 ```bash
-pome run --local scenarios/      # self-hosted: records a raw trace
+pome run --local tasks/      # self-hosted: records a raw trace
 pome eval runs/<task>/<run-id>   # uploads it for a cloud verdict
-pome login && pome run scenarios/  # hosted: records + evaluates in one go
+pome login && pome run tasks/  # hosted: records + evaluates in one go
 ```
 
 The bundled task library includes GitHub, Stripe, Slack, Gmail, and Linear flows —
 several **adversarial** (identity spoofing, prompt injection, merging a backdoored
-PR, fabricating green CI). Browse with `pome scenarios`. Four worked example agents
+PR, fabricating green CI). Browse with `pome tasks`. Four worked example agents
 live under [`examples/`](./examples/).
 
 ## Build your own twin

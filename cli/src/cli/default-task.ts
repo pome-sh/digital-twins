@@ -3,7 +3,7 @@
 // task, closing the demo → run-yours seam (north-star moment 05: their
 // agent, k=5, the same task they just watched the demo agent attempt).
 //
-// The default is a USER-VISIBLE COPY at scenarios/first-run-demo.md, dropped
+// The default is a USER-VISIBLE COPY at tasks/first-run-demo.md, dropped
 // on first use from the packaged demo task (src/demo/first-run-demo.md plus
 // its compiled seed sidecar — the client parser requires the sidecar when a
 // prose ## Seed State section is present). The copy — never the canonical
@@ -25,7 +25,7 @@ import { HostedUsageError } from "../hosted/errors.js";
 /** Design default k for "run yours" (moment 05: "Their agent · k=5"). */
 export const DEFAULT_TASK_TRIALS = 5;
 
-export const DEFAULT_TASK_DIR = "scenarios";
+export const DEFAULT_TASK_DIR = "tasks";
 
 export const DEFAULT_TASK_FILENAME = `${DEMO_TASK_NAME}.md`;
 
@@ -98,7 +98,7 @@ export function withUserCopyComment(source: string): string {
 
 /**
  * Resolve the bare-`pome run` default task, dropping the user copy on first
- * use. Never clobbers an existing scenarios/first-run-demo.md — that file is
+ * use. Never clobbers an existing tasks/first-run-demo.md — that file is
  * the user's (possibly edited) task from a prior bare run.
  */
 export async function ensureDefaultTask(
@@ -136,7 +136,7 @@ export async function ensureDefaultTask(
   // Seed first, md last: the md's presence is the commit point (the parser
   // hard-requires the sidecar once the md's prose ## Seed State is seen), so
   // a crash between the two writes never strands a half-usable default.
-  // COPYFILE_EXCL: NO file under scenarios/ is ever overwritten — a user who
+  // COPYFILE_EXCL: NO file under tasks/ is ever overwritten — a user who
   // deleted only the md but kept an edited seed keeps their seed.
   try {
     await copyFile(

@@ -200,7 +200,7 @@ describe("readEventsJsonl", () => {
 
 describe("computeTraceHealth", () => {
   it("reports ok across all layers when each layer has events", () => {
-    const layers = computeTraceHealth({ events: allEvents, scenarioUsesTwin: true });
+    const layers = computeTraceHealth({ events: allEvents, taskUsesTwin: true });
     expect(layers).toEqual([
       {
         name: "proxy",
@@ -229,8 +229,8 @@ describe("computeTraceHealth", () => {
   it("warns when scenario expects LLM but no LlmCallEvent appears", () => {
     const layers = computeTraceHealth({
       events: [twinHttp],
-      scenarioUsesTwin: true,
-      scenarioExpectsLlm: true,
+      taskUsesTwin: true,
+      taskExpectsLlm: true,
     });
     const proxy = layers.find((l) => l.name === "proxy")!;
     expect(proxy.count).toBe(0);
@@ -240,7 +240,7 @@ describe("computeTraceHealth", () => {
   });
 
   it("does not warn on the proxy layer when scenario does not declare LLM use", () => {
-    const layers = computeTraceHealth({ events: [twinHttp], scenarioUsesTwin: true });
+    const layers = computeTraceHealth({ events: [twinHttp], taskUsesTwin: true });
     const proxy = layers.find((l) => l.name === "proxy")!;
     expect(proxy.count).toBe(0);
     expect(proxy.expectedAtLeast).toBe(0);
@@ -248,17 +248,17 @@ describe("computeTraceHealth", () => {
     expect(proxy.note).toBeNull();
   });
 
-  it("warns on the twin layer when scenarioUsesTwin is true but no twin events", () => {
-    const layers = computeTraceHealth({ events: [llmCall], scenarioUsesTwin: true });
+  it("warns on the twin layer when taskUsesTwin is true but no twin events", () => {
+    const layers = computeTraceHealth({ events: [llmCall], taskUsesTwin: true });
     const twin = layers.find((l) => l.name === "twin")!;
     expect(twin.status).toBe("warning");
   });
 
-  it("warns on the CAS layer when scenarioExpectsCas is true but no adapter events", () => {
+  it("warns on the CAS layer when taskExpectsCas is true but no adapter events", () => {
     const layers = computeTraceHealth({
       events: [twinHttp, llmCall],
-      scenarioUsesTwin: true,
-      scenarioExpectsCas: true,
+      taskUsesTwin: true,
+      taskExpectsCas: true,
     });
     const cas = layers.find((l) => l.name === "CAS adapter")!;
     expect(cas.status).toBe("warning");
@@ -267,7 +267,7 @@ describe("computeTraceHealth", () => {
 
 describe("renderTraceHealth", () => {
   it("formats each layer on its own line", () => {
-    const layers = computeTraceHealth({ events: allEvents, scenarioUsesTwin: true });
+    const layers = computeTraceHealth({ events: allEvents, taskUsesTwin: true });
     const lines = renderTraceHealth(layers);
     expect(lines[0]).toBe("Trace health:");
     expect(lines).toContain("  proxy: 1/expected≥1 [ok]");
@@ -278,8 +278,8 @@ describe("renderTraceHealth", () => {
   it("appends the warning note when the layer is in warning state", () => {
     const layers = computeTraceHealth({
       events: [twinHttp],
-      scenarioUsesTwin: true,
-      scenarioExpectsLlm: true,
+      taskUsesTwin: true,
+      taskExpectsLlm: true,
     });
     const lines = renderTraceHealth(layers);
     expect(lines).toContain(

@@ -140,7 +140,7 @@ async function writeClaudeSdkScaffold(): Promise<ScaffoldResult> {
       "  1. npm install @pome-sh/adapter-claude-sdk @anthropic-ai/claude-agent-sdk zod\n" +
       "  2. pome login\n" +
       "  3. pome register agent <name>\n" +
-      "  4. pome run scenarios/01-bug-happy-path.md\n" +
+      "  4. pome run tasks/01-bug-happy-path.md\n" +
       "\n" +
       "See `pome docs getting-started` for a narrative walkthrough.",
   };

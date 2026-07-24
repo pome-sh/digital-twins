@@ -10,7 +10,7 @@ import {
   writeVerdictArtifact,
 } from "../hosted/evalResultCache.js";
 import { redactEvent, redactSecrets } from "../recorder/redaction.js";
-import { parseScenarioFile } from "../scenario/parseScenario.js";
+import { parseTaskFile } from "../task/parseTask.js";
 import {
   createHostedClient,
   perTwinReturnedByCloud,
@@ -30,12 +30,12 @@ import type {
 } from "../types/shared.js";
 import type { CriterionDefWire } from "../hosted/client.js";
 import type { RecorderEvent as LegacyGithubRecorderEvent } from "@pome-sh/shared-types";
-import type { Scenario } from "../scenario/scenarioSchema.js";
+import type { Task } from "../task/taskSchema.js";
 import type { Score } from "../hosted/evalResultView.js";
 import type { RunArtifacts } from "../recorder/artifacts.js";
 
-export interface RunScenarioHostedOptions {
-  scenarioPath: string;
+export interface RunTaskHostedOptions {
+  taskPath: string;
   agentCommand: string;
   artifactsDir?: string;
   hosted: { baseUrl: string; apiKey: string };
@@ -66,8 +66,8 @@ export interface RunScenarioHostedOptions {
   groupId?: string;
 }
 
-export interface RunScenarioHostedResult {
-  scenario: Scenario;
+export interface RunTaskHostedResult {
+  scenario: Task;
   runId: string; // local artifacts dir id (= session_id)
   cloudRunId: string;
   cloudDashboardUrl: string;
@@ -202,12 +202,12 @@ export function buildAgentEnv(params: {
   return env;
 }
 
-export async function runScenarioHosted(
-  options: RunScenarioHostedOptions
-): Promise<RunScenarioHostedResult> {
-  const scenario = await parseScenarioFile(options.scenarioPath);
-  const scenarioSource = await readFile(options.scenarioPath, "utf8");
-  const scenarioHash = createHash("sha256").update(scenarioSource).digest("hex");
+export async function runTaskHosted(
+  options: RunTaskHostedOptions
+): Promise<RunTaskHostedResult> {
+  const scenario = await parseTaskFile(options.taskPath);
+  const taskSource = await readFile(options.taskPath, "utf8");
+  const taskHash = createHash("sha256").update(taskSource).digest("hex");
   const artifactsDir = options.artifactsDir ?? "runs";
   const startedAt = new Date().toISOString();
 
@@ -221,7 +221,7 @@ export async function runScenarioHosted(
   // `agent_version` stamps the session; `--agent-version` overrides it. All are
   // optional during rollout — a manifest-less repo runs unattributed.
   const identity = await resolveRunAgentIdentity({
-    startDir: dirname(options.scenarioPath),
+    startDir: dirname(options.taskPath),
     apiBaseUrl: options.hosted.baseUrl,
     agentVersionOverride: options.agentVersion,
   });
@@ -242,14 +242,14 @@ export async function runScenarioHosted(
   // groups mint all k sessions upfront (one shared group_id) and pass each
   // one in as `premintedSession`; the single-run path mints its own here.
   // Forward the resolved seed (sidecar -> inline JSON -> twin defaults, in that
-  // precedence; see parseScenario.resolveSeedState) so the cloud doesn't need
+  // precedence; see parseTask.resolveSeedState) so the cloud doesn't need
   // to re-extract it from the markdown. Prose `## Seed State` sections have no
   // fenced JSON to extract — cloud would 422 with "no fenced code block".
   const session = await createSessionOrExplain(
     client,
     options.premintedSession,
     {
-      scenarioSource,
+      taskSource,
       twins: scenario.config.twins,
       agentId,
       agentVersion,
@@ -602,9 +602,9 @@ export async function runScenarioHosted(
       agentModel: options.agentModel ?? "unknown",
       agentSdk,
       criteria: criteriaDefs,
-      scenarioName: scenario.slug,
-      scenarioHash,
-      scenarioPrompt: scenario.prompt,
+      taskName: scenario.slug,
+      taskHash,
+      taskPrompt: scenario.prompt,
       expectedBehavior: scenario.expectedBehavior,
       // Explicit overrides when uploads succeeded; otherwise let cloud fall
       // back. For events.jsonl the conventional `team-<>/session-<>/events.jsonl`
@@ -660,7 +660,7 @@ export async function runScenarioHosted(
         version: VERDICT_ARTIFACT_VERSION,
         source: "cloud-finalize",
         task_name: scenario.slug,
-        scenario_path: options.scenarioPath,
+        scenario_path: options.taskPath,
         group_id: options.groupId ?? null,
         session_id: session.session_id,
         cloud_run_id: finalized.run_id,
@@ -718,7 +718,7 @@ async function createSessionOrExplain(
   client: HostedClient,
   preminted: CreateSessionResponse | undefined,
   input: {
-    scenarioSource: string;
+    taskSource: string;
     twins: string[];
     agentId?: string;
     agentVersion?: string;

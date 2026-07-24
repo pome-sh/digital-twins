@@ -6,7 +6,7 @@
 //   2. Mint ALL k demo sessions upfront (POST /v1/demo/sessions, one shared
 //      grp_ id) — each 15-min TTL comfortably covers the run.
 //   3. Per trial: run the bundled agent through the REAL capture path
-//      (runScenario: in-process twin + capture-server child + POME_* env),
+//      (runTask: in-process twin + capture-server child + POME_* env),
 //      upload the captured blobs with the trial's demo_token as Bearer, then
 //      POST /finalize (explicit 60s timeout) — the terminal verdict comes
 //      from that cloud evaluation. The CLI never scores locally.
@@ -24,9 +24,9 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { getAvailablePort } from "../runner/ports.js";
-import { runScenario, type RunScenarioOptions } from "../runner/runScenario.js";
+import { runTask, type RunTaskOptions } from "../runner/runTask.js";
 import { bootTwin } from "../twin/twinHarness.js";
-import { parseScenarioFile } from "../scenario/parseScenario.js";
+import { parseTaskFile } from "../task/parseTask.js";
 import { createHostedClient, type HostedClient } from "../hosted/client.js";
 import {
   scoreFromFinalizeResponse,
@@ -79,8 +79,8 @@ export interface RunDemoOptions {
   // ── test seams ─────────────────────────────────────────────────────────
   /** Agent command override. Default re-invokes this binary: `<node> <main.js> demo-agent`. */
   agentCommand?: string;
-  captureServerCommand?: RunScenarioOptions["captureServerCommand"];
-  runScenarioFn?: typeof runScenario;
+  captureServerCommand?: RunTaskOptions["captureServerCommand"];
+  runTaskFn?: typeof runTask;
   mintFn?: typeof mintDemoSessions;
   /** Per-session upload/finalize client factory (bearer demo_token). */
   trialClientFactory?: (session: DemoSession) => DemoTrialClient;
@@ -98,7 +98,7 @@ export async function runDemo(options: RunDemoOptions): Promise<RunDemoResult> {
   const out = options.out ?? ((line: string) => console.error(line));
   const trials = options.trials ?? 5;
   const artifactsDir = options.artifactsDir ?? "runs";
-  const runScenarioFn = options.runScenarioFn ?? runScenario;
+  const runTaskFn = options.runTaskFn ?? runTask;
   const mintFn = options.mintFn ?? mintDemoSessions;
   const trialClientFactory =
     options.trialClientFactory ??
@@ -112,7 +112,7 @@ export async function runDemo(options: RunDemoOptions): Promise<RunDemoResult> {
       }));
 
   const groupId = newGroupId();
-  const scenarioPath = demoTaskPath();
+  const taskPath = demoTaskPath();
 
   for (const line of reassuranceBox()) out(line);
   out("");
@@ -141,9 +141,9 @@ export async function runDemo(options: RunDemoOptions): Promise<RunDemoResult> {
 
   // Warm-up boot: validates the packaged seed and gives the design's
   // "spinning up github twin … ready" line an honest measurement. Each trial
-  // then boots its own isolated twin inside runScenario.
+  // then boots its own isolated twin inside runTask.
   if (options.skipTwinWarmup !== true) {
-    const scenario = await parseScenarioFile(scenarioPath);
+    const scenario = await parseTaskFile(taskPath);
     const warmupStart = Date.now();
     const port = await getAvailablePort();
     const harness = await bootTwin({
@@ -181,11 +181,11 @@ export async function runDemo(options: RunDemoOptions): Promise<RunDemoResult> {
       verdict = await runOneTrial({
         trialNumber,
         session,
-        scenarioPath,
+        taskPath,
         agentCommand,
         artifactsDir,
         apiBase: options.apiBase,
-        runScenarioFn,
+        runTaskFn,
         client,
         captureServerCommand: options.captureServerCommand,
         out,
@@ -255,13 +255,13 @@ export async function runDemo(options: RunDemoOptions): Promise<RunDemoResult> {
 interface RunOneTrialInput {
   trialNumber: number;
   session: DemoSession;
-  scenarioPath: string;
+  taskPath: string;
   agentCommand: string;
   artifactsDir: string;
   apiBase: string;
-  runScenarioFn: typeof runScenario;
+  runTaskFn: typeof runTask;
   client: DemoTrialClient;
-  captureServerCommand?: RunScenarioOptions["captureServerCommand"];
+  captureServerCommand?: RunTaskOptions["captureServerCommand"];
   out: (line: string) => void;
   collectedFailures: string[];
   /** F-710 — set once finalize succeeds, so the caller's error handling
@@ -271,8 +271,8 @@ interface RunOneTrialInput {
 
 async function runOneTrial(input: RunOneTrialInput): Promise<TrialVerdict> {
   const startedAt = Date.now();
-  const result = await input.runScenarioFn({
-    scenarioPath: input.scenarioPath,
+  const result = await input.runTaskFn({
+    taskPath: input.taskPath,
     agentCommand: input.agentCommand,
     artifactsDir: input.artifactsDir,
     captureServerCommand: input.captureServerCommand,
@@ -332,9 +332,9 @@ async function runOneTrial(input: RunOneTrialInput): Promise<TrialVerdict> {
     agentModel: "demo-gateway",
     agentSdk: null,
     criteria: [],
-    scenarioName: DEMO_TASK_NAME,
-    scenarioHash: "",
-    scenarioPrompt: "",
+    taskName: DEMO_TASK_NAME,
+    taskHash: "",
+    taskPrompt: "",
     expectedBehavior: "",
     traceStorageKey: uploaded.eventsKey ?? undefined,
     stateInitialStorageKey: uploaded.stateInitialKey ?? undefined,

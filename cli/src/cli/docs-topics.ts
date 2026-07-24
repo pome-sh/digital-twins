@@ -129,8 +129,10 @@ export const DOCS_TOPICS: DocsTopic[] = [
     keywords: ["session", "hosted", "sandbox", "twin"],
   },
   {
-    id: "cli-scenarios",
-    title: "pome scenarios",
+    id: "cli-tasks",
+    title: "pome tasks",
+    // F-892 — `path` still points at /docs/cli/scenarios: the docs.pome.sh page
+    // is renamed by the M4 docs door, not here. Repoint once that lands.
     path: "/docs/cli/scenarios",
     keywords: ["tasks", "scenarios", "catalog", "copy", "library", "twin"],
   },

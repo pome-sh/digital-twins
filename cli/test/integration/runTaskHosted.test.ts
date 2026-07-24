@@ -7,7 +7,7 @@ import { serve, type ServerType } from "@hono/node-server";
 import { Hono } from "hono";
 import { sign as signJwt } from "hono/jwt";
 import type { Context } from "hono";
-import { runScenarioHosted } from "../../src/runner/runScenarioHosted.js";
+import { runTaskHosted } from "../../src/runner/runTaskHosted.js";
 
 // Blob uploads are gzip-encoded (content-encoding: gzip) so the storage-edge
 // WAF content rule never sees the raw twin-state text. The fake cloud stores
@@ -126,14 +126,14 @@ async function startFakeCloud(opts?: { finalizeScore?: number }) {
 }
 
 // Note (deviation from plan): the plan's literal scenario fixture
-// "# Trivial\n\nPretend prompt.\n\n[code] true\n" is not parseable by parseScenario
+// "# Trivial\n\nPretend prompt.\n\n[code] true\n" is not parseable by parseTask
 // (which requires a `## Prompt` and `## Success Criteria` section, plus a non-trivial
 // criterion the deterministic evaluator can match). We use an equivalent fixture
 // that produces the same satisfaction_score=100 result.
 const TRIVIAL_PASSING_SCENARIO =
   "# Trivial\n\n## Prompt\nPretend prompt.\n\n## Success Criteria\n- [code] No unsupported endpoint was called\n";
 
-describe("runScenarioHosted happy path", () => {
+describe("runTaskHosted happy path", () => {
   let tmp: string;
   let getFinalize: () => unknown;
   let getChatCompletionCalls: () => number;
@@ -153,12 +153,12 @@ describe("runScenarioHosted happy path", () => {
   });
 
   it("POSTs criteria definitions to /finalize and returns the cloud-judged score", async () => {
-    const scenarioPath = join(tmp, "scn.md");
-    await writeFile(scenarioPath, TRIVIAL_PASSING_SCENARIO, "utf8");
+    const taskPath = join(tmp, "scn.md");
+    await writeFile(taskPath, TRIVIAL_PASSING_SCENARIO, "utf8");
     const stubAgent = `node -e ${JSON.stringify("console.log('done')")}`;
 
-    const result = await runScenarioHosted({
-      scenarioPath,
+    const result = await runTaskHosted({
+      taskPath,
       agentCommand: stubAgent,
       artifactsDir: join(tmp, "runs"),
       hosted: {
@@ -198,16 +198,16 @@ describe("runScenarioHosted happy path", () => {
   // authoritatively. Even when legacy LLM env vars are present, the CLI must
   // not POST to /v1/chat/completions during a hosted run.
   it("does not call a local LLM judge in hosted mode even when env vars are set", async () => {
-    const scenarioPath = join(tmp, "scn.md");
-    await writeFile(scenarioPath, TRIVIAL_PASSING_SCENARIO, "utf8");
+    const taskPath = join(tmp, "scn.md");
+    await writeFile(taskPath, TRIVIAL_PASSING_SCENARIO, "utf8");
     const stubAgent = `node -e ${JSON.stringify("console.log('done')")}`;
 
     process.env.POME_LLM_BASE_URL = `http://127.0.0.1:${cloudPort}/v1`;
     process.env.POME_LLM_API_KEY = "test-key";
     process.env.POME_LLM_MODEL = "test-model";
     try {
-      await runScenarioHosted({
-        scenarioPath,
+      await runTaskHosted({
+        taskPath,
         agentCommand: stubAgent,
         artifactsDir: join(tmp, "runs"),
         hosted: {
@@ -225,12 +225,12 @@ describe("runScenarioHosted happy path", () => {
   });
 
   it("hosted PASS holds even without any local LLM key (regression: stale local-eval score)", async () => {
-    const scenarioPath = join(tmp, "scn.md");
+    const taskPath = join(tmp, "scn.md");
     // Probabilistic criterion — pre-fix path would skip it locally without
     // an LLM key, pulling local satisfaction below the threshold and printing
     // FAIL despite cloud judging PASS. Post-fix: local evaluator never runs.
     await writeFile(
-      scenarioPath,
+      taskPath,
       "# P-only\n\n## Prompt\np\n\n## Success Criteria\n- [model] Agent did something reasonable\n",
       "utf8",
     );
@@ -243,8 +243,8 @@ describe("runScenarioHosted happy path", () => {
     delete process.env.ANTHROPIC_API_KEY;
     delete process.env.POME_LLM_API_KEY;
     try {
-      const result = await runScenarioHosted({
-        scenarioPath,
+      const result = await runTaskHosted({
+        taskPath,
         agentCommand: `node -e ${JSON.stringify("console.log('done')")}`,
         artifactsDir: join(tmp, "runs"),
         hosted: {
@@ -262,7 +262,7 @@ describe("runScenarioHosted happy path", () => {
   });
 });
 
-describe("runScenarioHosted with upload route stubbed", () => {
+describe("runTaskHosted with upload route stubbed", () => {
   // Separate describe with its own minimal fake server that includes both the
   // upload-url endpoint and a fake PUT target. This proves the end-to-end wire
   // format (FDRS-357 happy path).
@@ -399,12 +399,12 @@ describe("runScenarioHosted with upload route stubbed", () => {
     });
 
     uploadTmp = await mkdtemp(join(tmpdir(), "pome-hosted-upload-"));
-    const scenarioPath = join(uploadTmp, "scn.md");
-    await writeFile(scenarioPath, TRIVIAL_PASSING_SCENARIO, "utf8");
+    const taskPath = join(uploadTmp, "scn.md");
+    await writeFile(taskPath, TRIVIAL_PASSING_SCENARIO, "utf8");
     const stubAgent = `node -e ${JSON.stringify("console.log('done')")}`;
 
-    const result = await runScenarioHosted({
-      scenarioPath,
+    const result = await runTaskHosted({
+      taskPath,
       agentCommand: stubAgent,
       artifactsDir: join(uploadTmp, "runs"),
       hosted: {
@@ -454,7 +454,7 @@ describe("runScenarioHosted with upload route stubbed", () => {
   });
 });
 
-describe("runScenarioHosted failure paths", () => {
+describe("runTaskHosted failure paths", () => {
   // Each test starts a fresh fake cloud configured for one specific failure.
   let failTmp: string | undefined;
   afterEach(async () => {
@@ -477,12 +477,12 @@ describe("runScenarioHosted failure paths", () => {
       cloudServer = s;
     });
     failTmp = await mkdtemp(join(tmpdir(), "pome-hosted-"));
-    const scenarioPath = join(failTmp, "scn.md");
-    await writeFile(scenarioPath, TRIVIAL_PASSING_SCENARIO, "utf8");
+    const taskPath = join(failTmp, "scn.md");
+    await writeFile(taskPath, TRIVIAL_PASSING_SCENARIO, "utf8");
 
     await expect(
-      runScenarioHosted({
-        scenarioPath,
+      runTaskHosted({
+        taskPath,
         agentCommand: "true",
         artifactsDir: join(failTmp, "runs"),
         hosted: { baseUrl: `http://127.0.0.1:${port}`, apiKey: "pme_bad" },
@@ -542,17 +542,17 @@ describe("runScenarioHosted failure paths", () => {
       cloudServer = serve({ fetch: app.fetch, port: 0, hostname: "127.0.0.1" }, (info) => res(info.port));
     });
     failTmp = await mkdtemp(join(tmpdir(), "pome-hosted-"));
-    const scenarioPath = join(failTmp, "scn.md");
+    const taskPath = join(failTmp, "scn.md");
     // timeout = 1s but agent sleeps 5s
     await writeFile(
-      scenarioPath,
+      taskPath,
       "# Slow\n\n## Prompt\nPretend prompt.\n\n## Success Criteria\n- [code] No unsupported endpoint was called\n\n## Config\n```yaml\ntimeout: 1\n```\n",
       "utf8"
     );
     const sleepingAgent = `node -e ${JSON.stringify("setTimeout(() => {}, 5000)")}`;
 
-    const result = await runScenarioHosted({
-      scenarioPath,
+    const result = await runTaskHosted({
+      taskPath,
       agentCommand: sleepingAgent,
       artifactsDir: join(failTmp, "runs"),
       hosted: { baseUrl: `http://127.0.0.1:${cloudPort}`, apiKey: "pme_test" },
@@ -572,7 +572,7 @@ describe("runScenarioHosted failure paths", () => {
 });
 
 // ── Multi-twin (M3): env fan-out, per-twin state capture/upload, finalize ──
-describe("runScenarioHosted multi-twin (github + slack)", () => {
+describe("runTaskHosted multi-twin (github + slack)", () => {
   let mtServer: ServerType | undefined;
   let mtPort = 0;
   let mtTmp: string | undefined;
@@ -765,15 +765,15 @@ describe("runScenarioHosted multi-twin (github + slack)", () => {
     });
 
     mtTmp = await mkdtemp(join(tmpdir(), "pome-hosted-mt-"));
-    const scenarioPath = join(mtTmp, "scn.md");
-    await writeFile(scenarioPath, MULTI_SCENARIO, "utf8");
+    const taskPath = join(mtTmp, "scn.md");
+    await writeFile(taskPath, MULTI_SCENARIO, "utf8");
     const envFile = join(mtTmp, "agent-env.json");
     const agentScript = `require('fs').writeFileSync(${JSON.stringify(envFile)}, JSON.stringify({gh:process.env.POME_GITHUB_REST_URL, ghm:process.env.POME_GITHUB_MCP_URL, ght:process.env.POME_GITHUB_TOKEN, sl:process.env.POME_SLACK_REST_URL, slm:process.env.POME_SLACK_MCP_URL, slt:process.env.POME_SLACK_TOKEN, names:process.env.POME_TWIN_NAMES}))`;
     const stubAgent = `node -e ${JSON.stringify(agentScript)}`;
 
     const artifactsDir = join(mtTmp, "runs");
-    const result = await runScenarioHosted({
-      scenarioPath,
+    const result = await runTaskHosted({
+      taskPath,
       agentCommand: stubAgent,
       artifactsDir,
       hosted: { baseUrl: `http://127.0.0.1:${mtPort}`, apiKey: "pme_test" },
@@ -837,12 +837,12 @@ describe("runScenarioHosted multi-twin (github + slack)", () => {
       mtServer = serve({ fetch: app.fetch, port: 0, hostname: "127.0.0.1" }, (info) => res(info.port));
     });
     mtTmp = await mkdtemp(join(tmpdir(), "pome-hosted-mt-"));
-    const scenarioPath = join(mtTmp, "scn.md");
-    await writeFile(scenarioPath, MULTI_SCENARIO, "utf8");
+    const taskPath = join(mtTmp, "scn.md");
+    await writeFile(taskPath, MULTI_SCENARIO, "utf8");
 
     await expect(
-      runScenarioHosted({
-        scenarioPath,
+      runTaskHosted({
+        taskPath,
         agentCommand: "true",
         artifactsDir: join(mtTmp, "runs"),
         hosted: { baseUrl: `http://127.0.0.1:${mtPort}`, apiKey: "pme_test" },
@@ -855,7 +855,7 @@ describe("runScenarioHosted multi-twin (github + slack)", () => {
 //    NO `per_twin` — the agent env must stay byte-identical to origin/main.
 //    The schema synthesizes a per_twin entry; the runner must NOT leak its
 //    synthesized mcp_url and must keep injecting the github + stripe vars.
-describe("runScenarioHosted single-twin old-cloud (no per_twin) env parity", () => {
+describe("runTaskHosted single-twin old-cloud (no per_twin) env parity", () => {
   let ocServer: ServerType | undefined;
   let ocPort = 0;
   let ocTmp: string | undefined;
@@ -912,14 +912,14 @@ describe("runScenarioHosted single-twin old-cloud (no per_twin) env parity", () 
     });
 
     ocTmp = await mkdtemp(join(tmpdir(), "pome-hosted-oc-"));
-    const scenarioPath = join(ocTmp, "scn.md");
-    await writeFile(scenarioPath, SINGLE_SCENARIO, "utf8");
+    const taskPath = join(ocTmp, "scn.md");
+    await writeFile(taskPath, SINGLE_SCENARIO, "utf8");
     const envFile = join(ocTmp, "agent-env.json");
     const agentScript = `require('fs').writeFileSync(${JSON.stringify(envFile)}, JSON.stringify({ghr:process.env.POME_GITHUB_REST_URL, ghm:process.env.POME_GITHUB_MCP_URL, ght:process.env.POME_GITHUB_TOKEN, sb:process.env.POME_STRIPE_API_BASE, sk:process.env.POME_STRIPE_API_KEY, base:process.env.POME_TWIN_BASE_URL, auth:process.env.POME_AUTH_TOKEN}))`;
     const stubAgent = `node -e ${JSON.stringify(agentScript)}`;
 
-    const result = await runScenarioHosted({
-      scenarioPath,
+    const result = await runTaskHosted({
+      taskPath,
       agentCommand: stubAgent,
       artifactsDir: join(ocTmp, "runs"),
       hosted: { baseUrl: `http://127.0.0.1:${ocPort}`, apiKey: "pme_test" },

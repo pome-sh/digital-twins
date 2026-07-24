@@ -12,7 +12,7 @@ import { z } from "zod";
 
 export { criterionSchema };
 
-export const scenarioConfigSchema = z.object({
+export const taskConfigSchema = z.object({
   twins: z.array(z.string()).default(["github"]),
   timeout: z.number().int().positive().default(60),
   runs: z.number().int().positive().default(1),
@@ -78,7 +78,7 @@ export const slackSeedStateSchema = z
 // Slack scenarios use the Slack seed shape (`{ users, channels, ... }`).
 // Multi-twin scenarios are not a current requirement; the wrapped
 // `{ <twin>: { seed: ... } }` form was rejected here to keep one canonical
-// shape that twin parsers already speak natively. parseScenario disambiguates
+// shape that twin parsers already speak natively. parseTask disambiguates
 // the union by `config.twins`.
 //
 // Slack arm is FIRST because it is the only `.strict()` arm: a GitHub/Stripe
@@ -96,19 +96,19 @@ export const seedStateSchema = z.union([
 // ONLY for scenarios whose `config.twins` has >1 entry (the envelope-iff-multi-twin
 // rule, decided from `twins` alone — never by sniffing the seed shape). Each value
 // is one twin's flat seed, the same shapes `seedStateSchema` unions. Single-twin
-// scenarios keep the flat shape byte-identical. parseScenario builds and validates
+// scenarios keep the flat shape byte-identical. parseTask builds and validates
 // the envelope value-by-value with each twin's own schema; this record is the outer
-// shape scenarioSchema re-validates against.
+// shape taskSchema re-validates against.
 export const seedEnvelopeSchema = z.record(z.string(), seedStateSchema);
 
-export const scenarioSchema = z.object({
+export const taskSchema = z.object({
   slug: z.string().min(1),
   title: z.string().min(1),
   setup: z.string().default(""),
   prompt: z.string().min(1),
   expectedBehavior: z.string().default(""),
   criteria: z.array(criterionSchema).min(1),
-  config: scenarioConfigSchema,
+  config: taskConfigSchema,
   // Flat single-twin seed OR the multi-twin per-twin envelope. Flat is tried
   // first so single-twin seeds match their strict arms; the envelope only
   // matches when the flat union can't (its keys are twin ids, not seed fields).
@@ -116,7 +116,7 @@ export const scenarioSchema = z.object({
 });
 
 export type Criterion = z.infer<typeof criterionSchema>;
-export type ScenarioConfig = z.infer<typeof scenarioConfigSchema>;
+export type TaskConfig = z.infer<typeof taskConfigSchema>;
 export type GithubSeedState = z.infer<typeof githubSeedStateSchema>;
 export type StripeSeedState = z.infer<typeof stripeSeedStateSchema>;
 export type SlackSeedState = z.infer<typeof slackSeedStateSchema>;
@@ -125,4 +125,4 @@ export type LinearSeedState = z.infer<typeof linearSeedStateSchema>;
 export type StripeFailureInjectionRule = z.infer<typeof stripeFailureInjectionRuleSchema>;
 export type SeedState = z.infer<typeof seedStateSchema>;
 export type SeedEnvelope = z.infer<typeof seedEnvelopeSchema>;
-export type Scenario = z.infer<typeof scenarioSchema>;
+export type Task = z.infer<typeof taskSchema>;

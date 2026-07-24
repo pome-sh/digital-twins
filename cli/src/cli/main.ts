@@ -16,8 +16,8 @@ import {
   renderEvents,
   renderTraceHealth,
 } from "../recorder/inspect.js";
-import { runScenario } from "../runner/runScenario.js";
-import { runScenarioHosted } from "../runner/runScenarioHosted.js";
+import { runTask } from "../runner/runTask.js";
+import { runTaskHosted } from "../runner/runTaskHosted.js";
 import { effectiveTrialCount, parseTrialsFlag } from "../runner/trialCount.js";
 import { runScoreLine, scoreStatus } from "../hosted/evalResultView.js";
 import { HostedUsageError, exitCodeFor } from "../hosted/errors.js";
@@ -25,7 +25,7 @@ import { resolveCredentials, clearLocalCredentials } from "./credentials.js";
 import { loginWithClerk } from "./login.js";
 import { runDocsCommand } from "./docs.js";
 import { runCompileSeeds } from "./compile-seeds.js";
-import { runScenariosCommand } from "./scenarios.js";
+import { runTasksCommand } from "./tasks.js";
 import { runEvalCommand } from "./eval.js";
 import {
   copyAnnounceLine,
@@ -36,8 +36,8 @@ import {
 } from "./default-task.js";
 import {
   findTwin,
-  runnableScenarios,
-} from "./scenarios-catalog.js";
+  runnableTasks,
+} from "./tasks-catalog.js";
 import {
   friendlyHostedError,
   runSessionCreate,
@@ -71,8 +71,8 @@ import {
   discoverRunSet,
   loadTrialEvents,
 } from "../hosted/evalResultCache.js";
-import type { Scenario } from "../scenario/scenarioSchema.js";
-import { parseScenarioFile } from "../scenario/parseScenario.js";
+import type { Task } from "../task/taskSchema.js";
+import { parseTaskFile } from "../task/parseTask.js";
 import type { RecorderEvent } from "../types/shared.js";
 
 const PACKAGE_VERSION = readPackageVersion();
@@ -137,7 +137,7 @@ export function createProgram() {
         return;
       }
 
-      await mkdir("scenarios", { recursive: true });
+      await mkdir("tasks", { recursive: true });
       await mkdir("examples/agents", { recursive: true });
       await mkdir("runs", { recursive: true });
       await copyStarterFiles();
@@ -149,11 +149,11 @@ export function createProgram() {
         "Next steps:\n" +
         "  1. pome login                    # one-time, opens the dashboard to sign in\n" +
         "  2. pome register agent <name>    # scopes runs to this project (writes agent.slug to pome.json)\n" +
-        "  3. pome run scenarios/01-bug-happy-path.md\n" +
+        "  3. pome run tasks/01-bug-happy-path.md\n" +
         "\n" +
         "Optional follow-ups:\n" +
         "  - pome init --sdk claude         # scaffold a Claude Agent SDK starter\n" +
-        "  - pome scenarios stripe --copy   # add Stripe payment tasks when needed\n" +
+        "  - pome tasks stripe --copy       # add Stripe payment tasks when needed\n" +
         "\n" +
         "See `pome docs getting-started` for a narrative walkthrough.";
 
@@ -267,45 +267,59 @@ export function createProgram() {
       await runDocsCommand(topic, { site: opts.site, urlOnly: Boolean(opts.url) });
     });
 
-  program
-    .command("scenarios")
-    .argument(
-      "[twin]",
-      "Twin id (e.g. github). Omit to list available twins.",
-    )
-    .option(
-      "--copy",
-      "Copy the twin's runnable tasks into the local project.",
-      false,
-    )
-    .option(
-      "--force",
-      "With --copy, overwrite existing files in the destination.",
-      false,
-    )
-    .option(
-      "--dest <dir>",
-      "With --copy, write into this directory instead of ./scenarios/.",
-    )
-    .description(
-      "Browse the bundled task library (or copy a twin's tasks into the local project)",
-    )
-    .action(
-      async (
-        twin: string | undefined,
-        opts: { copy: boolean; force: boolean; dest?: string },
-      ) => {
-        await runScenariosCommand(twin, {
-          copy: opts.copy,
-          force: opts.force,
-          dest: opts.dest,
-        });
-      },
-    );
+  const registerTasksCommand = (name: string, hidden: boolean) => {
+    const cmd = program
+      .command(name, { hidden })
+      .argument(
+        "[twin]",
+        "Twin id (e.g. github). Omit to list available twins.",
+      )
+      .option(
+        "--copy",
+        "Copy the twin's runnable tasks into the local project.",
+        false,
+      )
+      .option(
+        "--force",
+        "With --copy, overwrite existing files in the destination.",
+        false,
+      )
+      .option(
+        "--dest <dir>",
+        "With --copy, write into this directory instead of ./tasks/.",
+      )
+      .description(
+        "Browse the bundled task library (or copy a twin's tasks into the local project)",
+      )
+      .action(
+        async (
+          twin: string | undefined,
+          opts: { copy: boolean; force: boolean; dest?: string },
+        ) => {
+          // F-892 — `pome scenarios` was renamed to `pome tasks`. The old name
+          // stays as a hidden, still-working alias with a one-line pointer so
+          // existing muscle memory / scripts don't break; help only shows
+          // `pome tasks`.
+          if (hidden) {
+            console.error(
+              "`pome scenarios` was renamed to `pome tasks` — running it for you. Update your scripts; the old name will be removed in a future release.",
+            );
+          }
+          await runTasksCommand(twin, {
+            copy: opts.copy,
+            force: opts.force,
+            dest: opts.dest,
+          });
+        },
+      );
+    return cmd;
+  };
+  registerTasksCommand("tasks", false);
+  registerTasksCommand("scenarios", true);
 
   program
     .command("compile-seeds")
-    .argument("[target]", "Task .md file or directory (defaults to ./scenarios)")
+    .argument("[target]", "Task .md file or directory (defaults to ./tasks)")
     .option("--force", "Recompile even if the sidecar's source hash matches", false)
     .option(
       "--hosted",
@@ -501,7 +515,7 @@ export function createProgram() {
     .command("run")
     .argument(
       "[path]",
-      'Task markdown file or directory. Omit to run the demo task ("that was ours, run yours"): scenarios/first-run-demo.md is dropped into your project on first use with runs: 5 pinned.',
+      'Task markdown file or directory. Omit to run the demo task ("that was ours, run yours"): tasks/first-run-demo.md is dropped into your project on first use with runs: 5 pinned.',
     )
     .option("--agent <command>", "Agent command to run")
     .option(
@@ -537,7 +551,7 @@ export function createProgram() {
       "Self-host: run against an in-process twin and CAPTURE a raw trace only (an audit log — no score, no verdict, no judge). A verdict comes from the cloud: run `pome eval <run-dir>` on the captured trace, or `pome login` and run against Pome cloud.",
     )
     .description(
-      'Run one or more Pome tasks. With no path, runs the demo task (scenarios/first-run-demo.md, copied into your project on first use — "that was ours, run yours"). Refuses to start if the doctor wiring checks fail (see `pome doctor`); there is no --force.',
+      'Run one or more Pome tasks. With no path, runs the demo task (tasks/first-run-demo.md, copied into your project on first use — "that was ours, run yours"). Refuses to start if the doctor wiring checks fail (see `pome doctor`); there is no --force.',
     )
     .action(
       async (
@@ -577,7 +591,7 @@ export function createProgram() {
         }
 
         // FDRS-645 — "run yours": bare `pome run` defaults to the demo task
-        // via a user-visible copy (scenarios/first-run-demo.md, dropped on
+        // via a user-visible copy (tasks/first-run-demo.md, dropped on
         // first use; its Config pins runs: 5 so an explicit -n still wins).
         // The moment-05 frame prints later, once the doctor + credential
         // gates have passed.
@@ -598,7 +612,7 @@ export function createProgram() {
         let files: string[];
         let hostedCreds: { apiBaseUrl: string; apiKey: string } | null;
         try {
-          files = await scenarioFiles(target);
+          files = await taskFiles(target);
         } catch (err) {
           const code = exitCodeFor(err);
           console.error(err instanceof Error ? err.message : String(err));
@@ -694,10 +708,10 @@ export function createProgram() {
               // config's `runs` field (both capped at 20). k>1 takes the
               // trial-group path; k=1 stays EXACTLY the single-run path
               // below (no group is ever stamped for it).
-              const scenarioForRuns = await parseScenarioFile(file);
+              const taskForRuns = await parseTaskFile(file);
               const k = effectiveTrialCount(
                 trialsFlag,
-                scenarioForRuns.config.runs,
+                taskForRuns.config.runs,
               );
               if (k > 1) {
                 const { runTrialGroup } = await import(
@@ -717,7 +731,7 @@ export function createProgram() {
                         : file
                     } -n ${k}`;
                 const groupResult = await runTrialGroup({
-                  scenarioPath: file,
+                  taskPath: file,
                   agentCommand,
                   agentCommandSource: options.agent
                     ? "--agent"
@@ -742,8 +756,8 @@ export function createProgram() {
                 continue;
               }
 
-              const result = await runScenarioHosted({
-                scenarioPath: file,
+              const result = await runTaskHosted({
+                taskPath: file,
                 agentCommand,
                 artifactsDir: options.artifactsDir,
                 hosted: { baseUrl: hostedCreds.apiBaseUrl, apiKey: hostedCreds.apiKey },
@@ -772,8 +786,8 @@ export function createProgram() {
             // no score, no verdict, no judge. Let exceptions (file-not-found,
             // parse errors, agent failures) propagate to Commander's top-level
             // handler.
-            const result = await runScenario({
-              scenarioPath: file,
+            const result = await runTask({
+              taskPath: file,
               agentCommand,
               artifactsDir: options.artifactsDir,
               // Commander negates --no-* flags: `--no-capture` → `capture: false`.
@@ -848,7 +862,7 @@ export function createProgram() {
 
   // Hidden: the bundled demo agent `pome demo` spawns as its trial child
   // through the real capture path (FDRS-643). Reads the POME_* env contract
-  // injected by runScenario plus POME_DEMO_* gateway coordinates.
+  // injected by runTask plus POME_DEMO_* gateway coordinates.
   program
     .command("demo-agent", { hidden: true })
     .description("Internal: the bundled demo agent process (spawned by `pome demo`).")
@@ -944,7 +958,7 @@ export function createProgram() {
       } else {
         const health = computeTraceHealth({
           events: eventsResult.events,
-          scenarioUsesTwin: meta.twins.length > 0,
+          taskUsesTwin: meta.twins.length > 0,
         });
         for (const line of renderTraceHealth(health)) console.log(line);
         for (const line of renderEvents(eventsResult.events)) console.log(line);
@@ -968,11 +982,11 @@ export function createProgram() {
     .description(
       "Assemble a paste-into-IDE fix prompt (no LLM call, no network). With no args, reads the latest FAILED run set under ./runs: the persisted cloud verdicts (verdict.json) become grouped failure signatures over the raw traces, in one prompt. Point it at a trial run dir to target that set, or use the legacy `<events.jsonl> <task.md>` form for a single trace.",
     )
-    .action(async (target?: string, scenarioArg?: string) => {
+    .action(async (target?: string, taskArg?: string) => {
       // Legacy 2-arg form: <events.jsonl> <scenario.md> — unchanged
       // (CAPTURE-ONLY, FDRS-657: raw trace + declared criteria, no verdict).
       if (target !== undefined && target.endsWith(".jsonl")) {
-        if (!scenarioArg) {
+        if (!taskArg) {
           console.error(
             "The events.jsonl form needs the task file: pome fix-prompt <events.jsonl> <task.md>",
           );
@@ -981,7 +995,7 @@ export function createProgram() {
         }
         const [eventsRaw, scenario] = await Promise.all([
           readFile(resolve(target), "utf8"),
-          parseScenarioFile(resolve(scenarioArg)),
+          parseTaskFile(resolve(taskArg)),
         ]);
         const events: RecorderEvent[] = eventsRaw
           .split("\n")
@@ -991,7 +1005,7 @@ export function createProgram() {
         console.log(buildFixPrompt({ events, scenario }));
         return;
       }
-      if (scenarioArg !== undefined) {
+      if (taskArg !== undefined) {
         console.error(
           "The second argument only applies to the events.jsonl form: pome fix-prompt <events.jsonl> <task.md>",
         );
@@ -1019,9 +1033,9 @@ export function createProgram() {
         return;
       }
       const set = discovery.set;
-      let scenario: Scenario | null = null;
+      let scenario: Task | null = null;
       try {
-        scenario = await parseScenarioFile(resolve(set.scenarioPath));
+        scenario = await parseTaskFile(resolve(set.taskPath));
       } catch {
         // Task file moved/edited since the run — the prompt degrades to the
         // verdict-embedded criteria.
@@ -1212,7 +1226,7 @@ const SUPPORTED_GMAIL_ENDPOINTS = [
   "POST /upload/gmail/v1/users/:userId/{messages,drafts} (media|multipart)",
 ];
 
-async function scenarioFiles(target: string) {
+async function taskFiles(target: string) {
   const resolved = resolve(target);
   // F0-5a — surface bad-input paths as `HostedUsageError` so the top-level
   // exit-code mapper returns the documented exit 5 ("usage error") instead
@@ -1235,7 +1249,7 @@ async function copyStarterFiles() {
   if (!packageRoot) return;
 
   await Promise.all([
-    copyStarterScenarios(packageRoot),
+    copyStarterTasks(packageRoot),
     copyIfPresent(join(packageRoot, "examples", "agents"), join("examples", "agents")),
   ]);
 }
@@ -1249,22 +1263,22 @@ async function copyIfPresent(source: string, target: string) {
   });
 }
 
-async function copyStarterScenarios(packageRoot: string) {
-  const scenarioDir = join(packageRoot, "scenarios");
-  if (!existsSync(scenarioDir)) return;
+async function copyStarterTasks(packageRoot: string) {
+  const taskDir = join(packageRoot, "tasks");
+  if (!existsSync(taskDir)) return;
 
   const starterTwin = findTwin("github");
-  const starterScenarios = starterTwin
-    ? runnableScenarios(starterTwin).map((s) => s.filename)
+  const starterTasks = starterTwin
+    ? runnableTasks(starterTwin).map((t) => t.filename)
     : [];
 
-  await mkdir("scenarios", { recursive: true });
+  await mkdir("tasks", { recursive: true });
   await Promise.all(
-    starterScenarios.flatMap((file) => {
+    starterTasks.flatMap((file) => {
       const sidecar = file.replace(/\.md$/i, ".seed.json");
       return [
-        copyIfPresent(join(scenarioDir, file), join("scenarios", file)),
-        copyIfPresent(join(scenarioDir, sidecar), join("scenarios", sidecar)),
+        copyIfPresent(join(taskDir, file), join("tasks", file)),
+        copyIfPresent(join(taskDir, sidecar), join("tasks", sidecar)),
       ];
     }),
   );

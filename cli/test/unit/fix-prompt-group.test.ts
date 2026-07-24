@@ -13,7 +13,7 @@ import {
 } from "../../src/fix-prompt/index.js";
 import { VERDICT_ARTIFACT_VERSION, type VerdictArtifact } from "../../src/hosted/evalResultCache.js";
 import type { CriterionResult, RecorderEvent } from "../../src/types/shared.js";
-import type { Scenario } from "../../src/scenario/scenarioSchema.js";
+import type { Task } from "../../src/task/taskSchema.js";
 
 const CRITERIA = {
   severity: "Severity is set correctly",
@@ -61,7 +61,7 @@ function trial(
   return { label: `trial ${n} · ses_${n}`, runDir: `runs/scn/ses_${n}`, verdict, events };
 }
 
-const scenario: Scenario = {
+const scenario: Task = {
   slug: "scn",
   title: "scn",
   setup: "",
@@ -73,7 +73,7 @@ const scenario: Scenario = {
     { type: "model", text: CRITERIA.comment },
   ],
   config: { twins: ["github"], timeout: 60, runs: 5, passThreshold: 100 },
-  seedState: {} as Scenario["seedState"],
+  seedState: {} as Task["seedState"],
 };
 
 function mixedTrials(): TrialFixInput[] {

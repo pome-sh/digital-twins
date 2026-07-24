@@ -7,9 +7,9 @@
 import { describe, it, expect, vi } from "vitest";
 import { buildFixPrompt, buildFixUserPrompt } from "../../src/fix-prompt/index.js";
 import type { RecorderEvent } from "../../src/types/shared.js";
-import type { Scenario } from "../../src/scenario/scenarioSchema.js";
+import type { Task } from "../../src/task/taskSchema.js";
 
-const scenario: Scenario = {
+const scenario: Task = {
   slug: "01-bug-happy-path",
   title: "Bug happy path",
   setup: "",
@@ -20,7 +20,7 @@ const scenario: Scenario = {
     { type: "model", text: "The agent left a helpful triage comment" },
   ],
   config: { twins: ["github"], timeout: 60, runs: 1, passThreshold: 100 },
-  seedState: {} as Scenario["seedState"],
+  seedState: {} as Task["seedState"],
 };
 
 const events = [

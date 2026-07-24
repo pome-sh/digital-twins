@@ -143,11 +143,11 @@ describe("pome run --hosted (e2e via spawn)", () => {
   });
 
   it("exits 0, prints PASS + cloud dashboard URL, and never POSTs agent_stdout", async () => {
-    const scenarioPath = join(tmp, "scn.md");
+    const taskPath = join(tmp, "scn.md");
     // Trivially-passing scenario: 'no unsupported endpoint' + 'no new labels'
     // are true given empty events + identical state from the fake cloud.
     await writeFile(
-      scenarioPath,
+      taskPath,
       [
         "# Trivial",
         "",
@@ -176,7 +176,7 @@ describe("pome run --hosted (e2e via spawn)", () => {
         TSX_LOADER,
         CLI_ENTRY,
         "run",
-        scenarioPath,
+        taskPath,
         "--hosted",
         "--api-url",
         `http://127.0.0.1:${port}`,
@@ -220,9 +220,9 @@ describe("pome run --hosted (e2e via spawn)", () => {
         },
       ],
     };
-    const scenarioPath = join(tmp, "scn.md");
+    const taskPath = join(tmp, "scn.md");
     await writeFile(
-      scenarioPath,
+      taskPath,
       [
         "# Trivial",
         "",
@@ -250,7 +250,7 @@ describe("pome run --hosted (e2e via spawn)", () => {
         TSX_LOADER,
         CLI_ENTRY,
         "run",
-        scenarioPath,
+        taskPath,
         "--api-url",
         `http://127.0.0.1:${port}`,
         "--agent",
@@ -359,9 +359,9 @@ describe("pome run --hosted (e2e via spawn)", () => {
       "utf8",
     );
 
-    const scenarioPath = join(tmp, "scn.md");
+    const taskPath = join(tmp, "scn.md");
     await writeFile(
-      scenarioPath,
+      taskPath,
       [
         "# Trivial",
         "",
@@ -390,7 +390,7 @@ describe("pome run --hosted (e2e via spawn)", () => {
         TSX_LOADER,
         CLI_ENTRY,
         "run",
-        scenarioPath,
+        taskPath,
         "--hosted",
         "--api-url",
         `http://127.0.0.1:${port}`,
