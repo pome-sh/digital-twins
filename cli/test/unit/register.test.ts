@@ -93,6 +93,7 @@ describe("runRegisterAgent", () => {
 
     await runRegisterAgent({
       apiBaseUrl: "https://input.example.com",
+      dashboardBaseUrl: "https://app.example.com",
       name: "Triage Bot",
       force: false,
     });
@@ -120,6 +121,7 @@ describe("runRegisterAgent", () => {
 
     await runRegisterAgent({
       apiBaseUrl: "https://api.example.com",
+      dashboardBaseUrl: "https://app.example.com",
       name: "Triage Bot",
       force: false,
       credentialsPath,
@@ -131,7 +133,7 @@ describe("runRegisterAgent", () => {
 
   it("fails clearly when no manifest is present", async () => {
     await expect(
-      runRegisterAgent({ apiBaseUrl: "https://api.example.com", name: "Triage Bot", force: false }),
+      runRegisterAgent({ apiBaseUrl: "https://api.example.com", dashboardBaseUrl: "https://app.example.com", name: "Triage Bot", force: false }),
     ).rejects.toThrow(/pome init/);
   });
 
@@ -147,6 +149,7 @@ describe("runRegisterAgent", () => {
 
     await runRegisterAgent({
       apiBaseUrl: "https://api.example.com",
+      dashboardBaseUrl: "https://app.example.com",
       name: "Triage Bot",
       force: false,
       credentialsPath,
@@ -166,6 +169,7 @@ describe("runRegisterAgent", () => {
 
     await runRegisterAgent({
       apiBaseUrl: "https://api.example.com",
+      dashboardBaseUrl: "https://app.example.com",
       name: "Triage Bot",
       force: true,
       credentialsPath,
@@ -181,7 +185,7 @@ describe("runRegisterAgent", () => {
     vi.spyOn(console, "error").mockImplementation((m?: unknown) => void errors.push(String(m)));
     vi.spyOn(globalThis, "fetch").mockResolvedValue(response(AGENT_OK));
 
-    await runRegisterAgent({ apiBaseUrl: "https://api.example.com", name: "Triage Bot", force: false });
+    await runRegisterAgent({ apiBaseUrl: "https://api.example.com", dashboardBaseUrl: "https://app.example.com", name: "Triage Bot", force: false });
 
     expect(errors.join("\n")).toMatch(/langraph/);
     expect(errors.join("\n")).toMatch(/langgraph/);
@@ -192,7 +196,7 @@ describe("runRegisterAgent", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(response({ id: "agt_only" }));
 
     await expect(
-      runRegisterAgent({ apiBaseUrl: "https://api.example.com", name: "Bad", force: false }),
+      runRegisterAgent({ apiBaseUrl: "https://api.example.com", dashboardBaseUrl: "https://app.example.com", name: "Bad", force: false }),
     ).rejects.toBeInstanceOf(HostedOrchError);
   });
 
@@ -201,7 +205,7 @@ describe("runRegisterAgent", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(response({}, { status: 404 }));
 
     await expect(
-      runRegisterAgent({ apiBaseUrl: "https://api.example.com", name: "Triage Bot", force: false }),
+      runRegisterAgent({ apiBaseUrl: "https://api.example.com", dashboardBaseUrl: "https://app.example.com", name: "Triage Bot", force: false }),
     ).rejects.toThrow(/not available|version/);
   });
 
@@ -215,6 +219,7 @@ describe("runRegisterAgent", () => {
 
     await runRegisterAgent({
       apiBaseUrl: "https://api.example.com",
+      dashboardBaseUrl: "https://app.example.com",
       name: "Triage Bot",
       force: false,
       twins: ["github", "slack"],
@@ -223,6 +228,23 @@ describe("runRegisterAgent", () => {
     const body = JSON.parse(String((fetchMock.mock.calls[0]![1] as RequestInit).body));
     expect(body).toMatchObject({ name: "Triage Bot", twins: ["github", "slack"] });
     expect(errors.join("\n")).toContain("Enabled services: github, slack");
+  });
+
+  it("prints a Dashboard line deep-linking the registered agent's page", async () => {
+    await writeManifest({ agent: { slug: "triage-bot" } });
+    const errors: string[] = [];
+    vi.spyOn(console, "error").mockImplementation((m?: unknown) => void errors.push(String(m)));
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(response(AGENT_OK));
+
+    await runRegisterAgent({
+      apiBaseUrl: "https://api.example.com",
+      dashboardBaseUrl: "https://app.example.com/", // trailing slash trimmed
+      name: "Triage Bot",
+      force: false,
+    });
+
+    // Deep-links the agent by its server-canonical slug, not a generic root.
+    expect(errors.join("\n")).toContain("Dashboard: https://app.example.com/agents/triage-bot");
   });
 });
 
@@ -243,7 +265,7 @@ describe("runRegisterAgent near-miss", () => {
       .mockResolvedValueOnce(conflict())
       .mockResolvedValueOnce(response(AGENT_OK));
 
-    await runRegisterAgent({ apiBaseUrl: "https://api.example.com", name: "Triage Bott", force: false });
+    await runRegisterAgent({ apiBaseUrl: "https://api.example.com", dashboardBaseUrl: "https://app.example.com", name: "Triage Bott", force: false });
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     const retry = JSON.parse(String((fetchMock.mock.calls[1]![1] as RequestInit).body));
@@ -260,6 +282,7 @@ describe("runRegisterAgent near-miss", () => {
 
     await runRegisterAgent({
       apiBaseUrl: "https://api.example.com",
+      dashboardBaseUrl: "https://app.example.com",
       name: "Triage Bott",
       force: false,
       stdinIsTTY: true,
@@ -280,6 +303,7 @@ describe("runRegisterAgent near-miss", () => {
 
     await runRegisterAgent({
       apiBaseUrl: "https://api.example.com",
+      dashboardBaseUrl: "https://app.example.com",
       name: "Triage Bott",
       force: false,
       stdinIsTTY: true,
@@ -311,7 +335,7 @@ describe("slug-rename hint (F-861)", () => {
     const errors = spyErrors();
     vi.spyOn(globalThis, "fetch").mockResolvedValue(response(RENAMED));
 
-    await runRegisterAgent({ apiBaseUrl: "https://api.example.com", name: "PR Review Agent", force: false });
+    await runRegisterAgent({ apiBaseUrl: "https://api.example.com", dashboardBaseUrl: "https://app.example.com", name: "PR Review Agent", force: false });
 
     const out = errors.join("\n");
     expect(out).toContain("pr-reviewer"); // old slug named
@@ -330,7 +354,7 @@ describe("slug-rename hint (F-861)", () => {
       response({ ...AGENT_OK, resolved_via: "slug" }),
     );
 
-    await runRegisterAgent({ apiBaseUrl: "https://api.example.com", name: "Triage Bot", force: false });
+    await runRegisterAgent({ apiBaseUrl: "https://api.example.com", dashboardBaseUrl: "https://app.example.com", name: "Triage Bot", force: false });
 
     expect(errors.join("\n")).not.toMatch(/renamed/i);
   });
@@ -342,7 +366,7 @@ describe("slug-rename hint (F-861)", () => {
       response({ ...AGENT_OK, slug: "triage-bot", resolved_via: "created", created: true }),
     );
 
-    await runRegisterAgent({ apiBaseUrl: "https://api.example.com", name: "Triage Bot", force: false });
+    await runRegisterAgent({ apiBaseUrl: "https://api.example.com", dashboardBaseUrl: "https://app.example.com", name: "Triage Bot", force: false });
 
     expect(errors.join("\n")).not.toMatch(/renamed/i);
   });
@@ -355,7 +379,7 @@ describe("slug-rename hint (F-861)", () => {
       response({ ...AGENT_OK, slug: "triage-bot", hint: "Heads up: judge model changed." }),
     );
 
-    await runRegisterAgent({ apiBaseUrl: "https://api.example.com", name: "Triage Bot", force: false });
+    await runRegisterAgent({ apiBaseUrl: "https://api.example.com", dashboardBaseUrl: "https://app.example.com", name: "Triage Bot", force: false });
 
     expect(errors.join("\n")).not.toMatch(/renamed/i);
   });
@@ -368,7 +392,7 @@ describe("slug-rename hint (F-861)", () => {
       response({ ...AGENT_OK, slug: "triage-bot", resolved_via: "merged" }),
     );
 
-    await runRegisterAgent({ apiBaseUrl: "https://api.example.com", name: "Triage Bot", force: false });
+    await runRegisterAgent({ apiBaseUrl: "https://api.example.com", dashboardBaseUrl: "https://app.example.com", name: "Triage Bot", force: false });
 
     expect(errors.join("\n")).not.toMatch(/renamed/i);
     expect(readManifestFile()).toMatchObject({ agent: { slug: "triage-bot" } });
