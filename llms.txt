@@ -1,0 +1,31 @@
+# Pome Digital Twins
+
+> Simulation testing infrastructure for AI agents. Open-source, local, stateful digital twins of the APIs your agent calls — GitHub, Stripe, Slack, Gmail, and Linear — answering the same REST, GraphQL, and MCP calls as production, backed by real SQLite state. 137 MCP tools in total, all deterministic, resettable, and requiring no live infrastructure. The `pome` CLI runs your agent against a twin and captures the trace; evaluation is a hosted feature at pome.sh.
+
+## Docs
+
+- [Documentation](https://docs.pome.sh): full guides, CLI reference, and per-package details
+- [Runtime contract](./CONTRACT.md): the frozen v1.2.0 twin contract every twin honors
+- [Endpoint-tier rubric](./packages/sdk/ENDPOINT-TIERS.md): semantic / shape / 501 fidelity tiers
+- [Contributor & agent conventions](./AGENTS.md): how to work in this repo
+
+## Twins
+
+- [twin-github](./packages/twin-github/FIDELITY.md): 65 MCP tools, 62 REST routes — repos, issues, PRs, reviews, merges (push-access gated)
+- [twin-stripe](./packages/twin-stripe/FIDELITY.md): 26 MCP tools, 43 REST routes — card + x402 crypto PaymentIntents, refunds, charges, balance, events
+- [twin-slack](./packages/twin-slack/FIDELITY.md): 11 MCP tools, 50 REST routes — channels, messages, threads, reactions, search
+- [twin-gmail](./packages/twin-gmail/FIDELITY.md): 13 MCP tools — frozen Gmail v1 REST: messages, drafts, threads, labels, uploads
+- [twin-linear](./packages/twin-linear/FIDELITY.md): 22 MCP tools — GraphQL + OAuth (PKCE) + signed webhooks; the first GraphQL twin
+
+## Packages
+
+- [@pome-sh/cli](https://www.npmjs.com/package/@pome-sh/cli): the `pome` CLI — run tasks, inspect traces, upload for evaluation
+- [@pome-sh/sdk](https://www.npmjs.com/package/@pome-sh/sdk): the twin engine — build your own twin with `defineTwin()`
+- [@pome-sh/shared-types](https://www.npmjs.com/package/@pome-sh/shared-types): Zod schemas and the trace contract
+- [@pome-sh/adapter-claude-sdk](https://www.npmjs.com/package/@pome-sh/adapter-claude-sdk): wire a Claude Agent SDK agent to a Pome run
+
+## Getting started
+
+- Run an agent task with no install: `npx @pome-sh/cli init && npx @pome-sh/cli run --local scenarios/01-bug-happy-path.md`
+- Start a standalone twin: `npx @pome-sh/cli twin start github`
+- The hosted platform (evaluation, simulation, observability): https://pome.sh
