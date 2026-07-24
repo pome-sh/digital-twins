@@ -428,6 +428,8 @@ export function createProgram() {
         try {
           await runRegisterAgent({
             apiBaseUrl: opts.apiUrl,
+            dashboardBaseUrl:
+              process.env.POME_DASHBOARD_URL ?? DEFAULT_DASHBOARD_URL,
             name,
             force: opts.force,
             twins: normalizeRegisterTwins(opts.twins),
@@ -640,23 +642,42 @@ export function createProgram() {
           }
         }
 
-        // FDRS-645 — "run yours": bare `pome run` defaults to the demo task
-        // via a user-visible copy (tasks/first-run-demo.md, dropped on
-        // first use; its Config pins runs: 5 so an explicit -n still wins).
-        // The moment-05 frame prints later, once the doctor + credential
-        // gates have passed.
+        // Read the manifest once — both bare-run task resolution (F-865) and
+        // the agent command below consume it.
+        const manifestRead = await readManifest(process.cwd()).catch(() => null);
+
+        // FDRS-645 / F-865 — bare `pome run` (no path) resolves its default:
+        //   - a MIGRATED project (manifest with a `tasks` key) runs that whole
+        //     declared directory, exactly like `pome run <that-dir>`: no demo
+        //     drop, no "run yours" frame, each file at its own `runs`/-n;
+        //   - an UN-MIGRATED project (no manifest / no `tasks` key) keeps the
+        //     "run yours" demo default — a user-visible copy at
+        //     tasks/first-run-demo.md (dropped on first use; its Config pins
+        //     runs: 5 so an explicit -n still wins). The moment-05 frame prints
+        //     later, once the doctor + credential gates have passed.
         let defaultTask: DefaultTaskResolution | null = null;
+        let bareViaManifestTasks = false;
         if (target === undefined) {
-          try {
-            defaultTask = await ensureDefaultTask();
-          } catch (err) {
-            console.error(err instanceof Error ? err.message : String(err));
-            process.exitCode = exitCodeFor(err);
-            return;
+          const declaredTasks = manifestRead?.manifest.tasks;
+          if (manifestRead && declaredTasks) {
+            // Resolve the declared dir relative to the manifest, not cwd — the
+            // manifest can be discovered up-tree. A declared-but-missing dir
+            // surfaces as taskFiles' usage error below (exit 5); we never
+            // silently fall back to the demo drop once intent is declared.
+            target = resolve(dirname(manifestRead.path), declaredTasks);
+            bareViaManifestTasks = true;
+          } else {
+            try {
+              defaultTask = await ensureDefaultTask();
+            } catch (err) {
+              console.error(err instanceof Error ? err.message : String(err));
+              process.exitCode = exitCodeFor(err);
+              return;
+            }
+            if (defaultTask.copied) console.error(copyAnnounceLine(defaultTask));
+            if (!defaultTask.trialsApplied) console.error(trialsPinFallbackLine());
+            target = defaultTask.path;
           }
-          if (defaultTask.copied) console.error(copyAnnounceLine(defaultTask));
-          if (!defaultTask.trialsApplied) console.error(trialsPinFallbackLine());
-          target = defaultTask.path;
         }
 
         let files: string[];
@@ -670,7 +691,22 @@ export function createProgram() {
           return;
         }
 
-        const manifestRead = await readManifest(process.cwd()).catch(() => null);
+        // F-865 — make a manifest-driven bare run legible: name where the set
+        // came from, and never let an empty declared dir no-op silently.
+        if (bareViaManifestTasks) {
+          const manifestFile = basename(manifestRead!.path);
+          const declared = manifestRead!.manifest.tasks;
+          if (files.length === 0) {
+            console.error(
+              `no task .md files found in ${declared}/ (declared in ${manifestFile}) — add tasks or copy some with \`pome tasks <twin> --copy\`.`,
+            );
+          } else {
+            console.error(
+              `resolved ${files.length} task(s) from ${manifestFile} (tasks: "${declared}")`,
+            );
+          }
+        }
+
         const configCommand = manifestRead?.manifest.command;
         const resolvedCommand = options.agent ?? configCommand;
         // Bare `pome init` (existing project) writes no `command`. Don't
