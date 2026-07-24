@@ -95,6 +95,23 @@ describe("resolveRunAgentIdentity", () => {
     });
   });
 
+  it("sends the manifest's twins on the auto-create re-resolve so a fork's first run enables them (F-926)", async () => {
+    const dir = await makeProject({ agent: { slug: "gmail-retry-notify" }, twins: ["gmail"] });
+    const credentialsPath = await writeCreds(dir, "tm_new");
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(response({ id: "agt_fresh", slug: "gmail-retry-notify", display_name: "G", judge_model: "m" }));
+
+    await resolveRunAgentIdentity({ startDir: dir, apiBaseUrl: "https://api.example.com", credentialsPath });
+
+    const body = JSON.parse(String((fetchMock.mock.calls[0]![1] as RequestInit).body));
+    expect(body.twins).toEqual(["gmail"]);
+    expect(JSON.parse(readFileSync(join(dir, ".pome", "link.json"), "utf8"))).toMatchObject({
+      agent_id: "agt_fresh",
+      team_id: "tm_new",
+    });
+  });
+
   it("the version override wins over the manifest agent.version", async () => {
     const dir = await makeProject({ agent: { slug: "pr-review-agent", version: "0.2.0" } });
     const credentialsPath = await writeCreds(dir, "tm_team");

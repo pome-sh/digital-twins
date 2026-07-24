@@ -23,7 +23,7 @@ import {
   resolveCachedAgentId,
   writeLinkCache,
 } from "./link-cache.js";
-import { readManifest } from "./project-config.js";
+import { normalizeManifestTwins, readManifest } from "./project-config.js";
 
 export interface RunAgentIdentity {
   /** The resolved agent id to send at session create; absent = unattributed. */
@@ -74,7 +74,11 @@ export async function resolveRunAgentIdentity(
     if (cachedId) {
       return { ...base, agentId: cachedId };
     }
-    // Silent re-resolution — a run never prompts for a near-miss.
+    // Silent re-resolution — a run never prompts for a near-miss. Send the
+    // manifest's twins so a fork / first `pome run` that auto-creates the agent
+    // enables the declared services instead of the server's `github` default
+    // (F-926); the server merges additively, so this is safe when the agent
+    // already exists.
     const resolved = await postAgentResolver(
       creds,
       {
@@ -83,6 +87,7 @@ export async function resolveRunAgentIdentity(
         description: agent.description,
         version: agent.version,
         framework: agent.framework,
+        twins: normalizeManifestTwins(manifestRead.manifest.twins),
       },
       resolveSeams({ stdinIsTTY: false }),
     );

@@ -171,6 +171,25 @@ function slugErrorMessage(raw: Record<string, unknown>, path: string): string {
   return suggestion.length > 0 ? `${base} Did you mean "${suggestion}"?` : base;
 }
 
+/** Normalize the manifest's `twins` to canonical (trim + lowercase, de-duped)
+ *  twin ids for the `POST /v1/agents` body. The manifest schema keeps `twins`
+ *  open (min(1) strings, not checked against MOUNTED_TWINS), so entries are
+ *  normalized but NOT validated here — the server returns a friendly error for
+ *  an unknown twin. Returns undefined when nothing survives so the cloud's
+ *  default enablement still applies. Shared by the register command and the
+ *  run-path identity resolver (F-926). */
+export function normalizeManifestTwins(
+  manifestTwins: readonly string[] | undefined,
+): string[] | undefined {
+  if (manifestTwins === undefined) return undefined;
+  const out = new Set<string>();
+  for (const twin of manifestTwins) {
+    const norm = twin.trim().toLowerCase();
+    if (norm.length > 0) out.add(norm);
+  }
+  return out.size > 0 ? [...out] : undefined;
+}
+
 async function fileExists(path: string): Promise<boolean> {
   try {
     await readFile(path, "utf8");
