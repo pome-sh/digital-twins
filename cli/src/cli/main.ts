@@ -77,7 +77,8 @@ import type { RecorderEvent } from "../types/shared.js";
 
 const PACKAGE_VERSION = readPackageVersion();
 const SESSION_CREATE_FORMATS = new Set(["text", "json", "env"]);
-const DEFAULT_AGENT_COMMAND = "npx tsx examples/agents/scripted-triage-agent.ts";
+const DEFAULT_AGENT_FILE = "examples/agents/scripted-triage-agent.ts";
+const DEFAULT_AGENT_COMMAND = `npx tsx ${DEFAULT_AGENT_FILE}`;
 const MANIFEST_SCHEMA_URL = "https://pome.sh/schemas/v1/pome.json";
 
 function readPackageVersion(): string {
@@ -118,7 +119,15 @@ export function createProgram() {
       "--sdk <name>",
       "Scaffold for a specific agent SDK (claude | claude-managed). Adds the SDK-specific example file and pre-fills agent.framework so the dashboard badges runs correctly.",
     )
-    .action(async (opts: { sdk?: string }) => {
+    .option(
+      "--bare",
+      "Write only the manifest — skip the starter task library and sample agents. Auto-selected when the current directory already has a package.json (the bring-your-own-agent case).",
+    )
+    .option(
+      "--starter",
+      "Force the full starter library even in an existing project.",
+    )
+    .action(async (opts: { sdk?: string; bare?: boolean; starter?: boolean }) => {
       const sdk = opts.sdk?.trim();
       if (
         sdk !== undefined &&
@@ -136,26 +145,59 @@ export function createProgram() {
         process.exitCode = 2;
         return;
       }
+      if (opts.bare && opts.starter) {
+        console.error("Pass at most one of --bare / --starter.");
+        process.exitCode = 2;
+        return;
+      }
 
-      await mkdir("tasks", { recursive: true });
-      await mkdir("examples/agents", { recursive: true });
-      await mkdir("runs", { recursive: true });
-      await copyStarterFiles();
+      // F-904 — a directory that already has a package.json is the "bring your
+      // own agent" case: scaffold only the manifest, never the starter library
+      // (a 2026-07-24 cold walk dumped 28 untracked files into a real project).
+      // --starter / --bare override the auto-decision in either direction.
+      const looksLikeExistingProject = existsSync(
+        join(process.cwd(), "package.json"),
+      );
+      const bare = opts.starter
+        ? false
+        : Boolean(opts.bare) || looksLikeExistingProject;
 
-      let command = DEFAULT_AGENT_COMMAND;
+      if (!bare) {
+        await mkdir("tasks", { recursive: true });
+        await mkdir("examples/agents", { recursive: true });
+        await mkdir("runs", { recursive: true });
+        await copyStarterFiles();
+      }
+
+      // Bare mode omits `command`: the BYO user launches their own agent, so a
+      // default pointer at an unscaffolded examples/agents/... file would be a
+      // broken instruction. --sdk still writes a real file and sets command.
+      let command: string | undefined = bare ? undefined : DEFAULT_AGENT_COMMAND;
       let framework: string | undefined;
-      let postInitMessage =
-        "Pome initialized.\n" +
-        "Next steps:\n" +
-        "  1. pome login                    # one-time, opens the dashboard to sign in\n" +
-        "  2. pome register agent <name>    # scopes runs to this project (writes agent.slug to pome.json)\n" +
-        "  3. pome run tasks/01-bug-happy-path.md\n" +
-        "\n" +
-        "Optional follow-ups:\n" +
-        "  - pome init --sdk claude         # scaffold a Claude Agent SDK starter\n" +
-        "  - pome tasks stripe --copy       # add Stripe payment tasks when needed\n" +
-        "\n" +
-        "See `pome docs getting-started` for a narrative walkthrough.";
+      let postInitMessage = bare
+        ? "Pome initialized (existing project — starter library skipped).\n" +
+          "Next steps:\n" +
+          '  1. Set "command" in pome.json to your agent\'s launch command\n' +
+          "  2. pome login                    # one-time, opens the dashboard to sign in\n" +
+          "  3. pome register agent <name>    # scopes runs to this project (writes agent.slug to pome.json)\n" +
+          "  4. pome run <your-task>.md\n" +
+          "\n" +
+          "Optional follow-ups:\n" +
+          "  - pome tasks github --copy       # drop the starter task library into tasks/\n" +
+          "  - pome init --sdk claude         # scaffold a Claude Agent SDK starter\n" +
+          "\n" +
+          "See `pome docs getting-started` for a narrative walkthrough."
+        : "Pome initialized.\n" +
+          "Next steps:\n" +
+          "  1. pome login                    # one-time, opens the dashboard to sign in\n" +
+          "  2. pome register agent <name>    # scopes runs to this project (writes agent.slug to pome.json)\n" +
+          "  3. pome run tasks/01-bug-happy-path.md\n" +
+          "\n" +
+          "Optional follow-ups:\n" +
+          "  - pome init --sdk claude         # scaffold a Claude Agent SDK starter\n" +
+          "  - pome tasks stripe --copy       # add Stripe payment tasks when needed\n" +
+          "\n" +
+          "See `pome docs getting-started` for a narrative walkthrough.";
 
       if (sdk) {
         const scaffold = await writeSdkScaffold(sdk);
@@ -166,6 +208,12 @@ export function createProgram() {
           scaffold.postInstallHint;
       }
 
+      // Point the manifest at an existing task directory so bare `pome run`
+      // (F-865) resolves it. The starter path always creates tasks/; bare mode
+      // only claims it when the user already keeps their tasks there.
+      const tasksDir =
+        !bare || (await hasMarkdownTasks("tasks")) ? "tasks" : undefined;
+
       // The manifest requires `agent.slug` (F-804). `pome init` runs before
       // `pome register`, so seed a portable slug derived from the directory
       // name; register later overwrites it with the server-canonical slug.
@@ -174,13 +222,15 @@ export function createProgram() {
         const slug = deriveAgentSlug(basename(process.cwd())) || "my-agent";
         const agent: Record<string, unknown> = { slug };
         if (framework) agent.framework = framework;
-        await writeManifest(join(process.cwd(), MANIFEST_JSON), "json", {
+        const manifest: Record<string, unknown> = {
           $schema: MANIFEST_SCHEMA_URL,
           agent,
-          command,
-          artifacts_dir: "runs",
-          pass_threshold: 100,
-        });
+        };
+        if (command) manifest.command = command;
+        if (tasksDir) manifest.tasks = tasksDir;
+        manifest.artifacts_dir = "runs";
+        manifest.pass_threshold = 100;
+        await writeManifest(join(process.cwd(), MANIFEST_JSON), "json", manifest);
       } else if (sdk) {
         const priorAgent =
           typeof existing.raw.agent === "object" && existing.raw.agent !== null
@@ -658,8 +708,20 @@ export function createProgram() {
         }
 
         const configCommand = manifestRead?.manifest.command;
-        const agentCommand =
-          options.agent ?? configCommand ?? DEFAULT_AGENT_COMMAND;
+        const resolvedCommand = options.agent ?? configCommand;
+        // Bare `pome init` (existing project) writes no `command`. Don't
+        // silently fall back to the starter scaffold it never created — a
+        // spawn of a missing file gives a cryptic error. Use the default only
+        // when that file actually exists; otherwise fail with guidance.
+        if (resolvedCommand === undefined && !existsSync(DEFAULT_AGENT_FILE)) {
+          console.error(
+            'No agent command configured. Set "command" in pome.json to your ' +
+              'agent\'s launch command, or pass --agent "<command>".',
+          );
+          process.exitCode = 2;
+          return;
+        }
+        const agentCommand = resolvedCommand ?? DEFAULT_AGENT_COMMAND;
         let worstExit = 0;
 
         // Hosted is the default. Self-host runs against an in-process twin via
@@ -1278,6 +1340,20 @@ async function taskFiles(target: string) {
     .filter((entry) => entry.endsWith(".md"))
     .sort()
     .map((entry) => join(resolved, entry));
+}
+
+// F-904 — does the cwd already carry a task directory worth recording in the
+// manifest? A directory named `dir` counts only when it holds at least one
+// `.md` (an empty scaffold dir is not a task set).
+async function hasMarkdownTasks(dir: string): Promise<boolean> {
+  const abs = join(process.cwd(), dir);
+  if (!existsSync(abs)) return false;
+  try {
+    const entries = await readdir(abs);
+    return entries.some((f) => f.toLowerCase().endsWith(".md"));
+  } catch {
+    return false;
+  }
 }
 
 async function copyStarterFiles() {
