@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { invalidArgument, notFound } from "../errors.js";
+import { checkFault } from "../faults.js";
 import { canonicalRaw, decodeGmailRaw, parseMime, stripBcc } from "../mime.js";
 import { matchesSearch } from "../search-match.js";
 import { SEARCH_MAILBOX_MESSAGE_BUDGET, validateSearchQuery } from "../search-parse.js";
@@ -73,6 +74,7 @@ export function sendMessage(
   raw: Uint8Array | string,
   options: { threadId?: string } = {}
 ): { sender: SemanticMessage; deliveries: Array<{ mailboxEmail: string; message: SemanticMessage }> } {
+  checkFault(domain.db, "messages.send");
   const senderMailboxId = domain.mailboxId(email);
   const bytes = acceptedRaw(raw);
   const parsed = parseMime(bytes);

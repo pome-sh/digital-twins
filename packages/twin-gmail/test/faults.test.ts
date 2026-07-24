@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "vitest";
-import { GmailDomain, openGmailTwinDatabase } from "../src/index.js";
+import { composeMime, GmailDomain, openGmailTwinDatabase } from "../src/index.js";
 import { checkFault, gmailFaultSchema } from "../src/faults.js";
 import { GmailError, gmailErrorEnvelope } from "../src/errors.js";
 import { defaultSeedState, parseSeed } from "../src/seed.js";
@@ -78,5 +78,32 @@ describe("seed integration", () => {
     expect(() => checkFault(db, "messages.send")).toThrow(); // call 1 throttled
     gmail.resetToDefault(); // clears counter + faults
     expect(() => checkFault(db, "messages.send")).not.toThrow();
+  });
+});
+
+describe("sendMessage gate", () => {
+  it("throttles the 2nd send when succeedFirst=1, throttleFor=1", () => {
+    const db = openGmailTwinDatabase(":memory:");
+    const gmail = new GmailDomain(db);
+    gmail.seed({
+      primaryMailbox: { email: "agent@pome-twin.test", displayName: "Agent" },
+      faults: [{ name: "rate-limited", target: "messages.send", succeedFirst: 1, throttleFor: 1 }],
+    } as never);
+    const raw = composeMime({
+      from: "agent@pome-twin.test",
+      to: ["x@pome-twin.test"],
+      subject: "hi",
+      text: "hi",
+      date: "2026-07-24T12:00:00.000Z",
+      messageId: "gate@test",
+    });
+    expect(() => gmail.sendMessage("agent@pome-twin.test", raw)).not.toThrow(); // 1st ok
+    let status = 0;
+    try {
+      gmail.sendMessage("agent@pome-twin.test", raw);
+    } catch (e) {
+      status = (e as GmailError).status;
+    }
+    expect(status).toBe(429); // 2nd throttled
   });
 });
