@@ -199,7 +199,7 @@ jobs:
       #
       # `cosign-release` MUST stay pinned to a v2.x binary. The installer
       # action's DEFAULT cosign version tracks the action major (v3.x installer
-      # → cosign v2 default; v4.x installer → cosign v3 default), so a Dependabot
+      # → cosign v2 default; v4.x installer → cosign v3 default), so an automated
       # bump of the action alone (as in #167) silently drifts the binary to v3
       # and reintroduces the failure above. Pinning the binary here decouples us
       # from the action version.

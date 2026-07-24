@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Canonical first-party registration drift gate. First-party twins must be
-// explicit at operational seams (contracts, bundles, images, Dependabot), but
-// those explicit arrays are easy to update incompletely. This check compares
-// every registration with config/first-party-twins.json and fails loudly.
+// explicit at operational seams (contracts, bundles, images), but those
+// explicit arrays are easy to update incompletely. This check compares every
+// registration with config/first-party-twins.json and fails loudly.
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -66,10 +66,9 @@ compare(
   imageRaw.split(/[,\s]+/).map((value) => value.trim().replace(/^["']|["']$/g, "")).filter(Boolean),
 );
 
-const dependabot = [
-  ...read(".github/dependabot.yml").matchAll(/directory:\s*\/packages\/twin-([a-z][a-z0-9-]*)/g),
-].map((match) => match[1]);
-compare(".github/dependabot.yml docker directories", dependabot);
+// Docker base-image updates are handled by Renovate, which auto-discovers
+// every packages/twin-*/Dockerfile — no per-twin config to keep in sync, so
+// there is no registration seam here to drift-check (was .github/dependabot.yml).
 
 const cliPackage = JSON.parse(read("cli/package.json"));
 compare(
