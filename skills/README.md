@@ -29,6 +29,7 @@ claude mcp add --transport http pome https://mcp.pome.sh/mcp
 | --- | --- |
 | [`pome`](./pome/SKILL.md) | **Entry router** — owns "test my agent with pome"; routes to the right coach skill by context |
 | [`pome-intake`](./pome-intake/SKILL.md) | Skill 0 — register the examinee clone scope, report twin coverage |
+| [`pome-suggest-tasks`](./pome-suggest-tasks/SKILL.md) | Own-agent front door — read a registered agent (`pome.json` + prompt/code), propose grounded candidate tasks, interview to pick one; runs before Skill 1 |
 | [`pome-author-task`](./pome-author-task/SKILL.md) | Skill 1 — author a graded task and save it to the team catalog |
 | [`pome-verify-seed`](./pome-verify-seed/SKILL.md) | Skill 2 — verify a task's seed is a fair exam before any run |
 | [`pome-run-task`](./pome-run-task/SKILL.md) | Skill 4 — run the exam, finalize from the live tape, narrate the report |

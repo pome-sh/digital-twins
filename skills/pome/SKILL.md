@@ -30,10 +30,19 @@ browser): `claude mcp add --transport http pome https://mcp.pome.sh/mcp`.
 | The builder arrives with… | Route |
 | --- | --- |
 | A **Claude managed-agent YAML** (pasted, or "test my managed agent") | `pome-intake` — collect the clone scope, register via `intake_clone_scope`, report twin coverage |
+| A **registered own agent** — a repo with a `pome.json` but **no task yet** ("test my agent" / "what should I test?", `tasks/` empty and `list_tasks` empty) | `pome-suggest-tasks` — read the manifest (`twins`) + the agent's prompt/code, propose grounded candidates, interview to pick one, then the authoring chain |
 | A **local repo agent / self-hosted process** (talks REST, no managed-agent YAML) | The local-examinee path: register once with `register_agent(name, twins)`, then `pome-run-task` — `run_task` mints the session and the launch spec; launch the process yourself via the REST launcher (`pome-run-task/references/launch-rest.md`), which **preflights the wiring** (config → twin reachable → routing → egress floor, the `pome doctor` checks) before it launches |
 | "**What should I test?**" / a worry to turn into a graded check | `pome-author-task` — library-first authoring, `[code]`/`[model]` criteria, validate → dry-run → `save_task` |
 | A drafted task, first run coming up ("is my seed right?") | `pome-verify-seed` — fair-exam triage before anything runs |
 | A verified task to execute ("run my tasks", "how did my agent do?") | `pome-run-task` — mint, launch, `finalize_run` on idle, narrate `get_report` |
+
+**Registered but untested (the F-891 cold start).** Detect it locally first, so
+the route resolves even before the MCP is connected: a `pome.json` at the repo
+root whose `tasks` dir holds no `.md`, and — when the MCP is up — an empty
+`list_tasks`. Both empty → the builder has an agent but no first task →
+`pome-suggest-tasks`. If local task files exist but the catalog is empty (a
+bundled-example repo), don't auto-fire suggestion: offer the choice — run the
+existing task, or suggest a fresh one grounded in the agent.
 
 When in doubt, ask one question — "is your agent a Claude managed agent, or a
 process you run yourself?" — and route on the answer. The full journey is
