@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.8.0
+
+### Minor Changes
+
+- [#231](https://github.com/pome-sh/digital-twins/pull/231) [`b016c68`](https://github.com/pome-sh/digital-twins/commit/b016c68ab82c367f097e3df4eb8e5b5883f47515) Thanks [@AFFFPupu](https://github.com/AFFFPupu)! - Gmail seeds accept the new opt-in `faults` field (named fault primitives, e.g. `rate-limited`) — the bundled `@pome-sh/shared-types` is now 0.12.2 and the bundled Gmail twin 0.2.0, so `pome run` no longer rejects fault seeds with `unrecognized_keys: ["faults"]`.
+
+### Patch Changes
+
+- [#226](https://github.com/pome-sh/digital-twins/pull/226) [`a6b12ec`](https://github.com/pome-sh/digital-twins/commit/a6b12ec05cb51451cf347a1d9651173d410452e5) Thanks [@AFFFPupu](https://github.com/AFFFPupu)! - `pome docs tasks` now points at the renamed docs.pome.sh page. The M4 docs door
+  (F-912) renamed `/docs/cli/scenarios` to `/docs/cli/tasks` on docs.pome.sh; this
+  repoints the `cli-tasks` topic's `path` to match. A redirect on the docs site
+  keeps the old `/docs/cli/scenarios` URL alive, and the `scenarios` keyword stays
+  on the topic so `pome docs scenarios` still resolves to the `pome tasks` page.
+
 ## 0.7.0
 
 ### Minor Changes

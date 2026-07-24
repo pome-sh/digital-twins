@@ -8,6 +8,11 @@ CREATE TABLE IF NOT EXISTS gmail_config (
   value TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS fault_counters (
+  operation TEXT PRIMARY KEY,
+  calls INTEGER NOT NULL DEFAULT 0
+);
+
 CREATE TABLE IF NOT EXISTS mailboxes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   email TEXT NOT NULL COLLATE NOCASE UNIQUE,
@@ -183,6 +188,7 @@ CREATE INDEX IF NOT EXISTS idx_filters_mailbox
 
 const RESET_SQL = `
 DELETE FROM gmail_config;
+DELETE FROM fault_counters;
 DELETE FROM send_as;
 DELETE FROM forwarding_addresses;
 DELETE FROM filters;

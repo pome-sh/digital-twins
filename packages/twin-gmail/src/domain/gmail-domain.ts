@@ -20,6 +20,7 @@ export class GmailDomain {
       resetDatabase(this.db);
       this.db.prepare("INSERT INTO gmail_config(key, value) VALUES ('clock', ?)").run(seed.clock);
       this.db.prepare("INSERT INTO gmail_config(key, value) VALUES ('delivery_mode', ?)").run(seed.deliveryMode);
+      this.db.prepare("INSERT INTO gmail_config(key, value) VALUES ('faults', ?)").run(JSON.stringify(seed.faults ?? []));
       for (const mailbox of [seed.primaryMailbox, ...seed.mailboxes]) seedMailbox(this.db, mailbox);
     }).immediate();
   }

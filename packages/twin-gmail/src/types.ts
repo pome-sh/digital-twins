@@ -89,6 +89,7 @@ export type GmailStateSeed = {
   mailboxes?: SeedMailbox[];
   deliveryMode?: DeliveryMode;
   clock?: string;
+  faults?: import("./faults.js").GmailFault[];
 };
 
 export type MessageRow = {

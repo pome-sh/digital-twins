@@ -292,11 +292,24 @@ const gmailMailboxSeedSchema = z.object({
   sendAs: z.array(z.record(z.string(), z.unknown())).max(1000).default([]),
 });
 
+// Named fault-injection primitives (mirror of twin-gmail `faults.ts`). Opt-in;
+// default seeds carry none. See CONTRACT.md (Gmail pins).
+const gmailFaultSchema = z
+  .object({
+    name: z.enum(["rate-limited"]),
+    target: z.string().min(1).max(128).default("messages.send"),
+    succeedFirst: z.number().int().nonnegative().max(1000).default(2),
+    throttleFor: z.number().int().positive().max(1000).default(3),
+    retryAfterSeconds: z.number().int().positive().max(3600).default(1),
+  })
+  .strict();
+
 export const gmailSeedStateSchema = z.object({
   primaryMailbox: gmailMailboxSeedSchema,
   mailboxes: z.array(gmailMailboxSeedSchema).max(100).default([]),
   deliveryMode: z.enum(["sender-only", "seeded-mailboxes"]).default("sender-only"),
   clock: z.string().datetime({ offset: true }).default("2025-01-01T00:00:00.000Z"),
+  faults: z.array(gmailFaultSchema).max(50).default([]),
 });
 export type GmailSeedState = z.infer<typeof gmailSeedStateSchema>;
 

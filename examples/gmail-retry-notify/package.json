@@ -1,0 +1,24 @@
+{
+  "name": "@pome-sh/gmail-retry-notify-example",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Bundled Pome example: a Gmail notification agent that must retry throttled (429) sends without duplicating already-delivered ones. Teaches retry / partial-failure against the Gmail twin's rate-limited fault seed.",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.81",
+    "ai": "^6.0.193",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.3",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

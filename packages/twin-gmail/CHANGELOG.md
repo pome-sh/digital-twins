@@ -1,5 +1,17 @@
 # @pome-sh/twin-gmail — CHANGELOG
 
+## 0.2.0 — 2026-07-24
+
+### Added
+
+- Named `rate-limited` fault-injection seed primitive (F-917). Gmail seeds accept
+  an optional `faults` array (default `[]`, opt-in). `rate-limited` throttles a
+  target operation (default `messages.send`) by call count: the first
+  `succeedFirst` calls succeed, the next `throttleFor` return 429
+  `RESOURCE_EXHAUSTED` (retry hint in the body, no `Retry-After` header), then
+  calls recover; the counter is per twin instance and cleared by
+  `POST /admin/reset`. Default seed behavior is unchanged.
+
 ## 0.1.2 — 2026-07-23
 
 Fix: declare `@hono/node-server` as a direct dependency. The twin's

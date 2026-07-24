@@ -54,11 +54,11 @@ dashboard shows two separate identities with separate scores.
    register_agent(name="support-triage-v1", twins=["github","slack"])
    register_agent(name="support-triage-v2", twins=["github","slack"])
    ```
-3. **Run** — for each agent id, `run_trials(scenario_id, agent_id, n=5)`. Each
+3. **Run** — for each agent id, `run_trials(task_id, agent_id, n=5)`. Each
    trial returns an `examinee_launch` spec (per-session twin MCP URLs, a bearer,
    `always_allow`, a `network.mode: limited` clamp, web tools off). Assemble the
    examinee clone from that spec (mirrors
-   `pome-run-scenario/references/launch-managed-agent.md`), give it
+   `pome-run-task/references/launch-managed-agent.md`), give it
    `examinee_task.prompt`, and let it work.
 4. **Finalize** — `finalize_run(session_id, agent_token)` the instant the
    examinee idles (the tape is pulled from the still-live twin session), then
