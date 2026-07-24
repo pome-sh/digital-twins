@@ -110,12 +110,40 @@ Tuning: with 5 recipients, `succeedFirst: 2` + `throttleFor: 3` means the last 3
 - **`CHANGELOG.md`** for `twin-gmail` and `shared-types`. The `shared-types` change is an additive optional field → backward-compatible **minor** (0.x: minor plays major); this PR only bumps + writes the changelog; the actual npm publish follows the `pome-package-release` flow separately.
 - **Auto gates** (no new wiring): `scripts/typecheck-examples.mjs` (typecheck:examples) and `scripts/smoke-examples.mjs` (launch smoke) discover the new example automatically. Keep `knip`/dead-code, code-health file-size, and legacy-criterion-marker lints green.
 
-## Testing
+## Testing & verification
+
+### Environment (confirmed 2026-07-24)
+
+- **Agent model calls (local):** `ANTHROPIC_API_KEY` present in the environment.
+- **Hosted twins + hosted eval:** global `pome` CLI **0.7.0** (upgraded from 0.5.0), logged in (keychain `sh.pome.cli`, validated via `pome session list` → exit 0). `pome run` is hosted-by-default; `-n <trials>` sets the trial group. Fallback auth `POME_API_KEY` (Pome team key) is used **only as a shell env var this session** — never written to any file, fixture, spec, plan, or commit (repo secret-scan / gitleaks enforced).
+- **Hosted twins available:** github, slack, gmail, linear. **Stripe is unhosted** → stripe-dependent tasks are not hosted-runnable.
+
+### Level 1 — automated (local, CI-parity)
 
 - **TDD for Part A** (ticket is `tdd-optional`; the counter/recovery/envelope is pure logic): red tests first for the fault-counter progression (succeed → throttle window → recover), the 429 `RESOURCE_EXHAUSTED` envelope with `Retry-After`, unknown-fault-name reject, and `/admin/reset` clearing the counter.
 - **shared-types** schema test: `gmailSeedStateSchema` accepts the `faults` array and defaults it to `[]`.
 - **Contract suite** case as above.
-- **Example**: covered by typecheck:examples + smoke-examples; red/green behavior verified by real runs recorded in `VERIFICATION.md`.
+- `typecheck:examples` + `smoke-examples`, plus knip / code-health / legacy-marker lints stay green.
+
+### Level 2 — hosted E2E for the new gmail example (F-917, required)
+
+- `pome run examples/gmail-retry-notify/tasks/01-throttled-send.md -n <trials>` against the hosted gmail twin, agent launched locally with `ANTHROPIC_API_KEY`.
+- **Red** (V1, no retry) → completed trials fail; **Green** (V2, retry+backoff+idempotent) → all completed trials pass.
+- Record the real per-trial verdict tables + run links inline in `VERIFICATION.md`.
+- Teardown: stop any lingering hosted sessions (`pome session list` / `pome session stop`); remove any stray registered agents afterward.
+
+### Level 3 — hosted E2E sweep across the M4a/M4b curriculum (verification standard, per Ao)
+
+Run each committed curriculum example's task(s) hosted and record red/green. Set:
+
+- pr-summary-agent · pr-summary-review (×3) · triage-agent · merge-agent · minimal-viktor (×6) · minimal-viktor-langgraph (×6) · support-triage (M4a hero) · gmail-retry-notify (new).
+- **Skipped/blocked, reported not fixed here:** the injection example (F-915 task not committed to the repo); any stripe-dependent task (stripe unhosted).
+- Pre-existing failures are reported against their owning tickets (F-915 / F-916 / F-918), not force-fixed under F-917; only trivial breakages are fixed opportunistically.
+- Same teardown discipline as Level 2.
+
+### Deliverable — per-ticket testing instructions
+
+Post a full, copy-pasteable hosted-E2E test procedure (env prereqs, exact `pome run` command(s), expected red/green, teardown) as a comment on **every M4b ticket that needs testing** (F-915, F-916, F-917, F-918). Authored from the *verified* procedure produced in Levels 2–3 — not guessed.
 
 ## Risks / notes
 
