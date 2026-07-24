@@ -115,9 +115,13 @@ export async function runSkillsInstall(
 
   if (outcome.installed.length > 0) {
     console.log("");
-    console.log("Invoke them from your agent:");
-    console.log(`  ${bold("/pome-setup")}   — wire your agent up to pome`);
-    console.log(`  ${bold("/pome-test")}    — run tasks for a registered agent`);
+    console.log(
+      "These Gen-1 skills are retired (F-859) — they now redirect to the Gen-2",
+    );
+    console.log("coach set, which is the current way to test an agent with pome:");
+    console.log(`  ${bold("npx skills add pome-sh/digital-twins")}`);
+    console.log(`  ${dim("/pome-setup → pome-intake + the REST-launch preflight")}`);
+    console.log(`  ${dim("/pome-test  → pome-run-task")}`);
   }
 }
 

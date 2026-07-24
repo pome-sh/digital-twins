@@ -46,8 +46,14 @@ test evidence (fixtures, kept e2e transcripts) stays in the pome-cloud repo
 under `apps/docs/docs/skills/`.
 
 The Gen-1 CLI-era skills in [`cli/skills/`](../cli/skills/) (`pome-setup`,
-`pome-test`, installed by `pome skills install`) are a separate legacy surface
-scheduled for retirement (F-859, M2); the `skills` CLI does not pick them up —
-only this top-level `skills/` directory is a standard discovery location. The
-[`pome`](./pome/SKILL.md) router supersedes Gen-1 `pome-test`'s trigger
-phrases so the two generations never collide on an entry point (F-801).
+`pome-test`, installed by `pome skills install`) were **retired at F-859 (M2)**:
+their `SKILL.md` files are now tombstones that redirect to this set (`pome-setup`
+→ `pome-intake` + the REST-launch preflight; `pome-test` → `pome-run-task`).
+Their rescue-worthy assets landed here — the `pome doctor` preflight and the
+adapter/`withPome()` REST wiring depth in
+[`pome-run-task/references/launch-rest.md`](./pome-run-task/references/launch-rest.md),
+and the 0–5 CI exit-code contract in [`cli/README.md`](../cli/README.md). The
+`skills` CLI does not pick the tombstones up — only this top-level `skills/`
+directory is a standard discovery location — and the [`pome`](./pome/SKILL.md)
+router owns Gen-1's shared trigger phrases so the two generations never collide
+on an entry point (F-801).

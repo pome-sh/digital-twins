@@ -8,9 +8,9 @@ Naming decision (F-801, 2026-07-22): this router is named `pome`, NOT
 `pome-test`. The Gen-1 skill installed by `pome skills install` already
 occupies `pome-test` in users' skills directories, so a Gen-2 skill with the
 same name would collide at install time for anyone who has Gen-1. Gen-1
-(`cli/skills/pome-setup`, `cli/skills/pome-test`) retires at F-859 (M2);
-until then this router owns the shared trigger phrases and the two
-generations never claim the same entry point.
+(`cli/skills/pome-setup`, `cli/skills/pome-test`) was retired at F-859 (M2)
+to tombstones that redirect here; this router owns the shared trigger phrases
+so the two generations never claim the same entry point.
 -->
 
 # Pome (entry router)
@@ -30,7 +30,7 @@ browser): `claude mcp add --transport http pome https://mcp.pome.sh/mcp`.
 | The builder arrives with… | Route |
 | --- | --- |
 | A **Claude managed-agent YAML** (pasted, or "test my managed agent") | `pome-intake` — collect the clone scope, register via `intake_clone_scope`, report twin coverage |
-| A **local repo agent / self-hosted process** (talks REST, no managed-agent YAML) | The local-examinee path: register once with `register_agent(name, twins)`, then `pome-run-task` — `run_task` mints the session and the launch spec; launch the process yourself via the REST launcher (`pome-run-task/references/launch-rest.md`) |
+| A **local repo agent / self-hosted process** (talks REST, no managed-agent YAML) | The local-examinee path: register once with `register_agent(name, twins)`, then `pome-run-task` — `run_task` mints the session and the launch spec; launch the process yourself via the REST launcher (`pome-run-task/references/launch-rest.md`), which **preflights the wiring** (config → twin reachable → routing → egress floor, the `pome doctor` checks) before it launches |
 | "**What should I test?**" / a worry to turn into a graded check | `pome-author-task` — library-first authoring, `[code]`/`[model]` criteria, validate → dry-run → `save_task` |
 | A drafted task, first run coming up ("is my seed right?") | `pome-verify-seed` — fair-exam triage before anything runs |
 | A verified task to execute ("run my tasks", "how did my agent do?") | `pome-run-task` — mint, launch, `finalize_run` on idle, narrate `get_report` |
