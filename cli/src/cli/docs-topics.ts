@@ -37,6 +37,10 @@ export const DOCS_TOPICS: DocsTopic[] = [
       "register",
       "pome.json",
       "connect",
+      // Migrated from the retired skills-setup topic (F-893): wiring your own
+      // agent is now the "bring your own agent" path. ("pome-setup" / "setup"
+      // already resolve to getting-started via its "setup" keyword.)
+      "wire",
     ],
   },
   {
@@ -46,9 +50,12 @@ export const DOCS_TOPICS: DocsTopic[] = [
     keywords: ["twins", "scenarios", "runs", "scoring", "artifacts", "loop"],
   },
   // F-889 dropped the Gen-1 /setup and /test-with-pome skill pages from the
-  // docs nav; F-893 retired the CLI commands that pointed at them. Their live
-  // keywords (register/wire → existing-agent, setup → getting-started,
-  // run/eval → cli-run/cli) are covered by the topics that remain.
+  // docs nav; F-893 retired the CLI commands that pointed at them. The two
+  // topic entries are gone, but their still-live keywords are MIGRATED onto the
+  // surviving replacement topics so `pome docs <kw>` keeps routing:
+  //   wire → existing-agent;  test-with-pome / pome-test → cli-run;
+  //   eval → cli-inspect.  (setup / pome-setup / register / run scenarios / and
+  //   /setup all already resolve via existing substrings — see the tests.)
   {
     id: "dashboard",
     title: "Pome Dashboard",
@@ -95,7 +102,20 @@ export const DOCS_TOPICS: DocsTopic[] = [
     id: "cli-run",
     title: "pome run",
     path: "/docs/cli/run",
-    keywords: ["run", "scenario", "agent", "flags", "artifacts", "default", "demo task", "run yours"],
+    keywords: [
+      "run",
+      "scenario",
+      "agent",
+      "flags",
+      "artifacts",
+      "default",
+      "demo task",
+      "run yours",
+      // Migrated from the retired skills-test topic (F-893): running tasks is
+      // how you test an agent with pome.
+      "test-with-pome",
+      "pome-test",
+    ],
   },
   {
     id: "cli-session",
@@ -119,7 +139,9 @@ export const DOCS_TOPICS: DocsTopic[] = [
     id: "cli-inspect",
     title: "pome inspect",
     path: "/docs/cli/inspect",
-    keywords: ["inspect", "score", "trace", "artifacts", "verdicts"],
+    // "eval" migrated from the retired skills-test topic (F-893): `pome eval`
+    // surfaces the same verdict/score this topic documents.
+    keywords: ["inspect", "score", "trace", "artifacts", "verdicts", "eval"],
   },
   {
     id: "cli-init",
