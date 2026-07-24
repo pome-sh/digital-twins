@@ -45,7 +45,13 @@ if (status === 0) status = run("npm", ["run", "build", "-w", "@pome-sh/twin-slac
 if (status === 0) status = run("npm", ["run", "build", "-w", "@pome-sh/twin-stripe"]);
 if (status === 0) status = run("npm", ["run", "build", "-w", "@pome-sh/twin-gmail"]);
 if (status === 0) status = run("npm", ["run", "build", "-w", "@pome-sh/twin-linear"]);
-if (status === 0) status = run("node", ["--test", "contract/contract.test.mjs", "contract/sdk-boot.test.mjs"]);
+if (status === 0)
+  status = run("node", [
+    "--test",
+    "contract/contract.test.mjs",
+    "contract/sdk-boot.test.mjs",
+    "contract/gmail-fault.test.mjs",
+  ]);
 
 const removed = cleanRuntimeJs(SHARED_SRC);
 console.log(`[contract/run] cleaned ${removed} generated runtime .js file(s) from packages/shared-types/src`);
