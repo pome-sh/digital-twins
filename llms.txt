@@ -1,6 +1,6 @@
 # Pome Digital Twins
 
-> Simulation testing infrastructure for AI agents. Open-source, local, stateful digital twins of the APIs your agent calls — GitHub, Stripe, Slack, Gmail, and Linear — answering the same REST, GraphQL, and MCP calls as production, backed by real SQLite state. 137 MCP tools total. Deterministic, resettable, no live infrastructure. The `pome` CLI runs your agent against a twin and captures the trace; evaluation is a hosted feature at pome.sh.
+> Simulation testing infrastructure for AI agents. Open-source, local, stateful digital twins of the APIs your agent calls — GitHub, Stripe, Slack, Gmail, and Linear — answering the same REST, GraphQL, and MCP calls as production, backed by real SQLite state. 137 MCP tools in total, all deterministic, resettable, and requiring no live infrastructure. The `pome` CLI runs your agent against a twin and captures the trace; evaluation is a hosted feature at pome.sh.
 
 ## Docs
 
