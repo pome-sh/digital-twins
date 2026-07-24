@@ -38,4 +38,14 @@ query/filter, and the mailbox history high-water mark. The signing key resolves 
 There is no forgeable public default string. Cross-mailbox, cross-query, and stale
 snapshot tokens fail with `invalidArgument`.
 
+## Fault seeds
+
+Opt-in named fault-injection primitives (default none; a seed's `faults` array
+defaults to `[]`). The name is reusable teaching vocabulary — any task may seed
+it. See CONTRACT.md (Gmail pins).
+
+| Fault | Target (default) | Behavior |
+| --- | --- | --- |
+| `rate-limited` | `messages.send` | First `succeedFirst` (default 2) matching calls succeed; the next `throttleFor` (default 3) return **429 `RESOURCE_EXHAUSTED`** (retry hint in body; `retryAfterSeconds` default 1); then calls recover. Counter is per twin instance, cleared by `POST /admin/reset`. |
+
 See `performanceBudgets` in [`fidelity.inventory.json`](fidelity.inventory.json).

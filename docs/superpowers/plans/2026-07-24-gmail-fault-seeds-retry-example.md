@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - **npm only.** Root uses `npm ci` / `npm install`; `packages/*` share one root `package-lock.json`. Examples are standalone packages with their OWN `package-lock.json` (not root workspaces).
-- **Vocabulary: "task", never "scenario"** in new code/docs/copy. Config key is `runs:` (not "trials"). Criterion markers are `[code]` / `[model]` only — never `[D]` / `[P]`.
+- **Vocabulary: "task", never "scenario"** in new code/docs/copy. Config key is `runs:` (not "trials"). Criterion markers are `[code]` / `[model]` only — never the retired D/P bracket forms.
 - **Additive contract only.** The default Gmail seed must remain byte-for-byte unchanged (`faults` defaults to `[]`). No behavior change unless a task opts in.
 - **No Retry-After HTTP header.** The shared sdk error path returns `{status, body}` with no header channel; the retry hint goes in the 429 body, not a header. Do not modify the shared sdk twin harness.
 - **Secret handling.** The Pome API key (`pme_…`) is used only as a shell env var this session — NEVER written to any file, fixture, test, spec, plan, or commit. Repo secret-scan (gitleaks + TruffleHog) is enforced.
@@ -842,7 +842,7 @@ git commit -m "test(contract): gmail rate-limited fault case (F-917)"
 
 - [ ] **Step 1: LIMITS.md** — add a row/note: named fault seeds; `rate-limited` throttles `messages.send` by call count (opt-in; default none).
 - [ ] **Step 2: CHANGELOGs** — add an "Unreleased" entry to each: twin-gmail ("Named `rate-limited` fault seed primitive on `messages.send` + 429 RESOURCE_EXHAUSTED"), shared-types ("Gmail seed `faults` field (opt-in, default `[]`)"). Do NOT bump `version` in `package.json`.
-- [ ] **Step 3: Run dead-code + code-health lints.** Run: `npm run lint:dead-code && npm run lint:legacy-markers` — Expected: PASS (no orphan exports; no `[D]`/`[P]` markers, no new "scenario").
+- [ ] **Step 3: Run dead-code + code-health lints.** Run: `npm run lint:dead-code && npm run lint:legacy-markers` — Expected: PASS (no orphan exports; no retired D/P bracket markers, no new "scenario").
 - [ ] **Step 4: Commit.**
 
 ```bash
