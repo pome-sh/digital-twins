@@ -80,16 +80,14 @@ compare(
 // every packages/twin-*/Dockerfile — no per-twin config to keep in sync, so
 // there is no registration seam here to drift-check (was .github/dependabot.yml).
 
+// The twins are bundled into the CLI by tsup (`noExternal: [/^@pome-sh\//]`), so
+// they are devDependencies of cli, not runtime deps, and `bundleDependencies` is
+// gone. The devDependency list is still a registration seam: a twin missing from
+// it would not install, and its registry entry's `import()` would not resolve.
 const cliPackage = JSON.parse(read("cli/package.json"));
 compare(
-  "cli/package.json dependencies",
-  Object.keys(cliPackage.dependencies)
-    .filter((name) => name.startsWith("@pome-sh/twin-"))
-    .map((name) => name.slice("@pome-sh/twin-".length)),
-);
-compare(
-  "cli/package.json bundleDependencies",
-  cliPackage.bundleDependencies
+  "cli/package.json devDependencies",
+  Object.keys(cliPackage.devDependencies)
     .filter((name) => name.startsWith("@pome-sh/twin-"))
     .map((name) => name.slice("@pome-sh/twin-".length)),
 );
@@ -102,7 +100,6 @@ for (const twin of canonical) {
 }
 
 for (const workflow of [
-  ".github/workflows/cli-ci.yml",
   ".github/workflows/twin-image.yml",
   ".github/workflows/agent-trace-overhead-gate.yml",
 ]) {

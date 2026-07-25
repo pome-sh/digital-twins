@@ -1,7 +1,7 @@
 {
   "name": "@pome-sh/adapter-claude-sdk",
-  "version": "0.2.4",
-  "description": "Pome adapter for Anthropic's Claude Agent SDK — wraps query() and tools so agent traces land in the Pome trace format.",
+  "version": "0.2.5",
+  "description": "Pome adapter for Anthropic's Claude Agent SDK \u2014 wraps query() and tools so agent traces land in the Pome trace format.",
   "private": false,
   "type": "module",
   "main": "./dist/index.js",
@@ -30,17 +30,16 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsup",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "prepublishOnly": "tsc -p tsconfig.build.json"
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.220.0",
     "@opentelemetry/resources": "^2.10.0",
-    "@opentelemetry/sdk-trace-base": "^2.0.0",
-    "@pome-sh/shared-types": "*"
+    "@opentelemetry/sdk-trace-base": "^2.0.0"
   },
   "peerDependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.215"
@@ -52,7 +51,9 @@
   },
   "devDependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.215",
+    "@pome-sh/shared-types": "*",
     "@types/node": "^26.1.0",
+    "tsup": "^8.5.0",
     "typescript": "^5.9.3",
     "vitest": "^4.1.10"
   },

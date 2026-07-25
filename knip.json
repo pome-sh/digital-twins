@@ -9,8 +9,16 @@
     "binaries": "off",
     "unlisted": "off"
   },
-  "ignore": ["**/*.d.ts", "**/upstream-coverage.types.ts"],
-  "ignoreBinaries": ["docker", "gh", "changeset", "security", "infisical"],
+  "ignore": [
+    "**/*.d.ts",
+    "**/upstream-coverage.types.ts"
+  ],
+  "ignoreBinaries": [
+    "docker",
+    "gh",
+    "security",
+    "infisical"
+  ],
   "ignoreExportsUsedInFile": true,
   "ignoreDependencies": [
     "@ai-sdk/anthropic",
@@ -19,9 +27,8 @@
     "@ai-sdk/openai",
     "@openrouter/ai-sdk-provider",
     "ai",
-    "@changesets/cli",
-    "@changesets/changelog-github",
-    "tsx"
+    "tsx",
+    "graphql"
   ],
   "workspaces": {
     ".": {
@@ -30,20 +37,43 @@
         "contract/run.mjs",
         "contract/*.test.mjs"
       ],
-      "project": ["scripts/**/*.{mjs,sh}", "contract/**/*.mjs"]
+      "project": [
+        "scripts/**/*.{mjs,sh}",
+        "contract/**/*.mjs"
+      ]
     },
     "packages/*": {
-      "entry": ["src/index.ts", "src/server.ts", "scripts/**/*.ts"],
-      "project": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts"]
+      "entry": [
+        "src/index.ts",
+        "src/server.ts",
+        "tsup.config.ts",
+        "scripts/**/*.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "test/**/*.ts",
+        "scripts/**/*.ts"
+      ]
     },
     "packages/sdk": {
-      "entry": ["src/index.ts", "src/server.ts", "src/parity.ts", "scripts/**/*.ts"],
-      "project": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts"]
+      "entry": [
+        "src/index.ts",
+        "src/server.ts",
+        "src/parity.ts",
+        "scripts/**/*.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "test/**/*.ts",
+        "scripts/**/*.ts"
+      ]
     },
     "cli": {
       "entry": [
         "src/cli/main.ts",
+        "tsup.config.ts",
         "scripts/*.{mjs,ts}",
+        "scripts/lib/*.ts",
         "examples/agents/*.ts",
         "test/**/*.test.ts",
         "test/fixtures/**/*.ts"
@@ -56,8 +86,14 @@
       ]
     },
     "examples/*": {
-      "entry": ["src/index.ts", "test/**/*.ts"],
-      "project": ["src/**/*.ts", "test/**/*.ts"]
+      "entry": [
+        "src/index.ts",
+        "test/**/*.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "test/**/*.ts"
+      ]
     }
   }
 }

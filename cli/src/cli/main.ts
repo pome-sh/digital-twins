@@ -81,7 +81,13 @@ const DEFAULT_AGENT_FILE = "examples/agents/scripted-triage-agent.ts";
 const DEFAULT_AGENT_COMMAND = `npx tsx ${DEFAULT_AGENT_FILE}`;
 const MANIFEST_SCHEMA_URL = "https://pome.sh/schemas/v1/pome.json";
 
+// Injected by tsup (`define: { PKG_VERSION }`) so the bundled CLI never has to
+// locate its own package.json at runtime. Undeclared under `tsx src/cli/main.ts`,
+// where the filesystem fallback below still applies.
+declare const PKG_VERSION: string | undefined;
+
 function readPackageVersion(): string {
+  if (typeof PKG_VERSION === "string" && PKG_VERSION.length > 0) return PKG_VERSION;
   try {
     const here = dirname(fileURLToPath(import.meta.url));
     const candidates = [

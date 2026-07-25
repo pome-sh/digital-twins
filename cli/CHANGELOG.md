@@ -1,5 +1,36 @@
 # Changelog
 
+Entries are hand-written from 0.9.0 on. Changesets was retired with the
+packaging restructure: bump `version` here and in `package.json`, and merging to
+`main` publishes (see `.github/workflows/release.yml`).
+
+## 0.9.0
+
+### Minor Changes
+
+- **The CLI is now a single self-contained bundle.** `@pome-sh/{sdk,shared-types,twin-*}`
+  are inlined by tsup instead of shipped as `bundleDependencies`, and they are no
+  longer published to npm at all. Unpacked tarball size drops from 15.2 MB to
+  1.5 MB (92 files, down from 1,100+), and each twin is a lazily-loaded chunk —
+  `pome twin start github` no longer parses the other four twins.
+- `pome --version` now reports a build-time constant rather than locating
+  `package.json` on disk at runtime.
+- `pome register agent` now sends the manifest's `twins` to `POST /v1/agents`, so
+  the cloud agent's enabled services match the manifest instead of falling back
+  to the server's `github` default. Previously a manifest like `twins: ["gmail"]`
+  was ignored and the first `pome run` errored with
+  `Requested twins are not enabled`. Any `--twins` flag is unioned with the
+  manifest's twins (the server still merges additively).
+
+### Patch Changes
+
+- Runtime assets (the fix-prompt system prompt, the packaged demo task and its
+  seed sidecar) moved to `assets/` at the package root. They used to be resolved
+  relative to their importing module, which a bundle cannot do.
+- `graphql` is now a declared dependency: it is a runtime import of the bundled
+  Linear twin, and `pome twin start linear` would otherwise fail with
+  ERR_MODULE_NOT_FOUND.
+
 ## 0.8.0
 
 ### Minor Changes

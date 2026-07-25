@@ -1,5 +1,19 @@
 # @pome-sh/adapter-claude-sdk — CHANGELOG
 
+## 0.2.5 — 2026-07-25
+
+Packaging only — no API or behavior change. The adapter is built with tsup and
+bundles its internal wire-types dependency (`@pome-sh/shared-types`, now a
+`private: true` workspace package) instead of declaring it. The published
+tarball therefore has no `@pome-sh/*` dependency at all: 27.6 kB unpacked, four
+files. OpenTelemetry stays external (a consumer's own OTel SDK must be the same
+`@opentelemetry/api` instance, or spans stop nesting) and
+`@anthropic-ai/claude-agent-sdk` stays a required peer.
+
+The adapter versions INDEPENDENTLY of `@pome-sh/cli` and is published by
+`.github/workflows/release.yml` only when its own version differs from the
+registry.
+
 ## 0.2.4 — 2026-07-24
 
 F-866 — `tool()`'s return type is widened from `SdkMcpToolDefinition<Schema>` to
