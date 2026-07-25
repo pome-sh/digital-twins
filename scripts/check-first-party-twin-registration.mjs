@@ -84,11 +84,6 @@ compare(
     .map((name) => name.slice("@pome-sh/twin-".length)),
 );
 
-const packed = [
-  ...read("scripts/pack-publishable.mjs").matchAll(/"packages\/twin-([a-z][a-z0-9-]*)"/g),
-].map((match) => match[1]);
-compare("scripts/pack-publishable.mjs packageDirs", packed);
-
 const rootPackage = JSON.parse(read("package.json"));
 for (const twin of canonical) {
   if (!rootPackage.scripts.build.includes(`-w @pome-sh/twin-${twin}`)) {
@@ -109,16 +104,10 @@ for (const workflow of [
   }
 }
 
-const packagePublish = read(".github/workflows/sdk-publish.yml");
-const cliRelease = read(".github/workflows/cli-release.yml");
-for (const twin of canonical) {
-  if (!packagePublish.includes(`pome-sh-twin-${twin}-*.tgz`)) {
-    failures.push(`sdk-publish.yml: missing twin-${twin} publish artifact`);
-  }
-  if (!cliRelease.includes(`npm view @pome-sh/twin-${twin}@`)) {
-    failures.push(`cli-release.yml: missing twin-${twin} dependency gate`);
-  }
-}
+// The twins are no longer published to npm (they are `private: true`
+// workspace members bundled into @pome-sh/cli), so there is no per-twin
+// publish artifact or npm-dependency gate left to drift-check here. The
+// former sdk-publish.yml / cli-release.yml assertions died with those seams.
 
 const catalogIds = [
   ...read("cli/src/cli/tasks-catalog.ts").matchAll(/^\s{4}id:\s*"([a-z][a-z0-9-]*)",$/gm),

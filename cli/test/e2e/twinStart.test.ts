@@ -16,9 +16,10 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { sign } from "hono/jwt";
 import { afterEach, describe, expect, it } from "vitest";
+import { resolveTsxBin } from "../../scripts/lib/resolve-tsx.js";
 
 const CLI_ROOT = fileURLToPath(new URL("../..", import.meta.url));
-const TSX_BIN = join(CLI_ROOT, "node_modules", ".bin", "tsx");
+const TSX_BIN = resolveTsxBin(import.meta.url);
 const MAIN_TS = join(CLI_ROOT, "src", "cli", "main.ts");
 const PERSISTED_SECRET = "e2e-persisted-secret-0123456789abcdef";
 

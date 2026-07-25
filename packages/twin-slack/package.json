@@ -2,7 +2,7 @@
   "name": "@pome-sh/twin-slack",
   "version": "0.2.2",
   "description": "Deterministic Slack Web API twin for agent testing — REST + MCP, SQLite-backed state.",
-  "private": false,
+  "private": true,
   "type": "module",
   "main": "./dist/src/index.js",
   "types": "./dist/src/index.d.ts",
@@ -14,11 +14,7 @@
     "./server": {
       "types": "./dist/src/server.d.ts",
       "default": "./dist/src/server.js"
-    },
-    "./*": "./dist/src/*.js"
-  },
-  "bin": {
-    "twin-slack": "./dist/src/server.js"
+    }
   },
   "files": [
     "dist",
@@ -26,9 +22,6 @@
     "FIDELITY.md",
     "fidelity.inventory.json"
   ],
-  "publishConfig": {
-    "access": "public"
-  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsx src/server.ts",
@@ -46,8 +39,8 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.0.10",
-    "@pome-sh/sdk": "0.5.1",
-    "@pome-sh/shared-types": "0.12.0",
+    "@pome-sh/sdk": "*",
+    "@pome-sh/shared-types": "*",
     "hono": "^4.12.31",
     "zod": "^4.1.13"
   },

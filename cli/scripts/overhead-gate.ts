@@ -28,6 +28,7 @@ import {
   summarize,
   type LatencyStats,
 } from "./overhead-stats.js";
+import { resolveTsxBin } from "./lib/resolve-tsx.js";
 
 // F-728 — N default raised 100 → 1000: at N=100 the nearest-rank p99 is the
 // second-largest sample, so one OS scheduling stall in either run's tail
@@ -56,7 +57,7 @@ const CLI_ROOT = process.cwd();
 // agent is spawned with cwd = the tmp scaffold (no node_modules), so npx
 // resolves tsx from registry.npmjs.org at runtime — a CONNECT the run's
 // deny-by-default egress floor refuses, killing the agent preflight (exit 3).
-const TSX_BIN = resolve(CLI_ROOT, "node_modules/.bin/tsx");
+const TSX_BIN = resolveTsxBin(import.meta.url);
 
 // FDRS-641 — `pome run` now hard-gates on the doctor wiring checks (config →
 // twin → routing → egress) with no --force. This synthetic benchmark used to

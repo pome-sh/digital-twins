@@ -1,11 +1,19 @@
 name: cli-release
+# PUBLISH FREEZE (packaging restructure, Lane A → Lane D).
+#
+# The push-to-main trigger is REMOVED for the duration of the restructure: the
+# @pome-sh/* internal packages are now `private: true` workspace members, so the
+# changesets path below (which publishes cli against exact npm pins of those
+# packages) can no longer produce a correct release. Lane D replaces this file
+# with a version-diff `release.yml`.
+#
+# Hotfix fallback while the freeze holds: check out the pre-restructure tag for
+# `@pome-sh/cli@0.8.0`, cherry-pick the fix, and `npm publish` from `cli/` by
+# hand — that tree still carries the exact-pin manifest this workflow expects.
+# `workflow_dispatch` is kept so that path can still be driven from CI if the
+# published dependency versions are pinned back by hand first.
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'cli/**'
-      - '.github/workflows/cli-release.yml'
 
 concurrency:
   group: cli-release-${{ github.ref }}

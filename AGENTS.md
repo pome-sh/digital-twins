@@ -31,12 +31,15 @@ live at **https://docs.pome.sh**.
   serialized `scenario` / `scenario_*` keys — the run-artifact `scenario` key and
   the finalize/result wire fields (server contract; flip with W3/FDRS-653) — and
   the in-memory carriers whose value flows straight into them.
-- **The CLI (`cli/`) is not a root workspace** — use `cd cli && npm ...`, not
-  `npm run -w` from the root.
-- **`cli/pnpm-workspace.yaml` is not pnpm** — it is only the changesets/manypkg
-  root marker for the single-package changesets setup (npm ignores it). Do not
-  replace it with `"workspaces": ["."]` in `cli/package.json`: that combination
-  breaks npm for scoped package names in this nested layout (F-727).
+- **The CLI (`cli/`) IS a root workspace member** — `workspaces: ["packages/*",
+  "cli"]`, one `package-lock.json`, one `npm ci`. Use `npm run -w @pome-sh/cli
+  ...` from the root. The former `cli/package-lock.json` and
+  `cli/pnpm-workspace.yaml` (the changesets/manypkg root marker) are gone.
+- **Internal `@pome-sh/*` deps are `"*"`** — sdk, shared-types and the five
+  twins are `private: true` workspace members resolved by npm's workspace
+  linking, never from the registry. Never reintroduce an exact version pin
+  between them: the exact pins drifted and installed a second registry copy of
+  `@pome-sh/shared-types` (two zod schema identities at one runtime).
 
 ## CLI releases (`@pome-sh/cli`)
 
@@ -96,8 +99,11 @@ digests are cosign-signed with GitHub OIDC, and each digest receives an SPDX
 SBOM attestation. Downstream cloud snapshot promotion must pin and verify those
 signed digests before rebuilding runtime snapshots. That promotion is operated
 from the private `pome-sh/pome-cloud` repo — maintainers: see
-`docs/runbooks/twin-release-and-promotion.md` there. Version-bump rules for
-`@pome-sh/*` packages live in [`PACKAGE_RELEASE.md`](PACKAGE_RELEASE.md).
+`docs/runbooks/twin-release-and-promotion.md` there.
+
+Only `@pome-sh/cli` and `@pome-sh/adapter-claude-sdk` are published to npm.
+Everything else is internal to the CLI tarball, so the per-package version-bump
+runbook (`PACKAGE_RELEASE.md`) is retired.
 
 Everything else — architecture, per-package details, and the CI gotchas
 (changeset gate, no-cloud-imports, twin Docker build) — is documented at

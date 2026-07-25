@@ -14,6 +14,9 @@ on:
       - 'packages/*/package.json'
       - 'package.json'
       - 'package-lock.json'
+      # The twin Dockerfiles COPY cli/package.json so `npm ci` can see every
+      # workspace manifest named in the lockfile.
+      - 'cli/package.json'
       - '.dockerignore'
       - '.trivyignore'
       - 'scripts/ci/wait-for-workflow.sh'
@@ -57,7 +60,7 @@ jobs:
           shared=false
           for f in "${files[@]}"; do
             case "$f" in
-              packages/shared-types/*|package.json|package-lock.json|.dockerignore|.trivyignore|scripts/ci/*|.github/workflows/*|packages/*/package.json)
+              packages/shared-types/*|package.json|package-lock.json|cli/package.json|.dockerignore|.trivyignore|scripts/ci/*|.github/workflows/*|packages/*/package.json)
                 shared=true
                 break
                 ;;

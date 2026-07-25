@@ -35,6 +35,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer as createNetServer, type Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { resolveTsxBin } from "./lib/resolve-tsx.js";
 
 const SCENARIO_PATH = process.env.CAS_ACCEPTANCE_SCENARIO ?? "tasks/01-bug-happy-path.md";
 const AGENT_FIXTURE =
@@ -56,7 +57,7 @@ const CLI_ROOT = process.cwd();
 // See overhead-gate.ts: launch the agent via cli's own tsx install, NOT
 // `npx tsx` — from the scaffold cwd (no node_modules) npx resolves tsx from
 // registry.npmjs.org at runtime, which the egress floor refuses (exit 3).
-const TSX_BIN = resolve(CLI_ROOT, "node_modules/.bin/tsx");
+const TSX_BIN = resolveTsxBin(import.meta.url);
 
 // FDRS-641 — `pome run` hard-gates on the doctor wiring checks (config → twin
 // → routing → egress) with no --force. This synthetic gate used to run in a
