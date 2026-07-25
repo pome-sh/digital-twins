@@ -75,28 +75,20 @@ several **adversarial** (identity spoofing, prompt injection, merging a backdoor
 PR, fabricating green CI). Browse with `pome tasks`. Four worked example agents
 live under [`examples/`](./examples/).
 
-## Build your own twin
+## How it works
 
-The five twins are thin domain plugins on [`@pome-sh/sdk`](./packages/sdk/). The
-engine supplies HTTP mounting, auth, the trace recorder, MCP dispatch, SQLite
-state, and the admin reset gate — so a twin is just its domain logic and tools:
+Everything ships inside `@pome-sh/cli` — one install, one entry point. The five
+twins are thin domain plugins on an internal twin engine that supplies HTTP
+mounting, bearer auth, the trace recorder, MCP dispatch, SQLite state, and the
+admin reset/seed gate. Those internals (`packages/sdk`, `packages/twin-*`) are
+implementation detail of the CLI, not separately installable packages.
 
-```ts
-import { defineTwin } from "@pome-sh/sdk";
-import { serve } from "@pome-sh/sdk/server";
+Every twin honors the frozen [`CONTRACT.md`](./CONTRACT.md) runtime contract —
+entry point, env surface, `/healthz` shape, auth, and MCP surfaces. See
+[`packages/README.md`](./packages/README.md) for the internal layout.
 
-const twin = defineTwin({
-  id: "my-service",
-  version: "0.1.0",
-  domain: ({ db, seed }) => createMyDomain(db, seed),
-  tools: [/* ToolSpec[] — name, zod schema, handler */],
-});
-
-await serve(twin, { port: 3333 });
-```
-
-Every twin honors the frozen [`CONTRACT.md`](./CONTRACT.md) runtime contract. Start
-from the [SDK README](./packages/sdk/README.md).
+Authoring your own twin is not a supported product surface today. If that's what
+you need, tell us: `founders@pome.sh`.
 
 ---
 

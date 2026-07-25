@@ -1,6 +1,13 @@
 # Pome Twin: Stripe x402
 
-> One of four twins in this repository (GitHub, Stripe x402, Slack, Gmail).
+> **Internal package.** One of five twin runtimes in this repository (GitHub,
+> Stripe x402, Slack, Gmail, Linear). It is not separately installable — it
+> ships inside [`@pome-sh/cli`](../../cli/). To run it:
+> `npx @pome-sh/cli twin start stripe`.
+>
+> The rest of this file is the engineering reference: HTTP/MCP surface, auth
+> shapes, known deviations, and the runtime contract pome-cloud's sandbox
+> images depend on.
 
 `@pome-sh/twin-stripe` is the only deterministic test double for **Stripe
 x402 machine payments**. Real Stripe sandbox doesn't auto-settle crypto
@@ -27,11 +34,6 @@ agent), the zero-install path needs only Node ≥ 24:
 ```bash
 npx @pome-sh/cli twin start stripe      # starts on :3333
 curl http://127.0.0.1:3333/healthz
-
-# Or, to develop the twin from source:
-# git clone https://github.com/pome-sh/pome-twins.git
-# cd pome-twins && npm install
-# npm run -w @pome-sh/twin-stripe dev
 
 # Real Stripe SDKs work via host override — they hit /v1/* directly
 # (no /s/:sid prefix) and the bearer alone resolves the session:
@@ -75,6 +77,8 @@ See [FIDELITY.md](./FIDELITY.md) for the full route table and known
 deviations from real Stripe.
 
 ## Running the buyer agent demo
+
+From a repo checkout (contributor path):
 
 ```bash
 # Terminal 1
@@ -233,8 +237,10 @@ Other deviations from real Stripe:
 
 ## Local commands
 
+Contributor-only, from a repo checkout (these scripts are not part of any
+published package):
+
 ```bash
-npm install
 npm run dev                        # boot on :3333 with default seed
 npm run typecheck                  # tsc --noEmit
 npm run test                       # vitest, 32 files / 237 tests
@@ -244,7 +250,7 @@ node dist/src/server.js            # production-shape boot
 
 ## Use it as a Stripe test double in your tests
 
-The cleanest way is to boot the published twin from your test setup; all
+The cleanest way is to boot the twin from your test setup via the CLI; all
 it needs is Node ≥ 24:
 
 ```ts
