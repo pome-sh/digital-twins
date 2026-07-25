@@ -14,7 +14,8 @@
     "./server": {
       "types": "./dist/src/server.d.ts",
       "default": "./dist/src/server.js"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",

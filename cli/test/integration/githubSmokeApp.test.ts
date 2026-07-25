@@ -1,6 +1,6 @@
 import { sign } from "hono/jwt";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createGitHubCloneApp } from "../../src/twin/githubCloneAdapter.js";
+import { createGitHubSmokeApp } from "../../src/twin/registry.js";
 
 const TEST_AUTH_SECRET = "test-secret-32-chars-minimum-length";
 const TEST_SID = "adapter-session";
@@ -19,9 +19,9 @@ afterAll(() => {
   else process.env.TWIN_AUTH_SECRET = previousSecret;
 });
 
-describe("github_clone adapter", () => {
+describe("github twin smoke app (registry)", () => {
   it("loads the new GitHub clone and exposes REST plus MCP surfaces", async () => {
-    const app = (await createGitHubCloneApp()) as { request: (url: string, init?: RequestInit) => Promise<Response> | Response };
+    const app = (await createGitHubSmokeApp()) as { request: (url: string, init?: RequestInit) => Promise<Response> | Response };
 
     const health = await app.request("/healthz");
     expect(health.status).toBe(200);
@@ -40,7 +40,7 @@ describe("github_clone adapter", () => {
   });
 
   it("serves real MCP JSON-RPC at POST /s/:sid/mcp (initialize, tools/list, tools/call)", async () => {
-    const app = (await createGitHubCloneApp()) as { request: (url: string, init?: RequestInit) => Promise<Response> | Response };
+    const app = (await createGitHubSmokeApp()) as { request: (url: string, init?: RequestInit) => Promise<Response> | Response };
     const url = `/s/${TEST_SID}/mcp`;
     const headers = { Authorization: `Bearer ${token}`, "content-type": "application/json" };
 

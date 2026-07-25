@@ -17,7 +17,6 @@
     "lint:no-catch": "node scripts/no-catch-and-continue.mjs",
     "lint:copy-markers": "node scripts/check-copy-markers.mjs",
     "lint:code-health": "node scripts/lint-code-health.mjs",
-    "lint:twin-registration": "node scripts/check-first-party-twin-registration.mjs",
     "lint:legacy-markers": "node scripts/lint-legacy-criterion-markers.mjs",
     "lint:dead-code": "knip --no-config-hints"
   },

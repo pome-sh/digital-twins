@@ -21,13 +21,8 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { serve } from "@hono/node-server";
 import { sign } from "hono/jwt";
-import { defaultSeedState as defaultSlackSeedState } from "@pome-sh/twin-slack";
-import { defaultSeed as defaultStripeSeed } from "@pome-sh/twin-stripe";
-import { defaultSeedState as defaultGmailSeedState } from "@pome-sh/twin-gmail";
-import { defaultSeedState as defaultLinearSeedState } from "@pome-sh/twin-linear";
+import { defaultPortFor, isTwinName, TWIN_NAMES, TWIN_REGISTRY } from "./registry.js";
 import { bootTwin } from "./twinHarness.js";
-
-export const SUPPORTED_STANDALONE_TWINS = ["github", "slack", "stripe", "gmail", "linear"] as const;
 
 /** The fixed session id a standalone twin serves under (`/s/standalone`). */
 const STANDALONE_SID = "standalone";
@@ -76,42 +71,12 @@ export function resolveStandaloneAuthSecret(
   return { secret: randomBytes(32).toString("hex"), source: "ephemeral" };
 }
 
-function defaultSeedFor(twin: string): unknown {
-  switch (twin) {
-    case "slack":
-      return defaultSlackSeedState();
-    case "stripe":
-      return defaultStripeSeed();
-    case "gmail":
-      return defaultGmailSeedState();
-    case "linear":
-      return defaultLinearSeedState();
-    default:
-      // github: bootTwin's adapter seeds the default world when the seed is
-      // undefined (pre-existing standalone behavior).
-      return undefined;
-  }
-}
-
-/** Resolve listen port for `pome twin start` when `--port` is omitted. */
-export function defaultPortFor(
-  twin: string,
-  env: NodeJS.ProcessEnv = process.env,
-): string {
-  if (env.PORT) return env.PORT;
-  if (twin === "gmail") return env.GMAIL_TWIN_PORT ?? "3336";
-  if (twin === "linear") return env.LINEAR_TWIN_PORT ?? "3337";
-  return "3333";
-}
-
 export async function runTwinStartCommand(
   name: string,
   options: { port?: string },
 ): Promise<void> {
-  if (!(SUPPORTED_STANDALONE_TWINS as readonly string[]).includes(name)) {
-    throw new Error(
-      `Unknown twin '${name}'. Supported: ${SUPPORTED_STANDALONE_TWINS.join(", ")}.`,
-    );
+  if (!isTwinName(name)) {
+    throw new Error(`Unknown twin '${name}'. Supported: ${TWIN_NAMES.join(", ")}.`);
   }
   // `PORT` wins when set (contract suite / packaged entries). Gmail defaults
   // to 3336 via GMAIL_TWIN_PORT; other twins keep 3333.
@@ -132,7 +97,7 @@ export async function runTwinStartCommand(
   const baseUrl = `http://127.0.0.1:${port}`;
   const harness = await bootTwin({
     twin: name,
-    seedState: defaultSeedFor(name),
+    seedState: await TWIN_REGISTRY[name].defaultSeed(),
     runId: STANDALONE_SID,
     twinBaseUrl: baseUrl,
   });

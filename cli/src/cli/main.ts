@@ -61,7 +61,7 @@ import {
   readManifest,
   writeManifest,
 } from "./project-config.js";
-import { createGitHubCloneApp } from "../twin/githubCloneAdapter.js";
+import { createGitHubSmokeApp } from "../twin/registry.js";
 import {
   buildFixPrompt,
   buildGroupFixPrompt,
@@ -1277,7 +1277,7 @@ export function createProgram() {
     .command("health")
     .description("Run an in-process smoke check")
     .action(async () => {
-      const app = (await createGitHubCloneApp()) as { request: (url: string) => Promise<Response> };
+      const app = (await createGitHubSmokeApp()) as { request: (url: string) => Promise<Response> };
       const response = await app.request("http://pome.local/healthz");
       console.log(await response.text());
     });

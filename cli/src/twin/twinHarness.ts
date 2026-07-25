@@ -2,8 +2,7 @@
 //
 // Twin-agnostic in-process boot for the self-host runner (FDRS-528 / FDRS-529).
 //
-// The local runner historically only booted the GitHub twin and threw for any
-// other seed shape. `bootTwin` generalizes that: given a twin name + the
+// `bootTwin` is a thin wrapper over `TWIN_REGISTRY`: given a twin name + the
 // scenario's (already twin-shaped) seed state, it stands up the matching
 // in-process twin app, seeds it, and exposes a uniform surface the runner drives
 // regardless of twin —
@@ -13,54 +12,18 @@
 //   - `events`      recorded twin HTTP events (one shared recorder buffer)
 //   - `close`       tear down the underlying SQLite handle
 //
-// Every twin's `createApp` takes the same CLI recorder instance, so events from
-// any twin land in one buffer typed as the legacy github `RecorderEvent` (the
-// shape is structurally shared via `@pome-sh/shared-types`; the `twin` field is
-// just a string, see `recorderEventSchema`). New twins slot in by adding a case.
+// Everything twin-specific — which package to import, the seed shape, the env
+// prefix, the extra JWT claims — lives in that twin's registry entry. This file
+// owns only the recorder lifecycle, which is shared across twins.
 import { createRecorder, type Recorder } from "../recorder/recorder.js";
 import type { RecorderEvent } from "@pome-sh/shared-types";
-import {
-  createGitHubCloneApp,
-  exportGitHubCloneState,
-  openGitHubCloneDatabase,
-  seedGitHubCloneDatabase,
-} from "./githubCloneAdapter.js";
-import {
-  createSlackTwinApp,
-  openSlackTwinDatabase,
-  SlackDomain,
-} from "@pome-sh/twin-slack";
-import { createApp } from "@pome-sh/sdk/server";
-import * as stripeTwin from "@pome-sh/twin-stripe";
-import {
-  applySeed as applyStripeSeed,
-  createTwinStripeApp,
-  openTwinStripeDatabase,
-  parseSeed as parseStripeSeed,
-  StripeDomain,
-} from "@pome-sh/twin-stripe";
-import {
-  createGmailTwinApp,
-  GmailDomain,
-  openGmailTwinDatabase,
-  parseSeed as parseGmailSeed,
-} from "@pome-sh/twin-gmail";
-import {
-  createLinearTwinApp,
-  DEFAULT_LINEAR_EMAIL,
-  LinearDomain,
-  openLinearTwinDatabase,
-  parseSeed as parseLinearSeed,
-} from "@pome-sh/twin-linear";
+import { isTwinName, TWIN_NAMES, TWIN_REGISTRY, type TwinApp } from "./registry.js";
 
-// The account every local Stripe scenario seeds under. The runner mints a JWT
-// whose `account_id` claim matches this, so `exportState` and the session
-// resolve to the same account the seed data lives in.
-export const STRIPE_LOCAL_ACCOUNT_ID = "acct_default";
+export { STRIPE_LOCAL_ACCOUNT_ID } from "./registry.js";
 
 export type TwinHarness = {
   /** Hono app the runner serves at `http://127.0.0.1:<port>`. */
-  app: { fetch: (request: Request, ...rest: unknown[]) => Response | Promise<Response> };
+  app: TwinApp;
   /** Uppercase env prefix: the agent reads `POME_<envName>_{REST,MCP}_URL`. */
   envName: string;
   /** Twin state for `[code]` scoring (initial before the agent, final after). */
@@ -86,7 +49,7 @@ export class UnsupportedTwinError extends Error {
   constructor(public readonly twin: string) {
     super(
       `Self-hosted local runs do not support the '${twin}' twin yet. ` +
-        `Supported: github, slack, stripe, gmail, linear.`,
+        `Supported: ${TWIN_NAMES.join(", ")}.`,
     );
     this.name = "UnsupportedTwinError";
   }
@@ -112,164 +75,37 @@ export async function bootTwin(opts: {
    */
   recorder?: Recorder;
 }): Promise<TwinHarness> {
+  if (!isTwinName(opts.twin)) throw new UnsupportedTwinError(opts.twin);
+  const entry = TWIN_REGISTRY[opts.twin];
+
   const ownsRecorder = opts.recorder === undefined;
   const recorder = opts.recorder ?? createRecorder({ eventsPath: opts.eventsPath });
 
   const flushRecorder = async () => {
     await recorder.flush?.();
   };
-  const closeRecorderAndDb = async (dbClose: () => void) => {
-    await flushRecorder();
-    // A shared recorder is owned by the caller — only flush here, never close
-    // it out from under sibling harnesses still writing to it.
-    if (ownsRecorder) await recorder.close?.();
-    dbClose();
+
+  const booted = await entry.boot({
+    seedState: opts.seedState,
+    runId: opts.runId,
+    twinBaseUrl: opts.twinBaseUrl,
+    recorder,
+  });
+
+  return {
+    app: booted.app,
+    envName: entry.envName,
+    exportState: () => booted.exportState(),
+    events: () => recorder.events(),
+    ...(booted.extraClaims ? { extraClaims: booted.extraClaims } : {}),
+    ...(entry.tokenEnvName ? { tokenEnvName: entry.tokenEnvName } : {}),
+    flush: () => flushRecorder(),
+    close: async () => {
+      await flushRecorder();
+      // A shared recorder is owned by the caller — only flush here, never close
+      // it out from under sibling harnesses still writing to it.
+      if (ownsRecorder) await recorder.close?.();
+      booted.closeDb();
+    },
   };
-
-  switch (opts.twin) {
-    case "github": {
-      const db = await openGitHubCloneDatabase();
-      await seedGitHubCloneDatabase(db, opts.seedState);
-      const app = (await createGitHubCloneApp({
-        db,
-        recorder,
-        runId: opts.runId,
-      })) as TwinHarness["app"];
-      return {
-        app,
-        envName: "GITHUB",
-        exportState: () => exportGitHubCloneState(db),
-        events: () => recorder.events(),
-        flush: () => flushRecorder(),
-        close: () => closeRecorderAndDb(() => (db as { close(): void }).close()),
-      };
-    }
-
-    case "slack": {
-      const db = openSlackTwinDatabase(":memory:");
-      const domain = new SlackDomain(db);
-      // `applySeed` runs the twin's own `parseSeed` (regex/shape validation +
-      // default-filling) before seeding, so the permissive scenario-side
-      // `slackSeedStateSchema` is tightened to the twin's contract here.
-      domain.applySeed(opts.seedState);
-      const app = createSlackTwinApp({
-        db,
-        domain,
-        // One shared CLI recorder buffers events for every twin; the engine
-        // types its param as `RecorderStore` (same structural shape).
-        recorder: recorder as NonNullable<Parameters<typeof createSlackTwinApp>[0]>["recorder"],
-        runId: opts.runId,
-      }) as TwinHarness["app"];
-      return {
-        app,
-        envName: "SLACK",
-        exportState: () => domain.exportState(),
-        events: () => recorder.events(),
-        flush: () => flushRecorder(),
-        close: () => closeRecorderAndDb(() => db.close()),
-      };
-    }
-
-    case "stripe": {
-      // Engine-based twin (F-684): the factory owns middleware, MCP mount,
-      // and the failure-injection store — seed rules ride in via `seed` and
-      // land in the same store the session middleware reads (FDRS-369), so
-      // e.g. scenario 14's lost-response 402 actually fires. Recorder
-      // counters (dropped) come from the engine handle, so the shared CLI
-      // recorder suffices here too.
-      const db = openTwinStripeDatabase(":memory:");
-      const domain = new StripeDomain(db);
-      const seed = parseStripeSeed(opts.seedState);
-      const twinBaseUrl = opts.twinBaseUrl ?? "http://127.0.0.1:3333";
-      type StripeDefinitionFactory = (factoryOpts: {
-        db: ReturnType<typeof openTwinStripeDatabase>;
-        twinBaseUrl?: string;
-      }) => Parameters<typeof createApp>[0];
-      const createStripeTwinDefinition = (
-        stripeTwin as typeof stripeTwin & {
-          createStripeTwinDefinition?: StripeDefinitionFactory;
-        }
-      ).createStripeTwinDefinition;
-      const app = (createStripeTwinDefinition
-        ? createApp(createStripeTwinDefinition({ db, twinBaseUrl }), {
-            db,
-            recorder,
-            runId: opts.runId,
-            seed,
-          })
-        : (() => {
-            // Older published twin-stripe packages predate the additive
-            // `seed` app option. Seed explicitly so local runs don't boot an
-            // empty credential store when the CLI resolves that package.
-            applyStripeSeed(db, seed);
-            return createTwinStripeApp({
-              db,
-              recorder:
-                recorder as NonNullable<Parameters<typeof createTwinStripeApp>[0]>["recorder"],
-              runId: opts.runId,
-              twinBaseUrl,
-            } as Parameters<typeof createTwinStripeApp>[0] & { twinBaseUrl?: string });
-          })()) as TwinHarness["app"];
-      return {
-        app,
-        envName: "STRIPE",
-        exportState: () => domain.exportState(STRIPE_LOCAL_ACCOUNT_ID),
-        events: () => recorder.events(),
-        extraClaims: { account_id: STRIPE_LOCAL_ACCOUNT_ID },
-        flush: () => flushRecorder(),
-        close: () => closeRecorderAndDb(() => db.close()),
-      };
-    }
-
-    case "gmail": {
-      const db = openGmailTwinDatabase(":memory:");
-      const seed = parseGmailSeed(opts.seedState);
-      const domain = new GmailDomain(db);
-      const app = createGmailTwinApp({
-        db,
-        seed,
-        recorder,
-        runId: opts.runId,
-      }) as TwinHarness["app"];
-      return {
-        app,
-        envName: "GMAIL",
-        exportState: () => domain.exportState(),
-        events: () => recorder.events(),
-        extraClaims: { gmail_email: seed.primaryMailbox.email },
-        tokenEnvName: "POME_GMAIL_TOKEN",
-        flush: () => flushRecorder(),
-        close: () => closeRecorderAndDb(() => db.close()),
-      };
-    }
-
-    case "linear": {
-      const db = openLinearTwinDatabase(":memory:");
-      const seed = parseLinearSeed(opts.seedState);
-      const domain = new LinearDomain(db);
-      const app = createLinearTwinApp({
-        db,
-        seed,
-        recorder,
-        runId: opts.runId,
-      }) as TwinHarness["app"];
-      const primaryEmail =
-        seed.users.find((user) => user.admin)?.email ??
-        seed.users[0]?.email ??
-        DEFAULT_LINEAR_EMAIL;
-      return {
-        app,
-        envName: "LINEAR",
-        exportState: () => domain.exportState(),
-        events: () => recorder.events(),
-        extraClaims: { linear_email: primaryEmail },
-        tokenEnvName: "POME_LINEAR_TOKEN",
-        flush: () => flushRecorder(),
-        close: () => closeRecorderAndDb(() => db.close()),
-      };
-    }
-
-    default:
-      throw new UnsupportedTwinError(opts.twin);
-  }
 }
