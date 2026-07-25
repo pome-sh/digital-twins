@@ -78,11 +78,12 @@ jobs:
       # F-705 — the CLI's production closure must stay free of gyp-marked
       # packages (the published artifact bundles the twins).
       - run: npm run gate:no-native
-      - run: npm run typecheck -w @pome-sh/cli
       # The CLI compiles against the sibling packages' built dists
-      # (`@pome-sh/sdk/server` → dist/server.d.ts), so build the workspace in
-      # dependency order — the root build chain ends with the CLI.
+      # (`@pome-sh/sdk/server` → dist/server.d.ts), so the workspace build has to
+      # come FIRST — before this PR the CLI resolved those types out of packed
+      # tarballs that already carried a dist. Same order as ci.yml.
       - run: npm run build
+      - run: npm run typecheck -w @pome-sh/cli
       # `@pome-sh/shared-types` still publishes RAW `.ts` from its `exports`
       # map, and its internal specifiers are `./x.js` — so the built CLI cannot
       # import it until the in-place runtime JS exists. The old pipeline got
