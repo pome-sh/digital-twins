@@ -83,6 +83,13 @@ jobs:
       # (`@pome-sh/sdk/server` → dist/server.d.ts), so build the workspace in
       # dependency order — the root build chain ends with the CLI.
       - run: npm run build
+      # `@pome-sh/shared-types` still publishes RAW `.ts` from its `exports`
+      # map, and its internal specifiers are `./x.js` — so the built CLI cannot
+      # import it until the in-place runtime JS exists. The old pipeline got
+      # those files for free inside the packed tarball; a workspace link does
+      # not. `contract/run.mjs` does the same thing before the black-box suite.
+      # (The wire-package lane replaces this with a normal dist build.)
+      - run: npm run build:runtime -w @pome-sh/shared-types
       - run: npm test -w @pome-sh/cli
       # F-709 — the frozen M1 runtime-contract assertions, asserted against
       # twins started via the CLI front door (`pome twin start <twin>`).
