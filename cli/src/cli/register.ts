@@ -32,6 +32,7 @@ import {
   writeLinkCache,
 } from "./link-cache.js";
 import {
+  normalizeManifestTwins,
   readRequiredManifest,
   writeManifest,
   type ManifestRead,
@@ -69,6 +70,29 @@ export function normalizeRegisterTwins(raw: string | undefined): string[] | unde
     );
   }
   return [...new Set(twins)];
+}
+
+/** Effective register twins = the manifest's declared `twins` (the default twin
+ *  set for runs) unioned with any `--twins` flag additions (F-926). Before this,
+ *  the CLI sent only the flag, so a manifest like `twins: ["gmail"]` never
+ *  reached `POST /v1/agents` and the server's `github` default won — the first
+ *  `pome run` then errored with "Requested twins are not enabled".
+ *
+ *  Union is the correct client shape because the server merges additively (never
+ *  removes), so there is no "reduce" semantics to preserve; sending more is
+ *  always safe. Manifest entries are normalized (trim + lowercase) to match the
+ *  flag path and the canonical lowercase twin ids; they are intentionally NOT
+ *  validated against MOUNTED_TWINS here (the manifest schema keeps `twins` open,
+ *  and the server returns a friendly error for an unknown twin). Returns
+ *  undefined when neither source contributes so the cloud's default enablement
+ *  still applies. */
+export function mergeRegisterTwins(
+  manifestTwins: readonly string[] | undefined,
+  flagTwins: readonly string[] | undefined,
+): string[] | undefined {
+  const merged = new Set<string>(normalizeManifestTwins(manifestTwins) ?? []);
+  for (const twin of flagTwins ?? []) merged.add(twin);
+  return merged.size > 0 ? [...merged] : undefined;
 }
 
 // ── Persist: manifest + link cache + gitignore ──────────────────────────────
@@ -190,12 +214,16 @@ export async function runRegisterAgent(opts: RegisterAgentOptions): Promise<void
     }
   }
 
+  // Send the manifest's declared twins (unioned with any --twins flag) so the
+  // cloud's enabled services match the manifest, not the server default (F-926).
+  const twins = mergeRegisterTwins(manifestRead.manifest.twins, opts.twins);
+
   const agent = await createAndPersistAgent({
     creds,
     name: opts.name,
     manifestRead,
     projectDir,
-    twins: opts.twins,
+    twins,
     seams: resolveSeams(opts),
   });
 
@@ -207,7 +235,7 @@ export async function runRegisterAgent(opts: RegisterAgentOptions): Promise<void
     console.error(
       `Enabled services: ${agent.enabled_services.length > 0 ? agent.enabled_services.join(", ") : "(none)"}.`,
     );
-  } else if (opts.twins && opts.twins.length > 0) {
+  } else if (twins && twins.length > 0) {
     console.error(
       "Enabled services: not reported by this pome cloud (older control plane) — twin scoping may not have taken effect.",
     );

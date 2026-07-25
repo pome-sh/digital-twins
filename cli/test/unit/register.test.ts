@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HostedOrchError } from "../../src/hosted/errors.js";
 import {
+  mergeRegisterTwins,
   normalizeRegisterTwins,
   runRegisterAgent,
 } from "../../src/cli/register.js";
@@ -230,6 +231,39 @@ describe("runRegisterAgent", () => {
     expect(errors.join("\n")).toContain("Enabled services: github, slack");
   });
 
+  it("sends the manifest's twins to POST /v1/agents when no --twins flag is given (F-926)", async () => {
+    await writeManifest({ agent: { slug: "gmail-retry-notify" }, twins: ["gmail"] });
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(response({ ...AGENT_OK, slug: "gmail-retry-notify", enabled_services: ["gmail"] }));
+
+    await runRegisterAgent({
+      apiBaseUrl: "https://api.example.com",
+      dashboardBaseUrl: "https://app.example.com",
+      name: "Gmail Retry Notify",
+      force: false,
+    });
+
+    const body = JSON.parse(String((fetchMock.mock.calls[0]![1] as RequestInit).body));
+    expect(body.twins).toEqual(["gmail"]);
+  });
+
+  it("unions the manifest twins with the --twins flag (server merges additively)", async () => {
+    await writeManifest({ agent: { slug: "triage-bot" }, twins: ["gmail"] });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(response(AGENT_OK));
+
+    await runRegisterAgent({
+      apiBaseUrl: "https://api.example.com",
+      dashboardBaseUrl: "https://app.example.com",
+      name: "Triage Bot",
+      force: false,
+      twins: ["slack"],
+    });
+
+    const body = JSON.parse(String((fetchMock.mock.calls[0]![1] as RequestInit).body));
+    expect(new Set(body.twins)).toEqual(new Set(["gmail", "slack"]));
+  });
+
   it("prints a Dashboard line deep-linking the registered agent's page", async () => {
     await writeManifest({ agent: { slug: "triage-bot" } });
     const errors: string[] = [];
@@ -409,5 +443,23 @@ describe("normalizeRegisterTwins", () => {
   });
   it("rejects an unknown twin against MOUNTED_TWINS", () => {
     expect(() => normalizeRegisterTwins("github,notion")).toThrow(/Unknown twin/);
+  });
+});
+
+describe("mergeRegisterTwins", () => {
+  it("returns manifest twins when no flag twins are given", () => {
+    expect(mergeRegisterTwins(["gmail"], undefined)).toEqual(["gmail"]);
+  });
+  it("returns flag twins when the manifest declares none", () => {
+    expect(mergeRegisterTwins(undefined, ["slack"])).toEqual(["slack"]);
+  });
+  it("unions and de-dupes both sources, normalizing manifest entries", () => {
+    expect(new Set(mergeRegisterTwins([" Gmail ", "github"], ["github", "slack"]))).toEqual(
+      new Set(["gmail", "github", "slack"]),
+    );
+  });
+  it("returns undefined when neither source contributes", () => {
+    expect(mergeRegisterTwins(undefined, undefined)).toBeUndefined();
+    expect(mergeRegisterTwins([" ", ""], [])).toBeUndefined();
   });
 });
