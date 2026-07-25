@@ -22,6 +22,17 @@ type HooksConfig = Partial<Record<HookEvent, HookCallbackMatcher[]>>;
  * User-supplied hooks in `params.options.hooks` are preserved — pome's
  * matchers are prepended per event so they fire alongside user callbacks.
  *
+ * Pinning the model: pass `params.options.model` (an alias like `"haiku"` /
+ * `"sonnet"` / `"opus"`, or a full id like `"claude-haiku-4-5"`). This wrapper
+ * forwards it verbatim to the upstream SDK, which passes it to the `claude` CLI
+ * as `--model`; omit it to run the CLI's default model. Note the wrapper only
+ * forwards the request — it cannot force the runtime to honor it. A
+ * subscription/OAuth login or an environment/gateway model pin can still
+ * override the choice, and the CLI does not error on an unknown id (it silently
+ * falls back). To see the model that actually ran, read `model` off the SDK's
+ * `system`/`init` message, or the per-turn `message.model` (both flow into the
+ * gen_ai spans and `LlmTurnEvent` this wrapper emits). See F-928.
+ *
  * v0: returns an AsyncGenerator, not the full `Query` interface — control
  * methods (`interrupt`, `setPermissionMode`, …) are not re-exposed yet. Use
  * the underlying SDK directly if you need them.

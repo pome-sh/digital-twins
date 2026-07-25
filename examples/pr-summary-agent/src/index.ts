@@ -76,6 +76,16 @@ summary comment.`;
 
 const TASK = process.env.POME_TASK?.trim() || DEFAULT_TASK;
 
+// Optional model override (F-928). When set, it is forwarded verbatim as the
+// Claude Agent SDK's `options.model`, which the SDK turns into the `claude`
+// CLI's `--model` flag. Omit it to run the CLI's own default model. Accepts an
+// alias (`haiku`, `sonnet`, `opus`) or a full id (`claude-haiku-4-5`). The
+// runtime can still override the request (subscription/OAuth login, or an
+// environment/gateway model pin), and the CLI does not error on an unknown id —
+// so this run logs the model the SDK actually resolved (the `system`/`init`
+// line below).
+const MODEL = process.env.POME_PR_SUMMARY_MODEL?.trim() || undefined;
+
 async function main() {
   const token = await resolveAuthToken();
 
@@ -106,6 +116,9 @@ async function main() {
         "Use the provided tools to enumerate open pull requests, then for each one read its metadata and base/head branch names, list the changed files, and read each changed file's content on BOTH the base and head branches to see what actually changed (file content is base64-encoded — decode it), then post exactly one summary comment. " +
         "Ground every statement in the actual file contents — never describe changes that are not present. Be concise and useful to a human reviewer. " +
         "Stop once every open pull request has a summary comment.",
+      // Only set `model` when overridden — omitting it lets the CLI pick its
+      // default, and setting it to `undefined` is not the same as omitting.
+      ...(MODEL ? { model: MODEL } : {}),
       permissionMode: "bypassPermissions",
       maxTurns: 30,
       allowedTools: tools.map((t) => t.name),
@@ -120,7 +133,14 @@ async function main() {
   try {
     for await (const msg of run) {
       thinking.reset();
-      if (msg.type === "assistant") {
+      if (msg.type === "system" && msg.subtype === "init") {
+        // Log the model the CLI actually resolved so a downshift (or a silent
+        // runtime override) is visible, never guessed (F-928).
+        console.log(
+          `model:    ${msg.model}` +
+            (MODEL ? ` (requested "${MODEL}")` : " (SDK default — no options.model set)")
+        );
+      } else if (msg.type === "assistant") {
         logAssistantMessage(msg);
       } else if (msg.type === "result") {
         if (msg.subtype === "success") {
