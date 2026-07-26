@@ -802,7 +802,7 @@ export function createProgram() {
             // documented exit codes. Anything else falls through to Commander
             // (treated like self-host).
             try {
-              // FDRS-636 — effective trial count: -n wins, else the scenario
+              // FDRS-636 — effective trial count: -n wins, else the task
               // config's `runs` field (both capped at 20). k>1 takes the
               // trial-group path; k=1 stays EXACTLY the single-run path
               // below (no group is ever stamped for it).
@@ -1081,7 +1081,7 @@ export function createProgram() {
       "Assemble a paste-into-IDE fix prompt (no LLM call, no network). With no args, reads the latest FAILED run set under ./runs: the persisted cloud verdicts (verdict.json) become grouped failure signatures over the raw traces, in one prompt. Point it at a trial run dir to target that set, or use the legacy `<events.jsonl> <task.md>` form for a single trace.",
     )
     .action(async (target?: string, taskArg?: string) => {
-      // Legacy 2-arg form: <events.jsonl> <scenario.md> — unchanged
+      // Legacy 2-arg form: <events.jsonl> <task.md> — unchanged
       // (CAPTURE-ONLY, FDRS-657: raw trace + declared criteria, no verdict).
       if (target !== undefined && target.endsWith(".jsonl")) {
         if (!taskArg) {
@@ -1091,7 +1091,7 @@ export function createProgram() {
           process.exitCode = 5;
           return;
         }
-        const [eventsRaw, scenario] = await Promise.all([
+        const [eventsRaw, task] = await Promise.all([
           readFile(resolve(target), "utf8"),
           parseTaskFile(resolve(taskArg)),
         ]);
@@ -1100,7 +1100,7 @@ export function createProgram() {
           .map((line) => line.trim())
           .filter((line) => line.length > 0)
           .map((line) => JSON.parse(line) as RecorderEvent);
-        console.log(buildFixPrompt({ events, scenario }));
+        console.log(buildFixPrompt({ events, task }));
         return;
       }
       if (taskArg !== undefined) {
@@ -1131,13 +1131,13 @@ export function createProgram() {
         return;
       }
       const set = discovery.set;
-      let scenario: Task | null = null;
+      let task: Task | null = null;
       try {
-        scenario = await parseTaskFile(resolve(set.taskPath));
+        task = await parseTaskFile(resolve(set.taskPath));
       } catch {
         // Task file moved/edited since the run — the prompt degrades to the
         // verdict-embedded criteria.
-        scenario = null;
+        task = null;
       }
       const trials: TrialFixInput[] = [];
       for (const [idx, t] of set.trials.entries()) {
@@ -1152,7 +1152,7 @@ export function createProgram() {
         buildGroupFixPrompt({
           taskName: set.taskName,
           groupId: set.groupId,
-          scenario,
+          task,
           trials,
         }),
       );
