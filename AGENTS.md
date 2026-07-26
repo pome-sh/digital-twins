@@ -28,9 +28,16 @@ live at **https://docs.pome.sh**.
   (`./tasks/`), and the internal runner/schema surface (`src/task/`, `runTask*`,
   the `Task` type, `parseTask`, `taskSchema`). `pome scenarios` survives only as
   a hidden deprecated alias. The ONLY remaining sanctioned survivors are the
-  serialized `scenario` / `scenario_*` keys — the run-artifact `scenario` key and
-  the finalize/result wire fields (server contract; flip with W3/FDRS-653) — and
-  the in-memory carriers whose value flows straight into them.
+  serialized `scenario` / `scenario_*` keys that have a contract behind them —
+  `meta.json`'s `scenario` slug (uploaded to cloud finalize; also read back by
+  `pome eval` / `pome inspect` from run dirs older CLIs wrote) and the
+  finalize / result / compile-seed wire fields (server contract; flip with
+  W3/FDRS-653) — and the in-memory carriers whose value flows straight into
+  them. F-933 renamed the two artifact keys that had no such contract:
+  `runs/latest.json` now writes `task` (was `scenario`) and
+  `runs/<task>/<session>/verdict.json` writes `task_path` (was
+  `scenario_path`); the verdict READ path still accepts `scenario_path` so
+  `pome fix-prompt` can read trials recorded by `@pome-sh/cli` <= 0.8.x.
 - **The CLI (`cli/`) is not a root workspace** — use `cd cli && npm ...`, not
   `npm run -w` from the root.
 - **`cli/pnpm-workspace.yaml` is not pnpm** — it is only the changesets/manypkg

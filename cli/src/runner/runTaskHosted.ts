@@ -660,7 +660,7 @@ export async function runTaskHosted(
         version: VERDICT_ARTIFACT_VERSION,
         source: "cloud-finalize",
         task_name: scenario.slug,
-        scenario_path: options.taskPath,
+        task_path: options.taskPath,
         group_id: options.groupId ?? null,
         session_id: session.session_id,
         cloud_run_id: finalized.run_id,

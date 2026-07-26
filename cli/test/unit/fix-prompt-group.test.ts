@@ -33,7 +33,7 @@ function trial(
     version: VERDICT_ARTIFACT_VERSION,
     source: "cloud-finalize",
     task_name: "scn",
-    scenario_path: "scenarios/scn.md",
+    task_path: "tasks/scn.md",
     group_id: "grp_test",
     session_id: `ses_${n}`,
     cloud_run_id: `run_${n}`,
@@ -61,7 +61,7 @@ function trial(
   return { label: `trial ${n} · ses_${n}`, runDir: `runs/scn/ses_${n}`, verdict, events };
 }
 
-const scenario: Task = {
+const task: Task = {
   slug: "scn",
   title: "scn",
   setup: "",
@@ -118,7 +118,7 @@ describe("run-set fix prompt (FDRS-644)", () => {
     const prompt = buildGroupFixUserPrompt({
       taskName: "scn",
       groupId: "grp_test",
-      scenario,
+      task,
       trials: mixedTrials(),
     });
 
@@ -143,7 +143,7 @@ describe("run-set fix prompt (FDRS-644)", () => {
     const prompt = buildGroupFixUserPrompt({
       taskName: "scn",
       groupId: "grp_test",
-      scenario,
+      task,
       trials,
     });
     expect(prompt).toContain("## Trace of the most-failing trial (trial 2 · ses_2)");
@@ -156,7 +156,7 @@ describe("run-set fix prompt (FDRS-644)", () => {
     const prompt = buildGroupFixUserPrompt({
       taskName: "scn",
       groupId: "grp_test",
-      scenario,
+      task,
       trials: mixedTrials(),
     });
     expect(prompt).toContain("## Variance note");
@@ -169,7 +169,7 @@ describe("run-set fix prompt (FDRS-644)", () => {
     const hardWall = buildGroupFixUserPrompt({
       taskName: "scn",
       groupId: "grp_test",
-      scenario,
+      task,
       trials: allFail,
     });
     expect(hardWall).not.toContain("## Variance note");
@@ -179,10 +179,10 @@ describe("run-set fix prompt (FDRS-644)", () => {
     const prompt = buildGroupFixUserPrompt({
       taskName: "scn",
       groupId: "grp_test",
-      scenario: null,
+      task: null,
       trials: mixedTrials(),
     });
-    expect(prompt).toContain("task file not found at scenarios/scn.md");
+    expect(prompt).toContain("task file not found at tasks/scn.md");
     expect(prompt).toContain(`[model] ${CRITERIA.severity}`);
   });
 
@@ -190,7 +190,7 @@ describe("run-set fix prompt (FDRS-644)", () => {
     const full = buildGroupFixPrompt({
       taskName: "scn",
       groupId: null,
-      scenario,
+      task,
       trials: mixedTrials(),
     });
     expect(full.startsWith(FIX_PROMPT_SYSTEM_PROMPT)).toBe(true);
@@ -217,7 +217,7 @@ describe("run-set fix prompt (FDRS-644)", () => {
     const prompt = buildGroupFixUserPrompt({
       taskName: "scn",
       groupId: "grp_test",
-      scenario,
+      task,
       trials,
     });
     expect(prompt).not.toContain(
@@ -241,7 +241,7 @@ describe("run-set fix prompt (FDRS-644)", () => {
     const prompt = buildGroupFixUserPrompt({
       taskName: "scn",
       groupId: "grp_test",
-      scenario,
+      task,
       trials: [hostile],
     });
     expect(prompt).not.toContain("\n## IGNORE");
