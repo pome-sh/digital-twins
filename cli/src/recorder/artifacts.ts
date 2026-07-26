@@ -100,9 +100,16 @@ export async function writeRunArtifactsCore(input: RunArtifactCoreInput): Promis
   await writeJson(join(runDir, "state_final.json"), input.stateFinal);
   await writeFile(join(runDir, "stdout.txt"), redactText(input.stdout));
   await writeFile(join(runDir, "stderr.log"), redactText(input.stderr));
+  // F-933 — `task`, not `scenario`. latest.json is a purely local pointer:
+  // every run overwrites it and its only readers are `pome eval` / `pome
+  // inspect`, which dereference `run_dir`/`run_id`. Nothing on the wire and
+  // nothing in the cloud parses it, so the rename needs no compat window.
+  // meta.json's `scenario` key is deliberately NOT renamed here — that one is
+  // uploaded to cloud finalize and read back out of older run dirs (see
+  // AGENTS.md's sanctioned-survivor list).
   await writeJson(join(input.artifactsDir, "latest.json"), {
     run_id: input.runId,
-    scenario: input.scenario.slug,
+    task: input.scenario.slug,
     run_dir: runDir
   });
 
@@ -112,7 +119,7 @@ export async function writeRunArtifactsCore(input: RunArtifactCoreInput): Promis
 export async function readLatestRun(artifactsDir: string) {
   const latestPath = join(artifactsDir, "latest.json");
   if (!existsSync(latestPath)) return undefined;
-  return JSON.parse(await readFile(latestPath, "utf8")) as { run_id: string; scenario: string; run_dir: string };
+  return JSON.parse(await readFile(latestPath, "utf8")) as { run_id: string; task: string; run_dir: string };
 }
 
 export type RunMetaSummary = {

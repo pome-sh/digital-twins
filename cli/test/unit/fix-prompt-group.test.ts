@@ -33,7 +33,7 @@ function trial(
     version: VERDICT_ARTIFACT_VERSION,
     source: "cloud-finalize",
     task_name: "scn",
-    scenario_path: "scenarios/scn.md",
+    task_path: "tasks/scn.md",
     group_id: "grp_test",
     session_id: `ses_${n}`,
     cloud_run_id: `run_${n}`,
@@ -182,7 +182,7 @@ describe("run-set fix prompt (FDRS-644)", () => {
       scenario: null,
       trials: mixedTrials(),
     });
-    expect(prompt).toContain("task file not found at scenarios/scn.md");
+    expect(prompt).toContain("task file not found at tasks/scn.md");
     expect(prompt).toContain(`[model] ${CRITERIA.severity}`);
   });
 

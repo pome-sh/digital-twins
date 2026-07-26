@@ -30,7 +30,7 @@ function verdict(over: Partial<VerdictArtifact>): VerdictArtifact {
     version: VERDICT_ARTIFACT_VERSION,
     source: "cloud-finalize",
     task_name: "scn",
-    scenario_path: "scenarios/scn.md",
+    task_path: "tasks/scn.md",
     group_id: "grp_cmd",
     session_id: "ses_1",
     cloud_run_id: "run_1",

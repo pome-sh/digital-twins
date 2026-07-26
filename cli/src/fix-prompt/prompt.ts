@@ -269,7 +269,7 @@ export function buildGroupFixUserPrompt(ctx: GroupFixPromptContext): string {
       ) as string);
   const promptBlock = ctx.scenario
     ? (redactSecrets(ctx.scenario.prompt) as string)
-    : `(task file not found at ${ctx.trials[0]?.verdict.scenario_path ?? "?"} — criteria above come from the cloud verdicts)`;
+    : `(task file not found at ${ctx.trials[0]?.verdict.task_path ?? "?"} — criteria above come from the cloud verdicts)`;
 
   const sections: string[] = [];
   sections.push(`## Run set (cloud-judged)
