@@ -1552,6 +1552,86 @@ describe("HostedClient.deleteSession discard guard (F-983)", () => {
     const client = createHostedClient({ baseUrl: BASE, apiKey: KEY });
     await expect(client.deleteSession(SID, true)).resolves.toBeUndefined();
   });
+
+  // A 409 that DECLARES reason=ungraded_session but hands back no usable
+  // token cannot be replayed and was not honoured — resolving would tell the
+  // caller the session stopped when it did not, which is the exact silent
+  // destruction F-983 closes. It is not HostedDiscardRefusedError either:
+  // with no token to replay, that type would be a lie.
+  function malformedRefusal(details: Record<string, unknown>) {
+    return new Response(
+      JSON.stringify({
+        error: {
+          type: "conflict",
+          message: "Session is still open; its run has not been graded.",
+          details: { reason: "ungraded_session", session_id: SID, ...details },
+          request_id: "req_3",
+        },
+      }),
+      { status: 409, headers: { "content-type": "application/json" } },
+    );
+  }
+
+  it("fails loudly when the refusal carries no discard_token at all", async () => {
+    mockFetch(async () => malformedRefusal({}));
+    const client = createHostedClient({ baseUrl: BASE, apiKey: KEY });
+    const err = (await client
+      .deleteSession(SID, true)
+      .catch((e: unknown) => e)) as Error;
+    expect(err).toBeInstanceOf(HostedOrchError);
+    expect(err).not.toBeInstanceOf(HostedDiscardRefusedError);
+    expect(err.message).toContain(SID);
+    expect(err.message).toContain("discard_token");
+  });
+
+  it("fails loudly when the refusal's discard_token is empty", async () => {
+    mockFetch(async () => malformedRefusal({ discard_token: "" }));
+    const client = createHostedClient({ baseUrl: BASE, apiKey: KEY });
+    const err = (await client
+      .deleteSession(SID, true)
+      .catch((e: unknown) => e)) as Error;
+    expect(err).toBeInstanceOf(HostedOrchError);
+    expect(err).not.toBeInstanceOf(HostedDiscardRefusedError);
+    expect(err.message).toContain(SID);
+  });
+
+  it("fails loudly when the refusal's discard_token is not a string", async () => {
+    mockFetch(async () => malformedRefusal({ discard_token: 42 }));
+    const client = createHostedClient({ baseUrl: BASE, apiKey: KEY });
+    await expect(client.deleteSession(SID, true)).rejects.toBeInstanceOf(
+      HostedOrchError,
+    );
+  });
+
+  it("only reads the refusal shape on a 409 — a 500 echoing it stays a server error", async () => {
+    mockFetch(
+      async () =>
+        new Response(
+          JSON.stringify({
+            error: {
+              type: "internal",
+              message: "boom",
+              details: {
+                reason: "ungraded_session",
+                session_id: SID,
+                state: "running",
+                task_name: "support-triage-p1",
+                open_seconds: 252,
+                discard_token: TOKEN,
+              },
+            },
+          }),
+          { status: 500, headers: { "content-type": "application/json" } },
+        ),
+    );
+    const client = createHostedClient({ baseUrl: BASE, apiKey: KEY });
+    const err = (await client
+      .deleteSession(SID, true)
+      .catch((e: unknown) => e)) as Error;
+    expect(err).toBeInstanceOf(HostedOrchError);
+    expect(err).not.toBeInstanceOf(HostedDiscardRefusedError);
+    expect(err.message).toContain("500");
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

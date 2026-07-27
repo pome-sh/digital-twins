@@ -421,30 +421,66 @@ interface DiscardRefusal {
   discardToken: string;
 }
 
-/** Read a 409 as an F-983 discard refusal, or null if it is an ordinary
- *  already-closed conflict (or an unparseable body). Null keeps the historic
- *  "409 means idempotent success" behaviour for every other 409. */
-async function readDiscardRefusal(res: Response): Promise<DiscardRefusal | null> {
+/** Three-way, because a refusal is defined by two things at once — it
+ *  declares `reason: "ungraded_session"` AND it hands back a replayable
+ *  token:
+ *   - `none`     — an ordinary already-closed conflict, or an unparseable
+ *                  body. Keeps the historic "409 means idempotent success".
+ *   - `refusal`  — a well-formed F-983 refusal; replayable.
+ *   - `unusable` — it CLAIMS to be a refusal but carries no usable
+ *                  `discard_token`. The delete did not happen and cannot be
+ *                  confirmed, so this must fail loudly; folding it into
+ *                  `none` would report a stop that never occurred. */
+type DiscardRefusalRead =
+  | { kind: "none" }
+  | { kind: "refusal"; refusal: DiscardRefusal }
+  | { kind: "unusable" };
+
+/** Read a 409 body as an F-983 discard refusal. Only ever called for status
+ *  409 — a non-409 that happens to echo `details.reason` is a server error,
+ *  not a refusal, and must keep its own status-based handling. */
+async function readDiscardRefusal(res: Response): Promise<DiscardRefusalRead> {
   let body: unknown;
   try {
     body = await res.clone().json();
   } catch {
-    return null;
+    return { kind: "none" };
   }
   const error = (body as { error?: Record<string, unknown> } | null)?.error;
   const details = error?.details as Record<string, unknown> | undefined;
-  if (!details || details.reason !== "ungraded_session") return null;
+  if (!details || details.reason !== "ungraded_session") return { kind: "none" };
   const discardToken = details.discard_token;
-  if (typeof discardToken !== "string" || discardToken.length === 0) return null;
+  if (typeof discardToken !== "string" || discardToken.length === 0) {
+    return { kind: "unusable" };
+  }
   return {
-    message: typeof error?.message === "string" ? error.message : "",
-    sessionId: typeof details.session_id === "string" ? details.session_id : "",
-    state: typeof details.state === "string" ? details.state : "open",
-    taskName: typeof details.task_name === "string" ? details.task_name : null,
-    openSeconds:
-      typeof details.open_seconds === "number" ? details.open_seconds : 0,
-    discardToken,
+    kind: "refusal",
+    refusal: {
+      message: typeof error?.message === "string" ? error.message : "",
+      sessionId:
+        typeof details.session_id === "string" ? details.session_id : "",
+      state: typeof details.state === "string" ? details.state : "open",
+      taskName:
+        typeof details.task_name === "string" ? details.task_name : null,
+      openSeconds:
+        typeof details.open_seconds === "number" ? details.open_seconds : 0,
+      discardToken,
+    },
   };
+}
+
+/** The delete was refused but the refusal is unreplayable. Say plainly that
+ *  the session is still running: a best-effort caller would otherwise read
+ *  silence as success. NOT HostedDiscardRefusedError — with no token to
+ *  replay, that type would be a lie. */
+function unusableRefusalError(sessionId: string): HostedOrchError {
+  return new HostedOrchError(
+    `DELETE /v1/sessions/${sessionId} → 409: the server refused to delete this ` +
+      `session but sent no usable discard_token, so the session was NOT ` +
+      `stopped. Retry, or stop it from the dashboard.`,
+    undefined,
+    409,
+  );
 }
 
 export function createHostedClient(config: HostedClientConfig): HostedClient {
@@ -1171,8 +1207,15 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
       // F-983: a 409 carrying reason=ungraded_session is a REFUSAL, not the
       // already-closed race. Never fold it into the idempotent-success branch
       // below — that swallow is exactly what made the CLI lie about stopping.
-      const refusal = await readDiscardRefusal(res);
-      if (refusal) {
+      // Scoped to 409: a 5xx that echoes the same `details` is a server
+      // error and keeps its status-based handling.
+      const read =
+        res.status === 409
+          ? await readDiscardRefusal(res)
+          : ({ kind: "none" } as DiscardRefusalRead);
+      if (read.kind === "unusable") throw unusableRefusalError(sessionId);
+      if (read.kind === "refusal") {
+        const { refusal } = read;
         if (!opts.discard) {
           throw new HostedDiscardRefusedError(
             refusal.message,
@@ -1186,8 +1229,16 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
         const confirmed = await attempt(refusal.discardToken);
         if (!confirmed) return;
         res = confirmed;
-        const stillRefused = await readDiscardRefusal(res);
-        if (stillRefused) {
+        const replayRead =
+          res.status === 409
+            ? await readDiscardRefusal(res)
+            : ({ kind: "none" } as DiscardRefusalRead);
+        // No third attempt either way: the token was already spent.
+        if (replayRead.kind === "unusable") {
+          throw unusableRefusalError(sessionId);
+        }
+        if (replayRead.kind === "refusal") {
+          const stillRefused = replayRead.refusal;
           throw new HostedDiscardRefusedError(
             stillRefused.message,
             stillRefused.sessionId || sessionId,
