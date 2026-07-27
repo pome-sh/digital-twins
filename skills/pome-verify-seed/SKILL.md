@@ -69,20 +69,22 @@ costs one session slot; offer it, don't default to it.
    the file is on the branch. A 404 on a probe may be session expiry — check
    `get_session` before blaming the seed.
 3. **Mutation hole**: if any probe mutated state (a POST slipped in, a tool had
-   side effects), the session no longer shows the seed — `stop_session` (twice —
-   see teardown below) and re-mint before probing further. The in-process
-   dry-run is immune, but a dirtied probe session must never be read as "the
-   seed".
+   side effects), the session no longer shows the seed — `stop_session` (see
+   teardown below; it may take two calls) and re-mint before probing further.
+   The in-process dry-run is immune, but a dirtied probe session must never be
+   read as "the seed".
 4. **Reset / teardown**: end every probe session with `stop_session`. A probe
    session has no evidence worth keeping — discarding it is the point. Never
    `finalize_run` a probe session; that would score the untouched seed.
-   The first `stop_session` is **refused** on purpose (F-983: an open session
-   holds an ungraded run, and the platform will not destroy one silently).
-   The refusal carries a server-issued `discard_token` in its `error.details`;
-   read that value and call `stop_session` again, passing it as the
-   `confirm_discard` parameter. Two calls, every time — the token cannot be
-   guessed ahead of the refusal, which is what keeps the same guard meaningful
-   for real runs.
+   Call `stop_session`; if it succeeds outright, teardown is done. **If it is
+   refused** (F-983: an open session holds an ungraded run, and the platform
+   will not destroy one silently), the refusal carries a server-issued
+   `discard_token` in its `error.details`; read that value and call
+   `stop_session` again, passing it as the `confirm_discard` parameter. Today's
+   control plane never refuses, so expect the one-call success — treat the
+   refusal-then-confirm path as the case to handle once it goes live, not the
+   default. The token cannot be guessed ahead of the refusal, which is what
+   keeps the same guard meaningful for real runs.
 
 ## Report
 
