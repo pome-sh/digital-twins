@@ -138,3 +138,48 @@ describe("withTurnUsage → LlmTurnEvent signals", () => {
     expect(seen).toEqual(["assistant", "result"]);
   });
 });
+
+// F-994. One API turn may arrive as several `assistant` messages sharing a
+// `message.id` — one per content block — each repeating the SAME `usage`. A row
+// per message duplicates the turn and makes `turn_index` count content blocks.
+describe("withTurnUsage → one row per API turn, not per content block", () => {
+  const usage = {
+    input_tokens: 2,
+    output_tokens: 2,
+    cache_read_input_tokens: 36276,
+    cache_creation_input_tokens: 250,
+  };
+
+  it("collapses content-block messages sharing a message.id into one row", async () => {
+    await drive([
+      { type: "assistant", message: { id: "msg_A", model: "claude-opus-4-8", usage } },
+      { type: "assistant", message: { id: "msg_A", model: "claude-opus-4-8", usage, stop_reason: "tool_use" } },
+      { type: "result", subtype: "success" },
+    ]);
+
+    const rows = readRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.cache_read_input_tokens).toBe(36276);
+    // A stop reason arriving on a later block of the turn is still captured.
+    expect(rows[0]!.finish_reasons).toEqual(["tool_use"]);
+  });
+
+  it("counts turns rather than content blocks in turn_index", async () => {
+    await drive([
+      { type: "assistant", message: { id: "msg_A", model: "m", usage } },
+      { type: "assistant", message: { id: "msg_A", model: "m", usage } },
+      { type: "user" },
+      { type: "assistant", message: { id: "msg_B", model: "m", usage } },
+      { type: "assistant", message: { id: "msg_B", model: "m", usage } },
+      { type: "result", subtype: "success" },
+    ]);
+
+    expect(readRows().map((r) => r.turn_index)).toEqual([0, 1]);
+  });
+
+  it("still writes the final turn when the stream ends without a result message", async () => {
+    await drive([{ type: "assistant", message: { id: "msg_A", model: "m", usage } }]);
+
+    expect(readRows()).toHaveLength(1);
+  });
+});

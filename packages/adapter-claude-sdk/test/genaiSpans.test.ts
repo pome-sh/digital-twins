@@ -91,6 +91,26 @@ async function drive(messages: Array<{ type: string; [k: string]: unknown }>): P
   for await (const _ of withGenAiSpans(src())) void _;
 }
 
+type ExportedSpan = { name: string; attributes: Array<{ key: string; value: Record<string, unknown> }> };
+
+// Every span the collector received, across all export requests.
+function collectSpans(): ExportedSpan[] {
+  const spans: ExportedSpan[] = [];
+  for (const c of captured) {
+    const rs = ((c.body as { resourceSpans?: unknown[] }).resourceSpans ?? []) as Array<Record<string, unknown>>;
+    for (const r of rs) {
+      for (const ss of (r.scopeSpans ?? []) as Array<{ spans?: unknown[] }>) {
+        for (const s of (ss.spans ?? []) as ExportedSpan[]) spans.push(s);
+      }
+    }
+  }
+  return spans;
+}
+
+function inputTokensOf(span: ExportedSpan): number {
+  return Number(flattenAttrs(span.attributes)["gen_ai.usage.input_tokens"]);
+}
+
 describe("withGenAiSpans → OTLP/JSON export", () => {
   it("emits a gen_ai span per assistant turn with token usage, then flushes on result", async () => {
     await drive([
@@ -178,5 +198,109 @@ describe("withGenAiSpans → OTLP/JSON export", () => {
     ]);
 
     expect(captured.length).toBe(0);
+  });
+});
+
+// F-994. Anthropic's `usage.input_tokens` counts only the tokens that missed the
+// cache; OTel semconv 1.27+ defines `gen_ai.usage.input_tokens` as the TOTAL.
+// The usage objects below are verbatim from a live Opus run (see the probe
+// evidence on the ticket) — Claude Code keeps a cache breakpoint at the tail of
+// the prompt, so the uncached residue is a constant 2 and the real input sits in
+// the two cache fields.
+describe("withGenAiSpans → gen_ai.usage.input_tokens is the semconv total", () => {
+  it("sums input_tokens + cache_read + cache_creation", async () => {
+    await drive([
+      {
+        type: "assistant",
+        message: {
+          id: "msg_01",
+          model: "claude-opus-4-8",
+          usage: {
+            input_tokens: 2,
+            output_tokens: 31,
+            cache_read_input_tokens: 15000,
+            cache_creation_input_tokens: 3000,
+          },
+        },
+      },
+      { type: "result", subtype: "success" },
+    ]);
+
+    const spans = collectSpans();
+    expect(spans.length).toBe(1);
+    expect(inputTokensOf(spans[0]!)).toBe(18002);
+    // Output tokens are not a cached quantity — passed through untouched.
+    expect(Number(flattenAttrs(spans[0]!.attributes)["gen_ai.usage.output_tokens"])).toBe(31);
+  });
+
+  it("treats absent cache components as 0 instead of null-propagating", async () => {
+    await drive([
+      { type: "assistant", message: { id: "msg_01", model: "claude-opus-4-8", usage: { input_tokens: 10, output_tokens: 5 } } },
+      { type: "result", subtype: "success" },
+    ]);
+
+    expect(inputTokensOf(collectSpans()[0]!)).toBe(10);
+  });
+
+  it("treats null cache components as 0 (the SDK types them `number | null`)", async () => {
+    await drive([
+      {
+        type: "assistant",
+        message: {
+          id: "msg_01",
+          model: "claude-opus-4-8",
+          usage: {
+            input_tokens: 7,
+            output_tokens: 5,
+            cache_read_input_tokens: null,
+            cache_creation_input_tokens: null,
+          },
+        },
+      },
+      { type: "result", subtype: "success" },
+    ]);
+
+    expect(inputTokensOf(collectSpans()[0]!)).toBe(7);
+  });
+
+  // One API turn may arrive as several `assistant` messages sharing a
+  // `message.id` (one per content block), each repeating the SAME usage. Once
+  // the cache components are summed, counting each block would multiply the
+  // cache read by the block count — a live 5-turn run over-reported by 79%.
+  it("counts one API turn split across content blocks exactly once", async () => {
+    const turnA = { input_tokens: 2, output_tokens: 2, cache_read_input_tokens: 0, cache_creation_input_tokens: 36276 };
+    const turnB = {
+      input_tokens: 2,
+      output_tokens: 55,
+      cache_read_input_tokens: 36276,
+      cache_creation_input_tokens: 250,
+    };
+    await drive([
+      { type: "assistant", message: { id: "msg_A", model: "claude-opus-4-8", usage: turnA } },
+      { type: "assistant", message: { id: "msg_A", model: "claude-opus-4-8", usage: turnA } },
+      { type: "user" },
+      { type: "assistant", message: { id: "msg_B", model: "claude-opus-4-8", usage: turnB } },
+      { type: "result", subtype: "success" },
+    ]);
+
+    const spans = collectSpans();
+    expect(spans.length).toBe(2);
+    // Matches the SDK's own `SDKResultMessage.usage` rollup for this stream.
+    expect(spans.map(inputTokensOf)).toEqual([36278, 36528]);
+  });
+
+  it("still emits the final turn when the stream ends without a result message", async () => {
+    await drive([
+      {
+        type: "assistant",
+        message: { id: "msg_01", model: "claude-opus-4-8", usage: { input_tokens: 2, cache_read_input_tokens: 900 } },
+      },
+    ]);
+    const { flushPomeTelemetry } = await import("../src/otel.js");
+    await flushPomeTelemetry();
+
+    const spans = collectSpans();
+    expect(spans.length).toBe(1);
+    expect(inputTokensOf(spans[0]!)).toBe(902);
   });
 });
