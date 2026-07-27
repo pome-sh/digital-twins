@@ -82,6 +82,15 @@ side-effect import is captured in the `[DECISION]` comment on
   them. Iteration is what hero tasks use today.
 - **`withPome()` is idempotent.** A second call is a no-op; the global fetch
   replacement is installed exactly once per process.
+- **`query()` turns on `includePartialMessages` when telemetry is on**, because
+  a turn's finished output-token count reaches the SDK only on a `message_delta`
+  stream event — the `assistant` message carries a `message_start` snapshot
+  roughly 5x too low. Every message that option adds is filtered back out before
+  it reaches your iterator, so your `for await` loop sees exactly what it saw
+  before; a test asserts the yielded sequence is identical with telemetry on and
+  off. Set the option to `true` yourself and nothing is filtered. Measured cost:
+  ~1.3–1.4x the stream bytes. `POME_DISABLE_PARTIAL_MESSAGES=1` opts out, at the
+  price of the low number.
 
 ## Signals file format
 
