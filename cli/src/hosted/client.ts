@@ -1170,16 +1170,18 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
     },
 
     async deleteSession(sessionId, bestEffort = true, opts = {}) {
-      // One DELETE attempt. `confirmDiscard` replays the token the control
-      // plane hands back with an F-983 refusal.
-      const attempt = async (confirmDiscard?: string): Promise<Response | null> => {
+      // One DELETE attempt, including the read of a 409 body. `confirmDiscard`
+      // replays the token the control plane hands back with an F-983 refusal.
+      const attempt = async (
+        confirmDiscard?: string,
+      ): Promise<{ res: Response; read: DiscardRefusalRead } | null> => {
         const ctrl = new AbortController();
         const timer = setTimeout(() => ctrl.abort(), timeoutMs);
         const qs = confirmDiscard
           ? `?confirm_discard=${encodeURIComponent(confirmDiscard)}`
           : "";
         try {
-          return await fetch(
+          const res = await fetch(
             `${config.baseUrl}/v1/sessions/${encodeURIComponent(sessionId)}${qs}`,
             {
               method: "DELETE",
@@ -1191,6 +1193,14 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
               signal: ctrl.signal,
             },
           );
+          // Keep the timeout active while consuming a 409 body — fetch()
+          // resolves after headers, before the body finishes (same hazard,
+          // same fix, as postJson's readResponse above).
+          const read =
+            res.status === 409
+              ? await readDiscardRefusal(res)
+              : ({ kind: "none" } as DiscardRefusalRead);
+          return { res, read };
         } catch (err) {
           if (bestEffort) return null;
           throw new HostedOrchError(
@@ -1201,21 +1211,18 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
         }
       };
 
-      let res = await attempt();
-      if (!res) return; // bestEffort transport failure
+      let first = await attempt();
+      if (!first) return; // bestEffort transport failure
+      let res = first.res;
 
       // F-983: a 409 carrying reason=ungraded_session is a REFUSAL, not the
       // already-closed race. Never fold it into the idempotent-success branch
       // below — that swallow is exactly what made the CLI lie about stopping.
       // Scoped to 409: a 5xx that echoes the same `details` is a server
       // error and keeps its status-based handling.
-      const read =
-        res.status === 409
-          ? await readDiscardRefusal(res)
-          : ({ kind: "none" } as DiscardRefusalRead);
-      if (read.kind === "unusable") throw unusableRefusalError(sessionId);
-      if (read.kind === "refusal") {
-        const { refusal } = read;
+      if (first.read.kind === "unusable") throw unusableRefusalError(sessionId);
+      if (first.read.kind === "refusal") {
+        const { refusal } = first.read;
         if (!opts.discard) {
           throw new HostedDiscardRefusedError(
             refusal.message,
@@ -1228,17 +1235,13 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
         }
         const confirmed = await attempt(refusal.discardToken);
         if (!confirmed) return;
-        res = confirmed;
-        const replayRead =
-          res.status === 409
-            ? await readDiscardRefusal(res)
-            : ({ kind: "none" } as DiscardRefusalRead);
+        res = confirmed.res;
         // No third attempt either way: the token was already spent.
-        if (replayRead.kind === "unusable") {
+        if (confirmed.read.kind === "unusable") {
           throw unusableRefusalError(sessionId);
         }
-        if (replayRead.kind === "refusal") {
-          const stillRefused = replayRead.refusal;
+        if (confirmed.read.kind === "refusal") {
+          const stillRefused = confirmed.read.refusal;
           throw new HostedDiscardRefusedError(
             stillRefused.message,
             stillRefused.sessionId || sessionId,
