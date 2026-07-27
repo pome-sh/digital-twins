@@ -38,9 +38,15 @@ function readRows(): Array<Record<string, unknown>> {
     .map((l) => JSON.parse(l) as Record<string, unknown>);
 }
 
+// A message may carry `__sleepMs` to hold the source generator before yielding
+// it, so a test can prove which messages move the latency-window boundary.
 async function drive(messages: Array<{ type: string; [k: string]: unknown }>): Promise<void> {
   async function* src() {
-    for (const m of messages) yield m;
+    for (const m of messages) {
+      const sleep = m.__sleepMs as number | undefined;
+      if (sleep) await new Promise((r) => setTimeout(r, sleep));
+      yield m;
+    }
   }
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   for await (const _ of withTurnUsage(src())) void _;
@@ -181,5 +187,77 @@ describe("withTurnUsage → one row per API turn, not per content block", () => 
     await drive([{ type: "assistant", message: { id: "msg_A", model: "m", usage } }]);
 
     expect(readRows()).toHaveLength(1);
+  });
+});
+
+// F-998. `output_tokens` on an assistant message is the `message_start`
+// snapshot, and `stop_reason` is null on every one of them — so this lane's
+// `finish_reasons` has always been null in practice. Both finished values live
+// on the `message_delta` stream event.
+describe("withTurnUsage → message_delta supplies output_tokens and finish_reasons", () => {
+  const streamStart = (id: string) => ({
+    type: "stream_event",
+    parent_tool_use_id: null,
+    event: { type: "message_start", message: { id, usage: { input_tokens: 2, output_tokens: 2 } } },
+  });
+  const streamDelta = (outputTokens: number, stopReason: string) => ({
+    type: "stream_event",
+    parent_tool_use_id: null,
+    event: { type: "message_delta", delta: { stop_reason: stopReason }, usage: { output_tokens: outputTokens } },
+  });
+
+  it("overrides the snapshot and fills in the finish reason", async () => {
+    await drive([
+      streamStart("msg_A"),
+      { type: "assistant", message: { id: "msg_A", model: "m", stop_reason: null, usage: { input_tokens: 2, output_tokens: 2 } } },
+      streamDelta(179, "tool_use"),
+      { type: "result", subtype: "success" },
+    ]);
+
+    const rows = readRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.output_tokens).toBe(179);
+    expect(rows[0]!.finish_reasons).toEqual(["tool_use"]);
+    // The input lane is untouched by F-998 — still the raw cache-miss residue.
+    expect(rows[0]!.input_tokens).toBe(2);
+  });
+
+  it("keeps the snapshot when no message_delta arrived", async () => {
+    await drive([
+      { type: "assistant", message: { id: "msg_A", model: "m", usage: { input_tokens: 2, output_tokens: 31 } } },
+      { type: "result", subtype: "success" },
+    ]);
+
+    expect(readRows()[0]!.output_tokens).toBe(31);
+  });
+
+  it("does not let injected partial messages shrink latency_ms", async () => {
+    await drive([
+      { type: "user" },
+      { type: "stream_event", __sleepMs: 40, parent_tool_use_id: null, event: { type: "message_start", message: { id: "msg_A", usage: {} } } },
+      { type: "system", subtype: "status", status: "requesting" },
+      { type: "assistant", message: { id: "msg_A", model: "m", usage: { input_tokens: 2, output_tokens: 2 } } },
+      streamDelta(179, "end_turn"),
+      { type: "result", subtype: "success" },
+    ]);
+
+    expect(readRows()[0]!.latency_ms as number).toBeGreaterThanOrEqual(30);
+  });
+
+  it("counts turns, not the stream events between them", async () => {
+    await drive([
+      streamStart("msg_A"),
+      { type: "assistant", message: { id: "msg_A", model: "m", usage: { input_tokens: 2, output_tokens: 2 } } },
+      streamDelta(179, "tool_use"),
+      { type: "user" },
+      streamStart("msg_B"),
+      { type: "assistant", message: { id: "msg_B", model: "m", usage: { input_tokens: 2, output_tokens: 72 } } },
+      streamDelta(73, "end_turn"),
+      { type: "result", subtype: "success" },
+    ]);
+
+    const rows = readRows();
+    expect(rows.map((r) => r.turn_index)).toEqual([0, 1]);
+    expect(rows.map((r) => r.output_tokens)).toEqual([179, 73]);
   });
 });

@@ -82,16 +82,27 @@ function flattenAttrs(attrs: Array<{ key: string; value: Record<string, unknown>
   return out;
 }
 
+// A message may carry `__sleepMs` to hold the source generator before yielding
+// it, so a test can prove which messages move the span-window boundary.
 async function drive(messages: Array<{ type: string; [k: string]: unknown }>): Promise<void> {
   const { withGenAiSpans } = await import("../src/genai-spans.js");
   async function* src() {
-    for (const m of messages) yield m;
+    for (const m of messages) {
+      const sleep = m.__sleepMs as number | undefined;
+      if (sleep) await new Promise((r) => setTimeout(r, sleep));
+      yield m;
+    }
   }
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   for await (const _ of withGenAiSpans(src())) void _;
 }
 
-type ExportedSpan = { name: string; attributes: Array<{ key: string; value: Record<string, unknown> }> };
+type ExportedSpan = {
+  name: string;
+  attributes: Array<{ key: string; value: Record<string, unknown> }>;
+  startTimeUnixNano?: string;
+  endTimeUnixNano?: string;
+};
 
 // Every span the collector received, across all export requests.
 function collectSpans(): ExportedSpan[] {
@@ -109,6 +120,14 @@ function collectSpans(): ExportedSpan[] {
 
 function inputTokensOf(span: ExportedSpan): number {
   return Number(flattenAttrs(span.attributes)["gen_ai.usage.input_tokens"]);
+}
+
+function outputTokensOf(span: ExportedSpan): number {
+  return Number(flattenAttrs(span.attributes)["gen_ai.usage.output_tokens"]);
+}
+
+function durationMsOf(span: ExportedSpan): number {
+  return (Number(span.endTimeUnixNano) - Number(span.startTimeUnixNano)) / 1e6;
 }
 
 describe("withGenAiSpans → OTLP/JSON export", () => {
@@ -302,5 +321,95 @@ describe("withGenAiSpans → gen_ai.usage.input_tokens is the semconv total", ()
     const spans = collectSpans();
     expect(spans.length).toBe(1);
     expect(inputTokensOf(spans[0]!)).toBe(902);
+  });
+});
+
+// F-998. An `assistant` message's `usage.output_tokens` is the `message_start`
+// snapshot — the count at the moment the stream envelope was cut, ~5x low. The
+// tell is `stop_reason: null` on every assistant message. The finished number
+// exists only on the `message_delta` stream event, which the adapter now gets by
+// injecting `includePartialMessages` (see partial-messages.ts).
+describe("withGenAiSpans → gen_ai.usage.output_tokens is the message_delta truth", () => {
+  const streamStart = (id: string) => ({
+    type: "stream_event",
+    parent_tool_use_id: null,
+    event: { type: "message_start", message: { id, usage: { input_tokens: 2, output_tokens: 2 } } },
+  });
+  const streamDelta = (outputTokens: number, stopReason: string) => ({
+    type: "stream_event",
+    parent_tool_use_id: null,
+    event: { type: "message_delta", delta: { stop_reason: stopReason }, usage: { output_tokens: outputTokens } },
+  });
+
+  it("prefers the message_delta count over the snapshot on the assistant message", async () => {
+    await drive([
+      streamStart("msg_A"),
+      { type: "assistant", message: { id: "msg_A", model: "claude-opus-4-8", usage: { input_tokens: 2, output_tokens: 2 } } },
+      streamDelta(179, "tool_use"),
+      { type: "result", subtype: "success" },
+    ]);
+
+    expect(outputTokensOf(collectSpans()[0]!)).toBe(179);
+  });
+
+  it("falls back to the snapshot when the caller left partial messages off", async () => {
+    await drive([
+      { type: "assistant", message: { id: "msg_A", model: "claude-opus-4-8", usage: { input_tokens: 2, output_tokens: 31 } } },
+      { type: "result", subtype: "success" },
+    ]);
+
+    expect(outputTokensOf(collectSpans()[0]!)).toBe(31);
+  });
+
+  // The whole point of the ticket: per-turn spans must sum to the SDK's own
+  // rollup. Tape below is verbatim from a live 4-turn Opus run whose
+  // `SDKResultMessage.usage.output_tokens` was 330 — the snapshots sum to 142.
+  it("sums to SDKResultMessage.usage.output_tokens across a multi-turn run", async () => {
+    const turn = (id: string, snapshot: number, truth: number, stop: string, blocks: number) => [
+      streamStart(id),
+      ...Array.from({ length: blocks }, () => ({
+        type: "assistant",
+        message: { id, model: "claude-opus-4-8", usage: { input_tokens: 2, output_tokens: snapshot } },
+      })),
+      streamDelta(truth, stop),
+    ];
+
+    await drive([
+      ...turn("msg_1", 2, 179, "tool_use", 3),
+      { type: "user" },
+      ...turn("msg_2", 72, 73, "tool_use", 1),
+      // The tool_result `user` message can land BEFORE the turn's message_delta
+      // (observed live) — it must not close the turn early.
+      { type: "user" },
+      ...turn("msg_3", 67, 73, "tool_use", 1),
+      { type: "user" },
+      ...turn("msg_4", 1, 5, "end_turn", 1),
+      { type: "result", subtype: "success" },
+    ]);
+
+    const spans = collectSpans();
+    expect(spans.length).toBe(4);
+    expect(spans.map(outputTokensOf)).toEqual([179, 73, 73, 5]);
+    expect(spans.reduce((n, s) => n + outputTokensOf(s), 0)).toBe(330);
+  });
+
+  // The span window is measured from the previously yielded message. Injected
+  // partial messages arrive microseconds before the assistant message they
+  // describe, so letting them move the boundary would collapse every window to
+  // ~0ms and undo F-994's latency fix.
+  it("keeps the span window measured from the last real message", async () => {
+    await drive([
+      { type: "user" },
+      // The API round trip: everything below lands once the response starts.
+      { type: "stream_event", __sleepMs: 40, parent_tool_use_id: null, event: { type: "message_start", message: { id: "msg_A", usage: {} } } },
+      { type: "system", subtype: "status", status: "requesting" },
+      { type: "assistant", message: { id: "msg_A", model: "claude-opus-4-8", usage: { input_tokens: 2, output_tokens: 2 } } },
+      streamDelta(179, "end_turn"),
+      { type: "result", subtype: "success" },
+    ]);
+
+    const spans = collectSpans();
+    expect(spans.length).toBe(1);
+    expect(durationMsOf(spans[0]!)).toBeGreaterThanOrEqual(30);
   });
 });

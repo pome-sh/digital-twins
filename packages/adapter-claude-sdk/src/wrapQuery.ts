@@ -21,6 +21,7 @@
 // rows. The message-stream wrapper here is the surviving pome insertion
 // point in the SDK iterator.
 
+import { isPartialMessageArtifact } from "./partial-messages.js";
 import { redactSecrets } from "./redaction.js";
 import {
   newEventId,
@@ -72,6 +73,16 @@ export async function* withToolEvents<T extends WithType>(
   const subagentEventIdByParentToolUseId = new Map<string, string>();
 
   for await (const msg of source) {
+    // Partial messages carry a `parent_tool_use_id` of their own, so a subagent
+    // stream event would otherwise be enough to mint a SubagentSpawnEvent. This
+    // lane reads content blocks, which partial messages do not carry — skipping
+    // them keeps the emitted rows identical whether or not F-998 asked the SDK
+    // for them.
+    if (isPartialMessageArtifact(msg)) {
+      yield msg;
+      continue;
+    }
+
     const parentToolUseId = readParentToolUseId(msg);
     if (parentToolUseId && !subagentEventIdByParentToolUseId.has(parentToolUseId)) {
       const event_id = newEventId();
