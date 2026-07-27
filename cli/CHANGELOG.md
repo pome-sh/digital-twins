@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.9.0
+
+### Minor Changes
+
+- [#241](https://github.com/pome-sh/digital-twins/pull/241) [`2980389`](https://github.com/pome-sh/digital-twins/commit/298038980419683db5641a372aa50d1fb1ee8b40) Thanks [@AFFFPupu](https://github.com/AFFFPupu)! - Run artifacts now speak "task", not the retired "scenario": `runs/latest.json` records the task slug under `task` (was `scenario`), and each trial's `verdict.json` records `task_path` (was `scenario_path`, next to the already-correct `task_name`). Scripts reading `latest.json` for `run_dir`/`run_id` are unaffected; anything reading the `scenario` key must switch to `task`. `pome fix-prompt` still reads `verdict.json` files written by earlier CLI versions — the old `scenario_path` spelling is accepted on read.
+
+- [#245](https://github.com/pome-sh/digital-twins/pull/245) [`9396956`](https://github.com/pome-sh/digital-twins/commit/93969566ad20070f47f852a4c7df88cd01c530c8) Thanks [@AFFFPupu](https://github.com/AFFFPupu)! - `pome session stop` learns to recognize a refusal to destroy a session whose run has not been graded, ahead of the control plane sending one. Pome creates the run row at finalize, so an open session holds an ungraded run; once the control plane starts refusing to delete one, this CLI reads what would be lost and, on a human-typed `pome session stop`, requires `--discard` to confirm. Automated teardown paths (a finished or crashed `pome run`, and the rollback of a half-provisioned trial group) already confirm the discard themselves, so they see no behavior change either before or after that control-plane change ships. Nothing here changes how `pome session stop` behaves against today's control plane, which does not yet refuse.
+
+### Patch Changes
+
+- [#242](https://github.com/pome-sh/digital-twins/pull/242) [`090e74a`](https://github.com/pome-sh/digital-twins/commit/090e74aa87a60dba32ab4539ca7435f63223d0ae) Thanks [@AFFFPupu](https://github.com/AFFFPupu)! - `pome compile-seeds` no longer overwrites seeds it did not author. Sidecars marked `"model": "hand-authored"` (or `"source_hash": "sha256:hand-authored"`) are now an explicit skip, reported as `keep … hand-authored seed left untouched`. Previously the sentinel could never equal a real sha256, so the cache check always missed and the seed was silently recompiled — rewriting the adversarial setups the starter tasks depend on (a backdoored PR, a fabricated green CI status, an exfiltration lure) while the run still reported normally. The skip outranks `--force`, since it states authorship rather than staleness; delete the sidecar or drop its `_meta` to recompile.
+
+  Tasks naming another twin alongside `github` are now skipped too. Their seed is a per-twin envelope (`{ github: {...}, slack: {...} }`) and the compiler only emits a flat `github` seed, so compiling one replaced the envelope and dropped the other twin's half — reachable today via the six `examples/minimal-viktor-langgraph` tasks, whose envelopes carry no `_meta` to protect them.
+
+- [#234](https://github.com/pome-sh/digital-twins/pull/234) [`acd8ef7`](https://github.com/pome-sh/digital-twins/commit/acd8ef7aa696e64a4f0315b93ac2aa9e1498313b) Thanks [@AFFFPupu](https://github.com/AFFFPupu)! - `pome register agent` now sends the manifest's `twins` to `POST /v1/agents`, so the cloud agent's enabled services match the manifest instead of falling back to the server's `github` default. Previously a manifest like `twins: ["gmail"]` was ignored and the first `pome run` errored with `Requested twins are not enabled`. Any `--twins` flag is unioned with the manifest's twins (the server still merges additively).
+
 ## 0.8.0
 
 ### Minor Changes
