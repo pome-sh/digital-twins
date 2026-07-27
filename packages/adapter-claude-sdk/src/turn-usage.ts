@@ -18,10 +18,17 @@
 // timing). `turn_index` is 0-based per `query()` stream. `parent_id` and
 // `session_id` are null in M1.
 //
+// `output_tokens` and `finish_reasons` come from the `message_delta` stream
+// event rather than the assistant message (F-998; see partial-messages.ts). The
+// assistant message's `output_tokens` is a `message_start` snapshot ~5x low, and
+// its `stop_reason` is null on every message the SDK emits — which is why this
+// lane's `finish_reasons` had always been null in practice.
+//
 // No signals path configured (standalone dev, or any run outside the pome CLI
 // runner): `writeLlmTurnEvent` is a static noop, so this wrapper just passes
 // messages through.
 
+import { MessageDeltaTracker, isPartialMessageArtifact } from "./partial-messages.js";
 import { newEventId, writeLlmTurnEvent } from "./signals.js";
 
 type WithType = { type?: string };
@@ -57,16 +64,20 @@ export async function* withTurnUsage<T extends WithType>(
   source: AsyncIterable<T>,
 ): AsyncGenerator<T, void, unknown> {
   // Boundary marking the start of the current turn. Initialized when iteration
-  // begins; advanced after every yielded message so each turn's latency spans
-  // only the gap since the previous message (matches genai-spans.ts).
+  // begins; advanced after every yielded message an agent author would see, so
+  // each turn's latency spans only the gap since the previous one of those
+  // (matches genai-spans.ts).
   let turnStartMs = Date.now();
   // 0-based counter, per this query() stream. Advances only for turns that
   // actually reported usage (a usage-less assistant message is not a turn).
   let turnIndex = 0;
   let pending: PendingTurn | null = null;
+  const deltas = new MessageDeltaTracker();
 
   function closeTurn(): void {
     if (!pending) return;
+    const truth = deltas.take(pending.id);
+    const stopReason = truth?.stopReason ?? pending.stopReason;
     writeLlmTurnEvent({
       ts: new Date().toISOString(),
       event_id: newEventId(),
@@ -75,10 +86,10 @@ export async function* withTurnUsage<T extends WithType>(
       turn_index: turnIndex,
       model: pending.model,
       input_tokens: pending.inputTokens,
-      output_tokens: pending.outputTokens,
+      output_tokens: truth?.outputTokens ?? pending.outputTokens,
       cache_read_input_tokens: pending.cacheReadTokens,
       cache_creation_input_tokens: pending.cacheCreationTokens,
-      finish_reasons: pending.stopReason != null ? [pending.stopReason] : null,
+      finish_reasons: stopReason != null ? [stopReason] : null,
       latency_ms: Math.max(0, pending.endTimeMs - pending.startTimeMs),
       latency_ms_estimated: true,
       session_id: null,
@@ -89,6 +100,8 @@ export async function* withTurnUsage<T extends WithType>(
 
   try {
     for await (const msg of source) {
+      deltas.observe(msg);
+
       if (msg.type === "assistant") {
         const a = msg as AssistantLike & WithType;
         const usage = (a.message?.usage ?? {}) as Record<string, unknown>;
@@ -126,7 +139,10 @@ export async function* withTurnUsage<T extends WithType>(
       }
 
       yield msg;
-      turnStartMs = Date.now();
+      // Pome's injected partial messages must not advance the boundary, or
+      // every `latency_ms` collapses to the gap between two stream events
+      // (matches genai-spans.ts).
+      if (!isPartialMessageArtifact(msg)) turnStartMs = Date.now();
     }
   } finally {
     // A stream that ends without a `result` — error, abort, or a consumer that

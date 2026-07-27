@@ -22,12 +22,21 @@
 // every id ever seen: a resumed session can legitimately replay a message id,
 // and that is a real second turn, not a duplicate block.
 //
+// Token attribution splits across the two directions. Input is read off the
+// assistant message (`totalInputTokens` below). Output is NOT there — the
+// assistant message carries a `message_start` snapshot, ~5x low — so it comes
+// from the `message_delta` stream event via MessageDeltaTracker, with the
+// snapshot kept only as a fallback for a stream that ended before its delta
+// (F-998; see partial-messages.ts for how those events are obtained and hidden
+// again).
+//
 // On the terminal `result` message we `await flushPomeTelemetry()` BEFORE
 // yielding it, so all spans are exported before the agent's loop ends and it
 // calls process.exit() — pome's CLI reads the session trace blob immediately
 // after the agent returns (the finalize-before-flush contract).
 
 import { flushPomeTelemetry, recordGenAiSpan } from "./otel.js";
+import { MessageDeltaTracker, isPartialMessageArtifact } from "./partial-messages.js";
 
 type WithType = { type?: string };
 
@@ -78,17 +87,19 @@ export async function* withGenAiSpans<T extends WithType>(
   source: AsyncIterable<T>,
 ): AsyncGenerator<T, void, unknown> {
   // Boundary marking the start of the next turn. Initialized when iteration
-  // begins; advanced after every yielded message, so a turn's span starts at
-  // the message yielded before its first content block.
+  // begins; advanced after every yielded message an agent author would see, so
+  // a turn's span starts at the message yielded before its first content block.
   let turnStartMs = Date.now();
   let pending: PendingTurn | null = null;
+  const deltas = new MessageDeltaTracker();
 
   function closeTurn(): void {
     if (!pending) return;
+    const truth = deltas.take(pending.id);
     recordGenAiSpan({
       model: pending.model,
       inputTokens: pending.inputTokens,
-      outputTokens: pending.outputTokens,
+      outputTokens: truth?.outputTokens ?? pending.outputTokens,
       startTimeMs: pending.startTimeMs,
       endTimeMs: pending.endTimeMs,
       isError: pending.isError,
@@ -98,6 +109,8 @@ export async function* withGenAiSpans<T extends WithType>(
 
   try {
     for await (const msg of source) {
+      deltas.observe(msg);
+
       if (msg.type === "assistant") {
         const a = msg as AssistantLike & WithType;
         const usage = (a.message?.usage ?? {}) as Record<string, unknown>;
@@ -132,7 +145,11 @@ export async function* withGenAiSpans<T extends WithType>(
       }
 
       yield msg;
-      turnStartMs = Date.now();
+      // Partial messages are pome's own injection and land microseconds before
+      // the assistant message they describe. Letting them advance the boundary
+      // would collapse every span window to ~0ms, so the window stays measured
+      // between the messages an agent author would have seen anyway.
+      if (!isPartialMessageArtifact(msg)) turnStartMs = Date.now();
     }
   } finally {
     // A stream that ends without a `result` — error, abort, or a consumer that
