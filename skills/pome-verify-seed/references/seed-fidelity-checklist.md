@@ -130,13 +130,23 @@ anything — used purely as a probe arena. Discipline:
 - **Opaque 404** on a probe = wrong path OR expired session — call
   `get_session` (side-effect-free) before blaming the seed.
 - **Mutation hole**: one mutating call (POST/PUT/DELETE, or an MCP tool with
-  side effects) and the live state is no longer the seed. `stop_session`,
-  `run_task` again, continue on the fresh session. Never report findings
-  from a dirtied session as seed facts.
+  side effects) and the live state is no longer the seed. `stop_session` —
+  today that succeeds outright; once the platform-side F-983 guard is live it
+  may instead refuse and hand back a `discard_token` to confirm (see below) —
+  then `run_task` again and continue on the fresh session. Never report
+  findings from a dirtied session as seed facts.
 - **Reset = discard + re-mint.** `stop_session` ends a probe session without
   evaluating — for probes that is exactly right (there is no evidence worth
-  keeping). Never `finalize_run` a probe session: it would spend a judge run
-  scoring an untouched (or self-dirtied) seed and record a meaningless run.
+  keeping). Call it once: if it succeeds, teardown is done. F-983: an open
+  session holds an ungraded run (Pome creates the `runs` row at finalize), so
+  the control plane may instead refuse with `error.details.reason ===
+  "ungraded_session"` and a `discard_token`; read that token and call
+  `stop_session` again, passing it as `confirm_discard`, to confirm the
+  discard. Against today's control plane this never happens — the first call
+  always succeeds — so treat the refusal-then-confirm path as the case to
+  handle once it ships, not the common case. Never `finalize_run` a probe
+  session: it would spend a judge run scoring an untouched (or self-dirtied)
+  seed and record a meaningless run.
 - **Cost**: each probe session takes a session slot until stopped; quota trips
   answer 402 with the freeing options. The fast path costs nothing — present
   the deep check as opt-in.

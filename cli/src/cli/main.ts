@@ -554,14 +554,32 @@ export function createProgram() {
       "Control-plane URL",
       process.env.POME_API_URL ?? DEFAULT_CONTROL_PLANE_URL,
     )
-    .action(async (sessionId: string, opts: { apiUrl: string }) => {
-      try {
-        await runSessionStop({ apiBaseUrl: opts.apiUrl, sessionId });
-      } catch (err) {
-        console.error(friendlyHostedError(err));
-        process.exitCode = 2;
-      }
-    });
+    .option(
+      "--discard",
+      "Confirm destroying a session whose run has not been graded (F-983)",
+      false,
+    )
+    .action(
+      async (
+        sessionId: string,
+        opts: { apiUrl: string; discard?: boolean },
+      ) => {
+        try {
+          await runSessionStop({
+            apiBaseUrl: opts.apiUrl,
+            sessionId,
+            discard: opts.discard === true,
+          });
+        } catch (err) {
+          // runSessionStop already prints the full refusal detail for
+          // HostedDiscardRefusedError; friendlyHostedError returns "" for it
+          // so we don't print a duplicate (or bare blank) line here.
+          const friendly = friendlyHostedError(err);
+          if (friendly) console.error(friendly);
+          process.exitCode = 2;
+        }
+      },
+    );
 
   program
     .command("run")
