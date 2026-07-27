@@ -3,9 +3,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CreateSessionResponse } from "../../src/types/shared.js";
+import { HostedDiscardRefusedError } from "../../src/hosted/errors.js";
 
 const mocks = vi.hoisted(() => ({
   createSession: vi.fn(),
+  deleteSession: vi.fn(),
   resolveCredentials: vi.fn(),
 }));
 
@@ -23,11 +25,12 @@ vi.mock("../../src/hosted/client.js", async (importOriginal) => {
     ...actual,
     createHostedClient: vi.fn(() => ({
       createSession: mocks.createSession,
+      deleteSession: mocks.deleteSession,
     })),
   };
 });
 
-import { runSessionCreate } from "../../src/cli/session.js";
+import { runSessionCreate, runSessionStop } from "../../src/cli/session.js";
 
 const session: CreateSessionResponse = {
   session_id: "ses_test",
@@ -277,5 +280,70 @@ describe("runSessionCreate secret output", () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("runSessionStop (F-983)", () => {
+  beforeEach(() => {
+    mocks.deleteSession.mockReset();
+    mocks.resolveCredentials.mockResolvedValue({
+      apiBaseUrl: "https://api.example.com",
+      apiKey: "pme_test",
+    });
+  });
+
+  it("does not request a discard by default", async () => {
+    mocks.deleteSession.mockResolvedValue(undefined);
+    await runSessionStop({
+      apiBaseUrl: "https://api.example.com",
+      sessionId: "ses_a",
+    });
+    expect(mocks.deleteSession).toHaveBeenCalledWith("ses_a", false, {
+      discard: false,
+    });
+  });
+
+  it("requests a discard when --discard was passed", async () => {
+    mocks.deleteSession.mockResolvedValue(undefined);
+    await runSessionStop({
+      apiBaseUrl: "https://api.example.com",
+      sessionId: "ses_a",
+      discard: true,
+    });
+    expect(mocks.deleteSession).toHaveBeenCalledWith("ses_a", false, {
+      discard: true,
+    });
+  });
+
+  it("prints the refusal naming the task and the keep-it path, and exits nonzero", async () => {
+    mocks.deleteSession.mockRejectedValue(
+      new HostedDiscardRefusedError(
+        "Session is still open.",
+        "ses_a",
+        "running",
+        "support-triage-p1",
+        252,
+        "dsc_tok",
+      ),
+    );
+    const errors: string[] = [];
+    const spy = vi
+      .spyOn(console, "error")
+      .mockImplementation((...args: unknown[]) => {
+        errors.push(args.map(String).join(" "));
+      });
+    await expect(
+      runSessionStop({
+        apiBaseUrl: "https://api.example.com",
+        sessionId: "ses_a",
+      }),
+    ).rejects.toBeInstanceOf(HostedDiscardRefusedError);
+    spy.mockRestore();
+    const printed = errors.join("\n");
+    expect(printed).toContain("ses_a");
+    expect(printed).toContain("support-triage-p1");
+    expect(printed).toContain("has not been graded");
+    expect(printed).toContain("--discard");
+    expect(printed).not.toContain("Stopped session");
   });
 });

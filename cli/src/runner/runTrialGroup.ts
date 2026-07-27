@@ -178,7 +178,13 @@ export async function runTrialGroup(
     // sessions polluting the reliability view; then let the caller map the
     // error to the documented exit code.
     await Promise.all(
-      sessions.map((s) => client.deleteSession(s.session_id).catch(() => undefined)),
+      // F-983: these sessions were minted and never launched, so there is no
+      // tape to lose — an explicit discard is honest here.
+      sessions.map((s) =>
+        client.deleteSession(s.session_id, true, { discard: true }).catch(
+          () => undefined,
+        ),
+      ),
     );
     throw err;
   }
