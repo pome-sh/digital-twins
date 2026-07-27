@@ -4,6 +4,7 @@ import {
   HostedAuthError,
   HostedQuotaError,
   HostedOrchError,
+  HostedDiscardRefusedError,
 } from "../../../src/hosted/errors.js";
 
 const BASE = "https://api.example.com";
@@ -1442,6 +1443,114 @@ describe("HostedClient.deleteSession", () => {
     );
     const client = createHostedClient({ baseUrl: BASE, apiKey: KEY });
     await expect(client.deleteSession("ses_missing", false)).rejects.toBeInstanceOf(HostedOrchError);
+  });
+});
+
+describe("HostedClient.deleteSession discard guard (F-983)", () => {
+  const SID = "ses_guard";
+  const TOKEN = "dsc_abcdefghijklmnopqrstuvwxyz012345";
+
+  function refusal() {
+    return new Response(
+      JSON.stringify({
+        error: {
+          type: "conflict",
+          message: "Session is still open; its run has not been graded.",
+          details: {
+            reason: "ungraded_session",
+            session_id: SID,
+            state: "running",
+            task_name: "support-triage-p1",
+            open_seconds: 252,
+            discard_token: TOKEN,
+          },
+          request_id: "req_1",
+        },
+      }),
+      { status: 409, headers: { "content-type": "application/json" } },
+    );
+  }
+
+  it("throws HostedDiscardRefusedError when the caller did not opt into discard", async () => {
+    mockFetch(async () => refusal());
+    const client = createHostedClient({ baseUrl: BASE, apiKey: KEY });
+    await expect(client.deleteSession(SID, false)).rejects.toBeInstanceOf(
+      HostedDiscardRefusedError,
+    );
+  });
+
+  it("throws the refusal even under bestEffort — a refusal is not transport noise", async () => {
+    mockFetch(async () => refusal());
+    const client = createHostedClient({ baseUrl: BASE, apiKey: KEY });
+    await expect(client.deleteSession(SID, true)).rejects.toBeInstanceOf(
+      HostedDiscardRefusedError,
+    );
+  });
+
+  it("carries the fields the CLI prints", async () => {
+    mockFetch(async () => refusal());
+    const client = createHostedClient({ baseUrl: BASE, apiKey: KEY });
+    const err = (await client
+      .deleteSession(SID, false)
+      .catch((e: unknown) => e)) as HostedDiscardRefusedError;
+    expect(err.sessionId).toBe(SID);
+    expect(err.state).toBe("running");
+    expect(err.taskName).toBe("support-triage-p1");
+    expect(err.openSeconds).toBe(252);
+    expect(err.discardToken).toBe(TOKEN);
+  });
+
+  it("replays the token on a second DELETE when discard is requested", async () => {
+    const urls: string[] = [];
+    mockFetch(async (url) => {
+      urls.push(String(url));
+      return urls.length === 1 ? refusal() : new Response(null, { status: 204 });
+    });
+    const client = createHostedClient({ baseUrl: BASE, apiKey: KEY });
+    await expect(
+      client.deleteSession(SID, false, { discard: true }),
+    ).resolves.toBeUndefined();
+    expect(urls).toHaveLength(2);
+    expect(urls[0]).toBe(`${BASE}/v1/sessions/${SID}`);
+    expect(urls[1]).toBe(`${BASE}/v1/sessions/${SID}?confirm_discard=${TOKEN}`);
+  });
+
+  it("does not retry a second time if the replay is also refused", async () => {
+    let calls = 0;
+    mockFetch(async () => {
+      calls += 1;
+      return refusal();
+    });
+    const client = createHostedClient({ baseUrl: BASE, apiKey: KEY });
+    await expect(
+      client.deleteSession(SID, false, { discard: true }),
+    ).rejects.toBeInstanceOf(HostedDiscardRefusedError);
+    expect(calls).toBe(2);
+  });
+
+  it("still treats an already-closed 409 as success (no discard reason)", async () => {
+    mockFetch(
+      async () =>
+        new Response(
+          JSON.stringify({
+            error: {
+              type: "conflict",
+              message: "Session is in state 'done' and cannot be deleted.",
+              details: { current_state: "done" },
+              request_id: "req_2",
+            },
+          }),
+          { status: 409, headers: { "content-type": "application/json" } },
+        ),
+    );
+    const client = createHostedClient({ baseUrl: BASE, apiKey: KEY });
+    await expect(client.deleteSession(SID, true)).resolves.toBeUndefined();
+  });
+
+  it("treats a 409 with an unreadable body as already-closed, not a refusal", async () => {
+    mockFetch(async () => new Response("not json", { status: 409 }));
+    const client = createHostedClient({ baseUrl: BASE, apiKey: KEY });
+    await expect(client.deleteSession(SID, true)).resolves.toBeUndefined();
   });
 });
 
