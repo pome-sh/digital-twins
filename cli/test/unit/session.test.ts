@@ -315,6 +315,26 @@ describe("runSessionStop (F-983)", () => {
     });
   });
 
+  it("prints 'Stopped session' when a confirmed discard succeeds", async () => {
+    // deleteSession resolving means the client already replayed the
+    // discard_token and the second attempt landed a real 204/200 — the
+    // ordinary success path, not a refusal.
+    mocks.deleteSession.mockResolvedValue(undefined);
+    const errors: string[] = [];
+    const spy = vi
+      .spyOn(console, "error")
+      .mockImplementation((...args: unknown[]) => {
+        errors.push(args.map(String).join(" "));
+      });
+    await runSessionStop({
+      apiBaseUrl: "https://api.example.com",
+      sessionId: "ses_a",
+      discard: true,
+    });
+    spy.mockRestore();
+    expect(errors.join("\n")).toContain("Stopped session ses_a");
+  });
+
   it("prints the refusal naming the task and the keep-it path, and exits nonzero", async () => {
     mocks.deleteSession.mockRejectedValue(
       new HostedDiscardRefusedError(
