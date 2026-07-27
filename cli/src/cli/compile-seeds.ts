@@ -20,6 +20,18 @@ import { exitCodeFor } from "../hosted/errors.js";
 
 const SIDECAR_META_VERSION = 1;
 
+/**
+ * Sidecars written by hand rather than by the compiler mark themselves with
+ * this sentinel. It is a statement of provenance, not a cache state: the seeds
+ * that carry it encode adversarial setups (a backdoored PR, a fabricated green
+ * CI status, an exfiltration lure) that a recompile would quietly rewrite,
+ * changing what the task tests while the run still reports normally. So it
+ * outranks even `--force`; to recompile one, delete the sidecar or drop its
+ * `_meta` first.
+ */
+const HAND_AUTHORED_MARKER = "hand-authored";
+const HAND_AUTHORED_SOURCE_HASH = `sha256:${HAND_AUTHORED_MARKER}`;
+
 interface CompileOptions {
   force: boolean;
   hosted: boolean;
@@ -28,7 +40,14 @@ interface CompileOptions {
 
 interface FileResult {
   path: string;
-  status: "compiled" | "skipped-cached" | "skipped-no-seed" | "skipped-unsupported-twin" | "skipped-inline-json" | "error";
+  status:
+    | "compiled"
+    | "skipped-cached"
+    | "skipped-hand-authored"
+    | "skipped-no-seed"
+    | "skipped-unsupported-twin"
+    | "skipped-inline-json"
+    | "error";
   message?: string;
   inputTokens?: number;
   outputTokens?: number;
@@ -80,15 +99,20 @@ async function compileOne(taskPath: string, opts: CompileOptions): Promise<FileR
     return { path: taskPath, status: "skipped-no-seed", message: "no ## Seed State section" };
   }
 
-  // Stripe scenarios use a different schema; v1 only supports github. Check
-  // twin first so Stripe scenarios are silently skipped without surfacing
-  // misleading "still on inline JSON" warnings.
+  // Other twins use a different schema; v1 only emits a flat github seed. Check
+  // twin first so those tasks are silently skipped without surfacing misleading
+  // "still on inline JSON" warnings.
+  //
+  // A task naming github *alongside* another twin is seeded from a per-twin
+  // envelope (`{ github: {...}, linear: {...} }`), so compiling it would replace
+  // the envelope with a github-only seed and drop the other twin's half.
   const twins = readTwinsFromConfig(markdown);
-  if (twins.length > 0 && !twins.includes("github")) {
+  const githubOnly = twins.length === 1 && twins[0] === "github";
+  if (twins.length > 0 && !githubOnly) {
     return {
       path: taskPath,
       status: "skipped-unsupported-twin",
-      message: `twins=${twins.join(",")} not supported yet`
+      message: `twins=${twins.join(",")} — only single-twin github tasks are supported yet`
     };
   }
 
@@ -105,6 +129,17 @@ async function compileOne(taskPath: string, opts: CompileOptions): Promise<FileR
 
   const sidecarPath = sidecarPathFor(taskPath);
   const proseHash = hashProse(seedText);
+
+  // Checked ahead of `--force` and ahead of the cache: this is authorship, not
+  // staleness. The sentinel can never equal a real sha256, so without this the
+  // cache always misses and the hand-authored seed is silently overwritten.
+  if (existsSync(sidecarPath) && (await isHandAuthored(sidecarPath))) {
+    return {
+      path: taskPath,
+      status: "skipped-hand-authored",
+      message: `hand-authored seed left untouched (${sidecarPath}) — delete it or drop its _meta to recompile`
+    };
+  }
 
   // Cache check only applies to local compile — hosted callers may have
   // different model versions than the locally-pinned COMPILER_MODEL, and the
@@ -219,6 +254,23 @@ async function readSidecarMeta(path: string): Promise<{ source_hash: string; mod
   }
 }
 
+/**
+ * Deliberately more lenient than `sidecarMetaSchema`: a hand-edited sidecar may
+ * carry only the sentinel and omit `version`/`compiled_at`. Failing that parse
+ * would fall through to a recompile — the exact overwrite this guards against —
+ * so any `_meta` bearing either sentinel field counts.
+ */
+async function isHandAuthored(path: string): Promise<boolean> {
+  try {
+    const raw = await readFile(path, "utf8");
+    const meta = (JSON.parse(raw) as { _meta?: { source_hash?: unknown; model?: unknown } })._meta;
+    if (!meta) return false;
+    return meta.model === HAND_AUTHORED_MARKER || meta.source_hash === HAND_AUTHORED_SOURCE_HASH;
+  } catch {
+    return false;
+  }
+}
+
 async function resolveTaskFiles(target: string): Promise<string[]> {
   const abs = resolve(target);
   if (!existsSync(abs)) throw new Error(`Path not found: ${target}`);
@@ -234,6 +286,8 @@ function statusStamp(status: FileResult["status"]): string {
       return "OK  ";
     case "skipped-cached":
       return "skip";
+    case "skipped-hand-authored":
+      return "keep";
     case "skipped-no-seed":
       return "skip";
     case "skipped-unsupported-twin":
