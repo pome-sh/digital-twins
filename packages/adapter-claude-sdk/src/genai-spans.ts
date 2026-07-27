@@ -3,13 +3,24 @@
 // withGenAiSpans — stream wrapper that turns the SDK message stream into
 // `gen_ai` OTLP spans (see otel.ts for the why and the wire contract).
 //
-// One CLIENT span per assistant turn: every `assistant` message that carries
-// `message.usage` is one LLM round-trip, so it becomes one span tagged with the
-// model and that turn's input/output tokens. The span window is approximated
-// from message timing — start = the moment we began awaiting this turn (the
-// previous yielded message), end = now — which yields real p50/p95 latency
+// One CLIENT span per API turn, tagged with the model and that turn's
+// input/output tokens. The span window is approximated from message timing —
+// start = the moment we began awaiting this turn (the previous yielded
+// message), end = the turn's last message — which yields real p50/p95 latency
 // samples for the rollup without needing per-call API timings the SDK doesn't
 // surface per turn.
+//
+// A turn is NOT an `assistant` message. One API turn may arrive as several
+// `assistant` messages sharing a `message.id`, one per content block (thinking,
+// text, tool_use), and every one of them repeats the SAME `usage` object. So we
+// accumulate by `message.id` and emit a single span when the turn closes — on
+// the next turn, on `result`, or on stream end. Emitting per message would
+// multiply the turn's cache-token counts by its content-block count (F-994: a
+// live 5-turn run over-reported its input total by 79%).
+//
+// The id check is deliberately against the turn being accumulated rather than
+// every id ever seen: a resumed session can legitimately replay a message id,
+// and that is a real second turn, not a duplicate block.
 //
 // On the terminal `result` message we `await flushPomeTelemetry()` BEFORE
 // yielding it, so all spans are exported before the agent's loop ends and it
@@ -22,46 +33,110 @@ type WithType = { type?: string };
 
 type AssistantLike = {
   type: "assistant";
-  message?: { model?: unknown; usage?: unknown };
+  message?: { id?: unknown; model?: unknown; usage?: unknown };
   error?: unknown;
 };
+
+/** One API turn being accumulated across its content-block messages. */
+interface PendingTurn {
+  /** `message.id`, or null when the message carried none (then never merged). */
+  id: string | null;
+  model: string | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  startTimeMs: number;
+  endTimeMs: number;
+  isError: boolean;
+}
 
 function asNumber(v: unknown): number | null {
   return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
 
+/**
+ * The OTel-semconv `gen_ai.usage.input_tokens`: the TOTAL input for the turn.
+ *
+ * Anthropic's `usage.input_tokens` counts only the tokens that missed the
+ * cache — the cached prefix is reported separately in `cache_read_input_tokens`
+ * and `cache_creation_input_tokens`. Claude Code keeps a cache breakpoint at the
+ * tail of the prompt, so on a cached run the raw field is a ~2-token constant
+ * and essentially the whole prompt lives in the two cache fields.
+ *
+ * Each component is read defensively: absent or null contributes 0. Returns
+ * null only when the turn reported no input at all, so a usage-less assistant
+ * message is still recognised as "not a completed round-trip".
+ */
+function totalInputTokens(usage: Record<string, unknown>): number | null {
+  const uncached = asNumber(usage.input_tokens);
+  const cacheRead = asNumber(usage.cache_read_input_tokens);
+  const cacheCreation = asNumber(usage.cache_creation_input_tokens);
+  if (uncached == null && cacheRead == null && cacheCreation == null) return null;
+  return (uncached ?? 0) + (cacheRead ?? 0) + (cacheCreation ?? 0);
+}
+
 export async function* withGenAiSpans<T extends WithType>(
   source: AsyncIterable<T>,
 ): AsyncGenerator<T, void, unknown> {
-  // Boundary marking the start of the current turn. Initialized when iteration
-  // begins; advanced after every yielded message so each assistant span spans
-  // only the gap since the previous message.
+  // Boundary marking the start of the next turn. Initialized when iteration
+  // begins; advanced after every yielded message, so a turn's span starts at
+  // the message yielded before its first content block.
   let turnStartMs = Date.now();
+  let pending: PendingTurn | null = null;
 
-  for await (const msg of source) {
-    if (msg.type === "assistant") {
-      const a = msg as AssistantLike & WithType;
-      const usage = (a.message?.usage ?? {}) as Record<string, unknown>;
-      const inputTokens = asNumber(usage.input_tokens);
-      const outputTokens = asNumber(usage.output_tokens);
-      // Only a turn that reported usage is a real, completed LLM round-trip.
-      if (inputTokens != null || outputTokens != null) {
-        recordGenAiSpan({
-          model: typeof a.message?.model === "string" ? a.message.model : null,
-          inputTokens,
-          outputTokens,
-          startTimeMs: turnStartMs,
-          endTimeMs: Date.now(),
-          isError: a.error != null,
-        });
+  function closeTurn(): void {
+    if (!pending) return;
+    recordGenAiSpan({
+      model: pending.model,
+      inputTokens: pending.inputTokens,
+      outputTokens: pending.outputTokens,
+      startTimeMs: pending.startTimeMs,
+      endTimeMs: pending.endTimeMs,
+      isError: pending.isError,
+    });
+    pending = null;
+  }
+
+  try {
+    for await (const msg of source) {
+      if (msg.type === "assistant") {
+        const a = msg as AssistantLike & WithType;
+        const usage = (a.message?.usage ?? {}) as Record<string, unknown>;
+        const inputTokens = totalInputTokens(usage);
+        const outputTokens = asNumber(usage.output_tokens);
+        // Only a turn that reported usage is a real, completed LLM round-trip.
+        if (inputTokens != null || outputTokens != null) {
+          const id = typeof a.message?.id === "string" ? a.message.id : null;
+          if (pending && id != null && pending.id === id) {
+            // Another content block of the turn already being accumulated: the
+            // usage is a repeat, so only widen the window and keep any error.
+            pending.endTimeMs = Date.now();
+            pending.isError ||= a.error != null;
+          } else {
+            closeTurn();
+            pending = {
+              id,
+              model: typeof a.message?.model === "string" ? a.message.model : null,
+              inputTokens,
+              outputTokens,
+              startTimeMs: turnStartMs,
+              endTimeMs: Date.now(),
+              isError: a.error != null,
+            };
+          }
+        }
+      } else if (msg.type === "result") {
+        // Drain the exporter before the final message escapes to the agent's
+        // loop, which exits the process right after.
+        closeTurn();
+        await flushPomeTelemetry();
       }
-    } else if (msg.type === "result") {
-      // Drain the exporter before the final message escapes to the agent's
-      // loop, which exits the process right after.
-      await flushPomeTelemetry();
-    }
 
-    yield msg;
-    turnStartMs = Date.now();
+      yield msg;
+      turnStartMs = Date.now();
+    }
+  } finally {
+    // A stream that ends without a `result` — error, abort, or a consumer that
+    // breaks out of its loop — must not swallow the turn still accumulating.
+    closeTurn();
   }
 }
