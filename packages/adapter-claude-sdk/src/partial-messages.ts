@@ -142,6 +142,15 @@ export class MessageDeltaTracker {
       else this.#openByStream.delete(stream);
       return;
     }
+    // `message_stop` closes the message, so the slot can go. Without this,
+    // `#openByStream` would keep one entry per subagent the run ever spawned
+    // rather than per stream currently open. Not done on `message_delta`: a
+    // server-side tool-use loop can emit several of those for one message, and
+    // the later ones still need the id.
+    if (ev.type === "message_stop") {
+      this.#openByStream.delete(stream);
+      return;
+    }
     if (ev.type !== "message_delta") return;
 
     const id = this.#openByStream.get(stream);

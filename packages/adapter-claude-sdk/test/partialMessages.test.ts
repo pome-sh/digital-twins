@@ -178,6 +178,27 @@ describe("MessageDeltaTracker — the authoritative per-turn output tokens", () 
     expect(t.take("msg_main")).toEqual({ outputTokens: 179, stopReason: "tool_use" });
   });
 
+  // Several deltas can arrive for one message (server-side tool-use loop), so
+  // the open slot must survive them and only close on `message_stop`.
+  it("keeps the open slot across deltas and releases it on message_stop", () => {
+    const messageStop = (parentToolUseId: string | null = null) => ({
+      type: "stream_event",
+      parent_tool_use_id: parentToolUseId,
+      event: { type: "message_stop" },
+    });
+
+    const t = new MessageDeltaTracker();
+    t.observe(messageStart("msg_A"));
+    t.observe(messageDelta(120, "tool_use"));
+    t.observe(messageDelta(179, "end_turn"));
+    t.observe(messageStop());
+    // A delta arriving after the stop has no open message to attach to, so it
+    // cannot retroactively overwrite the finished turn.
+    t.observe(messageDelta(9999, "end_turn"));
+
+    expect(t.take("msg_A")).toEqual({ outputTokens: 179, stopReason: "end_turn" });
+  });
+
   it("ignores a delta that arrives with no message_start ahead of it", () => {
     const t = new MessageDeltaTracker();
     t.observe(messageDelta(179, "tool_use"));
