@@ -110,15 +110,24 @@ function asString(v: unknown): string | null {
  * them back by `message.id` when a telemetry lane closes that turn.
  *
  * `message_delta` carries no message id of its own, so the id has to come from
- * the `message_start` that opened the message. Parallel Task subagents
- * interleave their stream events with the main agent's, and
- * `parent_tool_use_id` is the only thing separating the two — hence one "open
- * message" slot per stream rather than a single global.
+ * the `message_start` that opened the message. That makes the "currently open
+ * message" a piece of mutable state, and it is bucketed by `parent_tool_use_id`
+ * rather than kept as a single global so interleaved streams cannot steal each
+ * other's deltas.
+ *
+ * That bucketing is insurance, not a live code path: measured against `claude`
+ * 2.1.220, the SDK forwards **no** subagent stream events at all (34 stream
+ * events on a two-subagent run, 0 of them carrying a `parent_tool_use_id`),
+ * while subagent `assistant` messages do arrive. So today a subagent turn has no
+ * delta to find and keeps the snapshot — see the note on `take()`. The bucket
+ * exists because `SDKPartialAssistantMessage` declares `parent_tool_use_id`, so
+ * the day the SDK starts forwarding them, parallel Task subagents would
+ * otherwise cross-attribute silently.
  *
  * Ordering is safe by construction: `message_delta` always lands before the
  * next turn's `message_start` and before `result`, and a lane only closes a
  * turn on the next turn, on `result`, or at stream end. A turn whose delta never
- * arrived (aborted stream) simply falls back to the snapshot.
+ * arrived (aborted stream, or any subagent turn) falls back to the snapshot.
  */
 export class MessageDeltaTracker {
   readonly #openByStream = new Map<string, string>();
@@ -167,9 +176,13 @@ export class MessageDeltaTracker {
   }
 
   /**
-   * Read and forget a turn's true numbers. Forgetting matters: a resumed
-   * session can legitimately replay a `message.id`, and that is a real second
-   * turn which must not inherit the first one's totals.
+   * Read and forget a turn's true numbers, or null when none were seen — the
+   * caller then keeps the snapshot. Null is the normal case for a **subagent**
+   * turn, whose stream events the SDK does not forward.
+   *
+   * Forgetting matters: a resumed session can legitimately replay a
+   * `message.id`, and that is a real second turn which must not inherit the
+   * first one's totals.
    */
   take(messageId: string | null): TurnTruth | null {
     if (messageId == null) return null;

@@ -91,6 +91,14 @@ side-effect import is captured in the `[DECISION]` comment on
   off. Set the option to `true` yourself and nothing is filtered. Measured cost:
   ~1.3–1.4x the stream bytes. `POME_DISABLE_PARTIAL_MESSAGES=1` opts out, at the
   price of the low number.
+- **Sub-agent turns still report the snapshot.** The SDK forwards no stream
+  events for Task sub-agents (measured: 34 stream events on a two-sub-agent run,
+  none of them tagged with a `parent_tool_use_id`), so there is no
+  `message_delta` to read and those turns keep the low count. They are a small
+  share of a run's output. Note also that `SDKResultMessage.usage` counts only
+  the main agent, while both lanes emit a row per turn either way — so on a run
+  that uses sub-agents the lanes total *more* than the SDK's own rollup rather
+  than matching it exactly.
 
 ## Signals file format
 

@@ -393,6 +393,38 @@ describe("withGenAiSpans → gen_ai.usage.output_tokens is the message_delta tru
     expect(spans.reduce((n, s) => n + outputTokensOf(s), 0)).toBe(330);
   });
 
+  // Measured against `claude` 2.1.220: the SDK forwards no subagent stream
+  // events (34 on a two-subagent run, 0 with a `parent_tool_use_id`) while
+  // subagent `assistant` messages DO arrive. So a subagent turn has no delta and
+  // keeps the snapshot, and the main agent's delta must not leak onto it.
+  //
+  // Consequence worth knowing: `SDKResultMessage.usage` also excludes subagent
+  // usage, so the exactness invariant holds over MAIN-AGENT turns. Live
+  // two-subagent run: main deltas 517 + 7 == result 524, with the subagent turns'
+  // 4 + 4 sitting outside that total on both sides.
+  it("keeps the snapshot on a subagent turn and does not leak the main delta onto it", async () => {
+    await drive([
+      streamStart("msg_main"),
+      { type: "assistant", message: { id: "msg_main", model: "claude-opus-4-8", usage: { input_tokens: 2, output_tokens: 8 } } },
+      streamDelta(517, "tool_use"),
+      // Subagent turns: assistant messages only, no stream events of their own.
+      {
+        type: "assistant",
+        parent_tool_use_id: "toolu_alpha",
+        message: { id: "msg_sub_a", model: "claude-opus-4-8", usage: { input_tokens: 2, output_tokens: 4 } },
+      },
+      {
+        type: "assistant",
+        parent_tool_use_id: "toolu_beta",
+        message: { id: "msg_sub_b", model: "claude-opus-4-8", usage: { input_tokens: 2, output_tokens: 4 } },
+      },
+      { type: "result", subtype: "success" },
+    ]);
+
+    const spans = collectSpans();
+    expect(spans.map(outputTokensOf)).toEqual([517, 4, 4]);
+  });
+
   // The span window is measured from the previously yielded message. Injected
   // partial messages arrive microseconds before the assistant message they
   // describe, so letting them move the boundary would collapse every window to
