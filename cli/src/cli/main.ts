@@ -571,7 +571,11 @@ export function createProgram() {
             discard: opts.discard === true,
           });
         } catch (err) {
-          console.error(friendlyHostedError(err));
+          // runSessionStop already prints the full refusal detail for
+          // HostedDiscardRefusedError; friendlyHostedError returns "" for it
+          // so we don't print a duplicate (or bare blank) line here.
+          const friendly = friendlyHostedError(err);
+          if (friendly) console.error(friendly);
           process.exitCode = 2;
         }
       },

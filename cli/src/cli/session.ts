@@ -322,7 +322,16 @@ export async function runSessionStop(opts: {
   console.error(`Stopped session ${opts.sessionId}.`);
 }
 
+/** Empty string means "already fully reported — print nothing more". Only
+ *  `HostedDiscardRefusedError` returns it today: `runSessionStop` above just
+ *  printed the complete multi-line refusal (session, task, open time, the
+ *  `--discard` escape hatch), so falling through to `err.message` here would
+ *  either duplicate that or, when the server omits `error.message`, print a
+ *  bare blank line. Callers must skip printing when this returns "". */
 export function friendlyHostedError(err: unknown): string {
+  if (err instanceof HostedDiscardRefusedError) {
+    return "";
+  }
   if (err instanceof HostedAuthError) {
     return `${err.message} · Run \`pome login\` or set a valid POME_API_KEY.`;
   }
