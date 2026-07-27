@@ -368,6 +368,27 @@ describe("F-998: includePartialMessages injection is invisible to the caller", (
     expect(capturedQueryParams!.options!.includePartialMessages).toBeUndefined();
   });
 
+  // Setting the option to `false` declines to SEE partial messages, which is
+  // what the filter already guarantees. Telemetry keeps asking for them, so the
+  // sequence the caller gets is the same either way — it just stays accurate.
+  it("still asks, and still filters, when the caller set the option to false", async () => {
+    const { tape, gated } = buildTape();
+    fakeMessages = tape;
+    fakePartialOnly = gated;
+
+    const { query } = await import("../src/index.js");
+    const seen: Array<{ type: string }> = [];
+    for await (const m of query({
+      prompt: "x",
+      options: { includePartialMessages: false },
+    } as Parameters<typeof query>[0])) {
+      seen.push(m);
+    }
+
+    expect(capturedQueryParams!.options!.includePartialMessages).toBe(true);
+    expect(seen.map((m) => m.type)).toEqual(["system", "assistant", "result"]);
+  });
+
   it("passes stream events straight through when the caller asked for them", async () => {
     const { tape, gated } = buildTape();
     fakeMessages = tape;

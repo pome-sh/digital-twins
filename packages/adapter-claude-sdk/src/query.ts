@@ -37,10 +37,12 @@ type HooksConfig = Partial<Record<HookEvent, HookCallbackMatcher[]>>;
  * Telemetry runs turn on `includePartialMessages` internally (F-998): the true
  * per-turn `output_tokens` reaches the SDK only on a `message_delta` stream
  * event. Everything that option adds is filtered back out before it reaches the
- * returned iterator, so the message sequence is exactly what it would have been
- * — unless the caller set the option themselves, in which case pome touches
- * nothing and the stream events flow through as they asked. Set
- * `POME_DISABLE_PARTIAL_MESSAGES=1` to opt out entirely.
+ * returned iterator, so the message sequence is exactly what it would have been.
+ * Set the option to `true` yourself and pome touches nothing — the stream events
+ * flow through as you asked. Setting it to `false` only declines to *see* them:
+ * telemetry still asks for them and still filters them out, so the sequence you
+ * get is the same either way. `POME_DISABLE_PARTIAL_MESSAGES=1` opts out of
+ * asking at all, at the cost of the ~5x-low snapshot.
  *
  * v0: returns an AsyncGenerator, not the full `Query` interface — control
  * methods (`interrupt`, `setPermissionMode`, …) are not re-exposed yet. Use
