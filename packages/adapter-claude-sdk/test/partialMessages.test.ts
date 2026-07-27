@@ -199,6 +199,33 @@ describe("MessageDeltaTracker — the authoritative per-turn output tokens", () 
     expect(t.take("msg_A")).toEqual({ outputTokens: 179, stopReason: "end_turn" });
   });
 
+  // In the normal flow only one delta is ever outstanding, so a naive "return
+  // whatever delta we saw last" would pass every other test here. It is wrong as
+  // soon as two are pending at once — a turn that never produced an `assistant`
+  // message leaves its delta behind, and if the SDK ever forwards subagent
+  // stream events, two streams are in flight by construction. Pin the lookup.
+  it("hands each turn its OWN delta when several are outstanding", () => {
+    const t = new MessageDeltaTracker();
+    t.observe(messageStart("msg_A"));
+    t.observe(messageDelta(100, "tool_use"));
+    t.observe(messageStart("msg_B"));
+    t.observe(messageDelta(200, "end_turn"));
+
+    // Taken out of order on purpose: a positional implementation gets this wrong.
+    expect(t.take("msg_B")).toEqual({ outputTokens: 200, stopReason: "end_turn" });
+    expect(t.take("msg_A")).toEqual({ outputTokens: 100, stopReason: "tool_use" });
+  });
+
+  it("does not hand a turn a different turn's delta when its own is missing", () => {
+    const t = new MessageDeltaTracker();
+    t.observe(messageStart("msg_A"));
+    t.observe(messageDelta(100, "tool_use"));
+
+    // msg_B never got a delta — it must fall back to the snapshot, not inherit A's.
+    expect(t.take("msg_B")).toBeNull();
+    expect(t.take("msg_A")?.outputTokens).toBe(100);
+  });
+
   it("ignores a delta that arrives with no message_start ahead of it", () => {
     const t = new MessageDeltaTracker();
     t.observe(messageDelta(179, "tool_use"));

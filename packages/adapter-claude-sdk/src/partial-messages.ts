@@ -128,6 +128,15 @@ function asString(v: unknown): string | null {
  * next turn's `message_start` and before `result`, and a lane only closes a
  * turn on the next turn, on `result`, or at stream end. A turn whose delta never
  * arrived (aborted stream, or any subagent turn) falls back to the snapshot.
+ *
+ * The interleaving case is worth spelling out, because the lanes keep ONE
+ * `pending` turn that is not scoped per stream, so a subagent's `assistant`
+ * message closes whatever turn is open. That cannot lose the main agent's delta:
+ * the main message has to be complete — `message_delta`, then `message_stop` —
+ * before the `tool_use` block it ends on can run, and the subagent only exists
+ * because that tool ran. Causal, not lucky. Live two-subagent tape:
+ * `message_delta OUT=517` arrives, THEN the two subagent assistant messages,
+ * and 517 + 7 == the 524 the SDK reported.
  */
 export class MessageDeltaTracker {
   readonly #openByStream = new Map<string, string>();

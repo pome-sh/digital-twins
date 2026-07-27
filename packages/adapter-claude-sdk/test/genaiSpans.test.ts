@@ -425,6 +425,46 @@ describe("withGenAiSpans → gen_ai.usage.output_tokens is the message_delta tru
     expect(spans.map(outputTokensOf)).toEqual([517, 4, 4]);
   });
 
+  // The lanes keep ONE `pending` turn, not one per stream, so a subagent's
+  // assistant message closes whatever turn is open. That cannot lose the main
+  // agent's delta: the main message must be complete — message_delta, then
+  // message_stop — before the tool_use block it ends on can run, and the
+  // subagent only exists because that tool ran. This is the exact interleaving
+  // from a live two-subagent tape, and it must still total the SDK's 524.
+  it("does not lose the main agent's delta to an interleaved subagent turn", async () => {
+    const messageStop = () => ({
+      type: "stream_event",
+      parent_tool_use_id: null,
+      event: { type: "message_stop" },
+    });
+    const sub = (id: string, ptu: string) => ({
+      type: "assistant",
+      parent_tool_use_id: ptu,
+      message: { id, model: "claude-opus-4-8", usage: { input_tokens: 2, output_tokens: 4 } },
+    });
+
+    await drive([
+      streamStart("msg_main1"),
+      { type: "assistant", message: { id: "msg_main1", model: "claude-opus-4-8", usage: { input_tokens: 2, output_tokens: 8 } } },
+      { type: "assistant", message: { id: "msg_main1", model: "claude-opus-4-8", usage: { input_tokens: 2, output_tokens: 8 } } },
+      streamDelta(517, "tool_use"),
+      messageStop(),
+      sub("msg_sub_a", "toolu_alpha"),
+      sub("msg_sub_b", "toolu_beta"),
+      { type: "user" },
+      streamStart("msg_main2"),
+      { type: "assistant", message: { id: "msg_main2", model: "claude-opus-4-8", usage: { input_tokens: 2, output_tokens: 1 } } },
+      streamDelta(7, "end_turn"),
+      messageStop(),
+      { type: "result", subtype: "success" },
+    ]);
+
+    const spans = collectSpans();
+    expect(spans.map(outputTokensOf)).toEqual([517, 4, 4, 7]);
+    // Main-agent turns alone reproduce SDKResultMessage.usage.output_tokens.
+    expect(517 + 7).toBe(524);
+  });
+
   // The span window is measured from the previously yielded message. Injected
   // partial messages arrive microseconds before the assistant message they
   // describe, so letting them move the boundary would collapse every window to
