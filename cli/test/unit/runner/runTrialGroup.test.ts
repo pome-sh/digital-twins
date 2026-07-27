@@ -61,6 +61,15 @@ interface FakeCloud {
   events: string[];
   mints: Array<{ groupId?: string; idempotencyKey?: string; twins: string[] }>;
   deleted: string[];
+  /** F-983 — the FULL argument list of every deleteSession call. `deleted`
+   *  keeps only the session ids for the existing assertions; this pins the
+   *  `{ discard: true }` opt-in the rollback depends on. Without it a
+   *  refactor could drop the opt-in silently, and once the control plane
+   *  refuses ungraded sessions the rollback would leave the half-group open,
+   *  burning the team's concurrent-twin quota. */
+  deleteCalls: Array<
+    [string, boolean | undefined, { discard?: boolean } | undefined]
+  >;
   abandoned: Array<{ sessionId: string; errorCode?: string }>;
   failMintAt?: number;
 }
@@ -69,11 +78,13 @@ function makeFakeClient(overrides: Partial<FakeCloud> = {}): FakeCloud {
   const events: string[] = [];
   const mints: FakeCloud["mints"] = [];
   const deleted: string[] = [];
+  const deleteCalls: FakeCloud["deleteCalls"] = [];
   const abandoned: FakeCloud["abandoned"] = [];
   const cloud: FakeCloud = {
     events,
     mints,
     deleted,
+    deleteCalls,
     abandoned,
     ...overrides,
     client: null as unknown as HostedClient,
@@ -143,8 +154,9 @@ function makeFakeClient(overrides: Partial<FakeCloud> = {}): FakeCloud {
         abandoned: true,
       };
     },
-    async deleteSession(sessionId) {
+    async deleteSession(sessionId, bestEffort, opts) {
       deleted.push(sessionId);
+      deleteCalls.push([sessionId, bestEffort, opts]);
     },
   };
   return cloud;
@@ -275,9 +287,12 @@ describe("runTrialGroup — upfront minting (FDRS-636)", () => {
     expect(cloud.mints).toHaveLength(0);
   });
 
+  // failMintAt: 3 (not 2) so TWO sessions are already minted when the mint
+  // loop throws — the test name says "sessions", and rolling back more than
+  // one is what the `sessions.map(...)` in the rollback actually does.
   it("a failed mint rolls back the already-minted sessions and rethrows before any trial runs", async () => {
     const taskPath = await scenarioFixture();
-    const cloud = makeFakeClient({ failMintAt: 2 });
+    const cloud = makeFakeClient({ failMintAt: 3 });
     let trialsRun = 0;
 
     await expect(
@@ -297,7 +312,17 @@ describe("runTrialGroup — upfront minting (FDRS-636)", () => {
     ).rejects.toThrow(/twin provision timeout/);
 
     expect(trialsRun).toBe(0);
-    expect(cloud.deleted).toEqual(["ses_1"]);
+    expect(cloud.deleted).toEqual(["ses_1", "ses_2"]);
+
+    // F-983 — every rollback delete must OPT IN to discarding, asserted on the
+    // whole argument list rather than just the session id. These sessions were
+    // minted and never launched, so there is no tape to lose; but if the opt-in
+    // were dropped, the control plane's ungraded-session refusal would leave
+    // the half-group open and eat the team's concurrent-twin quota.
+    expect(cloud.deleteCalls).toEqual([
+      ["ses_1", true, { discard: true }],
+      ["ses_2", true, { discard: true }],
+    ]);
   });
 });
 

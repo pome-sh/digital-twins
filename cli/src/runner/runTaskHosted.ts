@@ -706,7 +706,14 @@ export async function runTaskHosted(
   } finally {
     // Best-effort teardown. TTL would reap anyway; explicit delete keeps
     // the dashboard sessions list tidy.
-    await client.deleteSession(session.session_id).catch(() => undefined);
+    // F-983: this teardown deliberately discards. On the success path the
+    // session is already `done` (finalize closed it) and the DELETE is a
+    // no-op; on the failure path we accept losing an ungraded tape rather
+    // than leaving open sessions to linger to TTL and pollute the
+    // reliability view. Flagged as known residue in the F-983 spec.
+    await client
+      .deleteSession(session.session_id, true, { discard: true })
+      .catch(() => undefined);
     await rm(signalsDir, { recursive: true, force: true }).catch(() => undefined);
   }
 }
