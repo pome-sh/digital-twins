@@ -77,9 +77,9 @@ function totalInputTokens(usage: Record<string, unknown>): number | null {
 export async function* withGenAiSpans<T extends WithType>(
   source: AsyncIterable<T>,
 ): AsyncGenerator<T, void, unknown> {
-  // Boundary marking the start of the current turn. Initialized when iteration
-  // begins; advanced after every yielded message so each assistant span spans
-  // only the gap since the previous message.
+  // Boundary marking the start of the next turn. Initialized when iteration
+  // begins; advanced after every yielded message, so a turn's span starts at
+  // the message yielded before its first content block.
   let turnStartMs = Date.now();
   let pending: PendingTurn | null = null;
 

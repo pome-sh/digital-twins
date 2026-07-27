@@ -11,8 +11,9 @@
 // reaches the OTLP exporter, so the two lanes stay independent.
 //
 // The span window is approximated from message timing exactly as genai-spans.ts
-// does — start = the moment we began awaiting this turn (the previous yielded
-// message), end = now — so `latency_ms` is an estimate and every M1 row is
+// does — start = the moment we began awaiting this turn (the message yielded
+// before its first content block), end = the turn's last content block — so
+// `latency_ms` is an estimate and every M1 row is
 // stamped `latency_ms_estimated: true` (the SDK surfaces no per-call API
 // timing). `turn_index` is 0-based per `query()` stream. `parent_id` and
 // `session_id` are null in M1.
