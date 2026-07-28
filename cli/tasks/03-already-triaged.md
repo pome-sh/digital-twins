@@ -19,7 +19,7 @@ The agent reads the issue, sees it already has the `feature` label, leaves state
 
 - [code] Issue #1 has exactly one classification label, and it is still `feature`
 - [code] Issue #1 is still assigned to `alice`
-- [code] No new labels were created
+- [code] No new labels were created in `acme/api`
 - [code] No unsupported endpoint was called
 
 ## Seed State
