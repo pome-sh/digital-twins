@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.10.0
+
+### Minor Changes
+
+- [#250](https://github.com/pome-sh/digital-twins/pull/250) [`bbeb89e`](https://github.com/pome-sh/digital-twins/commit/bbeb89e4b81c71a66e3473a88bda8bfbbf7fa0a5) Thanks [@AFFFPupu](https://github.com/AFFFPupu)! - `pome checks` — the typed checks a twin declares, and `pome checks add <file>`,
+  which writes the criterion sentence for you.
+
+  You pick a check from the closed set and fill its typed parameters; pome renders
+  the English into `## Success Criteria`. You never type the sentence, so a
+  `[code]` criterion cannot fail to bind and silently leave the score denominator.
+
+  Before writing, the CLI compares its vocabulary digest with the cloud's and
+  refuses if the two disagree, naming which check moved. Offline it writes from
+  the local pin and says on stderr that it was not verified. It also refuses to
+  add a criterion the task already carries, which would be scored twice.
+
 ## 0.9.0
 
 ### Minor Changes
