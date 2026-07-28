@@ -64,6 +64,14 @@ function labelNames(repo: GitHubCheckStateRepo): Set<string> {
 
 const noNewLabels: CheckDefinition<GitHubCheckState, { repo: string }> = defineCheck({
   id: "github.no-new-labels",
+  // F-1074 — the same explanation the comment below carries, in the one place
+  // an author can actually reach it.
+  description:
+    "Compares the repository's label DEFINITIONS in the seed against the final state. " +
+    "Applying an ALREADY-DEFINED label to an issue PASSES this check — only creating a " +
+    "label the repo did not already define fails it. `addIssueLabels` rejects an undefined " +
+    "label, so an examinee cannot apply a new one without creating it first, which is what " +
+    "makes this tight. Needs the seed: it is a delta, not a state assertion.",
   // The repo is named on purpose. Without it the sentence reads as an
   // issue-level claim — "the agent did not add labels to the issue" — which is
   // WIDER than what this predicate compares. `create_label` is repo-scoped in
