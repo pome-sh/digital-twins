@@ -33,6 +33,18 @@ export async function parseTaskFile(path: string): Promise<Task> {
   return parseTask(markdown, slugFromPath(path), sidecarSeed, path);
 }
 
+/** The task's declared twins, read WITHOUT requiring criteria (F-1074).
+ *  `taskSchema` demands at least one criterion, and `pome checks add` needs the
+ *  twin list BEFORE it has written one. Reuses this module's own section
+ *  splitter and config schema, so it is not a second parser. */
+export function readConfigTwins(markdown: string): string[] {
+  const configText = splitSections(markdown).get("config") ?? "";
+  const config = configText.trim()
+    ? taskConfigSchema.parse(parseFencedYaml(configText))
+    : taskConfigSchema.parse({});
+  return config.twins;
+}
+
 export function parseTask(markdown: string, slug = "scenario", sidecarSeed?: unknown, taskPath?: string): Task {
   const title = markdown.match(/^#\s+(.+)$/m)?.[1]?.trim() ?? slug;
   const sections = splitSections(markdown);

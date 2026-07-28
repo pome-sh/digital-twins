@@ -25,7 +25,7 @@ markdown ≤ 256 KiB). Output fields and what to do with each:
 | `already_passing` | Criteria already `passed` on the freshly seeded initial state | Triage each by intent (step 2) — this list is facts; the verdict drawn from it is not |
 | `deterministic` | Per-`code`-criterion dry-run status | Same statuses as `evaluate_criteria`; see step 4 |
 | `model` | `model` criteria (informational — the judge is not run) | Check each names observable behavior, not vibes |
-| `unmatched` entries / `no_criteria_prepass` | `code` text matched no registered predicate / nothing pre-passes | `unmatched` = authoring error → back to `pome-author-task`; never judge-scored |
+| `unmatched` entries / `no_criteria_prepass` | `code` text is not an instance of any declared check / nothing pre-passes | `unmatched` = authoring error → re-author it from `list_checks` via `pome-author-task`; never judge-scored |
 | `notes`, `verdict` | Prose + `BROKEN seed` / clean | Read the notes; **do not act on the verdict string** — it has no guard concept |
 
 ## Step 2 — guard-aware triage
@@ -80,7 +80,7 @@ Statuses per deterministic criterion, and what each means on a seed:
 | --- | --- | --- |
 | `failed` | Predicate matched, not yet satisfied | Correct for a discriminator |
 | `passed` | Predicate matched, already satisfied | Fine for a guard; BROKEN for anything else |
-| `unmatched` | No registered predicate for the text | Authoring error — restate to a known phrase or move to `model` |
+| `unmatched` | The text is not an instance of any declared check | Authoring error — pick a check from `list_checks` and let the system render the sentence (do NOT reword by hand), or move it to `model` |
 | `skipped` (`seed_load_failed`) | The twin could not boot this seed | Fix the seed first; step 3 usually names the cause |
 
 `model` entries are informational here — the judge only runs at

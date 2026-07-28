@@ -34,7 +34,7 @@ Triage each `already_passing` entry by intent, then judge:
 | Any non-guard criterion passes at seed | **BROKEN** — the exam is pre-won; weaken the seed or restate the criterion |
 | All criteria pass at seed | **BROKEN** — grades nothing, no matter what the verdict says |
 | No positive discriminator exists at all | **BROKEN** — even if nothing pre-passes; a crashed agent scores full marks |
-| Any `code` criterion is `unmatched` | **Authoring error** — no registered predicate; route back to `pome-author-task` |
+| Any `code` criterion is `unmatched` | **Authoring error** — the text is not an instance of any declared check. Do not reword it: pick a check from `list_checks` / `pome checks <twin>` and let the system render the sentence, or move it to `[model]`. Route back to `pome-author-task` |
 
 ## Fast path (default — in-process, free, no session)
 
