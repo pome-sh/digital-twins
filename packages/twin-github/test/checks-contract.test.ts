@@ -78,6 +78,23 @@ describe("declared check identity", () => {
     const missing = CHECKS.filter((check) => !FIXTURES[check.id]).map((check) => check.id);
     expect(missing, `checks with no FIXTURES entry: ${missing.join(", ")}`).toEqual([]);
   });
+
+  it("says what the predicate actually compares, in words the sentence does not carry", () => {
+    // The one defect this architecture makes EASIER, not harder: a rendered
+    // sentence wider or narrower than its check (Shankar et al., UIST '24
+    // §7.3.3 — readable surfaces hide the disagreement code makes visible).
+    // `No new labels were created in <repo>` reads as an issue-level claim; the
+    // predicate compares repo-level label DEFINITIONS. An authoring surface can
+    // only show what is declared, so the gap has to close here.
+    for (const check of CHECKS) {
+      expect(check.description?.trim(), `${check.id} declares no description`).toBeTruthy();
+      expect(
+        check.description.trim(),
+        `${check.id}'s description just restates its template — it must say what the ` +
+          `predicate COMPARES, which is the thing the sentence cannot carry`,
+      ).not.toBe(check.template);
+    }
+  });
 });
 
 describe("declared check grammar", () => {

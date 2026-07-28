@@ -2,16 +2,19 @@ import { describe, expect, it } from "vitest";
 import {
   checkNearMissPattern,
   checkPattern,
+  checksDigest,
   defineCheck,
   parseCheck,
   renderCheck,
   repoRef,
   templateSlots,
-  type CheckDefinition
+  type CheckDefinition,
+  type CheckParamType
 } from "../src/checks.js";
 
 const noNewLabels: CheckDefinition<unknown, { repo: string }> = defineCheck({
   id: "example.no-new-labels",
+  description: "Compares the repo's label definitions in the seed against the final state.",
   template: "No new labels were created in `{repo}`",
   params: { repo: repoRef },
   substrate: "seed+final",
@@ -92,6 +95,7 @@ describe("parseCheck", () => {
 describe("defineCheck validation", () => {
   const base = {
     id: "example.bad",
+    description: "Exists only to exercise defineCheck's validation.",
     substrate: "final" as const,
     polarity: () => "negative" as const,
     vacuityMutant: () => null,
@@ -114,5 +118,86 @@ describe("defineCheck validation", () => {
     expect(() => defineCheck({ ...base, template: "`{repo}` and `{repo}`", params: { repo: repoRef } })).toThrow(
       /duplicate template slot \{repo\}/
     );
+  });
+});
+
+describe("checksDigest", () => {
+  const alpha = defineCheck({
+    id: "x.alpha",
+    description: "Alpha compares the alpha field, which the sentence does not say.",
+    template: "Alpha is set on `{repo}`",
+    params: { repo: repoRef },
+    substrate: "final",
+    polarity: () => "positive",
+    vacuityMutant: () => null,
+    evaluate: () => ({ passed: true, reason: "stub" })
+  });
+  const beta = defineCheck({
+    id: "x.beta",
+    description: "Beta compares the beta field, which the sentence does not say.",
+    template: "Beta is set on `{repo}`",
+    params: { repo: repoRef },
+    substrate: "final",
+    polarity: () => "positive",
+    vacuityMutant: () => null,
+    evaluate: () => ({ passed: true, reason: "stub" })
+  });
+
+  it("does not depend on declaration order", () => {
+    expect(checksDigest([alpha, beta])).toBe(checksDigest([beta, alpha]));
+  });
+
+  it("moves when a template changes, because that changes what binds", () => {
+    const renamed = { ...alpha, template: "Alpha is now set on `{repo}`" };
+    expect(checksDigest([renamed])).not.toBe(checksDigest([alpha]));
+  });
+
+  it("moves when a param type's pattern changes", () => {
+    const looseRepo: CheckParamType = { ...repoRef, pattern: ".+" };
+    const loosened = { ...alpha, params: { repo: looseRepo } };
+    expect(checksDigest([loosened])).not.toBe(checksDigest([alpha]));
+  });
+
+  it("does NOT move when only prose changes", () => {
+    // The digest gates an author's write. A description or example edit changes
+    // no sentence and must never refuse one.
+    const reworded = {
+      ...alpha,
+      description: "A completely different explanation of the same comparison.",
+      params: { repo: { ...repoRef, example: "other/repo" } }
+    };
+    expect(checksDigest([reworded])).toBe(checksDigest([alpha]));
+  });
+
+  it("is prefixed so a caller can tell the algorithm from the value", () => {
+    expect(checksDigest([alpha])).toMatch(/^sha256:[0-9a-f]{64}$/);
+  });
+});
+
+describe("defineCheck validates a param type's own example", () => {
+  it("throws when the example fails the pattern it ships with", () => {
+    const broken: CheckParamType = {
+      name: "repo",
+      pattern: "[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+",
+      example: "not a repo",
+      render: (value) => value,
+      parse: (raw) => raw
+    };
+    expect(() =>
+      defineCheck({
+        id: "x.broken-example",
+        description: "Exists only to prove the example assertion fires.",
+        template: "A thing about `{repo}`",
+        params: { repo: broken },
+        substrate: "final",
+        polarity: () => "positive",
+        vacuityMutant: () => null,
+        evaluate: () => ({ passed: true, reason: "stub" })
+      })
+    ).toThrow(/example .* does not match its own pattern/);
+  });
+
+  it("accepts repoRef, whose example is a real repo reference", () => {
+    expect(new RegExp(`^${repoRef.pattern}$`).test(repoRef.example)).toBe(true);
   });
 });

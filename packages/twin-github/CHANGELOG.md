@@ -1,5 +1,14 @@
 # @pome-sh/twin-github — CHANGELOG
 
+## 0.3.0 — 2026-07-28
+
+- `github.no-new-labels` declares a `description`: it compares the repository's
+  label DEFINITIONS between the seed and the final state, so applying an
+  already-defined label passes. That was a source comment; it is now readable
+  by the authoring surfaces (F-1074).
+- Requires `@pome-sh/sdk@0.6.0`, whose `CheckDefinition` makes `description`
+  required. Minor for the same reason the sdk's is.
+
 ## 0.2.3 — 2026-07-28
 
 Additive: `@pome-sh/twin-github/checks` declares `github.no-new-labels`

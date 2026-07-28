@@ -15,6 +15,8 @@
 // reconcile — the drift gate's job is catching a pin that fell behind, not
 // reconciling two hand-maintained vocabularies.
 
+import { createHash } from "node:crypto";
+
 export type CheckPolarity = "positive" | "negative";
 
 // Which substrates a check's predicate needs. The consuming engine supplies
@@ -31,6 +33,11 @@ export type CheckSubstrateKind = "final" | "seed+final" | "tape";
 export interface CheckParamType {
   readonly name: string;
   readonly pattern: string;
+  // A valid value for this slot, shown as an author-facing hint (F-1074).
+  // `pattern` is a regex source; asking an author to satisfy one directly is
+  // hostile. `defineCheck` asserts this against `pattern` at module load, so a
+  // type whose own example is invalid cannot ship.
+  readonly example: string;
   render(value: string): string;
   parse(raw: string): string;
 }
@@ -42,6 +49,7 @@ export interface CheckParamType {
 export const repoRef: CheckParamType = {
   name: "repo",
   pattern: "[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+",
+  example: "acme/api",
   render: (value) => value,
   parse: (raw) => raw,
 };
@@ -67,6 +75,16 @@ export interface CheckDefinition<TState, TArgs extends Record<string, string>> {
   // `<twin>.<what-it-asserts>`, unique across the twin's declarations. Reports
   // name the check a criterion bound to; a regex source is not a name.
   id: string;
+  // What the predicate ACTUALLY compares, in a sentence or two (F-1074).
+  //
+  // REQUIRED, for the same reason `polarity` and `vacuityMutant` are: an
+  // optional field is one every later declaration omits, and an authoring
+  // surface can only show what is declared. A picker that offers nothing but
+  // the rendered sentence is the readable surface that hides disagreement
+  // (Shankar et al., UIST '24 §7.3.3) — `no-new-labels` reads as an
+  // issue-level claim while comparing repo-level label DEFINITIONS, so an
+  // agent applying an already-defined label passes, correctly and invisibly.
+  description: string;
   // English with typed slots, e.g. "No new labels were created in `{repo}`".
   // This is the ONE grammar: rendering and matching are both derived from it.
   template: string;
@@ -155,6 +173,17 @@ export function defineCheck<TState, TParams extends Record<string, CheckParamTyp
       throw new Error(`check ${def.id}: declared param \`${declared}\` is not used by the template`);
     }
   }
+  // F-1074 — a param type whose own example violates its own pattern would put
+  // an invalid value in front of an author as the suggested one.
+  for (const [name, type] of Object.entries(def.params)) {
+    const paramType = type as CheckParamType;
+    if (!new RegExp(`^${paramType.pattern}$`).test(paramType.example)) {
+      throw new Error(
+        `check ${def.id}: param \`${name}\` example ${JSON.stringify(paramType.example)} ` +
+          `does not match its own pattern /${paramType.pattern}/`,
+      );
+    }
+  }
   return def as CheckDefinition<TState, ArgsOfParams<TParams>>;
 }
 
@@ -183,11 +212,42 @@ function buildPattern(template: string, slotSource: (index: number) => string): 
   return new RegExp(`${source}$`);
 }
 
-export function checkPattern<TState, TArgs extends Record<string, string>>(
-  def: CheckDefinition<TState, TArgs>,
-): RegExp {
+// The subset of a declaration that decides what BINDS. Named as a type because
+// it is exactly what `checksDigest` hashes and exactly what a stale pin can
+// move. Taking this instead of `CheckDefinition` also lets a heterogeneous
+// registry be hashed without the args-erasing cast the engine needs elsewhere.
+export interface CheckBindingShape {
+  readonly id: string;
+  readonly template: string;
+  readonly substrate: CheckSubstrateKind;
+  readonly params: Readonly<Record<string, CheckParamType>>;
+}
+
+export function checkPattern(def: CheckBindingShape): RegExp {
   const { params } = templateSlots(def.template);
-  return buildPattern(def.template, (index) => def.params[params[index] as keyof TArgs]!.pattern);
+  return buildPattern(def.template, (index) => def.params[params[index]!]!.pattern);
+}
+
+// One implementation, called by BOTH the control plane and the CLI (F-1074).
+// They resolve declarations from independent npm pins and must be able to prove
+// they agree before an author writes a sentence; two implementations of "hash
+// the binding surface" would be the same two-representations-of-one-fact defect
+// this vocabulary exists to remove, one level down — a sort or key-order
+// difference would make every pin look skewed, or a real skew look equal.
+//
+// `description` and `example` are deliberately NOT hashed. This digest gates an
+// author's write, and a prose edit changes no sentence.
+export function checksDigest(defs: readonly CheckBindingShape[]): string {
+  const rows = defs
+    .map((def) => ({
+      id: def.id,
+      substrate: def.substrate,
+      // The compiled source, not the template: this also catches a change in
+      // `buildPattern` itself, which comparing templates would miss.
+      pattern: checkPattern(def).source,
+    }))
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  return `sha256:${createHash("sha256").update(JSON.stringify(rows), "utf8").digest("hex")}`;
 }
 
 // The literal segments intact, every slot wide open. A text matching THIS and
@@ -195,9 +255,7 @@ export function checkPattern<TState, TArgs extends Record<string, string>>(
 // check's sentence but fills a slot with something the slot's type rejects.
 // A text that fails this too is a stranger, and stays on the unmatched path —
 // which is what keeps this gate off the legacy phrases that resemble nothing.
-export function checkNearMissPattern<TState, TArgs extends Record<string, string>>(
-  def: CheckDefinition<TState, TArgs>,
-): RegExp {
+export function checkNearMissPattern(def: CheckBindingShape): RegExp {
   return buildPattern(def.template, () => ".+?");
 }
 

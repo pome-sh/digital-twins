@@ -1,5 +1,30 @@
 # @pome-sh/sdk
 
+## 0.6.0 — 2026-07-28
+
+Minor, not patch: `CheckDefinition.description` and `CheckParamType.example`
+are REQUIRED, which is a published signature change (`PACKAGE_RELEASE.md` —
+0.x minor plays the major role). 0.5.2 was a patch because it only *added*
+exports. `npm run test:contract` is green, but it is a runtime suite and
+required-ness is a compile-time property, so it is structurally blind to this
+class of change. Every implementer today is in this repo.
+
+- `CheckDefinition.description` — what the predicate actually compares.
+  Required because an authoring surface can only show what is declared, and a
+  rendered sentence wider than its check is the one defect this architecture
+  makes easier (Shankar et al., UIST '24 §7.3.3).
+- `CheckParamType.example` — a valid value per slot, asserted against its own
+  `pattern` inside `defineCheck`, so a type whose example is invalid cannot
+  ship. A regex source is not a prompt.
+- `checksDigest(defs)` — one implementation of "hash the binding surface",
+  called by both the control plane and the CLI, which resolve declarations
+  from independent npm pins. Hashes `id`, `substrate` and the COMPILED
+  pattern; never `description` or `example`, because a prose edit changes no
+  sentence and must never refuse an author's write.
+- `CheckBindingShape` — the subset that decides binding. `checkPattern` and
+  `checkNearMissPattern` now take it, so a heterogeneous registry can be
+  hashed without an args-erasing cast.
+
 ## 0.5.2 — 2026-07-28
 
 Additive: `@pome-sh/sdk/checks`, the assertable check vocabulary (F-1073).
