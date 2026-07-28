@@ -26,6 +26,8 @@ import { loginWithClerk } from "./login.js";
 import { runDocsCommand } from "./docs.js";
 import { runCompileSeeds } from "./compile-seeds.js";
 import { runTasksCommand } from "./tasks.js";
+import { runChecksCommand } from "./checks.js";
+import { runChecksAddCommand } from "./checks-add.js";
 import { runEvalCommand } from "./eval.js";
 import {
   copyAnnounceLine,
@@ -366,6 +368,47 @@ export function createProgram() {
   };
   registerTasksCommand("tasks", false);
   registerTasksCommand("scenarios", true);
+
+  // F-1074 — `pome checks` is a TOP-LEVEL group, not `pome tasks checks`:
+  // `pome tasks` already takes `[twin]` positionally, so `tasks checks` would
+  // parse "checks" as a twin id, and `pome task` one letter from `pome tasks`
+  // is a trap.
+  const checks = program
+    .command("checks")
+    .argument("[twin]", "Twin id (e.g. github). Omit to list twins that declare checks.")
+    .option("--json", "Emit the declaration as JSON (for skills and agents).", false)
+    .description(
+      "Browse the typed checks a twin declares — the closed set [code] criteria come from",
+    )
+    .action(async (twin: string | undefined, opts: { json: boolean }) => {
+      await runChecksCommand(twin, { json: opts.json });
+    });
+
+  checks
+    .command("add")
+    .argument("<file>", "Task markdown file to append a criterion to")
+    .option("--check <id>", "Check id (run `pome checks <twin>` to list them)")
+    .option(
+      "--arg <key=value>",
+      "One per declared parameter. Repeat the flag.",
+      (value: string, previous: string[] = []) => [...previous, value],
+      [],
+    )
+    .option(
+      "--api-url <url>",
+      "Control-plane URL",
+      process.env.POME_API_URL ?? DEFAULT_CONTROL_PLANE_URL,
+    )
+    .description(
+      "Add one [code] criterion by picking a declared check — pome writes the English",
+    )
+    .action(async (file: string, opts: { check?: string; arg: string[]; apiUrl: string }) => {
+      await runChecksAddCommand(file, {
+        check: opts.check,
+        arg: opts.arg,
+        apiBaseUrl: opts.apiUrl,
+      });
+    });
 
   program
     .command("compile-seeds")
