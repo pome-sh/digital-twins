@@ -1,5 +1,20 @@
 # @pome-sh/twin-github — CHANGELOG
 
+## 0.2.3 — 2026-07-28
+
+Additive: `@pome-sh/twin-github/checks` declares `github.no-new-labels`
+(F-1073), the twin's first assertable check, next to the state it reads.
+
+Its predicate compares the repo's label DEFINITION set between the seed and
+the final state. `addIssueLabels` rejects a label the repo does not define,
+so `create_label` is the only operation that can grow that set. The rendered
+sentence names the repo — ``No new labels were created in `acme/api`` — so a
+reader hears the repo-scoped claim rather than the wider issue-scoped one the
+bare phrasing invites.
+
+Repins `@pome-sh/sdk` to 0.5.2 for the `./checks` subpath. No twin wire,
+REST, or MCP surface change; `npm run test:contract` green.
+
 All notable changes to the GitHub twin are documented here. The format is
 loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 the package follows [Semantic Versioning](https://semver.org/).

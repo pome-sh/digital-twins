@@ -1,5 +1,22 @@
 # @pome-sh/sdk
 
+## 0.5.2 — 2026-07-28
+
+Additive: `@pome-sh/sdk/checks`, the assertable check vocabulary (F-1073).
+
+A check declares an English template with typed parameter slots; both the
+rendered sentence and the matcher that binds it are derived from that one
+template, so a declaration and its regex cannot drift apart. `defineCheck`
+validates the declaration at module load — a slot with no type, a type no
+slot uses, or a repeated slot are all hard errors rather than a check that
+silently binds nothing.
+
+`vacuityMutant` returns mutated ARGS rather than a mutated sentence, so the
+splice-the-wrong-literal hazard that forces a hand-written mutant sentence
+per rule is unreachable.
+
+No existing surface changed; `npm run test:contract` green.
+
 ## 0.5.1 — 2026-07-21
 
 Dependency-only patch: repin `@pome-sh/shared-types` to 0.12.0 (manifest data
