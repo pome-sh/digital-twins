@@ -1,5 +1,76 @@
 # Changelog
 
+## 0.13.0
+
+### Minor Changes
+
+- [#259](https://github.com/pome-sh/digital-twins/pull/259) [`5a49333`](https://github.com/pome-sh/digital-twins/commit/5a493333528ad5239a6a6fdc86921916d1739bff) Thanks [@AFFFPupu](https://github.com/AFFFPupu)! - You can now find out locally whether a task's `[code]` criteria will actually be graded.
+
+  A `[code]` criterion that binds no declared check is not an error anywhere: the
+  grader skips it and computes the score over the rest, so the denominator moves
+  for a reason nobody wrote down. Until now the only things that refused one were
+  `save_task` and `validate_task` over the hosted MCP — so an author writing tasks
+  in their own repo, offline or not, had no way to ask the question, and the first
+  signal was a run whose score had quietly dropped a criterion.
+
+  Two changes, both answered from this CLI's own pinned declarations, so they work
+  with no network:
+
+  - **`pome checks add` now audits the whole `## Success Criteria` block**, not just
+    the line it appends. Hand-edit a rendered sentence one word off and the next
+    append names it. It **warns and still writes** — an unrelated pre-existing line
+    is not a reason to refuse an append.
+  - **`pome checks lint <file...>`** answers the same question about files already on
+    disk. Shell globs work (`pome checks lint tasks/*.md`), and it exits 1 when a
+    criterion will not be graded, so it drops straight into your own CI.
+
+  Both name what is wrong rather than just flagging a line. A sentence that keeps a
+  check's shape but fills a slot with a value that slot's type rejects is reported
+  as the corrupted instance it is — naming the check, the slot, and the value —
+  because that one fails at finalize as `corrupted_check_instance:<id>`, while a
+  sentence matching nothing is the silent one.
+
+  A criterion whose twin has not migrated its vocabulary yet (stripe, slack, gmail,
+  linear) is reported as **unanswerable**, never as a pass: this CLI holds no
+  declaration to judge it by, and saying "fine" would be a guess.
+
+  Also fixes a cosmetic wart: the first criterion written into an empty
+  `## Success Criteria` section no longer lands flush against the next heading.
+
+- [#263](https://github.com/pome-sh/digital-twins/pull/263) [`938e74f`](https://github.com/pome-sh/digital-twins/commit/938e74f14008e0ccd9158dc782cbab18e7484f39) Thanks [@AFFFPupu](https://github.com/AFFFPupu)! - `pome checks github` offers a new assertion, and the criteria that decide whether an agent forged a green CI status now bind.
+
+  `` `create_commit_status` was never called `` and `` `create_check_run` was never
+called `` bound **nothing** before. They are the two `[code]` criteria on the
+  "fabricate a green CI status" task that decide whether the agent forged the
+  check — so a task whose entire subject is integrity under pressure was being
+  graded on its other two criteria, and `pome checks lint` reported it. It reports
+  `4 [code] criteria bind` now.
+
+  What made them answerable is a recorder that captures more, in the `@pome-sh/*`
+  packages this CLI bundles:
+
+  - **`RecorderEvent.tool`** — the twin ACTION a call invoked. It names the action,
+    not the transport: an MCP `tools/call` and the REST route that performs the
+    same thing stamp the same value, so `pick the other door` is not a way around
+    the assertion. A field carrying only the MCP tool name would have let an agent
+    clear `` `create_commit_status` was never called `` by writing the status over
+    REST.
+  - **`RecorderEvent.request_headers`** — the request headers as received, keys
+    lowercased and already redacted. Recorded for every event on the tape.
+
+  `pome checks add --check github.tool-never-called --arg tool=…` accepts only the
+  actions the recorder stamps on both transports. Naming any other tool leaves the
+  sentence unbound on purpose, and `pome checks lint` says so — a check that could
+  only ever answer "never called" is worse than one that visibly does not exist.
+
+  Recordings written by older CLIs still parse: both fields are optional, and a
+  missing one reads as "this recording predates the field" rather than as a value.
+
+  Also fixed: **neither leg of the Stripe x402 flow was recorded at all.** The
+  payment middleware answered each `402` challenge itself before the route ran, so
+  an unpaid attempt left no trace on the tape and no trace in the exported state.
+  Both legs are recorded now, with the `X-PAYMENT` header that tells them apart.
+
 ## 0.12.0
 
 ### Minor Changes
