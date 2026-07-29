@@ -16,6 +16,8 @@ on:
       - 'scripts/use-local-pome-tarballs.mjs'
       - 'scripts/check-cli-version-bump.sh'
       - 'scripts/check-cli-version-floor.sh'
+      - 'scripts/check-cli-pins-match-workspace.mjs'
+      - 'scripts/check-cli-pins-published.mjs'
       - '.github/workflows/cli-ci.yml'
   push:
     branches: [main]
@@ -34,6 +36,8 @@ on:
       - 'scripts/use-local-pome-tarballs.mjs'
       - 'scripts/check-cli-version-bump.sh'
       - 'scripts/check-cli-version-floor.sh'
+      - 'scripts/check-cli-pins-match-workspace.mjs'
+      - 'scripts/check-cli-pins-published.mjs'
       - '.github/workflows/cli-ci.yml'
   workflow_dispatch:
 
@@ -83,6 +87,14 @@ jobs:
         run: |
           npm ci
           node scripts/pack-publishable.mjs --out "$RUNNER_TEMP/tarballs"
+      # Everything below this line tests the WORKSPACE twins, not the versions
+      # cli/package.json declares: this step overwrites those deps with the
+      # tarballs packed above. That is deliberate — a PR that changes
+      # packages/twin-github must be tested against the change, and that version
+      # is not on npm yet — but it means no job in this workflow can see a stale
+      # pin. F-1135's scripts/check-cli-pins-match-workspace.mjs (in ci.yml)
+      # holds the pins equal to packages/ so this rewrite is a no-op; without it,
+      # cli-ci is green on an artifact nobody ships (F-1132).
       - name: Use local package tarballs before first npm publish
         working-directory: ${{ github.workspace }}
         run: node scripts/use-local-pome-tarballs.mjs cli/package.json

@@ -7,10 +7,15 @@
 # shipped without a version bump so downstream users couldn't tell via
 # `pome --version` whether their install picked up the new code. See FDRS-396.
 #
-# `cli/vendor/**` is covered because the CLI bundles vendored tarballs
-# (@pome-sh/shared-types and the twin packages) via `bundleDependencies`.
-# behavior change that ships to users, yet touches no file under cli/src/**;
-# without this the gate is silent on twin swaps. See FDRS-593.
+# The gate also fires on a "twin swap" — a change that ships to users while
+# touching no file under `cli/src/**`. That used to mean `cli/vendor/**`
+# (vendored tarballs, FDRS-593), but that directory no longer exists, so the
+# coverage had gone quietly false. The mechanism today is `cli/package.json`'s
+# `@pome-sh/*` pins: they are `bundleDependencies`, baked into the tarball at
+# publish time rather than resolved at install, so moving one changes what
+# users install as surely as editing src does. F-1135 restores that half —
+# without it a re-pin can land, read as fixed, and never publish. That silence
+# is what made F-1132 last six hours.
 #
 # Usage:
 #   BASE_REF=origin/main scripts/check-cli-version-bump.sh
@@ -32,8 +37,45 @@ fi
 # Capture to a variable first so that under `set -o pipefail` a grep-closed-pipe
 # SIGPIPE on `git diff` can't be misread as "no changes" and silently skip the gate.
 changed_files="$(git diff --name-only --diff-filter=ACMRTD "$BASE_REF"...HEAD)"
-if ! grep -qE '^cli/(src|vendor)/' <<<"$changed_files"; then
-  echo "✅ No changes under cli/src/ or cli/vendor/; CLI version-bump gate skipped."
+src_touched=0
+if grep -qE '^cli/(src|vendor)/' <<<"$changed_files"; then
+  src_touched=1
+fi
+
+# F-1135 — did a bundled `@pome-sh/*` pin move? Compared value-by-value rather
+# than by file, because `cli/package.json` also changes for reasons that are not
+# shipping changes (the Version PR's own `version` bump, script edits).
+pins_moved=""
+if grep -qE '^cli/package\.json$' <<<"$changed_files"; then
+  pins_moved="$(BASE_REF="$BASE_REF" node -e '
+const { execFileSync } = require("node:child_process");
+const fs = require("node:fs");
+const head = JSON.parse(fs.readFileSync("cli/package.json", "utf8"));
+let base;
+try {
+  base = JSON.parse(
+    execFileSync("git", ["show", process.env.BASE_REF + ":cli/package.json"], { encoding: "utf8" }),
+  );
+} catch {
+  process.exit(0); // no manifest on the base side — nothing to compare.
+}
+const pins = (m) =>
+  Object.fromEntries(
+    Object.entries({ ...(m.dependencies || {}), ...(m.devDependencies || {}) }).filter(([n]) =>
+      n.startsWith("@pome-sh/"),
+    ),
+  );
+const [a, b] = [pins(base), pins(head)];
+const moved = [];
+for (const n of new Set([...Object.keys(a), ...Object.keys(b)])) {
+  if (a[n] !== b[n]) moved.push("  " + n + ": " + (a[n] ?? "(absent)") + " → " + (b[n] ?? "(absent)"));
+}
+if (moved.length) console.log(moved.join("\n"));
+')"
+fi
+
+if [[ "$src_touched" -eq 0 && -z "$pins_moved" ]]; then
+  echo "✅ No changes under cli/src/, and no bundled @pome-sh/* pin moved; CLI version-bump gate skipped."
   exit 0
 fi
 
@@ -84,13 +126,32 @@ if [[ "$new_changeset" -eq 1 || "$version_bumped" -eq 1 ]]; then
   exit 0
 fi
 
+if [[ "$src_touched" -eq 1 ]]; then
+  trigger="touches cli/src/**"
+else
+  trigger="moves a bundled @pome-sh/* pin"
+fi
+
+moved_note=""
+if [[ -n "$pins_moved" ]]; then
+  moved_note="
+Bundled @pome-sh/* pin(s) moved in this PR:
+$pins_moved
+
+These are bundleDependencies — frozen into the published tarball at publish
+time, not resolved at install — so the re-pin only reaches users if the CLI
+version moves with it. F-1132: a pin sat correct in the repo while every
+\`pome checks add\` kept failing against the version users actually had.
+"
+fi
+
 cat >&2 <<EOF
 ❌ CLI version-bump gate failed.
 
-This PR touches cli/src/** or cli/vendor/** but neither:
+This PR $trigger but neither:
   (a) added a changeset file under cli/.changeset/, NOR
   (b) bumped cli/package.json version (still $head_version on both sides).
-
+$moved_note
 Pick one before merging:
 
   # (preferred) record a changeset:
