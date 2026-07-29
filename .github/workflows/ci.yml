@@ -55,6 +55,21 @@ jobs:
       # (packages/sdk/src): every statement catch must throw, return an
       # error/sentinel, or reject. Dependency-free, runs before `npm ci`.
       - run: node scripts/no-catch-and-continue.mjs
+      # F-1135 — cli/package.json's @pome-sh/* pins must equal packages/*'s
+      # versions. CI tests the workspace build (the tarball rewrite) while users
+      # install the published tarball, where those deps are bundleDependencies
+      # and the pin is frozen at publish time. F-1132 shipped a CLI that refused
+      # every `pome checks add` for github while cli-ci was green.
+      - run: node scripts/check-cli-pins-match-workspace.mjs
+      - run: node scripts/check-cli-pins-match-workspace.test.mjs
+      # The release-time half (scripts/check-cli-pins-published.mjs) needs the
+      # registry, so only its offline regression suite runs here — including the
+      # assertion that cli-release.yml no longer carries its own copy of the
+      # versions.
+      - run: node scripts/check-cli-pins-published.test.mjs
+      # F-1135 — the version-bump gate now also fires when a bundled @pome-sh/*
+      # pin moves (cli/vendor/**, its old stand-in for that, no longer exists).
+      - run: node scripts/check-cli-version-bump.test.mjs
       - run: bash scripts/lint-no-cloud-imports.sh
       - run: bash scripts/lint-no-cloud-imports.test.sh
       - run: node scripts/ci/wait-for-workflow.test.mjs
