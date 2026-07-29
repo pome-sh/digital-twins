@@ -4,6 +4,28 @@ All notable changes to the Stripe twin are documented here. The format is
 loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 the package follows [Semantic Versioning](https://semver.org/).
 
+## 0.3.0 — 2026-07-29
+
+The x402 flow reaches the recorder tape (F-1125). Minor: it requires
+`@pome-sh/sdk` >= 0.9.0, and the tape gains rows where there were none.
+
+### Fixed
+
+- **Neither x402 leg was recorded at all.** `registerX402Routes` mounted the
+  protected resource as a bare Hono handler, and the payment middleware answers
+  every challenge leg itself and returns before `next()` — so nothing reached the
+  recorder. An unpaid attempt left no trace anywhere: `state_final.json` is
+  identical whether the agent paid, failed to pay, or never tried. Both legs are
+  on the tape now, with their request headers, which is what makes task 13's
+  `The retry includes X-PAYMENT and returns 200` answerable.
+
+### Added
+
+- `request_headers` on the two events this twin builds by hand — `respond()` and
+  the idempotency dedupe replay. The replay's `Idempotency-Key` is now readable
+  on the one row that is about it.
+
+
 ## 0.2.5 — 2026-07-21
 
 Dependency-only patch: repin `@pome-sh/sdk` to 0.5.1 and

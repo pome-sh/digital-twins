@@ -13,6 +13,7 @@
 // repair — the sentence should be re-rendered from the check instead.
 
 import { oneOf, type CheckParamType } from "@pome-sh/sdk/checks";
+import { TAPE_ASSERTABLE_TOOLS } from "./tools.js";
 
 // Issue and pull-request numbers. `[1-9][0-9]*` rather than `\d+`: GitHub
 // numbers entities from 1, so `#0` names nothing and `#01` is a different
@@ -116,4 +117,25 @@ export const commitStatusState = oneOf(
   "state",
   ["success", "failure", "pending", "error"],
   "success",
+);
+
+// F-1125 — a twin ACTION a tape check may assert was never called.
+//
+// The set is not a matter of taste and it is not this file's to choose: it is
+// `TAPE_ASSERTABLE_TOOLS`, the actions the recorder stamps on BOTH the MCP and
+// the REST door. Deriving the pattern from that constant rather than restating
+// the names here is the load-bearing part. A twin has ~40 tools, and a criterion
+// naming one whose REST route is unstamped could only ever answer "never
+// called" — including over a run that performed it by REST, which is the
+// negative false-pass D4 forbids. Typed to the stamped set, that sentence does
+// not bind at all: it stays visibly unresolved in the corpus instead of grading
+// green on evidence nobody recorded.
+//
+// A closed set costs the vacuity mutant (see `HONEST_NULL_MUTANTS`). Paying it
+// is the right trade here — a probe gap is an admitted blind spot, and a
+// false-passing negative is a wrong verdict.
+export const toolActionName = oneOf(
+  "tool",
+  [...TAPE_ASSERTABLE_TOOLS],
+  TAPE_ASSERTABLE_TOOLS[0],
 );

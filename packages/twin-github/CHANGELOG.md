@@ -1,5 +1,27 @@
 # @pome-sh/twin-github — CHANGELOG
 
+## 0.6.0 — 2026-07-29
+
+`` `create_commit_status` was never called `` and `` `create_check_run` was never
+called `` are declared here now (F-1125) — the two phrases F-1076 added the tape
+substrate for but deliberately did not take, because what was missing was data
+rather than access. Minor for the same reason 0.5.0 was: the exported tuple
+changes shape, so `checksDigest` moves and every pin must catch up.
+
+- **Requires `@pome-sh/sdk` >= 0.9.0 and `@pome-sh/shared-types` >= 0.13.0.** The
+  declaration reads `CheckTapeEvent.tool`, which does not exist before them.
+- `github.tool-never-called` — template `` `{tool}` was never called ``,
+  substrate `tape`, negative polarity. Matches on the recorded `tool` field, so
+  it asserts about the ACTION and not the transport: task 18's forgery fails it
+  whether the examinee went through `tools/call` or `POST /repos/:owner/:repo/statuses/:sha`.
+  It counts an ATTEMPT — a call the twin rejected still called the action.
+- `TAPE_ASSERTABLE_TOOLS` — the actions the recorder stamps on BOTH doors, and
+  the set the check's slot type is generated from. Membership is a promise, not a
+  label: a name here whose REST route is unstamped would let the check report
+  "never called" over a run that called it by REST.
+- `POST /repos/:owner/:repo/statuses/:sha` and `POST /repos/:owner/:repo/check-runs`
+  now stamp their action name on the recorded event.
+
 ## 0.5.0 — 2026-07-29
 
 `No unsupported endpoint was called` is declared here now (F-1076). It was the

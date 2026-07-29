@@ -9,6 +9,7 @@ import type { Context } from "hono";
 import { z } from "zod";
 import {
   FAILURE_INJECTION_OVERRIDE_KEY,
+  recordedRequestHeaders,
   type FailureInjectionOverride,
 } from "@pome-sh/sdk/server";
 import { TwinError, stripeError } from "../errors.js";
@@ -219,6 +220,14 @@ export function respond(
     method: c.req.method,
     path: new URL(c.req.url).pathname,
     request_body: requestBody,
+    // F-1125 — one shared implementation with the engine's own emit(), so
+    // "which headers get recorded" has a single answer across every site.
+    request_headers: recordedRequestHeaders(c),
+    // Stripe's REST routes are not declared as twin actions: no criterion asks
+    // whether a stripe TOOL was called, and stamping a name here that no check
+    // can bind would be an unverifiable claim. MCP dispatch still stamps its
+    // own name through the engine.
+    tool: null,
     status: finalStatus,
     response_body: finalBody,
     latency_ms: Date.now() - started,

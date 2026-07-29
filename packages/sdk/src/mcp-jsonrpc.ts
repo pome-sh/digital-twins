@@ -16,6 +16,7 @@ import {
   type TwinDefinition,
 } from "./index.js";
 import { UnknownToolError, envelopeFor } from "./errors.js";
+import { recordedRequestHeaders } from "./request-capture.js";
 import { makeToolCallContext } from "./tool-context.js";
 
 const PARSE_ERROR = -32700;
@@ -226,6 +227,9 @@ async function handleToolsCall<TDb, TSeed, TDomain>(
       mutation: effectiveMutation,
       delta,
       error: toolError,
+      // The name the CALLER used, stamped even when `tool` above is undefined
+      // (unknown tool) or the handler threw. See `RecorderEvent.tool`.
+      tool: name,
     })
   );
 
@@ -243,6 +247,7 @@ function buildEventCore<TDb, TSeed, TDomain>(
     mutation: boolean;
     delta: RecorderEvent["state_delta"];
     error: string | null;
+    tool: string;
   }
 ) {
   const requestId = `req_${randomUUID()}`;
@@ -263,6 +268,12 @@ function buildEventCore<TDb, TSeed, TDomain>(
     method: c.req.method,
     path: new URL(c.req.url).pathname,
     request_body: fields.requestBody,
+    request_headers: recordedRequestHeaders(c),
+    // F-1125 — the whole reason the field exists. This surface is where the
+    // tool name used to be reachable only by digging it out of `request_body`
+    // on a `/mcp` path; a check that had to do that was reverse-engineering
+    // transport, and getting it wrong false-passes a negative criterion.
+    tool: fields.tool,
     status: fields.status,
     response_body: fields.responseBody,
     latency_ms: Date.now() - fields.started,

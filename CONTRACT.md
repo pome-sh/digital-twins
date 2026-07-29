@@ -1,6 +1,6 @@
 # Twin Runtime Contract
 
-**Version 1.4.0** — Gmail named fault seeds added 2026-07-24 (F-917); Linear contract added 2026-07-21; Gmail contract added 2026-07-20; boot-secret self-generation added 2026-07-10 (F-708). Verified by the black-box suite in [`contract/`](./contract/).
+**Version 1.5.0** — recorder tape gains `request_headers` + `tool`, and the stripe x402 legs are recorded at all, 2026-07-29 (F-1125); Gmail named fault seeds added 2026-07-24 (F-917); Linear contract added 2026-07-21; Gmail contract added 2026-07-20; boot-secret self-generation added 2026-07-10 (F-708). Verified by the black-box suite in [`contract/`](./contract/).
 
 This document enumerates everything pome-cloud (and the pome CLI) may rely on when booting and driving a twin. **Changing any item below is a breaking contract change**: update this document and the suite in the same PR, then open the matching pome-cloud consumer PR that pins and verifies the new signed twin artifact (rule of record: `packages/twin-github/README.md`, runtime-contract section).
 
@@ -37,7 +37,7 @@ This document enumerates everything pome-cloud (and the pome CLI) may rely on wh
 - Session mount `/s/:sid/*` — bearer JWT, HS256 over `TWIN_AUTH_SECRET`, claims `{sid, team_id, exp, …}`; the `sid` claim must equal the path `:sid`. Provider-shaped tokens (`ghp_/github_pat_pome_*`, `xox[bp]-pome-*`, `sk_test_pome_*`) are also accepted per twin.
 - `GET /s/:sid/_pome/health` → 200 `{ok: true, twin, …}`.
 - `GET /s/:sid/_pome/state` → 200 JSON object — the redacted state export that feeds cloud-side `[code]` scoring.
-- `GET /s/:sid/_pome/events` → 200 JSON array — the recorder tape fetched at end of run.
+- `GET /s/:sid/_pome/events` → 200 JSON array — the recorder tape fetched at end of run. Row shape is `@pome-sh/shared-types` `recorderEventSchema`. Two fields are additive as of F-1125 and a reader must treat ABSENT as "this recording predates the field", never as a value: `request_headers` (the request headers as received, keys lowercased, already redacted — `authorization` / `cookie` / `x-api-key` arrive as `[REDACTED]`) and `tool` (the twin ACTION the call invoked — stamped identically for an MCP `tools/call` and for a REST route that performs the same action; `null` means the serving surface declares no action, **not** that no action happened).
 - MCP: `GET /s/:sid/mcp/tools` → `{tools: […]}`; `POST /s/:sid/mcp` (streamable-HTTP JSON-RPC, stateless — `GET`/`DELETE` answer 405); legacy `POST /s/:sid/mcp/tools/:name` and `POST /s/:sid/mcp/call` (`{tool, arguments}`).
 - Reserved prefixes: `/_pome/*` and `/mcp/*` under the session mount belong to the platform (OQ-B6); domain routes must not shadow them.
 - Unknown **session** routes → **501** loud-unsupported envelope advertising `fidelity: "unsupported"` and the supported surfaces.
@@ -75,6 +75,7 @@ Probed against the pre-engine builds (`3cd86eb`); the contract suite asserts eve
 | `GET /s/:sid/_pome/health` exact keys | `ok, twin, implementation, fidelity, runtime` | `ok, twin` | `ok, twin, implementation, fidelity, runtime, tthw_seconds, recorder` |
 | `/_pome/state` fetches on the recorder tape | never | never | never |
 | `/admin/seed` on the recorder tape | recorded, `state_delta: null` | recorded, `state_delta: null` | not recorded |
+| `GET /x402/protected-resource` on the recorder tape | — | — | **both legs recorded** (F-1125): the 402 challenge and the paid retry, `state_mutation: false` on each. Was neither before — the payment middleware answered the challenge itself and the resource was a bare handler, so an unpaid attempt left no trace anywhere. The middleware's own settlement calls stay separate rows with their own deltas. |
 
 ### Gmail 1.2.0 pins
 
