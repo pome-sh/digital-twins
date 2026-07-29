@@ -45,6 +45,15 @@ export function readConfigTwins(markdown: string): string[] {
   return config.twins;
 }
 
+/** Which heading holds the criteria. ONE definition, shared by `parseTask` and
+ *  `readCodeCriteria` (F-1134): a reader that knew fewer spellings than the parser
+ *  would find zero criteria in a task that has several, and zero criteria reads as
+ *  a clean bill. Blessing a file whose criteria were never looked at is the exact
+ *  failure the binding check exists to remove. */
+function criteriaSection(sections: Map<string, string>): string {
+  return sections.get("success criteria") ?? sections.get("checks") ?? "";
+}
+
 /** One `[code]` criterion as an authoring surface sees it: the sentence, the twin
  *  whose declared vocabulary is supposed to grade it, and the human-facing marker
  *  reconstructed the way `parseCriteria` reconstructs it for error messages — so
@@ -67,7 +76,7 @@ export interface CodeCriterion {
  *  so a line it cannot understand is skipped instead: turning an author's
  *  half-finished file into a crash is how a warning surface stops being used. */
 export function readCodeCriteria(markdown: string): CodeCriterion[] {
-  const criteriaText = splitSections(markdown).get("success criteria") ?? "";
+  const criteriaText = criteriaSection(splitSections(markdown));
   // A malformed ## Config block is `parseTask`'s error to report, not this
   // reader's — fall back to the schema default so an audit still runs.
   let twins: string[];
@@ -97,7 +106,7 @@ export function parseTask(markdown: string, slug = "scenario", sidecarSeed?: unk
   const title = markdown.match(/^#\s+(.+)$/m)?.[1]?.trim() ?? slug;
   const sections = splitSections(markdown);
   const prompt = sections.get("prompt") ?? sections.get("task") ?? "";
-  const criteriaText = sections.get("success criteria") ?? sections.get("checks") ?? "";
+  const criteriaText = criteriaSection(sections);
   const configText = sections.get("config") ?? "";
   const seedText = sections.get("seed state") ?? "";
 

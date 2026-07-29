@@ -654,5 +654,22 @@ twins: ${twins}
   it("returns nothing for a file with no Success Criteria section at all", () => {
     expect(readCodeCriteria("# Audit\n\n## Prompt\n\ngo\n")).toEqual([]);
   });
+
+  // `parseTask` accepts `## Checks` as an alias for `## Success Criteria`, so a
+  // reader that only knew the long spelling would report zero criteria for a task
+  // that has several — and zero criteria reads as a clean bill. Silently blessing
+  // a file whose criteria were never read is the exact failure this whole surface
+  // exists to remove, so the two must accept the same headings.
+  it("reads the `## Checks` heading parseTask also accepts as the criteria section", () => {
+    const aliased = `# Audit
+
+## Checks
+
+- [code] Issue #1 exists in \`acme/api\`
+`;
+    expect(readCodeCriteria(aliased)).toEqual([
+      { marker: "[code]", twin: "github", text: "Issue #1 exists in `acme/api`" },
+    ]);
+  });
 })
 ;

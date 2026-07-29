@@ -100,6 +100,15 @@ describe("pome checks lint", () => {
     expect(captured.error.join("\n")).toContain("pome-lint-does-not-exist.md");
   });
 
+  // The user-visible consequence of the reader missing a heading alias: a clean
+  // bill on a file whose criteria were never looked at.
+  it("does not report a pass on a task that spells the section `## Checks`", async () => {
+    const path = await taskFile("# Audit\n\n## Checks\n\n- [code] Issue #1 does not exist\n");
+    await runChecksLintCommand([path]);
+    expect(process.exitCode).toBe(1);
+    expect(captured.error.join("\n")).toContain("Issue #1 does not exist");
+  });
+
   it("never consults the network — the whole point is that offline is answerable", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     const path = await taskFile(task("- [code] No new labels were ever created in `acme/api`"));
