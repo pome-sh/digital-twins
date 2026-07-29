@@ -55,7 +55,7 @@ import {
 } from "./check-issues.js";
 import { pullRequestReviewExists, pullRequestStateCheck } from "./check-pulls.js";
 import { commitStatus, fileExists, noNewLabels } from "./check-repos.js";
-import { noUnsupportedEndpoint } from "./check-tape.js";
+import { noUnsupportedEndpoint, toolNeverCalled } from "./check-tape.js";
 
 export type { Check } from "./check-kind.js";
 export type {
@@ -88,7 +88,8 @@ export const GITHUB_CHECKS = [
   fileExists,
   commitStatus,
   // Last, because the listing order runs from the assertion an author reaches
-  // for first to the ones a specialised task needs — and this is the only one
-  // that asserts about the RUN rather than the world it left behind.
+  // for first to the ones a specialised task needs — and these are the only ones
+  // that assert about the RUN rather than the world it left behind.
   noUnsupportedEndpoint,
+  toolNeverCalled,
 ] as const;

@@ -9,6 +9,14 @@ import { createRecorderHandle, createRecorderStore } from "../src/recorder.js";
 import { redactEvent, redactSecrets } from "../src/redaction.js";
 import { defineTwin } from "../src/index.js";
 import { TEST_AUTH_SECRET, TEST_SID, signTestToken, withAuth } from "./_authHelper.js";
+import { toyTwin } from "./_toyTwin.js";
+
+async function recordedEvents(
+  app: ReturnType<typeof createApp>,
+): Promise<Record<string, unknown>[]> {
+  const res = await app.request(`/s/${TEST_SID}/_pome/events`, withAuth(token));
+  return (await res.json()) as Record<string, unknown>[];
+}
 
 const previousSecret = process.env.TWIN_AUTH_SECRET;
 let token: string;
@@ -417,6 +425,62 @@ describe("recorder redacts every emitted event", () => {
     });
     const [event] = store.events();
     expect((event!.request_body as Record<string, unknown>).client_secret).toBe("[REDACTED]");
+  });
+});
+
+// F-1125. `request_headers` is recorded WHOLESALE — no allowlist — so the
+// safety of the whole field rests on the engine's unconditional redaction. Both
+// directions are load-bearing and each has its own failure mode:
+//
+//   - a credential that SURVIVES is a leak the twin cannot see;
+//   - a subject that DIES is a criterion that can never fire. `X-PAYMENT` is
+//     base64(JSON), so its value always begins `eyJ` — one character class away
+//     from the JWT scrubber. It survives only because base64 carries no `.`,
+//     which is a property of `scrubJwts` this test pins rather than assumes.
+describe("recorded request headers — F-1125 redaction boundary", () => {
+  const xPayment = Buffer.from(
+    JSON.stringify({
+      x402Version: 1,
+      scheme: "exact",
+      payload: { authorization: { to: "0xabc", value: "10000" }, signature: "0xfake" },
+    }),
+    "utf8",
+  ).toString("base64");
+
+  it("redacts the bearer credential the agent authenticated with", async () => {
+    const app = createApp(toyTwin, { seed: { items: [] }, runId: "run_headers" });
+    await app.request(
+      `/s/${TEST_SID}/items`,
+      withAuth(token, { headers: { cookie: "session=abc" } }),
+    );
+    const [event] = await recordedEvents(app);
+    const headers = event.request_headers as Record<string, string>;
+    expect(headers.authorization).toBe("[REDACTED]");
+    expect(headers.cookie).toBe("[REDACTED]");
+  });
+
+  it("leaves X-PAYMENT readable — a scrubbed subject is a check that can never fire", async () => {
+    const app = createApp(toyTwin, { seed: { items: [] }, runId: "run_headers" });
+    await app.request(
+      `/s/${TEST_SID}/items`,
+      withAuth(token, { headers: { "x-payment": xPayment, "idempotency-key": "idem_1" } }),
+    );
+    const [event] = await recordedEvents(app);
+    const headers = event.request_headers as Record<string, string>;
+    expect(headers["x-payment"]).toBe(xPayment);
+    expect(headers["idempotency-key"]).toBe("idem_1");
+  });
+
+  it("lowercases header names so a check never has to guess the casing", async () => {
+    const app = createApp(toyTwin, { seed: { items: [] }, runId: "run_headers" });
+    await app.request(
+      `/s/${TEST_SID}/items`,
+      withAuth(token, { headers: { "X-PAYMENT": xPayment } }),
+    );
+    const [event] = await recordedEvents(app);
+    const headers = event.request_headers as Record<string, string>;
+    expect(Object.keys(headers)).toContain("x-payment");
+    expect(headers["x-payment"]).toBe(xPayment);
   });
 });
 

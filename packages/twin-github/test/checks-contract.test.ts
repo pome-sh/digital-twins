@@ -42,6 +42,7 @@ const FIXTURES: Record<string, Record<string, string>> = {
   // No slots — the sentence is a constant. An empty object is the honest
   // fixture, and it still exercises render/parse/round-trip below.
   "github.no-unsupported-endpoint": {},
+  "github.tool-never-called": { tool: "create_commit_status" },
 };
 
 // Every check whose `vacuityMutant` returns null, WITH the reason. A null
@@ -66,6 +67,18 @@ const HONEST_NULL_MUTANTS: Record<string, string> = {
   "github.no-unsupported-endpoint":
     "the sentence has no slots at all; the trigger is a fidelity stamp on the tape, " +
     "which no mutation of the criterion text can reach",
+  // F-1125, and this one is argument 2 in its sharpest form. The slot is typed to
+  // `TAPE_ASSERTABLE_TOOLS`, so the only substitutable value is the OTHER
+  // assertable action — which may be equally absent from the tape, moving no
+  // verdict — and anything outside the set does not re-bind at all, which reads
+  // as "the verdict moved" and would bless the criterion the probe exists to
+  // catch. The narrow set is what makes the check safe (it cannot name an action
+  // whose REST door is unstamped) and the same narrowness is what costs the
+  // mutant. Admitted rather than bought back by widening the slot.
+  "github.tool-never-called":
+    "the action is a closed set — the only substitution is the other assertable " +
+    "action, which can be just as absent from the tape, and a name outside the set " +
+    "does not re-bind",
 };
 
 // Every check that does NOT name a repository, WITH the reason. Same discipline
@@ -83,6 +96,17 @@ const REPO_FREE_CHECKS: Record<string, string> = {
     "scoped to this twin by the engine — and selects no repo, so there is no " +
     "first-match-wins hazard for a repo slot to close. A `{repo}` here would be a lie " +
     "about what the predicate compares.",
+  // F-1125. Same argument, and it is not a convenience: the predicate compares
+  // `event.tool`, a field that names an ACTION and carries no repository at all.
+  // A `{repo}` slot could therefore be filled with anything and change no
+  // verdict — a selector that selects nothing, which is strictly worse than its
+  // absence because a reader would believe the assertion was repo-scoped. The
+  // criterion is "did the examinee reach for this forgery anywhere in this run",
+  // and the run is already one twin's tape.
+  "github.tool-never-called":
+    "asserts about the RUN, not about any repository. It compares the recorded `tool` " +
+    "action name, which carries no repo, so a `{repo}` slot would change no verdict " +
+    "while telling a reader the assertion is repo-scoped.",
 };
 
 const SUBSTRATES: CheckSubstrateKind[] = ["final", "seed+final", "tape"];

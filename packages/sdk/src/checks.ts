@@ -132,15 +132,16 @@ export interface CheckOutcome {
 // One recorded twin HTTP call, as a `substrate: "tape"` check sees it.
 //
 // This is the frozen v1.0 `TwinHttpEvent` (`@pome-sh/shared-types`
-// recorder-events) minus two things:
+// recorder-events) minus required-ness: every field is optional/nullable so a
+// malformed row can never crash a predicate.
 //
-//   - `headers`, which DOES NOT EXIST on the recorded event. F-1076 verified
-//     this rather than assuming it — the recorder never captured them, so
-//     `The retry includes X-PAYMENT` is unanswerable at any substrate width.
-//     That is a recorder gap, tracked separately; it is not a narrowing anyone
-//     can lift here.
-//   - required-ness. Every field is optional/nullable so a malformed row can
-//     never crash a predicate.
+// F-1125 closed the gap F-1076 documented here. `headers` used not to exist on
+// the recorded event at all — not a narrowing a consumer could lift, but a
+// recorder that never captured them, which is why `The retry includes X-PAYMENT`
+// was unanswerable at any substrate width. It is `request_headers` now, and
+// `tool` alongside it. Both are OPTIONAL for the same reason every field here
+// is: a recording made before they existed still has to parse, and a tape check
+// reading `undefined` must decide what that means rather than crash.
 //
 // It lives HERE, not in the consuming engine, for the same reason the
 // declarations do: the checks that read it are declared in twin packages, and a
@@ -156,12 +157,31 @@ export interface CheckTapeEvent {
   method?: string | null;
   path?: string | null;
   request_body?: unknown;
+  // F-1125 — the request headers as recorded, keys lowercased by the runtime.
+  //
+  // `undefined` is a THIRD world here and a check must not collapse it into the
+  // other two: `{}` is "the call sent no headers", a present map missing a key is
+  // "it sent others but not that one", and ABSENT is "this recording predates
+  // the field". Only the first two support a verdict; reading absent as "the
+  // header was not sent" would answer a negative criterion over a recording that
+  // never carried the evidence.
+  request_headers?: Record<string, string>;
   status?: number | null;
   response_body?: unknown;
   latency_ms?: number | null;
   fidelity?: string | null;
   state_mutation?: boolean | null;
   error?: string | null;
+  // F-1125 — the twin ACTION this call invoked, or null when the surface that
+  // served it declares none. Stamped identically by MCP dispatch and by a REST
+  // route that performs the same action, which is what lets a check ask "was
+  // this ever called" without knowing which transport the examinee chose.
+  //
+  // A check must treat `null` as "no declared action", NOT as "no action": the
+  // twin stamps only the surfaces it has committed to, and the set of actions a
+  // check may name is generated from that commitment (see the GitHub twin's
+  // `TAPE_ASSERTABLE_TOOLS`). `undefined` means the row predates the field.
+  tool?: string | null;
   // F-980 — the citable identity of this call. `event_id` rather than
   // `request_id` because only `event_id` survives onto the OTLP span lane.
   event_id?: string | null;

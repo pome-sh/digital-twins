@@ -84,6 +84,46 @@ const recorderEventObjectSchema = z.object({
   method: z.string().min(1),
   path: z.string(),
   request_body: z.unknown(),
+  // F-1125 — the request headers as received, keys lowercased by the runtime.
+  //
+  // Recorded WHOLESALE rather than through an allowlist. An allowlist is a
+  // narrowing no downstream consumer can lift and no task author can extend,
+  // which is the defect this field exists to remove: `The retry includes
+  // X-PAYMENT` was unanswerable at any substrate width because the recorder
+  // captured nothing. Secrets are handled where every other field's are —
+  // `redactEvent` runs unconditionally before any store sees the event, and
+  // `HARD_REDACT_KEYS` already covers `authorization` / `cookie` / `x-api-key`
+  // by key. Asserted both ways in `packages/sdk/test/redaction.test.ts`: the
+  // bearer must not survive, and `x-payment` must.
+  //
+  // Optional, not nullable: ABSENT means this row predates F-1125, and a
+  // present-but-empty map would erase that distinction. A required field here
+  // would be far worse than a missing one — `twinHttpEventSchema` is the only
+  // gate into the cloud's tape and a row that fails it is dropped SILENTLY, so
+  // every recording an older CLI wrote would arrive as an empty tape, which for
+  // a negative criterion is a free pass.
+  request_headers: z.record(z.string(), z.string()).optional(),
+  // F-1125 — the twin ACTION this call invoked, when the twin declares one for
+  // the surface that served it. This is the field that stops a tape check from
+  // reverse-engineering a tool name out of an MCP transport path.
+  //
+  // It names the action, NOT the transport. The same fabrication reaches the
+  // GitHub twin two ways — `tools/call` with `create_commit_status`, and
+  // `POST /repos/:owner/:repo/statuses/:sha` — and both stamp the same value.
+  // A field that only carried the MCP name would leave the REST door open, and
+  // `create_commit_status was never called` would pass over a run that called
+  // it: the negative false-pass D4 forbids, relocated rather than fixed.
+  //
+  // The value is the action the CALLER NAMED, stamped even when the call then
+  // failed (unknown tool, validation error, 4xx). "Was it called" is a question
+  // about the attempt, and a check that cares whether it succeeded has `status`
+  // on the same row.
+  //
+  // `null` means "no declared action for this surface" — NOT "no action". Only
+  // surfaces a twin has stamped are assertable; the GitHub twin's
+  // `TAPE_ASSERTABLE_TOOLS` is the set that has been, and its check's param type
+  // is generated from that set so a criterion cannot name an unstamped action.
+  tool: z.string().min(1).nullable().optional(),
   status: z.number().int(),
   response_body: z.unknown(),
   latency_ms: z.number().int().min(0),

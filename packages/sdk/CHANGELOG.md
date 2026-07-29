@@ -1,5 +1,35 @@
 # @pome-sh/sdk
 
+## 0.9.0 — 2026-07-29
+
+The recorder captures request headers and the tool that was called (F-1125).
+Minor: it requires `@pome-sh/shared-types` >= 0.13.0, and `CheckTapeEvent` grows
+two fields a tape check can read.
+
+### Added
+
+- `recordedRequestHeaders(c)` and `setRecordedTool(c, tool)` (new
+  `request-capture` module, re-exported from `@pome-sh/sdk/server`) — the ONE
+  answer to "which headers get recorded" and "what counts as the tool that was
+  called", shared by all five emission sites. Twins that build recorder events by
+  hand must use them; five copies of that policy is five chances for one twin's
+  tape to be the one a header-reading check cannot see.
+- `handle({ tool })` — declare the twin action a REST route performs, recorded as
+  `RecorderEvent.tool`. Use the matching MCP tool's name.
+- `CheckTapeEvent.request_headers` / `CheckTapeEvent.tool`. Both optional: a
+  recording made before they existed still has to parse, and `undefined` is a
+  THIRD world a check must not collapse into the other two — it means "this
+  recording predates the field", not "the header was not sent".
+
+### Changed
+
+- Every recorder emission site — `handle()`, JSON-RPC `tools/call`, the two
+  legacy MCP dispatch routes, and the failure injector — now populates
+  `request_headers`, and stamps `tool` where it knows one. The MCP surfaces stamp
+  the name the CALLER used, including when the tool is unknown or its arguments
+  were rejected: "was it called" is a question about the attempt.
+
+
 ## 0.8.0 — 2026-07-29
 
 A declared check can read the ordered call tape (F-1076, settling D1's open
