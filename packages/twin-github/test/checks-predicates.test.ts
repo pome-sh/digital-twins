@@ -411,11 +411,26 @@ describe("every check, against a repo that is not in the state", () => {
       "github.commit-status": { context: "ci/build", repo: "acme/missing", state: "success" },
     };
     for (const declared of GITHUB_CHECKS as readonly unknown[] as readonly OpenCheck[]) {
-      const outcome = declared.evaluate(fixtures[declared.id]!, { seed: world(), tape: null, final: world() });
+      const outcome = declared.evaluate(fixtures[declared.id] ?? {}, {
+        seed: world(),
+        tape: null,
+        final: world(),
+      });
+      // D18.5 holds for EVERY check, repo-taking or not: never throw, always
+      // return a named failure so the other criteria still score.
       expect(outcome.passed, `${declared.id} passed against a missing repo`).toBe(false);
-      expect(outcome.reason, `${declared.id} did not name the missing repo`).toContain(
-        "acme/missing",
-      );
+      expect(outcome.reason, `${declared.id} failed without naming a reason`).toBeTruthy();
+      // Only a check that SELECTS a repo can name the missing one. F-1076's
+      // tape check selects none — it is handed `tape: null` here and correctly
+      // answers `tape_missing`, which is the D18.5 property above and not a
+      // statement about repositories. `checks-contract.test.ts` is where a
+      // check earns the right to be repo-free, via the `REPO_FREE_CHECKS`
+      // ledger; this loop just declines to ask it the wrong question.
+      if (Object.keys(declared.params).includes("repo")) {
+        expect(outcome.reason, `${declared.id} did not name the missing repo`).toContain(
+          "acme/missing",
+        );
+      }
     }
   });
 });

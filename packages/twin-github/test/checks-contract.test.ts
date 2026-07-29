@@ -39,6 +39,9 @@ const FIXTURES: Record<string, Record<string, string>> = {
   "github.pr-review-exists": { review: "APPROVED", pr: "1", repo: "acme/api" },
   "github.file-exists": { path: "src/index.ts", repo: "acme/api" },
   "github.commit-status": { context: "ci/build", repo: "acme/api", state: "success" },
+  // No slots — the sentence is a constant. An empty object is the honest
+  // fixture, and it still exercises render/parse/round-trip below.
+  "github.no-unsupported-endpoint": {},
 };
 
 // Every check whose `vacuityMutant` returns null, WITH the reason. A null
@@ -60,6 +63,26 @@ const HONEST_NULL_MUTANTS: Record<string, string> = {
   "github.pr-review-exists": "the review state is a closed set; the PR number only selects",
   "github.commit-status":
     "the status state is a closed set, and the context only filters the candidate rows",
+  "github.no-unsupported-endpoint":
+    "the sentence has no slots at all; the trigger is a fidelity stamp on the tape, " +
+    "which no mutation of the criterion text can reach",
+};
+
+// Every check that does NOT name a repository, WITH the reason. Same discipline
+// as the ledger above: the rule below is real, and an exception to it has to be
+// argued in writing rather than waved through by loosening the assertion.
+//
+// F-1076 opened this. The repo rule exists to stop a check SELECTING state
+// ambiguously — the legacy patterns scanned repositories first-match-wins, so a
+// two-repo world graded whichever sorted first. A check that selects no state at
+// all cannot have that bug, and naming a repo it never reads would be worse than
+// silent: it would tell a reader the assertion is repo-scoped when it is not.
+const REPO_FREE_CHECKS: Record<string, string> = {
+  "github.no-unsupported-endpoint":
+    "asserts about the RUN, not about any repository. It reads the call tape — already " +
+    "scoped to this twin by the engine — and selects no repo, so there is no " +
+    "first-match-wins hazard for a repo slot to close. A `{repo}` here would be a lie " +
+    "about what the predicate compares.",
 };
 
 const SUBSTRATES: CheckSubstrateKind[] = ["final", "seed+final", "tape"];
@@ -194,11 +217,32 @@ describe("declared check grammar", () => {
     // check the repo costs the author nothing, so the ambiguity is simply
     // removed. Asserting it here keeps a future declaration from reintroducing
     // it for the convenience of a shorter sentence.
+    //
+    // F-1076 — a check that selects NO state cannot have the bug this prevents,
+    // so it may sit in `REPO_FREE_CHECKS` with its reason. The exception is
+    // ledgered rather than folded into the assertion because "params is empty"
+    // would also excuse a state check that simply forgot its selector.
     for (const check of CHECKS) {
+      if (REPO_FREE_CHECKS[check.id]) continue;
       expect(
         Object.keys(check.params),
         `${check.id} does not name a repository, so it cannot say which repo it asserts about`,
       ).toContain("repo");
+    }
+  });
+
+  it("only lets a check skip the repo rule if it reads no state at all", () => {
+    // The ledger above is an escape hatch, so it needs its own gate. The ONLY
+    // defensible reason to assert without naming a repo is that the check reads
+    // the run rather than the world — anything reading `final` or `seed+final`
+    // is selecting state and owes the reader a scope.
+    for (const id of Object.keys(REPO_FREE_CHECKS)) {
+      const check = CHECKS.find((candidate) => candidate.id === id);
+      expect(check, `${id} is ledgered REPO_FREE but is not a declared check`).toBeTruthy();
+      expect(
+        check!.substrate,
+        `${id} skips the repo rule but reads state — it must name the repo it asserts about`,
+      ).toBe("tape");
     }
   });
 });
