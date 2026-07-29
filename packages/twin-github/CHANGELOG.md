@@ -1,5 +1,41 @@
 # @pome-sh/twin-github — CHANGELOG
 
+## 0.4.0 — 2026-07-29
+
+The whole GitHub vocabulary is declared here now (F-1075). `GITHUB_CHECKS` goes
+from one entry to eleven, absorbing the ten predicates that lived as regexes in
+pome-cloud's `deterministic/github.ts`. Minor, and it would be a major if these
+packages were 1.x: the exported tuple changes shape and one exported type
+changes meaning.
+
+- Ten new declarations: `github.issue-exists`, `.issue-state`,
+  `.issue-has-label`, `.issue-exactly-one-label`, `.issue-assignee`,
+  `.issue-comment-contains`, `.pr-state`, `.pr-review-exists`, `.file-exists`,
+  `.commit-status`.
+- **Every check names its repository.** The regexes took `in owner/repo` as an
+  OPTIONAL qualifier and, absent it, scanned repositories first-match-wins — so
+  in a two-repo world a criterion silently graded whichever sorted first. Under
+  a picked check the repo costs the author nothing, so the ambiguity is removed
+  rather than documented.
+- **`GitHubCheckStateIssue.labels` is `GitHubCheckStateLabel[]`, was `string[]`.**
+  The old type was wrong: `exportState()` emits label ROWS. Nothing read it, so
+  no verdict changes — but a check that had started reading it would have
+  compared objects to strings and found nothing, forever.
+- `github.issue-has-label-generic` is NOT ported. It existed only because free
+  English arrives in more than one word order; nothing renders it now.
+- `A REQUEST_CHANGES review exists …` no longer binds. The regex folded the
+  review EVENT verb onto the API state `CHANGES_REQUESTED` because an author
+  typing English could reach for either; under a picked check there is nothing
+  to fold. The bundled tasks and examples are re-rendered accordingly.
+- `github.commit-status` declares no vacuity mutant, where its regex had one.
+  Typing the state as a closed set is right, and it costs this: a closed set has
+  no guaranteed-false member, so no mutant can falsify it honestly. Recorded in
+  `HONEST_NULL_MUTANTS` rather than papered over.
+- Not here: `No unsupported endpoint was called` and the two `was never called`
+  phrases. They read the call TAPE, and whether a check may is D1's open half
+  (F-1076).
+- Requires `@pome-sh/sdk@0.7.0` for `oneOf` and the vacuity sentinels.
+
 ## 0.3.0 — 2026-07-28
 
 - `github.no-new-labels` declares a `description`: it compares the repository's

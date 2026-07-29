@@ -16,7 +16,7 @@ state and label, and comments with a GitHub reference — without contacting liv
 GitHub or Linear.
 
 ## Success Criteria
-- [code:github] Issue #1 in acme/api still exists and remains open
+- [code:github] Issue #1 in `acme/api` is in state open
 - [code:linear] An issue titled "Orders 500 after deploy" exists
 - [code:linear] That issue is in state In Progress
 - [code:linear] That issue has label Agent

@@ -1,8 +1,16 @@
-import { parseCheck, renderCheck } from "@pome-sh/sdk/checks";
+import { parseCheck, renderCheck, type CheckDefinition } from "@pome-sh/sdk/checks";
 import { describe, expect, it } from "vitest";
 import { GITHUB_CHECKS, type GitHubCheckState } from "../src/checks.js";
 
-const noNewLabels = GITHUB_CHECKS.find((check) => check.id === "github.no-new-labels")!;
+// The declarations are a heterogeneous tuple, so `find` yields a union whose
+// args types TypeScript then intersects — asking for every check's parameters
+// at once. Erase to the open shape, as the contract suite does, and look the
+// check up by id: that also proves it is actually registered in the tuple the
+// package ships, not merely defined.
+type OpenCheck = CheckDefinition<GitHubCheckState, Record<string, string>>;
+const noNewLabels = (GITHUB_CHECKS as readonly unknown[] as readonly OpenCheck[]).find(
+  (check) => check.id === "github.no-new-labels",
+)!;
 
 function state(labels: string[]): GitHubCheckState {
   return {
@@ -71,7 +79,9 @@ describe("github.no-new-labels — predicate", () => {
   it("passes when a PRE-EXISTING label is applied to an issue — this check is about the repo's label set", () => {
     const seed = state(SEEDED);
     const final = state(SEEDED);
-    final.repositories![0]!.issues = [{ number: 1, labels: ["feature", "question"] }];
+    final.repositories![0]!.issues = [
+      { number: 1, labels: [{ name: "feature" }, { name: "question" }] },
+    ];
     expect(noNewLabels.evaluate(ARGS, { seed, final }).passed).toBe(true);
   });
 

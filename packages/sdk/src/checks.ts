@@ -19,6 +19,21 @@ import { createHash } from "node:crypto";
 
 export type CheckPolarity = "positive" | "negative";
 
+// The values a `vacuityMutant` substitutes to falsify a check's scanned
+// literal. They live here, not in the consumer that probes with them, because
+// the declaration WRITES them and the probe RECOGNISES them — two copies of one
+// fact is the defect this vocabulary exists to remove, and the failure mode of a
+// skew is silent: the probe stops recognising its own mutants and every check
+// reads as un-probed.
+//
+// Three forms because a slot's type has to accept the substitution or the mutant
+// cannot re-bind, and a check that stops matching its own pattern evaluates to
+// `unmatched`, which reads as "the verdict moved" and blesses the very criterion
+// the probe exists to catch.
+export const VACUITY_SENTINEL = "pome-vacuity-never";
+export const VACUITY_SENTINEL_SNAKE = "pome_vacuity_never";
+export const VACUITY_SENTINEL_NUMBER = 987654321;
+
 // Which substrates a check's predicate needs. The consuming engine supplies
 // them and, when one is unavailable, returns a NAMED skip instead of calling
 // `evaluate` against a hole:
@@ -53,6 +68,41 @@ export const repoRef: CheckParamType = {
   render: (value) => value,
   parse: (raw) => raw,
 };
+
+// A slot whose value comes from a CLOSED set — an issue's `open`/`closed`, a
+// review's `APPROVED`/`CHANGES_REQUESTED`, a commit status's four states.
+//
+// F-1075. The legacy regexes spelled these inline as `(open|closed)`, which
+// worked but put the closed set somewhere no authoring surface could read. As a
+// param type the set travels with the declaration: `pome checks` prints it, the
+// picker offers it, and a value outside it is a corrupted instance rather than
+// a lookup that quietly finds nothing.
+//
+// Non-capturing on purpose — see `defineCheck`'s group assertion. The values are
+// escaped because a set member is a LITERAL, never a sub-pattern; `not merged`
+// carrying a space is fine, and a member carrying `.` must not become `any`.
+export function oneOf(name: string, values: readonly string[], example?: string): CheckParamType {
+  if (values.length === 0) throw new Error(`param type ${name}: oneOf needs at least one value`);
+  return {
+    name,
+    pattern: `(?:${values.map(escapeLiteral).join("|")})`,
+    example: example ?? values[0]!,
+    render: (value) => value,
+    parse: (raw) => raw,
+  };
+}
+
+// How many capture groups a param type's pattern opens on its own. Must be
+// zero: `checkPattern` wraps exactly one group per slot and every consumer reads
+// group i+1 as slot i, so a type that smuggles in its own group shifts every
+// later slot by one and silently hands each predicate its neighbour's argument.
+//
+// The `|` trick: appending an empty alternative makes the pattern match "" no
+// matter what it is, so the result array is always non-null and its length is
+// 1 + the group count.
+function captureGroupCount(source: string): number {
+  return new RegExp(`${source}|`).exec("")!.length - 1;
+}
 
 export interface CheckOutcome {
   passed: boolean;
@@ -181,6 +231,20 @@ export function defineCheck<TState, TParams extends Record<string, CheckParamTyp
       throw new Error(
         `check ${def.id}: param \`${name}\` example ${JSON.stringify(paramType.example)} ` +
           `does not match its own pattern /${paramType.pattern}/`,
+      );
+    }
+    // F-1075 — the failure this prevents is silent and total. Every consumer
+    // reads capture group i+1 as template slot i (`parseCheck` here,
+    // `argsFromMatch` in the cloud's adapter); one extra group inside a param's
+    // pattern shifts all of them, so each predicate is handed its neighbour's
+    // argument and grades a sentence nobody wrote. Cheap to assert, invisible
+    // to debug — `oneOf` is non-capturing for exactly this reason.
+    const groups = captureGroupCount(paramType.pattern);
+    if (groups > 0) {
+      throw new Error(
+        `check ${def.id}: param \`${name}\` pattern /${paramType.pattern}/ opens ${groups} ` +
+          `capture group(s). Slot patterns must be group-free — use (?:…) — or every ` +
+          `slot after this one binds the wrong value.`,
       );
     }
   }

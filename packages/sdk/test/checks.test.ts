@@ -4,6 +4,7 @@ import {
   checkPattern,
   checksDigest,
   defineCheck,
+  oneOf,
   parseCheck,
   renderCheck,
   repoRef,
@@ -199,5 +200,99 @@ describe("defineCheck validates a param type's own example", () => {
 
   it("accepts repoRef, whose example is a real repo reference", () => {
     expect(new RegExp(`^${repoRef.pattern}$`).test(repoRef.example)).toBe(true);
+  });
+});
+
+describe("oneOf", () => {
+  const issueState = oneOf("state", ["open", "closed"]);
+
+  it("builds a pattern that accepts every member and nothing else", () => {
+    expect(new RegExp(`^${issueState.pattern}$`).test("open")).toBe(true);
+    expect(new RegExp(`^${issueState.pattern}$`).test("closed")).toBe(true);
+    expect(new RegExp(`^${issueState.pattern}$`).test("merged")).toBe(false);
+  });
+
+  it("defaults its example to the first member, so the example is always valid", () => {
+    expect(issueState.example).toBe("open");
+    expect(new RegExp(`^${issueState.pattern}$`).test(issueState.example)).toBe(true);
+  });
+
+  it("accepts a member containing a space", () => {
+    const merge = oneOf("state", ["merged", "not merged"]);
+    expect(new RegExp(`^${merge.pattern}$`).test("not merged")).toBe(true);
+  });
+
+  it("treats a member as a literal, not a sub-pattern", () => {
+    // A member carrying a regex metacharacter must match itself and only
+    // itself. Unescaped, `payment.succeeded` would also accept `paymentXsucceeded`.
+    const event = oneOf("event", ["payment.succeeded"]);
+    expect(new RegExp(`^${event.pattern}$`).test("payment.succeeded")).toBe(true);
+    expect(new RegExp(`^${event.pattern}$`).test("paymentXsucceeded")).toBe(false);
+  });
+
+  it("refuses an empty value set, which would build a pattern matching nothing", () => {
+    expect(() => oneOf("state", [])).toThrow(/at least one value/);
+  });
+
+  it("keeps a check's slot indices intact when several enums appear in one template", () => {
+    // The regression this guards: an enum built with a CAPTURING group would
+    // shift group indices, so `state` would parse the review slot's text.
+    const twoEnums = defineCheck({
+      id: "x.two-enums",
+      description: "Exists to prove two enum slots keep their own capture groups.",
+      template: "A {review} review exists while the issue is {state}",
+      params: { review: oneOf("review", ["APPROVED", "COMMENTED"]), state: issueState },
+      substrate: "final",
+      polarity: () => "positive",
+      vacuityMutant: () => null,
+      evaluate: () => ({ passed: true, reason: "stub" })
+    });
+    expect(parseCheck(twoEnums, "A COMMENTED review exists while the issue is closed")).toEqual({
+      review: "COMMENTED",
+      state: "closed"
+    });
+  });
+});
+
+describe("defineCheck rejects a param pattern that opens its own capture group", () => {
+  // Without this guard the failure is silent and total: `checkPattern` wraps one
+  // group per slot and every consumer reads group i+1 as slot i, so one stray
+  // group hands every later predicate its neighbour's argument.
+  const capturing: CheckParamType = {
+    name: "state",
+    pattern: "(open|closed)",
+    example: "open",
+    render: (value) => value,
+    parse: (raw) => raw
+  };
+
+  it("throws, naming the param and the group count", () => {
+    expect(() =>
+      defineCheck({
+        id: "x.capturing-param",
+        description: "Exists only to prove the capture-group assertion fires.",
+        template: "Issue #1 is {state}",
+        params: { state: capturing },
+        substrate: "final",
+        polarity: () => "positive",
+        vacuityMutant: () => null,
+        evaluate: () => ({ passed: true, reason: "stub" })
+      })
+    ).toThrow(/param `state` pattern .* opens 1 capture group/);
+  });
+
+  it("accepts the non-capturing form of the same set", () => {
+    expect(() =>
+      defineCheck({
+        id: "x.noncapturing-param",
+        description: "Exists only to prove the assertion accepts (?:…).",
+        template: "Issue #1 is {state}",
+        params: { state: oneOf("state", ["open", "closed"]) },
+        substrate: "final",
+        polarity: () => "positive",
+        vacuityMutant: () => null,
+        evaluate: () => ({ passed: true, reason: "stub" })
+      })
+    ).not.toThrow();
   });
 });

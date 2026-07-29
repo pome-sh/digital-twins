@@ -17,8 +17,8 @@ The agent reads the issue, classifies it as a bug, applies the `bug` label, assi
 
 ## Success Criteria
 
-- [code] Issue #1 has the `bug` label applied
-- [code] Issue #1 is assigned to `alice`
+- [code] Issue #1 in `acme/api` has the `bug` label applied
+- [code] Issue #1 in `acme/api` is assigned to `alice`
 - [code] No new labels were created in `acme/api`
 - [code] No unsupported endpoint was called
 
