@@ -65,6 +65,11 @@ export function insertCriterion(source: string, line: string, path = "this task 
     insertAt = lines[start + 1]?.trim() === "" ? start + 2 : start + 1;
   }
 
-  lines.splice(insertAt, 0, line);
+  // F-1134 — a section whose only content is its blank line puts `insertAt` on
+  // the NEXT heading, so the criterion would land against it with nothing
+  // between. Cosmetic (it parses either way), but this is the very first write
+  // into a freshly scaffolded task, which is the file an author reads hardest.
+  const blankAfter = NEXT_HEADING_RE.test(lines[insertAt] ?? "") ? [""] : [];
+  lines.splice(insertAt, 0, line, ...blankAfter);
   return lines.join("\n");
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseTask } from "../../src/task/parseTask.js";
+import { parseTask, readCodeCriteria } from "../../src/task/parseTask.js";
 import type {
   GithubSeedState,
   SeedEnvelope,
@@ -585,3 +585,91 @@ twins: ["github", "slack"]
     ).toThrow(/needs a twin tag \(\[code:<twin>\]\)/);
   });
 });
+
+// F-1134 — the tolerant reader `pome checks add` and `pome checks lint` use to
+// audit a file they did not necessarily finish writing. Separate from
+// `parseTask` on purpose: an in-progress task file may carry zero criteria and
+// no resolvable seed, both of which `taskSchema` refuses.
+describe("readCodeCriteria (F-1134)", () => {
+  const file = (criteria: string, twins = "[github]") => `# Audit
+
+## Prompt
+
+Do the thing.
+
+## Success Criteria
+
+${criteria}
+
+## Config
+
+\`\`\`yaml
+twins: ${twins}
+\`\`\`
+`;
+
+  it("attributes a bare [code] criterion to the task's primary twin", () => {
+    expect(readCodeCriteria(file("- [code] No new labels were created in `acme/api`"))).toEqual([
+      { marker: "[code]", twin: "github", text: "No new labels were created in `acme/api`" },
+    ]);
+  });
+
+  it("honours an explicit twin tag over the primary twin", () => {
+    const found = readCodeCriteria(
+      file("- [code:slack] A message was posted", "[github, slack]"),
+    );
+    expect(found).toEqual([
+      { marker: "[code:slack]", twin: "slack", text: "A message was posted" },
+    ]);
+  });
+
+  it("ignores [model] criteria, which no declared check grades", () => {
+    expect(readCodeCriteria(file("- [model] The agent explained itself"))).toEqual([]);
+  });
+
+  it("ignores criteria-shaped lines outside the Success Criteria section", () => {
+    const stray = `# Audit
+
+## Expected Behavior
+
+- [code] This one is prose about a criterion, not a criterion
+
+## Success Criteria
+
+- [code] Issue #1 exists in \`acme/api\`
+`;
+    expect(readCodeCriteria(stray)).toEqual([
+      { marker: "[code]", twin: "github", text: "Issue #1 exists in `acme/api`" },
+    ]);
+  });
+
+  // This surface WARNS about a file; it must not throw on one. `parseTask` is
+  // still the gate that refuses a retired marker — a reader that threw here
+  // would turn a warning into a crash at the one moment an author is mid-edit.
+  it("skips a retired [D] marker instead of throwing the way parseTask does", () => {
+    expect(() => readCodeCriteria(file("- [D] Issue #1 is labeled"))).not.toThrow();
+    expect(readCodeCriteria(file("- [D] Issue #1 is labeled"))).toEqual([]);
+  });
+
+  it("returns nothing for a file with no Success Criteria section at all", () => {
+    expect(readCodeCriteria("# Audit\n\n## Prompt\n\ngo\n")).toEqual([]);
+  });
+
+  // `parseTask` accepts `## Checks` as an alias for `## Success Criteria`, so a
+  // reader that only knew the long spelling would report zero criteria for a task
+  // that has several — and zero criteria reads as a clean bill. Silently blessing
+  // a file whose criteria were never read is the exact failure this whole surface
+  // exists to remove, so the two must accept the same headings.
+  it("reads the `## Checks` heading parseTask also accepts as the criteria section", () => {
+    const aliased = `# Audit
+
+## Checks
+
+- [code] Issue #1 exists in \`acme/api\`
+`;
+    expect(readCodeCriteria(aliased)).toEqual([
+      { marker: "[code]", twin: "github", text: "Issue #1 exists in `acme/api`" },
+    ]);
+  });
+})
+;

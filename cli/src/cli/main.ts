@@ -28,6 +28,7 @@ import { runCompileSeeds } from "./compile-seeds.js";
 import { runTasksCommand } from "./tasks.js";
 import { runChecksCommand } from "./checks.js";
 import { runChecksAddCommand } from "./checks-add.js";
+import { runChecksLintCommand } from "./checks-lint.js";
 import { runEvalCommand } from "./eval.js";
 import {
   copyAnnounceLine,
@@ -408,6 +409,18 @@ export function createProgram() {
         arg: opts.arg,
         apiBaseUrl: opts.apiUrl,
       });
+    });
+
+  // F-1134 — the read-only half. `checks add` warns about the block it writes
+  // into, which covers an author mid-edit; this answers the same question about a
+  // file already on disk, which is what a builder's own CI needs. Offline: it
+  // reads this CLI's pinned declarations and never calls the cloud.
+  checks
+    .command("lint")
+    .argument("<file...>", "Task markdown file(s) — shell globs work: tasks/*.md")
+    .description("Report [code] criteria that bind no declared check, so are never graded")
+    .action(async (files: string[]) => {
+      await runChecksLintCommand(files);
     });
 
   program

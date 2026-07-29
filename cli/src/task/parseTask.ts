@@ -45,11 +45,68 @@ export function readConfigTwins(markdown: string): string[] {
   return config.twins;
 }
 
+/** Which heading holds the criteria. ONE definition, shared by `parseTask` and
+ *  `readCodeCriteria` (F-1134): a reader that knew fewer spellings than the parser
+ *  would find zero criteria in a task that has several, and zero criteria reads as
+ *  a clean bill. Blessing a file whose criteria were never looked at is the exact
+ *  failure the binding check exists to remove. */
+function criteriaSection(sections: Map<string, string>): string {
+  return sections.get("success criteria") ?? sections.get("checks") ?? "";
+}
+
+/** One `[code]` criterion as an authoring surface sees it: the sentence, the twin
+ *  whose declared vocabulary is supposed to grade it, and the human-facing marker
+ *  reconstructed the way `parseCriteria` reconstructs it for error messages — so
+ *  a report can echo a line the author can find by searching the file. */
+export interface CodeCriterion {
+  marker: string;
+  twin: string;
+  text: string;
+}
+
+/** The task's `[code]` criteria with each one's attributed twin, read WITHOUT the
+ *  full task schema (F-1134). Same reason `readConfigTwins` exists, one step
+ *  further along: `pome checks add` and `pome checks lint` audit files that are
+ *  mid-edit, and `taskSchema` refuses one carrying no criteria or no resolvable
+ *  seed. Reuses this module's own section splitter and criterion grammar, so it
+ *  is not a second parser.
+ *
+ *  TOLERANT BY DESIGN. `parseCriteria` throws on a retired marker or a tag naming
+ *  no declared twin, and it is right to — it gates a run. This reader only warns,
+ *  so a line it cannot understand is skipped instead: turning an author's
+ *  half-finished file into a crash is how a warning surface stops being used. */
+export function readCodeCriteria(markdown: string): CodeCriterion[] {
+  const criteriaText = criteriaSection(splitSections(markdown));
+  // A malformed ## Config block is `parseTask`'s error to report, not this
+  // reader's — fall back to the schema default so an audit still runs.
+  let twins: string[];
+  try {
+    twins = readConfigTwins(markdown);
+  } catch {
+    twins = taskConfigSchema.parse({}).twins;
+  }
+  const primary = twins[0];
+  if (primary === undefined) return [];
+
+  const found: CodeCriterion[] = [];
+  for (const rawLine of criteriaText.split("\n")) {
+    const match = rawLine.trim().match(CRITERION_LINE_RE);
+    if (!match || match[1] !== "code") continue;
+    const tag = match[2];
+    found.push({
+      marker: `[code${tag ? `:${tag}` : ""}]`,
+      twin: tag ?? primary,
+      text: match[3]!.trim(),
+    });
+  }
+  return found;
+}
+
 export function parseTask(markdown: string, slug = "scenario", sidecarSeed?: unknown, taskPath?: string): Task {
   const title = markdown.match(/^#\s+(.+)$/m)?.[1]?.trim() ?? slug;
   const sections = splitSections(markdown);
   const prompt = sections.get("prompt") ?? sections.get("task") ?? "";
-  const criteriaText = sections.get("success criteria") ?? sections.get("checks") ?? "";
+  const criteriaText = criteriaSection(sections);
   const configText = sections.get("config") ?? "";
   const seedText = sections.get("seed state") ?? "";
 
