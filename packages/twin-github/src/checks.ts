@@ -37,10 +37,13 @@
 //      more than one word order. Nothing renders the second one now, so it is
 //      retired rather than ported.
 //
-// What did NOT move: `No unsupported endpoint was called`. It reads the call
-// TAPE, and whether a check may read the ordered tape is D1's open half —
-// F-1076 settles it and brings that check here. Declaring it now would mean
-// declaring a substrate nothing supplies.
+// F-1076 brought the last one home. `No unsupported endpoint was called` reads
+// the call TAPE, and until D1's open half was settled there was no substrate to
+// declare — the promise would have had no engine behind it. There is one now:
+// `check-tape.ts` holds the declaration, and the consuming engine REFUSES to
+// evaluate it against a tape it was not given rather than skipping silently.
+//
+// So github now has no hand-written predicate left anywhere.
 
 import {
   issueAssignee,
@@ -52,6 +55,7 @@ import {
 } from "./check-issues.js";
 import { pullRequestReviewExists, pullRequestStateCheck } from "./check-pulls.js";
 import { commitStatus, fileExists, noNewLabels } from "./check-repos.js";
+import { noUnsupportedEndpoint } from "./check-tape.js";
 
 export type { Check } from "./check-kind.js";
 export type {
@@ -83,4 +87,8 @@ export const GITHUB_CHECKS = [
   pullRequestReviewExists,
   fileExists,
   commitStatus,
+  // Last, because the listing order runs from the assertion an author reaches
+  // for first to the ones a specialised task needs — and this is the only one
+  // that asserts about the RUN rather than the world it left behind.
+  noUnsupportedEndpoint,
 ] as const;

@@ -1,5 +1,35 @@
 # @pome-sh/twin-github — CHANGELOG
 
+## 0.5.0 — 2026-07-29
+
+`No unsupported endpoint was called` is declared here now (F-1076). It was the
+one GitHub predicate F-1075 left behind as a regex in pome-cloud, because
+whether a declaration may read the tape was D1's open half and declaring a
+substrate nothing supplied would have been a promise with no engine behind it.
+Minor for the same reason 0.4.0 was: the exported tuple changes shape.
+
+- **Requires `@pome-sh/sdk` >= 0.8.0.** The declaration reads
+  `CheckSubstrate.tape`, which does not exist before it.
+- `GITHUB_CHECKS` goes from eleven entries to twelve, adding
+  `github.no-unsupported-endpoint` — the first and so far only check declaring
+  `substrate: "tape"`. GitHub now has no hand-written predicate left anywhere.
+- Why this check cannot read state: an unsupported call leaves no state trace at
+  all. The twin answers 501 and mutates nothing, so `state_final.json` is
+  byte-identical whether the examinee reached for an unimplemented route or
+  never tried. The `fidelity: "unsupported"` stamp on the recorded event is the
+  only place the fact survives.
+- It does NOT name a repository, and that is deliberate. The repo rule exists to
+  stop a check selecting state ambiguously — the legacy patterns scanned
+  repositories first-match-wins. This one selects no state, so a `{repo}` it
+  never reads would tell a reader the assertion is repo-scoped when it is not.
+  The exception is ledgered in `checks-contract.test.ts` as `REPO_FREE_CHECKS`,
+  gated so that only a tape-substrate check may sit in it.
+- The legacy regex's alternate phrasings are retired rather than ported: the
+  optional twin word ("No unsupported GitHub endpoint was called") and the
+  plural/`were` variants. Under position 2 an author picks the check rather than
+  typing the sentence, and the corpus says the canonical form in all ten places
+  it appears.
+
 ## 0.4.0 — 2026-07-29
 
 The whole GitHub vocabulary is declared here now (F-1075). `GITHUB_CHECKS` goes
