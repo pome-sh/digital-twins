@@ -56,13 +56,14 @@ describe("github.no-new-labels — declaration", () => {
 
 describe("github.no-new-labels — predicate", () => {
   it("passes when the label set is untouched", () => {
-    const outcome = noNewLabels.evaluate(ARGS, { seed: state(SEEDED), final: state(SEEDED) });
+    const outcome = noNewLabels.evaluate(ARGS, { seed: state(SEEDED), tape: null, final: state(SEEDED) });
     expect(outcome.passed).toBe(true);
   });
 
   it("fails and names the labels the examinee created", () => {
     const outcome = noNewLabels.evaluate(ARGS, {
       seed: state(SEEDED),
+      tape: null,
       final: state([...SEEDED, "wontfix", "needs-triage"]),
     });
     expect(outcome.passed).toBe(false);
@@ -82,16 +83,16 @@ describe("github.no-new-labels — predicate", () => {
     final.repositories![0]!.issues = [
       { number: 1, labels: [{ name: "feature" }, { name: "question" }] },
     ];
-    expect(noNewLabels.evaluate(ARGS, { seed, final }).passed).toBe(true);
+    expect(noNewLabels.evaluate(ARGS, { seed, final, tape: null }).passed).toBe(true);
   });
 
   it("does not fail when a label is REMOVED — the sentence says `new`", () => {
-    const outcome = noNewLabels.evaluate(ARGS, { seed: state(SEEDED), final: state(["bug"]) });
+    const outcome = noNewLabels.evaluate(ARGS, { seed: state(SEEDED), tape: null, final: state(["bug"]) });
     expect(outcome.passed).toBe(true);
   });
 
   it("skips, named, when the seed is unavailable rather than passing vacuously", () => {
-    const outcome = noNewLabels.evaluate(ARGS, { seed: null, final: state(SEEDED) });
+    const outcome = noNewLabels.evaluate(ARGS, { seed: null, tape: null, final: state(SEEDED) });
     expect(outcome.status).toBe("skipped");
     expect(outcome.reason).toBe("seed_missing");
   });
@@ -99,7 +100,7 @@ describe("github.no-new-labels — predicate", () => {
   it("fails when the named repo is absent from the state", () => {
     const outcome = noNewLabels.evaluate(
       { repo: "acme/other" },
-      { seed: state(SEEDED), final: state(SEEDED) },
+      { seed: state(SEEDED), tape: null, final: state(SEEDED) },
     );
     expect(outcome.passed).toBe(false);
     expect(outcome.reason).toContain("acme/other");
@@ -109,18 +110,18 @@ describe("github.no-new-labels — predicate", () => {
     const noFullName: GitHubCheckState = {
       repositories: [{ owner: "acme", name: "api", labels: [{ name: "bug" }] }],
     };
-    expect(noNewLabels.evaluate(ARGS, { seed: noFullName, final: noFullName }).passed).toBe(true);
+    expect(noNewLabels.evaluate(ARGS, { seed: noFullName, tape: null, final: noFullName }).passed).toBe(true);
   });
 
   it("does not resolve a bare repo name — `repoRef` cannot produce one", () => {
     const bare: GitHubCheckState = { repositories: [{ name: "api", labels: [{ name: "bug" }] }] };
-    const outcome = noNewLabels.evaluate(ARGS, { seed: bare, final: bare });
+    const outcome = noNewLabels.evaluate(ARGS, { seed: bare, tape: null, final: bare });
     expect(outcome.passed).toBe(false);
     expect(outcome.reason).toContain("not found in the seed state");
   });
 
   it("tolerates a state export with no labels key at all", () => {
     const bare: GitHubCheckState = { repositories: [{ full_name: "acme/api" }] };
-    expect(noNewLabels.evaluate(ARGS, { seed: bare, final: bare }).passed).toBe(true);
+    expect(noNewLabels.evaluate(ARGS, { seed: bare, tape: null, final: bare }).passed).toBe(true);
   });
 });

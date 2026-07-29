@@ -10,7 +10,8 @@ import {
   repoRef,
   templateSlots,
   type CheckDefinition,
-  type CheckParamType
+  type CheckParamType,
+  type CheckTapeEvent
 } from "../src/checks.js";
 
 const noNewLabels: CheckDefinition<unknown, { repo: string }> = defineCheck({
@@ -294,5 +295,97 @@ describe("defineCheck rejects a param pattern that opens its own capture group",
         evaluate: () => ({ passed: true, reason: "stub" })
       })
     ).not.toThrow();
+  });
+});
+
+// ── F-1076: the tape substrate ───────────────────────────────────────────────
+//
+// D1's open half. A declaration may now read the recorded call tape as an
+// ORDERED sequence of complete events, bodies included. Ordering is a contract
+// the consumer owes the check, not an artifact of how the blob got parsed.
+
+describe("tape substrate", () => {
+  it("hands a declaration the ordered tape and lets it cite events", () => {
+    const check = defineCheck({
+      id: "test.saw-a-call",
+      description: "Asserts the tape recorded at least one call, and cites the first.",
+      template: "A call was recorded",
+      params: {},
+      substrate: "tape",
+      polarity: () => "positive",
+      vacuityMutant: () => null,
+      evaluate(_args, { tape }) {
+        if (tape === null) return { passed: false, reason: "tape_missing", status: "skipped" };
+        const first = tape[0];
+        return first === undefined
+          ? { passed: false, reason: "no calls recorded" }
+          : {
+              passed: true,
+              reason: `first call was ${first.method} ${first.path}`,
+              evidenceEventIds: [first.event_id ?? ""]
+            };
+      }
+    });
+
+    const tape: CheckTapeEvent[] = [
+      { twin: "github", method: "POST", path: "/repos/acme/api/issues", event_id: "evt_1" },
+      { twin: "github", method: "GET", path: "/repos/acme/api", event_id: "evt_2" }
+    ];
+
+    // Order is the contract: the check reads tape[0] and must get the POST.
+    expect(check.evaluate({}, { seed: null, final: {}, tape })).toEqual({
+      passed: true,
+      reason: "first call was POST /repos/acme/api/issues",
+      evidenceEventIds: ["evt_1"]
+    });
+  });
+
+  it("lets a check refuse rather than pass when it was handed no tape", () => {
+    const check = defineCheck({
+      id: "test.refuses-without-tape",
+      description: "Exists to prove a tape check can name its own refusal.",
+      template: "Nothing unsupported was called",
+      params: {},
+      substrate: "tape",
+      polarity: () => "negative",
+      vacuityMutant: () => null,
+      evaluate(_args, { tape }) {
+        if (tape === null) return { passed: false, reason: "tape_missing", status: "skipped" };
+        return { passed: true, reason: `${tape.length} call(s) inspected` };
+      }
+    });
+
+    expect(check.evaluate({}, { seed: null, final: {}, tape: null })).toEqual({
+      passed: false,
+      reason: "tape_missing",
+      status: "skipped"
+    });
+    // An EMPTY tape is a real world — an agent that called nothing — and must
+    // reach a real verdict rather than collapsing into the refusal above.
+    expect(check.evaluate({}, { seed: null, final: {}, tape: [] })).toEqual({
+      passed: true,
+      reason: "0 call(s) inspected"
+    });
+  });
+
+  it("carries the fields a tape assertion actually needs", () => {
+    // Bodies are the load-bearing addition: task 19's charge id lives in the
+    // request body, not the path, and an MCP-transport call carries its tool
+    // name there too.
+    const event: CheckTapeEvent = {
+      ts: "2026-07-29T00:00:00.000Z",
+      twin: "stripe",
+      method: "POST",
+      path: "/v1/refunds",
+      request_body: '{"charge":"ch_test_200"}',
+      status: 400,
+      response_body: null,
+      latency_ms: 3,
+      fidelity: "semantic",
+      state_mutation: false,
+      error: "charge_already_refunded",
+      event_id: "evt_attempt"
+    };
+    expect(String(event.request_body)).toContain("ch_test_200");
   });
 });

@@ -111,6 +111,60 @@ export interface CheckOutcome {
   // so the criterion leaves the score denominator instead of vacuously
   // passing a wrong agent.
   status?: "passed" | "failed" | "unmatched" | "skipped";
+  // F-1076 — the recorded calls this outcome asserted against, by
+  // `TwinHttpEvent.event_id`. Only a `substrate: "tape"` check can fill it;
+  // state-reading checks leave it absent, because their evidence is a path into
+  // the state tree and this pointer does not model that.
+  //
+  // It exists because moving a tape predicate into a declaration would
+  // otherwise have DROPPED F-980's citations on the floor: the consuming
+  // engine's outcome type has carried this field since F-980, and a declaration
+  // that could not express it would have been a silent downgrade sold as a
+  // refactor.
+  //
+  // Absent and `[]` mean the same thing downstream, so a check with nothing to
+  // cite must OMIT the key rather than send an empty array — the consumer
+  // persists this into a jsonb row, and an empty affordance would have to be
+  // special-cased by every reader of it.
+  evidenceEventIds?: string[];
+}
+
+// One recorded twin HTTP call, as a `substrate: "tape"` check sees it.
+//
+// This is the frozen v1.0 `TwinHttpEvent` (`@pome-sh/shared-types`
+// recorder-events) minus two things:
+//
+//   - `headers`, which DOES NOT EXIST on the recorded event. F-1076 verified
+//     this rather than assuming it — the recorder never captured them, so
+//     `The retry includes X-PAYMENT` is unanswerable at any substrate width.
+//     That is a recorder gap, tracked separately; it is not a narrowing anyone
+//     can lift here.
+//   - required-ness. Every field is optional/nullable so a malformed row can
+//     never crash a predicate.
+//
+// It lives HERE, not in the consuming engine, for the same reason the
+// declarations do: the checks that read it are declared in twin packages, and a
+// consumer-side copy of this shape would drift the way the mirrored state shape
+// did before F-1075 deleted it — silently, surfacing only when a predicate
+// reads a field the copy forgot.
+//
+// ORDER IS A CONTRACT. The consumer supplies these oldest-first, and a check
+// may rely on it. That is the half of D1 this type settles.
+export interface CheckTapeEvent {
+  ts?: string | null;
+  twin?: string | null;
+  method?: string | null;
+  path?: string | null;
+  request_body?: unknown;
+  status?: number | null;
+  response_body?: unknown;
+  latency_ms?: number | null;
+  fidelity?: string | null;
+  state_mutation?: boolean | null;
+  error?: string | null;
+  // F-980 — the citable identity of this call. `event_id` rather than
+  // `request_id` because only `event_id` survives onto the OTLP span lane.
+  event_id?: string | null;
 }
 
 export interface CheckSubstrate<TState> {
@@ -119,6 +173,17 @@ export interface CheckSubstrate<TState> {
   // consumer that forgets produces a named skip rather than a crash.
   seed: TState | null;
   final: TState;
+  // F-1076 — non-null whenever the declaration asked for "tape", already scoped
+  // to this criterion's twin by the engine. Ordered oldest-first.
+  //
+  // Required key, nullable value, exactly like `seed`. An OPTIONAL key is one
+  // every later consumer forgets to pass, and forgetting it here silently
+  // promotes every tape check to a skip — a fleet of negative criteria that
+  // stop asserting, quietly, which is the one failure D4 forbids.
+  //
+  // `null` and `[]` are DIFFERENT WORLDS and a check must treat them so: `null`
+  // is "nobody handed me a tape", `[]` is "the agent called nothing".
+  tape: readonly CheckTapeEvent[] | null;
 }
 
 export interface CheckDefinition<TState, TArgs extends Record<string, string>> {

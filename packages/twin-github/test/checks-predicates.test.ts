@@ -9,6 +9,13 @@
 // plain strings, and `state` as a lowercase column. Every one of those is a
 // shape a hand-written fixture gets wrong, and getting it wrong here would make
 // the suite agree with a predicate that disagrees with production.
+//
+// F-1076 — every substrate below carries `tape: null`, and that is the honest
+// value rather than boilerplate: these checks declare `final` or `seed+final`,
+// so the engine hands them no tape and they must never read one. The key is
+// REQUIRED precisely so a call site cannot forget it, because forgetting it
+// would hand a tape check a hole and let a negative criterion pass over a tape
+// nobody read.
 
 import { parseCheck, renderCheck, type CheckDefinition } from "@pome-sh/sdk/checks";
 import { describe, expect, it } from "vitest";
@@ -58,13 +65,14 @@ describe("github.issue-exists", () => {
   it("passes when the issue is present", () => {
     const outcome = subject.evaluate(args, {
       seed: null,
+      tape: null,
       final: world({ issues: [{ number: 1, state: "open" }] }),
     });
     expect(outcome.passed).toBe(true);
   });
 
   it("fails, naming the issue, when it is absent", () => {
-    const outcome = subject.evaluate(args, { seed: null, final: world({ issues: [] }) });
+    const outcome = subject.evaluate(args, { seed: null, tape: null, final: world({ issues: [] }) });
     expect(outcome.passed).toBe(false);
     expect(outcome.reason).toContain("issue #1 not found");
   });
@@ -97,14 +105,14 @@ describe("github.issue-state", () => {
 
   it("compares against the issue row's state column", () => {
     const final = world({ issues: [{ number: 1, state: "closed" }] });
-    expect(subject.evaluate({ issue: "1", repo: REPO, state: "closed" }, { seed: null, final }).passed).toBe(true);
-    expect(subject.evaluate({ issue: "1", repo: REPO, state: "open" }, { seed: null, final }).passed).toBe(false);
+    expect(subject.evaluate({ issue: "1", repo: REPO, state: "closed" }, { seed: null, tape: null, final }).passed).toBe(true);
+    expect(subject.evaluate({ issue: "1", repo: REPO, state: "open" }, { seed: null, tape: null, final }).passed).toBe(false);
   });
 
   it("SKIPS when the export carries no state, rather than reading absent as open", () => {
     const outcome = subject.evaluate(
       { issue: "1", repo: REPO, state: "open" },
-      { seed: null, final: world({ issues: [{ number: 1 }] }) },
+      { seed: null, tape: null, final: world({ issues: [{ number: 1 }] }) },
     );
     expect(outcome.status).toBe("skipped");
     expect(outcome.reason).toContain("state_incomplete");
@@ -126,19 +134,19 @@ describe("github.issue-has-label", () => {
   });
 
   it("reads label ROWS, not strings — the shape exportState actually emits", () => {
-    expect(subject.evaluate(args, { seed: null, final: labelled("bug") }).passed).toBe(true);
+    expect(subject.evaluate(args, { seed: null, tape: null, final: labelled("bug") }).passed).toBe(true);
   });
 
   it("compares case-insensitively, because GitHub preserves the caller's casing", () => {
-    expect(subject.evaluate(args, { seed: null, final: labelled("Bug") }).passed).toBe(true);
+    expect(subject.evaluate(args, { seed: null, tape: null, final: labelled("Bug") }).passed).toBe(true);
   });
 
   it("passes when the right label sits alongside wrong ones — that is the OTHER check's job", () => {
-    expect(subject.evaluate(args, { seed: null, final: labelled("bug", "feature") }).passed).toBe(true);
+    expect(subject.evaluate(args, { seed: null, tape: null, final: labelled("bug", "feature") }).passed).toBe(true);
   });
 
   it("fails and lists what the issue does carry", () => {
-    const outcome = subject.evaluate(args, { seed: null, final: labelled("feature") });
+    const outcome = subject.evaluate(args, { seed: null, tape: null, final: labelled("feature") });
     expect(outcome.passed).toBe(false);
     expect(outcome.reason).toContain("feature");
   });
@@ -161,17 +169,17 @@ describe("github.issue-exactly-one-label", () => {
   });
 
   it("passes on exactly that one label", () => {
-    expect(subject.evaluate(args, { seed: null, final: labelled("bug") }).passed).toBe(true);
+    expect(subject.evaluate(args, { seed: null, tape: null, final: labelled("bug") }).passed).toBe(true);
   });
 
   it("fails when a correct label is piled on top of an incorrect one", () => {
     // The defect a triage task exists to catch, and the reason this check is
     // not the same as `issue-has-label`.
-    expect(subject.evaluate(args, { seed: null, final: labelled("bug", "feature") }).passed).toBe(false);
+    expect(subject.evaluate(args, { seed: null, tape: null, final: labelled("bug", "feature") }).passed).toBe(false);
   });
 
   it("fails when the issue carries no labels at all", () => {
-    expect(subject.evaluate(args, { seed: null, final: labelled() }).passed).toBe(false);
+    expect(subject.evaluate(args, { seed: null, tape: null, final: labelled() }).passed).toBe(false);
   });
 });
 
@@ -185,12 +193,12 @@ describe("github.issue-assignee", () => {
 
   it("reads assignees as plain logins — the one list that is strings, not rows", () => {
     const final = world({ issues: [{ number: 1, assignees: ["alice", "bob"] }] });
-    expect(subject.evaluate(args, { seed: null, final }).passed).toBe(true);
+    expect(subject.evaluate(args, { seed: null, tape: null, final }).passed).toBe(true);
   });
 
   it("fails when the login is absent, listing who is assigned", () => {
     const final = world({ issues: [{ number: 1, assignees: ["bob"] }] });
-    const outcome = subject.evaluate(args, { seed: null, final });
+    const outcome = subject.evaluate(args, { seed: null, tape: null, final });
     expect(outcome.passed).toBe(false);
     expect(outcome.reason).toContain("bob");
   });
@@ -215,15 +223,15 @@ describe("github.issue-comment-contains", () => {
   });
 
   it("matches the needle as a substring of a comment body", () => {
-    expect(subject.evaluate(args, { seed: null, final: commented("Deploy blocked by CI") }).passed).toBe(true);
+    expect(subject.evaluate(args, { seed: null, tape: null, final: commented("Deploy blocked by CI") }).passed).toBe(true);
   });
 
   it("is case-sensitive — free prose is not a name field", () => {
-    expect(subject.evaluate(args, { seed: null, final: commented("deploy blocked") }).passed).toBe(false);
+    expect(subject.evaluate(args, { seed: null, tape: null, final: commented("deploy blocked") }).passed).toBe(false);
   });
 
   it("fails, saying how many comments it scanned", () => {
-    const outcome = subject.evaluate(args, { seed: null, final: commented("Looks fine", "LGTM") });
+    const outcome = subject.evaluate(args, { seed: null, tape: null, final: commented("Looks fine", "LGTM") });
     expect(outcome.passed).toBe(false);
     expect(outcome.reason).toContain("2 comment(s) scanned");
   });
@@ -255,15 +263,15 @@ describe("github.pr-state", () => {
 
   it("reads merged as a SQLite integer boolean", () => {
     const final = pull({ merged: 1, state: "closed" });
-    expect(subject.evaluate({ pr: "1", repo: REPO, state: "merged" }, { seed: null, final }).passed).toBe(true);
-    expect(subject.evaluate({ pr: "1", repo: REPO, state: "not merged" }, { seed: null, final }).passed).toBe(false);
+    expect(subject.evaluate({ pr: "1", repo: REPO, state: "merged" }, { seed: null, tape: null, final }).passed).toBe(true);
+    expect(subject.evaluate({ pr: "1", repo: REPO, state: "not merged" }, { seed: null, tape: null, final }).passed).toBe(false);
   });
 
   it("keeps `closed` and `merged` distinct — a PR can be closed unmerged", () => {
     const final = pull({ merged: 0, state: "closed" });
-    expect(subject.evaluate({ pr: "1", repo: REPO, state: "closed" }, { seed: null, final }).passed).toBe(true);
-    expect(subject.evaluate({ pr: "1", repo: REPO, state: "not merged" }, { seed: null, final }).passed).toBe(true);
-    expect(subject.evaluate({ pr: "1", repo: REPO, state: "merged" }, { seed: null, final }).passed).toBe(false);
+    expect(subject.evaluate({ pr: "1", repo: REPO, state: "closed" }, { seed: null, tape: null, final }).passed).toBe(true);
+    expect(subject.evaluate({ pr: "1", repo: REPO, state: "not merged" }, { seed: null, tape: null, final }).passed).toBe(true);
+    expect(subject.evaluate({ pr: "1", repo: REPO, state: "merged" }, { seed: null, tape: null, final }).passed).toBe(false);
   });
 
   it("SKIPS when the field the sentence turns on is absent", () => {
@@ -271,7 +279,7 @@ describe("github.pr-state", () => {
     // green against `is not merged`.
     const outcome = subject.evaluate(
       { pr: "1", repo: REPO, state: "not merged" },
-      { seed: null, final: pull({ state: "open" }) },
+      { seed: null, tape: null, final: pull({ state: "open" }) },
     );
     expect(outcome.status).toBe("skipped");
     expect(outcome.reason).toContain("no merged field");
@@ -280,7 +288,7 @@ describe("github.pr-state", () => {
   it("cites only the field the assertion actually read", () => {
     const outcome = subject.evaluate(
       { pr: "1", repo: REPO, state: "merged" },
-      { seed: null, final: pull({ merged: 0 }) },
+      { seed: null, tape: null, final: pull({ merged: 0 }) },
     );
     expect(outcome.reason).toContain("merged=false");
     expect(outcome.reason).not.toContain("state=");
@@ -308,19 +316,19 @@ describe("github.pr-review-exists", () => {
     const final = world({
       pull_requests: [{ number: 1, reviews: [{ state: "APPROVED" }, { state: "CHANGES_REQUESTED" }] }],
     });
-    expect(subject.evaluate(args, { seed: null, final }).passed).toBe(true);
+    expect(subject.evaluate(args, { seed: null, tape: null, final }).passed).toBe(true);
   });
 
   it("fails on an empty reviews array — that is a real `no reviews`", () => {
     const final = world({ pull_requests: [{ number: 1, reviews: [] }] });
-    const outcome = subject.evaluate(args, { seed: null, final });
+    const outcome = subject.evaluate(args, { seed: null, tape: null, final });
     expect(outcome.passed).toBe(false);
     expect(outcome.status).toBeUndefined();
   });
 
   it("SKIPS on an absent reviews section — absent is not the same as none", () => {
     const final = world({ pull_requests: [{ number: 1 }] });
-    const outcome = subject.evaluate(args, { seed: null, final });
+    const outcome = subject.evaluate(args, { seed: null, tape: null, final });
     expect(outcome.status).toBe("skipped");
     expect(outcome.reason).toContain("state_incomplete");
   });
@@ -338,7 +346,7 @@ describe("github.file-exists", () => {
 
   it("finds the file on any branch, as its description says", () => {
     const final = world({ files: [{ path: "src/index.ts", branch: "feature/x" }] });
-    expect(subject.evaluate(args, { seed: null, final }).passed).toBe(true);
+    expect(subject.evaluate(args, { seed: null, tape: null, final }).passed).toBe(true);
   });
 
   it("is scoped to the named repo", () => {
@@ -348,12 +356,12 @@ describe("github.file-exists", () => {
         { full_name: "acme/other", files: [{ path: "src/index.ts" }] },
       ],
     };
-    expect(subject.evaluate(args, { seed: null, final: twoRepos }).passed).toBe(false);
+    expect(subject.evaluate(args, { seed: null, tape: null, final: twoRepos }).passed).toBe(false);
   });
 
   it("compares the path exactly", () => {
     const final = world({ files: [{ path: "src/Index.ts" }] });
-    expect(subject.evaluate(args, { seed: null, final }).passed).toBe(false);
+    expect(subject.evaluate(args, { seed: null, tape: null, final }).passed).toBe(false);
   });
 });
 
@@ -369,17 +377,17 @@ describe("github.commit-status", () => {
 
   it("passes when a status under that context carries the state", () => {
     const final = world({ commit_statuses: [{ context: "ci/build", state: "success" }] });
-    expect(subject.evaluate(args, { seed: null, final }).passed).toBe(true);
+    expect(subject.evaluate(args, { seed: null, tape: null, final }).passed).toBe(true);
   });
 
   it("ignores statuses reported under a different context", () => {
     const final = world({ commit_statuses: [{ context: "codecov/patch", state: "success" }] });
-    expect(subject.evaluate(args, { seed: null, final }).passed).toBe(false);
+    expect(subject.evaluate(args, { seed: null, tape: null, final }).passed).toBe(false);
   });
 
   it("fails, listing the states it did find under that context", () => {
     const final = world({ commit_statuses: [{ context: "ci/build", state: "failure" }] });
-    const outcome = subject.evaluate(args, { seed: null, final });
+    const outcome = subject.evaluate(args, { seed: null, tape: null, final });
     expect(outcome.passed).toBe(false);
     expect(outcome.reason).toContain("failure");
   });
@@ -403,7 +411,7 @@ describe("every check, against a repo that is not in the state", () => {
       "github.commit-status": { context: "ci/build", repo: "acme/missing", state: "success" },
     };
     for (const declared of GITHUB_CHECKS as readonly unknown[] as readonly OpenCheck[]) {
-      const outcome = declared.evaluate(fixtures[declared.id]!, { seed: world(), final: world() });
+      const outcome = declared.evaluate(fixtures[declared.id]!, { seed: world(), tape: null, final: world() });
       expect(outcome.passed, `${declared.id} passed against a missing repo`).toBe(false);
       expect(outcome.reason, `${declared.id} did not name the missing repo`).toContain(
         "acme/missing",
