@@ -301,3 +301,96 @@ describe("pome checks add — interactive", () => {
     expect(captured.error.join("\n")).toContain("--check");
   });
 });
+
+// F-1134 — the write path is the only place a local-only author is standing when
+// the file is in front of them, so it is where the whole block gets audited.
+// WARN, never refuse: an unrelated pre-existing line is not a reason to decline
+// an append, and a tool that refuses is a tool people stop using.
+describe("pome checks add — auditing the block it writes into", () => {
+  const HAND_EDITED = "No new labels were ever created in `acme/api`";
+
+  /** The ticket's transcript: a rendered criterion, one word off. */
+  const withBrokenLine = TASK.replace(
+    "- [code] Issue #1 is still assigned to `alice`",
+    `- [code] ${HAND_EDITED}`,
+  );
+
+  async function addTo(body: string) {
+    const path = await taskFile(body);
+    await runChecksAddCommand(path, {
+      check: "github.issue-has-label",
+      arg: ["issue=1", "repo=acme/api", "label=bug"],
+      stdinIsTTY: false,
+      fetchRemote: agreeing,
+    });
+    return path;
+  }
+
+  it("names the broken line sitting above the one it just appended", async () => {
+    await addTo(withBrokenLine);
+    expect(captured.error.join("\n")).toContain(HAND_EDITED);
+  });
+
+  it("says the broken line will not be graded", async () => {
+    await addTo(withBrokenLine);
+    expect(captured.error.join("\n")).toMatch(/not be graded/);
+  });
+
+  it("points at the closed set the sentence could have come from", async () => {
+    await addTo(withBrokenLine);
+    expect(captured.error.join("\n")).toContain("pome checks github");
+  });
+
+  it("still writes, and still exits 0 — a pre-existing line is not a refusal", async () => {
+    const path = await addTo(withBrokenLine);
+    expect(process.exitCode).toBeUndefined();
+    expect(await readFile(path, "utf8")).toContain(
+      "- [code] Issue #1 in `acme/api` has the `bug` label applied",
+    );
+  });
+
+  it("says nothing when every [code] criterion in the block binds", async () => {
+    await addTo(
+      TASK.replace(
+        "- [code] Issue #1 is still assigned to `alice`",
+        "- [code] Issue #1 in `acme/api` is assigned to `alice`",
+      ),
+    );
+    expect(captured.error.join("\n")).toBe("");
+  });
+
+  it("cannot warn about the sentence it rendered itself", async () => {
+    // An empty block, so the only [code] criterion afterwards is the written one.
+    await addTo(TASK.replace("- [code] Issue #1 is still assigned to `alice`\n", ""));
+    expect(captured.error.join("\n")).toBe("");
+  });
+
+  it("names the check and the offending slot for a corrupted instance", async () => {
+    await addTo(
+      TASK.replace(
+        "- [code] Issue #1 is still assigned to `alice`",
+        // GitHub numbers issues from 1, so `#0` names nothing.
+        "- [code] Issue #0 in `acme/api` has the `bug` label applied",
+      ),
+    );
+    const err = captured.error.join("\n");
+    expect(err).toContain("github.issue-has-label");
+    expect(err).toContain("issue");
+  });
+
+  it("says nothing about a criterion whose twin declares no vocabulary yet", async () => {
+    const path = await taskFile(
+      TASK.replace("twins: [github]", "twins: [github, slack]").replace(
+        "- [code] Issue #1 is still assigned to `alice`",
+        "- [code:slack] A message was posted to #general",
+      ),
+    );
+    await runChecksAddCommand(path, {
+      check: "github.no-new-labels",
+      arg: ["repo=acme/api"],
+      stdinIsTTY: false,
+      fetchRemote: agreeing,
+    });
+    expect(captured.error.join("\n")).toBe("");
+  });
+});

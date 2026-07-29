@@ -36,6 +36,7 @@ import {
   type DeclaredCheck,
 } from "./checks.js";
 import { resolveCredentials, type ResolvedCredentials } from "./credentials.js";
+import { auditCodeCriteria, formatBindingReport } from "./criterion-binding.js";
 
 export interface RemoteChecks {
   twin: string;
@@ -307,4 +308,20 @@ export async function runChecksAddCommand(file: string, opts: ChecksAddOptions):
       ? "  negative — this should PASS on an untouched seed; only the examinee can break it."
       : "  positive — this should FAIL on an untouched seed; the examinee has to make it true.",
   );
+
+  // F-1134 — audit the WHOLE block, not just the line just appended. A
+  // hand-edited criterion binds nothing and leaves the score denominator in
+  // silence, and this is the one moment a local-only author is looking at the
+  // file. Audits `next`, so the sentence just written is included and has to come
+  // back bound — it was rendered from a declaration, so it always does.
+  //
+  // WARN, never refuse, and after the summary rather than before it: declining to
+  // append because of an unrelated pre-existing line would be obnoxious and would
+  // tempt authors back to typing sentences by hand, which is the defect. Deliberately
+  // does not touch `process.exitCode` — `pome checks lint` is the surface that fails.
+  const { findings } = auditCodeCriteria(next);
+  if (findings.length > 0) {
+    console.error("");
+    console.error(formatBindingReport(findings, file));
+  }
 }

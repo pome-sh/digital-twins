@@ -54,6 +54,25 @@ describe("insertCriterion", () => {
     expect(out).toContain("## Success Criteria\n\n- [code] X");
   });
 
+  // F-1134 — the first write into an empty section landed the criterion directly
+  // against the next heading. It parses either way, so this is cosmetic, but the
+  // very first file `pome checks add` touches is the one an author reads most
+  // carefully. Note the fixture: a section whose blank line is the ONLY thing
+  // between the two headings. A hand-written task file looks like this; the
+  // double-blank shape above already came out right.
+  it("keeps a blank line between the criterion and the next heading", () => {
+    const bare = "# T\n\n## Success Criteria\n\n## Config\n\n```yaml\ntwins: [github]\n```\n";
+    expect(insertCriterion(bare, "- [code] X")).toBe(
+      "# T\n\n## Success Criteria\n\n- [code] X\n\n## Config\n\n```yaml\ntwins: [github]\n```\n",
+    );
+  });
+
+  it("does not add a second blank line when one already follows", () => {
+    const out = insertCriterion(TASK, "- [code] X");
+    expect(out).toContain("- [code] X\n\n## Config");
+    expect(out).not.toContain("- [code] X\n\n\n## Config");
+  });
+
   it("handles the section being last in the file", () => {
     const last = "# T\n\n## Success Criteria\n\n- [code] A\n";
     expect(insertCriterion(last, "- [code] B")).toBe(

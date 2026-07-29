@@ -45,6 +45,54 @@ export function readConfigTwins(markdown: string): string[] {
   return config.twins;
 }
 
+/** One `[code]` criterion as an authoring surface sees it: the sentence, the twin
+ *  whose declared vocabulary is supposed to grade it, and the human-facing marker
+ *  reconstructed the way `parseCriteria` reconstructs it for error messages — so
+ *  a report can echo a line the author can find by searching the file. */
+export interface CodeCriterion {
+  marker: string;
+  twin: string;
+  text: string;
+}
+
+/** The task's `[code]` criteria with each one's attributed twin, read WITHOUT the
+ *  full task schema (F-1134). Same reason `readConfigTwins` exists, one step
+ *  further along: `pome checks add` and `pome checks lint` audit files that are
+ *  mid-edit, and `taskSchema` refuses one carrying no criteria or no resolvable
+ *  seed. Reuses this module's own section splitter and criterion grammar, so it
+ *  is not a second parser.
+ *
+ *  TOLERANT BY DESIGN. `parseCriteria` throws on a retired marker or a tag naming
+ *  no declared twin, and it is right to — it gates a run. This reader only warns,
+ *  so a line it cannot understand is skipped instead: turning an author's
+ *  half-finished file into a crash is how a warning surface stops being used. */
+export function readCodeCriteria(markdown: string): CodeCriterion[] {
+  const criteriaText = splitSections(markdown).get("success criteria") ?? "";
+  // A malformed ## Config block is `parseTask`'s error to report, not this
+  // reader's — fall back to the schema default so an audit still runs.
+  let twins: string[];
+  try {
+    twins = readConfigTwins(markdown);
+  } catch {
+    twins = taskConfigSchema.parse({}).twins;
+  }
+  const primary = twins[0];
+  if (primary === undefined) return [];
+
+  const found: CodeCriterion[] = [];
+  for (const rawLine of criteriaText.split("\n")) {
+    const match = rawLine.trim().match(CRITERION_LINE_RE);
+    if (!match || match[1] !== "code") continue;
+    const tag = match[2];
+    found.push({
+      marker: `[code${tag ? `:${tag}` : ""}]`,
+      twin: tag ?? primary,
+      text: match[3]!.trim(),
+    });
+  }
+  return found;
+}
+
 export function parseTask(markdown: string, slug = "scenario", sidecarSeed?: unknown, taskPath?: string): Task {
   const title = markdown.match(/^#\s+(.+)$/m)?.[1]?.trim() ?? slug;
   const sections = splitSections(markdown);
