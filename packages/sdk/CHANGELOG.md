@@ -1,5 +1,38 @@
 # @pome-sh/sdk
 
+## 0.8.0 — 2026-07-29
+
+A declared check can read the ordered call tape (F-1076, settling D1's open
+half). Minor, not patch: `CheckSubstrate.tape` is a REQUIRED key, so a consumer
+that constructs a substrate — pome-cloud's declaration adapter is the one that
+does — fails to typecheck until it supplies one (`PACKAGE_RELEASE.md` — 0.x
+minor plays the major role).
+
+- `CheckSubstrate.tape: readonly CheckTapeEvent[] | null` — the recorded HTTP
+  call tape, scoped to the criterion's twin by the consuming engine and ordered
+  oldest-first. **That ordering is a contract**, not an artifact of how the blob
+  happened to be parsed; a check may rely on it.
+- Required key, nullable value, deliberately mirroring `seed`. An optional key
+  is one every later consumer forgets to pass, and forgetting it would hand a
+  tape check a hole — letting a negative criterion pass over a tape nobody read,
+  which is the one failure D4 forbids. `null` and `[]` are different worlds:
+  "nobody handed me a tape" versus "the agent called nothing".
+- `CheckTapeEvent` — one recorded call, as a `substrate: "tape"` check sees it.
+  The frozen v1.0 `TwinHttpEvent` with every field optional/nullable so a
+  malformed row cannot crash a predicate. It lives here rather than in the
+  consuming engine for the same reason the declarations do: a consumer-side copy
+  drifts silently, surfacing only when a predicate reads a field the copy forgot.
+- **No `headers`, and this is not an oversight.** The recorder never captured
+  them, so an assertion like "the retry includes X-PAYMENT" is unanswerable at
+  any substrate width. Verified against `recorder-events.ts` rather than assumed.
+  Closing that gap is a recorder change, tracked separately.
+- `CheckOutcome.evidenceEventIds?: string[]` — the calls an outcome asserted
+  against. Without it, moving a tape predicate into a declaration would have
+  dropped F-980's citations on the floor: a silent downgrade sold as a refactor.
+  Omit the key rather than sending `[]`; absent and empty mean the same thing
+  downstream, and an empty affordance would have to be special-cased by every
+  reader of the persisted row.
+
 ## 0.7.0 — 2026-07-29
 
 Minor, not patch: `defineCheck` now REJECTS a declaration it used to accept, so
