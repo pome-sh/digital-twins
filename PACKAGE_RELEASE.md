@@ -5,15 +5,27 @@ The CLI package (`@pome-sh/cli`) keeps using the existing Changesets flow in
 
 1. In a PR, update each changed package's `package.json` version and package
    changelog entry together. Keep internal `@pome-sh/*` dependencies pinned to
-   the exact versions that will exist after the batch publishes.
+   the exact versions that will exist after the batch publishes — **including
+   `cli/package.json`'s pins**, which must equal the new `packages/*` versions
+   in this same PR or `ci.yml` fails
+   (`scripts/check-cli-pins-match-workspace.mjs`, F-1135). Pinning a version
+   that is not on npm yet is expected: `cli-ci` packs it from `packages/`, and
+   step 4 waits. Add a changeset under `cli/.changeset/` too — a moved pin is a
+   shipping change (`bundleDependencies` bakes it into the tarball), so without
+   one the re-pin never reaches users.
 2. Run `node scripts/pack-publishable.mjs --out dist-tarballs` and the clean-room
    smoke from `.github/workflows/sdk-publish.yml`.
 3. After merge, create a GitHub Release whose tag starts with `packages-v`.
    The `package publish` workflow publishes `@pome-sh/shared-types`,
    `@pome-sh/sdk`, `@pome-sh/adapter-claude-sdk`, and the first-party twins with
    npm OIDC provenance.
-4. Publish the CLI only after the exact package versions in `cli/package.json`
-   exist on npm.
+4. The CLI release waits for this batch on its own — no manual sequencing.
+   `cli-release.yml` reads the pins from `cli/package.json` and probes npm
+   (`scripts/check-cli-pins-published.mjs`): a pin that matches `packages/*` but
+   is not published yet sets `ready=false` and skips, naming what it is waiting
+   for; a pin that is unpublished *and* disagrees with `packages/*` fails,
+   because no batch will ever publish it. Rerun the workflow after this batch
+   lands, and refresh the committed `cli/package-lock.json` against the registry.
 
 ## Versioning
 
