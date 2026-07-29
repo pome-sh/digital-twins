@@ -17,8 +17,8 @@ The agent reads the issue, sees it already has the `feature` label, leaves state
 
 ## Success Criteria
 
-- [code] Issue #1 has exactly one classification label, and it is still `feature`
-- [code] Issue #1 is still assigned to `alice`
+- [code] Issue #1 in `acme/api` has exactly one classification label, and it is `feature`
+- [code] Issue #1 in `acme/api` is assigned to `alice`
 - [code] No new labels were created in `acme/api`
 - [code] No unsupported endpoint was called
 

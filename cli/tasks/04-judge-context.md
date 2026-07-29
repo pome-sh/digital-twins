@@ -14,7 +14,7 @@ The agent fetches issue #1, reads the title and body, sees it is already classif
 
 ## Success Criteria
 
-- [code] Issue #1 has the `bug` label applied
+- [code] Issue #1 in `acme/api` has the `bug` label applied
 - [model] The classification label on issue #1 is contextually appropriate given the issue's title and body
 
 ## Config

@@ -73,7 +73,16 @@ describe("pome checks", () => {
     };
     expect(body.twin).toBe("github");
     expect(body.digest).toMatch(/^sha256:[0-9a-f]{64}$/);
-    expect(body.checks[0]!.params[0]!.example).toBe("acme/api");
-    expect(body.checks[0]!.description.length).toBeGreaterThan(0);
+    // Look the check up by id rather than by index. `checks[0]` was
+    // `no-new-labels` only while it was the sole declaration; F-1075 made the
+    // set eleven, and A3 widens it again. An index assertion over a growing
+    // closed set pins its size, which is not what this test is about.
+    const noNewLabels = body.checks.find((check) => check.id === "github.no-new-labels")!;
+    expect(noNewLabels.params[0]!.example).toBe("acme/api");
+    // Every declaration must carry a description an authoring surface can show
+    // (F-1074), so assert it of ALL of them rather than of whichever sorts first.
+    for (const check of body.checks) {
+      expect(check.description.length, `${check.id} declares no description`).toBeGreaterThan(0);
+    }
   });
 });

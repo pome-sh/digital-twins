@@ -4,7 +4,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { handshake, runChecksAddCommand } from "../../src/cli/checks-add.js";
-import { localDigest } from "../../src/cli/checks.js";
+import { checksFor, localDigest } from "../../src/cli/checks.js";
+
+// The menu position of the check these tests pick. Derived, never hard-coded:
+// the vocabulary is a CLOSED SET THAT GROWS — F-1075 took github from 1 check
+// to 11 and A3 will widen the other twins — so a literal "1" here asserts the
+// size of the set rather than the behaviour of the picker.
+const PICK = String(
+  checksFor("github").findIndex((check) => check.id === "github.no-new-labels") + 1,
+);
 
 const tempDirs: string[] = [];
 const captured = { log: [] as string[], error: [] as string[] };
@@ -228,13 +236,13 @@ describe("pome checks add — interactive", () => {
       stdinIsTTY: true,
       ask: async (question: string) => {
         asked.push(question);
-        return asked.length === 1 ? "1" : "acme/api";
+        return asked.length === 1 ? PICK : "acme/api";
       },
       confirm: async () => true,
       fetchRemote: agreeing,
     });
     const shown = captured.log.join("\n");
-    expect(shown).toContain("1) No new labels were created in `<repo>`");
+    expect(shown).toContain(`${PICK}) No new labels were created in `);
     expect(shown).toContain("DEFINITIONS");
     // The parameter prompt carries the declared example, not the regex.
     expect(asked[1]).toContain("acme/api");
@@ -247,7 +255,7 @@ describe("pome checks add — interactive", () => {
     await runChecksAddCommand(path, {
       arg: [],
       stdinIsTTY: true,
-      ask: async (q: string) => (q === "> " ? "1" : "acme/api"),
+      ask: async (q: string) => (q === "> " ? PICK : "acme/api"),
       confirm: async (question: string) => {
         expect(question).toContain("No new labels were created in `acme/api`");
         return false;
@@ -260,7 +268,7 @@ describe("pome checks add — interactive", () => {
 
   it("re-asks rather than failing when a parameter is typed wrong", async () => {
     const path = await taskFile();
-    const answers = ["1", "api", "acme/api"];
+    const answers = [PICK, "api", "acme/api"];
     let i = 0;
     await runChecksAddCommand(path, {
       arg: [],
@@ -278,7 +286,7 @@ describe("pome checks add — interactive", () => {
     await runChecksAddCommand(path, {
       arg: [],
       stdinIsTTY: true,
-      ask: async () => "99",
+      ask: async () => String(checksFor("github").length + 1),
       confirm: async () => true,
       fetchRemote: agreeing,
     });

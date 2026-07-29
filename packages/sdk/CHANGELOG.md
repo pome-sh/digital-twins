@@ -1,5 +1,28 @@
 # @pome-sh/sdk
 
+## 0.7.0 — 2026-07-29
+
+Minor, not patch: `defineCheck` now REJECTS a declaration it used to accept, so
+a consumer that upgrades can fail at module load. That is a behaviour change on
+a published entry point (`PACKAGE_RELEASE.md` — 0.x minor plays the major role).
+
+- `oneOf(name, values, example?)` — a param type for a slot whose value comes
+  from a closed set. The legacy GitHub regexes spelled these inline as
+  `(open|closed)`, where no authoring surface could read them; as a param type
+  the set travels with the declaration. Non-capturing and value-escaped, so a
+  member carrying a regex metacharacter matches itself and only itself.
+- `defineCheck` rejects a param type whose `pattern` opens its own capture
+  group. Every consumer reads capture group i+1 as template slot i, so one
+  stray group shifts all of them and hands each predicate its neighbour's
+  argument — a silent, total mis-grade. This is the change that makes 0.7.0 a
+  minor: a declaration using `(a|b)` where `(?:a|b)` was meant threw nothing
+  before and throws now.
+- `VACUITY_SENTINEL`, `VACUITY_SENTINEL_SNAKE`, `VACUITY_SENTINEL_NUMBER` — the
+  values a `vacuityMutant` substitutes. They move here from pome-cloud's probe
+  because the declaration WRITES them and the probe RECOGNISES them; two copies
+  of one fact skew silently, and the failure mode is that the probe stops
+  recognising its own mutants and every check reads as un-probed.
+
 ## 0.6.0 — 2026-07-28
 
 Minor, not patch: `CheckDefinition.description` and `CheckParamType.example`

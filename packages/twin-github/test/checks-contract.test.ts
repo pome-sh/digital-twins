@@ -29,14 +29,37 @@ const CHECKS = GITHUB_CHECKS as readonly unknown[] as readonly OpenCheck[];
 // with no fixture fails rather than silently skipping every property here.
 const FIXTURES: Record<string, Record<string, string>> = {
   "github.no-new-labels": { repo: "acme/api" },
+  "github.issue-exists": { issue: "1", repo: "acme/api" },
+  "github.issue-state": { issue: "1", repo: "acme/api", state: "closed" },
+  "github.issue-has-label": { issue: "1", repo: "acme/api", label: "bug" },
+  "github.issue-exactly-one-label": { issue: "1", repo: "acme/api", label: "bug" },
+  "github.issue-assignee": { issue: "1", repo: "acme/api", login: "alice" },
+  "github.issue-comment-contains": { needle: "Deploy blocked", issue: "1", repo: "acme/api" },
+  "github.pr-state": { pr: "1", repo: "acme/api", state: "not merged" },
+  "github.pr-review-exists": { review: "APPROVED", pr: "1", repo: "acme/api" },
+  "github.file-exists": { path: "src/index.ts", repo: "acme/api" },
+  "github.commit-status": { context: "ci/build", repo: "acme/api", state: "success" },
 };
 
 // Every check whose `vacuityMutant` returns null, WITH the reason. A null
 // mutant is an admitted blind spot; admitting it in a ledger is what keeps it
-// from becoming a habit. Adding a line here means arguing the parameter only
-// selects, and is never scanned.
+// from becoming a habit.
+//
+// There are exactly two arguments that earn a line here, and F-1075 added the
+// second:
+//   1. THE PARAMETER ONLY SELECTS. Falsifying it moves the verdict for a reason
+//      that never reaches the assertion — a clean bill the check did not earn.
+//   2. THE PARAMETER IS A CLOSED SET. Typing a slot as `oneOf` means no member
+//      is guaranteed false, so a mutant could assert a different state that
+//      happens to be true as well. This is the price of the closed set, and it
+//      is worth paying — but it must be admitted, not hidden.
 const HONEST_NULL_MUTANTS: Record<string, string> = {
   "github.no-new-labels": "the repo is a selector, not a scanned literal",
+  "github.issue-state": "the state is a closed set; the issue number only selects",
+  "github.pr-state": "the state is a closed set; the PR number only selects",
+  "github.pr-review-exists": "the review state is a closed set; the PR number only selects",
+  "github.commit-status":
+    "the status state is a closed set, and the context only filters the candidate rows",
 };
 
 const SUBSTRATES: CheckSubstrateKind[] = ["final", "seed+final", "tape"];
@@ -129,6 +152,53 @@ describe("declared check grammar", () => {
       const rendered = renderCheck(check, FIXTURES[check.id]!);
       expect(checkNearMissPattern(check).test(rendered)).toBe(true);
       expect(checkPattern(check).test(rendered)).toBe(true);
+    }
+  });
+
+  it("binds no OTHER check's valid sentence", () => {
+    // F-1075. With one declaration this was unfalsifiable; with eleven it is
+    // the property that makes the set a vocabulary rather than a pile. Two
+    // checks that both claim one sentence is the wrong-match bug the exhaustive
+    // invariant (D6) exists to compute — this is its per-twin half, held here so
+    // a new declaration cannot ship broken and be caught only downstream.
+    for (const check of CHECKS) {
+      const rendered = renderCheck(check, FIXTURES[check.id]!);
+      const claimants = CHECKS.filter((other) => checkPattern(other).test(rendered)).map(
+        (other) => other.id,
+      );
+      expect(claimants, `"${rendered}" is claimed by more than one check`).toEqual([check.id]);
+    }
+  });
+
+  it("reports a corrupted instance as its OWN check, not a neighbour's", () => {
+    // Near-miss patterns open every slot to `.+?`, so a broad template can
+    // shadow a narrow one and a corrupted sentence gets reported under the
+    // wrong name — an error message pointing an author at a check they did not
+    // use. Requiring each valid sentence to near-miss only its own check keeps
+    // that impossible.
+    for (const check of CHECKS) {
+      const rendered = renderCheck(check, FIXTURES[check.id]!);
+      const resemblers = CHECKS.filter((other) =>
+        checkNearMissPattern(other).test(rendered),
+      ).map((other) => other.id);
+      expect(resemblers, `"${rendered}" resembles more than one check's template`).toEqual([
+        check.id,
+      ]);
+    }
+  });
+
+  it("names the repository in every check, so no assertion is repo-ambiguous", () => {
+    // F-1075. The legacy patterns took `in owner/repo` as an OPTIONAL qualifier
+    // and, absent it, scanned repositories first-match-wins — so in a two-repo
+    // world a criterion silently graded whichever sorted first. Under a picked
+    // check the repo costs the author nothing, so the ambiguity is simply
+    // removed. Asserting it here keeps a future declaration from reintroducing
+    // it for the convenience of a shorter sentence.
+    for (const check of CHECKS) {
+      expect(
+        Object.keys(check.params),
+        `${check.id} does not name a repository, so it cannot say which repo it asserts about`,
+      ).toContain("repo");
     }
   });
 });
