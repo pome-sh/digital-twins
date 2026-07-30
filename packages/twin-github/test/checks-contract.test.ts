@@ -10,6 +10,7 @@ import {
   checkNearMissPattern,
   checkPattern,
   parseCheck,
+  probeDiscrimination,
   renderCheck,
   type CheckDefinition,
   type CheckSubstrateKind,
@@ -300,6 +301,70 @@ describe("declared vacuity mutants", () => {
         parseCheck(check, mutant),
         `${check.id}: the mutant must still bind to this check, or the probe measures nothing`,
       ).toEqual(mutantArgs);
+    }
+  });
+});
+
+// Every check that declines to name a failing world, WITH the reason.
+//
+// It is EMPTY, and that is the claim (F-1126). `HONEST_NULL_MUTANTS` above has
+// two unavoidable arguments — a selector-only slot, a closed set with no
+// guaranteed-false member. Neither transfers here: a world is a hand-written
+// fixture and every field of `CheckSubstrate` is hand-fillable. An entry in this
+// ledger is therefore an admission that a check may not be able to fail, which
+// is the thing the whole vocabulary exists to rule out.
+//
+// Keep it empty. If a future check needs a line, argue it in writing here the
+// way `REPO_FREE_CHECKS` makes its exceptions argue.
+const HONEST_NULL_WORLDS: Record<string, string> = {};
+
+describe("declared discriminating worlds", () => {
+  it("names a passing and a failing world for every check, or admits a null in the ledger", () => {
+    for (const check of CHECKS) {
+      const args = FIXTURES[check.id]!;
+      const verdict = probeDiscrimination(check, args);
+
+      if (verdict.kind === "declined") {
+        expect(
+          HONEST_NULL_WORLDS[check.id],
+          `${check.id} names no worlds and gives no reason in HONEST_NULL_WORLDS. A check ` +
+            `that cannot demonstrate a failing world may not be able to fail at all.`,
+        ).toBeTruthy();
+        continue;
+      }
+
+      expect(
+        HONEST_NULL_WORLDS[check.id],
+        `${check.id} names its worlds but is still listed in HONEST_NULL_WORLDS — stale entry`,
+      ).toBeUndefined();
+
+      expect(
+        verdict.kind === "broken" ? `${check.id}: ${verdict.arm} — ${verdict.detail}` : "discriminates",
+      ).toBe("discriminates");
+    }
+  });
+
+  it("ships an EMPTY null-worlds ledger", () => {
+    // Not ceremony. The moment this has an entry, the gate's guarantee weakens
+    // from "every check can fail" to "every check can fail or said why not", and
+    // that change should require editing this assertion on purpose.
+    expect(Object.keys(HONEST_NULL_WORLDS)).toEqual([]);
+  });
+
+  it("puts each world on the substrate the check declared", () => {
+    // A `final` check handed a seed, or a `tape` check handed none, would pass
+    // the arms above while testing a substrate the engine will never give it.
+    for (const check of CHECKS) {
+      const worlds = check.discriminatingWorlds?.(FIXTURES[check.id]!) ?? null;
+      if (worlds === null) continue;
+      for (const [side, world] of Object.entries(worlds)) {
+        if (check.substrate === "seed+final") {
+          expect(world.seed, `${check.id}.${side} declares seed+final but names no seed`).not.toBeNull();
+        }
+        if (check.substrate === "tape") {
+          expect(world.tape, `${check.id}.${side} declares tape but names none`).not.toBeNull();
+        }
+      }
     }
   });
 });

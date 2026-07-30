@@ -9,6 +9,7 @@
 import { defineCheck, repoRef, VACUITY_SENTINEL } from "@pome-sh/sdk/checks";
 import { commitStatusState, filePath, statusContext } from "./check-params.js";
 import { labelNames, resolveRepo } from "./check-state.js";
+import { deltaWorld, finalWorld, repoState } from "./check-worlds.js";
 import type { Check } from "./check-kind.js";
 
 export const noNewLabels: Check<{ repo: string }> = defineCheck({
@@ -44,6 +45,16 @@ export const noNewLabels: Check<{ repo: string }> = defineCheck({
   // verdict ("repo not found") for a reason that never reaches the assertion —
   // a clean bill this check did not earn. Reported as `no_trigger`.
   vacuityMutant: () => null,
+  // The only seed+final check, so its worlds are the only ones naming a seed.
+  // The failing world's final gains a definition the seed did not have, which is
+  // the delta itself.
+  discriminatingWorlds: () => ({
+    passing: deltaWorld(repoState({ labels: [{ name: "bug" }] }), repoState({ labels: [{ name: "bug" }] })),
+    failing: deltaWorld(
+      repoState({ labels: [{ name: "bug" }] }),
+      repoState({ labels: [{ name: "bug" }, { name: "invented" }] }),
+    ),
+  }),
   evaluate({ repo }, { seed, final }) {
     // The engine guards this before calling; the check guards too, so a
     // consumer that forgets gets a named skip rather than a vacuous pass.
@@ -83,6 +94,10 @@ export const fileExists: Check<{ path: string; repo: string }> = defineCheck({
   subject: ({ path }) => path,
   // The path IS the scanned literal.
   vacuityMutant: (args) => ({ ...args, path: `${VACUITY_SENTINEL}.txt` }),
+  discriminatingWorlds: ({ path }) => ({
+    passing: finalWorld(repoState({ files: [{ path }] })),
+    failing: finalWorld(repoState({ files: [{ path: "some/other/file.ts" }] })),
+  }),
   evaluate({ path, repo }, { final }) {
     const found = resolveRepo(final, repo, "state_final");
     if ("missing" in found) return { passed: false, reason: found.missing };
@@ -120,6 +135,15 @@ export const commitStatus: Check<{ context: string; repo: string; state: string 
   // anything, which is the same false clean bill one step earlier. `no_trigger`
   // is the honest answer.
   vacuityMutant: () => null,
+  // The failing world keeps the CONTEXT and moves the STATE. Dropping the
+  // context instead would empty the candidate set and produce a reason about
+  // nothing having been found, which is the shape arm 3 distrusts.
+  discriminatingWorlds: ({ context, state }) => ({
+    passing: finalWorld(repoState({ commit_statuses: [{ context, state }] })),
+    failing: finalWorld(
+      repoState({ commit_statuses: [{ context, state: state === "failure" ? "success" : "failure" }] }),
+    ),
+  }),
   evaluate({ context, repo, state }, { final }) {
     const found = resolveRepo(final, repo, "state_final");
     if ("missing" in found) return { passed: false, reason: found.missing };

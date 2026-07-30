@@ -291,11 +291,7 @@ export interface CheckDefinition<TState, TArgs extends Record<string, string>> {
   // `HONEST_NULL_WORLDS`. Unlike `vacuityMutant` there is no structural excuse —
   // a closed set genuinely has no guaranteed-false member, but every field of
   // `CheckSubstrate<TState>` is hand-fillable — so that ledger ships EMPTY.
-  //
-  // OPTIONAL only until twin-github's declarations all carry one; F-1126's
-  // second commit removes the `?`, which is the point at which a whole twin has
-  // proved every check can supply a pair.
-  discriminatingWorlds?(args: TArgs): CheckWorlds<TState> | null;
+  discriminatingWorlds(args: TArgs): CheckWorlds<TState> | null;
   evaluate(args: TArgs, substrate: CheckSubstrate<TState>): CheckOutcome;
 }
 
@@ -467,7 +463,7 @@ export function probeDiscrimination<TState, TArgs extends Record<string, string>
   def: CheckDefinition<TState, TArgs>,
   args: TArgs,
 ): DiscriminationVerdict {
-  const worlds = def.discriminatingWorlds?.(args) ?? null;
+  const worlds = def.discriminatingWorlds(args);
   if (worlds === null) return { kind: "declined" };
 
   const passing = def.evaluate(args, worlds.passing);

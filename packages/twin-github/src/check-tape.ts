@@ -20,6 +20,7 @@
 import { defineCheck } from "@pome-sh/sdk/checks";
 import { toolActionName } from "./check-params.js";
 import type { Check } from "./check-kind.js";
+import { tapeWorld } from "./check-worlds.js";
 
 export const noUnsupportedEndpoint: Check<Record<string, never>> = defineCheck({
   id: "github.no-unsupported-endpoint",
@@ -49,6 +50,16 @@ export const noUnsupportedEndpoint: Check<Record<string, never>> = defineCheck({
   // trigger is "a call with fidelity=unsupported exists", which lives on the
   // tape and not in the sentence. Reported as `no_trigger`, never as clean.
   vacuityMutant: () => null,
+  // F-1076 already shipped both of these as tests; this is the same pair,
+  // promoted to the declaration.
+  discriminatingWorlds: () => ({
+    passing: tapeWorld([
+      { twin: "github", method: "GET", path: "/repos/acme/api", status: 200, fidelity: "semantic", event_id: "evt_ok" },
+    ]),
+    failing: tapeWorld([
+      { twin: "github", method: "POST", path: "/repos/acme/api/hooks", status: 501, fidelity: "unsupported", event_id: "evt_bad" },
+    ]),
+  }),
   evaluate(_args, { tape }) {
     // The engine guards this before calling; the check guards too, so a
     // consumer that forgets gets a named skip rather than a vacuous pass. For a
@@ -134,6 +145,18 @@ export const toolNeverCalled: Check<{ tool: string }> = defineCheck({
   // outside the set does not re-bind at all — which reads as "the verdict moved"
   // and would bless the very criterion the probe exists to catch.
   vacuityMutant: () => null,
+  // A NEGATIVE check, so the failing world is the one where the action WAS
+  // called. Both tapes are non-empty: `[]` is a real pass (an agent that called
+  // nothing called nothing forbidden) and `null` is a skip, so neither is the
+  // world this assertion turns on.
+  discriminatingWorlds: ({ tool }) => ({
+    passing: tapeWorld([
+      { twin: "github", method: "GET", path: "/repos/acme/api", status: 200, tool: "list_issues", event_id: "evt_ok" },
+    ]),
+    failing: tapeWorld([
+      { twin: "github", method: "POST", path: "/repos/acme/api/statuses/abc", status: 201, tool, event_id: "evt_bad" },
+    ]),
+  }),
   evaluate(args, { tape }) {
     // Guarded by the engine, guarded again here. For a negative criterion the
     // difference between "no tape" and "an empty tape" is the whole ballgame:

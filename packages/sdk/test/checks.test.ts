@@ -16,6 +16,10 @@ import {
   type CheckTapeEvent
 } from "../src/checks.js";
 
+// These fixtures exercise the GRAMMAR — render, parse, digest, near-miss —
+// not the vocabulary, so they decline to name worlds. The ledger discipline
+// that makes a null cost something lives in each twin's checks-contract test,
+// where the declarations actually ship (F-1126).
 const noNewLabels: CheckDefinition<unknown, { repo: string }> = defineCheck({
   id: "example.no-new-labels",
   description: "Compares the repo's label definitions in the seed against the final state.",
@@ -25,6 +29,7 @@ const noNewLabels: CheckDefinition<unknown, { repo: string }> = defineCheck({
   polarity: () => "negative",
   subject: () => null,
   vacuityMutant: () => null,
+  discriminatingWorlds: () => null,
   evaluate: () => ({ passed: true, reason: "stub" })
 });
 
@@ -103,6 +108,7 @@ describe("defineCheck validation", () => {
     substrate: "final" as const,
     polarity: () => "negative" as const,
     vacuityMutant: () => null,
+    discriminatingWorlds: () => null,
     evaluate: () => ({ passed: true, reason: "stub" })
   };
 
@@ -134,6 +140,7 @@ describe("checksDigest", () => {
     substrate: "final",
     polarity: () => "positive",
     vacuityMutant: () => null,
+    discriminatingWorlds: () => null,
     evaluate: () => ({ passed: true, reason: "stub" })
   });
   const beta = defineCheck({
@@ -144,6 +151,7 @@ describe("checksDigest", () => {
     substrate: "final",
     polarity: () => "positive",
     vacuityMutant: () => null,
+    discriminatingWorlds: () => null,
     evaluate: () => ({ passed: true, reason: "stub" })
   });
 
@@ -196,6 +204,7 @@ describe("defineCheck validates a param type's own example", () => {
         substrate: "final",
         polarity: () => "positive",
         vacuityMutant: () => null,
+        discriminatingWorlds: () => null,
         evaluate: () => ({ passed: true, reason: "stub" })
       })
     ).toThrow(/example .* does not match its own pattern/);
@@ -248,6 +257,7 @@ describe("oneOf", () => {
       substrate: "final",
       polarity: () => "positive",
       vacuityMutant: () => null,
+      discriminatingWorlds: () => null,
       evaluate: () => ({ passed: true, reason: "stub" })
     });
     expect(parseCheck(twoEnums, "A COMMENTED review exists while the issue is closed")).toEqual({
@@ -279,6 +289,7 @@ describe("defineCheck rejects a param pattern that opens its own capture group",
         substrate: "final",
         polarity: () => "positive",
         vacuityMutant: () => null,
+        discriminatingWorlds: () => null,
         evaluate: () => ({ passed: true, reason: "stub" })
       })
     ).toThrow(/param `state` pattern .* opens 1 capture group/);
@@ -294,6 +305,7 @@ describe("defineCheck rejects a param pattern that opens its own capture group",
         substrate: "final",
         polarity: () => "positive",
         vacuityMutant: () => null,
+        discriminatingWorlds: () => null,
         evaluate: () => ({ passed: true, reason: "stub" })
       })
     ).not.toThrow();
@@ -316,6 +328,7 @@ describe("tape substrate", () => {
       substrate: "tape",
       polarity: () => "positive",
       vacuityMutant: () => null,
+      discriminatingWorlds: () => null,
       evaluate(_args, { tape }) {
         if (tape === null) return { passed: false, reason: "tape_missing", status: "skipped" };
         const first = tape[0];
@@ -351,6 +364,7 @@ describe("tape substrate", () => {
       substrate: "tape",
       polarity: () => "negative",
       vacuityMutant: () => null,
+      discriminatingWorlds: () => null,
       evaluate(_args, { tape }) {
         if (tape === null) return { passed: false, reason: "tape_missing", status: "skipped" };
         return { passed: true, reason: `${tape.length} call(s) inspected` };

@@ -8,6 +8,7 @@
 import { defineCheck, repoRef } from "@pome-sh/sdk/checks";
 import { prNumber, pullRequestState, reviewState } from "./check-params.js";
 import { isMerged, resolvePullRequest } from "./check-state.js";
+import { finalWorld, repoState } from "./check-worlds.js";
 import type { Check } from "./check-kind.js";
 
 export const pullRequestStateCheck: Check<{ pr: string; repo: string; state: string }> = defineCheck({
@@ -29,6 +30,31 @@ export const pullRequestStateCheck: Check<{ pr: string; repo: string; state: str
   // No falsifiable trigger, same shape as issue-state: a closed set with no
   // guaranteed-false member, and a PR number that only resolves.
   vacuityMutant: () => null,
+  // `merged` is a SQLite integer boolean, and BOTH worlds set the field the
+  // assertion turns on: `merged == null` makes this check SKIP, and a skip
+  // satisfies neither arm.
+  discriminatingWorlds: ({ pr, state }) => {
+    const onMergeFlag = state === "merged" || state === "not merged";
+    if (onMergeFlag) {
+      const wantMerged = state === "merged";
+      return {
+        passing: finalWorld(
+          repoState({ pull_requests: [{ number: Number(pr), merged: wantMerged ? 1 : 0 }] }),
+        ),
+        failing: finalWorld(
+          repoState({ pull_requests: [{ number: Number(pr), merged: wantMerged ? 0 : 1 }] }),
+        ),
+      };
+    }
+    return {
+      passing: finalWorld(repoState({ pull_requests: [{ number: Number(pr), state }] })),
+      failing: finalWorld(
+        repoState({
+          pull_requests: [{ number: Number(pr), state: state === "open" ? "closed" : "open" }],
+        }),
+      ),
+    };
+  },
   evaluate({ pr, repo, state }, { final }) {
     const found = resolvePullRequest(final, repo, pr);
     if ("missing" in found) return { passed: false, reason: found.missing };
@@ -81,6 +107,14 @@ export const pullRequestReviewExists: Check<{ review: string; pr: string; repo: 
   // A closed set with no guaranteed-false member, and a PR number that only
   // resolves. Same reasoning as issue-state.
   vacuityMutant: () => null,
+  // The failing world names `reviews: []`, NOT an absent section: absent SKIPS,
+  // because absent is not none — and a skip satisfies no arm.
+  discriminatingWorlds: ({ pr, review }) => ({
+    passing: finalWorld(
+      repoState({ pull_requests: [{ number: Number(pr), reviews: [{ state: review }] }] }),
+    ),
+    failing: finalWorld(repoState({ pull_requests: [{ number: Number(pr), reviews: [] }] })),
+  }),
   evaluate({ review, pr, repo }, { final }) {
     const found = resolvePullRequest(final, repo, pr);
     if ("missing" in found) return { passed: false, reason: found.missing };
