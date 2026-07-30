@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { renderCheck, templateSlots } from "@pome-sh/sdk/checks";
 import { auditCodeCriteria, bindCriterion } from "../../src/cli/criterion-binding.js";
 import { checksFor } from "../../src/cli/checks.js";
+import { twinWithoutChecks } from "./_noVocabularyTwin.js";
 
 const file = (criteria: string, twins = "[github]") => `# Audit
 
@@ -59,15 +60,22 @@ describe("bindCriterion", () => {
     });
   });
 
-  // `pome checks stripe` already draws this line: a twin that exists but declares
-  // nothing is a different fact from a sentence that binds nothing. The CLI holds
-  // no declaration to judge these by, so claiming they will not be graded would
-  // be a guess — and a wrong one on every stripe/gmail/linear task shipped.
-  // Slack left this list in F-1126; stripe is the example now.
+  // A twin that exists but declares nothing is a different fact from a sentence
+  // that binds nothing. The CLI holds no declaration to judge these by, so
+  // claiming they will not be graded would be a guess — and a wrong one on every
+  // task that twin ships.
+  //
+  // The twin is DERIVED, not named. Slack left the list in F-1126 and stripe in
+  // F-1127, and naming stripe here is what broke this test and four others in the
+  // second of those — a literal asserting the MEMBERSHIP of the set where the
+  // test means to assert the behaviour, which is F-1075's hard-coded picker index
+  // one level up. See `_noVocabularyTwin.ts` for what happens when A3 empties the
+  // list.
   it("says nothing about a twin that declares no vocabulary yet", () => {
-    expect(
-      bindCriterion({ marker: "[code:stripe]", twin: "stripe", text: "A refund was issued" }),
-    ).toEqual({ kind: "no-vocabulary" });
+    const twin = twinWithoutChecks();
+    expect(bindCriterion({ marker: `[code:${twin}]`, twin, text: "Something happened" })).toEqual({
+      kind: "no-vocabulary",
+    });
   });
 
   // The property that makes `pome checks add` trustworthy: it renders from a
@@ -121,11 +129,12 @@ describe("auditCodeCriteria", () => {
   // Bucketed as unanswerable, NOT as bound. A caller that wanted to print a
   // pass line has to notice the difference.
   it("separates a twin with no declared vocabulary from the criteria that bind", () => {
-    const audit = auditCodeCriteria(file("- [code] A refund was issued", "[stripe]"));
+    const twin = twinWithoutChecks();
+    const audit = auditCodeCriteria(file("- [code] Something happened", `[${twin}]`));
     expect(audit.bound).toBe(0);
     expect(audit.findings).toEqual([]);
     expect(audit.unanswerable).toEqual([
-      { marker: "[code]", twin: "stripe", text: "A refund was issued" },
+      { marker: "[code]", twin, text: "Something happened" },
     ]);
   });
 

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { runChecksLintCommand } from "../../src/cli/checks-lint.js";
+import { twinWithoutChecks } from "./_noVocabularyTwin.js";
 
 const tempDirs: string[] = [];
 const captured = { log: [] as string[], error: [] as string[] };
@@ -70,10 +71,11 @@ describe("pome checks lint", () => {
   // a failure — this CLI holds no declaration to judge it by. Counting it as
   // either would be the false clean bill the whole vocabulary exists to remove.
   it("reports a twin with no declared vocabulary as unanswerable, not as a pass", async () => {
-    const path = await taskFile(task("- [code] A refund was issued", "[stripe]"));
+    const twin = twinWithoutChecks();
+    const path = await taskFile(task("- [code] Something happened", `[${twin}]`));
     await runChecksLintCommand([path]);
     expect(process.exitCode).toBeUndefined();
-    expect(captured.log.join("\n")).toMatch(/stripe/);
+    expect(captured.log.join("\n")).toContain(twin);
   });
 
   it("names the file each finding came from when given several", async () => {
