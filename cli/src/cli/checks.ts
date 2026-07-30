@@ -12,8 +12,10 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { checksDigest, templateSlots, type CheckDefinition } from "@pome-sh/sdk/checks";
+import { MOUNTED_TWINS } from "@pome-sh/shared-types";
 import { GITHUB_CHECKS } from "@pome-sh/twin-github/checks";
 import { GMAIL_CHECKS } from "@pome-sh/twin-gmail/checks";
+import { LINEAR_CHECKS } from "@pome-sh/twin-linear/checks";
 import { SLACK_CHECKS } from "@pome-sh/twin-slack/checks";
 import { STRIPE_CHECKS } from "@pome-sh/twin-stripe/checks";
 
@@ -28,16 +30,26 @@ const REGISTRIES: Record<string, readonly DeclaredCheck[]> = {
   slack: SLACK_CHECKS as readonly unknown[] as readonly DeclaredCheck[],
   stripe: STRIPE_CHECKS as readonly unknown[] as readonly DeclaredCheck[],
   gmail: GMAIL_CHECKS as readonly unknown[] as readonly DeclaredCheck[],
+  linear: LINEAR_CHECKS as readonly unknown[] as readonly DeclaredCheck[],
 };
 
-// Twins that EXIST but declare nothing yet. Listed separately so `pome checks
-// linear` answers "not migrated yet" instead of "no such twin" — a typo and an
-// empty vocabulary are different facts. F-1126 removed slack; F-1127 removed
-// stripe; F-1128 removed gmail, which is the first twin whose migration needed
-// a seed loader in pome-cloud before its vocabulary could grade anything.
+// Twins that EXIST but declare nothing yet — DERIVED, not listed.
 //
-// One entry left. F-1129 takes linear and empties the list.
-const TWINS_WITHOUT_CHECKS = ["linear"];
+// The distinction is still real: `pome checks <twin>` must answer "not migrated
+// yet" for a twin that exists, and "no such twin" for a typo. What is no longer
+// real is the hand-maintained literal. F-1126 removed slack from it, F-1127
+// stripe, F-1128 gmail, and F-1129 would have emptied it — four tickets each
+// editing one line of a list that `MOUNTED_TWINS` already knows.
+//
+// So it is a set difference instead. Today it is EMPTY, which is A3's whole
+// acceptance criterion. The day a sixth twin mounts, it repopulates itself and
+// the "not migrated yet" path comes back live without anyone remembering to add
+// a literal — which is the failure this project is named for, one level down.
+// Annotated `string[]` on purpose: `MOUNTED_TWINS` is a literal-union tuple, so
+// the filtered result keeps that union and `isKnownTwin` cannot ask it about an
+// arbitrary string. Widening here is what keeps the caller's question — "is this
+// user-typed word a twin?" — expressible.
+const TWINS_WITHOUT_CHECKS: string[] = MOUNTED_TWINS.filter((twin) => !(twin in REGISTRIES));
 
 export function twinsWithChecks(): string[] {
   return Object.keys(REGISTRIES).sort();
@@ -53,8 +65,9 @@ export function twinsWithChecks(): string[] {
  * assert the behaviour, which is the same defect F-1075 hit with a hard-coded
  * picker index.
  *
- * A3 empties this list. When it does, the tests reading it should fail loudly
- * rather than silently stop covering anything.
+ * A3 empties this list, and F-1129 answered the question that raised: the PATH
+ * stays, the LITERAL goes. It is now `MOUNTED_TWINS` minus the registry, so an
+ * empty result is a fact about the world rather than a list nobody updated.
  */
 export function twinsWithoutChecks(): string[] {
   return [...TWINS_WITHOUT_CHECKS];
