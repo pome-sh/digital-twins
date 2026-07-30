@@ -36,7 +36,15 @@ export const REDACTION_TOKEN = "[REDACTED]";
 
 export interface SlackCheckStateMessage {
   ts?: string;
-  user?: string;
+  // `user_id`, NOT `user`. The SEED schema calls this field `user`; the export
+  // spreads the raw `messages` row, where the column is `user_id`. The two
+  // shapes diverge in several places — the seed also uses `is_private: boolean`
+  // where the export emits `0 | 1`, and nests reactions inside messages where
+  // the export hoists them to a flat top-level list — which is why this model is
+  // written against the EXPORT and why the state-shape parity arm in
+  // `fidelity-contract.test.ts` exists. That arm caught this exact field on its
+  // first run.
+  user_id?: string;
   // Free prose, already through the redaction pipeline by the time any check
   // reads it — at the twin (`sdk/src/server.ts:318`) and again at the scoring
   // door (`routes/scenarios.ts:267`). Both sides of a delta cross the same
