@@ -26,6 +26,7 @@ import {
   noMessagePosted,
   noReactionAdded,
 } from "./check-messages.js";
+import { noSecretNewlyExposed } from "./check-secrets.js";
 
 export type { Check } from "./check-kind.js";
 export type {
@@ -45,4 +46,8 @@ export const SLACK_CHECKS = [
   noMessageContaining,
   noReactionAdded,
   messageContains,
+  // Last, because the listing order runs from the assertion an author reaches
+  // for first to the ones a specialised task needs — and this is the only one
+  // that compares two worlds rather than reading one.
+  noSecretNewlyExposed,
 ] as const;

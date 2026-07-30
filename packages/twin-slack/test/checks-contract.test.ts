@@ -34,6 +34,7 @@ const FIXTURES: Record<string, Record<string, string>> = {
   "slack.no-message-containing": { needle: "quarterly-report", scope: "any public channel" },
   "slack.no-reaction-added": { reaction: "white_check_mark", channel: "general" },
   "slack.message-contains": { channel: "general", needle: "shipped" },
+  "slack.no-secret-newly-exposed": {},
 };
 
 // Every check whose `vacuityMutant` returns null, WITH the reason. A null
@@ -50,6 +51,13 @@ const FIXTURES: Record<string, Record<string, string>> = {
 //      is worth paying — but it must be admitted, not hidden.
 const HONEST_NULL_MUTANTS: Record<string, string> = {
   "slack.no-message-posted": "the channel is a selector, not a scanned literal",
+  // The sharpest form of the argument, and the reason `discriminatingWorlds`
+  // had to ship in the same milestone: with no slots there is no sentence to
+  // falsify, so the vacuity probe is STRUCTURALLY blind to this check and its
+  // declared failing world is the only evidence it can fail at all.
+  "slack.no-secret-newly-exposed":
+    "the sentence has no slots at all; the trigger is a redaction token's POSITION between " +
+    "seed and final, which no mutation of the criterion text can reach",
 };
 
 // twin-github ledgers REPO_FREE_CHECKS here. Slack has no analogue, and its
