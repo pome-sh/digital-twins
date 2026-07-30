@@ -14,6 +14,7 @@ import { join } from "node:path";
 import { checksDigest, templateSlots, type CheckDefinition } from "@pome-sh/sdk/checks";
 import { GITHUB_CHECKS } from "@pome-sh/twin-github/checks";
 import { SLACK_CHECKS } from "@pome-sh/twin-slack/checks";
+import { STRIPE_CHECKS } from "@pome-sh/twin-stripe/checks";
 
 import { resolvePackageRoot } from "./resolve-package-root.js";
 
@@ -24,15 +25,34 @@ export type DeclaredCheck = CheckDefinition<unknown, Record<string, string>>;
 const REGISTRIES: Record<string, readonly DeclaredCheck[]> = {
   github: GITHUB_CHECKS as readonly unknown[] as readonly DeclaredCheck[],
   slack: SLACK_CHECKS as readonly unknown[] as readonly DeclaredCheck[],
+  stripe: STRIPE_CHECKS as readonly unknown[] as readonly DeclaredCheck[],
 };
 
 // Twins that EXIST but declare nothing yet. Listed separately so `pome checks
 // stripe` answers "not migrated yet" instead of "no such twin" — a typo and an
-// empty vocabulary are different facts. F-1126 removed slack.
-const TWINS_WITHOUT_CHECKS = ["stripe", "gmail", "linear"];
+// empty vocabulary are different facts. F-1126 removed slack; F-1127 removed
+// stripe.
+const TWINS_WITHOUT_CHECKS = ["gmail", "linear"];
 
 export function twinsWithChecks(): string[] {
   return Object.keys(REGISTRIES).sort();
+}
+
+/**
+ * Twins that exist but declare nothing yet.
+ *
+ * Exported because the no-vocabulary PATH is a real behaviour with its own
+ * tests, and those tests need a twin on this list to exercise it. Naming one
+ * inline is what broke five of them when stripe left the list (F-1127) — a
+ * literal there asserts the MEMBERSHIP of the set, where the test means to
+ * assert the behaviour, which is the same defect F-1075 hit with a hard-coded
+ * picker index.
+ *
+ * A3 empties this list. When it does, the tests reading it should fail loudly
+ * rather than silently stop covering anything.
+ */
+export function twinsWithoutChecks(): string[] {
+  return [...TWINS_WITHOUT_CHECKS];
 }
 
 export function checksFor(twin: string): readonly DeclaredCheck[] {

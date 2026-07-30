@@ -5,6 +5,32 @@ loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 the package follows [Semantic Versioning](https://semver.org/).
 
 
+## 0.4.0 — 2026-07-30
+
+Stripe declares its assertable check vocabulary (F-1127, milestone A3).
+
+- New `./checks` subpath: `STRIPE_CHECKS`, eleven declarations, plus the
+  `StripeCheckState` model they read (`check-state.ts`). pome-cloud deletes its
+  hand-maintained mirror of that shape in the same milestone — the twin's model
+  is now the only one.
+- Four declarations replace hand-written regexes the cloud held
+  (`payment-intent-amount`, `payment-intent-status`, `no-refund-on-charge`,
+  `x402-retry-includes-payment`); seven are new, and each exists because a
+  shipped criterion asked for it and bound nothing. Stripe's unbound `[code]`
+  criteria go 8 → 0.
+- Three of the new ones read the TAPE, because the final state cannot answer
+  them: a rejected request mutates nothing, and a 402 challenge mutates nothing.
+- `fidelity-contract.test.ts` gains a state-shape parity arm. Unlike Slack's,
+  Stripe's export does not spread SQLite rows — every collection goes through
+  `serializers.ts` — so the join fields lose their `_id` suffix
+  (`refunds.charge_id` → `refund.charge`). The arm pins that renaming against a
+  real `exportState()`, along with two documented deviations a fixture must
+  model: `charge.refunded` stays false on a partial refund, and a balance
+  transaction's `source` points at the PaymentIntent rather than the charge.
+
+Minor: new published exports. No change to the served REST/MCP surface, to
+`/_pome/state`, or to any seed schema.
+
 ## 0.3.1 — 2026-07-30
 
 Dependency-only patch: repin `@pome-sh/sdk` to 0.10.0 (F-1126). No surface change.

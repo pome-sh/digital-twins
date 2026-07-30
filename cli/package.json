@@ -1,7 +1,7 @@
 {
   "name": "@pome-sh/cli",
   "version": "0.14.0",
-  "description": "Digital-twin testing for AI agents — run tasks against resettable local or hosted twins and record tool-call traces for evaluation on pome.sh.",
+  "description": "Digital-twin testing for AI agents \u2014 run tasks against resettable local or hosted twins and record tool-call traces for evaluation on pome.sh.",
   "keywords": [
     "ai",
     "agents",
@@ -71,7 +71,7 @@
     "@pome-sh/twin-github": "0.7.0",
     "@pome-sh/twin-linear": "0.1.1",
     "@pome-sh/twin-slack": "0.3.0",
-    "@pome-sh/twin-stripe": "0.3.1",
+    "@pome-sh/twin-stripe": "0.4.0",
     "ai": "^7.0.18",
     "commander": "^15.0.0",
     "hono": "^4.10.7",

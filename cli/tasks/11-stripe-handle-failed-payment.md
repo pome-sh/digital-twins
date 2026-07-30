@@ -4,8 +4,8 @@
 Attempt to create a crypto PaymentIntent with invalid payment parameters, handle the Stripe-shaped error, then create a valid PaymentIntent.
 
 ## Success Criteria
-- [code] The invalid request returns a Stripe invalid_request_error
-- [code] A valid PaymentIntent is created after the failure
+- [code] A request was rejected with a Stripe "invalid_request_error" error
+- [code] A PaymentIntent exists with status "requires_action"
 
 ## Seed State
 ```json

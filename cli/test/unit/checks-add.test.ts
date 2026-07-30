@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { handshake, runChecksAddCommand } from "../../src/cli/checks-add.js";
 import { checksFor, localDigest } from "../../src/cli/checks.js";
+import { twinWithoutChecks } from "./_noVocabularyTwin.js";
 
 // The menu position of the check these tests pick. Derived, never hard-coded:
 // the vocabulary is a CLOSED SET THAT GROWS — F-1075 took github from 1 check
@@ -379,10 +380,11 @@ describe("pome checks add — auditing the block it writes into", () => {
   });
 
   it("says nothing about a criterion whose twin declares no vocabulary yet", async () => {
+    const twin = twinWithoutChecks();
     const path = await taskFile(
-      TASK.replace("twins: [github]", "twins: [github, stripe]").replace(
+      TASK.replace("twins: [github]", `twins: [github, ${twin}]`).replace(
         "- [code] Issue #1 is still assigned to `alice`",
-        "- [code:stripe] A refund was issued on the charge",
+        `- [code:${twin}] Something happened`,
       ),
     );
     await runChecksAddCommand(path, {

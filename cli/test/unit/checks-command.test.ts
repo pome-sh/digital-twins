@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createProgram } from "../../src/cli/main.js";
+import { twinWithoutChecks } from "./_noVocabularyTwin.js";
 
 interface CapturedConsole {
   log: string[];
@@ -50,8 +51,10 @@ describe("pome checks", () => {
   });
 
   it("says plainly that a real twin has no declared checks yet", async () => {
+    // Derived, not named — see `_noVocabularyTwin.ts`. Naming stripe here broke
+    // this test when stripe declared its vocabulary (F-1127).
     const captured = captureConsole();
-    await createProgram().parseAsync(["node", "pome", "checks", "stripe"]);
+    await createProgram().parseAsync(["node", "pome", "checks", twinWithoutChecks()]);
     expect(captured.log.join("\n").toLowerCase()).toContain("no declared checks");
     expect(process.exitCode).toBeUndefined();
   });
