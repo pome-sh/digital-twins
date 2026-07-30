@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MOUNTED_TWINS } from "@pome-sh/shared-types";
 import { createProgram } from "../../src/cli/main.js";
-import { twinWithoutChecks } from "./_noVocabularyTwin.js";
+import { checksFor, twinsWithoutChecks } from "../../src/cli/checks.js";
 
 interface CapturedConsole {
   log: string[];
@@ -50,13 +51,26 @@ describe("pome checks", () => {
     expect(captured.log.join("\n")).toContain("github");
   });
 
-  it("says plainly that a real twin has no declared checks yet", async () => {
-    // Derived, not named — see `_noVocabularyTwin.ts`. Naming stripe here broke
-    // this test when stripe declared its vocabulary (F-1127).
-    const captured = captureConsole();
-    await createProgram().parseAsync(["node", "pome", "checks", twinWithoutChecks()]);
-    expect(captured.log.join("\n").toLowerCase()).toContain("no declared checks");
-    expect(process.exitCode).toBeUndefined();
+  // A3's completion invariant, and the replacement for the case that used to
+  // live here (F-1129).
+  //
+  // That case ran `pome checks <a twin with no vocabulary>` and asserted the
+  // "no declared checks yet" line. It cannot run any more, and the reason is
+  // the milestone succeeding rather than the test rotting: the branch needs a
+  // twin id that `isKnownTwin` accepts and `checksFor` returns nothing for, and
+  // once every MOUNTED twin declares, no id satisfies both. A synthetic id
+  // takes the "no such twin" path instead — a different assertion wearing the
+  // same shape, which is worse than no assertion because it looks like one.
+  //
+  // So assert the fact directly. This goes red the day someone mounts a twin
+  // without declaring its vocabulary, which is exactly when the dormant
+  // `checksFor(twin).length === 0` branch becomes reachable again and whoever
+  // did it needs pointing at it.
+  it("leaves no mounted twin without a declared vocabulary", () => {
+    expect(twinsWithoutChecks()).toEqual([]);
+    for (const twin of MOUNTED_TWINS) {
+      expect(checksFor(twin).length, `${twin} declares no checks`).toBeGreaterThan(0);
+    }
   });
 
   it("errors with a hint on an unknown twin", async () => {
