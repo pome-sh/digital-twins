@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.15.0
+
+### Minor Changes
+
+- [#267](https://github.com/pome-sh/digital-twins/pull/267) [`a29e0f4`](https://github.com/pome-sh/digital-twins/commit/a29e0f4602a96abdcc64833684f165a0135db2fa) Thanks [@AFFFPupu](https://github.com/AFFFPupu)! - `pome checks gmail` answers with a vocabulary instead of "not migrated yet"
+  (F-1128).
+
+  Gmail is the third twin to declare its assertable checks, and the first whose
+  migration needed plumbing before vocabulary: pome-cloud had no in-process seed
+  loader for it, so every gmail criterion reported `no_seed_loader` — not a wrong
+  verdict, an absent one.
+
+  The CLI half is the pin and the registry entry. `gmail` leaves
+  `TWINS_WITHOUT_CHECKS` and `@pome-sh/twin-gmail` is repinned to 0.3.0, which is
+  the release that carries the `./checks` subpath. `pome checks stripe` and
+  `pome checks linear` still answer "not migrated yet"; those are F-1127 and
+  F-1129.
+
+- [#266](https://github.com/pome-sh/digital-twins/pull/266) [`757b275`](https://github.com/pome-sh/digital-twins/commit/757b27567102c05e3b1b8d68bc4966db00baec1b) Thanks [@AFFFPupu](https://github.com/AFFFPupu)! - `pome checks stripe` prints Stripe's declared vocabulary instead of "no declared checks yet" (F-1127).
+
+  Eleven declarations arrive from `@pome-sh/twin-stripe@0.4.0`, so `pome checks`, `pome checks add`
+  and `pome checks lint` all cover Stripe now. `TWINS_WITHOUT_CHECKS` is down to gmail and linear.
+
+  The six starter tasks under `tasks/` that target Stripe were rewritten to bind: tasks 11, 12, 13
+  and 14 carried `[code]` criteria that had never been graded deterministically — prose, a
+  JavaScript expression, and sentences whose subject the sentence never identified. `pome checks lint
+tasks/1*-stripe*.md` is green on all of them.
+
+  Task 14 also loses a claim that measurement showed to be false: sending an `Idempotency-Key` on the
+  retry does not prevent the second refund row in this twin, because the injected 402 is the response
+  the idempotency middleware sees and it declines to cache any 4xx. What the task actually separates
+  is an agent that verifies before retrying from one that retries blindly.
+
+  `twinsWithoutChecks()` is exported so tests can derive "a twin that declares nothing" rather than
+  naming one — five tests named `stripe` inline and all five broke when it stopped being true.
+
 ## 0.14.0
 
 ### Minor Changes
