@@ -1,5 +1,16 @@
 # @pome-sh/twin-linear — CHANGELOG
 
+
+## 0.1.1 — 2026-07-30
+
+Dependency-only patch: repin `@pome-sh/sdk` to 0.10.0 (F-1126). No surface change.
+
+The repin is not cosmetic. npm only symlinks a workspace sibling when the
+declared pin matches its version; a stale pin makes npm install a nested
+PUBLISHED copy instead, so the package is built and tested against the registry
+rather than this tree. `scripts/check-workspace-pins-match-workspace.mjs` now
+gates it.
+
 ## 0.1.0 — 2026-07-21
 
 First public release of the deterministic Linear twin:

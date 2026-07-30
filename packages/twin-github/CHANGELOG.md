@@ -1,5 +1,19 @@
 # @pome-sh/twin-github — CHANGELOG
 
+
+## 0.7.0 — 2026-07-30
+
+Every declared check names its discriminating worlds (F-1126).
+
+- All 13 declarations gain `discriminatingWorlds`, and `checks-contract.test.ts`
+  gains a three-arm gate plus `HONEST_NULL_WORLDS` — which ships EMPTY.
+- New `check-worlds.ts` exports the fixture builders (`finalWorld`,
+  `deltaWorld`, `tapeWorld`, `repoState`). They live in `src/` because the field
+  is read from npm by pome-cloud and the CLI.
+- Repins `@pome-sh/sdk` to 0.10.0.
+
+Minor: the sdk floor moves, and every declaration changes shape.
+
 ## 0.6.0 — 2026-07-29
 
 `` `create_commit_status` was never called `` and `` `create_check_run` was never

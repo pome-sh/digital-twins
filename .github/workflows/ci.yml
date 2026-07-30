@@ -62,6 +62,14 @@ jobs:
       # every `pome checks add` for github while cli-ci was green.
       - run: node scripts/check-cli-pins-match-workspace.mjs
       - run: node scripts/check-cli-pins-match-workspace.test.mjs
+      # F-1126 — the same argument one directory over. npm only SYMLINKS a
+      # sibling when the declared pin matches its version; otherwise it installs
+      # a real nested copy from the registry, and that package is built and
+      # tested against the PUBLISHED artifact instead of this tree. twin-slack
+      # pinned sdk 0.5.1 against a workspace on 0.9.0 for months, and
+      # adapter-claude-sdk pinned shared-types one minor back. CI was green
+      # throughout — everything it ran genuinely passed, against the wrong sdk.
+      - run: node scripts/check-workspace-pins-match-workspace.mjs
       # The release-time half (scripts/check-cli-pins-published.mjs) needs the
       # registry, so only its offline regression suite runs here — including the
       # assertion that cli-release.yml no longer carries its own copy of the

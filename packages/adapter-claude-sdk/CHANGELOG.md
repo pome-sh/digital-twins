@@ -1,5 +1,16 @@
 # @pome-sh/adapter-claude-sdk — CHANGELOG
 
+
+## 0.2.5 — 2026-07-30
+
+Dependency-only patch: repin `@pome-sh/shared-types` to 0.13.0 (F-1126). No surface change.
+
+The repin is not cosmetic. npm only symlinks a workspace sibling when the
+declared pin matches its version; a stale pin makes npm install a nested
+PUBLISHED copy instead, so the package is built and tested against the registry
+rather than this tree. `scripts/check-workspace-pins-match-workspace.mjs` now
+gates it.
+
 ## 0.2.4 — 2026-07-24
 
 F-866 — `tool()`'s return type is widened from `SdkMcpToolDefinition<Schema>` to

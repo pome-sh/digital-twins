@@ -4,6 +4,17 @@ All notable changes to the Stripe twin are documented here. The format is
 loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 the package follows [Semantic Versioning](https://semver.org/).
 
+
+## 0.3.1 — 2026-07-30
+
+Dependency-only patch: repin `@pome-sh/sdk` to 0.10.0 (F-1126). No surface change.
+
+The repin is not cosmetic. npm only symlinks a workspace sibling when the
+declared pin matches its version; a stale pin makes npm install a nested
+PUBLISHED copy instead, so the package is built and tested against the registry
+rather than this tree. `scripts/check-workspace-pins-match-workspace.mjs` now
+gates it.
+
 ## 0.3.0 — 2026-07-29
 
 The x402 flow reaches the recorder tape (F-1125). Minor: it requires
