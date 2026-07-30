@@ -101,7 +101,7 @@ describe("pome checks add — the flags path", () => {
   });
 
   it("tags the line when the task declares more than one twin", async () => {
-    const path = await taskFile(TASK.replace("twins: [github]", "twins: [github, slack]"));
+    const path = await taskFile(TASK.replace("twins: [github]", "twins: [github, stripe]"));
     await runChecksAddCommand(path, {
       check: "github.no-new-labels",
       arg: ["repo=acme/api"],
@@ -380,9 +380,9 @@ describe("pome checks add — auditing the block it writes into", () => {
 
   it("says nothing about a criterion whose twin declares no vocabulary yet", async () => {
     const path = await taskFile(
-      TASK.replace("twins: [github]", "twins: [github, slack]").replace(
+      TASK.replace("twins: [github]", "twins: [github, stripe]").replace(
         "- [code] Issue #1 is still assigned to `alice`",
-        "- [code:slack] A message was posted to #general",
+        "- [code:stripe] A refund was issued on the charge",
       ),
     );
     await runChecksAddCommand(path, {

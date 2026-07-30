@@ -59,13 +59,14 @@ describe("bindCriterion", () => {
     });
   });
 
-  // `pome checks slack` already draws this line: a twin that exists but declares
+  // `pome checks stripe` already draws this line: a twin that exists but declares
   // nothing is a different fact from a sentence that binds nothing. The CLI holds
   // no declaration to judge these by, so claiming they will not be graded would
-  // be a guess — and a wrong one on every stripe/slack/gmail/linear task shipped.
+  // be a guess — and a wrong one on every stripe/gmail/linear task shipped.
+  // Slack left this list in F-1126; stripe is the example now.
   it("says nothing about a twin that declares no vocabulary yet", () => {
     expect(
-      bindCriterion({ marker: "[code:slack]", twin: "slack", text: "A message was posted" }),
+      bindCriterion({ marker: "[code:stripe]", twin: "stripe", text: "A refund was issued" }),
     ).toEqual({ kind: "no-vocabulary" });
   });
 
@@ -120,11 +121,11 @@ describe("auditCodeCriteria", () => {
   // Bucketed as unanswerable, NOT as bound. A caller that wanted to print a
   // pass line has to notice the difference.
   it("separates a twin with no declared vocabulary from the criteria that bind", () => {
-    const audit = auditCodeCriteria(file("- [code] A message was posted", "[slack]"));
+    const audit = auditCodeCriteria(file("- [code] A refund was issued", "[stripe]"));
     expect(audit.bound).toBe(0);
     expect(audit.findings).toEqual([]);
     expect(audit.unanswerable).toEqual([
-      { marker: "[code]", twin: "slack", text: "A message was posted" },
+      { marker: "[code]", twin: "stripe", text: "A refund was issued" },
     ]);
   });
 

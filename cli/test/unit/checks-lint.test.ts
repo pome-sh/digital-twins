@@ -70,10 +70,10 @@ describe("pome checks lint", () => {
   // a failure — this CLI holds no declaration to judge it by. Counting it as
   // either would be the false clean bill the whole vocabulary exists to remove.
   it("reports a twin with no declared vocabulary as unanswerable, not as a pass", async () => {
-    const path = await taskFile(task("- [code] A message was posted", "[slack]"));
+    const path = await taskFile(task("- [code] A refund was issued", "[stripe]"));
     await runChecksLintCommand([path]);
     expect(process.exitCode).toBeUndefined();
-    expect(captured.log.join("\n")).toMatch(/slack/);
+    expect(captured.log.join("\n")).toMatch(/stripe/);
   });
 
   it("names the file each finding came from when given several", async () => {

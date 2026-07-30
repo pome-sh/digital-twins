@@ -51,7 +51,7 @@ describe("pome checks", () => {
 
   it("says plainly that a real twin has no declared checks yet", async () => {
     const captured = captureConsole();
-    await createProgram().parseAsync(["node", "pome", "checks", "slack"]);
+    await createProgram().parseAsync(["node", "pome", "checks", "stripe"]);
     expect(captured.log.join("\n").toLowerCase()).toContain("no declared checks");
     expect(process.exitCode).toBeUndefined();
   });
