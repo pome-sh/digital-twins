@@ -13,6 +13,7 @@ import { join } from "node:path";
 
 import { checksDigest, templateSlots, type CheckDefinition } from "@pome-sh/sdk/checks";
 import { GITHUB_CHECKS } from "@pome-sh/twin-github/checks";
+import { SLACK_CHECKS } from "@pome-sh/twin-slack/checks";
 
 import { resolvePackageRoot } from "./resolve-package-root.js";
 
@@ -22,12 +23,13 @@ export type DeclaredCheck = CheckDefinition<unknown, Record<string, string>>;
 
 const REGISTRIES: Record<string, readonly DeclaredCheck[]> = {
   github: GITHUB_CHECKS as readonly unknown[] as readonly DeclaredCheck[],
+  slack: SLACK_CHECKS as readonly unknown[] as readonly DeclaredCheck[],
 };
 
 // Twins that EXIST but declare nothing yet. Listed separately so `pome checks
-// slack` answers "not migrated yet" instead of "no such twin" — a typo and an
-// empty vocabulary are different facts.
-const TWINS_WITHOUT_CHECKS = ["slack", "stripe", "gmail", "linear"];
+// stripe` answers "not migrated yet" instead of "no such twin" — a typo and an
+// empty vocabulary are different facts. F-1126 removed slack.
+const TWINS_WITHOUT_CHECKS = ["stripe", "gmail", "linear"];
 
 export function twinsWithChecks(): string[] {
   return Object.keys(REGISTRIES).sort();
@@ -185,4 +187,12 @@ export async function runChecksCommand(
     console.log(`    ${dim(`pome checks add <file> --check ${def.id} ${argFlagsFor(def)}`)}`);
     console.log("");
   }
+  // F-1126 — the digest, shown rather than only computed.
+  //
+  // `checks add` already refuses to write a sentence when this disagrees with
+  // the control plane's (`checks-add.ts`), and that refusal is correct but
+  // opaque: an author who hits it has no way to see WHICH side moved. Printing
+  // it here turns "the digest handshake refuses" into something a user can
+  // compare against `GET /v1/checks?twin=<twin>` themselves.
+  console.log(dim(`digest ${localDigest(twin)}`));
 }

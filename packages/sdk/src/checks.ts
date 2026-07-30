@@ -206,6 +206,37 @@ export interface CheckSubstrate<TState> {
   tape: readonly CheckTapeEvent[] | null;
 }
 
+// A check's own proof that it discriminates: one world where its assertion
+// holds, one where it does not.
+//
+// A PAIR, and the reason is measured rather than argued (F-1126). Every
+// state-reading check resolves its selector before it asserts, and a selector
+// miss returns a REAL failure rather than a skip — so 11 of GitHub's 13
+// declarations returned `passed: false` against `{ seed: {}, final: {} }`, a
+// fixture that proves nothing about the assertion. Requiring the passing side
+// forces a world that actually resolves, and `probeDiscrimination`'s third arm
+// rejects a failing world whose reason is the one an empty world already gives.
+//
+// It is also not a new shape. F-1076 shipped it twice as a convention —
+// `check-tape.test.ts`'s "THE FAILING WORLD" and, directly below it, the pair
+// asserting opposite verdicts against a byte-identical state. This promotes that
+// convention to a declaration with a gate behind it.
+export interface CheckWorlds<TState> {
+  passing: CheckSubstrate<TState>;
+  failing: CheckSubstrate<TState>;
+}
+
+export type DiscriminationArm = "passing" | "failing" | "degenerate";
+
+export type DiscriminationVerdict =
+  // Both worlds answered, and they disagreed.
+  | { kind: "discriminates" }
+  // The declaration returned null. The CALLER must find a ledger entry — this
+  // function deliberately does not know about ledgers, so a twin cannot satisfy
+  // the gate by shipping an empty one.
+  | { kind: "declined" }
+  | { kind: "broken"; arm: DiscriminationArm; detail: string };
+
 export interface CheckDefinition<TState, TArgs extends Record<string, string>> {
   // `<twin>.<what-it-asserts>`, unique across the twin's declarations. Reports
   // name the check a criterion bound to; a regex source is not a name.
@@ -252,6 +283,15 @@ export interface CheckDefinition<TState, TArgs extends Record<string, string>> {
   // bill the check did not earn. Null is reported as `no_trigger`, never as
   // clean — an admitted blind spot beats a false clean bill.
   vacuityMutant(args: TArgs): TArgs | null;
+  // The worlds this check discriminates between (F-1126). Same required-ness as
+  // `description` and `vacuityMutant`, for the same reason: an optional field is
+  // one every later declaration omits.
+  //
+  // Return null ONLY when no pair can be built, and state why in the twin's
+  // `HONEST_NULL_WORLDS`. Unlike `vacuityMutant` there is no structural excuse —
+  // a closed set genuinely has no guaranteed-false member, but every field of
+  // `CheckSubstrate<TState>` is hand-fillable — so that ledger ships EMPTY.
+  discriminatingWorlds(args: TArgs): CheckWorlds<TState> | null;
   evaluate(args: TArgs, substrate: CheckSubstrate<TState>): CheckOutcome;
 }
 
@@ -385,7 +425,10 @@ export function checkPattern(def: CheckBindingShape): RegExp {
 // difference would make every pin look skewed, or a real skew look equal.
 //
 // `description` and `example` are deliberately NOT hashed. This digest gates an
-// author's write, and a prose edit changes no sentence.
+// author's write, and a prose edit changes no sentence. Neither is
+// `discriminatingWorlds` (F-1126) — a fixture is not part of the binding
+// surface, so adding the field skews no pin and a changed world moves no
+// sentence.
 export function checksDigest(defs: readonly CheckBindingShape[]): string {
   const rows = defs
     .map((def) => ({
@@ -421,3 +464,11 @@ export function parseCheck<TState, TArgs extends Record<string, string>>(
   });
   return args as TArgs;
 }
+
+// The probe lives in its own module because it EXERCISES declarations, where
+// everything above DEFINES the grammar — and because this file hit the 500-LOC
+// health limit, which was a fair reading of that seam rather than an obstacle.
+//
+// Re-exported here so `@pome-sh/sdk/checks` keeps one import site: consumers ask
+// the vocabulary module about the vocabulary, and the split stays internal.
+export { probeDiscrimination } from "./check-discrimination.js";

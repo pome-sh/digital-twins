@@ -15,6 +15,7 @@ import {
   login,
 } from "./check-params.js";
 import { appliedLabelNames, resolveIssue, sameLabel } from "./check-state.js";
+import { finalWorld, repoState } from "./check-worlds.js";
 import type { Check } from "./check-kind.js";
 
 export const issueExists: Check<{ issue: string; repo: string }> = defineCheck({
@@ -37,6 +38,12 @@ export const issueExists: Check<{ issue: string; repo: string }> = defineCheck({
   // for a reason that never reaches the assertion. Here the lookup IS the
   // assertion, so falsifying it is exactly right.
   vacuityMutant: (args) => ({ ...args, issue: String(VACUITY_SENTINEL_NUMBER) }),
+  // The repo is PRESENT in both worlds; only the issue moves. A world without
+  // the repo would fail the way an EMPTY world does, which arm 3 rejects.
+  discriminatingWorlds: ({ issue }) => ({
+    passing: finalWorld(repoState({ issues: [{ number: Number(issue) }] })),
+    failing: finalWorld(repoState({ issues: [{ number: Number(issue) + 1 }] })),
+  }),
   evaluate({ issue, repo }, { final }) {
     const found = resolveIssue(final, repo, issue);
     if ("missing" in found) return { passed: false, reason: found.missing };
@@ -79,6 +86,14 @@ export const issueStateCheck: Check<{ issue: string; repo: string; state: string
   // nothing, so this admits the blind spot as `no_trigger` instead of buying a
   // false clean bill.
   vacuityMutant: () => null,
+  // The closed set costs the vacuity mutant but not this: a world can simply
+  // hold the other member.
+  discriminatingWorlds: ({ issue, state }) => ({
+    passing: finalWorld(repoState({ issues: [{ number: Number(issue), state }] })),
+    failing: finalWorld(
+      repoState({ issues: [{ number: Number(issue), state: state === "closed" ? "open" : "closed" }] }),
+    ),
+  }),
   evaluate({ issue, repo, state }, { final }) {
     const found = resolveIssue(final, repo, issue);
     if ("missing" in found) return { passed: false, reason: found.missing };
@@ -116,6 +131,15 @@ export const issueHasLabel: Check<{ issue: string; repo: string; label: string }
   subject: ({ label }) => label,
   // The label is what the scan ranges over; the issue number only resolves.
   vacuityMutant: (args) => ({ ...args, label: VACUITY_SENTINEL }),
+  // `labels` are ROW OBJECTS, not strings. The failing world carries a DIFFERENT
+  // label rather than none, so its reason names a non-empty applied set and
+  // cannot be mistaken for a missing issue.
+  discriminatingWorlds: ({ issue, label }) => ({
+    passing: finalWorld(repoState({ issues: [{ number: Number(issue), labels: [{ name: label }] }] })),
+    failing: finalWorld(
+      repoState({ issues: [{ number: Number(issue), labels: [{ name: "unrelated" }] }] }),
+    ),
+  }),
   evaluate({ issue, repo, label }, { final }) {
     const found = resolveIssue(final, repo, issue);
     if ("missing" in found) return { passed: false, reason: found.missing };
@@ -143,6 +167,14 @@ export const issueExactlyOneLabel: Check<{ issue: string; repo: string; label: s
   polarity: () => "positive",
   subject: ({ label }) => label,
   vacuityMutant: (args) => ({ ...args, label: VACUITY_SENTINEL }),
+  // The failing world holds the RIGHT label plus one more — the defect this
+  // check exists to catch, and precisely the one `issue-has-label` passes.
+  discriminatingWorlds: ({ issue, label }) => ({
+    passing: finalWorld(repoState({ issues: [{ number: Number(issue), labels: [{ name: label }] }] })),
+    failing: finalWorld(
+      repoState({ issues: [{ number: Number(issue), labels: [{ name: label }, { name: "extra" }] }] }),
+    ),
+  }),
   evaluate({ issue, repo, label }, { final }) {
     const found = resolveIssue(final, repo, issue);
     if ("missing" in found) return { passed: false, reason: found.missing };
@@ -170,6 +202,12 @@ export const issueAssignee: Check<{ issue: string; repo: string; login: string }
   polarity: () => "positive",
   subject: (args) => args.login,
   vacuityMutant: (args) => ({ ...args, login: VACUITY_SENTINEL }),
+  // `assignees` really is `string[]` of logins here, while its label neighbours
+  // are row objects — the domain resolves it through a separate join.
+  discriminatingWorlds: ({ issue, login: wanted }) => ({
+    passing: finalWorld(repoState({ issues: [{ number: Number(issue), assignees: [wanted] }] })),
+    failing: finalWorld(repoState({ issues: [{ number: Number(issue), assignees: ["someone-else"] }] })),
+  }),
   evaluate(args, { final }) {
     const found = resolveIssue(final, args.repo, args.issue);
     if ("missing" in found) return { passed: false, reason: found.missing };
@@ -201,6 +239,17 @@ export const issueCommentContains: Check<{ needle: string; issue: string; repo: 
   // number instead would early-return "not found" and move the verdict for
   // every seed, for a reason that never reaches the comment scan.
   vacuityMutant: (args) => ({ ...args, needle: VACUITY_SENTINEL }),
+  // A comment that does not contain the needle, rather than zero comments: the
+  // reason then states a scanned count, which distinguishes it from an
+  // unresolvable issue.
+  discriminatingWorlds: ({ issue, needle }) => ({
+    passing: finalWorld(
+      repoState({ issues: [{ number: Number(issue), comments: [{ body: `left pad ${needle} right pad` }] }] }),
+    ),
+    failing: finalWorld(
+      repoState({ issues: [{ number: Number(issue), comments: [{ body: "unrelated chatter" }] }] }),
+    ),
+  }),
   evaluate({ needle, issue, repo }, { final }) {
     const found = resolveIssue(final, repo, issue);
     if ("missing" in found) return { passed: false, reason: found.missing };

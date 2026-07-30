@@ -6,14 +6,20 @@ import {
   defineCheck,
   oneOf,
   parseCheck,
+  probeDiscrimination,
   renderCheck,
   repoRef,
   templateSlots,
   type CheckDefinition,
   type CheckParamType,
+  type CheckSubstrate,
   type CheckTapeEvent
 } from "../src/checks.js";
 
+// These fixtures exercise the GRAMMAR — render, parse, digest, near-miss —
+// not the vocabulary, so they decline to name worlds. The ledger discipline
+// that makes a null cost something lives in each twin's checks-contract test,
+// where the declarations actually ship (F-1126).
 const noNewLabels: CheckDefinition<unknown, { repo: string }> = defineCheck({
   id: "example.no-new-labels",
   description: "Compares the repo's label definitions in the seed against the final state.",
@@ -23,6 +29,7 @@ const noNewLabels: CheckDefinition<unknown, { repo: string }> = defineCheck({
   polarity: () => "negative",
   subject: () => null,
   vacuityMutant: () => null,
+  discriminatingWorlds: () => null,
   evaluate: () => ({ passed: true, reason: "stub" })
 });
 
@@ -101,6 +108,7 @@ describe("defineCheck validation", () => {
     substrate: "final" as const,
     polarity: () => "negative" as const,
     vacuityMutant: () => null,
+    discriminatingWorlds: () => null,
     evaluate: () => ({ passed: true, reason: "stub" })
   };
 
@@ -132,6 +140,7 @@ describe("checksDigest", () => {
     substrate: "final",
     polarity: () => "positive",
     vacuityMutant: () => null,
+    discriminatingWorlds: () => null,
     evaluate: () => ({ passed: true, reason: "stub" })
   });
   const beta = defineCheck({
@@ -142,6 +151,7 @@ describe("checksDigest", () => {
     substrate: "final",
     polarity: () => "positive",
     vacuityMutant: () => null,
+    discriminatingWorlds: () => null,
     evaluate: () => ({ passed: true, reason: "stub" })
   });
 
@@ -194,6 +204,7 @@ describe("defineCheck validates a param type's own example", () => {
         substrate: "final",
         polarity: () => "positive",
         vacuityMutant: () => null,
+        discriminatingWorlds: () => null,
         evaluate: () => ({ passed: true, reason: "stub" })
       })
     ).toThrow(/example .* does not match its own pattern/);
@@ -246,6 +257,7 @@ describe("oneOf", () => {
       substrate: "final",
       polarity: () => "positive",
       vacuityMutant: () => null,
+      discriminatingWorlds: () => null,
       evaluate: () => ({ passed: true, reason: "stub" })
     });
     expect(parseCheck(twoEnums, "A COMMENTED review exists while the issue is closed")).toEqual({
@@ -277,6 +289,7 @@ describe("defineCheck rejects a param pattern that opens its own capture group",
         substrate: "final",
         polarity: () => "positive",
         vacuityMutant: () => null,
+        discriminatingWorlds: () => null,
         evaluate: () => ({ passed: true, reason: "stub" })
       })
     ).toThrow(/param `state` pattern .* opens 1 capture group/);
@@ -292,6 +305,7 @@ describe("defineCheck rejects a param pattern that opens its own capture group",
         substrate: "final",
         polarity: () => "positive",
         vacuityMutant: () => null,
+        discriminatingWorlds: () => null,
         evaluate: () => ({ passed: true, reason: "stub" })
       })
     ).not.toThrow();
@@ -314,6 +328,7 @@ describe("tape substrate", () => {
       substrate: "tape",
       polarity: () => "positive",
       vacuityMutant: () => null,
+      discriminatingWorlds: () => null,
       evaluate(_args, { tape }) {
         if (tape === null) return { passed: false, reason: "tape_missing", status: "skipped" };
         const first = tape[0];
@@ -349,6 +364,7 @@ describe("tape substrate", () => {
       substrate: "tape",
       polarity: () => "negative",
       vacuityMutant: () => null,
+      discriminatingWorlds: () => null,
       evaluate(_args, { tape }) {
         if (tape === null) return { passed: false, reason: "tape_missing", status: "skipped" };
         return { passed: true, reason: `${tape.length} call(s) inspected` };
@@ -387,5 +403,113 @@ describe("tape substrate", () => {
       event_id: "evt_attempt"
     };
     expect(String(event.request_body)).toContain("ch_test_200");
+  });
+});
+
+describe("probeDiscrimination", () => {
+  // A minimal state the fixtures below can shape freely.
+  type S = { n?: number };
+  const world = (final: S): CheckSubstrate<S> => ({ seed: null, final, tape: null });
+
+  /** `n` must be the wanted number. Fails honestly when it is not; an empty
+   *  world says something else, which is what arm 3 turns on. */
+  const base = defineCheck<S, { want: CheckParamType }>({
+    id: "t.n-is",
+    description: "Compares state.n against the wanted number.",
+    template: "n is {want}",
+    params: {
+      want: { name: "want", pattern: "[0-9]+", example: "1", render: (v) => v, parse: (v) => v },
+    },
+    substrate: "final",
+    polarity: () => "positive",
+    vacuityMutant: () => null,
+    discriminatingWorlds: ({ want }) => ({
+      passing: world({ n: Number(want) }),
+      failing: world({ n: Number(want) + 1 }),
+    }),
+    evaluate({ want }, { final }) {
+      if (final.n === undefined) return { passed: false, reason: "n is absent" };
+      return { passed: final.n === Number(want), reason: `n=${final.n} (wanted ${want})` };
+    },
+  });
+
+  it("passes a check whose two worlds disagree", () => {
+    expect(probeDiscrimination(base, { want: "1" })).toEqual({ kind: "discriminates" });
+  });
+
+  it("reports `declined` when the check names no worlds", () => {
+    const declining = { ...base, discriminatingWorlds: () => null };
+    expect(probeDiscrimination(declining, { want: "1" })).toEqual({ kind: "declined" });
+  });
+
+  it("breaks on the PASSING arm when the passing world does not pass", () => {
+    const bad = {
+      ...base,
+      discriminatingWorlds: () => ({ passing: world({ n: 9 }), failing: world({ n: 2 }) }),
+    };
+    expect(probeDiscrimination(bad, { want: "1" })).toMatchObject({
+      kind: "broken",
+      arm: "passing",
+    });
+  });
+
+  it("breaks on the FAILING arm when the failing world does not fail", () => {
+    const bad = {
+      ...base,
+      discriminatingWorlds: () => ({ passing: world({ n: 1 }), failing: world({ n: 1 }) }),
+    };
+    expect(probeDiscrimination(bad, { want: "1" })).toMatchObject({
+      kind: "broken",
+      arm: "failing",
+    });
+  });
+
+  it("breaks on the DEGENERATE arm when the failing world fails the way an EMPTY world does", () => {
+    // F-1126's measured defect: 11 of 13 GitHub checks returned `passed: false`
+    // on `{}` because their selector missed. A fixture that reproduces the empty
+    // world's reason proves nothing about the assertion.
+    const bad = {
+      ...base,
+      discriminatingWorlds: () => ({ passing: world({ n: 1 }), failing: world({}) }),
+    };
+    expect(probeDiscrimination(bad, { want: "1" })).toMatchObject({
+      kind: "broken",
+      arm: "degenerate",
+    });
+  });
+
+  it("refuses a SKIPPED outcome as either verdict", () => {
+    // A skip is an abstention, and the engine honours `status` VERBATIM — so an
+    // outcome carrying one leaves the score denominator whatever `passed` says.
+    // Accepting it here would let a check satisfy the gate by declining to
+    // answer, which is the failure the whole field exists to rule out.
+    //
+    // Both directions are asserted on purpose. Testing only a skipping PASSING
+    // world would still pass with the `status` guard deleted entirely, because
+    // `passed === true` alone already rejects it — so that version of this test
+    // gates nothing. Measured, not assumed.
+    const skipsPassing = {
+      ...base,
+      evaluate: (_args: { want: string }, { final }: CheckSubstrate<S>) =>
+        final.n === 1
+          ? { passed: true, status: "skipped" as const, reason: "abstaining" }
+          : { passed: false, reason: "n is wrong" },
+    };
+    expect(probeDiscrimination(skipsPassing, { want: "1" })).toMatchObject({
+      kind: "broken",
+      arm: "passing",
+    });
+
+    const skipsFailing = {
+      ...base,
+      evaluate: (_args: { want: string }, { final }: CheckSubstrate<S>) =>
+        final.n === 1
+          ? { passed: true, reason: "n is right" }
+          : { passed: false, status: "skipped" as const, reason: "abstaining" },
+    };
+    expect(probeDiscrimination(skipsFailing, { want: "1" })).toMatchObject({
+      kind: "broken",
+      arm: "failing",
+    });
   });
 });

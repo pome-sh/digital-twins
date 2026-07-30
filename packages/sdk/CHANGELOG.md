@@ -1,5 +1,30 @@
 # @pome-sh/sdk
 
+
+## 0.10.0 — 2026-07-30
+
+A declared check can name the worlds it discriminates between (F-1126).
+
+- New required `discriminatingWorlds(args)` on `CheckDefinition`, returning a
+  `{ passing, failing }` pair of `CheckSubstrate`s or `null`.
+- New `probeDiscrimination(def, args)` — pure, no test framework — returning
+  `discriminates` / `declined` / `broken` with the arm that broke. Each twin's
+  contract test owns the admitted-null ledger, so an empty ledger cannot
+  silently excuse anything.
+
+It is a PAIR rather than the failing half alone, and the reason is measured:
+every state-reading check resolves its selector before it asserts, and a
+selector miss returns a real failure rather than a skip — so 11 of GitHub's 13
+declarations returned `passed: false` against an empty world, a fixture that
+proves nothing. The third arm rejects a failing world whose reason is the one an
+empty world already gives.
+
+`checksDigest` is unchanged and does not hash the new field: a fixture is not
+part of the binding surface, so this cannot skew a CLI↔prod handshake.
+
+Minor: a required field on a published interface. Every declaration must add
+one.
+
 ## 0.9.0 — 2026-07-29
 
 The recorder captures request headers and the tool that was called (F-1125).
