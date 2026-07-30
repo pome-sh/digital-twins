@@ -13,6 +13,7 @@ import { join } from "node:path";
 
 import { checksDigest, templateSlots, type CheckDefinition } from "@pome-sh/sdk/checks";
 import { GITHUB_CHECKS } from "@pome-sh/twin-github/checks";
+import { GMAIL_CHECKS } from "@pome-sh/twin-gmail/checks";
 import { SLACK_CHECKS } from "@pome-sh/twin-slack/checks";
 import { STRIPE_CHECKS } from "@pome-sh/twin-stripe/checks";
 
@@ -26,13 +27,17 @@ const REGISTRIES: Record<string, readonly DeclaredCheck[]> = {
   github: GITHUB_CHECKS as readonly unknown[] as readonly DeclaredCheck[],
   slack: SLACK_CHECKS as readonly unknown[] as readonly DeclaredCheck[],
   stripe: STRIPE_CHECKS as readonly unknown[] as readonly DeclaredCheck[],
+  gmail: GMAIL_CHECKS as readonly unknown[] as readonly DeclaredCheck[],
 };
 
 // Twins that EXIST but declare nothing yet. Listed separately so `pome checks
-// stripe` answers "not migrated yet" instead of "no such twin" — a typo and an
+// linear` answers "not migrated yet" instead of "no such twin" — a typo and an
 // empty vocabulary are different facts. F-1126 removed slack; F-1127 removed
-// stripe.
-const TWINS_WITHOUT_CHECKS = ["gmail", "linear"];
+// stripe; F-1128 removed gmail, which is the first twin whose migration needed
+// a seed loader in pome-cloud before its vocabulary could grade anything.
+//
+// One entry left. F-1129 takes linear and empties the list.
+const TWINS_WITHOUT_CHECKS = ["linear"];
 
 export function twinsWithChecks(): string[] {
   return Object.keys(REGISTRIES).sort();
