@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.14.0
+
+### Minor Changes
+
+- [#264](https://github.com/pome-sh/digital-twins/pull/264) [`48cc6ff`](https://github.com/pome-sh/digital-twins/commit/48cc6ff44a8008aada6ab9e09e6b32d6eb0ec1b5) Thanks [@AFFFPupu](https://github.com/AFFFPupu)! - `pome checks slack` answers with Slack's five declared checks; slack leaves the
+  not-yet-migrated list. `pome checks <twin>` now also prints the digest instead
+  of only computing it, so an author who hits `checks add`'s skew refusal can see
+  which side moved.
+
+  `bundleDependencies` bakes the moved `@pome-sh/*` pins into the tarball, so this
+  is a shipping change and needs a changeset of its own.
+
 ## 0.13.0
 
 ### Minor Changes
