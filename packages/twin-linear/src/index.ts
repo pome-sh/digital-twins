@@ -27,6 +27,23 @@ export {
   withPublicOAuth,
 } from "./twin.js";
 export { registerLinearRoutes } from "./routes.js";
+// The declared check vocabulary (F-1129). Re-exported from the root as
+// twin-slack does, alongside the `@pome-sh/twin-linear/checks` subpath that
+// pome-cloud and the CLI both import. The `LinearCheckState*` types are a
+// CHECK's reading of the exported tree, and are deliberately distinct from the
+// `LinearIssue` / `LinearUser` / `LinearComment` row types below: the export
+// carries `stateId` and `labelIds` where those carry names.
+export { LINEAR_CHECKS } from "./checks.js";
+export type {
+  Check,
+  LinearCheckState,
+  LinearCheckStateComment,
+  LinearCheckStateIssue,
+  LinearCheckStateLabel,
+  LinearCheckStateTeam,
+  LinearCheckStateUser,
+  LinearCheckStateWorkflowState,
+} from "./checks.js";
 export type {
   LinearStateSeed,
   LinearTwinDatabase,

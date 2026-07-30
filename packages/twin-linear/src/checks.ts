@@ -29,6 +29,7 @@
 // `check-params.ts`, fixture worlds in `check-worlds.ts`, and the reading of the
 // exported tree in `check-state.ts`.
 
+import { issueCommentContains, issueThreadedReply } from "./check-comments.js";
 import {
   issueAssignee,
   issueEstimate,
@@ -36,6 +37,7 @@ import {
   issueHasLabel,
   issueState,
 } from "./check-issues.js";
+import { noUnsupportedEndpoint } from "./check-tape.js";
 
 export type { Check } from "./check-kind.js";
 export type {
@@ -59,4 +61,10 @@ export const LINEAR_CHECKS = [
   issueHasLabel,
   issueEstimate,
   issueAssignee,
+  issueCommentContains,
+  issueThreadedReply,
+  // Last, because the listing order runs from the assertion an author reaches
+  // for first to the ones a specialised task needs — and this is the only one
+  // that reads the run rather than the world it left behind.
+  noUnsupportedEndpoint,
 ] as const;

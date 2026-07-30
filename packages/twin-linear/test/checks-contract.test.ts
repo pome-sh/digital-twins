@@ -44,6 +44,13 @@ const FIXTURES: Record<string, Record<string, string>> = {
     team: "ENG",
     user: "dev@pome-twin.test",
   },
+  "linear.issue-comment-contains": {
+    title: "Orders 500 after deploy",
+    team: "ENG",
+    needle: "#1",
+  },
+  "linear.issue-threaded-reply": { title: "Needs comment and label triage", team: "ENG" },
+  "linear.no-unsupported-endpoint": {},
 };
 
 // Every check whose `vacuityMutant` returns null, WITH the reason. A null
@@ -56,14 +63,28 @@ const FIXTURES: Record<string, Record<string, string>> = {
 //   2. THE PARAMETER IS A CLOSED SET. Typing a slot as `oneOf` means no member
 //      is guaranteed false, so a mutant could assert a different state that
 //      happens to be true as well.
-const HONEST_NULL_MUTANTS: Record<string, string> = {};
+const HONEST_NULL_MUTANTS: Record<string, string> = {
+  "linear.issue-threaded-reply":
+    "both slots only SELECT the issue; the trigger is a parentId relation between the seed and " +
+    "the final state, which no mutation of the criterion text can reach",
+  // The sharpest form of the argument, and the reason `discriminatingWorlds`
+  // exists: with no slots there is no sentence to falsify, so the vacuity probe
+  // is STRUCTURALLY blind to this check and its declared failing world is the
+  // only evidence it can fail at all.
+  "linear.no-unsupported-endpoint":
+    "the sentence has no slots; the trigger is a fidelity stamp on the tape, which lives in the " +
+    "recording and not in the criterion text",
+};
 
 // twin-github ledgers REPO_FREE_CHECKS; this is Linear's analogue, and unlike
 // twin-slack Linear does NOT argue the rule away — `seed.ts:319-325` validates
 // issue-title uniqueness per team, so the ambiguity a scope slot closes is real
 // here. Only a check that reads no state at all may be ledgered, and the second
 // assertion below enforces that by requiring `substrate: "tape"`.
-const TEAM_FREE_CHECKS: Record<string, string> = {};
+const TEAM_FREE_CHECKS: Record<string, string> = {
+  "linear.no-unsupported-endpoint":
+    "reads the tape and no state at all, so there is no issue to disambiguate between teams",
+};
 
 // Ships EMPTY and stays empty. Unlike `vacuityMutant` there is no structural
 // excuse — a closed set genuinely has no guaranteed-false member, but every
