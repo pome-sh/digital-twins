@@ -45,7 +45,11 @@ const REGISTRIES: Record<string, readonly DeclaredCheck[]> = {
 // acceptance criterion. The day a sixth twin mounts, it repopulates itself and
 // the "not migrated yet" path comes back live without anyone remembering to add
 // a literal — which is the failure this project is named for, one level down.
-const TWINS_WITHOUT_CHECKS = MOUNTED_TWINS.filter((twin) => !(twin in REGISTRIES));
+// Annotated `string[]` on purpose: `MOUNTED_TWINS` is a literal-union tuple, so
+// the filtered result keeps that union and `isKnownTwin` cannot ask it about an
+// arbitrary string. Widening here is what keeps the caller's question — "is this
+// user-typed word a twin?" — expressible.
+const TWINS_WITHOUT_CHECKS: string[] = MOUNTED_TWINS.filter((twin) => !(twin in REGISTRIES));
 
 export function twinsWithChecks(): string[] {
   return Object.keys(REGISTRIES).sort();
