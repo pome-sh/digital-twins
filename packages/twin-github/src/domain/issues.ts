@@ -163,8 +163,12 @@ export function updateIssue(domain: GitHubDomain, input: { owner: string; repo: 
 
 export function addIssueComment(domain: GitHubDomain, input: { owner: string; repo: string; issue_number: number; body: string }, onDelta?: StateDeltaCallback) {
   const repo = domain.requireRepo(input.owner, input.repo);
+  // Issue OR pull request (F-1151) — see `requireCommentTarget`. Resolved once,
+  // outside the transaction's return value, because the serializer below needs
+  // the kind too.
+  let target: "issue" | "pull_request" = "issue";
   const comment = domain.transaction(() => {
-    domain.requireIssue(repo.id, input.issue_number);
+    target = domain.requireCommentTarget(repo.id, input.issue_number);
     if (!input.body.trim()) validationFailed("body", "missing");
     const now = nowIso();
     const result = domain.db.prepare("INSERT INTO issue_comments (repo_id, issue_number, body, user_login, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)").run(
@@ -179,15 +183,17 @@ export function addIssueComment(domain: GitHubDomain, input: { owner: string; re
   });
   domain.audit("add_issue_comment", repo.full_name, input);
   onDelta?.({ before: null, after: issueCommentState(comment, repo) });
-  return issueCommentJson(comment, repo);
+  return issueCommentJson(comment, repo, target);
 }
 
 
 export function listIssueComments(domain: GitHubDomain, input: { owner: string; repo: string; issue_number: number } & PageOptions) {
   const repo = domain.requireRepo(input.owner, input.repo);
-  domain.requireIssue(repo.id, input.issue_number);
+  // Reads the same targets the write path accepts (F-1151). Widening only the
+  // POST would let an agent leave a comment it could not then read back.
+  const target = domain.requireCommentTarget(repo.id, input.issue_number);
   const rows = domain.listIssueCommentRows(repo.id, input.issue_number);
-  return paginate(rows, input.page, input.per_page ?? input.perPage).map((comment) => issueCommentJson(comment, repo));
+  return paginate(rows, input.page, input.per_page ?? input.perPage).map((comment) => issueCommentJson(comment, repo, target));
 }
 
 
@@ -279,7 +285,11 @@ export function updateIssueComment(domain: GitHubDomain, input: { owner: string;
   });
   domain.audit("update_issue_comment", repo.full_name, input);
   onDelta?.({ before, after: issueCommentState(comment, repo) });
-  return issueCommentJson(comment, repo);
+  // Addressed by comment id, so the kind has to be looked up from the row rather
+  // than taken from the request (F-1151). `commentTargetKind` — not the throwing
+  // form: the comment exists, so an unresolvable target is a corrupt row, and
+  // 404ing an update that already succeeded would be the worse answer.
+  return issueCommentJson(comment, repo, domain.commentTargetKind(repo.id, comment.issue_number) ?? "issue");
 }
 
 

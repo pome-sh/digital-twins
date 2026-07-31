@@ -1,0 +1,14 @@
+{
+  "users": [{ "login": "pome-agent", "type": "User", "name": "Pome Agent" }],
+  "repositories": [
+    {
+      "owner": "acme",
+      "name": "widgets",
+      "default_branch": "main",
+      "collaborators": ["pome-agent"],
+      "files": [{ "path": "README.md", "branch": "main", "content": "# widgets\n" }],
+      "issues": [],
+      "pull_requests": []
+    }
+  ]
+}

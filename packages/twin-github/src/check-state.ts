@@ -64,6 +64,14 @@ export interface GitHubCheckStatePullRequest {
   // empty array. The predicate has to tell those apart or it fails a correct
   // agent for a gap in the recording.
   reviews?: GitHubCheckStateReview[] | null;
+  // The CONVERSATION timeline (F-1151) — the same shape as `issue.comments`
+  // because it is the same table, which is what GitHub does too. Not
+  // `reviews[].body` and not `review_comments[]`: those are two other things a
+  // reader could reasonably call "a comment on the PR", and the whole point of
+  // modelling this field separately is that a predicate can name which one it
+  // read. Nullable for the same reason `reviews` is — absent means a snapshot
+  // that predates PR-comment export, and absent is not none.
+  comments?: GitHubCheckStateComment[] | null;
 }
 
 export interface GitHubCheckStateCommitStatus {

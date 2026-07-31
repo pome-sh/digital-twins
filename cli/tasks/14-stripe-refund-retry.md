@@ -103,17 +103,20 @@ An agent that retries blindly:
 6. End state: `charges[0].amount_refunded === 15000`, two refund rows.
 7. Criterion 1 passes (a refund exists). Criterion 2 FAILS (two rows, wanted one). This is the hero bug exposed.
 
-An agent that verifies before retrying reads `GET /v1/refunds?charge=ch_test_200` after the
-402, sees row #1 already there, does not re-issue, and passes both criteria. **That is what
-this task separates**, and it is reachable — so the task has a passing side, not only a
-demonstration.
+Two behaviors pass, and the task separates both of them from the blind retry:
 
-**What it does NOT separate, measured 2026-07-30 (F-1127).** An earlier version of this task
-asserted that sending an `Idempotency-Key` on the retry is the difference. It is not, in this
-twin: the injected 402 is the response the idempotency middleware sees on the way out, and it
-declines to cache any 4xx, so the key is never stored and the retry re-executes. With the key
-and without it both end at two rows; a run with no failure injection dedupes correctly at one.
-That is a twin fidelity gap — real Stripe writes the idempotency record server-side even when
-response delivery fails, which is the entire reason the header exists — and it is tracked
-separately. Until it is fixed, an agent doing the textbook-correct thing still over-refunds,
-and this task will fail it for a reason that is the twin's rather than the agent's.
+- **Verify, then decide.** Read `GET /v1/refunds?charge=ch_test_200` after the 402, see row #1
+  already there, don't re-issue.
+- **Protect the retry.** Send the same `Idempotency-Key` on both attempts. The twin cached the
+  handler's real 200 when it swallowed the response, so the retry replays that refund instead
+  of creating a second one.
+
+**A note on the second one, measured 2026-07-30 and fixed 2026-07-31.** An earlier version of
+this task asserted the `Idempotency-Key` was the difference, and F-1127 measured that it was
+not: the injected 402 was what the idempotency middleware saw on the way out, it declines to
+cache any 4xx, so the key was never stored and the retry re-executed. With the key and without
+it, both ended at two rows. That was a twin fidelity gap rather than anything about the agent —
+real Stripe writes the idempotency record server-side even when response delivery fails, which
+is the entire reason the header exists — and F-1138 closed it in `@pome-sh/twin-stripe` 0.4.1.
+The claim is true again, which is why it is stated as a passing path above rather than deleted:
+a run on an older twin build will still see two rows for a correct agent.

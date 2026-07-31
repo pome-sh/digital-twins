@@ -5,6 +5,39 @@ loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 the package follows [Semantic Versioning](https://semver.org/).
 
 
+## 0.4.1 — 2026-07-31
+
+`after_handler` failure injection stops eating the `Idempotency-Key` record
+(F-1138).
+
+- The mode models "the server processed it, but response delivery to the client
+  failed." Real Stripe writes the idempotency record server-side in that
+  situation — it is the entire reason the header exists, because a retry then
+  replays. The twin persisted the mutation and dropped the key: it modelled the
+  half of the failure that hurts and none of the half that protects.
+- Mechanism: the injected status is substituted INSIDE the handler, which is
+  inside `idempotencyMiddleware`, so the cache saw a 402, declined it under the
+  "never cache a 4xx" rule, and stored nothing. The retry was a cache miss and
+  committed the mutation a second time. `respond()` now parks the handler's own
+  status + body on the context and the idempotency layer decides on that, so it
+  caches the real 200 and the retry replays it.
+- Middleware order is unchanged, and so is the argument for it: a
+  `before_handler` envelope is still produced outside the cache and still never
+  stored, so a retry under the same key re-invokes the handler. A genuine 4xx
+  from a handler is still not cached either — the layer now asks what the
+  HANDLER answered, and a real client error answered 4xx.
+- Wire and tape are unchanged: the injected attempt still delivers 402 with the
+  configured envelope and is still recorded with `state_mutation: true` plus the
+  real `state_delta`.
+- This moves `cli/tasks/14-stripe-refund-retry.md`: an agent that sends the same
+  `Idempotency-Key` on the retry now ends at one refund row instead of two, so
+  the task's second criterion separates it from an agent that retries blind.
+  `test/after-handler-idempotency.test.ts` carries the five-archetype
+  measurement, promoted from F-1127's grading notes into the test tree.
+
+Patch: bug fix. No change to the served REST/MCP surface, to `/_pome/state`, to
+any seed schema, or to the declared check set.
+
 ## 0.4.0 — 2026-07-30
 
 Stripe declares its assertable check vocabulary (F-1127, milestone A3).

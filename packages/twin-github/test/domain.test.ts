@@ -118,6 +118,80 @@ describe("GitHubDomain edge cases", () => {
     expect(domain.getIssue({ owner: "acme", repo: "api", issue_number: 1 }).comments).toBe(1);
   });
 
+  // F-1151 — the issue-comment endpoints address an issue OR a pull request,
+  // because real GitHub models every PR as an issue and documents these routes as
+  // the way to comment on one.
+  describe("comments on a pull request", () => {
+    const seeded = () => {
+      const domain = new GitHubDomain(openGitHubCloneDatabase());
+      domain.seed();
+      domain.createBranch({ owner: "acme", repo: "api", branch: "pr-comment" });
+      domain.pushFiles({
+        owner: "acme",
+        repo: "api",
+        branch: "pr-comment",
+        message: "Change",
+        files: [{ path: "pr-comment.txt", content: "x\n" }]
+      });
+      const pr = domain.createPullRequest({ owner: "acme", repo: "api", title: "PR", head: "pr-comment", base: "main" });
+      return { domain, pr: (pr as { number: number }).number };
+    };
+
+    it("accepts a comment addressed to a PR number and reads it back", () => {
+      const { domain, pr } = seeded();
+      // The default seed has issue #1 and this PR is #2, so the number really is
+      // selecting the PR rather than falling back to an issue.
+      expect(pr).not.toBe(1);
+      domain.addIssueComment({ owner: "acme", repo: "api", issue_number: pr, body: "Summary of this PR." });
+      const listed = domain.listIssueComments({ owner: "acme", repo: "api", issue_number: pr }) as Array<{ body: string }>;
+      expect(listed).toEqual([expect.objectContaining({ body: "Summary of this PR." })]);
+      // …and it did NOT land on the issue that shares the endpoint.
+      expect(domain.listIssueComments({ owner: "acme", repo: "api", issue_number: 1 })).toEqual([]);
+    });
+
+    it("browses at /pull/N while keeping issue_url on the issues path, as GitHub does", () => {
+      const { domain, pr } = seeded();
+      const created = domain.addIssueComment({ owner: "acme", repo: "api", issue_number: pr, body: "Summary." }) as {
+        html_url: string;
+        issue_url: string;
+      };
+      expect(created.html_url).toContain(`/acme/api/pull/${pr}#issuecomment-`);
+      expect(created.issue_url).toBe(`https://api.github.com/repos/acme/api/issues/${pr}`);
+
+      // Same shape when read back by id, where the kind has to come from the row.
+      const updated = domain.updateIssueComment({ owner: "acme", repo: "api", comment_id: 1, body: "Revised." }) as {
+        html_url: string;
+      };
+      expect(updated.html_url).toContain(`/acme/api/pull/${pr}#issuecomment-`);
+    });
+
+    it("keeps html_url on /issues/N for a comment on a real issue", () => {
+      const { domain } = seeded();
+      const created = domain.addIssueComment({ owner: "acme", repo: "api", issue_number: 1, body: "On the issue." }) as {
+        html_url: string;
+      };
+      expect(created.html_url).toContain("/acme/api/issues/1#issuecomment-");
+    });
+
+    it("still 404s a number that names neither an issue nor a pull request", () => {
+      const { domain } = seeded();
+      expect(() => domain.addIssueComment({ owner: "acme", repo: "api", issue_number: 999, body: "nobody" })).toThrow(
+        "Issue not found"
+      );
+      expect(() => domain.listIssueComments({ owner: "acme", repo: "api", issue_number: 999 })).toThrow("Issue not found");
+    });
+
+    it("does not widen the issue-only surfaces to pull requests", () => {
+      // The comment routes moved; labels/assignees/state did not. Widening those
+      // would be divergence #16's read half, which is still out of scope.
+      const { domain, pr } = seeded();
+      expect(() => domain.getIssue({ owner: "acme", repo: "api", issue_number: pr })).toThrow("Issue not found");
+      expect(() => domain.updateIssue({ owner: "acme", repo: "api", issue_number: pr, state: "closed" })).toThrow(
+        "Issue not found"
+      );
+    });
+  });
+
   it("populates pull request head and base SHAs", () => {
     const domain = new GitHubDomain(openGitHubCloneDatabase());
     domain.seed();
