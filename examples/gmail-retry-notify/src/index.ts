@@ -143,8 +143,14 @@ function buildMime({ from, to, subject, body }: { from: string; to: string; subj
   );
 }
 
+// Plain string replacement rather than regexes. `=` only ever appears as base64
+// padding, at the end and at most twice, so stripping every `=` is equivalent to
+// anchoring on the tail — and it drops the `/=+$/` that CodeQL flags as a
+// polynomial-ReDoS sink (`js/polynomial-redos`). The regex was harmless while
+// `buildTools` was module-private; exporting it for the F-1152 probe gate put a
+// caller-reachable path in front of it, which is what turned the alert on.
 function toBase64Url(s: string): string {
-  return Buffer.from(s, "utf8").toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return Buffer.from(s, "utf8").toString("base64").replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 }
 
 async function resolveModel(slug: string): Promise<Parameters<typeof generateText>[0]["model"]> {
