@@ -21,6 +21,80 @@
 // in-process on the example's OWN task seed, then invoke every tool the example
 // registers once with fixture arguments and fail if the twin refused.
 
+import { execFileSync } from "node:child_process";
+import { existsSync, readdirSync, rmSync } from "node:fs";
+import { createServer } from "node:net";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = resolve(HERE, "..");
+const SHARED_TYPES_SRC = join(REPO_ROOT, "packages", "shared-types", "src");
+
+/**
+ * The session id the gate mints its bearer for, and the secret it signs with.
+ * The twin's auth middleware rejects a JWT whose `sid` disagrees with the URL,
+ * so both halves of the gate read these.
+ */
+export const PROBE_SID = "probe";
+export const PROBE_SECRET = "pome-f1152-probe-gate-secret-32-chars";
+
+/** Bind port 0, read what the OS assigned, release it. */
+export async function freePort() {
+  return new Promise((resolvePort, reject) => {
+    const probe = createServer();
+    probe.on("error", reject);
+    probe.listen(0, "127.0.0.1", () => {
+      const { port } = probe.address();
+      probe.close(() => resolvePort(port));
+    });
+  });
+}
+
+/**
+ * Run `fn` with `@pome-sh/shared-types` loadable by plain `node`, then undo it.
+ *
+ * That package exports `./src/index.ts` and ships no dist build, so the twin
+ * packages' runtime import chain lands on TypeScript whose relative specifiers
+ * (`./recorder-events.js`) node's type-stripping does not rewrite — nothing in
+ * this repo can `import("@pome-sh/twin-github")` under bare `node` until
+ * `build:runtime` emits the `.js` in place. contract/run.mjs hits the same wall
+ * and solves it identically.
+ *
+ * The emitted files are untracked and MUST be removed afterwards: left behind
+ * they shadow the `.ts` sources and break `lint:dead-code`. Hence the `finally`.
+ */
+export async function withSharedTypesRuntime(fn) {
+  execFileSync("npm", ["run", "build:runtime", "-w", "@pome-sh/shared-types"], {
+    cwd: REPO_ROOT,
+    stdio: "pipe",
+  });
+  try {
+    return await fn();
+  } finally {
+    const removed = cleanRuntimeJs(SHARED_TYPES_SRC);
+    if (process.env.POME_PROBE_VERBOSE === "1") {
+      console.log(`[probe:examples] cleaned ${removed} generated runtime .js file(s)`);
+    }
+  }
+}
+
+// Only remove `X.js` when `X.ts` sits next to it — the exact inverse of
+// tsconfig.runtime.json's in-place emit. Nothing else is touched.
+function cleanRuntimeJs(dir) {
+  let removed = 0;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      removed += cleanRuntimeJs(full);
+    } else if (entry.name.endsWith(".js") && existsSync(`${full.slice(0, -3)}.ts`)) {
+      rmSync(full);
+      removed += 1;
+    }
+  }
+  return removed;
+}
+
 /**
  * Hand each declared twin its slice of a task seed.
  *

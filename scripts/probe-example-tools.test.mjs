@@ -10,6 +10,7 @@
  * (typecheck:examples, smoke:examples) were green throughout. The cases below
  * are written from that incident.
  */
+import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,8 +19,11 @@ import {
   annotateFromTape,
   evaluateProbeRun,
   formatFindings,
+  freePort,
+  PROBE_SECRET,
   resolveConfig,
   splitSeed,
+  withSharedTypesRuntime,
 } from "./probe-example-tools.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -300,6 +304,76 @@ assert(
     assert(text.includes(needle), `the failure report names ${needle}`);
   }
 }
+
+// ── the driver, against a real in-process GitHub twin ────────────────────────
+// No model, no Docker, no network beyond loopback: `serve()` binds a port and
+// the fixture example's tools talk to it.
+//
+// `withSharedTypesRuntime` is not optional here. `@pome-sh/shared-types` exports
+// `./src/index.ts` with no dist build, so under plain `node` the twin packages'
+// import chain lands on TypeScript that node's type-stripping cannot follow
+// (`./recorder-events.js` does not exist). contract/run.mjs hits the same wall
+// and solves it the same way.
+await withSharedTypesRuntime(async () => {
+  const { serve, createRecorderStore } = await import("@pome-sh/sdk/server");
+  const { githubTwinDefinition, openGitHubCloneDatabase } = await import("@pome-sh/twin-github");
+  const { sign } = await import("hono/jwt");
+
+  const port = await freePort();
+  const fixtureDir = join(ROOT, "scripts/fixtures/probe-examples/refused");
+  const seed = JSON.parse(readFileSync(join(fixtureDir, "tasks/01-probe.seed.json"), "utf8"));
+  const store = createRecorderStore();
+  process.env.TWIN_AUTH_SECRET = PROBE_SECRET;
+  const twin = await serve(githubTwinDefinition, {
+    port,
+    hostname: "127.0.0.1",
+    db: openGitHubCloneDatabase(":memory:"),
+    seed,
+    recorder: store,
+    runId: "probe",
+  });
+  const token = await sign(
+    { sid: "probe", team_id: "tm_probe", login: "pome-agent", exp: Math.floor(Date.now() / 1000) + 3600 },
+    PROBE_SECRET,
+  );
+
+  const spec = {
+    module: join(fixtureDir, "tools.mjs"),
+    export: "buildTools",
+    config: { mcpUrl: `http://127.0.0.1:${port}/s/probe/mcp`, token },
+    probes: [{ tool: "comment_on_issue", args: { owner: "acme", repo: "widgets", issue_number: 1, body: "probe" } }],
+  };
+  // NOT spawnSync. The twin serves from THIS process's event loop, and
+  // spawnSync blocks it — the child would wait forever on a frozen server.
+  const child = await new Promise((done) => {
+    const proc = spawn(process.execPath, [join(ROOT, "scripts/example-tool-probe-driver.mjs")], {
+      env: { ...process.env, POME_PROBE_SPEC: JSON.stringify(spec) },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    proc.stdout.on("data", (buf) => { stdout += buf.toString(); });
+    proc.stderr.on("data", (buf) => { stderr += buf.toString(); });
+    proc.on("close", () => done({ stdout, stderr }));
+  });
+  await twin.close();
+
+  const lines = child.stdout.trim().split("\n").filter(Boolean).map((line) => JSON.parse(line));
+  const tools = lines.find((line) => line.kind === "tools");
+  assert(tools && tools.names.includes("comment_on_issue"), `the driver reports the built tool table (stderr: ${child.stderr})`);
+  const probe = lines.find((line) => line.kind === "probe");
+  assert(
+    probe && probe.calls.some((call) => call.status === 404),
+    "the driver reports the twin's 404 even though the example swallowed it",
+  );
+  assert(probe.threw === null, "the fixture's twin() really did swallow the 404 — so the wire is the only oracle");
+
+  const tape = store.events();
+  assert(
+    tape.some((event) => event.status === 404 && event.tool === "add_issue_comment"),
+    "the twin's own tape carries the 404 and stamps the action (F-1125, MCP surface)",
+  );
+});
 
 if (failures > 0) {
   console.error(`\n${failures} assertion(s) failed.`);
