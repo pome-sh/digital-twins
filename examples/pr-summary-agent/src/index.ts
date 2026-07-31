@@ -104,8 +104,7 @@ async function main() {
 
   banner({ task: TASK, mcpUrl: MCP_URL, sid: MCP_SID });
 
-  const twin = new TwinMcpClient(MCP_URL, token);
-  const tools = buildTwinTools(twin);
+  const tools = buildTwinTools({ mcpUrl: MCP_URL, token });
   const server = createSdkMcpServer({ name: "github-twin", version: "0.1.0", tools });
 
   const run = query({
@@ -197,7 +196,19 @@ function startThinkingIndicator() {
   };
 }
 
-function buildTwinTools(twin: TwinMcpClient) {
+/**
+ * Build the tool table this agent hands the model.
+ *
+ * Exported and config-taking (rather than closing over module-level env) so a
+ * gate can exercise every tool against a live twin without a model — F-1152.
+ * This example and `pr-summary-review` both shipped a `comment_on_pull_request`
+ * the GitHub twin answered `404 Issue not found` for, on every subject, for as
+ * long as the examples existed, and no gate looked: `typecheck:examples` is
+ * green on a well-typed tool whose endpoint 404s, and `smoke:examples` returns
+ * before any tool fires.
+ */
+export function buildTwinTools(config: { mcpUrl: string; token: string }) {
+  const twin = new TwinMcpClient(config.mcpUrl, config.token);
   const ownerRepo = {
     owner: z.string().describe("Repository owner (org or user login)."),
     repo: z.string().describe("Repository name.")
