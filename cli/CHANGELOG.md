@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.16.0
+
+### Minor Changes
+
+- [#268](https://github.com/pome-sh/digital-twins/pull/268) [`92a869e`](https://github.com/pome-sh/digital-twins/commit/92a869ee18f488ac3d97c91a1b07e08f92ee1709) Thanks [@AFFFPupu](https://github.com/AFFFPupu)! - `pome checks linear` answers with a vocabulary instead of "not migrated yet" —
+  eight declared checks covering issue state, labels, estimate, assignee,
+  comments, threaded replies, existence, and unsupported endpoint calls.
+
+  Tasks 24, 25 and 26 are rewritten so every criterion names its own subject. A
+  rendered sentence cannot say "that issue": under a picked check the author fills
+  parameters, and a check only ever sees its own arguments. Each Linear check now
+  names both the issue title and its team, because Linear validates title
+  uniqueness per team rather than per workspace.
+
+  Task 26 loses one criterion rather than gaining a subject: `linear.issue-state`
+  fails when the issue is absent, so it already subsumes `An issue titled "..."
+exists`.
+
 ## 0.15.0
 
 ### Minor Changes
