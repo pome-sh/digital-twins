@@ -71,7 +71,7 @@
     "@pome-sh/twin-github": "0.8.0",
     "@pome-sh/twin-linear": "0.2.0",
     "@pome-sh/twin-slack": "0.3.0",
-    "@pome-sh/twin-stripe": "0.4.0",
+    "@pome-sh/twin-stripe": "0.4.1",
     "ai": "^7.0.18",
     "commander": "^15.0.0",
     "hono": "^4.10.7",
