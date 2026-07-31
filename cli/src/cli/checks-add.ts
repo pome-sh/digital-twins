@@ -8,7 +8,9 @@
  * the cloud resolves them from a different one. Before writing, ask the cloud
  * for the vocabulary it GRADES against and compare digests.
  *   equal        → write, silently
- *   different    → REFUSE, and name which check moved
+ *   different    → REFUSE, and name what moved (`vocabulary-skew.ts`, F-1137 —
+ *                  a check, a field of one, or the sdk that compiled it, but
+ *                  never an empty list)
  *   unreachable  → write from the local pin with a named note on stderr
  * Offline authoring is real, and the degraded path's worst case is bounded: a
  * stale sentence that keeps a template's literal segments fails at finalize as
@@ -37,11 +39,10 @@ import {
 } from "./checks.js";
 import { resolveCredentials, type ResolvedCredentials } from "./credentials.js";
 import { auditCodeCriteria, formatBindingReport } from "./criterion-binding.js";
+import { explainSkew, formatSkewRefusal, type RemoteVocabulary } from "./vocabulary-skew.js";
 
-export interface RemoteChecks {
+export interface RemoteChecks extends RemoteVocabulary {
   twin: string;
-  digest: string;
-  checks: Array<{ id: string; template: string; substrate: string }>;
 }
 
 export type HandshakeResult =
@@ -78,31 +79,12 @@ export async function handshake(
 
   if (localDigest(twin) === remote.digest) return { kind: "match" };
 
-  const here = new Map(checksFor(twin).map((check) => [check.id, check.template]));
-  const there = new Map(remote.checks.map((check) => [check.id, check.template]));
-  const moved: string[] = [];
-  for (const [id, template] of here) {
-    if (!there.has(id)) moved.push(`${id} — this CLI has it, the cloud does not`);
-    else if (there.get(id) !== template) {
-      moved.push(
-        `${id} — the sentence differs\n        here:  ${template}\n        cloud: ${there.get(id)}`,
-      );
-    }
-  }
-  for (const id of there.keys()) {
-    if (!here.has(id)) moved.push(`${id} — the cloud has it, this CLI does not`);
-  }
-
-  return {
-    kind: "skew",
-    message:
-      `Refusing to write: this CLI and the cloud disagree about ${twin}'s vocabulary, so a ` +
-      `sentence written here might not be graded there.\n` +
-      moved.map((line) => `      - ${line}`).join("\n") +
-      `\n\n  local @pome-sh/twin-${twin} ${pin}` +
-      `\n  Update with \`npm i -g @pome-sh/cli@latest\`. If this CLI is already current, the ` +
-      `cloud is behind — that is a deploy, not something you can fix here.`,
-  };
+  // F-1137 — the taxonomy lives in `vocabulary-skew.ts` and is NON-EMPTY by
+  // construction, so this refusal cannot name the disagreement and then list
+  // nothing. Which is what it did whenever the skew was in `substrate` or in the
+  // compiled pattern: the two fields `checksDigest` hashes that the old
+  // id-and-template diff never looked at.
+  return { kind: "skew", message: formatSkewRefusal(twin, explainSkew(twin, remote)) };
 }
 
 async function liveFetch(creds: ResolvedCredentials, twin: string): Promise<RemoteChecks> {
