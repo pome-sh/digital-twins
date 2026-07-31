@@ -13,6 +13,7 @@ import {
   type FailureInjectionOverride,
 } from "@pome-sh/sdk/server";
 import { TwinError, stripeError } from "../errors.js";
+import { setHandlerResult } from "../idempotency.js";
 import type {
   Recorder,
   ResolvedSession,
@@ -192,6 +193,10 @@ export function respond(
   stateDelta: StateDelta = null
 ) {
   const reqId = requestId();
+  // The handler's own answer, before any transport-level substitution below.
+  // The idempotency middleware wraps this handler and reads it on the way out;
+  // `setHandlerResult`'s doc carries what goes wrong without it (F-1138).
+  setHandlerResult(c, { status, body: responseBody });
   // FDRS-339: if the failure-injection middleware matched in `after_handler`
   // mode, it parked an override on the context. The handler has already
   // mutated state (so state_mutation + state_delta stay truthful), but the
