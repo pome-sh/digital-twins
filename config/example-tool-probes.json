@@ -1,0 +1,147 @@
+{
+  "gmail-retry-notify": {
+    "seed": "tasks/01-throttled-send.seed.json",
+    "module": "src/index.ts",
+    "export": "buildTools",
+    "config": { "restUrl": "$gmail.rest", "authToken": "$token" },
+    "probes": [
+      { "tool": "list_sent", "args": {} },
+      {
+        "tool": "send_email",
+        "args": { "to": "dana@pome-twin.test", "subject": "F-1152 probe", "body": "F-1152 probe." }
+      }
+    ]
+  },
+  "merge-agent": {
+    "seed": "tasks/01-identity-spoof.seed.json",
+    "module": "src/index.ts",
+    "export": "buildTools",
+    "config": { "restUrl": "$github.rest", "authToken": "$token" },
+    "probes": [
+      { "tool": "list_open_pull_requests", "args": { "owner": "pome-sh", "repo": "calculator" } },
+      { "tool": "get_pull_request", "args": { "owner": "pome-sh", "repo": "calculator", "number": 1 } },
+      { "tool": "get_pull_request_files", "args": { "owner": "pome-sh", "repo": "calculator", "number": 1 } },
+      { "tool": "list_collaborators", "args": { "owner": "pome-sh", "repo": "calculator" } },
+      { "tool": "search_users", "args": { "q": "GaganSD" } },
+      {
+        "tool": "request_changes",
+        "args": { "owner": "pome-sh", "repo": "calculator", "number": 2, "body": "F-1152 probe." }
+      },
+      { "tool": "merge_pull_request", "args": { "owner": "pome-sh", "repo": "calculator", "number": 1 } }
+    ]
+  },
+  "minimal-viktor": {
+    "seed": "tasks/01-clean-merge.seed.json",
+    "module": "src/index.ts",
+    "export": "buildTools",
+    "config": {
+      "ghUrl": "$github.rest",
+      "ghToken": "$token",
+      "slackUrl": "$slack.rest",
+      "slackToken": "$token"
+    },
+    "probes": [
+      { "tool": "list_open_pull_requests", "args": { "owner": "viktor-hq", "repo": "orders-service" } },
+      { "tool": "get_pull_request", "args": { "owner": "viktor-hq", "repo": "orders-service", "number": 1 } },
+      { "tool": "get_pull_request_files", "args": { "owner": "viktor-hq", "repo": "orders-service", "number": 1 } },
+      { "tool": "get_pull_request_status", "args": { "owner": "viktor-hq", "repo": "orders-service", "number": 1 } },
+      {
+        "tool": "get_file_contents",
+        "args": { "owner": "viktor-hq", "repo": "orders-service", "path": "orders.py", "ref": "main" }
+      },
+      { "tool": "list_collaborators", "args": { "owner": "viktor-hq", "repo": "orders-service" } },
+      { "tool": "slack_list_channels", "args": {} },
+      { "tool": "slack_post_message", "args": { "channel": "eng-alerts", "text": "F-1152 probe." } },
+      {
+        "tool": "request_changes",
+        "args": { "owner": "viktor-hq", "repo": "orders-service", "number": 1, "body": "F-1152 probe." }
+      },
+      { "tool": "merge_pull_request", "args": { "owner": "viktor-hq", "repo": "orders-service", "number": 1 } }
+    ]
+  },
+  "minimal-viktor-langgraph": {
+    "seed": "tasks/01-clean-merge.seed.json",
+    "module": "src/tools.ts",
+    "export": "buildTools",
+    "config": {
+      "ghUrl": "$github.rest",
+      "ghToken": "$token",
+      "slackUrl": "$slack.rest",
+      "slackToken": "$token"
+    },
+    "probes": [
+      { "tool": "list_open_pull_requests", "args": { "owner": "viktor-hq", "repo": "orders-service" } },
+      { "tool": "get_pull_request", "args": { "owner": "viktor-hq", "repo": "orders-service", "number": 1 } },
+      { "tool": "get_pull_request_files", "args": { "owner": "viktor-hq", "repo": "orders-service", "number": 1 } },
+      { "tool": "get_pull_request_status", "args": { "owner": "viktor-hq", "repo": "orders-service", "number": 1 } },
+      {
+        "tool": "get_file_contents",
+        "args": { "owner": "viktor-hq", "repo": "orders-service", "path": "orders.py", "ref": "main" }
+      },
+      { "tool": "list_collaborators", "args": { "owner": "viktor-hq", "repo": "orders-service" } },
+      { "tool": "slack_post_message", "args": { "channel": "eng-alerts", "text": "F-1152 probe." } },
+      {
+        "tool": "request_changes",
+        "args": { "owner": "viktor-hq", "repo": "orders-service", "number": 1, "body": "F-1152 probe." }
+      },
+      { "tool": "merge_pull_request", "args": { "owner": "viktor-hq", "repo": "orders-service", "number": 1 } }
+    ]
+  },
+  "pr-summary-agent": {
+    "seed": "tasks/01-summarize-prs.seed.json",
+    "module": "src/index.ts",
+    "export": "buildTwinTools",
+    "config": { "mcpUrl": "$github.mcp", "token": "$token" },
+    "probes": [
+      { "tool": "list_open_pull_requests", "args": { "owner": "acme", "repo": "widgets" } },
+      { "tool": "get_pull_request", "args": { "owner": "acme", "repo": "widgets", "pull_number": 1 } },
+      { "tool": "get_pull_request_files", "args": { "owner": "acme", "repo": "widgets", "pull_number": 1 } },
+      {
+        "tool": "get_file_contents",
+        "args": { "owner": "acme", "repo": "widgets", "path": "widget.py", "ref": "main" }
+      },
+      {
+        "tool": "comment_on_pull_request",
+        "args": { "owner": "acme", "repo": "widgets", "pull_number": 1, "body": "F-1152 probe." }
+      }
+    ]
+  },
+  "pr-summary-review": {
+    "seed": "tasks/01-clean-prs.seed.json",
+    "module": "src/index.ts",
+    "export": "buildTwinTools",
+    "config": { "mcpUrl": "$github.mcp", "token": "$token" },
+    "probes": [
+      { "tool": "list_open_pull_requests", "args": { "owner": "acme", "repo": "widgets" } },
+      { "tool": "get_pull_request", "args": { "owner": "acme", "repo": "widgets", "pull_number": 1 } },
+      { "tool": "get_pull_request_files", "args": { "owner": "acme", "repo": "widgets", "pull_number": 1 } },
+      {
+        "tool": "get_file_contents",
+        "args": { "owner": "acme", "repo": "widgets", "path": "widget.py", "ref": "main" }
+      },
+      {
+        "tool": "comment_on_pull_request",
+        "args": { "owner": "acme", "repo": "widgets", "pull_number": 1, "body": "F-1152 probe." }
+      },
+      {
+        "tool": "submit_pull_request_review",
+        "args": { "owner": "acme", "repo": "widgets", "pull_number": 1, "event": "COMMENT", "body": "F-1152 probe." }
+      }
+    ]
+  },
+  "triage-agent": {
+    "seed": "tasks/01-triage-acme-issues.seed.json",
+    "module": "src/index.ts",
+    "export": "buildTwinTools",
+    "config": { "mcpUrl": "$github.mcp", "token": "$token" },
+    "probes": [
+      { "tool": "list_open_issues", "args": { "owner": "acme", "repo": "api" } },
+      { "tool": "add_label", "args": { "owner": "acme", "repo": "api", "issue_number": 1, "label": "bug" } },
+      {
+        "tool": "comment_on_issue",
+        "args": { "owner": "acme", "repo": "api", "issue_number": 1, "body": "F-1152 probe." }
+      },
+      { "tool": "close_issue", "args": { "owner": "acme", "repo": "api", "issue_number": 1 } }
+    ]
+  }
+}

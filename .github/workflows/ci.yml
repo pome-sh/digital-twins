@@ -121,6 +121,16 @@ jobs:
           # `await main()` ran above the class it uses). Launch each example for
           # real (POME_PREFLIGHT unset) and fail if it crashes on load.
           npm run smoke:examples
+          # F-1152 — the two gates above each stop short of a twin call:
+          # typecheck:examples is green on a well-typed tool whose endpoint
+          # 404s, and smoke:examples returns before any tool fires because a
+          # real run needs a model. Both examples/pr-summary-agent and
+          # examples/pr-summary-review shipped a `comment_on_pull_request` the
+          # GitHub twin answered `404 Issue not found` for, on every subject,
+          # for as long as they existed. Boot each example's declared twins on
+          # its own task seed and invoke every registered tool once — no model.
+          npm run probe:examples
+          node scripts/probe-example-tools.test.mjs
           # twin-github runs with coverage thresholds (90% lines/funcs/statements)
           # instead of a second plain `npm test` pass for that workspace.
           npm test -w @pome-sh/shared-types -w @pome-sh/sdk -w @pome-sh/adapter-claude-sdk -w @pome-sh/twin-slack -w @pome-sh/twin-stripe -w @pome-sh/twin-gmail -w @pome-sh/twin-linear

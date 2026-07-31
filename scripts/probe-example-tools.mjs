@@ -99,49 +99,45 @@ function cleanRuntimeJs(dir) {
 /**
  * Hand each declared twin its slice of a task seed.
  *
- * Single-twin examples ship a FLAT seed (`{_meta, users, repositories, …}`);
- * multi-twin examples ship a per-twin ENVELOPE (`{github: {…}, slack: {…}}`).
- * A seed matching neither shape is a hard error rather than a fallback: reading
- * an envelope as a flat seed compiles the whole envelope into one twin's world
- * and nothing complains, which is the silent overwrite F-987 fixed in the seed
- * compiler.
+ * This mirrors `cli/src/task/parseTask.ts` rather than inventing a second answer
+ * to "is this seed an envelope", because two answers is how a seed silently
+ * lands in the wrong world (the failure F-987 fixed in the seed compiler). The
+ * contract there, verbatim in three parts:
+ *
+ *   1. Envelope-iff-multi-twin, decided from the declared twin list ALONE —
+ *      "never by sniffing the seed shape". One twin ⇒ the seed is flat.
+ *   2. Envelope keys are a SUBSET of the declared twins. A twin with no key
+ *      falls back to its own default seed (`undefined` here, which is what
+ *      `serve()` treats as "seed the default world"). A key that is not a
+ *      declared twin is a loud error.
+ *   3. `_meta` (source hash, model, compiled_at) is stripped before schema
+ *      parsing. It is not optional politeness: the gmail twin's seed schema is
+ *      strict and rejects the key outright.
  */
 export function splitSeed(seed, twinIds) {
-  const keys = Object.keys(seed ?? {});
-  const envelopeKeys = keys.filter((key) => isTwinLike(key));
+  const stripped = stripSeedMeta(seed);
 
-  if (envelopeKeys.length > 0) {
-    const extra = envelopeKeys.filter((key) => !twinIds.includes(key));
-    if (extra.length > 0) {
-      throw new Error(
-        `seed is a per-twin envelope carrying [${envelopeKeys.join(", ")}] but the example ` +
-          `declares twins [${twinIds.join(", ")}] — unknown: [${extra.join(", ")}]`,
-      );
-    }
-    const missing = twinIds.filter((id) => !envelopeKeys.includes(id));
-    if (missing.length > 0) {
-      throw new Error(
-        `seed is a per-twin envelope but has no slice for declared twin(s): ${missing.join(", ")}`,
-      );
-    }
-    return Object.fromEntries(twinIds.map((id) => [id, seed[id]]));
-  }
+  if (twinIds.length === 1) return { [twinIds[0]]: stripped };
 
-  if (twinIds.length !== 1) {
+  const keys = Object.keys(stripped ?? {});
+  const unknown = keys.filter((key) => !twinIds.includes(key));
+  if (unknown.length > 0) {
     throw new Error(
-      `example declares twins [${twinIds.join(", ")}] but the seed is a flat seed ` +
-        `(top-level keys: ${keys.join(", ")}) — a multi-twin example needs a per-twin envelope`,
+      `seed is a per-twin envelope with key(s) [${unknown.join(", ")}] that the example does not ` +
+        `declare (declares: [${twinIds.join(", ")}])`,
     );
   }
-  return { [twinIds[0]]: seed };
+  // A declared twin with no envelope key gets `undefined` → its default world.
+  return Object.fromEntries(twinIds.map((id) => [id, stripSeedMeta(stripped?.[id])]));
 }
 
-// The first-party twin ids. Kept as a literal rather than read from
-// config/first-party-twins.json so splitSeed stays a pure function over its
-// arguments; check-first-party-twin-registration.mjs already guards that list.
-const TWIN_IDS = ["github", "slack", "stripe", "gmail", "linear"];
-function isTwinLike(key) {
-  return TWIN_IDS.includes(key);
+/** `stripSidecarMeta` from cli/src/task/parseTask.ts. */
+function stripSeedMeta(seed) {
+  if (seed && typeof seed === "object" && !Array.isArray(seed)) {
+    const { _meta, ...rest } = seed;
+    return rest;
+  }
+  return seed;
 }
 
 /**

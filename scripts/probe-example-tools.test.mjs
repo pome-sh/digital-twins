@@ -45,41 +45,42 @@ function assertThrows(fn, match, msg) {
 }
 
 // ── splitSeed ───────────────────────────────────────────────────────────────
+// Mirrors cli/src/task/parseTask.ts. Envelope-iff-multi-twin, decided from the
+// declared twin list alone — never by sniffing the seed shape.
+//
 // A single-twin example ships a FLAT seed. examples/triage-agent's is
 // { _meta, users, repositories }.
 {
   const flat = { _meta: { version: 1 }, users: [], repositories: [{ owner: "acme", name: "api" }] };
   const out = splitSeed(flat, ["github"]);
-  assert(out.github === flat, "splitSeed hands a flat seed to the single declared twin verbatim");
+  assert(out.github.repositories === flat.repositories, "splitSeed hands a flat seed to the single declared twin");
+  // Not politeness: the gmail twin's seed schema is strict and rejects `_meta`.
+  assert(!("_meta" in out.github), "splitSeed strips the _meta envelope before the twin's schema sees it");
 }
 
 // A multi-twin example ships a PER-TWIN ENVELOPE. Both viktor examples'
 // 01-clean-merge.seed.json is exactly { github: {...}, slack: {...} }.
 {
-  const gh = { users: [], repositories: [] };
+  const gh = { _meta: { version: 1 }, users: [], repositories: [] };
   const sl = { channels: [] };
   const out = splitSeed({ github: gh, slack: sl }, ["github", "slack"]);
-  assert(out.github === gh, "splitSeed slices the github half of an envelope");
-  assert(out.slack === sl, "splitSeed slices the slack half of an envelope");
+  assert(out.github.repositories === gh.repositories, "splitSeed slices the github half of an envelope");
+  assert(!("_meta" in out.github), "splitSeed strips _meta from an envelope slice too");
+  assert(out.slack.channels === sl.channels, "splitSeed slices the slack half of an envelope");
 }
 
-// The failure this hard error exists to prevent is F-987's: a per-twin envelope
-// read as a flat seed compiles the whole envelope into ONE twin's world, and
-// nothing complains.
+// Envelope keys are a SUBSET of the declared twins: a twin with no key falls
+// back to its own default world, which `serve()` reads as `seed: undefined`.
+{
+  const out = splitSeed({ github: { repositories: [] } }, ["github", "slack"]);
+  assert(out.slack === undefined, "a declared twin absent from the envelope falls back to its default seed");
+}
+
+// A key that is not a declared twin is a loud error.
 assertThrows(
-  () => splitSeed({ github: {}, slack: {} }, ["github"]),
-  "declares twins [github]",
-  "splitSeed rejects an envelope carrying a twin the example does not declare",
-);
-assertThrows(
-  () => splitSeed({ github: {} }, ["github", "slack"]),
+  () => splitSeed({ github: {}, slack: {} }, ["github", "gmail"]),
   "slack",
-  "splitSeed rejects an envelope missing a declared twin",
-);
-assertThrows(
-  () => splitSeed({ _meta: {}, users: [] }, ["github", "slack"]),
-  "flat seed",
-  "splitSeed rejects a flat seed for a multi-twin example",
+  "splitSeed rejects an envelope key the example does not declare",
 );
 
 // ── resolveConfig ───────────────────────────────────────────────────────────
