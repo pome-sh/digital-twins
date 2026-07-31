@@ -37,6 +37,7 @@ const FIXTURES: Record<string, Record<string, string>> = {
   "github.issue-assignee": { issue: "1", repo: "acme/api", login: "alice" },
   "github.issue-comment-contains": { needle: "Deploy blocked", issue: "1", repo: "acme/api" },
   "github.pr-state": { pr: "1", repo: "acme/api", state: "not merged" },
+  "github.pr-comment-exists": { pr: "1", repo: "acme/api" },
   "github.pr-review-exists": { review: "APPROVED", pr: "1", repo: "acme/api" },
   "github.file-exists": { path: "src/index.ts", repo: "acme/api" },
   "github.commit-status": { context: "ci/build", repo: "acme/api", state: "success" },
@@ -63,6 +64,14 @@ const HONEST_NULL_MUTANTS: Record<string, string> = {
   "github.issue-state": "the state is a closed set; the issue number only selects",
   "github.pr-state": "the state is a closed set; the PR number only selects",
   "github.pr-review-exists": "the review state is a closed set; the PR number only selects",
+  // F-1151, and this is argument 1 with nothing to soften it: the PR number is
+  // the check's ONLY slot and it purely selects. Falsifying it early-returns
+  // "pull request not found" on every seed, which moves the verdict without the
+  // comment count ever being read — a clean bill the check did not earn. There is
+  // no second slot to falsify because the assertion is a count, not a literal.
+  "github.pr-comment-exists":
+    "the PR number is the only slot and it only selects; the assertion is a count, " +
+    "so there is no scanned literal to falsify",
   "github.commit-status":
     "the status state is a closed set, and the context only filters the candidate rows",
   "github.no-unsupported-endpoint":

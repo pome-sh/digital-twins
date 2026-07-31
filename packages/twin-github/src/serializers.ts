@@ -362,13 +362,23 @@ export function issueJson(issue: IssueRow, repo: RepoRow, labels: LabelRow[] = [
   } satisfies DeepPartial<Issue>;
 }
 
-export function issueCommentJson(comment: IssueCommentRow, repo: RepoRow) {
+// `target` is what the comment hangs off (F-1151). Only `html_url` turns on it,
+// and it does so the way GitHub's does: a comment on a pull request is browsed at
+// `/pull/N`, while `issue_url` stays `/repos/:o/:r/issues/N` for BOTH — GitHub
+// keeps that one on the issues path even for a PR, because a PR is an issue.
+// Defaulted to `"issue"`, so the only callers that must think about it are the
+// comment routes.
+export function issueCommentJson(
+  comment: IssueCommentRow,
+  repo: RepoRow,
+  target: "issue" | "pull_request" = "issue"
+) {
   return {
     id: comment.id,
     node_id: `IC_${comment.id}`,
     body: comment.body,
     user: userJson(comment.user_login),
-    html_url: `https://github.com/${repo.full_name}/issues/${comment.issue_number}#issuecomment-${comment.id}`,
+    html_url: `https://github.com/${repo.full_name}/${target === "pull_request" ? "pull" : "issues"}/${comment.issue_number}#issuecomment-${comment.id}`,
     issue_url: `https://api.github.com/repos/${repo.full_name}/issues/${comment.issue_number}`,
     created_at: comment.created_at,
     updated_at: comment.updated_at

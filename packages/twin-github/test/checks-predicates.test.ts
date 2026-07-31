@@ -295,6 +295,76 @@ describe("github.pr-state", () => {
   });
 });
 
+// F-1151. The properties worth pinning here are the ones the three readings put
+// at risk: this check must count the CONVERSATION timeline and must not be
+// satisfied by either of its neighbours.
+describe("github.pr-comment-exists", () => {
+  const subject = check("github.pr-comment-exists");
+  const args = { pr: "1", repo: REPO };
+
+  it("renders and binds the sentence the corpus already carries", () => {
+    // Byte-identical to the six criteria in `examples/pr-summary-agent` and
+    // `examples/pr-summary-review`. If this string ever changes, those six stop
+    // binding and pome-cloud's exhaustive arm goes red — which is the intended
+    // alarm, not a nuisance.
+    const sentence = "Pull request #1 in `acme/api` has at least one comment";
+    expect(renderCheck(subject, args)).toBe(sentence);
+    expect(parseCheck(subject, sentence)).toEqual(args);
+  });
+
+  it("passes on one conversation comment", () => {
+    const final = world({ pull_requests: [{ number: 1, comments: [{ body: "Summary: adds a discount." }] }] });
+    expect(subject.evaluate(args, { seed: null, tape: null, final }).passed).toBe(true);
+  });
+
+  it("is NOT satisfied by a review body — that is reading 2, and a different check", () => {
+    const final = world({
+      pull_requests: [{ number: 1, comments: [], reviews: [{ state: "COMMENTED" }] }],
+    });
+    const outcome = subject.evaluate(args, { seed: null, tape: null, final });
+    expect(outcome.passed).toBe(false);
+    expect(outcome.reason).toContain("no conversation comments");
+  });
+
+  it("is NOT satisfied by an inline review comment — that is reading 3", () => {
+    // `review_comments` is not even in the read model, so this is really a
+    // statement about the shape: an extra exported field must not leak into this
+    // count. Written as a cast because a predicate that could see it would be
+    // the bug.
+    const final = world({
+      pull_requests: [
+        { number: 1, comments: [], review_comments: [{ path: "a.py", body: "nit" }] } as never,
+      ],
+    });
+    expect(subject.evaluate(args, { seed: null, tape: null, final }).passed).toBe(false);
+  });
+
+  it("fails on an empty comments array — that is a real `nobody commented`", () => {
+    const final = world({ pull_requests: [{ number: 1, comments: [] }] });
+    const outcome = subject.evaluate(args, { seed: null, tape: null, final });
+    expect(outcome.passed).toBe(false);
+    expect(outcome.status).toBeUndefined();
+  });
+
+  it("SKIPS on an absent comments section — absent is not the same as none", () => {
+    const final = world({ pull_requests: [{ number: 1 }] });
+    const outcome = subject.evaluate(args, { seed: null, tape: null, final });
+    expect(outcome.status).toBe("skipped");
+    expect(outcome.reason).toContain("state_incomplete");
+  });
+
+  it("does not read the ISSUE with the same number", () => {
+    // The number space is shared, so a world can hold an issue #1 and a PR #1
+    // only if the twin misnumbered something — but the predicate must select by
+    // entity regardless, or a commented issue would pass a PR's criterion.
+    const final = world({
+      issues: [{ number: 1, comments: [{ body: "on the issue" }] }],
+      pull_requests: [{ number: 1, comments: [] }],
+    });
+    expect(subject.evaluate(args, { seed: null, tape: null, final }).passed).toBe(false);
+  });
+});
+
 describe("github.pr-review-exists", () => {
   const subject = check("github.pr-review-exists");
   const args = { review: "CHANGES_REQUESTED", pr: "1", repo: REPO };
@@ -406,6 +476,7 @@ describe("every check, against a repo that is not in the state", () => {
       "github.issue-comment-contains": { needle: "x", issue: "1", repo: "acme/missing" },
       "github.no-new-labels": { repo: "acme/missing" },
       "github.pr-state": { pr: "1", repo: "acme/missing", state: "merged" },
+      "github.pr-comment-exists": { pr: "1", repo: "acme/missing" },
       "github.pr-review-exists": { review: "APPROVED", pr: "1", repo: "acme/missing" },
       "github.file-exists": { path: "a.ts", repo: "acme/missing" },
       "github.commit-status": { context: "ci/build", repo: "acme/missing", state: "success" },

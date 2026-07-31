@@ -68,7 +68,7 @@
     "@pome-sh/sdk": "0.10.0",
     "@pome-sh/shared-types": "0.13.0",
     "@pome-sh/twin-gmail": "0.3.0",
-    "@pome-sh/twin-github": "0.7.0",
+    "@pome-sh/twin-github": "0.8.0",
     "@pome-sh/twin-linear": "0.2.0",
     "@pome-sh/twin-slack": "0.3.0",
     "@pome-sh/twin-stripe": "0.4.0",
