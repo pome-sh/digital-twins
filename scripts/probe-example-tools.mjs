@@ -101,3 +101,137 @@ function resolveToken(token, ctx) {
   }
   return booted[surface];
 }
+
+/**
+ * The five ways this gate goes red. Ordered most-actionable first so a wall of
+ * unprobed-tool findings never buries a real refusal.
+ *
+ * `refused` reads the WIRE status, never the handler's return value: the
+ * AI-SDK and LangGraph examples' `gh()` / `twinFetch()` deliberately swallow a
+ * 4xx and hand the model `{ok:false,status}` so one bad call cannot abort the
+ * run, so `threw` is silent on exactly the failure this gate exists to catch.
+ */
+export function evaluateProbeRun({ example, seed, probes, report }) {
+  const findings = [];
+  const at = (kind, tool, detail) => findings.push({ kind, example, seed, tool, detail });
+
+  if (report.error) {
+    at("driver-error", null, report.error);
+    return findings;
+  }
+
+  const registered = report.toolNames ?? [];
+  const byTool = new Map(report.probes.map((probe) => [probe.tool, probe]));
+
+  for (const probe of probes) {
+    if (!registered.includes(probe.tool)) {
+      at(
+        "unknown-tool",
+        probe.tool,
+        `probed but the example registers no such tool (registers: ${registered.join(", ") || "none"})`,
+      );
+      continue;
+    }
+    const observed = byTool.get(probe.tool);
+    if (!observed) {
+      at("driver-error", probe.tool, "the driver reported no result for this probe");
+      continue;
+    }
+    const worst = observed.calls.reduce((acc, call) => (call.status > (acc?.status ?? -1) ? call : acc), null);
+    const status = worst?.status ?? 0;
+
+    if (probe.expect_status !== undefined) {
+      if (status === probe.expect_status) continue;
+      at(
+        "stale-expect",
+        probe.tool,
+        `declares expect_status ${probe.expect_status} (${probe.why}) but the twin answered ${status} — ` +
+          "drop the exemption",
+      );
+      continue;
+    }
+    if (status >= 400) {
+      at(
+        "refused",
+        probe.tool,
+        JSON.stringify({ status, method: worst.method, url: worst.url, args: probe.args, threw: observed.threw }),
+      );
+    }
+  }
+
+  for (const tool of registered) {
+    if (!probes.some((probe) => probe.tool === tool)) {
+      at("unprobed-tool", tool, "registered by the example but no probe declares fixture arguments for it");
+    }
+  }
+
+  return findings;
+}
+
+/**
+ * Enrich each `refused` finding with the twin's own account of the call: the
+ * ACTION the tool named (F-1125 stamps it even on a failure row, on both the
+ * MCP and REST surfaces) and the error text. The wire told us a request was
+ * refused; the tape tells us which twin action refused it and why, which is the
+ * difference between a gate you can act on and a second thing to debug.
+ */
+export function annotateFromTape(findings, events) {
+  return findings.map((finding) => {
+    if (finding.kind !== "refused") return finding;
+    const wire = JSON.parse(finding.detail);
+    const row = events.find(
+      (event) => event.status === wire.status && event.method === wire.method && wire.url.endsWith(event.path),
+    );
+    return {
+      ...finding,
+      detail: JSON.stringify({
+        ...wire,
+        twin: row?.twin ?? null,
+        action: row?.tool ?? null,
+        error: row?.error ?? null,
+      }),
+    };
+  });
+}
+
+const HEADLINE = {
+  refused: "the twin refused this tool's call",
+  "unprobed-tool": "no probe covers this registered tool",
+  "unknown-tool": "probe names a tool the example does not register",
+  "stale-expect": "expect_status exemption no longer applies",
+  "driver-error": "the probe driver could not run this example",
+};
+
+export function formatFindings(findings) {
+  const lines = [];
+  for (const [example, group] of groupBy(findings, (finding) => finding.example)) {
+    lines.push(`FAILED  examples/${example}`);
+    for (const finding of group) {
+      lines.push(`  ${finding.tool ? `tool ${finding.tool}` : "example"} — ${HEADLINE[finding.kind]}`);
+      if (finding.kind === "refused") {
+        const detail = JSON.parse(finding.detail);
+        lines.push(
+          `    ${detail.twin ?? "twin"} twin answered ${detail.status}   ${detail.method} ${detail.url}` +
+            (detail.action ? `   (action: ${detail.action})` : ""),
+        );
+        if (detail.error) lines.push(`    "${detail.error}"`);
+        lines.push(`    seed: ${finding.seed}`);
+        lines.push(`    args: ${JSON.stringify(detail.args)}`);
+      } else {
+        lines.push(`    ${finding.detail}`);
+      }
+    }
+    lines.push("");
+  }
+  return lines.join("\n");
+}
+
+function groupBy(items, key) {
+  const map = new Map();
+  for (const item of items) {
+    const k = key(item);
+    if (!map.has(k)) map.set(k, []);
+    map.get(k).push(item);
+  }
+  return map;
+}

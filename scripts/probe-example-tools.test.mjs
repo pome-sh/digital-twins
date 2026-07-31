@@ -14,7 +14,13 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { resolveConfig, splitSeed } from "./probe-example-tools.mjs";
+import {
+  annotateFromTape,
+  evaluateProbeRun,
+  formatFindings,
+  resolveConfig,
+  splitSeed,
+} from "./probe-example-tools.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -103,6 +109,196 @@ assertThrows(
     "$github.graphql",
     "resolveConfig rejects an unknown surface on a booted twin",
   );
+}
+
+// ── evaluateProbeRun: the five ways the gate goes red ───────────────────────
+const SEED = "tasks/01-summarize-prs.seed.json";
+function ok(tool) {
+  return { tool, calls: [{ method: "POST", url: "http://t/s/probe/mcp/call", status: 200 }], threw: null };
+}
+function run(overrides = {}) {
+  return evaluateProbeRun({
+    example: "pr-summary-agent",
+    seed: SEED,
+    probes: [{ tool: "list_open_pull_requests", args: { owner: "acme", repo: "widgets" } }],
+    report: { toolNames: ["list_open_pull_requests"], probes: [ok("list_open_pull_requests")], error: null },
+    ...overrides,
+  });
+}
+
+assert(run().length === 0, "evaluateProbeRun is silent on a clean run");
+
+// 1. refused — THE incident. comment_on_pull_request wrapped add_issue_comment
+// at a PR number and the twin answered 404 for every subject.
+{
+  const findings = evaluateProbeRun({
+    example: "pr-summary-agent",
+    seed: SEED,
+    probes: [
+      { tool: "comment_on_pull_request", args: { owner: "acme", repo: "widgets", pull_number: 1, body: "probe" } },
+    ],
+    report: {
+      toolNames: ["comment_on_pull_request"],
+      probes: [
+        {
+          tool: "comment_on_pull_request",
+          calls: [{ method: "POST", url: "http://t/s/probe/mcp/call", status: 404 }],
+          threw: "twin tool add_issue_comment failed: 404 Issue not found",
+        },
+      ],
+      error: null,
+    },
+  });
+  assert(findings.length === 1 && findings[0].kind === "refused", "a 4xx twin answer is a `refused` finding");
+  assert(findings[0].tool === "comment_on_pull_request", "the finding names the example's tool, not the twin action");
+}
+
+// A 5xx counts too — the gate's claim is "the twin did not refuse", not "not 4xx".
+assert(
+  run({
+    report: {
+      toolNames: ["list_open_pull_requests"],
+      probes: [
+        { tool: "list_open_pull_requests", calls: [{ method: "POST", url: "http://t/x", status: 500 }], threw: null },
+      ],
+      error: null,
+    },
+  })[0].kind === "refused",
+  "a 5xx twin answer is also `refused`",
+);
+
+// A swallowed 4xx is still caught: the AI-SDK and LangGraph examples' gh() hands
+// the model {ok:false,status} instead of throwing, so `threw: null` proves
+// nothing and only the wire status counts.
+assert(
+  run({
+    report: {
+      toolNames: ["list_open_pull_requests"],
+      probes: [
+        {
+          tool: "list_open_pull_requests",
+          calls: [{ method: "GET", url: "http://t/repos/acme/widgets/pulls", status: 404 }],
+          threw: null,
+        },
+      ],
+      error: null,
+    },
+  })[0].kind === "refused",
+  "a 4xx the example swallowed is still `refused`",
+);
+
+// 2. unprobed-tool — the anti-drift clause. A tool with no probe is a hole.
+{
+  const findings = run({
+    report: {
+      toolNames: ["list_open_pull_requests", "comment_on_pull_request"],
+      probes: [ok("list_open_pull_requests")],
+      error: null,
+    },
+  });
+  assert(findings.length === 1 && findings[0].kind === "unprobed-tool", "a registered tool with no probe is a finding");
+  assert(findings[0].tool === "comment_on_pull_request", "the unprobed-tool finding names the tool");
+}
+
+// 3. unknown-tool — a probe naming a tool the example does not register.
+{
+  const findings = evaluateProbeRun({
+    example: "pr-summary-agent",
+    seed: SEED,
+    probes: [{ tool: "post_summary", args: {} }],
+    report: { toolNames: ["comment_on_pull_request"], probes: [], error: null },
+  });
+  assert(
+    findings.some((f) => f.kind === "unknown-tool" && f.tool === "post_summary"),
+    "a probe for an absent tool is a finding",
+  );
+}
+
+// 4. stale-expect — the escape hatch expires loudly. Without this an F-1151-style
+// twin fix leaves a permanent exemption behind.
+{
+  const probes = [
+    {
+      tool: "send_email",
+      args: {},
+      expect_status: 429,
+      why: "the seed injects a rate-limit fault on messages.send",
+    },
+  ];
+  const refused = {
+    toolNames: ["send_email"],
+    probes: [{ tool: "send_email", calls: [{ method: "POST", url: "http://t/x", status: 429 }], threw: null }],
+    error: null,
+  };
+  assert(
+    evaluateProbeRun({
+      example: "gmail-retry-notify",
+      seed: "tasks/01-throttled-send.seed.json",
+      probes,
+      report: refused,
+    }).length === 0,
+    "a declared expect_status excuses that exact status",
+  );
+  const nowGreen = { toolNames: ["send_email"], probes: [ok("send_email")], error: null };
+  const findings = evaluateProbeRun({
+    example: "gmail-retry-notify",
+    seed: "tasks/01-throttled-send.seed.json",
+    probes,
+    report: nowGreen,
+  });
+  assert(findings.length === 1 && findings[0].kind === "stale-expect", "an expect_status that no longer happens is a finding");
+}
+
+// 5. driver-error — the example failed to import, or the driver died.
+{
+  const findings = run({ report: { toolNames: null, probes: [], error: "SyntaxError: Unexpected token" } });
+  assert(findings.length === 1 && findings[0].kind === "driver-error", "a driver error is a finding");
+}
+
+// ── the report has to be readable without re-deriving anything ───────────────
+{
+  const findings = annotateFromTape(
+    evaluateProbeRun({
+      example: "pr-summary-agent",
+      seed: SEED,
+      probes: [
+        { tool: "comment_on_pull_request", args: { owner: "acme", repo: "widgets", pull_number: 1, body: "probe" } },
+      ],
+      report: {
+        toolNames: ["comment_on_pull_request"],
+        probes: [
+          {
+            tool: "comment_on_pull_request",
+            calls: [{ method: "POST", url: "http://t/s/probe/mcp/call", status: 404 }],
+            threw: null,
+          },
+        ],
+        error: null,
+      },
+    }),
+    [
+      {
+        twin: "github",
+        method: "POST",
+        path: "/s/probe/mcp/call",
+        status: 404,
+        tool: "add_issue_comment",
+        error: "Issue not found",
+      },
+    ],
+  );
+  const text = formatFindings(findings);
+  for (const needle of [
+    "examples/pr-summary-agent",
+    "comment_on_pull_request",
+    "404",
+    "add_issue_comment",
+    "Issue not found",
+    SEED,
+    "pull_number",
+  ]) {
+    assert(text.includes(needle), `the failure report names ${needle}`);
+  }
 }
 
 if (failures > 0) {
