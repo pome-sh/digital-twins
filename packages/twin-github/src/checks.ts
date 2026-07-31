@@ -53,7 +53,11 @@ import {
   issueHasLabel,
   issueStateCheck,
 } from "./check-issues.js";
-import { pullRequestReviewExists, pullRequestStateCheck } from "./check-pulls.js";
+import {
+  pullRequestCommentExists,
+  pullRequestReviewExists,
+  pullRequestStateCheck,
+} from "./check-pulls.js";
 import { commitStatus, fileExists, noNewLabels } from "./check-repos.js";
 import { noUnsupportedEndpoint, toolNeverCalled } from "./check-tape.js";
 
@@ -84,6 +88,7 @@ export const GITHUB_CHECKS = [
   issueCommentContains,
   noNewLabels,
   pullRequestStateCheck,
+  pullRequestCommentExists,
   pullRequestReviewExists,
   fileExists,
   commitStatus,

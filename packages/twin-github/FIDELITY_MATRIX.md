@@ -12,9 +12,9 @@ Last verified: 2026-07-12
 | `POST /repos/:owner/:repo/issues` | hot | semantic | Creates persistent issues with GitHub-shaped labels and assignees. |
 | `GET /repos/:owner/:repo/issues/:number` | hot | semantic | Reads persisted issue state and returns GitHub-style 404. |
 | `PATCH /repos/:owner/:repo/issues/:number` | hot | semantic | Mutates title/body/state/labels/assignees and records state mutation. |
-| `GET /repos/:owner/:repo/issues/:number/comments` | hot | semantic | Lists persisted issue comments with pagination. |
-| `POST /repos/:owner/:repo/issues/:number/comments` | hot | semantic | Creates persistent issue comments. |
-| `PATCH /repos/:owner/:repo/issues/comments/:comment_id` | hot | semantic | Updates issue comment body and `updated_at`. |
+| `GET /repos/:owner/:repo/issues/:number/comments` | hot | semantic | Lists persisted conversation comments with pagination. `:number` may name an ISSUE or a PULL REQUEST (F-1151), as on real GitHub. |
+| `POST /repos/:owner/:repo/issues/:number/comments` | hot | semantic | Creates persistent conversation comments. `:number` may name an ISSUE or a PULL REQUEST (F-1151) — this is how a PR's conversation is commented on; `pulls/:number/comments` is the inline review-comment surface instead. |
+| `PATCH /repos/:owner/:repo/issues/comments/:comment_id` | hot | semantic | Updates issue comment body and `updated_at`. One id space across both target kinds, so this addresses a PR's comment too. |
 | `DELETE /repos/:owner/:repo/issues/comments/:comment_id` | hot | semantic | Deletes issue comment; 404 for unknown id. |
 | `GET /repos/:owner/:repo/labels` | hot | semantic | Lists repository labels with deterministic local IDs. |
 | `POST /repos/:owner/:repo/labels` | warm | semantic | Creates labels; color validation is intentionally permissive. |

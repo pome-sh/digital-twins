@@ -1,6 +1,44 @@
 # @pome-sh/twin-github — CHANGELOG
 
 
+## 0.8.0 — 2026-07-31
+
+`Pull request #N in \`<repo>\` has at least one comment` binds a declaration, and
+the write path it grades exists for the first time (F-1151).
+
+- **A comment may hang off a PULL REQUEST.**
+  `GET|POST /repos/:o/:r/issues/:number/comments` (`add_issue_comment`,
+  `list_issue_comments`) accept a PR number, which is how real GitHub documents
+  commenting on a PR's conversation. They used to answer `404 Issue not found`:
+  `issue_comments` carried a foreign key to `issues(repo_id, number)` and a pull
+  request has no row there. The FK is now repo-level, which is what the migration
+  `ensureCommentsAllowPullRequests` rebuilds an existing database for. One table
+  and one id space, so `PATCH|DELETE /issues/comments/:comment_id` still addresses
+  either kind unambiguously.
+- **`exportState()` gives each pull request `comments`.** Three surfaces on a PR
+  can be called a comment and the export keeps them apart: `comments[]` is the
+  conversation, `reviews[].body` is a review's prose, `review_comments[]` are
+  inline. `GitHubCheckStatePullRequest` models the new field nullable, so an older
+  snapshot SKIPS rather than reporting a false zero.
+- **`github.pr-comment-exists`** — template
+  `` Pull request #{pr} in `{repo}` has at least one comment ``, substrate `final`,
+  positive polarity. It grades the CONVERSATION reading and its `description` says
+  so, and says the other two are not it. F-1075 declined to bind this sentence
+  because "comment" had three meanings; the reading picked is the one GitHub's own
+  API means and the one a summarising agent produces.
+- `html_url` on a PR's comment is `/pull/N#issuecomment-…`, matching GitHub;
+  `issue_url` stays on the issues path for both kinds, also matching GitHub.
+- New `test/db-migrations.test.ts` — the first coverage of this package's
+  `migrate()` upgrade path, which no `:memory:` test exercises.
+
+Minor, and the exported tuple grows, so **`checksDigest` for github moves**:
+`sha256:5282…4424` → `sha256:cbf9…6782`. Every consumer pin must catch up or the
+`pome checks add` handshake refuses the write — the CLI pin moves in the same
+commit, and pome-cloud's must move when it takes this release.
+
+The `GET /issues` COLLECTION still excludes pull requests (FIDELITY.md
+divergence 16); only the comment routes honour the PR-is-an-issue rule so far.
+
 ## 0.7.0 — 2026-07-30
 
 Every declared check names its discriminating worlds (F-1126).
