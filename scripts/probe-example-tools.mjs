@@ -21,8 +21,8 @@
 // in-process on the example's OWN task seed, then invoke every tool the example
 // registers once with fixture arguments and fail if the twin refused.
 
-import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync, rmSync } from "node:fs";
+import { execFileSync, spawn } from "node:child_process";
+import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -30,6 +30,7 @@ import { fileURLToPath } from "node:url";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "..");
 const SHARED_TYPES_SRC = join(REPO_ROOT, "packages", "shared-types", "src");
+const DRIVER = join(HERE, "example-tool-probe-driver.mjs");
 
 /**
  * The session id the gate mints its bearer for, and the secret it signs with.
@@ -308,4 +309,180 @@ function groupBy(items, key) {
     map.get(k).push(item);
   }
   return map;
+}
+
+/**
+ * Import specifier, definition export, and database opener per twin id.
+ *
+ * The three twins the bundled examples actually declare, and no more. The export
+ * names are NOT uniform across the twin packages, so each is spelled out rather
+ * than derived: the opener is `open<Name>CloneDatabase` for github but
+ * `open<Name>TwinDatabase` for slack and gmail. Each opener migrates the schema
+ * itself (`openTwinDatabase(path, { migrate })`), so `":memory:"` is ready to
+ * serve with no separate migrate step.
+ *
+ * stripe and linear are deliberately absent: no bundled example declares them,
+ * and both export a `create<Name>TwinDefinition()` FACTORY rather than a
+ * definition constant, so they would need a different shape here. An example
+ * that declares an unlisted twin gets the loud error in `probeExample`, which is
+ * the right failure — a guessed export name would throw something far less
+ * legible.
+ */
+export const TWIN_MODULES = {
+  github: { pkg: "@pome-sh/twin-github", definition: "githubTwinDefinition", open: "openGitHubCloneDatabase" },
+  slack: { pkg: "@pome-sh/twin-slack", definition: "slackTwinDefinition", open: "openSlackTwinDatabase" },
+  gmail: { pkg: "@pome-sh/twin-gmail", definition: "gmailTwinDefinition", open: "openGmailTwinDatabase" },
+};
+
+/**
+ * Boot every twin the example declares, run its probes, return findings.
+ *
+ * Twins run IN-PROCESS here (no model, no Docker, no network beyond loopback)
+ * while the example's tools run in a child under the example's own `tsx`, which
+ * is how a real `pome run` resolves them.
+ *
+ * Callers must already be inside `withSharedTypesRuntime`.
+ */
+export async function probeExample(name, entry, opts) {
+  const exampleDir = join(opts.examplesDir, name);
+  const manifest = JSON.parse(readFileSync(join(exampleDir, "pome.json"), "utf8"));
+  const twinIds = manifest.twins ?? ["github"];
+  const slices = splitSeed(JSON.parse(readFileSync(join(exampleDir, entry.seed), "utf8")), twinIds);
+
+  process.env.TWIN_AUTH_SECRET = PROBE_SECRET;
+  const { serve, createRecorderStore } = await import("@pome-sh/sdk/server");
+  const { sign } = await import("hono/jwt");
+
+  const booted = [];
+  const urls = {};
+  const stores = {};
+  for (const id of twinIds) {
+    const twinModule = TWIN_MODULES[id];
+    if (!twinModule) {
+      throw new Error(
+        `examples/${name} declares twin "${id}", which this gate cannot boot ` +
+          `(knows: ${Object.keys(TWIN_MODULES).join(", ")})`,
+      );
+    }
+    const mod = await import(twinModule.pkg);
+    const port = await freePort();
+    const store = createRecorderStore();
+    booted.push(
+      await serve(mod[twinModule.definition], {
+        port,
+        hostname: "127.0.0.1",
+        db: mod[twinModule.open](":memory:"),
+        seed: slices[id],
+        recorder: store,
+        runId: "probe",
+      }),
+    );
+    const base = `http://127.0.0.1:${port}`;
+    urls[id] = { rest: `${base}/s/${PROBE_SID}`, mcp: `${base}/s/${PROBE_SID}/mcp` };
+    stores[id] = store;
+  }
+
+  try {
+    const token = await sign(
+      { sid: PROBE_SID, team_id: "tm_probe", login: "pome-agent", exp: Math.floor(Date.now() / 1000) + 3600 },
+      PROBE_SECRET,
+    );
+    const report = await runDriver(exampleDir, {
+      module: resolve(exampleDir, entry.module),
+      export: entry.export,
+      config: resolveConfig(entry.config, { twins: urls, token }),
+      probes: entry.probes,
+    });
+    const tape = twinIds.flatMap((id) => stores[id].events().map((event) => ({ ...event, twin: id })));
+    return annotateFromTape(
+      evaluateProbeRun({ example: name, seed: entry.seed, probes: entry.probes, report }),
+      tape,
+    );
+  } finally {
+    for (const twin of booted) await twin.close();
+  }
+}
+
+/**
+ * Spawn the driver in the example's tree and parse its NDJSON.
+ *
+ * `tsx` when the example has one (its tool table is TypeScript and resolves that
+ * example's own zod / `file:`-linked adapter copies); bare `node` otherwise,
+ * which is what lets the test suite drive fixture examples that ship a `.mjs`
+ * tool table and need no install.
+ *
+ * Asynchronous on purpose. The twins serve from THIS process's event loop, so a
+ * `spawnSync` here would block it and the child would wait forever on a frozen
+ * server.
+ */
+async function runDriver(exampleDir, spec) {
+  const tsx = join(exampleDir, "node_modules", ".bin", "tsx");
+  const runner = existsSync(tsx) ? tsx : process.execPath;
+  return new Promise((resolveReport) => {
+    // POME_PREFLIGHT would make several examples `process.exit(0)` at import.
+    const env = { ...process.env, POME_PROBE_SPEC: JSON.stringify(spec) };
+    delete env.POME_PREFLIGHT;
+    const child = spawn(runner, [DRIVER], { cwd: exampleDir, env, stdio: ["ignore", "pipe", "pipe"] });
+    let out = "";
+    let err = "";
+    child.stdout.on("data", (buf) => { out += buf.toString(); });
+    child.stderr.on("data", (buf) => { err += buf.toString(); });
+    child.on("error", (spawnErr) =>
+      resolveReport({ toolNames: null, probes: [], error: `failed to spawn ${runner}: ${spawnErr.message}` }),
+    );
+    child.on("close", () => {
+      const rows = [];
+      for (const line of out.split("\n")) {
+        if (!line.trim()) continue;
+        try {
+          rows.push(JSON.parse(line));
+        } catch {
+          // An example that logs a banner to stdout is not a failure; the
+          // driver's own rows are the only JSON we care about.
+        }
+      }
+      const failure = rows.find((row) => row.kind === "error");
+      const tools = rows.find((row) => row.kind === "tools");
+      const tail = err.trim().split("\n").slice(-5).join("\n");
+      resolveReport({
+        toolNames: tools?.names ?? null,
+        probes: rows.filter((row) => row.kind === "probe"),
+        error:
+          failure?.message ??
+          (tools ? null : `the driver reported no tool table${tail ? `: ${tail}` : ""}`),
+      });
+    });
+  });
+}
+
+export async function runGate(opts = {}) {
+  const repoRoot = opts.repoRoot ?? REPO_ROOT;
+  const examplesDir = opts.examplesDir ?? join(repoRoot, "examples");
+  const manifestPath = opts.manifestPath ?? join(repoRoot, "config/example-tool-probes.json");
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  const names = Object.keys(manifest).sort();
+
+  console.log(`Probing twin tools for ${names.length} example(s): ${names.join(", ")}`);
+  const findings = [];
+  for (const name of names) {
+    process.stdout.write(`\n=== examples/${name} === `);
+    const found = await probeExample(name, manifest[name], { repoRoot, examplesDir });
+    console.log(found.length === 0 ? `OK (${manifest[name].probes.length} tools)` : `${found.length} finding(s)`);
+    findings.push(...found);
+  }
+
+  if (findings.length > 0) {
+    console.error(`\n${formatFindings(findings)}`);
+    console.error(
+      `Examples with twin-tool findings: ${[...new Set(findings.map((finding) => finding.example))].join(", ")}`,
+    );
+    return 1;
+  }
+  const probeCount = names.reduce((sum, name) => sum + manifest[name].probes.length, 0);
+  console.log(`\nAll ${probeCount} registered tools across ${names.length} example(s) were answered by their twins.`);
+  return 0;
+}
+
+if (import.meta.main) {
+  process.exit(await withSharedTypesRuntime(() => runGate()));
 }

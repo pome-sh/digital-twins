@@ -375,6 +375,74 @@ await withSharedTypesRuntime(async () => {
   );
 });
 
+// ── the whole gate, end to end, over the fixture examples ───────────────────
+await withSharedTypesRuntime(async () => {
+  const { probeExample } = await import("./probe-example-tools.mjs");
+  const opts = { repoRoot: ROOT, examplesDir: join(ROOT, "scripts/fixtures/probe-examples") };
+  const base = {
+    seed: "tasks/01-probe.seed.json",
+    module: "tools.mjs",
+    export: "buildTools",
+    config: { mcpUrl: "$github.mcp", token: "$token" },
+  };
+
+  const sound = await probeExample(
+    "sound",
+    {
+      ...base,
+      probes: [
+        { tool: "list_open_issues", args: { owner: "acme", repo: "widgets" } },
+        { tool: "comment_on_issue", args: { owner: "acme", repo: "widgets", issue_number: 1, body: "probe" } },
+      ],
+    },
+    opts,
+  );
+  assert(sound.length === 0, `a sound example produces no findings (got: ${JSON.stringify(sound)})`);
+
+  const refused = await probeExample(
+    "refused",
+    {
+      ...base,
+      probes: [{ tool: "comment_on_issue", args: { owner: "acme", repo: "widgets", issue_number: 1, body: "probe" } }],
+    },
+    opts,
+  );
+  assert(
+    refused.length === 1 && refused[0].kind === "refused",
+    `a refused tool is caught (got: ${JSON.stringify(refused)})`,
+  );
+  const text = formatFindings(refused);
+  assert(text.includes("examples/refused"), "the end-to-end report names the example");
+  assert(text.includes("comment_on_issue"), "the end-to-end report names the tool");
+  assert(text.includes("404"), "the end-to-end report carries the twin's status");
+  assert(text.includes("add_issue_comment"), "the end-to-end report names the twin action, read off the tape");
+  assert(text.includes("Issue not found"), "the end-to-end report carries the twin's error text");
+
+  // The anti-drift clause, end to end: drop a probe and the gate still reds.
+  const drifted = await probeExample(
+    "sound",
+    { ...base, probes: [{ tool: "list_open_issues", args: { owner: "acme", repo: "widgets" } }] },
+    opts,
+  );
+  assert(
+    drifted.some((finding) => finding.kind === "unprobed-tool" && finding.tool === "comment_on_issue"),
+    `a registered tool with no probe reds the gate end to end (got: ${JSON.stringify(drifted)})`,
+  );
+});
+
+// ── the gate is actually wired into CI ──────────────────────────────────────
+// A gate nothing runs is the failure mode this ticket exists to prevent.
+{
+  const ci = readFileSync(join(ROOT, ".github/workflows/ci.yml"), "utf8");
+  assert(ci.includes("npm run probe:examples"), "ci.yml runs the probe gate");
+  assert(ci.includes("node scripts/probe-example-tools.test.mjs"), "ci.yml runs the probe gate's own tests");
+  const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
+  assert(
+    pkg.scripts["probe:examples"] === "node scripts/probe-example-tools.mjs",
+    "package.json declares probe:examples",
+  );
+}
+
 if (failures > 0) {
   console.error(`\n${failures} assertion(s) failed.`);
   process.exit(1);
