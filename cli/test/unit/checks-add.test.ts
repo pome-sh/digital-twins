@@ -2,9 +2,10 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { checkPattern, templateSlots } from "@pome-sh/sdk/checks";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { handshake, runChecksAddCommand } from "../../src/cli/checks-add.js";
-import { checksFor, localDigest } from "../../src/cli/checks.js";
+import { checksFor, localDigest, pinnedVersion } from "../../src/cli/checks.js";
 import { twinWithoutChecks } from "./_noVocabularyTwin.js";
 
 // The menu position of the check these tests pick. Derived, never hard-coded:
@@ -50,6 +51,32 @@ const agreeing = async (twin: string) => ({
   digest: localDigest(twin),
   checks: [],
 });
+
+/** Everything `GET /v1/checks` publishes, mirrored from this CLI's own pin — the
+ *  compiled `pattern` and the parameter patterns included, because prod serves
+ *  both. Derived rather than written out: the vocabulary is a closed set that
+ *  grows, so a literal fixture would assert its size, not the behaviour. */
+function mirrorOfLocal(twin: string) {
+  return checksFor(twin).map((def) => ({
+    id: def.id,
+    template: def.template,
+    substrate: def.substrate,
+    pattern: checkPattern(def).source,
+    params: templateSlots(def.template).params.map((name) => ({
+      name,
+      pattern: def.params[name]!.pattern,
+    })),
+  }));
+}
+
+/** The bullet list the refusal renders. The F-1137 defect was that this came back
+ *  empty while the refusal claimed to name what moved. */
+function bulletsIn(message: string): string[] {
+  return message
+    .split("\n")
+    .filter((line) => line.trimStart().startsWith("- "))
+    .map((line) => line.replace(/^\s*-\s*/, ""));
+}
 
 beforeEach(() => {
   process.exitCode = undefined;
@@ -188,6 +215,67 @@ describe("the digest handshake", () => {
     expect(result.message).toContain("github.no-new-labels");
     expect(result.message).toContain("No labels were created");
     expect(result.message).toContain("@pome-sh/cli@latest");
+  });
+
+  // F-1137 — the refusal is correct, but it used to build its bullet list from
+  // `id` and `template` while `checksDigest` hashes `id`, `substrate` and the
+  // COMPILED pattern. A skew in either of the two it did not compare refused with
+  // an empty bullet list: a named refusal that names nothing, in exactly the
+  // situation the digest was widened to catch.
+  it("names the check and both substrates when only the substrate moved", async () => {
+    const result = await handshake("github", async (twin) => ({
+      twin,
+      digest: "sha256:the-cloud-hashed-a-different-substrate",
+      checks: mirrorOfLocal("github").map((check, index) =>
+        index === 0 ? { ...check, substrate: "tape" } : check,
+      ),
+    }));
+
+    expect(result.kind).toBe("skew");
+    if (result.kind !== "skew") throw new Error("unreachable");
+    const first = checksFor("github")[0]!;
+    expect(result.message).toContain(first.id);
+    expect(result.message).toContain(first.substrate);
+    expect(result.message).toContain("tape");
+    expect(bulletsIn(result.message).length).toBeGreaterThan(0);
+  });
+
+  it("names the sdk generator when only the compiled pattern moved", async () => {
+    const result = await handshake("github", async (twin) => ({
+      twin,
+      digest: "sha256:a-different-sdk-compiled-these",
+      // Every field the cloud publishes is byte-identical to ours EXCEPT the
+      // compiled pattern — what a `buildPattern` change looks like on the wire.
+      checks: mirrorOfLocal("github").map((check) => ({
+        ...check,
+        pattern: check.pattern!.replace("^", "^(?:)"),
+      })),
+    }));
+
+    expect(result.kind).toBe("skew");
+    if (result.kind !== "skew") throw new Error("unreachable");
+    expect(result.message).toContain("buildPattern");
+    expect(result.message).toContain(`@pome-sh/sdk ${pinnedVersion("@pome-sh/sdk")}`);
+    expect(bulletsIn(result.message).length).toBeGreaterThan(0);
+  });
+
+  it("still names a class when the cloud publishes nothing this CLI can diff", async () => {
+    const result = await handshake("github", async (twin) => ({
+      twin,
+      digest: "sha256:a-control-plane-that-publishes-no-pattern",
+      checks: checksFor("github").map((def) => ({
+        id: def.id,
+        template: def.template,
+        substrate: def.substrate,
+      })),
+    }));
+
+    expect(result.kind).toBe("skew");
+    if (result.kind !== "skew") throw new Error("unreachable");
+    const bullets = bulletsIn(result.message);
+    expect(bullets.length).toBeGreaterThan(0);
+    for (const bullet of bullets) expect(bullet).not.toBe("");
+    expect(result.message).toContain("buildPattern");
   });
 
   it("degrades with a NAMED note when the cloud is unreachable", async () => {
