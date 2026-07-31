@@ -353,6 +353,23 @@ describe("github.pr-comment-exists", () => {
     expect(outcome.reason).toContain("state_incomplete");
   });
 
+  it("is the ONLY declaration that reaches a PR's comments — the issue-side needle does not", () => {
+    // This is what the description promises, and the promise is load-bearing: it
+    // tells an author where to go for the comment's TEXT. `issue-comment-contains`
+    // resolves its subject among the repository's ISSUES, so aiming it at a PR
+    // number fails at the lookup — the author must not be sent there. If that
+    // check ever learns to read a PR, this test fails and the description is
+    // wrong; fix both together.
+    const needle = check("github.issue-comment-contains");
+    const final = world({
+      issues: [],
+      pull_requests: [{ number: 1, comments: [{ body: "Summary: adds a discount." }] }],
+    });
+    const outcome = needle.evaluate({ needle: "discount", issue: "1", repo: REPO }, { seed: null, tape: null, final });
+    expect(outcome.passed).toBe(false);
+    expect(outcome.reason).toContain("issue #1 not found");
+  });
+
   it("does not read the ISSUE with the same number", () => {
     // The number space is shared, so a world can hold an issue #1 and a PR #1
     // only if the twin misnumbered something — but the predicate must select by

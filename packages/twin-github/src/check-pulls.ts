@@ -133,9 +133,11 @@ export const pullRequestCommentExists: Check<{ pr: string; repo: string }> = def
     "reader may call a comment on a PR: a review's body is not one (assert that with " +
     "`github.pr-review-exists`), and an inline review comment anchored to a file and line is " +
     "not one either. It says nothing about who commented, how many did, or what any of them " +
-    "say — `github.issue-comment-contains` is the assertion that reads a body. A pull request " +
-    "whose export carries no comments section at all is SKIPPED, because absent is not the " +
-    "same as none.",
+    "say — and no declaration reads the TEXT of a pull request's comment yet. " +
+    "`github.issue-comment-contains` is the issue-side counterpart and does NOT reach a pull " +
+    "request: it resolves its subject among the repository's issues, so pointing it at a PR " +
+    "number fails as `issue #N not found`. A pull request whose export carries no comments " +
+    "section at all is SKIPPED, because absent is not the same as none.",
   template: "Pull request #{pr} in `{repo}` has at least one comment",
   params: { pr: prNumber, repo: repoRef },
   substrate: "final",
