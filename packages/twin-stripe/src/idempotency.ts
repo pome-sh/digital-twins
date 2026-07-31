@@ -10,6 +10,7 @@
 //   - Header present + miss → invoke handler; on response, store row.
 import { createHash } from "node:crypto";
 import type { Context, MiddlewareHandler } from "hono";
+import { recordedRequestHeaders } from "@pome-sh/sdk/server";
 import { stripeError } from "./errors.js";
 import type {
   IdempotencyKeyRow,
@@ -227,6 +228,11 @@ function recordDedupeEvent(
     method: c.req.method,
     path: new URL(c.req.url).pathname,
     request_body: rawBody === "" ? null : rawBody,
+    // F-1125 — the replay's own headers, which is where `Idempotency-Key`
+    // lives. Recording the dedupe outcome while hiding the key that caused it
+    // would leave the reason unreadable on the one row that is about it.
+    request_headers: recordedRequestHeaders(c),
+    tool: null,
     status: cached.status,
     response_body: cached.body,
     latency_ms: Date.now() - startedAt,

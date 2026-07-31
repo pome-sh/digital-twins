@@ -19,3 +19,11 @@ export type {
   UserRow,
   WorkspaceRow,
 } from "./types.js";
+export { SLACK_CHECKS } from "./checks.js";
+export type {
+  Check,
+  SlackCheckState,
+  SlackCheckStateChannel,
+  SlackCheckStateMessage,
+  SlackCheckStateReaction,
+} from "./checks.js";

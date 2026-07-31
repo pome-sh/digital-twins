@@ -1,5 +1,55 @@
 # @pome-sh/twin-gmail — CHANGELOG
 
+## 0.3.0 — 2026-07-30
+
+Gmail declares its assertable check vocabulary (F-1128, milestone A3).
+
+- New `./checks` subpath: `GMAIL_CHECKS`, seven declarations, plus the
+  `GmailCheckState` model they read (`check-state.ts`). pome-cloud deletes its
+  hand-maintained mirror of that shape in the same milestone — the twin's model
+  is now the only one.
+- Four declarations are new and bind the six criteria A3 found unbound across
+  tasks 22, 23 and 27: `gmail.message-has-label` (which clears three of them,
+  because two tasks say the same sentence), `gmail.label-exists`,
+  `gmail.draft-addressed-to` and `gmail.draft-count-at-least`.
+- Three are carried across from pome-cloud's hand-written regexes:
+  `gmail.mailbox-label-count`, `gmail.one-message-per-recipient` and
+  `gmail.no-unsupported-endpoint`. The last drops the twin word — it is now the
+  same sentence twin-github declares, resolved per-twin by the engine — so
+  `examples/gmail-retry-notify` is rewritten to the rendered templates in the
+  same commit.
+- `gmail.draft-addressed-to` declares its recipient as the check's `subject`.
+  pome-cloud has carried a prediction since F-1028 that this exact criterion
+  becomes an unguarded redaction hazard the day a gmail draft-recipient
+  predicate ships without one.
+- Two shapes drove the state model and are pinned by tests rather than left as
+  comments: an exported draft row carries no addressing at all (the recipient
+  lives on the backing message, reached through `messageId`), and message
+  bodies are digested away unconditionally — so no check on this twin can scan
+  message prose.
+- Ambiguity is closed in the reader rather than the grammar: a message id
+  present in more than one mailbox returns `message_ambiguous` instead of
+  grading whichever sorted first. Gmail mints ids per mailbox, and the corpus
+  sentences carry no mailbox.
+- New `test/fidelity-contract.test.ts` adds the state-shape parity arm gmail
+  never had. The existing parity harness's rings are all about the tool surface;
+  nothing had ever compared `exportGmailState()` against the shape a consumer
+  reads.
+- `vitest.config.ts` replaces the `test` script's hand-maintained file list.
+  `faults.test.ts` had already fallen off it — a suite that exists, passes, and
+  never ran.
+
+
+## 0.2.1 — 2026-07-30
+
+Dependency-only patch: repin `@pome-sh/sdk` to 0.10.0 (F-1126). No surface change.
+
+The repin is not cosmetic. npm only symlinks a workspace sibling when the
+declared pin matches its version; a stale pin makes npm install a nested
+PUBLISHED copy instead, so the package is built and tested against the registry
+rather than this tree. `scripts/check-workspace-pins-match-workspace.mjs` now
+gates it.
+
 ## 0.2.0 — 2026-07-24
 
 ### Added

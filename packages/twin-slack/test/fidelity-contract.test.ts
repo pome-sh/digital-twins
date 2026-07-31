@@ -17,6 +17,9 @@ import {
   loadFidelityInventory,
 } from "@pome-sh/sdk/parity";
 import { listTools, MUTATING_TOOL_NAMES } from "../src/tools.js";
+import { openSlackTwinDatabase } from "../src/db.js";
+import { SlackDomain } from "../src/domain/index.js";
+import { defaultSeedState } from "../src/seed.js";
 
 const PKG_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const FIDELITY_PATH = join(PKG_ROOT, "FIDELITY.md");
@@ -151,6 +154,89 @@ describe("heat tiers (F-729 ruling, F-736 re-cut)", () => {
         ledger.includes("`" + surface.name + "`"),
         `'${surface.name}' is at/below target but listed in the ledger`
       ).toBe(false);
+    }
+  });
+});
+
+describe("state-shape parity", () => {
+  // `check-state.ts` is a hand-written TOLERANT READER of raw SQLite rows —
+  // `exportState()` is a set of `SELECT *` dumps, so nothing makes the model and
+  // the export agree. The parity harness's three rings (live tool list,
+  // fidelity.inventory.json, scenario coverage) are all about the TOOL surface;
+  // this is the arm that was missing, and its absence is why pome-cloud's
+  // hand-maintained mirror of this shape could drift for a milestone with
+  // nothing to notice.
+  //
+  // It lives in the file that already runs rather than in a new gate, which is
+  // F-1126's instruction: reuse the parity harness, do not build a second drift
+  // gate.
+  const exported = (): Record<string, unknown> => {
+    const db = openSlackTwinDatabase(":memory:");
+    const domain = new SlackDomain(db);
+    domain.applySeed(defaultSeedState());
+    return domain.exportState() as Record<string, unknown>;
+  };
+
+  it("finds every top-level key SlackCheckState names", () => {
+    const state = exported();
+    for (const key of ["channels", "reactions"]) {
+      expect(state, `exportState() no longer produces "${key}"`).toHaveProperty(key);
+    }
+  });
+
+  it("finds every channel field the model reads, on a real exported row", () => {
+    const channels = exported().channels as Record<string, unknown>[];
+    expect(channels.length).toBeGreaterThan(0);
+    for (const field of ["id", "name", "is_private", "is_group", "is_im", "is_mpim", "messages"]) {
+      expect(channels[0]!, `exportState() channels no longer carry "${field}"`).toHaveProperty(field);
+    }
+  });
+
+  it("confirms is_private really arrives as an INTEGER, not a boolean", () => {
+    // The trap `check-state.ts` documents. If the twin ever normalises this to a
+    // boolean, `isPublicChannel` still works (it accepts both) but the comment
+    // becomes a lie — and the next reader writes `=== 1` against a boolean.
+    const channels = exported().channels as Record<string, unknown>[];
+    expect(typeof channels[0]!.is_private).toBe("number");
+  });
+
+  it("finds every message field the model reads", () => {
+    const channels = exported().channels as Record<string, unknown>[];
+    const withMessages = channels.find(
+      (channel) => (channel.messages as unknown[]).length > 0,
+    );
+    expect(withMessages, "the default seed has no message to check the shape against").toBeTruthy();
+    const message = (withMessages!.messages as Record<string, unknown>[])[0]!;
+    for (const field of ["ts", "user_id", "text"]) {
+      expect(message, `exportState() messages no longer carry "${field}"`).toHaveProperty(field);
+    }
+  });
+
+  it("finds every reaction field the model reads, and confirms they are TOP-LEVEL", () => {
+    // Reactions are keyed by `channel_id` in a flat list, not nested under their
+    // channel. A predicate that assumed nesting would silently find none.
+    const db = openSlackTwinDatabase(":memory:");
+    const domain = new SlackDomain(db);
+    domain.applySeed({
+      ...defaultSeedState(),
+      channels: [
+        {
+          id: "C_GENERAL",
+          name: "general",
+          is_private: false,
+          topic: "",
+          purpose: "",
+          members: ["U_PRIMARY"],
+          messages: [
+            { user: "U_PRIMARY", text: "ship it", reactions: [{ name: "tada", user: "U_PRIMARY" }] },
+          ],
+        },
+      ],
+    });
+    const reactions = domain.exportState().reactions as Record<string, unknown>[];
+    expect(reactions.length).toBeGreaterThan(0);
+    for (const field of ["channel_id", "message_ts", "name", "user_id"]) {
+      expect(reactions[0]!, `exportState() reactions no longer carry "${field}"`).toHaveProperty(field);
     }
   });
 });

@@ -16,11 +16,10 @@ state and label, and comments with a GitHub reference — without contacting liv
 GitHub or Linear.
 
 ## Success Criteria
-- [code:github] Issue #1 in acme/api still exists and remains open
-- [code:linear] An issue titled "Orders 500 after deploy" exists
-- [code:linear] That issue is in state In Progress
-- [code:linear] That issue has label Agent
-- [code:linear] A comment exists on that issue mentioning GitHub issue #1
+- [code:github] Issue #1 in `acme/api` is in state open
+- [code:linear] Issue "Orders 500 after deploy" in `ENG` is in state "In Progress"
+- [code:linear] Issue "Orders 500 after deploy" in `ENG` has label "Agent"
+- [code:linear] A comment on issue "Orders 500 after deploy" in `ENG` contains "#1"
 - [model] The Linear issue clearly handoffs the GitHub orders bug without inventing unrelated work
 
 ## Config

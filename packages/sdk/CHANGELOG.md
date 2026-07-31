@@ -1,5 +1,158 @@
 # @pome-sh/sdk
 
+
+## 0.10.0 — 2026-07-30
+
+A declared check can name the worlds it discriminates between (F-1126).
+
+- New required `discriminatingWorlds(args)` on `CheckDefinition`, returning a
+  `{ passing, failing }` pair of `CheckSubstrate`s or `null`.
+- New `probeDiscrimination(def, args)` — pure, no test framework — returning
+  `discriminates` / `declined` / `broken` with the arm that broke. Each twin's
+  contract test owns the admitted-null ledger, so an empty ledger cannot
+  silently excuse anything.
+
+It is a PAIR rather than the failing half alone, and the reason is measured:
+every state-reading check resolves its selector before it asserts, and a
+selector miss returns a real failure rather than a skip — so 11 of GitHub's 13
+declarations returned `passed: false` against an empty world, a fixture that
+proves nothing. The third arm rejects a failing world whose reason is the one an
+empty world already gives.
+
+`checksDigest` is unchanged and does not hash the new field: a fixture is not
+part of the binding surface, so this cannot skew a CLI↔prod handshake.
+
+Minor: a required field on a published interface. Every declaration must add
+one.
+
+## 0.9.0 — 2026-07-29
+
+The recorder captures request headers and the tool that was called (F-1125).
+Minor: it requires `@pome-sh/shared-types` >= 0.13.0, and `CheckTapeEvent` grows
+two fields a tape check can read.
+
+### Added
+
+- `recordedRequestHeaders(c)` and `setRecordedTool(c, tool)` (new
+  `request-capture` module, re-exported from `@pome-sh/sdk/server`) — the ONE
+  answer to "which headers get recorded" and "what counts as the tool that was
+  called", shared by all five emission sites. Twins that build recorder events by
+  hand must use them; five copies of that policy is five chances for one twin's
+  tape to be the one a header-reading check cannot see.
+- `handle({ tool })` — declare the twin action a REST route performs, recorded as
+  `RecorderEvent.tool`. Use the matching MCP tool's name.
+- `CheckTapeEvent.request_headers` / `CheckTapeEvent.tool`. Both optional: a
+  recording made before they existed still has to parse, and `undefined` is a
+  THIRD world a check must not collapse into the other two — it means "this
+  recording predates the field", not "the header was not sent".
+
+### Changed
+
+- Every recorder emission site — `handle()`, JSON-RPC `tools/call`, the two
+  legacy MCP dispatch routes, and the failure injector — now populates
+  `request_headers`, and stamps `tool` where it knows one. The MCP surfaces stamp
+  the name the CALLER used, including when the tool is unknown or its arguments
+  were rejected: "was it called" is a question about the attempt.
+
+
+## 0.8.0 — 2026-07-29
+
+A declared check can read the ordered call tape (F-1076, settling D1's open
+half). Minor, not patch: `CheckSubstrate.tape` is a REQUIRED key, so a consumer
+that constructs a substrate — pome-cloud's declaration adapter is the one that
+does — fails to typecheck until it supplies one (`PACKAGE_RELEASE.md` — 0.x
+minor plays the major role).
+
+- `CheckSubstrate.tape: readonly CheckTapeEvent[] | null` — the recorded HTTP
+  call tape, scoped to the criterion's twin by the consuming engine and ordered
+  oldest-first. **That ordering is a contract**, not an artifact of how the blob
+  happened to be parsed; a check may rely on it.
+- Required key, nullable value, deliberately mirroring `seed`. An optional key
+  is one every later consumer forgets to pass, and forgetting it would hand a
+  tape check a hole — letting a negative criterion pass over a tape nobody read,
+  which is the one failure D4 forbids. `null` and `[]` are different worlds:
+  "nobody handed me a tape" versus "the agent called nothing".
+- `CheckTapeEvent` — one recorded call, as a `substrate: "tape"` check sees it.
+  The frozen v1.0 `TwinHttpEvent` with every field optional/nullable so a
+  malformed row cannot crash a predicate. It lives here rather than in the
+  consuming engine for the same reason the declarations do: a consumer-side copy
+  drifts silently, surfacing only when a predicate reads a field the copy forgot.
+- **No `headers`, and this is not an oversight.** The recorder never captured
+  them, so an assertion like "the retry includes X-PAYMENT" is unanswerable at
+  any substrate width. Verified against `recorder-events.ts` rather than assumed.
+  Closing that gap is a recorder change, tracked separately.
+- `CheckOutcome.evidenceEventIds?: string[]` — the calls an outcome asserted
+  against. Without it, moving a tape predicate into a declaration would have
+  dropped F-980's citations on the floor: a silent downgrade sold as a refactor.
+  Omit the key rather than sending `[]`; absent and empty mean the same thing
+  downstream, and an empty affordance would have to be special-cased by every
+  reader of the persisted row.
+
+## 0.7.0 — 2026-07-29
+
+Minor, not patch: `defineCheck` now REJECTS a declaration it used to accept, so
+a consumer that upgrades can fail at module load. That is a behaviour change on
+a published entry point (`PACKAGE_RELEASE.md` — 0.x minor plays the major role).
+
+- `oneOf(name, values, example?)` — a param type for a slot whose value comes
+  from a closed set. The legacy GitHub regexes spelled these inline as
+  `(open|closed)`, where no authoring surface could read them; as a param type
+  the set travels with the declaration. Non-capturing and value-escaped, so a
+  member carrying a regex metacharacter matches itself and only itself.
+- `defineCheck` rejects a param type whose `pattern` opens its own capture
+  group. Every consumer reads capture group i+1 as template slot i, so one
+  stray group shifts all of them and hands each predicate its neighbour's
+  argument — a silent, total mis-grade. This is the change that makes 0.7.0 a
+  minor: a declaration using `(a|b)` where `(?:a|b)` was meant threw nothing
+  before and throws now.
+- `VACUITY_SENTINEL`, `VACUITY_SENTINEL_SNAKE`, `VACUITY_SENTINEL_NUMBER` — the
+  values a `vacuityMutant` substitutes. They move here from pome-cloud's probe
+  because the declaration WRITES them and the probe RECOGNISES them; two copies
+  of one fact skew silently, and the failure mode is that the probe stops
+  recognising its own mutants and every check reads as un-probed.
+
+## 0.6.0 — 2026-07-28
+
+Minor, not patch: `CheckDefinition.description` and `CheckParamType.example`
+are REQUIRED, which is a published signature change (`PACKAGE_RELEASE.md` —
+0.x minor plays the major role). 0.5.2 was a patch because it only *added*
+exports. `npm run test:contract` is green, but it is a runtime suite and
+required-ness is a compile-time property, so it is structurally blind to this
+class of change. Every implementer today is in this repo.
+
+- `CheckDefinition.description` — what the predicate actually compares.
+  Required because an authoring surface can only show what is declared, and a
+  rendered sentence wider than its check is the one defect this architecture
+  makes easier (Shankar et al., UIST '24 §7.3.3).
+- `CheckParamType.example` — a valid value per slot, asserted against its own
+  `pattern` inside `defineCheck`, so a type whose example is invalid cannot
+  ship. A regex source is not a prompt.
+- `checksDigest(defs)` — one implementation of "hash the binding surface",
+  called by both the control plane and the CLI, which resolve declarations
+  from independent npm pins. Hashes `id`, `substrate` and the COMPILED
+  pattern; never `description` or `example`, because a prose edit changes no
+  sentence and must never refuse an author's write.
+- `CheckBindingShape` — the subset that decides binding. `checkPattern` and
+  `checkNearMissPattern` now take it, so a heterogeneous registry can be
+  hashed without an args-erasing cast.
+
+## 0.5.2 — 2026-07-28
+
+Additive: `@pome-sh/sdk/checks`, the assertable check vocabulary (F-1073).
+
+A check declares an English template with typed parameter slots; both the
+rendered sentence and the matcher that binds it are derived from that one
+template, so a declaration and its regex cannot drift apart. `defineCheck`
+validates the declaration at module load — a slot with no type, a type no
+slot uses, or a repeated slot are all hard errors rather than a check that
+silently binds nothing.
+
+`vacuityMutant` returns mutated ARGS rather than a mutated sentence, so the
+splice-the-wrong-literal hazard that forces a hand-written mutant sentence
+per rule is unreachable.
+
+No existing surface changed; `npm run test:contract` green.
+
 ## 0.5.1 — 2026-07-21
 
 Dependency-only patch: repin `@pome-sh/shared-types` to 0.12.0 (manifest data

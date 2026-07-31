@@ -110,13 +110,17 @@ for (const workflow of [
 }
 
 const packagePublish = read(".github/workflows/sdk-publish.yml");
-const cliRelease = read(".github/workflows/cli-release.yml");
+// F-1135 — a per-twin `npm view @pome-sh/twin-<twin>@<version>` literal in
+// cli-release.yml used to be required here. That block was the rot this gate
+// exists to catch: its seven versions were true for one day (2026-07-20), the
+// pins moved six times after, and every stale line still resolved. The release
+// gate now derives the list from cli/package.json
+// (scripts/check-cli-pins-published.mjs), so there is no per-twin YAML literal
+// left to register. The pin that replaced it is already drift-checked above, as
+// `cli/package.json dependencies` / `bundleDependencies`.
 for (const twin of canonical) {
   if (!packagePublish.includes(`pome-sh-twin-${twin}-*.tgz`)) {
     failures.push(`sdk-publish.yml: missing twin-${twin} publish artifact`);
-  }
-  if (!cliRelease.includes(`npm view @pome-sh/twin-${twin}@`)) {
-    failures.push(`cli-release.yml: missing twin-${twin} dependency gate`);
   }
 }
 

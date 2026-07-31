@@ -1,5 +1,57 @@
 # @pome-sh/twin-linear — CHANGELOG
 
+## 0.2.0 — 2026-07-30
+
+Linear declares its assertable check vocabulary (F-1129, milestone A3) — the
+last of the five twins, and the one whose migration could not be a rename.
+
+- New `./checks` subpath: `LINEAR_CHECKS`, eight declarations, plus the
+  `LinearCheckState` model they read (`check-state.ts`). pome-cloud deletes its
+  hand-maintained mirror of that shape in the same milestone — the twin's model
+  is now the only one. `LINEAR_CHECKS` is also re-exported from the package
+  root, as twin-slack does.
+- **Every check names its TEAM**, where twin-slack's vocabulary names no scope
+  at all. `seed.ts` validates issue-title uniqueness via `issueTitlesByTeam` —
+  per team, not per workspace — so a title-keyed selector over a two-team world
+  is exactly the ambiguity twin-github's repo rule exists to close. The contract
+  test enforces it, and only a check that reads no state may be ledgered out.
+- **A selector miss FAILS; a truncated export SKIPS.** twin-github fails on a
+  miss and twin-slack skips; Linear needs both from one resolver, so
+  `Resolved<T>` carries the disposition. The split is evidenced rather than
+  chosen: `state.ts` exports `exportBounds.truncatedCollections`, so the twin
+  itself reports when rows were dropped past `STATE_EXPORT_CAP`. That is the
+  only place in this vocabulary where "not found" and "absent" are different
+  facts, and neither `GitHubCheckState` nor `SlackCheckState` has an analogue.
+- Five checks read an issue row — `linear.issue-exists`, `linear.issue-state`,
+  `linear.issue-has-label`, `linear.issue-estimate`, `linear.issue-assignee` —
+  two read comments, one reads the tape. `linear.issue-threaded-reply` is the
+  only `seed+final` member: it asserts a reply whose parent existed IN THE SEED,
+  because a final-only reading is satisfied by an agent that posts a comment and
+  then replies to itself.
+- `linear.no-unsupported-endpoint` drops the twin word — it is now the same
+  sentence twin-github and twin-gmail declare, resolved per-twin by the engine.
+- **`linear.issue-lifecycle` is NOT migrated**, and that is a narrowing rather
+  than an oversight. A declared `... is {lifecycle}` near-misses every
+  `is in state "..."` sentence and would report a corrupted state criterion under
+  a check the author never picked. It had zero corpus users; `is in state "Done"`
+  / `"Canceled"` re-expresses what mattered.
+- `cli/tasks/24`, `25` and `26` are rewritten in the same commit. Six of the nine
+  shipped criteria named their subject with "that issue", with no subject at all,
+  or by pointing at an id in the seed — and a rendered sentence cannot carry a
+  pronoun, because a check only ever sees its own arguments. Task 26 LOSES a
+  criterion rather than gaining a subject: `linear.issue-state` fails on a
+  missing issue and already subsumes `An issue titled "..." exists`.
+
+## 0.1.1 — 2026-07-30
+
+Dependency-only patch: repin `@pome-sh/sdk` to 0.10.0 (F-1126). No surface change.
+
+The repin is not cosmetic. npm only symlinks a workspace sibling when the
+declared pin matches its version; a stale pin makes npm install a nested
+PUBLISHED copy instead, so the package is built and tested against the registry
+rather than this tree. `scripts/check-workspace-pins-match-workspace.mjs` now
+gates it.
+
 ## 0.1.0 — 2026-07-21
 
 First public release of the deterministic Linear twin:

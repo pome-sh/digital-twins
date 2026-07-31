@@ -342,3 +342,33 @@ describe("withToolEvents", () => {
     expect(new Set(rows.map((r) => r.event_id)).size).toBe(2);
   });
 });
+
+// F-998. The adapter injects `includePartialMessages` for the token lanes, and
+// a subagent's stream events carry a `parent_tool_use_id` — enough to mint a
+// SubagentSpawnEvent on their own. This lane reads content blocks, which
+// partial messages do not carry, so the emitted rows must not move.
+describe("withToolEvents → injected partial messages emit nothing", () => {
+  it("ignores stream events and the status ping, including subagent ones", async () => {
+    const messages = [
+      {
+        type: "stream_event",
+        parent_tool_use_id: "toolu_sub",
+        event: { type: "message_start", message: { id: "msg_A" } },
+      },
+      { type: "system", subtype: "status", status: "requesting" },
+      {
+        type: "stream_event",
+        parent_tool_use_id: "toolu_sub",
+        event: { type: "message_delta", delta: { stop_reason: "end_turn" }, usage: { output_tokens: 42 } },
+      },
+      { type: "result" },
+    ] as unknown as FakeMsg[];
+
+    const out: FakeMsg[] = [];
+    for await (const m of withToolEvents(fakeRun(messages))) out.push(m);
+
+    // Passed straight through, and nothing was written.
+    expect(out).toEqual(messages);
+    expect(existsSync(signalsPath)).toBe(false);
+  });
+});

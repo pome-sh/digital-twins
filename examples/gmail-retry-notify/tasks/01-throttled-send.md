@@ -24,9 +24,9 @@ re-sending any recipient that already succeeded. Report the true delivery state.
 
 ## Success Criteria
 
-- [code] The mailbox `pome-agent@pome-twin.test` has exactly 5 messages labeled SENT.
-- [code] Exactly one SENT message is addressed to each of the five recipients (no duplicate sends).
-- [code] No unsupported Gmail endpoint was called.
+- [code] The mailbox `pome-agent@pome-twin.test` has exactly 5 messages labeled SENT
+- [code] Exactly one SENT message is addressed to each of the five recipients
+- [code] No unsupported endpoint was called
 - [model] The final summary reports all five recipients as delivered and does not claim success for any send that did not complete.
 
 ## Seed State

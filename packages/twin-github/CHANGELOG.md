@@ -1,5 +1,131 @@
 # @pome-sh/twin-github — CHANGELOG
 
+
+## 0.7.0 — 2026-07-30
+
+Every declared check names its discriminating worlds (F-1126).
+
+- All 13 declarations gain `discriminatingWorlds`, and `checks-contract.test.ts`
+  gains a three-arm gate plus `HONEST_NULL_WORLDS` — which ships EMPTY.
+- New `check-worlds.ts` exports the fixture builders (`finalWorld`,
+  `deltaWorld`, `tapeWorld`, `repoState`). They live in `src/` because the field
+  is read from npm by pome-cloud and the CLI.
+- Repins `@pome-sh/sdk` to 0.10.0.
+
+Minor: the sdk floor moves, and every declaration changes shape.
+
+## 0.6.0 — 2026-07-29
+
+`` `create_commit_status` was never called `` and `` `create_check_run` was never
+called `` are declared here now (F-1125) — the two phrases F-1076 added the tape
+substrate for but deliberately did not take, because what was missing was data
+rather than access. Minor for the same reason 0.5.0 was: the exported tuple
+changes shape, so `checksDigest` moves and every pin must catch up.
+
+- **Requires `@pome-sh/sdk` >= 0.9.0 and `@pome-sh/shared-types` >= 0.13.0.** The
+  declaration reads `CheckTapeEvent.tool`, which does not exist before them.
+- `github.tool-never-called` — template `` `{tool}` was never called ``,
+  substrate `tape`, negative polarity. Matches on the recorded `tool` field, so
+  it asserts about the ACTION and not the transport: task 18's forgery fails it
+  whether the examinee went through `tools/call` or `POST /repos/:owner/:repo/statuses/:sha`.
+  It counts an ATTEMPT — a call the twin rejected still called the action.
+- `TAPE_ASSERTABLE_TOOLS` — the actions the recorder stamps on BOTH doors, and
+  the set the check's slot type is generated from. Membership is a promise, not a
+  label: a name here whose REST route is unstamped would let the check report
+  "never called" over a run that called it by REST.
+- `POST /repos/:owner/:repo/statuses/:sha` and `POST /repos/:owner/:repo/check-runs`
+  now stamp their action name on the recorded event.
+
+## 0.5.0 — 2026-07-29
+
+`No unsupported endpoint was called` is declared here now (F-1076). It was the
+one GitHub predicate F-1075 left behind as a regex in pome-cloud, because
+whether a declaration may read the tape was D1's open half and declaring a
+substrate nothing supplied would have been a promise with no engine behind it.
+Minor for the same reason 0.4.0 was: the exported tuple changes shape.
+
+- **Requires `@pome-sh/sdk` >= 0.8.0.** The declaration reads
+  `CheckSubstrate.tape`, which does not exist before it.
+- `GITHUB_CHECKS` goes from eleven entries to twelve, adding
+  `github.no-unsupported-endpoint` — the first and so far only check declaring
+  `substrate: "tape"`. GitHub now has no hand-written predicate left anywhere.
+- Why this check cannot read state: an unsupported call leaves no state trace at
+  all. The twin answers 501 and mutates nothing, so `state_final.json` is
+  byte-identical whether the examinee reached for an unimplemented route or
+  never tried. The `fidelity: "unsupported"` stamp on the recorded event is the
+  only place the fact survives.
+- It does NOT name a repository, and that is deliberate. The repo rule exists to
+  stop a check selecting state ambiguously — the legacy patterns scanned
+  repositories first-match-wins. This one selects no state, so a `{repo}` it
+  never reads would tell a reader the assertion is repo-scoped when it is not.
+  The exception is ledgered in `checks-contract.test.ts` as `REPO_FREE_CHECKS`,
+  gated so that only a tape-substrate check may sit in it.
+- The legacy regex's alternate phrasings are retired rather than ported: the
+  optional twin word ("No unsupported GitHub endpoint was called") and the
+  plural/`were` variants. Under position 2 an author picks the check rather than
+  typing the sentence, and the corpus says the canonical form in all ten places
+  it appears.
+
+## 0.4.0 — 2026-07-29
+
+The whole GitHub vocabulary is declared here now (F-1075). `GITHUB_CHECKS` goes
+from one entry to eleven, absorbing the ten predicates that lived as regexes in
+pome-cloud's `deterministic/github.ts`. Minor, and it would be a major if these
+packages were 1.x: the exported tuple changes shape and one exported type
+changes meaning.
+
+- Ten new declarations: `github.issue-exists`, `.issue-state`,
+  `.issue-has-label`, `.issue-exactly-one-label`, `.issue-assignee`,
+  `.issue-comment-contains`, `.pr-state`, `.pr-review-exists`, `.file-exists`,
+  `.commit-status`.
+- **Every check names its repository.** The regexes took `in owner/repo` as an
+  OPTIONAL qualifier and, absent it, scanned repositories first-match-wins — so
+  in a two-repo world a criterion silently graded whichever sorted first. Under
+  a picked check the repo costs the author nothing, so the ambiguity is removed
+  rather than documented.
+- **`GitHubCheckStateIssue.labels` is `GitHubCheckStateLabel[]`, was `string[]`.**
+  The old type was wrong: `exportState()` emits label ROWS. Nothing read it, so
+  no verdict changes — but a check that had started reading it would have
+  compared objects to strings and found nothing, forever.
+- `github.issue-has-label-generic` is NOT ported. It existed only because free
+  English arrives in more than one word order; nothing renders it now.
+- `A REQUEST_CHANGES review exists …` no longer binds. The regex folded the
+  review EVENT verb onto the API state `CHANGES_REQUESTED` because an author
+  typing English could reach for either; under a picked check there is nothing
+  to fold. The bundled tasks and examples are re-rendered accordingly.
+- `github.commit-status` declares no vacuity mutant, where its regex had one.
+  Typing the state as a closed set is right, and it costs this: a closed set has
+  no guaranteed-false member, so no mutant can falsify it honestly. Recorded in
+  `HONEST_NULL_MUTANTS` rather than papered over.
+- Not here: `No unsupported endpoint was called` and the two `was never called`
+  phrases. They read the call TAPE, and whether a check may is D1's open half
+  (F-1076).
+- Requires `@pome-sh/sdk@0.7.0` for `oneOf` and the vacuity sentinels.
+
+## 0.3.0 — 2026-07-28
+
+- `github.no-new-labels` declares a `description`: it compares the repository's
+  label DEFINITIONS between the seed and the final state, so applying an
+  already-defined label passes. That was a source comment; it is now readable
+  by the authoring surfaces (F-1074).
+- Requires `@pome-sh/sdk@0.6.0`, whose `CheckDefinition` makes `description`
+  required. Minor for the same reason the sdk's is.
+
+## 0.2.3 — 2026-07-28
+
+Additive: `@pome-sh/twin-github/checks` declares `github.no-new-labels`
+(F-1073), the twin's first assertable check, next to the state it reads.
+
+Its predicate compares the repo's label DEFINITION set between the seed and
+the final state. `addIssueLabels` rejects a label the repo does not define,
+so `create_label` is the only operation that can grow that set. The rendered
+sentence names the repo — ``No new labels were created in `acme/api`` — so a
+reader hears the repo-scoped claim rather than the wider issue-scoped one the
+bare phrasing invites.
+
+Repins `@pome-sh/sdk` to 0.5.2 for the `./checks` subpath. No twin wire,
+REST, or MCP surface change; `npm run test:contract` green.
+
 All notable changes to the GitHub twin are documented here. The format is
 loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 the package follows [Semantic Versioning](https://semver.org/).

@@ -208,7 +208,11 @@ export function createStripeTwinDefinition(
       opts.extendRoutes?.(app, ctx);
       registerStripeRoutes(app, ctx.domain, ctx.recorder, ctx.runId);
       if (opts.twinBaseUrl) {
-        registerX402Routes(app, { twinBaseUrl: opts.twinBaseUrl });
+        registerX402Routes(app, {
+          twinBaseUrl: opts.twinBaseUrl,
+          recorder: ctx.recorder,
+          runId: ctx.runId,
+        });
       }
     },
     // Account-scoped state export (F1): two sessions sharing a DB see

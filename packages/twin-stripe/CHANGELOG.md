@@ -4,6 +4,65 @@ All notable changes to the Stripe twin are documented here. The format is
 loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 the package follows [Semantic Versioning](https://semver.org/).
 
+
+## 0.4.0 — 2026-07-30
+
+Stripe declares its assertable check vocabulary (F-1127, milestone A3).
+
+- New `./checks` subpath: `STRIPE_CHECKS`, eleven declarations, plus the
+  `StripeCheckState` model they read (`check-state.ts`). pome-cloud deletes its
+  hand-maintained mirror of that shape in the same milestone — the twin's model
+  is now the only one.
+- Four declarations replace hand-written regexes the cloud held
+  (`payment-intent-amount`, `payment-intent-status`, `no-refund-on-charge`,
+  `x402-retry-includes-payment`); seven are new, and each exists because a
+  shipped criterion asked for it and bound nothing. Stripe's unbound `[code]`
+  criteria go 8 → 0.
+- Three of the new ones read the TAPE, because the final state cannot answer
+  them: a rejected request mutates nothing, and a 402 challenge mutates nothing.
+- `fidelity-contract.test.ts` gains a state-shape parity arm. Unlike Slack's,
+  Stripe's export does not spread SQLite rows — every collection goes through
+  `serializers.ts` — so the join fields lose their `_id` suffix
+  (`refunds.charge_id` → `refund.charge`). The arm pins that renaming against a
+  real `exportState()`, along with two documented deviations a fixture must
+  model: `charge.refunded` stays false on a partial refund, and a balance
+  transaction's `source` points at the PaymentIntent rather than the charge.
+
+Minor: new published exports. No change to the served REST/MCP surface, to
+`/_pome/state`, or to any seed schema.
+
+## 0.3.1 — 2026-07-30
+
+Dependency-only patch: repin `@pome-sh/sdk` to 0.10.0 (F-1126). No surface change.
+
+The repin is not cosmetic. npm only symlinks a workspace sibling when the
+declared pin matches its version; a stale pin makes npm install a nested
+PUBLISHED copy instead, so the package is built and tested against the registry
+rather than this tree. `scripts/check-workspace-pins-match-workspace.mjs` now
+gates it.
+
+## 0.3.0 — 2026-07-29
+
+The x402 flow reaches the recorder tape (F-1125). Minor: it requires
+`@pome-sh/sdk` >= 0.9.0, and the tape gains rows where there were none.
+
+### Fixed
+
+- **Neither x402 leg was recorded at all.** `registerX402Routes` mounted the
+  protected resource as a bare Hono handler, and the payment middleware answers
+  every challenge leg itself and returns before `next()` — so nothing reached the
+  recorder. An unpaid attempt left no trace anywhere: `state_final.json` is
+  identical whether the agent paid, failed to pay, or never tried. Both legs are
+  on the tape now, with their request headers, which is what makes task 13's
+  `The retry includes X-PAYMENT and returns 200` answerable.
+
+### Added
+
+- `request_headers` on the two events this twin builds by hand — `respond()` and
+  the idempotency dedupe replay. The replay's `Idempotency-Key` is now readable
+  on the one row that is about it.
+
+
 ## 0.2.5 — 2026-07-21
 
 Dependency-only patch: repin `@pome-sh/sdk` to 0.5.1 and

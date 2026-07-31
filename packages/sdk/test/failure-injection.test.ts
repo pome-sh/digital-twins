@@ -120,6 +120,24 @@ describe("failureInjectionMiddleware", () => {
     });
   });
 
+  // F-1125 — the injected event is hand-built, so it is exactly the kind of
+  // site left behind when a field is added to the row. An injected fault that
+  // recorded no headers would make the injected call the one row on the tape a
+  // header-reading check cannot see.
+  it("before_handler: records the injected call's request headers", async () => {
+    const events: RecorderEvent[] = [];
+    const { app } = buildApp("before_handler", events);
+    await app.request("/v1/refunds", {
+      method: "POST",
+      body: "{}",
+      headers: { "idempotency-key": "idem_fi" },
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0]!.request_headers).toBeDefined();
+    expect(events[0]!.request_headers!["idempotency-key"]).toBe("idem_fi");
+    expect(events[0]!.tool).toBeNull();
+  });
+
   it("after_handler: lets the handler run and parks the override on the context", async () => {
     const events: RecorderEvent[] = [];
     const { app, runs, override } = buildApp("after_handler", events);

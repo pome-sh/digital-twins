@@ -1,5 +1,32 @@
 # @pome-sh/shared-types — CHANGELOG
 
+## 0.13.0 — 2026-07-29
+
+The recorder captures enough to express the S4 class (F-1125). Minor, not patch:
+the frozen v1 trace row grows two keys, and a consumer that wants to read them
+must re-pin (`PACKAGE_RELEASE.md` — 0.x minor plays the major role).
+
+### Added
+
+- `RecorderEvent.request_headers?: Record<string, string>` — the request headers
+  as received, keys lowercased. Recorded WHOLESALE rather than through an
+  allowlist: an allowlist is a narrowing no consumer can lift and no task author
+  can extend, which is why `The retry includes X-PAYMENT` was unanswerable at any
+  substrate width. Secrets are handled where every other field's are — the
+  engine's unconditional `redactEvent` scrubs `authorization` / `cookie` /
+  `x-api-key` by key.
+- `RecorderEvent.tool?: string | null` — the twin ACTION the call invoked. It
+  names the action, NOT the transport: an MCP `tools/call` and the REST route that
+  performs the same thing stamp the same value, so a tape check never has to
+  reverse-engineer a tool name out of an MCP request body. `null` means "no
+  declared action for this surface", never "no action happened".
+
+Both are OPTIONAL, and that is load-bearing rather than cosmetic.
+`twinHttpEventSchema` is the only gate into the cloud's tape and a row that fails
+it is dropped **silently**, so a required field would turn every recording an
+older CLI wrote into an empty tape — which, for a negative criterion, is a free
+pass.
+
 ## 0.12.2 — 2026-07-24
 
 ### Added
