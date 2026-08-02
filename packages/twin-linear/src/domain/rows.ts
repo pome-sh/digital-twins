@@ -21,7 +21,8 @@ import type {
   LinearWebhook,
   LinearWorkflowState,
   LinearWorkflowStateType,
-  LinearAgentSessionState,
+  LinearAgentSessionExternalUrl,
+  LinearAgentSessionStatus,
 } from "../types.js";
 
 export type OrgRow = {
@@ -190,10 +191,10 @@ export type AgentSessionRow = {
   id: string;
   issue_id: string | null;
   comment_id: string | null;
-  agent_user_id: string;
-  state: string;
+  app_user_id: string;
+  status: string;
   plan: string | null;
-  external_url: string | null;
+  external_urls_json: string;
   created_at: string;
   updated_at: string;
 };
@@ -384,10 +385,10 @@ export function mapAgentSession(row: AgentSessionRow): LinearAgentSession {
     id: row.id,
     issueId: row.issue_id,
     commentId: row.comment_id,
-    agentUserId: row.agent_user_id,
-    state: row.state as LinearAgentSessionState,
+    appUserId: row.app_user_id,
+    status: row.status as LinearAgentSessionStatus,
     plan: row.plan,
-    externalUrl: row.external_url,
+    externalUrls: JSON.parse(row.external_urls_json) as LinearAgentSessionExternalUrl[],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

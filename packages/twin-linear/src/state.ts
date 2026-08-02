@@ -238,13 +238,15 @@ export function exportLinearState(db: LinearTwinDatabase): LinearStateExport {
       resourceTypes: parseJson(wh.resourceTypes),
     })),
     webhookDeliveries,
-    agentSessions: db
-      .prepare(
-        `SELECT id, issue_id AS issueId, comment_id AS commentId, agent_user_id AS agentUserId,
-                state, plan, external_url AS externalUrl, created_at AS createdAt
-         FROM agent_sessions ORDER BY created_at`
-      )
-      .all(),
+    agentSessions: (
+      db
+        .prepare(
+          `SELECT id, issue_id AS issueId, comment_id AS commentId, app_user_id AS appUserId,
+                  status, plan, external_urls_json AS externalUrls, created_at AS createdAt
+           FROM agent_sessions ORDER BY created_at`
+        )
+        .all() as Array<Record<string, unknown>>
+    ).map((session) => ({ ...session, externalUrls: parseJson(session.externalUrls) })),
     agentActivities,
     exportBounds: { truncatedCollections },
   };

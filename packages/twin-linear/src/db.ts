@@ -244,15 +244,15 @@ CREATE TABLE IF NOT EXISTS agent_sessions (
   id TEXT PRIMARY KEY,
   issue_id TEXT,
   comment_id TEXT,
-  agent_user_id TEXT NOT NULL,
-  state TEXT NOT NULL,
+  app_user_id TEXT NOT NULL,
+  status TEXT NOT NULL,
   plan TEXT,
-  external_url TEXT,
+  external_urls_json TEXT NOT NULL DEFAULT '[]',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   FOREIGN KEY (issue_id) REFERENCES issues(id) ON DELETE CASCADE,
   FOREIGN KEY (comment_id) REFERENCES comments(id) ON DELETE CASCADE,
-  FOREIGN KEY (agent_user_id) REFERENCES users(id) ON DELETE CASCADE
+  FOREIGN KEY (app_user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS agent_activities (

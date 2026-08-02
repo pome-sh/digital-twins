@@ -92,30 +92,36 @@ export const webhookCreateInputSchema = z
   })
   .strict();
 
+/** Mirrors Linear's `AgentSessionExternalUrlInput` field-for-field (F-1172). */
+const agentSessionExternalUrlSchema = z
+  .object({ url: z.string().min(1), label: z.string() })
+  .strict();
+const optionalExternalUrls = z.array(agentSessionExternalUrlSchema).nullish();
+
 export const agentSessionOnIssueInputSchema = z
   .object({
     issueId: z.string().min(1),
-    agentUserId: z.string().optional(),
+    appUserId: z.string().optional(),
     plan: optionalString,
-    externalUrl: optionalString,
+    externalUrls: optionalExternalUrls,
   })
   .strict();
 
 export const agentSessionOnCommentInputSchema = z
   .object({
     commentId: z.string().min(1),
-    agentUserId: z.string().optional(),
+    appUserId: z.string().optional(),
     plan: optionalString,
-    externalUrl: optionalString,
+    externalUrls: optionalExternalUrls,
   })
   .strict();
 
 export const agentSessionUpdateInputSchema = z
   .object({
     id: z.string().min(1).optional(),
-    state: z.string().optional(),
+    status: z.string().optional(),
     plan: optionalString,
-    externalUrl: optionalString,
+    externalUrls: optionalExternalUrls,
   })
   .strict();
 
@@ -229,9 +235,9 @@ export function parseAgentSessionOnIssueInput(input: unknown) {
   const raw = parseOrBadUserInput(agentSessionOnIssueInputSchema, input, "agentSessionCreateOnIssue input");
   return {
     issueId: raw.issueId,
-    agentUserId: raw.agentUserId,
+    appUserId: raw.appUserId,
     plan: raw.plan ?? null,
-    externalUrl: raw.externalUrl ?? null,
+    externalUrls: raw.externalUrls ?? null,
   };
 }
 
@@ -243,9 +249,9 @@ export function parseAgentSessionOnCommentInput(input: unknown) {
   );
   return {
     commentId: raw.commentId,
-    agentUserId: raw.agentUserId,
+    appUserId: raw.appUserId,
     plan: raw.plan ?? null,
-    externalUrl: raw.externalUrl ?? null,
+    externalUrls: raw.externalUrls ?? null,
   };
 }
 
@@ -253,9 +259,9 @@ export function parseAgentSessionUpdateInput(input: unknown) {
   const raw = parseOrBadUserInput(agentSessionUpdateInputSchema, input, "agentSessionUpdate input");
   return {
     id: raw.id,
-    state: raw.state,
+    status: raw.status,
     plan: raw.plan,
-    externalUrl: raw.externalUrl,
+    externalUrls: raw.externalUrls,
   };
 }
 

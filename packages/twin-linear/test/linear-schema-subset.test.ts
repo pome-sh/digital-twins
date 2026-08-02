@@ -26,6 +26,7 @@ import {
   type GraphQLNamedType,
 } from "graphql";
 import { describe, expect, it } from "vitest";
+import { AGENT_SESSION_STATUSES } from "../src/domain/normalize.js";
 import { linearGraphQLSchema } from "../src/graphql/schema.js";
 
 type UpstreamType = {
@@ -100,6 +101,13 @@ describe("twin GraphQL types stay a subset of Linear's real schema (F-1172)", ()
       expect(invented, `${name} declares members Linear does not: ${invented.join(", ")}`).toEqual([]);
     });
   }
+
+  it("the status values the domain accepts are the ones the SDL declares", () => {
+    // Two declarations of the same enum (SDL + the TS union the writers validate
+    // against) can drift apart; a value the domain accepts but the SDL rejects
+    // would blow up at serialisation time, not at authoring time.
+    expect(AGENT_SESSION_STATUSES.slice().sort()).toEqual(twinMembers("AgentSessionStatus")?.members.sort());
+  });
 
   it("AgentSession carries the fields the twin promises to model", () => {
     const twin = twinMembers("AgentSession");

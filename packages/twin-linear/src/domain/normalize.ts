@@ -5,7 +5,7 @@ import {
   BODY_MAX_BYTES,
   TITLE_MAX_BYTES,
   type LinearAgentActivityType,
-  type LinearAgentSessionState,
+  type LinearAgentSessionStatus,
   type LinearIssuePriority,
   type LinearWorkflowStateType,
 } from "../types.js";
@@ -44,10 +44,21 @@ export function inferStateType(name: string): LinearWorkflowStateType {
   return "unstarted";
 }
 
-export function normalizeSessionState(value: string): LinearAgentSessionState {
-  const allowed: LinearAgentSessionState[] = ["pending", "active", "completed", "failed", "canceled"];
-  if (!allowed.includes(value as LinearAgentSessionState)) badUserInput(`Invalid agent session state: ${value}`);
-  return value as LinearAgentSessionState;
+/** Linear's AgentSessionStatus members, verbatim (F-1172). */
+export const AGENT_SESSION_STATUSES: LinearAgentSessionStatus[] = [
+  "pending",
+  "active",
+  "awaitingInput",
+  "complete",
+  "error",
+  "stale",
+];
+
+export function normalizeSessionStatus(value: string): LinearAgentSessionStatus {
+  if (!AGENT_SESSION_STATUSES.includes(value as LinearAgentSessionStatus)) {
+    badUserInput(`Invalid agent session status: ${value}`);
+  }
+  return value as LinearAgentSessionStatus;
 }
 
 export function normalizeActivityType(value: string): LinearAgentActivityType {
