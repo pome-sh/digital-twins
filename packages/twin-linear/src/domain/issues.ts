@@ -246,30 +246,30 @@ export async function updateIssue(
   const before = issueWebhookPayload(issue);
   const patch: Partial<IssueRow> = {};
   let changed = false;
-  if ("title" in input && input.title !== undefined) {
+  if (input.title !== undefined) {
     assertTitle(input.title);
     patch.title = input.title;
     if (input.title !== issue.title) changed = true;
   }
-  if ("description" in input) {
+  if (input.description !== undefined) {
     if (input.description != null) assertBody(input.description);
     patch.description = input.description ?? null;
     if ((input.description ?? null) !== issue.description) changed = true;
   }
-  if ("priority" in input) {
+  if (input.priority !== undefined) {
     patch.priority = normalizePriority(input.priority);
     if (patch.priority !== issue.priority) changed = true;
   }
-  if ("estimate" in input) {
+  if (input.estimate !== undefined) {
     patch.estimate = normalizeEstimate(input.estimate);
     if (patch.estimate !== issue.estimate) changed = true;
   }
-  if ("parentId" in input) {
+  if (input.parentId !== undefined) {
     patch.parent_id = input.parentId ? domain.requireIssue(input.parentId).id : null;
     if (patch.parent_id) assertNoParentCycle(domain, issue.id, patch.parent_id);
     if (patch.parent_id !== issue.parentId) changed = true;
   }
-  if ("stateId" in input && input.stateId != null) {
+  if (input.stateId != null) {
     const state = domain.requireState(input.stateId, issue.teamId);
     const now = domain.now();
     patch.state_id = state.id;
@@ -279,33 +279,33 @@ export async function updateIssue(
     patch.canceled_at = state.type === "canceled" ? (issue.canceledAt ?? now) : null;
     if (state.id !== issue.stateId) changed = true;
   }
-  if ("assigneeId" in input) {
+  if (input.assigneeId !== undefined) {
     patch.assignee_id = input.assigneeId ? domain.requireUser(input.assigneeId).id : null;
     if (patch.assignee_id !== issue.assigneeId) changed = true;
   }
-  if ("delegateId" in input) {
+  if (input.delegateId !== undefined) {
     patch.delegate_id = input.delegateId ? domain.requireUser(input.delegateId).id : null;
     if (patch.delegate_id !== issue.delegateId) changed = true;
   }
-  if ("projectId" in input) {
+  if (input.projectId !== undefined) {
     patch.project_id = input.projectId ? domain.requireProject(input.projectId, issue.teamId).id : null;
     if (patch.project_id !== issue.projectId) changed = true;
   }
-  if ("cycleId" in input) {
+  if (input.cycleId !== undefined) {
     patch.cycle_id = input.cycleId ? domain.requireCycle(input.cycleId, issue.teamId).id : null;
     if (patch.cycle_id !== issue.cycleId) changed = true;
   }
-  if ("archivedAt" in input) {
+  if (input.archivedAt !== undefined) {
     patch.archived_at = input.archivedAt ?? null;
     if ((input.archivedAt ?? null) !== issue.archivedAt) changed = true;
   }
-  if ("dueDate" in input) {
+  if (input.dueDate !== undefined) {
     patch.due_date = input.dueDate ?? null;
     if ((input.dueDate ?? null) !== issue.dueDate) changed = true;
   }
 
   let nextLabelIds: string[] | undefined;
-  if ("labelIds" in input && input.labelIds !== undefined && input.labelIds !== null) {
+  if (input.labelIds != null) {
     nextLabelIds = input.labelIds.map((ref) => domain.requireLabel(ref, issue.teamId).id);
     const beforeLabels = [...issue.labelIds].sort().join("\0");
     const afterLabels = [...nextLabelIds].sort().join("\0");
@@ -341,32 +341,35 @@ export async function updateIssue(
     )
     .run(
       patch.title ?? null,
-      "description" in input ? 1 : 0,
+      input.description !== undefined ? 1 : 0,
       patch.description ?? null,
       patch.priority ?? null,
-      "estimate" in input ? 1 : 0,
+      input.estimate !== undefined ? 1 : 0,
       patch.estimate ?? null,
       patch.state_id ?? null,
-      "assigneeId" in input ? 1 : 0,
+      input.assigneeId !== undefined ? 1 : 0,
       patch.assignee_id ?? null,
-      "delegateId" in input ? 1 : 0,
+      input.delegateId !== undefined ? 1 : 0,
       patch.delegate_id ?? null,
-      "projectId" in input ? 1 : 0,
+      input.projectId !== undefined ? 1 : 0,
       patch.project_id ?? null,
-      "cycleId" in input ? 1 : 0,
+      input.cycleId !== undefined ? 1 : 0,
       patch.cycle_id ?? null,
-      "parentId" in input ? 1 : 0,
+      input.parentId !== undefined ? 1 : 0,
       patch.parent_id ?? null,
-      "archivedAt" in input ? 1 : 0,
+      input.archivedAt !== undefined ? 1 : 0,
       patch.archived_at ?? null,
       // Must CASE-clear timestamps on reopen — COALESCE(null, completed_at) would keep Done stamps.
-      "stateId" in input ? 1 : 0,
+      // Gated on `!= null` to match the guard that computes them: the timestamps are derived from a
+      // target state, so a null stateId (no transition, and state_id itself held by COALESCE) leaves
+      // them alone rather than writing the uncomputed nulls over a Done issue's stamps.
+      input.stateId != null ? 1 : 0,
       patch.canceled_at ?? null,
-      "stateId" in input ? 1 : 0,
+      input.stateId != null ? 1 : 0,
       patch.completed_at ?? null,
-      "stateId" in input ? 1 : 0,
+      input.stateId != null ? 1 : 0,
       patch.started_at ?? null,
-      "dueDate" in input ? 1 : 0,
+      input.dueDate !== undefined ? 1 : 0,
       patch.due_date ?? null,
       now,
       issue.id

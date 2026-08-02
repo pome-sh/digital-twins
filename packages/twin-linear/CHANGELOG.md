@@ -1,5 +1,27 @@
 # @pome-sh/twin-linear — CHANGELOG
 
+## Unreleased
+
+- **Fixed: partial updates no longer wipe fields the caller never mentioned
+  (F-1166).** Nullable fields on update mutations are tri-state — key absent
+  and key present with `undefined` both mean "leave alone", `null` means
+  "clear". The twin tested presence with the `in` operator, but every caller
+  builds its patch as an object literal with all keys present, so an
+  `agentSessionUpdate` that only set `state` silently erased `plan` and
+  `externalUrl`. The same shape bug affected `issueUpdate`, `issueLabelUpdate`,
+  `updateProject`, `updateDocument`, and the MCP `save_issue`, `save_project`,
+  and `save_document` tools; `save_document` with only a title additionally
+  failed outright with a spurious reparenting error. Presence is now tested as
+  `!== undefined` at both the input-parsing and domain layers.
+- **Fixed: `issueUpdate` with an explicit `stateId: null` no longer erases an
+  issue's lifecycle timestamps (F-1166).** The block that derives
+  `started_at` / `completed_at` / `canceled_at` was gated on `stateId != null`,
+  but the flags that wrote them were gated on `stateId !== undefined`, so a
+  rename sent alongside `stateId: null` wrote the uncomputed nulls while
+  `COALESCE` correctly held `state_id` — leaving a Done issue with no
+  completion timestamp. The flags now match the guard. A real transition still
+  clears the stamps.
+
 ## 0.2.0 — 2026-07-30
 
 Linear declares its assertable check vocabulary (F-1129, milestone A3) — the
