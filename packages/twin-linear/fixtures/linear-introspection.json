@@ -1,0 +1,66 @@
+{
+  "_readme": "Committed slice of Linear's real GraphQL introspection. A type absent here is UNGUARDED. Regenerate with `node scripts/regen-linear-introspection.mjs`; never hand-edit.",
+  "source": "https://api.linear.app/graphql",
+  "fetched_at": "2026-08-02T14:52:09.995Z",
+  "query_sha256": "6029c665c71a485e86c4524bfa6793eb6cb2f0f6ab48e6277bc4d5a62fbe1079",
+  "guarded_types": [
+    "AgentSession",
+    "AgentSessionExternalUrlInput",
+    "AgentSessionStatus"
+  ],
+  "types": {
+    "AgentSession": {
+      "kind": "OBJECT",
+      "fields": {
+        "activities": "AgentActivityConnection!",
+        "appUser": "User!",
+        "archivedAt": "DateTime",
+        "codingHarnessModelLabel": "String",
+        "comment": "Comment",
+        "context": "JSON!",
+        "createdAt": "DateTime!",
+        "creator": "User",
+        "dismissedAt": "DateTime",
+        "dismissedBy": "User",
+        "endedAt": "DateTime",
+        "externalLink": "String",
+        "externalLinks": "[AgentSessionExternalLink!]!",
+        "externalUrls": "JSON!",
+        "id": "ID!",
+        "issue": "Issue",
+        "plan": "JSON",
+        "pullRequest": "PullRequest",
+        "pullRequests": "AgentSessionToPullRequestConnection!",
+        "slugId": "String!",
+        "sourceComment": "Comment",
+        "sourceMetadata": "JSON",
+        "startedAt": "DateTime",
+        "status": "AgentSessionStatus!",
+        "summary": "String",
+        "type": "AgentSessionType",
+        "updatedAt": "DateTime!",
+        "url": "String",
+        "workspaceDiff": "JSON",
+        "workspaceDiffFiles": "[AgentSessionWorkspaceDiffFile!]"
+      }
+    },
+    "AgentSessionExternalUrlInput": {
+      "kind": "INPUT_OBJECT",
+      "inputFields": {
+        "label": "String!",
+        "url": "String!"
+      }
+    },
+    "AgentSessionStatus": {
+      "kind": "ENUM",
+      "enumValues": [
+        "active",
+        "awaitingInput",
+        "complete",
+        "error",
+        "pending",
+        "stale"
+      ]
+    }
+  }
+}
