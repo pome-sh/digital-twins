@@ -360,11 +360,14 @@ export async function updateIssue(
       input.archivedAt !== undefined ? 1 : 0,
       patch.archived_at ?? null,
       // Must CASE-clear timestamps on reopen — COALESCE(null, completed_at) would keep Done stamps.
-      input.stateId !== undefined ? 1 : 0,
+      // Gated on `!= null` to match the guard that computes them: the timestamps are derived from a
+      // target state, so a null stateId (no transition, and state_id itself held by COALESCE) leaves
+      // them alone rather than writing the uncomputed nulls over a Done issue's stamps.
+      input.stateId != null ? 1 : 0,
       patch.canceled_at ?? null,
-      input.stateId !== undefined ? 1 : 0,
+      input.stateId != null ? 1 : 0,
       patch.completed_at ?? null,
-      input.stateId !== undefined ? 1 : 0,
+      input.stateId != null ? 1 : 0,
       patch.started_at ?? null,
       input.dueDate !== undefined ? 1 : 0,
       patch.due_date ?? null,
