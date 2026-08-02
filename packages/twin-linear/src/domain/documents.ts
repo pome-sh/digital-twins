@@ -117,15 +117,15 @@ export function updateDocument(
 ): LinearDocument {
   domain.requireScopes(actor, ["write"]);
   const doc = domain.requireDocument(id);
-  if ("title" in input && input.title !== undefined) assertTitle(input.title);
-  if ("content" in input && input.content != null) assertBody(input.content);
+  if (input.title !== undefined) assertTitle(input.title);
+  if (input.content != null) assertBody(input.content);
   const parents =
-    "project" in input || "team" in input || "issue" in input || "cycle" in input
+    input.project !== undefined || input.team !== undefined || input.issue !== undefined || input.cycle !== undefined
       ? resolveParents(domain, {
-          project: "project" in input ? input.project : undefined,
-          team: "team" in input ? input.team : undefined,
-          issue: "issue" in input ? input.issue : undefined,
-          cycle: "cycle" in input ? input.cycle : undefined,
+          project: input.project,
+          team: input.team,
+          issue: input.issue,
+          cycle: input.cycle,
         })
       : null;
   if (parents && parents.count !== 1) {
@@ -148,7 +148,7 @@ export function updateDocument(
     )
     .run(
       input.title ?? null,
-      "content" in input ? 1 : 0,
+      input.content !== undefined ? 1 : 0,
       input.content ?? null,
       parents ? 1 : 0,
       parents?.projectId ?? null,
@@ -158,9 +158,9 @@ export function updateDocument(
       parents?.issueId ?? null,
       parents ? 1 : 0,
       parents?.cycleId ?? null,
-      "icon" in input ? 1 : 0,
+      input.icon !== undefined ? 1 : 0,
       input.icon ?? null,
-      "color" in input ? 1 : 0,
+      input.color !== undefined ? 1 : 0,
       input.color ?? null,
       now,
       doc.id

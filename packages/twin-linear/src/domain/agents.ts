@@ -84,6 +84,10 @@ export function updateAgentSession(
   domain.requireScopes(actor, ["write"]);
   const session = domain.requireAgentSession(id);
   const now = domain.tick();
+  // Nullable fields are tri-state: `undefined` (absent, or explicitly passed as undefined)
+  // means "leave alone", `null` means "clear". Never test presence with `in` here — callers
+  // build this patch as an object literal with every key present, so `in` would clear
+  // every field the caller did not mention (F-1166).
   domain.db
     .prepare(
       `UPDATE agent_sessions SET
@@ -95,9 +99,9 @@ export function updateAgentSession(
     )
     .run(
       input.state ? normalizeSessionState(input.state) : null,
-      "plan" in input ? 1 : 0,
+      input.plan !== undefined ? 1 : 0,
       input.plan ?? null,
-      "externalUrl" in input ? 1 : 0,
+      input.externalUrl !== undefined ? 1 : 0,
       input.externalUrl ?? null,
       now,
       session.id
