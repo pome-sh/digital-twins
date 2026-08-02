@@ -56,7 +56,11 @@
   (`fixtures/linear-introspection.json`, refreshed by
   `node scripts/regen-linear-introspection.mjs`). The old drift only surfaced
   when a capture query happened to select the field; this fails at authoring
-  time instead.
+  time instead. Scope: the guard covers the output type and the one input
+  object the twin mirrors exactly. The mutation-input surface
+  (`AgentSessionUpdateInput`, `AgentSessionCreateOnIssue` / `OnComment`,
+  `AgentActivityCreateInput`) still diverges from Linear, predates this change,
+  and is tracked separately.
 - **Fixed: partial updates no longer wipe fields the caller never mentioned
   (F-1166).** Nullable fields on update mutations are tri-state — key absent
   and key present with `undefined` both mean "leave alone", `null` means

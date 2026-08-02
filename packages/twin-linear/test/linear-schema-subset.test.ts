@@ -51,6 +51,15 @@ const upstream = JSON.parse(
  * Types the guard must actually be checking. Kept here, not read off the
  * fixture, so that deleting a type from the fixture fails loudly instead of
  * silently removing coverage.
+ *
+ * SCOPE — this list is the OUTPUT-side surface plus the one input object the
+ * twin mirrors exactly. The twin's mutation INPUT types (`AgentSessionUpdateInput`,
+ * `AgentSessionCreateOnIssue` / `OnComment`, `AgentActivityCreateInput`) still
+ * declare fields Linear does not — `AgentSessionUpdateInput` upstream has no
+ * `status` and no `id` at all, for instance. That divergence predates F-1172
+ * and is tracked separately; see the SCOPE note on `GUARDED_TYPES` in
+ * `scripts/regen-linear-introspection.mjs`. Do not read this file as evidence
+ * about the input surface.
  */
 const MUST_BE_GUARDED = ["AgentSession", "AgentSessionStatus", "AgentSessionExternalUrlInput"];
 

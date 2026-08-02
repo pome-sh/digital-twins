@@ -29,6 +29,27 @@ const LINEAR_GRAPHQL_URL = "https://api.linear.app/graphql";
 /**
  * The upstream types the twin models and must not drift from. Extend this list
  * (and re-run) when the twin starts emulating another Linear type.
+ *
+ * SCOPE — READ THIS BEFORE ASSUMING COVERAGE. These are the OUTPUT-side types
+ * plus the one input object the twin mirrors exactly. The twin's MUTATION INPUT
+ * types are deliberately NOT guarded yet, because they still diverge from
+ * Linear and adding them here would fail immediately:
+ *
+ *   - `AgentSessionUpdateInput` upstream declares externalLink, externalUrls,
+ *     addedExternalUrls, removedExternalUrls, plan, dismissedAt, userState —
+ *     no `status` and no `id`. Upstream, session status moves via agent
+ *     activities, not through `agentSessionUpdate` at all. The twin declares
+ *     id, status, plan, externalUrls.
+ *   - `AgentSessionCreateOnIssue` / `AgentSessionCreateOnComment` are not
+ *     Linear type names at all (upstream has `AgentSessionCreateInput`: id,
+ *     issueId, appUserId, context) and the twin adds `plan`.
+ *   - `AgentActivityCreateInput` — twin: sessionId, type, body, ephemeral;
+ *     Linear: id, agentSessionId, signal, signalMetadata, contextualMetadata,
+ *     content, ephemeral.
+ *
+ * These predate F-1172 (the old `state` / `agentUserId` were equally invented)
+ * and reconciling them is its own piece of work, tracked separately. Until
+ * then: the guard proves nothing about the mutation-input surface.
  */
 const GUARDED_TYPES = ["AgentSession", "AgentSessionStatus", "AgentSessionExternalUrlInput"];
 
