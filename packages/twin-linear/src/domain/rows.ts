@@ -22,8 +22,8 @@ import type {
   LinearWorkflowState,
   LinearWorkflowStateType,
   LinearAgentSessionExternalUrl,
-  LinearAgentSessionStatus,
 } from "../types.js";
+import { readSessionStatus } from "./normalize.js";
 
 export type OrgRow = {
   id: string;
@@ -386,7 +386,7 @@ export function mapAgentSession(row: AgentSessionRow): LinearAgentSession {
     issueId: row.issue_id,
     commentId: row.comment_id,
     appUserId: row.app_user_id,
-    status: row.status as LinearAgentSessionStatus,
+    status: readSessionStatus(row.status),
     plan: row.plan,
     externalUrls: JSON.parse(row.external_urls_json) as LinearAgentSessionExternalUrl[],
     createdAt: row.created_at,

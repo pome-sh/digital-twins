@@ -21,8 +21,21 @@
   `AgentSessionStatus` is now a real enum carrying Linear's six members —
   `pending`, `active`, `awaitingInput`, `complete`, `error`, `stale`. The twin
   previously accepted `completed`, `failed` and `canceled`, which Linear does
-  not have; those are rejected now. Migrate `completed` → `complete` and
-  `failed` → `error`.
+  not have; those are rejected now. All three are rewritten on open:
+  `completed` → `complete`, `failed` → `error`, and `canceled` → `stale`
+  (Linear has no cancellation state; `stale`, "no longer progressing", is its
+  closest neighbour).
+
+  **An existing `LINEAR_TWIN_DB` file migrates in place on open.**
+  `agent_sessions` renames `agent_user_id` → `app_user_id` and `state` →
+  `status`, adds `external_urls_json`, backfills a non-empty `external_url`
+  into a one-entry collection (`[{ url, label: "" }]` — Linear's label is
+  non-null and the old shape carried none), drops `external_url`, and maps the
+  three retired status values. It is idempotent and a no-op on a database
+  created by the current schema. Cloud's per-session databases are ephemeral
+  (ADR-012) and unaffected. A status that still cannot be mapped now fails at
+  the read boundary with a message naming the value and the cause, rather than
+  surviving to die at GraphQL enum serialisation.
 
   `externalUrls` is a collection, matching Linear: it replaces the single
   nullable `externalUrl` string with a JSON array of `{ url, label }` objects,
