@@ -1,6 +1,26 @@
 # @pome-sh/twin-linear — CHANGELOG
 
-## Unreleased
+## 0.3.0 — 2026-08-02
+
+**BREAKING RELEASE — read this before upgrading.** Two things a consumer must
+act on:
+
+1. **`AgentSession` is renamed to Linear's real field names (F-1172).** No
+   aliases, no deprecation window: `state` → `status` (now a real
+   `AgentSessionStatus` enum), `externalUrl` → `externalUrls` (a collection),
+   `agentUser` → `appUser`, plus `id: ID!`, `createdAt` / `updatedAt: DateTime!`
+   and `plan: JSON`. Queries, mutation inputs, the `/_pome/state` export and the
+   `AgentSessionEvent` webhook payload all change shape. Any agent, task or
+   check that names the old fields must be updated.
+2. **An existing `LINEAR_TWIN_DB` file is migrated in place on open.** The
+   `agent_sessions` table is rewritten (`agent_user_id` → `app_user_id`,
+   `state` → `status`, `external_url` → `external_urls_json`), and the three
+   retired status values are remapped: **`completed` → `complete`,
+   `failed` → `error`, `canceled` → `stale`.** The migration is idempotent and
+   there is no downgrade path — a 0.2.x twin cannot read a migrated database.
+
+Also in this release: partial updates stop wiping fields the caller never
+mentioned (F-1166), across `agentSessionUpdate` and six sibling mutations.
 
 - **BREAKING — `AgentSession` now uses Linear's real field names and types
   (F-1172).** The twin declared four fields Linear does not have, so an agent
