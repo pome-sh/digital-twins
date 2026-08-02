@@ -299,14 +299,14 @@ export function createFormatters(commands: LinearDomain, actor: ActorContext): G
 
   const formatAgentSession = (session: LinearAgentSession) => ({
     id: session.id,
-    state: session.state,
+    status: session.status,
     plan: session.plan,
-    externalUrl: session.externalUrl,
+    externalUrls: session.externalUrls,
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,
     issue: () => (session.issueId ? formatIssue(commands.requireIssue(session.issueId)) : null),
     comment: () => (session.commentId ? formatComment(commands.requireComment(session.commentId)) : null),
-    agentUser: () => formatUser(commands.requireUser(session.agentUserId)),
+    appUser: () => formatUser(commands.requireUser(session.appUserId)),
     activities: (args: ConnectionArgs) =>
       connect(
         commands.listAgentActivities(session.id),

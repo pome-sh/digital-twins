@@ -2,6 +2,65 @@
 
 ## Unreleased
 
+- **BREAKING — `AgentSession` now uses Linear's real field names and types
+  (F-1172).** The twin declared four fields Linear does not have, so an agent
+  written against real Linear read `undefined` from the twin and an agent
+  written against the twin broke in production. There is no alias and no
+  deprecation window: a twin carrying both the old and the new name would still
+  expose a field Linear does not declare, which is the defect itself.
+
+  | was | is now |
+  | --- | --- |
+  | `state: String!` | `status: AgentSessionStatus!` |
+  | `externalUrl: String` | `externalUrls: JSON!` |
+  | `agentUser: User!` | `appUser: User!` |
+  | `id: String!` | `id: ID!` |
+  | `createdAt` / `updatedAt: String!` | `createdAt` / `updatedAt: DateTime!` |
+  | `plan: String` | `plan: JSON` |
+
+  `AgentSessionStatus` is now a real enum carrying Linear's six members —
+  `pending`, `active`, `awaitingInput`, `complete`, `error`, `stale`. The twin
+  previously accepted `completed`, `failed` and `canceled`, which Linear does
+  not have; those are rejected now. All three are rewritten on open:
+  `completed` → `complete`, `failed` → `error`, and `canceled` → `stale`
+  (Linear has no cancellation state; `stale`, "no longer progressing", is its
+  closest neighbour).
+
+  **An existing `LINEAR_TWIN_DB` file migrates in place on open.**
+  `agent_sessions` renames `agent_user_id` → `app_user_id` and `state` →
+  `status`, adds `external_urls_json`, backfills a non-empty `external_url`
+  into a one-entry collection (`[{ url, label: "" }]` — Linear's label is
+  non-null and the old shape carried none), drops `external_url`, and maps the
+  three retired status values. It is idempotent and a no-op on a database
+  created by the current schema. Cloud's per-session databases are ephemeral
+  (ADR-012) and unaffected. A status that still cannot be mapped now fails at
+  the read boundary with a message naming the value and the cause, rather than
+  surviving to die at GraphQL enum serialisation.
+
+  `externalUrls` is a collection, matching Linear: it replaces the single
+  nullable `externalUrl` string with a JSON array of `{ url, label }` objects,
+  and it is never null (an empty array when there are none). The mutation
+  inputs follow: `agentSessionCreateOnIssue` / `agentSessionCreateOnComment`
+  take `appUserId` and `externalUrls: [AgentSessionExternalUrlInput!]`, and
+  `agentSessionUpdate` takes `status` and `externalUrls`. F-1166's tri-state
+  contract is unchanged — key absent or `undefined` leaves a field alone, and
+  `null` clears it (`externalUrls: null` clears to `[]`).
+
+  The `/state` export and the `AgentSessionEvent` webhook payload rename with
+  the wire surface (`appUserId`, `status`, `externalUrls`).
+- **Added: a guard that fails when the twin invents a field Linear does not
+  have (F-1172).** `test/linear-schema-subset.test.ts` asserts the twin's
+  `AgentSession`, `AgentSessionStatus` and `AgentSessionExternalUrlInput`
+  members are a subset of Linear's, read from a committed, credential-free
+  slice of Linear's real introspection response
+  (`fixtures/linear-introspection.json`, refreshed by
+  `node scripts/regen-linear-introspection.mjs`). The old drift only surfaced
+  when a capture query happened to select the field; this fails at authoring
+  time instead. Scope: the guard covers the output type and the one input
+  object the twin mirrors exactly. The mutation-input surface
+  (`AgentSessionUpdateInput`, `AgentSessionCreateOnIssue` / `OnComment`,
+  `AgentActivityCreateInput`) still diverges from Linear, predates this change,
+  and is tracked separately.
 - **Fixed: partial updates no longer wipe fields the caller never mentioned
   (F-1166).** Nullable fields on update mutations are tri-state — key absent
   and key present with `undefined` both mean "leave alone", `null` means

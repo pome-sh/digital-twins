@@ -230,7 +230,7 @@ export async function createIssue(
     url: issue.url,
   });
   if (issue.delegateId) {
-    await domain.createAgentSessionOnIssue({ issueId: issue.id, agentUserId: issue.delegateId }, actor);
+    await domain.createAgentSessionOnIssue({ issueId: issue.id, appUserId: issue.delegateId }, actor);
   }
   return issue;
 }
@@ -391,7 +391,7 @@ export async function updateIssue(
     updatedFrom: before,
   });
   if (updated.delegateId && updated.delegateId !== issue.delegateId) {
-    await domain.createAgentSessionOnIssue({ issueId: updated.id, agentUserId: updated.delegateId }, actor);
+    await domain.createAgentSessionOnIssue({ issueId: updated.id, appUserId: updated.delegateId }, actor);
   }
   return updated;
 }

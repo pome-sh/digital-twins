@@ -20,7 +20,16 @@ export type LinearAgentActivityType =
   | "response"
   | "error"
   | "prompt";
-export type LinearAgentSessionState = "pending" | "active" | "completed" | "failed" | "canceled";
+/** Linear's `AgentSessionStatus` enum, member-for-member (F-1172). */
+export type LinearAgentSessionStatus =
+  | "pending"
+  | "active"
+  | "awaitingInput"
+  | "complete"
+  | "error"
+  | "stale";
+/** One entry of Linear's `AgentSession.externalUrls` JSON payload. */
+export type LinearAgentSessionExternalUrl = { url: string; label: string };
 export type LinearProjectState = "planned" | "started" | "completed" | "canceled";
 
 export type LinearOrganization = {
@@ -225,10 +234,10 @@ export type LinearAgentSession = {
   id: string;
   issueId: string | null;
   commentId: string | null;
-  agentUserId: string;
-  state: LinearAgentSessionState;
+  appUserId: string;
+  status: LinearAgentSessionStatus;
   plan: string | null;
-  externalUrl: string | null;
+  externalUrls: LinearAgentSessionExternalUrl[];
   createdAt: string;
   updatedAt: string;
 };

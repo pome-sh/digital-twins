@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 import { notFound } from "../errors.js";
-import type { LinearAgentActivity, LinearAgentSession } from "../types.js";
-import { assertBody, normalizeActivityType, normalizeSessionState } from "./normalize.js";
+import type {
+  LinearAgentActivity,
+  LinearAgentSession,
+  LinearAgentSessionExternalUrl,
+} from "../types.js";
+import { assertBody, normalizeActivityType, normalizeSessionStatus } from "./normalize.js";
 import type { ActorContext, LinearDomain } from "./linear-domain.js";
 import { mapAgentActivity, mapAgentSession, type AgentActivityRow, type AgentSessionRow } from "./rows.js";
 import { emitWebhook } from "./webhooks.js";
@@ -19,31 +23,61 @@ export function getAgentSession(domain: LinearDomain, ref: string): LinearAgentS
   return row ? mapAgentSession(row) : null;
 }
 
+export type AgentSessionOnIssueInput = {
+  issueId: string;
+  appUserId?: string;
+  plan?: string | null;
+  externalUrls?: LinearAgentSessionExternalUrl[] | null;
+};
+
+export type AgentSessionOnCommentInput = {
+  commentId: string;
+  appUserId?: string;
+  plan?: string | null;
+  externalUrls?: LinearAgentSessionExternalUrl[] | null;
+};
+
+export type AgentSessionPatch = {
+  status?: string;
+  plan?: string | null;
+  externalUrls?: LinearAgentSessionExternalUrl[] | null;
+};
+
 export async function createAgentSessionOnIssue(
   domain: LinearDomain,
-  input: { issueId: string; agentUserId?: string; plan?: string | null; externalUrl?: string | null },
+  input: AgentSessionOnIssueInput,
   actor: ActorContext = {}
 ): Promise<LinearAgentSession> {
   domain.requireScopes(actor, ["write"]);
   const issue = domain.requireIssue(input.issueId);
   const viewer = domain.resolveViewer(actor);
   const agent =
-    (input.agentUserId ? domain.requireUser(input.agentUserId) : null) ??
+    (input.appUserId ? domain.requireUser(input.appUserId) : null) ??
     domain.listUsers().find((u) => u.app) ??
     viewer;
   const now = domain.tick();
   const id = domain.nextId("agent_session");
   domain.db
     .prepare(
-      `INSERT INTO agent_sessions(id, issue_id, comment_id, agent_user_id, state, plan, external_url, created_at, updated_at)
+      `INSERT INTO agent_sessions(id, issue_id, comment_id, app_user_id, status, plan, external_urls_json, created_at, updated_at)
          VALUES (?,?,?,?,?,?,?,?,?)`
     )
-    .run(id, issue.id, null, agent.id, "pending", input.plan ?? null, input.externalUrl ?? null, now, now);
+    .run(
+      id,
+      issue.id,
+      null,
+      agent.id,
+      "pending",
+      input.plan ?? null,
+      JSON.stringify(input.externalUrls ?? []),
+      now,
+      now
+    );
   const session = domain.requireAgentSession(id);
   await emitWebhook(domain, {
     type: "AgentSessionEvent",
     action: "created",
-    data: { id: session.id, issueId: issue.id, state: session.state },
+    data: { id: session.id, issueId: issue.id, status: session.status },
     actor: viewer,
     teamId: issue.teamId,
   });
@@ -52,7 +86,7 @@ export async function createAgentSessionOnIssue(
 
 export async function createAgentSessionOnComment(
   domain: LinearDomain,
-  input: { commentId: string; agentUserId?: string; plan?: string | null; externalUrl?: string | null },
+  input: AgentSessionOnCommentInput,
   actor: ActorContext = {}
 ): Promise<LinearAgentSession> {
   // comments:create covers mention-triggered sessions from createComment; write covers GraphQL.
@@ -61,24 +95,34 @@ export async function createAgentSessionOnComment(
   const issue = domain.requireIssue(comment.issueId);
   const viewer = domain.resolveViewer(actor);
   const agent =
-    (input.agentUserId ? domain.requireUser(input.agentUserId) : null) ??
+    (input.appUserId ? domain.requireUser(input.appUserId) : null) ??
     domain.listUsers().find((u) => u.app) ??
     viewer;
   const now = domain.tick();
   const id = domain.nextId("agent_session");
   domain.db
     .prepare(
-      `INSERT INTO agent_sessions(id, issue_id, comment_id, agent_user_id, state, plan, external_url, created_at, updated_at)
+      `INSERT INTO agent_sessions(id, issue_id, comment_id, app_user_id, status, plan, external_urls_json, created_at, updated_at)
          VALUES (?,?,?,?,?,?,?,?,?)`
     )
-    .run(id, issue.id, comment.id, agent.id, "pending", input.plan ?? null, input.externalUrl ?? null, now, now);
+    .run(
+      id,
+      issue.id,
+      comment.id,
+      agent.id,
+      "pending",
+      input.plan ?? null,
+      JSON.stringify(input.externalUrls ?? []),
+      now,
+      now
+    );
   return domain.requireAgentSession(id);
 }
 
 export function updateAgentSession(
   domain: LinearDomain,
   id: string,
-  input: { state?: string; plan?: string | null; externalUrl?: string | null },
+  input: AgentSessionPatch,
   actor: ActorContext = {}
 ): LinearAgentSession {
   domain.requireScopes(actor, ["write"]);
@@ -91,18 +135,18 @@ export function updateAgentSession(
   domain.db
     .prepare(
       `UPDATE agent_sessions SET
-          state = COALESCE(?, state),
+          status = COALESCE(?, status),
           plan = CASE WHEN ? THEN ? ELSE plan END,
-          external_url = CASE WHEN ? THEN ? ELSE external_url END,
+          external_urls_json = CASE WHEN ? THEN ? ELSE external_urls_json END,
           updated_at = ?
          WHERE id = ?`
     )
     .run(
-      input.state ? normalizeSessionState(input.state) : null,
+      input.status ? normalizeSessionStatus(input.status) : null,
       input.plan !== undefined ? 1 : 0,
       input.plan ?? null,
-      input.externalUrl !== undefined ? 1 : 0,
-      input.externalUrl ?? null,
+      input.externalUrls !== undefined ? 1 : 0,
+      JSON.stringify(input.externalUrls ?? []),
       now,
       session.id
     );
@@ -133,7 +177,7 @@ export async function createAgentActivity(
     await emitWebhook(domain, {
       type: "AgentSessionEvent",
       action: "prompted",
-      data: { id: session.id, state: session.state },
+      data: { id: session.id, status: session.status },
       actor: viewer,
       teamId: session.issueId ? domain.requireIssue(session.issueId).teamId : null,
     });
