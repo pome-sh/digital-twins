@@ -94,7 +94,11 @@ async function resolveModel(slug: string): Promise<BaseChatModel> {
 
   if (prefix === "anthropic" || slug.startsWith("claude")) {
     const { ChatAnthropic } = await import("@langchain/anthropic");
-    return new ChatAnthropic({ model: id, apiKey: requiredEnv("ANTHROPIC_API_KEY"), temperature: 0 });
+    // No `temperature`: it is removed on claude-sonnet-5 (and every Opus 4.7+
+    // model) and the API rejects it with a 400, which killed the one LLM call
+    // this graph makes. Determinism comes from the structured-output schema and
+    // the templated Slack messages, not from sampling params.
+    return new ChatAnthropic({ model: id, apiKey: requiredEnv("ANTHROPIC_API_KEY") });
   }
   // OpenAI: an explicit `openai/` prefix, or a bare GPT / o-series id
   // (`gpt-…`, `o1`, `o3`…). `/^o\d/` so an `ollama/…` slug isn't swept in.
