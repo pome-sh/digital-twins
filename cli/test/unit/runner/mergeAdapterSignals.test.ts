@@ -4,7 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { eventSchema } from "../../../src/types/shared.js";
-import { mergeAdapterSignalsIntoEvents } from "../../../src/runner/mergeAdapterSignals.js";
+import {
+  mergeAdapterSignalsIntoEvents,
+  resolveTwinHttpParents,
+} from "../../../src/runner/mergeAdapterSignals.js";
 
 async function workspace() {
   return mkdtemp(join(tmpdir(), "pome-merge-"));
@@ -244,5 +247,103 @@ describe("mergeAdapterSignalsIntoEvents", () => {
     expect(lines).toHaveLength(2);
     expect(JSON.parse(lines[0]).event_id).toBe("evt_existing");
     expect(JSON.parse(lines[1]).event_id).toBe("evt_hook");
+  });
+});
+
+// F-1200 — the merge is the one place that sees both the twin's tape and the
+// adapter's signals, so it is where a twin HTTP row gets the tool call that
+// caused it. Before this, every twin row shipped with a null parent and the
+// waterfall could only render twin calls as a separate list.
+describe("resolveTwinHttpParents", () => {
+  const toolUse = (event_id: string, tool_use_id: string) => ({
+    ts: "2026-08-03T12:00:00.000Z",
+    event_id,
+    parent_event_id: null,
+    kind: "ToolUseEvent" as const,
+    tool_use_id,
+    tool_name: "mcp__github__create_issue",
+    input: {},
+  });
+
+  const twinHttp = (event_id: string, over: Record<string, unknown> = {}) => ({
+    ts: "2026-08-03T12:00:01.000Z",
+    run_id: "run_1",
+    twin: "github",
+    request_id: event_id,
+    step_id: null,
+    tool_call_id: null,
+    method: "POST",
+    path: "/repos/acme/app/issues",
+    request_body: {},
+    status: 201,
+    response_body: {},
+    latency_ms: 12,
+    fidelity: "semantic" as const,
+    state_mutation: true,
+    state_delta: null,
+    error: null,
+    kind: "TwinHttpEvent" as const,
+    event_id,
+    parent_event_id: null,
+    ...over,
+  });
+
+  const parse = (rows: unknown[]) => rows.map((r) => eventSchema.parse(r));
+  const twinRow = (rows: ReturnType<typeof parse>) =>
+    rows.find((r) => r.kind === "TwinHttpEvent") as Extract<
+      (typeof rows)[number],
+      { kind: "TwinHttpEvent" }
+    >;
+
+  it("parents a twin row at the ToolUseEvent named by tool_call_id", () => {
+    const rows = parse([
+      toolUse("evt_tool_1", "toolu_abc"),
+      twinHttp("req_1", { tool_call_id: "toolu_abc" }),
+    ]);
+    expect(twinRow(resolveTwinHttpParents(rows)).parent_event_id).toBe("evt_tool_1");
+  });
+
+  it("falls back to correlation_id, which every twin persists", () => {
+    // Only github pins `stampToolCallId`; the default tape stamps null there
+    // and carries the header on `correlation_id` alone.
+    const rows = parse([
+      toolUse("evt_tool_2", "toolu_xyz"),
+      twinHttp("req_2", { tool_call_id: null, correlation_id: "toolu_xyz" }),
+    ]);
+    expect(twinRow(resolveTwinHttpParents(rows)).parent_event_id).toBe("evt_tool_2");
+  });
+
+  it("leaves the parent null when the id names no tool call", () => {
+    // A pre-F-1200 `tlc_`, a `req_` from the no-header fallback, or a REST call
+    // made outside any tool handler. Inventing a parent would put twin calls
+    // under tools that did not make them.
+    const rows = parse([
+      toolUse("evt_tool_3", "toolu_abc"),
+      twinHttp("req_3", { correlation_id: "tlc_deadbeef" }),
+    ]);
+    expect(twinRow(resolveTwinHttpParents(rows)).parent_event_id).toBeNull();
+  });
+
+  it("never overwrites a parent the writer already established", () => {
+    const rows = parse([
+      toolUse("evt_tool_4", "toolu_abc"),
+      twinHttp("req_4", { tool_call_id: "toolu_abc", parent_event_id: "evt_preset" }),
+    ]);
+    expect(twinRow(resolveTwinHttpParents(rows)).parent_event_id).toBe("evt_preset");
+  });
+
+  it("resolves a legacy tape that only wrote parent_id", () => {
+    // The tolerant reader settles `parent_event_id` to null for a 0.13.0 row,
+    // which is exactly the shape this join then fills in.
+    const { parent_event_id: _omit, ...legacy } = twinHttp("req_5", {
+      tool_call_id: "toolu_abc",
+    });
+    const rows = parse([toolUse("evt_tool_5", "toolu_abc"), { ...legacy, parent_id: null }]);
+    expect(twinRow(resolveTwinHttpParents(rows)).parent_event_id).toBe("evt_tool_5");
+  });
+
+  it("is a no-op when the run recorded no tool calls", () => {
+    const rows = parse([twinHttp("req_6", { tool_call_id: "toolu_abc" })]);
+    expect(resolveTwinHttpParents(rows)).toEqual(rows);
   });
 });
