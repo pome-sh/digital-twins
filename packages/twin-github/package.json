@@ -1,6 +1,6 @@
 {
   "name": "@pome-sh/twin-github",
-  "version": "0.8.2",
+  "version": "0.9.0",
   "description": "Deterministic GitHub-shaped twin for agent testing \u2014 REST + MCP, SQLite-backed state.",
   "private": false,
   "type": "module",
