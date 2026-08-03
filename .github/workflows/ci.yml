@@ -111,6 +111,7 @@ jobs:
           # is exactly why the gate lives here: zod cannot tell a reader from a
           # writer, so nothing else stops a new emitter reintroducing it.
           npm run lint:parent-vocab
+          node scripts/lint-parent-vocab.test.mjs
           # F-818 — the committed manifest JSON Schema (served at
           # pome.sh/schemas/v1/pome.json) must match the zod source.
           npm run check:manifest-schema -w @pome-sh/shared-types

@@ -51,43 +51,57 @@ const ALLOWED = new Map([
     "golden corpus — its `legacy:` inputs ARE pre-F-1200 rows",
   ],
   [
-    // Not the trace format at all: a Linear issue has a parent issue, and this
-    // is that column. Scoping the gate by field name catches it as collateral;
-    // renaming a twin's domain model to satisfy a trace-vocab gate would be the
-    // tail wagging the dog.
-    "packages/twin-linear/src/domain/rows.ts",
+    // Not the trace format at all: a Linear issue has a parent issue, and
+    // `parent_id` is that SQLite column — in the schema DDL, the seed inserts,
+    // the SELECT projections and the cycle check. Scoping the gate by field
+    // name catches the whole package as collateral; renaming a twin's domain
+    // model to satisfy a trace-vocab gate would be the tail wagging the dog.
+    // A trailing `/` makes this a directory prefix, not one file.
+    "packages/twin-linear/src/",
     "the Linear twin's own domain model — an issue's parent issue, not an event's parent row",
   ],
 ]);
 
-// Strip line comments, block comments, and string/template literals so a
-// mention in prose (or in a legacy JSON blob) is not a violation. Deliberately
-// simple: it over-strips rather than under-strips, and a writer emitting
-// `parent_id:` outside a string is exactly what it must not miss.
-function stripNonCode(source) {
-  return source
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/\/\/[^\n]*/g, "")
-    .replace(/'(?:\\.|[^'\\])*'/g, "''")
-    .replace(/"(?:\\.|[^"\\])*"/g, '""')
-    .replace(/`(?:\\.|[^`\\])*`/g, "``");
+// An entry ending in `/` covers everything beneath it.
+function allowReason(rel) {
+  for (const [key, reason] of ALLOWED) {
+    if (key.endsWith("/") ? rel.startsWith(key) : rel === key) return reason;
+  }
+  return null;
 }
 
-const BARE_PARENT_ID = /(?<![_\w])parent_id(?![_\w])/;
+// Strip comments only. Strings are NOT stripped: an earlier version removed
+// them first, which meant a quoted or computed property key —
+// `{ "parent_id": null }`, `{ ["parent_id"]: null }` — emitted the forbidden
+// field with the gate still green. A quoted key is the same emission as a bare
+// one, so the scan has to see it. (Caught in review on the PR that added this
+// gate; `lint-parent-vocab.test.mjs` locks it.)
+//
+// The trade is that a legitimate string mention in non-allowlisted source now
+// trips the gate. That is the right bias for an invariant: a loud false
+// positive is answered with a one-line allowlist entry and a stated reason,
+// while a silent false negative is how the old vocab comes back.
+function stripComments(source) {
+  return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+}
+
+// Bare identifier, or the same name as a quoted string — which in practice is
+// either a property key or a reference to the legacy field. Both are emissions.
+const BARE_PARENT_ID = /(?<![_\w])parent_id(?![_\w])|['"`]parent_id['"`]/;
 
 const violations = [];
 for (const pattern of ROOTS) {
   for (const file of globSync(pattern, { exclude: (p) => p.includes("node_modules") })) {
     const rel = file.split(`${process.cwd()}/`).pop();
-    if (ALLOWED.has(rel)) continue;
-    const code = stripNonCode(readFileSync(file, "utf8"));
+    if (allowReason(rel) !== null) continue;
+    const code = stripComments(readFileSync(file, "utf8"));
     if (!BARE_PARENT_ID.test(code)) continue;
     // Report the real line numbers, from the unstripped source, for anything
     // that survived the strip.
     readFileSync(file, "utf8")
       .split("\n")
       .forEach((line, i) => {
-        const bare = stripNonCode(line);
+        const bare = stripComments(line);
         if (BARE_PARENT_ID.test(bare)) violations.push(`${rel}:${i + 1}: ${line.trim()}`);
       });
   }
