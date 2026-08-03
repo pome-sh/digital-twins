@@ -54,6 +54,8 @@
 //     state check that leaned on export order would be reading an
 //     implementation detail the twin is free to change.
 
+import { childStatePath, statePath, type CheckOutcome } from "@pome-sh/sdk/checks";
+
 export interface StripeCheckStatePaymentIntent {
   id?: string;
   amount?: number;
@@ -124,8 +126,34 @@ export interface StripeCheckState {
 
 /** twin-github's and twin-slack's verdict type, same shape and same reason: a
  *  resolver must be able to say WHY it found nothing, because the ways of
- *  finding nothing get different verdicts. */
-export type Resolved<T> = { found: T } | { missing: string };
+ *  finding nothing get different verdicts.
+ *
+ *  F-1197 added the pointers, also twin-github's: `path` is where the resolution
+ *  landed, `searched` is the collection a failed lookup scanned — absent when the
+ *  export carried no such collection, because a citation that resolves to
+ *  nothing is the affordance-to-nowhere that ticket removes. */
+export type Resolved<T> =
+  | { found: T; path: string }
+  | { missing: string; searched?: string };
+
+/** The exported collections a pointer can address (F-1197). Named because seven
+ *  declarations reach for them, and because these are WIRE names — `refunds`,
+ *  not `refund_rows` — which is exactly the distinction this file's header
+ *  spends thirty lines on. A literal typed out at each call site is a chance to
+ *  reintroduce a row-column name that resolves to nothing. */
+export const PAYMENT_INTENTS_PATH = statePath("payment_intents");
+export const CHARGES_PATH = statePath("charges");
+export const EVENTS_PATH = statePath("events");
+export const REFUNDS_PATH = statePath("refunds");
+
+/** The `skipped` outcome an unresolvable lookup produces, citing where it
+ *  looked. Stripe abstains where twin-github fails, on twin-slack's precedent
+ *  (see `resolveCharge`), so this is `missOutcome` with `skipped`. */
+export function missSkip(miss: { missing: string; searched?: string }): CheckOutcome {
+  const outcome: CheckOutcome = { passed: false, status: "skipped", reason: miss.missing };
+  if (miss.searched === undefined) return outcome;
+  return { ...outcome, evidenceStatePaths: [miss.searched] };
+}
 
 /**
  * The charge a criterion names, with the three outcomes a refund assertion has
@@ -147,8 +175,9 @@ export function resolveCharge(
   chargeId: string,
 ): Resolved<StripeCheckStateCharge> {
   if (state.charges == null) return { missing: "state_incomplete" };
-  const hit = state.charges.find((charge) => charge.id === chargeId);
-  return hit ? { found: hit } : { missing: `charge_not_found ("${chargeId}")` };
+  const index = state.charges.findIndex((charge) => charge.id === chargeId);
+  if (index < 0) return { missing: `charge_not_found ("${chargeId}")`, searched: CHARGES_PATH };
+  return { found: state.charges[index]!, path: childStatePath(CHARGES_PATH, index) };
 }
 
 /**
@@ -168,5 +197,12 @@ export function refundsOnCharge(
   const charge = resolveCharge(state, chargeId);
   if ("missing" in charge) return charge;
   if (state.refunds == null) return { missing: "state_incomplete" };
-  return { found: state.refunds.filter((refund) => refund.charge === chargeId) };
+  // `/refunds`, the SOURCE collection. Refund rows are not nested under their
+  // charge in this export — they carry a `charge` wire field and are filtered
+  // here — so the per-charge list this returns exists nowhere in the tree to
+  // point at, and the collection is the honest address for a count over it.
+  return {
+    found: state.refunds.filter((refund) => refund.charge === chargeId),
+    path: REFUNDS_PATH,
+  };
 }

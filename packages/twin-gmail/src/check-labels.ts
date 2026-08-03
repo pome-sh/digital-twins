@@ -11,7 +11,7 @@
 import { defineCheck, VACUITY_SENTINEL } from "@pome-sh/sdk/checks";
 import type { Check } from "./check-kind.js";
 import { labelName } from "./check-params.js";
-import { resolveLabelByName } from "./check-state.js";
+import { missSkip, resolveLabelByName } from "./check-state.js";
 import { finalWorld, gmailState, systemLabel, userLabel } from "./check-worlds.js";
 
 export const labelExists: Check<{ label: string }> = defineCheck({
@@ -52,10 +52,21 @@ export const labelExists: Check<{ label: string }> = defineCheck({
       // `state_incomplete` and `collection_truncated` are unanswerable; a label
       // genuinely not there is the honest FAIL this check exists to deliver.
       if (found.missing.startsWith("label_not_found")) {
-        return { passed: false, reason: `no label named "${label}" exists` };
+        return {
+          passed: false,
+          reason: `no label named "${label}" exists`,
+          // The label COLLECTION — the honest citation for a lookup that found
+          // nothing, and the arm a reader most wants to open: see for yourself
+          // that the name is not in it (F-1197).
+          ...(found.searched === undefined ? {} : { evidenceStatePaths: [found.searched] }),
+        };
       }
-      return { passed: false, status: "skipped", reason: found.missing };
+      return missSkip(found);
     }
-    return { passed: true, reason: `label "${label}" exists (id ${found.found.id ?? "?"})` };
+    return {
+      passed: true,
+      reason: `label "${label}" exists (id ${found.found.id ?? "?"})`,
+      evidenceStatePaths: [found.path],
+    };
   },
 });

@@ -35,9 +35,38 @@
 //   - EVERYTHING IS MAILBOX-SCOPED via `mailboxEmail`, and ids are minted per
 //     mailbox, so `deliveryMode: "seeded-mailboxes"` can put one id in two.
 
+import { childStatePath, statePath, type CheckOutcome } from "@pome-sh/sdk/checks";
+
 /** A resolver must be able to say WHY it found nothing: the ways of finding
- *  nothing get different verdicts. Same shape and same reason as twin-github's. */
-export type Resolved<T> = { found: T } | { missing: string };
+ *  nothing get different verdicts. Same shape and same reason as twin-github's.
+ *
+ *  F-1197 added the pointers, also twin-github's: `path` is where the resolution
+ *  landed, `searched` is the collection a failed lookup scanned. Both optional on
+ *  the missing arm because gmail's commonest refusal is `state_incomplete` — the
+ *  collection is absent from the export entirely, so there is nowhere to point
+ *  and citing anything would be an affordance to nowhere. */
+export type Resolved<T> =
+  | { found: T; path: string }
+  | { missing: string; searched?: string };
+
+/** The exported collections a pointer can address. Named because six
+ *  declarations reach for them and a literal `"/messageLabels"` typed out six
+ *  times is six chances to typo one into a pointer that resolves to nothing —
+ *  and the mis-cased `/messagelabels` would look right in a diff. */
+export const MESSAGES_PATH = statePath("messages");
+export const DRAFTS_PATH = statePath("drafts");
+export const LABELS_PATH = statePath("labels");
+export const MESSAGE_LABELS_PATH = statePath("messageLabels");
+
+/** The `skipped` outcome an unresolvable lookup produces, citing where it
+ *  looked. Gmail abstains where twin-github fails — a message the export does
+ *  not carry cannot be attested either way — so this is `missOutcome` with
+ *  `skipped`, exactly as twin-slack's `missSkip` is. */
+export function missSkip(miss: { missing: string; searched?: string }): CheckOutcome {
+  const outcome: CheckOutcome = { passed: false, status: "skipped", reason: miss.missing };
+  if (miss.searched === undefined) return outcome;
+  return { ...outcome, evidenceStatePaths: [miss.searched] };
+}
 
 export interface GmailCheckStateMailbox {
   email?: string;
@@ -134,13 +163,26 @@ export function resolveMessage(
   id: string,
 ): Resolved<GmailCheckStateMessage> {
   if (state.messages == null) return { missing: "state_incomplete" };
-  const hits = state.messages.filter((message) => lower(message.id) === lower(id));
-  if (hits.length > 1) {
-    return { missing: `message_ambiguous ("${id}" exists in ${hits.length} mailboxes)` };
+  const indices = state.messages
+    .map((message, index) => (lower(message.id) === lower(id) ? index : -1))
+    .filter((index) => index >= 0);
+  if (indices.length > 1) {
+    // The AMBIGUITY is the finding, so the citation is the collection rather
+    // than one of the candidates: pointing at either would present a coin-flip
+    // as the thing the check read.
+    return {
+      missing: `message_ambiguous ("${id}" exists in ${indices.length} mailboxes)`,
+      searched: MESSAGES_PATH,
+    };
   }
-  if (hits.length === 1) return { found: hits[0]! };
-  if (isTruncated(state, "messages")) return { missing: 'collection_truncated ("messages")' };
-  return { missing: `message_not_found ("${id}")` };
+  if (indices.length === 1) {
+    const index = indices[0]!;
+    return { found: state.messages[index]!, path: childStatePath(MESSAGES_PATH, index) };
+  }
+  if (isTruncated(state, "messages")) {
+    return { missing: 'collection_truncated ("messages")', searched: MESSAGES_PATH };
+  }
+  return { missing: `message_not_found ("${id}")`, searched: MESSAGES_PATH };
 }
 
 /**
@@ -179,9 +221,13 @@ export function messageCarriesLabel(
     (row) => lower(row.messageId) === lower(messageId) && ids.has(lower(row.labelId)),
   );
   if (!carried && isTruncated(state, "messageLabels")) {
-    return { missing: 'collection_truncated ("messageLabels")' };
+    return { missing: 'collection_truncated ("messageLabels")', searched: MESSAGE_LABELS_PATH };
   }
-  return { found: carried };
+  // The JOIN, not a row in it. The answer is a boolean this function computed
+  // and the tree holds no such value, so the honest address is the table the
+  // question was asked of — and on the `false` side there is no row to name at
+  // all, which is exactly the arm a reader wants to check.
+  return { found: carried, path: MESSAGE_LABELS_PATH };
 }
 
 /**
@@ -197,10 +243,14 @@ export function resolveLabelByName(
   name: string,
 ): Resolved<GmailCheckStateLabel> {
   if (state.labels == null) return { missing: "state_incomplete" };
-  const hit = state.labels.find((label) => lower(label.name) === lower(name));
-  if (hit) return { found: hit };
-  if (isTruncated(state, "labels")) return { missing: 'collection_truncated ("labels")' };
-  return { missing: `label_not_found ("${name}")` };
+  const index = state.labels.findIndex((label) => lower(label.name) === lower(name));
+  if (index >= 0) {
+    return { found: state.labels[index]!, path: childStatePath(LABELS_PATH, index) };
+  }
+  if (isTruncated(state, "labels")) {
+    return { missing: 'collection_truncated ("labels")', searched: LABELS_PATH };
+  }
+  return { missing: `label_not_found ("${name}")`, searched: LABELS_PATH };
 }
 
 /**

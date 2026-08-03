@@ -37,7 +37,7 @@
 import { defineCheck } from "@pome-sh/sdk/checks";
 import type { Check } from "./check-kind.js";
 import { chargeId, rowCount } from "./check-params.js";
-import { refundsOnCharge } from "./check-state.js";
+import { missSkip, refundsOnCharge } from "./check-state.js";
 import { charge, finalWorld, refund, stripeState } from "./check-worlds.js";
 
 export const refundExists: Check<{ charge: string }> = defineCheck({
@@ -69,13 +69,18 @@ export const refundExists: Check<{ charge: string }> = defineCheck({
   }),
   evaluate(args, { final }) {
     const rows = refundsOnCharge(final, args.charge);
-    if ("missing" in rows) return { passed: false, status: "skipped", reason: rows.missing };
+    if ("missing" in rows) return missSkip(rows);
     return {
       passed: rows.found.length > 0,
       reason:
         rows.found.length > 0
           ? `charge "${args.charge}" has ${rows.found.length} refund row(s)`
           : `charge "${args.charge}" has no refund rows`,
+      // The refund COLLECTION (F-1197). Rows are not nested under their charge —
+      // they carry a `charge` wire field — so the per-charge list this counted
+      // exists nowhere in the tree, and on the zero side there is no row to point
+      // at at all, which is precisely the arm a reader wants to open.
+      evidenceStatePaths: [rows.path],
     };
   },
 });
@@ -122,7 +127,7 @@ export const refundCount: Check<{ charge: string; count: string }> = defineCheck
   },
   evaluate(args, { final }) {
     const rows = refundsOnCharge(final, args.charge);
-    if ("missing" in rows) return { passed: false, status: "skipped", reason: rows.missing };
+    if ("missing" in rows) return missSkip(rows);
     const wanted = Number(args.count);
     return {
       passed: rows.found.length === wanted,
@@ -131,6 +136,9 @@ export const refundCount: Check<{ charge: string; count: string }> = defineCheck
         (rows.found.length > wanted
           ? ` — ${rows.found.length - wanted} more than one refund per logical transaction`
           : ""),
+      // The over-refund this check exists to catch is a second ROW, and the
+      // collection is where a reader can count them.
+      evidenceStatePaths: [rows.path],
     };
   },
 });

@@ -6,9 +6,9 @@
 // Declarations only. The grammar rules they all obey are in `checks.ts`, which
 // assembles them; how the exported tree is read is in `check-state.ts`.
 
-import { defineCheck, repoRef, VACUITY_SENTINEL } from "@pome-sh/sdk/checks";
+import { childStatePath, defineCheck, repoRef, VACUITY_SENTINEL } from "@pome-sh/sdk/checks";
 import { commitStatusState, filePath, statusContext } from "./check-params.js";
-import { labelNames, resolveRepo } from "./check-state.js";
+import { labelNames, missOutcome, resolveRepo } from "./check-state.js";
 import { deltaWorld, finalWorld, repoState } from "./check-worlds.js";
 import type { Check } from "./check-kind.js";
 
@@ -60,22 +60,36 @@ export const noNewLabels: Check<{ repo: string }> = defineCheck({
     // consumer that forgets gets a named skip rather than a vacuous pass.
     if (seed === null) return { passed: false, reason: "seed_missing", status: "skipped" };
 
+    // The SEED-side refusal cites nothing. `missOutcome` carries the pointer the
+    // lookup walked, and this one walked the seed — a pointer always addresses
+    // `final` (the sdk's `check-state-path.ts` says why), so passing it through
+    // would send a reader into the tree the report does not render, at a path
+    // that may well resolve to an unrelated repo. The reason still names the miss.
     const seedRepo = resolveRepo(seed, repo, "the seed state");
-    if ("missing" in seedRepo) return { passed: false, reason: seedRepo.missing };
+    if ("missing" in seedRepo) return missOutcome({ ...seedRepo, searched: undefined });
     const finalRepo = resolveRepo(final, repo, "state_final");
-    if ("missing" in finalRepo) return { passed: false, reason: finalRepo.missing };
+    if ("missing" in finalRepo) return missOutcome(finalRepo);
 
     const before = labelNames(seedRepo.found);
     const created = [...labelNames(finalRepo.found)].filter((name) => !before.has(name)).sort();
+    // F-1197 — the only seed+final check, and the one that shows why a pointer
+    // addresses `final` rather than the substrate the assertion ranges over.
+    // The delta is computed from two trees; the reader has ONE on screen. So the
+    // citation is the final definition set — the side a reader can look at — and
+    // the reason carries the comparison. Pointing into a seed nothing renders
+    // would move the dead affordance rather than remove it.
+    const definitions = [childStatePath(finalRepo.path, "labels")];
     if (created.length === 0) {
       return {
         passed: true,
         reason: `no labels were created in ${repo} (${before.size} defined at seed, unchanged at finish)`,
+        evidenceStatePaths: definitions,
       };
     }
     return {
       passed: false,
       reason: `labels created in ${repo}: ${created.map((name) => `\`${name}\``).join(", ")}`,
+      evidenceStatePaths: definitions,
     };
   },
 });
@@ -100,7 +114,7 @@ export const fileExists: Check<{ path: string; repo: string }> = defineCheck({
   }),
   evaluate({ path, repo }, { final }) {
     const found = resolveRepo(final, repo, "state_final");
-    if ("missing" in found) return { passed: false, reason: found.missing };
+    if ("missing" in found) return missOutcome(found);
     const files = found.found.files ?? [];
     const passed = files.some((file) => file.path === path);
     return {
@@ -108,6 +122,7 @@ export const fileExists: Check<{ path: string; repo: string }> = defineCheck({
       reason: passed
         ? `file exists at "${path}" in ${repo}`
         : `no file found at "${path}" in ${repo} (${files.length} file(s) exported)`,
+      evidenceStatePaths: [childStatePath(found.path, "files")],
     };
   },
 });
@@ -146,7 +161,7 @@ export const commitStatus: Check<{ context: string; repo: string; state: string 
   }),
   evaluate({ context, repo, state }, { final }) {
     const found = resolveRepo(final, repo, "state_final");
-    if ("missing" in found) return { passed: false, reason: found.missing };
+    if ("missing" in found) return missOutcome(found);
     const candidates = (found.found.commit_statuses ?? []).filter(
       (row) => row.context === context,
     );
@@ -157,6 +172,11 @@ export const commitStatus: Check<{ context: string; repo: string; state: string 
         ? `commit status "${context}" is "${state}" in ${repo}`
         : `no commit status "${context}" with state "${state}" in ${repo} ` +
           `(found: [${candidates.map((row) => row.state).join(", ")}])`,
+      // Every status row, not the filtered candidates. The filter is part of the
+      // assertion — "which commit" is explicitly not asserted — and a pointer at
+      // a set this check computed rather than a set the tree holds would address
+      // nothing a reader could open.
+      evidenceStatePaths: [childStatePath(found.path, "commit_statuses")],
     };
   },
 });

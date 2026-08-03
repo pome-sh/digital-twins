@@ -42,11 +42,13 @@ import {
   workflowStateName,
 } from "./check-params.js";
 import {
+  fieldPath,
   resolveIssue,
   resolveLabelNames,
   resolveUserLabels,
   resolveWorkflowStateName,
   unresolved,
+  USERS_PATH,
 } from "./check-state.js";
 import { finalWorld, issueRow, linearState } from "./check-worlds.js";
 
@@ -81,7 +83,13 @@ export const issueExists: Check<{ title: string; team: string }> = defineCheck({
     // Echoing the title is safe HERE and only here: this check declares it as
     // its subject, so the engine skipped the criterion as `subject_redacted`
     // before reaching this line if a redactor would have destroyed it.
-    return { passed: true, reason: `an issue titled "${title}" exists in \`${team}\`` };
+    // The ROW itself: here the lookup IS the assertion, so the address the
+    // resolution walked to is exactly what produced the verdict (F-1197).
+    return {
+      passed: true,
+      reason: `an issue titled "${title}" exists in \`${team}\``,
+      evidenceStatePaths: [issue.path],
+    };
   },
 });
 
@@ -123,6 +131,11 @@ export const issueState: Check<{ title: string; team: string; state: string }> =
     return {
       passed: name.found.toLowerCase() === state.toLowerCase(),
       reason: `issue state is "${name.found}" (wanted "${state}")`,
+      // BOTH ends of trap 1's join. An issue has no state string — it has a
+      // `stateId` into the team's own workflow catalog — so a reader handed only
+      // the issue row would find an opaque id, and one handed only the catalog
+      // row would not know which issue pointed at it.
+      evidenceStatePaths: [fieldPath(issue.path, issue.found, "stateId"), name.path],
     };
   },
 });
@@ -154,6 +167,8 @@ export const issueHasLabel: Check<{ title: string; team: string; label: string }
     return {
       passed: names.found.has(label.toLowerCase()),
       reason: `issue carries ${names.found.size} label(s) (wanted "${label}")`,
+      // Trap 2's join, both ends: `labelIds` on the row, names in the catalog.
+      evidenceStatePaths: [fieldPath(issue.path, issue.found, "labelIds"), names.path],
     };
   },
 });
@@ -189,6 +204,11 @@ export const issueEstimate: Check<{ title: string; team: string; estimate: strin
     return {
       passed: actual === Number(estimate),
       reason: `issue estimate is ${actual === null ? "unset" : actual} (wanted ${estimate})`,
+      // `fieldPath`, not a bare `…/estimate`: an UNSET estimate is the verdict
+      // this check exists to deliver, and on an export that omits the column
+      // entirely a pointer at it would resolve to nothing — stripping the
+      // affordance from exactly the row a reader wants to open.
+      evidenceStatePaths: [fieldPath(issue.path, issue.found, "estimate")],
     };
   },
 });
@@ -217,11 +237,20 @@ export const issueAssignee: Check<{ title: string; team: string; user: string }>
     const issue = resolveIssue(final, team, title);
     if ("missing" in issue) return unresolved(issue);
     const labels = resolveUserLabels(final, issue.found.assigneeId);
-    if (labels.length === 0) return { passed: false, reason: "issue has no assignee" };
+    // The issue row on both arms. An unassigned issue has no user row to point
+    // at, so citing `/users` only when one resolved would make the citation's
+    // PRESENCE track the verdict — and its absence would start reading as
+    // "unassigned", which is a verdict class the pointer must not encode.
+    const assignment = [fieldPath(issue.path, issue.found, "assigneeId")];
+    if (labels.length === 0) {
+      return { passed: false, reason: "issue has no assignee", evidenceStatePaths: assignment };
+    }
+    if (final.users != null) assignment.push(USERS_PATH);
     return {
       passed: labels.some((l) => l.toLowerCase() === user.toLowerCase()),
       // Safe to quote: `user` is this check's declared subject.
       reason: `issue is assigned to \`${labels[0]}\` (wanted \`${user}\`)`,
+      evidenceStatePaths: assignment,
     };
   },
 });
