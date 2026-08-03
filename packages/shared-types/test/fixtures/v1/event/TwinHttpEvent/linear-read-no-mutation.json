@@ -1,0 +1,25 @@
+{
+  "ts": "2026-08-03T10:15:21.006Z",
+  "run_id": "run_01k2f7q9",
+  "twin": "linear",
+  "request_id": "req_01k2f7q9a1",
+  "task_step_id": null,
+  "step_id": null,
+  "tool_call_id": null,
+  "method": "GET",
+  "path": "/issues/F-1201",
+  "request_body": null,
+  "status": 200,
+  "response_body": {
+    "identifier": "F-1201",
+    "state": "Backlog"
+  },
+  "latency_ms": 12,
+  "fidelity": "semantic",
+  "state_mutation": false,
+  "state_delta": null,
+  "error": null,
+  "kind": "TwinHttpEvent",
+  "event_id": "evt_01k2f7q9a1",
+  "parent_id": null
+}

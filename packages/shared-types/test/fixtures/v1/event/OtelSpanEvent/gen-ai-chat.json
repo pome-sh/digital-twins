@@ -1,0 +1,42 @@
+{
+  "ts": "2026-08-03T10:15:24.702Z",
+  "event_id": "9a8b7c6d5e4f3a2b",
+  "parent_id": "1122334455667788",
+  "kind": "OtelSpanEvent",
+  "trace_id": "4f1e2d3c4b5a69788796a5b4c3d2e1f0",
+  "span_id": "9a8b7c6d5e4f3a2b",
+  "parent_span_id": "1122334455667788",
+  "name": "chat claude-opus-4-8",
+  "span_kind": "CLIENT",
+  "start_time_unix_nano": "1785752124702000000",
+  "end_time_unix_nano": "1785752127012000000",
+  "status_code": "UNSET",
+  "status_message": null,
+  "gen_ai_provider_name": "anthropic",
+  "gen_ai_operation_name": "chat",
+  "gen_ai_request_model": "claude-opus-4-8",
+  "gen_ai_agent_name": "triage-agent",
+  "gen_ai_agent_id": "agent_01k2f7q9",
+  "gen_ai_tool_name": null,
+  "gen_ai_usage_input_tokens": 3120,
+  "gen_ai_usage_output_tokens": 486,
+  "http_request_method": null,
+  "http_response_status_code": null,
+  "url_full": null,
+  "url_path": null,
+  "server_address": null,
+  "server_port": null,
+  "error_type": null,
+  "attributes": {
+    "gen_ai.provider.name": "anthropic",
+    "gen_ai.operation.name": "chat",
+    "gen_ai.request.model": "claude-opus-4-8",
+    "gen_ai.agent.name": "triage-agent",
+    "gen_ai.agent.id": "agent_01k2f7q9",
+    "gen_ai.usage.input_tokens": 3120,
+    "gen_ai.usage.output_tokens": 486,
+    "gen_ai.response.finish_reasons": [
+      "tool_use"
+    ]
+  }
+}

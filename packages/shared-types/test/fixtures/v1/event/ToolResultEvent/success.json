@@ -1,0 +1,9 @@
+{
+  "ts": "2026-08-03T10:15:22.612Z",
+  "event_id": "evt_01k2f7q9c5",
+  "parent_id": "evt_01k2f7q9c1",
+  "kind": "ToolResultEvent",
+  "tool_use_id": "toolu_01WxYzAbCdEf",
+  "output": "Created acme/app#41",
+  "is_error": false
+}
