@@ -230,7 +230,7 @@ export function shimLegacyEventToSpan(
   const candidate = {
     ts: nanosToIso(startNano),
     event_id: spanId,
-    parent_id: parentSpanId,
+    parent_event_id: parentSpanId,
     kind: "OtelSpanEvent" as const,
     trace_id: traceId,
     span_id: spanId,

@@ -156,7 +156,7 @@ describe("trace context resolution", () => {
     expect(span.span_id).toBe("legacy:e_http");
     expect(span.event_id).toBe("legacy:e_http");
     expect(span.parent_span_id).toBe("legacy:e_root");
-    expect(span.parent_id).toBe("legacy:e_root");
+    expect(span.parent_event_id).toBe("legacy:e_root");
   });
 
   it("requires explicit run_id for LlmCall / ToolUse rows", () => {
