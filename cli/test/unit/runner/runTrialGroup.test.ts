@@ -32,7 +32,7 @@ import type {
   RunTaskHostedOptions,
   RunTaskHostedResult,
 } from "../../../src/runner/runTaskHosted.js";
-import type { Score } from "../../../src/hosted/evalResultView.js";
+import type { Score, ScoreStatus } from "../../../src/hosted/evalResultView.js";
 
 vi.mock("../../../src/hosted/client.js", async (importOriginal) => {
   const original = await importOriginal<typeof import("../../../src/hosted/client.js")>();
@@ -192,12 +192,20 @@ function trialResult(input: {
   exitCode: number;
   durationMs: number;
   failedTexts?: string[];
+  /**
+   * F-925 — the run's three-state verdict. Defaults from `exitCode` so every
+   * existing call site keeps meaning what it meant; pass it explicitly to
+   * simulate a trial that finalized but could not be fully graded, which is
+   * the state `exitCode` alone cannot express.
+   */
+  verdict?: ScoreStatus;
 }): RunTaskHostedResult {
   return {
     runId: input.sessionId,
     cloudRunId: `run_${input.sessionId}`,
     cloudDashboardUrl: `https://app.example/runs/run_${input.sessionId}`,
     score: scoreOf(input.satisfaction, input.failedTexts ?? []),
+    verdict: input.verdict ?? (input.exitCode === 0 ? "pass" : "fail"),
     exitCode: input.exitCode,
     durationMs: input.durationMs,
     scenario: undefined as never,
@@ -387,6 +395,48 @@ describe("runTrialGroup — errored trials (FDRS-636)", () => {
     expect(text).toContain("trial 1  ⚠  errored         twin pod restarted mid-run — excluded");
     expect(text).toContain("trial 2  ✓  96       12.1s");
     expect(result.exitCode).toBe(0);
+  });
+
+  // F-925 — the state `exitCode` alone could not express. A trial that
+  // finalized with a criterion that never ran is neither a pass nor the
+  // agent's failure; it leaves the fraction and cannot buy the group a 0.
+  it("keeps an ungradable trial out of the fraction and out of a green exit", async () => {
+    const taskPath = await scenarioFixture();
+    const cloud = makeFakeClient();
+    const out: string[] = [];
+
+    const result = await runTrialGroup({
+      taskPath,
+      agentCommand: "node agent.js",
+      trials: 2,
+      hosted: { baseUrl: "https://api.example", apiKey: "pme_k" },
+      dashboardBaseUrl: "https://app.pome.sh",
+      out: (line) => out.push(line),
+      client: cloud.client,
+      runTaskHostedFn: async (options) => {
+        const sid = options.premintedSession!.session_id;
+        // Trial 2 scored 100 over a shrunken denominator: exit 1, but NOT a
+        // failure. Before this it arrived as `passed: exitCode === 0` and
+        // simply counted as a loss.
+        return sid === "ses_1"
+          ? trialResult({ sessionId: sid, satisfaction: 100, exitCode: 0, durationMs: 1000 })
+          : trialResult({
+              sessionId: sid,
+              satisfaction: 100,
+              exitCode: 1,
+              durationMs: 1100,
+              verdict: "incomplete",
+            });
+      },
+    });
+
+    const text = out.join("\n");
+    expect(text).toContain("1 of 1 passed · 1 incomplete, excluded from the fraction");
+    // Never "1 of 2" (which would blame the agent) and never "2 of 2".
+    expect(text).not.toContain("1 of 2 passed");
+    expect(text).not.toContain("2 of 2 passed");
+    // Green here would tell CI the set was verified when half of it was not.
+    expect(result.exitCode).toBe(1);
   });
 
   it("exit 1 when a completed trial failed; failing criteria feed the start-there line", async () => {

@@ -485,7 +485,7 @@ export async function runEval(options: RunEvalOptions): Promise<RunEvalResult> {
     return client.finalize(sid, {
       stopReason: "eval_upload",
       // /finalize's schema requires an integer exit_code, so `null` (agent
-      // timed out, or meta.json lacked the field) cannot pass through.
+      // timed out, or meta.json lacked the field) is not a legal value.
       // Send -1 as the explicit "unknown" sentinel — never a fabricated 0,
       // which would report a clean agent exit the trace can't vouch for.
       exitCode: artifacts.meta.exitCode ?? -1,
@@ -530,14 +530,16 @@ export async function runEval(options: RunEvalOptions): Promise<RunEvalResult> {
   // score.json), and the verdict lives in the cloud (see the dashboard URL).
   const score = scoreFromFinalizeResponse(finalized);
 
-  // Exit-code policy — DELIBERATE DIVERGENCE from hosted `pome run`
-  // (FDRS-618): `pome run` maps the raw cloud score (score >= threshold →
-  // 0), because pre-FDRS-618 cloud builds don't emit criteria_results and
-  // the cloud exit decision is documented as score-only. `pome eval` is a
-  // NEW command with no such compatibility surface, so it adopts the full
-  // FDRS-591/611 A5 guard up front: exit 0 ONLY when the run was evaluated,
-  // every criterion was judged (can_pass), AND the score clears the
-  // threshold. An UNEVAL verdict (e.g. all criteria skipped) exits 1.
+  // Exit-code policy — the full FDRS-591/611 A5 guard: exit 0 ONLY when the run
+  // was evaluated, every criterion was judged (can_pass), AND the score clears
+  // the threshold. An INCOMPLETE verdict (any criterion not evaluated) exits 1.
+  //
+  // F-925 retired the divergence that used to be documented here. `pome run`
+  // mapped the raw cloud score because "pre-FDRS-618 cloud builds don't emit
+  // criteria_results" — but `scoreFromFinalizeResponse` already handles that
+  // case (`hasCriteriaResults ? … : true`), so the guard degrades to score-only
+  // for exactly those builds on its own. The divergence was protecting a case
+  // its own helper already protected, and the two commands now agree.
   const exitCode = scoreStatus(score, EVAL_PASS_THRESHOLD) === "pass" ? 0 : 1;
 
   return {
@@ -618,7 +620,7 @@ export async function runEvalCommand(
     // Same verdict shape as hosted `pome run`: LABEL, score line, cloud URL.
     const status = scoreStatus(result.score, EVAL_PASS_THRESHOLD);
     const label =
-      status === "pass" ? "PASS" : status === "fail" ? "FAIL" : "UNEVAL";
+      status === "pass" ? "PASS" : status === "fail" ? "FAIL" : "INCOMPLETE";
     console.error(`${label} ${result.taskName}`);
     console.error(`  ${runScoreLine(result.score, EVAL_PASS_THRESHOLD, "cloud score")}`);
     if (result.score.results.length > 0) {

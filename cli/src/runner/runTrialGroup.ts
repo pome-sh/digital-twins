@@ -250,7 +250,14 @@ export async function runTrialGroup(
       row = {
         kind: "completed",
         score: result.score.satisfaction,
-        passed: result.exitCode === 0,
+        // F-925 — the trial's own verdict, carried out of the run rather than
+        // re-derived here. It was `result.exitCode === 0`, which cannot express
+        // the third state (1 means both "failed" and "could not be graded"), so
+        // a 100/100 trial with 3 of 4 criteria skipped counted as a clean pass.
+        // Reusing the run's own value rather than calling `scoreStatus` again
+        // on the same inputs is what keeps the trial line and the single-run
+        // headline from ever disagreeing.
+        verdict: result.verdict,
         seconds: result.durationMs / 1000,
         note:
           failing.length > 0
