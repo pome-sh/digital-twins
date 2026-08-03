@@ -208,7 +208,7 @@ describe("pome run --hosted (e2e via spawn)", () => {
     );
   }, 90_000);
 
-  it("prints UNEVAL when cloud score is 100 but returned criteria were skipped", async () => {
+  it("prints INCOMPLETE and exits 1 when cloud score is 100 but a criterion was skipped", async () => {
     finalizeResponseOverrides = {
       criteria_results: [
         {
@@ -268,9 +268,19 @@ describe("pome run --hosted (e2e via spawn)", () => {
     child.stderr.on("data", (d) => (stderr += d.toString()));
     const code = await new Promise<number>((res) => child.on("close", res));
 
-    expect(code, `stderr was:\n${stderr}`).toBe(0);
-    expect(stderr).toMatch(/UNEVAL Trivial/);
-    expect(stderr).toContain("score: un-evaluated (cannot pass)");
+    // F-925 — `pome run` used to exit 0 here, a documented divergence from
+    // `pome eval` justified by pre-FDRS-618 cloud builds that emit no
+    // `criteria_results`. That compat lives in `scoreFromFinalizeResponse`
+    // (can_pass true when the field is absent), so the divergence was guarding
+    // a case its own helper already guarded. A run whose criterion never ran is
+    // not a green CI signal.
+    expect(code, `stderr was:\n${stderr}`).toBe(1);
+    // F-932 — the label and the copy. "cannot pass" was a verdict about the
+    // AGENT for a gap in the GRADER.
+    expect(stderr).toMatch(/INCOMPLETE Trivial/);
+    expect(stderr).toContain("score: incomplete —");
+    expect(stderr).toContain("1 of 1 criteria not evaluated");
+    expect(stderr).not.toContain("cannot pass");
     expect(stderr).toContain("cloud score: 100/100");
   }, 90_000);
 

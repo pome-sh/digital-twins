@@ -250,7 +250,14 @@ export async function runTrialGroup(
       row = {
         kind: "completed",
         score: result.score.satisfaction,
-        passed: result.exitCode === 0,
+        // F-925 — the trial's own verdict, carried out of the run rather than
+        // re-derived here. It was `result.exitCode === 0`, which cannot express
+        // the third state (1 means both "failed" and "could not be graded"), so
+        // a 100/100 trial with 3 of 4 criteria skipped counted as a clean pass.
+        // Reusing the run's own value rather than calling `scoreStatus` again
+        // on the same inputs is what keeps the trial line and the single-run
+        // headline from ever disagreeing.
+        verdict: result.verdict,
         seconds: result.durationMs / 1000,
         note:
           failing.length > 0
@@ -313,8 +320,14 @@ export async function runTrialGroup(
   // 4. FDRS-644 — the fix & green handoff, only when a COMPLETED trial
   // failed. Errored trials are sandbox noise: the answer there is re-run,
   // not a code fix, so an errored-only group gets no handoff.
+  //
+  // F-925 — `fail`, NOT "anything that isn't a pass". This was `!r.passed`,
+  // which now includes the incomplete trial, and pointing someone at
+  // `pome fix-prompt` for a criterion that never ran tells them to fix an agent
+  // that may be blameless. An abstention is a grader gap; the handoff is for
+  // agent defects.
   const failedCompleted = rows.filter(
-    (r) => r.kind === "completed" && !r.passed,
+    (r) => r.kind === "completed" && r.verdict === "fail",
   ).length;
   if (failedCompleted > 0) {
     const artifactsDir = options.artifactsDir ?? "runs";

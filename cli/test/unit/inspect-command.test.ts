@@ -125,7 +125,7 @@ describe("pome inspect command", () => {
     expect(out).toContain("Events (2):");
     // No verdict rendered — capture-only.
     expect(out).not.toContain("Score");
-    expect(out).not.toMatch(/\bPASS\b|\bFAIL\b|\bUNEVAL\b/);
+    expect(out).not.toMatch(/\bPASS\b|\bFAIL\b|\bINCOMPLETE\b/);
   });
 
   it("shows only trace/audit content — never a verdict, even if a stray score.json exists", async () => {
@@ -171,6 +171,6 @@ describe("pome inspect command", () => {
     expect(out).toContain("Trace health:");
     expect(out).toContain("Events (1):");
     expect(out).not.toContain("Score");
-    expect(out).not.toMatch(/\bPASS\b|\bFAIL\b|\bUNEVAL\b/);
+    expect(out).not.toMatch(/\bPASS\b|\bFAIL\b|\bINCOMPLETE\b/);
   });
 });

@@ -941,7 +941,7 @@ export function createProgram() {
                 result.scenario.config.passThreshold,
               );
               const label =
-                status === "pass" ? "PASS" : status === "fail" ? "FAIL" : "UNEVAL";
+                status === "pass" ? "PASS" : status === "fail" ? "FAIL" : "INCOMPLETE";
               console.error(`${label} ${result.scenario.title}`);
               console.error(`  ${runScoreLine(result.score, result.scenario.config.passThreshold, "cloud score")}`);
               console.error(`  local: ${result.artifacts.runDir}`);
