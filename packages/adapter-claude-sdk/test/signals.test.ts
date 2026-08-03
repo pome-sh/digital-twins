@@ -64,7 +64,7 @@ describe("writeHookEvent", () => {
     writeHookEvent({
       ts: "2026-05-26T20:00:00.000Z",
       event_id: "11111111-1111-4111-8111-111111111111",
-      parent_id: null,
+      causing_tool_use_id: null,
       kind: "HookEvent",
       hook_name: "SessionStart",
       tool_name: null,
@@ -74,32 +74,32 @@ describe("writeHookEvent", () => {
     expect(JSON.parse(lines[0]!)).toEqual({
       ts: "2026-05-26T20:00:00.000Z",
       event_id: "11111111-1111-4111-8111-111111111111",
-      parent_id: null,
+      causing_tool_use_id: null,
       kind: "HookEvent",
       hook_name: "SessionStart",
       tool_name: null,
     });
   });
 
-  it("preserves tool_name and parent_id when supplied", () => {
+  it("preserves tool_name and causing_tool_use_id when supplied", () => {
     writeHookEvent({
       ts: "2026-05-26T20:00:01.000Z",
       event_id: "22222222-2222-4222-8222-222222222222",
-      parent_id: "toolu_abc",
+      causing_tool_use_id: "toolu_abc",
       kind: "HookEvent",
       hook_name: "PostToolUse",
       tool_name: "list_open_issues",
     });
     const parsed = JSON.parse(readLines(signalsPath)[0]!);
     expect(parsed.tool_name).toBe("list_open_issues");
-    expect(parsed.parent_id).toBe("toolu_abc");
+    expect(parsed.causing_tool_use_id).toBe("toolu_abc");
   });
 
   it("appends multiple lines without overwriting", () => {
     writeHookEvent({
       ts: "2026-05-26T20:00:00.000Z",
       event_id: "a",
-      parent_id: null,
+      causing_tool_use_id: null,
       kind: "HookEvent",
       hook_name: "SessionStart",
       tool_name: null,
@@ -107,7 +107,7 @@ describe("writeHookEvent", () => {
     writeHookEvent({
       ts: "2026-05-26T20:00:01.000Z",
       event_id: "b",
-      parent_id: null,
+      causing_tool_use_id: null,
       kind: "HookEvent",
       hook_name: "SessionEnd",
       tool_name: null,
@@ -121,7 +121,7 @@ describe("writeHookEvent", () => {
       writeHookEvent({
         ts: "2026-05-26T20:00:00.000Z",
         event_id: "a",
-        parent_id: null,
+        causing_tool_use_id: null,
         kind: "HookEvent",
         hook_name: "SessionStart",
         tool_name: null,

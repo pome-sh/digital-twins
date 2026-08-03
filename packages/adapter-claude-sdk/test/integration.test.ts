@@ -251,7 +251,7 @@ describe("end-to-end: withPome + tool + query", () => {
     expect(fetchCalls[0]!.headers["x-pome-correlation-id"]).toBeUndefined();
   });
 
-  it("acceptance: full M0 row shape — when a hook fires, the row carries kind=HookEvent + event_id + parent_id", async () => {
+  it("acceptance: full M0 row shape — when a hook fires, the row carries kind=HookEvent + event_id + causing_tool_use_id", async () => {
     const { withPome, query } = await import("../src/index.js");
     withPome();
     fakeMessages = [];
@@ -281,7 +281,7 @@ describe("end-to-end: withPome + tool + query", () => {
     expect(row.kind).toBe("HookEvent");
     expect(row.hook_name).toBe("PreToolUse");
     expect(row.tool_name).toBe("list");
-    expect(row.parent_id).toBe("toolu_42");
+    expect(row.causing_tool_use_id).toBe("toolu_42");
     expect(typeof row.event_id).toBe("string");
     expect(row.event_id.length).toBeGreaterThan(0);
     expect(typeof row.ts).toBe("string");

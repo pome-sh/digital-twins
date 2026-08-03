@@ -44,18 +44,26 @@ export function buildPomeHooks(): Partial<Record<HookEvent, HookCallbackMatcher[
       {
         hooks: [
           async (input, toolUseID) => {
-            // `parent_id`: prefer the SDK's explicit `toolUseID` callback
-            // arg, then `input.tool_use_id` (carried on tool-scoped hook
-            // payloads like PostToolUseFailure / PermissionDenied / etc.),
-            // else null. Per the M0 schema, `null` marks the root of a
-            // parent chain (e.g. SessionStart, top-level Setup) and is
-            // valid — the downstream correlator (FDRS-412) does ts-ordered
-            // insertion without requiring parent links on every row.
-            const parent_id = toolUseID ?? readToolUseId(input) ?? null;
+            // `causing_tool_use_id`: prefer the SDK's explicit `toolUseID`
+            // callback arg, then `input.tool_use_id` (carried on tool-scoped
+            // hook payloads like PostToolUseFailure / PermissionDenied /
+            // etc.), else null.
+            //
+            // F-1200: this is a raw SDK `tool_use_id`, NOT a spawning
+            // `event_id`, and before F-1200 it was written to `parent_id` —
+            // one of the four different things that field meant. A hook fires
+            // *because of* a tool call but is not spawned by its row, and the
+            // adapter has no `event_id` for that call at hook time, so the
+            // hook stays rootless: `parent_event_id` is null. Per the M0
+            // schema a null parent is valid — the downstream correlator
+            // (FDRS-412) does ts-ordered insertion without requiring parent
+            // links on every row.
+            const causing_tool_use_id = toolUseID ?? readToolUseId(input) ?? null;
             writeHookEvent({
               ts: new Date().toISOString(),
               event_id: newEventId(),
-              parent_id,
+              parent_event_id: null,
+              causing_tool_use_id,
               kind: "HookEvent",
               hook_name: event,
               tool_name: readToolName(input),

@@ -77,7 +77,7 @@ describe("withTurnUsage → LlmTurnEvent signals", () => {
     const r = rows[0]!;
     expect(r.kind).toBe("LlmTurnEvent");
     expect(r.turn_index).toBe(0);
-    expect(r.parent_id).toBeNull();
+    expect(r.parent_event_id).toBeNull();
     expect(r.model).toBe("claude-opus-4-8");
     expect(r.input_tokens).toBe(1200);
     expect(r.output_tokens).toBe(340);

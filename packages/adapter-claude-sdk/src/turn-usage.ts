@@ -81,7 +81,11 @@ export async function* withTurnUsage<T extends WithType>(
     writeLlmTurnEvent({
       ts: new Date().toISOString(),
       event_id: newEventId(),
-      parent_id: null,
+      // A turn is a root within events.jsonl. The run is not an event row —
+      // it is the TRACE (`legacy-shim` derives `trace_id` from `run_id`), so
+      // there is no `event_id` for a turn to point at. F-1200's ticket body
+      // said "pointing at the run"; the run has no row to point at.
+      parent_event_id: null,
       kind: "LlmTurnEvent",
       turn_index: turnIndex,
       model: pending.model,

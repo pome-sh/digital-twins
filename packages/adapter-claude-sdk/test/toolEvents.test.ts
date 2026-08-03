@@ -62,7 +62,7 @@ describe("withToolEvents", () => {
     expect(out).toEqual(messages);
   });
 
-  it("ticket acceptance: one tool_use + matching tool_result emits ToolUseEvent + ToolResultEvent with parent_id linkage", async () => {
+  it("ticket acceptance: one tool_use + matching tool_result emits ToolUseEvent + ToolResultEvent with parent_event_id linkage", async () => {
     const messages: FakeMsg[] = [
       {
         type: "assistant",
@@ -101,11 +101,11 @@ describe("withToolEvents", () => {
     expect(typeof tu[0].event_id).toBe("string");
     expect(tu[0].event_id.length).toBeGreaterThan(0);
     expect(typeof tu[0].ts).toBe("string");
-    expect(tu[0].parent_id === null || typeof tu[0].parent_id === "string").toBe(true);
+    expect(tu[0].parent_event_id === null || typeof tu[0].parent_event_id === "string").toBe(true);
 
     expect(tr[0].tool_use_id).toBe("toolu_xyz");
     expect(tr[0].is_error).toBe(false);
-    expect(tr[0].parent_id).toBe(tu[0].event_id);
+    expect(tr[0].parent_event_id).toBe(tu[0].event_id);
     expect(typeof tr[0].event_id).toBe("string");
     expect(tr[0].event_id).not.toBe(tu[0].event_id);
   });
@@ -185,7 +185,7 @@ describe("withToolEvents", () => {
     expect(row.is_error).toBe(true);
   });
 
-  it("orphan tool_result (no prior tool_use) still emits with parent_id=null", async () => {
+  it("orphan tool_result (no prior tool_use) still emits with parent_event_id=null", async () => {
     const messages: FakeMsg[] = [
       {
         type: "user",
@@ -201,7 +201,7 @@ describe("withToolEvents", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].kind).toBe("ToolResultEvent");
     expect(rows[0].tool_use_id).toBe("toolu_ghost");
-    expect(rows[0].parent_id).toBeNull();
+    expect(rows[0].parent_event_id).toBeNull();
   });
 
   it("ignores assistant messages with no tool_use blocks", async () => {
@@ -232,7 +232,7 @@ describe("withToolEvents", () => {
     expect(existsSync(signalsPath)).toBe(false);
   });
 
-  it("FDRS-409 ticket acceptance: 1 parent tool_use + 2 child assistant messages emits 1 SubagentSpawnEvent and chains child events via parent_id", async () => {
+  it("FDRS-409 ticket acceptance: 1 parent tool_use + 2 child assistant messages emits 1 SubagentSpawnEvent and chains child events via parent_event_id", async () => {
     const messages: FakeMsg[] = [
       // Parent agent fires the spawning tool_use (e.g. Task tool).
       {
@@ -280,15 +280,15 @@ describe("withToolEvents", () => {
     const childA = uses.find((r) => r.tool_use_id === "toolu_child_a");
     const childB = uses.find((r) => r.tool_use_id === "toolu_child_b");
 
-    // SubagentSpawnEvent.parent_id points at the spawning tool_use's event_id.
-    expect(spawns[0].parent_id).toBe(parentUse?.event_id);
+    // SubagentSpawnEvent.parent_event_id points at the spawning tool_use's event_id.
+    expect(spawns[0].parent_event_id).toBe(parentUse?.event_id);
 
     // Parent tool_use itself has no sub-agent ancestor.
-    expect(parentUse?.parent_id).toBeNull();
+    expect(parentUse?.parent_event_id).toBeNull();
 
     // Both child tool_uses chain through the SubagentSpawnEvent.
-    expect(childA?.parent_id).toBe(spawns[0].event_id);
-    expect(childB?.parent_id).toBe(spawns[0].event_id);
+    expect(childA?.parent_event_id).toBe(spawns[0].event_id);
+    expect(childB?.parent_event_id).toBe(spawns[0].event_id);
   });
 
   it("emits at most one SubagentSpawnEvent per distinct parent_tool_use_id", async () => {
