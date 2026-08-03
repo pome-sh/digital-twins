@@ -13,22 +13,53 @@ re-reports a bug that open issue #1 already tracks.
 
 ## The fix ("33, not 0")
 
-The whole product story is **one line** of the system prompt — `TRIAGE_RULE` in
-[`src/index.ts`](./src/index.ts):
+The whole product story is **one line** of committed configuration —
+`DENY_ISSUE_LOOKUP` in [`src/index.ts`](./src/index.ts):
 
-- **v1 (ships as the default — fails).** The baseline line tells the agent
-  *not* to search existing issues, so it files a **duplicate** issue for a bug
-  already tracked. It scores **33, not 0**: the agent does real work (its
-  report has concrete repro steps), but flunks both duplicate-detection
-  criteria — exactly the failure a happy-path demo never shows.
-- **v2 (the one-line fix — passes).** Swap `TRIAGE_RULE` to the commented
-  `TRIAGE_RULE_V2` right next to it (*search open issues first; comment on the
-  existing issue instead of opening a second one*), re-run, and the same exam
-  goes green.
+- **`true` (ships as the default — fails).** The agent's tool policy denies it
+  every read path into the repository's issues (`search_issues`, `list_issues`,
+  `get_issue`). Its system prompt is the *correct* one — search before filing —
+  so it reaches for the lookup, is refused, honestly concludes nothing tracks
+  the bug, and files a **duplicate**. It scores **33, not 0**: the agent does
+  real work (its report has concrete repro steps) and flunks the
+  duplicate-detection criteria — exactly the failure a happy-path demo never
+  shows.
+- **`false` (the one-line fix — passes).** Flip the constant, re-run, and the
+  same exam goes green: the agent searches, finds issue #1, comments on it, and
+  posts *its* link back.
 
-The two lines are verbatim from `../agents/support-triage-v1.yaml` and
-`…-v2.yaml` — this examinee and the managed-agent pair tell the same
-fail → fix → pass story on different runtimes.
+This is a **pattern-1** baseline in the curriculum's terms
+(`pome-cloud docs/curriculum/failure-classes.md` §3): the flaw is in the code
+and config layer, so a stronger model cannot rescue it — it follows the correct
+instruction *more* reliably and simply gets refused faster.
+
+The managed-agent pair next door (`../agents/support-triage-v1.yaml` vs
+`…-v2.yaml`) tells the same fail → fix → pass story through a *prompt* flaw, on
+a different runtime. That is a pattern-2 baseline and its red is
+model-dependent; it is kept for the managed-agent path, but this file is the one
+the curriculum grades.
+
+## Telemetry
+
+`query` is imported from `@pome-sh/adapter-claude-sdk`, not from
+`@anthropic-ai/claude-agent-sdk`. It is a drop-in — the message stream is
+byte-for-byte what the SDK yields — and it emits gen_ai OTLP spans (model,
+per-turn input/output tokens, latency) whenever a runner injects
+`POME_OTEL_EXPORTER_OTLP_ENDPOINT`, which both `pome run` and the coach do. With
+no endpoint set it is inert, so a standalone run is unaffected.
+
+Adopting it moved `@anthropic-ai/claude-agent-sdk` from a pinned `0.2.141` to
+`^0.3.215` — the adapter's peer range, and the range
+[`../../triage-agent`](../../triage-agent) already runs on. Nothing in this
+examinee's SDK surface changed with it.
+
+Using the adapter rather than hand-rolling the exporter is deliberate: per-turn
+token accounting has two non-obvious traps the adapter already fixed — one API
+turn arrives as several `assistant` messages that each repeat the same `usage`
+object (naive counting over-reported one run's input by 79%), and the true
+per-turn `output_tokens` only arrives on a `message_delta` stream event, not on
+the assistant message. An example that re-implemented this would be teaching the
+bug.
 
 ## How the coach launches it
 
@@ -90,8 +121,9 @@ per-session bearer the runner injects as `POME_AUTH_TOKEN`.
 ## Layout
 
 ```
-src/index.ts       the examinee — env wiring, the TRIAGE_RULE v1/v2 pair, the SDK loop
-test/env.test.ts   unit test for the launch env contract (npm test)
+src/index.ts             the examinee — env wiring, the DENY_ISSUE_LOOKUP defect, the SDK loop
+test/env.test.ts         unit test for the launch env contract (npm test)
+test/tool-policy.test.ts the lesson pinned as a property — both branches, neither shipped value
 ```
 
 `npm run typecheck` type-checks; `npm test` runs the env-contract test. This

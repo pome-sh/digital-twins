@@ -1,5 +1,38 @@
 # Verification — the self-fix flip on `duplicate-issue`
 
+## Two baselines, and only one of them is measured here
+
+This example now carries **two** failing baselines, on two runtimes:
+
+| Baseline | Where | Flaw | Curriculum pattern | Measured below |
+|---|---|---|---|---|
+| Managed-agent v1/v2 prompt pair | `agents/*.yaml` | charter line telling the agent not to search | 2 (policy constant) | **yes** |
+| Local examinee | `local/src/index.ts` — `DENY_ISSUE_LOOKUP` | tool policy denies every issue read path | 1 (config defect) | **no — pending** |
+
+**Everything below measures the first one.** The local examinee's pattern-1
+baseline is the one the curriculum grades, and it has **no stamp yet**.
+
+Three reasons the numbers below do not transfer to it, each independently
+sufficient:
+
+1. **It is a different flaw.** A prompt line and a tool policy are not the same
+   experiment, and the whole point of the re-cut is that the second one does not
+   rot the way the first one can.
+2. **They predate honest scoring.** They were recorded before a criterion the
+   grader could not run rendered as `NOT EVALUATED` — so a `100` in the table
+   below is not the same claim a `100` is today.
+3. **They predate the twin images.** All five twin snapshots were rebuilt and
+   promoted on 2026-08-03 (F-1147). Any stamp recorded before then was measured
+   against a different substrate.
+
+They are kept, unedited, because the "33, not 0" story is real and this is where
+it was actually measured — and because deleting the provenance of a number the
+whole onboarding narrative rests on would be worse than dating it.
+
+---
+
+## Measured: the managed-agent v1/v2 pair (2026-07, superseded as the curriculum stamp)
+
 Empirically measured on Pome, scored from the live twin tape (`provenance: hosted`),
 on team **AFFF's workspace**. Runs are visible on `app.pome.sh`.
 
@@ -86,3 +119,65 @@ pristine; a stronger model may or may not remove the last flake.
    agent_token)` immediately (tape is pulled from the still-live twin session).
 4. The two versions differ by one line — `agents/support-triage-v1.yaml` vs
    `agents/support-triage-v2.yaml`.
+
+---
+
+## Pending: the local examinee's pattern-1 baseline
+
+**Status: not yet measured** (2026-08-03). Deliberately empty — writing plausible
+numbers here is the exact failure the surrounding project exists to stop.
+
+| Variant | Pass rate | Score (per trial) | Behavior |
+|---|---|---|---|
+| `DENY_ISSUE_LOOKUP = true` (baseline) | — | — | — |
+| `DENY_ISSUE_LOOKUP = false` (fixed) | — | — | — |
+
+### The prediction, stated before the measurement
+
+So the run can disagree with it.
+
+| criterion | kind | baseline | fixed |
+|---|---|---|---|
+| A message in "support" contains "issues/1" | code:slack | ✗ | ✓ |
+| recognized the existing issue, opened no duplicate | model | ✗ | ✓ |
+| concrete repro steps | model | ✓ | ✓ |
+
+Baseline expected at **33**, for the same reason the managed-agent v1 scored 33
+and not 0: the agent does real work and its report is good. What it cannot do is
+look.
+
+### How to measure it
+
+```bash
+pome run tasks/duplicate-issue.md -n 5          # red   (DENY_ISSUE_LOOKUP = true)
+# flip the constant in local/src/index.ts, then
+pome run tasks/duplicate-issue.md -n 5          # green
+```
+
+Record the model id, `n/N`, the date and the run ids on both sides, then fill the
+table and the `verified red:` stamp in [`README.md`](./README.md).
+
+### The criteria are not finished
+
+The set above asserts that the agent **linked the right issue**. It does not
+assert that it **opened no second one** — the negative assertion
+`docs/curriculum/failure-classes.md` §4.2 asks for, and the one this example's
+lesson is actually named after. The declared GitHub vocabulary could not express
+it until `github.no-new-issues` ([F-1198](https://linear.app/pome-sh/issue/F-1198),
+digital-twins#283).
+
+Sequencing, because it is a cross-repo train and getting it wrong reddens the
+corpus gate: **twin-github 0.9.0 merges → publishes to npm → pome-cloud bumps its
+pin → only then** does a `no-new-issues` criterion belong in this task file. Added
+earlier, `criteria-corpus-watch` resolves it against the old pin and reports an
+unresolved phrase.
+
+### Re-verification duty
+
+Pattern-1 baselines carry the lowest rot risk — no model capability routes around
+a tool that was never exposed — so this does not need re-verifying per model
+generation. It **does** need re-verifying when the GitHub twin's tool surface
+changes: a new read path to an issue that `ISSUE_LOOKUP_TOOLS` does not name is a
+way around the defect, and the baseline would go green for the wrong reason.
+`local/test/tool-policy.test.ts` pins the list; it cannot know about a tool that
+does not exist yet.
