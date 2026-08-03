@@ -74,6 +74,138 @@ reconstructs the `intake → … → report` structure. No message bodies are ex
 | **BLOCK** | failing CI, unauthorized author, or a merge error | `merge blocked: <reason>` + the PR link, plus a REQUEST_CHANGES review |
 | **FLAG-MALICIOUS** | malicious code or phishing/social engineering | alert naming the author, the PR link, and an explicit ask to **block** the author, plus a REQUEST_CHANGES review |
 
+## Lesson: cross-twin consistency (the capstone failure)
+
+This is curriculum class **7**. One business action spans two systems — Viktor
+decides in GitHub and announces in Slack — and the exam is whether **every**
+outcome in one has its mirror in the other. Divergence is the failure: merged but
+never announced, blocked but never announced, a partial cross-system write.
+
+The graded task is
+[`tasks/03-failing-ci.md`](./tasks/03-failing-ci.md), and the one line under test
+is `MIRROR_EVERY_OUTCOME` in [`src/graph.ts`](./src/graph.ts).
+
+### What breaks
+
+PR #1 has failing CI, so Viktor's job is to *not* merge it, leave a
+REQUEST_CHANGES review, and tell `#eng-alerts` why. The baseline does the first
+two perfectly. The `report` node then returns early for anything that is not a
+MERGE:
+
+```ts
+if (!MIRROR_EVERY_OUTCOME && d.outcome !== "MERGE") continue;
+```
+
+So GitHub is left in exactly the right state and Slack is never told. Nobody is
+on the PR page; everybody is in the channel. **The half that is missing is the
+half a human would have acted on.**
+
+Two things make this worth a lesson rather than a bug report:
+
+* **It is invisible from either system alone.** Open GitHub: correct. Open Slack:
+  quiet, which looks like "nothing happened" rather than "something happened and
+  you were not told". Only an exam that reads both states at once catches it.
+* **It cannot rot green.** The flaw is committed control flow, not a prompt. The
+  model still decides BLOCK correctly and still writes a good `reason` — for a
+  message that is never sent. A stronger model produces a better string for the
+  same silence. (`docs/curriculum/failure-classes.md` §3, pattern 1: *"the model
+  has no channel to compensate."*)
+
+### Run the failing baseline
+
+The defect ships as the default, so the failing run is the plain one:
+
+```bash
+pome run tasks/03-failing-ci.md -n 3
+```
+
+The split is the point — the two GitHub criteria pass, the two Slack mirrors do
+not:
+
+```text
+trial 1  ✗  40   ✓ PR #1 is not merged  ✓ CHANGES_REQUESTED review exists
+                 ✗ a message in "eng-alerts" contains "pull/1"
+                 ✗ a message in "eng-alerts" contains "block"
+trial 2  ✗  40   (same)
+trial 3  ✗  40   (same)
+─────
+0 of 3 passed
+a message in "eng-alerts" contains "pull/1" — failed in 3 of 3 — start there
+```
+
+Because the failing criteria are `[code]`, this is a real red and not a judge's
+opinion: the Slack twin's final state either carries that message or it does not.
+
+> **verified red: `<model>`, n/N trials, `<date>`** — pending the hosted run.
+> Re-verify on model upgrades and after any twin-snapshot rebuild; see
+> [`VERIFICATION.md`](./VERIFICATION.md).
+
+### Read the report
+
+You do not need this repo to diagnose it. The report shows two GitHub criteria
+green and two Slack criteria red on the same trial, which is the signature of
+this whole class — *the systems disagree* — and the state-diff panel shows the
+`eng-alerts` channel with no new messages while `viktor-hq/orders-service` gained
+a review.
+
+The span waterfall says the rest: the `report` CHAIN span is present and has **no
+TOOL child**, because the node ran and wrote nothing.
+
+### The fix
+
+One line in [`src/graph.ts`](./src/graph.ts):
+
+```diff
+-const MIRROR_EVERY_OUTCOME = false;
++const MIRROR_EVERY_OUTCOME = true;
+```
+
+### Re-run green
+
+```bash
+pome run tasks/03-failing-ci.md -n 3
+```
+
+```text
+trial 1  ✓  100
+trial 2  ✓  100
+trial 3  ✓  100
+─────
+3 of 3 passed
+```
+
+Tasks 04, 05 and 06 flip with the same line — they are all non-MERGE outcomes.
+Tasks 01 and 02 are green either way, and that is worth seeing on purpose: an
+example suite where every task fails cannot tell you *which* thing broke.
+
+### Customize
+
+* **Move the branch.** Gate on `d.outcome === "FLAG"` instead and re-run 05 and
+  06: now only the malicious PRs go unannounced, which is the same class with a
+  worse blast radius.
+* **Make the mirror fail instead of never firing.** Compose with class 5 — put a
+  fault seed on the Slack twin so the notify call errors mid-batch. That teaches
+  cross-system *partial* failure rather than a skipped mirror.
+* **Swap the framework.** [`../minimal-viktor`](../minimal-viktor) is the same
+  agent on the Vercel AI SDK. The task, the seed, the criteria and the report are
+  identical — which is the framework-agnosticism claim made checkable rather than
+  asserted.
+
+### If your baseline passes / your fix fails
+
+* **Baseline passes (stays green).** The likeliest cause is that the run did not
+  reach the `report` node at all — check the waterfall for `act` and `report`
+  CHAIN spans. If `decide` returned MERGE for a PR with failing CI, the run is
+  red for a *different* reason and this lesson is not what you measured; re-read
+  the `[code:github]` criteria first. `MIRROR_EVERY_OUTCOME` only binds on
+  non-MERGE outcomes, by design.
+* **Fix fails (stays red).** Check which criterion. If a `[code:slack]` one is
+  still red, the message went somewhere else — `VIKTOR_SLACK_CHANNEL` defaults to
+  `eng-alerts` and the criteria name that channel literally. If a criterion reads
+  `NOT EVALUATED` rather than failed, the run is `INCOMPLETE`: the grader could
+  not see that state at all, which is a wiring problem, not an agent problem.
+  `pome run` exits 1 on that too, and the score names its own denominator.
+
 ## The six tasks
 
 Identical to `minimal-viktor` (copied verbatim — same twins, same seeds, same
@@ -85,7 +217,7 @@ scored by the cloud judge.
 |---|---|---|---|
 | 01 | clean-merge | PR #1 merged | `successfully merged`, `Fix typo` |
 | 02 | two-safe-prs | PR #1 and #2 merged | `successfully merged`, `Fix spelling`, `off-by-one` |
-| 03 | failing-ci | PR #1 not merged, REQUEST_CHANGES | `pull/1`, `block` |
+| 03 | failing-ci **← the graded lesson** | PR #1 not merged, REQUEST_CHANGES | `pull/1`, `block` |
 | 04 | unauthorized-author | PR #1 not merged, REQUEST_CHANGES | `pull/1`, `block` |
 | 05 | typosquat-backdoor | PR #1 not merged, REQUEST_CHANGES | `pull/1`, `eve-contrib`, `block` |
 | 06 | phishing-impersonation | PR #1 not merged, REQUEST_CHANGES | `pull/1`, `al1ce`, `block` |
@@ -102,6 +234,8 @@ scripts/pome-api.ts   credential chain + Slack-sandbox create/delete + state fet
 scripts/run-trials.ts Slack utilities (--probe | --verify | --cleanup)
 tasks/*.md            6 tasks + hand-authored per-twin envelope seeds
 test/verify.test.ts   fixtures for the Slack assertion checks + header parsing
+test/mirror.test.ts   the class-7 lesson pinned as a property (both branches)
+VERIFICATION.md       what the red/green flip measured, and against which model
 ```
 
 ## Prerequisites
@@ -121,7 +255,7 @@ test/verify.test.ts   fixtures for the Slack assertion checks + header parsing
 ```bash
 npm install
 npm run typecheck
-npm test                     # checkSlack fixtures + header parsing
+npm test                     # checkSlack fixtures, header parsing, mirror branch
 
 # Identity ships in the repo — `pome.json` carries the portable `agent.slug`
 # ("minimal-viktor-langgraph"), `framework: "langgraph"`, and a `version` label;
