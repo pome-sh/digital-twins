@@ -162,12 +162,20 @@ function normalizeTaskStepVocab<
 // Here an explicit `parent_event_id: null` is the documented root-of-chain
 // marker, so a disagreeing legacy `parent_id` must not silently re-parent a row
 // the writer deliberately rooted.
+// The return type stays `T` rather than `T & { parent_event_id: string | null }`
+// even though the value always carries the key after this runs. Widening it
+// breaks the identity `Event` = union of the variant types: the variants must
+// keep `parent_event_id` OPTIONAL on the input side for the tolerant read, so a
+// narrowed output type makes a hand-built `LlmCallEvent` no longer assignable
+// to `Event`. Downstream code (the CLI's inspect, pome-cloud's readers) relies
+// on that identity, and it is worth more than a type-level restatement of a
+// runtime guarantee. Read it as `parent_event_id ?? null`.
 function normalizeParentVocab<
   T extends { parent_event_id?: string | null; parent_id?: string | null },
->(event: T): T & { parent_event_id: string | null } {
+>(event: T): T {
   return event.parent_event_id === undefined
     ? { ...event, parent_event_id: event.parent_id ?? null }
-    : (event as T & { parent_event_id: string | null });
+    : event;
 }
 
 // F-1200, the HookEvent arm of the same tolerant read. A pre-F-1200 HookEvent
@@ -177,7 +185,7 @@ function normalizeParentVocab<
 // `causing_tool_use_id` instead and leave the hook rootless.
 function normalizeHookCausingToolUseId<
   T extends { causing_tool_use_id?: string | null; parent_id?: string | null },
->(event: T): T & { causing_tool_use_id: string | null; parent_event_id: null } {
+>(event: T): T {
   return {
     ...event,
     causing_tool_use_id:
