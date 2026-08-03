@@ -1,7 +1,7 @@
 {
   "ts": "2026-08-03T10:15:20.114Z",
   "event_id": "evt_01k2f7q8z1",
-  "parent_id": null,
+  "parent_event_id": null,
   "kind": "LlmCallEvent",
   "host": "api.anthropic.com",
   "port": 443,

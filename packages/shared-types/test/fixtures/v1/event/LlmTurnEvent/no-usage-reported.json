@@ -1,7 +1,7 @@
 {
   "ts": "2026-08-03T10:15:19.902Z",
   "event_id": "evt_01k2f7q8y4",
-  "parent_id": null,
+  "parent_event_id": null,
   "kind": "LlmTurnEvent",
   "turn_index": 0,
   "model": null,

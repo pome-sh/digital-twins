@@ -297,7 +297,7 @@ export type ToolUseEvent = z.infer<typeof toolUseEventSchema>;
 
 // `ToolResultEvent` — emitted by the CAS adapter (FDRS-408) for each
 // tool_result content block in a user message. `tool_use_id` matches the
-// originating `ToolUseEvent.tool_use_id`; `parent_id` typically points at
+// originating `ToolUseEvent.tool_use_id`; `parent_event_id` points at
 // that ToolUseEvent's `event_id`.
 export const toolResultEventSchema = z.object({
   ...eventBaseShape,
@@ -348,7 +348,8 @@ export type HookEvent = z.infer<typeof hookEventSchema>;
 // Field discipline (grill 2026-07-14 + codex review 2026-07-15):
 //   - Absent SDK values are `nullable`, not `optional` — writers emit explicit
 //     null so the on-disk JSON shape is stable.
-//   - `parent_id: null` in M1 (turn→tool parent linkage is M2).
+//   - `parent_event_id: null` — a turn is a root within events.jsonl. The
+//     run is the TRACE, not an event row, so there is nothing to point at.
 //   - `session_id: null` in M1 (no session-id env plumbing — out of scope).
 //   - No cost fields (no OTEL convention; computed cloud-side from a pricing
 //     table at display time).

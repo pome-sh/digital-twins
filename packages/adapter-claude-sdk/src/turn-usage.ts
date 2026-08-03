@@ -15,7 +15,7 @@
 // before its first content block), end = the turn's last content block — so
 // `latency_ms` is an estimate and every M1 row is
 // stamped `latency_ms_estimated: true` (the SDK surfaces no per-call API
-// timing). `turn_index` is 0-based per `query()` stream. `parent_id` and
+// timing). `turn_index` is 0-based per `query()` stream. `parent_event_id` and
 // `session_id` are null in M1.
 //
 // `output_tokens` and `finish_reasons` come from the `message_delta` stream

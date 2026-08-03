@@ -38,5 +38,5 @@
   "error": null,
   "kind": "TwinHttpEvent",
   "event_id": "evt_01k2f7q9c3",
-  "parent_id": "evt_01k2f7q9c1"
+  "parent_event_id": "evt_01k2f7q9c1"
 }
