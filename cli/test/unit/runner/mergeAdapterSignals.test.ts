@@ -3,7 +3,7 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { eventSchema } from "../../../src/types/shared.js";
+import { eventSchema, shimLegacyEventToSpan } from "../../../src/types/shared.js";
 import {
   mergeAdapterSignalsIntoEvents,
   resolveTwinHttpParents,
@@ -345,5 +345,82 @@ describe("resolveTwinHttpParents", () => {
   it("is a no-op when the run recorded no tool calls", () => {
     const rows = parse([twinHttp("req_6", { tool_call_id: "toolu_abc" })]);
     expect(resolveTwinHttpParents(rows)).toEqual(rows);
+  });
+});
+
+// F-1200 acceptance. The ticket's observable is "one tree: run → turn → tool →
+// twin HTTP", and the thing that made it impossible was structural: every twin
+// row carried a null parent, so `legacy-shim` derived `parent_span_id: null`
+// and every twin span was a root with nothing to attach to. This walks the
+// whole chain on real shapes rather than asserting the join in isolation.
+describe("F-1200 acceptance: a twin call sits inside the tool that made it", () => {
+  it("merged tape → shim → a span parented at the tool's span", async () => {
+    const dir = await workspace();
+    const eventsPath = join(dir, "events.jsonl");
+    const signalsPath = join(dir, "signals.jsonl");
+
+    // The twin's tape: written by another process, which cannot know the
+    // agent-side event_id. It carries the causing tool's id on the header it
+    // received — since F-1200 that is the SDK's real `toolu_`, not a `tlc_`.
+    await writeFile(
+      eventsPath,
+      JSON.stringify({
+        ts: "2026-08-03T12:00:01.000Z",
+        run_id: "run_accept",
+        twin: "github",
+        request_id: "req_1",
+        correlation_id: "toolu_01WxYzAbCdEf",
+        step_id: null,
+        tool_call_id: "toolu_01WxYzAbCdEf",
+        method: "POST",
+        path: "/repos/acme/app/issues",
+        request_body: {},
+        status: 201,
+        response_body: { number: 7 },
+        latency_ms: 12,
+        fidelity: "semantic",
+        state_mutation: true,
+        state_delta: null,
+        error: null,
+        kind: "TwinHttpEvent",
+        event_id: "evt_twin_1",
+        parent_event_id: null,
+      }) + "\n",
+    );
+
+    // The adapter's signals: the tool call that caused it.
+    await writeFile(
+      signalsPath,
+      JSON.stringify({
+        ts: "2026-08-03T12:00:00.000Z",
+        event_id: "evt_tool_1",
+        parent_event_id: null,
+        kind: "ToolUseEvent",
+        tool_use_id: "toolu_01WxYzAbCdEf",
+        tool_name: "mcp__github__create_issue",
+        input: { title: "Bug" },
+      }) + "\n",
+    );
+
+    await mergeAdapterSignalsIntoEvents(signalsPath, eventsPath);
+
+    const rows = (await readFile(eventsPath, "utf8"))
+      .split("\n")
+      .filter((l) => l.length > 0)
+      .map((l) => eventSchema.parse(JSON.parse(l)));
+
+    const twin = rows.find((r) => r.kind === "TwinHttpEvent");
+    const tool = rows.find((r) => r.kind === "ToolUseEvent");
+    expect(twin?.parent_event_id).toBe("evt_tool_1");
+
+    // And the whole point of fixing the parent rather than adding trace_id /
+    // span_id: the shim now produces a correctly-parented span for free.
+    const twinSpan = shimLegacyEventToSpan(twin);
+    const toolSpan = shimLegacyEventToSpan(tool, { run_id: "run_accept" });
+
+    expect(twinSpan.parent_span_id).toBe(toolSpan.span_id);
+    expect(twinSpan.trace_id).toBe(toolSpan.trace_id);
+    // Before F-1200 this was null, which is what made the two trees unstitchable.
+    expect(twinSpan.parent_span_id).not.toBeNull();
   });
 });
