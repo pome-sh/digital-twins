@@ -15,7 +15,7 @@
 // before its first content block), end = the turn's last content block — so
 // `latency_ms` is an estimate and every M1 row is
 // stamped `latency_ms_estimated: true` (the SDK surfaces no per-call API
-// timing). `turn_index` is 0-based per `query()` stream. `parent_id` and
+// timing). `turn_index` is 0-based per `query()` stream. `parent_event_id` and
 // `session_id` are null in M1.
 //
 // `output_tokens` and `finish_reasons` come from the `message_delta` stream
@@ -81,7 +81,11 @@ export async function* withTurnUsage<T extends WithType>(
     writeLlmTurnEvent({
       ts: new Date().toISOString(),
       event_id: newEventId(),
-      parent_id: null,
+      // A turn is a root within events.jsonl. The run is not an event row —
+      // it is the TRACE (`legacy-shim` derives `trace_id` from `run_id`), so
+      // there is no `event_id` for a turn to point at. F-1200's ticket body
+      // said "pointing at the run"; the run has no row to point at.
+      parent_event_id: null,
       kind: "LlmTurnEvent",
       turn_index: turnIndex,
       model: pending.model,

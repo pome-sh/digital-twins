@@ -163,28 +163,37 @@ export const POME_RECORDER_EVENTS_PATH = "POME_RECORDER_EVENTS_PATH";
  * durable tape never persists a mismatched discriminator. Disk rows from the
  * durable store use this shape so finalize/upload does not need a second wrap
  * for crash-streamed events.
+ *
+ * `parent_event_id` is null here and that is not a stub: the twin runs in its
+ * own process and legitimately cannot know the `event_id` of the agent-side
+ * `ToolUseEvent` that caused the call. What it DOES carry is the causing tool's
+ * id, arriving on `x-pome-correlation-id` and persisted as `correlation_id`
+ * (always) and `tool_call_id` (when the twin pins `stampToolCallId`). Since
+ * F-1200 that header holds the SDK's real `toolu_…`, so the parent is resolvable
+ * — and `mergeAdapterSignalsIntoEvents` in the CLI resolves it, because that is
+ * the one place that sees both this tape and the adapter's signals.
  */
 export function toTwinHttpEventRow(
   event: RecorderEvent
-): RecorderEvent & { kind: "TwinHttpEvent"; event_id: string; parent_id: null } {
+): RecorderEvent & { kind: "TwinHttpEvent"; event_id: string; parent_event_id: null } {
   const maybeKind = (event as { kind?: unknown }).kind;
   if (maybeKind === "TwinHttpEvent") {
     const existing = event as RecorderEvent & {
       kind: "TwinHttpEvent";
       event_id?: string;
-      parent_id?: null;
+      parent_event_id?: null;
     };
     return {
       ...existing,
       event_id: typeof existing.event_id === "string" ? existing.event_id : event.request_id,
-      parent_id: null,
+      parent_event_id: null,
     };
   }
   return {
     ...event,
     kind: "TwinHttpEvent",
     event_id: event.request_id,
-    parent_id: null,
+    parent_event_id: null,
   };
 }
 

@@ -106,6 +106,12 @@ jobs:
           # Before that it compared bytes no schema change could move.
           npm run check:trace-contract -w @pome-sh/shared-types
           node packages/shared-types/scripts/emit-trace-contract.test.mjs
+          # F-1200 — `parent_id` meant four different things across five writers.
+          # The schema still ACCEPTS it so stored 0.13.0 rows keep parsing, which
+          # is exactly why the gate lives here: zod cannot tell a reader from a
+          # writer, so nothing else stops a new emitter reintroducing it.
+          npm run lint:parent-vocab
+          node scripts/lint-parent-vocab.test.mjs
           # F-818 — the committed manifest JSON Schema (served at
           # pome.sh/schemas/v1/pome.json) must match the zod source.
           npm run check:manifest-schema -w @pome-sh/shared-types

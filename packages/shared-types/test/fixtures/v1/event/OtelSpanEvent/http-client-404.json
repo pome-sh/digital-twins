@@ -1,7 +1,7 @@
 {
   "ts": "2026-08-03T10:15:25.088Z",
   "event_id": "b1c2d3e4f5061728",
-  "parent_id": null,
+  "parent_event_id": null,
   "kind": "OtelSpanEvent",
   "trace_id": "4f1e2d3c4b5a69788796a5b4c3d2e1f0",
   "span_id": "b1c2d3e4f5061728",

@@ -20,6 +20,7 @@
     "lint:code-health": "node scripts/lint-code-health.mjs",
     "lint:twin-registration": "node scripts/check-first-party-twin-registration.mjs",
     "lint:legacy-markers": "node scripts/lint-legacy-criterion-markers.mjs",
+    "lint:parent-vocab": "node scripts/lint-parent-vocab.mjs",
     "lint:cli-pins": "node scripts/check-cli-pins-match-workspace.mjs",
     "lint:dead-code": "knip --no-config-hints"
   },

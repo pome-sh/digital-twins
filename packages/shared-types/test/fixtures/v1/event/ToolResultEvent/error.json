@@ -1,7 +1,7 @@
 {
   "ts": "2026-08-03T10:15:25.088Z",
   "event_id": "evt_01k2f7q9f0",
-  "parent_id": "evt_01k2f7q9e8",
+  "parent_event_id": "evt_01k2f7q9e8",
   "kind": "ToolResultEvent",
   "tool_use_id": "toolu_01GhIjKlMnOp",
   "output": {

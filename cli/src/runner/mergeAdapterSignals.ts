@@ -25,6 +25,45 @@ import { redactEvent } from "../recorder/redaction.js";
 // lines are dropped and counted; the caller can log the drop count. Existing
 // events.jsonl rows that fail to parse are passed through unsorted at the
 // head of the file so a corrupted in-flight write is never silently dropped.
+/**
+ * F-1200 — give every twin HTTP row the tool call that caused it.
+ *
+ * The twin writes `parent_event_id: null` because it runs in its own process
+ * and cannot know the agent-side `event_id`; the adapter knows the `event_id`
+ * but never sees the twin's tape. This merge is the one place both halves are
+ * in hand, so the join belongs here — and it is a pure data operation over two
+ * finished files, with no dependency on the order the two writers ran in.
+ *
+ * The join key is the SDK's `tool_use_id`, which since F-1200 is what the
+ * adapter stamps on `x-pome-correlation-id`. The twin persists that header as
+ * `correlation_id` ALWAYS and as `tool_call_id` only when it pins
+ * `stampToolCallId` (github's frozen tape shape) — so `correlation_id` is the
+ * key that works for every twin, with `tool_call_id` preferred when present
+ * because it is unambiguously the header rather than the request-id fallback.
+ *
+ * A row keeps its null parent when the id names no tool call: a pre-F-1200
+ * `tlc_…`, a `req_…` from the no-header fallback, or a direct REST call made
+ * outside any tool handler. An unresolvable parent is the honest answer there —
+ * inventing one would put twin calls under tools that did not make them.
+ */
+export function resolveTwinHttpParents(rows: Event[]): Event[] {
+  const eventIdByToolUseId = new Map<string, string>();
+  for (const row of rows) {
+    if (row.kind === "ToolUseEvent") eventIdByToolUseId.set(row.tool_use_id, row.event_id);
+  }
+  if (eventIdByToolUseId.size === 0) return rows;
+
+  return rows.map((row) => {
+    if (row.kind !== "TwinHttpEvent") return row;
+    // Never overwrite a parent the writer already established.
+    if (row.parent_event_id != null) return row;
+    const causingToolUseId = row.tool_call_id ?? row.correlation_id ?? null;
+    if (causingToolUseId === null) return row;
+    const parentEventId = eventIdByToolUseId.get(causingToolUseId);
+    return parentEventId === undefined ? row : { ...row, parent_event_id: parentEventId };
+  });
+}
+
 export async function mergeAdapterSignalsIntoEvents(
   signalsPath: string,
   eventsJsonlPath: string,
@@ -85,9 +124,9 @@ export async function mergeAdapterSignalsIntoEvents(
     }
   }
 
-  // Concat + stable sort by ts. ISO-8601 with `Z` sorts chronologically under
-  // lexicographic compare.
-  const merged = eventRows.concat(signalRows);
+  // Concat, resolve twin-HTTP parentage, then stable sort by ts. ISO-8601 with
+  // `Z` sorts chronologically under lexicographic compare.
+  const merged = resolveTwinHttpParents(eventRows.concat(signalRows));
   merged.sort((a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0));
 
   const sortedJsonl = merged.map((r) => JSON.stringify(r)).join("\n");

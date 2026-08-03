@@ -136,7 +136,7 @@ export const LEGACY_FIXTURES: readonly LegacyFixture[] = deepFreeze<readonly Leg
     expected: {
       ts: "2026-06-02T12:00:00.000Z",
       event_id: "legacy:evt_http_1",
-      parent_id: null,
+      parent_event_id: null,
       kind: "OtelSpanEvent",
       trace_id: "legacy:run_otel_demo",
       span_id: "legacy:evt_http_1",
@@ -199,7 +199,7 @@ export const LEGACY_FIXTURES: readonly LegacyFixture[] = deepFreeze<readonly Leg
     expected: {
       ts: "2026-06-02T12:00:01.000Z",
       event_id: "legacy:evt_llm_1",
-      parent_id: "legacy:evt_http_1",
+      parent_event_id: "legacy:evt_http_1",
       kind: "OtelSpanEvent",
       trace_id: "legacy:run_otel_demo",
       span_id: "legacy:evt_llm_1",
@@ -259,7 +259,7 @@ export const LEGACY_FIXTURES: readonly LegacyFixture[] = deepFreeze<readonly Leg
     expected: {
       ts: "2026-06-02T12:00:02.000Z",
       event_id: "legacy:evt_tool_1",
-      parent_id: "legacy:evt_llm_1",
+      parent_event_id: "legacy:evt_llm_1",
       kind: "OtelSpanEvent",
       trace_id: "legacy:run_otel_demo",
       span_id: "legacy:evt_tool_1",
