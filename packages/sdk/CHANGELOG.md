@@ -1,6 +1,39 @@
 # @pome-sh/sdk
 
 
+## 0.10.1 — 2026-08-03
+
+A state-reading check can say WHERE it looked (F-1197).
+
+- New `CheckOutcome.evidenceStatePaths` — the state-substrate sibling of
+  `evidenceEventIds`, carrying RFC 6901 JSON Pointers into the twin's exported
+  state tree. Optional and additive; a check with nothing to name omits it, the
+  same omit-don't-empty discipline the existing field has.
+- New `statePath(...segments)` / `childStatePath(base, ...segments)` builders and
+  `resolveStatePath(tree, pointer)` reader, in `check-state-path.ts` and
+  re-exported from `@pome-sh/sdk/checks`.
+- New `probeStateCitation(def, args)` — pure, no test framework, the sibling of
+  `probeDiscrimination`. Returns `cites` / `declined` / `uncited` /
+  `unresolvable` / `malformed`, and probes BOTH declared worlds.
+
+The measurement behind it: `evidenceEventIds` can only be filled by a
+`substrate: "tape"` check, and of the 45 checks the five first-party twins
+declare, 8 read the tape. The other 37 read state and could cite nothing at all —
+a verdict that renders as an inert row, which a reader cannot tell from a verdict
+with no evidence behind it. Every Slack `[code]` criterion was in that set,
+because Slack declares no tape check.
+
+A pointer ALWAYS addresses `final`, never `seed`, even for a delta check: the
+consumer has the final tree on screen, so a pointer into a seed it is not
+rendering would relocate the dead affordance rather than remove it.
+
+`probeStateCitation` probes both arms deliberately. A citation present on a
+passing world and absent on a failing one would be worse than none, because its
+absence starts reading as a verdict class.
+
+No binding surface moved — `checksDigest` hashes `{id, substrate, pattern}`, so
+no pin looks skewed and no rendered sentence changed.
+
 ## 0.10.0 — 2026-07-30
 
 A declared check can name the worlds it discriminates between (F-1126).

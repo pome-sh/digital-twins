@@ -1,6 +1,6 @@
 {
   "name": "@pome-sh/twin-slack",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Deterministic Slack Web API twin for agent testing \u2014 REST + MCP, SQLite-backed state.",
   "private": false,
   "type": "module",
@@ -46,7 +46,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.0.10",
-    "@pome-sh/sdk": "0.10.0",
+    "@pome-sh/sdk": "0.10.1",
     "@pome-sh/shared-types": "0.13.0",
     "hono": "^4.12.31",
     "zod": "^4.1.13"

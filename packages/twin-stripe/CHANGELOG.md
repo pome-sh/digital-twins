@@ -5,6 +5,28 @@ loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 the package follows [Semantic Versioning](https://semver.org/).
 
 
+## 0.4.2 — 2026-08-03
+
+Every state-reading check says where it looked (F-1197).
+
+- 7 declarations now fill `CheckOutcome.evidenceStatePaths` (new in
+  `@pome-sh/sdk` 0.10.1) with RFC 6901 pointers into this twin's exported tree.
+- `check-state.ts`'s resolvers return the pointer they walked. `Resolved<T>`'s
+  found arm gains `path`; its missing arm gains an optional `searched`, naming
+  the collection a failed lookup scanned.
+- `checks-contract.test.ts` gains the citation gate and an EMPTY
+  `HONEST_UNCITED_CHECKS` ledger.
+
+A failed lookup cites too, and that is the half worth knowing about. A charge the account does not hold SKIPS, and `refund_count is 0` against a charge nobody has is exactly the conflation `resolveCharge` exists to prevent.
+So the honest citation on that arm is not the row — there is none — but the list:
+*this is where I looked, see for yourself that it is not in it.*
+
+Requires `@pome-sh/sdk` 0.10.1: the declarations call `statePath` /
+`childStatePath`, which 0.10.0 does not export.
+
+No sentence, template, substrate or check id changed, so `checksDigest` is
+identical and no criterion re-binds.
+
 ## 0.4.1 — 2026-07-31
 
 `after_handler` failure injection stops eating the `Idempotency-Key` record

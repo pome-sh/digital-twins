@@ -1,5 +1,27 @@
 # @pome-sh/twin-linear — CHANGELOG
 
+## 0.3.1 — 2026-08-03
+
+Every state-reading check says where it looked (F-1197).
+
+- 7 declarations now fill `CheckOutcome.evidenceStatePaths` (new in
+  `@pome-sh/sdk` 0.10.1) with RFC 6901 pointers into this twin's exported tree.
+- `check-state.ts`'s resolvers return the pointer they walked. `Resolved<T>`'s
+  found arm gains `path`; its missing arm gains an optional `searched`, naming
+  the collection a failed lookup scanned.
+- `checks-contract.test.ts` gains the citation gate and an EMPTY
+  `HONEST_UNCITED_CHECKS` ledger.
+
+A failed lookup cites too, and that is the half worth knowing about. A title that resolves to nothing, or to two issues, is the refusal task 26 turns on.
+So the honest citation on that arm is not the row — there is none — but the list:
+*this is where I looked, see for yourself that it is not in it.*
+
+Requires `@pome-sh/sdk` 0.10.1: the declarations call `statePath` /
+`childStatePath`, which 0.10.0 does not export.
+
+No sentence, template, substrate or check id changed, so `checksDigest` is
+identical and no criterion re-binds.
+
 ## 0.3.0 — 2026-08-02
 
 **BREAKING RELEASE — read this before upgrading.** Two things a consumer must
