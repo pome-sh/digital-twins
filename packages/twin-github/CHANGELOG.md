@@ -1,6 +1,28 @@
 # @pome-sh/twin-github — CHANGELOG
 
 
+## 0.8.1 — 2026-08-03
+
+Every state-reading check says where it looked (F-1197).
+
+- 12 declarations now fill `CheckOutcome.evidenceStatePaths` (new in
+  `@pome-sh/sdk` 0.10.1) with RFC 6901 pointers into this twin's exported tree.
+- `check-state.ts`'s resolvers return the pointer they walked. `Resolved<T>`'s
+  found arm gains `path`; its missing arm gains an optional `searched`, naming
+  the collection a failed lookup scanned.
+- `checks-contract.test.ts` gains the citation gate and an EMPTY
+  `HONEST_UNCITED_CHECKS` ledger.
+
+A failed lookup cites too, and that is the half worth knowing about. `github.issue-exists` FAILS by not finding the issue, so a design where only a successful resolution can cite would leave the verdict a reader most wants to inspect pointing nowhere.
+So the honest citation on that arm is not the row — there is none — but the list:
+*this is where I looked, see for yourself that it is not in it.*
+
+Requires `@pome-sh/sdk` 0.10.1: the declarations call `statePath` /
+`childStatePath`, which 0.10.0 does not export.
+
+No sentence, template, substrate or check id changed, so `checksDigest` is
+identical and no criterion re-binds.
+
 ## 0.8.0 — 2026-07-31
 
 `Pull request #N in \`<repo>\` has at least one comment` binds a declaration, and
