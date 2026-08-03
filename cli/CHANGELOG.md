@@ -1,5 +1,101 @@
 # Changelog
 
+## 0.17.0
+
+### Minor Changes
+
+- [#271](https://github.com/pome-sh/digital-twins/pull/271) [`88e3bb5`](https://github.com/pome-sh/digital-twins/commit/88e3bb5850bb9b1e93e850f546e67a64db442ab8) Thanks [@AFFFPupu](https://github.com/AFFFPupu)! - `pome checks github` gains a fourteenth check, and the GitHub twin can finally
+  record the thing it grades. `github.pr-comment-exists` binds
+  `` Pull request #N in `<repo>` has at least one comment ``, the sentence six
+  bundled `pr-summary-*` criteria have carried unbound since the vocabulary was
+  declared.
+
+  The sentence was unbound because "comment" has three readings on a pull request —
+  a conversation comment, a review's body, or an inline review comment — and
+  guessing between them ships a check that lies. This one grades the CONVERSATION
+  timeline, its `description` says so, and says the other two are not it: assert a
+  review with `github.pr-review-exists`, and an inline comment has no declaration
+  yet.
+
+  Underneath, `add_issue_comment` and `list_issue_comments` now accept a PULL
+  REQUEST number, which is how real GitHub documents commenting on a PR. They used
+  to answer `404 Issue not found` for every PR, so an agent whose job is to leave a
+  summary had no working way to leave one.
+
+  Bundled twin pins: `@pome-sh/twin-github` 0.7.0 → 0.8.0. github's checks digest
+  moves with the new declaration, so `pome checks add --twin github` requires a
+  control plane on the matching pin.
+
+- [#279](https://github.com/pome-sh/digital-twins/pull/279) [`d3c352a`](https://github.com/pome-sh/digital-twins/commit/d3c352ad3306c28d9583308ae62387671fd36c36) Thanks [@GaganSD](https://github.com/GaganSD)! - BREAKING: the bundled Linear twin moves to `@pome-sh/twin-linear` 0.3.0, whose
+  `AgentSession` uses Linear's real field names.
+
+  `@pome-sh/twin-linear` is a `bundleDependencies` entry, so the pin is baked into
+  the CLI tarball and this re-pin is what actually delivers 0.3.0 to anyone running
+  `pome`. The twin declared `state`, `externalUrl` and `agentUser` — three names
+  Linear does not have — so an agent written against real Linear read `undefined`
+  from the twin, and an agent written against the twin broke in production. They
+  are now `status` (a real `AgentSessionStatus` enum), `externalUrls` (a collection
+  of `{ url, label }`) and `appUser`, alongside `id: ID!`, `createdAt` /
+  `updatedAt: DateTime!` and `plan: JSON`. There is no alias and no deprecation
+  window: a twin carrying both names would still expose a field Linear does not
+  declare, which is the defect.
+
+  Two consequences for a CLI user. Any task, seed or check that names the old
+  fields must be renamed — including in the `/_pome/state` export the checks read
+  and in the `AgentSessionEvent` webhook payload. And an existing `LINEAR_TWIN_DB`
+  file is migrated in place the first time this CLI opens it: `agent_sessions`
+  renames `agent_user_id` → `app_user_id` and `state` → `status`, adds
+  `external_urls_json` backfilled from `external_url`, and rewrites the three
+  retired status values (`completed` → `complete`, `failed` → `error`,
+  `canceled` → `stale`). The migration is idempotent, but there is no downgrade —
+  an older CLI cannot read a migrated database.
+
+  The same pin also carries F-1166: partial updates no longer wipe fields the
+  caller never mentioned. Nullable fields are tri-state — key absent or present
+  with `undefined` leaves the value alone, `null` clears it — which fixes
+  `agentSessionUpdate`, `issueUpdate`, `issueLabelUpdate`, `updateProject`,
+  `updateDocument` and the MCP `save_issue` / `save_project` / `save_document`
+  tools, plus an `issueUpdate` with an explicit `stateId: null` erasing an issue's
+  lifecycle timestamps.
+
+### Patch Changes
+
+- [#274](https://github.com/pome-sh/digital-twins/pull/274) [`90ead60`](https://github.com/pome-sh/digital-twins/commit/90ead60e26010c52f81ef125921ae0c67616e06f) Thanks [@AFFFPupu](https://github.com/AFFFPupu)! - The digest refusal now names what moved in every case, including the two it used
+  to refuse over in silence.
+
+  `pome checks add` compares its own vocabulary digest against the one the control
+  plane grades with, and refuses to write a sentence when they differ. That refusal
+  built its "which check moved" list from `id` and `template`, while `checksDigest`
+  hashes `id`, `substrate` and the COMPILED pattern. So a skew that moved only a
+  `substrate`, or only `buildPattern`'s output while every template stayed
+  byte-identical, printed the headline and then an empty bullet list — a named
+  refusal that named nothing, in exactly the two cases the digest was widened to
+  catch.
+
+  The comparison is now a taxonomy with no silent branch: ids on one side only, a
+  moved sentence, a moved substrate, moved parameter patterns, and — because
+  `GET /v1/checks` publishes the compiled pattern too — a check whose declaration
+  matches ours yet compiles differently, which is reported as the `@pome-sh/sdk`
+  `buildPattern` difference it is, with this CLI's sdk pin named. A control plane
+  that publishes no compiled pattern leaves nothing to localise, and that case is
+  reported as its own class rather than as a blank list.
+
+- [#275](https://github.com/pome-sh/digital-twins/pull/275) [`c85d383`](https://github.com/pome-sh/digital-twins/commit/c85d383ce053d45fa896fed769327d3cb33ecdca) Thanks [@AFFFPupu](https://github.com/AFFFPupu)! - The bundled Stripe twin keeps the `Idempotency-Key` record when a lost-response
+  failure is injected (`@pome-sh/twin-stripe` 0.4.1).
+
+  `after_handler` injection models "the server processed it, but response delivery
+  to the client failed." Real Stripe writes the idempotency record server-side in
+  exactly that case — that is the whole reason the header exists, because a retry
+  then replays. The twin persisted the mutation and dropped the key, so the header
+  changed nothing and an agent doing the textbook-correct thing still
+  double-refunded.
+
+  This moves `tasks/14-stripe-refund-retry.md`: an agent that reuses its
+  `Idempotency-Key` on the retry now ends at one refund row rather than two, so the
+  task's second criterion separates it from an agent that retries blind. Nothing
+  about the wire changed — the injected attempt still answers 402 with the
+  configured envelope and is still recorded with the real state delta.
+
 ## 0.16.0
 
 ### Minor Changes
