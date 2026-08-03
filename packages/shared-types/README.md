@@ -31,7 +31,10 @@ const safe = redactSecrets(JSON.stringify(event));
 
 Subpath exports: `recorder-events`, `run`, `otel`, `otel/fixtures`, and
 `redaction`. The machine-readable trace contract ships as
-`trace-contract.json` inside the package.
+`trace-contract.json` inside the package. Its `eventKinds` map is enumerated
+from the zod event union at build time and lists the wire fixture backing each
+kind — adding a member without a fixture fails `check:trace-contract`
+(see `test/fixtures/v1/README.md`).
 
 ## Docs
 

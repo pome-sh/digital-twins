@@ -1,0 +1,16 @@
+{
+  "ts": "2026-08-03T10:15:24.702Z",
+  "event_id": "evt_01k2f7q9e3",
+  "parent_id": null,
+  "kind": "LlmTurnEvent",
+  "turn_index": 2,
+  "model": "claude-opus-4-8",
+  "input_tokens": 3120,
+  "output_tokens": 486,
+  "cache_read_input_tokens": 24576,
+  "cache_creation_input_tokens": 1024,
+  "finish_reasons": ["tool_use"],
+  "latency_ms": 2310,
+  "latency_ms_estimated": true,
+  "session_id": null
+}

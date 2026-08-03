@@ -1,0 +1,8 @@
+{
+  "ts": "2026-08-03T10:15:19.870Z",
+  "event_id": "evt_01k2f7q8y0",
+  "parent_id": null,
+  "kind": "HookEvent",
+  "hook_name": "SessionStarted",
+  "tool_name": null
+}

@@ -101,7 +101,11 @@ jobs:
           # cli/scripts/**, and packages/** (cli-ci.yml's former duplicate step
           # was folded in here).
           npm run gate:no-eval
+          # F-1201 — the contract now enumerates the event union from zod and
+          # requires a fixture per kind, so a new kind with none reds this line.
+          # Before that it compared bytes no schema change could move.
           npm run check:trace-contract -w @pome-sh/shared-types
+          node packages/shared-types/scripts/emit-trace-contract.test.mjs
           # F-818 — the committed manifest JSON Schema (served at
           # pome.sh/schemas/v1/pome.json) must match the zod source.
           npm run check:manifest-schema -w @pome-sh/shared-types

@@ -1,0 +1,18 @@
+{
+  "ts": "2026-08-03T10:15:24.702Z",
+  "event_id": "evt_01k2f7q9e2",
+  "parent_id": "evt_01k2f7q9d4",
+  "kind": "LlmCallEvent",
+  "host": "api.anthropic.com",
+  "port": 443,
+  "latency_ms": 2310,
+  "bytes_in": 8192,
+  "bytes_out": 26884,
+  "url": "https://api.anthropic.com/v1/messages",
+  "method": "POST",
+  "status": 200,
+  "model": "claude-opus-4-8",
+  "prompt_tokens": 3120,
+  "completion_tokens": 486,
+  "cost_usd": 0.0821
+}
