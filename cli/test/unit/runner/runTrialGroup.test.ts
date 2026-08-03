@@ -432,6 +432,11 @@ describe("runTrialGroup — errored trials (FDRS-636)", () => {
 
     const text = out.join("\n");
     expect(text).toContain("1 of 1 passed · 1 incomplete, excluded from the fraction");
+    // The fix-prompt handoff is for AGENT defects. An abstention is a grader
+    // gap, so pointing the reader at `pome fix-prompt` would tell them to fix
+    // an agent that may be blameless. (This predicate was `!r.passed`, which
+    // would have swept the incomplete trial in.)
+    expect(text).not.toContain("pome fix-prompt");
     // Never "1 of 2" (which would blame the agent) and never "2 of 2".
     expect(text).not.toContain("1 of 2 passed");
     expect(text).not.toContain("2 of 2 passed");

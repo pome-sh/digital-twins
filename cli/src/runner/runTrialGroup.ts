@@ -320,8 +320,14 @@ export async function runTrialGroup(
   // 4. FDRS-644 — the fix & green handoff, only when a COMPLETED trial
   // failed. Errored trials are sandbox noise: the answer there is re-run,
   // not a code fix, so an errored-only group gets no handoff.
+  //
+  // F-925 — `fail`, NOT "anything that isn't a pass". This was `!r.passed`,
+  // which now includes the incomplete trial, and pointing someone at
+  // `pome fix-prompt` for a criterion that never ran tells them to fix an agent
+  // that may be blameless. An abstention is a grader gap; the handoff is for
+  // agent defects.
   const failedCompleted = rows.filter(
-    (r) => r.kind === "completed" && !r.passed,
+    (r) => r.kind === "completed" && r.verdict === "fail",
   ).length;
   if (failedCompleted > 0) {
     const artifactsDir = options.artifactsDir ?? "runs";
