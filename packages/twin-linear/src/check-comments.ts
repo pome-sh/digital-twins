@@ -18,7 +18,7 @@
 import { defineCheck, VACUITY_SENTINEL } from "@pome-sh/sdk/checks";
 import type { Check } from "./check-kind.js";
 import { commentNeedle, issueTitle, teamKey } from "./check-params.js";
-import { resolveComments, resolveIssue, unresolved } from "./check-state.js";
+import { COMMENTS_PATH, resolveComments, resolveIssue, unresolved } from "./check-state.js";
 import { deltaWorld, finalWorld, issueRow, linearState } from "./check-worlds.js";
 
 export const issueCommentContains: Check<{ title: string; team: string; needle: string }> =
@@ -72,6 +72,7 @@ export const issueCommentContains: Check<{ title: string; team: string; needle: 
         reason: hit
           ? `a comment contains "${needle}"`
           : `no comment contains "${needle}" (${comments.found.length} comment(s) scanned)`,
+        evidenceStatePaths: [comments.path],
       };
     },
   });
@@ -120,10 +121,16 @@ export const issueThreadedReply: Check<{ title: string; team: string }> = define
     // consumer that forgets gets a named skip rather than a vacuous pass.
     if (seed === null) return { passed: false, reason: "seed_missing", status: "skipped" };
 
+    // SEED-side refusals cite nothing, deliberately. `unresolved` carries the
+    // pointer the lookup walked, and these two walked the SEED — a pointer
+    // always addresses `final` (see the sdk's `check-state-path.ts`), so passing
+    // one through here would send a reader into the tree the report does not
+    // render, at a path that may well resolve to something unrelated. Dropping
+    // the citation is the honest degradation; the reason still names the miss.
     const seedIssue = resolveIssue(seed, team, title);
-    if ("missing" in seedIssue) return unresolved(seedIssue);
+    if ("missing" in seedIssue) return unresolved({ ...seedIssue, searched: undefined });
     const seedComments = resolveComments(seed, seedIssue.found);
-    if ("missing" in seedComments) return unresolved(seedComments);
+    if ("missing" in seedComments) return unresolved({ ...seedComments, searched: undefined });
     const seeded = new Set(
       seedComments.found.map((c) => c.id).filter((id): id is string => typeof id === "string"),
     );
@@ -141,6 +148,11 @@ export const issueThreadedReply: Check<{ title: string; team: string }> = define
       reason:
         `${replies.length} repl${replies.length === 1 ? "y" : "ies"} to a seeded comment ` +
         `(${seeded.size} seeded comment(s), ${finalComments.found.length} at finish)`,
+      // The FINAL comment list only. This is a delta over two trees and the
+      // reader has one on screen; a pointer into the seed would send them to the
+      // tree the report does not render (see the sdk's `check-state-path.ts`).
+      // The reason carries the seed side.
+      evidenceStatePaths: [COMMENTS_PATH],
     };
   },
 });

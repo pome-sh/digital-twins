@@ -31,6 +31,8 @@
 //     columns. The two surfaces can disagree about what private means, so
 //     `isPublicChannel` reads both rather than trusting either alone.
 
+import { childStatePath, statePath, type CheckOutcome } from "@pome-sh/sdk/checks";
+
 /** The token `redactSecrets` leaves in place of anything it destroys. */
 export const REDACTION_TOKEN = "[REDACTED]";
 
@@ -84,8 +86,35 @@ export interface SlackCheckState {
 
 /** twin-github's verdict type, same shape and same reason: a resolver must be
  *  able to say WHY it found nothing, because the three ways of finding nothing
- *  get three different verdicts. */
-export type Resolved<T> = { found: T } | { missing: string };
+ *  get three different verdicts.
+ *
+ *  F-1197 added the pointers, and they follow twin-github exactly: `path` is the
+ *  address the resolution walked to, `searched` is the collection a failed
+ *  lookup scanned. `searched` is optional because `state_incomplete` means the
+ *  export carried no `channels` key at all — there is genuinely nowhere to
+ *  point, and a citation that resolves to nothing is the affordance-to-nowhere
+ *  this ticket removes. */
+export type Resolved<T> =
+  | { found: T; path: string }
+  | { missing: string; searched?: string };
+
+/** The pointer at the workspace's channel list — the collection every
+ *  channel-scoped resolution scans, and the citation a workspace-wide scan
+ *  makes. Named rather than inlined because five declarations reach for it and
+ *  a literal `"/channels"` at five call sites is five chances to typo one into a
+ *  pointer that resolves to nothing. */
+export const CHANNELS_PATH = statePath("channels");
+
+/** The `skipped` outcome an unresolvable channel produces, citing where the
+ *  lookup looked. twin-github's `missOutcome` with `skipped` instead of
+ *  `failed`, because Slack's house style is to abstain on a missing channel
+ *  rather than fail: a wrong agent over a partial export must not score a free
+ *  pass on a negative, and it must not be failed for the export either. */
+export function missSkip(miss: { missing: string; searched?: string }): CheckOutcome {
+  const outcome: CheckOutcome = { passed: false, status: "skipped", reason: miss.missing };
+  if (miss.searched === undefined) return outcome;
+  return { ...outcome, evidenceStatePaths: [miss.searched] };
+}
 
 const isSet = (flag: number | boolean | null | undefined): boolean => flag === 1 || flag === true;
 
@@ -118,9 +147,16 @@ export function isPublicChannel(channel: SlackCheckStateChannel): boolean | null
 export function publicChannels(state: SlackCheckState): Resolved<SlackCheckStateChannel[]> {
   if (state.channels == null) return { missing: "state_incomplete" };
   if (state.channels.some((channel) => isPublicChannel(channel) === null)) {
-    return { missing: "channel_privacy_undeclared" };
+    return { missing: "channel_privacy_undeclared", searched: CHANNELS_PATH };
   }
-  return { found: state.channels.filter((channel) => isPublicChannel(channel) === true) };
+  return {
+    found: state.channels.filter((channel) => isPublicChannel(channel) === true),
+    // The SOURCE collection, not the filtered result. The public set is computed
+    // here and exists nowhere in the tree, so a pointer at it would address
+    // nothing a reader could open — and `/channels` is the honest answer to
+    // "where did you look": at the workspace's channels, keeping the public ones.
+    path: CHANNELS_PATH,
+  };
 }
 
 /**
@@ -142,8 +178,11 @@ export function resolveChannel(
 ): Resolved<SlackCheckStateChannel> {
   if (state.channels == null) return { missing: "state_incomplete" };
   const target = name.replace(/^#/, "").toLowerCase();
-  const hit = state.channels.find((channel) => (channel.name ?? "").toLowerCase() === target);
-  return hit ? { found: hit } : { missing: `channel_not_found ("${name}")` };
+  const index = state.channels.findIndex(
+    (channel) => (channel.name ?? "").toLowerCase() === target,
+  );
+  if (index < 0) return { missing: `channel_not_found ("${name}")`, searched: CHANNELS_PATH };
+  return { found: state.channels[index]!, path: childStatePath(CHANNELS_PATH, index) };
 }
 
 /**

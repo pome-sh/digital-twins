@@ -11,6 +11,7 @@ import {
   checkPattern,
   parseCheck,
   probeDiscrimination,
+  probeStateCitation,
   renderCheck,
   type CheckDefinition,
   type CheckSubstrateKind,
@@ -328,5 +329,71 @@ describe("migrated sentences", () => {
     expect(renderCheck(messageContains, { channel: "general", needle: "shipped" })).toBe(
       'A message in "general" contains "shipped"',
     );
+  });
+});
+
+// Every state-reading check that cites no path, WITH the reason (F-1197).
+//
+// EMPTY, and — like `HONEST_NULL_WORLDS` above — that is the claim. F-1197
+// opened by counting what could cite anything at all: 8 of 45 declared checks,
+// because only a `tape` check could fill `evidenceEventIds`. An optional field
+// with no gate behind it is how a number like that happens, so the field ships
+// with this gate and the ledger ships empty. The argument for the pointer
+// grammar, and for why a pointer addresses `final`, is in the sdk's
+// `check-state-path.ts`; this is only its per-twin enforcement.
+//
+// An entry here admits that a verdict renders as an inert row — indistinguishable,
+// to a reader, from a verdict with no evidence at all.
+const HONEST_UNCITED_CHECKS: Record<string, string> = {};
+
+describe("declared state citations", () => {
+  it("cites a resolvable state path from every check that reads state", () => {
+    for (const check of CHECKS) {
+      // A tape check cites `evidenceEventIds` and is not this gate's business.
+      if (check.substrate === "tape") continue;
+      const verdict = probeStateCitation(check, FIXTURES[check.id]!);
+
+      if (verdict.kind === "cites") {
+        expect(
+          HONEST_UNCITED_CHECKS[check.id],
+          `${check.id} cites its state path but is still listed in HONEST_UNCITED_CHECKS — stale entry`,
+        ).toBeUndefined();
+        continue;
+      }
+
+      expect(
+        HONEST_UNCITED_CHECKS[check.id],
+        `${check.id} reads state but ${
+          verdict.kind === "declined"
+            ? "names no worlds, so its citation cannot be probed"
+            : verdict.kind === "uncited"
+              ? `its ${verdict.arm} world produced no evidenceStatePaths`
+              : verdict.kind === "unresolvable"
+                ? `its ${verdict.arm} world cites ${verdict.pointer}, which resolves to nothing in that world`
+                : `its ${verdict.arm} world cited malformed evidence — ${verdict.detail}`
+        }. A state verdict that cites nothing renders as an inert row.`,
+      ).toBeTruthy();
+    }
+  });
+
+  it("ships an EMPTY uncited ledger", () => {
+    expect(Object.keys(HONEST_UNCITED_CHECKS)).toEqual([]);
+  });
+
+  it("leaves the state-path field absent on every tape check", () => {
+    // The converse. A tape check has no state tree to point into — the engine
+    // hands it a deliberately barren `final` so it cannot read one — so a pointer
+    // from here would address a world the check never saw.
+    for (const check of CHECKS) {
+      if (check.substrate !== "tape") continue;
+      const worlds = check.discriminatingWorlds(FIXTURES[check.id]!);
+      if (worlds === null) continue;
+      for (const [side, world] of Object.entries(worlds)) {
+        expect(
+          check.evaluate(FIXTURES[check.id]!, world).evidenceStatePaths,
+          `${check.id}.${side} reads the tape but cites a state path`,
+        ).toBeUndefined();
+      }
+    }
   });
 });

@@ -151,7 +151,13 @@ describe("resolveIssue — the four outcomes", () => {
 
 describe("the indirect joins", () => {
   it("resolves the workflow state NAME through stateId, team-scoped", () => {
-    expect(resolveWorkflowStateName(world(), issueIn(world()))).toEqual({ found: "In Progress" });
+    // F-1197 — and the path points at the CATALOG ROW's name, not at the issue.
+    // The issue carries only an opaque `stateId`; the readable half of trap 1's
+    // join is over here.
+    expect(resolveWorkflowStateName(world(), issueIn(world()))).toEqual({
+      found: "In Progress",
+      path: "/workflowStates/0/name",
+    });
   });
 
   it("skips workflow_state_unresolved when the state row belongs to another team", () => {
@@ -159,6 +165,7 @@ describe("the indirect joins", () => {
     expect(resolveWorkflowStateName(w, issueIn(w))).toEqual({
       missing: "workflow_state_unresolved",
       skip: true,
+      searched: "/workflowStates",
     });
   });
 
@@ -171,19 +178,26 @@ describe("the indirect joins", () => {
   });
 
   it("resolves label NAMES through labelIds, lowercased", () => {
-    expect(resolveLabelNames(world(), issueIn(world()))).toEqual({ found: new Set(["agent"]) });
+    expect(resolveLabelNames(world(), issueIn(world()))).toEqual({
+      found: new Set(["agent"]),
+      path: "/labels",
+    });
   });
 
   it("skips label_unresolved when a linked label has no catalog row", () => {
     const w = world();
     w.issues = [{ ...w.issues![0]!, labelIds: ["label_agent", "label_ghost"] }];
-    expect(resolveLabelNames(w, issueIn(w))).toEqual({ missing: "label_unresolved", skip: true });
+    expect(resolveLabelNames(w, issueIn(w))).toEqual({
+      missing: "label_unresolved",
+      skip: true,
+      searched: "/labels",
+    });
   });
 
   it("returns an empty set for an issue with no labels", () => {
     const w = world();
     w.issues = [{ ...w.issues![0]!, labelIds: [] }];
-    expect(resolveLabelNames(w, issueIn(w))).toEqual({ found: new Set() });
+    expect(resolveLabelNames(w, issueIn(w))).toEqual({ found: new Set(), path: "/labels" });
   });
 
   it("returns only the comments on the given issue", () => {
@@ -234,8 +248,9 @@ describe("the model tolerates a partial export rather than throwing", () => {
     expect(resolveWorkflowStateName(w, bare)).toEqual({
       missing: "workflow_state_unresolved",
       skip: true,
+      searched: "/workflowStates",
     });
-    expect(resolveLabelNames(w, bare)).toEqual({ found: new Set() });
+    expect(resolveLabelNames(w, bare)).toEqual({ found: new Set(), path: "/labels" });
   });
 
   it("survives an entirely empty state object", () => {

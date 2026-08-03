@@ -40,7 +40,7 @@
 // `linear.issue-exists`. The team key is safe to quote: `[A-Z][A-Z0-9]*`
 // matches no pattern in either redactor.
 
-import type { CheckOutcome } from "@pome-sh/sdk/checks";
+import { childStatePath, statePath, type CheckOutcome } from "@pome-sh/sdk/checks";
 
 export interface LinearCheckStateTeam {
   id?: string;
@@ -112,13 +112,43 @@ export interface LinearCheckState {
  * stops every call site from re-deciding it — and re-deciding it wrongly is how
  * a do-nothing agent scores 100% on task 26.
  */
-export type Resolved<T> = { found: T } | { missing: string; skip: boolean };
+export type Resolved<T> =
+  | { found: T; path: string }
+  | { missing: string; skip: boolean; searched?: string };
 
-/** The one place an unresolved selector becomes an outcome. */
-export function unresolved(r: { missing: string; skip: boolean }): CheckOutcome {
-  return r.skip
+/** The exported collections a pointer can address (F-1197). Named because seven
+ *  declarations reach for them. */
+export const ISSUES_PATH = statePath("issues");
+export const COMMENTS_PATH = statePath("comments");
+export const LABELS_PATH = statePath("labels");
+export const WORKFLOW_STATES_PATH = statePath("workflowStates");
+export const USERS_PATH = statePath("users");
+
+/**
+ * A pointer at `key` on the row `base` addresses, falling back to the row when
+ * the export does not carry that key (F-1197).
+ *
+ * The fallback is the whole point and it is not defensive padding. An UNSET
+ * estimate and an ABSENT assignee are both real, common, and exactly the
+ * verdicts a reader wants to inspect — and a pointer at a key the row does not
+ * have resolves to nothing, which would strip the affordance from precisely
+ * those rows. Widening to the row keeps the citation honest (it is where the
+ * check looked) and resolvable (the row is there).
+ */
+export function fieldPath(base: string, row: object, key: string): string {
+  return Object.prototype.hasOwnProperty.call(row, key) ? childStatePath(base, key) : base;
+}
+
+/** The one place an unresolved selector becomes an outcome.
+ *
+ *  F-1197 — it also carries the citation, so the rule "a refusal names where it
+ *  looked" is written once rather than at fourteen call sites. */
+export function unresolved(r: { missing: string; skip: boolean; searched?: string }): CheckOutcome {
+  const outcome: CheckOutcome = r.skip
     ? { passed: false, status: "skipped", reason: r.missing }
     : { passed: false, reason: r.missing };
+  if (r.searched === undefined) return outcome;
+  return { ...outcome, evidenceStatePaths: [r.searched] };
 }
 
 export function isTruncated(state: LinearCheckState, collection: string): boolean {
@@ -139,27 +169,44 @@ export function resolveIssue(
   if (state.teams == null) return { missing: "state_incomplete", skip: true };
   const team = state.teams.find((t) => t.key === teamKey);
   if (team?.id == null) {
-    return { missing: `team \`${teamKey}\` not found in state_final`, skip: false };
+    return {
+      missing: `team \`${teamKey}\` not found in state_final`,
+      skip: false,
+      searched: statePath("teams"),
+    };
   }
   if (state.issues == null) return { missing: "state_incomplete", skip: true };
 
-  const matches = state.issues.filter(
-    (issue) =>
-      issue.teamId === team.id &&
-      issue.title === title &&
-      (issue.archivedAt ?? null) === null,
-  );
-  if (matches.length === 1) return { found: matches[0]! };
-  if (matches.length > 1) {
+  const indices = state.issues
+    .map((issue, index) =>
+      issue.teamId === team.id && issue.title === title && (issue.archivedAt ?? null) === null
+        ? index
+        : -1,
+    )
+    .filter((index) => index >= 0);
+  if (indices.length === 1) {
+    const index = indices[0]!;
+    return { found: state.issues[index]!, path: childStatePath(ISSUES_PATH, index) };
+  }
+  if (indices.length > 1) {
+    // The AMBIGUITY is the finding, so the citation is the collection: naming
+    // one of the duplicates would present a coin-flip as the thing that was read.
     return {
-      missing: `${matches.length} issues in \`${teamKey}\` share that title`,
+      missing: `${indices.length} issues in \`${teamKey}\` share that title`,
       skip: false,
+      searched: ISSUES_PATH,
     };
   }
   // The only skip a miss can earn, and it is earned by evidence rather than by
   // taste: the twin itself reported that `issues` lost rows to the export cap.
-  if (isTruncated(state, "issues")) return { missing: "state_truncated", skip: true };
-  return { missing: `no issue with that title in \`${teamKey}\``, skip: false };
+  if (isTruncated(state, "issues")) {
+    return { missing: "state_truncated", skip: true, searched: ISSUES_PATH };
+  }
+  return {
+    missing: `no issue with that title in \`${teamKey}\``,
+    skip: false,
+    searched: ISSUES_PATH,
+  };
 }
 
 /** Trap 1: `stateId` → the team's own workflow-state row. */
@@ -168,11 +215,14 @@ export function resolveWorkflowStateName(
   issue: LinearCheckStateIssue,
 ): Resolved<string> {
   if (state.workflowStates == null) return { missing: "state_incomplete", skip: true };
-  const row = state.workflowStates.find(
+  const index = state.workflowStates.findIndex(
     (s) => s.id === issue.stateId && s.teamId === issue.teamId,
   );
-  if (row?.name == null) return { missing: "workflow_state_unresolved", skip: true };
-  return { found: row.name };
+  const row = index >= 0 ? state.workflowStates[index]! : undefined;
+  if (row?.name == null) {
+    return { missing: "workflow_state_unresolved", skip: true, searched: WORKFLOW_STATES_PATH };
+  }
+  return { found: row.name, path: childStatePath(WORKFLOW_STATES_PATH, index, "name") };
 }
 
 /**
@@ -194,10 +244,14 @@ export function resolveLabelNames(
     const name = byId.get(id);
     // A link to a label the export did not carry is a partial export, not a
     // verdict about the examinee.
-    if (name === undefined) return { missing: "label_unresolved", skip: true };
+    if (name === undefined) return { missing: "label_unresolved", skip: true, searched: LABELS_PATH };
     names.add(name);
   }
-  return { found: names };
+  // The CATALOG this join read. The resolved name set is computed here and
+  // exists nowhere in the tree, so the catalog is the honest address — and it is
+  // the half of the join a reader cannot see from the issue row, which carries
+  // ids only.
+  return { found: names, path: LABELS_PATH };
 }
 
 export function resolveComments(
@@ -205,7 +259,10 @@ export function resolveComments(
   issue: LinearCheckStateIssue,
 ): Resolved<LinearCheckStateComment[]> {
   if (state.comments == null) return { missing: "state_incomplete", skip: true };
-  return { found: state.comments.filter((c) => c.issueId === issue.id) };
+  // `/comments`, the SOURCE collection, not the filtered result: the export
+  // stores comments flat and keys them by `issueId`, so the per-issue list this
+  // returns exists nowhere in the tree to point at.
+  return { found: state.comments.filter((c) => c.issueId === issue.id), path: COMMENTS_PATH };
 }
 
 /**

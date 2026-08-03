@@ -22,6 +22,12 @@
 //   - `repository.labels` (definitions) and `issue.labels` (applied) are
 //     different sets. Confusing them is the defect `github.no-new-labels`'s
 //     description exists to prevent.
+//
+// F-1197 — the resolvers below also return the POINTER they walked, so a check
+// can cite where it looked. Nothing else about them changed; the shapes above
+// are still the only thing that decides how the tree is read.
+
+import { childStatePath, statePath, type CheckOutcome } from "@pome-sh/sdk/checks";
 
 export interface GitHubCheckStateLabel {
   name?: string;
@@ -109,10 +115,23 @@ export interface GitHubCheckState {
 // anything else — so there is deliberately no bare-name branch here. The
 // owner/name fallback is for a state export that somehow omits `full_name`,
 // not for a bare-name reference, which cannot reach this function.
-export function findRepo(state: GitHubCheckState, ref: string): GitHubCheckStateRepo | null {
-  for (const repo of state.repositories ?? []) {
-    if (repo.full_name === ref) return repo;
-    if (repo.owner != null && repo.name != null && `${repo.owner}/${repo.name}` === ref) return repo;
+//
+// F-1197 — it returns the INDEX beside the row. The index is not decoration: a
+// check cites where it looked as a JSON Pointer, and a pointer into an array
+// needs the position the walk actually stopped at. Computing it here, in the
+// same loop that decides which repo matched, is what keeps the citation and the
+// verdict describing the same row — a second `findIndex` at the call site would
+// be a second copy of the `full_name` / `owner+name` fallback, free to drift.
+export function findRepo(
+  state: GitHubCheckState,
+  ref: string,
+): { repo: GitHubCheckStateRepo; index: number } | null {
+  const repositories = state.repositories ?? [];
+  for (const [index, repo] of repositories.entries()) {
+    if (repo.full_name === ref) return { repo, index };
+    if (repo.owner != null && repo.name != null && `${repo.owner}/${repo.name}` === ref) {
+      return { repo, index };
+    }
   }
   return null;
 }
@@ -129,15 +148,55 @@ export function labelNames(repo: GitHubCheckStateRepo): Set<string> {
 // must say the same thing when it is missing. Returning the reason rather than
 // throwing keeps the "repo not found" verdict a normal `failed` with a sentence
 // an author can act on.
-export type Resolved<T> = { found: T } | { missing: string };
+//
+// F-1197 added a pointer to BOTH arms, and the second one is the interesting
+// half. `path` on the found arm is the address the resolution walked to, which
+// the check extends with the field it goes on to read.
+//
+// `searched` on the MISSING arm is the collection the lookup scanned and did not
+// find its entity in. It exists because the gate found the gap: `issue-exists`
+// FAILS by not finding the issue, so a design where only a successful resolution
+// can cite would have left that check — and every "not found" verdict under it —
+// pointing at nothing on exactly the verdict a reader most wants to inspect. The
+// honest citation there is not the row (there is none) but the list: *this* is
+// where I looked, see for yourself that it is not in it.
+//
+// Optional because the tree may not carry the collection at all, and a citation
+// that resolves to nothing is the affordance-to-nowhere this ticket exists to
+// remove. Absent `searched` means the check cites nothing on that path, which is
+// the correct degradation rather than a lesser one.
+export type Resolved<T> =
+  | { found: T; path: string }
+  | { missing: string; searched?: string };
+
+/**
+ * The `failed` outcome a missing entity produces, citing where the lookup
+ * looked.
+ *
+ * One function rather than a conditional spread at every `if ("missing" in …)`
+ * site, because the rule it encodes — cite the searched collection, cite nothing
+ * when there was none — is one rule, and twelve hand-written copies of it is
+ * twelve chances for one to quietly drop the citation.
+ */
+export function missOutcome(miss: { missing: string; searched?: string }): CheckOutcome {
+  if (miss.searched === undefined) return { passed: false, reason: miss.missing };
+  return { passed: false, reason: miss.missing, evidenceStatePaths: [miss.searched] };
+}
 
 export function resolveRepo(
   state: GitHubCheckState,
   ref: string,
   where: string,
 ): Resolved<GitHubCheckStateRepo> {
-  const repo = findRepo(state, ref);
-  return repo ? { found: repo } : { missing: `repo ${ref} not found in ${where}` };
+  const hit = findRepo(state, ref);
+  if (hit) return { found: hit.repo, path: statePath("repositories", hit.index) };
+  return {
+    missing: `repo ${ref} not found in ${where}`,
+    // `undefined` — the key absent from the export — is the only case with
+    // nothing to point at. A `null` repository list is a citable fact: it says
+    // the export carried the field and it was empty.
+    searched: state.repositories === undefined ? undefined : statePath("repositories"),
+  };
 }
 
 export function resolveIssue(
@@ -147,8 +206,16 @@ export function resolveIssue(
 ): Resolved<GitHubCheckStateIssue> {
   const repo = resolveRepo(state, ref, "state_final");
   if ("missing" in repo) return repo;
-  const issue = (repo.found.issues ?? []).find((candidate) => candidate.number === Number(number));
-  return issue ? { found: issue } : { missing: `issue #${number} not found in ${ref}` };
+  const issues = repo.found.issues ?? [];
+  const index = issues.findIndex((candidate) => candidate.number === Number(number));
+  if (index >= 0) {
+    return { found: issues[index]!, path: childStatePath(repo.path, "issues", index) };
+  }
+  return {
+    missing: `issue #${number} not found in ${ref}`,
+    searched:
+      repo.found.issues === undefined ? undefined : childStatePath(repo.path, "issues"),
+  };
 }
 
 export function resolvePullRequest(
@@ -158,10 +225,18 @@ export function resolvePullRequest(
 ): Resolved<GitHubCheckStatePullRequest> {
   const repo = resolveRepo(state, ref, "state_final");
   if ("missing" in repo) return repo;
-  const pull = (repo.found.pull_requests ?? []).find(
-    (candidate) => candidate.number === Number(number),
-  );
-  return pull ? { found: pull } : { missing: `pull request #${number} not found in ${ref}` };
+  const pulls = repo.found.pull_requests ?? [];
+  const index = pulls.findIndex((candidate) => candidate.number === Number(number));
+  if (index >= 0) {
+    return { found: pulls[index]!, path: childStatePath(repo.path, "pull_requests", index) };
+  }
+  return {
+    missing: `pull request #${number} not found in ${ref}`,
+    searched:
+      repo.found.pull_requests === undefined
+        ? undefined
+        : childStatePath(repo.path, "pull_requests"),
+  };
 }
 
 export function isMerged(pull: GitHubCheckStatePullRequest): boolean {

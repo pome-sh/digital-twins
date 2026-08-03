@@ -18,7 +18,10 @@ import { countWord, exactCount, labelRef, mailboxRef, messageId, parseCount } fr
 import {
   isTruncated,
   labelIdsFor,
+  MESSAGE_LABELS_PATH,
+  MESSAGES_PATH,
   messageCarriesLabel,
+  missSkip,
   resolveMessage,
   type GmailCheckState,
 } from "./check-state.js";
@@ -74,14 +77,20 @@ export const messageHasLabel: Check<{ message: string; label: string }> = define
   },
   evaluate({ message: id, label }, { final }) {
     const found = resolveMessage(final, id);
-    if ("missing" in found) return { passed: false, status: "skipped", reason: found.missing };
+    if ("missing" in found) return missSkip(found);
     const carried = messageCarriesLabel(final, id, label);
-    if ("missing" in carried) return { passed: false, status: "skipped", reason: carried.missing };
+    if ("missing" in carried) return missSkip(carried);
     return {
       passed: carried.found,
       reason: carried.found
         ? `message ${id} carries label ${label}`
         : `message ${id} does not carry label ${label}`,
+      // BOTH halves of the lookup, because the predicate really does read two
+      // places: the message row it resolved by id, and the join table it then
+      // questioned. Labels are not nested under their message in this export —
+      // that is the whole reason `messageCarriesLabel` exists — so one pointer
+      // could not say where this verdict came from (F-1197).
+      evidenceStatePaths: [found.path, carried.path],
     };
   },
 });
@@ -161,6 +170,11 @@ export const mailboxLabelCount: Check<{ mailbox: string; count: string; label: s
       return {
         passed: total === wanted,
         reason: `mailbox "${mailbox}" has ${total} message(s) labeled ${label} (wanted ${wanted})`,
+        // The two collections the count is computed FROM. The count itself lives
+        // nowhere in the tree, so there is no narrower honest address — and the
+        // guards above already established that both collections are present and
+        // un-capped, which is what makes these pointers resolve.
+        evidenceStatePaths: [MESSAGES_PATH, MESSAGE_LABELS_PATH],
       };
     },
   });
@@ -235,6 +249,11 @@ export const oneMessagePerRecipient: Check<{ label: string; count: string }> = d
         : `${sent.length} ${label} message(s) to ${distinct.size} distinct recipient(s) ` +
           `(${addressees.length} addressee slot(s)${wanted == null ? "" : `, wanted ${wanted}`}` +
           `${noDuplicates ? "" : ", duplicate send detected"})`,
+      // Same two collections, same reason: the duplicate this check exists to
+      // catch is a property of the addressee lists across `messages`, filtered
+      // by `messageLabels`, and neither the flattened list nor its distinct set
+      // is anything the tree holds.
+      evidenceStatePaths: [MESSAGES_PATH, MESSAGE_LABELS_PATH],
     };
   },
 });
