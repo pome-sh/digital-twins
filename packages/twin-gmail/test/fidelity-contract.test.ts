@@ -168,7 +168,10 @@ describe("the declared checks, against a real exported mailbox", () => {
   });
 
   it("accepts the label by its DISPLAY NAME too, on the real export", () => {
-    expect(messageCarriesLabel(state, "msg_build", "Build")).toEqual({ found: true });
+    expect(messageCarriesLabel(state, "msg_build", "Build")).toEqual({
+      found: true,
+      path: "/messageLabels",
+    });
   });
 
   it("grades `A draft addressed to alice@example.com exists` FALSE on the seed", () => {

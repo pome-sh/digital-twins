@@ -47,7 +47,12 @@ import {
   paymentIntentStatus,
   stripeEventType,
 } from "./check-params.js";
-import type { StripeCheckState } from "./check-state.js";
+import {
+  CHARGES_PATH,
+  EVENTS_PATH,
+  PAYMENT_INTENTS_PATH,
+  type StripeCheckState,
+} from "./check-state.js";
 import { charge, event, finalWorld, paymentIntent, stripeState } from "./check-worlds.js";
 
 const STATE_INCOMPLETE = { passed: false, status: "skipped" as const, reason: "state_incomplete" };
@@ -97,6 +102,12 @@ export const paymentIntentAmount: Check<{ amount: string }> = defineCheck({
       reason: found
         ? `a PaymentIntent exists with amount ${wanted}`
         : `no PaymentIntent has amount ${wanted} (amounts: [${pis.map((pi) => pi.amount ?? "?").join(", ")}])`,
+      // The COLLECTION, not the matching row (F-1197). Every check in this file
+      // scans a whole collection and answers a question about the set — "does
+      // one exist with…" — so the set is what was read. Citing the hit on a pass
+      // and the collection on a fail would make the pointer's shape track the
+      // verdict, and a reader would learn to read it as one.
+      evidenceStatePaths: [PAYMENT_INTENTS_PATH],
     };
   },
 });
@@ -139,6 +150,9 @@ export const paymentIntentStatusIs: Check<{ status: string }> = defineCheck({
         passed: false,
         status: "unmatched",
         reason: `ambiguous: ${pis.length} payment_intents and this sentence names one`,
+        // The ambiguity IS the finding, and the collection is where a reader
+        // sees it: several intents where the sentence says "the".
+        evidenceStatePaths: [PAYMENT_INTENTS_PATH],
       };
     }
     const found = pis.some((pi) => pi.status === status);
@@ -148,6 +162,7 @@ export const paymentIntentStatusIs: Check<{ status: string }> = defineCheck({
         ? `the PaymentIntent has status "${status}"`
         : `the PaymentIntent does not have status "${status}" ` +
           `(statuses: [${pis.map((pi) => pi.status ?? "?").join(", ")}])`,
+      evidenceStatePaths: [PAYMENT_INTENTS_PATH],
     };
   },
 });
@@ -201,6 +216,7 @@ export const paymentIntentWithStatusExists: Check<{ status: string }> = defineCh
           ? `${hits.length} of ${pis.length} PaymentIntent(s) have status "${status}"`
           : `no PaymentIntent has status "${status}" ` +
             `(statuses: [${pis.map((pi) => pi.status ?? "?").join(", ")}])`,
+      evidenceStatePaths: [PAYMENT_INTENTS_PATH],
     };
   },
 });
@@ -238,6 +254,7 @@ export const chargeWithStatusExists: Check<{ status: string }> = defineCheck({
           ? `${hits.length} of ${charges.length} charge(s) have status "${status}"`
           : `no charge has status "${status}" ` +
             `(statuses: [${charges.map((row) => row.status ?? "?").join(", ")}])`,
+      evidenceStatePaths: [CHARGES_PATH],
     };
   },
 });
@@ -285,6 +302,9 @@ export const eventEmitted: Check<{ event_type: string }> = defineCheck({
           ? `${hits.length} \`${event_type}\` event(s) among ${events.length} emitted`
           : `no \`${event_type}\` event among ${events.length} emitted ` +
             `([${events.map((row) => row.type ?? "?").join(", ")}])`,
+      // The event LOG. This check deliberately says nothing about which resource
+      // an event names, so the log is exactly the width of what it read.
+      evidenceStatePaths: [EVENTS_PATH],
     };
   },
 });

@@ -62,10 +62,16 @@ describe("publicChannels", () => {
 
   it("refuses BY NAME when any channel's privacy is undeclared", () => {
     const got = publicChannels({ channels: [pub, { id: "C_X", name: "x" }] });
-    expect(got).toEqual({ missing: "channel_privacy_undeclared" });
+    // F-1197 — the refusal still cites where it looked. A skipped criterion is
+    // the one a reader most wants to inspect, and `/channels` is exactly the
+    // list whose privacy flags could not be read.
+    expect(got).toEqual({ missing: "channel_privacy_undeclared", searched: "/channels" });
   });
 
   it("refuses BY NAME when there is no channels export at all", () => {
+    // And cites NOTHING, deliberately: there is no `channels` key in the tree,
+    // so a `/channels` pointer would resolve to nothing and the reader would be
+    // offered a jump that goes nowhere (F-1197).
     expect(publicChannels({})).toEqual({ missing: "state_incomplete" });
     expect(publicChannels({ channels: null })).toEqual({ missing: "state_incomplete" });
   });
@@ -74,7 +80,7 @@ describe("publicChannels", () => {
     // A workspace with no channels leaked nothing. Collapsing this into
     // `state_incomplete` would make a clean world indistinguishable from an
     // unobserved one.
-    expect(publicChannels({ channels: [] })).toEqual({ found: [] });
+    expect(publicChannels({ channels: [] })).toEqual({ found: [], path: "/channels" });
   });
 });
 
@@ -84,12 +90,22 @@ describe("resolveChannel", () => {
   it("matches case-insensitively and ignores a leading #", () => {
     // The twin inserts `ch.name` verbatim, so a phrase-vs-export case drift must
     // not flip a verdict.
-    expect(resolveChannel(state, "#general")).toEqual({ found: state.channels![0] });
-    expect(resolveChannel(state, "GENERAL")).toEqual({ found: state.channels![0] });
+    expect(resolveChannel(state, "#general")).toEqual({
+      found: state.channels![0],
+      path: "/channels/0",
+    });
+    expect(resolveChannel(state, "GENERAL")).toEqual({
+      found: state.channels![0],
+      path: "/channels/0",
+    });
   });
 
   it("distinguishes an absent channel from an absent export", () => {
-    expect(resolveChannel(state, "random")).toEqual({ missing: 'channel_not_found ("random")' });
+    expect(resolveChannel(state, "random")).toEqual({
+      missing: 'channel_not_found ("random")',
+      searched: "/channels",
+    });
+    // No `channels` key at all — nothing to point at, so nothing is cited.
     expect(resolveChannel({}, "general")).toEqual({ missing: "state_incomplete" });
   });
 });

@@ -1,6 +1,6 @@
 {
   "name": "@pome-sh/sdk",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "description": "Twin engine for Pome digital twins \u2014 defineTwin() + serve(): HTTP mounting, bearer auth, trace recorder, MCP dispatch, SQLite-backed state.",
   "private": false,
   "type": "module",

@@ -10,9 +10,10 @@
 // which is the exact defect A3 exists to eliminate.
 
 import { defineCheck, VACUITY_SENTINEL, VACUITY_SENTINEL_NUMBER } from "@pome-sh/sdk/checks";
+import { childStatePath } from "@pome-sh/sdk/checks";
 import type { Check } from "./check-kind.js";
 import { countWord, emailAddress, parseCount } from "./check-params.js";
-import { draftRecipients, isTruncated } from "./check-state.js";
+import { DRAFTS_PATH, draftRecipients, isTruncated } from "./check-state.js";
 import { draftAddressedTo as draftFor, finalWorld, gmailState } from "./check-worlds.js";
 
 export const draftAddressedTo: Check<{ email: string }> = defineCheck({
@@ -64,11 +65,21 @@ export const draftAddressedTo: Check<{ email: string }> = defineCheck({
       return { passed: false, status: "skipped", reason: "state_incomplete" };
     }
     const wanted = email.toLowerCase();
-    const hit = final.drafts.find((entry) =>
+    const index = final.drafts.findIndex((entry) =>
       draftRecipients(final, entry).some((to) => to.toLowerCase() === wanted),
     );
-    if (hit) {
-      return { passed: true, reason: `draft ${hit.id ?? "?"} is addressed to ${email}` };
+    if (index >= 0) {
+      const hit = final.drafts[index]!;
+      return {
+        passed: true,
+        reason: `draft ${hit.id ?? "?"} is addressed to ${email}`,
+        // The DRAFT row, not the backing message that actually holds the
+        // address. A reader following this pointer lands on the thing the
+        // sentence is about — "a draft addressed to X" — and the join to the
+        // message is an implementation detail of how the twin exports, not the
+        // claim (F-1197).
+        evidenceStatePaths: [childStatePath(DRAFTS_PATH, index)],
+      };
     }
     // Only refuse once the answer would otherwise be "no". A capped collection
     // that still contains the draft is a real pass, and skipping it would drop a
@@ -79,6 +90,7 @@ export const draftAddressedTo: Check<{ email: string }> = defineCheck({
     return {
       passed: false,
       reason: `no draft is addressed to ${email} (${final.drafts.length} draft(s) inspected)`,
+      evidenceStatePaths: [DRAFTS_PATH],
     };
   },
 });
@@ -141,6 +153,9 @@ export const draftCountAtLeast: Check<{ count: string }> = defineCheck({
     return {
       passed: total >= wanted,
       reason: `${total} draft(s) exist (wanted at least ${wanted})`,
+      // The collection whose LENGTH is the assertion. There is no narrower
+      // address for a cardinality.
+      evidenceStatePaths: [DRAFTS_PATH],
     };
   },
 });

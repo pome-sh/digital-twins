@@ -5,9 +5,9 @@
 // Declarations only. The grammar rules they all obey are in `checks.ts`, which
 // assembles them; how the exported tree is read is in `check-state.ts`.
 
-import { defineCheck, repoRef } from "@pome-sh/sdk/checks";
+import { childStatePath, defineCheck, repoRef } from "@pome-sh/sdk/checks";
 import { prNumber, pullRequestState, reviewState } from "./check-params.js";
-import { isMerged, resolvePullRequest } from "./check-state.js";
+import { isMerged, missOutcome, resolvePullRequest } from "./check-state.js";
 import { finalWorld, repoState } from "./check-worlds.js";
 import type { Check } from "./check-kind.js";
 
@@ -57,7 +57,7 @@ export const pullRequestStateCheck: Check<{ pr: string; repo: string; state: str
   },
   evaluate({ pr, repo, state }, { final }) {
     const found = resolvePullRequest(final, repo, pr);
-    if ("missing" in found) return { passed: false, reason: found.missing };
+    if ("missing" in found) return missOutcome(found);
     const pull = found.found;
     const onMergeFlag = state === "merged" || state === "not merged";
     // The field this assertion turns on must be PRESENT. Absent, the safe
@@ -73,6 +73,9 @@ export const pullRequestStateCheck: Check<{ pr: string; repo: string; state: str
         reason: `pull request #${pr} has no ${
           onMergeFlag ? "merged" : "state"
         } field in state_final (state_incomplete)`,
+        // The ROW: the field this branch exists for is the absent one, so a
+        // pointer at it would resolve to nothing (F-1197).
+        evidenceStatePaths: [found.path],
       };
     }
     // Cite only the field the assertion actually turned on. Printing both
@@ -83,11 +86,17 @@ export const pullRequestStateCheck: Check<{ pr: string; repo: string; state: str
       return {
         passed: state === "merged" ? merged : !merged,
         reason: `pull request #${pr}: merged=${merged} (wanted "${state}")`,
+        // The SAME discipline the reason above already follows: cite only the
+        // field the assertion turned on. `merged` and `state` are different
+        // columns, and a citation naming both would offer a reader an absent
+        // field as evidence for a verdict that never read it.
+        evidenceStatePaths: [childStatePath(found.path, "merged")],
       };
     }
     return {
       passed: pull.state === state,
       reason: `pull request #${pr}: state="${pull.state}" (wanted "${state}")`,
+      evidenceStatePaths: [childStatePath(found.path, "state")],
     };
   },
 });
@@ -163,7 +172,7 @@ export const pullRequestCommentExists: Check<{ pr: string; repo: string }> = def
   }),
   evaluate({ pr, repo }, { final }) {
     const found = resolvePullRequest(final, repo, pr);
-    if ("missing" in found) return { passed: false, reason: found.missing };
+    if ("missing" in found) return missOutcome(found);
     // Comments section absent — a snapshot predating PR-comment export. We
     // cannot tell "nobody commented" from "not captured", so safe-skip rather
     // than failing an agent that did comment. An empty array is a real zero and
@@ -173,6 +182,7 @@ export const pullRequestCommentExists: Check<{ pr: string; repo: string }> = def
         passed: false,
         status: "skipped",
         reason: `pull request #${pr} has no comments section in state_final (state_incomplete)`,
+        evidenceStatePaths: [found.path],
       };
     }
     const count = found.found.comments.length;
@@ -185,6 +195,10 @@ export const pullRequestCommentExists: Check<{ pr: string; repo: string }> = def
         count > 0
           ? `pull request #${pr} has ${count} conversation comment(s)`
           : `pull request #${pr} has no conversation comments (reviews and inline review comments are not counted)`,
+      // `comments`, and this pointer is the disambiguation the description
+      // spends a paragraph on. Three fields on a PR can be called "a comment";
+      // the citation names which one was counted, in a form a reader can open.
+      evidenceStatePaths: [childStatePath(found.path, "comments")],
     };
   },
 });
@@ -214,7 +228,7 @@ export const pullRequestReviewExists: Check<{ review: string; pr: string; repo: 
   }),
   evaluate({ review, pr, repo }, { final }) {
     const found = resolvePullRequest(final, repo, pr);
-    if ("missing" in found) return { passed: false, reason: found.missing };
+    if ("missing" in found) return missOutcome(found);
     // Reviews section absent (an older twin snapshot predating review export):
     // we cannot distinguish "no review" from "not captured", so safe-skip
     // rather than vacuously failing a correct agent. An empty array is a real
@@ -224,6 +238,7 @@ export const pullRequestReviewExists: Check<{ review: string; pr: string; repo: 
         passed: false,
         status: "skipped",
         reason: `pull request #${pr} has no reviews section in state_final (state_incomplete)`,
+        evidenceStatePaths: [found.path],
       };
     }
     const states = found.found.reviews.map((row) => row.state ?? "");
@@ -233,6 +248,7 @@ export const pullRequestReviewExists: Check<{ review: string; pr: string; repo: 
       reason: passed
         ? `pull request #${pr} has a ${review} review`
         : `pull request #${pr} reviews are [${states.join(", ")}], missing a ${review} review`,
+      evidenceStatePaths: [childStatePath(found.path, "reviews")],
     };
   },
 });

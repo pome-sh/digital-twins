@@ -48,6 +48,9 @@ describe("resolveMessage", () => {
   it("says message_not_found when the collection is present but the id is not", () => {
     expect(resolveMessage(state(), "msg_ghost")).toEqual({
       missing: 'message_not_found ("msg_ghost")',
+      // F-1197 — the refusal names the collection it scanned, so a reader can
+      // open it and see the id is genuinely not there.
+      searched: "/messages",
     });
   });
 
@@ -65,6 +68,7 @@ describe("resolveMessage", () => {
     });
     expect(resolveMessage(two, "msg_support")).toEqual({
       missing: 'message_ambiguous ("msg_support" exists in 2 mailboxes)',
+      searched: "/messages",
     });
   });
 
@@ -76,6 +80,7 @@ describe("resolveMessage", () => {
     });
     expect(resolveMessage(big, "msg_ghost")).toEqual({
       missing: 'collection_truncated ("messages")',
+      searched: "/messages",
     });
   });
 
@@ -111,11 +116,19 @@ describe("labelIdsFor", () => {
 
 describe("messageCarriesLabel", () => {
   it("reads the join, not a nested field", () => {
-    expect(messageCarriesLabel(state(), "msg_support", "INBOX")).toEqual({ found: true });
+    // The path is the JOIN TABLE, not a row in it: the answer is a boolean this
+    // function computes, and the tree holds no such value (F-1197).
+    expect(messageCarriesLabel(state(), "msg_support", "INBOX")).toEqual({
+      found: true,
+      path: "/messageLabels",
+    });
   });
 
   it("answers false for a label the message does not carry", () => {
-    expect(messageCarriesLabel(state(), "msg_support", "Label_follow_up")).toEqual({ found: false });
+    expect(messageCarriesLabel(state(), "msg_support", "Label_follow_up")).toEqual({
+      found: false,
+      path: "/messageLabels",
+    });
   });
 
   it("says state_incomplete when messageLabels is absent", () => {
@@ -134,6 +147,7 @@ describe("messageCarriesLabel", () => {
     });
     expect(messageCarriesLabel(big, "msg_support", "Label_follow_up")).toEqual({
       missing: 'collection_truncated ("messageLabels")',
+      searched: "/messageLabels",
     });
   });
 });
@@ -149,6 +163,7 @@ describe("resolveLabelByName", () => {
   it("does not match on the id, so an author cannot mistake one for the other", () => {
     expect(resolveLabelByName(state(), "Label_follow_up")).toEqual({
       missing: 'label_not_found ("Label_follow_up")',
+      searched: "/labels",
     });
   });
 

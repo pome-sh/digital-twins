@@ -5,7 +5,7 @@
 // Declarations only. The grammar rules they all obey are in `checks.ts`, which
 // assembles them; how the exported tree is read is in `check-state.ts`.
 
-import { defineCheck, VACUITY_SENTINEL, VACUITY_SENTINEL_NUMBER } from "@pome-sh/sdk/checks";
+import { childStatePath, defineCheck, VACUITY_SENTINEL, VACUITY_SENTINEL_NUMBER } from "@pome-sh/sdk/checks";
 import { repoRef } from "@pome-sh/sdk/checks";
 import {
   commentNeedle,
@@ -14,7 +14,7 @@ import {
   labelName,
   login,
 } from "./check-params.js";
-import { appliedLabelNames, resolveIssue, sameLabel } from "./check-state.js";
+import { appliedLabelNames, missOutcome, resolveIssue, sameLabel } from "./check-state.js";
 import { finalWorld, repoState } from "./check-worlds.js";
 import type { Check } from "./check-kind.js";
 
@@ -46,8 +46,14 @@ export const issueExists: Check<{ issue: string; repo: string }> = defineCheck({
   }),
   evaluate({ issue, repo }, { final }) {
     const found = resolveIssue(final, repo, issue);
-    if ("missing" in found) return { passed: false, reason: found.missing };
-    return { passed: true, reason: `issue #${issue} exists in ${repo}` };
+    if ("missing" in found) return missOutcome(found);
+    // The ISSUE itself, not a field on it — here the lookup is the assertion, so
+    // the row's own address is exactly what produced the verdict (F-1197).
+    return {
+      passed: true,
+      reason: `issue #${issue} exists in ${repo}`,
+      evidenceStatePaths: [found.path],
+    };
   },
 });
 
@@ -96,7 +102,7 @@ export const issueStateCheck: Check<{ issue: string; repo: string; state: string
   }),
   evaluate({ issue, repo, state }, { final }) {
     const found = resolveIssue(final, repo, issue);
-    if ("missing" in found) return { passed: false, reason: found.missing };
+    if ("missing" in found) return missOutcome(found);
     // The issue row must carry a state to attest it; a snapshot that omitted it
     // cannot be judged either way → safe-skip rather than false-fail.
     if (found.found.state == null) {
@@ -104,12 +110,18 @@ export const issueStateCheck: Check<{ issue: string; repo: string; state: string
         passed: false,
         status: "skipped",
         reason: `issue #${issue} has no state in state_final (state_incomplete)`,
+        // The ROW, not `…/state` — the field this branch exists for is the one
+        // that is absent, and a pointer at it would not resolve. Pointing at the
+        // row is what lets a reader see the gap for themselves instead of taking
+        // the reason's word for it (F-1197).
+        evidenceStatePaths: [found.path],
       };
     }
     const actual = found.found.state.toLowerCase();
     return {
       passed: actual === state,
       reason: `issue #${issue} state is "${found.found.state}" (wanted "${state}")`,
+      evidenceStatePaths: [childStatePath(found.path, "state")],
     };
   },
 });
@@ -142,7 +154,7 @@ export const issueHasLabel: Check<{ issue: string; repo: string; label: string }
   }),
   evaluate({ issue, repo, label }, { final }) {
     const found = resolveIssue(final, repo, issue);
-    if ("missing" in found) return { passed: false, reason: found.missing };
+    if ("missing" in found) return missOutcome(found);
     const applied = appliedLabelNames(found.found);
     const passed = applied.some((name) => sameLabel(name, label));
     return {
@@ -150,6 +162,10 @@ export const issueHasLabel: Check<{ issue: string; repo: string; label: string }
       reason: passed
         ? `issue #${issue} has label "${label}"`
         : `issue #${issue} labels are [${applied.join(", ")}], missing "${label}"`,
+      // The APPLIED set, which is the set this check scanned — not the repo's
+      // label definitions, which is the neighbouring set `no-new-labels` reads
+      // and the one this check's description exists to keep it distinct from.
+      evidenceStatePaths: [childStatePath(found.path, "labels")],
     };
   },
 });
@@ -177,7 +193,7 @@ export const issueExactlyOneLabel: Check<{ issue: string; repo: string; label: s
   }),
   evaluate({ issue, repo, label }, { final }) {
     const found = resolveIssue(final, repo, issue);
-    if ("missing" in found) return { passed: false, reason: found.missing };
+    if ("missing" in found) return missOutcome(found);
     const applied = appliedLabelNames(found.found);
     const passed = applied.length === 1 && sameLabel(applied[0]!, label);
     return {
@@ -185,6 +201,9 @@ export const issueExactlyOneLabel: Check<{ issue: string; repo: string; label: s
       reason: passed
         ? `issue #${issue} has exactly one label ("${label}")`
         : `issue #${issue} has labels [${applied.join(", ")}], expected exactly one label "${label}"`,
+      // The same pointer `issue-has-label` cites, because both read the same
+      // field — the difference between them is the assertion, not the address.
+      evidenceStatePaths: [childStatePath(found.path, "labels")],
     };
   },
 });
@@ -210,7 +229,7 @@ export const issueAssignee: Check<{ issue: string; repo: string; login: string }
   }),
   evaluate(args, { final }) {
     const found = resolveIssue(final, args.repo, args.issue);
-    if ("missing" in found) return { passed: false, reason: found.missing };
+    if ("missing" in found) return missOutcome(found);
     const assignees = found.found.assignees ?? [];
     const passed = assignees.includes(args.login);
     return {
@@ -218,6 +237,7 @@ export const issueAssignee: Check<{ issue: string; repo: string; login: string }
       reason: passed
         ? `issue #${args.issue} is assigned to "${args.login}"`
         : `issue #${args.issue} assignees are [${assignees.join(", ")}], missing "${args.login}"`,
+      evidenceStatePaths: [childStatePath(found.path, "assignees")],
     };
   },
 });
@@ -252,7 +272,7 @@ export const issueCommentContains: Check<{ needle: string; issue: string; repo: 
   }),
   evaluate({ needle, issue, repo }, { final }) {
     const found = resolveIssue(final, repo, issue);
-    if ("missing" in found) return { passed: false, reason: found.missing };
+    if ("missing" in found) return missOutcome(found);
     const comments = found.found.comments ?? [];
     const passed = comments.some((comment) => (comment.body ?? "").includes(needle));
     return {
@@ -260,6 +280,12 @@ export const issueCommentContains: Check<{ needle: string; issue: string; repo: 
       reason: passed
         ? `issue #${issue} has a comment containing "${needle}"`
         : `issue #${issue} has no comment containing "${needle}" (${comments.length} comment(s) scanned)`,
+      // The whole comment list, not the matching comment. The check scans every
+      // body, so the list is what it read — and on the FAILING side there is no
+      // matching row to point at, which would leave the citation present on a
+      // pass and absent on a fail. A pointer that appears only when the verdict
+      // is good is worse than none: its absence would read as a verdict class.
+      evidenceStatePaths: [childStatePath(found.path, "comments")],
     };
   },
 });

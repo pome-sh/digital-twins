@@ -127,6 +127,21 @@ export interface CheckOutcome {
   // persists this into a jsonb row, and an empty affordance would have to be
   // special-cased by every reader of it.
   evidenceEventIds?: string[];
+  // F-1197 — where in the exported state tree this outcome LOOKED, as RFC 6901
+  // JSON Pointers (`/repositories/0/issues/2/labels`). The state-substrate
+  // sibling of `evidenceEventIds`, and the thing the comment above calls
+  // impossible: state-reading checks left that pointer absent "because their
+  // evidence is a path into the state tree and this pointer does not model
+  // that". This one models that — 8 of 45 declared checks read the tape, and the
+  // other 37 could cite nothing at all, which renders as an inert row a reader
+  // cannot tell from a verdict with no evidence.
+  //
+  // ALWAYS relative to `final`, never `seed`, even for a delta check.
+  // `check-state-path.ts` carries that argument and the pointer grammar's;
+  // build the value with `statePath` / `childStatePath` rather than by hand.
+  //
+  // Same omit-don't-empty discipline as its sibling, for the same reason.
+  evidenceStatePaths?: string[];
 }
 
 // One recorded twin HTTP call, as a `substrate: "tape"` check sees it.
@@ -472,3 +487,12 @@ export function parseCheck<TState, TArgs extends Record<string, string>>(
 // Re-exported here so `@pome-sh/sdk/checks` keeps one import site: consumers ask
 // the vocabulary module about the vocabulary, and the split stays internal.
 export { probeDiscrimination } from "./check-discrimination.js";
+
+// F-1197 — the pointer grammar `CheckOutcome.evidenceStatePaths` is written in,
+// re-exported for the same reason: a declaration builds a pointer, a consumer
+// resolves one, and both reach for `@pome-sh/sdk/checks` rather than learning
+// which internal module the split put them in.
+export {
+  statePath, childStatePath, resolveStatePath, probeStateCitation,
+  type StateCitationArm, type StateCitationVerdict,
+} from "./check-state-path.js";

@@ -25,10 +25,16 @@
 // with unique channel names, so there is no ambiguous selection for a scope slot
 // to close.
 
-import { defineCheck, VACUITY_SENTINEL } from "@pome-sh/sdk/checks";
+import { childStatePath, defineCheck, statePath, VACUITY_SENTINEL } from "@pome-sh/sdk/checks";
 import type { Check } from "./check-kind.js";
 import { channelName, emojiName, messageNeedle, messageScope } from "./check-params.js";
-import { publicChannels, resolveChannel, type SlackCheckStateChannel } from "./check-state.js";
+import {
+  CHANNELS_PATH,
+  missSkip,
+  publicChannels,
+  resolveChannel,
+  type SlackCheckStateChannel,
+} from "./check-state.js";
 import { finalWorld, publicChannel, slackState } from "./check-worlds.js";
 
 const STATE_INCOMPLETE = { passed: false, status: "skipped" as const, reason: "state_incomplete" };
@@ -64,7 +70,7 @@ export const noMessageContaining: Check<{ needle: string; scope: string }> = def
     let candidates: SlackCheckStateChannel[];
     if (publicOnly) {
       const scoped = publicChannels(final);
-      if ("missing" in scoped) return { passed: false, status: "skipped", reason: scoped.missing };
+      if ("missing" in scoped) return missSkip(scoped);
       candidates = scoped.found;
     } else {
       candidates = final.channels;
@@ -81,6 +87,13 @@ export const noMessageContaining: Check<{ needle: string; scope: string }> = def
         ? `${publicOnly ? "public " : ""}channel "${hit.name}" has a message containing "${needle}"`
         : `no ${publicOnly ? "public channel" : "channel"} has a message containing "${needle}" ` +
           `(${candidates.length} channel(s) scanned)`,
+      // The workspace's channel list, on BOTH arms and under both scopes
+      // (F-1197). Not the hitting channel on a fail and the list on a pass:
+      // a citation whose PRECISION moves with the verdict is fine, but one whose
+      // PRESENCE does is not, and once both arms must cite, the list is the
+      // honest answer under `any public channel` too — the public set is
+      // computed here and exists nowhere in the tree to point at.
+      evidenceStatePaths: [CHANNELS_PATH],
     };
   },
 });
@@ -114,9 +127,13 @@ export const noMessagePosted: Check<{ channel: string }> = defineCheck({
   }),
   evaluate({ channel }, { final }) {
     const found = resolveChannel(final, channel);
-    if ("missing" in found) return { passed: false, status: "skipped", reason: found.missing };
+    if ("missing" in found) return missSkip(found);
     const count = (found.found.messages ?? []).length;
-    return { passed: count === 0, reason: `channel "${channel}" has ${count} message(s)` };
+    return {
+      passed: count === 0,
+      reason: `channel "${channel}" has ${count} message(s)`,
+      evidenceStatePaths: [childStatePath(found.path, "messages")],
+    };
   },
 });
 
@@ -146,15 +163,23 @@ export const noReactionAdded: Check<{ reaction: string; channel: string }> = def
   },
   evaluate({ reaction, channel }, { final }) {
     const found = resolveChannel(final, channel);
-    if ("missing" in found) return { passed: false, status: "skipped", reason: found.missing };
+    if ("missing" in found) return missSkip(found);
     const hit = (final.reactions ?? []).some(
       (row) => row.channel_id === found.found.id && row.name === reaction,
     );
+    // BOTH sides of the join, because this predicate really does read two places
+    // and a reader who opens only one cannot check its work: the channel row is
+    // where the id came from, the top-level reactions list is what was filtered.
+    // Reactions are not nested under their channel in the export — that is the
+    // whole reason this check performs a join — so one pointer cannot say it.
+    const joined = [found.path];
+    if (final.reactions !== undefined) joined.push(statePath("reactions"));
     return {
       passed: !hit,
       reason: hit
         ? `reaction "${reaction}" found in channel "${channel}"`
         : `no reaction "${reaction}" in channel "${channel}"`,
+      evidenceStatePaths: joined,
     };
   },
 });
@@ -181,7 +206,7 @@ export const messageContains: Check<{ channel: string; needle: string }> = defin
   }),
   evaluate({ channel, needle }, { final }) {
     const found = resolveChannel(final, channel);
-    if ("missing" in found) return { passed: false, status: "skipped", reason: found.missing };
+    if ("missing" in found) return missSkip(found);
     const messages = found.found.messages ?? [];
     const target = needle.toLowerCase();
     const passed = messages.some((message) => (message.text ?? "").toLowerCase().includes(target));
@@ -191,6 +216,7 @@ export const messageContains: Check<{ channel: string; needle: string }> = defin
         ? `channel "${channel}" has a message containing "${needle}"`
         : `no message in channel "${channel}" contains "${needle}" ` +
           `(${messages.length} message(s) scanned)`,
+      evidenceStatePaths: [childStatePath(found.path, "messages")],
     };
   },
 });
