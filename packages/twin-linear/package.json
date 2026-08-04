@@ -15,6 +15,10 @@
       "types": "./dist/src/server.d.ts",
       "default": "./dist/src/server.js"
     },
+    "./checks": {
+      "types": "./dist/src/checks.d.ts",
+      "default": "./dist/src/checks.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
