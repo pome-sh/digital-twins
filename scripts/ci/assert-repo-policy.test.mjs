@@ -47,7 +47,7 @@ function baseRulesets(overrides = {}) {
       {
         type: "pull_request",
         parameters: {
-          required_approving_review_count: 1,
+          required_approving_review_count: 0,
           required_review_thread_resolution: true,
           dismiss_stale_reviews_on_push: true,
           require_code_owner_review: false,
@@ -224,7 +224,7 @@ function main() {
           {
             type: "pull_request",
             parameters: {
-              required_approving_review_count: 0,
+              required_approving_review_count: 1,
               required_review_thread_resolution: true,
             },
           },
@@ -242,7 +242,11 @@ function main() {
         ],
       }),
     );
-    assert(r.status === 1, "zero approving reviews on ruleset must fail");
+    assert(r.status === 1, "non-zero approving reviews on ruleset must fail");
+    assert(
+      `${r.stdout}\n${r.stderr}`.includes("required_approving_review_count must be 0"),
+      r.stderr,
+    );
   }
 
   {
@@ -253,7 +257,7 @@ function main() {
           {
             type: "pull_request",
             parameters: {
-              required_approving_review_count: 1,
+              required_approving_review_count: 0,
               required_review_thread_resolution: false,
             },
           },
