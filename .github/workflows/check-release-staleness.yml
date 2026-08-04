@@ -1,0 +1,126 @@
+name: check release staleness
+
+# F-1180 — a CLI release that cannot merge must be visible without anyone
+# trying to merge it.
+#
+# Deliberately a SEPARATE workflow file from cli-release.yml, with its own
+# independent trigger. The alarm has to survive the thing it is watching: a
+# cli-release.yml that is broken, disabled, or never triggered would take an
+# embedded check down with it, and "no release PR and no alarm" is precisely
+# the silence this ticket is about. Daily, because the release cadence is
+# batch-driven and a stuck release should surface the next morning rather than
+# at the next release attempt.
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+  # Changing the checker or the required-context list must prove the checker
+  # still parses on the PR that changes it.
+  pull_request:
+    paths:
+      - "scripts/ci/check-release-staleness.mjs"
+      - "scripts/ci/check-release-staleness.test.mjs"
+      - "scripts/ci/verify-release-pr-checks.mjs"
+      - "scripts/ci/verify-release-pr-checks.test.mjs"
+      - "config/required-checks.json"
+      - ".github/workflows/check-release-staleness.yml"
+      - ".github/workflows/cli-release.yml"
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check-staleness:
+    name: CLI release is not stuck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Regression-test the release-PR check verifier
+        run: node scripts/ci/verify-release-pr-checks.test.mjs
+
+      - name: Regression-test the staleness checker
+        run: node scripts/ci/check-release-staleness.test.mjs
+
+      # Reads live PR/check state, so it only makes sense off a PR branch.
+      - name: Check CLI release freshness
+        id: check
+        if: github.event_name != 'pull_request'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node scripts/ci/check-release-staleness.mjs
+
+      # Scoped to the check step's own outcome (not a bare `if: failure()`) so a
+      # checkout or runner fault doesn't file a misleading "release is stuck"
+      # issue when the checker never ran. Title is constant so the lookup below
+      # keeps reusing one long-lived issue instead of filing one per day.
+      - name: File/update tracking issue on a stuck release
+        if: steps.check.outcome == 'failure'
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        env:
+          STALE_REASON: ${{ steps.check.outputs.reason }}
+          STALE_REPORT: ${{ steps.check.outputs.report }}
+        with:
+          script: |
+            /* eslint-disable */
+            const label = "cli-release-stuck";
+            const title = "The @pome-sh/cli release is stuck";
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            // Empty when the checker died before reaching a verdict (bad JSON,
+            // gh failure). Say that, rather than printing nothing and reading
+            // as "no problem" on an issue filed because there is one.
+            const reason = process.env.STALE_REASON || "The staleness check failed before it reached a verdict — see the run log.";
+            const report = process.env.STALE_REPORT || "(no report was produced)";
+            const body = [
+              reason,
+              ``,
+              `<details><summary>Release path status</summary>`,
+              ``,
+              "```",
+              report,
+              "```",
+              ``,
+              `</details>`,
+              ``,
+              `Failed run: ${runUrl}`,
+              ``,
+              `**If this says BLOCKED:** the version PR's workflow runs are parked at \`action_required\` because it was pushed with the ambient \`GITHUB_TOKEN\`, which GitHub refuses to let trigger workflows. \`gh pr merge --admin\` cannot help — an *absent* required check is a different rule violation from a failed one. Unblock it with:`,
+              ``,
+              "```bash",
+              `for id in $(gh run list --branch changeset-release/main --json databaseId,conclusion \\`,
+              `              --jq '.[] | select(.conclusion=="action_required") | .databaseId'); do`,
+              `  gh api -X POST repos/${context.repo.owner}/${context.repo.repo}/actions/runs/$id/approve`,
+              `done`,
+              "```",
+              ``,
+              `The durable fix is the repo secret \`RELEASE_BOT_TOKEN\` (a PAT with contents + pull-requests write). \`cli-release.yml\` already prefers it over \`GITHUB_TOKEN\`; see \`scripts/ci/verify-release-pr-checks.mjs\` for why a repo Actions *setting* is not the fix.`,
+              ``,
+              `This issue is reused across consecutive failures (commented on, not re-filed) so a release that stays stuck stays visible instead of getting buried.`,
+            ].join("\n");
+
+            const { data: openIssues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              labels: label,
+            });
+
+            if (openIssues.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: openIssues[0].number,
+                body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: [label],
+              });
+            }
