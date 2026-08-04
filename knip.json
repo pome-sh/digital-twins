@@ -34,6 +34,7 @@
     ".": {
       "entry": [
         "scripts/*.{mjs,sh}",
+        "scripts/ci/*.{mjs,sh}",
         "scripts/fixtures/**/*.mjs",
         "contract/run.mjs",
         "contract/*.test.mjs"

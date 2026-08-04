@@ -21,11 +21,28 @@ RULESETS_OUT="$(mktemp)"
 LIST_OUT="$(mktemp)"
 trap 'rm -f "${OUT}" "${RULESETS_OUT}" "${LIST_OUT}"' EXIT
 
-REQUIRED_CHECKS=(
-  "typecheck-test"
-  "gitleaks + trufflehog"
-  "dependency review"
-)
+# F-1180 — the contexts live in config/required-checks.json. A second
+# hand-maintained copy of the same list is the F-1135 shape: one goes stale
+# while both still look like they are watching.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REQUIRED_CHECKS_FILE="${REQUIRED_CHECKS_FILE:-${REPO_ROOT}/config/required-checks.json}"
+# Read into a variable first (not `mapfile < <(...)`, which is bash 4+ and
+# swallows the exit status): `set -e` must still fire if the file is unreadable.
+REQUIRED_CHECKS_RAW="$(
+  REQUIRED_CHECKS_FILE="${REQUIRED_CHECKS_FILE}" node -e '
+    const fs = require("fs");
+    const cfg = JSON.parse(fs.readFileSync(process.env.REQUIRED_CHECKS_FILE, "utf8"));
+    if (!Array.isArray(cfg.contexts) || cfg.contexts.length === 0) {
+      console.error("::error::config/required-checks.json must list a non-empty contexts array");
+      process.exit(1);
+    }
+    process.stdout.write(cfg.contexts.join("\n") + "\n");
+  '
+)"
+REQUIRED_CHECKS=()
+while IFS= read -r line; do
+  [[ -n "${line}" ]] && REQUIRED_CHECKS+=("${line}")
+done <<<"${REQUIRED_CHECKS_RAW}"
 FOUNDER_TEAM_ID="16601595"
 RULESET_NAME="main founder-bypass"
 

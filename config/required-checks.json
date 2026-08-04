@@ -1,0 +1,6 @@
+{
+  "branch": "main",
+  "contexts": ["typecheck-test", "gitleaks + trufflehog", "dependency review"],
+  "why": "Single source of truth for main's required status-check contexts. scripts/ci/assert-repo-policy.sh reads it and asserts GitHub's live branch protection + ruleset carry exactly these. Keeping the list in one file is the F-1135 lesson applied to CI contexts: a second hand-maintained copy goes stale while still looking like something is watching.",
+  "note": "These are job NAMES as GitHub renders them on a commit's check-runs: `typecheck-test` (ci.yml), `gitleaks + trufflehog` (secret-scan.yml), `dependency review` (dependency-review.yml). Renaming a job renames its context and silently drops the required check — change this file in the same PR."
+}
