@@ -1,6 +1,19 @@
 # @pome-sh/adapter-claude-sdk — CHANGELOG
 
 
+## 0.3.1 — 2026-08-04
+
+Dependency patch (#302), and the one in this batch a consumer can actually observe.
+
+- `@opentelemetry/exporter-trace-otlp-http` `^0.220.0` → `^0.221.0`. A 0.x caret
+  does not cross minor, so `^0.220.0` resolves `<0.221.0` — a consumer on 0.3.0
+  could not get 0.221.x at all. The other range moves in this batch are floors
+  their old ranges already admitted; this one is not.
+- `@opentelemetry/api` `^1.9.0` → `^1.9.1`, `@opentelemetry/sdk-trace-base`
+  `^2.0.0` → `^2.10.0` (already admitted).
+- Repinned to `@pome-sh/shared-types@0.14.1`.
+- Peer range on `@anthropic-ai/claude-agent-sdk` is unchanged at `^0.3.215`.
+
 ## 0.3.0 — 2026-08-04
 
 The correlation header carries the SDK's real `tool_use_id` (F-1200).
