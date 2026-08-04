@@ -106,15 +106,27 @@ export function main() {
       ]) || "{}",
     );
     const last = runs.workflow_runs?.[0];
-    lines.push(
-      last
-        ? `last cli-release run: ${last.conclusion ?? last.status} (${last.created_at})`
-        : "last cli-release run: none found",
-    );
-    // A skipped-but-successful run is the designed packages-v* wait, not a
-    // fault. Only an actually broken release path is worth waking someone for.
-    if (last && last.conclusion && last.conclusion !== "success") {
-      reason = `NO_RELEASE — ${pending.length} changeset(s) are pending and the last cli-release run concluded ${last.conclusion}, so no version PR is coming`;
+    if (!last) {
+      lines.push("last cli-release run: none found");
+      reason = `NO_RELEASE — ${pending.length} changeset(s) are pending and cli-release has never run on main, so no version PR is coming`;
+    } else {
+      const runAgeDays = (now - Date.parse(last.created_at)) / 86_400_000;
+      lines.push(
+        `last cli-release run: ${last.conclusion ?? last.status} (${last.created_at}, ${runAgeDays.toFixed(1)}d ago)`,
+      );
+      if (last.conclusion && last.conclusion !== "success") {
+        reason = `NO_RELEASE — ${pending.length} changeset(s) are pending and the last cli-release run concluded ${last.conclusion}, so no version PR is coming`;
+      } else if (runAgeDays > maxAgeDays) {
+        // A skipped-but-successful run is the designed packages-v* wait — but
+        // only for as long as the batch actually takes. Past the window the
+        // tolerance becomes the bug: cli-release only fires on a push touching
+        // `cli/**`, so if the batch publishes and nobody pushes again, the run
+        // that skipped stays the newest run FOREVER, concluded `success`, and
+        // "still waiting" is indistinguishable from "nothing is ever coming".
+        // That is this ticket's own defect wearing a different hat. A run that
+        // is still in progress this long is hung, which is the same answer.
+        reason = `NO_RELEASE — ${pending.length} changeset(s) have been pending with no release PR and no cli-release run for ${runAgeDays.toFixed(1)} days (limit ${maxAgeDays}); the last run concluded ${last.conclusion ?? last.status}`;
+      }
     }
   } else {
     lines.push("release PR: none open; nothing pending");

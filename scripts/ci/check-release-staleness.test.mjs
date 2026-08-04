@@ -146,9 +146,9 @@ function main() {
     assert(r.out.includes("NO_RELEASE"), r.out);
   }
 
-  // 5 — no PR, changesets pending, last release run SUCCEEDED. This is the
-  // designed packages-v* wait (`ready=false` skips and still concludes
-  // success) and can last days. Alarming here would train everyone to mute it.
+  // 5 — no PR, changesets pending, last release run SUCCEEDED *recently*. This
+  // is the designed packages-v* wait (`ready=false` skips and still concludes
+  // success). Alarming here would train everyone to mute it.
   {
     const r = run(
       {
@@ -158,6 +158,55 @@ function main() {
       ["brave-pugs-shake.md"],
     );
     assert(r.status === 0, `the designed packages-v* wait must not alarm: ${r.out}`);
+  }
+
+  // 5b — the same skip-success, but STALE. cli-release only fires on a push
+  // touching `cli/**`, so once the batch publishes and nobody pushes again,
+  // that skipped run stays the newest run forever, concluded `success`. An
+  // unbounded tolerance for case 5 means this state is silent for eternity —
+  // the ticket's own defect, one directory over. Caught in review of PR #300.
+  {
+    const r = run(
+      {
+        pulls: [],
+        releaseRuns: [{ conclusion: "success", created_at: "2026-07-28T00:00:00Z" }],
+      },
+      ["brave-pugs-shake.md"],
+    );
+    assert(r.status === 1, `a week-old skip-success must alarm, got ${r.status}: ${r.out}`);
+    assert(r.out.includes("NO_RELEASE"), r.out);
+  }
+
+  // 5c — changesets pending and cli-release has never run at all (workflow
+  // deleted, disabled, or its trigger broken). Nothing is coming.
+  {
+    const r = run({ pulls: [], releaseRuns: [] }, ["brave-pugs-shake.md"]);
+    assert(r.status === 1, `no cli-release run at all must alarm, got ${r.status}: ${r.out}`);
+    assert(r.out.includes("never run"), r.out);
+  }
+
+  // 5d — a run stuck in progress for days is hung, not working.
+  {
+    const r = run(
+      {
+        pulls: [],
+        releaseRuns: [{ conclusion: null, status: "in_progress", created_at: "2026-07-28T00:00:00Z" }],
+      },
+      ["brave-pugs-shake.md"],
+    );
+    assert(r.status === 1, `a hung release run must alarm, got ${r.status}: ${r.out}`);
+  }
+
+  // 5e — but a run in progress right now is just running.
+  {
+    const r = run(
+      {
+        pulls: [],
+        releaseRuns: [{ conclusion: null, status: "in_progress", created_at: "2026-08-04T11:00:00Z" }],
+      },
+      ["brave-pugs-shake.md"],
+    );
+    assert(r.status === 0, `an in-flight release run must not alarm: ${r.out}`);
   }
 
   // 6 — nothing pending, nothing open: quiet.
