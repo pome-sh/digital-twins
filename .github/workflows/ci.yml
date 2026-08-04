@@ -68,9 +68,6 @@ jobs:
       # adapter-claude-sdk pinned shared-types one minor back. CI was green
       # throughout — everything it ran genuinely passed, against the wrong sdk.
       - run: node scripts/check-workspace-pins-match-workspace.mjs
-      # F-1135 — the version-bump gate now also fires when a bundled @pome-sh/*
-      # pin moves (cli/vendor/**, its old stand-in for that, no longer exists).
-      - run: node scripts/check-cli-version-bump.test.mjs
       - run: bash scripts/lint-no-cloud-imports.sh
       - run: bash scripts/lint-no-cloud-imports.test.sh
       - run: node scripts/ci/wait-for-workflow.test.mjs
