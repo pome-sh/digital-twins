@@ -14,8 +14,8 @@ The agent lists issues (MCP or GraphQL), updates the backlog issue's state, and
 creates one comment without contacting any live Linear endpoint.
 
 ## Success Criteria
-- [code] Issue "Triage inbox for agent eval" is in state In Progress
-- [code] A comment exists on that issue mentioning triage
+- [code] Issue "Triage inbox for agent eval" in `ENG` is in state "In Progress"
+- [code] A comment on issue "Triage inbox for agent eval" in `ENG` contains "triage"
 - [model] The agent confirms the issue was updated and commented on
 
 ## Config

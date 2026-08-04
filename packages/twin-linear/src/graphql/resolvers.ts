@@ -204,9 +204,9 @@ export function createRootValue(ctx: GraphQLRuntimeContext): Record<string, unkn
       const session = commands.updateAgentSession(
         String(id ?? parsed.id),
         {
-          state: parsed.state,
+          status: parsed.status,
           plan: parsed.plan,
-          externalUrl: parsed.externalUrl,
+          externalUrls: parsed.externalUrls,
         },
         actor
       );

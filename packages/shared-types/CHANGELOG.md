@@ -1,5 +1,59 @@
 # @pome-sh/shared-types — CHANGELOG
 
+
+## 0.14.0 — 2026-08-04
+
+`parent_id` stops meaning four different things (F-1200).
+
+- **`parent_event_id`** is the canonical spelling: always the spawning row's
+  `event_id`. It replaces `parent_id`, which meant a spawning `event_id`, a raw
+  SDK `tool_use_id`, a hard null, or a mirror of `parent_span_id` depending on
+  which of five writers produced the row — so reading a trace meant knowing
+  where the row came from.
+- **`HookEvent.causing_tool_use_id`** takes the one meaning that was never a
+  parent edge. A hook fires *because of* a tool call but is not spawned by its
+  row, and the emitter has no `event_id` for that call at hook time.
+- **Old rows still parse.** `parent_id` stays in the schema as a legacy input
+  key and the exported readers normalize it, the same tolerant-reader shape
+  `scenario_step_id` has had since 0.5.0. A stored 0.13.0 recording needs no
+  migration. On a HookEvent the legacy value routes to `causing_tool_use_id`,
+  not `parent_event_id` — copying it would mint an edge pointing at a row that
+  does not exist.
+- On `OtelSpanEvent` the field is derived from `parent_span_id`, which the
+  cross-field invariant already pins it equal to, so that arm needs no lookup.
+  The invariant now reads `parent_event_id === parent_span_id`.
+
+**Consumers must act**: anything reading `parent_id` off a freshly captured row
+will not find it. Read `parent_event_id`, or parse through `eventSchema` /
+`otelEventSchema`, which settle it for you.
+
+## 0.13.0 — 2026-07-29
+
+The recorder captures enough to express the S4 class (F-1125). Minor, not patch:
+the frozen v1 trace row grows two keys, and a consumer that wants to read them
+must re-pin (`PACKAGE_RELEASE.md` — 0.x minor plays the major role).
+
+### Added
+
+- `RecorderEvent.request_headers?: Record<string, string>` — the request headers
+  as received, keys lowercased. Recorded WHOLESALE rather than through an
+  allowlist: an allowlist is a narrowing no consumer can lift and no task author
+  can extend, which is why `The retry includes X-PAYMENT` was unanswerable at any
+  substrate width. Secrets are handled where every other field's are — the
+  engine's unconditional `redactEvent` scrubs `authorization` / `cookie` /
+  `x-api-key` by key.
+- `RecorderEvent.tool?: string | null` — the twin ACTION the call invoked. It
+  names the action, NOT the transport: an MCP `tools/call` and the REST route that
+  performs the same thing stamp the same value, so a tape check never has to
+  reverse-engineer a tool name out of an MCP request body. `null` means "no
+  declared action for this surface", never "no action happened".
+
+Both are OPTIONAL, and that is load-bearing rather than cosmetic.
+`twinHttpEventSchema` is the only gate into the cloud's tape and a row that fails
+it is dropped **silently**, so a required field would turn every recording an
+older CLI wrote into an empty tape — which, for a negative criterion, is a free
+pass.
+
 ## 0.12.2 — 2026-07-24
 
 ### Added

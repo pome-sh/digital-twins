@@ -40,7 +40,10 @@ export function tool<Schema extends AnyZodRawShape>(
   handler: (args: InferShape<Schema>, extra: unknown) => Promise<ToolCallResult>,
   extras?: ToolExtras,
 ): SdkMcpToolDefinition<any> {
-  const wrapped = wrapHandler(handler as (a: unknown) => Promise<ToolCallResult>);
+  // F-1200: `extra` is load-bearing now — `wrapHandler` reads the SDK's real
+  // `tool_use_id` off its `_meta` and forwards the argument on to the handler,
+  // which the pre-F-1200 wrapper dropped.
+  const wrapped = wrapHandler(handler as (a: unknown, extra: unknown) => Promise<ToolCallResult>);
   return sdkTool(
     name,
     description,

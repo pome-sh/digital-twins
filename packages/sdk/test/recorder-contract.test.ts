@@ -261,7 +261,7 @@ describe("recorder write-through contract (F-720)", () => {
     const wrapped = toTwinHttpEventRow(legacyShaped);
     expect(wrapped.kind).toBe("TwinHttpEvent");
     expect(wrapped.event_id).toBe("req_legacy");
-    expect(wrapped.parent_id).toBeNull();
+    expect(wrapped.parent_event_id).toBeNull();
     const already = toTwinHttpEventRow({
       ...sampleEvent({ request_id: "req_ok" }),
       kind: "TwinHttpEvent",
@@ -270,6 +270,9 @@ describe("recorder write-through contract (F-720)", () => {
     } as RecorderEvent);
     expect(already.kind).toBe("TwinHttpEvent");
     expect(already.event_id).toBe("req_ok");
+    // Fed a pre-F-1200 row on purpose: the wrapper emits the canonical
+    // spelling regardless of which one the caller handed it.
+    expect(already.parent_event_id).toBeNull();
   });
 
   it("bounded file-backed store caps events() but keeps all rows on disk", async () => {

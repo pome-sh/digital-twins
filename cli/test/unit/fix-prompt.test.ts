@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // FDRS-657 — `pome fix-prompt` is CAPTURE-ONLY: it assembles a paste-into-IDE
-// prompt from the raw trace + the scenario's criteria, with NO LLM/judge call
+// prompt from the raw trace + the task's criteria, with NO LLM/judge call
 // and NO network. This test asserts the prompt content and that no fetch is
 // attempted.
 
@@ -9,7 +9,7 @@ import { buildFixPrompt, buildFixUserPrompt } from "../../src/fix-prompt/index.j
 import type { RecorderEvent } from "../../src/types/shared.js";
 import type { Task } from "../../src/task/taskSchema.js";
 
-const scenario: Task = {
+const task: Task = {
   slug: "01-bug-happy-path",
   title: "Bug happy path",
   setup: "",
@@ -37,14 +37,14 @@ const events = [
 ] as unknown as RecorderEvent[];
 
 describe("fix-prompt (capture-only)", () => {
-  it("builds a prompt from the trace + all scenario criteria, no network", () => {
+  it("builds a prompt from the trace + all task criteria, no network", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
 
-    const out = buildFixPrompt({ events, scenario });
+    const out = buildFixPrompt({ events, task });
 
     // System instructions are prepended.
     expect(out).toContain("You are a senior engineer");
-    // The scenario prompt + every criterion are included (no verdict needed).
+    // The task prompt + every criterion are included (no verdict needed).
     expect(out).toContain("Triage the incoming bug and label it.");
     expect(out).toContain("[code] The issue is labeled `bug`");
     expect(out).toContain("[model] The agent left a helpful triage comment");
@@ -58,7 +58,7 @@ describe("fix-prompt (capture-only)", () => {
   });
 
   it("lists criteria as 'had to satisfy', not a local pass/fail verdict", () => {
-    const user = buildFixUserPrompt({ events, scenario });
+    const user = buildFixUserPrompt({ events, task });
     expect(user).toContain("## Criteria the run had to satisfy");
     expect(user).not.toMatch(/\bpassed\b|\bfailed\b|judge confidence/);
   });

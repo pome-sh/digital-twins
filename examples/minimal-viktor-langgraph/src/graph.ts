@@ -79,9 +79,19 @@ const SYSTEM = [
   "Decide for EVERY pull request in the context. Base each decision only on the evidence provided.",
 ].join("\n");
 
-/** Read the first `owner/repo` slug out of the task prompt. */
-function parseRepo(task: string): { owner: string; repo: string } {
-  const m = task.match(/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)/);
+/**
+ * Read the first `owner/repo` slug out of the task prompt.
+ *
+ * The slug appears mid-sentence ("…the open pull requests in viktor-hq/orders-service.")
+ * so the match has to end where the name ends, not where the punctuation does.
+ * A `.` cannot simply leave the character class — a repo may legitimately be
+ * named `foo.github.io` — so the slug is anchored with a trailing `\b`: the
+ * match backtracks off any trailing `.` or `-` to land on the last word
+ * character, keeping interior dots and dropping the sentence's period. Without
+ * it every GitHub call went to `orders-service.` and 404'd (F-1207).
+ */
+export function parseRepo(task: string): { owner: string; repo: string } {
+  const m = task.match(/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\b/);
   if (!m) throw new Error(`could not find an owner/repo slug in the task: ${task}`);
   return { owner: m[1]!, repo: m[2]! };
 }

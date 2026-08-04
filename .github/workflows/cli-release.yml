@@ -44,24 +44,13 @@ jobs:
       # for trusted publishing and publishes cleanly.
       - name: Install npm with OIDC trusted publishing support
         run: npm install -g npm@11.5.1
-      - name: Check package dependencies are published
-        id: package-deps
-        run: |
-          set +e
-          npm view @pome-sh/shared-types@0.11.0 version &&
-          npm view @pome-sh/sdk@0.5.0 version &&
-          npm view @pome-sh/twin-github@0.2.1 version &&
-          npm view @pome-sh/twin-slack@0.2.1 version &&
-          npm view @pome-sh/twin-stripe@0.2.4 version &&
-          npm view @pome-sh/twin-gmail@0.1.0 version &&
-          npm view @pome-sh/twin-linear@0.1.0 version
-          ready=$?
-          set -e
-          if [ "$ready" -eq 0 ]; then
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-          fi
+      # F-1135 — read the versions to probe FROM cli/package.json. This step
+      # used to `npm view` seven hard-coded literals; they were the true pin set
+      # for exactly one day (2026-07-20), the pins moved six times after, and
+      # all seven kept resolving — so the step could not fail while looking like
+      # something was watching. Sets ready=false (skip) when a pin matches
+      # packages/ but its batch has not published; exits 1 when a pin is missing
+      # AND disagrees with packages/, because no batch will ever publish that.
       - name: Skip until package batch is published
         if: steps.package-deps.outputs.ready != 'true'
         run: |

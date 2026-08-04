@@ -181,6 +181,8 @@ CREATE TABLE IF NOT EXISTS issue_labels (
   FOREIGN KEY (repo_id, label_name) REFERENCES labels(repo_id, name) ON DELETE CASCADE
 );
 
+-- issue_number names an issue OR a pull request, so no FK to issues — see
+-- ensureCommentsAllowPullRequests below (F-1151).
 CREATE TABLE IF NOT EXISTS issue_comments (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   repo_id INTEGER NOT NULL,
@@ -189,7 +191,7 @@ CREATE TABLE IF NOT EXISTS issue_comments (
   user_login TEXT NOT NULL,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
-  FOREIGN KEY (repo_id, issue_number) REFERENCES issues(repo_id, number) ON UPDATE CASCADE ON DELETE CASCADE
+  FOREIGN KEY (repo_id) REFERENCES repositories(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS pull_requests (
@@ -325,6 +327,7 @@ export function migrate(db: GitHubCloneDatabase) {
   ensureColumn(db, "pull_request_review_comments", "in_reply_to_id", "INTEGER");
   ensureColumn(db, "collaborators", "invitation_state", "TEXT NOT NULL DEFAULT 'accepted'");
   ensureIssueNumberCascade(db);
+  ensureCommentsAllowPullRequests(db);
   hydrateDerivedColumns(db);
 }
 
@@ -340,7 +343,11 @@ function ensureColumn(db: GitHubCloneDatabase, table: string, column: string, de
 }
 
 function ensureIssueNumberCascade(db: GitHubCloneDatabase) {
-  const tables = ["issue_assignees", "issue_labels", "issue_comments"];
+  // `issue_comments` used to be rebuilt here too. It is not any more: F-1151
+  // removed its `issues` FK outright, so it has no cascade to fix, and leaving
+  // it in this list would have this function put the constraint back on every
+  // boot of an older database. `ensureCommentsAllowPullRequests` owns it now.
+  const tables = ["issue_assignees", "issue_labels"];
   const needsRebuild = tables.some((table) => {
     const foreignKeys = db.prepare(`PRAGMA foreign_key_list(${table})`).all() as Array<{ table: string; on_update: string }>;
     return foreignKeys.some((key) => key.table === "issues" && key.on_update !== "CASCADE");
@@ -373,7 +380,45 @@ CREATE TABLE issue_labels (
 INSERT INTO issue_labels (repo_id, issue_number, label_name)
   SELECT repo_id, issue_number, label_name FROM issue_labels_old;
 DROP TABLE issue_labels_old;
+`);
+  db.pragma("foreign_keys = ON");
+}
 
+// F-1151 — a comment may hang off a PULL REQUEST, not only an issue.
+//
+// Real GitHub models every pull request as an issue and documents the Issue
+// Comments endpoints as the way to comment on a PR's conversation. The twin's
+// `add_issue_comment` therefore has to accept a PR number, and until this
+// migration it could not: `issue_comments` carried an FK to `issues(repo_id,
+// number)`, and a PR has no row there (`createPullRequest` writes no companion
+// issue — that is divergence #16 in FIDELITY.md, whose read side is still open).
+// So the insert failed the constraint before any predicate could read it, and
+// the only comment tool the bundled `pr-summary-*` examples expose 404'd on
+// every run.
+//
+// The pair stays unambiguous without the constraint because `nextNumber()` hands
+// issues and pull requests numbers out of ONE per-repo `entity_counter`: within
+// a repo a number names an issue or a PR, never both.
+//
+// What the FK was also buying, and where each half went:
+//   - ON DELETE CASCADE from `repositories` — replaced by a direct repo FK, so
+//     dropping a repository still takes its comments.
+//   - ON UPDATE CASCADE on issue renumbering — dropped. The seed path already
+//     renumbers `issue_comments` itself (`domain/github-domain.ts`), belt-and-
+//     braces with the cascade that is now the only belt.
+//
+// One table rather than a second `pull_request_comments`, because
+// `PATCH|DELETE /repos/:o/:r/issues/comments/:comment_id` addresses a comment by
+// id alone. Two AUTOINCREMENT tables behind one route is two id spaces behind
+// one address — a wrong-target write waiting for the first collision.
+function ensureCommentsAllowPullRequests(db: GitHubCloneDatabase) {
+  const foreignKeys = db.prepare("PRAGMA foreign_key_list(issue_comments)").all() as Array<{
+    table: string;
+  }>;
+  if (!foreignKeys.some((key) => key.table === "issues")) return;
+
+  db.pragma("foreign_keys = OFF");
+  db.exec(`
 ALTER TABLE issue_comments RENAME TO issue_comments_old;
 CREATE TABLE issue_comments (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -383,7 +428,7 @@ CREATE TABLE issue_comments (
   user_login TEXT NOT NULL,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
-  FOREIGN KEY (repo_id, issue_number) REFERENCES issues(repo_id, number) ON UPDATE CASCADE ON DELETE CASCADE
+  FOREIGN KEY (repo_id) REFERENCES repositories(id) ON DELETE CASCADE
 );
 INSERT INTO issue_comments (id, repo_id, issue_number, body, user_login, created_at, updated_at)
   SELECT id, repo_id, issue_number, body, user_login, created_at, updated_at FROM issue_comments_old;

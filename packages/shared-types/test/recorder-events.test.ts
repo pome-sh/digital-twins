@@ -141,3 +141,54 @@ describe("recorderEventSchema", () => {
     expect(r.step_id).toBe("stp_runtime_1");
   });
 });
+
+// ── F-1125 ───────────────────────────────────────────────────────────────────
+// The two fields that make the S4 class expressible. Both are ADDITIVE and
+// optional: `twinHttpEventSchema` is the only gate into the cloud's tape
+// (`parseEventsJsonl` silently skips a row that fails it), so a required field
+// would drop every row an older CLI wrote — an empty tape, which for a negative
+// criterion is a free pass.
+describe("recorderEventSchema — F-1125 request_headers", () => {
+  it("preserves recorded request headers", () => {
+    const r = recorderEventSchema.parse({
+      ...baseEvent,
+      request_headers: { "x-payment": "eyJ4NDAy", "content-type": "application/json" },
+    });
+    expect(r.request_headers).toEqual({
+      "x-payment": "eyJ4NDAy",
+      "content-type": "application/json",
+    });
+  });
+
+  it("parses a row that carries no request_headers (rows written before F-1125)", () => {
+    const r = recorderEventSchema.parse(baseEvent);
+    expect(r.request_headers).toBeUndefined();
+  });
+
+  it("rejects a non-string header value rather than coercing it", () => {
+    expect(() =>
+      recorderEventSchema.parse({ ...baseEvent, request_headers: { "content-length": 12 } }),
+    ).toThrow();
+  });
+});
+
+describe("recorderEventSchema — F-1125 tool", () => {
+  it("preserves the twin action the call invoked", () => {
+    const r = recorderEventSchema.parse({ ...baseEvent, tool: "create_commit_status" });
+    expect(r.tool).toBe("create_commit_status");
+  });
+
+  it("accepts an explicit null for a call that invoked no declared action", () => {
+    const r = recorderEventSchema.parse({ ...baseEvent, tool: null });
+    expect(r.tool).toBeNull();
+  });
+
+  it("parses a row that carries no tool (rows written before F-1125)", () => {
+    const r = recorderEventSchema.parse(baseEvent);
+    expect(r.tool).toBeUndefined();
+  });
+
+  it("rejects an empty tool name — absent and null already mean 'no action'", () => {
+    expect(() => recorderEventSchema.parse({ ...baseEvent, tool: "" })).toThrow();
+  });
+});

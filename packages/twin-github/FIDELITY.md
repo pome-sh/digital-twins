@@ -287,6 +287,20 @@ upstream so a divergence that upstream "heals" becomes a tier-upgrade signal.
     out of scope, but the array-aware oracle (FDRS-455) now SEES the item-count
     divergence: registered as accepted on the collection root so this L1 read surface is
     INFO, not drift, and flagged as a genuine twin-fidelity gap for follow-up.
+
+    **Narrowed by F-1151: the COMMENT routes now honour the rule.**
+    `GET|POST /repos/:o/:r/issues/:number/comments` accept a pull-request number, which is
+    how real GitHub documents commenting on a PR's conversation. Until F-1151 they did
+    not — `issue_comments` carried a foreign key to `issues(repo_id, number)` and a PR has
+    no row there, so every PR comment failed the constraint and the route answered
+    `404 Issue not found`. That was this bullet's write-side face, and it was recorded
+    nowhere: the matrix listed the route as `hot`/`semantic` with no caveat, and the only
+    comment tool the bundled `pr-summary-*` examples expose 404'd on every run. What
+    remains open is the READ half above — the `/issues` COLLECTION still lists issues
+    only, and PRs still carry no `pull_request` member — so the divergence stands and
+    keeps its registry entry. The number space was never the obstacle: `nextNumber()`
+    already draws issue and PR numbers from one per-repo counter, so a number names one
+    entity or the other, never both.
 17. **Issue `assignees`/`labels` arrays reflect the controlled-sandbox seed, not real GitHub.**
     The plural `assignees` and the `labels` arrays are non-empty on the twin (its seeded
     fictional assignee/label) but empty on real GitHub for the seeded sandbox — the same

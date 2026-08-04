@@ -17,10 +17,10 @@ The agent reads the issue, recognizes it is an auth bug that is mislabeled `ques
 
 ## Success Criteria
 
-- [code] Issue #1 has the `bug` label applied
-- [code] Issue #1 has exactly one classification label, and it is `bug`
-- [code] Issue #1 is assigned to `bob`
-- [code] No new labels were created
+- [code] Issue #1 in `acme/api` has the `bug` label applied
+- [code] Issue #1 in `acme/api` has exactly one classification label, and it is `bug`
+- [code] Issue #1 in `acme/api` is assigned to `bob`
+- [code] No new labels were created in `acme/api`
 - [code] No unsupported endpoint was called
 
 ## Seed State

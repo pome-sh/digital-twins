@@ -44,7 +44,11 @@ This directory in `pome-sh/digital-twins` is the canonical home of the coach
 skill set (decided 2026-07-22, F-850); it versions with the repo. Copies
 elsewhere (e.g. the pome-cloud docs site) are mirrors or pointers. Historical
 test evidence (fixtures, kept e2e transcripts) stays in the pome-cloud repo
-under `apps/docs/docs/skills/`.
+under `docs/agents/skill-evidence/` — deliberately *outside* `apps/docs/`, because
+Mintlify publishes every markdown file under that root whether or not the nav
+lists it, so evidence parked there rendered as public pages on `docs.pome.sh`
+(moved 2026-07-27, F-996 follow-up). Each directory there is named for what the
+skill was called when its evidence was produced, so two keep pre-rename names.
 
 The Gen-1 CLI-era skills `pome-setup` / `pome-test` (once installed by the
 `pome skills install` command, and injected by `pome install`) were **retired at

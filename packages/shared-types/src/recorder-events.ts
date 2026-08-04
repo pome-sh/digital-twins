@@ -84,6 +84,46 @@ const recorderEventObjectSchema = z.object({
   method: z.string().min(1),
   path: z.string(),
   request_body: z.unknown(),
+  // F-1125 — the request headers as received, keys lowercased by the runtime.
+  //
+  // Recorded WHOLESALE rather than through an allowlist. An allowlist is a
+  // narrowing no downstream consumer can lift and no task author can extend,
+  // which is the defect this field exists to remove: `The retry includes
+  // X-PAYMENT` was unanswerable at any substrate width because the recorder
+  // captured nothing. Secrets are handled where every other field's are —
+  // `redactEvent` runs unconditionally before any store sees the event, and
+  // `HARD_REDACT_KEYS` already covers `authorization` / `cookie` / `x-api-key`
+  // by key. Asserted both ways in `packages/sdk/test/redaction.test.ts`: the
+  // bearer must not survive, and `x-payment` must.
+  //
+  // Optional, not nullable: ABSENT means this row predates F-1125, and a
+  // present-but-empty map would erase that distinction. A required field here
+  // would be far worse than a missing one — `twinHttpEventSchema` is the only
+  // gate into the cloud's tape and a row that fails it is dropped SILENTLY, so
+  // every recording an older CLI wrote would arrive as an empty tape, which for
+  // a negative criterion is a free pass.
+  request_headers: z.record(z.string(), z.string()).optional(),
+  // F-1125 — the twin ACTION this call invoked, when the twin declares one for
+  // the surface that served it. This is the field that stops a tape check from
+  // reverse-engineering a tool name out of an MCP transport path.
+  //
+  // It names the action, NOT the transport. The same fabrication reaches the
+  // GitHub twin two ways — `tools/call` with `create_commit_status`, and
+  // `POST /repos/:owner/:repo/statuses/:sha` — and both stamp the same value.
+  // A field that only carried the MCP name would leave the REST door open, and
+  // `create_commit_status was never called` would pass over a run that called
+  // it: the negative false-pass D4 forbids, relocated rather than fixed.
+  //
+  // The value is the action the CALLER NAMED, stamped even when the call then
+  // failed (unknown tool, validation error, 4xx). "Was it called" is a question
+  // about the attempt, and a check that cares whether it succeeded has `status`
+  // on the same row.
+  //
+  // `null` means "no declared action for this surface" — NOT "no action". Only
+  // surfaces a twin has stamped are assertable; the GitHub twin's
+  // `TAPE_ASSERTABLE_TOOLS` is the set that has been, and its check's param type
+  // is generated from that set so a criterion cannot name an unstamped action.
+  tool: z.string().min(1).nullable().optional(),
   status: z.number().int(),
   response_body: z.unknown(),
   latency_ms: z.number().int().min(0),
@@ -112,6 +152,50 @@ function normalizeTaskStepVocab<
   return event;
 }
 
+// F-1200 tolerant reader: populate the canonical `parent_event_id` from the
+// pre-F-1200 `parent_id` when only the old key was written, and settle an
+// absent parent to an explicit `null` so a parsed row never carries
+// `undefined`. The old key is preserved as-sent (additive normalization — a
+// re-serialized row still parses under a pre-F-1200 reader).
+//
+// The guard is `=== undefined`, NOT `== null` as the task-step normalizer uses.
+// Here an explicit `parent_event_id: null` is the documented root-of-chain
+// marker, so a disagreeing legacy `parent_id` must not silently re-parent a row
+// the writer deliberately rooted.
+// The return type stays `T` rather than `T & { parent_event_id: string | null }`
+// even though the value always carries the key after this runs. Widening it
+// breaks the identity `Event` = union of the variant types: the variants must
+// keep `parent_event_id` OPTIONAL on the input side for the tolerant read, so a
+// narrowed output type makes a hand-built `LlmCallEvent` no longer assignable
+// to `Event`. Downstream code (the CLI's inspect, pome-cloud's readers) relies
+// on that identity, and it is worth more than a type-level restatement of a
+// runtime guarantee. Read it as `parent_event_id ?? null`.
+function normalizeParentVocab<
+  T extends { parent_event_id?: string | null; parent_id?: string | null },
+>(event: T): T {
+  return event.parent_event_id === undefined
+    ? { ...event, parent_event_id: event.parent_id ?? null }
+    : event;
+}
+
+// F-1200, the HookEvent arm of the same tolerant read. A pre-F-1200 HookEvent
+// wrote the SDK's raw `tool_use_id` into `parent_id`, so the generic rule above
+// would copy it into `parent_event_id` and mint a parent edge pointing at a row
+// that does not exist — the exact confusion the vocab split removes. Route it to
+// `causing_tool_use_id` instead and leave the hook rootless.
+function normalizeHookCausingToolUseId<
+  T extends { causing_tool_use_id?: string | null; parent_id?: string | null },
+>(event: T): T {
+  return {
+    ...event,
+    causing_tool_use_id:
+      event.causing_tool_use_id === undefined
+        ? (event.parent_id ?? null)
+        : event.causing_tool_use_id,
+    parent_event_id: null,
+  };
+}
+
 export const recorderEventSchema = recorderEventObjectSchema.transform(normalizeTaskStepVocab);
 export type RecorderEvent = z.infer<typeof recorderEventSchema>;
 
@@ -120,11 +204,13 @@ export type RecorderEvent = z.infer<typeof recorderEventSchema>;
 //
 // Hard-cut from the legacy single-shape `RecorderEvent`. The on-disk row is
 // now a tagged union over `kind`. Every variant carries:
-//   - `event_id`  — unique row id (uuid/nanoid, set by emitter)
-//   - `parent_id` — points at the spawning row's `event_id`, or null at the
-//                   root of a parent chain (e.g. top-level twin HTTP calls,
-//                   the first LLM call in a turn).
-//   - `kind`      — the discriminator literal (see each schema below)
+//   - `event_id`        — unique row id (uuid/nanoid, set by emitter)
+//   - `parent_event_id` — points at the spawning row's `event_id`, or null at
+//                         the root of a parent chain (e.g. the first LLM call
+//                         in a turn).
+//   - `parent_id`       — the pre-F-1200 spelling of the same field. Legacy
+//                         INPUT key only; no writer in this repo emits it.
+//   - `kind`            — the discriminator literal (see each schema below)
 //
 // Provenance:
 //   - PR/FAQ: linear.app/pome-sh/project/agent-trace-v1-af8924d607f0
@@ -142,10 +228,27 @@ export type RecorderEvent = z.infer<typeof recorderEventSchema>;
 
 // Common fields on every event variant. Spread (not extend) so the resulting
 // Zod object types stay readable.
+//
+// F-1200 vocab split. `parent_id` used to mean four different things depending
+// on which of five writers produced the row — a spawning `event_id`, a raw SDK
+// `tool_use_id`, a hard null, and a mirror of `parent_span_id`. `parent_event_id`
+// is now the one canonical meaning (the spawning row's `event_id`); the hook
+// writer's raw SDK id lives on `HookEvent.causing_tool_use_id`.
+//
+// BOTH keys stay in the schema, and both are optional, for the same reason
+// `scenario_step_id` does (FDRS-653): every shipped 0.13.0 emitter writes
+// `parent_id`, and this shape is the only gate into the cloud's tape — a row
+// that fails to parse is dropped SILENTLY, so a stored recording arriving as an
+// empty tape would be worse than a duplicated key. The exported readers
+// normalize (`normalizeParentVocab`), so a parsed row always carries an
+// explicit `parent_event_id`, never `undefined`. Writer-side discipline is
+// enforced out-of-band by the `lint:parent-vocab` CI gate, which fails on a
+// bare `parent_id` in any emitter.
 const eventBaseShape = {
   ts: z.string().datetime(),
   event_id: z.string().min(1),
-  parent_id: z.string().min(1).nullable(),
+  parent_event_id: z.string().min(1).nullable().optional(),
+  parent_id: z.string().min(1).nullable().optional(),
 } as const;
 
 // `TwinHttpEvent` is the legacy RecorderEvent shape extended with the union
@@ -157,7 +260,8 @@ const eventBaseShape = {
 export const twinHttpEventSchema = recorderEventObjectSchema.extend({
   kind: z.literal("TwinHttpEvent"),
   event_id: z.string().min(1),
-  parent_id: z.string().min(1).nullable(),
+  parent_event_id: z.string().min(1).nullable().optional(),
+  parent_id: z.string().min(1).nullable().optional(),
 });
 export type TwinHttpEvent = z.infer<typeof twinHttpEventSchema>;
 
@@ -201,7 +305,7 @@ export type ToolUseEvent = z.infer<typeof toolUseEventSchema>;
 
 // `ToolResultEvent` — emitted by the CAS adapter (FDRS-408) for each
 // tool_result content block in a user message. `tool_use_id` matches the
-// originating `ToolUseEvent.tool_use_id`; `parent_id` typically points at
+// originating `ToolUseEvent.tool_use_id`; `parent_event_id` points at
 // that ToolUseEvent's `event_id`.
 export const toolResultEventSchema = z.object({
   ...eventBaseShape,
@@ -226,11 +330,18 @@ export type SubagentSpawnEvent = z.infer<typeof subagentSpawnEventSchema>;
 // SDK's 25 hook invocations (FDRS-407). `tool_name` is null when the hook
 // isn't tool-scoped (e.g. SessionStarted, PreCompact, PermissionGranted on a
 // non-tool resource).
+// F-1200: a hook fires *because of* a tool call, but it is not spawned by that
+// call's row — the SDK hands the hook a raw `tool_use_id`, and the adapter has
+// no `event_id` for it at hook time. Before F-1200 that raw id was written to
+// `parent_id`, which is one of the four meanings that field carried. It now has
+// its own name, and a HookEvent's `parent_event_id` is null: the hook is an
+// audit-trail row, not a node in the causal tree.
 export const hookEventSchema = z.object({
   ...eventBaseShape,
   kind: z.literal("HookEvent"),
   hook_name: z.string().min(1),
   tool_name: z.string().min(1).nullable(),
+  causing_tool_use_id: z.string().min(1).nullable().optional(),
 });
 export type HookEvent = z.infer<typeof hookEventSchema>;
 
@@ -245,7 +356,8 @@ export type HookEvent = z.infer<typeof hookEventSchema>;
 // Field discipline (grill 2026-07-14 + codex review 2026-07-15):
 //   - Absent SDK values are `nullable`, not `optional` — writers emit explicit
 //     null so the on-disk JSON shape is stable.
-//   - `parent_id: null` in M1 (turn→tool parent linkage is M2).
+//   - `parent_event_id: null` — a turn is a root within events.jsonl. The
+//     run is the TRACE, not an event row, so there is nothing to point at.
 //   - `session_id: null` in M1 (no session-id env plumbing — out of scope).
 //   - No cost fields (no OTEL convention; computed cloud-side from a pricing
 //     table at display time).
@@ -284,9 +396,11 @@ const eventUnionSchema = z.discriminatedUnion("kind", [
   hookEventSchema,
   llmTurnEventSchema,
 ]);
-export const eventSchema = eventUnionSchema.transform((event) =>
-  event.kind === "TwinHttpEvent" ? normalizeTaskStepVocab(event) : event,
-);
+export const eventSchema = eventUnionSchema.transform((event) => {
+  if (event.kind === "TwinHttpEvent") return normalizeParentVocab(normalizeTaskStepVocab(event));
+  if (event.kind === "HookEvent") return normalizeHookCausingToolUseId(event);
+  return normalizeParentVocab(event);
+});
 export type Event = z.infer<typeof eventSchema>;
 
 // Detect a pre-FDRS-398 legacy row on disk. A new-shape row always carries a

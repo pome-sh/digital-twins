@@ -12,7 +12,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const FAKE_SCHEMA = {} as never;
 
-let capturedQueryParams: { prompt: string; options?: { hooks?: unknown } } | null = null;
+let capturedQueryParams: {
+  prompt: string;
+  options?: { hooks?: unknown; includePartialMessages?: boolean };
+} | null = null;
 
 vi.mock("@anthropic-ai/claude-agent-sdk", () => {
   return {
@@ -22,7 +25,7 @@ vi.mock("@anthropic-ai/claude-agent-sdk", () => {
       schema: unknown,
       handler: (args: unknown, extra: unknown) => Promise<unknown>,
     ) => ({ name, description, schema, handler }),
-    query: (params: { prompt: string; options?: { hooks?: unknown } }) => {
+    query: (params: { prompt: string; options?: { hooks?: unknown; includePartialMessages?: boolean } }) => {
       capturedQueryParams = params;
       return fakeQuery();
     },
@@ -63,13 +66,28 @@ vi.mock("@anthropic-ai/claude-agent-sdk", () => {
 });
 
 let fakeMessages: Array<{ type: string }> = [];
+// Entries of `fakeMessages` the fake SDK withholds unless the caller asked for
+// partial messages. Mirrors the `claude` CLI, where a single gate guards BOTH
+// `stream_event` and the per-turn `system/status:requesting` ping:
+//   case"stream_request_start": if(H) yield {type:"system",subtype:"status",status:"requesting"}
+//   ...                         if(H) yield {type:"stream_event", event:...}
+let fakePartialOnly = new Set<{ type: string }>();
 async function* fakeQuery() {
-  for (const m of fakeMessages) yield m;
+  const partial = capturedQueryParams?.options?.includePartialMessages === true;
+  for (const m of fakeMessages) {
+    if (!partial && fakePartialOnly.has(m)) continue;
+    yield m;
+  }
 }
 
 let tmp: string;
 let signalsPath: string;
-const ENV_KEYS = ["POME_TWIN_BASE_URL", "POME_ADAPTER_SIGNALS_PATH"] as const;
+const ENV_KEYS = [
+  "POME_TWIN_BASE_URL",
+  "POME_ADAPTER_SIGNALS_PATH",
+  "POME_OTEL_EXPORTER_OTLP_ENDPOINT",
+  "POME_DISABLE_PARTIAL_MESSAGES",
+] as const;
 const saved: Record<string, string | undefined> = {};
 let originalFetch: typeof globalThis.fetch;
 let fetchCalls: Array<{ url: string; headers: Record<string, string> }>;
@@ -82,7 +100,11 @@ beforeEach(() => {
   process.env.POME_ADAPTER_SIGNALS_PATH = signalsPath;
   process.env.POME_TWIN_BASE_URL = "http://127.0.0.1:3333";
 
+  delete process.env.POME_OTEL_EXPORTER_OTLP_ENDPOINT;
+  delete process.env.POME_DISABLE_PARTIAL_MESSAGES;
+
   fakeMessages = [];
+  fakePartialOnly = new Set();
   fetchCalls = [];
   capturedQueryParams = null;
   originalFetch = globalThis.fetch;
@@ -229,7 +251,7 @@ describe("end-to-end: withPome + tool + query", () => {
     expect(fetchCalls[0]!.headers["x-pome-correlation-id"]).toBeUndefined();
   });
 
-  it("acceptance: full M0 row shape — when a hook fires, the row carries kind=HookEvent + event_id + parent_id", async () => {
+  it("acceptance: full M0 row shape — when a hook fires, the row carries kind=HookEvent + event_id + causing_tool_use_id", async () => {
     const { withPome, query } = await import("../src/index.js");
     withPome();
     fakeMessages = [];
@@ -259,9 +281,129 @@ describe("end-to-end: withPome + tool + query", () => {
     expect(row.kind).toBe("HookEvent");
     expect(row.hook_name).toBe("PreToolUse");
     expect(row.tool_name).toBe("list");
-    expect(row.parent_id).toBe("toolu_42");
+    expect(row.causing_tool_use_id).toBe("toolu_42");
     expect(typeof row.event_id).toBe("string");
     expect(row.event_id.length).toBeGreaterThan(0);
     expect(typeof row.ts).toBe("string");
+  });
+});
+
+// F-998. The adapter turns `includePartialMessages` on behind the agent
+// author's back to reach the only authoritative per-turn output-token count the
+// SDK emits (`message_delta`). The price of that is a stream the author never
+// asked for, so everything the flag adds is filtered back out before it reaches
+// their `for await` loop.
+describe("F-998: includePartialMessages injection is invisible to the caller", () => {
+  // One API turn as the CLI actually lays it out: the flag-gated artifacts
+  // interleaved with the messages an author sees today.
+  function buildTape() {
+    const statusPing = { type: "system", subtype: "status", status: "requesting" } as { type: string };
+    const messageStart = {
+      type: "stream_event",
+      parent_tool_use_id: null,
+      event: { type: "message_start", message: { id: "msg_A", usage: { input_tokens: 2, output_tokens: 2 } } },
+    } as unknown as { type: string };
+    const messageDelta = {
+      type: "stream_event",
+      parent_tool_use_id: null,
+      event: { type: "message_delta", delta: { stop_reason: "end_turn" }, usage: { output_tokens: 179 } },
+    } as unknown as { type: string };
+    const messageStop = {
+      type: "stream_event",
+      parent_tool_use_id: null,
+      event: { type: "message_stop" },
+    } as unknown as { type: string };
+
+    const tape = [
+      { type: "system", subtype: "init" } as { type: string },
+      statusPing,
+      messageStart,
+      { type: "assistant", message: { id: "msg_A", model: "m", usage: { input_tokens: 2, output_tokens: 2 } } } as unknown as { type: string },
+      messageDelta,
+      messageStop,
+      { type: "result", subtype: "success" } as { type: string },
+    ];
+    return { tape, gated: new Set([statusPing, messageStart, messageDelta, messageStop]) };
+  }
+
+  async function collect(): Promise<Array<{ type: string }>> {
+    const { query } = await import("../src/index.js");
+    const seen: Array<{ type: string }> = [];
+    for await (const m of query({ prompt: "x" } as Parameters<typeof query>[0])) seen.push(m);
+    return seen;
+  }
+
+  it("yields byte-identical messages with telemetry on and off", async () => {
+    const { tape, gated } = buildTape();
+    fakeMessages = tape;
+    fakePartialOnly = gated;
+
+    // Telemetry ON (the signals path is set by beforeEach) — the adapter
+    // injects, the fake SDK emits the extra messages, the filter removes them.
+    const withTelemetry = await collect();
+    expect(capturedQueryParams!.options!.includePartialMessages).toBe(true);
+
+    // Telemetry OFF — no injection, so the fake SDK never emits them at all.
+    delete process.env.POME_ADAPTER_SIGNALS_PATH;
+    const withoutTelemetry = await collect();
+    expect(capturedQueryParams!.options!.includePartialMessages).toBeUndefined();
+
+    expect(withTelemetry).toEqual(withoutTelemetry);
+    expect(withTelemetry.map((m) => m.type)).toEqual(["system", "assistant", "result"]);
+  });
+
+  it("does not request partial messages when no telemetry lane is configured", async () => {
+    delete process.env.POME_ADAPTER_SIGNALS_PATH;
+    fakeMessages = [{ type: "result", subtype: "success" } as { type: string }];
+
+    await collect();
+    expect(capturedQueryParams!.options!.includePartialMessages).toBeUndefined();
+  });
+
+  it("honours POME_DISABLE_PARTIAL_MESSAGES as a no-release kill switch", async () => {
+    process.env.POME_DISABLE_PARTIAL_MESSAGES = "1";
+    fakeMessages = [{ type: "result", subtype: "success" } as { type: string }];
+
+    await collect();
+    expect(capturedQueryParams!.options!.includePartialMessages).toBeUndefined();
+  });
+
+  // Setting the option to `false` declines to SEE partial messages, which is
+  // what the filter already guarantees. Telemetry keeps asking for them, so the
+  // sequence the caller gets is the same either way — it just stays accurate.
+  it("still asks, and still filters, when the caller set the option to false", async () => {
+    const { tape, gated } = buildTape();
+    fakeMessages = tape;
+    fakePartialOnly = gated;
+
+    const { query } = await import("../src/index.js");
+    const seen: Array<{ type: string }> = [];
+    for await (const m of query({
+      prompt: "x",
+      options: { includePartialMessages: false },
+    } as Parameters<typeof query>[0])) {
+      seen.push(m);
+    }
+
+    expect(capturedQueryParams!.options!.includePartialMessages).toBe(true);
+    expect(seen.map((m) => m.type)).toEqual(["system", "assistant", "result"]);
+  });
+
+  it("passes stream events straight through when the caller asked for them", async () => {
+    const { tape, gated } = buildTape();
+    fakeMessages = tape;
+    fakePartialOnly = gated;
+
+    const { query } = await import("../src/index.js");
+    const seen: Array<{ type: string }> = [];
+    for await (const m of query({
+      prompt: "x",
+      options: { includePartialMessages: true },
+    } as Parameters<typeof query>[0])) {
+      seen.push(m);
+    }
+
+    // The caller opted in, so nothing is filtered — including the status ping.
+    expect(seen).toEqual(tape);
   });
 });

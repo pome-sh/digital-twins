@@ -218,7 +218,18 @@ export class GitHubDomain {
           ...pull,
           files: this.listPullRequestFileRows(repo.id, pull.number),
           reviews: this.listPullRequestReviewRows(repo.id, pull.number),
-          review_comments: this.listPullRequestReviewCommentRows(repo.id, pull.number)
+          review_comments: this.listPullRequestReviewCommentRows(repo.id, pull.number),
+          // F-1151. THREE distinct comment surfaces reach a pull request and this
+          // is the third, so the export keeps them apart rather than merging them
+          // into one count a predicate could not attribute:
+          //   `reviews[].body`     — the prose attached to a review verdict
+          //   `review_comments[]`  — inline comments anchored to a file and line
+          //   `comments[]`         — the conversation timeline, THIS one
+          // Read from `issue_comments` because that is where GitHub puts them:
+          // conversation comments on a PR go through the issue-comment endpoints,
+          // and the number space is shared, so a PR's number selects its own rows
+          // and no issue's.
+          comments: this.listIssueCommentRows(repo.id, pull.number)
         })),
         commit_statuses: this.db.prepare("SELECT * FROM commit_statuses WHERE repo_id = ? ORDER BY id ASC").all(repo.id),
         check_runs: this.db.prepare("SELECT * FROM check_runs WHERE repo_id = ? ORDER BY id ASC").all(repo.id)
@@ -1065,6 +1076,47 @@ export class GitHubDomain {
 
   requireIssue(repoId: number, number: number) {
     return (this.db.prepare("SELECT * FROM issues WHERE repo_id = ? AND number = ?").get(repoId, number) as IssueRow | undefined) ?? notFound("Issue not found");
+  }
+
+
+  // F-1151 — what the ISSUE COMMENT endpoints may address.
+  //
+  // Real GitHub models every pull request as an issue and documents
+  // `/repos/:o/:r/issues/:number/comments` as the way to comment on a PR's
+  // conversation; `pulls/:number/comments` is the inline REVIEW comment surface,
+  // which is a different thing. So a comment target is an issue OR a pull
+  // request, and `requireIssue` is too narrow for these two routes — it 404'd
+  // every PR comment, including the only one the bundled `pr-summary-*` examples
+  // know how to write.
+  //
+  // Deliberately NOT widened past the comment routes. Everything else reached
+  // through `requireIssue` (labels, assignees, state) really is issue-only in
+  // this twin, and making a PR answer those would be divergence #16's read half
+  // — a bigger change than a comment target, and still out of scope.
+  //
+  // The lookup order does not matter: `nextNumber()` draws issue and PR numbers
+  // from one per-repo counter, so at most one of the two can match.
+  //
+  // The KIND is returned rather than a boolean because the serializer needs it:
+  // GitHub's `html_url` for a comment on a PR is `/pull/N#issuecomment-…`, not
+  // `/issues/N#…`, and the twin would otherwise ship a divergence nothing had
+  // recorded.
+  commentTargetKind(repoId: number, number: number): "issue" | "pull_request" | null {
+    if (this.db.prepare("SELECT 1 FROM issues WHERE repo_id = ? AND number = ?").get(repoId, number)) {
+      return "issue";
+    }
+    if (this.db.prepare("SELECT 1 FROM pull_requests WHERE repo_id = ? AND number = ?").get(repoId, number)) {
+      return "pull_request";
+    }
+    return null;
+  }
+
+
+  requireCommentTarget(repoId: number, number: number): "issue" | "pull_request" {
+    // Same sentence `requireIssue` raises: this IS the issues endpoint, and an
+    // agent that named a number belonging to neither entity has made the same
+    // mistake either way.
+    return this.commentTargetKind(repoId, number) ?? notFound("Issue not found");
   }
 
 
