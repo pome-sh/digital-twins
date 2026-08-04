@@ -1,5 +1,12 @@
 # @pome-sh/twin-slack — CHANGELOG
 
+
+## 0.3.2 — 2026-08-04
+
+- Re-pinned to `@pome-sh/sdk@0.11.0` / `@pome-sh/shared-types@0.14.0` for the F-1200 parent-vocabulary
+  change: a recorded row now carries `parent_event_id` rather than `parent_id`.
+  No change to this twin's own surface — `npm run test:contract` is green.
+
 All notable changes to the Slack twin are documented here. The format is
 loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 the package follows [Semantic Versioning](https://semver.org/).
