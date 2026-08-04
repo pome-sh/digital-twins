@@ -200,11 +200,14 @@ The agent searches, finds issue #1, comments on it, and posts *its* link back to
 
 ### If your baseline passes / your fix fails
 
-* **Baseline passes (stays green).** Check the waterfall for a `search_issues` or
-  `list_issues` span that *succeeded* — if one did, the twin exposed a read path
-  the denial list does not name, and the fix is to add it (and to say so in
-  `ISSUE_LOOKUP_TOOLS`), not to weaken the criteria. `test/tool-policy.test.ts`
-  pins the list for exactly this reason.
+* **Baseline passes (stays green).** It does — 4/5 open-book, 5/5 with the
+  sandbox closed. This section used to say the fix is to add the missing read
+  path to `ISSUE_LOOKUP_TOOLS`. **That advice was measured wrong and is
+  withdrawn.** Shutting the first three paths surfaced two more the same
+  afternoon — `list_issue_comments` and `update_issue` — and the twin's read
+  surface is wide enough that the next pass would surface more. Do not extend the
+  list; the flaw has to stop being a denial ([F-1292](https://linear.app/pome-sh/issue/F-1292),
+  numbers in [`VERIFICATION.md`](./VERIFICATION.md)).
 * **Fix fails (stays red).** If a criterion reads `NOT EVALUATED` rather than
   failed, the run is `INCOMPLETE` — the grader could not see that state at all,
   which is a wiring problem rather than an agent problem. `pome run` exits 1 on
