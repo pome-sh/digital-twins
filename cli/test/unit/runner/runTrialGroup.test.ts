@@ -32,7 +32,7 @@ import type {
   RunTaskHostedOptions,
   RunTaskHostedResult,
 } from "../../../src/runner/runTaskHosted.js";
-import type { Score } from "../../../src/hosted/evalResultView.js";
+import type { Score, ScoreStatus } from "../../../src/hosted/evalResultView.js";
 
 vi.mock("../../../src/hosted/client.js", async (importOriginal) => {
   const original = await importOriginal<typeof import("../../../src/hosted/client.js")>();
@@ -61,6 +61,15 @@ interface FakeCloud {
   events: string[];
   mints: Array<{ groupId?: string; idempotencyKey?: string; twins: string[] }>;
   deleted: string[];
+  /** F-983 — the FULL argument list of every deleteSession call. `deleted`
+   *  keeps only the session ids for the existing assertions; this pins the
+   *  `{ discard: true }` opt-in the rollback depends on. Without it a
+   *  refactor could drop the opt-in silently, and once the control plane
+   *  refuses ungraded sessions the rollback would leave the half-group open,
+   *  burning the team's concurrent-twin quota. */
+  deleteCalls: Array<
+    [string, boolean | undefined, { discard?: boolean } | undefined]
+  >;
   abandoned: Array<{ sessionId: string; errorCode?: string }>;
   failMintAt?: number;
 }
@@ -69,11 +78,13 @@ function makeFakeClient(overrides: Partial<FakeCloud> = {}): FakeCloud {
   const events: string[] = [];
   const mints: FakeCloud["mints"] = [];
   const deleted: string[] = [];
+  const deleteCalls: FakeCloud["deleteCalls"] = [];
   const abandoned: FakeCloud["abandoned"] = [];
   const cloud: FakeCloud = {
     events,
     mints,
     deleted,
+    deleteCalls,
     abandoned,
     ...overrides,
     client: null as unknown as HostedClient,
@@ -143,8 +154,9 @@ function makeFakeClient(overrides: Partial<FakeCloud> = {}): FakeCloud {
         abandoned: true,
       };
     },
-    async deleteSession(sessionId) {
+    async deleteSession(sessionId, bestEffort, opts) {
       deleted.push(sessionId);
+      deleteCalls.push([sessionId, bestEffort, opts]);
     },
   };
   return cloud;
@@ -180,12 +192,20 @@ function trialResult(input: {
   exitCode: number;
   durationMs: number;
   failedTexts?: string[];
+  /**
+   * F-925 — the run's three-state verdict. Defaults from `exitCode` so every
+   * existing call site keeps meaning what it meant; pass it explicitly to
+   * simulate a trial that finalized but could not be fully graded, which is
+   * the state `exitCode` alone cannot express.
+   */
+  verdict?: ScoreStatus;
 }): RunTaskHostedResult {
   return {
     runId: input.sessionId,
     cloudRunId: `run_${input.sessionId}`,
     cloudDashboardUrl: `https://app.example/runs/run_${input.sessionId}`,
     score: scoreOf(input.satisfaction, input.failedTexts ?? []),
+    verdict: input.verdict ?? (input.exitCode === 0 ? "pass" : "fail"),
     exitCode: input.exitCode,
     durationMs: input.durationMs,
     scenario: undefined as never,
@@ -275,9 +295,12 @@ describe("runTrialGroup — upfront minting (FDRS-636)", () => {
     expect(cloud.mints).toHaveLength(0);
   });
 
+  // failMintAt: 3 (not 2) so TWO sessions are already minted when the mint
+  // loop throws — the test name says "sessions", and rolling back more than
+  // one is what the `sessions.map(...)` in the rollback actually does.
   it("a failed mint rolls back the already-minted sessions and rethrows before any trial runs", async () => {
     const taskPath = await scenarioFixture();
-    const cloud = makeFakeClient({ failMintAt: 2 });
+    const cloud = makeFakeClient({ failMintAt: 3 });
     let trialsRun = 0;
 
     await expect(
@@ -297,7 +320,17 @@ describe("runTrialGroup — upfront minting (FDRS-636)", () => {
     ).rejects.toThrow(/twin provision timeout/);
 
     expect(trialsRun).toBe(0);
-    expect(cloud.deleted).toEqual(["ses_1"]);
+    expect(cloud.deleted).toEqual(["ses_1", "ses_2"]);
+
+    // F-983 — every rollback delete must OPT IN to discarding, asserted on the
+    // whole argument list rather than just the session id. These sessions were
+    // minted and never launched, so there is no tape to lose; but if the opt-in
+    // were dropped, the control plane's ungraded-session refusal would leave
+    // the half-group open and eat the team's concurrent-twin quota.
+    expect(cloud.deleteCalls).toEqual([
+      ["ses_1", true, { discard: true }],
+      ["ses_2", true, { discard: true }],
+    ]);
   });
 });
 
@@ -362,6 +395,53 @@ describe("runTrialGroup — errored trials (FDRS-636)", () => {
     expect(text).toContain("trial 1  ⚠  errored         twin pod restarted mid-run — excluded");
     expect(text).toContain("trial 2  ✓  96       12.1s");
     expect(result.exitCode).toBe(0);
+  });
+
+  // F-925 — the state `exitCode` alone could not express. A trial that
+  // finalized with a criterion that never ran is neither a pass nor the
+  // agent's failure; it leaves the fraction and cannot buy the group a 0.
+  it("keeps an ungradable trial out of the fraction and out of a green exit", async () => {
+    const taskPath = await scenarioFixture();
+    const cloud = makeFakeClient();
+    const out: string[] = [];
+
+    const result = await runTrialGroup({
+      taskPath,
+      agentCommand: "node agent.js",
+      trials: 2,
+      hosted: { baseUrl: "https://api.example", apiKey: "pme_k" },
+      dashboardBaseUrl: "https://app.pome.sh",
+      out: (line) => out.push(line),
+      client: cloud.client,
+      runTaskHostedFn: async (options) => {
+        const sid = options.premintedSession!.session_id;
+        // Trial 2 scored 100 over a shrunken denominator: exit 1, but NOT a
+        // failure. Before this it arrived as `passed: exitCode === 0` and
+        // simply counted as a loss.
+        return sid === "ses_1"
+          ? trialResult({ sessionId: sid, satisfaction: 100, exitCode: 0, durationMs: 1000 })
+          : trialResult({
+              sessionId: sid,
+              satisfaction: 100,
+              exitCode: 1,
+              durationMs: 1100,
+              verdict: "incomplete",
+            });
+      },
+    });
+
+    const text = out.join("\n");
+    expect(text).toContain("1 of 1 passed · 1 incomplete, excluded from the fraction");
+    // The fix-prompt handoff is for AGENT defects. An abstention is a grader
+    // gap, so pointing the reader at `pome fix-prompt` would tell them to fix
+    // an agent that may be blameless. (This predicate was `!r.passed`, which
+    // would have swept the incomplete trial in.)
+    expect(text).not.toContain("pome fix-prompt");
+    // Never "1 of 2" (which would blame the agent) and never "2 of 2".
+    expect(text).not.toContain("1 of 2 passed");
+    expect(text).not.toContain("2 of 2 passed");
+    // Green here would tell CI the set was verified when half of it was not.
+    expect(result.exitCode).toBe(1);
   });
 
   it("exit 1 when a completed trial failed; failing criteria feed the start-there line", async () => {

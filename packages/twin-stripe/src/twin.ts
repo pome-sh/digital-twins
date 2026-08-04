@@ -169,7 +169,13 @@ export function createStripeTwinDefinition(
       // Failure injection MUST run before idempotency so a configured
       // failure response isn't cached by the idempotency layer (a retry
       // under the same key would replay the synthetic 4xx instead of
-      // re-invoking the handler).
+      // re-invoking the handler). That argument is about `before_handler`,
+      // whose envelope is produced out here and never reaches the cache.
+      // `after_handler` is the other half and needs no reordering: it
+      // substitutes inside the handler, so the idempotency layer reads the
+      // HANDLER's status + body off the context (`setHandlerResult`) and caches
+      // the real 200 — which is the record real Stripe writes when response
+      // delivery fails, and dropping it double-refunded the retry (F-1138).
       app.use("*", failureInjectionMiddleware(failureInjection, {
         recorder: ctx.recorder,
         runId: ctx.runId,
@@ -208,7 +214,11 @@ export function createStripeTwinDefinition(
       opts.extendRoutes?.(app, ctx);
       registerStripeRoutes(app, ctx.domain, ctx.recorder, ctx.runId);
       if (opts.twinBaseUrl) {
-        registerX402Routes(app, { twinBaseUrl: opts.twinBaseUrl });
+        registerX402Routes(app, {
+          twinBaseUrl: opts.twinBaseUrl,
+          recorder: ctx.recorder,
+          runId: ctx.runId,
+        });
       }
     },
     // Account-scoped state export (F1): two sessions sharing a DB see

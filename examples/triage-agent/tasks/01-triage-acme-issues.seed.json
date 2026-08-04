@@ -1,0 +1,80 @@
+{
+  "_meta": {
+    "version": 1,
+    "source_hash": "sha256:hand-authored",
+    "model": "hand-authored",
+    "compiled_at": "2026-07-31T00:00:00.000Z"
+  },
+  "users": [
+    {
+      "login": "acme",
+      "type": "Organization",
+      "name": "Acme"
+    },
+    {
+      "login": "alice",
+      "type": "User",
+      "name": "Alice"
+    },
+    {
+      "login": "bob",
+      "type": "User",
+      "name": "Bob"
+    },
+    {
+      "login": "pome-agent",
+      "type": "User",
+      "name": "Pome Agent"
+    }
+  ],
+  "repositories": [
+    {
+      "owner": "acme",
+      "name": "api",
+      "description": "Example API service used by GitHub twin tests.",
+      "default_branch": "main",
+      "collaborators": [
+        "alice",
+        "bob",
+        "pome-agent"
+      ],
+      "labels": [
+        {
+          "name": "bug",
+          "color": "d73a4a",
+          "description": "Something is not working"
+        },
+        {
+          "name": "feature",
+          "color": "a2eeef",
+          "description": "New feature or request"
+        },
+        {
+          "name": "question",
+          "color": "d876e3",
+          "description": "More information needed"
+        }
+      ],
+      "files": [
+        {
+          "path": "README.md",
+          "content": "# Acme API\n\nA seeded repository for local GitHub twin tests.\n"
+        },
+        {
+          "path": "src/index.ts",
+          "content": "export function handler() {\n  return 'ok';\n}\n"
+        }
+      ],
+      "issues": [
+        {
+          "number": 1,
+          "title": "500 error on POST /orders after deploy",
+          "body": "Started failing right after the 14:00 deploy. Stack trace points to OrderController#create.",
+          "labels": [],
+          "assignees": []
+        }
+      ],
+      "pull_requests": []
+    }
+  ]
+}

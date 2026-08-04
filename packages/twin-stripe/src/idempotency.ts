@@ -10,6 +10,7 @@
 //   - Header present + miss → invoke handler; on response, store row.
 import { createHash } from "node:crypto";
 import type { Context, MiddlewareHandler } from "hono";
+import { recordedRequestHeaders } from "@pome-sh/sdk/server";
 import { stripeError } from "./errors.js";
 import type {
   IdempotencyKeyRow,
@@ -22,6 +23,34 @@ import { nowIso, requestId } from "./util.js";
 const CACHEABLE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 type CachedResponse = { status: number; bodyText: string };
+
+type HandlerResult = { status: number; body: unknown };
+
+const HANDLER_RESULT_KEY = "twinStripeHandlerResult";
+
+/**
+ * Park what the route handler actually answered, for this middleware to read on
+ * the way out. Called by `respond()` — the twin's single response path.
+ *
+ * The response sitting on `c.res` is not always the handler's. `after_handler`
+ * failure injection substitutes status + body to model "the server processed it
+ * but response delivery to the client failed" (FDRS-339), and it substitutes
+ * INSIDE the handler, which is inside this middleware. So the cache used to see
+ * the injected 402, decline it under the 4xx rule below, and store nothing —
+ * dropping the record real Stripe writes in exactly that situation, which is the
+ * entire reason `Idempotency-Key` exists. The retry then re-executed and the
+ * refund landed twice (F-1138).
+ *
+ * Only `respond()` parks a result. Routes that answer with a bare `c.json` (the
+ * x402 legs, test endpoints) park nothing and `c.res` remains the truth.
+ */
+export function setHandlerResult(c: Context, result: HandlerResult): void {
+  c.set(HANDLER_RESULT_KEY as never, result as never);
+}
+
+function getHandlerResult(c: Context): HandlerResult | null {
+  return (c.get(HANDLER_RESULT_KEY as never) as HandlerResult | undefined) ?? null;
+}
 
 function hashRequest(method: string, path: string, body: string): string {
   return createHash("sha256")
@@ -163,18 +192,28 @@ export function idempotencyMiddleware(
     // its first request can retry under the same key against a fresh
     // handler invocation. Real Stripe re-executes on 4xx for client
     // errors; mirroring that is F5.
+    //
+    // The status this decides on is the HANDLER's, not the wire's — see
+    // `setHandlerResult`. A genuine 4xx still declines, because the handler
+    // itself answered 4xx; an injected lost-response 402 over a committed 200
+    // does not, because the handler answered 200.
     try {
-      const status = c.res.status;
+      const handled = getHandlerResult(c);
+      const status = handled ? handled.status : c.res.status;
       if (status >= 400) {
         resolvePending({ status, bodyText: "null" });
         return;
       }
-      const cloned = c.res.clone();
       let bodyText = "";
-      try {
-        bodyText = await cloned.text();
-      } catch {
-        bodyText = "";
+      if (handled) {
+        bodyText = JSON.stringify(handled.body);
+      } else {
+        const cloned = c.res.clone();
+        try {
+          bodyText = await cloned.text();
+        } catch {
+          bodyText = "";
+        }
       }
       // Validate the body is JSON; fall back to "null" if not (still cacheable).
       try {
@@ -227,6 +266,11 @@ function recordDedupeEvent(
     method: c.req.method,
     path: new URL(c.req.url).pathname,
     request_body: rawBody === "" ? null : rawBody,
+    // F-1125 — the replay's own headers, which is where `Idempotency-Key`
+    // lives. Recording the dedupe outcome while hiding the key that caused it
+    // would leave the reason unreadable on the one row that is about it.
+    request_headers: recordedRequestHeaders(c),
+    tool: null,
     status: cached.status,
     response_body: cached.body,
     latency_ms: Date.now() - startedAt,

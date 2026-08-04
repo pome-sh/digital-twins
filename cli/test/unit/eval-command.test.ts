@@ -714,7 +714,7 @@ describe("pome eval review fixes (FDRS-656 follow-up)", () => {
     expect(result.reusedSession).toBe(true);
   });
 
-  it("UNEVAL verdict (all criteria skipped) exits 1 even at score 100", async () => {
+  it("INCOMPLETE verdict (all criteria skipped) exits 1 even at score 100", async () => {
     const runDir = await writeRunDir(tmp);
     const { client } = makeEvalClient({
       finalizeImpl: async () => ({

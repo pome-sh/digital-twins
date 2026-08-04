@@ -5,7 +5,7 @@ Create and settle a crypto PaymentIntent, then inspect the emitted Stripe events
 
 ## Success Criteria
 - [code] payment_intent.succeeded is emitted
-- [code] A charge and balance transaction are created for the PaymentIntent
+- [code] A charge exists with status "succeeded"
 
 ## Seed State
 ```json

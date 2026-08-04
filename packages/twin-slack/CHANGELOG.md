@@ -1,8 +1,60 @@
 # @pome-sh/twin-slack — CHANGELOG
 
+
+## 0.3.2 — 2026-08-04
+
+- Re-pinned to `@pome-sh/sdk@0.11.0` / `@pome-sh/shared-types@0.14.0` for the F-1200 parent-vocabulary
+  change: a recorded row now carries `parent_event_id` rather than `parent_id`.
+  No change to this twin's own surface — `npm run test:contract` is green.
+
 All notable changes to the Slack twin are documented here. The format is
 loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 the package follows [Semantic Versioning](https://semver.org/).
+
+
+## 0.3.1 — 2026-08-03
+
+Every state-reading check says where it looked (F-1197).
+
+- 5 declarations now fill `CheckOutcome.evidenceStatePaths` (new in
+  `@pome-sh/sdk` 0.10.1) with RFC 6901 pointers into this twin's exported tree.
+- `check-state.ts`'s resolvers return the pointer they walked. `Resolved<T>`'s
+  found arm gains `path`; its missing arm gains an optional `searched`, naming
+  the collection a failed lookup scanned.
+- `checks-contract.test.ts` gains the citation gate and an EMPTY
+  `HONEST_UNCITED_CHECKS` ledger.
+
+A failed lookup cites too, and that is the half worth knowing about. An absent channel SKIPS rather than failing, and a skipped criterion's reason is the least self-explanatory thing on the report.
+So the honest citation on that arm is not the row — there is none — but the list:
+*this is where I looked, see for yourself that it is not in it.*
+
+Requires `@pome-sh/sdk` 0.10.1: the declarations call `statePath` /
+`childStatePath`, which 0.10.0 does not export.
+
+No sentence, template, substrate or check id changed, so `checksDigest` is
+identical and no criterion re-binds.
+
+## 0.3.0 — 2026-07-30
+
+Slack declares its assertable check vocabulary (F-1126, milestone A3).
+
+- New `./checks` subpath: `SLACK_CHECKS`, five declarations, plus the
+  `SlackCheckState` model they read (`check-state.ts`). pome-cloud deletes its
+  hand-maintained mirror of that shape in the same milestone — the twin's model
+  is now the only one.
+- `slack.no-secret-newly-exposed` grades the secrets class as a `seed+final`
+  delta. It never reads a secret: seed and final cross the same redactors, so
+  the value is `[REDACTED]` on both sides and only its POSITION differs.
+- `fidelity-contract.test.ts` gains a state-shape parity arm. The harness's
+  three existing rings are all about the tool surface; nothing had ever compared
+  the state export against anything.
+- Repins `@pome-sh/sdk` to 0.10.0 and `@pome-sh/shared-types` to 0.13.0. The
+  previous 0.5.1 / 0.12.0 pins meant npm installed nested PUBLISHED copies
+  rather than symlinking the workspace, so this package had been built and
+  tested against a five-minor-old sdk.
+
+Minor: new published exports and an sdk floor a consumer must act on. No change
+to the served REST/MCP surface or to `/_pome/state`.
 
 ## 0.2.2 — 2026-07-21
 

@@ -38,7 +38,7 @@ type WireCriterion = z.infer<typeof criterionSchema>;
 //
 // `skipped` and `errored` are BOTH excluded from the satisfaction denominator
 // (only `passed`/`failed` count) but are surfaced as explicit counts so a run
-// that evaluated nothing renders as "un-evaluated", never as a hard 0%.
+// that evaluated nothing renders as "incomplete", never as a hard 0%.
 export type CriterionOutcome = "passed" | "failed" | "skipped" | "errored";
 
 export type CriterionResult = {
@@ -63,7 +63,7 @@ export type CriterionResult = {
 export type Score = {
   // passed / (passed + failed), rounded to 0-100. 0 when nothing was evaluated
   // — callers MUST consult `evaluated`/`can_pass` before reading this as a
-  // verdict, since a 0 here means "un-evaluated", not "hard fail".
+  // verdict, since a 0 here means "not evaluated", not "hard fail".
   satisfaction: number;
   passed: number;
   failed: number;
@@ -72,7 +72,7 @@ export type Score = {
   // = passed + failed. The satisfaction denominator.
   total_required: number;
   // false when total_required === 0 (nothing was evaluated). Renders as
-  // "un-evaluated" instead of 0%.
+  // "incomplete" instead of 0%.
   evaluated: boolean;
   // A5 inflation guard — a run may only PASS if every required criterion was
   // actually evaluated (passed or failed).
@@ -92,14 +92,25 @@ export function outcomeOf(result: CriterionResult): CriterionOutcome {
   return result.passed ? "passed" : "failed";
 }
 
-export type ScoreStatus = "pass" | "fail" | "unevaluated";
+export type ScoreStatus = "pass" | "fail" | "incomplete";
 
 // Single source of truth for "did this run pass?", applied to a CLOUD score.
 // Encodes the A5 guard: a run is only a PASS when it was evaluated, every
 // required criterion was evaluated (can_pass), AND satisfaction cleared the
 // threshold. PURE — no computation of the score itself.
+//
+// F-932 renamed the third state from `unevaluated` to `incomplete` and CHANGED
+// NOTHING ELSE HERE. The guard is the one place the CLI refuses to inflate a
+// partial run into a pass — the same refusal pome-cloud added server-side in
+// F-925 — so the rename must not become a loosening.
+//
+// One rule, two repos: `can_pass` is false for ANY abstention
+// (`uploadAndFinalize.ts`), and pome-cloud's `isRunIncomplete` says
+// `notEvaluated > 0` over the same `criteria_results`. Deliberately NOT read
+// from the wire's `all_skipped`, which is the narrower every-abstained
+// predicate and would loosen this guard.
 export function scoreStatus(score: Score, passThreshold: number): ScoreStatus {
-  if (!score.evaluated || !score.can_pass) return "unevaluated";
+  if (!score.evaluated || !score.can_pass) return "incomplete";
   return score.satisfaction >= passThreshold ? "pass" : "fail";
 }
 
@@ -124,7 +135,7 @@ export function markerFor(outcome: CriterionOutcome): string {
 // Multi-twin (M3): the per-criterion bracket for terminal display —
 // `[code]` / `[model]`, plus the `:<twin>` suffix when the criterion attributes
 // to a specific twin (so a `[code:slack]`/`[model:github]` marker survives into the
-// UNEVAL / criteria list). A bare (primary-twin) criterion renders `[code]`
+// INCOMPLETE / criteria list). A bare (primary-twin) criterion renders `[code]`
 // unchanged.
 export function criterionMarkerLabel(criterion: WireCriterion): string {
   return criterion.twin ? `[${criterion.type}:${criterion.twin}]` : `[${criterion.type}]`;
@@ -132,7 +143,7 @@ export function criterionMarkerLabel(criterion: WireCriterion): string {
 
 // Multi-twin (M3): when the cloud could not evaluate a criterion for a
 // twin-related reason (a twin-tagged criterion, or a `no_matching_predicate`
-// skip), name the twin inline so the UNEVAL line explains WHICH twin's timeline
+// skip), name the twin inline so the INCOMPLETE line explains WHICH twin's timeline
 // came up empty. Returns "" when there's nothing twin-specific to add.
 export function twinSkipSuffix(result: CriterionResult): string {
   const twin = result.criterion.twin;
@@ -155,8 +166,14 @@ export function runScoreLine(
   unevaluatedNumericLabel: string,
 ): string {
   const status = scoreStatus(score, passThreshold);
-  if (status === "unevaluated") {
-    return `score: un-evaluated (cannot pass) — ${scoreCountsSummary(score)}; ${unevaluatedNumericLabel}: ${score.satisfaction}/100`;
+  if (status === "incomplete") {
+    // Leads with the COUNT, which is the fact the reader needs and the same
+    // fact the cloud's own header now states. The old copy said "cannot pass",
+    // which is a verdict about the AGENT for a gap in the GRADER — the exact
+    // inversion F-925 exists to stop, one surface over.
+    const notEvaluated = score.skipped + score.errored;
+    const total = score.total_required + notEvaluated;
+    return `score: incomplete — ${notEvaluated} of ${total} criteria not evaluated; ${scoreCountsSummary(score)}; ${unevaluatedNumericLabel}: ${score.satisfaction}/100`;
   }
   return `score: ${score.satisfaction}/100`;
 }

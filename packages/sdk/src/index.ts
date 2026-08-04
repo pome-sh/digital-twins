@@ -1,3 +1,4 @@
+// file-size: the package's public type barrel — every documented surface a community twin author sees lives here by design; splitting it would move types away from the docs that explain them.
 // SPDX-License-Identifier: Apache-2.0
 // `@pome-sh/sdk` — public surface for community twin authors.
 // `defineTwin()` returns data booted by `serve()` from `@pome-sh/sdk/server`.
@@ -174,6 +175,14 @@ export interface RecorderHandle {
       fidelity?: RecorderFidelity;
       /** Per-surface error projection override (admin routes have their own frozen envelope on some twins). */
       errorEnvelope?: (err: unknown) => { status: number; body: unknown };
+      /**
+       * F-1125 — the twin ACTION this route performs, recorded as
+       * `RecorderEvent.tool` (see its doc for what the field means and why a
+       * REST route left undeclared answers "never" for a call that happened).
+       * Use the matching MCP tool's name; omit when there is no counterpart.
+       * MCP dispatch stashes its name with `setRecordedTool`, which wins.
+       */
+      tool?: string;
     },
     fn: (c: Context) => Promise<RecorderHandlerResult> | RecorderHandlerResult
   ): (c: Context) => Promise<Response>;

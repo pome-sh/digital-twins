@@ -16,6 +16,9 @@ import type { ResolvedCredentials } from "./credentials.js";
 export interface InteractiveSeams {
   stdinIsTTY?: boolean;
   confirm?: (question: string) => Promise<boolean>;
+  /** Free-text prompt. Added by F-1074: picking a check from a numbered list and
+   *  filling its typed parameters needs an answer, not a yes/no. */
+  ask?: (question: string) => Promise<string>;
 }
 
 /** The manifest identity fields POSTed to the resolver. */
@@ -33,6 +36,7 @@ export function resolveSeams(opts: InteractiveSeams): Required<InteractiveSeams>
   return {
     stdinIsTTY: opts.stdinIsTTY ?? Boolean(process.stdin.isTTY),
     confirm: opts.confirm ?? promptYesNo,
+    ask: opts.ask ?? promptLine,
   };
 }
 
@@ -152,6 +156,15 @@ async function promptYesNo(question: string): Promise<boolean> {
   try {
     const answer = await new Promise<string>((resolve) => rl.question(question, resolve));
     return /^y(es)?$/i.test(answer.trim());
+  } finally {
+    rl.close();
+  }
+}
+
+async function promptLine(question: string): Promise<string> {
+  const rl = createInterface({ input: process.stdin, output: process.stderr });
+  try {
+    return (await new Promise<string>((resolve) => rl.question(question, resolve))).trim();
   } finally {
     rl.close();
   }

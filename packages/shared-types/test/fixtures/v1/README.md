@@ -18,10 +18,46 @@ createSessionResponse/           → createSessionResponseSchema (POST /v1/sessi
 usage/                           → usageResponseSchema         (GET  /v1/usage)
 run/                             → runSchema                   (Run row; 0.3.0-era scenario_* vocab)
 runTaskVocab/                    → runSchema                   (W3 task_* vocab, FDRS-653)
+event/<Kind>/                    → otelEventSchema             (events.jsonl row; one dir per union member)
 ```
 
 Each `*.json` file is a single wire value: an object, or (for `planTier`) a
 bare JSON string. Every fixture MUST parse successfully under the mapped schema.
+
+### `event/` — one directory per event kind (F-1201)
+
+`event/` is the one nested corpus. It holds `events.jsonl` rows, one directory
+per member of the event union (`otelEventSchema` = the seven `eventSchema`
+variants plus `OtelSpanEvent`), and **a fixture's directory is its `kind`**.
+
+Adding a member to the union without adding a fixture is a build failure:
+
+```
+$ npm run emit:trace-contract -w @pome-sh/shared-types
+trace-contract.json event-fixture coverage failed (F-1201):
+- no fixture for event kind(s): MyNewEvent.
+```
+
+`scripts/emit-trace-contract.mjs` enumerates the kinds **from the zod union** at
+emit time and writes them into `trace-contract.json` as `eventKinds`, so the
+coverage requirement cannot be satisfied by a stale list. Both `emit` and
+`--check` refuse — regenerating is not an escape hatch. Renaming a kind is the
+same failure from the other side: the old directory now describes a member the
+union does not have, and that is rejected too.
+
+Before F-1201 this corpus was 18 session/run/plan shapes and nothing else. The
+contract carried zero event-kind entries, and `check:trace-contract` compared
+bytes that no schema change could move — which is how M1 shipped `LlmTurnEvent`
+with no fixture anywhere and CI stayed green.
+
+Fixtures are written the way an emitter writes them (`TwinHttpEvent` keeps the
+runtime's field order, with `kind` / `event_id` / `parent_id` last), and cover
+the modes each schema documents rather than just one row per kind: baseline
+vs. TLS-terminated `LlmCallEvent`, a `HookEvent` with and without `tool_name`,
+an `LlmTurnEvent` where every absent SDK value is an explicit `null`. The
+`OtelSpanEvent` rows are generated through `mapOtelSpanToEvent` — hand-writing
+one is impractical, since the schema requires `ts`, the id chain, and every
+typed projection to agree with the attribute bag.
 
 ### The two vocabularies (FDRS-653)
 
@@ -36,13 +72,22 @@ tolerant-reader compatibility corpus.
 ## Scope
 
 Deliberately scoped to the `/v1` wire surface (`planTier`, `createSession`,
-`usage`, `run`). It is **not** whole-file byte parity, whole-schema equality, or
-a guard for every possible loosening/removal, and it does **not** cover
-cloud-only billing schemas. Byte-for-byte repo parity is a non-goal after M8;
-represented fixture parsing through the published package is the contract.
+`usage`, `run`) plus the `events.jsonl` row (`event/`). It is **not** whole-file
+byte parity, whole-schema equality, or a guard for every possible
+loosening/removal, and it does **not** cover cloud-only billing schemas.
+Byte-for-byte repo parity is a non-goal after M8; represented fixture parsing
+through the published package is the contract.
+
+The `event/` requirement is coverage, not exhaustiveness: one fixture per kind
+is the floor, and a kind whose shape changes should grow a fixture for the new
+mode rather than have its existing one edited in place.
 
 ## How this repo consumes it
 
 `packages/shared-types/test/v1-fixture-parity.test.ts` parses every fixture under
-the mapped schema. Downstream repos should consume the published
-`@pome-sh/shared-types` package instead of vendoring or mirroring this corpus.
+the mapped schema, and asserts the `event/` corpus covers every union member —
+a check stated to the *type* checker there, and to *zod* in
+`scripts/emit-trace-contract.mjs`, so a bug in either derivation shows up as a
+disagreement. `scripts/emit-trace-contract.test.mjs` covers the gate itself.
+Downstream repos should consume the published `@pome-sh/shared-types` package
+instead of vendoring or mirroring this corpus.

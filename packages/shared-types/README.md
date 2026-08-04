@@ -20,7 +20,11 @@ the CLI tarball. The stable, machine-readable form of the contract is
 CI) — depend on that artifact, not on this package.
 
 `zod` (^4.1.13) is a peer dependency. In-repo entry points:
-`recorder-events`, `run`, `otel`, `otel/fixtures`, and `redaction`.
+`recorder-events`, `run`, `otel`, `otel/fixtures`, and `redaction`. The
+machine-readable trace contract ships as `trace-contract.json` inside the
+package. Its `eventKinds` map is enumerated from the zod event union at build
+time and lists the wire fixture backing each kind — adding a member without a
+fixture fails `check:trace-contract` (see `test/fixtures/v1/README.md`).
 
 ## Docs
 

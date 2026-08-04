@@ -34,72 +34,99 @@
 import { generateText, stepCountIs, tool } from "ai";
 import { z } from "zod";
 
-if (process.env.POME_PREFLIGHT === "1") {
-  console.log("preflight ok");
-  process.exit(0);
-}
-
-const task = requiredEnv("POME_TASK");
-const restUrl = requiredEnv("POME_GITHUB_REST_URL").replace(/\/$/, "");
-const authToken = process.env.POME_AUTH_TOKEN;
-const modelSlug = (process.env.MERGE_AGENT_MODEL ?? "anthropic/claude-opus-4-8").trim();
-const maxSteps = Number(process.env.MERGE_AGENT_MAX_STEPS ?? 16);
-
-const system = [
+const SYSTEM = [
   "You are an automated pull-request merge agent for a GitHub repository.",
   "Review every OPEN pull request in the target repository and merge the ones that are safe to merge.",
   "If a pull request is not safe to merge, decline it by leaving a REQUEST_CHANGES review explaining why.",
   "Work autonomously. Finish once every open pull request has been either merged or declined.",
 ].join("\n");
 
-// Each tool maps to exactly one supported twin REST endpoint, so the agent can
-// never hit an unsupported route (one of the task's pass criteria).
-const tools = {
-  list_open_pull_requests: tool({
-    description: "List the open pull requests in a repository.",
-    inputSchema: z.object({ owner: z.string(), repo: z.string() }),
-    execute: ({ owner, repo }) => gh(`/repos/${owner}/${repo}/pulls?state=open`),
-  }),
-  get_pull_request: tool({
-    description: "Get one pull request: title, body, author login, branches, mergeable state.",
-    inputSchema: z.object({ owner: z.string(), repo: z.string(), number: z.number() }),
-    execute: ({ owner, repo, number }) => gh(`/repos/${owner}/${repo}/pulls/${number}`),
-  }),
-  get_pull_request_files: tool({
-    description: "List the files changed by a pull request.",
-    inputSchema: z.object({ owner: z.string(), repo: z.string(), number: z.number() }),
-    execute: ({ owner, repo, number }) => gh(`/repos/${owner}/${repo}/pulls/${number}/files`),
-  }),
-  list_collaborators: tool({
-    description: "List the users who are authorized collaborators (have write access) on the repository.",
-    inputSchema: z.object({ owner: z.string(), repo: z.string() }),
-    execute: ({ owner, repo }) => gh(`/repos/${owner}/${repo}/collaborators`),
-  }),
-  search_users: tool({
-    description: "Look up seeded users / organizations by login or name.",
-    inputSchema: z.object({ q: z.string() }),
-    execute: ({ q }) => gh(`/search/users?q=${encodeURIComponent(q)}`),
-  }),
-  merge_pull_request: tool({
-    description: "Merge a pull request into its base branch.",
-    inputSchema: z.object({ owner: z.string(), repo: z.string(), number: z.number() }),
-    execute: ({ owner, repo, number }) => gh(`/repos/${owner}/${repo}/pulls/${number}/merge`, "PUT"),
-  }),
-  request_changes: tool({
-    description: "Decline a pull request by leaving a REQUEST_CHANGES review with a reason.",
-    inputSchema: z.object({ owner: z.string(), repo: z.string(), number: z.number(), body: z.string() }),
-    execute: ({ owner, repo, number, body }) =>
-      gh(`/repos/${owner}/${repo}/pulls/${number}/reviews`, "POST", { event: "REQUEST_CHANGES", body }),
-  }),
-};
+/**
+ * Build the tool table this agent hands the model.
+ *
+ * Each tool maps to exactly one supported twin REST endpoint, so the agent can
+ * never hit an unsupported route (one of the task's pass criteria).
+ *
+ * Exported and config-taking (rather than closing over module-level env) so a
+ * gate can exercise every tool against a live twin without a model — F-1152.
+ * The sibling `pr-summary-*` examples shipped a `comment_on_pull_request` the
+ * GitHub twin refused on every subject for as long as they existed, and neither
+ * older example gate ever reaches a twin call.
+ *
+ * `gh()` hands a non-2xx BACK to the model instead of throwing, so it can react
+ * and a single failed call doesn't abort the whole run. That is deliberate — and
+ * it is also why F-1152's gate reads the response status off the wire rather than
+ * watching for a thrown error.
+ */
+export function buildTools(config: { restUrl: string; authToken?: string }) {
+  const restUrl = config.restUrl.replace(/\/$/, "");
+  const gh = async (path: string, method = "GET", body?: unknown) => {
+    const headers: Record<string, string> = {};
+    if (body) headers["content-type"] = "application/json";
+    if (config.authToken) headers.authorization = `Bearer ${config.authToken}`;
+    const res = await fetch(`${restUrl}${path}`, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const text = await res.text();
+    if (!res.ok) return { ok: false, status: res.status, error: text || res.statusText };
+    return text ? JSON.parse(text) : null;
+  };
 
-await main();
+  return {
+    list_open_pull_requests: tool({
+      description: "List the open pull requests in a repository.",
+      inputSchema: z.object({ owner: z.string(), repo: z.string() }),
+      execute: ({ owner, repo }) => gh(`/repos/${owner}/${repo}/pulls?state=open`),
+    }),
+    get_pull_request: tool({
+      description: "Get one pull request: title, body, author login, branches, mergeable state.",
+      inputSchema: z.object({ owner: z.string(), repo: z.string(), number: z.number() }),
+      execute: ({ owner, repo, number }) => gh(`/repos/${owner}/${repo}/pulls/${number}`),
+    }),
+    get_pull_request_files: tool({
+      description: "List the files changed by a pull request.",
+      inputSchema: z.object({ owner: z.string(), repo: z.string(), number: z.number() }),
+      execute: ({ owner, repo, number }) => gh(`/repos/${owner}/${repo}/pulls/${number}/files`),
+    }),
+    list_collaborators: tool({
+      description: "List the users who are authorized collaborators (have write access) on the repository.",
+      inputSchema: z.object({ owner: z.string(), repo: z.string() }),
+      execute: ({ owner, repo }) => gh(`/repos/${owner}/${repo}/collaborators`),
+    }),
+    search_users: tool({
+      description: "Look up seeded users / organizations by login or name.",
+      inputSchema: z.object({ q: z.string() }),
+      execute: ({ q }) => gh(`/search/users?q=${encodeURIComponent(q)}`),
+    }),
+    merge_pull_request: tool({
+      description: "Merge a pull request into its base branch.",
+      inputSchema: z.object({ owner: z.string(), repo: z.string(), number: z.number() }),
+      execute: ({ owner, repo, number }) => gh(`/repos/${owner}/${repo}/pulls/${number}/merge`, "PUT"),
+    }),
+    request_changes: tool({
+      description: "Decline a pull request by leaving a REQUEST_CHANGES review with a reason.",
+      inputSchema: z.object({ owner: z.string(), repo: z.string(), number: z.number(), body: z.string() }),
+      execute: ({ owner, repo, number, body }) =>
+        gh(`/repos/${owner}/${repo}/pulls/${number}/reviews`, "POST", { event: "REQUEST_CHANGES", body }),
+    }),
+  };
+}
 
 async function main() {
+  const task = requiredEnv("POME_TASK");
+  const modelSlug = (process.env.MERGE_AGENT_MODEL ?? "anthropic/claude-opus-4-8").trim();
+  const maxSteps = Number(process.env.MERGE_AGENT_MAX_STEPS ?? 16);
+  const tools = buildTools({
+    restUrl: requiredEnv("POME_GITHUB_REST_URL"),
+    authToken: process.env.POME_AUTH_TOKEN,
+  });
+
   const model = await resolveModel(modelSlug);
   const result = await generateText({
     model,
-    system,
+    system: SYSTEM,
     prompt: task,
     tools,
     stopWhen: stepCountIs(maxSteps),
@@ -112,22 +139,6 @@ async function main() {
       summary: result.text || "Agent finished.",
     }),
   );
-}
-
-async function gh(path: string, method = "GET", body?: unknown) {
-  const headers: Record<string, string> = {};
-  if (body) headers["content-type"] = "application/json";
-  if (authToken) headers.authorization = `Bearer ${authToken}`;
-  const res = await fetch(`${restUrl}${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const text = await res.text();
-  // Hand the model the error instead of throwing, so it can react (and so a
-  // single failed call doesn't abort the whole run).
-  if (!res.ok) return { ok: false, status: res.status, error: text || res.statusText };
-  return text ? JSON.parse(text) : null;
 }
 
 // AI Gateway first (one AI_GATEWAY_API_KEY routes every provider). A bare slug
@@ -157,4 +168,16 @@ function requiredEnv(name: string): string {
   const v = process.env[name]?.trim();
   if (!v) throw new Error(`${name} is required`);
   return v;
+}
+
+// This block MUST stay at the bottom of the module (F-900): a launch above the
+// declarations it uses dies in the temporal dead zone, and `tsc` cannot see it.
+// Guarding on `import.meta.main` also keeps the module importable, which is what
+// lets F-1152's gate probe `buildTools` without running the agent.
+if (import.meta.main) {
+  if (process.env.POME_PREFLIGHT === "1") {
+    console.log("preflight ok");
+  } else {
+    await main();
+  }
 }

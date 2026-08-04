@@ -1,3 +1,4 @@
+// file-size: the recorder's store implementations, the handle() middleware, and the F-720/F-698 write-through contract are one unit — the contract is documented inline against the code it constrains.
 // SPDX-License-Identifier: Apache-2.0
 // Twin-core recorder (F-681 / F-720). Home: `packages/sdk/src/recorder.ts`
 // (`@pome-sh/sdk`); all first-party twins and the CLI harness consume it.
@@ -56,6 +57,7 @@ import type { Context } from "hono";
 import type { RecorderEvent, TwinId } from "@pome-sh/shared-types";
 import type { RecorderHandle, RecorderHandlerResult } from "./index.js";
 import { envelopeFor } from "./errors.js";
+import { recordedRequestHeaders, resolveRecordedTool } from "./request-capture.js";
 import { redactEvent } from "./redaction.js";
 
 /**
@@ -161,28 +163,37 @@ export const POME_RECORDER_EVENTS_PATH = "POME_RECORDER_EVENTS_PATH";
  * durable tape never persists a mismatched discriminator. Disk rows from the
  * durable store use this shape so finalize/upload does not need a second wrap
  * for crash-streamed events.
+ *
+ * `parent_event_id` is null here and that is not a stub: the twin runs in its
+ * own process and legitimately cannot know the `event_id` of the agent-side
+ * `ToolUseEvent` that caused the call. What it DOES carry is the causing tool's
+ * id, arriving on `x-pome-correlation-id` and persisted as `correlation_id`
+ * (always) and `tool_call_id` (when the twin pins `stampToolCallId`). Since
+ * F-1200 that header holds the SDK's real `toolu_…`, so the parent is resolvable
+ * — and `mergeAdapterSignalsIntoEvents` in the CLI resolves it, because that is
+ * the one place that sees both this tape and the adapter's signals.
  */
 export function toTwinHttpEventRow(
   event: RecorderEvent
-): RecorderEvent & { kind: "TwinHttpEvent"; event_id: string; parent_id: null } {
+): RecorderEvent & { kind: "TwinHttpEvent"; event_id: string; parent_event_id: null } {
   const maybeKind = (event as { kind?: unknown }).kind;
   if (maybeKind === "TwinHttpEvent") {
     const existing = event as RecorderEvent & {
       kind: "TwinHttpEvent";
       event_id?: string;
-      parent_id?: null;
+      parent_event_id?: null;
     };
     return {
       ...existing,
       event_id: typeof existing.event_id === "string" ? existing.event_id : event.request_id,
-      parent_id: null,
+      parent_event_id: null,
     };
   }
   return {
     ...event,
     kind: "TwinHttpEvent",
     event_id: event.request_id,
-    parent_id: null,
+    parent_event_id: null,
   };
 }
 
@@ -363,7 +374,8 @@ export function createRecorderHandle(options: RecorderHandleOptions): RecorderHa
     result: RecorderHandlerResult,
     mutation: boolean,
     fidelity: "semantic" | "unsupported",
-    error: string | null
+    error: string | null,
+    declaredTool?: string
   ) {
     const requestId = `req_${randomUUID()}`;
     // FDRS-402 / FDRS-653 stamping (F-683: engine parity with the per-twin
@@ -392,6 +404,8 @@ export function createRecorderHandle(options: RecorderHandleOptions): RecorderHa
       method: c.req.method,
       path: new URL(c.req.url).pathname,
       request_body: requestBody,
+      request_headers: recordedRequestHeaders(c),
+      tool: resolveRecordedTool(c, declaredTool),
       status: result.status,
       response_body: result.body,
       latency_ms: Date.now() - started,
@@ -421,7 +435,7 @@ export function createRecorderHandle(options: RecorderHandleOptions): RecorderHa
     async close() {
       await store.close?.();
     },
-    handle({ mutation, fidelity = "semantic", errorEnvelope: perCallEnvelope }, fn) {
+    handle({ mutation, fidelity = "semantic", errorEnvelope: perCallEnvelope, tool }, fn) {
       const projectError = perCallEnvelope ?? errorEnvelope;
       return async (c) => {
         const started = Date.now();
@@ -435,7 +449,7 @@ export function createRecorderHandle(options: RecorderHandleOptions): RecorderHa
           const effectiveMutation = result.mutation ?? mutation;
           const errorMsg =
             result.status >= 400 ? extractMessage(result.body) ?? "request failed" : null;
-          emit(c, started, requestBody, result, effectiveMutation, fidelity, errorMsg);
+          emit(c, started, requestBody, result, effectiveMutation, fidelity, errorMsg, tool);
           return respondWith(c, result.status, result.body);
         } catch (caught) {
           const envelope = projectError(caught);
@@ -452,7 +466,8 @@ export function createRecorderHandle(options: RecorderHandleOptions): RecorderHa
             { status: envelope.status, body: envelope.body },
             false,
             fidelity,
-            errMsg
+            errMsg,
+            tool
           );
           return respondWith(c, envelope.status, envelope.body);
         }

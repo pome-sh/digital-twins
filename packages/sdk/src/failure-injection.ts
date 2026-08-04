@@ -29,6 +29,7 @@ import { randomUUID } from "node:crypto";
 import type { MiddlewareHandler } from "hono";
 import { z } from "zod";
 import type { RecorderEvent } from "@pome-sh/shared-types";
+import { recordedRequestHeaders } from "./request-capture.js";
 
 export const FAILURE_INJECTION_OVERRIDE_KEY = "failureInjectionOverride";
 
@@ -178,6 +179,12 @@ export function failureInjectionMiddleware(
         method,
         path: rawPath,
         request_body: requestBody,
+        // F-1125 — same capture policy as the engine's emit(); an injected
+        // fault must not be the one row a header-reading check cannot see.
+        request_headers: recordedRequestHeaders(c),
+        // Injection is transport-level: it intercepts a (method, path) tuple,
+        // never a declared twin action.
+        tool: null,
         status: rule.status,
         response_body: rule.body,
         latency_ms: Date.now() - started,

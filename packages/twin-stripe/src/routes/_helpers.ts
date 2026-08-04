@@ -9,9 +9,11 @@ import type { Context } from "hono";
 import { z } from "zod";
 import {
   FAILURE_INJECTION_OVERRIDE_KEY,
+  recordedRequestHeaders,
   type FailureInjectionOverride,
 } from "@pome-sh/sdk/server";
 import { TwinError, stripeError } from "../errors.js";
+import { setHandlerResult } from "../idempotency.js";
 import type {
   Recorder,
   ResolvedSession,
@@ -191,6 +193,10 @@ export function respond(
   stateDelta: StateDelta = null
 ) {
   const reqId = requestId();
+  // The handler's own answer, before any transport-level substitution below.
+  // The idempotency middleware wraps this handler and reads it on the way out;
+  // `setHandlerResult`'s doc carries what goes wrong without it (F-1138).
+  setHandlerResult(c, { status, body: responseBody });
   // FDRS-339: if the failure-injection middleware matched in `after_handler`
   // mode, it parked an override on the context. The handler has already
   // mutated state (so state_mutation + state_delta stay truthful), but the
@@ -219,6 +225,14 @@ export function respond(
     method: c.req.method,
     path: new URL(c.req.url).pathname,
     request_body: requestBody,
+    // F-1125 — one shared implementation with the engine's own emit(), so
+    // "which headers get recorded" has a single answer across every site.
+    request_headers: recordedRequestHeaders(c),
+    // Stripe's REST routes are not declared as twin actions: no criterion asks
+    // whether a stripe TOOL was called, and stamping a name here that no check
+    // can bind would be an unverifiable claim. MCP dispatch still stamps its
+    // own name through the engine.
+    tool: null,
     status: finalStatus,
     response_body: finalBody,
     latency_ms: Date.now() - started,

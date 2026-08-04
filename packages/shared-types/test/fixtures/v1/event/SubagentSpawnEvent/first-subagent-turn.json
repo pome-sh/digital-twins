@@ -1,0 +1,7 @@
+{
+  "ts": "2026-08-03T10:15:23.900Z",
+  "event_id": "evt_01k2f7q9d4",
+  "parent_event_id": "evt_01k2f7q9c1",
+  "kind": "SubagentSpawnEvent",
+  "parent_tool_use_id": "toolu_01WxYzAbCdEf"
+}

@@ -21,14 +21,24 @@
 // duration and are EXCLUDED from the fraction's denominator.
 
 import { criterionPhrase } from "../demo/render.js";
+import type { ScoreStatus } from "../hosted/evalResultView.js";
 
 export type TrialRow =
   | {
       kind: "completed";
       /** Cloud-authoritative satisfaction score, 0-100. */
       score: number;
-      /** Cleared the scenario's pass threshold. */
-      passed: boolean;
+      /**
+       * F-925 — three states, not a boolean. `incomplete` means the trial ran
+       * and finalized but at least one criterion never produced a verdict, so
+       * it is neither a pass nor the agent's failure. It was `passed: boolean`
+       * fed from `exitCode === 0`, which counted a 100/100 run with 3 of 4
+       * criteria skipped as a clean passing trial.
+       *
+       * Typed as the CLI's own `ScoreStatus` rather than a second enum, so the
+       * trial line and the single-run headline cannot drift apart.
+       */
+      verdict: ScoreStatus;
       seconds: number;
       /** Failing-criteria summary ("a · b"), absent when none were reported. */
       note?: string;
@@ -67,7 +77,11 @@ export function trialRowLine(n: number, row: TrialRow): string {
   if (row.kind === "errored") {
     return `trial ${n}  ⚠  ${"errored".padEnd(16)}${row.reason} — excluded`;
   }
-  const mark = row.passed ? "✓" : "✗";
+  // A dash for the ungradable trial: it ran, and it asserts nothing. Reusing
+  // ✗ would make a grader gap look like the agent's failure at a glance, which
+  // is the whole reading F-925 removes.
+  const mark =
+    row.verdict === "pass" ? "✓" : row.verdict === "incomplete" ? "–" : "✗";
   const base = `trial ${n}  ${mark}  ${String(row.score).padEnd(9)}${row.seconds.toFixed(1)}s`;
   return row.note ? `${base}  ${row.note}` : base;
 }
@@ -86,17 +100,32 @@ export function groupSummaryLines(input: GroupSummaryInput): string[] {
   const completed = input.rows.filter(
     (r): r is Extract<TrialRow, { kind: "completed" }> => r.kind === "completed",
   );
-  const passed = completed.filter((r) => r.passed).length;
+  const passed = completed.filter((r) => r.verdict === "pass").length;
+  const incomplete = completed.filter((r) => r.verdict === "incomplete").length;
+  // F-925 — the fraction's denominator is the GRADED trials. A trial that
+  // finalized but could not be fully graded leaves both the numerator and the
+  // denominator, so a 5-trial set with one of them reads "3 of 4", never the
+  // "4 of 5" that counted it as a pass.
+  const graded = completed.length - incomplete;
   const errored = input.rows.length - completed.length;
 
   const lines: string[] = ["─────"];
 
-  // The fraction counts COMPLETED trials only; errored trials are named and
-  // excluded, never silently folded into the denominator.
-  let fraction =
-    completed.length === 0
-      ? "no trials completed"
-      : `${passed} of ${completed.length} passed`;
+  // The fraction counts GRADED trials only; incomplete and errored trials are
+  // named and excluded, never silently folded into the denominator. They stay
+  // two clauses rather than one: "the trial died" is ours to retry, "the trial
+  // ran and could not be graded" is a grader gap, and a reader told the wrong
+  // one goes looking in the wrong place.
+  let fraction: string;
+  if (graded === 0) {
+    fraction =
+      completed.length === 0 ? "no trials completed" : "no trials could be graded";
+  } else {
+    fraction = `${passed} of ${graded} passed`;
+  }
+  if (incomplete > 0) {
+    fraction += ` · ${incomplete} incomplete, excluded from the fraction`;
+  }
   if (errored > 0) {
     fraction += ` · ${errored} errored, excluded from the fraction`;
   }
@@ -132,7 +161,11 @@ export function groupExitCode(rows: TrialRow[]): number {
     (r): r is Extract<TrialRow, { kind: "completed" }> => r.kind === "completed",
   );
   if (completed.length === 0) return 2;
-  return completed.every((r) => r.passed) ? 0 : 1;
+  // F-925 — an ungradable trial is not a pass, so a group holding one cannot
+  // exit 0: green here would tell CI the set was verified when part of it was
+  // never checked. It stays 1 rather than 2 even when EVERY trial was
+  // incomplete — `2` means nothing completed, and these completed.
+  return completed.every((r) => r.verdict === "pass") ? 0 : 1;
 }
 
 /** Modal failed-criterion text across the group's completed trials, as the

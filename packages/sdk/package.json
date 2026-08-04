@@ -1,7 +1,7 @@
 {
   "name": "@pome-sh/sdk",
-  "version": "0.5.1",
-  "description": "Twin engine for Pome digital twins — defineTwin() + serve(): HTTP mounting, bearer auth, trace recorder, MCP dispatch, SQLite-backed state.",
+  "version": "0.11.0",
+  "description": "Twin engine for Pome digital twins \u2014 defineTwin() + serve(): HTTP mounting, bearer auth, trace recorder, MCP dispatch, SQLite-backed state.",
   "private": false,
   "type": "module",
   "main": "./dist/index.js",
@@ -18,6 +18,10 @@
     "./parity": {
       "types": "./dist/parity.d.ts",
       "default": "./dist/parity.js"
+    },
+    "./checks": {
+      "types": "./dist/checks.d.ts",
+      "default": "./dist/checks.js"
     }
   },
   "publishConfig": {
@@ -44,7 +48,7 @@
     "emit-fidelity": "tsx scripts/emit-fidelity.ts"
   },
   "dependencies": {
-    "@pome-sh/shared-types": "0.12.0",
+    "@pome-sh/shared-types": "0.14.0",
     "hono": "^4.12.31",
     "zod": "^4.1.13"
   },

@@ -76,7 +76,7 @@ export async function createComment(
   if (mentionsAppUser(comment.body)) {
     const appUser = domain.listUsers().find((u) => u.app && comment.body.includes(u.displayName));
     if (appUser) {
-      await domain.createAgentSessionOnComment({ commentId: comment.id, agentUserId: appUser.id }, actor);
+      await domain.createAgentSessionOnComment({ commentId: comment.id, appUserId: appUser.id }, actor);
     }
   }
   return comment;

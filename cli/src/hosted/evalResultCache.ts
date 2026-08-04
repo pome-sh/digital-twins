@@ -35,9 +35,9 @@ export interface VerdictArtifact {
   /** Provenance: the only writer is the /finalize response path. */
   source: "cloud-finalize";
   task_name: string;
-  /** The scenario path as the run invocation saw it (may move later —
-   *  readers must tolerate a dangling path). */
-  scenario_path: string;
+  /** The task path as the run invocation saw it (may move later — readers
+   *  must tolerate a dangling path). */
+  task_path: string;
   /** Shared trial-group id (`grp_` + nanoid21); null on single runs. */
   group_id: string | null;
   session_id: string;
@@ -69,19 +69,32 @@ export async function writeVerdictArtifact(
   );
 }
 
+/** F-933 — the on-disk shape, which may predate the `scenario_path` →
+ *  `task_path` rename. `@pome-sh/cli` <= 0.8.x wrote `scenario_path`; unlike
+ *  latest.json (rewritten by every run), verdict.json files accumulate under
+ *  runs/ and outlive a CLI upgrade, so the READ path accepts either spelling
+ *  and normalizes to `task_path` before anything downstream sees it. The
+ *  WRITE path emits `task_path` only. Drop the legacy branch once pre-0.9 run
+ *  dirs are no longer worth reading. */
+type OnDiskVerdictArtifact = Omit<VerdictArtifact, "task_path"> & {
+  task_path?: string;
+  /** Retired pre-F-933 spelling of `task_path`. */
+  scenario_path?: string;
+};
+
 /** Read one trial's verdict.json. Returns null when absent or when the file
  *  isn't a recognizable verdict artifact (foreign/corrupt files are skipped,
  *  never thrown on — fix-prompt discovery must survive a messy runs/). */
 /** Every field the fix-prompt pipeline dereferences must hold its declared
  *  shape, or the FILE is rejected — discovery treats a half-recognizable
  *  verdict.json as foreign rather than crashing downstream on it. */
-function isVerdictArtifact(parsed: unknown): parsed is VerdictArtifact {
+function isVerdictArtifact(parsed: unknown): parsed is OnDiskVerdictArtifact {
   if (typeof parsed !== "object" || parsed === null) return false;
   const v = parsed as Record<string, unknown>;
   if (v.source !== "cloud-finalize") return false;
   if (typeof v.session_id !== "string") return false;
   if (typeof v.task_name !== "string") return false;
-  if (typeof v.scenario_path !== "string") return false;
+  if (typeof v.task_path !== "string" && typeof v.scenario_path !== "string") return false;
   if (v.group_id !== null && typeof v.group_id !== "string") return false;
   if (typeof v.finalized_at !== "string") return false;
   if (typeof v.passed !== "boolean") return false;
@@ -102,6 +115,14 @@ function isVerdictArtifact(parsed: unknown): parsed is VerdictArtifact {
   });
 }
 
+/** F-933 — collapse the legacy `scenario_path` onto `task_path` so callers
+ *  only ever deal with one spelling. Validation ran first, so at least one of
+ *  the two is a string. */
+function normalizeVerdictArtifact(parsed: OnDiskVerdictArtifact): VerdictArtifact {
+  const { scenario_path: legacyPath, task_path: taskPath, ...rest } = parsed;
+  return { ...rest, task_path: taskPath ?? legacyPath! };
+}
+
 export async function readVerdictArtifact(
   runDir: string,
 ): Promise<TrialVerdict | null> {
@@ -115,7 +136,7 @@ export async function readVerdictArtifact(
   try {
     const parsed: unknown = JSON.parse(raw);
     if (!isVerdictArtifact(parsed)) return null;
-    return { runDir, verdict: parsed };
+    return { runDir, verdict: normalizeVerdictArtifact(parsed) };
   } catch {
     return null;
   }
@@ -154,7 +175,7 @@ export interface RunSet {
   /** null = a single run that never had a group. */
   groupId: string | null;
   taskName: string;
-  /** The scenario path recorded at run time (first trial's). */
+  /** The task path recorded at run time (first trial's). */
   taskPath: string;
   /** Trials sorted by finalized_at ascending. */
   trials: TrialVerdict[];
@@ -181,7 +202,7 @@ export function groupRunSets(trials: TrialVerdict[]): RunSet[] {
     sets.push({
       groupId: bucket[0]!.verdict.group_id,
       taskName: bucket[0]!.verdict.task_name,
-      taskPath: bucket[0]!.verdict.scenario_path,
+      taskPath: bucket[0]!.verdict.task_path,
       trials: bucket,
       latestFinalizedAt: last.verdict.finalized_at,
       anyFailed: bucket.some((t) => !t.verdict.passed),

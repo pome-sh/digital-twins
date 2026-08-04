@@ -7,6 +7,7 @@ import {
 } from "@anthropic-ai/claude-agent-sdk";
 import { buildPomeHooks } from "./hooks.js";
 import { withGenAiSpans } from "./genai-spans.js";
+import { isPartialMessageArtifact, shouldInjectPartialMessages } from "./partial-messages.js";
 import { withTurnUsage } from "./turn-usage.js";
 import { withToolEvents } from "./wrapQuery.js";
 
@@ -22,11 +23,38 @@ type HooksConfig = Partial<Record<HookEvent, HookCallbackMatcher[]>>;
  * User-supplied hooks in `params.options.hooks` are preserved — pome's
  * matchers are prepended per event so they fire alongside user callbacks.
  *
+ * Pinning the model: pass `params.options.model` (an alias like `"haiku"` /
+ * `"sonnet"` / `"opus"`, or a full id like `"claude-haiku-4-5"`). This wrapper
+ * forwards it verbatim to the upstream SDK, which passes it to the `claude` CLI
+ * as `--model`; omit it to run the CLI's default model. Note the wrapper only
+ * forwards the request — it cannot force the runtime to honor it. A
+ * subscription/OAuth login or an environment/gateway model pin can still
+ * override the choice, and the CLI does not error on an unknown id (it silently
+ * falls back). To see the model that actually ran, read `model` off the SDK's
+ * `system`/`init` message, or the per-turn `message.model` (both flow into the
+ * gen_ai spans and `LlmTurnEvent` this wrapper emits). See F-928.
+ *
+ * Telemetry runs turn on `includePartialMessages` internally (F-998): the true
+ * per-turn `output_tokens` reaches the SDK only on a `message_delta` stream
+ * event. Everything that option adds is filtered back out before it reaches the
+ * returned iterator, so the message sequence is exactly what it would have been.
+ * Set the option to `true` yourself and pome touches nothing — the stream events
+ * flow through as you asked. Setting it to `false` only declines to *see* them:
+ * telemetry still asks for them and still filters them out, so the sequence you
+ * get is the same either way. `POME_DISABLE_PARTIAL_MESSAGES=1` opts out of
+ * asking at all, at the cost of the ~5x-low snapshot.
+ *
  * v0: returns an AsyncGenerator, not the full `Query` interface — control
  * methods (`interrupt`, `setPermissionMode`, …) are not re-exposed yet. Use
  * the underlying SDK directly if you need them.
  */
 export function query(params: QueryParams): AsyncGenerator<SDKMessage, void, unknown> {
+  // A caller who asked for partial messages gets them verbatim; only pome's own
+  // injection is hidden again.
+  const inject =
+    shouldInjectPartialMessages() && params.options?.includePartialMessages !== true;
+  const prepared = withPomeHooks(params, inject);
+
   // Three read-only stream wrappers, composed innermost-first:
   //   • withToolEvents   — ToolUse/ToolResult/SubagentSpawn rows → signals JSONL
   //   • withTurnUsage    — one LlmTurnEvent per usage-bearing assistant turn
@@ -35,12 +63,30 @@ export function query(params: QueryParams): AsyncGenerator<SDKMessage, void, unk
   //                        flushes the exporter on the terminal `result`.
   // The two signals wrappers append to POME_ADAPTER_SIGNALS_PATH and are inert
   // when it is unset; withGenAiSpans is inert when no OTLP endpoint is set.
-  return withGenAiSpans<SDKMessage>(
-    withTurnUsage<SDKMessage>(withToolEvents<SDKMessage>(sdkQuery(withPomeHooks(params)))),
+  const instrumented = withGenAiSpans<SDKMessage>(
+    withTurnUsage<SDKMessage>(withToolEvents<SDKMessage>(sdkQuery(prepared))),
   );
+
+  // Outermost, so the wrappers above still see the stream events they read the
+  // per-turn output tokens from.
+  return inject ? withoutPartialMessages(instrumented) : instrumented;
 }
 
-function withPomeHooks(params: QueryParams): QueryParams {
+/**
+ * Drop the messages `includePartialMessages` added — `stream_event` plus the
+ * per-turn `system/status:requesting` ping — so an agent author's `for await`
+ * loop sees exactly what it saw before pome started asking for them.
+ */
+async function* withoutPartialMessages(
+  source: AsyncGenerator<SDKMessage, void, unknown>,
+): AsyncGenerator<SDKMessage, void, unknown> {
+  for await (const msg of source) {
+    if (isPartialMessageArtifact(msg)) continue;
+    yield msg;
+  }
+}
+
+function withPomeHooks(params: QueryParams, includePartialMessages: boolean): QueryParams {
   const pomeHooks = buildPomeHooks();
   const userHooks = (params.options?.hooks ?? {}) as HooksConfig;
   const merged: HooksConfig = {};
@@ -52,6 +98,10 @@ function withPomeHooks(params: QueryParams): QueryParams {
   }
   return {
     ...params,
-    options: { ...(params.options ?? {}), hooks: merged },
+    options: {
+      ...(params.options ?? {}),
+      hooks: merged,
+      ...(includePartialMessages ? { includePartialMessages: true } : {}),
+    },
   };
 }

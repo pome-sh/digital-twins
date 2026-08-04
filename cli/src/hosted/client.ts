@@ -21,6 +21,7 @@ import {
   HostedAuthError,
   HostedOrchError,
   HostedQuotaError,
+  HostedDiscardRefusedError,
 } from "./errors.js";
 
 // Writer-side shape of the finalize criteria (see FinalizeInput.criteria).
@@ -325,8 +326,16 @@ export interface HostedClient {
    *  for the feature-detection contract (a 404 here means an older control
    *  plane; callers must tolerate it silently). */
   requestMetaUploadUrl(sessionId: string): Promise<MetaUploadUrlResponse>;
-  /** @param bestEffort default true — hosted runner swallows network errors on teardown */
-  deleteSession(sessionId: string, bestEffort?: boolean): Promise<void>;
+  /** @param bestEffort default true — hosted runner swallows network errors on teardown
+   *  @param opts.discard F-983 — set true to confirm discarding an ungraded
+   *  session after catching {@link HostedDiscardRefusedError}. Never implied
+   *  by `bestEffort`: a refusal is a deliberate server decision, not
+   *  transport noise. */
+  deleteSession(
+    sessionId: string,
+    bestEffort?: boolean,
+    opts?: { discard?: boolean },
+  ): Promise<void>;
 }
 
 // Keep these readers wire-identical to the additive exports in
@@ -401,6 +410,77 @@ class RetryableFinalizeStatusError extends HostedOrchError {
     super(error.message, error.requestId, error.status);
     this.name = "RetryableFinalizeStatusError";
   }
+}
+
+interface DiscardRefusal {
+  message: string;
+  sessionId: string;
+  state: string;
+  taskName: string | null;
+  openSeconds: number;
+  discardToken: string;
+}
+
+/** Three-way, because a refusal is defined by two things at once — it
+ *  declares `reason: "ungraded_session"` AND it hands back a replayable
+ *  token:
+ *   - `none`     — an ordinary already-closed conflict, or an unparseable
+ *                  body. Keeps the historic "409 means idempotent success".
+ *   - `refusal`  — a well-formed F-983 refusal; replayable.
+ *   - `unusable` — it CLAIMS to be a refusal but carries no usable
+ *                  `discard_token`. The delete did not happen and cannot be
+ *                  confirmed, so this must fail loudly; folding it into
+ *                  `none` would report a stop that never occurred. */
+type DiscardRefusalRead =
+  | { kind: "none" }
+  | { kind: "refusal"; refusal: DiscardRefusal }
+  | { kind: "unusable" };
+
+/** Read a 409 body as an F-983 discard refusal. Only ever called for status
+ *  409 — a non-409 that happens to echo `details.reason` is a server error,
+ *  not a refusal, and must keep its own status-based handling. */
+async function readDiscardRefusal(res: Response): Promise<DiscardRefusalRead> {
+  let body: unknown;
+  try {
+    body = await res.clone().json();
+  } catch {
+    return { kind: "none" };
+  }
+  const error = (body as { error?: Record<string, unknown> } | null)?.error;
+  const details = error?.details as Record<string, unknown> | undefined;
+  if (!details || details.reason !== "ungraded_session") return { kind: "none" };
+  const discardToken = details.discard_token;
+  if (typeof discardToken !== "string" || discardToken.length === 0) {
+    return { kind: "unusable" };
+  }
+  return {
+    kind: "refusal",
+    refusal: {
+      message: typeof error?.message === "string" ? error.message : "",
+      sessionId:
+        typeof details.session_id === "string" ? details.session_id : "",
+      state: typeof details.state === "string" ? details.state : "open",
+      taskName:
+        typeof details.task_name === "string" ? details.task_name : null,
+      openSeconds:
+        typeof details.open_seconds === "number" ? details.open_seconds : 0,
+      discardToken,
+    },
+  };
+}
+
+/** The delete was refused but the refusal is unreplayable. Say plainly that
+ *  the session is still running: a best-effort caller would otherwise read
+ *  silence as success. NOT HostedDiscardRefusedError — with no token to
+ *  replay, that type would be a lie. */
+function unusableRefusalError(sessionId: string): HostedOrchError {
+  return new HostedOrchError(
+    `DELETE /v1/sessions/${sessionId} → 409: the server refused to delete this ` +
+      `session but sent no usable discard_token, so the session was NOT ` +
+      `stopped. Retry, or stop it from the dashboard.`,
+    undefined,
+    409,
+  );
 }
 
 export function createHostedClient(config: HostedClientConfig): HostedClient {
@@ -1089,35 +1169,94 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
       );
     },
 
-    async deleteSession(sessionId, bestEffort = true) {
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-      let res: Response;
-      try {
-        res = await fetch(
-          `${config.baseUrl}/v1/sessions/${encodeURIComponent(sessionId)}`,
-          {
-            method: "DELETE",
-            // authHeaders, not a hardcoded x-api-key: demo teardown carries a
-            // bearer demo_token (FDRS-643 live-run finding — the hardcoded
-            // header made every demo DELETE an opaque 404, silently swallowed
-            // by best-effort).
-            headers: authHeaders,
-            signal: ctrl.signal,
-          }
-        );
-      } catch (err) {
-        if (bestEffort) return;
-        throw new HostedOrchError(
-          err instanceof Error ? err.message : "network error",
-        );
-      } finally {
-        clearTimeout(timer);
+    async deleteSession(sessionId, bestEffort = true, opts = {}) {
+      // One DELETE attempt, including the read of a 409 body. `confirmDiscard`
+      // replays the token the control plane hands back with an F-983 refusal.
+      const attempt = async (
+        confirmDiscard?: string,
+      ): Promise<{ res: Response; read: DiscardRefusalRead } | null> => {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+        const qs = confirmDiscard
+          ? `?confirm_discard=${encodeURIComponent(confirmDiscard)}`
+          : "";
+        try {
+          const res = await fetch(
+            `${config.baseUrl}/v1/sessions/${encodeURIComponent(sessionId)}${qs}`,
+            {
+              method: "DELETE",
+              // authHeaders, not a hardcoded x-api-key: demo teardown carries a
+              // bearer demo_token (FDRS-643 live-run finding — the hardcoded
+              // header made every demo DELETE an opaque 404, silently swallowed
+              // by best-effort).
+              headers: authHeaders,
+              signal: ctrl.signal,
+            },
+          );
+          // Keep the timeout active while consuming a 409 body — fetch()
+          // resolves after headers, before the body finishes (same hazard,
+          // same fix, as postJson's readResponse above).
+          const read =
+            res.status === 409
+              ? await readDiscardRefusal(res)
+              : ({ kind: "none" } as DiscardRefusalRead);
+          return { res, read };
+        } catch (err) {
+          if (bestEffort) return null;
+          throw new HostedOrchError(
+            err instanceof Error ? err.message : "network error",
+          );
+        } finally {
+          clearTimeout(timer);
+        }
+      };
+
+      let first = await attempt();
+      if (!first) return; // bestEffort transport failure
+      let res = first.res;
+
+      // F-983: a 409 carrying reason=ungraded_session is a REFUSAL, not the
+      // already-closed race. Never fold it into the idempotent-success branch
+      // below — that swallow is exactly what made the CLI lie about stopping.
+      // Scoped to 409: a 5xx that echoes the same `details` is a server
+      // error and keeps its status-based handling.
+      if (first.read.kind === "unusable") throw unusableRefusalError(sessionId);
+      if (first.read.kind === "refusal") {
+        const { refusal } = first.read;
+        if (!opts.discard) {
+          throw new HostedDiscardRefusedError(
+            refusal.message,
+            refusal.sessionId || sessionId,
+            refusal.state,
+            refusal.taskName,
+            refusal.openSeconds,
+            refusal.discardToken,
+          );
+        }
+        const confirmed = await attempt(refusal.discardToken);
+        if (!confirmed) return;
+        res = confirmed.res;
+        // No third attempt either way: the token was already spent.
+        if (confirmed.read.kind === "unusable") {
+          throw unusableRefusalError(sessionId);
+        }
+        if (confirmed.read.kind === "refusal") {
+          const stillRefused = confirmed.read.refusal;
+          throw new HostedDiscardRefusedError(
+            stillRefused.message,
+            stillRefused.sessionId || sessionId,
+            stillRefused.state,
+            stillRefused.taskName,
+            stillRefused.openSeconds,
+            stillRefused.discardToken,
+          );
+        }
       }
+
       // Cloud spec (pome-cloud docs/05-api-spec.md): 204 on success. Accept
-      // 200 too in case a future control-plane returns a body. 409 keeps
-      // best-effort teardown idempotent when a concurrent reaper already
-      // closed the row.
+      // 200 too in case a future control-plane returns a body. A 409 that is
+      // NOT an F-983 refusal keeps best-effort teardown idempotent when a
+      // concurrent reaper already closed the row.
       if (res.status === 204 || res.status === 200 || res.status === 409) return;
       if (res.status === 404) {
         if (bestEffort) return;
@@ -1127,12 +1266,12 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
       }
       if (res.status === 401 || res.status === 403) {
         throw new HostedAuthError(
-          `DELETE /v1/sessions/${sessionId} → ${res.status}`
+          `DELETE /v1/sessions/${sessionId} → ${res.status}`,
         );
       }
-      // 404 / 5xx — log via thrown but caller can swallow if mid-teardown.
+      // 5xx — thrown, but caller can swallow if mid-teardown.
       throw new HostedOrchError(
-        `DELETE /v1/sessions/${sessionId} → ${res.status}`
+        `DELETE /v1/sessions/${sessionId} → ${res.status}`,
       );
     },
   };

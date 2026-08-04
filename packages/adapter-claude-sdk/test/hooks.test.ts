@@ -115,7 +115,7 @@ describe("buildPomeHooks coverage", () => {
 });
 
 describe("HookEvent row shape per hook category", () => {
-  it("tool category (PreToolUse): tool_name + parent_id from tool_use_id", async () => {
+  it("tool category (PreToolUse): tool_name + causing_tool_use_id from tool_use_id", async () => {
     await invoke(
       "PreToolUse",
       fakeInput({
@@ -131,7 +131,7 @@ describe("HookEvent row shape per hook category", () => {
       kind: "HookEvent",
       hook_name: "PreToolUse",
       tool_name: "list_open_issues",
-      parent_id: "toolu_abc",
+      causing_tool_use_id: "toolu_abc",
     });
   });
 
@@ -150,7 +150,7 @@ describe("HookEvent row shape per hook category", () => {
     expect(row).toMatchObject({
       hook_name: "PostToolUse",
       tool_name: "create_issue",
-      parent_id: "toolu_xyz",
+      causing_tool_use_id: "toolu_xyz",
     });
   });
 
@@ -166,11 +166,11 @@ describe("HookEvent row shape per hook category", () => {
     expect(row).toMatchObject({
       hook_name: "PostToolBatch",
       tool_name: null,
-      parent_id: null,
+      causing_tool_use_id: null,
     });
   });
 
-  it("subagent category (SubagentStart): no tool_name, parent_id null", async () => {
+  it("subagent category (SubagentStart): no tool_name, causing_tool_use_id null", async () => {
     await invoke(
       "SubagentStart",
       fakeInput({
@@ -182,7 +182,7 @@ describe("HookEvent row shape per hook category", () => {
     expect(row).toMatchObject({
       hook_name: "SubagentStart",
       tool_name: null,
-      parent_id: null,
+      causing_tool_use_id: null,
     });
   });
 
@@ -195,7 +195,7 @@ describe("HookEvent row shape per hook category", () => {
     });
   });
 
-  it("compact category (PreCompact): no tool_name, parent_id null", async () => {
+  it("compact category (PreCompact): no tool_name, causing_tool_use_id null", async () => {
     await invoke(
       "PreCompact",
       fakeInput({ hook_event_name: "PreCompact", trigger: "auto" }),
@@ -204,7 +204,7 @@ describe("HookEvent row shape per hook category", () => {
     expect(row).toMatchObject({
       hook_name: "PreCompact",
       tool_name: null,
-      parent_id: null,
+      causing_tool_use_id: null,
     });
   });
 
@@ -227,11 +227,11 @@ describe("HookEvent row shape per hook category", () => {
     expect(row).toMatchObject({
       hook_name: "PermissionRequest",
       tool_name: "Bash",
-      parent_id: null,
+      causing_tool_use_id: null,
     });
   });
 
-  it("permission category (PermissionDenied): tool_name + tool_use_id → parent_id", async () => {
+  it("permission category (PermissionDenied): tool_name + tool_use_id → causing_tool_use_id", async () => {
     await invoke(
       "PermissionDenied",
       fakeInput({
@@ -246,7 +246,7 @@ describe("HookEvent row shape per hook category", () => {
     expect(row).toMatchObject({
       hook_name: "PermissionDenied",
       tool_name: "Bash",
-      parent_id: "toolu_denied",
+      causing_tool_use_id: "toolu_denied",
     });
   });
 
@@ -304,7 +304,7 @@ describe("HookEvent row shape per hook category", () => {
     });
   });
 
-  it("session category (SessionStart): tool_name null, parent_id null", async () => {
+  it("session category (SessionStart): tool_name null, causing_tool_use_id null", async () => {
     await invoke(
       "SessionStart",
       fakeInput({ hook_event_name: "SessionStart", source: "startup" }),
@@ -313,7 +313,7 @@ describe("HookEvent row shape per hook category", () => {
     expect(row).toMatchObject({
       hook_name: "SessionStart",
       tool_name: null,
-      parent_id: null,
+      causing_tool_use_id: null,
     });
   });
 
@@ -326,7 +326,7 @@ describe("HookEvent row shape per hook category", () => {
     expect(row).toMatchObject({
       hook_name: "SessionEnd",
       tool_name: null,
-      parent_id: null,
+      causing_tool_use_id: null,
     });
   });
 

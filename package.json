@@ -11,6 +11,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "typecheck:examples": "node scripts/typecheck-examples.mjs",
     "smoke:examples": "node scripts/smoke-examples.mjs",
+    "probe:examples": "node scripts/probe-example-tools.mjs",
     "lint:no-cloud-imports": "bash scripts/lint-no-cloud-imports.sh",
     "gate:no-eval": "node scripts/no-eval-in-oss.mjs",
     "gate:no-native": "node scripts/no-native-modules.mjs",
@@ -19,6 +20,8 @@
     "lint:code-health": "node scripts/lint-code-health.mjs",
     "lint:twin-registration": "node scripts/check-first-party-twin-registration.mjs",
     "lint:legacy-markers": "node scripts/lint-legacy-criterion-markers.mjs",
+    "lint:parent-vocab": "node scripts/lint-parent-vocab.mjs",
+    "lint:cli-pins": "node scripts/check-cli-pins-match-workspace.mjs",
     "lint:dead-code": "knip --no-config-hints"
   },
   "engines": {

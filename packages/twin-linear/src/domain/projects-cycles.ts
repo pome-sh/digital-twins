@@ -60,7 +60,7 @@ export function updateProject(
     )
     .run(
       input.name ?? null,
-      "description" in input ? 1 : 0,
+      input.description !== undefined ? 1 : 0,
       input.description ?? null,
       input.state ?? null,
       now,

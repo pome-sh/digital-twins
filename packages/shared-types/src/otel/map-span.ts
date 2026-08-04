@@ -108,7 +108,7 @@ export function mapOtelSpanToEvent(rawSpan: unknown): OtelSpanEvent {
     // parent-chain mirrors span parentage so downstream union readers and M3
     // correlation agree.
     event_id: span.span_id,
-    parent_id: parentSpanId,
+    parent_event_id: parentSpanId,
     kind: "OtelSpanEvent" as const,
 
     trace_id: span.trace_id,

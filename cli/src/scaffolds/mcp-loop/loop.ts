@@ -176,7 +176,7 @@ function emitToolUse(
       JSON.stringify({
         ts: new Date().toISOString(),
         event_id: randomUUID(),
-        parent_id: null,
+        parent_event_id: null,
         kind: "ToolUseEvent",
         tool_use_id: row.tool_use_id,
         tool_name: row.tool_name,
@@ -199,7 +199,7 @@ function emitToolResult(
       JSON.stringify({
         ts: new Date().toISOString(),
         event_id: randomUUID(),
-        parent_id: null,
+        parent_event_id: null,
         kind: "ToolResultEvent",
         tool_use_id: row.tool_use_id,
         output: row.output,
@@ -240,7 +240,7 @@ function emitLlmCall(
       JSON.stringify({
         ts: new Date().toISOString(),
         event_id: randomUUID(),
-        parent_id: null,
+        parent_event_id: null,
         kind: "LlmCallEvent",
         host: row.host,
         port: 443,

@@ -55,6 +55,29 @@ jobs:
       # (packages/sdk/src): every statement catch must throw, return an
       # error/sentinel, or reject. Dependency-free, runs before `npm ci`.
       - run: node scripts/no-catch-and-continue.mjs
+      # F-1135 — cli/package.json's @pome-sh/* pins must equal packages/*'s
+      # versions. CI tests the workspace build (the tarball rewrite) while users
+      # install the published tarball, where those deps are bundleDependencies
+      # and the pin is frozen at publish time. F-1132 shipped a CLI that refused
+      # every `pome checks add` for github while cli-ci was green.
+      - run: node scripts/check-cli-pins-match-workspace.mjs
+      - run: node scripts/check-cli-pins-match-workspace.test.mjs
+      # F-1126 — the same argument one directory over. npm only SYMLINKS a
+      # sibling when the declared pin matches its version; otherwise it installs
+      # a real nested copy from the registry, and that package is built and
+      # tested against the PUBLISHED artifact instead of this tree. twin-slack
+      # pinned sdk 0.5.1 against a workspace on 0.9.0 for months, and
+      # adapter-claude-sdk pinned shared-types one minor back. CI was green
+      # throughout — everything it ran genuinely passed, against the wrong sdk.
+      - run: node scripts/check-workspace-pins-match-workspace.mjs
+      # The release-time half (scripts/check-cli-pins-published.mjs) needs the
+      # registry, so only its offline regression suite runs here — including the
+      # assertion that cli-release.yml no longer carries its own copy of the
+      # versions.
+      - run: node scripts/check-cli-pins-published.test.mjs
+      # F-1135 — the version-bump gate now also fires when a bundled @pome-sh/*
+      # pin moves (cli/vendor/**, its old stand-in for that, no longer exists).
+      - run: node scripts/check-cli-version-bump.test.mjs
       - run: bash scripts/lint-no-cloud-imports.sh
       - run: bash scripts/lint-no-cloud-imports.test.sh
       - run: node scripts/ci/wait-for-workflow.test.mjs
@@ -78,7 +101,17 @@ jobs:
           # cli/scripts/**, and packages/** (cli-ci.yml's former duplicate step
           # was folded in here).
           npm run gate:no-eval
+          # F-1201 — the contract now enumerates the event union from zod and
+          # requires a fixture per kind, so a new kind with none reds this line.
+          # Before that it compared bytes no schema change could move.
           npm run check:trace-contract -w @pome-sh/shared-types
+          node packages/shared-types/scripts/emit-trace-contract.test.mjs
+          # F-1200 — `parent_id` meant four different things across five writers.
+          # The schema still ACCEPTS it so stored 0.13.0 rows keep parsing, which
+          # is exactly why the gate lives here: zod cannot tell a reader from a
+          # writer, so nothing else stops a new emitter reintroducing it.
+          npm run lint:parent-vocab
+          node scripts/lint-parent-vocab.test.mjs
           # F-818 — the committed manifest JSON Schema (served at
           # pome.sh/schemas/v1/pome.json) must match the zod source.
           npm run check:manifest-schema -w @pome-sh/shared-types
@@ -98,6 +131,16 @@ jobs:
           # `await main()` ran above the class it uses). Launch each example for
           # real (POME_PREFLIGHT unset) and fail if it crashes on load.
           npm run smoke:examples
+          # F-1152 — the two gates above each stop short of a twin call:
+          # typecheck:examples is green on a well-typed tool whose endpoint
+          # 404s, and smoke:examples returns before any tool fires because a
+          # real run needs a model. Both examples/pr-summary-agent and
+          # examples/pr-summary-review shipped a `comment_on_pull_request` the
+          # GitHub twin answered `404 Issue not found` for, on every subject,
+          # for as long as they existed. Boot each example's declared twins on
+          # its own task seed and invoke every registered tool once — no model.
+          npm run probe:examples
+          node scripts/probe-example-tools.test.mjs
           # twin-github runs with coverage thresholds (90% lines/funcs/statements)
           # instead of a second plain `npm test` pass for that workspace.
           npm test -w @pome-sh/shared-types -w @pome-sh/sdk -w @pome-sh/adapter-claude-sdk -w @pome-sh/twin-slack -w @pome-sh/twin-stripe -w @pome-sh/twin-gmail -w @pome-sh/twin-linear

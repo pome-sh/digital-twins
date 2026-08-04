@@ -13,6 +13,7 @@ import type { RouteContext } from "@pome-sh/sdk";
 import type { StateDelta } from "@pome-sh/shared-types";
 import type { GitHubDomain } from "./domain/index.js";
 import { TwinError, validationFailed } from "./errors.js";
+import { TAPE_ASSERTABLE_TOOLS } from "./tools.js";
 
 type HandleResult = { status: number; body: unknown; mutation?: boolean; delta?: StateDelta };
 
@@ -67,6 +68,25 @@ export function registerGitHubRoutes(session: Hono, { domain, recorder }: RouteC
   /** Route wrapper: engine recorder middleware with the handler's own result. */
   const handle = (fn: (c: Context) => Promise<HandleResult> | HandleResult) =>
     recorder.handle({ mutation: false }, async (c) => {
+      const result = await fn(c);
+      return { status: result.status, body: result.body, mutation: result.mutation ?? false, delta: result.delta ?? null };
+    });
+
+  /**
+   * F-1125 — `handle` for a REST route that performs one of the twin's MCP
+   * actions, stamping that tool's name on the recorded event.
+   *
+   * The parameter is typed to `TAPE_ASSERTABLE_TOOLS`, so a name outside the
+   * set cannot be stamped and a set member with no stamped route is caught by
+   * `test/tool-stamping.test.ts`. A `was never called` check is only as honest
+   * as the doors the recorder watches, and the two halves drifting apart is how
+   * it would quietly start lying.
+   */
+  const handleAs = (
+    tool: (typeof TAPE_ASSERTABLE_TOOLS)[number],
+    fn: (c: Context) => Promise<HandleResult> | HandleResult
+  ) =>
+    recorder.handle({ mutation: false, tool }, async (c) => {
       const result = await fn(c);
       return { status: result.status, body: result.body, mutation: result.mutation ?? false, delta: result.delta ?? null };
     });
@@ -275,13 +295,13 @@ export function registerGitHubRoutes(session: Hono, { domain, recorder }: RouteC
   }));
 
   // Cluster F — commit status + checks
-  session.post("/repos/:owner/:repo/statuses/:sha", handle(async (c) => {
+  session.post("/repos/:owner/:repo/statuses/:sha", handleAs("create_commit_status", async (c) => {
     const args = { ...params(c), sha: requireParam(c, "sha"), ...createStatusSchema.parse(await readJson(c)) };
     const { value, delta } = captureDelta((onDelta) => domain.createCommitStatus(args, onDelta));
     return created(value, delta);
   }));
   session.get("/repos/:owner/:repo/commits/:ref/status", handle((c) => ok(domain.getCombinedStatusForRef({ ...params(c), ref: requireParam(c, "ref") }))));
-  session.post("/repos/:owner/:repo/check-runs", handle(async (c) => {
+  session.post("/repos/:owner/:repo/check-runs", handleAs("create_check_run", async (c) => {
     const args = { ...params(c), ...createCheckRunSchema.parse(await readJson(c)) };
     const { value, delta } = captureDelta((onDelta) => domain.createCheckRun(args, onDelta));
     return created(value, delta);
