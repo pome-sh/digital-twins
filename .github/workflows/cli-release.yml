@@ -89,9 +89,9 @@ jobs:
       # override an *absent* check, only a failed one. That is GitHub's
       # anti-recursion guard, deliberate design, not a bug.
       #
-      # It is NOT the repo's fork-PR contributor-approval setting: dependabot and
-      # renovate open PRs on same-repo branches here under that same setting and
-      # their runs go green. Only `github-actions[bot]` parks. So the fix is a
+      # It is NOT the repo's fork-PR contributor-approval setting: Renovate
+      # opens same-repo PRs here under that same setting and its runs go green.
+      # Only `github-actions[bot]` parks. So the fix is a
       # real actor — RELEASE_BOT_TOKEN, a PAT (contents + pull-requests write),
       # the SPECS_BOT_TOKEN equivalent from F-1115 in pome-sh/openapi-spec-mcp.
       #
