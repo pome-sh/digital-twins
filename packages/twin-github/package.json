@@ -1,6 +1,6 @@
 {
   "name": "@pome-sh/twin-github",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "description": "Deterministic GitHub-shaped twin for agent testing \u2014 REST + MCP, SQLite-backed state.",
   "private": false,
   "type": "module",
@@ -47,8 +47,8 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.0.10",
-    "@pome-sh/sdk": "0.10.1",
-    "@pome-sh/shared-types": "0.13.0",
+    "@pome-sh/sdk": "0.11.0",
+    "@pome-sh/shared-types": "0.14.0",
     "hono": "^4.12.31",
     "zod": "^4.1.13"
   },

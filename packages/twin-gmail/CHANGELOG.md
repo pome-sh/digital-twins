@@ -1,5 +1,12 @@
 # @pome-sh/twin-gmail — CHANGELOG
 
+
+## 0.3.2 — 2026-08-04
+
+- Re-pinned to `@pome-sh/sdk@0.11.0` for the F-1200 parent-vocabulary
+  change: a recorded row now carries `parent_event_id` rather than `parent_id`.
+  No change to this twin's own surface — `npm run test:contract` is green.
+
 ## 0.3.1 — 2026-08-03
 
 Every state-reading check says where it looked (F-1197).

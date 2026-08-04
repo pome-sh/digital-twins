@@ -1,6 +1,26 @@
 # @pome-sh/adapter-claude-sdk — CHANGELOG
 
 
+## 0.3.0 — 2026-08-04
+
+The correlation header carries the SDK's real `tool_use_id` (F-1200).
+
+- `wrapHandler` reads it from the MCP handler's `extra` argument
+  (`_meta["claudecode/toolUseId"]`, stamped by the Claude Code CLI) instead of
+  minting a `tlc_<random>` that named nothing. `ToolUseEvent.tool_use_id` is
+  the SDK's `toolu_…`, so the old id could never be joined back to the tool
+  call that made a twin request — every twin HTTP row stayed an orphan.
+  The read is tolerant: an absent or malformed key falls back to a minted id
+  rather than throwing, because failing a tool call over a trace-linkage detail
+  would be strictly worse than an unjoinable trace.
+- **`wrapHandler` no longer discards the handler's second argument.** It called
+  `handler(args)` and dropped `extra` outright, so a handler reading
+  `extra.signal` saw undefined. Its type signature changes accordingly.
+- New exports: `readSdkToolUseId`, `SDK_TOOL_USE_ID_META_KEY`.
+- Emitted rows use the new parent vocabulary: `wrapQuery` writes
+  `parent_event_id`, hooks write `causing_tool_use_id` and stay rootless.
+- Requires `@pome-sh/shared-types@0.14.0`.
+
 ## 0.2.5 — 2026-07-30
 
 Dependency-only patch: repin `@pome-sh/shared-types` to 0.13.0 (F-1126). No surface change.

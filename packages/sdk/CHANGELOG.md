@@ -1,6 +1,19 @@
 # @pome-sh/sdk
 
 
+## 0.11.0 — 2026-08-04
+
+Twin HTTP rows carry the new parent vocabulary (F-1200).
+
+- `toTwinHttpEventRow` emits `parent_event_id` instead of `parent_id`; its
+  return type changes with it.
+- The value is still `null`, and that is not a stub: a twin runs in its own
+  process and cannot know the `event_id` of the agent-side `ToolUseEvent` that
+  caused the call. It carries the causing tool's id on `correlation_id`
+  (always) and `tool_call_id` (when the twin pins `stampToolCallId`), and the
+  CLI's post-run merge resolves the parent from that.
+- Requires `@pome-sh/shared-types@0.14.0`.
+
 ## 0.10.1 — 2026-08-03
 
 A state-reading check can say WHERE it looked (F-1197).
