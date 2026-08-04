@@ -45,11 +45,11 @@
     "zod": "^4.1.13"
   },
   "devDependencies": {
-    "@types/node": "^26.1.0",
+    "@types/node": "^26.1.2",
     "typescript": "^5.9.3",
     "vitest": "^4.1.10",
     "yaml": "^2.9.0",
-    "zod": "^4.1.13"
+    "zod": "^4.4.3"
   },
   "publishConfig": {
     "access": "public"

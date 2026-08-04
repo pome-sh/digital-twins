@@ -2,7 +2,9 @@
   "name": "pome-monorepo",
   "private": true,
   "version": "0.1.0",
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "packageManager": "npm@11.5.1",
   "scripts": {
     "build": "npm run build -w @pome-sh/shared-types && npm run build -w @pome-sh/sdk && npm run build -w @pome-sh/adapter-claude-sdk && npm run build -w @pome-sh/twin-github && npm run build -w @pome-sh/twin-slack && npm run build -w @pome-sh/twin-stripe && npm run build -w @pome-sh/twin-gmail && npm run build -w @pome-sh/twin-linear",
@@ -29,10 +31,10 @@
     "npm": ">=11.5.1"
   },
   "devDependencies": {
-    "knip": "^6.27.0"
+    "knip": "^6.31.0"
   },
   "overrides": {
-    "hono": "^4.12.31",
-    "fast-uri": "^3.1.4"
+    "hono": "^4.13.0",
+    "fast-uri": "^3.1.5"
   }
 }

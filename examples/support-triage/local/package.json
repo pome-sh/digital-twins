@@ -13,8 +13,8 @@
     "@anthropic-ai/claude-agent-sdk": "0.2.141"
   },
   "devDependencies": {
-    "@types/node": "^25.0.3",
-    "tsx": "^4.21.0",
+    "@types/node": "^25.9.5",
+    "tsx": "^4.23.5",
     "typescript": "^5.9.3",
     "vitest": "^4.1.10"
   },
