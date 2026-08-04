@@ -9,6 +9,11 @@
   "prConcurrentLimit": 1,
   "prHourlyLimit": 0,
   "rebaseWhen": "conflicted",
+  "labels": ["dependencies"],
+  "rangeStrategy": "bump",
+  "lockFileMaintenance": {
+    "enabled": true
+  },
   "packageRules": [
     {
       "description": "Batch every non-major update (npm, docker, github-actions) into a single PR so we never see more than one routine dependency PR at a time.",
@@ -17,8 +22,21 @@
       "groupSlug": "all-non-major"
     },
     {
-      "description": "Do NOT bump actions/setup-node to v7 — v7 changed how registry-url writes .npmrc and breaks OIDC Trusted Publishing (ENEEDAUTH). Pinned to v6.x. See .github/workflows/sdk-publish.yml and actions/setup-node#1551.",
+      "description": "CLI @pome-sh/* pins are release-gated (lint:cli-pins / changesets). Renovate must not bump them from npm.",
+      "matchManagers": ["npm"],
+      "matchPackagePatterns": ["^@pome-sh/"],
+      "enabled": false
+    },
+    {
+      "description": "Known-risky majors — keep on current major until an intentional human PR.",
+      "matchPackageNames": ["typescript", "@linear/sdk", "graphql"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    },
+    {
+      "description": "DO NOT bump actions/setup-node to v7 in sdk-publish.yml — v7 changed how registry-url writes .npmrc and breaks OIDC Trusted Publishing (ENEEDAUTH). The publish job stays on v6.x. See sdk-publish.yml and actions/setup-node#1551. Other workflows may already be on v7.",
       "matchDepNames": ["actions/setup-node"],
+      "matchFileNames": [".github/workflows/sdk-publish.yml"],
       "matchUpdateTypes": ["major"],
       "enabled": false
     }
@@ -26,6 +44,6 @@
   "vulnerabilityAlerts": {
     "description": "Security fixes are not held for the fortnightly window.",
     "schedule": ["at any time"],
-    "labels": ["security"]
+    "labels": ["security", "dependencies"]
   }
 }
