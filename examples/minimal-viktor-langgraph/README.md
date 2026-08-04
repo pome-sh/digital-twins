@@ -64,7 +64,11 @@ OpenInference emits, and pome projects:
 | `openinference.span.kind = TOOL` + `tool.name` | `gen_ai_tool_name` | `tool` row on the waterfall |
 
 Graph nodes (`CHAIN` spans) carry the W3C parent/child tree, so the waterfall
-reconstructs the `intake → … → report` structure. No message bodies are exported.
+reconstructs the `intake → … → report` *nesting* — each node's tool calls sit
+under it, and durations are on the timeline bars. Measured 2026-08-04: the row
+*order* is not the execution order for these spans (`decide` can render after
+`report`), and twin HTTP rows attach to the LLM span rather than the tool that
+issued them. Read the bars, not the row sequence. No message bodies are exported.
 
 ## What Viktor does
 
@@ -120,36 +124,65 @@ pome run tasks/03-failing-ci.md -n 3
 ```
 
 The split is the point — the two GitHub criteria pass, the two Slack mirrors do
-not:
+not. Verbatim, from the run recorded in
+[`VERIFICATION.md`](./VERIFICATION.md):
 
 ```text
-trial 1  ✗  40   ✓ PR #1 is not merged  ✓ CHANGES_REQUESTED review exists
-                 ✗ a message in "eng-alerts" contains "pull/1"
-                 ✗ a message in "eng-alerts" contains "block"
-trial 2  ✗  40   (same)
-trial 3  ✗  40   (same)
+provisioning 3 isolated github+slack twins … ready
+spawning agent npm start · from pome.json …
+
+trial 1  ✗  60       12.4s  a message in "eng-alerts" contains "pull/1" · a message in "eng-alerts" contains "block"
+trial 2  ✗  60       12.0s  a message in "eng-alerts" contains "pull/1" · a message in "eng-alerts" contains "block"
+trial 3  ✗  60       15.4s  a message in "eng-alerts" contains "pull/1" · a message in "eng-alerts" contains "block"
 ─────
 0 of 3 passed
-a message in "eng-alerts" contains "pull/1" — failed in 3 of 3 — start there
+a message in "eng-alerts" contains "pull/1" failed in 3 of 3 — start there
 ```
 
-Because the failing criteria are `[code]`, this is a real red and not a judge's
-opinion: the Slack twin's final state either carries that message or it does not.
+**60, not 0, and not 40 either.** Three of five criteria pass — the two
+`[code:github]` ones *and* the `[model]` one, which asks whether the agent
+declined for the right reason. It did: it read the failing `ci/test` status and
+wrote *"CI is failing, so the PR cannot be safely merged despite alice being an
+authorized collaborator"* into the review. The judge grades that reasoning and
+passes it. The agent understood the situation perfectly and told nobody.
 
-> **verified red: `<model>`, n/N trials, `<date>`** — pending the hosted run.
-> Re-verify on model upgrades and after any twin-snapshot rebuild; see
-> [`VERIFICATION.md`](./VERIFICATION.md).
+Because the two failing criteria are `[code]`, this is a real red and not a
+judge's opinion: the Slack twin's final state either carries that message or it
+does not. The evidence line says which:
+
+```text
+no message in channel "eng-alerts" contains "pull/1" (0 message(s) scanned)
+```
+
+> **verified red: `claude-sonnet-5`, 0/3 trials, 2026-08-04** — run set
+> `grp_vfeaFUEL6Kz0tY176g8xl`. Re-verify after any twin-snapshot rebuild; see
+> [`VERIFICATION.md`](./VERIFICATION.md) for the run ids and the model routing.
 
 ### Read the report
 
-You do not need this repo to diagnose it. The report shows two GitHub criteria
-green and two Slack criteria red on the same trial, which is the signature of
-this whole class — *the systems disagree* — and the state-diff panel shows the
-`eng-alerts` channel with no new messages while `viktor-hq/orders-service` gained
-a review.
+You do not need this repo to diagnose it. Open the run and the diagnosis is the
+top half of the page:
 
-The span waterfall says the rest: the `report` CHAIN span is present and has **no
-TOOL child**, because the node ran and wrote nothing.
+* **Satisfaction `60/100` · 3 of 5 criteria passed.** The score names its own
+  denominator, so a partial red reads as a partial red.
+* **Criteria, split by kind.** `Code-based 2/4`, `Model-based 1/1` — and the two
+  red rows are both Slack, both with `(0 message(s) scanned)` under them. Two
+  systems, one action, one of them silent.
+* **State**, with a `github` / `slack` tab. GitHub carries a
+  `CHANGES_REQUESTED` review from `pome-agent` and `merged: 0`. Slack carries the
+  `eng-alerts` channel with nothing in it.
+* **Trace.** `STEP act 636ms` has a `TOOL request_changes` child. `STEP report`
+  is **1ms with no child at all** — the node ran and wrote nothing. That single
+  row is the defect, visible without opening `src/graph.ts`.
+
+Across the three trials, the run-set page puts it in one grid: *rows = criteria,
+columns = trials*, and the two Slack rows read `0/3` while every other row reads
+`3/3`. The failure is not flaky, and it is not everywhere.
+
+> Two things on that page are rough today and are filed, not hidden: the trace
+> rows are **not in execution order** for OpenInference spans (the timeline bars
+> are — read those), and the twin HTTP rows hang off the LLM span rather than the
+> tool that issued them. Neither changes the verdict or the state panel.
 
 ### The fix
 
@@ -167,16 +200,24 @@ pome run tasks/03-failing-ci.md -n 3
 ```
 
 ```text
-trial 1  ✓  100
-trial 2  ✓  100
-trial 3  ✓  100
+trial 1  ✓  100      12.5s
+trial 2  ✓  100      11.8s
+trial 3  ✓  100      11.3s
 ─────
 3 of 3 passed
 ```
 
+The run-set page keeps both sets side by side — `0/3` at 19:34, `3/3` at 19:35 —
+so the fix is a delta you can point at, not a number you have to remember. And
+`STEP report` now has a `TOOL slack_post_message` child.
+
 Tasks 04, 05 and 06 flip with the same line — they are all non-MERGE outcomes.
 Tasks 01 and 02 are green either way, and that is worth seeing on purpose: an
 example suite where every task fails cannot tell you *which* thing broke.
+Measured rather than assumed: `01-clean-merge` passes 100 under **both** variants
+and `04-unauthorized-author` fails at the same 60 under the baseline
+([`VERIFICATION.md`](./VERIFICATION.md) has the run ids). 02, 05 and 06 are the
+same two shapes and were not run.
 
 ### Customize
 
