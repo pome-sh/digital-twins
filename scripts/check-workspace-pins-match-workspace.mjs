@@ -27,8 +27,9 @@
 // makes the same argument for `cli/`. The CLI half existed; the packages half
 // did not, which is why the drift lived in packages.
 //
-// THE RULE — a pin must EQUAL the pinned sibling's workspace version. Stated the
-// useful way: `npm ci` must produce a symlink, never a nested install.
+// THE RULE — a pin must be `"*"` / `workspace:*` (always a workspace link) OR an
+// exact semver that EQUALS the sibling's workspace version. Stated the useful
+// way: `npm ci` must produce a symlink, never a nested install.
 
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -58,9 +59,14 @@ export function findPinViolations(repoRoot) {
         // nothing in this tree could satisfy it, so npm installing from the
         // registry is the only possible and the correct behaviour.
         if (!sibling) continue;
+        // Lane A / workspace unification: `"*"` (and `workspace:*`) always
+        // resolves to the local sibling via npm workspaces, so it cannot
+        // silently pull a nested registry copy. Exact pins remain required to
+        // MATCH the sibling when they are used.
+        if (pin === "*" || pin === "workspace:*") continue;
         if (!EXACT_VERSION.test(pin)) {
           violations.push(
-            `packages/${dir} (${name}): ${field}.${dep} is "${pin}" — @pome-sh/* pins must be exact`,
+            `packages/${dir} (${name}): ${field}.${dep} is "${pin}" — @pome-sh/* pins must be exact semver, "*", or "workspace:*"`,
           );
           continue;
         }
