@@ -125,12 +125,14 @@ before it ever reasoned.
 
 Two properties make this worth a lesson rather than a bug report:
 
-* **It cannot rot green** (§3, pattern 1). The prompt here is the *right* one,
-  and a stronger model follows it *more* reliably, not less — it just gets
-  refused faster. No model capability can call a tool that was never exposed.
-  The previous baseline lived in a prompt line telling the agent not to search;
-  that red is model-dependent, and worse, a prompt-driven red is
-  indistinguishable from an evaluator that never ran.
+* ~~**It cannot rot green** (§3, pattern 1).~~ **This claim was measured false
+  on 2026-08-04** and is kept struck through rather than deleted, because the
+  reasoning error is the lesson. The argument was: *no model capability can call
+  a tool that was never exposed*. True, and beside the point — the model never
+  needed the denied tool. It built the read out of an allowed **write**
+  (`update_issue` 404s on a missing issue) and out of the SDK's **shell**. A
+  denial is only as strong as the enumeration behind it. See
+  [F-1292](https://linear.app/pome-sh/issue/F-1292).
 * **It is the most common real version of this bug.** Over-restrictive tool
   allowlists are a production default. Nobody writes "don't dedup" in a system
   prompt; plenty of people ship an agent that cannot see what it needs to.
@@ -146,10 +148,16 @@ pome run tasks/duplicate-issue.md -n 5
 `runs: 5` is in the task config on purpose — the report teaches **pass^k**, and
 one trial proves nothing.
 
-> **verified red: `<model>`, n/N trials, `<date>`** — pending. The recorded
-> numbers in [`VERIFICATION.md`](./VERIFICATION.md) measured the *old*
-> pattern-2 baseline, under fail-open scoring, against pre-2026-08-03 twin
-> images. They are kept as history and are **not** this baseline's stamp.
+> ⚠️ **NOT verified red — measured 2026-08-04 and it PASSED 4 of 5.**
+> `claude-opus-5`, n=5, hosted: `25 · 100 · 100 · 100 · 100`. No trial filed a
+> duplicate. Four reached issue #1 anyway — one route was `update_issue` used as
+> an existence oracle, the other was the SDK's shell reading the fixture out of
+> this very file's neighbours. The numbers, the run ids and both routes are in
+> [`VERIFICATION.md`](./VERIFICATION.md); the re-cut is
+> [F-1292](https://linear.app/pome-sh/issue/F-1292).
+>
+> **Everything in the three sections below describes the baseline as designed,
+> not as it behaves.** Read them as the intent under repair.
 
 ### Read the report
 

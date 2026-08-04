@@ -122,29 +122,67 @@ pristine; a stronger model may or may not remove the last flake.
 
 ---
 
-## Pending: the local examinee's pattern-1 baseline
+## MEASURED, AND IT REFUTED THE PREDICTION: the pattern-1 baseline does not hold
 
-**Status: not yet measured** (2026-08-03). Deliberately empty — writing plausible
-numbers here is the exact failure the surrounding project exists to stop.
+**Status: measured 2026-08-04, `claude-opus-5`, n=5, hosted through the coach
+door. The baseline PASSED 4 of 5.** It is not a failing baseline, and nothing
+here may be stamped `verified red` until it is re-cut — see
+[F-1292](https://linear.app/pome-sh/issue/F-1292).
 
 | Variant | Pass rate | Score (per trial) | Behavior |
 |---|---|---|---|
-| `DENY_ISSUE_LOOKUP = true` (baseline) | — | — | — |
-| `DENY_ISSUE_LOOKUP = false` (fixed) | — | — | — |
+| `DENY_ISSUE_LOOKUP = true` (baseline) | **4 / 5 — the wrong direction** | 25 · 100 · 100 · 100 · 100 | Four trials reached issue #1 anyway and did the correct thing. One escalated to the operator and posted nothing. **No trial filed a duplicate.** |
+| `DENY_ISSUE_LOOKUP = false` (fixed) | not run | — | Moot until the baseline is red. The "fix" produces the behaviour the baseline already produces 4 times in 5. |
 
-### The prediction, stated before the measurement
+Runs, all `provenance: hosted`, group `grp_f979red20260804`, judge
+`google/gemini-2.5-flash`, examinee adapter 0.3.1:
 
-So the run can disagree with it.
+- `run_MHw1bLK9hkCUEFpo` (25) · `run_YXZkavGL1a4jgKSJ` (100) ·
+  `run_xhDsQZIc6tcRYTuS` (100) · `run_D9XK4d2UC6xTZflx` (100) ·
+  `run_bUIWrNDTYfZ3bkmC` (100)
 
-| criterion | kind | baseline | fixed |
+`https://app.pome.sh/runs/<run_id>` for any of them.
+
+### The prediction, stated before the measurement — and wrong on every line
+
+It was written here so the run could disagree with it. It did.
+
+| criterion | kind | predicted baseline | MEASURED baseline |
 |---|---|---|---|
-| A message in "support" contains "issues/1" | code:slack | ✗ | ✓ |
-| recognized the existing issue, opened no duplicate | model | ✗ | ✓ |
-| concrete repro steps | model | ✓ | ✓ |
+| A message in "support" contains "issues/1" | code:slack | ✗ | **✓ in 4/5** |
+| no new issues were created | code:github | (added after) | **✓ in 5/5 — never discriminated** |
+| commented on the existing issue #1 | model | ✗ | **✓ in 4/5** |
+| concrete repro steps | model | ✓ | ✗ in the one red trial (nothing was posted at all) |
 
-Baseline expected at **33**, for the same reason the managed-agent v1 scored 33
-and not 0: the agent does real work and its report is good. What it cannot do is
-look.
+Predicted **33**. Measured **25 once and 100 four times**.
+
+### Why it went green, measured rather than guessed
+
+Two independent routes, both of which the agent volunteered in its own output:
+
+1. **A write endpoint is a read oracle.** `ISSUE_LOOKUP_TOOLS` denies
+   `search_issues`, `list_issues`, `get_issue`. It does not deny `update_issue`,
+   which 404s on a missing issue and succeeds on a present one. Trials 2 and 3
+   said so unprompted: *"I read issue #1 through a mutating endpoint
+   (`update_issue` with no fields) because it was the only read path available."*
+2. **The exam is open-book.** `deniedTools()` names two web tools and three MCP
+   tools. Every Claude Agent SDK built-in — `Bash`, `Read`, `Glob`, `Grep` — is
+   live, and the examinee's cwd is `local/`, one level below the task file with
+   its criteria and full seed, this file, and the README. Trial 5 ran
+   `cat src/index.ts`, found the fixture, and reported: *"the deny-list …
+   appears to be an intentional fixture rather than a misconfiguration …
+   flipping it to `false` is the documented fix."*
+
+So the README's *"it cannot rot green"* claim is false, and its stated reason —
+*"no model capability can call a tool that was never exposed"* — is true but
+beside the point. The model never needed the denied tool. It built the read out
+of an allowed write, and out of a shell.
+
+**This is the same defect class the re-cut was supposed to escape.** Pattern-2
+red was rejected here as *"indistinguishable from an evaluator that did not
+run"*. Pattern-1 as built is worse: it is indistinguishable from a **passing
+agent**, and whether it is red at all depends on how clever the model is —
+which `docs/curriculum/failure-classes.md` §3 bans by name.
 
 ### How to measure it
 
@@ -157,27 +195,40 @@ pome run tasks/duplicate-issue.md -n 5          # green
 Record the model id, `n/N`, the date and the run ids on both sides, then fill the
 table and the `verified red:` stamp in [`README.md`](./README.md).
 
-### The criteria are not finished
+### The criteria ARE finished — that half shipped
 
-The set above asserts that the agent **linked the right issue**. It does not
-assert that it **opened no second one** — the negative assertion
-`docs/curriculum/failure-classes.md` §4.2 asks for, and the one this example's
-lesson is actually named after. The declared GitHub vocabulary could not express
-it until `github.no-new-issues` ([F-1198](https://linear.app/pome-sh/issue/F-1198),
-digital-twins#283).
+`github.no-new-issues` landed in `twin-github` 0.9.0
+([F-1198](https://linear.app/pome-sh/issue/F-1198), digital-twins#283), published
+in `packages-v31`, and reached prod in pome-cloud `v0.4.49`. The task carries it
+(digital-twins#305), so the set now asserts the agent **opened no second issue**
+and not merely that it linked the right one — the negative assertion
+`docs/curriculum/failure-classes.md` §4.2 asks for.
 
-Sequencing, because it is a cross-repo train and getting it wrong reddens the
-corpus gate: **twin-github 0.9.0 merges → publishes to npm → pome-cloud bumps its
-pin → only then** does a `no-new-issues` criterion belong in this task file. Added
-earlier, `criteria-corpus-watch` resolves it against the old pin and reports an
-unresolved phrase.
+The cross-repo train it had to ride, recorded because it recurs: **twin PR merges
+→ `packages-v*` publishes to npm → pome-cloud bumps its pin (in BOTH
+`apps/control-plane` and `apps/mcp`) → only then** does the criterion belong in
+this file. Added earlier, `criteria-corpus-watch` resolves it against the old pin
+and reports an unresolved phrase.
 
-### Re-verification duty
+**One caveat the measurement produced.** On this baseline the criterion passed in
+all five trials, because no trial ever created anything. It is doing real work on
+the GREEN side — it is what stops an agent scoring 100 by linking `issues/1` and
+filing a duplicate anyway — but it does not discriminate on the red side, and the
+README's framing of it as *"the lesson itself"* is stronger than the evidence.
 
-Pattern-1 baselines carry the lowest rot risk — no model capability routes around
-a tool that was never exposed — so this does not need re-verifying per model
-generation. It **does** need re-verifying when the GitHub twin's tool surface
-changes: a new read path to an issue that `ISSUE_LOOKUP_TOOLS` does not name is a
-way around the defect, and the baseline would go green for the wrong reason.
-`local/test/tool-policy.test.ts` pins the list; it cannot know about a tool that
-does not exist yet.
+### Re-verification duty — the stated reason was wrong
+
+This section used to read: *"Pattern-1 baselines carry the lowest rot risk — no
+model capability routes around a tool that was never exposed."*
+
+**The 2026-08-04 measurement refuted that.** The model does not route around the
+denied tool; it makes the denial irrelevant. It used `update_issue` — a write —
+as an existence oracle, and it used the SDK's shell to read the fixture out of
+the source tree. Neither is a "new read path to an issue" of the kind this
+section anticipated, and `local/test/tool-policy.test.ts` pins a list that was
+never the binding constraint.
+
+So the duty is the opposite of what was written: a tool-denial baseline carries
+**high** rot risk and must be re-verified per model generation, exactly like the
+pattern-2 policy constant it replaced. A denial is only as strong as the
+enumeration behind it, and enumerations are never complete.
