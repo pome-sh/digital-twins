@@ -99,34 +99,47 @@ export function main() {
     }
   } else if (pending.length > 0) {
     lines.push("release PR: none open");
+    // Deliberately a WINDOW of runs, not `per_page=1`. cli-release declares
+    // `cancel-in-progress: false`, so a hung run keeps holding the concurrency
+    // lock while a later `cli/**` push queues a fresh run behind it. Reading
+    // only the newest run sees that queued run's brand-new `created_at` and
+    // calls the release path healthy while nothing can actually proceed.
     const runs = JSON.parse(
       gh([
         "api",
-        `repos/${repo}/actions/workflows/cli-release.yml/runs?branch=main&per_page=1`,
+        `repos/${repo}/actions/workflows/cli-release.yml/runs?branch=main&per_page=10`,
       ]) || "{}",
     );
-    const last = runs.workflow_runs?.[0];
-    if (!last) {
-      lines.push("last cli-release run: none found");
+    const all = runs.workflow_runs ?? [];
+    const ageOf = (run) => (now - Date.parse(run.created_at)) / 86_400_000;
+    const inFlight = all.filter((r) => !r.conclusion);
+    const stuck = inFlight.filter((r) => ageOf(r) > maxAgeDays);
+    const newestDone = all.find((r) => r.conclusion);
+
+    lines.push(
+      `cli-release runs (newest ${all.length}): ` +
+        (all.map((r) => `${r.conclusion ?? r.status}@${ageOf(r).toFixed(1)}d`).join(", ") || "none"),
+    );
+
+    if (all.length === 0) {
       reason = `NO_RELEASE — ${pending.length} changeset(s) are pending and cli-release has never run on main, so no version PR is coming`;
-    } else {
-      const runAgeDays = (now - Date.parse(last.created_at)) / 86_400_000;
-      lines.push(
-        `last cli-release run: ${last.conclusion ?? last.status} (${last.created_at}, ${runAgeDays.toFixed(1)}d ago)`,
-      );
-      if (last.conclusion && last.conclusion !== "success") {
-        reason = `NO_RELEASE — ${pending.length} changeset(s) are pending and the last cli-release run concluded ${last.conclusion}, so no version PR is coming`;
-      } else if (runAgeDays > maxAgeDays) {
-        // A skipped-but-successful run is the designed packages-v* wait — but
-        // only for as long as the batch actually takes. Past the window the
-        // tolerance becomes the bug: cli-release only fires on a push touching
-        // `cli/**`, so if the batch publishes and nobody pushes again, the run
-        // that skipped stays the newest run FOREVER, concluded `success`, and
-        // "still waiting" is indistinguishable from "nothing is ever coming".
-        // That is this ticket's own defect wearing a different hat. A run that
-        // is still in progress this long is hung, which is the same answer.
-        reason = `NO_RELEASE — ${pending.length} changeset(s) have been pending with no release PR and no cli-release run for ${runAgeDays.toFixed(1)} days (limit ${maxAgeDays}); the last run concluded ${last.conclusion ?? last.status}`;
-      }
+    } else if (stuck.length > 0) {
+      reason = `NO_RELEASE — ${pending.length} changeset(s) are pending and a cli-release run has been ${stuck[0].status} for ${ageOf(stuck[0]).toFixed(1)} days (limit ${maxAgeDays}); with cancel-in-progress:false it is holding the concurrency lock, so queued runs behind it cannot release either`;
+    } else if (inFlight.length > 0) {
+      // Something is actively running and has not been running too long. That
+      // is the release path working, whatever the older runs say.
+      lines.push("a cli-release run is in flight and not overdue — not alarming");
+    } else if (newestDone.conclusion !== "success") {
+      reason = `NO_RELEASE — ${pending.length} changeset(s) are pending and the last cli-release run concluded ${newestDone.conclusion}, so no version PR is coming`;
+    } else if (ageOf(newestDone) > maxAgeDays) {
+      // A skipped-but-successful run is the designed packages-v* wait — but
+      // only for as long as the batch actually takes. Past the window the
+      // tolerance becomes the bug: cli-release only fires on a push touching
+      // `cli/**`, so if the batch publishes and nobody pushes again, the run
+      // that skipped stays the newest run FOREVER, concluded `success`, and
+      // "still waiting" is indistinguishable from "nothing is ever coming".
+      // That is this ticket's own defect wearing a different hat.
+      reason = `NO_RELEASE — ${pending.length} changeset(s) have been pending with no release PR and no cli-release run for ${ageOf(newestDone).toFixed(1)} days (limit ${maxAgeDays}); the last run concluded ${newestDone.conclusion}`;
     }
   } else {
     lines.push("release PR: none open; nothing pending");

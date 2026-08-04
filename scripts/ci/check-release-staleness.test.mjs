@@ -209,6 +209,43 @@ function main() {
     assert(r.status === 0, `an in-flight release run must not alarm: ${r.out}`);
   }
 
+  // 5f — a hung run MASKED by a fresh queued one. cli-release sets
+  // `cancel-in-progress: false`, so the week-old in_progress run still holds
+  // the concurrency lock and the newly queued run behind it cannot start.
+  // Reading only the newest run (per_page=1) sees that queued run's brand-new
+  // created_at and calls everything healthy. Caught in review of PR #300.
+  {
+    const r = run(
+      {
+        pulls: [],
+        releaseRuns: [
+          { conclusion: null, status: "queued", created_at: "2026-08-04T11:00:00Z" },
+          { conclusion: null, status: "in_progress", created_at: "2026-07-28T00:00:00Z" },
+        ],
+      },
+      ["brave-pugs-shake.md"],
+    );
+    assert(r.status === 1, `a hung run behind a fresh queued one must alarm: ${r.out}`);
+    assert(r.out.includes("concurrency lock"), r.out);
+  }
+
+  // 5g — the mirror image: a run started minutes ago while the last COMPLETED
+  // run is ancient. The path is actively working; alarming on the old
+  // completed run would fire on every release that follows a quiet spell.
+  {
+    const r = run(
+      {
+        pulls: [],
+        releaseRuns: [
+          { conclusion: null, status: "in_progress", created_at: "2026-08-04T11:50:00Z" },
+          { conclusion: "success", created_at: "2026-07-20T00:00:00Z" },
+        ],
+      },
+      ["brave-pugs-shake.md"],
+    );
+    assert(r.status === 0, `a fresh in-flight run means the path works: ${r.out}`);
+  }
+
   // 6 — nothing pending, nothing open: quiet.
   {
     const r = run({ pulls: [], releaseRuns: [] });
