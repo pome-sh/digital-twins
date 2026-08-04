@@ -42,4 +42,9 @@ twins: [github, slack]
 runs: 3
 timeout: 240
 passThreshold: 100
+# This is the graded task for the class-7 lesson: src/graph.ts ships with
+# MIRROR_EVERY_OUTCOME = false, so the two [code:slack] mirrors fail and
+# everything else passes. See README.md and VERIFICATION.md.
+# verified red: claude-sonnet-5, 0/3 trials red @ 60, 2026-08-04
+# verified green: claude-sonnet-5, 3/3 trials @ 100, 2026-08-04
 ```
