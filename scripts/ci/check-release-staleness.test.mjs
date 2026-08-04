@@ -44,7 +44,17 @@ if (joined.includes("/pulls?state=open")) {
 } else if (joined.includes("/check-runs")) {
   process.stdout.write(JSON.stringify({ check_runs: state.checkRuns ?? [] }));
 } else if (joined.includes("cli-release.yml/runs")) {
-  process.stdout.write(JSON.stringify({ workflow_runs: state.releaseRuns ?? [] }));
+  // Model GitHub's ?status= filter: the script relies on it to see the lock
+  // holder regardless of how many runs were queued and superseded after it.
+  const all = state.releaseRuns ?? [];
+  const m = joined.match(/status=([a-z_]+)/);
+  const out = !m
+    ? all
+    : m[1] === "completed"
+      ? all.filter((r) => r.conclusion)
+      : all.filter((r) => !r.conclusion && r.status === m[1]);
+  const p = joined.match(/per_page=(\\d+)/);
+  process.stdout.write(JSON.stringify({ workflow_runs: p ? out.slice(0, Number(p[1])) : out }));
 } else {
   process.stderr.write("unexpected gh call: " + joined + "\\n");
   process.exit(2);
@@ -244,6 +254,33 @@ function main() {
       ["brave-pugs-shake.md"],
     );
     assert(r.status === 0, `a fresh in-flight run means the path works: ${r.out}`);
+  }
+
+  // 5h — the lock holder buried past any fixed window. Each new `cli/**` push
+  // supersedes the pending run, so a long hang accumulates cancelled runs
+  // ahead of the hung one; with `per_page=10` the only run that matters falls
+  // off the end and a fresh queued run makes it all look healthy. The script
+  // asks GitHub for the non-completed runs by status instead, so the hung run
+  // is returned no matter how much newer noise sits in front of it. Caught in
+  // review of PR #300 — third finding on this same block.
+  {
+    const superseded = Array.from({ length: 12 }, (_, i) => ({
+      conclusion: "cancelled",
+      created_at: `2026-08-0${(i % 3) + 1}T0${i % 10}:00:00Z`,
+    }));
+    const r = run(
+      {
+        pulls: [],
+        releaseRuns: [
+          { conclusion: null, status: "queued", created_at: "2026-08-04T11:00:00Z" },
+          ...superseded,
+          { conclusion: null, status: "in_progress", created_at: "2026-07-25T00:00:00Z" },
+        ],
+      },
+      ["brave-pugs-shake.md"],
+    );
+    assert(r.status === 1, `a lock holder past the window must still alarm: ${r.out}`);
+    assert(r.out.includes("concurrency lock"), r.out);
   }
 
   // 6 — nothing pending, nothing open: quiet.

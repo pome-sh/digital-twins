@@ -99,29 +99,38 @@ export function main() {
     }
   } else if (pending.length > 0) {
     lines.push("release PR: none open");
-    // Deliberately a WINDOW of runs, not `per_page=1`. cli-release declares
-    // `cancel-in-progress: false`, so a hung run keeps holding the concurrency
-    // lock while a later `cli/**` push queues a fresh run behind it. Reading
-    // only the newest run sees that queued run's brand-new `created_at` and
-    // calls the release path healthy while nothing can actually proceed.
-    const runs = JSON.parse(
-      gh([
-        "api",
-        `repos/${repo}/actions/workflows/cli-release.yml/runs?branch=main&per_page=10`,
-      ]) || "{}",
-    );
-    const all = runs.workflow_runs ?? [];
+    // Query the in-flight runs BY STATUS rather than taking the newest N and
+    // filtering client-side. cli-release declares `cancel-in-progress: false`,
+    // so a hung run keeps holding the concurrency lock while later `cli/**`
+    // pushes queue behind it — and each new arrival supersedes (cancels) the
+    // previous pending one. Enough of those and the hung run, which is the
+    // only thing that matters, falls outside any fixed window of recent runs,
+    // leaving a fresh queued run to make this look healthy. A window big
+    // enough today is a window that rots; asking GitHub for exactly the
+    // non-completed runs has no threshold to get wrong.
+    const listRuns = (status, perPage) =>
+      JSON.parse(
+        gh([
+          "api",
+          `repos/${repo}/actions/workflows/cli-release.yml/runs?branch=main&status=${status}&per_page=${perPage}`,
+        ]) || "{}",
+      ).workflow_runs ?? [];
+
     const ageOf = (run) => (now - Date.parse(run.created_at)) / 86_400_000;
-    const inFlight = all.filter((r) => !r.conclusion);
+    const inFlight = [...listRuns("in_progress", 30), ...listRuns("queued", 30)];
     const stuck = inFlight.filter((r) => ageOf(r) > maxAgeDays);
-    const newestDone = all.find((r) => r.conclusion);
+    const newestDone = listRuns("completed", 1)[0];
 
     lines.push(
-      `cli-release runs (newest ${all.length}): ` +
-        (all.map((r) => `${r.conclusion ?? r.status}@${ageOf(r).toFixed(1)}d`).join(", ") || "none"),
+      `cli-release in flight: ` +
+        (inFlight.map((r) => `${r.status}@${ageOf(r).toFixed(1)}d`).join(", ") || "none"),
+    );
+    lines.push(
+      `cli-release newest completed: ` +
+        (newestDone ? `${newestDone.conclusion}@${ageOf(newestDone).toFixed(1)}d` : "none"),
     );
 
-    if (all.length === 0) {
+    if (inFlight.length === 0 && !newestDone) {
       reason = `NO_RELEASE — ${pending.length} changeset(s) are pending and cli-release has never run on main, so no version PR is coming`;
     } else if (stuck.length > 0) {
       reason = `NO_RELEASE — ${pending.length} changeset(s) are pending and a cli-release run has been ${stuck[0].status} for ${ageOf(stuck[0]).toFixed(1)} days (limit ${maxAgeDays}); with cancel-in-progress:false it is holding the concurrency lock, so queued runs behind it cannot release either`;
