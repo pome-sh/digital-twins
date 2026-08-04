@@ -63,5 +63,7 @@ tool-confirmation handshake, so the F-787 deadlock does not apply.
    (it exits, or blocks with no further requests). Detection is process-level:
    watch the process, or the twin request stream going quiet.
 4. The instant it idles, go to **SKILL.md §3**: `finalize_run(session_id,
-   agent_token)` on the Pome `session_id`, while the twin sandbox is still up.
-   Do not shut the twins down first — a late finalize loses the tape.
+   agent_token, agent_model=<examinee model>)` on the Pome `session_id`,
+   while the twin sandbox is still up. Pass the model the examinee actually
+   ran on (required for the report). Do not shut the twins down first — a
+   late finalize loses the tape.
