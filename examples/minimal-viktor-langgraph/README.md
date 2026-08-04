@@ -64,11 +64,18 @@ OpenInference emits, and pome projects:
 | `openinference.span.kind = TOOL` + `tool.name` | `gen_ai_tool_name` | `tool` row on the waterfall |
 
 Graph nodes (`CHAIN` spans) carry the W3C parent/child tree, so the waterfall
-reconstructs the `intake → … → report` *nesting* — each node's tool calls sit
-under it, and durations are on the timeline bars. Measured 2026-08-04: the row
-*order* is not the execution order for these spans (`decide` can render after
-`report`), and twin HTTP rows attach to the LLM span rather than the tool that
-issued them. Read the bars, not the row sequence. No message bodies are exported.
+reconstructs the `intake → … → report` nesting — each node's tool calls sit under
+it, with durations on the timeline bars. No message bodies are exported.
+
+One honest limit, measured 2026-08-04: **twin HTTP rows nest one level shallower
+here than on a Claude-adapter agent.** Each row lands under the enclosing LLM
+turn rather than under the specific tool call that issued it. That is not the
+cloud guessing — the composer joins on a per-tool-call correlation id, and today
+only the Claude adapter injects one (`x-pome-correlation-id`); with no join key
+it falls back to the enclosing turn rather than inventing an edge. Extracting
+that layer for LangGraph and the Vercel AI SDK is
+[F-950](https://linear.app/pome-sh/issue/F-950). Nothing about grading depends on
+it: the criteria read the twins' final state, not the tree.
 
 ## What Viktor does
 
@@ -179,10 +186,14 @@ Across the three trials, the run-set page puts it in one grid: *rows = criteria,
 columns = trials*, and the two Slack rows read `0/3` while every other row reads
 `3/3`. The failure is not flaky, and it is not everywhere.
 
-> Two things on that page are rough today and are filed, not hidden: the trace
-> rows are **not in execution order** for OpenInference spans (the timeline bars
-> are — read those), and the twin HTTP rows hang off the LLM span rather than the
-> tool that issued them. Neither changes the verdict or the state panel.
+> Two notes on that trace, neither of which touches the verdict or the state
+> panel. **Row order:** on `app.pome.sh` today the rows do not read in execution
+> order (`decide` can render after `report`) — the timeline bars beside them do,
+> so read those. That is fixed on `main` by F-1281 and is waiting on a release
+> tag, not on a fix. **Nesting depth:** twin HTTP rows sit under the enclosing
+> LLM turn rather than under the tool that issued them, because only the Claude
+> adapter injects the per-tool-call correlation id the composer joins on
+> ([F-950](https://linear.app/pome-sh/issue/F-950)).
 
 ### The fix
 
