@@ -27,6 +27,7 @@ jobs:
       contents: write        # push the version branch / tags
       pull-requests: write    # open the "Version Packages" PR
       id-token: write         # npm OIDC Trusted Publishing (provenance)
+      actions: write          # F-1180 — approve workflow runs parked at action_required
     defaults:
       run:
         working-directory: cli
@@ -84,7 +85,25 @@ jobs:
         if: steps.package-deps.outputs.ready == 'true'
         working-directory: ${{ github.workspace }}
         run: scripts/check-cli-version-floor.sh
+      # F-1180 — the token here decides whether the release PR can ever merge.
+      # GitHub parks every workflow run whose `triggering_actor` is
+      # `github-actions[bot]` at `action_required` (0s, no status reported), so a
+      # version PR pushed with the ambient GITHUB_TOKEN leaves main's three
+      # required contexts sitting in `expected` forever — and `--admin` cannot
+      # override an *absent* check, only a failed one. That is GitHub's
+      # anti-recursion guard, deliberate design, not a bug.
+      #
+      # It is NOT the repo's fork-PR contributor-approval setting: dependabot and
+      # renovate open PRs on same-repo branches here under that same setting and
+      # their runs go green. Only `github-actions[bot]` parks. So the fix is a
+      # real actor — RELEASE_BOT_TOKEN, a PAT (contents + pull-requests write),
+      # the SPECS_BOT_TOKEN equivalent from F-1115 in pome-sh/openapi-spec-mcp.
+      #
+      # Falls back to GITHUB_TOKEN so releasing keeps working before the secret
+      # is minted; the verify step below is what refuses to call that silence a
+      # success.
       - name: Changesets — version PR or publish
+        id: changesets
         if: steps.package-deps.outputs.ready == 'true'
         uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0
         with:
@@ -94,5 +113,19 @@ jobs:
           title: "chore(cli): version packages"
           commit: "chore(cli): version packages"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_BOT_TOKEN || secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: "true"
+      # F-1180 — a release PR that opened fine and collects no checks looks
+      # exactly like one nobody has got round to merging. This step polls the
+      # head commit's check runs, approves anything parked, retriggers via
+      # close/reopen when a PAT is available, and fails the run loudly if the
+      # required contexts still will not report. Never exits 0 on silence.
+      - name: Release PR will actually get its required checks
+        if: steps.package-deps.outputs.ready == 'true' && steps.changesets.outputs.pullRequestNumber
+        working-directory: ${{ github.workspace }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_BOT_TOKEN: ${{ secrets.RELEASE_BOT_TOKEN }}
+          PR_NUMBER: ${{ steps.changesets.outputs.pullRequestNumber }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node scripts/ci/verify-release-pr-checks.mjs
