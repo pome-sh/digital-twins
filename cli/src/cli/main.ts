@@ -26,6 +26,9 @@ import { loginWithClerk } from "./login.js";
 import { runDocsCommand } from "./docs.js";
 import { runCompileSeeds } from "./compile-seeds.js";
 import { runTasksCommand } from "./tasks.js";
+import { runChecksCommand } from "./checks.js";
+import { runChecksAddCommand } from "./checks-add.js";
+import { runChecksLintCommand } from "./checks-lint.js";
 import { runEvalCommand } from "./eval.js";
 import {
   copyAnnounceLine,
@@ -373,6 +376,59 @@ export function createProgram() {
   registerTasksCommand("tasks", false);
   registerTasksCommand("scenarios", true);
 
+  // F-1074 — `pome checks` is a TOP-LEVEL group, not `pome tasks checks`:
+  // `pome tasks` already takes `[twin]` positionally, so `tasks checks` would
+  // parse "checks" as a twin id, and `pome task` one letter from `pome tasks`
+  // is a trap.
+  const checks = program
+    .command("checks")
+    .argument("[twin]", "Twin id (e.g. github). Omit to list twins that declare checks.")
+    .option("--json", "Emit the declaration as JSON (for skills and agents).", false)
+    .description(
+      "Browse the typed checks a twin declares — the closed set [code] criteria come from",
+    )
+    .action(async (twin: string | undefined, opts: { json: boolean }) => {
+      await runChecksCommand(twin, { json: opts.json });
+    });
+
+  checks
+    .command("add")
+    .argument("<file>", "Task markdown file to append a criterion to")
+    .option("--check <id>", "Check id (run `pome checks <twin>` to list them)")
+    .option(
+      "--arg <key=value>",
+      "One per declared parameter. Repeat the flag.",
+      (value: string, previous: string[] = []) => [...previous, value],
+      [],
+    )
+    .option(
+      "--api-url <url>",
+      "Control-plane URL",
+      process.env.POME_API_URL ?? DEFAULT_CONTROL_PLANE_URL,
+    )
+    .description(
+      "Add one [code] criterion by picking a declared check — pome writes the English",
+    )
+    .action(async (file: string, opts: { check?: string; arg: string[]; apiUrl: string }) => {
+      await runChecksAddCommand(file, {
+        check: opts.check,
+        arg: opts.arg,
+        apiBaseUrl: opts.apiUrl,
+      });
+    });
+
+  // F-1134 — the read-only half. `checks add` warns about the block it writes
+  // into, which covers an author mid-edit; this answers the same question about a
+  // file already on disk, which is what a builder's own CI needs. Offline: it
+  // reads this CLI's pinned declarations and never calls the cloud.
+  checks
+    .command("lint")
+    .argument("<file...>", "Task markdown file(s) — shell globs work: tasks/*.md")
+    .description("Report [code] criteria that bind no declared check, so are never graded")
+    .action(async (files: string[]) => {
+      await runChecksLintCommand(files);
+    });
+
   program
     .command("compile-seeds")
     .argument("[target]", "Task .md file or directory (defaults to ./tasks)")
@@ -560,14 +616,32 @@ export function createProgram() {
       "Control-plane URL",
       process.env.POME_API_URL ?? DEFAULT_CONTROL_PLANE_URL,
     )
-    .action(async (sessionId: string, opts: { apiUrl: string }) => {
-      try {
-        await runSessionStop({ apiBaseUrl: opts.apiUrl, sessionId });
-      } catch (err) {
-        console.error(friendlyHostedError(err));
-        process.exitCode = 2;
-      }
-    });
+    .option(
+      "--discard",
+      "Confirm destroying a session whose run has not been graded (F-983)",
+      false,
+    )
+    .action(
+      async (
+        sessionId: string,
+        opts: { apiUrl: string; discard?: boolean },
+      ) => {
+        try {
+          await runSessionStop({
+            apiBaseUrl: opts.apiUrl,
+            sessionId,
+            discard: opts.discard === true,
+          });
+        } catch (err) {
+          // runSessionStop already prints the full refusal detail for
+          // HostedDiscardRefusedError; friendlyHostedError returns "" for it
+          // so we don't print a duplicate (or bare blank) line here.
+          const friendly = friendlyHostedError(err);
+          if (friendly) console.error(friendly);
+          process.exitCode = 2;
+        }
+      },
+    );
 
   program
     .command("run")
@@ -808,7 +882,7 @@ export function createProgram() {
             // documented exit codes. Anything else falls through to Commander
             // (treated like self-host).
             try {
-              // FDRS-636 — effective trial count: -n wins, else the scenario
+              // FDRS-636 — effective trial count: -n wins, else the task
               // config's `runs` field (both capped at 20). k>1 takes the
               // trial-group path; k=1 stays EXACTLY the single-run path
               // below (no group is ever stamped for it).
@@ -873,7 +947,7 @@ export function createProgram() {
                 result.scenario.config.passThreshold,
               );
               const label =
-                status === "pass" ? "PASS" : status === "fail" ? "FAIL" : "UNEVAL";
+                status === "pass" ? "PASS" : status === "fail" ? "FAIL" : "INCOMPLETE";
               console.error(`${label} ${result.scenario.title}`);
               console.error(`  ${runScoreLine(result.score, result.scenario.config.passThreshold, "cloud score")}`);
               console.error(`  local: ${result.artifacts.runDir}`);
@@ -1087,7 +1161,7 @@ export function createProgram() {
       "Assemble a paste-into-IDE fix prompt (no LLM call, no network). With no args, reads the latest FAILED run set under ./runs: the persisted cloud verdicts (verdict.json) become grouped failure signatures over the raw traces, in one prompt. Point it at a trial run dir to target that set, or use the legacy `<events.jsonl> <task.md>` form for a single trace.",
     )
     .action(async (target?: string, taskArg?: string) => {
-      // Legacy 2-arg form: <events.jsonl> <scenario.md> — unchanged
+      // Legacy 2-arg form: <events.jsonl> <task.md> — unchanged
       // (CAPTURE-ONLY, FDRS-657: raw trace + declared criteria, no verdict).
       if (target !== undefined && target.endsWith(".jsonl")) {
         if (!taskArg) {
@@ -1097,7 +1171,7 @@ export function createProgram() {
           process.exitCode = 5;
           return;
         }
-        const [eventsRaw, scenario] = await Promise.all([
+        const [eventsRaw, task] = await Promise.all([
           readFile(resolve(target), "utf8"),
           parseTaskFile(resolve(taskArg)),
         ]);
@@ -1106,7 +1180,7 @@ export function createProgram() {
           .map((line) => line.trim())
           .filter((line) => line.length > 0)
           .map((line) => JSON.parse(line) as RecorderEvent);
-        console.log(buildFixPrompt({ events, scenario }));
+        console.log(buildFixPrompt({ events, task }));
         return;
       }
       if (taskArg !== undefined) {
@@ -1137,13 +1211,13 @@ export function createProgram() {
         return;
       }
       const set = discovery.set;
-      let scenario: Task | null = null;
+      let task: Task | null = null;
       try {
-        scenario = await parseTaskFile(resolve(set.taskPath));
+        task = await parseTaskFile(resolve(set.taskPath));
       } catch {
         // Task file moved/edited since the run — the prompt degrades to the
         // verdict-embedded criteria.
-        scenario = null;
+        task = null;
       }
       const trials: TrialFixInput[] = [];
       for (const [idx, t] of set.trials.entries()) {
@@ -1158,7 +1232,7 @@ export function createProgram() {
         buildGroupFixPrompt({
           taskName: set.taskName,
           groupId: set.groupId,
-          scenario,
+          task,
           trials,
         }),
       );

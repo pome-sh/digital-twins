@@ -43,6 +43,20 @@ function sampleEvent(i: number): RecorderEvent {
     method: "POST",
     path: "/s/test/items",
     request_body: { i },
+    // F-1125 — a representative row, because the durable store's cost is
+    // dominated by `JSON.stringify` of it. `request_headers` is the widest field
+    // a real request adds and it is on EVERY event, so a sample that omitted it
+    // would under-measure the hot path this gate exists to protect and report a
+    // budget the production tape never runs against.
+    request_headers: {
+      authorization: "[REDACTED]",
+      "content-type": "application/json",
+      "user-agent": "node",
+      accept: "*/*",
+      "accept-encoding": "br, gzip, deflate",
+      "x-pome-correlation-id": "toolu_01AbCdEfGhIjKlMnOpQrStUv",
+    },
+    tool: null,
     status: 201,
     response_body: { ok: true },
     latency_ms: 1,

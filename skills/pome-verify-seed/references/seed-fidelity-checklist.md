@@ -25,7 +25,7 @@ markdown ≤ 256 KiB). Output fields and what to do with each:
 | `already_passing` | Criteria already `passed` on the freshly seeded initial state | Triage each by intent (step 2) — this list is facts; the verdict drawn from it is not |
 | `deterministic` | Per-`code`-criterion dry-run status | Same statuses as `evaluate_criteria`; see step 4 |
 | `model` | `model` criteria (informational — the judge is not run) | Check each names observable behavior, not vibes |
-| `unmatched` entries / `no_criteria_prepass` | `code` text matched no registered predicate / nothing pre-passes | `unmatched` = authoring error → back to `pome-author-task`; never judge-scored |
+| `unmatched` entries / `no_criteria_prepass` | `code` text is not an instance of any declared check / nothing pre-passes | `unmatched` = authoring error → re-author it from `list_checks` via `pome-author-task`; never judge-scored |
 | `notes`, `verdict` | Prose + `BROKEN seed` / clean | Read the notes; **do not act on the verdict string** — it has no guard concept |
 
 ## Step 2 — guard-aware triage
@@ -80,7 +80,7 @@ Statuses per deterministic criterion, and what each means on a seed:
 | --- | --- | --- |
 | `failed` | Predicate matched, not yet satisfied | Correct for a discriminator |
 | `passed` | Predicate matched, already satisfied | Fine for a guard; BROKEN for anything else |
-| `unmatched` | No registered predicate for the text | Authoring error — restate to a known phrase or move to `model` |
+| `unmatched` | The text is not an instance of any declared check | Authoring error — pick a check from `list_checks` and let the system render the sentence (do NOT reword by hand), or move it to `model` |
 | `skipped` (`seed_load_failed`) | The twin could not boot this seed | Fix the seed first; step 3 usually names the cause |
 
 `model` entries are informational here — the judge only runs at
@@ -130,13 +130,23 @@ anything — used purely as a probe arena. Discipline:
 - **Opaque 404** on a probe = wrong path OR expired session — call
   `get_session` (side-effect-free) before blaming the seed.
 - **Mutation hole**: one mutating call (POST/PUT/DELETE, or an MCP tool with
-  side effects) and the live state is no longer the seed. `stop_session`,
-  `run_task` again, continue on the fresh session. Never report findings
-  from a dirtied session as seed facts.
+  side effects) and the live state is no longer the seed. `stop_session` —
+  today that succeeds outright; once the platform-side F-983 guard is live it
+  may instead refuse and hand back a `discard_token` to confirm (see below) —
+  then `run_task` again and continue on the fresh session. Never report
+  findings from a dirtied session as seed facts.
 - **Reset = discard + re-mint.** `stop_session` ends a probe session without
   evaluating — for probes that is exactly right (there is no evidence worth
-  keeping). Never `finalize_run` a probe session: it would spend a judge run
-  scoring an untouched (or self-dirtied) seed and record a meaningless run.
+  keeping). Call it once: if it succeeds, teardown is done. F-983: an open
+  session holds an ungraded run (Pome creates the `runs` row at finalize), so
+  the control plane may instead refuse with `error.details.reason ===
+  "ungraded_session"` and a `discard_token`; read that token and call
+  `stop_session` again, passing it as `confirm_discard`, to confirm the
+  discard. Against today's control plane this never happens — the first call
+  always succeeds — so treat the refusal-then-confirm path as the case to
+  handle once it ships, not the common case. Never `finalize_run` a probe
+  session: it would spend a judge run scoring an untouched (or self-dirtied)
+  seed and record a meaningless run.
 - **Cost**: each probe session takes a session slot until stopped; quota trips
   answer 402 with the freeing options. The fast path costs nothing — present
   the deep check as opt-in.

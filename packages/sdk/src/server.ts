@@ -37,6 +37,7 @@ import { makeToolCallContext } from "./tool-context.js";
 import { twinBuildInfo } from "./build-info.js";
 import { handleMcpJsonRpc, mcpMethodNotAllowed } from "./mcp-jsonrpc.js";
 import { createRecorderHandle, resolveRecorderStore, type RecorderStore } from "./recorder.js";
+import { setRecordedTool } from "./request-capture.js";
 import { redactSecrets } from "./redaction.js";
 import { TwinError, UnknownToolError, envelopeFor } from "./errors.js";
 import {
@@ -63,6 +64,11 @@ export {
   toTwinHttpEventRow,
   POME_RECORDER_EVENTS_PATH,
 } from "./recorder.js";
+// F-1125 — twins that build their own recorder events (stripe's respond
+// helpers, its dedupe replay, and the x402 gate) must capture headers the same
+// way the engine does. Re-exported so there is ONE answer to "which headers get
+// recorded" rather than one per emission site.
+export { recordedRequestHeaders, setRecordedTool } from "./request-capture.js";
 export type {
   RecorderStore,
   RecorderStoreOptions,
@@ -352,6 +358,9 @@ export function createApp<TDb, TSeed, TDomain>(
     "/mcp/tools/:name",
     recorder.handle({ mutation: false }, async (c) => {
       const name = c.req.param("name") ?? "";
+      // F-1125 — stamp before `findTool`, which throws on an unknown name. An
+      // attempt that named a forbidden action still has to appear on the tape.
+      if (name) setRecordedTool(c, name);
       const tool = findTool(definition, name);
       const args = await readBody(c);
       const parsed = tool.schema.parse(args ?? {});
@@ -390,6 +399,9 @@ export function createApp<TDb, TSeed, TDomain>(
           .object({ tool: z.string().min(1), arguments: jsonRecord.default({}) })
           .parse(raw) as { tool: string; arguments: Record<string, unknown> };
       }
+      // F-1125 — same as `/mcp/tools/:name`: stamp the name the caller sent
+      // before the lookup that can reject it.
+      setRecordedTool(c, call.tool);
       const tool = findTool(definition, call.tool);
       const parsed = tool.schema.parse(call.arguments);
       const toolCall = makeToolCallContext(c);

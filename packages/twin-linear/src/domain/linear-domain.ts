@@ -361,14 +361,14 @@ export class LinearDomain {
   }
 
   createAgentSessionOnIssue(
-    input: { issueId: string; agentUserId?: string; plan?: string | null; externalUrl?: string | null },
+    input: agents.AgentSessionOnIssueInput,
     actor: ActorContext = {}
   ): Promise<LinearAgentSession> {
     return agents.createAgentSessionOnIssue(this, input, actor);
   }
 
   createAgentSessionOnComment(
-    input: { commentId: string; agentUserId?: string; plan?: string | null; externalUrl?: string | null },
+    input: agents.AgentSessionOnCommentInput,
     actor: ActorContext = {}
   ): Promise<LinearAgentSession> {
     return agents.createAgentSessionOnComment(this, input, actor);
@@ -376,7 +376,7 @@ export class LinearDomain {
 
   updateAgentSession(
     id: string,
-    input: { state?: string; plan?: string | null; externalUrl?: string | null },
+    input: agents.AgentSessionPatch,
     actor: ActorContext = {}
   ): LinearAgentSession {
     return agents.updateAgentSession(this, id, input, actor);

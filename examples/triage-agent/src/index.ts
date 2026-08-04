@@ -97,6 +97,18 @@ const BASELINE_TRUST =
 const USE_BASELINE = process.env.POME_TRIAGE_BASELINE === "1";
 const SYSTEM_PROMPT = SYSTEM_PROMPT_CORE + (USE_BASELINE ? BASELINE_TRUST : INJECTION_HARDENING);
 
+// Optional model override (F-928). When set, it is forwarded verbatim as the
+// Claude Agent SDK's `options.model`, which the SDK turns into the `claude`
+// CLI's `--model` flag. Omit it to run the CLI's own default model. Accepts an
+// alias (`haiku`, `sonnet`, `opus`) or a full id (`claude-haiku-4-5`).
+//
+// Caveat worth knowing: the value is forwarded, but the *runtime* has the final
+// say. A subscription/OAuth login, or an environment/gateway model pin, can
+// override it — and the CLI does not error on an unknown id, it silently falls
+// back. That is exactly why this run prints the model the SDK actually resolved
+// (the `system`/`init` line below): the running model is never a silent guess.
+const MODEL = process.env.POME_TRIAGE_MODEL?.trim() || undefined;
+
 async function main() {
   const token = await resolveAuthToken();
 
@@ -110,14 +122,16 @@ async function main() {
 
   banner({ task: TASK, mcpUrl: MCP_URL, sid: MCP_SID });
 
-  const twin = new TwinMcpClient(MCP_URL, token);
-  const tools = buildTwinTools(twin);
+  const tools = buildTwinTools({ mcpUrl: MCP_URL, token });
   const server = createSdkMcpServer({ name: "github-twin", version: "0.1.0", tools });
 
   const run = query({
     prompt: TASK,
     options: {
       systemPrompt: SYSTEM_PROMPT,
+      // Only set `model` when overridden — omitting it lets the CLI pick its
+      // default, and setting it to `undefined` is not the same as omitting.
+      ...(MODEL ? { model: MODEL } : {}),
       permissionMode: "bypassPermissions",
       maxTurns: 25,
       allowedTools: tools.map((t) => t.name),
@@ -132,7 +146,15 @@ async function main() {
   try {
     for await (const msg of run) {
       thinking.reset();
-      if (msg.type === "assistant") {
+      if (msg.type === "system" && msg.subtype === "init") {
+        // The SDK's init message carries the model the CLI actually resolved —
+        // log it so a downshift (or a silent runtime override) is visible, never
+        // guessed (F-928).
+        console.log(
+          `model:    ${msg.model}` +
+            (MODEL ? ` (requested "${MODEL}")` : " (SDK default — no options.model set)")
+        );
+      } else if (msg.type === "assistant") {
         logAssistantMessage(msg);
       } else if (msg.type === "result") {
         if (msg.subtype === "success") {
@@ -191,7 +213,17 @@ function startThinkingIndicator() {
   };
 }
 
-function buildTwinTools(twin: TwinMcpClient) {
+/**
+ * Build the tool table this agent hands the model.
+ *
+ * Exported and config-taking (rather than closing over module-level env) so a
+ * gate can exercise every tool against a live twin without a model — F-1152.
+ * The sibling `pr-summary-*` examples shipped a `comment_on_pull_request` the
+ * GitHub twin refused on every subject for as long as they existed, because
+ * neither older example gate ever reaches a twin call.
+ */
+export function buildTwinTools(config: { mcpUrl: string; token: string }) {
+  const twin = new TwinMcpClient(config.mcpUrl, config.token);
   const ownerRepo = {
     owner: z.string().describe("Repository owner (org or user login)."),
     repo: z.string().describe("Repository name.")

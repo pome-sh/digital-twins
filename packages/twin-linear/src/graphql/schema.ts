@@ -7,6 +7,8 @@ import { buildSchema, type GraphQLSchema } from "graphql";
 export const linearGraphQLSchema: GraphQLSchema = buildSchema(`
   scalar TeamFilter
   scalar PaginationOrderBy
+  scalar DateTime
+  scalar JSON
 
   type Query {
     viewer: User!
@@ -299,16 +301,26 @@ export const linearGraphQLSchema: GraphQLSchema = buildSchema(`
     team: Team
   }
 
+  """Linear's AgentSessionStatus, member-for-member (F-1172)."""
+  enum AgentSessionStatus {
+    pending
+    active
+    awaitingInput
+    complete
+    error
+    stale
+  }
+
   type AgentSession {
-    id: String!
-    state: String!
-    plan: String
-    externalUrl: String
-    createdAt: String!
-    updatedAt: String!
+    id: ID!
+    status: AgentSessionStatus!
+    plan: JSON
+    externalUrls: JSON!
+    createdAt: DateTime!
+    updatedAt: DateTime!
     issue: Issue
     comment: Comment
-    agentUser: User!
+    appUser: User!
     activities(first: Int, after: String, last: Int, before: String): AgentActivityConnection!
   }
 
@@ -474,25 +486,31 @@ export const linearGraphQLSchema: GraphQLSchema = buildSchema(`
     enabled: Boolean
   }
 
+  """Linear's AgentSessionExternalUrlInput, field-for-field (F-1172)."""
+  input AgentSessionExternalUrlInput {
+    url: String!
+    label: String!
+  }
+
   input AgentSessionCreateOnIssue {
     issueId: String!
-    agentUserId: String
+    appUserId: String
     plan: String
-    externalUrl: String
+    externalUrls: [AgentSessionExternalUrlInput!]
   }
 
   input AgentSessionCreateOnComment {
     commentId: String!
-    agentUserId: String
+    appUserId: String
     plan: String
-    externalUrl: String
+    externalUrls: [AgentSessionExternalUrlInput!]
   }
 
   input AgentSessionUpdateInput {
     id: String
-    state: String
+    status: AgentSessionStatus
     plan: String
-    externalUrl: String
+    externalUrls: [AgentSessionExternalUrlInput!]
   }
 
   input AgentActivityCreateInput {

@@ -153,7 +153,12 @@ export function shimLegacyEventToSpan(
   const startNano = msToNanos(startMs);
   const traceId = legacyId(resolveRunId(options, record));
   const spanId = legacyId(record.event_id);
-  const parentSpanId = record.parent_id !== null ? legacyId(record.parent_id) : null;
+  // F-1200 vocab: `parent_event_id` is canonical, `parent_id` is the pre-F-1200
+  // spelling. The shim reads raw records straight off disk — including tapes
+  // written by shipped 0.13.0 emitters — so it does the tolerant read itself
+  // rather than assuming the caller ran it through `eventSchema` first.
+  const parentEventId = record.parent_event_id ?? record.parent_id ?? null;
+  const parentSpanId = parentEventId !== null ? legacyId(parentEventId) : null;
 
   // Lossless: serialize the RAW input (not the Zod-stripped record) so additive
   // legacy fields survive round-trip.
@@ -225,7 +230,7 @@ export function shimLegacyEventToSpan(
   const candidate = {
     ts: nanosToIso(startNano),
     event_id: spanId,
-    parent_id: parentSpanId,
+    parent_event_id: parentSpanId,
     kind: "OtelSpanEvent" as const,
     trace_id: traceId,
     span_id: spanId,

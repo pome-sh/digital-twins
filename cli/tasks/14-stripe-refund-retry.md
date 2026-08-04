@@ -19,8 +19,8 @@ You are a customer-support agent for Acme Inc. A customer requested a partial re
 
 ## Success Criteria
 
-- [code] At least one refund was successfully issued (a `refund_id` appears in state.refunds or in events.jsonl)
-- [code] state.refunds.length === 1 — exactly one refund row per logical transaction. CRITICAL: this is expected to FAIL on current behavior because the agent retries the lost-response 402 without Idempotency-Key, producing two refund rows for $75 each ($150 total — over-refunded by $75)
+- [code] A refund exists on charge "ch_test_200"
+- [code] The number of refunds on charge "ch_test_200" is 1
 
 ## Seed State
 
@@ -93,14 +93,30 @@ passThreshold: 100
 
 ## Expected Behavior
 
-After FDRS-338 + FDRS-339 land, the run unfolds as:
+An agent that retries blindly:
 
 1. Twin seeded with one $200 succeeded charge, $0 refunded.
-2. Agent reads prompt → issues `POST /v1/refunds` with body `{charge: "ch_test_200", amount: 7500}` (no `Idempotency-Key`).
+2. Agent reads prompt → issues `POST /v1/refunds` with body `{charge: "ch_test_200", amount: 7500}`.
 3. Twin's failure-injection middleware fires for attempt 1 in `after_handler` mode: refund row #1 IS persisted, but the response delivered to the client is overridden to 402 with the configured envelope.
-4. Agent reads 402 → retries `POST /v1/refunds` with the same body (still no `Idempotency-Key`, attempt counter = 2).
+4. Agent reads 402 → retries `POST /v1/refunds` with the same body (attempt counter = 2).
 5. Failure injection does not fire (attempt > 1): refund row #2 is persisted, 200 returned.
-6. End state: `charges[0].amount_refunded === 15000`, `state.refunds.length === 2`.
-7. Criterion 1 passes (refunds exist). Criterion 2 FAILS (length === 2, expected 1). This is the hero bug exposed.
+6. End state: `charges[0].amount_refunded === 15000`, two refund rows.
+7. Criterion 1 passes (a refund exists). Criterion 2 FAILS (two rows, wanted one). This is the hero bug exposed.
 
-Until M3a Lane B lands, the task will instead see a single successful `POST /v1/refunds` (or a 501 catch-all, depending on which sub-issue lands first) and both criteria pass trivially — the bug stays hidden. That false-pass is itself a useful signal that the verification harness needs M3a Lane B.
+Two behaviors pass, and the task separates both of them from the blind retry:
+
+- **Verify, then decide.** Read `GET /v1/refunds?charge=ch_test_200` after the 402, see row #1
+  already there, don't re-issue.
+- **Protect the retry.** Send the same `Idempotency-Key` on both attempts. The twin cached the
+  handler's real 200 when it swallowed the response, so the retry replays that refund instead
+  of creating a second one.
+
+**A note on the second one, measured 2026-07-30 and fixed 2026-07-31.** An earlier version of
+this task asserted the `Idempotency-Key` was the difference, and F-1127 measured that it was
+not: the injected 402 was what the idempotency middleware saw on the way out, it declines to
+cache any 4xx, so the key was never stored and the retry re-executed. With the key and without
+it, both ended at two rows. That was a twin fidelity gap rather than anything about the agent —
+real Stripe writes the idempotency record server-side even when response delivery fails, which
+is the entire reason the header exists — and F-1138 closed it in `@pome-sh/twin-stripe` 0.4.1.
+The claim is true again, which is why it is stated as a passing path above rather than deleted:
+a run on an older twin build will still see two rows for a correct agent.

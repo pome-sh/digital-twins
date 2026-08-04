@@ -3,7 +3,7 @@
 // Assembles the paste-into-IDE fix prompt for a failed run (FDRS-657).
 //
 // CAPTURE-ONLY: the OSS CLI does NOT call an LLM here. `pome fix-prompt`
-// assembles a self-contained prompt — system instructions + the scenario's
+// assembles a self-contained prompt — system instructions + the task's
 // criteria + the raw captured trace — and prints it so the developer can paste
 // it into THEIR own coding assistant (Cursor / Claude Code). The former BYOK
 // local-judge call that generated the handoff CLI-side was removed under
@@ -53,7 +53,7 @@ export function escapeTagContent(text: string): string {
 
 export interface FixPromptContext {
   events: RecorderEvent[];
-  scenario: Task;
+  task: Task;
 }
 
 function truncateBody(body: unknown): unknown {
@@ -102,10 +102,10 @@ function renderCriteria(criteria: Criterion[]): string {
 }
 
 export function buildFixUserPrompt(ctx: FixPromptContext): string {
-  const criteria = redactSecrets(renderCriteria(ctx.scenario.criteria)) as string;
+  const criteria = redactSecrets(renderCriteria(ctx.task.criteria)) as string;
   const trace = renderEvents(ctx.events.map((event) => redactEvent(event)));
-  const taskTitle = redactSecrets(ctx.scenario.title) as string;
-  const taskPrompt = redactSecrets(ctx.scenario.prompt) as string;
+  const taskTitle = redactSecrets(ctx.task.title) as string;
+  const taskPrompt = redactSecrets(ctx.task.prompt) as string;
 
   return `## Task
 ${taskTitle}
@@ -144,7 +144,7 @@ export interface GroupFixPromptContext {
   groupId: string | null;
   /** Parsed task file when it still resolves. Null degrades the prompt to
    *  the verdict-embedded criteria (the file may have moved since the run). */
-  scenario: Task | null;
+  task: Task | null;
   /** Completed trials of the run set (verdict.json present), run order. */
   trials: TrialFixInput[];
 }
@@ -257,8 +257,8 @@ export function buildGroupFixUserPrompt(ctx: GroupFixPromptContext): string {
   const signatures = redactSecrets(
     renderGroupedSignatures(ctx.trials),
   ) as string;
-  const criteriaBlock = ctx.scenario
-    ? (redactSecrets(renderCriteria(ctx.scenario.criteria)) as string)
+  const criteriaBlock = ctx.task
+    ? (redactSecrets(renderCriteria(ctx.task.criteria)) as string)
     : (redactSecrets(
         renderCriteria(
           (ctx.trials[0]?.verdict.criteria_results ?? []).map((r) => ({
@@ -267,9 +267,9 @@ export function buildGroupFixUserPrompt(ctx: GroupFixPromptContext): string {
           })) as Criterion[],
         ),
       ) as string);
-  const promptBlock = ctx.scenario
-    ? (redactSecrets(ctx.scenario.prompt) as string)
-    : `(task file not found at ${ctx.trials[0]?.verdict.scenario_path ?? "?"} — criteria above come from the cloud verdicts)`;
+  const promptBlock = ctx.task
+    ? (redactSecrets(ctx.task.prompt) as string)
+    : `(task file not found at ${ctx.trials[0]?.verdict.task_path ?? "?"} — criteria above come from the cloud verdicts)`;
 
   const sections: string[] = [];
   sections.push(`## Run set (cloud-judged)

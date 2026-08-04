@@ -301,4 +301,35 @@ describe("writeRunArtifactsCore — file-set contract (F-689 / D6)", () => {
     expect(Object.keys(meta.twin_versions)).toEqual(["github"]);
     expect(meta.twin_versions.github).toMatch(/^\d+\.\d+\.\d+/);
   });
+
+  it("latest.json names the task under `task`, never `scenario` (F-933)", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pome-art-"));
+    const task = fakeTask();
+    const runId = "run_test_latest";
+
+    await writeRunArtifactsCore({
+      artifactsDir: root,
+      runId,
+      scenario: task,
+      startedAt: "2026-05-26T11:59:59.000Z",
+      completedAt: "2026-05-26T12:00:02.000Z",
+      stdout: "",
+      stderr: "",
+      exitCode: 0,
+      events: [],
+      stateInitial: {},
+      stateFinal: {},
+    });
+
+    const latest = JSON.parse(await readFile(join(root, "latest.json"), "utf8")) as Record<
+      string,
+      unknown
+    >;
+    expect(latest).toEqual({
+      run_id: runId,
+      task: task.slug,
+      run_dir: join(root, task.slug, runId),
+    });
+    expect(latest).not.toHaveProperty("scenario");
+  });
 });

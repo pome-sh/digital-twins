@@ -137,10 +137,60 @@ export async function createSlackSession(creds: PomeCredentials): Promise<SlackS
   return { sessionId: body.session_id, twinUrl: twinUrl.replace(/\/$/, ""), agentToken: body.agent_token };
 }
 
+/**
+ * Delete a sandbox session. The control plane refuses to destroy a session
+ * whose run has never been graded (409, `error.details.reason ===
+ * "ungraded_session"`) and hands back a one-time `discard_token` to confirm
+ * the discard. Every session this teardown deletes was created by the run
+ * itself and is either already finalized or was never launched -- there is
+ * nothing worth grading -- so we auto-confirm without prompting. A 409 that
+ * is NOT that reason (e.g. an already-closed session carrying
+ * `details.current_state`) is idempotent success: the sandbox is already
+ * gone. An unrecognized/unparseable 409 body, or a recognized refusal with
+ * no usable token, is neither of those -- it falls through to the existing
+ * warning so a real leak stays visible in the run output.
+ */
 export async function deleteSession(creds: PomeCredentials, sessionId: string): Promise<void> {
-  const res = await controlPlane(creds, "DELETE", `/v1/sessions/${encodeURIComponent(sessionId)}`);
+  const path = `/v1/sessions/${encodeURIComponent(sessionId)}`;
+  let res = await controlPlane(creds, "DELETE", path);
+
+  if (res.status === 409) {
+    const details = parseConflictDetails(res.text);
+    if (details) {
+      if (details.reason === "ungraded_session") {
+        const token = details.discard_token;
+        if (typeof token === "string" && token.length > 0) {
+          res = await controlPlane(
+            creds,
+            "DELETE",
+            `${path}?confirm_discard=${encodeURIComponent(token)}`,
+          );
+        }
+        // else: a recognized refusal with no usable discard_token -- fall
+        // through to the warning below instead of swallowing it silently.
+      } else {
+        // Some other named reason (already-closed session, etc.): the
+        // sandbox is already gone.
+        return;
+      }
+    }
+    // else: unparseable body -- fall through to the warning below rather
+    // than treating an unrecognized 409 as success.
+  }
+
   if (res.status >= 400 && res.status !== 404) {
     console.warn(`[run-trials] DELETE ${sessionId} -> ${res.status} (sandbox may be leaked): ${res.text}`);
+  }
+}
+
+function parseConflictDetails(text: string): { reason?: string; discard_token?: string } | undefined {
+  try {
+    const parsed = JSON.parse(text) as {
+      error?: { details?: { reason?: string; discard_token?: string } };
+    };
+    return parsed.error?.details;
+  } catch {
+    return undefined;
   }
 }
 

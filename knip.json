@@ -34,6 +34,7 @@
     ".": {
       "entry": [
         "scripts/*.{mjs,sh}",
+        "scripts/fixtures/**/*.mjs",
         "contract/run.mjs",
         "contract/*.test.mjs"
       ],
@@ -56,17 +57,8 @@
       ]
     },
     "packages/sdk": {
-      "entry": [
-        "src/index.ts",
-        "src/server.ts",
-        "src/parity.ts",
-        "scripts/**/*.ts"
-      ],
-      "project": [
-        "src/**/*.ts",
-        "test/**/*.ts",
-        "scripts/**/*.ts"
-      ]
+      "entry": ["src/index.ts", "src/server.ts", "src/parity.ts", "src/checks.ts", "scripts/**/*.ts"],
+      "project": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts"]
     },
     "cli": {
       "entry": [

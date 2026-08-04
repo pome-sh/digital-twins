@@ -71,6 +71,16 @@ pull request has both a summary comment and a review verdict.`;
 
 const TASK = process.env.POME_TASK?.trim() || DEFAULT_TASK;
 
+// Optional model override (F-928). When set, it is forwarded verbatim as the
+// Claude Agent SDK's `options.model`, which the SDK turns into the `claude`
+// CLI's `--model` flag. Omit it to run the CLI's own default model. Accepts an
+// alias (`haiku`, `sonnet`, `opus`) or a full id (`claude-haiku-4-5`). The
+// runtime can still override the request (subscription/OAuth login, or an
+// environment/gateway model pin), and the CLI does not error on an unknown id —
+// so this run logs the model the SDK actually resolved (the `system`/`init`
+// line below).
+const MODEL = process.env.POME_PR_REVIEW_MODEL?.trim() || undefined;
+
 async function main() {
   const token = await resolveAuthToken();
 
@@ -91,8 +101,7 @@ async function main() {
 
   banner({ task: TASK, mcpUrl: MCP_URL, sid: MCP_SID });
 
-  const twin = new TwinMcpClient(MCP_URL, token);
-  const tools = buildTwinTools(twin);
+  const tools = buildTwinTools({ mcpUrl: MCP_URL, token });
   const server = createSdkMcpServer({ name: "github-twin", version: "0.1.0", tools });
 
   const run = query({
@@ -104,6 +113,9 @@ async function main() {
         "Approve only changes that are clearly correct and low-risk. Request changes when the change contains a real defect, a removed safety check, a hardcoded secret, or another blocking problem. Use COMMENT when a human's judgment is needed but there is no clear blocker. " +
         "Ground every statement in the actual file contents — never describe changes that are not present. Never merge a pull request. " +
         "Stop once every open pull request has both a summary comment and a review verdict.",
+      // Only set `model` when overridden — omitting it lets the CLI pick its
+      // default, and setting it to `undefined` is not the same as omitting.
+      ...(MODEL ? { model: MODEL } : {}),
       permissionMode: "bypassPermissions",
       maxTurns: 40,
       allowedTools: tools.map((t) => t.name),
@@ -118,7 +130,14 @@ async function main() {
   try {
     for await (const msg of run) {
       thinking.reset();
-      if (msg.type === "assistant") {
+      if (msg.type === "system" && msg.subtype === "init") {
+        // Log the model the CLI actually resolved so a downshift (or a silent
+        // runtime override) is visible, never guessed (F-928).
+        console.log(
+          `model:    ${msg.model}` +
+            (MODEL ? ` (requested "${MODEL}")` : " (SDK default — no options.model set)")
+        );
+      } else if (msg.type === "assistant") {
         logAssistantMessage(msg);
       } else if (msg.type === "result") {
         if (msg.subtype === "success") {
@@ -175,7 +194,19 @@ function startThinkingIndicator() {
   };
 }
 
-function buildTwinTools(twin: TwinMcpClient) {
+/**
+ * Build the tool table this agent hands the model.
+ *
+ * Exported and config-taking (rather than closing over module-level env) so a
+ * gate can exercise every tool against a live twin without a model — F-1152.
+ * This example and `pr-summary-agent` both shipped a `comment_on_pull_request`
+ * the GitHub twin answered `404 Issue not found` for, on every subject, for as
+ * long as the examples existed, and no gate looked: `typecheck:examples` is
+ * green on a well-typed tool whose endpoint 404s, and `smoke:examples` returns
+ * before any tool fires.
+ */
+export function buildTwinTools(config: { mcpUrl: string; token: string }) {
+  const twin = new TwinMcpClient(config.mcpUrl, config.token);
   const ownerRepo = {
     owner: z.string().describe("Repository owner (org or user login)."),
     repo: z.string().describe("Repository name.")

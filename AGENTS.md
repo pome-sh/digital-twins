@@ -28,9 +28,16 @@ live at **https://docs.pome.sh**.
   (`./tasks/`), and the internal runner/schema surface (`src/task/`, `runTask*`,
   the `Task` type, `parseTask`, `taskSchema`). `pome scenarios` survives only as
   a hidden deprecated alias. The ONLY remaining sanctioned survivors are the
-  serialized `scenario` / `scenario_*` keys — the run-artifact `scenario` key and
-  the finalize/result wire fields (server contract; flip with W3/FDRS-653) — and
-  the in-memory carriers whose value flows straight into them.
+  serialized `scenario` / `scenario_*` keys that have a contract behind them —
+  `meta.json`'s `scenario` slug (uploaded to cloud finalize; also read back by
+  `pome eval` / `pome inspect` from run dirs older CLIs wrote) and the
+  finalize / result / compile-seed wire fields (server contract; flip with
+  W3/FDRS-653) — and the in-memory carriers whose value flows straight into
+  them. F-933 renamed the two artifact keys that had no such contract:
+  `runs/latest.json` now writes `task` (was `scenario`) and
+  `runs/<task>/<session>/verdict.json` writes `task_path` (was
+  `scenario_path`); the verdict READ path still accepts `scenario_path` so
+  `pome fix-prompt` can read trials recorded by `@pome-sh/cli` <= 0.8.x.
 - **The CLI (`cli/`) IS a root workspace member** — `workspaces: ["packages/*",
   "cli"]`, one `package-lock.json`, one `npm ci`. Use `npm run -w @pome-sh/cli
   ...` from the root. The former `cli/package-lock.json` and
@@ -62,6 +69,7 @@ The two version INDEPENDENTLY: the CLI is on its own line, the adapter on its
 0.2.x line. There is no lockstep to enforce (nothing published depends on an
 internal version), so there is no sync-versions script. Changesets are gone.
 
+
 ## Invariants ↔ CI checks (P8)
 
 Docs are contracts. Any PR that changes an invariant below must update this
@@ -83,6 +91,9 @@ section in the same PR.
 | Both published tarballs install and run with no access to this workspace; all five twins boot from the CLI tarball; a consumer typechecks against the adapter's shipped declarations | [`scripts/clean-room-pack-test.mjs`](scripts/clean-room-pack-test.mjs) via `npm run test:pack` in [`ci.yml`](.github/workflows/ci.yml) and [`release.yml`](.github/workflows/release.yml) |
 | Package barrels + file-size hygiene | [`scripts/lint-code-health.mjs`](scripts/lint-code-health.mjs) |
 | A published version is never behind npm `latest` — a publish must not retag `latest` backwards (an unpublished package's `0.0.0` baseline passes) | the `plan` job in [`.github/workflows/release.yml`](.github/workflows/release.yml) |
+| Every tool a bundled example registers is answered by the twin it targets, on that example's own task seed. A tool the twin refuses (4xx/5xx) reds the gate naming the example, the tool, and the twin's status; a newly added tool with no probe reds it too, as does an `expect_status` exemption that no longer fires. `typecheck:examples` is green on a well-typed tool whose endpoint 404s and `smoke:examples` returns before any tool fires, which is how `comment_on_pull_request` 404'd in two examples for their entire existence. Needs no model | [`scripts/probe-example-tools.mjs`](scripts/probe-example-tools.mjs) (`npm run probe:examples`) in [`.github/workflows/ci.yml`](.github/workflows/ci.yml), fixture arguments in [`config/example-tool-probes.json`](config/example-tool-probes.json); regression: [`scripts/probe-example-tools.test.mjs`](scripts/probe-example-tools.test.mjs) |
+| Every member of the event union (`otelEventSchema` — the seven `eventSchema` variants plus `OtelSpanEvent`) has at least one wire fixture under `packages/shared-types/test/fixtures/v1/event/<Kind>/`, and the kind list in `trace-contract.json` is enumerated from the zod union rather than typed out. Adding a kind with no fixture, or renaming one and leaving its directory behind, fails BOTH `emit:trace-contract` and `--check` — regenerating is not an escape hatch. The old script read no schema at all: `canonicalSchemas` was a hardcoded four-string literal and the rest was a directory walk, so a new kind moved zero bytes and the byte-compare was green by construction, which is how M1 shipped `LlmTurnEvent` with no fixture anywhere | [`packages/shared-types/scripts/emit-trace-contract.mjs`](packages/shared-types/scripts/emit-trace-contract.mjs) (`npm run check:trace-contract -w @pome-sh/shared-types`) in [`.github/workflows/ci.yml`](.github/workflows/ci.yml); regression: [`packages/shared-types/scripts/emit-trace-contract.test.mjs`](packages/shared-types/scripts/emit-trace-contract.test.mjs). The dropped/renamed half is `typecheck` — `test/export-surface.test.ts` guards the per-kind types, `test/v1-fixture-parity.test.ts` keys its coverage map on `OtelEvent["kind"]` |
+| No emitter writes a bare `parent_id`. It meant four different things depending on which of five writers produced the row — a spawning `event_id` (`wrapQuery`), a raw SDK `tool_use_id` (`hooks`), a hard null (`turn-usage`, and every twin HTTP row), and a mirror of `parent_span_id` (`OtelSpanEvent`) — so reading a trace meant knowing which writer a row came from. The vocab is `parent_event_id` (always the spawning row's `event_id`) plus `causing_tool_use_id` for the meaning that was never a parent edge. The schema still ACCEPTS `parent_id` as a legacy input key, and must: every shipped 0.13.0 emitter writes it and a row that fails to parse is dropped silently, so the tolerant readers stay. That tolerance is exactly why the gate is a linter and not zod — nothing in the type system can stop a new writer emitting the old spelling and having it parse. Allowlist is five reader files, one of which is the Linear twin's own domain model (an issue's parent issue, not an event's parent row) | [`scripts/lint-parent-vocab.mjs`](scripts/lint-parent-vocab.mjs) (`npm run lint:parent-vocab`) in [`.github/workflows/ci.yml`](.github/workflows/ci.yml); regression: [`scripts/lint-parent-vocab.test.mjs`](scripts/lint-parent-vocab.test.mjs) — case 2 locks the quoted-key hole the first version of the gate had |
 
 ## Public Repo Guardrails
 

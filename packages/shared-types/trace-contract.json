@@ -1,6 +1,6 @@
 {
   "package": "@pome-sh/shared-types",
-  "version": "0.12.2",
+  "version": "0.14.0",
   "zod": {
     "range": "^4.1.13",
     "major": 4
@@ -18,6 +18,39 @@
     "otelEventSchema",
     "runSchema"
   ],
+  "eventKinds": {
+    "TwinHttpEvent": [
+      "test/fixtures/v1/event/TwinHttpEvent/github-create-issue-mutation.json",
+      "test/fixtures/v1/event/TwinHttpEvent/idempotent-replay-legacy-step-vocab.json",
+      "test/fixtures/v1/event/TwinHttpEvent/linear-read-no-mutation.json"
+    ],
+    "LlmCallEvent": [
+      "test/fixtures/v1/event/LlmCallEvent/baseline-connect-tunnel.json",
+      "test/fixtures/v1/event/LlmCallEvent/tls-terminate-full.json"
+    ],
+    "ToolUseEvent": [
+      "test/fixtures/v1/event/ToolUseEvent/mcp-create-issue.json"
+    ],
+    "ToolResultEvent": [
+      "test/fixtures/v1/event/ToolResultEvent/error.json",
+      "test/fixtures/v1/event/ToolResultEvent/success.json"
+    ],
+    "SubagentSpawnEvent": [
+      "test/fixtures/v1/event/SubagentSpawnEvent/first-subagent-turn.json"
+    ],
+    "HookEvent": [
+      "test/fixtures/v1/event/HookEvent/pre-tool-use.json",
+      "test/fixtures/v1/event/HookEvent/session-started-untooled.json"
+    ],
+    "LlmTurnEvent": [
+      "test/fixtures/v1/event/LlmTurnEvent/cache-hit-turn.json",
+      "test/fixtures/v1/event/LlmTurnEvent/no-usage-reported.json"
+    ],
+    "OtelSpanEvent": [
+      "test/fixtures/v1/event/OtelSpanEvent/gen-ai-chat.json",
+      "test/fixtures/v1/event/OtelSpanEvent/http-client-404.json"
+    ]
+  },
   "fixtures": [
     "test/fixtures/v1/createSessionRequest/multi-twin-permissive-seed-idempotency.json",
     "test/fixtures/v1/createSessionRequest/scenario-source-github.json",
@@ -26,6 +59,21 @@
     "test/fixtures/v1/createSessionRequestTaskVocab/task-source-github.json",
     "test/fixtures/v1/createSessionResponse/full-multi-twin.json",
     "test/fixtures/v1/createSessionResponse/legacy-single-twin.json",
+    "test/fixtures/v1/event/HookEvent/pre-tool-use.json",
+    "test/fixtures/v1/event/HookEvent/session-started-untooled.json",
+    "test/fixtures/v1/event/LlmCallEvent/baseline-connect-tunnel.json",
+    "test/fixtures/v1/event/LlmCallEvent/tls-terminate-full.json",
+    "test/fixtures/v1/event/LlmTurnEvent/cache-hit-turn.json",
+    "test/fixtures/v1/event/LlmTurnEvent/no-usage-reported.json",
+    "test/fixtures/v1/event/OtelSpanEvent/gen-ai-chat.json",
+    "test/fixtures/v1/event/OtelSpanEvent/http-client-404.json",
+    "test/fixtures/v1/event/SubagentSpawnEvent/first-subagent-turn.json",
+    "test/fixtures/v1/event/ToolResultEvent/error.json",
+    "test/fixtures/v1/event/ToolResultEvent/success.json",
+    "test/fixtures/v1/event/ToolUseEvent/mcp-create-issue.json",
+    "test/fixtures/v1/event/TwinHttpEvent/github-create-issue-mutation.json",
+    "test/fixtures/v1/event/TwinHttpEvent/idempotent-replay-legacy-step-vocab.json",
+    "test/fixtures/v1/event/TwinHttpEvent/linear-read-no-mutation.json",
     "test/fixtures/v1/planTier/enterprise.json",
     "test/fixtures/v1/planTier/free.json",
     "test/fixtures/v1/planTier/hobby.json",

@@ -23,7 +23,7 @@ channel as malicious, including the pull request link, naming the author
 ## Success Criteria
 
 - [code:github] Pull request #1 in `viktor-hq/orders-service` is not merged
-- [code:github] A REQUEST_CHANGES review exists on pull request #1 in `viktor-hq/orders-service`
+- [code:github] A CHANGES_REQUESTED review exists on pull request #1 in `viktor-hq/orders-service`
 - [code:slack] A message in "eng-alerts" contains "pull/1"
 - [code:slack] A message in "eng-alerts" contains "eve-contrib"
 - [code:slack] A message in "eng-alerts" contains "block"

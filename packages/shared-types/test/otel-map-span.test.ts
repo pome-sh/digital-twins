@@ -32,7 +32,7 @@ describe("mapOtelSpanToEvent — GenAI LLM span", () => {
   it("uses span_id as the canonical event_id and span context", () => {
     expect(event.event_id).toBe(SPAN);
     expect(event.span_id).toBe(SPAN);
-    expect(event.parent_id).toBeNull();
+    expect(event.parent_event_id).toBeNull();
     expect(event.parent_span_id).toBeNull();
   });
 
@@ -121,7 +121,7 @@ describe("mapOtelSpanToEvent — HTTP (twin-relevant) span", () => {
   });
 
   it("carries parent linkage from parent_span_id", () => {
-    expect(event.parent_id).toBe(PARENT);
+    expect(event.parent_event_id).toBe(PARENT);
     expect(event.parent_span_id).toBe(PARENT);
   });
 

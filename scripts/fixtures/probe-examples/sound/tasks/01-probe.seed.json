@@ -1,0 +1,16 @@
+{
+  "users": [{ "login": "pome-agent", "type": "User", "name": "Pome Agent" }],
+  "repositories": [
+    {
+      "owner": "acme",
+      "name": "widgets",
+      "default_branch": "main",
+      "collaborators": ["pome-agent"],
+      "files": [{ "path": "README.md", "branch": "main", "content": "# widgets\n" }],
+      "issues": [
+        { "number": 1, "title": "A seeded issue", "body": "so add_issue_comment has a subject", "state": "open" }
+      ],
+      "pull_requests": []
+    }
+  ]
+}

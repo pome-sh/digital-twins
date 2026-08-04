@@ -1,0 +1,42 @@
+{
+  "ts": "2026-08-03T10:15:22.481Z",
+  "run_id": "run_01k2f7q9",
+  "twin": "github",
+  "request_id": "req_01k2f7q9c3",
+  "correlation_id": "corr_01k2f7q9c3",
+  "task_step_id": "open-the-issue",
+  "step_id": "stp_9f2a41",
+  "tool_call_id": "toolu_01WxYzAbCdEf",
+  "method": "POST",
+  "path": "/repos/acme/app/issues",
+  "request_body": {
+    "title": "Retry drops X-PAYMENT",
+    "body": "The second attempt omits the header."
+  },
+  "request_headers": {
+    "accept": "application/vnd.github+json",
+    "content-type": "application/json",
+    "user-agent": "pome-cli/0.12.0",
+    "x-payment": "prepaid-2026-08"
+  },
+  "tool": "create_issue",
+  "status": 201,
+  "response_body": {
+    "number": 41,
+    "state": "open"
+  },
+  "latency_ms": 118,
+  "fidelity": "semantic",
+  "state_mutation": true,
+  "state_delta": {
+    "before": null,
+    "after": {
+      "number": 41,
+      "state": "open"
+    }
+  },
+  "error": null,
+  "kind": "TwinHttpEvent",
+  "event_id": "evt_01k2f7q9c3",
+  "parent_event_id": "evt_01k2f7q9c1"
+}

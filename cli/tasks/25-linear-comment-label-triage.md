@@ -16,9 +16,9 @@ with `parentId`, ensures the label exists, attaches it with `save_issue`, and
 sets `estimate` without contacting any live Linear endpoint.
 
 ## Success Criteria
-- [code] Issue "Needs comment and label triage" has estimate 2
-- [code] Issue has label "Needs triage"
-- [code] A reply comment exists with parentId equal to the seeded root comment
+- [code] Issue "Needs comment and label triage" in `ENG` has estimate 2
+- [code] Issue "Needs comment and label triage" in `ENG` has label "Needs triage"
+- [code] A threaded reply to a seeded comment exists on issue "Needs comment and label triage" in `ENG`
 - [model] The agent confirms the threaded reply, label, and estimate were applied
 
 ## Config

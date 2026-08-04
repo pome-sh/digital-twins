@@ -264,3 +264,28 @@ All optional. Defaults match `npx @pome-sh/cli twin start github`.
 | `POME_REPO_OWNER` / `POME_REPO_NAME` | `acme` / `api` | Override the default repo named in the bundled task. |
 | `TWIN_AUTH_SECRET` | — | The secret the twin was started with. Used to mint the JWT locally when `POME_AUTH_TOKEN` is unset. |
 | `POME_TRIAGE_BASELINE` | unset | Set to `1` to run the **vulnerable** prompt from the injection lesson (default is the hardened prompt). Under `pome run`, also add it to `POME_AGENT_ENV_ALLOWLIST` so it reaches the agent. |
+| `POME_TRIAGE_MODEL` | unset (CLI default) | Pin/downshift the model — an alias (`haiku`, `sonnet`, `opus`) or a full id (`claude-haiku-4-5`). Forwarded as the Agent SDK's `options.model`. Under `pome run`, also add it to `POME_AGENT_ENV_ALLOWLIST` so it reaches the agent. See [Pinning the model](#pinning-the-model). |
+
+### Pinning the model
+
+By default this example sets **no** model, so the Claude Agent SDK runs the
+`claude` CLI's own default (this is why the dashboard shows whatever the CLI
+picked — e.g. `sonnet` — not a model Pome chose). To pin or downshift it, set
+`POME_TRIAGE_MODEL`:
+
+```bash
+POME_TRIAGE_MODEL=claude-haiku-4-5 npm run start
+```
+
+The value is forwarded verbatim to `options.model` and becomes the CLI's
+`--model` flag. Two caveats, both surfaced by the `model:` line the run now
+prints on startup:
+
+- The **runtime** has the final say. A subscription/OAuth login, or an
+  environment/gateway model pin, can override your request.
+- An **unknown id does not error** — the CLI silently falls back to its default.
+
+So don't trust the value you passed; trust the `model:` line, which reports what
+the SDK actually resolved (it's the same `message.model` that feeds the
+dashboard's gen_ai spans). This is the resolution for
+[F-928](https://linear.app/pome-sh/issue/F-928).

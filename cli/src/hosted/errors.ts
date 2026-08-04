@@ -87,6 +87,26 @@ export class HostedTrialError extends Error {
   }
 }
 
+/** F-983 — `DELETE /v1/sessions/:id` refused to destroy a session whose run
+ *  has not been graded. Pome creates the `runs` row at finalize, so an open
+ *  session holds an ungraded run and deleting it discards the evidence. The
+ *  control plane issues `discardToken`; replaying it confirms the discard.
+ *  Deliberately NOT swallowed by `bestEffort` — that flag covers transport
+ *  noise and already-closed races, not a deliberate server refusal. */
+export class HostedDiscardRefusedError extends Error {
+  constructor(
+    message: string,
+    public readonly sessionId: string,
+    public readonly state: string,
+    public readonly taskName: string | null,
+    public readonly openSeconds: number,
+    public readonly discardToken: string,
+  ) {
+    super(message);
+    this.name = "HostedDiscardRefusedError";
+  }
+}
+
 export function exitCodeFor(err: unknown): number {
   if (err instanceof HostedAuthError) return 3;
   if (err instanceof HostedQuotaError) return 4;

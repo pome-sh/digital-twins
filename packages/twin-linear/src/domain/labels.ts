@@ -64,7 +64,7 @@ export async function updateLabel(
     .run(
       input.name ?? null,
       input.color ?? null,
-      "description" in input ? 1 : 0,
+      input.description !== undefined ? 1 : 0,
       input.description ?? null,
       now,
       label.id
