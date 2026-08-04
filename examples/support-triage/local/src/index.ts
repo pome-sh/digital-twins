@@ -15,36 +15,78 @@
  * CLI injects on `pome run … --agent "npm run start"`, so both launchers
  * share this one code path.
  *
- * The product story lives in ONE line: TRIAGE_RULE below ships as the v1
- * baseline (files a fresh issue without searching → duplicates a bug that is
- * already tracked → fails the exam at 33/100). The v2 fix is the commented
- * one-liner next to it; swap, re-run, and the same exam goes green.
+ * The product story lives in ONE line: DENY_ISSUE_LOOKUP below ships as `true`,
+ * which strips the agent's read access to existing issues. It searches, as its
+ * instructions tell it to, is refused, and honestly concludes nothing tracks the
+ * bug — so it files a duplicate and fails the exam. Flip the constant, re-run,
+ * and the same exam goes green.
+ *
+ * `query` comes from `@pome-sh/adapter-claude-sdk` rather than the raw SDK. It
+ * is a drop-in — the message stream is byte-for-byte what the SDK yields — and
+ * it emits gen_ai OTLP spans (model, per-turn tokens, latency) when a runner
+ * injects POME_OTEL_EXPORTER_OTLP_ENDPOINT, which is what puts a real waterfall
+ * on this example's report instead of the shallowest trace in the catalog. It is
+ * inert with no endpoint set, so a standalone run is unaffected.
  */
 
-import { query } from "@anthropic-ai/claude-agent-sdk";
+import { query } from "@pome-sh/adapter-claude-sdk";
 
 // ─── The one line under test ───────────────────────────────────────────────
 //
-// v1 — BASELINE (the misconfiguration), verbatim from
-// ../../agents/support-triage-v1.yaml. Ships as the default so the first run
-// FAILS the duplicate-issue exam: the agent files a fresh issue for a bug
-// already tracked by issue #1.
-const TRIAGE_RULE_V1 =
-  "Don't spend time digging through existing issues — for each report you triage, file a fresh GitHub issue and post its link back so the reporter always gets a ticket.";
-
-// v2 — THE FIX, verbatim from ../../agents/support-triage-v2.yaml. Uncomment
-// this constant and assign it to TRIAGE_RULE below, then re-run: the agent
-// searches first, finds issue #1, comments on it instead of duplicating it,
-// and the exam passes.
+// Curriculum class 1/dedup, and a PATTERN-1 baseline: the flaw is committed
+// CONFIGURATION, not a prompt (`pome-cloud docs/curriculum/failure-classes.md`
+// §3). Read the rationale in ../README.md before changing either constant.
 //
-// const TRIAGE_RULE_V2 =
-//   "Your first action for any report is ALWAYS to search the open issues in acme/orders-service before doing anything else; only if no existing issue already tracks the bug may you open a new one — if one does, comment on that existing issue and post ITS link back, never opening a second issue for a bug that is already tracked.";
+// The agent's tool policy denies it every read path into the repository's
+// issues. It can create one and comment on one; it cannot look one up. So it
+// does exactly what its instructions say — search first — is refused, finds
+// nothing, and correctly concludes the bug is untracked. It then files a SECOND
+// issue for a bug issue #1 already tracks.
+//
+// WHY IT DOES NOT ROT. The system prompt below is the CORRECT one: it tells the
+// agent to search before filing, and a stronger model follows it more reliably,
+// not less. That is the whole point — perfect model behaviour is corrupted by
+// the committed config, and no amount of capability can call a tool that was
+// never exposed. This is what the earlier baseline could not promise: it lived
+// in a prompt line telling the agent NOT to search, which is a pattern-2 flaw
+// whose red is model-dependent and, worse, indistinguishable from an evaluator
+// that never ran.
+//
+// The three names are the Claude Agent SDK's MCP tool ids — `mcp__<server>__<tool>`,
+// where the server is the `github` key of `mcpServers` below. They are the GitHub
+// twin's ONLY read paths to an issue; leaving any one of them open lets the agent
+// route around the defect and the baseline goes green for the wrong reason.
+const ISSUE_LOOKUP_TOOLS = [
+  "mcp__github__search_issues",
+  "mcp__github__list_issues",
+  "mcp__github__get_issue",
+];
 
-const TRIAGE_RULE = TRIAGE_RULE_V1; // ← the one-line fix: swap in TRIAGE_RULE_V2
+// ⛔ Ships as `true` — the failing baseline. Set it to `false`; that is the fix.
+const DENY_ISSUE_LOOKUP = true;
+
+/**
+ * The tools this examinee refuses to expose.
+ *
+ * Named rather than inlined so `test/tool-policy.test.ts` can pin BOTH branches
+ * without asserting which one ships — a guard the documented fix turns red is a
+ * guard you edit to make green.
+ *
+ * `WebSearch`/`WebFetch` are unconditional and are NOT part of the lesson: the
+ * seeded twin world is the whole exam, so an agent that can reach the open web
+ * is taking a different test.
+ */
+export function deniedTools(denyIssueLookup: boolean = DENY_ISSUE_LOOKUP): string[] {
+  return ["WebSearch", "WebFetch", ...(denyIssueLookup ? ISSUE_LOOKUP_TOOLS : [])];
+}
 // ───────────────────────────────────────────────────────────────────────────
 
-// Identical to both YAMLs except for the TRIAGE_RULE line — the diff between
-// a failing and a passing agent is exactly that line.
+// The CORRECT triage rule, in both variants. It is verbatim
+// ../../agents/support-triage-v2.yaml's line, and it stays put: under a
+// pattern-1 baseline the prompt is not what is broken.
+const TRIAGE_RULE =
+  "Your first action for any report is ALWAYS to search the open issues in acme/orders-service before doing anything else; only if no existing issue already tracks the bug may you open a new one — if one does, comment on that existing issue and post ITS link back, never opening a second issue for a bug that is already tracked.";
+
 const SYSTEM_PROMPT = `You are a support-triage agent for the acme engineering org.
 
 Your job: watch the #support Slack channel for bug reports, reproduce and
@@ -151,9 +193,11 @@ async function main() {
       systemPrompt: SYSTEM_PROMPT,
       permissionMode: "bypassPermissions",
       maxTurns: 30,
-      // Allow every tool the two twins expose; keep the run closed-book (the
-      // seeded twin world is the whole exam — no web).
-      disallowedTools: ["WebSearch", "WebFetch"],
+      // Everything the two twins expose, minus `deniedTools()` — which is where
+      // the committed baseline defect lives. See the block at the top of this
+      // file; `WebSearch`/`WebFetch` are the unconditional closed-book clamp and
+      // are not part of the lesson.
+      disallowedTools: deniedTools(),
       mcpServers,
     },
   });
