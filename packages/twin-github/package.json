@@ -1,7 +1,7 @@
 {
   "name": "@pome-sh/twin-github",
   "version": "0.8.2",
-  "description": "Deterministic GitHub-shaped twin for agent testing \u2014 REST + MCP, SQLite-backed state.",
+  "description": "Deterministic GitHub-shaped twin for agent testing — REST + MCP, SQLite-backed state.",
   "private": true,
   "type": "module",
   "main": "./dist/src/index.js",
@@ -15,7 +15,7 @@
       "types": "./dist/src/server.d.ts",
       "default": "./dist/src/server.js"
     },
-    "./package.json": "./package.json"
+undefined
   },
   "files": [
     "dist",
