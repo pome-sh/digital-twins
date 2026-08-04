@@ -68,13 +68,20 @@ pristine; a stronger model may or may not remove the last flake.
 
 ## Reproduce
 
-1. Register two agents on Pome: `register_agent(name="support-triage-v1",
-   twins=["github","slack"])` and the same for `-v2`.
-2. For each, `run_trials(task_id, agent_id, n=5)`; assemble each trial's
-   clone from `examinee_launch` (env clamp, vault `static_bearer` per twin URL,
-   `always_allow` on every `mcp_toolset`, web tools off), model
-   `claude-sonnet-5`, `system` = that version's prompt; kick off with
-   `examinee_task.prompt`.
+> The runs recorded above were made with the two prompts registered as two
+> separate Pome agents. That is no longer the shape to copy: it produces two
+> unrelated identities with no delta between them. The steps below are the
+> current one — one agent, a declared version per run — which is what pairs the
+> two run-sets into a fail→green comparison.
+
+1. Register one agent on Pome: `register_agent(name="support-triage",
+   twins=["github","slack"])`.
+2. `run_trials(task_id, agent_id, agent_version="v1", n=5)`, then the same with
+   `agent_version="v2"` and the v1 run's `group_id` as `baseline_group_id`.
+   For each trial, assemble the clone from `examinee_launch` (env clamp, vault
+   `static_bearer` per twin URL, `always_allow` on every `mcp_toolset`, web
+   tools off), model `claude-sonnet-5`, `system` = that version's prompt; kick
+   off with `examinee_task.prompt`.
 3. Poll the managed-agent session to idle, then `finalize_run(session_id,
    agent_token)` immediately (tape is pulled from the still-live twin session).
 4. The two versions differ by one line — `agents/support-triage-v1.yaml` vs

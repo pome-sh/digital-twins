@@ -42,22 +42,23 @@ open issue #1 for the coupon bug, then `#support` receives a *new* report of the
 
 ## Run it against Pome
 
-The two versions are exercised as **two distinct agents** end-to-end, so the
-dashboard shows two separate identities with separate scores.
+The two versions are **one agent at two declared versions**, so the dashboard
+can show the v1→v2 delta rather than two unrelated identities with no
+relationship between them.
 
 1. **Register on Cloud Managed Agents** — create each agent from its YAML on
    Anthropic's Managed Agents platform (`ant beta:agents create`, model
    `claude-sonnet-5`).
-2. **Register on Pome** (control MCP) — one call per version, so each accrues its
-   own history:
+2. **Register on Pome** (control MCP) — once. The version is not part of the
+   identity; it is declared per run in step 3:
    ```
-   register_agent(name="support-triage-v1", twins=["github","slack"])
-   register_agent(name="support-triage-v2", twins=["github","slack"])
+   register_agent(name="support-triage", twins=["github","slack"])
    ```
-3. **Run** — for each agent id, `run_trials(task_id, agent_id, n=5)`. Each
-   trial returns an `examinee_launch` spec (per-session twin MCP URLs, a bearer,
-   `always_allow`, a `network.mode: limited` clamp, web tools off). Assemble the
-   examinee clone from that spec (mirrors
+3. **Run** — `run_trials(task_id, agent_id, agent_version="v1", n=5)`, then the
+   same call with `agent_version="v2"`. Each trial returns an `examinee_launch`
+   spec (per-session twin MCP URLs, a bearer, `always_allow`, a
+   `network.mode: limited` clamp, web tools off). Assemble the examinee clone
+   from that spec (mirrors
    `pome-run-task/references/launch-managed-agent.md`), give it
    `examinee_task.prompt`, and let it work.
 4. **Finalize** — `finalize_run(session_id, agent_token)` the instant the
@@ -65,8 +66,13 @@ dashboard shows two separate identities with separate scores.
    `get_report` for the score. Tear the clone down afterward — clones are
    ephemeral, one per trial.
 
-The self-fix loop is the swap between step 3's two agents: run v1 → watch it fail
-by filing a duplicate → switch to v2 (the one-line fix) → watch it pass.
+The self-fix loop is the swap between step 3's two versions: run v1 → watch it
+fail by filing a duplicate → re-run as v2 (the one-line fix) → watch it pass.
+Declare the version on **both** runs. Run-sets are partitioned by
+`(agent, task, agent_version)`, so two runs under one label are read as one
+agent tried twice — and the v1→v2 improvement gets reported as that agent
+being unreliable. Pass the v1 run's `group_id` as the v2 run's
+`baseline_group_id` and the report pairs them into a fail→green comparison.
 
 ## Local examinee
 
