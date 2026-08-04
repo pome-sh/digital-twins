@@ -59,11 +59,14 @@ https://mcp.pome.sh/mcp`) so the `run_task` / `finalize_run` / `get_report` /
 
 ## The run loop
 
-1. **Mint** — `run_task(task_id, agent_id, group_id)` → `session_id`,
-   `agent_token` (SENSITIVE, memory-only), `examinee_task`, `examinee_launch`.
-   Mint the `group_id` upfront so an attempt's trials aggregate as one exam (a
-   post-fix rerun opens a new group and links back — see step 5); for a `runs: N`
-   task use `run_trials(n, task_id, group_id)`, the batch form. Heal a
+1. **Mint** — `run_task(task_id, agent_id, agent_version, group_id)` →
+   `session_id`, `agent_token` (SENSITIVE, memory-only), `examinee_task`,
+   `examinee_launch`. Pass `agent_version` from the manifest's `agent.version`
+   on every run — run-sets are partitioned by it, so an unversioned run cannot
+   be told apart from a later one. Mint the `group_id` upfront so an attempt's
+   trials aggregate as one exam (a post-fix rerun opens a new group, bumps the
+   version, and links back — see step 5); for a `runs: N` task use
+   `run_trials(n, task_id, agent_version, group_id)`, the batch form. Heal a
    `twins not enabled` 400 with one additive `register_agent` (F-784).
 2. **Launch** — dispatch on the Runtime line: managed agent → `ant`
    (`references/launch-managed-agent.md`); anything else → REST
@@ -76,9 +79,11 @@ https://mcp.pome.sh/mcp`) so the `run_task` / `finalize_run` / `get_report` /
    `hosted`, the `app.pome.sh` link.
 5. **Fix loop** — on a failure, hand the report's `## Handoff (fix prompt)` to the
    builder; they edit the **examinee** prompt; re-run only the failed tasks
-   (same `agent_id`) as a fresh run-set — a **new** `group_id` carrying the
-   failing run's group_id as `baseline_group_id` (the report's `## Rerun after
-   fixing` section pre-fills both); diff the two reports and show the delta.
+   (same `agent_id`, a **new** `agent_version` — the edited prompt is a
+   different thing under test) as a fresh run-set — a **new** `group_id`
+   carrying the failing run's group_id as `baseline_group_id` (the report's
+   `## Rerun after fixing` section pre-fills all three); diff the two reports
+   and show the delta.
    Anti-cheat guardrail: never weaken a criterion/`passThreshold` or edit the
    seed to force a green — a criterion fix goes back through author/verify.
 

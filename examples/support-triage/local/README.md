@@ -42,9 +42,12 @@ This folder is built to be spawned as a **local subprocess** by the coach
    cd support-triage-local && npm install
    ```
 
-2. **Mint the run** — `run_task(task_id, agent_id)` seeds live twin sandboxes
-   and returns `examinee_task` (the kickoff prompt) and `examinee_launch`
-   (per-twin MCP URLs + the session bearer).
+2. **Mint the run** — `run_task(task_id, agent_id, agent_version="v1")` seeds
+   live twin sandboxes and returns `examinee_task` (the kickoff prompt) and
+   `examinee_launch` (per-twin MCP URLs + the session bearer). Declare the
+   version: after you swap in the fix below, the re-run declares `"v2"`, and
+   that is what keeps the failing run and the fixed one from being read as one
+   agent tried twice.
 
 3. **Spawn with the env contract** — map the spec onto the env and start the
    process:
