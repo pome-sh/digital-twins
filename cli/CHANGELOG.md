@@ -1,5 +1,53 @@
 # Changelog
 
+## 0.19.0
+
+### Minor Changes
+
+- [#296](https://github.com/pome-sh/digital-twins/pull/296) [`396b956`](https://github.com/pome-sh/digital-twins/commit/396b956b8df96bb047aca14fe38cbef334ae940d) Thanks [@AFFFPupu](https://github.com/AFFFPupu)! - Re-pinned the bundled `@pome-sh/*` packages to the packages-v30 batch:
+  shared-types 0.14.0, sdk 0.11.0, the five twins.
+
+  These are `bundleDependencies`, frozen into the tarball at publish time rather
+  than resolved at install, so the re-pin only reaches users through a CLI
+  version bump. The batch carries the F-1200 parent-vocabulary change: a recorded
+  row now names the tool call that caused it via `parent_event_id`, and the
+  CLI's post-run merge resolves that parent.
+
+- [#295](https://github.com/pome-sh/digital-twins/pull/295) [`ed61ae9`](https://github.com/pome-sh/digital-twins/commit/ed61ae9a99fb9ee8d4a55e5b482dc94a057b0d93) Thanks [@AFFFPupu](https://github.com/AFFFPupu)! - A twin HTTP row in `events.jsonl` now names the tool call that caused it.
+
+  The post-run merge resolves each `TwinHttpEvent`'s `parent_event_id` to the
+  `event_id` of the `ToolUseEvent` that made the call, keyed on the SDK's real
+  `tool_use_id`. Previously every twin row carried a null parent, so a trace was
+  either a tool tree or a flat list of twin calls, never one tree.
+
+  Wire vocab: emitters write `parent_event_id` (the spawning row's `event_id`) or
+  `causing_tool_use_id`, replacing `parent_id`, which meant four different things
+  depending on which writer produced the row. Recordings written by older
+  versions still parse — `parent_id` is accepted as a legacy input key and
+  normalized on read.
+
+### Patch Changes
+
+- [#294](https://github.com/pome-sh/digital-twins/pull/294) [`2e40227`](https://github.com/pome-sh/digital-twins/commit/2e402271604d2df4679becd373de4283d343d7d3) Thanks [@AFFFPupu](https://github.com/AFFFPupu)! - Re-pin the bundled twins and sdk onto packages-v29, so `pome checks` can see the state citations.
+
+  The batch: `@pome-sh/sdk` 0.10.1, `@pome-sh/twin-github` 0.8.1,
+  `@pome-sh/twin-gmail` 0.3.1, `@pome-sh/twin-linear` 0.3.1,
+  `@pome-sh/twin-slack` 0.3.1, `@pome-sh/twin-stripe` 0.4.2.
+
+  F-1197 gives every state-reading check a `CheckOutcome.evidenceStatePaths` — RFC
+  6901 pointers into the twin's exported state tree, saying which field the verdict
+  was read off. 37 of the 45 declared checks could previously cite nothing at all,
+  because only a `substrate: "tape"` check can fill `evidenceEventIds`.
+
+  This is a re-pin rather than a `cli/src/**` change, and it still needs a release:
+  these six are `bundleDependencies`, frozen into the tarball at publish time
+  rather than resolved at install, so without a version bump the moved pin never
+  reaches anyone. F-1132 is the six hours that rule was learned in.
+
+  No CLI behaviour changes. `checksDigest` hashes `{id, substrate, pattern}` only
+  and none of those moved, so `pome checks` renders the same sentences and
+  `vocabulary-skew` sees no drift against a cloud on the same batch.
+
 ## 0.18.0
 
 ### Minor Changes
