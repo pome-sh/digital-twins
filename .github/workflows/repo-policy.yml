@@ -13,6 +13,8 @@ on:
     paths:
       - "scripts/ci/assert-repo-policy.sh"
       - "scripts/ci/assert-repo-policy.test.mjs"
+      # F-1180 — the required-context list moved here; this script now reads it.
+      - "config/required-checks.json"
       - ".github/workflows/repo-policy.yml"
       - ".github/workflows/dependency-review.yml"
       - ".github/workflows/ci.yml"
