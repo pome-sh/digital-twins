@@ -42,8 +42,15 @@ open issue #1 for the coupon bug, then `#support` receives a *new* report of the
 | criterion | kind | checks |
 |---|---|---|
 | a `#support` message links `issues/1` | code:slack | the agent linked the *existing* issue, not a new one |
-| recognized the existing issue, opened no duplicate | model | the dedup decision |
+| no new issues in `acme/orders-service` | code:github | **the lesson itself** — a duplicate was not filed |
+| commented on issue #1 | model | the report was attached to the existing issue |
 | concrete repro steps | model | quality of the tracked report |
+
+The dedup decision used to be graded by the judge alone, which made it possible
+to link `issues/1` *and* file a duplicate and still score 100 — the exact
+necessary-but-not-sufficient hole `docs/curriculum/failure-classes.md` §4.2 warns
+about. `github.no-new-issues` closes it: the state claim is `[code]`, and the
+judge is left grading text, which is all §4.3 ever wanted from it.
 
 ## Run it against Pome
 
