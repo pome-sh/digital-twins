@@ -9,6 +9,12 @@
   "prConcurrentLimit": 1,
   "prHourlyLimit": 0,
   "rebaseWhen": "conflicted",
+  "labels": ["dependencies"],
+  "rangeStrategy": "bump",
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["* 0-5 1,15 * *"]
+  },
   "packageRules": [
     {
       "description": "Batch every non-major update (npm, docker, github-actions) into a single PR so we never see more than one routine dependency PR at a time.",
@@ -17,8 +23,21 @@
       "groupSlug": "all-non-major"
     },
     {
-      "description": "Do NOT bump actions/setup-node to v7 — v7 changed how registry-url writes .npmrc and breaks OIDC Trusted Publishing (ENEEDAUTH). Pinned to v6.x. See .github/workflows/sdk-publish.yml and actions/setup-node#1551.",
+      "description": "Release-gated @pome-sh/* pins (cli + packages). Renovate must not bump them from npm.",
+      "matchManagers": ["npm"],
+      "matchPackageNames": ["/^@pome-sh//"],
+      "enabled": false
+    },
+    {
+      "description": "Known-risky majors — keep on current major until an intentional human PR (TS ≥6, Linear SDK 55→89, GraphQL 17).",
+      "matchPackageNames": ["typescript", "@linear/sdk", "graphql"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    },
+    {
+      "description": "Publish job stays on setup-node v6 (OIDC npmrc / ENEEDAUTH). Do not major-bump remaining v6 pins. See sdk-publish.yml and actions/setup-node#1551.",
       "matchDepNames": ["actions/setup-node"],
+      "matchCurrentVersion": "/^v?6\\./",
       "matchUpdateTypes": ["major"],
       "enabled": false
     }
