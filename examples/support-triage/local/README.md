@@ -11,27 +11,47 @@ The exam it takes is the pack's task,
 [`../tasks/duplicate-issue.md`](../tasks/duplicate-issue.md): a customer
 re-reports a bug that open issue #1 already tracks.
 
-## The fix ("33, not 0")
+## ⚠️ The baseline below does not fail. Measured, twice.
 
-The whole product story is **one line** of committed configuration —
+`DENY_ISSUE_LOOKUP = true` is **green**, on `claude-opus-5`, n=5 each, hosted:
+
+| configuration | pass rate |
+|---|---|
+| as shipped 2026-08-04, open sandbox | 25 · 100 · 100 · 100 · 100 — **4/5** |
+| sandbox closed (`tools: []`), denial unchanged | 100 × 5 — **5/5** |
+| no denial at all, closed sandbox (the control) | 100 × 5 — **5/5** |
+
+**No trial filed a duplicate** — the behaviour the whole lesson is built around.
+Run ids and the routes the agent used are in
+[`../VERIFICATION.md`](../VERIFICATION.md); the re-cut is
+[F-1292](https://linear.app/pome-sh/issue/F-1292). Treat this folder as a working
+local examinee with a **known-green** placeholder defect, not as a lesson.
+
+## What the one line was supposed to do
+
+The product story was meant to live in **one line** of committed configuration —
 `DENY_ISSUE_LOOKUP` in [`src/index.ts`](./src/index.ts):
 
-- **`true` (ships as the default — fails).** The agent's tool policy denies it
-  every read path into the repository's issues (`search_issues`, `list_issues`,
-  `get_issue`). Its system prompt is the *correct* one — search before filing —
-  so it reaches for the lookup, is refused, honestly concludes nothing tracks
-  the bug, and files a **duplicate**. It scores **33, not 0**: the agent does
-  real work (its report has concrete repro steps) and flunks the
-  duplicate-detection criteria — exactly the failure a happy-path demo never
-  shows.
-- **`false` (the one-line fix — passes).** Flip the constant, re-run, and the
-  same exam goes green: the agent searches, finds issue #1, comments on it, and
-  posts *its* link back.
+- **`true` (ships as the default — was expected to fail).** The agent's tool
+  policy denies it three read paths into the repository's issues
+  (`search_issues`, `list_issues`, `get_issue`). Its system prompt is the
+  *correct* one — search before filing — so the theory was that it reaches for
+  the lookup, is refused, honestly concludes nothing tracks the bug, and files a
+  **duplicate**, scoring 33 rather than 0.
+- **`false` (the one-line "fix").** The agent searches, finds issue #1, comments
+  on it, and posts *its* link back.
 
-This is a **pattern-1** baseline in the curriculum's terms
-(`pome-cloud docs/curriculum/failure-classes.md` §3): the flaw is in the code
-and config layer, so a stronger model cannot rescue it — it follows the correct
-instruction *more* reliably and simply gets refused faster.
+What actually happens is that the agent reaches issue #1 anyway, through paths
+the three names do not cover: `list_issue_comments` and `update_issue` (a write
+that 404s on a missing issue), both used in **5 of 5** trials once the shell was
+taken away. So the two variants produce the same behaviour and the same score.
+
+It was filed as a **pattern-1** baseline in the curriculum's terms
+(`pome-cloud docs/curriculum/failure-classes.md` §3) on the theory that a flaw in
+the config layer cannot be rescued by a stronger model. The theory does not hold
+for a *denial*: the model does not need to route around the denied tool, it only
+needs any other tool that answers the same question. §3's own words, now earned:
+a denial is only as strong as its enumeration.
 
 The managed-agent pair next door (`../agents/support-triage-v1.yaml` vs
 `…-v2.yaml`) tells the same fail → fix → pass story through a *prompt* flaw, on
@@ -123,8 +143,27 @@ per-session bearer the runner injects as `POME_AUTH_TOKEN`.
 ```
 src/index.ts             the examinee — env wiring, the DENY_ISSUE_LOOKUP defect, the SDK loop
 test/env.test.ts         unit test for the launch env contract (npm test)
-test/tool-policy.test.ts the lesson pinned as a property — both branches, neither shipped value
+test/tool-policy.test.ts two properties — the deny-list's branches, and the closed sandbox
 ```
+
+### The closed sandbox
+
+`options.tools: []` gives the model **no SDK built-in at all** — no `Bash`,
+`Read`, `Glob`, `Grep`, `Write`, `Edit`, `WebSearch` or `WebFetch`. Only the two
+twins' MCP tools reach it, because those come from `mcpServers` rather than from
+the built-in set (verified from the SDK's `init` message: 100 tools, all
+`mcp__*`).
+
+This is an **allowlist**, deliberately, rather than more names in
+`disallowedTools`. Until 2026-08-05 every built-in was live, and one measured
+trial in five used `Bash` to `cat` this examinee's own source and identify the
+fixture — with `../tasks/duplicate-issue.md`, which carries all four grading
+criteria and the complete seed state, one directory away. An examinee that can
+read its own criteria is not sitting an exam.
+
+Note that `allowedTools` would **not** have closed it: it only auto-approves and
+does not restrict. Measured — `allowedTools` naming a single MCP tool left 152
+tools live, `Bash` and `Read` among them.
 
 `npm run typecheck` type-checks; `npm test` runs the env-contract test. This
 package is intentionally **not** part of the root npm workspace — install and

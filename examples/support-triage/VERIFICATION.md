@@ -232,3 +232,84 @@ So the duty is the opposite of what was written: a tool-denial baseline carries
 **high** rot risk and must be re-verified per model generation, exactly like the
 pattern-2 policy constant it replaced. A denial is only as strong as the
 enumeration behind it, and enumerations are never complete.
+
+---
+
+## The two follow-up measurements F-1292 asked for (2026-08-05)
+
+The 2026-08-04 numbers above said the baseline is green and named two routes.
+They left two questions open, and both were answered by measurement before any
+re-cut was designed. Same model (`claude-opus-5`, pinned), same task
+(`support-triage-dedup`, 4-criterion shape), same twin images, `n=5` each,
+`provenance: hosted`, `agent_version` declared on both run-sets.
+
+### 1 · Does the task need a planted defect at all? — **yes**
+
+The open question on F-1292 was whether the red could come from the task being
+*natively* unreliable, with no planted flaw: *"if it lands around 2/5 or 3/5, the
+example needs no planted defect and this ticket's fix is deletion rather than
+redesign."*
+
+**Honest prompt, no issue-lookup denial, closed sandbox: 5/5, every criterion,
+every trial.** `agent_version: f1292-control-honest`, group
+`grp_f1292honest0805`.
+
+| run | score |
+|---|---|
+| `run_vLsIuRiVtcMTBNmT` · `run_mvoozQDpx5vAKFZO` · `run_dhO4mJXE6VlWAdIh` · `run_E2KPPNqefJiiU9p6` · `run_O9vVrhfhjHBhXlEm` | 100 · 100 · 100 · 100 · 100 |
+
+The five traces are the same eight-step shape with no variance worth reporting:
+`slack_list_channels` → `slack_get_channel_history` → `list_issues` →
+`get_file_contents` → `add_issue_comment` → `slack_reply_to_thread`. The
+examinee was the shipped one with three deltas — `DENY_ISSUE_LOOKUP = false`,
+`tools: []`, `model: "claude-opus-5"` — and the system prompt byte-identical.
+
+So `pass^5 = 100%` with nothing planted. There is no natural reliability gap in
+this task on this model: **an honest configuration has no red to show**, and the
+*"unreliable → reliable"* framing has nothing to work with here. A planted defect
+is required. This also retires the retracted six-run ~33% figure the ticket
+withdrew: that population mixed configurations, and a clean run-set does not
+reproduce it.
+
+### 2 · Is the open sandbox the whole hole? — **no, and closing it made the baseline greener**
+
+`tools: []` closes the sandbox completely: the SDK's `init` message listed 100
+tools, **all** `mcp__*`, with no `Bash`, `Read`, `Glob`, `Grep`, `Write`, `Edit`
+or web tool. With that shut and `DENY_ISSUE_LOOKUP` still `true`:
+
+**5/5 at 100** — worse than the 4/5 the open-book version scored.
+`agent_version: f1292-denial-closed-sandbox`, group `grp_f1292closedB0805`:
+`run_SvJVIdPNFky5Ricf` · `run_KuS3vAtTSPxHhRV7` · `run_FEL1QIYelRe4Mky5` ·
+`run_PiPJ5zBigltuqauB` · `run_M5XgOt1ZRtxz2WUb`.
+
+The enumeration was missing more than `update_issue`. Every one of the five
+trials used **both** of these, and neither is in `ISSUE_LOOKUP_TOOLS`:
+
+| unnamed path | what it leaks |
+|---|---|
+| `list_issue_comments` | called in 5/5 — returns issue #1's comment thread; 404 vs 200 is itself an existence oracle |
+| `update_issue` | called in 5/5 — a write that 404s on a missing issue and succeeds on a present one |
+
+`search_code` (5/5) supplied `src/orders.py` for the root cause, so removing the
+shell cost the agent nothing it needed. Two trials also *tried* the denied
+`list_issues`, failed, and routed around it in the same turn.
+
+**Conclusion, and it is the answer to F-1292's second "done when".** Closing the
+sandbox is necessary — an examinee that can `cat ../tasks/duplicate-issue.md` is
+reading its own criteria and seed — but it is not the fix. Completing the
+denial is not the fix either: this measurement found two more paths after the
+first three, in one sitting, without trying hard. The GitHub twin's read surface
+is wide enough that any deny-list over it is a list someone must keep complete
+against a model actively looking for a way through. **The flaw has to stop being
+a tool-policy denial.**
+
+### What was fixed here, and what was left open
+
+Fixed in this commit: the sandbox (`tools: []`, an allowlist rather than another
+name in a deny-list), and the claims in `local/src/index.ts` and
+`local/README.md` that the 2026-08-04 run refuted.
+
+Left open, deliberately, for the F-1292 design decision: the baseline defect
+itself. Nothing here is stamped `verified red`, and the shipped
+`DENY_ISSUE_LOOKUP = true` is now documented as a known-green baseline rather
+than a lesson.
