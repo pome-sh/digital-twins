@@ -4,7 +4,7 @@
 // (FDRS-657). CAPTURE-ONLY: no LLM/judge call happens here. The former BYOK
 // CLI-side judge call (`callJudge`) that generated the handoff was removed;
 // this now returns the fully-assembled prompt (system instructions + the
-// scenario's criteria + the captured trace) for the developer to paste into
+// task's criteria + the captured trace) for the developer to paste into
 // their own coding assistant.
 
 import {
@@ -16,7 +16,7 @@ import {
 } from "./prompt.js";
 
 /**
- * Build the paste-into-IDE fix prompt from the raw trace + the scenario's
+ * Build the paste-into-IDE fix prompt from the raw trace + the task's
  * criteria. PURE + synchronous — no network, no LLM, no local judge.
  *
  * The output is a complete prompt: the system instructions (how to write the

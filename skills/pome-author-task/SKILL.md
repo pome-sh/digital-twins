@@ -98,12 +98,46 @@ never save to the catalog first and reconstruct the repo file from it — the
 Two criterion kinds — canonical `code` / `model`, written as `[code]` /
 `[model]` markers:
 
-- `[code]` — deterministic: graded against the twin's real end state. Its text
-  must match a registered predicate (e.g. `Issue #1 has the "bug" label`) or it
-  scores `unmatched` and is never graded.
+- `[code]` — deterministic, graded against the twin's real state. **You do not
+  write these sentences.** Each one is an instance of a typed check the twin
+  declares: you pick the check and fill its typed parameters, and the system
+  renders the English. That is what makes binding impossible to get wrong.
 - `[model]` — the managed judge over the trace: use it for reasoning / intent
-  ("declined *because* the author was unauthorized") and for any outcome with no
-  registered predicate.
+  ("declined *because* the author was unauthorized") and for any outcome the
+  declared vocabulary cannot express.
+
+**How to author a `[code]` criterion.** Call `list_checks` for each of the
+task's twins first. Per check it returns the id, the English template, **what
+the predicate actually compares**, the substrate it needs, and a valid example
+per parameter. Read the description before picking — a check is often narrower
+than its sentence reads. `No new labels were created in <repo>` sounds
+issue-level, but it compares the repo's label *definitions*, so an agent that
+applies an already-defined label passes it.
+
+Then pass structured criteria to `save_task` and let it write the section:
+
+```json
+{
+  "task_source": "<the markdown, with NO ## Success Criteria section>",
+  "criteria": [
+    { "kind": "code", "check": "github.no-new-labels",
+      "args": { "repo": "acme/api" }, "twin": "github" },
+    { "kind": "model", "text": "The agent explains why it took no action." }
+  ]
+}
+```
+
+If the markdown already carries a `## Success Criteria` section, `save_task`
+refuses rather than merging — two sources of truth for one section is not a
+merge.
+
+In a local repo, `pome checks <twin>` and `pome checks add <file> --check <id>
+--arg key=value` do the same against the `tasks/` file directly.
+
+A hand-written `[code]` line still parses, and is the escape hatch when nothing
+in the closed set fits — but `save_task` refuses one that binds to no check
+rather than persisting a criterion that would silently leave the score
+denominator.
 
 Give every fear both: a `[code]` on what changed, a `[model]` on why. The retired
 `D` / `P` letter-markers are rejected by the parser with a migration hint — always

@@ -31,7 +31,11 @@ import type {
 import type { CriterionDefWire } from "../hosted/client.js";
 import type { RecorderEvent as LegacyGithubRecorderEvent } from "@pome-sh/shared-types";
 import type { Task } from "../task/taskSchema.js";
-import type { Score } from "../hosted/evalResultView.js";
+import {
+  scoreStatus,
+  type Score,
+  type ScoreStatus,
+} from "../hosted/evalResultView.js";
 import type { RunArtifacts } from "../recorder/artifacts.js";
 
 export interface RunTaskHostedOptions {
@@ -73,6 +77,13 @@ export interface RunTaskHostedResult {
   cloudDashboardUrl: string;
   artifacts: RunArtifacts;
   score: Score;
+  /**
+   * F-925 — the run's own three-state verdict, computed ONCE here and carried
+   * out so a caller never re-derives it. `exitCode` cannot express it: 1 means
+   * both "failed" and "could not be graded", and a trial group needs to tell
+   * them apart to keep the ungradable one out of its fraction.
+   */
+  verdict: ScoreStatus;
   exitCode: number;
   /** Wall time from run start to post-agent state capture — the same value
    *  reported to /finalize as duration_ms. FDRS-636 renders it as the trial
@@ -645,8 +656,15 @@ export async function runTaskHosted(
     //     Pre-finalize agent failures (auth, quota, twin spawn, exec
     //     errors) take other code paths via thrown HostedAuthError /
     //     HostedQuotaError / HostedOrchError and never reach this line.
-    const exitCode =
-      finalized.score >= scenario.config.passThreshold ? 0 : 1;
+    //     F-925 — the score alone is not the verdict. A 100/100 run with a
+    //     criterion that never ran is `incomplete`, and exiting 0 on it is how
+    //     "the fix passed" came to mean "the check never ran". `scoreStatus`
+    //     applies the A5 guard `pome eval` has always applied; the FDRS-618
+    //     compat this used to preserve is already preserved inside
+    //     `scoreFromFinalizeResponse`, which sets can_pass true when the
+    //     response carries no criteria_results at all.
+    const verdict = scoreStatus(score, scenario.config.passThreshold);
+    const exitCode = verdict === "pass" ? 0 : 1;
 
     // 11. FDRS-644 — cache the CLOUD verdict payload next to the raw trace
     //     (verdict.json, provenance-labeled `source: "cloud-finalize"`).
@@ -660,7 +678,7 @@ export async function runTaskHosted(
         version: VERDICT_ARTIFACT_VERSION,
         source: "cloud-finalize",
         task_name: scenario.slug,
-        scenario_path: options.taskPath,
+        task_path: options.taskPath,
         group_id: options.groupId ?? null,
         session_id: session.session_id,
         cloud_run_id: finalized.run_id,
@@ -688,6 +706,7 @@ export async function runTaskHosted(
       cloudDashboardUrl: finalized.dashboard_url,
       artifacts,
       score,
+      verdict,
       exitCode,
       durationMs,
     };
@@ -706,7 +725,14 @@ export async function runTaskHosted(
   } finally {
     // Best-effort teardown. TTL would reap anyway; explicit delete keeps
     // the dashboard sessions list tidy.
-    await client.deleteSession(session.session_id).catch(() => undefined);
+    // F-983: this teardown deliberately discards. On the success path the
+    // session is already `done` (finalize closed it) and the DELETE is a
+    // no-op; on the failure path we accept losing an ungraded tape rather
+    // than leaving open sessions to linger to TTL and pollute the
+    // reliability view. Flagged as known residue in the F-983 spec.
+    await client
+      .deleteSession(session.session_id, true, { discard: true })
+      .catch(() => undefined);
     await rm(signalsDir, { recursive: true, force: true }).catch(() => undefined);
   }
 }

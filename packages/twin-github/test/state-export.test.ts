@@ -39,6 +39,56 @@ describe("state export", () => {
     });
   });
 
+  // F-1151 — the third comment surface on a pull request, and the one the twin
+  // could not record at all before: `add_issue_comment` on a PR number failed the
+  // `issue_comments` FK, so a summarising agent's only write path 404'd.
+  it("exports a pull request's conversation comments separately from its reviews and inline comments", () => {
+    const domain = new GitHubDomain(openGitHubCloneDatabase());
+    domain.seed({
+      users: [{ login: "alice", type: "User", name: "Alice" }],
+      repositories: [
+        {
+          owner: "acme",
+          name: "widgets",
+          default_branch: "main",
+          collaborators: ["alice"],
+          files: [
+            { path: "widget.py", content: "def total():\n    return 1\n", branch: "main" },
+            { path: "widget.py", content: "def total(discount=0):\n    return 1\n", branch: "add-discount" }
+          ],
+          // No `issues` at all — exactly the shape the pr-summary seeds carry, and
+          // the shape that used to make a PR comment impossible.
+          pull_requests: [{ number: 1, title: "Add discount", head: "add-discount", base: "main" }]
+        }
+      ]
+    });
+
+    domain.addIssueComment({ owner: "acme", repo: "widgets", issue_number: 1, body: "Summary: adds an optional discount." });
+    domain.createPullRequestReview({ owner: "acme", repo: "widgets", pull_number: 1, event: "COMMENT", body: "a review body" });
+    domain.createPullRequestReviewComment({
+      owner: "acme",
+      repo: "widgets",
+      pull_number: 1,
+      path: "widget.py",
+      line: 1,
+      body: "an inline comment"
+    });
+
+    const repo = domain.exportState().repositories.find((item) => item.full_name === "acme/widgets");
+    const pull = repo?.pull_requests.find((item) => item.number === 1);
+    // All three surfaces present and DISTINCT: `github.pr-comment-exists` reads
+    // only the first, and the point of exporting them apart is that a predicate
+    // can say which one it read.
+    expect(pull?.comments).toEqual([
+      expect.objectContaining({ body: "Summary: adds an optional discount." })
+    ]);
+    expect(pull?.reviews).toEqual([expect.objectContaining({ body: "a review body" })]);
+    expect(pull?.review_comments).toEqual([expect.objectContaining({ body: "an inline comment" })]);
+    // The comment hangs off the PR and nothing else — there is no issue #1 to
+    // have absorbed it.
+    expect(repo?.issues).toEqual([]);
+  });
+
   it("preserves the seeded pull request author as user_login on export", () => {
     const domain = new GitHubDomain(openGitHubCloneDatabase());
     const seed = parseSeed({

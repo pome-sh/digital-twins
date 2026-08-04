@@ -88,15 +88,22 @@ as prose, not rejected. `- [Code] ...` (wrong case), `- [code : github] ...`
 (spaces), or a missing bullet all silently produce no criterion, so re-count
 your criteria in the `validate_task` output.
 
-One grading caveat that the parser does NOT check: a `[code]` criterion is
-graded by matching its text against a per-twin registry of deterministic
-predicates (e.g. `Issue #1 has the "bug" label`, `Comment containing "X"
-appears on issue #1`, `A message in the "#general" channel contains "X"`).
-A `[code]` whose phrasing matches no registered predicate parses fine but
-scores `unmatched` — it is never graded. Dry-run your criteria with
-`evaluate_criteria` (and `verify_seed` for pre-pass checks) before saving.
-Outcomes with no registered predicate (like "the issue is closed") belong
-in a `[model]` criterion instead.
+`[code]` criteria are not free text. Each one is an instance of a typed check
+a twin declares, and the system renders the English from your pick — so the
+sentence and the predicate cannot disagree. Get the closed set from
+`list_checks` (hosted) or `pome checks <twin>` (CLI), then pass structured
+`criteria` to `save_task`, or run `pome checks add <file> --check <id> --arg
+key=value`. You never type the sentence.
+
+A hand-written `[code]` line still parses, but `save_task` refuses one that
+binds to no check rather than persisting a criterion that would silently leave
+the score denominator. `validate_task` reports `bound_to` per `[code]`
+criterion — the check it will be graded by, `null` when it binds to nothing, or
+`"not_checked"` when the vocabulary was unreachable. An outcome the declared
+vocabulary cannot express belongs in a `[model]` criterion instead.
+
+Dry-run with `evaluate_criteria` (and `verify_seed` for pre-pass checks) before
+saving.
 
 Twin-tag validation, exactly as the parser enforces it:
 

@@ -34,7 +34,7 @@ Triage each `already_passing` entry by intent, then judge:
 | Any non-guard criterion passes at seed | **BROKEN** — the exam is pre-won; weaken the seed or restate the criterion |
 | All criteria pass at seed | **BROKEN** — grades nothing, no matter what the verdict says |
 | No positive discriminator exists at all | **BROKEN** — even if nothing pre-passes; a crashed agent scores full marks |
-| Any `code` criterion is `unmatched` | **Authoring error** — no registered predicate; route back to `pome-author-task` |
+| Any `code` criterion is `unmatched` | **Authoring error** — the text is not an instance of any declared check. Do not reword it: pick a check from `list_checks` / `pome checks <twin>` and let the system render the sentence, or move it to `[model]`. Route back to `pome-author-task` |
 
 ## Fast path (default — in-process, free, no session)
 
@@ -69,12 +69,22 @@ costs one session slot; offer it, don't default to it.
    the file is on the branch. A 404 on a probe may be session expiry — check
    `get_session` before blaming the seed.
 3. **Mutation hole**: if any probe mutated state (a POST slipped in, a tool had
-   side effects), the session no longer shows the seed — `stop_session` and
-   re-mint before probing further. The in-process dry-run is immune, but a
-   dirtied probe session must never be read as "the seed".
+   side effects), the session no longer shows the seed — `stop_session` (see
+   teardown below; it may take two calls) and re-mint before probing further.
+   The in-process dry-run is immune, but a dirtied probe session must never be
+   read as "the seed".
 4. **Reset / teardown**: end every probe session with `stop_session`. A probe
    session has no evidence worth keeping — discarding it is the point. Never
    `finalize_run` a probe session; that would score the untouched seed.
+   Call `stop_session`; if it succeeds outright, teardown is done. **If it is
+   refused** (F-983: an open session holds an ungraded run, and the platform
+   will not destroy one silently), the refusal carries a server-issued
+   `discard_token` in its `error.details`; read that value and call
+   `stop_session` again, passing it as the `confirm_discard` parameter. Today's
+   control plane never refuses, so expect the one-call success — treat the
+   refusal-then-confirm path as the case to handle once it goes live, not the
+   default. The token cannot be guessed ahead of the refusal, which is what
+   keeps the same guard meaningful for real runs.
 
 ## Report
 

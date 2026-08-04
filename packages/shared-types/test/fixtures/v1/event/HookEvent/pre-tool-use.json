@@ -1,0 +1,9 @@
+{
+  "ts": "2026-08-03T10:15:22.290Z",
+  "event_id": "evt_01k2f7q9c0",
+  "parent_event_id": null,
+  "causing_tool_use_id": "toolu_01WxYzAbCdEf",
+  "kind": "HookEvent",
+  "hook_name": "PreToolUse",
+  "tool_name": "mcp__github__create_issue"
+}

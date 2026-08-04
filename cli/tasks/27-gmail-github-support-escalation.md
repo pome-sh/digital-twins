@@ -18,9 +18,9 @@ Gmail or GitHub.
 
 ## Success Criteria
 - [code:gmail] Message msg_support has label Label_follow_up
-- [code:github] Issue #1 exists in acme/api
-- [code:github] Issue #1 has the `bug` label applied
-- [code:github] Issue #1 is assigned to `alice`
+- [code:github] Issue #1 exists in `acme/api`
+- [code:github] Issue #1 in `acme/api` has the `bug` label applied
+- [code:github] Issue #1 in `acme/api` is assigned to `alice`
 - [model] The GitHub issue summarizes Alice's stuck production export and no mail was sent
 
 ## Config

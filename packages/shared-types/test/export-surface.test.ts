@@ -21,6 +21,14 @@ import * as api from "../src/index.js";
 // EvaluatorHooks / TraceUploadContext in 0.9.0). It is enforced when
 // `npm run typecheck` compiles this test: a dropped or renamed type breaks
 // the build.
+//
+// F-1201 added the trace surface — `Event`, `OtelEvent`, `RecorderEvent` and
+// the eight per-kind variant types. They had been absent since F-754, so a
+// dropped or renamed event kind was the one public-type change this guard could
+// not see, on exactly the surface `trace-contract.json` calls canonical. Note
+// what this guard does and does not do: it catches a kind that DISAPPEARS or is
+// RENAMED. A kind that is ADDED is the fixture gate's job
+// (`scripts/emit-trace-contract.mjs`), because no tuple can require a payload.
 import type {
   AcceptInviteRequest,
   AcceptInviteResponse,
@@ -37,6 +45,7 @@ import type {
   CreateSessionResponse,
   CriterionDef,
   CriterionDefInput,
+  Event,
   FinalizeAcceptedResponse,
   FinalizeCompletedStatusResponse,
   FinalizeFailedStatusResponse,
@@ -50,14 +59,20 @@ import type {
   FinalizeStatusUrl,
   GmailSeedState,
   GithubSeedState,
+  HookEvent,
+  LlmCallEvent,
+  LlmTurnEvent,
   Manifest,
   ManifestAgent,
   ManifestInput,
   MeResponse,
+  OtelEvent,
+  OtelSpanEvent,
   PerTwinStateKeys,
   PersistedScenario,
   PersistedTask,
   PlanTier,
+  RecorderEvent,
   Scenario,
   ScenarioConfig,
   SeedEnvelope,
@@ -69,6 +84,7 @@ import type {
   StateUploadUrlEntry,
   StateUploadUrlResponse,
   StripeSeedState,
+  SubagentSpawnEvent,
   SubmitResultRequest,
   SubmitResultResponse,
   Task,
@@ -77,6 +93,9 @@ import type {
   TeamInvite,
   TeamMember,
   TeamRole,
+  ToolResultEvent,
+  ToolUseEvent,
+  TwinHttpEvent,
   UsageResponse,
   User,
 } from "../src/index.js";
@@ -99,6 +118,7 @@ type _TypeSurfaceAssert = [
   CreateSessionResponse,
   CriterionDef,
   CriterionDefInput,
+  Event,
   FinalizeAcceptedResponse,
   FinalizeCompletedStatusResponse,
   FinalizeFailedStatusResponse,
@@ -112,14 +132,20 @@ type _TypeSurfaceAssert = [
   FinalizeStatusUrl,
   GmailSeedState,
   GithubSeedState,
+  HookEvent,
+  LlmCallEvent,
+  LlmTurnEvent,
   Manifest,
   ManifestAgent,
   ManifestInput,
   MeResponse,
+  OtelEvent,
+  OtelSpanEvent,
   PerTwinStateKeys,
   PersistedScenario,
   PersistedTask,
   PlanTier,
+  RecorderEvent,
   Scenario,
   ScenarioConfig,
   SeedEnvelope,
@@ -131,6 +157,7 @@ type _TypeSurfaceAssert = [
   StateUploadUrlEntry,
   StateUploadUrlResponse,
   StripeSeedState,
+  SubagentSpawnEvent,
   SubmitResultRequest,
   SubmitResultResponse,
   Task,
@@ -139,13 +166,16 @@ type _TypeSurfaceAssert = [
   TeamInvite,
   TeamMember,
   TeamRole,
+  ToolResultEvent,
+  ToolUseEvent,
+  TwinHttpEvent,
   UsageResponse,
   User,
 ];
 // Compile-time anchor: exactly one tuple entry per guarded type. The literal
 // type on the left fails to compile if an entry is added or removed above
 // without updating the count.
-const TYPE_SURFACE_SIZE: _TypeSurfaceAssert["length"] = 57;
+const TYPE_SURFACE_SIZE: _TypeSurfaceAssert["length"] = 68;
 
 // Runtime value exports (types are erased and cannot appear on `Object.keys`).
 const EXPECTED_EXPORTS = [
@@ -314,10 +344,10 @@ describe("@pome-sh/shared-types barrel export surface (F-754)", () => {
     expect(Object.keys(api).sort()).toEqual([...EXPECTED_EXPORTS]);
   });
 
-  it("guards the TYPE surface (57 types/interfaces)", () => {
+  it("guards the TYPE surface (68 types/interfaces)", () => {
     // The real guard is the type-only import + _TypeSurfaceAssert tuple above,
     // enforced at typecheck time. This assertion just anchors the count at
     // runtime so the guard's scope is visible in test output.
-    expect(TYPE_SURFACE_SIZE).toBe(57);
+    expect(TYPE_SURFACE_SIZE).toBe(68);
   });
 });

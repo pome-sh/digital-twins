@@ -8,6 +8,7 @@ import { createHostedClient, perTwinReturnedByCloud } from "../hosted/client.js"
 import type { CreateSessionResponse } from "../types/shared.js";
 import {
   HostedAuthError,
+  HostedDiscardRefusedError,
   HostedOrchError,
   HostedQuotaError,
 } from "../hosted/errors.js";
@@ -288,17 +289,49 @@ export async function runSessionList(opts: {
 export async function runSessionStop(opts: {
   apiBaseUrl: string;
   sessionId: string;
+  /** F-983: confirm destroying a session whose run has not been graded.
+   *  Off by default — a human-typed destructive command gets the refusal
+   *  printed instead of silently discarding the evidence. */
+  discard?: boolean;
 }): Promise<void> {
   const creds = await resolveCredentials({ apiBaseUrl: opts.apiBaseUrl });
   const client = createHostedClient({
     baseUrl: creds.apiBaseUrl,
     apiKey: creds.apiKey,
   });
-  await client.deleteSession(opts.sessionId, false);
+  try {
+    await client.deleteSession(opts.sessionId, false, {
+      discard: opts.discard === true,
+    });
+  } catch (err) {
+    if (err instanceof HostedDiscardRefusedError) {
+      console.error(
+        `Refused to stop ${err.sessionId}: it is still open (${err.state}), so its ` +
+          `run has not been graded — Pome creates the run row at finalize, and ` +
+          `stopping now discards it.`,
+      );
+      if (err.taskName) console.error(`  Task: ${err.taskName}`);
+      console.error(`  Open for ${err.openSeconds}s.`);
+      console.error(
+        `  To keep the run, finalize it instead. To discard it anyway: ` +
+          `pome session stop ${err.sessionId} --discard`,
+      );
+    }
+    throw err;
+  }
   console.error(`Stopped session ${opts.sessionId}.`);
 }
 
+/** Empty string means "already fully reported — print nothing more". Only
+ *  `HostedDiscardRefusedError` returns it today: `runSessionStop` above just
+ *  printed the complete multi-line refusal (session, task, open time, the
+ *  `--discard` escape hatch), so falling through to `err.message` here would
+ *  either duplicate that or, when the server omits `error.message`, print a
+ *  bare blank line. Callers must skip printing when this returns "". */
 export function friendlyHostedError(err: unknown): string {
+  if (err instanceof HostedDiscardRefusedError) {
+    return "";
+  }
   if (err instanceof HostedAuthError) {
     return `${err.message} · Run \`pome login\` or set a valid POME_API_KEY.`;
   }

@@ -209,6 +209,14 @@ plus the `examples/buyer-agent/` end-to-end demo against a running twin.
   client with a typo in its first request can retry under the same key
   against a fresh handler invocation (matches real Stripe, which
   re-executes on 4xx for client errors).
+- **Idempotency-Key under an injected lost response**
+  (`after-handler-idempotency.test.ts`, F-1138): the status the rule
+  above reads is the one the HANDLER answered, not the one on the wire.
+  An `after_handler` failure-injection rule delivers its configured 4xx
+  while the mutation stays committed, and real Stripe writes the
+  idempotency record server-side in exactly that case — a retry under
+  the same key replays the response the client never saw rather than
+  mutating again. A genuine 4xx from a handler is still not cached.
 
 ## Pome introspection (`/_pome/*`)
 

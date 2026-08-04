@@ -15,6 +15,9 @@ import {
   loadFidelityInventory,
 } from "@pome-sh/sdk/parity";
 import { listTools } from "../src/tools.js";
+import { openTwinStripeDatabase } from "../src/db.js";
+import { StripeDomain } from "../src/domain/index.js";
+import { applySeed, parseSeed } from "../src/seed.js";
 
 const root = resolve(import.meta.dirname, "..");
 const inventory = loadFidelityInventory(resolve(root, "fidelity.inventory.json"));
@@ -51,5 +54,138 @@ describe("Stripe fidelity contract", () => {
     }
     expect(matrix).toContain("Unsupported `/v1/*` paths");
     expect(matrix).toContain("Last verified");
+  });
+});
+
+// ── F-1127 ──────────────────────────────────────────────────────────────────
+describe("state-shape parity", () => {
+  // `check-state.ts` is a hand-written reader of what `exportState()` produces,
+  // and pome-cloud deletes its own mirror of that shape in the same milestone —
+  // so from here on this model is the only one, and nothing but this arm makes
+  // it agree with the export.
+  //
+  // The parity harness's three rings (live tool list, fidelity.inventory.json,
+  // scenario coverage) are all about the TOOL surface. This is the arm that was
+  // missing, and its absence is why the cloud's copy could drift for a milestone
+  // with nothing to notice. It lives in the file that already runs rather than
+  // in a new gate — A3's instruction: reuse the parity harness, do not build a
+  // second drift gate.
+  //
+  // Stripe's export does NOT spread SQLite rows the way Slack's does: every
+  // collection goes through `serializers.ts` first, so what a check reads is the
+  // Stripe WIRE object and the join fields lose their `_id` suffix
+  // (`refunds.charge_id` → `refund.charge`). A model written against the seed
+  // schema would carry the row names and silently match nothing, which for a
+  // positive criterion means failing a correct agent. That renaming is what this
+  // arm exists to pin.
+  const settledAndRefunded = (): Record<string, unknown> => {
+    const db = openTwinStripeDatabase(":memory:");
+    applySeed(
+      db,
+      parseSeed({
+        api_keys: [{ key: "sk_test_parity", sid: "parity", account_id: "acct_parity" }],
+      }),
+    );
+    const domain = new StripeDomain(db);
+    const created = domain.createPaymentIntent("acct_parity", {
+      amount: 20000,
+      currency: "usd",
+      payment_method_types: ["crypto"],
+      payment_method_options: { crypto: { mode: "deposit", deposit_options: { networks: ["base"] } } },
+    }).body as { id: string };
+    const settled = domain.simulateCryptoDeposit("acct_parity", created.id).body as {
+      latest_charge: string;
+    };
+    domain.createRefund("acct_parity", { charge: settled.latest_charge, amount: 7500 });
+    return domain.exportState("acct_parity") as Record<string, unknown>;
+  };
+
+  const rows = (state: Record<string, unknown>, key: string): Record<string, unknown>[] => {
+    const list = state[key] as Record<string, unknown>[];
+    expect(list?.length, `the parity world produced no ${key} to check the shape against`)
+      .toBeGreaterThan(0);
+    return list;
+  };
+
+  it("finds every top-level key StripeCheckState names", () => {
+    const state = settledAndRefunded();
+    for (const key of ["payment_intents", "charges", "balance_transactions", "events", "refunds"]) {
+      expect(state, `exportState() no longer produces "${key}"`).toHaveProperty(key);
+    }
+  });
+
+  it("finds every PaymentIntent field the model reads", () => {
+    const state = settledAndRefunded();
+    for (const field of ["id", "amount", "currency", "status", "latest_charge"]) {
+      expect(rows(state, "payment_intents")[0]!, `payment_intents lost "${field}"`).toHaveProperty(
+        field,
+      );
+    }
+  });
+
+  it("finds every charge field the model reads, under its WIRE name", () => {
+    // `payment_intent` and `balance_transaction`, not `payment_intent_id` /
+    // `balance_transaction_id`. This is the renaming above, asserted.
+    const state = settledAndRefunded();
+    for (const field of [
+      "id",
+      "amount",
+      "amount_refunded",
+      "currency",
+      "status",
+      "refunded",
+      "paid",
+      "payment_intent",
+      "balance_transaction",
+    ]) {
+      expect(rows(state, "charges")[0]!, `charges lost "${field}"`).toHaveProperty(field);
+    }
+  });
+
+  it("finds every refund field the model reads, under its WIRE name", () => {
+    const state = settledAndRefunded();
+    for (const field of ["id", "amount", "currency", "status", "charge", "payment_intent"]) {
+      expect(rows(state, "refunds")[0]!, `refunds lost "${field}"`).toHaveProperty(field);
+    }
+  });
+
+  it("finds every event field the model reads, and confirms `data` holds `object`", () => {
+    const state = settledAndRefunded();
+    const event = rows(state, "events")[0]!;
+    for (const field of ["id", "type", "data", "created"]) {
+      expect(event, `events lost "${field}"`).toHaveProperty(field);
+    }
+    expect(event.data, "an event's `data` no longer carries `object`").toHaveProperty("object");
+  });
+
+  it("finds every balance-transaction field the model reads", () => {
+    const state = settledAndRefunded();
+    for (const field of ["id", "amount", "source", "status", "type"]) {
+      expect(rows(state, "balance_transactions")[0]!, `balance_transactions lost "${field}"`)
+        .toHaveProperty(field);
+    }
+  });
+
+  it("confirms `refunded` stays FALSE on a partially-refunded charge", () => {
+    // The trap `check-state.ts` documents, and the reason `stripe.refund-exists`
+    // reads refund ROWS rather than this flag: `refunded` is true only when a
+    // charge is FULLY refunded, and task 14 only ever produces partial ones. If
+    // the twin ever changed this, a check reading the flag would start working
+    // and the comment would become a lie — so pin the behaviour, not the comment.
+    const state = settledAndRefunded();
+    const charge = rows(state, "charges")[0]!;
+    expect(charge.amount_refunded).toBe(7500);
+    expect(charge.refunded).toBe(false);
+  });
+
+  it("confirms a balance transaction's `source` points at the PAYMENT INTENT", () => {
+    // The twin's own documented v1 deviation — real Stripe links it to the
+    // charge. `check-worlds.ts` builds fixtures against the deviation, so if the
+    // twin ever corrects it, every fixture modelling a world it can no longer
+    // produce fails here rather than passing silently.
+    const state = settledAndRefunded();
+    const charged = rows(state, "balance_transactions").find((row) => row.type === "charge")!;
+    const pi = rows(state, "payment_intents")[0]!;
+    expect(charged.source).toBe(pi.id);
   });
 });

@@ -96,9 +96,19 @@ function makeStubClient({
   getFinalizeSignalsStorageKey: () => string | undefined;
   getFinalizeInput: () => unknown;
   getCreateSessionInput: () => unknown;
+  /** F-983 — the FULL argument list of every deleteSession call, so the
+   *  teardown's `{ discard: true }` is pinned. Capturing only the session id
+   *  would let a refactor silently drop the discard opt-in, and once the
+   *  control plane starts refusing, teardown would stop deleting sessions. */
+  getDeleteSessionCalls: () => Array<
+    [string, boolean | undefined, { discard?: boolean } | undefined]
+  >;
 } {
   let finalizeInput: unknown;
   let createSessionInput: unknown;
+  const deleteSessionCalls: Array<
+    [string, boolean | undefined, { discard?: boolean } | undefined]
+  > = [];
 
   const client: HostedClient = {
     async createSession(input) {
@@ -168,13 +178,14 @@ function makeStubClient({
     async abandonSession() {
       throw new HostedOrchError("no abandon stubbed (single-run path never calls it)");
     },
-    async deleteSession() {
-      // no-op
+    async deleteSession(sessionId, bestEffort, opts) {
+      deleteSessionCalls.push([sessionId, bestEffort, opts]);
     },
   };
 
   return {
     client,
+    getDeleteSessionCalls: () => deleteSessionCalls,
     getFinalizeTraceStorageKey: () =>
       (finalizeInput as { traceStorageKey?: string } | undefined)
         ?.traceStorageKey,
@@ -341,12 +352,13 @@ describe("runTaskHosted events.jsonl upload orchestration (FDRS-357)", () => {
     let capturedPutBody: string | null = null;
     let putCallCount = 0;
 
-    const { client, getFinalizeTraceStorageKey } = makeStubClient({
-      requestEventsUploadUrlImpl: async () => ({
-        url: FAKE_UPLOAD_URL,
-        key: FAKE_UPLOAD_KEY,
-      }),
-    });
+    const { client, getFinalizeTraceStorageKey, getDeleteSessionCalls } =
+      makeStubClient({
+        requestEventsUploadUrlImpl: async () => ({
+          url: FAKE_UPLOAD_URL,
+          key: FAKE_UPLOAD_KEY,
+        }),
+      });
 
     // Stub globalThis.fetch to intercept the PUT to the signed URL.
     vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
@@ -388,6 +400,14 @@ describe("runTaskHosted events.jsonl upload orchestration (FDRS-357)", () => {
 
     // finalize must receive the storage key as traceStorageKey.
     expect(getFinalizeTraceStorageKey()).toBe(FAKE_UPLOAD_KEY);
+
+    // F-983 — the `finally` teardown must OPT IN to discarding. Asserting the
+    // whole argument list, not just the session id: dropping `discard: true`
+    // would make teardown stop deleting sessions once the control plane
+    // starts refusing ungraded ones, stranding sandboxes on the team's quota.
+    expect(getDeleteSessionCalls()).toEqual([
+      [FAKE_SESSION_ID, true, { discard: true }],
+    ]);
   });
 
   it("state upload happy path: PUTs both state blobs and forwards both keys to finalize (FDRS-395)", async () => {

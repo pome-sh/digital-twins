@@ -1,0 +1,13 @@
+{
+  "ts": "2026-08-03T10:15:22.303Z",
+  "event_id": "evt_01k2f7q9c1",
+  "parent_event_id": "evt_01k2f7q8z1",
+  "kind": "ToolUseEvent",
+  "tool_use_id": "toolu_01WxYzAbCdEf",
+  "tool_name": "mcp__github__create_issue",
+  "input": {
+    "repo": "acme/app",
+    "title": "Retry drops X-PAYMENT",
+    "body": "The second attempt omits the header."
+  }
+}

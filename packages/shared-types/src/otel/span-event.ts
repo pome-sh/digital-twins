@@ -83,7 +83,14 @@ const otelSpanEventObjectSchema = z.object({
   // ── shared event-union base (mirrors `eventBaseShape` in recorder-events.ts) ─
   ts: z.string().datetime(),
   event_id: canonicalSpanIdSchema,
-  parent_id: canonicalSpanIdSchema.nullable(),
+  // F-1200 — `parent_event_id` replaces `parent_id`. For THIS kind the field is
+  // fully redundant with `parent_span_id` (the invariant below pins them
+  // equal), so the tolerant read needs no `parent_id` lookup at all: a row
+  // written under either spelling normalizes to the same value, derived from
+  // span context. `parent_id` stays accepted as a legacy input key so a stored
+  // 0.13.0 row round-trips unchanged.
+  parent_event_id: canonicalSpanIdSchema.nullable().optional(),
+  parent_id: canonicalSpanIdSchema.nullable().optional(),
   kind: z.literal("OtelSpanEvent"),
 
   // ── W3C trace context — real span parentage (M3 correlation reads these) ────
@@ -122,7 +129,14 @@ const otelSpanEventObjectSchema = z.object({
   attributes: z.record(z.string(), otelAttributeValueSchema),
 });
 
-export const otelSpanEventSchema = otelSpanEventObjectSchema.superRefine((event, ctx) => {
+export const otelSpanEventSchema = otelSpanEventObjectSchema
+  // Normalize BEFORE the invariants run, so the checks below see a settled
+  // `parent_event_id` whichever spelling the stored row used.
+  .transform((event) => ({
+    ...event,
+    parent_event_id: event.parent_event_id ?? event.parent_span_id,
+  }))
+  .superRefine((event, ctx) => {
   // Base-union chain mirrors span context.
   if (event.event_id !== event.span_id) {
     ctx.addIssue({
@@ -131,11 +145,11 @@ export const otelSpanEventSchema = otelSpanEventObjectSchema.superRefine((event,
       message: "event_id must equal span_id",
     });
   }
-  if (event.parent_id !== event.parent_span_id) {
+  if (event.parent_event_id !== event.parent_span_id) {
     ctx.addIssue({
       code: "custom",
-      path: ["parent_id"],
-      message: "parent_id must equal parent_span_id",
+      path: ["parent_event_id"],
+      message: "parent_event_id must equal parent_span_id",
     });
   }
 

@@ -89,8 +89,9 @@ returns `{ run_id, score, judge_model, dashboard_url }`. One evaluation per run.
 **Status** = passed/failed/unmatched, **Reason**), **Provenance** (a live
 twin-pull run is `hosted` — say so, it means Pome watched the work, not the
 agent self-reporting), and the dashboard link on `app.pome.sh`. An `unmatched`
-criterion is an unregistered predicate, not a failing grade — route it back to
-`pome-author-task`.
+criterion binds to no declared check, so it was never graded — that is an
+authoring defect, not a failing grade. Route it back to `pome-author-task`,
+which re-authors it from `list_checks` rather than rewording it.
 
 ## 5. Fix loop (re-run only what failed, show the delta)
 

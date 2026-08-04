@@ -55,7 +55,7 @@ export interface CaptureServerHandle {
 interface LlmCallEventRow {
   ts: string;
   event_id: string;
-  parent_id: null;
+  parent_event_id: null;
   kind: "LlmCallEvent";
   host: string;
   port: number;
@@ -218,7 +218,7 @@ function handleConnect({
     const row: LlmCallEventRow = {
       ts: new Date().toISOString(),
       event_id: randomUUID(),
-      parent_id: null,
+      parent_event_id: null,
       kind: "LlmCallEvent",
       host,
       port,

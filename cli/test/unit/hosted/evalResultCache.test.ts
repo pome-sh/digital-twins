@@ -4,7 +4,7 @@
 // and the fix-prompt discovery semantics (trial dir → its set regardless of
 // outcome; root → latest failed set). Foreign/corrupt files never throw.
 
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -25,7 +25,7 @@ function verdict(over: Partial<VerdictArtifact>): VerdictArtifact {
     version: VERDICT_ARTIFACT_VERSION,
     source: "cloud-finalize",
     task_name: "scn",
-    scenario_path: "scenarios/scn.md",
+    task_path: "tasks/scn.md",
     group_id: null,
     session_id: "ses_x",
     cloud_run_id: "run_x",
@@ -81,6 +81,40 @@ describe("verdict artifact (FDRS-644)", () => {
     expect(await readVerdictArtifact(foreign)).toBeNull();
 
     expect(await readVerdictArtifact(join(tmp, "scn", "nope"))).toBeNull();
+  });
+
+  it("writes `task_path` and still reads pre-F-933 `scenario_path` trials (normalized)", async () => {
+    const tmp = await mkdtemp(join(tmpdir(), "verdict-legacy-"));
+
+    // Write path: the retired spelling never lands on disk again.
+    const fresh = join(tmp, "scn", "ses_new");
+    await mkdir(fresh, { recursive: true });
+    await writeVerdictArtifact(fresh, verdict({ session_id: "ses_new" }));
+    const onDisk = JSON.parse(
+      await readFile(join(fresh, "verdict.json"), "utf8"),
+    ) as Record<string, unknown>;
+    expect(onDisk.task_path).toBe("tasks/scn.md");
+    expect(onDisk).not.toHaveProperty("scenario_path");
+
+    // Read path: a run dir written by cli <= 0.8.x still resolves, and the
+    // legacy key is surfaced to callers as `task_path`.
+    const legacyDir = join(tmp, "scn", "ses_old");
+    await mkdir(legacyDir, { recursive: true });
+    const { task_path: _tp, ...withoutTaskPath } = verdict({ session_id: "ses_old" });
+    await writeFile(
+      join(legacyDir, "verdict.json"),
+      JSON.stringify({ ...withoutTaskPath, scenario_path: "scenarios/scn.md" }),
+      "utf8",
+    );
+    const legacy = await readVerdictArtifact(legacyDir);
+    expect(legacy?.verdict.task_path).toBe("scenarios/scn.md");
+    expect(groupRunSets([legacy!])[0]!.taskPath).toBe("scenarios/scn.md");
+
+    // Neither spelling present → still foreign.
+    const neither = join(tmp, "scn", "ses_none");
+    await mkdir(neither, { recursive: true });
+    await writeFile(join(neither, "verdict.json"), JSON.stringify(withoutTaskPath), "utf8");
+    expect(await readVerdictArtifact(neither)).toBeNull();
   });
 
   it("rejects half-recognizable files instead of crashing downstream (adversarial fix)", async () => {

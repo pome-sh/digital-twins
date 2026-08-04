@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
-import { badUserInput } from "../errors.js";
+import { LinearTwinError, badUserInput } from "../errors.js";
 import { byteLength } from "../ids.js";
 import {
   BODY_MAX_BYTES,
   TITLE_MAX_BYTES,
   type LinearAgentActivityType,
-  type LinearAgentSessionState,
+  type LinearAgentSessionStatus,
   type LinearIssuePriority,
   type LinearWorkflowStateType,
 } from "../types.js";
@@ -44,10 +44,40 @@ export function inferStateType(name: string): LinearWorkflowStateType {
   return "unstarted";
 }
 
-export function normalizeSessionState(value: string): LinearAgentSessionState {
-  const allowed: LinearAgentSessionState[] = ["pending", "active", "completed", "failed", "canceled"];
-  if (!allowed.includes(value as LinearAgentSessionState)) badUserInput(`Invalid agent session state: ${value}`);
-  return value as LinearAgentSessionState;
+/** Linear's AgentSessionStatus members, verbatim (F-1172). */
+export const AGENT_SESSION_STATUSES: LinearAgentSessionStatus[] = [
+  "pending",
+  "active",
+  "awaitingInput",
+  "complete",
+  "error",
+  "stale",
+];
+
+/**
+ * A status read back OUT of storage. An unknown value here is a corrupt or
+ * unmigrated database, not bad caller input — and left unchecked it dies at
+ * GraphQL enum serialisation (`Enum "AgentSessionStatus" cannot represent
+ * value: "canceled"`), which names neither the row nor the cause. Fail at the
+ * boundary where the message can (F-1172).
+ */
+export function readSessionStatus(value: string): LinearAgentSessionStatus {
+  if (!AGENT_SESSION_STATUSES.includes(value as LinearAgentSessionStatus)) {
+    throw new LinearTwinError(
+      500,
+      "INTERNAL_SERVER_ERROR",
+      `Stored agent session status "${value}" is not one of Linear's AgentSessionStatus members ` +
+        `(${AGENT_SESSION_STATUSES.join(", ")}). This database predates the F-1172 rename and was not migrated.`
+    );
+  }
+  return value as LinearAgentSessionStatus;
+}
+
+export function normalizeSessionStatus(value: string): LinearAgentSessionStatus {
+  if (!AGENT_SESSION_STATUSES.includes(value as LinearAgentSessionStatus)) {
+    badUserInput(`Invalid agent session status: ${value}`);
+  }
+  return value as LinearAgentSessionStatus;
 }
 
 export function normalizeActivityType(value: string): LinearAgentActivityType {

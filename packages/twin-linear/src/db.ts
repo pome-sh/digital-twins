@@ -244,15 +244,15 @@ CREATE TABLE IF NOT EXISTS agent_sessions (
   id TEXT PRIMARY KEY,
   issue_id TEXT,
   comment_id TEXT,
-  agent_user_id TEXT NOT NULL,
-  state TEXT NOT NULL,
+  app_user_id TEXT NOT NULL,
+  status TEXT NOT NULL,
   plan TEXT,
-  external_url TEXT,
+  external_urls_json TEXT NOT NULL DEFAULT '[]',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   FOREIGN KEY (issue_id) REFERENCES issues(id) ON DELETE CASCADE,
   FOREIGN KEY (comment_id) REFERENCES comments(id) ON DELETE CASCADE,
-  FOREIGN KEY (agent_user_id) REFERENCES users(id) ON DELETE CASCADE
+  FOREIGN KEY (app_user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS agent_activities (
@@ -322,11 +322,70 @@ export function openLinearTwinDatabase(
   return openTwinDatabase(path, { migrate });
 }
 
+/**
+ * Pre-F-1172 agent session states that Linear does not have, and the Linear
+ * member each one becomes. Linear has no cancellation state; `stale` ("no
+ * longer progressing") is its closest neighbour.
+ */
+export const RETIRED_AGENT_SESSION_STATUSES: ReadonlyArray<readonly [string, string]> = [
+  ["completed", "complete"],
+  ["failed", "error"],
+  ["canceled", "stale"],
+];
+
 export function migrate(db: LinearTwinDatabase): void {
   db.exec(MIGRATION_SQL);
   ensureColumn(db, "issues", "estimate", "INTEGER");
   ensureColumn(db, "issues", "parent_id", "TEXT");
   ensureColumn(db, "comments", "parent_id", "TEXT");
+  migrateAgentSessions(db);
+}
+
+/**
+ * F-1172 — carry a pre-rename `agent_sessions` table forward.
+ *
+ * `CREATE TABLE IF NOT EXISTS` is a no-op on a database that already has the
+ * table, so without this an existing `LINEAR_TWIN_DB` file opens clean on the
+ * OLD columns and then dies later with `"undefined" is not valid JSON` from
+ * `mapAgentSession`, nowhere near the cause. Reopening old files is supported
+ * (see the `ensureColumn` calls above); cloud's per-session databases are
+ * ephemeral, but local and self-host files are not.
+ *
+ * Every step is guarded on the current column set, so this is idempotent and a
+ * no-op on a database created by the current schema.
+ */
+function migrateAgentSessions(db: LinearTwinDatabase): void {
+  const columnNames = (): string[] =>
+    (db.prepare("PRAGMA table_info(agent_sessions)").all() as Array<{ name: string }>).map(
+      (column) => column.name
+    );
+
+  let columns = columnNames();
+  if (columns.includes("agent_user_id") && !columns.includes("app_user_id")) {
+    db.exec("ALTER TABLE agent_sessions RENAME COLUMN agent_user_id TO app_user_id");
+  }
+  if (columns.includes("state") && !columns.includes("status")) {
+    db.exec("ALTER TABLE agent_sessions RENAME COLUMN state TO status");
+  }
+
+  columns = columnNames();
+  if (!columns.includes("external_urls_json")) {
+    db.exec("ALTER TABLE agent_sessions ADD COLUMN external_urls_json TEXT NOT NULL DEFAULT '[]'");
+  }
+  if (columns.includes("external_url")) {
+    // The single URL becomes a one-entry collection. Linear's label is
+    // non-null and the old shape carried none, so it backfills as empty.
+    db.exec(
+      `UPDATE agent_sessions
+          SET external_urls_json = json_array(json_object('url', external_url, 'label', ''))
+        WHERE external_url IS NOT NULL AND external_url <> ''`
+    );
+    db.exec("ALTER TABLE agent_sessions DROP COLUMN external_url");
+  }
+
+  for (const [retired, replacement] of RETIRED_AGENT_SESSION_STATUSES) {
+    db.prepare("UPDATE agent_sessions SET status = ? WHERE status = ?").run(replacement, retired);
+  }
 }
 
 export function resetDatabase(db: LinearTwinDatabase): void {

@@ -92,30 +92,36 @@ export const webhookCreateInputSchema = z
   })
   .strict();
 
+/** Mirrors Linear's `AgentSessionExternalUrlInput` field-for-field (F-1172). */
+const agentSessionExternalUrlSchema = z
+  .object({ url: z.string().min(1), label: z.string() })
+  .strict();
+const optionalExternalUrls = z.array(agentSessionExternalUrlSchema).nullish();
+
 export const agentSessionOnIssueInputSchema = z
   .object({
     issueId: z.string().min(1),
-    agentUserId: z.string().optional(),
+    appUserId: z.string().optional(),
     plan: optionalString,
-    externalUrl: optionalString,
+    externalUrls: optionalExternalUrls,
   })
   .strict();
 
 export const agentSessionOnCommentInputSchema = z
   .object({
     commentId: z.string().min(1),
-    agentUserId: z.string().optional(),
+    appUserId: z.string().optional(),
     plan: optionalString,
-    externalUrl: optionalString,
+    externalUrls: optionalExternalUrls,
   })
   .strict();
 
 export const agentSessionUpdateInputSchema = z
   .object({
     id: z.string().min(1).optional(),
-    state: z.string().optional(),
+    status: z.string().optional(),
     plan: optionalString,
-    externalUrl: optionalString,
+    externalUrls: optionalExternalUrls,
   })
   .strict();
 
@@ -144,7 +150,7 @@ export function parseIssueCreateInput(input: unknown): IssueCreateInput {
     title: raw.title,
     description: raw.description ?? null,
     priority: raw.priority ?? undefined,
-    estimate: "estimate" in raw ? (raw.estimate ?? null) : undefined,
+    estimate: raw.estimate,
     stateId: raw.stateId ?? null,
     assigneeId: raw.assigneeId ?? null,
     delegateId: raw.delegateId ?? null,
@@ -161,19 +167,19 @@ export function parseIssueCreateInput(input: unknown): IssueCreateInput {
 export function parseIssueUpdateInput(input: unknown): { id?: string; patch: IssueUpdateInput } {
   const raw = parseOrBadUserInput(issueUpdateInputSchema, input, "issueUpdate input");
   const patch: IssueUpdateInput = {};
-  if ("title" in raw && raw.title !== undefined) patch.title = raw.title;
-  if ("description" in raw) patch.description = raw.description ?? null;
-  if ("priority" in raw) patch.priority = raw.priority ?? null;
-  if ("estimate" in raw) patch.estimate = raw.estimate ?? null;
-  if ("stateId" in raw) patch.stateId = raw.stateId ?? null;
-  if ("assigneeId" in raw) patch.assigneeId = raw.assigneeId ?? null;
-  if ("delegateId" in raw) patch.delegateId = raw.delegateId ?? null;
-  if ("labelIds" in raw) patch.labelIds = raw.labelIds ?? [];
-  if ("projectId" in raw) patch.projectId = raw.projectId ?? null;
-  if ("cycleId" in raw) patch.cycleId = raw.cycleId ?? null;
-  if ("parentId" in raw) patch.parentId = raw.parentId ?? null;
-  if ("archivedAt" in raw) patch.archivedAt = raw.archivedAt ?? null;
-  if ("dueDate" in raw) patch.dueDate = raw.dueDate ?? null;
+  if (raw.title !== undefined) patch.title = raw.title;
+  if (raw.description !== undefined) patch.description = raw.description ?? null;
+  if (raw.priority !== undefined) patch.priority = raw.priority ?? null;
+  if (raw.estimate !== undefined) patch.estimate = raw.estimate ?? null;
+  if (raw.stateId !== undefined) patch.stateId = raw.stateId ?? null;
+  if (raw.assigneeId !== undefined) patch.assigneeId = raw.assigneeId ?? null;
+  if (raw.delegateId !== undefined) patch.delegateId = raw.delegateId ?? null;
+  if (raw.labelIds !== undefined) patch.labelIds = raw.labelIds ?? [];
+  if (raw.projectId !== undefined) patch.projectId = raw.projectId ?? null;
+  if (raw.cycleId !== undefined) patch.cycleId = raw.cycleId ?? null;
+  if (raw.parentId !== undefined) patch.parentId = raw.parentId ?? null;
+  if (raw.archivedAt !== undefined) patch.archivedAt = raw.archivedAt ?? null;
+  if (raw.dueDate !== undefined) patch.dueDate = raw.dueDate ?? null;
   return { id: raw.id, patch };
 }
 
@@ -208,7 +214,7 @@ export function parseIssueLabelUpdateInput(input: unknown) {
     id: raw.id,
     name: raw.name,
     color: raw.color,
-    description: "description" in raw ? (raw.description ?? null) : undefined,
+    description: raw.description,
   };
 }
 
@@ -229,9 +235,9 @@ export function parseAgentSessionOnIssueInput(input: unknown) {
   const raw = parseOrBadUserInput(agentSessionOnIssueInputSchema, input, "agentSessionCreateOnIssue input");
   return {
     issueId: raw.issueId,
-    agentUserId: raw.agentUserId,
+    appUserId: raw.appUserId,
     plan: raw.plan ?? null,
-    externalUrl: raw.externalUrl ?? null,
+    externalUrls: raw.externalUrls ?? null,
   };
 }
 
@@ -243,9 +249,9 @@ export function parseAgentSessionOnCommentInput(input: unknown) {
   );
   return {
     commentId: raw.commentId,
-    agentUserId: raw.agentUserId,
+    appUserId: raw.appUserId,
     plan: raw.plan ?? null,
-    externalUrl: raw.externalUrl ?? null,
+    externalUrls: raw.externalUrls ?? null,
   };
 }
 
@@ -253,9 +259,9 @@ export function parseAgentSessionUpdateInput(input: unknown) {
   const raw = parseOrBadUserInput(agentSessionUpdateInputSchema, input, "agentSessionUpdate input");
   return {
     id: raw.id,
-    state: raw.state,
-    plan: "plan" in raw ? (raw.plan ?? null) : undefined,
-    externalUrl: "externalUrl" in raw ? (raw.externalUrl ?? null) : undefined,
+    status: raw.status,
+    plan: raw.plan,
+    externalUrls: raw.externalUrls,
   };
 }
 

@@ -121,13 +121,29 @@ describe("otelSpanEventSchema — id validation", () => {
     if (!result.success) expect(result.error.issues[0]?.path).toEqual(["event_id"]);
   });
 
-  it("rejects parent_id that does not equal parent_span_id", () => {
+  it("rejects parent_event_id that does not equal parent_span_id", () => {
     const result = otelSpanEventSchema.safeParse({
       ...validEvent,
-      parent_id: "legacy:x",
+      parent_event_id: "legacy:x",
       parent_span_id: null,
     });
     expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.issues[0]?.path).toEqual(["parent_event_id"]);
+  });
+
+  // F-1200 — for this kind the parent field is fully redundant with span
+  // context, so the tolerant read derives it from `parent_span_id` rather than
+  // consulting the pre-F-1200 `parent_id`. A stored 0.13.0 row therefore
+  // normalizes without a lookup, and a stale `parent_id` cannot contradict the
+  // span context it is supposed to mirror.
+  it("derives parent_event_id from parent_span_id on a pre-F-1200 row", () => {
+    const { parent_event_id: _omit, ...rest } = validEvent as Record<string, unknown>;
+    const parsed = otelSpanEventSchema.parse({
+      ...rest,
+      parent_id: "legacy:evt_root",
+      parent_span_id: "legacy:evt_root",
+    });
+    expect(parsed.parent_event_id).toBe("legacy:evt_root");
   });
 });
 

@@ -134,7 +134,7 @@ describe("pome capture-server", () => {
     expect(row.kind).toBe("LlmCallEvent");
     expect(row.host).toBe("localhost");
     expect(row.port).toBe(upstream!.port);
-    expect(row.parent_id).toBeNull();
+    expect(row.parent_event_id).toBeNull();
     expect(typeof row.event_id).toBe("string");
     expect(row.event_id.length).toBeGreaterThan(0);
     expect(row.bytes_out).toBeGreaterThan(0);

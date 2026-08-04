@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // FDRS-644 — `pome fix-prompt` command surface:
-//   - legacy 2-arg form (<events.jsonl> <scenario.md>) is unchanged;
-//   - an events.jsonl target without a scenario is a usage error (exit 5);
+//   - legacy 2-arg form (<events.jsonl> <task.md>) is unchanged;
+//   - an events.jsonl target without a task file is a usage error (exit 5);
 //   - a second argument with a dir target is a usage error (exit 5);
 //   - 0-arg reads ./runs and emits the latest FAILED run set's grouped
 //     prompt; all-green roots print "nothing to fix" (exit 0); empty roots
@@ -19,7 +19,7 @@ import {
   type VerdictArtifact,
 } from "../../src/hosted/evalResultCache.js";
 
-const SCENARIO =
+const TASK_MD =
   "# scn\n\n## Prompt\nTriage the bug.\n\n## Success Criteria\n- [model] Severity is set correctly\n";
 
 const EVENT =
@@ -30,7 +30,7 @@ function verdict(over: Partial<VerdictArtifact>): VerdictArtifact {
     version: VERDICT_ARTIFACT_VERSION,
     source: "cloud-finalize",
     task_name: "scn",
-    scenario_path: "scenarios/scn.md",
+    task_path: "tasks/scn.md",
     group_id: "grp_cmd",
     session_id: "ses_1",
     cloud_run_id: "run_1",
@@ -95,7 +95,7 @@ describe("pome fix-prompt command (FDRS-644)", () => {
   it("legacy 2-arg form is unchanged", async () => {
     const dir = await mkdtemp(join(tmpdir(), "fixcmd-legacy-"));
     await writeFile(join(dir, "events.jsonl"), EVENT, "utf8");
-    await writeFile(join(dir, "scn.md"), SCENARIO, "utf8");
+    await writeFile(join(dir, "scn.md"), TASK_MD, "utf8");
     await run(join(dir, "events.jsonl"), join(dir, "scn.md"));
 
     expect(process.exitCode ?? 0).toBe(0);
@@ -104,7 +104,7 @@ describe("pome fix-prompt command (FDRS-644)", () => {
     expect(text).toContain("Severity is set correctly");
   });
 
-  it("an events.jsonl target without a scenario is a usage error", async () => {
+  it("an events.jsonl target without a task file is a usage error", async () => {
     const dir = await mkdtemp(join(tmpdir(), "fixcmd-usage-"));
     await writeFile(join(dir, "events.jsonl"), EVENT, "utf8");
     await run(join(dir, "events.jsonl"));
@@ -138,8 +138,8 @@ describe("pome fix-prompt command (FDRS-644)", () => {
         },
       ],
     });
-    await mkdir(join(dir, "scenarios"), { recursive: true });
-    await writeFile(join(dir, "scenarios", "scn.md"), SCENARIO, "utf8");
+    await mkdir(join(dir, "tasks"), { recursive: true });
+    await writeFile(join(dir, "tasks", "scn.md"), TASK_MD, "utf8");
     process.chdir(dir);
 
     await run();
@@ -149,6 +149,9 @@ describe("pome fix-prompt command (FDRS-644)", () => {
     expect(text).toContain("under-rated");
     expect(text).toContain("1 of 2 completed trials passed");
     expect(text).toContain("## Variance note");
+    // The on-disk task file must match the verdict's `task_path`, or this
+    // whole test silently exercises the degraded (file-missing) branch.
+    expect(text).not.toContain("task file not found");
   });
 
   it("all-green roots print nothing-to-fix (exit 0)", async () => {
