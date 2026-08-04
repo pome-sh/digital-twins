@@ -1,7 +1,7 @@
 {
   "name": "@pome-sh/twin-stripe",
   "version": "0.4.3",
-  "description": "Deterministic test double for Stripe x402 machine payments \u2014 stateful clone agents can drive without burning sandbox quota or real chain gas.",
+  "description": "Deterministic test double for Stripe x402 machine payments — stateful clone agents can drive without burning sandbox quota or real chain gas.",
   "private": true,
   "type": "module",
   "main": "./dist/src/index.js",
@@ -14,6 +14,10 @@
     "./server": {
       "types": "./dist/src/server.d.ts",
       "default": "./dist/src/server.js"
+    },
+    "./checks": {
+      "types": "./dist/src/checks.d.ts",
+      "default": "./dist/src/checks.js"
     }
   },
   "files": [
