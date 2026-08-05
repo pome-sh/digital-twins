@@ -109,7 +109,7 @@ export const LEGACY_FIXTURES: readonly LegacyFixture[] = deepFreeze<readonly Leg
   {
     name: "twin-http/github-create-issue",
     provenance:
-      "Pome TwinHttpEvent (packages/shared-types/src/recorder-events.ts). Frozen output of shimLegacyEventToSpan (M1.2).",
+      "Pome TwinHttpEvent (packages/wire/src/recorder-events.ts). Frozen output of shimLegacyEventToSpan (M1.2).",
     derivedFrom: "pome-internal",
     legacy: {
       ts: "2026-06-02T12:00:00.000Z",

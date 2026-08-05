@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "vitest";
 
+import { KNOWN_TWIN_IDS, recorderEventSchema } from "@pome-sh/wire";
 import {
-  KNOWN_TWIN_IDS,
   MOUNTED_TWINS,
   createSessionResponseSchema,
   gmailSeedStateSchema,
   providerScopedSeedStateSchema,
-  recorderEventSchema,
-} from "../src/index.js";
+} from "../../src/contract/index.js";
 
 const mailbox = {
   email: "POME-Agent@POME-TWIN.TEST",

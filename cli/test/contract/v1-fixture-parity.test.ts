@@ -20,8 +20,8 @@ import {
   createSessionResponseSchema,
   planTierSchema,
   usageResponseSchema,
-} from "@pome-sh/shared-types";
-import { runSchema } from "@pome-sh/shared-types/run";
+} from "../../src/contract/index.js";
+import { runSchema } from "../../src/contract/run.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const corpusRoot = join(here, "..", "fixtures", "contract", "v1");

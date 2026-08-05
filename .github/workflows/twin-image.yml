@@ -10,7 +10,7 @@ on:
       - 'packages/twin-linear/**'
       - 'packages/twin-slack/**'
       - 'packages/twin-stripe/**'
-      - 'packages/shared-types/**'
+      - 'packages/wire/**'
       - 'packages/*/package.json'
       - 'package.json'
       - 'package-lock.json'
@@ -30,7 +30,8 @@ on:
 jobs:
   # On PRs, build only twins whose package tree (or shared runtime inputs)
   # changed. main/tags/dispatch always build the full matrix so GHCR stays
-  # coherent. Shared-types / lockfiles / Docker wiring ⇒ all twins.
+  # coherent. @pome-sh/wire / lockfiles / Docker wiring ⇒ all twins. (The cloud
+  # contract in cli/src/contract is deliberately NOT here: no twin imports it.)
   #
   # FIRST_PARTY_TWINS: github, slack, stripe, gmail, linear
   detect-twins:
@@ -60,7 +61,7 @@ jobs:
           shared=false
           for f in "${files[@]}"; do
             case "$f" in
-              packages/shared-types/*|package.json|package-lock.json|cli/package.json|.dockerignore|.trivyignore|scripts/ci/*|.github/workflows/*|packages/*/package.json)
+              packages/wire/*|package.json|package-lock.json|cli/package.json|.dockerignore|.trivyignore|scripts/ci/*|.github/workflows/*|packages/*/package.json)
                 shared=true
                 break
                 ;;

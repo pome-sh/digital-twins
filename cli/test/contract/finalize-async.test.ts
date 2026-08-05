@@ -4,7 +4,7 @@ import {
   finalizeInitialResponseSchema,
   finalizeResponseSchema,
   finalizeStatusResponseSchema,
-} from "../src/index.js";
+} from "../../src/contract/index.js";
 
 const legacyResult = {
   run_id: "run_123",

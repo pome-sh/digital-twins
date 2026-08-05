@@ -1,10 +1,10 @@
 // file-size: Shared seed-state Zod schemas across twins — kept together so seed contracts stay one module.
 // SPDX-License-Identifier: Apache-2.0
 //
-// shared-types — provider seed-state schemas (part of §3 TASKS). The
+// contract — provider seed-state schemas (part of §3 TASKS). The
 // per-provider seed worlds (GitHub / Stripe / Slack), the provider-scoped
 // wrapper, and the legacy-or-scoped `seedStateSchema` union consumed by
-// `taskSchema`. Re-exported through the `@pome-sh/shared-types` barrel.
+// `taskSchema`. Re-exported through the `cli/src/contract` barrel.
 
 import { z } from "zod";
 

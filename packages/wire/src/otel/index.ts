@@ -8,7 +8,7 @@
  * OWNERSHIP BOUNDARY (settled at FDRS-653; supersedes the earlier
  * "pome-cloud mirrors this directory verbatim" claim, which no longer held):
  *   - FORMAT schemas are canonical HERE, in `pome-sh/pome-twins`
- *     `@pome-sh/shared-types` v0.5.0+: `span-event`, `event-schema`,
+ *     `@pome-sh/shared-types` v0.5.0+ (now `@pome-sh/wire`): `span-event`, `event-schema`,
  *     `semconv`, `nano`, `project`, `map-span`, `legacy-shim`, and the
  *     `fixtures/` corpus. pome-cloud CONSUMES this surface (FDRS-654 swaps it
  *     onto the published package); it does not fork it.

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MOUNTED_TWINS } from "@pome-sh/shared-types";
+import { MOUNTED_TWINS } from "../../src/contract/index.js";
 import { createProgram } from "../../src/cli/main.js";
 import { checksFor, twinsWithoutChecks } from "../../src/cli/checks.js";
 

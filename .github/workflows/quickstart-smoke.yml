@@ -9,7 +9,7 @@ on:
     paths:
       - 'README.md'
       - 'examples/triage-agent/**'
-      - 'packages/shared-types/**'
+      - 'packages/wire/**'
       - 'packages/sdk/**'
       # Smoke boots github + gmail via the CLI; keep both twins in the filter.
       - 'packages/twin-github/**'
@@ -25,7 +25,7 @@ on:
     paths:
       - 'README.md'
       - 'examples/triage-agent/**'
-      - 'packages/shared-types/**'
+      - 'packages/wire/**'
       - 'packages/sdk/**'
       - 'packages/twin-github/**'
       - 'packages/twin-gmail/**'

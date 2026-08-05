@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// shared-types §1 — IDENTITY. Users, teams, memberships, invites, API keys.
-// Re-exported through the `@pome-sh/shared-types` barrel (index.ts).
+// contract §1 — IDENTITY. Users, teams, memberships, invites, API keys.
+// Re-exported through the `cli/src/contract` barrel (index.ts).
 
 import { z } from "zod";
 

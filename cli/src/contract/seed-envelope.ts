@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// shared-types §3 — multi-twin seed envelope. Re-exported through the
-// `@pome-sh/shared-types` barrel (index.ts).
+// contract §3 — multi-twin seed envelope. Re-exported through the
+// `cli/src/contract` barrel (index.ts).
 //
 // THE RULE (no shape-sniffing anywhere): the create-session `seed` override is a
 // per-twin envelope `{ <twin>: <flat seed> }` IF AND ONLY IF the session has

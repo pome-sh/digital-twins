@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// shared-types §6 — the pome.json / pome.yaml MANIFEST (F-818, format spec
+// contract §6 — the pome.json / pome.yaml MANIFEST (F-818, format spec
 // F-804). One canonical zod schema; JSON and YAML are interchangeable carriers
 // of the same snake_case keys (both files present is a hard error at the CLI
 // loader, not here). The `agent` block is the stable cross-carrier identity
@@ -76,7 +76,7 @@ export type ManifestInput = z.input<typeof manifestSchema>;
 // by editors via the manifest's `$schema` pointer. `io: "input"` emits the
 // AUTHOR-side shape — run-config keys with defaults stay optional instead of
 // being promoted to required by the parsed (output) view. Shared by the
-// build-time emitter (scripts/emit-manifest-schema.mjs) and the snapshot test
+// build-time emitter (cli/scripts/emit-manifest-schema.mjs) and the snapshot test
 // so the two can never disagree.
 export function buildManifestJsonSchema(): Record<string, unknown> {
   return {

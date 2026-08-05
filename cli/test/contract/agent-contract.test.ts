@@ -13,7 +13,7 @@ import {
   agentResponseSchema,
   createAgentRequestSchema,
   createSessionRequestSchema,
-} from "../src/index.js";
+} from "../../src/contract/index.js";
 
 describe("createAgentRequestSchema — manifest identity fields (F-818)", () => {
   it("still accepts the pre-F-818 minimal payload", () => {

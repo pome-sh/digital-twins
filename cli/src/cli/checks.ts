@@ -12,7 +12,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { checksDigest, templateSlots, type CheckDefinition } from "@pome-sh/sdk/checks";
-import { MOUNTED_TWINS } from "@pome-sh/shared-types";
+import { MOUNTED_TWINS } from "../contract/index.js";
 import { GITHUB_CHECKS } from "@pome-sh/twin-github/checks";
 import { GMAIL_CHECKS } from "@pome-sh/twin-gmail/checks";
 import { LINEAR_CHECKS } from "@pome-sh/twin-linear/checks";

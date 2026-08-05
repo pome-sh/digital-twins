@@ -21,7 +21,6 @@
 
 - [@pome-sh/cli](https://www.npmjs.com/package/@pome-sh/cli): the `pome` CLI — run tasks, inspect traces, upload for evaluation
 - [@pome-sh/sdk](https://www.npmjs.com/package/@pome-sh/sdk): the twin engine — build your own twin with `defineTwin()`
-- [@pome-sh/shared-types](https://www.npmjs.com/package/@pome-sh/shared-types): Zod schemas and the trace contract
 - [@pome-sh/adapter-claude-sdk](https://www.npmjs.com/package/@pome-sh/adapter-claude-sdk): wire a Claude Agent SDK agent to a Pome run
 
 ## Getting started

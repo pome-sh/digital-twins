@@ -7,7 +7,7 @@ SPDX-License-Identifier: Apache-2.0
 Drop-in adapter for Anthropic's `claude-agent-sdk`. Add one import + one call,
 and your agent's runs produce overlay signals (`HookEvent` audit rows plus —
 under FDRS-408 — `ToolUseEvent` / `ToolResultEvent` payload rows) that let the
-Pome correlator stitch your trace into a [`Run`][shared-types] with named lanes,
+Pome correlator stitch your trace into a [`Run`](../../cli/src/contract/run.ts) with named lanes,
 ordered steps, and a generated fix prompt.
 
 ## One-import API
@@ -38,7 +38,7 @@ That's the whole user-facing surface.
 | Signal | How it lands |
 | --- | --- |
 | `tool_call_id` header on outgoing twin requests | Wrapped `tool()` puts an id into `AsyncLocalStorage` for the lifetime of the handler. `globalThis.fetch` is replaced once at `withPome()` time; outgoing requests to **allowlisted twin origins** carry `x-pome-correlation-id: tlc_<hex>`. The twin's recorder reads the header and writes it into the event. |
-| `HookEvent` audit row per SDK hook invocation | Wrapped `query()` merges a read-only hook into every entry in the SDK's `HOOK_EVENTS` (PreToolUse / PostToolUse / SubagentStart / PreCompact / PermissionRequest / TaskCreated / SessionStart / …). Each invocation appends one row matching [`hookEventSchema`][shared-types] — `{ts, event_id, parent_id, kind:"HookEvent", hook_name, tool_name}` — to a JSONL sidechannel file (`process.env.POME_ADAPTER_SIGNALS_PATH`). User-supplied hooks in `options.hooks` are preserved. |
+| `HookEvent` audit row per SDK hook invocation | Wrapped `query()` merges a read-only hook into every entry in the SDK's `HOOK_EVENTS` (PreToolUse / PostToolUse / SubagentStart / PreCompact / PermissionRequest / TaskCreated / SessionStart / …). Each invocation appends one row matching [`hookEventSchema`][wire] — `{ts, event_id, parent_id, kind:"HookEvent", hook_name, tool_name}` — to a JSONL sidechannel file (`process.env.POME_ADAPTER_SIGNALS_PATH`). User-supplied hooks in `options.hooks` are preserved. |
 
 ## When it's a no-op
 
@@ -60,7 +60,7 @@ That's the whole user-facing surface.
 reaches the twin — single source of truth, no race under parallel tool calls.
 `HookEvent` rows are written to the sidechannel as each SDK hook fires; they
 follow the discriminated-union schema in
-[`packages/shared-types/src/recorder-events.ts`][shared-types], so the
+[`packages/wire/src/recorder-events.ts`][wire], so the
 correlator (FDRS-412) can merge them into `events.jsonl` by `ts`-ordered
 insertion. Hook handlers are read-only — they observe and never mutate the
 event the SDK passes them.
@@ -103,7 +103,7 @@ side-effect import is captured in the `[DECISION]` comment on
 ## Signals file format
 
 One JSON object per line, ordered by emission time. Rows follow the M0
-discriminated-union shape in [`shared-types`][shared-types]:
+discriminated-union shape in [`wire`][wire]:
 
 ```jsonl
 {"ts":"2026-05-26T20:00:00.000Z","event_id":"...","parent_id":null,"kind":"HookEvent","hook_name":"SessionStart","tool_name":null}
@@ -118,4 +118,4 @@ The correlator (`FDRS-412`) reads this alongside `events.jsonl` and produces a
 
 Apache-2.0.
 
-[shared-types]: ../shared-types/src/recorder-events.ts
+[wire]: ../wire/src/recorder-events.ts

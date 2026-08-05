@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// shared-types §5 — ERROR ENVELOPE (public REST). The `error.type` enum and the
-// wrapping envelope shape. Re-exported through the `@pome-sh/shared-types`
+// contract §5 — ERROR ENVELOPE (public REST). The `error.type` enum and the
+// wrapping envelope shape. Re-exported through the `cli/src/contract`
 // barrel (index.ts).
 
 import { z } from "zod";

@@ -1,4 +1,15 @@
-# @pome-sh/shared-types — CHANGELOG
+# `cli/src/contract` — CHANGELOG
+
+The release history of `@pome-sh/shared-types`, whose `/v1` cloud control-plane
+clusters became this directory in F-942. Kept because these entries are the
+coordination record with `pome-cloud`: which release added which field, and which
+tolerant reader still accepts the shape before it. The trace-surface entries
+describe schemas that now live in `@pome-sh/wire`; the GitHub access-control
+entries describe `packages/twin-github/src/access-control.ts`.
+
+Versions below are `@pome-sh/shared-types` versions. Nothing here was ever
+published to npm — the package was `private: true` throughout — so a version is a
+workspace marker, not an installable artifact.
 
 
 ## 0.14.0 — 2026-08-04

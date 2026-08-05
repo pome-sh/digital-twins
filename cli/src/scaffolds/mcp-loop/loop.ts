@@ -163,7 +163,7 @@ export function createHttpMcpClient(opts: {
 // ---------------------------------------------------------------------------
 
 // Hand-built JSON-line rows matching the adapter's on-disk shapes (no
-// shared-types runtime dep). The CLI runner merges this file into the canonical
+// @pome-sh/wire runtime dep). The CLI runner merges this file into the canonical
 // events.jsonl after the subprocess exits.
 function emitToolUse(
   signalsPath: string | null,

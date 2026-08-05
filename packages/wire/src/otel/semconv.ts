@@ -24,7 +24,7 @@
  *   - http:  https://opentelemetry.io/docs/specs/semconv/http/http-spans/
  *
  * This module is the canonical home of the pinned OTel convention surface;
- * pome-cloud consumes it as part of `@pome-sh/shared-types` (ownership
+ * pome-cloud consumes it as part of `@pome-sh/wire` (ownership
  * boundary settled at FDRS-653 — see `./index.ts`).
  */
 

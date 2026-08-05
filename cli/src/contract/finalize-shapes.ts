@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// shared-types — /v1/sessions/:id/finalize response family (part of §4 PUBLIC
+// contract — /v1/sessions/:id/finalize response family (part of §4 PUBLIC
 // REST API). ADR-013 managed-judge synchronous result plus the F-700 async
 // `Prefer: respond-async` accepted/status/union shapes. Re-exported through the
-// `@pome-sh/shared-types` barrel (index.ts).
+// `cli/src/contract` barrel (index.ts).
 
 import { z } from "zod";
 import { criterionResultSchema } from "./run.js";

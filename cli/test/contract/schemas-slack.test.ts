@@ -9,7 +9,7 @@ import {
   createSessionResponseSchema,
   providerScopedSeedStateSchema,
   slackSeedStateSchema,
-} from "../src/index.js";
+} from "../../src/contract/index.js";
 import { KNOWN_TWIN_IDS } from "@pome-sh/wire";
 
 describe("MOUNTED_TWINS", () => {

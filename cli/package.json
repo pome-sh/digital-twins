@@ -52,7 +52,9 @@
     "test:e2e": "vitest run test/e2e",
     "gate:no-eval": "node ../scripts/no-eval-in-oss.mjs",
     "gate:no-native": "node ../scripts/no-native-modules.mjs --root .",
-    "gate:recorder-overhead": "tsx scripts/recorder-overhead-gate.ts"
+    "gate:recorder-overhead": "tsx scripts/recorder-overhead-gate.ts",
+    "emit:manifest-schema": "node scripts/emit-manifest-schema.mjs",
+    "check:manifest-schema": "node scripts/emit-manifest-schema.mjs --check"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.9",
@@ -71,7 +73,6 @@
   },
   "devDependencies": {
     "@pome-sh/sdk": "*",
-    "@pome-sh/shared-types": "*",
     "@pome-sh/wire": "*",
     "@pome-sh/twin-github": "*",
     "@pome-sh/twin-gmail": "*",

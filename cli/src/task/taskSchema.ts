@@ -7,7 +7,7 @@ import { linearSeedSchema as linearSeedStateSchema } from "@pome-sh/twin-linear"
 // (legacy `D`/`P` enum values) exists only for 0.3.0-era persisted artifacts,
 // never for scenario markdown. The former local criterion-kind fork is
 // retired here (M6 — one published contract).
-import { criterionSchema } from "@pome-sh/shared-types";
+import { criterionSchema } from "../contract/index.js";
 import { z } from "zod";
 
 export { criterionSchema };

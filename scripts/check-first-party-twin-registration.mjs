@@ -12,7 +12,7 @@
 // `TWIN_NAME_LIST` itself is still compared here — that list is what the type
 // is derived FROM, so nothing inside the CLI can catch it drifting from the
 // canonical set. The seams below live outside the type system entirely (twin
-// images, the black-box contract suite, shared-types wire enums, workflow path
+// images, the black-box contract suite, the wire enums, workflow path
 // filters) and are the reason this script survives.
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -41,8 +41,8 @@ function quotedArray(path, exportName) {
 }
 
 compare(
-  "packages/shared-types/src/sessions.ts MOUNTED_TWINS",
-  quotedArray("packages/shared-types/src/sessions.ts", "MOUNTED_TWINS"),
+  "cli/src/contract/sessions.ts MOUNTED_TWINS",
+  quotedArray("cli/src/contract/sessions.ts", "MOUNTED_TWINS"),
 );
 compare(
   "packages/wire/src/recorder-events.ts KNOWN_TWIN_IDS",

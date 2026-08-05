@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// shared-types §2 — SESSIONS. Mounted-twin allowlist, session state machine,
+// contract §2 — SESSIONS. Mounted-twin allowlist, session state machine,
 // internal DB row + public API response shapes. Re-exported through the
-// `@pome-sh/shared-types` barrel (index.ts).
+// `cli/src/contract` barrel (index.ts).
 
 import { z } from "zod";
 

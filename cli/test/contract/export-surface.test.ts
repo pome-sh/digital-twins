@@ -1,18 +1,25 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-754 export-surface guard. The `@pome-sh/shared-types` barrel is the public
-// V1 contract; consumers (CLI, twins, pome-cloud) import runtime values by name
-// from it. The topical-module split (F-754) must be provably zero-surface-change:
-// if a re-export is dropped, renamed, or shadowed by an `export *` collision,
-// the sorted key list below drifts and this test fails loud.
+// F-754 export-surface guard, for the cloud control-plane half of the former
+// `@pome-sh/shared-types` barrel (F-942 moved these clusters to
+// `cli/src/contract/`; the trace half is
+// `packages/wire/test/export-surface.test.ts`). Between the two files every
+// symbol the old snapshot named is still named, so the three-way split is
+// auditable as a partition rather than as a loosening. The GitHub access-control
+// values left in the same milestone and are exercised by
+// `packages/twin-github/test/access-control-catalog.test.ts`.
+//
+// `pome-cloud` imports these runtime values by name. If a re-export is dropped,
+// renamed, or shadowed by an `export *` collision, the sorted key list below
+// drifts and this test fails loud.
 //
 // The expected list is an explicit inline array (not a `.snap` file) so the
-// public surface reads plainly in review. It was generated from the pre-refactor
+// surface reads plainly in review. It was generated from the pre-refactor
 // `main` build. When you intentionally add/remove an export, update this list in
 // the same PR.
 
 import { describe, expect, it } from "vitest";
-import * as api from "../src/index.js";
+import * as api from "../../src/contract/index.js";
 // TYPE-surface guard: `Object.keys` only sees runtime values, so dropping an
 // `export type` / `export interface` — or a whole type-only leaf re-export —
 // would pass the runtime snapshot silently. This type-only import enumerates
@@ -45,7 +52,6 @@ import type {
   CreateSessionResponse,
   CriterionDef,
   CriterionDefInput,
-  Event,
   FinalizeAcceptedResponse,
   FinalizeCompletedStatusResponse,
   FinalizeFailedStatusResponse,
@@ -59,20 +65,14 @@ import type {
   FinalizeStatusUrl,
   GmailSeedState,
   GithubSeedState,
-  HookEvent,
-  LlmCallEvent,
-  LlmTurnEvent,
   Manifest,
   ManifestAgent,
   ManifestInput,
   MeResponse,
-  OtelEvent,
-  OtelSpanEvent,
   PerTwinStateKeys,
   PersistedScenario,
   PersistedTask,
   PlanTier,
-  RecorderEvent,
   Scenario,
   ScenarioConfig,
   SeedEnvelope,
@@ -84,7 +84,6 @@ import type {
   StateUploadUrlEntry,
   StateUploadUrlResponse,
   StripeSeedState,
-  SubagentSpawnEvent,
   SubmitResultRequest,
   SubmitResultResponse,
   Task,
@@ -93,12 +92,9 @@ import type {
   TeamInvite,
   TeamMember,
   TeamRole,
-  ToolResultEvent,
-  ToolUseEvent,
-  TwinHttpEvent,
   UsageResponse,
   User,
-} from "../src/index.js";
+} from "../../src/contract/index.js";
 
 // Referencing every imported type keeps the guard alive under
 // noUnusedLocals-style settings; the tuple is never instantiated.
@@ -118,7 +114,6 @@ type _TypeSurfaceAssert = [
   CreateSessionResponse,
   CriterionDef,
   CriterionDefInput,
-  Event,
   FinalizeAcceptedResponse,
   FinalizeCompletedStatusResponse,
   FinalizeFailedStatusResponse,
@@ -132,20 +127,14 @@ type _TypeSurfaceAssert = [
   FinalizeStatusUrl,
   GmailSeedState,
   GithubSeedState,
-  HookEvent,
-  LlmCallEvent,
-  LlmTurnEvent,
   Manifest,
   ManifestAgent,
   ManifestInput,
   MeResponse,
-  OtelEvent,
-  OtelSpanEvent,
   PerTwinStateKeys,
   PersistedScenario,
   PersistedTask,
   PlanTier,
-  RecorderEvent,
   Scenario,
   ScenarioConfig,
   SeedEnvelope,
@@ -157,7 +146,6 @@ type _TypeSurfaceAssert = [
   StateUploadUrlEntry,
   StateUploadUrlResponse,
   StripeSeedState,
-  SubagentSpawnEvent,
   SubmitResultRequest,
   SubmitResultResponse,
   Task,
@@ -166,60 +154,22 @@ type _TypeSurfaceAssert = [
   TeamInvite,
   TeamMember,
   TeamRole,
-  ToolResultEvent,
-  ToolUseEvent,
-  TwinHttpEvent,
   UsageResponse,
   User,
 ];
 // Compile-time anchor: exactly one tuple entry per guarded type. The literal
 // type on the left fails to compile if an entry is added or removed above
 // without updating the count.
-const TYPE_SURFACE_SIZE: _TypeSurfaceAssert["length"] = 68;
+const TYPE_SURFACE_SIZE: _TypeSurfaceAssert["length"] = 57;
 
 // Runtime value exports (types are erased and cannot appear on `Object.keys`).
 const EXPECTED_EXPORTS = [
   "CRITERION_KINDS",
-  "ERROR_TYPE",
-  "GEN_AI_AGENT_ID",
-  "GEN_AI_AGENT_NAME",
-  "GEN_AI_OPERATION_NAME",
-  "GEN_AI_PROVIDER_NAME",
-  "GEN_AI_REQUEST_MODEL",
-  "GEN_AI_SYSTEM_DEPRECATED",
-  "GEN_AI_TOOL_NAME",
-  "GEN_AI_USAGE_COMPLETION_TOKENS_LEGACY",
-  "GEN_AI_USAGE_INPUT_TOKENS",
-  "GEN_AI_USAGE_OUTPUT_TOKENS",
-  "GEN_AI_USAGE_PROMPT_TOKENS_LEGACY",
-  "HTTP_REQUEST_METHOD",
-  "HTTP_RESPONSE_STATUS_CODE",
-  "KNOWN_TWIN_IDS",
-  "LEGACY_ATTR_NAMESPACE",
   "LEGACY_CRITERION_KIND_MAP",
-  "LEGACY_ID_PREFIX",
-  "LEGACY_SHIM_SEMCONV_VERSION",
   "LEGACY_TASK_VOCAB_KEY_MAP",
   "MOUNTED_TWINS",
-  "OPENINFERENCE_LLM_MODEL_NAME",
-  "OPENINFERENCE_LLM_PROVIDER",
-  "OPENINFERENCE_LLM_SYSTEM",
-  "OPENINFERENCE_LLM_TOKEN_COUNT_COMPLETION",
-  "OPENINFERENCE_LLM_TOKEN_COUNT_PROMPT",
-  "OPENINFERENCE_TOOL_NAME",
-  "OTEL_CORE_SEMCONV_VERSION",
-  "OTEL_GENAI_SCHEMA_URL",
-  "OTEL_GENAI_SCHEMA_VERSION",
-  "OTEL_PROJECTION_KEYS",
-  "OTEL_SPAN_KINDS",
-  "OTEL_STATUS_CODES",
-  "SERVER_ADDRESS",
-  "SERVER_PORT",
   "SLUG_MAX_LENGTH",
   "SLUG_RE",
-  "UINT64_MAX",
-  "URL_FULL",
-  "URL_PATH",
   "acceptInviteRequestSchema",
   "acceptInviteResponseSchema",
   "agentResponseSchema",
@@ -229,9 +179,6 @@ const EXPECTED_EXPORTS = [
   "apiKeyCreatedSchema",
   "apiKeySchema",
   "buildManifestJsonSchema",
-  "canonicalSpanIdSchema",
-  "canonicalTraceIdSchema",
-  "compareUint64",
   "correlatorKindSchema",
   "createAgentRequestSchema",
   "createEvalSessionResponseSchema",
@@ -245,7 +192,6 @@ const EXPECTED_EXPORTS = [
   "criterionSchema",
   "deriveAgentSlug",
   "deterministicCriterionResultSchema",
-  "eventSchema",
   "finalizeAcceptedResponseSchema",
   "finalizeCompletedStatusResponseSchema",
   "finalizeFailedStatusResponseSchema",
@@ -259,39 +205,20 @@ const EXPECTED_EXPORTS = [
   "finalizeStatusUrlSchema",
   "githubSeedStateSchema",
   "gmailSeedStateSchema",
-  "hookEventSchema",
-  "isLegacyEventRow",
   "isMultiTwinSeedEnvelope",
-  "isUint64",
   "judgeModelSchema",
   "laneSchema",
   "linearSeedStateSchema",
-  "llmCallEventSchema",
-  "llmTurnEventSchema",
   "manifestAgentSchema",
   "manifestSchema",
-  "mapOtelSpanToEvent",
   "meResponseSchema",
-  "msToNanos",
-  "nanosToIso",
   "normalizeTaskVocabKeys",
-  "otelAttributeValueSchema",
-  "otelEventSchema",
-  "otelSpanEventSchema",
-  "otelSpanInputSchema",
-  "otelSpanKindSchema",
-  "otelStatusCodeSchema",
   "perTwinStateKeysSchema",
   "persistedScenarioSchema",
   "persistedTaskSchema",
   "planTierSchema",
   "probabilisticCriterionResultSchema",
-  "projectAttributes",
   "providerScopedSeedStateSchema",
-  "recorderEventSchema",
-  "recorderFidelitySchema",
-  "redactEvent",
-  "redactSecrets",
   "runSchema",
   "scenarioConfigSchema",
   "scenarioSchema",
@@ -300,15 +227,11 @@ const EXPECTED_EXPORTS = [
   "sessionPublicSchema",
   "sessionSchema",
   "sessionStateSchema",
-  "shimLegacyEventToSpan",
-  "shimmableLegacyEventSchema",
   "slackSeedStateSchema",
-  "stateDeltaSchema",
   "stateUploadUrlEntrySchema",
   "stateUploadUrlResponseSchema",
   "stepSchema",
   "stripeSeedStateSchema",
-  "subagentSpawnEventSchema",
   "submitResultRequestSchema",
   "submitResultResponseSchema",
   "taskConfigSchema",
@@ -317,26 +240,19 @@ const EXPECTED_EXPORTS = [
   "teamMemberSchema",
   "teamRoleSchema",
   "teamSchema",
-  "toolResultEventSchema",
-  "toolUseEventSchema",
-  "twinHttpEventSchema",
-  "twinIdSchema",
-  "unixNanoSchema",
   "usageResponseSchema",
   "userSchema",
-  "w3cSpanIdSchema",
-  "w3cTraceIdSchema",
 ] as const;
 
-describe("@pome-sh/shared-types barrel export surface (F-754)", () => {
+describe("cli/src/contract barrel export surface (F-754, F-942)", () => {
   it("re-exports exactly the pre-refactor runtime value surface", () => {
     expect(Object.keys(api).sort()).toEqual([...EXPECTED_EXPORTS]);
   });
 
-  it("guards the TYPE surface (68 types/interfaces)", () => {
+  it("guards the TYPE surface (57 types/interfaces)", () => {
     // The real guard is the type-only import + _TypeSurfaceAssert tuple above,
     // enforced at typecheck time. This assertion just anchors the count at
     // runtime so the guard's scope is visible in test output.
-    expect(TYPE_SURFACE_SIZE).toBe(68);
+    expect(TYPE_SURFACE_SIZE).toBe(57);
   });
 });

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// shared-types §3 — TASKS. Task config, the parsed task markdown shape, and the
+// contract §3 — TASKS. Task config, the parsed task markdown shape, and the
 // persisted task row, plus their deprecated `scenario*` aliases. The provider
 // seed-state schemas consumed by `taskSchema.seedState` live in `./seed-state.ts`.
-// Re-exported through the `@pome-sh/shared-types` barrel (index.ts).
+// Re-exported through the `cli/src/contract` barrel (index.ts).
 
 import { z } from "zod";
 import { criterionSchema, judgeModelSchema } from "./run.js";

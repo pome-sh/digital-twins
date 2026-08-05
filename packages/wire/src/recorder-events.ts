@@ -16,7 +16,7 @@
 import { z } from "zod";
 
 // `twin` is an open string at the schema level so SDK-based community twins
-// can set their own id without forcing a shared-types schema bump. Dashboard
+// can set their own id without forcing a wire schema bump. Dashboard
 // rendering pattern-matches against `KNOWN_TWIN_IDS` and falls back to
 // generic rendering for unknown values — losing a recording to parse failure
 // would be worse than rendering it generically. First-party twins SHOULD use
@@ -35,7 +35,7 @@ export type RecorderFidelity = z.infer<typeof recorderFidelitySchema>;
 // state); `after: null` = row was deleted. Parent `null` = no mutation (read-only
 // call — should also have `state_mutation: false`). Per-twin types are NOT
 // enforced — each twin owns its row shape, and forcing a strong type here would
-// couple shared-types to twin schemas.
+// couple wire to twin schemas.
 export const stateDeltaSchema = z
   .object({
     before: z.record(z.string(), z.unknown()).nullable(),

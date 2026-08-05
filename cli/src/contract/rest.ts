@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// shared-types §4 — PUBLIC REST API (api.pome.sh/v1) request/response shapes,
+// contract §4 — PUBLIC REST API (api.pome.sh/v1) request/response shapes,
 // excluding the /finalize response family (see `./finalize-shapes.ts`). The two
 // module-private helpers (`normalizeCreateSessionResponse` and the
 // `*ObjectSchema` consts wrapped by z.preprocess) stay co-located with their
-// exported consumers here. Re-exported through the `@pome-sh/shared-types` barrel.
+// exported consumers here. Re-exported through the `cli/src/contract` barrel.
 
 import { z } from "zod";
 import {
