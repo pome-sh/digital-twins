@@ -23,8 +23,12 @@ instead of probing the endpoint.
 
 **SENSITIVE — the bearer.** `run_task` returns `agent_token`, a
 session-scoped JWT that is the bearer for every twin URL — a live credential.
-Hold it in memory for this run only: never write it to disk, into a task, or
-a log. It dies at `expires_at`; `finalize_run` is the last thing that needs it.
+It exists for **one** purpose: handing the examinee its twin authentication at
+launch (§2). Pass it straight into the launcher's env or vault and then let go
+of it — never write it to disk, into a task, or a log, never repeat it back to
+the builder, and never keep it around "for later". Nothing downstream needs it:
+`finalize_run` derives the bearer from `session_id` server-side. It dies at
+`expires_at` regardless.
 
 ## 1. Mint the run
 
@@ -86,7 +90,7 @@ final state + events off the **still-live** twins; once the session leaves
 `ready`/`running` the sandbox is torn down and the tape is gone — it errors, and
 the run is unrecoverable. So the moment the launcher reports the examinee idle
 (done / awaiting-input with no more tool calls coming), call
-`finalize_run(session_id, agent_token)` **immediately** — before any cleanup,
+`finalize_run(session_id)` **immediately** — before any cleanup,
 before narrating anything. It scores synchronously against the pulled tape and
 returns `{ run_id, score, judge_model, dashboard_url }`. One evaluation per run.
 
