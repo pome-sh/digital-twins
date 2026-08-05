@@ -48,6 +48,12 @@ jobs:
       - run: node scripts/check-copy-markers.mjs
       - run: node scripts/lint-code-health.mjs
       - run: node scripts/check-first-party-twin-registration.mjs
+      # release.yml only publishes on a version diff against npm — a PR that
+      # changes a published package's source without bumping its version
+      # merges clean and silently never reaches npm. Only meaningful against
+      # the PR's actual base (a push to main has already merged).
+      - if: github.event_name == 'pull_request'
+        run: node scripts/ci/check-version-bump-required.mjs "${{ github.event.pull_request.base.sha }}"
       # F-778 — the legacy D/P criterion markers are retired; fail on any
       # reintroduction outside the parser's own legacy-detection code.
       - run: node scripts/lint-legacy-criterion-markers.mjs
