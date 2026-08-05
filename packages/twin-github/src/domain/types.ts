@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { StateDelta } from "@pome-sh/shared-types";
+import type { StateDelta } from "@pome-sh/wire";
 
 export type PageOptions = { page?: number; per_page?: number; perPage?: number };
 export type MutatingOptions = { actor?: string };

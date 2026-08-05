@@ -9,18 +9,18 @@ COPY package.json package-lock.json ./
 COPY cli/package.json cli/package.json
 COPY packages packages
 # Scope the install to the workspaces this image actually builds: the twin,
-# plus sdk/shared-types it compiles against, plus the workspace root's own
+# plus sdk/wire it compiles against, plus the workspace root's own
 # devDependencies. Without the scope, npm ci would also pull the CLI's
 # @ai-sdk/ai/anthropic graph into a build stage that never uses it.
 RUN npm ci --include-workspace-root \
-  -w @pome-sh/shared-types -w @pome-sh/sdk -w @pome-sh/twin-slack
-RUN npm run build:runtime -w @pome-sh/shared-types
+  -w @pome-sh/wire -w @pome-sh/sdk -w @pome-sh/twin-slack
+RUN npm run build -w @pome-sh/wire
 # The twin imports `@pome-sh/sdk/server`, resolved from the SDK's built dist.
 RUN npm run build -w @pome-sh/sdk
 RUN npm run build -w @pome-sh/twin-slack
 # The runtime image should not include dev/test tooling or unrelated workspace
 # deps. Reinstall only this twin's production graph (plus workspace deps it
-# links: sdk, shared-types) — not every packages/* workspace.
+# links: sdk, wire) — not every packages/* workspace.
 RUN rm -rf node_modules packages/*/node_modules \
   && npm ci --omit=dev -w @pome-sh/twin-slack
 
@@ -32,7 +32,13 @@ ENV SLACK_CLONE_HOST=0.0.0.0
 # (and their CVE surface) to the scanned image.
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 COPY --from=build /repo/node_modules ./node_modules
-COPY --from=build /repo/packages/shared-types ./packages/shared-types
+# The twin's dist imports @pome-sh/wire; ship its built output. Before F-942 this
+# was `COPY packages/shared-types` -- the WHOLE directory, sources included -- because
+# that package exported `./src/index.ts` and `build:runtime` emitted the runtime
+# `.js` in place beside each `.ts`. wire builds to dist/ like every other
+# package, so package.json + dist is the entire runtime need.
+COPY --from=build /repo/packages/wire/package.json ./packages/wire/package.json
+COPY --from=build /repo/packages/wire/dist ./packages/wire/dist
 # The twin's dist imports `@pome-sh/sdk`; ship the SDK's built output so the
 # workspace symlink in node_modules resolves at runtime.
 COPY --from=build /repo/packages/sdk/package.json ./packages/sdk/package.json

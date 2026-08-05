@@ -2,7 +2,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createGitHubCloneApp } from "../src/twin.js";
 import { createRecorderStore } from "@pome-sh/sdk/server";
-import type { RecorderEvent } from "@pome-sh/shared-types";
+import type { RecorderEvent } from "@pome-sh/wire";
 import { TEST_AUTH_SECRET, TEST_SID, signTestToken, withAuth } from "./_authHelper.js";
 
 const previousSecret = process.env.TWIN_AUTH_SECRET;

@@ -1,6 +1,6 @@
 // file-size: SlackDomain coordinator keeps seed/lifecycle plus shared channel/user helpers; area modules own conversations/chat/etc.
 // SPDX-License-Identifier: Apache-2.0
-import type { StateDelta } from "@pome-sh/shared-types";
+import type { StateDelta } from "@pome-sh/wire";
 import { resetDatabase } from "../db.js";
 import {
   canvasesCreate as canvasesCreateImpl,

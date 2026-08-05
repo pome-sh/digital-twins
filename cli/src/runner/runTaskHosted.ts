@@ -29,7 +29,7 @@ import type {
   RecorderEvent,
 } from "../types/shared.js";
 import type { CriterionDefWire } from "../hosted/client.js";
-import type { RecorderEvent as LegacyGithubRecorderEvent } from "@pome-sh/shared-types";
+import type { RecorderEvent as LegacyGithubRecorderEvent } from "@pome-sh/wire";
 import type { Task } from "../task/taskSchema.js";
 import {
   scoreStatus,

@@ -12,7 +12,7 @@
 // The suite body lives in ./suite.mjs (FDRS-681) so the identical assertions
 // also run against the sdk-booted proof entry (./sdk-boot.test.mjs).
 //
-// Prerequisite: `npm run build:runtime -w @pome-sh/shared-types`,
+// Prerequisite: `npm run build -w @pome-sh/wire`,
 // `npm run build -w @pome-sh/sdk`, and `npm run build -w @pome-sh/twin-*`
 // (the root `test:contract` script chains these via contract/run.mjs).
 

@@ -16,7 +16,7 @@
 
 import { basename, dirname } from "node:path";
 
-import { MOUNTED_TWINS, type AgentResponse } from "@pome-sh/shared-types";
+import { MOUNTED_TWINS, type AgentResponse } from "../contract/index.js";
 import {
   postAgentResolver,
   resolveSeams,

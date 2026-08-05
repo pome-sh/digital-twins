@@ -28,7 +28,7 @@
 import { randomUUID } from "node:crypto";
 import type { MiddlewareHandler } from "hono";
 import { z } from "zod";
-import type { RecorderEvent } from "@pome-sh/shared-types";
+import type { RecorderEvent } from "@pome-sh/wire";
 import { recordedRequestHeaders } from "./request-capture.js";
 
 export const FAILURE_INJECTION_OVERRIDE_KEY = "failureInjectionOverride";

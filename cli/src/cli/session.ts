@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
-import { MOUNTED_TWINS } from "@pome-sh/shared-types";
+import { MOUNTED_TWINS } from "../contract/index.js";
 import { createHostedClient, perTwinReturnedByCloud } from "../hosted/client.js";
 import type { CreateSessionResponse } from "../types/shared.js";
 import {
@@ -28,7 +28,7 @@ export function ensureMcpSuffix(url: string): string {
 // Multi-twin (M3): the CLI's ad-hoc session allowlist is the shared mounted-twin
 // set (github, stripe, slack, gmail, linear). Repeated `--twin` flags
 // stand up a multi-twin session in one call.
-// Keep newly-added twin ids explicit during shared-types publish windows: local
+// Keep newly-added twin ids explicit during contract publish windows: local
 // development may still resolve a previous installed package.
 const ALLOWED_TWINS = new Set<string>([...MOUNTED_TWINS, "gmail", "linear"]);
 

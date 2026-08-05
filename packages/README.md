@@ -26,7 +26,7 @@ Each directory has its own README (ports, env, runtime contract) and a
 | Directory | Workspace name | Role | Published? |
 | --- | --- | --- | --- |
 | [`sdk/`](./sdk/) | `@pome-sh/sdk` | Twin engine — HTTP mount, auth, recorder, MCP dispatch, SQLite | internal |
-| [`shared-types/`](./shared-types/) | `@pome-sh/shared-types` | Zod schemas, recorder/task/trace types | internal |
+| [`wire/`](./wire/) | `@pome-sh/wire` | Zod schemas for recorder events, OTel spans, redaction | internal |
 | [`adapter-claude-sdk/`](./adapter-claude-sdk/) | `@pome-sh/adapter-claude-sdk` | Claude Agent SDK adapter for user agent code | published |
 
 The end-user **`pome` CLI** lives at repo root [`cli/`](../cli/), not under

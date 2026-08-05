@@ -7,12 +7,12 @@ COPY package.json package-lock.json ./
 COPY cli/package.json cli/package.json
 COPY packages packages
 # Scope the install to the workspaces this image actually builds: the twin,
-# plus sdk/shared-types it compiles against, plus the workspace root's own
+# plus sdk/wire it compiles against, plus the workspace root's own
 # devDependencies. Without the scope, npm ci would also pull the CLI's
 # @ai-sdk/ai/anthropic graph into a build stage that never uses it.
 RUN npm ci --include-workspace-root \
-  -w @pome-sh/shared-types -w @pome-sh/sdk -w @pome-sh/twin-gmail
-RUN npm run build:runtime -w @pome-sh/shared-types
+  -w @pome-sh/wire -w @pome-sh/sdk -w @pome-sh/twin-gmail
+RUN npm run build -w @pome-sh/wire
 RUN npm run build -w @pome-sh/sdk
 RUN npm run build -w @pome-sh/twin-gmail
 RUN rm -rf node_modules packages/*/node_modules \
@@ -24,7 +24,13 @@ ENV NODE_ENV=production
 ENV GMAIL_TWIN_HOST=0.0.0.0
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 COPY --from=build /repo/node_modules ./node_modules
-COPY --from=build /repo/packages/shared-types ./packages/shared-types
+# The twin's dist imports @pome-sh/wire; ship its built output. Before F-942 this
+# was `COPY packages/shared-types` -- the WHOLE directory, sources included -- because
+# that package exported `./src/index.ts` and `build:runtime` emitted the runtime
+# `.js` in place beside each `.ts`. wire builds to dist/ like every other
+# package, so package.json + dist is the entire runtime need.
+COPY --from=build /repo/packages/wire/package.json ./packages/wire/package.json
+COPY --from=build /repo/packages/wire/dist ./packages/wire/dist
 COPY --from=build /repo/packages/sdk/package.json ./packages/sdk/package.json
 COPY --from=build /repo/packages/sdk/dist ./packages/sdk/dist
 COPY --from=build /repo/packages/twin-gmail/package.json ./packages/twin-gmail/package.json

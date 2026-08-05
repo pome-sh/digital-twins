@@ -12,7 +12,7 @@ import {
   type RecorderEvent,
   type RecorderFidelity,
   type TwinId,
-} from "@pome-sh/shared-types";
+} from "@pome-sh/wire";
 
 export { recorderEventSchema, recorderFidelitySchema };
 export type { RecorderEvent, RecorderFidelity, TwinId };

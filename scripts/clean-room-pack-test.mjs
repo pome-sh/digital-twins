@@ -29,7 +29,7 @@
 //
 // The adapter checks:
 //   - packed manifest declares no `@pome-sh/*` dependency (its wire types are
-//     bundled; `@pome-sh/shared-types` is private)
+//     bundled; `@pome-sh/wire` is private)
 //   - no dangling `.map` files, no compiled `dist/examples/` directory
 //   - runtime import of `flushPomeTelemetry` with the peer installed
 //   - a real consumer file TYPECHECKS against the shipped `dist/index.d.ts`.

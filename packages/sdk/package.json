@@ -45,7 +45,7 @@
     "emit-fidelity": "tsx scripts/emit-fidelity.ts"
   },
   "dependencies": {
-    "@pome-sh/shared-types": "*",
+    "@pome-sh/wire": "*",
     "hono": "^4.13.0",
     "zod": "^4.4.3"
   },

@@ -22,7 +22,7 @@ imports belong in this package.
 Complete before advertising hosted Gmail:
 
 1. **Registry** — Add `gmail` to the mounted/provisionable twin registry and
-   consume a `@pome-sh/shared-types` version that includes `gmailSeedStateSchema`.
+   consume a CLI whose `cli/src/contract` includes `gmailSeedStateSchema`.
 2. **JWT claims** — Mint the session JWT with
    `gmail_email: "pome-agent@pome-twin.test"` by default, or the normalized
    primary mailbox email from the accepted Gmail seed.

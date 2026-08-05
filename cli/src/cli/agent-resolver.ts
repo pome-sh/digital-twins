@@ -7,7 +7,7 @@
 
 import { createInterface } from "node:readline";
 
-import { agentResponseSchema, type AgentResponse } from "@pome-sh/shared-types";
+import { agentResponseSchema, type AgentResponse } from "../contract/index.js";
 
 import { HostedAuthError, HostedOrchError } from "../hosted/errors.js";
 import type { ResolvedCredentials } from "./credentials.js";

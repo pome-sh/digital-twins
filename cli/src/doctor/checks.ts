@@ -102,7 +102,7 @@ async function checkConfig(cwd: string): Promise<ConfigCheck> {
     };
   }
 
-  // readManifest validates against the shared-types schema (slug shape,
+  // readManifest validates against the contract schema (slug shape,
   // command non-empty, etc.) and throws a named cause on any violation.
   let read;
   try {

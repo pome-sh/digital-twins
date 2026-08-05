@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   createSessionResponseSchema,
   type CreateSessionResponse,
-} from "@pome-sh/shared-types";
+} from "../../../src/contract/index.js";
 import { buildAgentEnv } from "../../../src/runner/runTaskHosted.js";
 import { rawBodyHadPerTwin } from "../../../src/hosted/client.js";
 

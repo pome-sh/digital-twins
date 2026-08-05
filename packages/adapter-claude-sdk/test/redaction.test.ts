@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Co-located guard for the adapter redaction surface (FDRS-588 / FDRS-608):
-// since M6 it re-exports @pome-sh/shared-types/redaction — these cases pin
+// since M6 it re-exports @pome-sh/wire/redaction — these cases pin
 // the shapes the adapter relies on staying redacted.
 import { describe, expect, it } from "vitest";
 import { redactSecrets } from "../src/redaction.js";

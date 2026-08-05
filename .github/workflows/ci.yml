@@ -94,8 +94,8 @@ jobs:
           # F-1201 — the contract now enumerates the event union from zod and
           # requires a fixture per kind, so a new kind with none reds this line.
           # Before that it compared bytes no schema change could move.
-          npm run check:trace-contract -w @pome-sh/shared-types
-          node packages/shared-types/scripts/emit-trace-contract.test.mjs
+          npm run check:trace-contract -w @pome-sh/wire
+          node packages/wire/scripts/emit-trace-contract.test.mjs
           # F-1200 — `parent_id` meant four different things across five writers.
           # The schema still ACCEPTS it so stored 0.13.0 rows keep parsing, which
           # is exactly why the gate lives here: zod cannot tell a reader from a
@@ -104,7 +104,7 @@ jobs:
           node scripts/lint-parent-vocab.test.mjs
           # F-818 — the committed manifest JSON Schema (served at
           # pome.sh/schemas/v1/pome.json) must match the zod source.
-          npm run check:manifest-schema -w @pome-sh/shared-types
+          npm run check:manifest-schema -w @pome-sh/cli
           # Consumers import sibling packages through their published `exports`
           # (e.g. `@pome-sh/sdk/server` → dist/server.d.ts). Build the workspace in
           # dependency order so those subpaths resolve before typecheck/test.
@@ -133,7 +133,7 @@ jobs:
           node scripts/probe-example-tools.test.mjs
           # twin-github runs with coverage thresholds (90% lines/funcs/statements)
           # instead of a second plain `npm test` pass for that workspace.
-          npm test -w @pome-sh/shared-types -w @pome-sh/sdk -w @pome-sh/adapter-claude-sdk -w @pome-sh/twin-slack -w @pome-sh/twin-stripe -w @pome-sh/twin-gmail -w @pome-sh/twin-linear
+          npm test -w @pome-sh/wire -w @pome-sh/sdk -w @pome-sh/adapter-claude-sdk -w @pome-sh/twin-slack -w @pome-sh/twin-stripe -w @pome-sh/twin-gmail -w @pome-sh/twin-linear
           npm run test:coverage -w @pome-sh/twin-github
           # Former cli-ci.yml (folded in here — one required check, one npm ci).
           npm test -w @pome-sh/cli
@@ -152,8 +152,9 @@ jobs:
       # F-709 — the frozen M1 runtime-contract assertions, asserted against
       # twins started via the CLI front door (`pome twin start <twin>`).
       # Separate step so a failure here is not buried in the block above. The
-      # bundled CLI is self-contained (shared-types is inlined), so unlike the
-      # packaged twins it needs no in-place runtime JS emit first.
+      # bundled CLI is self-contained (it owns cli/src/contract and inlines
+      # @pome-sh/wire), so unlike the packaged twins it resolves nothing from a
+      # sibling workspace at runtime.
       - name: Contract suite vs pome twin start
         if: steps.scope.outputs.heavy == 'true'
         run: node --test contract/cli-start.test.mjs

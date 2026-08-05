@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { recorderEventSchema } from "@pome-sh/shared-types";
+import { recorderEventSchema } from "@pome-sh/wire";
 import { createApp } from "../src/server.js";
 import { TEST_AUTH_SECRET, TEST_SID, signTestToken, withAuth } from "./_authHelper.js";
 import { toyTwin } from "./_toyTwin.js";

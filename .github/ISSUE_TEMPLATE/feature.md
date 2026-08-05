@@ -30,7 +30,7 @@ Helps us understand the shape of the problem.
 
 - Does this affect twin fidelity? <!-- yes / no, and how -->
 - Does this affect the recording / replay format? <!-- yes / no -->
-- Does this require changes to `@pome-sh/shared-types`? <!-- yes / no -->
+- Does this require changes to `@pome-sh/wire` or `cli/src/contract`? <!-- yes / no -->
 
 ## Anything else
 

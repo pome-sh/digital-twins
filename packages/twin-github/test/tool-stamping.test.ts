@@ -18,7 +18,7 @@
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createRecorderStore } from "@pome-sh/sdk/server";
-import type { RecorderEvent } from "@pome-sh/shared-types";
+import type { RecorderEvent } from "@pome-sh/wire";
 import { createGitHubCloneApp } from "../src/twin.js";
 import { TAPE_ASSERTABLE_TOOLS } from "../src/tools.js";
 import { TEST_AUTH_SECRET, TEST_SID, signTestToken, withAuth } from "./_authHelper.js";

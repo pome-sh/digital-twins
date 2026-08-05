@@ -8,7 +8,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { defineTwin } from "../src/index.js";
 import { TwinError } from "../src/errors.js";
 import { createApp, created, ok } from "../src/server.js";
-import { recorderEventSchema } from "@pome-sh/shared-types";
+import { recorderEventSchema } from "@pome-sh/wire";
 import { TEST_AUTH_SECRET, TEST_SID, signTestToken, withAuth } from "./_authHelper.js";
 
 const previousSecret = process.env.TWIN_AUTH_SECRET;

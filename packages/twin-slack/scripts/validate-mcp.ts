@@ -27,7 +27,7 @@ import { SlackDomain } from "../src/domain/index.js";
 import { createRecorderStore } from "@pome-sh/sdk/server";
 import { defaultSeedState } from "../src/seed.js";
 import { toolDefinitions } from "../src/tools.js";
-import type { RecorderEvent } from "@pome-sh/shared-types";
+import type { RecorderEvent } from "@pome-sh/wire";
 
 const OUTPUT_PATH = join(dirname(fileURLToPath(import.meta.url)), "validate-mcp.output.txt");
 const SID = "validate-mcp-session";
