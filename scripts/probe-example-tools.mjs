@@ -57,8 +57,16 @@ export async function freePort() {
  *
  * Every twin's runtime import chain reaches the wire contract, so nothing here
  * can `import("@pome-sh/twin-github")` until wire's `dist/` exists. ci.yml runs
- * `npm run build` before this gate, which covers it; the build below is for the
- * bare `npm run probe:examples` a developer types.
+ * `npm run build` before this gate, which covers it; the build below is the
+ * fallback for the bare `npm run probe:examples` a developer types.
+ *
+ * Build only when `dist/` is ABSENT, never unconditionally: wire's build opens
+ * with `rm -rf dist`, so an unconditional rebuild here briefly deletes the
+ * artifact every other workspace resolves `@pome-sh/wire` through. Anything
+ * running alongside this gate dies with ERR_MODULE_NOT_FOUND on
+ * `@pome-sh/wire/dist/index.js` — a failure that names the wrong culprit
+ * entirely. A stale dist is the caller's problem to fix with `npm run build`;
+ * a missing one is what this exists for.
  *
  * Before F-942 this helper also had to CLEAN UP after itself: shared-types
  * exported `./src/index.ts` with no dist build, so the only way to load it under
@@ -67,10 +75,12 @@ export async function freePort() {
  * wire builds to `dist/` like every other package, so there is nothing to undo.
  */
 export async function withWireRuntime(fn) {
-  execFileSync("npm", ["run", "build", "-w", "@pome-sh/wire"], {
-    cwd: REPO_ROOT,
-    stdio: "pipe",
-  });
+  if (!existsSync(join(REPO_ROOT, "packages/wire/dist/index.js"))) {
+    execFileSync("npm", ["run", "build", "-w", "@pome-sh/wire"], {
+      cwd: REPO_ROOT,
+      stdio: "pipe",
+    });
+  }
   return await fn();
 }
 
