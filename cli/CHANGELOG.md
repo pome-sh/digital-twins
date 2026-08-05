@@ -4,6 +4,22 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.21.4
+
+### Patch Changes
+
+- **Two files that were never exam questions are gone** (F-1303).
+  `00-default-seed.md` was a *"seed-only reference document (not a task)"* by the
+  catalog's own words and was already hidden from `pome init` — yet it still
+  contributed three `[code]` criteria to the scored corpus, one of them a
+  criterion the default seed already satisfies. `04-judge-context.md` shipped
+  `passThreshold: 50` against one `[code]` and one `[model]` criterion, and its
+  `[code]` was pre-satisfied by its own sidecar — so it cleared the bar on its
+  own and **a do-nothing agent passed it**, in the starter library a new user
+  runs first. Its stated purpose was to exercise our own LLM-judge evaluator,
+  which is a question about Pome, not about anyone's agent; 36 of the remaining
+  tasks carry `[model]` criteria, so nothing is lost by deleting it.
+
 ## 0.21.3
 
 ### Patch Changes

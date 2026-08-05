@@ -47,10 +47,12 @@ describe("pome init", () => {
     // Bundled .seed.json sidecars must land alongside their .md so that
     // `pome run tasks/01-...` doesn't fall into the prose-seed parse path.
     expect(existsSync("tasks/01-bug-happy-path.seed.json")).toBe(true);
-    // 04-judge-context now ships a sidecar that pre-labels issue #1 `bug`
-    // (the default seed leaves it unlabeled). Init must copy it alongside the .md.
-    expect(existsSync("tasks/04-judge-context.md")).toBe(true);
-    expect(existsSync("tasks/04-judge-context.seed.json")).toBe(true);
+    // F-1303 deleted 04-judge-context: it measured OUR judge lane, not the
+    // agent, and at `passThreshold: 50` its one already-satisfied `[code]`
+    // criterion cleared the bar on its own — so a do-nothing agent passed the
+    // first task a new user ran. Asserted absent, and its sidecar with it.
+    expect(existsSync("tasks/04-judge-context.md")).toBe(false);
+    expect(existsSync("tasks/04-judge-context.seed.json")).toBe(false);
 
     await createProgram().parseAsync(["node", "pome", "init"]);
 

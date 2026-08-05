@@ -6,8 +6,15 @@
  * uses the GitHub twin entries from this catalog as its starter scaffold while
  * Stripe/Slack tasks remain opt-in via `pome tasks <twin> --copy`.
  *
- * `runnable: false` marks a seed-only reference document (not a task
- * to execute) — copy commands skip these.
+ * `runnable: false` marks an entry the copy commands skip. NO ENTRY CARRIES IT
+ * TODAY (F-1303 deleted `00-default-seed.md`, its only user), and the field is
+ * kept rather than retired because F-1305 is what it is for: the twin-smoke
+ * tasks — `10`, `13`, `23`, whose prompts say "the Stripe clone" and "exercise
+ * all thirteen available Gmail tools" — are our self-tests, and they leave the
+ * starter library the moment the zero-model prober can cover their routes.
+ *
+ * `tasks-catalog.test.ts` pins the count at zero, so the next entry to carry it
+ * is a deliberate act rather than a quiet one.
  */
 export interface CatalogTask {
   filename: string;
@@ -31,13 +38,6 @@ export const TASK_TWINS: TaskTwin[] = [
       "Issue triage, labeling, PR review, and identity checks against a deterministic GitHub clone.",
     tasks: [
       {
-        filename: "00-default-seed.md",
-        title: "Default seed (reference)",
-        summary:
-          "Reference seed state used by hosted runs that don't define their own.",
-        runnable: false,
-      },
-      {
         filename: "01-bug-happy-path.md",
         title: "Bug — happy path",
         summary: "Triage a clear bug report: apply label, assign the owner.",
@@ -48,13 +48,6 @@ export const TASK_TWINS: TaskTwin[] = [
         title: "Already triaged",
         summary:
           "Issue is already labeled and assigned — agent should not pile on.",
-        runnable: true,
-      },
-      {
-        filename: "04-judge-context.md",
-        title: "Judge sees context",
-        summary:
-          "Exercises the LLM-judge evaluator: is the existing label contextually appropriate?",
         runnable: true,
       },
       {
