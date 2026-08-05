@@ -23,6 +23,10 @@ export async function seedGitHubCloneDatabase(db: unknown, seed?: unknown) {
   new GitHubDomain(db as never).seed(resolvedSeed as never);
 }
 
-export async function exportGitHubCloneState(db: unknown) {
+// Same TS2742 reason as `createGitHubCloneApp` above: the inferred export-state
+// shape names the twin's own `dist/src/types.js`, which is not portable from
+// cli's emitted declarations now that the twin resolves through a workspace
+// symlink. Callers parse this against their own schema anyway.
+export async function exportGitHubCloneState(db: unknown): Promise<unknown> {
   return new GitHubDomain(db as never).exportState();
 }

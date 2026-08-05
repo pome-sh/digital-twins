@@ -2,7 +2,7 @@
   "name": "@pome-sh/sdk",
   "version": "0.11.1",
   "description": "Twin engine for Pome digital twins \u2014 defineTwin() + serve(): HTTP mounting, bearer auth, trace recorder, MCP dispatch, SQLite-backed state.",
-  "private": false,
+  "private": true,
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -23,9 +23,6 @@
       "types": "./dist/checks.d.ts",
       "default": "./dist/checks.js"
     }
-  },
-  "publishConfig": {
-    "access": "public"
   },
   "repository": {
     "type": "git",
@@ -48,7 +45,7 @@
     "emit-fidelity": "tsx scripts/emit-fidelity.ts"
   },
   "dependencies": {
-    "@pome-sh/shared-types": "0.14.1",
+    "@pome-sh/shared-types": "*",
     "hono": "^4.13.0",
     "zod": "^4.4.3"
   },

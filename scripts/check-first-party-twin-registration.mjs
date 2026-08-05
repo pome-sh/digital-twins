@@ -84,11 +84,6 @@ compare(
     .map((name) => name.slice("@pome-sh/twin-".length)),
 );
 
-const packed = [
-  ...read("scripts/pack-publishable.mjs").matchAll(/"packages\/twin-([a-z][a-z0-9-]*)"/g),
-].map((match) => match[1]);
-compare("scripts/pack-publishable.mjs packageDirs", packed);
-
 const rootPackage = JSON.parse(read("package.json"));
 for (const twin of canonical) {
   if (!rootPackage.scripts.build.includes(`-w @pome-sh/twin-${twin}`)) {
@@ -109,20 +104,10 @@ for (const workflow of [
   }
 }
 
-const packagePublish = read(".github/workflows/sdk-publish.yml");
-// F-1135 — a per-twin `npm view @pome-sh/twin-<twin>@<version>` literal in
-// cli-release.yml used to be required here. That block was the rot this gate
-// exists to catch: its seven versions were true for one day (2026-07-20), the
-// pins moved six times after, and every stale line still resolved. The release
-// gate now derives the list from cli/package.json
-// (scripts/check-cli-pins-published.mjs), so there is no per-twin YAML literal
-// left to register. The pin that replaced it is already drift-checked above, as
-// `cli/package.json dependencies` / `bundleDependencies`.
-for (const twin of canonical) {
-  if (!packagePublish.includes(`pome-sh-twin-${twin}-*.tgz`)) {
-    failures.push(`sdk-publish.yml: missing twin-${twin} publish artifact`);
-  }
-}
+// The twins are no longer published to npm (they are `private: true`
+// workspace members bundled into @pome-sh/cli), so there is no per-twin
+// publish artifact or npm-dependency gate left to drift-check here. The
+// former sdk-publish.yml / cli-release.yml assertions died with those seams.
 
 const catalogIds = [
   ...read("cli/src/cli/tasks-catalog.ts").matchAll(/^\s{4}id:\s*"([a-z][a-z0-9-]*)",$/gm),

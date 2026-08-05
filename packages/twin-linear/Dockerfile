@@ -2,8 +2,16 @@
 FROM node:26-bookworm@sha256:219fc9da91e7f29a9f32290ff598cdf8886fd68f421ff515c8f93434da39a271 AS build
 WORKDIR /repo
 COPY package.json package-lock.json ./
+# `cli/` is a workspace member (its manifest is in the lockfile), so npm ci
+# needs the manifest present even though no twin image runs the CLI.
+COPY cli/package.json cli/package.json
 COPY packages packages
-RUN npm ci
+# Scope the install to the workspaces this image actually builds: the twin,
+# plus sdk/shared-types it compiles against, plus the workspace root's own
+# devDependencies. Without the scope, npm ci would also pull the CLI's
+# @ai-sdk/ai/anthropic graph into a build stage that never uses it.
+RUN npm ci --include-workspace-root \
+  -w @pome-sh/shared-types -w @pome-sh/sdk -w @pome-sh/twin-linear
 RUN npm run build:runtime -w @pome-sh/shared-types
 RUN npm run build -w @pome-sh/sdk
 RUN npm run build -w @pome-sh/twin-linear

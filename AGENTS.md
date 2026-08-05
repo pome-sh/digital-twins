@@ -38,12 +38,15 @@ live at **https://docs.pome.sh**.
   `runs/<task>/<session>/verdict.json` writes `task_path` (was
   `scenario_path`); the verdict READ path still accepts `scenario_path` so
   `pome fix-prompt` can read trials recorded by `@pome-sh/cli` <= 0.8.x.
-- **The CLI (`cli/`) is not a root workspace** — use `cd cli && npm ...`, not
-  `npm run -w` from the root.
-- **`cli/pnpm-workspace.yaml` is not pnpm** — it is only the changesets/manypkg
-  root marker for the single-package changesets setup (npm ignores it). Do not
-  replace it with `"workspaces": ["."]` in `cli/package.json`: that combination
-  breaks npm for scoped package names in this nested layout (F-727).
+- **The CLI (`cli/`) IS a root workspace member** — `workspaces: ["packages/*",
+  "cli"]`, one `package-lock.json`, one `npm ci`. Use `npm run -w @pome-sh/cli
+  ...` from the root. The former `cli/package-lock.json` and
+  `cli/pnpm-workspace.yaml` (the changesets/manypkg root marker) are gone.
+- **Internal `@pome-sh/*` deps are `"*"`** — sdk, shared-types and the five
+  twins are `private: true` workspace members resolved by npm's workspace
+  linking, never from the registry. Never reintroduce an exact version pin
+  between them: the exact pins drifted and installed a second registry copy of
+  `@pome-sh/shared-types` (two zod schema identities at one runtime).
 
 ## CLI releases (`@pome-sh/cli`)
 
@@ -86,17 +89,6 @@ for id in $(gh run list --branch changeset-release/main --json databaseId,conclu
 done
 ```
 
-**Bumping a `packages/*` version? Carry the CLI pin in the same PR** (F-1135).
-The CLI's `@pome-sh/*` deps are `bundleDependencies`, so the pin is baked into
-the published tarball rather than resolved at install — while a pin lags
-`packages/`, CI is green on an artifact nobody ships. Pinning a version that is
-not on npm yet is expected and fine: `cli-ci` packs it from `packages/`, and
-`cli-release.yml` waits until the `packages-v*` batch publishes. Add a changeset
-too, or the re-pin never reaches users. If the lag is deliberate, declare it in
-`CLOUD_FIRST_WINDOWS` in
-[`scripts/check-cli-pins-match-workspace.mjs`](scripts/check-cli-pins-match-workspace.mjs)
-rather than removing the gate.
-
 ## Invariants ↔ CI checks (P8)
 
 Docs are contracts. Any PR that changes an invariant below must update this
@@ -117,8 +109,6 @@ section in the same PR.
 | Zero native modules in the production dependency closure (gyp markers: `binding.gyp` / `"gypfile"`; prebuilt installers like esbuild/fsevents pass) | [`scripts/no-native-modules.mjs`](scripts/no-native-modules.mjs) via `npm run gate:no-native` in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (root closure) and [`.github/workflows/cli-ci.yml`](.github/workflows/cli-ci.yml) (CLI closure) |
 | Package barrels + file-size hygiene | [`scripts/lint-code-health.mjs`](scripts/lint-code-health.mjs) |
 | `@pome-sh/cli` version never behind npm `latest` — a publish must not retag `latest` backwards (first publish exempt: an E404 baseline passes) | [`scripts/check-cli-version-floor.sh`](scripts/check-cli-version-floor.sh) in [`.github/workflows/cli-ci.yml`](.github/workflows/cli-ci.yml) (PRs) and [`.github/workflows/cli-release.yml`](.github/workflows/cli-release.yml) (pre-publish) |
-| `cli/package.json`'s `@pome-sh/*` pins equal their `packages/*` versions — i.e. the tarball rewrite CI applies is a no-op, so the artifact CI tests is the artifact users install. A deliberate cloud-first lag (F-1075's ordering) is declared in `CLOUD_FIRST_WINDOWS`, pinned to the exact version pair so it expires the next time either side moves | [`scripts/check-cli-pins-match-workspace.mjs`](scripts/check-cli-pins-match-workspace.mjs) (`npm run lint:cli-pins`) in [`.github/workflows/ci.yml`](.github/workflows/ci.yml); regression: [`scripts/check-cli-pins-match-workspace.test.mjs`](scripts/check-cli-pins-match-workspace.test.mjs) |
-| Every `@pome-sh/*` version the CLI pins exists on npm before a release publishes, read from the manifest and not from a second copy of the versions (pin matches `packages/` but is unpublished ⇒ skip until the `packages-v*` batch lands; pin disagrees with `packages/` and is unpublished ⇒ fail, since no batch will ever publish it) | [`scripts/check-cli-pins-published.mjs`](scripts/check-cli-pins-published.mjs) in [`.github/workflows/cli-release.yml`](.github/workflows/cli-release.yml); regression: [`scripts/check-cli-pins-published.test.mjs`](scripts/check-cli-pins-published.test.mjs) |
 | Every tool a bundled example registers is answered by the twin it targets, on that example's own task seed. A tool the twin refuses (4xx/5xx) reds the gate naming the example, the tool, and the twin's status; a newly added tool with no probe reds it too, as does an `expect_status` exemption that no longer fires. `typecheck:examples` is green on a well-typed tool whose endpoint 404s and `smoke:examples` returns before any tool fires, which is how `comment_on_pull_request` 404'd in two examples for their entire existence. Needs no model | [`scripts/probe-example-tools.mjs`](scripts/probe-example-tools.mjs) (`npm run probe:examples`) in [`.github/workflows/ci.yml`](.github/workflows/ci.yml), fixture arguments in [`config/example-tool-probes.json`](config/example-tool-probes.json); regression: [`scripts/probe-example-tools.test.mjs`](scripts/probe-example-tools.test.mjs) |
 | Every member of the event union (`otelEventSchema` — the seven `eventSchema` variants plus `OtelSpanEvent`) has at least one wire fixture under `packages/shared-types/test/fixtures/v1/event/<Kind>/`, and the kind list in `trace-contract.json` is enumerated from the zod union rather than typed out. Adding a kind with no fixture, or renaming one and leaving its directory behind, fails BOTH `emit:trace-contract` and `--check` — regenerating is not an escape hatch. The old script read no schema at all: `canonicalSchemas` was a hardcoded four-string literal and the rest was a directory walk, so a new kind moved zero bytes and the byte-compare was green by construction, which is how M1 shipped `LlmTurnEvent` with no fixture anywhere | [`packages/shared-types/scripts/emit-trace-contract.mjs`](packages/shared-types/scripts/emit-trace-contract.mjs) (`npm run check:trace-contract -w @pome-sh/shared-types`) in [`.github/workflows/ci.yml`](.github/workflows/ci.yml); regression: [`packages/shared-types/scripts/emit-trace-contract.test.mjs`](packages/shared-types/scripts/emit-trace-contract.test.mjs). The dropped/renamed half is `typecheck` — `test/export-surface.test.ts` guards the per-kind types, `test/v1-fixture-parity.test.ts` keys its coverage map on `OtelEvent["kind"]` |
 | No emitter writes a bare `parent_id`. It meant four different things depending on which of five writers produced the row — a spawning `event_id` (`wrapQuery`), a raw SDK `tool_use_id` (`hooks`), a hard null (`turn-usage`, and every twin HTTP row), and a mirror of `parent_span_id` (`OtelSpanEvent`) — so reading a trace meant knowing which writer a row came from. The vocab is `parent_event_id` (always the spawning row's `event_id`) plus `causing_tool_use_id` for the meaning that was never a parent edge. The schema still ACCEPTS `parent_id` as a legacy input key, and must: every shipped 0.13.0 emitter writes it and a row that fails to parse is dropped silently, so the tolerant readers stay. That tolerance is exactly why the gate is a linter and not zod — nothing in the type system can stop a new writer emitting the old spelling and having it parse. Allowlist is five reader files, one of which is the Linear twin's own domain model (an issue's parent issue, not an event's parent row) | [`scripts/lint-parent-vocab.mjs`](scripts/lint-parent-vocab.mjs) (`npm run lint:parent-vocab`) in [`.github/workflows/ci.yml`](.github/workflows/ci.yml); regression: [`scripts/lint-parent-vocab.test.mjs`](scripts/lint-parent-vocab.test.mjs) — case 2 locks the quoted-key hole the first version of the gate had |
@@ -149,8 +139,11 @@ digests are cosign-signed with GitHub OIDC, and each digest receives an SPDX
 SBOM attestation. Downstream cloud snapshot promotion must pin and verify those
 signed digests before rebuilding runtime snapshots. That promotion is operated
 from the private `pome-sh/pome-cloud` repo — maintainers: see
-`docs/runbooks/twin-release-and-promotion.md` there. Version-bump rules for
-`@pome-sh/*` packages live in [`PACKAGE_RELEASE.md`](PACKAGE_RELEASE.md).
+`docs/runbooks/twin-release-and-promotion.md` there.
+
+Only `@pome-sh/cli` and `@pome-sh/adapter-claude-sdk` are published to npm.
+Everything else is internal to the CLI tarball, so the per-package version-bump
+runbook (`PACKAGE_RELEASE.md`) is retired.
 
 Everything else — architecture, per-package details, and the CI gotchas
 (changeset gate, no-cloud-imports, twin Docker build) — is documented at

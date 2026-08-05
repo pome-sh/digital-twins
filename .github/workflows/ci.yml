@@ -36,9 +36,9 @@ jobs:
           fi
           # Paths that can affect package build/test/parity or the CI contract.
           if git diff --name-only "${BASE_SHA}" HEAD | grep -qE \
-            '^(packages/|examples/|scripts/|contract/|config/|knip\.json|package(-lock)?\.json$|\.github/workflows/ci\.yml$)'; then
+            '^(packages/|cli/|examples/|scripts/|contract/|config/|knip\.json|package(-lock)?\.json$|\.github/workflows/ci\.yml$)'; then
             echo "heavy=true" >> "$GITHUB_OUTPUT"
-            echo "Running heavy suite (package/script/lockfile/ci changes)."
+            echo "Running heavy suite (package/cli/script/lockfile/ci changes)."
           else
             echo "heavy=false" >> "$GITHUB_OUTPUT"
             echo "Skipping heavy suite (docs/chore-only PR); required check stays green."
@@ -60,8 +60,6 @@ jobs:
       # install the published tarball, where those deps are bundleDependencies
       # and the pin is frozen at publish time. F-1132 shipped a CLI that refused
       # every `pome checks add` for github while cli-ci was green.
-      - run: node scripts/check-cli-pins-match-workspace.mjs
-      - run: node scripts/check-cli-pins-match-workspace.test.mjs
       # F-1126 — the same argument one directory over. npm only SYMLINKS a
       # sibling when the declared pin matches its version; otherwise it installs
       # a real nested copy from the registry, and that package is built and
@@ -70,11 +68,6 @@ jobs:
       # adapter-claude-sdk pinned shared-types one minor back. CI was green
       # throughout — everything it ran genuinely passed, against the wrong sdk.
       - run: node scripts/check-workspace-pins-match-workspace.mjs
-      # The release-time half (scripts/check-cli-pins-published.mjs) needs the
-      # registry, so only its offline regression suite runs here — including the
-      # assertion that cli-release.yml no longer carries its own copy of the
-      # versions.
-      - run: node scripts/check-cli-pins-published.test.mjs
       # F-1135 — the version-bump gate now also fires when a bundled @pome-sh/*
       # pin moves (cli/vendor/**, its old stand-in for that, no longer exists).
       - run: node scripts/check-cli-version-bump.test.mjs

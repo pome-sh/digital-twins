@@ -18,8 +18,6 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - 'cli/**'
-      - 'scripts/pack-publishable.mjs'
-      - 'scripts/use-local-pome-tarballs.mjs'
       - '.github/workflows/quickstart-smoke.yml'
   push:
     branches: [main]
@@ -35,8 +33,6 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - 'cli/**'
-      - 'scripts/pack-publishable.mjs'
-      - 'scripts/use-local-pome-tarballs.mjs'
       - '.github/workflows/quickstart-smoke.yml'
   workflow_dispatch:
 
@@ -57,8 +53,8 @@ jobs:
   # lane in this repo. (An earlier version of this comment claimed the opposite,
   # which is why readers believed the published pins had coverage — they had
   # none until F-1132 shipped a CLI that refused every `pome checks add`.) What
-  # keeps the two artifacts honest is scripts/check-cli-pins-match-workspace.mjs
-  # in ci.yml, which fails the PR when a pin and its packages/ version disagree.
+  # keeps workspace @pome-sh edges honest is scripts/check-workspace-pins-match-workspace.mjs
+  # in ci.yml (exact pins between private packages are banned; deps are `"*"`).
   #
   # The agent mints a JWT from the shared TWIN_AUTH_SECRET env, probes the twin's
   # /tools with it in PREFLIGHT mode (POME_PREFLIGHT=1), and exits 0. That path
@@ -77,7 +73,6 @@ jobs:
           cache: npm
           cache-dependency-path: |
             package-lock.json
-            cli/package-lock.json
             examples/triage-agent/package-lock.json
       # Root install so the example's adapter dep resolves. The example's
       # `file:` adapter dep resolves its own @anthropic-ai/claude-agent-sdk
@@ -96,14 +91,20 @@ jobs:
         run: |
           npm ci
           npm test
+      # `cli/` is a root workspace member: the root `npm ci` above already
+      # linked the @pome-sh/* twins out of packages/*, so the CLI builds
+      # straight from this checkout (the tarball pack/rewrite dance is gone).
+      # The root build chain builds the packages in dependency order and ends
+      # with the CLI.
       - name: Build the CLI from this checkout
-        run: |
-          node scripts/pack-publishable.mjs --out "$RUNNER_TEMP/tarballs"
-          POME_TARBALL_DIR="$RUNNER_TEMP/tarballs" node scripts/use-local-pome-tarballs.mjs cli/package.json
-          cd cli
-          npm install --package-lock-only --ignore-scripts
-          npm ci
-          npm run build
+        run: npm run build
+      # `@pome-sh/shared-types` still publishes RAW `.ts` from its `exports`
+      # map, and its internal specifiers are `./x.js` — so the built CLI cannot
+      # import it until the in-place runtime JS exists. The old pipeline got
+      # those files for free inside the packed tarball; a workspace link does
+      # not. `contract/run.mjs` does the same thing before the black-box suite.
+      # (The wire-package lane replaces this with a normal dist build.)
+      - run: npm run build:runtime -w @pome-sh/shared-types
       # One secret, shared via env by the twin and the agent — the README's
       # TWIN_AUTH_SECRET flow. (Not a real credential: generated per run,
       # loopback twin, torn down with the job.)

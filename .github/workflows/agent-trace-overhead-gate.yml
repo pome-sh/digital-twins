@@ -79,22 +79,20 @@ jobs:
       # resolve `withPome()` + the SDK's `tool()` at runtime, and so the pack
       # step below can build all publishable packages.
       - run: npm ci
-      # The CLI consumes the @pome-sh/* packages as published versions, which
-      # don't exist on npm before the first release. Pack them locally and
-      # point the CLI at the tarballs (deps + transitive overrides).
-      - name: Pack @pome-sh packages and rewrite the CLI onto local tarballs
-        run: |
-          node scripts/pack-publishable.mjs --out "$RUNNER_TEMP/tarballs"
-          node scripts/use-local-pome-tarballs.mjs cli/package.json
-      - name: Install + build CLI
-        working-directory: cli
-        run: |
-          # No committed cli/package-lock.json until @pome-sh/* are on npm;
-          # generate a lockfile from the rewritten manifest then freeze.
-          # --ignore-scripts on lock-only: prepare/tsc runs before deps exist.
-          npm install --package-lock-only --ignore-scripts
-          npm ci
-          npm run build
+      # `cli/` is a root workspace member: the `npm ci` above already linked
+      # the @pome-sh/* packages out of packages/*, so the CLI builds straight
+      # from this checkout (no tarball pack + manifest rewrite, no second
+      # lockfile). The root chain builds the packages in dependency order and
+      # ends with the CLI.
+      - name: Build CLI
+        run: npm run build
+      # `@pome-sh/shared-types` still publishes RAW `.ts` from its `exports`
+      # map, and its internal specifiers are `./x.js` — so the built CLI cannot
+      # import it until the in-place runtime JS exists. The old pipeline got
+      # those files for free inside the packed tarball; a workspace link does
+      # not. `contract/run.mjs` does the same thing before the black-box suite.
+      # (The wire-package lane replaces this with a normal dist build.)
+      - run: npm run build:runtime -w @pome-sh/shared-types
       - name: Run agent-trace overhead gate (PR/FAQ #1)
         working-directory: cli
         env:

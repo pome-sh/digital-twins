@@ -35,7 +35,7 @@
       "enabled": false
     },
     {
-      "description": "Publish job stays on setup-node v6 (OIDC npmrc / ENEEDAUTH). Do not major-bump remaining v6 pins. See sdk-publish.yml and actions/setup-node#1551.",
+      "description": "Do NOT bump actions/setup-node to v7 — v7 changed how registry-url writes .npmrc and breaks OIDC Trusted Publishing (ENEEDAUTH). Pinned to v6.x. See .github/workflows/cli-release.yml and actions/setup-node#1551.",
       "matchDepNames": ["actions/setup-node"],
       "matchCurrentVersion": "/^v?6\\./",
       "matchUpdateTypes": ["major"],

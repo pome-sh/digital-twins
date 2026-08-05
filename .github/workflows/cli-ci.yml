@@ -12,12 +12,8 @@ on:
       - 'packages/twin-stripe/**'
       - 'package.json'
       - 'package-lock.json'
-      - 'scripts/pack-publishable.mjs'
-      - 'scripts/use-local-pome-tarballs.mjs'
       - 'scripts/check-cli-version-bump.sh'
       - 'scripts/check-cli-version-floor.sh'
-      - 'scripts/check-cli-pins-match-workspace.mjs'
-      - 'scripts/check-cli-pins-published.mjs'
       - '.github/workflows/cli-ci.yml'
   push:
     branches: [main]
@@ -32,12 +28,8 @@ on:
       - 'packages/twin-stripe/**'
       - 'package.json'
       - 'package-lock.json'
-      - 'scripts/pack-publishable.mjs'
-      - 'scripts/use-local-pome-tarballs.mjs'
       - 'scripts/check-cli-version-bump.sh'
       - 'scripts/check-cli-version-floor.sh'
-      - 'scripts/check-cli-pins-match-workspace.mjs'
-      - 'scripts/check-cli-pins-published.mjs'
       - '.github/workflows/cli-ci.yml'
   workflow_dispatch:
 
@@ -51,9 +43,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    defaults:
-      run:
-        working-directory: cli
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -64,12 +53,10 @@ jobs:
       # untouched (see scripts/check-cli-version-bump.sh).
       - name: CLI version bump or changeset required
         if: ${{ github.event_name == 'pull_request' }}
-        working-directory: ${{ github.workspace }}
         run: BASE_REF="origin/${{ github.event.pull_request.base.ref }}" scripts/check-cli-version-bump.sh
       # F-724 — cli/package.json must never sit behind npm's published latest;
       # publishing from a regressed base retags `latest` backwards.
       - name: CLI version not behind npm latest
-        working-directory: ${{ github.workspace }}
         run: scripts/check-cli-version-floor.sh
       # Node 24 — the repo's engines floor (node:sqlite twins, PR #85/F-719).
       # The old reason (better-sqlite3's node-gyp needing Node 24 APIs) died
@@ -82,71 +69,69 @@ jobs:
       # F-692 / D9 — the no-eval-in-oss gate now runs ONCE, repo-wide, in
       # ci.yml's typecheck-test job (npm run gate:no-eval); this duplicate
       # cli-scoped step was folded in there.
-      - name: Build local @pome-sh package tarballs
-        working-directory: ${{ github.workspace }}
-        run: |
-          npm ci
-          node scripts/pack-publishable.mjs --out "$RUNNER_TEMP/tarballs"
-      # Everything below this line tests the WORKSPACE twins, not the versions
-      # cli/package.json declares: this step overwrites those deps with the
-      # tarballs packed above. That is deliberate — a PR that changes
-      # packages/twin-github must be tested against the change, and that version
-      # is not on npm yet — but it means no job in this workflow can see a stale
-      # pin. F-1135's scripts/check-cli-pins-match-workspace.mjs (in ci.yml)
-      # holds the pins equal to packages/ so this rewrite is a no-op; without it,
-      # cli-ci is green on an artifact nobody ships (F-1132).
-      - name: Use local package tarballs before first npm publish
-        working-directory: ${{ github.workspace }}
-        run: node scripts/use-local-pome-tarballs.mjs cli/package.json
-      # New package-batch versions may not exist on npm yet, so CI rewrites
-      # @pome-sh/* deps to local tarballs, regenerates the lock from that
-      # manifest, then freezes the install with npm ci. Refresh the committed
-      # registry lock after the package batch publishes.
-      # --ignore-scripts on lock-only: `prepare` runs `tsc` before node_modules
-      # exists and fails with missing commander/ai types. `npm ci` then installs
-      # deps and runs prepare with a complete tree.
-      - run: |
-          npm install --package-lock-only --ignore-scripts
-          npm ci
+      #
+      # `cli/` is a root workspace member now: one `npm ci` links the
+      # @pome-sh/* twins straight out of packages/*. No tarball rewriting, no
+      # second lockfile — the pack-publishable / use-local-pome-tarballs dance
+      # and the "publish the package batch first" gate are gone.
+      - run: npm ci
       # F-705 — the CLI's production closure must stay free of gyp-marked
       # packages (the published artifact bundles the twins).
       - run: npm run gate:no-native
-      - run: npm run typecheck
+      # The CLI compiles against the sibling packages' built dists
+      # (`@pome-sh/sdk/server` → dist/server.d.ts), so the workspace build has to
+      # come FIRST — before this PR the CLI resolved those types out of packed
+      # tarballs that already carried a dist. Same order as ci.yml.
       - run: npm run build
-      - run: npm test
+      - run: npm run typecheck -w @pome-sh/cli
+      # `@pome-sh/shared-types` still publishes RAW `.ts` from its `exports`
+      # map, and its internal specifiers are `./x.js` — so the built CLI cannot
+      # import it until the in-place runtime JS exists. The old pipeline got
+      # those files for free inside the packed tarball; a workspace link does
+      # not. `contract/run.mjs` does the same thing before the black-box suite.
+      # (The wire-package lane replaces this with a normal dist build.)
+      - run: npm run build:runtime -w @pome-sh/shared-types
+      - run: npm test -w @pome-sh/cli
       # F-709 — the frozen M1 runtime-contract assertions, asserted against
       # twins started via the CLI front door (`pome twin start <twin>`).
-      # Reuses the build above; the CLI resolves the twins from the local
-      # @pome-sh tarballs installed earlier in this job.
+      # Reuses the build above; the CLI resolves the twins from the workspace.
       - name: Contract suite vs pome twin start
-        working-directory: ${{ github.workspace }}
         run: node --test contract/cli-start.test.mjs
-      # Former cli-publish-smoke.yml — same tarball install, so pack/clean-room
-      # checks reuse this job instead of a second npm ci + pack cycle.
-      - name: npm publish --dry-run (packs the real tarball)
-        run: npm publish --dry-run --ignore-scripts 2>&1 | tee "$RUNNER_TEMP/pack.log"
-      - name: Pack and clean-room install
+      # Former cli-publish-smoke.yml. The clean-room BOOT check moves to the
+      # tsup lane: `bundleDependencies` stops working the moment `cli/` joins
+      # the root workspace (npm hoists the workspace links to the repo-root
+      # node_modules, so `cli/node_modules/@pome-sh/` is empty and npm packs a
+      # tarball that DECLARES bundled deps while shipping none — npm then
+      # trusts the declaration and skips fetching them, so the tarball installs
+      # "successfully" and dies with ERR_MODULE_NOT_FOUND on first command).
+      #
+      # What this job still gates: the tarball packs, carries no hard-link
+      # entries (npm registry E415), ships the bin entry — and, critically,
+      # that the publish guard REFUSES it, so the freeze cannot be bypassed by
+      # an `npm publish` from a green build.
+      - name: Pack and assert the publish freeze holds
         run: |
           set -euo pipefail
-          npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP"
+          npm pack -w @pome-sh/cli --ignore-scripts --pack-destination "$RUNNER_TEMP"
           tgz="$(ls "$RUNNER_TEMP"/pome-sh-cli-*.tgz)"
-          # The npm registry rejects tarballs with hard-link entries (E415).
-          # Fail here rather than at publish time if any slip in.
-          if tar -tvf "$tgz" | grep -qE '^h'; then
+          # Capture the listings to variables first. Under `set -o pipefail` a
+          # `tar | grep -q` closes the pipe on its first match, and tar's
+          # resulting SIGPIPE ("stdout: write error") fails the whole step —
+          # same trap scripts/check-cli-version-bump.sh documents.
+          verbose_listing="$(tar -tvf "$tgz")"
+          if grep -qE '^h' <<<"$verbose_listing"; then
             echo "tarball contains hard links — npm registry would reject (E415):"
-            tar -tvf "$tgz" | grep -E '^h'
+            grep -E '^h' <<<"$verbose_listing"
             exit 1
           fi
-          room="$(mktemp -d)"
-          cd "$room"
-          npm init -y >/dev/null 2>&1
-          npm install "$tgz" --no-audit --no-fund --ignore-scripts
-          # bin resolves and dist entry is present:
-          test -f node_modules/@pome-sh/cli/dist/src/cli/main.js
-          # bundled packages made it into the tarball (must match
-          # bundleDependencies in cli/package.json):
-          for t in sdk shared-types twin-gmail twin-github twin-linear twin-slack twin-stripe; do
-            ls node_modules/@pome-sh/cli/node_modules/@pome-sh/$t/package.json \
-              || { echo "MISSING bundled @pome-sh/$t in published tarball"; exit 1; }
-          done
-          echo "clean-room OK: bin + dist + bundled twins present"
+          listing="$(tar -tzf "$tgz")"
+          if ! grep -qx 'package/dist/src/cli/main.js' <<<"$listing"; then
+            echo "::error::tarball is missing the bin entry package/dist/src/cli/main.js"
+            exit 1
+          fi
+          echo "pack OK (no hard links, bin entry present): $tgz"
+          if node cli/scripts/assert-publishable.mjs --quiet; then
+            echo "::error::cli/scripts/assert-publishable.mjs accepted a tarball with unbundled private deps"
+            exit 1
+          fi
+          echo "publish freeze holds: the guard refuses this tarball."
