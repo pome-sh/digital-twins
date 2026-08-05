@@ -32,10 +32,10 @@
     "npm": ">=11.5.1"
   },
   "devDependencies": {
-    "knip": "^6.27.0"
+    "knip": "^6.31.0"
   },
   "overrides": {
-    "hono": "^4.12.31",
-    "fast-uri": "^3.1.4"
+    "hono": "^4.13.0",
+    "fast-uri": "^3.1.5"
   }
 }

@@ -21,6 +21,11 @@ packaging restructure: bump `version` here and in `package.json`, and merging to
   was ignored and the first `pome run` errored with
   `Requested twins are not enabled`. Any `--twins` flag is unioned with the
   manifest's twins (the server still merges additively).
+- [#283](https://github.com/pome-sh/digital-twins/pull/283) [`cb1e87f`](https://github.com/pome-sh/digital-twins/commit/cb1e87fc2246e25ffb3ee856a5dd1892656a78a0) Thanks [@AFFFPupu](https://github.com/AFFFPupu)! - `pome checks github` lists `github.no-new-issues`, so `pome checks add --check github.no-new-issues --arg repo=<owner>/<name>` can write the sentence.
+
+  The pin carries `@pome-sh/twin-github` 0.8.0 → 0.9.0. Without this half the CLI would know one fewer check than prod serves, which is F-1132 exactly: for six hours every `pome checks add --check github.*` refused with exit 2 while cli-ci was green on the commit that caused it.
+
+  What the new check says: _No new issues were created in `<repo>`_ — a seed→final delta over issue NUMBERS. It is what `github.issue-exists` cannot say, and the curriculum's hero lesson ("do not open a duplicate for a bug already tracked") had no deterministic way to be graded without it.
 
 ### Patch Changes
 
@@ -30,6 +35,10 @@ packaging restructure: bump `version` here and in `package.json`, and merging to
 - `graphql` is now a declared dependency: it is a runtime import of the bundled
   Linear twin, and `pome twin start linear` would otherwise fail with
   ERR_MODULE_NOT_FOUND.
+- [#306](https://github.com/pome-sh/digital-twins/pull/306) [`518938f`](https://github.com/pome-sh/digital-twins/commit/518938fce39823006d933aabb6f33c5d3a837feb) Thanks [@AFFFPupu](https://github.com/AFFFPupu)! - Re-pin the bundled `@pome-sh/*` packages to the packages-v31 batch: twin-github
+  0.9.0 (adds the `github.no-new-issues` declaration), sdk 0.11.1, shared-types
+  0.14.1, adapter 0.3.1, twin-gmail/linear/slack 0.3.3, twin-stripe 0.4.4. The CLI
+  bundles these, so `pome checks github` now lists 15 declarations instead of 14.
 
 ## 0.19.0
 
