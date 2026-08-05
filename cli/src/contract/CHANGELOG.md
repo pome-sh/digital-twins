@@ -12,6 +12,11 @@ published to npm — the package was `private: true` throughout — so a version
 workspace marker, not an installable artifact.
 
 
+## 0.14.1 — 2026-08-04
+
+Dependency-only patch (#302): `zod` `^4.1.13` → `^4.4.3` and dev `@types/node`.
+No source file changed; `trace-contract.json`'s version stamp is regenerated to match.
+
 ## 0.14.0 — 2026-08-04
 
 `parent_id` stops meaning four different things (F-1200).

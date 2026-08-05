@@ -62,12 +62,20 @@ see it** — through the real twin MCP/REST surface — mint a probe session. Th
 costs one session slot; offer it, don't default to it.
 
 1. `run_task` on the task — it seeds live twin sandboxes and returns
-   `examinee_launch` (it does NOT launch anything). Keep `agent_token`.
+   `examinee_launch` (it does NOT launch anything).
 2. Probe **read-only** (GET only) via `examinee_launch.rest_urls` or
-   `mcp_servers` URLs with `Authorization: Bearer <agent_token>`. Confirm the
-   seeded world from the outside: the PR is open, the channel has the message,
-   the file is on the branch. A 404 on a probe may be session expiry — check
-   `get_session` before blaming the seed.
+   `mcp_servers` URLs. The bearer is the session's `agent_token`, a live
+   credential — **put it in the environment once and reference it by name; do
+   not paste the value into a command, a message, or a file**:
+
+   ```bash
+   export POME_AGENT_TOKEN='<the agent_token from run_task>'   # once, this shell only
+   curl -sS -H "Authorization: Bearer $POME_AGENT_TOKEN" "<rest_urls[twin]>/<path>"
+   ```
+
+   Confirm the seeded world from the outside: the PR is open, the channel has
+   the message, the file is on the branch. A 404 on a probe may be session
+   expiry — check `get_session` before blaming the seed.
 3. **Mutation hole**: if any probe mutated state (a POST slipped in, a tool had
    side effects), the session no longer shows the seed — `stop_session` (see
    teardown below; it may take two calls) and re-mint before probing further.
@@ -79,8 +87,10 @@ costs one session slot; offer it, don't default to it.
    Call `stop_session`; if it succeeds outright, teardown is done. **If it is
    refused** (F-983: an open session holds an ungraded run, and the platform
    will not destroy one silently), the refusal carries a server-issued
-   `discard_token` in its `error.details`; read that value and call
-   `stop_session` again, passing it as the `confirm_discard` parameter. Today's
+   `discard_token` in its `error.details`. That is a one-shot confirmation
+   nonce for this refusal, not a credential — it authenticates nothing and
+   grants no access. Pass it straight back as `stop_session`'s
+   `confirm_discard` parameter. Today's
    control plane never refuses, so expect the one-call success — treat the
    refusal-then-confirm path as the case to handle once it goes live, not the
    default. The token cannot be guessed ahead of the refusal, which is what

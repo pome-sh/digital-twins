@@ -23,8 +23,12 @@ instead of probing the endpoint.
 
 **SENSITIVE — the bearer.** `run_task` returns `agent_token`, a
 session-scoped JWT that is the bearer for every twin URL — a live credential.
-Hold it in memory for this run only: never write it to disk, into a task, or
-a log. It dies at `expires_at`; `finalize_run` is the last thing that needs it.
+It exists for **one** purpose: handing the examinee its twin authentication at
+launch (§2). Pass it straight into the launcher's env or vault and then let go
+of it — never write it to disk, into a task, or a log, never repeat it back to
+the builder, and never keep it around "for later". Nothing downstream needs it:
+`finalize_run` derives the bearer from `session_id` server-side. It dies at
+`expires_at` regardless.
 
 ## 1. Mint the run
 
@@ -33,17 +37,25 @@ attempt — the baseline and any *pre-fix* flaky retries — so they aggregate a
 one exam (aggregation keys on `(group_id, task)`; never reuse a `group_id`
 across different tasks). A **post-fix** rerun is the exception: it opens a *new*
 `group_id` and links back to the baseline via `baseline_group_id` (see §5).
-Then call `run_task(task_id, agent_id, group_id)` (the
+Then call `run_task(task_id, agent_id, agent_version, group_id)` (the
 `agent_id` from intake). It seeds live twin sandboxes and returns `session_id`,
 `expires_at`, `agent_token`, `examinee_task` (the prompt + twins the examinee
 sees — no criteria), and `examinee_launch` (the full launch spec).
 
+**`agent_version` on every run.** Read it from the manifest's `agent.version`
+(`pome.json`); if the builder declares none, ask for one before the first run
+rather than sending nothing. It is the label the run declares itself to be, and
+it is what keeps one version's trials from being averaged with another's — the
+dashboard partitions run-sets by `(agent, task, agent_version)`. Never
+auto-bump it: it changes when the builder changes the examinee (§5), and a
+version that moves on its own would split one exam into two run-sets of one.
+
 - **Trials-of-N (the batch form)** — when the task's `## Config` sets `runs: N`
   (a flakiness budget), don't hand-loop `run_task`: call
-  `run_trials(n, task_id, group_id)`, the batch form that provisions all N
-  trials up front under one shared `group_id` and returns a `trials[]` array,
-  each with its own `session_id` + `agent_token`. You still launch and
-  `finalize_run` **each** trial (all N sandboxes share the concurrency quota —
+  `run_trials(n, task_id, agent_version, group_id)`, the batch form that
+  provisions all N trials up front under one shared `group_id` and returns a
+  `trials[]` array, each with its own `session_id` + `agent_token`. You still
+  launch and `finalize_run` **each** trial (all N sandboxes share the quota —
   launch + finalize promptly to free slots). Pass-rate is judged here, not by
   the platform: once the trials finalize, `list_runs(group_id)` gives the
   cross-trial view — compute the fraction passed and compare it to the task's
@@ -78,7 +90,7 @@ final state + events off the **still-live** twins; once the session leaves
 `ready`/`running` the sandbox is torn down and the tape is gone — it errors, and
 the run is unrecoverable. So the moment the launcher reports the examinee idle
 (done / awaiting-input with no more tool calls coming), call
-`finalize_run(session_id, agent_token)` **immediately** — before any cleanup,
+`finalize_run(session_id)` **immediately** — before any cleanup,
 before narrating anything. It scores synchronously against the pulled tape and
 returns `{ run_id, score, judge_model, dashboard_url }`. One evaluation per run.
 
@@ -121,6 +133,15 @@ re-verified as a fair exam before it counts. Then:
    into one aggregate and destroys the split. (A *pre-fix* flaky retry — same
    examinee, no edit — still shares the group_id; only a post-fix rerun opens a
    new one and links back with `baseline_group_id`.)
+
+   **Bump `agent_version` too, and say so to the builder.** The edited prompt is
+   a different agent, so the rerun declares a different version — have the
+   builder set it in `pome.json` (`agent.version`), or agree one with them and
+   pass it. A fresh `group_id` alone is not enough: the reliability page also
+   partitions the *implicit* run-set by declared version, and the verdict strip
+   asserts "same agent, same prompt" over a run-set. Rerun the fix as `v1` and
+   the platform is being told the failure and the fix are the same agent — the
+   spread it then reports is the fix working, mislabelled as unreliability.
 2. There is no delta field in the report — compute it: pull `get_report` for the
    baseline run and the rerun, diff the Status column per criterion, and report
    the flips (`"leaked to #general: failed → passed"`). Baseline and rerun are

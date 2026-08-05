@@ -19,12 +19,11 @@
 
 ## Packages
 
-- [@pome-sh/cli](https://www.npmjs.com/package/@pome-sh/cli): the `pome` CLI — run tasks, inspect traces, upload for evaluation
-- [@pome-sh/sdk](https://www.npmjs.com/package/@pome-sh/sdk): the twin engine — build your own twin with `defineTwin()`
+- [@pome-sh/cli](https://www.npmjs.com/package/@pome-sh/cli): the `pome` CLI — run tasks, inspect traces, upload for evaluation. The twin engine and all five twins ship inside it; there is nothing else to install.
 - [@pome-sh/adapter-claude-sdk](https://www.npmjs.com/package/@pome-sh/adapter-claude-sdk): wire a Claude Agent SDK agent to a Pome run
 
 ## Getting started
 
-- Run an agent task with no install: `npx @pome-sh/cli init && npx @pome-sh/cli run --local scenarios/01-bug-happy-path.md`
+- Run an agent task with no install: `npx @pome-sh/cli init && npx @pome-sh/cli run --local tasks/01-bug-happy-path.md`
 - Start a standalone twin: `npx @pome-sh/cli twin start github`
 - The hosted platform (evaluation, simulation, observability): https://pome.sh

@@ -1,6 +1,41 @@
 # @pome-sh/twin-github — CHANGELOG
 
 
+## 0.9.0 — 2026-08-04
+
+`No new issues were created in \`<repo>\`` is declarable, and the curriculum's
+hero lesson can be graded deterministically for the first time (F-1198).
+
+- **`github.no-new-issues`.** A `seed+final` delta over issue NUMBERS, negative
+  polarity, no subject, no vacuity mutant — the exact sibling of
+  `github.no-new-labels`, down to the "the repo is a selector" entry in the
+  honest-null ledger. It fails when the final state carries an issue number the
+  seed did not.
+- **Why it exists.** `examples/support-triage` teaches *"do not open a second
+  issue for a bug that is already tracked"* and, until this, the vocabulary had
+  no way to say that: `github.issue-exists` is positive-only and
+  `github.issue-state` FAILS on a missing issue, so neither can be turned around
+  into an absence. The lesson was graded by `[model]`, which meant an agent that
+  commented on the right issue, posted the right link **and also filed a
+  duplicate** scored 100. That is τ-bench's necessary-but-not-sufficient caveat,
+  which `docs/curriculum/failure-classes.md` §4.2 names as a rule we follow.
+- **Numbers, not titles.** A duplicate issue is the one that looks most like what
+  it duplicates — same title, same body, same labels. The number is the only
+  field an examinee cannot choose, so it is the only honest key for the delta. A
+  row carrying no usable number is dropped rather than counted: `NaN` compares
+  unequal to itself and would read as a newly created issue on every run.
+- **What it does NOT assert.** Anything about the seeded issues themselves.
+  Closing one, relabelling one and commenting on one all PASS — pair it with
+  `github.issue-state` or `github.issue-comment-contains` when those matter. The
+  green half of the hero lesson (comment on #1 instead of opening #2) has its own
+  test for exactly this reason: a negative that only "the agent did nothing" can
+  satisfy is not a check, it is a trap.
+- **It cites, on both arms** (F-1197's rule, so `HONEST_UNCITED_CHECKS` stays
+  empty): the pointer is the FINAL issue list, the collection a reader can count
+  for themselves, and the reason carries the comparison. Like `no-new-labels`, a
+  seed-side repo miss cites nothing — a pointer addresses `final`, and one walked
+  in the seed would send a reader into a tree no report renders.
+
 ## 0.8.2 — 2026-08-04
 
 - Re-pinned to `@pome-sh/sdk@0.11.0` / `@pome-sh/shared-types@0.14.0` for the F-1200 parent-vocabulary
