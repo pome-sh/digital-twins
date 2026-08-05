@@ -9,13 +9,18 @@ the live twin tape.
 ## Install (one command)
 
 ```bash
-npx skills add pome-sh/digital-twins
+npx skills add pome-sh/digital-twins --skill '*'
 ```
 
 The [`skills` CLI](https://github.com/vercel-labs/skills) discovers every
 `skills/<name>/SKILL.md` in this repo and installs the set into your agent's
 skills directory (e.g. `~/.claude/skills/`). Each skill ships with its
 `references/` so one-level-deep links resolve.
+
+`--skill '*'` takes all six without the picker. If you drop the flag, the
+picker opens on a **Pome Coach** row (from `.claude-plugin/plugin.json`) whose
+radio selects the whole set with one space — the coach only works whole, since
+`pome` routes into the other five.
 
 Then connect the Pome control MCP so the `mcp__pome__*` tools resolve:
 

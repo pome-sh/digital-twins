@@ -24,6 +24,7 @@
     "lint:code-health": "node scripts/lint-code-health.mjs",
     "lint:legacy-markers": "node scripts/lint-legacy-criterion-markers.mjs",
     "lint:parent-vocab": "node scripts/lint-parent-vocab.mjs",
+    "lint:skill-manifest": "node scripts/check-plugin-manifest-lists-every-skill.mjs",
     "lint:dead-code": "knip --no-config-hints",
     "gate:bundled-deps": "node scripts/check-bundled-runtime-deps.mjs"
   },

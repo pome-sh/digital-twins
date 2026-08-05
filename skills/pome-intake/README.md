@@ -21,7 +21,7 @@ Part of the coach set — install the whole set with one command (see
 [`skills/README.md`](../README.md)):
 
 ```bash
-npx skills add pome-sh/digital-twins
+npx skills add pome-sh/digital-twins --skill '*'
 ```
 
 Requires the Pome control MCP connection (`claude mcp add --transport http pome
