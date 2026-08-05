@@ -1,0 +1,201 @@
+{
+  "github": {
+    "probes": [
+      { "tool": "get_me", "args": {} },
+      { "tool": "get_repository", "args": { "owner": "acme", "repo": "api" } },
+      { "tool": "search_repositories", "args": { "query": "api" } },
+      { "tool": "search_code", "args": { "query": "handler" } },
+      { "tool": "search_users", "args": { "query": "alice" } },
+      { "tool": "search_issues", "args": { "query": "500" } },
+      { "tool": "search_commits", "args": { "query": "Initial" } },
+      { "tool": "create_repository", "args": { "owner": "acme", "name": "probe-repo", "description": "F-1305 probe" } },
+      { "tool": "fork_repository", "args": { "owner": "acme", "repo": "api", "organization": "forks" } },
+      { "tool": "list_collaborators", "args": { "owner": "acme", "repo": "api" } },
+      { "tool": "add_collaborator", "args": { "owner": "acme", "repo": "api", "username": "newbie", "permission": "push" } },
+
+      { "tool": "get_file_contents", "args": { "owner": "acme", "repo": "api", "path": "README.md" } },
+      { "tool": "list_commits", "args": { "owner": "acme", "repo": "api" }, "as": "main_commits" },
+      { "tool": "get_commit", "args": { "owner": "acme", "repo": "api", "ref": "$main_commits.0.sha" } },
+      { "tool": "compare_commits", "args": { "owner": "acme", "repo": "api", "base": "main", "head": "main" } },
+      { "tool": "list_branches", "args": { "owner": "acme", "repo": "api" } },
+      { "tool": "get_branch", "args": { "owner": "acme", "repo": "api", "branch": "main" } },
+
+      { "tool": "get_issue", "args": { "owner": "acme", "repo": "api", "issue_number": 1 } },
+      { "tool": "update_issue", "args": { "owner": "acme", "repo": "api", "issue_number": 1, "state": "open" } },
+      { "tool": "list_issues", "args": { "owner": "acme", "repo": "api", "state": "all" } },
+      { "tool": "create_issue", "args": { "owner": "acme", "repo": "api", "title": "F-1305 probe issue" } },
+      { "tool": "add_issue_comment", "args": { "owner": "acme", "repo": "api", "issue_number": 1, "body": "F-1305 probe." }, "as": "issue_comment" },
+      { "tool": "list_issue_comments", "args": { "owner": "acme", "repo": "api", "issue_number": 1 } },
+      { "tool": "update_issue_comment", "args": { "owner": "acme", "repo": "api", "comment_id": "$issue_comment.id", "body": "F-1305 probe, edited." } },
+      { "tool": "delete_issue_comment", "args": { "owner": "acme", "repo": "api", "comment_id": "$issue_comment.id" } },
+      { "tool": "add_assignees", "args": { "owner": "acme", "repo": "api", "issue_number": 1, "assignees": ["alice"] } },
+
+      { "tool": "list_repository_labels", "args": { "owner": "acme", "repo": "api" } },
+      { "tool": "create_label", "args": { "owner": "acme", "repo": "api", "name": "probe", "color": "ededed" } },
+      { "tool": "list_issue_labels", "args": { "owner": "acme", "repo": "api", "issue_number": 1 } },
+      { "tool": "add_issue_labels", "args": { "owner": "acme", "repo": "api", "issue_number": 1, "labels": ["probe"] } },
+      { "tool": "remove_issue_label", "args": { "owner": "acme", "repo": "api", "issue_number": 1, "label": "probe" } },
+
+      { "tool": "create_branch", "args": { "owner": "acme", "repo": "api", "branch": "probe-merge" } },
+      { "tool": "create_or_update_file", "args": { "owner": "acme", "repo": "api", "branch": "probe-merge", "path": "probe.ts", "message": "Add probe file", "content": "export const probe = true;\n" } },
+      { "tool": "push_files", "args": { "owner": "acme", "repo": "api", "branch": "probe-merge", "message": "Push probe files", "files": [{ "path": "probe-2.ts", "content": "export const probe2 = true;\n" }] } },
+      { "tool": "create_pull_request", "args": { "owner": "acme", "repo": "api", "title": "F-1305 probe PR", "head": "probe-merge", "base": "main" }, "as": "merge_pr" },
+      { "tool": "get_pull_request", "args": { "owner": "acme", "repo": "api", "pull_number": "$merge_pr.number" } },
+      { "tool": "list_pull_requests", "args": { "owner": "acme", "repo": "api", "state": "all" } },
+      { "tool": "get_pull_request_files", "args": { "owner": "acme", "repo": "api", "pull_number": "$merge_pr.number" } },
+      { "tool": "get_pull_request_diff", "args": { "owner": "acme", "repo": "api", "pull_number": "$merge_pr.number" } },
+      { "tool": "get_pull_request_commits", "args": { "owner": "acme", "repo": "api", "pull_number": "$merge_pr.number" } },
+      { "tool": "get_pull_request_status", "args": { "owner": "acme", "repo": "api", "pull_number": "$merge_pr.number" } },
+      { "tool": "get_pull_request_reviews", "args": { "owner": "acme", "repo": "api", "pull_number": "$merge_pr.number" } },
+      { "tool": "create_pull_request_review", "args": { "owner": "acme", "repo": "api", "pull_number": "$merge_pr.number", "event": "COMMENT", "body": "F-1305 probe review." } },
+      { "tool": "get_pull_request_comments", "args": { "owner": "acme", "repo": "api", "pull_number": "$merge_pr.number" } },
+      {
+        "note": "F-1151 regression fixture. `comment_on_pull_request` in examples/pr-summary-agent and examples/pr-summary-review wrapped add_issue_comment at a PULL REQUEST's number, and the twin answered `404 Issue not found` for every one of those calls, on every subject, for as long as the examples existed. The issue-number probe above cannot see that class: it comments on issue #1, which always worked. This is the same tool at a pull request's number.",
+        "tool": "add_issue_comment",
+        "args": { "owner": "acme", "repo": "api", "issue_number": "$merge_pr.number", "body": "F-1305 probe comment on a pull request." },
+        "as": "pr_number_comment"
+      },
+      { "tool": "update_pull_request_branch", "args": { "owner": "acme", "repo": "api", "pull_number": "$merge_pr.number" } },
+      { "tool": "merge_pull_request", "args": { "owner": "acme", "repo": "api", "pull_number": "$merge_pr.number" } },
+
+      { "tool": "create_branch", "args": { "owner": "acme", "repo": "api", "branch": "probe-review" } },
+      { "tool": "create_or_update_file", "args": { "owner": "acme", "repo": "api", "branch": "probe-review", "path": "review.ts", "message": "Add review file", "content": "export const review = true;\n" } },
+      { "tool": "create_pull_request", "args": { "owner": "acme", "repo": "api", "title": "F-1305 probe review PR", "head": "probe-review", "base": "main" }, "as": "review_pr" },
+      { "tool": "update_pull_request", "args": { "owner": "acme", "repo": "api", "pull_number": "$review_pr.number", "title": "F-1305 probe review PR (updated)" } },
+      { "tool": "create_pull_request_review_comment", "args": { "owner": "acme", "repo": "api", "pull_number": "$review_pr.number", "body": "F-1305 probe inline comment.", "path": "review.ts", "line": 1 }, "as": "inline_comment" },
+      { "tool": "add_reply_to_pull_request_comment", "args": { "owner": "acme", "repo": "api", "pull_number": "$review_pr.number", "comment_id": "$inline_comment.id", "body": "F-1305 probe reply." } },
+
+      { "tool": "create_branch", "args": { "owner": "acme", "repo": "api", "branch": "probe-scratch" } },
+      { "tool": "create_or_update_file", "args": { "owner": "acme", "repo": "api", "branch": "probe-scratch", "path": "scratch.txt", "message": "Add scratch", "content": "scratch\n" }, "as": "scratch_file" },
+      { "tool": "delete_file", "args": { "owner": "acme", "repo": "api", "branch": "probe-scratch", "path": "scratch.txt", "message": "Drop scratch", "sha": "$scratch_file.content.sha" } },
+      { "tool": "delete_branch", "args": { "owner": "acme", "repo": "api", "branch": "probe-scratch" } },
+
+      { "tool": "create_milestone", "args": { "owner": "acme", "repo": "api", "title": "F-1305 probe milestone", "description": "F-1305 probe" }, "as": "milestone" },
+      { "tool": "list_milestones", "args": { "owner": "acme", "repo": "api" } },
+      { "tool": "update_milestone", "args": { "owner": "acme", "repo": "api", "milestone_number": "$milestone.number", "state": "closed" } },
+      { "tool": "delete_milestone", "args": { "owner": "acme", "repo": "api", "milestone_number": "$milestone.number" } },
+
+      { "tool": "create_commit_status", "args": { "owner": "acme", "repo": "api", "sha": "$main_commits.0.sha", "state": "success", "context": "ci/probe" } },
+      { "tool": "get_combined_status_for_ref", "args": { "owner": "acme", "repo": "api", "ref": "$main_commits.0.sha" } },
+      { "tool": "create_check_run", "args": { "owner": "acme", "repo": "api", "name": "probe", "head_sha": "$main_commits.0.sha", "status": "completed", "conclusion": "success" } },
+      { "tool": "list_check_runs_for_ref", "args": { "owner": "acme", "repo": "api", "ref": "$main_commits.0.sha" } },
+
+      { "tool": "create_release", "args": { "owner": "acme", "repo": "api", "tag_name": "v1.0.0-probe", "name": "F-1305 probe release", "body": "F-1305 probe" } },
+      { "tool": "list_releases", "args": { "owner": "acme", "repo": "api" } },
+      { "tool": "get_latest_release", "args": { "owner": "acme", "repo": "api" } },
+      { "tool": "get_release_by_tag", "args": { "owner": "acme", "repo": "api", "tag": "v1.0.0-probe" } },
+      { "tool": "list_tags", "args": { "owner": "acme", "repo": "api" } },
+      { "tool": "get_tag", "args": { "owner": "acme", "repo": "api", "tag": "v1.0.0-probe" } }
+    ]
+  },
+
+  "stripe": {
+    "probes": [
+      { "tool": "retrieve_balance", "args": {} },
+      { "tool": "list_balance_transactions", "args": { "limit": 5 } },
+
+      { "tool": "create_customer", "args": { "name": "F-1305 probe", "email": "probe@pome-twin.test" }, "as": "customer" },
+      { "tool": "retrieve_customer", "args": { "id": "$customer.id" } },
+      { "tool": "update_customer", "args": { "id": "$customer.id", "description": "F-1305 probe, updated" } },
+      { "tool": "list_customers", "args": { "limit": 5 } },
+
+      { "tool": "create_payment_method", "args": { "type": "card", "card": { "number": "4242424242424242", "exp_month": 12, "exp_year": 2030, "cvc": "123" } }, "as": "payment_method" },
+      { "tool": "retrieve_payment_method", "args": { "id": "$payment_method.id" } },
+      { "tool": "attach_payment_method", "args": { "id": "$payment_method.id", "customer": "$customer.id" } },
+      { "tool": "list_customer_payment_methods", "args": { "customer": "$customer.id", "type": "card" } },
+      { "tool": "detach_payment_method", "args": { "id": "$payment_method.id" } },
+
+      { "tool": "create_payment_method", "args": { "type": "card", "card": { "number": "4242424242424242", "exp_month": 12, "exp_year": 2030, "cvc": "123" } }, "as": "confirm_pm" },
+      { "tool": "create_payment_intent", "args": { "amount": 5000, "currency": "usd", "payment_method_types": ["card"] }, "as": "settled_intent" },
+      { "tool": "retrieve_payment_intent", "args": { "id": "$settled_intent.id" } },
+      { "tool": "update_payment_intent", "args": { "id": "$settled_intent.id", "metadata": { "probe": "f-1305" } } },
+      { "tool": "confirm_payment_intent", "args": { "id": "$settled_intent.id", "payment_method": "$confirm_pm.id" }, "as": "confirmed_intent" },
+      { "tool": "list_payment_intents", "args": { "limit": 5 } },
+
+      { "tool": "retrieve_charge", "args": { "id": "$confirmed_intent.latest_charge" } },
+      { "tool": "list_charges", "args": { "limit": 5 } },
+      { "tool": "create_refund", "args": { "charge": "$confirmed_intent.latest_charge", "amount": 100 }, "as": "refund" },
+      { "tool": "retrieve_refund", "args": { "id": "$refund.id" } },
+      { "tool": "list_refunds", "args": { "limit": 5 } },
+
+      { "tool": "create_payment_intent", "args": { "amount": 2500, "currency": "usd", "payment_method_types": ["crypto"], "payment_method_options": { "crypto": { "mode": "deposit", "deposit_options": { "networks": ["base"] } } } }, "as": "crypto_intent" },
+      { "tool": "simulate_crypto_deposit", "args": { "id": "$crypto_intent.id" } },
+
+      { "tool": "create_payment_intent", "args": { "amount": 1500, "currency": "usd", "payment_method_types": ["card"] }, "as": "doomed_intent" },
+      { "tool": "cancel_payment_intent", "args": { "id": "$doomed_intent.id" } },
+
+      { "tool": "list_events", "args": { "limit": 5 }, "as": "events" },
+      { "tool": "retrieve_event", "args": { "id": "$events.data.0.id" } },
+
+      { "tool": "delete_customer", "args": { "id": "$customer.id" } }
+    ]
+  },
+
+  "slack": {
+    "probes": [
+      { "tool": "slack_list_channels", "args": { "limit": 10 } },
+      { "tool": "slack_get_users", "args": { "limit": 10 } },
+      { "tool": "slack_get_user_profile", "args": { "user_id": "U_AGENT" } },
+      { "tool": "slack_list_channel_members", "args": { "channel_id": "C_GENERAL", "limit": 10 } },
+
+      { "tool": "slack_post_message", "args": { "channel_id": "C_GENERAL", "text": "F-1305 probe." }, "as": "parent" },
+      { "tool": "slack_reply_to_thread", "args": { "channel_id": "C_GENERAL", "thread_ts": "$parent.ts", "text": "F-1305 probe reply." } },
+      { "tool": "slack_get_thread_replies", "args": { "channel_id": "C_GENERAL", "thread_ts": "$parent.ts" } },
+      { "tool": "slack_add_reaction", "args": { "channel_id": "C_GENERAL", "timestamp": "$parent.ts", "reaction": "eyes" } },
+      { "tool": "slack_get_reactions", "args": { "channel_id": "C_GENERAL", "timestamp": "$parent.ts" } },
+      { "tool": "slack_get_channel_history", "args": { "channel_id": "C_GENERAL", "limit": 10 } },
+      { "tool": "slack_search_messages", "args": { "query": "probe" } }
+    ]
+  },
+
+  "gmail": {
+    "probes": [
+      { "tool": "list_labels", "args": {} },
+      { "tool": "create_label", "args": { "displayName": "F-1305 probe" } },
+      { "tool": "search_threads", "args": { "pageSize": 5 }, "as": "threads" },
+      { "tool": "get_thread", "args": { "threadId": "$threads.threads.0.id" }, "as": "thread" },
+      { "tool": "get_message", "args": { "messageId": "$thread.messages.0.id" } },
+
+      { "tool": "label_thread", "args": { "threadId": "$thread.id", "labelIds": ["STARRED"] } },
+      { "tool": "unlabel_thread", "args": { "threadId": "$thread.id", "labelIds": ["STARRED"] } },
+      { "tool": "apply_sensitive_thread_label", "args": { "threadId": "$thread.id", "labelOption": "SPAM" } },
+      { "tool": "label_message", "args": { "messageId": "$thread.messages.0.id", "labelIds": ["STARRED"] } },
+      { "tool": "unlabel_message", "args": { "messageId": "$thread.messages.0.id", "labelIds": ["STARRED"] } },
+      { "tool": "apply_sensitive_message_label", "args": { "messageId": "$thread.messages.0.id", "labelOption": "SPAM" } },
+
+      { "tool": "create_draft", "args": { "to": ["probe@pome-twin.test"], "subject": "F-1305 probe", "body": "F-1305 probe." } },
+      { "tool": "list_drafts", "args": { "pageSize": 5 } }
+    ]
+  },
+
+  "linear": {
+    "probes": [
+      { "tool": "list_teams", "args": { "limit": 10 } },
+      { "tool": "get_team", "args": { "query": "ENG" } },
+      { "tool": "list_users", "args": { "limit": 10 } },
+      { "tool": "get_user", "args": { "query": "agent@pome-twin.test" } },
+      { "tool": "list_issue_statuses", "args": { "team": "ENG" } },
+      { "tool": "get_issue_status", "args": { "team": "ENG", "name": "Todo" } },
+      { "tool": "list_issue_labels", "args": { "team": "ENG", "limit": 10 } },
+      { "tool": "create_issue_label", "args": { "team": "ENG", "name": "f-1305-probe", "color": "#0f766e" } },
+      { "tool": "list_cycles", "args": { "teamId": "team_eng", "limit": 10 } },
+
+      { "tool": "list_issues", "args": { "team": "ENG", "limit": 10 } },
+      { "tool": "save_issue", "args": { "team": "ENG", "title": "F-1305 probe issue", "description": "F-1305 probe." }, "as": "issue" },
+      { "tool": "get_issue", "args": { "id": "$issue.id" } },
+      { "tool": "save_comment", "args": { "issueId": "$issue.id", "body": "F-1305 probe comment." }, "as": "comment" },
+      { "tool": "list_comments", "args": { "issueId": "$issue.id", "limit": 10 } },
+      { "tool": "delete_comment", "args": { "id": "$comment.id" } },
+
+      { "tool": "save_project", "args": { "team": "ENG", "name": "F-1305 probe project" }, "as": "project" },
+      { "tool": "list_projects", "args": { "team": "ENG", "limit": 10 } },
+      { "tool": "get_project", "args": { "query": "F-1305 probe project" } },
+
+      { "tool": "save_document", "args": { "title": "F-1305 probe document", "content": "F-1305 probe.", "project": "$project.id" }, "as": "document" },
+      { "tool": "list_documents", "args": { "limit": 10 } },
+      { "tool": "get_document", "args": { "id": "$document.id" } },
+
+      { "tool": "search_documentation", "args": { "query": "issue" } }
+    ]
+  }
+}

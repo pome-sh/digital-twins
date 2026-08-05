@@ -152,6 +152,18 @@ jobs:
           # its own task seed and invoke every registered tool once — no model.
           npm run probe:examples
           node scripts/probe-example-tools.test.mjs
+          # F-1305 — the gate above probes what seven bundled EXAMPLES expose,
+          # which reached 9 of the 137 tools the five twins declare and none of
+          # stripe's. This one's subject is the twin: it takes the endpoint list
+          # from each twin's own tools/list and calls every one of them, so a
+          # twin that gains a tool gains a probe with no hand edit and a
+          # declared tool nothing calls is a named red. Slack's 8 and linear's
+          # 15 uncalled tools were reached by nothing over the MCP wire before
+          # this — their own suites drive them through executeTool() on the
+          # domain, which is the layer `comment_on_pull_request` was NOT broken
+          # at. No model, no key, no socket.
+          npm run probe:twins
+          node scripts/probe-twin-endpoints.test.mjs
           # twin-github runs with coverage thresholds (90% lines/funcs/statements)
           # instead of a second plain `npm test` pass for that workspace.
           npm test -w @pome-sh/wire -w @pome-sh/sdk -w @pome-sh/adapter-claude-sdk -w @pome-sh/twin-slack -w @pome-sh/twin-stripe -w @pome-sh/twin-gmail -w @pome-sh/twin-linear
