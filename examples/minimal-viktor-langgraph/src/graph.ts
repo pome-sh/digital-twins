@@ -22,6 +22,51 @@ import { z } from "zod";
 
 import { buildTools, type TwinConfig } from "./tools.js";
 
+// ─── The one line under test ────────────────────────────────────────────────
+//
+// Curriculum class 7, cross-twin consistency: one business action spans two
+// systems, and the exam is whether every outcome in GitHub has its mirror in
+// Slack. `docs/curriculum/failure-classes.md` §6.7 names this defect shape
+// exactly — *"the Slack notify call is gated on a wrong boolean branch so one
+// outcome class never posts."*
+//
+// FALSE (ships as the baseline). The `report` node returns early for anything
+// that is not a MERGE, so a blocked or flagged pull request is acted on in
+// GitHub — the merge is correctly withheld, the REQUEST_CHANGES review lands —
+// and #eng-alerts is never told. GitHub and Slack now disagree about what
+// happened, and the half that is missing is the half a human would act on.
+//
+// TRUE is the fix. That is the entire diff.
+//
+// Why a flag and not a deleted line: the exam is `pome run`, not a git diff, and
+// a fix that has to be typed in the right place is a fix a reader can get wrong.
+// It also makes the defect greppable from the report — the criterion that fails
+// names `eng-alerts`, and this is the only place in the graph that writes there.
+//
+// WHY IT DOES NOT ROT (§3): the flaw is committed CONTROL FLOW, not a prompt.
+// The model's judgment is untouched — it still decides BLOCK correctly, still
+// explains why, and the decision still reaches `state.decisions`. A stronger
+// model produces a better `reason` string for a message that is never sent. No
+// model capability can compensate for a branch that returns before the write.
+const MIRROR_EVERY_OUTCOME = false;
+
+/**
+ * Does this outcome get mirrored to Slack?
+ *
+ * A named predicate rather than an inline `&&` so the lesson has something a
+ * test can hold on to. `test/mirror.test.ts` pins BOTH branches without asking
+ * which one ships — a guard that asserted the shipped value would have to be
+ * edited by the very fix it is meant to protect, and a guard you edit to go
+ * green is not a guard.
+ */
+export function shouldMirror(
+  outcome: Decision["outcome"],
+  mirrorEveryOutcome: boolean = MIRROR_EVERY_OUTCOME,
+): boolean {
+  return mirrorEveryOutcome || outcome === "MERGE";
+}
+// ────────────────────────────────────────────────────────────────────────────
+
 // ── the model's decision, one per pull request ───────────────────────────────
 const decisionSchema = z.object({
   number: z.number().describe("the pull request number"),
@@ -239,6 +284,9 @@ export function buildGraph(model: BaseChatModel, config: TwinConfig, channel: st
   // 5. report — one Slack message per PR, templated so the behavior contract is
   //    guaranteed (TOOL spans). MERGE → "successfully merged …"; BLOCK →
   //    "merge blocked: …" + PR link; FLAG → alert naming the author + "block".
+  //
+  //    THIS NODE CARRIES THE COMMITTED BASELINE DEFECT — see MIRROR_EVERY_OUTCOME
+  //    below and the "Lesson" section of README.md.
   async function report(state: ViktorState): Promise<Partial<ViktorState>> {
     const { owner, repo, channel } = state;
     // Template from the GATHERED ground-truth PR (title/author/number), keyed by
@@ -249,6 +297,11 @@ export function buildGraph(model: BaseChatModel, config: TwinConfig, channel: st
     const link = (n: number) => `https://github.com/${owner}/${repo}/pull/${n}`;
     const reports: string[] = [];
     for (const d of state.decisions) {
+      // ⛔ THE BASELINE DEFECT. `MIRROR_EVERY_OUTCOME` ships as `false`, so this
+      // returns early for every BLOCK and FLAG: GitHub is left correct and
+      // #eng-alerts is never told. Flip the constant to `true` — that is the
+      // whole fix.
+      if (!shouldMirror(d.outcome)) continue;
       const pr = byNumber.get(d.number);
       const number = pr?.number ?? d.number;
       const title = pr?.title ?? d.title;

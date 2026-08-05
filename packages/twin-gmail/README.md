@@ -1,8 +1,17 @@
 # `@pome-sh/twin-gmail`
 
+> **Internal package.** One of five twin runtimes in this repository (GitHub,
+> Stripe x402, Slack, Gmail, Linear). It is not separately installable — it
+> ships inside [`@pome-sh/cli`](../../cli/). To run it:
+> `npx @pome-sh/cli twin start gmail`.
+>
+> The rest of this file is the engineering reference: frozen auth identity, MCP
+> tool set, named gaps, limits, and the runtime contract pome-cloud's sandbox
+> images depend on.
+
 Deterministic Gmail-shaped twin for agent testing (Pome).
 
-**Status: OSS release candidate.** This package includes the deterministic
+It implements the deterministic
 SQLite mailbox model, strict seed/reset APIs, canonical MIME storage, identity,
 delivery, drafts, labels/history/search, bounded semantic state export,
 recording projection, the frozen Gmail REST/upload surface, and the captured
@@ -126,6 +135,8 @@ that pins and verifies the new signed digest.
   `pome-cloud` consumer PR.
 
 ## Development
+
+Contributor-only, from a repo checkout:
 
 ```bash
 npm test -w @pome-sh/twin-gmail

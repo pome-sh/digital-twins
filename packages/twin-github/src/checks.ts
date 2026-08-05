@@ -58,7 +58,7 @@ import {
   pullRequestReviewExists,
   pullRequestStateCheck,
 } from "./check-pulls.js";
-import { commitStatus, fileExists, noNewLabels } from "./check-repos.js";
+import { commitStatus, fileExists, noNewIssues, noNewLabels } from "./check-repos.js";
 import { noUnsupportedEndpoint, toolNeverCalled } from "./check-tape.js";
 
 export type { Check } from "./check-kind.js";
@@ -86,6 +86,10 @@ export const GITHUB_CHECKS = [
   issueExactlyOneLabel,
   issueAssignee,
   issueCommentContains,
+  // The two repo-scoped deltas sit together, right after the issue assertions
+  // they are the negatives of: `no-new-issues` is what `issue-exists` cannot
+  // say, and an author reaching for one usually wants to see the other.
+  noNewIssues,
   noNewLabels,
   pullRequestStateCheck,
   pullRequestCommentExists,

@@ -1,8 +1,17 @@
 # `@pome-sh/twin-linear`
 
+> **Internal package.** One of five twin runtimes in this repository (GitHub,
+> Stripe x402, Slack, Gmail, Linear). It is not separately installable — it
+> ships inside [`@pome-sh/cli`](../../cli/). To run it:
+> `npx @pome-sh/cli twin start linear`.
+>
+> The rest of this file is the engineering reference: frozen auth identity, MCP
+> tool set, named gaps, limits, and the runtime contract pome-cloud's sandbox
+> images depend on.
+
 Deterministic Linear-shaped twin for agent testing (Pome).
 
-**Status: OSS release candidate.** This package includes the deterministic
+It implements the deterministic
 SQLite workspace model, strict seed/reset APIs, GraphQL + OAuth surfaces,
 bounded semantic state export, recording projection, and the captured
 twenty-two-tool first-party MCP contract (Gate 0 launch + Gate-1 Wave 4).
@@ -132,6 +141,8 @@ that pins and verifies the new signed digest.
   `pome-cloud` consumer PR.
 
 ## Development
+
+Contributor-only, from a repo checkout:
 
 ```bash
 npm test -w @pome-sh/twin-linear

@@ -492,6 +492,7 @@ describe("every check, against a repo that is not in the state", () => {
       "github.issue-assignee": { issue: "1", repo: "acme/missing", login: "alice" },
       "github.issue-comment-contains": { needle: "x", issue: "1", repo: "acme/missing" },
       "github.no-new-labels": { repo: "acme/missing" },
+      "github.no-new-issues": { repo: "acme/missing" },
       "github.pr-state": { pr: "1", repo: "acme/missing", state: "merged" },
       "github.pr-comment-exists": { pr: "1", repo: "acme/missing" },
       "github.pr-review-exists": { review: "APPROVED", pr: "1", repo: "acme/missing" },
