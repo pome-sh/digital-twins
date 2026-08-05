@@ -65,7 +65,7 @@ describe("runTask + POME_ADAPTER_SIGNALS_PATH", () => {
       const result = await runTask({
         taskPath: "tasks/01-bug-happy-path.md",
         captureServerCommand: captureServerForTests,
-        agentCommand: "npx tsx examples/agents/scripted-triage-agent.ts",
+        agentCommand: "node examples/agents/scripted-triage-agent.ts",
         artifactsDir,
       });
 

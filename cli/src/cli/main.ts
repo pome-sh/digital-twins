@@ -64,7 +64,7 @@ import {
   readManifest,
   writeManifest,
 } from "./project-config.js";
-import { createGitHubSmokeApp } from "../twin/registry.js";
+import { createGitHubSmokeApp, isTwinName, TWIN_NAME_LIST } from "../twin/registry.js";
 import {
   buildFixPrompt,
   buildGroupFixPrompt,
@@ -81,7 +81,17 @@ import type { RecorderEvent } from "../types/shared.js";
 const PACKAGE_VERSION = readPackageVersion();
 const SESSION_CREATE_FORMATS = new Set(["text", "json", "env"]);
 const DEFAULT_AGENT_FILE = "examples/agents/scripted-triage-agent.ts";
-const DEFAULT_AGENT_COMMAND = `npx tsx ${DEFAULT_AGENT_FILE}`;
+// `node` (not `npx tsx`): Node ≥ 24 strips this file's type annotations
+// natively, so the scaffolded zero-install quickstart never has to resolve a
+// package over the network. `npx tsx` used to be the default, but `pome run`
+// pipes the agent's traffic through the egress-floor proxy (deny-by-default,
+// twin hosts + LLM providers + loopback only) — so on a machine that has
+// never run `npx tsx` before, npx's own registry lookup for tsx gets refused
+// by that same floor, the scaffolded agent silently never starts, and the
+// documented `pome init && pome run --local tasks/01-bug-happy-path.md`
+// quickstart ends in an empty trace ("twin runtime emitted no HTTP events")
+// with no error pointing at the real cause.
+const DEFAULT_AGENT_COMMAND = `node ${DEFAULT_AGENT_FILE}`;
 const MANIFEST_SCHEMA_URL = "https://pome.sh/schemas/v1/pome.json";
 
 // Injected by tsup (`define: { PKG_VERSION }`) so the bundled CLI never has to
@@ -1241,7 +1251,7 @@ export function createProgram() {
   const twin = program.command("twin").description("Manage local twins");
   twin
     .command("start")
-    .argument("<name>", "Twin name (github | slack | stripe | gmail)")
+    .argument("<name>", `Twin name (${TWIN_NAME_LIST.join(" | ")})`)
     .option(
       "--port <port>",
       "Port to bind (default: $PORT, else GMAIL_TWIN_PORT/3336 for gmail, else 3333)",
@@ -1259,9 +1269,8 @@ export function createProgram() {
     .argument("[name]", "Twin name (default: github)", "github")
     .description("Reset standalone twin state")
     .action(async (name: string) => {
-      const supported = new Set(["github", "slack", "stripe", "gmail"]);
-      if (!supported.has(name)) {
-        throw new Error(`Unknown twin '${name}'. Supported: ${[...supported].join(", ")}.`);
+      if (!isTwinName(name)) {
+        throw new Error(`Unknown twin '${name}'. Supported: ${TWIN_NAME_LIST.join(", ")}.`);
       }
       const dbPaths =
         name === "gmail"

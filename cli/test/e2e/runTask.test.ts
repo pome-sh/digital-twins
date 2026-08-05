@@ -44,7 +44,7 @@ describe("Pome scenario runner (capture-only)", () => {
       for (const taskPath of scenarios) {
         const result = await runTask({
           taskPath,
-          agentCommand: "npx tsx examples/agents/scripted-triage-agent.ts",
+          agentCommand: "node examples/agents/scripted-triage-agent.ts",
           artifactsDir,
           captureServerCommand: captureServerForTests,
         });
