@@ -5,7 +5,7 @@ not an install surface.** The only thing end users install is
 [`@pome-sh/cli`](../cli/) (`npx @pome-sh/cli …`), which ships the twin engine,
 `@pome-sh/wire`, and all five twins inside its tarball. This doc is the
 internal architecture map for contributors — what each package is, why it's
-shaped the way it is, and which of the seven are actually reachable from
+shaped the way it is, and which of the eight are actually reachable from
 outside this repo.
 
 ## The registry: one typed source of truth for five twins
@@ -39,10 +39,11 @@ to keep in sync.
 [`wire/`](./wire/) is the vocabulary every process in this repo agrees on for
 describing a run: Zod schemas and types for recorder events, the OpenTelemetry
 span extension of that union, and secret redaction. The CLI, the twin engine
-(`@pome-sh/sdk`), all five first-party twins, and
-[`@pome-sh/adapter-claude-sdk`](./adapter-claude-sdk/) all import from it —
-it's the one place a wire-shape change has to happen for every producer and
-consumer to see it consistently.
+(`@pome-sh/sdk`), [`@pome-sh/adapter-claude-sdk`](./adapter-claude-sdk/), and
+three of the five twins (`twin-github`, `twin-slack`, `twin-stripe`) import
+from it directly; `twin-gmail` and `twin-linear` only reach it transitively
+through `@pome-sh/sdk`. It's the one place a wire-shape change has to happen
+for every producer and consumer to see it consistently.
 
 It exists because that vocabulary used to live in a package called
 `@pome-sh/shared-types`, which drifted: internal consumers pinned an *exact*
