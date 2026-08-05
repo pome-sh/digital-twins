@@ -72,9 +72,11 @@ https://mcp.pome.sh/mcp`) so the `run_task` / `finalize_run` / `get_report` /
    (`references/launch-managed-agent.md`); anything else → REST
    (`references/launch-rest.md`). The launcher assembles from `examinee_launch`,
    starts the examinee, and watches for idle.
-3. **Finalize immediately** — `finalize_run(session_id, agent_token)` the instant
-   the examinee idles, while the twin tape is still live. A late finalize loses
-   the tape.
+3. **Finalize immediately** — `finalize_run(session_id, agent_token,
+   agent_model=<examinee model>)` the instant the examinee idles, while the
+   twin tape is still live. Pass the model the examinee actually ran on
+   (intake Model line / launcher config); required for the report. A late
+   finalize loses the tape.
 4. **Report** — `get_report(run_id)`: score, criteria (kind/status), provenance
    `hosted`, the `app.pome.sh` link.
 5. **Fix loop** — on a failure, hand the report's `## Handoff (fix prompt)` to the

@@ -86,9 +86,13 @@ final state + events off the **still-live** twins; once the session leaves
 `ready`/`running` the sandbox is torn down and the tape is gone — it errors, and
 the run is unrecoverable. So the moment the launcher reports the examinee idle
 (done / awaiting-input with no more tool calls coming), call
-`finalize_run(session_id, agent_token)` **immediately** — before any cleanup,
-before narrating anything. It scores synchronously against the pulled tape and
-returns `{ run_id, score, judge_model, dashboard_url }`. One evaluation per run.
+`finalize_run(session_id, agent_token, agent_model=<examinee model>)`
+**immediately** — before any cleanup, before narrating anything. Pass
+`agent_model` from the intake Model line (or whatever model the launcher
+configured); it is required for the report — omit only if truly unknown
+(the report Model column stays blank). It scores synchronously against the
+pulled tape and returns `{ run_id, score, judge_model, dashboard_url }`.
+One evaluation per run.
 
 ## 4. Narrate the report
 
