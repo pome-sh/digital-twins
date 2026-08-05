@@ -60,7 +60,8 @@ https://mcp.pome.sh/mcp`) so the `run_task` / `finalize_run` / `get_report` /
 ## The run loop
 
 1. **Mint** — `run_task(task_id, agent_id, agent_version, group_id)` →
-   `session_id`, `agent_token` (SENSITIVE, memory-only), `examinee_task`,
+   `session_id`, `agent_token` (SENSITIVE — hand it to the examinee at launch,
+   then let go of it), `examinee_task`,
    `examinee_launch`. Pass `agent_version` from the manifest's `agent.version`
    on every run — run-sets are partitioned by it, so an unversioned run cannot
    be told apart from a later one. Mint the `group_id` upfront so an attempt's
@@ -72,7 +73,7 @@ https://mcp.pome.sh/mcp`) so the `run_task` / `finalize_run` / `get_report` /
    (`references/launch-managed-agent.md`); anything else → REST
    (`references/launch-rest.md`). The launcher assembles from `examinee_launch`,
    starts the examinee, and watches for idle.
-3. **Finalize immediately** — `finalize_run(session_id, agent_token)` the instant
+3. **Finalize immediately** — `finalize_run(session_id)` the instant
    the examinee idles, while the twin tape is still live. A late finalize loses
    the tape.
 4. **Report** — `get_report(run_id)`: score, criteria (kind/status), provenance
