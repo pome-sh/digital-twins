@@ -118,8 +118,16 @@ edited, …) belong in a `[model]` criterion.
 `session_id` + `agent_token` + `examinee_launch` and does **not** launch
 anything — used purely as a probe arena. Discipline:
 
+- **The token stays out of your output.** Everything below authenticates with
+  the session bearer; hold it in an environment variable for the life of the
+  probe and refer to `$POME_AGENT_TOKEN`, never the value.
+
 - **Read-only probes.** REST is the easy surface:
-  `GET <rest_urls[twin]>/<path>` with `Authorization: Bearer <agent_token>`.
+  `GET <rest_urls[twin]>/<path>`, authenticated with the session bearer. Export
+  it once (`export POME_AGENT_TOKEN='<agent_token>'`) and reference it by name
+  from then on — `-H "Authorization: Bearer $POME_AGENT_TOKEN"`. The token is a
+  live credential: it belongs in the environment, never pasted into a command
+  you emit, a message, or a file.
   The github twin speaks GitHub-REST shapes: `/repos/<owner>/<name>/pulls/1`,
   `…/collaborators`, `…/issues/1/comments`. The slack twin speaks Slack-Web
   method names but with **no `/api` prefix**: `<base>/conversations.list`,
