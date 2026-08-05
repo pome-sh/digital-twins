@@ -4,11 +4,11 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
-## 0.20.0
+## 0.21.0
 
 ### Minor Changes
 
-- **The CLI is now a single self-contained bundle.** `@pome-sh/{sdk,shared-types,twin-*}`
+- **The CLI is now a single self-contained bundle.** `@pome-sh/{sdk,wire,twin-*}`
   are inlined by tsup instead of shipped as `bundleDependencies`, and they are no
   longer published to npm at all. Unpacked tarball size drops from 15.2 MB to
   1.5 MB (92 files, down from 1,100+), and each twin is a lazily-loaded chunk —
@@ -21,11 +21,12 @@ packaging restructure: bump `version` here and in `package.json`, and merging to
   was ignored and the first `pome run` errored with
   `Requested twins are not enabled`. Any `--twins` flag is unioned with the
   manifest's twins (the server still merges additively).
-- [#283](https://github.com/pome-sh/digital-twins/pull/283) [`cb1e87f`](https://github.com/pome-sh/digital-twins/commit/cb1e87fc2246e25ffb3ee856a5dd1892656a78a0) Thanks [@AFFFPupu](https://github.com/AFFFPupu)! - `pome checks github` lists `github.no-new-issues`, so `pome checks add --check github.no-new-issues --arg repo=<owner>/<name>` can write the sentence.
-
-  The pin carries `@pome-sh/twin-github` 0.8.0 → 0.9.0. Without this half the CLI would know one fewer check than prod serves, which is F-1132 exactly: for six hours every `pome checks add --check github.*` refused with exit 2 while cli-ci was green on the commit that caused it.
-
-  What the new check says: _No new issues were created in `<repo>`_ — a seed→final delta over issue NUMBERS. It is what `github.issue-exists` cannot say, and the curriculum's hero lesson ("do not open a duplicate for a bug already tracked") had no deterministic way to be graded without it.
+- The twin registry (`cli/src/twin/registry.ts`) is now the single typed
+  source of truth for the five twins, replacing four parallel hand-maintained
+  lists. A missing twin entry is a compile error, not a runtime surprise.
+- `@pome-sh/shared-types` is dissolved: its trace surface (recorder events,
+  redaction, OTel mapping) moves to the new private `@pome-sh/wire`, and the
+  cloud-only contract modules move to `cli/src/contract/`.
 
 ### Patch Changes
 
@@ -35,6 +36,27 @@ packaging restructure: bump `version` here and in `package.json`, and merging to
 - `graphql` is now a declared dependency: it is a runtime import of the bundled
   Linear twin, and `pome twin start linear` would otherwise fail with
   ERR_MODULE_NOT_FOUND.
+- The root workspace build is now a topological sort over the workspace's own
+  `@pome-sh/*` dependency graph (`scripts/build.mjs`) instead of a hand-written
+  per-package chain, so adding, removing, or renaming a package needs no build
+  script edit.
+- The two published packages (`@pome-sh/cli`, `@pome-sh/adapter-claude-sdk`)
+  now publish through one version-diff-triggered pipeline (`release.yml`):
+  bump a version, merge, it publishes. No changesets, no version PR, no batch
+  releases. See `RELEASING.md`.
+
+## 0.20.0
+
+### Minor Changes
+
+- [#283](https://github.com/pome-sh/digital-twins/pull/283) [`cb1e87f`](https://github.com/pome-sh/digital-twins/commit/cb1e87fc2246e25ffb3ee856a5dd1892656a78a0) Thanks [@AFFFPupu](https://github.com/AFFFPupu)! - `pome checks github` lists `github.no-new-issues`, so `pome checks add --check github.no-new-issues --arg repo=<owner>/<name>` can write the sentence.
+
+  The pin carries `@pome-sh/twin-github` 0.8.0 → 0.9.0. Without this half the CLI would know one fewer check than prod serves, which is F-1132 exactly: for six hours every `pome checks add --check github.*` refused with exit 2 while cli-ci was green on the commit that caused it.
+
+  What the new check says: _No new issues were created in `<repo>`_ — a seed→final delta over issue NUMBERS. It is what `github.issue-exists` cannot say, and the curriculum's hero lesson ("do not open a duplicate for a bug already tracked") had no deterministic way to be graded without it.
+
+### Patch Changes
+
 - [#306](https://github.com/pome-sh/digital-twins/pull/306) [`518938f`](https://github.com/pome-sh/digital-twins/commit/518938fce39823006d933aabb6f33c5d3a837feb) Thanks [@AFFFPupu](https://github.com/AFFFPupu)! - Re-pin the bundled `@pome-sh/*` packages to the packages-v31 batch: twin-github
   0.9.0 (adds the `github.no-new-issues` declaration), sdk 0.11.1, shared-types
   0.14.1, adapter 0.3.1, twin-gmail/linear/slack 0.3.3, twin-stripe 0.4.4. The CLI
