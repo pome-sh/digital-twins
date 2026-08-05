@@ -7,7 +7,7 @@ import {
   githubAccessControlCatalogSchema,
   groupGitHubAccessControlByCategory,
   summarizeGitHubAccessControlCatalog,
-} from "../src/github-access-control.js";
+} from "../src/access-control.js";
 
 describe("github access-control catalog", () => {
   it("parses the canonical catalog", () => {

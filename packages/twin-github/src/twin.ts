@@ -18,8 +18,10 @@ import {
   type SessionValue,
 } from "@pome-sh/sdk/server";
 import type { Hono } from "hono";
-import { summarizeGitHubAccessControlCatalog } from "@pome-sh/shared-types";
-import { githubAccessControlPayload } from "./access-control.js";
+import {
+  githubAccessControlPayload,
+  summarizeGitHubAccessControlCatalog,
+} from "./access-control.js";
 import { openGitHubCloneDatabase } from "./db.js";
 import { GitHubDomain } from "./domain/index.js";
 import { TwinError, githubError } from "./errors.js";

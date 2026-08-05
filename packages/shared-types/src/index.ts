@@ -17,7 +17,6 @@
 // regardless of which leaf file owns the type.
 export * from "./run.js";
 export * from "./task-vocab.js";
-export * from "./github-access-control.js";
 // F-942 — the trace surface (recorder events, redaction, the OTel extension)
 // now lives in @pome-sh/wire. Re-exported here only while the remaining
 // cloud-contract clusters are moved to cli/src/contract/; both this line and
