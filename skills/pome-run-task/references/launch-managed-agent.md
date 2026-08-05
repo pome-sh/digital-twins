@@ -64,8 +64,8 @@ supported path is to set it up front.
 Poll the session (`ant beta:sessions retrieve --session-id <sid>`). Idle =
 the examinee has finished the kickoff task and is emitting no further tool calls
 (terminal/completed, or awaiting input with nothing more coming). The moment it
-idles, **stop polling and go to SKILL.md §3** — `finalize_run(session_id,
-agent_token)` on the **Pome** `session_id` (not the `ant` session id), while the
+idles, **stop polling and go to SKILL.md §3** — `finalize_run(session_id)` on
+the **Pome** `session_id` (not the `ant` session id), while the
 twin sandbox is still up. Do not tear the `ant` session down first: if the twin
 session expires or is finalized-too-late, the tape is gone. `finalize_run` pulls
 the tape and scores; only then is the managed-agent session safe to discard.
