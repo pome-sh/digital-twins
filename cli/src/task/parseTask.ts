@@ -4,15 +4,22 @@ import { readFile } from "node:fs/promises";
 import { basename, extname } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
-import { defaultSeedState, seedSchema } from "@pome-sh/twin-github";
+// The `/seed` SUBPATH, never the package root (F-1306). What this module wants
+// from a twin is its zod seed schema and its default world — pure data. The root
+// export additionally carries the domain, the SQLite schema, the Hono app and
+// (for linear) a GraphQL executor, and `main.ts` reaches this module on every
+// invocation, so importing the root here made `pome --version` parse three twins'
+// entire server. `seed.ts` in each twin imports nothing but `zod`, so the
+// subpath is a leaf. See `cli/src/twin/registry.ts` for the lazy boot path.
+import { defaultSeedState, seedSchema } from "@pome-sh/twin-github/seed";
 import {
   defaultSeedState as defaultGmailSeedState,
   gmailSeedSchema,
-} from "@pome-sh/twin-gmail";
+} from "@pome-sh/twin-gmail/seed";
 import {
   defaultSeedState as defaultLinearSeedState,
   linearSeedSchema as linearSeedStateSchema,
-} from "@pome-sh/twin-linear";
+} from "@pome-sh/twin-linear/seed";
 import { parseGitHubSeedState } from "./githubSeedCompat.js";
 import {
   criterionSchema,

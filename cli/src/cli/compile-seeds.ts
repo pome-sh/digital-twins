@@ -166,7 +166,7 @@ async function compileOne(taskPath: string, opts: CompileOptions): Promise<FileR
   }
 
   try {
-    verifySeedWithTwin(result.seed);
+    await verifySeedWithTwin(result.seed);
   } catch (err) {
     return { path: taskPath, status: "error", message: (err as Error).message };
   }

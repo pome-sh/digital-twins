@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-import { parseSeed, seedSchema } from "@pome-sh/twin-github";
+// `/seed`, not the package root (F-1306) — see `parseTask.ts`'s note.
+import { parseSeed, seedSchema } from "@pome-sh/twin-github/seed";
 
 // Bundled scenario sidecars and legacy compile output used singular `assignee`
 // on issues; @pome-sh/twin-github's seedSchema expects `assignees[]`. Zod strips
