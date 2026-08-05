@@ -14,7 +14,9 @@ function run(cmd, args) {
   return res.status ?? 1;
 }
 
-let status = run("npm", ["run", "build:runtime", "-w", "@pome-sh/shared-types"]);
+// Wire first: every twin's runtime import chain reaches it, and the suite spawns
+// the twins with plain `node`, so wire's dist/ must exist before anything boots.
+let status = run("npm", ["run", "build", "-w", "@pome-sh/wire"]);
 // The sdk build must precede the twin builds: twin-slack is a thin
 // @pome-sh/sdk plugin since F-683 and compiles against the sdk dist.
 if (status === 0) status = run("npm", ["run", "build", "-w", "@pome-sh/sdk"]);

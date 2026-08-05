@@ -9,7 +9,7 @@
 // after the subprocess exits and feeds it to the correlator (FDRS-412).
 //
 // FDRS-407: rows are now M0-schema events. The on-disk shape matches
-// `@pome-sh/shared-types`' discriminated union (`hookEventSchema` and
+// `@pome-sh/wire`'s discriminated union (`hookEventSchema` and
 // siblings). Legacy `{type: "step"}` / `{type: "tool_call"}` shapes are
 // removed.
 //
@@ -33,7 +33,7 @@ import type {
   SubagentSpawnEvent,
   ToolResultEvent,
   ToolUseEvent,
-} from "@pome-sh/shared-types";
+} from "@pome-sh/wire";
 
 export const ADAPTER_SIGNALS_ENV = "POME_ADAPTER_SIGNALS_PATH";
 

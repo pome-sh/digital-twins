@@ -1,22 +1,20 @@
 {
-  "package": "@pome-sh/shared-types",
-  "version": "0.14.0",
+  "package": "@pome-sh/wire",
+  "version": "0.1.0",
   "zod": {
     "range": "^4.1.13",
     "major": 4
   },
   "exports": {
-    "root": "@pome-sh/shared-types",
-    "recorderEvents": "@pome-sh/shared-types/recorder-events",
-    "run": "@pome-sh/shared-types/run",
-    "otel": "@pome-sh/shared-types/otel",
-    "redaction": "@pome-sh/shared-types/redaction"
+    "root": "@pome-sh/wire",
+    "recorderEvents": "@pome-sh/wire/recorder-events",
+    "otel": "@pome-sh/wire/otel",
+    "redaction": "@pome-sh/wire/redaction"
   },
   "canonicalSchemas": [
     "recorderEventSchema",
     "eventSchema",
-    "otelEventSchema",
-    "runSchema"
+    "otelEventSchema"
   ],
   "eventKinds": {
     "TwinHttpEvent": [
@@ -52,13 +50,6 @@
     ]
   },
   "fixtures": [
-    "test/fixtures/v1/createSessionRequest/multi-twin-permissive-seed-idempotency.json",
-    "test/fixtures/v1/createSessionRequest/scenario-source-github.json",
-    "test/fixtures/v1/createSessionRequest/stored-scenario.json",
-    "test/fixtures/v1/createSessionRequestTaskVocab/stored-task.json",
-    "test/fixtures/v1/createSessionRequestTaskVocab/task-source-github.json",
-    "test/fixtures/v1/createSessionResponse/full-multi-twin.json",
-    "test/fixtures/v1/createSessionResponse/legacy-single-twin.json",
     "test/fixtures/v1/event/HookEvent/pre-tool-use.json",
     "test/fixtures/v1/event/HookEvent/session-started-untooled.json",
     "test/fixtures/v1/event/LlmCallEvent/baseline-connect-tunnel.json",
@@ -73,17 +64,6 @@
     "test/fixtures/v1/event/ToolUseEvent/mcp-create-issue.json",
     "test/fixtures/v1/event/TwinHttpEvent/github-create-issue-mutation.json",
     "test/fixtures/v1/event/TwinHttpEvent/idempotent-replay-legacy-step-vocab.json",
-    "test/fixtures/v1/event/TwinHttpEvent/linear-read-no-mutation.json",
-    "test/fixtures/v1/planTier/enterprise.json",
-    "test/fixtures/v1/planTier/free.json",
-    "test/fixtures/v1/planTier/hobby.json",
-    "test/fixtures/v1/planTier/pro.json",
-    "test/fixtures/v1/planTier/self_host_annual.json",
-    "test/fixtures/v1/planTier/team.json",
-    "test/fixtures/v1/run/full-production.json",
-    "test/fixtures/v1/run/legacy-minimal.json",
-    "test/fixtures/v1/runTaskVocab/full-production-task-vocab.json",
-    "test/fixtures/v1/usage/free-tier.json",
-    "test/fixtures/v1/usage/team-tier-exhausted.json"
+    "test/fixtures/v1/event/TwinHttpEvent/linear-read-no-mutation.json"
   ]
 }

@@ -18,7 +18,7 @@ export type StripeErrorType =
 // looser union here would let invalid events slip onto the wire.
 export type StripeErrorFidelity = "semantic" | "unsupported";
 
-import type { StateDelta } from "@pome-sh/shared-types";
+import type { StateDelta } from "@pome-sh/wire";
 
 export type StripeErrorOpts = {
   param?: string;

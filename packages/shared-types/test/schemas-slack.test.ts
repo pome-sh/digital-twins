@@ -10,7 +10,7 @@ import {
   providerScopedSeedStateSchema,
   slackSeedStateSchema,
 } from "../src/index.js";
-import { KNOWN_TWIN_IDS } from "../src/recorder-events.js";
+import { KNOWN_TWIN_IDS } from "@pome-sh/wire";
 
 describe("MOUNTED_TWINS", () => {
   it("includes slack and gmail alongside github and stripe", () => {

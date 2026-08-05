@@ -15,7 +15,7 @@ import {
   createFileBackedRecorderStore,
   createRecorderStore,
 } from "@pome-sh/sdk/server";
-import type { RecorderEvent } from "@pome-sh/shared-types";
+import type { RecorderEvent } from "@pome-sh/wire";
 import { percentile, summarize } from "./overhead-stats.js";
 
 const N = Number.parseInt(process.env.RECORDER_OVERHEAD_N ?? "200", 10);

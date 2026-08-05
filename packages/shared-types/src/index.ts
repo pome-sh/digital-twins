@@ -15,14 +15,14 @@
 
 // Barrel re-exports — consumers `import { ... } from "@pome-sh/shared-types"`
 // regardless of which leaf file owns the type.
-export * from "./recorder-events.js";
 export * from "./run.js";
 export * from "./task-vocab.js";
 export * from "./github-access-control.js";
-export * from "./redaction.js";
-// OpenTelemetry-native trace surface (M1 / FDRS-480-482): OtelSpanEvent schema,
-// GenAI/HTTP span mapper, legacy→span shim, pinned semconv, otelEventSchema.
-export * from "./otel/index.js";
+// F-942 — the trace surface (recorder events, redaction, the OTel extension)
+// now lives in @pome-sh/wire. Re-exported here only while the remaining
+// cloud-contract clusters are moved to cli/src/contract/; both this line and
+// this package go away in the same milestone.
+export * from "@pome-sh/wire";
 
 // V1 contract clusters (F-754 split out of this file, zero behavior change):
 export * from "./identity.js";          // §1 IDENTITY

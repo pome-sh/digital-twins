@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 import { Hono } from "hono";
-import type { RecorderEvent } from "@pome-sh/shared-types";
+import type { RecorderEvent } from "@pome-sh/wire";
 import {
   FAILURE_INJECTION_OVERRIDE_KEY,
   createFailureInjectionStore,

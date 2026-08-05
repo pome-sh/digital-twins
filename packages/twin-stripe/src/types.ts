@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { TwinDatabase } from "@pome-sh/sdk";
 import type { FailureInjectionRule } from "@pome-sh/sdk/server";
-import type { RecorderEvent } from "@pome-sh/shared-types";
+import type { RecorderEvent } from "@pome-sh/wire";
 
 // The engine's driver wrapper is the only database surface a twin sees
 // (F-681/F-684): prepare/exec/pragma/transaction/close.
@@ -15,7 +15,7 @@ export type TwinStripeDatabase = TwinDatabase;
 // F-684; domain routes only need the `record` sink (the engine's
 // RecorderHandle satisfies it structurally).
 
-export type { RecorderEvent, StateDelta } from "@pome-sh/shared-types";
+export type { RecorderEvent, StateDelta } from "@pome-sh/wire";
 
 export type Recorder = {
   record(event: RecorderEvent): void;

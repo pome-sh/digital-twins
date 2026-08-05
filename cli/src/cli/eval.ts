@@ -52,7 +52,7 @@ import {
 } from "../hosted/evalResultView.js";
 import { resolveCredentials } from "./credentials.js";
 import { readManifest } from "./project-config.js";
-import type { RecorderEvent as LegacyGithubRecorderEvent } from "@pome-sh/shared-types";
+import type { RecorderEvent as LegacyGithubRecorderEvent } from "@pome-sh/wire";
 import { isLegacyEventRow, type FinalizeResponse } from "../types/shared.js";
 
 const EVAL_SESSION_FILE = "eval-session.json";

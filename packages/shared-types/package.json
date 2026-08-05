@@ -8,17 +8,12 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./recorder-events": "./src/recorder-events.ts",
-    "./run": "./src/run.ts",
-    "./otel": "./src/otel/index.ts",
-    "./otel/fixtures": "./src/otel/fixtures/index.ts",
-    "./redaction": "./src/redaction.ts"
+    "./run": "./src/run.ts"
   },
   "files": [
     "dist",
     "src",
     "package.json",
-    "trace-contract.json",
     "manifest-schema.json"
   ],
   "repository": {
@@ -36,10 +31,11 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "build": "rm -rf dist && tsc -p tsconfig.build.json && node scripts/emit-manifest-schema.mjs",
     "prepublishOnly": "npm run build",
-    "emit:trace-contract": "node scripts/emit-trace-contract.mjs",
-    "check:trace-contract": "node scripts/emit-trace-contract.mjs --check",
     "emit:manifest-schema": "node scripts/emit-manifest-schema.mjs",
     "check:manifest-schema": "node scripts/emit-manifest-schema.mjs --check"
+  },
+  "dependencies": {
+    "@pome-sh/wire": "*"
   },
   "peerDependencies": {
     "zod": "^4.1.13"

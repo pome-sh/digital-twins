@@ -15,7 +15,7 @@
  */
 
 import { z } from "zod";
-import { twinIdSchema } from "./recorder-events.js";
+import { twinIdSchema } from "@pome-sh/wire";
 import { LEGACY_CRITERION_KIND_MAP, normalizeTaskVocabKeys } from "./task-vocab.js";
 
 // Judge model is a free-form string (BYOK Flavor #1, OpenAI-compatible endpoint

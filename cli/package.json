@@ -72,6 +72,7 @@
   "devDependencies": {
     "@pome-sh/sdk": "*",
     "@pome-sh/shared-types": "*",
+    "@pome-sh/wire": "*",
     "@pome-sh/twin-github": "*",
     "@pome-sh/twin-gmail": "*",
     "@pome-sh/twin-linear": "*",

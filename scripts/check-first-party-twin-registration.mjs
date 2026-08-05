@@ -45,8 +45,8 @@ compare(
   quotedArray("packages/shared-types/src/sessions.ts", "MOUNTED_TWINS"),
 );
 compare(
-  "packages/shared-types/src/recorder-events.ts KNOWN_TWIN_IDS",
-  quotedArray("packages/shared-types/src/recorder-events.ts", "KNOWN_TWIN_IDS"),
+  "packages/wire/src/recorder-events.ts KNOWN_TWIN_IDS",
+  quotedArray("packages/wire/src/recorder-events.ts", "KNOWN_TWIN_IDS"),
 );
 compare(
   "cli/src/twin/registry.ts TWIN_NAME_LIST",

@@ -42,12 +42,11 @@ const scriptRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 // `src/otel/**` imports its siblings with the `.js` extensions TypeScript
 // requires under NodeNext — and those `.js` files do not exist on disk. Rewrite
 // a relative `.js` specifier to the `.ts` beside it so the OTel tree loads
-// without a build step. (`src/manifest.ts` needs none of this, which is why
-// `emit-manifest-schema.mjs` imports it directly.)
+// without a build step.
 //
-// The rewrite is unconditional when the `.ts` exists, so `npm run build:runtime`
-// — which emits `.js` IN PLACE beside each `.ts` for the Docker/contract boots —
-// cannot shadow the source this contract is generated from.
+// Reading the SOURCE rather than `dist/` is deliberate: this gate runs in
+// ci.yml's cheap block, before `npm ci` has built any workspace, and a contract
+// generated from a stale `dist/` would be green against bytes nobody ships.
 registerHooks({
   resolve(specifier, context, nextResolve) {
     if (specifier.startsWith(".") && specifier.endsWith(".js") && context.parentURL?.endsWith(".ts")) {
@@ -62,11 +61,13 @@ registerHooks({
 // WHICH schemas are the contract, a question no introspection can answer — but
 // no longer an unchecked one: `assertCanonicalSchemas` proves each is really on
 // the barrel, so a rename cannot leave a dangling name here.
+// F-942 — `runSchema` left this list with `run.ts`: the completed-run row is the
+// cloud control-plane's shape, not the wire trace surface, and it now lives in
+// `cli/src/contract/run.ts`. What remains is exactly what @pome-sh/wire owns.
 export const CANONICAL_SCHEMAS = [
   "recorderEventSchema",
   "eventSchema",
   "otelEventSchema",
-  "runSchema",
 ];
 
 const FIXTURE_HINT = "test/fixtures/v1/event/<Kind>/<name>.json";
@@ -229,11 +230,10 @@ export function buildContract({ pkg, eventKinds, fixtures }) {
       major: 4,
     },
     exports: {
-      root: "@pome-sh/shared-types",
-      recorderEvents: "@pome-sh/shared-types/recorder-events",
-      run: "@pome-sh/shared-types/run",
-      otel: "@pome-sh/shared-types/otel",
-      redaction: "@pome-sh/shared-types/redaction",
+      root: "@pome-sh/wire",
+      recorderEvents: "@pome-sh/wire/recorder-events",
+      otel: "@pome-sh/wire/otel",
+      redaction: "@pome-sh/wire/redaction",
     },
     canonicalSchemas: [...CANONICAL_SCHEMAS],
     // Union declaration order, not sorted: the contract mirrors the schema.

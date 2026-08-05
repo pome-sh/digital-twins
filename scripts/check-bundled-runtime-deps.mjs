@@ -31,6 +31,7 @@ const readJson = (path) => JSON.parse(readFileSync(path, "utf8"));
 const BUNDLED_PACKAGES = [
   "packages/sdk",
   "packages/shared-types",
+  "packages/wire",
   "packages/twin-github",
   "packages/twin-slack",
   "packages/twin-stripe",

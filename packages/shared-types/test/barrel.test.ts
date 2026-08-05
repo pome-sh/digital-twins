@@ -8,24 +8,27 @@
 // checks downstream silently break.
 
 import { describe, expect, it } from "vitest";
+import * as wire from "@pome-sh/wire";
 import * as barrel from "../src/index.js";
-import * as recorderEvents from "../src/recorder-events.js";
 import * as run from "../src/run.js";
 
-describe("index.ts barrel re-exports from recorder-events.ts", () => {
-  it("re-exports recorderEventSchema (same identity)", () => {
-    expect(barrel.recorderEventSchema).toBe(recorderEvents.recorderEventSchema);
+// F-942 — the recorder-events / otel / redaction leaves moved to
+// `@pome-sh/wire`; their leaf-vs-barrel identity is guarded in
+// `packages/wire/test/export-surface.test.ts`. What this barrel must still prove
+// is that re-exporting them through a PACKAGE boundary preserves identity —
+// otherwise a second zod copy would break every discriminated union downstream.
+describe("index.ts barrel re-exports @pome-sh/wire (same identity)", () => {
+  it("re-exports recorderEventSchema", () => {
+    expect(barrel.recorderEventSchema).toBe(wire.recorderEventSchema);
   });
   it("re-exports recorderFidelitySchema", () => {
-    expect(barrel.recorderFidelitySchema).toBe(
-      recorderEvents.recorderFidelitySchema
-    );
+    expect(barrel.recorderFidelitySchema).toBe(wire.recorderFidelitySchema);
   });
   it("re-exports twinIdSchema", () => {
-    expect(barrel.twinIdSchema).toBe(recorderEvents.twinIdSchema);
+    expect(barrel.twinIdSchema).toBe(wire.twinIdSchema);
   });
   it("re-exports stateDeltaSchema", () => {
-    expect(barrel.stateDeltaSchema).toBe(recorderEvents.stateDeltaSchema);
+    expect(barrel.stateDeltaSchema).toBe(wire.stateDeltaSchema);
   });
 });
 

@@ -60,7 +60,7 @@ function fixtureRoot(kinds) {
   writeFileSync(
     join(dir, "package.json"),
     JSON.stringify(
-      { name: "@pome-sh/shared-types", version: "0.0.0", peerDependencies: { zod: "^4.1.13" } },
+      { name: "@pome-sh/wire", version: "0.0.0", peerDependencies: { zod: "^4.1.13" } },
       null,
       2,
     ),
@@ -155,7 +155,10 @@ function main() {
   // than returning the kinds it did recognize. A short list is a gate that
   // quietly stops requiring fixtures for whatever it walked past.
   {
-    expectThrows(() => unionKinds(api.planTierSchema, "planTierSchema"), "unhandled zod node");
+    // F-942: `planTierSchema` was the stand-in here until it left with the
+    // cloud contract. `twinIdSchema` is the same argument — an enum node, not a
+    // union/pipe/object — and it is one this package still owns.
+    expectThrows(() => unionKinds(api.twinIdSchema, "twinIdSchema"), "unhandled zod node");
     expectThrows(() => unionKinds({ def: { type: "object", shape: {} } }, "noKind"), "no literal");
   }
 

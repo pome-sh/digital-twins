@@ -16,7 +16,7 @@
 // prefix, the extra JWT claims — lives in that twin's registry entry. This file
 // owns only the recorder lifecycle, which is shared across twins.
 import { createRecorder, type Recorder } from "../recorder/recorder.js";
-import type { RecorderEvent } from "@pome-sh/shared-types";
+import type { RecorderEvent } from "@pome-sh/wire";
 import { isTwinName, TWIN_NAMES, TWIN_REGISTRY, type TwinApp } from "./registry.js";
 
 export { STRIPE_LOCAL_ACCOUNT_ID } from "./registry.js";

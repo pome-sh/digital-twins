@@ -51,7 +51,7 @@
   },
   "devDependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.215",
-    "@pome-sh/shared-types": "*",
+    "@pome-sh/wire": "*",
     "@types/node": "^26.1.0",
     "tsup": "^8.5.0",
     "typescript": "^5.9.3",

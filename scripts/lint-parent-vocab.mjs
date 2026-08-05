@@ -35,19 +35,19 @@ const ROOTS = [
 // here should be a deliberate decision, not a way to quiet the gate.
 const ALLOWED = new Map([
   [
-    "packages/shared-types/src/recorder-events.ts",
+    "packages/wire/src/recorder-events.ts",
     "declares `parent_id` as the legacy input key and hosts both tolerant readers",
   ],
   [
-    "packages/shared-types/src/otel/span-event.ts",
+    "packages/wire/src/otel/span-event.ts",
     "accepts `parent_id` as a legacy input key on the OTel arm",
   ],
   [
-    "packages/shared-types/src/otel/legacy-shim.ts",
+    "packages/wire/src/otel/legacy-shim.ts",
     "reads raw pre-F-1200 rows straight off disk",
   ],
   [
-    "packages/shared-types/src/otel/fixtures/data.ts",
+    "packages/wire/src/otel/fixtures/data.ts",
     "golden corpus — its `legacy:` inputs ARE pre-F-1200 rows",
   ],
   [

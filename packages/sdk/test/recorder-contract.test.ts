@@ -12,7 +12,7 @@ import {
   recorderEventSchema,
   twinHttpEventSchema,
   type RecorderEvent,
-} from "@pome-sh/shared-types";
+} from "@pome-sh/wire";
 
 // Optional fsync override so we can assert flush() rethrows a prior failure
 // after the rejected promise has left `pending` (ESM blocks spyOn on node:fs).

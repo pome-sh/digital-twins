@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { toTwinHttpEventRow } from "@pome-sh/sdk/server";
 import type { Task } from "../task/taskSchema.js";
-import type { RecorderEvent } from "@pome-sh/shared-types";
+import type { RecorderEvent } from "@pome-sh/wire";
 import { redactEvent, redactSecrets } from "./redaction.js";
 import { META_SPEC_VERSION, resolveTwinPackageVersions } from "./specMeta.js";
 

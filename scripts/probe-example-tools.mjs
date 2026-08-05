@@ -22,14 +22,13 @@
 // registers once with fixture arguments and fail if the twin refused.
 
 import { execFileSync, spawn } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "..");
-const SHARED_TYPES_SRC = join(REPO_ROOT, "packages", "shared-types", "src");
 const DRIVER = join(HERE, "example-tool-probe-driver.mjs");
 
 /**
@@ -53,47 +52,26 @@ export async function freePort() {
 }
 
 /**
- * Run `fn` with `@pome-sh/shared-types` loadable by plain `node`, then undo it.
+ * Make sure `@pome-sh/wire` is built before `fn` imports a twin under plain
+ * `node`.
  *
- * That package exports `./src/index.ts` and ships no dist build, so the twin
- * packages' runtime import chain lands on TypeScript whose relative specifiers
- * (`./recorder-events.js`) node's type-stripping does not rewrite — nothing in
- * this repo can `import("@pome-sh/twin-github")` under bare `node` until
- * `build:runtime` emits the `.js` in place. contract/run.mjs hits the same wall
- * and solves it identically.
+ * Every twin's runtime import chain reaches the wire contract, so nothing here
+ * can `import("@pome-sh/twin-github")` until wire's `dist/` exists. ci.yml runs
+ * `npm run build` before this gate, which covers it; the build below is for the
+ * bare `npm run probe:examples` a developer types.
  *
- * The emitted files are untracked and MUST be removed afterwards: left behind
- * they shadow the `.ts` sources and break `lint:dead-code`. Hence the `finally`.
+ * Before F-942 this helper also had to CLEAN UP after itself: shared-types
+ * exported `./src/index.ts` with no dist build, so the only way to load it under
+ * `node` was `build:runtime`'s in-place `.js` emit beside each `.ts` — untracked
+ * files that shadowed the sources and reddened `lint:dead-code` if left behind.
+ * wire builds to `dist/` like every other package, so there is nothing to undo.
  */
-export async function withSharedTypesRuntime(fn) {
-  execFileSync("npm", ["run", "build:runtime", "-w", "@pome-sh/shared-types"], {
+export async function withWireRuntime(fn) {
+  execFileSync("npm", ["run", "build", "-w", "@pome-sh/wire"], {
     cwd: REPO_ROOT,
     stdio: "pipe",
   });
-  try {
-    return await fn();
-  } finally {
-    const removed = cleanRuntimeJs(SHARED_TYPES_SRC);
-    if (process.env.POME_PROBE_VERBOSE === "1") {
-      console.log(`[probe:examples] cleaned ${removed} generated runtime .js file(s)`);
-    }
-  }
-}
-
-// Only remove `X.js` when `X.ts` sits next to it — the exact inverse of
-// tsconfig.runtime.json's in-place emit. Nothing else is touched.
-function cleanRuntimeJs(dir) {
-  let removed = 0;
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      removed += cleanRuntimeJs(full);
-    } else if (entry.name.endsWith(".js") && existsSync(`${full.slice(0, -3)}.ts`)) {
-      rmSync(full);
-      removed += 1;
-    }
-  }
-  return removed;
+  return await fn();
 }
 
 /**
@@ -337,7 +315,7 @@ export const TWIN_MODULES = {
  * while the example's tools run in a child under the example's own `tsx`, which
  * is how a real `pome run` resolves them.
  *
- * Callers must already be inside `withSharedTypesRuntime`.
+ * Callers must already be inside `withWireRuntime`.
  */
 export async function probeExample(name, entry, opts) {
   const exampleDir = join(opts.examplesDir, name);
@@ -480,5 +458,5 @@ export async function runGate(opts = {}) {
 }
 
 if (import.meta.main) {
-  process.exit(await withSharedTypesRuntime(() => runGate()));
+  process.exit(await withWireRuntime(() => runGate()));
 }

@@ -5,7 +5,7 @@
 // whole-document ops (insert_after/before → append; section replace → full
 // replace; section delete → no-op). Matches warm × shape target.
 
-import type { StateDelta } from "@pome-sh/shared-types";
+import type { StateDelta } from "@pome-sh/wire";
 import { slackError } from "../errors.js";
 import type { CanvasRow, ChannelMemberRow, ChannelRow, SlackTwinDatabase } from "../types.js";
 import { nowIso } from "../util.js";

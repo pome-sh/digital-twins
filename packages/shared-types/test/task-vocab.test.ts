@@ -30,7 +30,7 @@ import {
   taskConfigSchema,
   taskSchema,
 } from "../src/index.js";
-import { eventSchema, recorderEventSchema } from "../src/recorder-events.js";
+import { eventSchema, recorderEventSchema } from "@pome-sh/wire";
 
 // ─── normalizeTaskVocabKeys (the raw key mapper) ─────────────────────────────
 

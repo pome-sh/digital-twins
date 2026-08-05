@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { TwinDatabase } from "@pome-sh/sdk";
 
-export type { RecorderEvent } from "@pome-sh/shared-types";
+export type { RecorderEvent } from "@pome-sh/wire";
 
 // The engine's driver wrapper is the only database surface a twin sees
 // (F-681/F-682): prepare/exec/pragma/transaction/close.
