@@ -1,21 +1,31 @@
 # Pome Twin: GitHub
 
-> One of four twins in this repository (GitHub, Stripe x402, Slack, Gmail).
+> **Internal package.** One of five twin runtimes in this repository (GitHub,
+> Stripe x402, Slack, Gmail, Linear). It is not separately installable — it
+> ships inside [`@pome-sh/cli`](../../cli/). To run it:
+> `npx @pome-sh/cli twin start github`.
+>
+> The rest of this file is the engineering reference: HTTP/MCP surface, seed
+> shape, and the runtime contract pome-cloud's sandbox images depend on.
 
 `@pome-sh/twin-github` is a local, stateful GitHub twin for agent testing. It exposes GitHub-shaped REST routes plus a 65-tool MCP-style API backed by the same SQLite domain services.
 
 ## Quickstart
 
 ```bash
-npm install
-npm run seed
-export TWIN_AUTH_SECRET=$(openssl rand -hex 32)
-npm run dev
+npx @pome-sh/cli twin start github   # http://127.0.0.1:3333, prints the MCP URL + POME_AUTH_TOKEN
+curl http://127.0.0.1:3333/healthz
 ```
+
+To run it from a repo checkout instead (contributors), see
+[Local commands](#local-commands) below.
 
 GitHub-shaped REST + MCP routes live under `/s/:sid/*` and require a
 bearer token whose `sid` claim matches the URL `:sid`. `/healthz` and
 `/admin/*` stay at the root (admin is localhost-only).
+
+`npx @pome-sh/cli twin start github` already prints a usable `POME_AUTH_TOKEN`.
+To mint one by hand against a self-booted server:
 
 ```bash
 # Mint a token (32-char minimum secret recommended; use the SAME secret as the server)
@@ -143,12 +153,10 @@ Keep agent assertions behavior-based: compare invariants (PR merged, stale `sha`
 
 ## Use In A New Project
 
-1. Install and start the twin:
+1. Start the twin:
 
 ```bash
-cd ~/pome-twins/packages/twin-github
-npm install
-GITHUB_CLONE_DB=.github_clone/my-project.db npm run dev
+npx @pome-sh/cli twin start github
 ```
 
 2. Reset or seed state before each run:
@@ -224,9 +232,14 @@ GITHUB_MCP_URL=http://127.0.0.1:3333/s/demo/mcp npm run agent:claude -- \
 
 The example captures the PR number returned by `create_pull_request` and reuses it for review and merge calls.
 
-## Local Commands
+## Local commands
+
+Contributor-only, from a repo checkout (these scripts are not part of any
+published package):
 
 ```bash
+npm run dev          # boot this twin on :3333 from source
+npm run seed         # seed the local DB
 npm run typecheck
 npm test
 npm run smoke
@@ -238,12 +251,13 @@ npm run agent:claude
 
 `npm run capture:fixtures` uses `gh api` to refresh sanitized response-shape fixtures when GitHub CLI auth is available.
 
-## Pome CLI Entry Point
+## Pome CLI entry point
 
-The user-facing `pome` CLI lives at [`cli/`](../../cli/) in this repo. From `cli/`:
+The user-facing `pome` CLI lives at [`cli/`](../../cli/) in this repo and is the
+only supported way to run this twin:
 
 ```bash
-npm run dev -- twin start github --port 3333
+npx @pome-sh/cli twin start github --port 3333
 ```
 
 The command prints:

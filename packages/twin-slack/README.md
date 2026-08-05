@@ -1,21 +1,31 @@
 # Pome Twin: Slack
 
-> One of four twins in this repository (GitHub, Stripe x402, Slack, Gmail).
+> **Internal package.** One of five twin runtimes in this repository (GitHub,
+> Stripe x402, Slack, Gmail, Linear). It is not separately installable — it
+> ships inside [`@pome-sh/cli`](../../cli/). To run it:
+> `npx @pome-sh/cli twin start slack`.
+>
+> The rest of this file is the engineering reference: HTTP/MCP surface, seed
+> shape, security model, and the runtime contract pome-cloud's sandbox images
+> depend on.
 
 `@pome-sh/twin-slack` is a local, stateful Slack twin for agent testing. It exposes Slack Web API–shaped REST routes plus an 11-tool MCP-style API backed by the same SQLite domain services. The 11 visible MCP tools mirror the canonical Slack agent toolset (post message, reply to thread, add reaction, get channel history, get thread replies, list channels, list users, get user profile, search messages, get reactions, list channel members).
 
 ## Quickstart
 
 ```bash
-npm install
-npm run seed
-export TWIN_AUTH_SECRET=$(openssl rand -hex 32)
-npm run dev
+npx @pome-sh/cli twin start slack   # http://127.0.0.1:3333, prints the MCP URL + POME_AUTH_TOKEN
+curl http://127.0.0.1:3333/healthz
 ```
+
+Contributors booting from a repo checkout: see [Local commands](#local-commands).
 
 Slack-shaped REST + MCP routes live under `/s/:sid/*` and require a
 bearer token whose `sid` claim matches the URL `:sid`. `/healthz` and
 `/admin/*` stay at the root (admin is localhost-only).
+
+The CLI prints a usable `POME_AUTH_TOKEN`. To mint one by hand against a
+self-booted server:
 
 ```bash
 # Mint a token (32-char minimum secret recommended; use the SAME secret as the server)
@@ -98,28 +108,16 @@ path's `:sid`.
 
 ### Use in a new project
 
-```bash
-npm i -D @pome-sh/twin-slack  # or npm i -D / pnpm add -D
-```
-
-In another terminal, boot the twin and seed it:
+Boot the twin with the CLI and drive it over HTTP — that is the whole
+integration surface:
 
 ```bash
-TWIN_AUTH_SECRET=$(openssl rand -hex 32) npx --package=@pome-sh/twin-slack twin-slack &
+npx @pome-sh/cli twin start slack &
 curl -X POST http://127.0.0.1:3333/admin/seed -H 'content-type: application/json' -d '{}'
 ```
 
-In tests:
-
-```ts
-import { createSlackTwinApp, openSlackTwinDatabase, SlackDomain, defaultSeedState } from "@pome-sh/twin-slack";
-
-const db = openSlackTwinDatabase(":memory:");
-const domain = new SlackDomain(db);
-domain.seed(defaultSeedState());
-const app = createSlackTwinApp({ db, domain, runId: "my-test" });
-// pass `app.fetch` to fetch-shape clients, e.g. Hono's app.request
-```
+There is no supported in-process API: `createSlackTwinApp` and friends are
+internal exports consumed only by this repo's own tests and the CLI.
 
 ### Claude Agent example
 
@@ -134,8 +132,10 @@ ANTHROPIC_API_KEY=sk-... npm run agent:claude "Post hello to #general and react 
 
 ### Local commands
 
+Contributor-only, from a repo checkout (these scripts are not part of any
+published package):
+
 ```bash
-npm install          # install deps
 npm run seed         # seed the local DB
 npm run dev          # boot the twin on :3333
 npm run smoke        # 12-step end-to-end smoke test
