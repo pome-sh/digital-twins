@@ -21,7 +21,8 @@ const BARREL_PATHS = [
   "packages/twin-stripe/src/index.ts",
   "packages/twin-stripe/src/domain/index.ts",
   "packages/adapter-claude-sdk/src/index.ts",
-  "packages/shared-types/src/index.ts",
+  "packages/wire/src/index.ts",
+  "cli/src/contract/index.ts",
 ];
 
 // Existing large modules — shrink this list as files are split (F-679).
@@ -32,7 +33,7 @@ const FILE_SIZE_ALLOWLIST = new Set([
   "cli/src/cli/install.ts",
   "cli/src/hosted/client.ts",
   "cli/src/runner/runTaskHosted.ts",
-  "packages/shared-types/src/otel/fixtures/data.ts",
+  "packages/wire/src/otel/fixtures/data.ts",
   "packages/twin-github/src/serializers.ts",
   "packages/twin-github/src/tools.ts",
   "packages/twin-linear/src/seed.ts",
@@ -45,7 +46,7 @@ const SIZE_SCAN_DIRS = [
   "packages/twin-linear/src",
   "packages/twin-slack/src",
   "packages/twin-stripe/src",
-  "packages/shared-types/src",
+  "packages/wire/src",
   "packages/sdk/src",
   "packages/adapter-claude-sdk/src",
   "cli/src",

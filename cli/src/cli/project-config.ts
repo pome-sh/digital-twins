@@ -4,7 +4,7 @@
 // `pome.config.json` handling — no back-compat, 0 users. The committed manifest
 // is `pome.json` (canonical) with `pome.yaml` / `pome.yml` as interchangeable
 // carriers of the same snake_case keys. One canonical zod schema
-// (`@pome-sh/shared-types` `manifestSchema`) validates every carrier.
+// (`cli/src/contract` `manifestSchema`) validates every carrier.
 //
 // The registered `agt_` id is deliberately NOT in the manifest — it lives in
 // the gitignored `.pome/link.json` cache (see link-cache.ts). The portable
@@ -18,7 +18,7 @@ import {
   deriveAgentSlug,
   manifestSchema,
   type Manifest,
-} from "@pome-sh/shared-types";
+} from "../contract/index.js";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 
 import { HostedOrchError } from "../hosted/errors.js";

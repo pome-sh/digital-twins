@@ -50,8 +50,8 @@
 // SCOPE — deliberately narrow, to stay a zero-false-positive structural gate:
 //
 //   • Only `packages/sdk/src/**/*.ts` (the engine). Twins, the CLI, and
-//     shared-types are out of scope for THIS gate (barrel-policy + file-size
-//     health live in scripts/lint-code-health.mjs; shared-types is F-754).
+//     the wire/contract barrels are out of scope for THIS gate (barrel-policy
+//     + file-size health live in scripts/lint-code-health.mjs).
 //   • Only STATEMENT try/catch. Promise `.catch(cb)` handlers are a different
 //     construct with their own idioms (e.g. `.json().catch(() => ({}))` in
 //     parity.ts is a legitimate default-on-parse-fail) and are NOT flagged.

@@ -58,7 +58,7 @@ import {
   DEFAULT_CONTROL_PLANE_URL,
   DEFAULT_DASHBOARD_URL,
 } from "./defaults.js";
-import { deriveAgentSlug } from "@pome-sh/shared-types";
+import { deriveAgentSlug } from "../contract/index.js";
 import {
   MANIFEST_JSON,
   readManifest,

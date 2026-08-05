@@ -1,0 +1,444 @@
+# `cli/src/contract` — CHANGELOG
+
+The release history of `@pome-sh/shared-types`, whose `/v1` cloud control-plane
+clusters became this directory in F-942. Kept because these entries are the
+coordination record with `pome-cloud`: which release added which field, and which
+tolerant reader still accepts the shape before it. The trace-surface entries
+describe schemas that now live in `@pome-sh/wire`; the GitHub access-control
+entries describe `packages/twin-github/src/access-control.ts`.
+
+Versions below are `@pome-sh/shared-types` versions. Nothing here was ever
+published to npm — the package was `private: true` throughout — so a version is a
+workspace marker, not an installable artifact.
+
+
+## 0.14.1 — 2026-08-04
+
+Dependency-only patch (#302): `zod` `^4.1.13` → `^4.4.3` and dev `@types/node`.
+No source file changed; `trace-contract.json`'s version stamp is regenerated to match.
+
+## 0.14.0 — 2026-08-04
+
+`parent_id` stops meaning four different things (F-1200).
+
+- **`parent_event_id`** is the canonical spelling: always the spawning row's
+  `event_id`. It replaces `parent_id`, which meant a spawning `event_id`, a raw
+  SDK `tool_use_id`, a hard null, or a mirror of `parent_span_id` depending on
+  which of five writers produced the row — so reading a trace meant knowing
+  where the row came from.
+- **`HookEvent.causing_tool_use_id`** takes the one meaning that was never a
+  parent edge. A hook fires *because of* a tool call but is not spawned by its
+  row, and the emitter has no `event_id` for that call at hook time.
+- **Old rows still parse.** `parent_id` stays in the schema as a legacy input
+  key and the exported readers normalize it, the same tolerant-reader shape
+  `scenario_step_id` has had since 0.5.0. A stored 0.13.0 recording needs no
+  migration. On a HookEvent the legacy value routes to `causing_tool_use_id`,
+  not `parent_event_id` — copying it would mint an edge pointing at a row that
+  does not exist.
+- On `OtelSpanEvent` the field is derived from `parent_span_id`, which the
+  cross-field invariant already pins it equal to, so that arm needs no lookup.
+  The invariant now reads `parent_event_id === parent_span_id`.
+
+**Consumers must act**: anything reading `parent_id` off a freshly captured row
+will not find it. Read `parent_event_id`, or parse through `eventSchema` /
+`otelEventSchema`, which settle it for you.
+
+## 0.13.0 — 2026-07-29
+
+The recorder captures enough to express the S4 class (F-1125). Minor, not patch:
+the frozen v1 trace row grows two keys, and a consumer that wants to read them
+must re-pin (`PACKAGE_RELEASE.md` — 0.x minor plays the major role).
+
+### Added
+
+- `RecorderEvent.request_headers?: Record<string, string>` — the request headers
+  as received, keys lowercased. Recorded WHOLESALE rather than through an
+  allowlist: an allowlist is a narrowing no consumer can lift and no task author
+  can extend, which is why `The retry includes X-PAYMENT` was unanswerable at any
+  substrate width. Secrets are handled where every other field's are — the
+  engine's unconditional `redactEvent` scrubs `authorization` / `cookie` /
+  `x-api-key` by key.
+- `RecorderEvent.tool?: string | null` — the twin ACTION the call invoked. It
+  names the action, NOT the transport: an MCP `tools/call` and the REST route that
+  performs the same thing stamp the same value, so a tape check never has to
+  reverse-engineer a tool name out of an MCP request body. `null` means "no
+  declared action for this surface", never "no action happened".
+
+Both are OPTIONAL, and that is load-bearing rather than cosmetic.
+`twinHttpEventSchema` is the only gate into the cloud's tape and a row that fails
+it is dropped **silently**, so a required field would turn every recording an
+older CLI wrote into an empty tape — which, for a negative criterion, is a free
+pass.
+
+## 0.12.2 — 2026-07-24
+
+### Added
+
+- Gmail seed `faults` field (F-917): an optional array of named fault primitives
+  (`rate-limited`) mirroring twin-gmail. Optional, default `[]` — no change for
+  existing seeds or the pre-F-917 cloud.
+
+## 0.12.1
+
+### Added
+
+- `agentResponseSchema` (`POST /v1/agents`) gains optional `resolved_via` and
+  `hint` (F-861). `resolved_via` is an open string enum — known values today are
+  `slug` (live match), `alias` (an old slug renamed to the returned canonical),
+  and `created` (fresh auto-register); an unknown future resolver mode is
+  tolerated as an additive value, not rejected. `hint` is an optional
+  human-readable nudge. Both optional and tolerant — no change for the pre-F-820
+  cloud. Consumed by the CLI to surface a one-time slug-rename notice on the
+  alias branch.
+
+## 0.12.0
+
+### Added
+
+- Canonical `pome.json` / `pome.yaml` manifest data model (F-818, spec F-804):
+  `manifestSchema` + `manifestAgentSchema` (agent identity block + snake_case
+  CLI run-config keys, carrier-agnostic), with `Manifest` / `ManifestAgent` /
+  `ManifestInput` types. Only `agent.slug` is required; `artifacts_dir` /
+  `pass_threshold` default to `runs` / `100` on parse.
+- `SLUG_RE`, `SLUG_MAX_LENGTH`, `agentSlugSchema`, and `deriveAgentSlug` —
+  the agent-slug authority. `SLUG_RE` is byte-identical to the pome-cloud
+  control-plane's regex; `deriveAgentSlug` is a behavior-identical port
+  (equivalence-tested against the upstream body, with the edge-strip regex
+  rewritten to linear form to clear CodeQL's js/polynomial-redos) so local and
+  server validation can never drift.
+  **Consumer note (pome-cloud):** as of F-820 the control-plane and dashboard
+  must import these instead of their private copies
+  (`apps/control-plane/src/routes/agents.ts`, `packages/db/src/agent-slug.ts`).
+- `manifest-schema.json` — JSON Schema generated from the zod manifest schema
+  at build time (`emit:manifest-schema`, snapshot-tested, shipped in the
+  tarball). This is the document pome.sh/schemas/v1/pome.json serves (F-821);
+  `buildManifestJsonSchema()` is exported for that route.
+- Additive `/v1` agent-identity fields, all optional (tolerant reader both
+  directions): `createAgentRequestSchema` gains `slug` / `description` /
+  `version` / `framework`; `createSessionRequestSchema` gains `agent_version`
+  (per-run override); `agentResponseSchema` gains `framework` / `description` /
+  `version` / `created` (resolver auto-register flag).
+
+## 0.11.0
+
+### Added
+
+- First-party Gmail registration in `MOUNTED_TWINS` and `KNOWN_TWIN_IDS`.
+- Gmail mailbox seed schemas, including stable message/thread/draft/label IDs
+  and provider-scoped seed-envelope support.
+- Tolerant-reader coverage proving legacy sessions and community recorder IDs
+  remain valid. Gmail deliberately adds no `provider_credentials.gmail`.
+
+## 0.10.1
+
+### Added
+
+- `otel/project` now accepts the **OpenInference** attribute vocabulary
+  (`llm.model_name`, `llm.provider`, `llm.system`, `llm.token_count.prompt`,
+  `llm.token_count.completion`, `tool.name`) as fallback aliases and normalizes
+  them onto the canonical `gen_ai_*` projection fields. OpenInference is the
+  standard OTel instrumentation for LangChain.js / LangGraph (and LlamaIndex),
+  so an agent instrumented with `@arizeai/openinference-instrumentation-langchain`
+  now surfaces model, provider, token usage, and tool name on the
+  agent-telemetry rollup and span waterfall with no correlator or dashboard
+  changes. Pure key aliases (value pass-through); the `OtelSpanEvent` shape is
+  unchanged. New exported semconv constants: `OPENINFERENCE_LLM_MODEL_NAME`,
+  `OPENINFERENCE_LLM_PROVIDER`, `OPENINFERENCE_LLM_SYSTEM`,
+  `OPENINFERENCE_LLM_TOKEN_COUNT_PROMPT`,
+  `OPENINFERENCE_LLM_TOKEN_COUNT_COMPLETION`, `OPENINFERENCE_TOOL_NAME`.
+  **Consumer note (pome-cloud):** to let these survive the sim-telemetry
+  allowlist, add the new source keys to `SIM_SAFE_ATTRIBUTE_KEYS` after bumping
+  this pin.
+
+## 0.10.0
+
+### Changed
+
+- `criterionDefSchema.kind` (the `/v1` finalize wire boundary) is now a
+  tolerant reader (F-778): input accepts `"D" | "P" | "code" | "model"`;
+  parsed output is always the canonical `"code" | "model"` (normalized via
+  `LEGACY_CRITERION_KIND_MAP`). Previously the schema accepted ONLY the legacy
+  `"D" | "P"` spellings. **Consumer-must-act:** the `CriterionDef["kind"]`
+  *output* type changes from `"D" | "P"` to `"code" | "model"` — readers of
+  parsed finalize criteria (cloud finalize route, judge) must compare against
+  the canonical kinds after bumping this pin. Writers may send either spelling
+  during the compat window; released CLIs keep sending `"D"` / `"P"` until the
+  CLI release that rides this migration.
+- `LEGACY_CRITERION_KIND_MAP` is now documented as the single sanctioned
+  legacy-spelling exception of the F-778 zero-residue migration (read-only
+  input normalization; no writer may emit `D` / `P`).
+
+### Added
+
+- `CriterionDefInput` (type-only) — the writer-side shape of the finalize
+  wire during the compat window (`kind: "D" | "P" | "code" | "model"`).
+  Producers that still emit the legacy spellings type their payloads with
+  this; readers keep seeing the canonical `CriterionDef` after parse.
+
+## 0.9.0
+
+### Removed
+
+- Removed the unused `EvaluatorHooks` and `TraceUploadContext` exports (and the
+  `evaluator-hooks` leaf) from the retired local-evaluation architecture.
+
+## 0.8.0
+
+### Added
+
+- `LlmTurnEvent` — a new member of the `events.jsonl` discriminated union
+  (`eventSchema`) for per-assistant-turn LLM usage. Envelope: `ts`, `event_id`,
+  `parent_id` (null in M1); payload `turn_index` (0-based, per adapter query
+  stream), `model`, `input_tokens`, `output_tokens`, `cache_read_input_tokens`,
+  `cache_creation_input_tokens`, `finish_reasons`, `latency_ms` +
+  `latency_ms_estimated`, and `session_id` (null in M1). Absent SDK values are
+  nullable, not optional. The Claude-SDK adapter emits it into the signals
+  JSONL; the self-host merge admits it. No cost fields (computed cloud-side).
+  Not projected by the legacy shim in M1 (M2 maps it to a `chat` span).
+
+### Notes
+
+- This is a **minor** bump even though the change is additive: `eventSchema` is
+  a frozen canonical contract surface, so a new union member is a
+  consumer-must-act change (an older reader rejects a new `LlmTurnEvent` row).
+- `semconv.ts` now documents that `gen_ai.*` migrated at core v1.42.0 into the
+  zero-release `semantic-conventions-genai` repo — future GenAI pins must use a
+  commit SHA, not a version tag.
+
+## 0.7.0
+
+### Added
+
+- Multi-twin (M3) session wire contract — purely additive, zero-breaking:
+  - `criterionSchema.twin` (run.ts) and `criterionDefSchema.twin` (rest.ts) —
+    optional per-criterion twin attribution; absent = the session's primary
+    twin (`twins[0]`). Rides the D/P→code/model transform untouched.
+  - `finalizeRequestSchema` (finalize-shapes.ts) — the LIVE `POST
+    /v1/sessions/:id/finalize` request body the CLI sends (criterion defs plus
+    trace/state/signals storage keys).
+  - `perTwinStateKeysSchema` plus an optional `per_twin_state_keys` on the
+    finalize request — per-twin initial/final state storage keys.
+  - `createAgentRequestSchema` (with optional `twins`) and `agentResponseSchema`
+    (with optional `enabled_services`) for the `POST /v1/agents` surface.
+  - `stateUploadUrlResponseSchema` with an optional per-twin URL+key map.
+  - `seedEnvelopeSchema` and `isMultiTwinSeedEnvelope(twins)` — the seed is a
+    per-twin envelope `{ <twin>: <flat seed> }` iff a session has more than one
+    twin; single-twin sessions always use the flat seed shape. No shape-sniffing.
+
+### Changed
+
+- `createSessionRequestSchema.twins` doc: multi-twin arrays are now honored (max
+  3 twins per session, cap enforced cloud-side; one isolated sandbox per twin).
+
+## 0.6.1
+
+### Added
+
+- Accepted and status response schemas for asynchronous managed evaluation
+  finalization (`Prefer: respond-async`), including relative same-origin
+  `status_url` paths and `{ type, message, details? }` failure errors, plus
+  the legacy scored-response fallback.
+
+## 0.6.0
+
+First npm-published release (F-714).
+
+M6 — publish the trace-format contract as the single reusable package surface
+for OSS twins, the CLI, adapters, and pome-cloud consumers.
+
+### Added
+
+- Subpath exports for `recorder-events`, `run`, `otel`, and `redaction` so
+  downstream codegen and consumers can import stable contract leaves.
+- Shared redaction helpers (`redactSecrets`, `redactEvent`) used by CLI,
+  adapter, SDK, and first-party twins.
+- CLI response contract coverage for eval sessions, finalize responses, and
+  criterion definitions.
+
+### Changed
+
+- `@pome-sh/shared-types` is the source of truth for the CLI trace/event
+  schemas; the CLI no longer maintains a local copy.
+- Published consumers must use zod 4 (`^4.1.13`).
+
+## 0.5.0
+
+FDRS-653 — reconcile the forked OTel surface (twins is the single canonical
+home; pome-cloud consumes), adopt the W3 "scenario → task" wire vocabulary
+behind a tolerant reader, and settle the `src/otel/` ownership banners. Also
+formally releases the previously-`Unreleased` FDRS-480/481/482 (OTel surface)
+and FDRS-398 (unified event union) sections below.
+
+### Added
+
+- `src/task-vocab.ts` — `LEGACY_TASK_VOCAB_KEY_MAP`, `normalizeTaskVocabKeys`,
+  `LEGACY_CRITERION_KIND_MAP` (exported from the barrel). The tolerant-reader
+  machinery for the 0.3.0 compatibility window.
+- W3 vocab, canonical everywhere: `Run.task_name` / `Run.task_hash` /
+  `Run.promoted_task_id`, `submitResultRequest.task_name` / `.task_hash`,
+  `createSessionRequest.task_source` / `.task_id`,
+  `RecorderEvent.task_step_id` (additive alongside the deprecated
+  `scenario_step_id`), criterion kind `code` / `model`
+  (+ `criterionKindSchema`, `CRITERION_KINDS`).
+- Canonical `task*` exports: `taskSchema` / `Task`, `taskConfigSchema` /
+  `TaskConfig`, `persistedTaskSchema` / `PersistedTask`. The `scenario*`
+  exports remain as deprecated aliases for one release train (FDRS-654).
+- `githubSeedStateSchema` (ported from pome-cloud): full GitHub world —
+  top-level `users`, `default_branch`, `files`, `pull_requests` with
+  `reviews` / `statuses`. Fixes the narrowing-boundary bug class where
+  PR-based seeds were silently zod-stripped to an empty repo.
+- `FixtureDerivedFrom` gains `"live-capture"` (ported from pome-cloud;
+  reserved — no in-repo fixture uses it).
+- New-vocab fixture dirs `test/fixtures/v1/runTaskVocab/` +
+  `test/fixtures/v1/createSessionRequestTaskVocab/`, plus task-vocab
+  normalization tests (`test/task-vocab.test.ts`) and ported seed-boundary /
+  slack seed tests.
+
+### Changed
+
+- TOLERANT READER (0.3.0 window): `runSchema`, `submitResultRequestSchema`,
+  `createSessionRequestSchema`, `recorderEventSchema`, `eventSchema` accept
+  BOTH the 0.3.0-era `scenario_*` keys / `D`|`P` criterion kinds and the new
+  vocabulary, normalizing to the new keys at parse time (new key wins when
+  both are present). Nothing a 0.3.0-era artifact contains becomes invalid;
+  shipped CLIs vendoring shared-types 0.3.0 keep working unchanged.
+- `src/otel/` ownership banners: format schemas (span-event, event-schema,
+  semconv, nano, project, map-span, legacy-shim, fixtures) are canonical HERE;
+  ingest-side utilities (OTLP decode, redaction/allowlist processors, storage
+  helpers, capture tooling) are cloud-owned consumers. The stale
+  "pome-cloud mirrors this directory verbatim" claims are removed.
+- SCHEMA CLASS CHANGE (downstream SDK consumers): the tolerant-reader wrapping
+  changes the exported schema classes. `recorderEventSchema` is no longer a
+  bare `ZodObject` and `eventSchema` is no longer a bare
+  `ZodDiscriminatedUnion` (both are transform-wrapped); `runSchema`,
+  `submitResultRequestSchema`, and `createSessionRequestSchema` are
+  preprocess-wrapped. Object-schema methods (`.extend` / `.shape` / `.omit` /
+  `.pick` / `.options`) no longer exist on these five exports. `.parse` /
+  `.safeParse` / `z.infer` are unchanged, and no in-repo consumer used the
+  removed methods. `twinHttpEventSchema` and the other event-variant schemas
+  remain plain `ZodObject`s (discriminated-union members).
+
+### Notes
+
+- pome-cloud's hand-mirrored `packages/shared-types` (0.3.0 + cloud-local otel
+  surface) is superseded by this package; the cloud consumer swap is FDRS-654.
+- The CLI's vendored shared-types tarball intentionally stays at 0.3.0 in this
+  release (separately version-gated; rides the FDRS-654/657 train).
+
+## 0.4.0
+
+FDRS-613 — reconcile the twins /v1 wire surface with the pome-cloud production
+truth, add a shared /v1 fixture corpus + parity test, and ship runnable `dist`
+JS/`.d.ts` so npm consumers (SDK / adapter) can vendor a published tarball
+(T10 / FDRS-585 / FDRS-612).
+
+### Added
+
+- `planTierSchema`: `hobby`, `team` tiers.
+- `sessionSchema.twins` (M3 authoritative twin list) + `MOUNTED_TWINS` const.
+- `createSessionRequestSchema`: permissive `seed` (`z.record`, ADR-015) +
+  `idempotency_key`.
+- `createSessionResponseSchema`: `session_token` + `per_twin{}` (required).
+- `submitResultRequestSchema.events_jsonl_url`.
+- `run.ts`: `correlatorKindSchema` + `correlator_kind`, `environment`,
+  `promoted_scenario_id`, `replay_run_id`, `state_archive_s3_key`, agent
+  telemetry rollup (`agent_tokens_in/out`, `agent_latency_p50/p95/max_ms`,
+  `agent_error_count`, `agent_telemetry_span_count`), `summary`.
+- `test/fixtures/v1/` shared JSON corpus + `test/v1-fixture-parity.test.ts`.
+- Build now emits `dist/` (JS + `.d.ts`); package `main`/`types`/`exports` point
+  at `dist`, `files` ships `dist`, `prepublishOnly` builds.
+
+### Changed
+
+- `usageResponseSchema.sessions_remaining`: `.int()` → `.int().min(0)` (matches
+  cloud's clamped live snapshot).
+- `run.ts` `events_jsonl_url`: relaxed from `.url()` to `z.string()` (persisted
+  values are storage keys, not URLs).
+
+## Unreleased
+
+FDRS-480/481/482 — OpenTelemetry-native trace format (M1). Canonical home of the
+OTel surface; `pome-cloud` consumes the published package surface instead of
+mirroring `src/otel/` source files.
+
+### Added
+
+- New `src/otel/` surface, re-exported from the barrel:
+  - `OtelSpanEvent` schema + `mapOtelSpanToEvent` — pure/deterministic mapping of
+    a normalized OTel GenAI/HTTP span onto flat `gen_ai_*` / `http_*` / `url_*` /
+    `server_*` / `error_type` projections. Real W3C trace context (32-/16-char
+    lowercase-hex, non-zero) or explicit `legacy:<id>`; uint64 nanos (no BigInt);
+    `end>=start`; `event_id==span_id`; projection-drift `superRefine` (typed
+    fields must equal `projectAttributes(attributes)`).
+  - `shimLegacyEventToSpan` — lossless (`pome.legacy.record_json` keeps the RAW
+    record), deterministic legacy `TwinHttpEvent`/`LlmCallEvent`/`ToolUseEvent` →
+    span shim. OTel status rules (1xx–3xx UNSET; 4xx/5xx + transport errors ERROR).
+  - `otelEventSchema` — the OTel-extended event union (legacy `eventSchema` ∪
+    `OtelSpanEvent`), additive; the frozen v1 `eventSchema` is unchanged.
+  - Pinned semconv: `OTEL_CORE_SEMCONV_VERSION` (1.41.1), `OTEL_GENAI_SCHEMA_VERSION`
+    (1.42.0), canonical `gen_ai.provider.name` (with `gen_ai.system` deprecated alias).
+  - uint64/nanos helpers + the single attribute projector, and a golden-fixture
+    corpus under `src/otel/fixtures/` (test/dev artifact; not in the public barrel).
+
+### Notes
+
+- Additive only — `eventSchema` / `recorderEventSchema` and every existing export
+  are untouched. Patterns are zod 3+4 compatible (cloud is on zod 3).
+- No version bump: accumulates under `## Unreleased` per this changelog's
+  convention. Downstream consumers pick this up through the next
+  `@pome-sh/shared-types` publish.
+
+---
+
+FDRS-398 — unified `events.jsonl` discriminated-union schema for Agent Trace v1 (M0).
+
+### Added
+
+- `GITHUB_ACCESS_CONTROL_CATALOG` — canonical 52-endpoint GitHub twin sandbox catalog (25 v1 + 27 FDRS-300 v2 hot paths) for hosted access-control toggles, grouped by functional cluster (Issues, Branches & files, Status & checks, …). Export helpers: `formatGitHubAccessControlLabel`, `groupGitHubAccessControlByCategory`, `summarizeGitHubAccessControlCatalog`, `githubAccessControlToolNames`.
+- `eventSchema` — discriminated union over `kind` across `TwinHttpEvent | LlmCallEvent | ToolUseEvent | ToolResultEvent | SubagentSpawnEvent | HookEvent`. Every variant carries `event_id: string`, `parent_id: string | null`, `kind` literal, and `ts` (ISO-8601).
+- `twinHttpEventSchema` — the existing `recorderEventSchema` shape extended with the union discriminator + parent-chain fields. Renaming of `RecorderEvent`; the legacy export is kept until downstream tickets (FDRS-402 / 403 / 412 / 415 / 417) migrate their callers.
+- `llmCallEventSchema` — baseline fields (`host`, `port`, `latency_ms`, `bytes_in`, `bytes_out`) always populated by the M0 HTTP_PROXY CONNECT-tunnel capture; TLS-terminate-only fields (`url`, `method`, `status`, `model`, `prompt_tokens`, `completion_tokens`, `cost_usd`) are `nullable()` and stay null in baseline + CAS mode (CAS surfaces per-turn cost/model on the run summary from `SDKResultMessage`, not on individual `LlmCallEvent` rows).
+- `toolUseEventSchema` / `toolResultEventSchema` — CAS-adapter-emitted (FDRS-408) tool-call envelope; payloads typed `unknown` (already redactor-scrubbed by the writer).
+- `subagentSpawnEventSchema` — CAS-adapter-emitted (FDRS-409) once per sub-agent.
+- `hookEventSchema` — thin audit-trail row for the 25 SDK hooks (FDRS-407); `tool_name` nullable for non-tool-scoped hooks.
+- `isLegacyEventRow(row): boolean` — returns `true` iff `row` is a plain object missing a string `kind` discriminator (i.e. pre-FDRS-398 single-shape row on disk). Non-objects and arrays return `false`.
+
+### Notes
+
+- The legacy `recorderEventSchema` / `RecorderEvent` export is untouched — its 58 callers compile against the same shape they did before. Their migration to `twinHttpEventSchema` is owned by downstream tickets.
+- OtelSpanEvent dropped from the v1 union (FDRS-400 cancelled by the 2026-05-26 `/plan-eng-review`). Adding it in v2 is a non-breaking extension via the `kind` discriminator.
+- No version bump — `@pome-sh/shared-types` is held off npm until OSS Stage 1; consumers pick this up via workspace dep.
+
+## 0.3.0 — 2026-05-11
+
+FDRS-318 — file split + correlator/state-inspector field surface for M1+M2.
+
+### Added
+
+- New leaf `src/recorder-events.ts` and `src/run.ts`. `src/index.ts` keeps barrel re-exports for back-compat — consumers continue to `import { ... } from "@pome-sh/shared-types"` unchanged.
+- `RecorderEvent.state_delta: { before, after } | null` — row-level before/after for state-inspector. `before: null` = insert; `after: null` = delete; parent `null` = no mutation.
+- `RecorderEvent.step_id: string | null` — correlator-assigned post-hoc group id. Coexists with the existing `scenario_step_id` (scenario-author-set static expectation).
+- `RecorderEvent.tool_call_id: string | null` — adapter-emitted (`@pome-sh/adapter-claude-sdk`). Null in heuristic-correlator path.
+- `Run.lanes: Lane[]` + `Run.steps: Step[]` — correlator output, flat parallel arrays. Default `[]` for legacy runs.
+- `Run.fix_prompt: string | null` — CLI-generated handoff prompt (BYOK Flavor #1, runs CLI-side). Default `null` for legacy / `--no-fix-prompt`.
+- `Run.events_jsonl_url: string | null` — S3 URL for raw events.jsonl (V1.5 re-correlate). Default `null` for self-host / `--no-upload` / legacy.
+- `submitResultRequestSchema.lanes` / `.steps` / `.fix_prompt` — matching CLI submit fields with backward-compat defaults for pre-M3i CLIs during rollout.
+- `Step`, `Lane`, `TwinId`, `KnownTwinId`, `StateDelta` types + corresponding Zod schemas (`stepSchema`, `laneSchema`, `twinIdSchema`, `stateDeltaSchema`).
+- `KNOWN_TWIN_IDS = ["github", "stripe"] as const` — canonical pattern-match set for dashboard rendering.
+- Vitest config + `test/recorder-events.test.ts`, `test/run.test.ts`, `test/barrel.test.ts` — first-ever package-level test suite.
+
+### Changed
+
+- `criterionSchema` + `judgeModelSchema` now live in `src/run.ts` (re-exported via barrel from `src/index.ts`). External imports are unaffected.
+- `RecorderEvent.twin` was already `z.string().min(1)` and remains so — `KNOWN_TWIN_IDS` is exported alongside for dashboard rendering. Closed-enum was considered and rejected mid-implementation (see FDRS-318 [DECISION] amendment) for SDK community-twin compatibility.
+
+### Breaking (for emitters of RecorderEvent)
+
+- `state_delta`, `step_id`, `tool_call_id` are required (nullable) fields. Existing emitters that construct `RecorderEvent` without these fail Zod parse. SDK middleware + twin-github already updated in this PR; future twin authors must pass these (use `null` if not applicable).
+
+### Notes
+
+- Pre-Stage-1, the cloud carried a temporary mirror copy. M8 retires source
+  mirroring; downstream consumers should use the published `@pome-sh/shared-types`
+  package contract.
+- FDRS-318's description says `Run.events_jsonl_url: string`, FDRS-327 says nullable. Aligned with FDRS-327 (nullable) — see [DECISION] comment on FDRS-318.

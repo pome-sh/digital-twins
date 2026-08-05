@@ -30,7 +30,7 @@ export interface CaptureServerOptions {
   allowHosts?: readonly string[];
   // Where refused CONNECTs are recorded (JSONL, one EgressRefusedRow per
   // refusal). A sidecar next to events.jsonl — deliberately NOT events.jsonl,
-  // whose row shape is locked by shared-types / the correlator. Optional: the
+  // whose row shape is locked by @pome-sh/wire / the correlator. Optional: the
   // floor enforces regardless; without it refusals just aren't persisted.
   egressOut?: string;
 }
@@ -45,7 +45,7 @@ export interface CaptureServerHandle {
   close: () => Promise<void>;
 }
 
-// Mirror of `llmCallEventSchema` in `packages/shared-types/src/recorder-events.ts`
+// Mirror of `llmCallEventSchema` in `packages/wire/src/recorder-events.ts`
 // (locked by FDRS-398). The cli vendors shared-types at 0.3.0 which predates
 // the unified discriminated-union schema, so the shape lives here as a
 // structural mirror. Bumping the vendored tarball is a separate ticket — the

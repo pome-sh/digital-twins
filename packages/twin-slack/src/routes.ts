@@ -9,7 +9,7 @@
 
 import type { Context, Hono } from "hono";
 import type { RouteContext } from "@pome-sh/sdk";
-import type { StateDelta } from "@pome-sh/shared-types";
+import type { StateDelta } from "@pome-sh/wire";
 import type { SlackDomain, Actor } from "./domain/index.js";
 import { TwinError } from "./errors.js";
 import { slackOk } from "./serializers.js";

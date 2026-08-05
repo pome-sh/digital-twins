@@ -8,7 +8,7 @@
 // would test the predicate against a world the pipeline never produces.
 
 import { describe, expect, it } from "vitest";
-import { redactSecrets } from "@pome-sh/shared-types/redaction";
+import { redactSecrets } from "@pome-sh/wire/redaction";
 import { noSecretNewlyExposed } from "../src/check-secrets.js";
 import type { SlackCheckState } from "../src/check-state.js";
 import { privateChannel, publicChannel, slackState } from "../src/check-worlds.js";

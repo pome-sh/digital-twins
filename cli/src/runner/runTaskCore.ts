@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { Task } from "../task/taskSchema.js";
 import { writeRunArtifactsCore } from "../recorder/artifacts.js";
-import type { RecorderEvent } from "@pome-sh/shared-types";
+import type { RecorderEvent } from "@pome-sh/wire";
 
 export interface WriteRunInput {
   artifactsDir: string;

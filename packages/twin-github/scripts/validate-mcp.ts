@@ -25,7 +25,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { createGitHubCloneApp } from "../src/twin.js";
 import { createRecorderStore } from "@pome-sh/sdk/server";
 import { toolDefinitions } from "../src/tools.js";
-import type { RecorderEvent } from "@pome-sh/shared-types";
+import type { RecorderEvent } from "@pome-sh/wire";
 import type { GitHubStateSeed } from "../src/types.js";
 
 const OUTPUT_PATH = join(dirname(fileURLToPath(import.meta.url)), "validate-mcp.output.txt");

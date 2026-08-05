@@ -9,7 +9,7 @@
 // package and keeps the same 11 frozen assertions running against the
 // sdk-booted twin, labeled distinctly from contract.test.mjs's run.
 //
-// Prerequisite: sdk + shared-types runtime + twin-slack builds (chained by
+// Prerequisite: sdk + wire + twin-slack builds (chained by
 // contract/run.mjs via the root `test:contract` script).
 
 import { describe } from "node:test";

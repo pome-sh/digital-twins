@@ -31,4 +31,4 @@ around it is Claude-specific. Split the correlation core into a
 framework-neutral module so Vercel AI SDK and LangGraph agents get the same
 guarantee instead of re-deriving it.
 
-Depends on: the `@pome-sh/wire` package (shared-types dissolution lane).
+Depends on: the `@pome-sh/wire` package (landed in F-942).

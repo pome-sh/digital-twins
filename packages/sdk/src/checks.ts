@@ -146,7 +146,7 @@ export interface CheckOutcome {
 
 // One recorded twin HTTP call, as a `substrate: "tape"` check sees it.
 //
-// This is the frozen v1.0 `TwinHttpEvent` (`@pome-sh/shared-types`
+// This is the frozen v1.0 `TwinHttpEvent` (`@pome-sh/wire`
 // recorder-events) minus required-ness: every field is optional/nullable so a
 // malformed row can never crash a predicate.
 //

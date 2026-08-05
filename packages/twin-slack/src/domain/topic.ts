@@ -4,7 +4,7 @@
 // update the channel row and return a serialized channel. Membership is
 // required for every channel type (real Slack); IM/MPIM are rejected.
 
-import type { StateDelta } from "@pome-sh/shared-types";
+import type { StateDelta } from "@pome-sh/wire";
 import { slackError } from "../errors.js";
 import { serializeChannel } from "../serializers.js";
 import type { ChannelMemberRow, ChannelRow, SlackTwinDatabase } from "../types.js";

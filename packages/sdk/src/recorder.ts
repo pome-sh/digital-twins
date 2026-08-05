@@ -54,7 +54,7 @@ import {
 } from "node:fs";
 import { dirname } from "node:path";
 import type { Context } from "hono";
-import type { RecorderEvent, TwinId } from "@pome-sh/shared-types";
+import type { RecorderEvent, TwinId } from "@pome-sh/wire";
 import type { RecorderHandle, RecorderHandlerResult } from "./index.js";
 import { envelopeFor } from "./errors.js";
 import { recordedRequestHeaders, resolveRecordedTool } from "./request-capture.js";

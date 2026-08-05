@@ -5,7 +5,7 @@
 // The proxy refuses CONNECT tunnels to hosts outside the allowlist with a
 // 403 BEFORE dialing upstream, and records each refusal in the egress
 // sidecar (egress.jsonl — deliberately NOT events.jsonl, whose row shape is
-// locked by shared-types / the correlator). Loopback targets are always
+// locked by @pome-sh/wire / the correlator). Loopback targets are always
 // allowed so twin traffic can never be broken by a bad allowlist.
 //
 // The "allowed but unresolvable" case asserts the ordering: an allowlisted

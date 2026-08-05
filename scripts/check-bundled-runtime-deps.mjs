@@ -30,7 +30,7 @@ const readJson = (path) => JSON.parse(readFileSync(path, "utf8"));
 // adapter-claude-sdk is NOT in the CLI's graph (it is published separately).
 const BUNDLED_PACKAGES = [
   "packages/sdk",
-  "packages/shared-types",
+  "packages/wire",
   "packages/twin-github",
   "packages/twin-slack",
   "packages/twin-stripe",

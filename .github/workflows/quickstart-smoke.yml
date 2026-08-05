@@ -9,7 +9,7 @@ on:
     paths:
       - 'README.md'
       - 'examples/triage-agent/**'
-      - 'packages/shared-types/**'
+      - 'packages/wire/**'
       - 'packages/sdk/**'
       # Smoke boots github + gmail via the CLI; keep both twins in the filter.
       - 'packages/twin-github/**'
@@ -25,7 +25,7 @@ on:
     paths:
       - 'README.md'
       - 'examples/triage-agent/**'
-      - 'packages/shared-types/**'
+      - 'packages/wire/**'
       - 'packages/sdk/**'
       - 'packages/twin-github/**'
       - 'packages/twin-gmail/**'
@@ -85,6 +85,12 @@ jobs:
       # install; without a built dist the packed package has nothing to import
       # (`Cannot find module '@pome-sh/adapter-claude-sdk'`). Build must precede
       # the example's `npm ci` so the pack includes dist/.
+      #
+      # @pome-sh/wire must build first: the adapter bundles it via tsup's
+      # `noExternal`, which resolves wire's `exports` map at build time — wire
+      # is dist-only (like the adapter), so without this the adapter's own
+      # build fails with "Could not resolve @pome-sh/wire/redaction".
+      - run: npm run build -w @pome-sh/wire
       - run: npm run build -w @pome-sh/adapter-claude-sdk
       - name: Auth-token unit test
         working-directory: examples/triage-agent

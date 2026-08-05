@@ -13,12 +13,12 @@ export type StripeErrorType =
   | "idempotency_error"
   | "rate_limit_error";
 
-// Mirrors the canonical RecorderEvent.fidelity from @pome-sh/shared-types
+// Mirrors the canonical RecorderEvent.fidelity from @pome-sh/wire
 // (FDRS-318). The recorder logs whichever value the envelope carries, so a
 // looser union here would let invalid events slip onto the wire.
 export type StripeErrorFidelity = "semantic" | "unsupported";
 
-import type { StateDelta } from "@pome-sh/shared-types";
+import type { StateDelta } from "@pome-sh/wire";
 
 export type StripeErrorOpts = {
   param?: string;

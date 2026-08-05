@@ -22,7 +22,7 @@
 //
 // The adapter checks:
 //   - packed manifest declares no `@pome-sh/*` dependency (its wire types are
-//     bundled; `@pome-sh/shared-types` is private)
+//     bundled; `@pome-sh/wire` is private)
 //   - runtime import of `flushPomeTelemetry` with the peer installed
 //   - a real consumer file TYPECHECKS against the shipped `dist/index.d.ts`.
 //     Runtime-import-only would pass even if dts bundling dropped or

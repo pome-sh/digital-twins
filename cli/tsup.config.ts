@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The CLI ships as ONE self-contained bundle. Every `@pome-sh/*` workspace
-// package (sdk, shared-types, the five twins) is inlined via `noExternal`, so
+// package (sdk, wire, the five twins) is inlined via `noExternal`, so
 // the published tarball has zero internal runtime dependencies and none of the
 // packages need to exist on npm. That replaces `bundleDependencies`, which
 // silently stopped working once `cli/` joined the root npm workspace (npm packs

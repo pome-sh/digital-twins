@@ -45,7 +45,7 @@ export interface BlockedEgress {
 
 // Sidecar row written by the capture-server for every refused CONNECT. Lives
 // in egress.jsonl, deliberately NOT events.jsonl — the events row shape is
-// locked by shared-types and consumed by the correlator, and the refusal is
+// locked by @pome-sh/wire and consumed by the correlator, and the refusal is
 // runner-facing diagnostics, not trace data.
 export interface EgressRefusedRow {
   ts: string;

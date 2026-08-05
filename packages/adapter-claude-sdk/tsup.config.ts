@@ -2,7 +2,7 @@
 //
 // The adapter is the second (and only other) published package. It bundles its
 // internal `@pome-sh/*` dependency — the wire types + redaction helpers — via
-// `noExternal`, because `@pome-sh/shared-types` is `private: true` and would be
+// `noExternal`, because `@pome-sh/wire` is `private: true` and would be
 // unresolvable from the registry.
 //
 // Everything else stays external and stays a real dependency: the OpenTelemetry

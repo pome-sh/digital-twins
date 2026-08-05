@@ -22,9 +22,9 @@ export class TwinBootError extends Error {
 export const POME_CORE_ROUTE_NAMES = new Set(["health", "state", "events"]);
 
 export function makeDeltaSink() {
-  let delta: import("@pome-sh/shared-types").RecorderEvent["state_delta"] = null;
+  let delta: import("@pome-sh/wire").RecorderEvent["state_delta"] = null;
   return {
-    report(d: import("@pome-sh/shared-types").RecorderEvent["state_delta"]) {
+    report(d: import("@pome-sh/wire").RecorderEvent["state_delta"]) {
       delta = d;
     },
     value() {

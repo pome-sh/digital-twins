@@ -10,7 +10,7 @@
 import type { Context, Hono } from "hono";
 import { z } from "zod";
 import type { RouteContext } from "@pome-sh/sdk";
-import type { StateDelta } from "@pome-sh/shared-types";
+import type { StateDelta } from "@pome-sh/wire";
 import type { GitHubDomain } from "./domain/index.js";
 import { TwinError, validationFailed } from "./errors.js";
 import { TAPE_ASSERTABLE_TOOLS } from "./tools.js";

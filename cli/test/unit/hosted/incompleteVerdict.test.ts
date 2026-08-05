@@ -19,7 +19,7 @@
 // server-side. Renaming the state must not loosen it.
 
 import { describe, expect, it } from "vitest";
-import type { CriterionResult } from "@pome-sh/shared-types";
+import type { CriterionResult } from "../../../src/contract/index.js";
 import {
   runScoreLine,
   scoreStatus,

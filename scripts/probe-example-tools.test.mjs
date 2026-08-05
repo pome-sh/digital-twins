@@ -23,7 +23,7 @@ import {
   PROBE_SECRET,
   resolveConfig,
   splitSeed,
-  withSharedTypesRuntime,
+  withWireRuntime,
 } from "./probe-example-tools.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -310,12 +310,11 @@ assert(
 // No model, no Docker, no network beyond loopback: `serve()` binds a port and
 // the fixture example's tools talk to it.
 //
-// `withSharedTypesRuntime` is not optional here. `@pome-sh/shared-types` exports
-// `./src/index.ts` with no dist build, so under plain `node` the twin packages'
-// import chain lands on TypeScript that node's type-stripping cannot follow
-// (`./recorder-events.js` does not exist). contract/run.mjs hits the same wall
-// and solves it the same way.
-await withSharedTypesRuntime(async () => {
+// `withWireRuntime` is not optional here. Every twin's runtime import chain
+// reaches `@pome-sh/wire`, so `import("@pome-sh/twin-github")` under plain `node`
+// needs wire's `dist/` on disk first. contract/run.mjs builds it for the same
+// reason.
+await withWireRuntime(async () => {
   const { serve, createRecorderStore } = await import("@pome-sh/sdk/server");
   const { githubTwinDefinition, openGitHubCloneDatabase } = await import("@pome-sh/twin-github");
   const { sign } = await import("hono/jwt");
@@ -377,7 +376,7 @@ await withSharedTypesRuntime(async () => {
 });
 
 // ── the whole gate, end to end, over the fixture examples ───────────────────
-await withSharedTypesRuntime(async () => {
+await withWireRuntime(async () => {
   const { probeExample } = await import("./probe-example-tools.mjs");
   const opts = { repoRoot: ROOT, examplesDir: join(ROOT, "scripts/fixtures/probe-examples") };
   const base = {

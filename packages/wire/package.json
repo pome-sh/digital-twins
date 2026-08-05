@@ -1,0 +1,67 @@
+{
+  "name": "@pome-sh/wire",
+  "version": "0.1.0",
+  "description": "Pome's wire format — Zod schemas for recorder events, the OpenTelemetry extension surface, and secret redaction. Shared by every twin, the sdk, the adapter and the CLI.",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./recorder-events": {
+      "types": "./dist/recorder-events.d.ts",
+      "default": "./dist/recorder-events.js"
+    },
+    "./otel": {
+      "types": "./dist/otel/index.d.ts",
+      "default": "./dist/otel/index.js"
+    },
+    "./otel/fixtures": {
+      "types": "./dist/otel/fixtures/index.d.ts",
+      "default": "./dist/otel/fixtures/index.js"
+    },
+    "./redaction": {
+      "types": "./dist/redaction.d.ts",
+      "default": "./dist/redaction.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "package.json",
+    "trace-contract.json"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pome-sh/digital-twins.git",
+    "directory": "packages/wire"
+  },
+  "homepage": "https://github.com/pome-sh/digital-twins/tree/main/packages/wire",
+  "bugs": {
+    "url": "https://github.com/pome-sh/digital-twins/issues"
+  },
+  "license": "Apache-2.0",
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prepublishOnly": "npm run build",
+    "emit:trace-contract": "node scripts/emit-trace-contract.mjs",
+    "check:trace-contract": "node scripts/emit-trace-contract.mjs --check"
+  },
+  "peerDependencies": {
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10",
+    "zod": "^4.1.13"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

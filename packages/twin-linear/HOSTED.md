@@ -23,7 +23,7 @@ imports belong in this package.
 Complete before advertising hosted Linear:
 
 1. **Registry** — Add `linear` to the mounted/provisionable twin registry and
-   consume `@pome-sh/shared-types` with `linearSeedStateSchema`.
+   consume a CLI whose `cli/src/contract` has `linearSeedStateSchema`.
 2. **JWT claims** — Mint the session JWT with
    `linear_email: "admin@pome-twin.test"` by default, or the normalized
    primary admin email from the accepted Linear seed.

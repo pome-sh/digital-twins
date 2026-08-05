@@ -84,7 +84,7 @@ check("7. the canonical spellings are not false positives", {
 
 check("8. an allowlisted reader may name the legacy key", {
   files: {
-    "packages/shared-types/src/recorder-events.ts": `export const s = { parent_id: 1 };\n`,
+    "packages/wire/src/recorder-events.ts": `export const s = { parent_id: 1 };\n`,
   },
   expect: "green",
 });

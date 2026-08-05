@@ -2,7 +2,7 @@
 import { z } from "zod";
 import type { SlackStateSeed } from "./types.js";
 
-// Slack seed schema. Matches `slackSeedStateSchema` in `@pome-sh/shared-types`
+// Slack seed schema. Matches `slackSeedStateSchema` in `cli/src/contract`
 // shape-for-shape. Minimum bootstrap is `{}` — every nested field has defaults
 // and every top-level list defaults to `[]`.
 export const seedSchema = z.object({
