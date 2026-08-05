@@ -34,7 +34,9 @@ describe("pome install (F-893 redirect)", () => {
     expect(out).toContain("retired");
     // Both Gen-2 install steps are named.
     expect(out).toContain("claude mcp add --transport http pome https://mcp.pome.sh/mcp");
-    expect(out).toContain("npx skills add pome-sh/digital-twins");
+    // F-1226: the bare form drops the reader on a picker with nothing ticked and
+    // the coach only works as a set, so the install-all flag is part of the copy.
+    expect(out).toContain("npx skills add pome-sh/digital-twins --skill '*'");
     // Points at the intake / REST-launch preflight as the next step.
     expect(out).toContain("pome-intake");
     // A retired command lands the user on the right path — never a non-zero exit.
