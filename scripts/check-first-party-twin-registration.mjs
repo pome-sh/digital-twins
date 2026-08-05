@@ -4,6 +4,16 @@
 // explicit at operational seams (contracts, bundles, images), but those
 // explicit arrays are easy to update incompletely. This check compares every
 // registration with config/first-party-twins.json and fails loudly.
+//
+// The CLI's own registration is no longer a hand-maintained array: `TwinName` is
+// derived from `TWIN_NAME_LIST` and `TWIN_REGISTRY` is a
+// `Record<TwinName, TwinEntry>`, so a missing CLI entry is a compile error and
+// the per-entry values are asserted by cli/test/unit/twin/registry.test.ts.
+// `TWIN_NAME_LIST` itself is still compared here — that list is what the type
+// is derived FROM, so nothing inside the CLI can catch it drifting from the
+// canonical set. The seams below live outside the type system entirely (twin
+// images, the black-box contract suite, shared-types wire enums, workflow path
+// filters) and are the reason this script survives.
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -39,8 +49,8 @@ compare(
   quotedArray("packages/shared-types/src/recorder-events.ts", "KNOWN_TWIN_IDS"),
 );
 compare(
-  "cli/src/twin/twinStart.ts SUPPORTED_STANDALONE_TWINS",
-  quotedArray("cli/src/twin/twinStart.ts", "SUPPORTED_STANDALONE_TWINS"),
+  "cli/src/twin/registry.ts TWIN_NAME_LIST",
+  quotedArray("cli/src/twin/registry.ts", "TWIN_NAME_LIST"),
 );
 
 const contractNames = [

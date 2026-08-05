@@ -19,6 +19,7 @@
       "types": "./dist/src/checks.d.ts",
       "default": "./dist/src/checks.js"
     },
+    "./package.json": "./package.json",
     "./x402": {
       "types": "./dist/src/x402.d.ts",
       "default": "./dist/src/x402.js"
