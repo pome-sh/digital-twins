@@ -111,7 +111,7 @@ describe("pome init --sdk", () => {
     };
     expect(cfg.agent.framework).toBeUndefined();
     expect(cfg.command).toBe(
-      "npx tsx examples/agents/scripted-triage-agent.ts",
+      "node examples/agents/scripted-triage-agent.ts",
     );
   });
 

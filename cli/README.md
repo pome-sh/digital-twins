@@ -42,7 +42,7 @@ local/OSS package release.
 pome login                       # one-time; opens the dashboard to sign in
 pome init                        # scaffolds tasks/, examples/agents/, runs/, pome.config.json
 pome register agent my-agent     # scopes runs to this project
-pome run tasks/01-bug-happy-path.md --agent "npx tsx examples/agents/scripted-triage-agent.ts"
+pome run tasks/01-bug-happy-path.md --agent "node examples/agents/scripted-triage-agent.ts"
 pome inspect latest              # trace/audit view of the last run
 ```
 
