@@ -13,7 +13,11 @@
 // repair — the sentence should be re-rendered from the check instead.
 
 import { oneOf, type CheckParamType } from "@pome-sh/sdk/checks";
-import { TAPE_ASSERTABLE_TOOLS } from "./tools.js";
+// From the standalone data module, NOT from `./tools.js` (F-1306): this file is
+// in the eager import graph of `@pome-sh/twin-github/checks`, which the CLI
+// loads on every invocation, and `tools.ts` carries ~40 zod tool schemas plus
+// `executeTool`'s domain dispatch. `tools.ts` re-exports the same constant.
+import { TAPE_ASSERTABLE_TOOLS } from "./tape-assertable-tools.js";
 
 // Issue and pull-request numbers. `[1-9][0-9]*` rather than `\d+`: GitHub
 // numbers entities from 1, so `#0` names nothing and `#01` is a different
