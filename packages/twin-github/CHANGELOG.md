@@ -1,6 +1,23 @@
 # @pome-sh/twin-github — CHANGELOG
 
 
+## 0.9.1 — 2026-08-06
+
+Two additive changes, no behavior change (F-1306).
+
+- New `./seed` subpath export: `seedSchema`, `parseSeed` and `defaultSeedState`
+  from a module whose only import is `zod`. The CLI needs a seed schema on its
+  startup path and was reading it from the package ROOT, which also exports
+  `GitHubDomain`, `openGitHubCloneDatabase` and `createGitHubCloneApp` — so a
+  schema lookup pulled 200 KB of twin into `pome --version`. The root keeps
+  exporting all three names.
+- `TAPE_ASSERTABLE_TOOLS` moved from `tools.ts` to `tape-assertable-tools.ts`
+  (`tools.ts` re-exports it, so `routes.ts`, the root and
+  `test/tool-stamping.test.ts` are unchanged). `check-params.ts` reads it, and
+  `./checks` is loaded on every CLI invocation because `pome checks` needs the
+  vocabulary synchronously — which meant 649 lines of tool schemas and
+  `executeTool`'s domain dispatch loaded with it.
+
 ## 0.9.0 — 2026-08-04
 
 `No new issues were created in \`<repo>\`` is declarable, and the curriculum's
