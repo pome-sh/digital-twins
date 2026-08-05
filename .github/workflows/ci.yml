@@ -54,6 +54,13 @@ jobs:
       # the PR's actual base (a push to main has already merged).
       - if: github.event_name == 'pull_request'
         run: node scripts/ci/check-version-bump-required.mjs "${{ github.event.pull_request.base.sha }}"
+      # F-1226 — the plugin manifest is what makes the `skills` installer render
+      # one select-all row instead of six unticked checkboxes. It has to live in
+      # the always-on block: adding a skill touches only `skills/`, which the
+      # scope step above classifies as docs-only, so a heavy-block gate would be
+      # skipped by exactly the PR that drifts it.
+      - run: node scripts/check-plugin-manifest-lists-every-skill.mjs
+      - run: node scripts/check-plugin-manifest-lists-every-skill.test.mjs
       # F-778 — the legacy D/P criterion markers are retired; fail on any
       # reintroduction outside the parser's own legacy-detection code.
       - run: node scripts/lint-legacy-criterion-markers.mjs
