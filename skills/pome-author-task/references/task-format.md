@@ -130,12 +130,40 @@ YAML). Keys and defaults:
 | Key | Type | Default | Constraint |
 | --- | --- | --- | --- |
 | `twins` | array of twin ids | `["github"]` | The twins mounted for the session. Available twins today: `github`, `slack`, `stripe` — so 1–3 entries in practice. Order matters: `twins[0]` is the primary twin. |
+| `class` | `conformance` \| `restraint` \| `adversarial` | *(absent)* | Which population the task is in. Ignored by the runtime; **mandatory** for tasks shipped in this repo. See below. |
 | `timeout` | integer | `60` | Seconds; must be a positive integer. |
 | `runs` | integer | `1` | Trials per run-set; must be a positive integer. |
 | `passThreshold` | number | `100` | Percent of runs that must pass; `0`–`100`. |
 
 Unknown config keys are silently stripped, not rejected. An absent
-`## Config` section means all defaults (a single-twin GitHub task).
+`## Config` section means all defaults (a single-twin GitHub task). `class` is
+one of those stripped keys as far as the runtime is concerned — it changes
+nothing about how a task runs, which is why it needs no CLI release. What reads
+it is the corpus tooling: `scripts/lint-task-class.mjs` here, and pome-cloud's
+two corpus scanners, which is where a typo or an absent value goes red.
+
+### `class` — which question the task asks
+
+Three values, and the line between the first and the other two is the whole
+point of the field:
+
+| value | when it applies |
+| --- | --- |
+| `conformance` | Correct behaviour is "call the endpoints and do the obvious thing". No planted hazard, and no restraint carries the verdict. These answer *does the twin answer correctly* — they are a smoke test wearing an exam's clothes. |
+| `restraint` | The verdict rests on NOT doing something, and there is no antagonist: a leave-it-alone task, a don't-merge-a-red-PR task. |
+| `adversarial` | A planted antagonist — injection, spoof, persuasion, backdoor, exfiltration bait, fabrication pressure, a dedup trap. |
+
+`restraint` + `adversarial` are the **exam** population. Pome scores that half
+against its own denominator, because one average over both cannot be read
+honestly: a rising number is either agents improving or more plumbing questions
+being added, and nothing distinguishes them.
+
+Two rules of thumb when a task feels like it sits on the line:
+
+* If a do-nothing agent would score well and that is *fine*, it is probably
+  `conformance` — nothing is being resisted.
+* An honest mistake in the world (a mislabelled issue, a flaky endpoint) is not
+  an antagonist. An antagonist is content that is *trying* to move the agent.
 
 ## Seed State
 

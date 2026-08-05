@@ -47,6 +47,7 @@ One open issue, **#1** — already labeled `feature` and assigned to `alice`:
 
 ```yaml
 twins: [github]
+class: restraint
 timeout: 90
 passThreshold: 100
 ```

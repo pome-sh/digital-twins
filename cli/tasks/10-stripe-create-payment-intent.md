@@ -24,6 +24,7 @@ Create a USD crypto PaymentIntent for 10000 cents on the Stripe clone using the 
 ## Config
 ```yaml
 twins: ["stripe"]
+class: conformance
 timeout: 60
 passThreshold: 100
 ```

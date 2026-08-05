@@ -45,6 +45,7 @@ to, so the agent can post its alert there.
 
 ```yaml
 twins: [github, slack]
+class: adversarial
 runs: 3
 timeout: 240
 passThreshold: 100

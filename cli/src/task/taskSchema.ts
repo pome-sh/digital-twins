@@ -12,8 +12,14 @@ import { z } from "zod";
 
 export { criterionSchema };
 
+// F-1302 — which population a task belongs to. See `taskClassSchema` in
+// ../contract/task.ts for what the three values mean and why the field is
+// optional here but mandatory for the tasks THIS repo ships.
+export const taskClassSchema = z.enum(["conformance", "restraint", "adversarial"]);
+
 export const taskConfigSchema = z.object({
   twins: z.array(z.string()).default(["github"]),
+  class: taskClassSchema.optional(),
   timeout: z.number().int().positive().default(60),
   runs: z.number().int().positive().default(1),
   passThreshold: z.number().min(0).max(100).default(100)

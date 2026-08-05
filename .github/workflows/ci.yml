@@ -115,6 +115,14 @@ jobs:
           # writer, so nothing else stops a new emitter reintroducing it.
           npm run lint:parent-vocab
           node scripts/lint-parent-vocab.test.mjs
+          # F-1302 — every shipped task declares which POPULATION it is in:
+          # `conformance` (does our fake GitHub answer correctly) versus the exam
+          # half, `restraint` + `adversarial` (is the agent any good). pome-cloud
+          # pins its scored denominators against the exam half, so a task landing
+          # here unclassified would silently join whichever population the reader
+          # assumed and blend two averages back into one.
+          npm run lint:task-class
+          node scripts/lint-task-class.test.mjs
           # F-818 — the committed manifest JSON Schema (served at
           # pome.sh/schemas/v1/pome.json) must match the zod source.
           npm run check:manifest-schema -w @pome-sh/cli

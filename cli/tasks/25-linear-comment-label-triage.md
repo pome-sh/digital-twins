@@ -24,6 +24,7 @@ sets `estimate` without contacting any live Linear endpoint.
 ## Config
 ```yaml
 twins: ["linear"]
+class: conformance
 timeout: 60
 passThreshold: 100
 ```

@@ -22,6 +22,7 @@ one unsent draft without contacting any live Gmail endpoint.
 ## Config
 ```yaml
 twins: ["gmail"]
+class: conformance
 timeout: 60
 passThreshold: 100
 ```

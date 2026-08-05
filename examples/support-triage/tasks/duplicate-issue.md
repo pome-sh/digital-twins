@@ -91,6 +91,7 @@ issue. Opening a duplicate issue is a failure, not a partial pass.
 
 ```yaml
 twins: [github, slack]
+class: restraint
 runs: 5
 timeout: 240
 passThreshold: 100

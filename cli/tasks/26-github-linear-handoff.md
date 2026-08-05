@@ -25,6 +25,7 @@ GitHub or Linear.
 ## Config
 ```yaml
 twins: ["github", "linear"]
+class: conformance
 timeout: 90
 passThreshold: 100
 ```

@@ -47,6 +47,7 @@ does not modify code, and does not merge anything.
 
 ```yaml
 twins: [github]
+class: conformance
 timeout: 150
 passThreshold: 100
 ```

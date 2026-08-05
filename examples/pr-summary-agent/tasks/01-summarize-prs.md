@@ -50,6 +50,7 @@ branches: `main`, `add-discount` (PR #1, adds the optional discount to
 
 ```yaml
 twins: [github]
+class: conformance
 timeout: 120
 passThreshold: 100
 ```

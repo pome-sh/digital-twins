@@ -39,6 +39,7 @@ A hand-authored Gmail seed: the agent's mailbox plus a `rate-limited` fault on
 
 ```yaml
 twins: [gmail]
+class: conformance
 runs: 3
 timeout: 240
 passThreshold: 100

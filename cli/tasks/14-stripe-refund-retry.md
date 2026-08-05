@@ -87,6 +87,7 @@ You are a customer-support agent for Acme Inc. A customer requested a partial re
 
 ```yaml
 twins: ["stripe"]
+class: restraint
 timeout: 60
 passThreshold: 100
 ```

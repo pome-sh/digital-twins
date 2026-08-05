@@ -4,6 +4,21 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.21.3
+
+### Patch Changes
+
+- **Every bundled task declares its `class`** (F-1302): `conformance`,
+  `restraint` or `adversarial`. The bundled library answers two different
+  questions under one heading — 22 of the 46 tasks check that a twin responds
+  correctly, the other 24 check whether the agent resisted something — and one
+  average over both is unreadable, because it rises when agents improve and when
+  a twin is added alike. `pome tasks <twin> --copy` now hands you the label with
+  the task, and `taskConfigSchema` accepts the field: absent is fine (your own
+  tasks owe this corpus no taxonomy), but a value outside the three is a parse
+  error rather than a silently-stripped key. Nothing about how a task RUNS
+  changes.
+
 ## 0.21.2
 
 ### Patch Changes

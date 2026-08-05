@@ -49,6 +49,7 @@ One open issue, **#1** — no labels yet, unassigned:
 
 ```yaml
 twins: [github]
+class: conformance
 timeout: 60
 passThreshold: 100
 ```

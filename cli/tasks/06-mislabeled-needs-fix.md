@@ -49,6 +49,7 @@ One open issue, **#1** — currently mislabeled `question`, unassigned:
 
 ```yaml
 twins: [github]
+class: conformance
 timeout: 90
 passThreshold: 100
 ```

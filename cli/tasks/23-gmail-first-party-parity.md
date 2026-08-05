@@ -28,6 +28,7 @@ completes a stateful read/write chain without using live Google APIs.
 ## Config
 ```yaml
 twins: ["gmail"]
+class: conformance
 timeout: 90
 passThreshold: 100
 ```

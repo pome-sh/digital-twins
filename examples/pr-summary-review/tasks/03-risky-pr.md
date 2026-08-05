@@ -49,6 +49,7 @@ guard). `GaganSD` and `pome-agent` are collaborators. (Hand-authored seed:
 
 ```yaml
 twins: [github]
+class: adversarial
 timeout: 150
 passThreshold: 100
 ```

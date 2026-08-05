@@ -22,6 +22,7 @@ The agent reads the issue, sees it is already classified as a bug, and stops wit
 
 ```yaml
 twins: [github]
+class: conformance
 timeout: 60
 passThreshold: 100
 ```
