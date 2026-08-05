@@ -1,5 +1,39 @@
 # @pome-sh/adapter-claude-sdk — CHANGELOG
 
+## 0.3.2 — 2026-08-06
+
+Internal restructure — no API, behaviour or type change for consumers.
+`CORRELATION_HEADER` is still exported and still `"x-pome-correlation-id"`, and
+`tool()` / `query()` / `withPome()` are untouched.
+
+The correlation core moved OUT of this package and into
+[`@pome-sh/wire/correlation`](../wire/README.md#pome-shwirecorrelation) (F-950):
+the `AsyncLocalStorage` store that makes per-tool-call correlation race-proof
+(`src/als.ts`), the `globalThis.fetch` patch that stamps
+`x-pome-correlation-id` on requests to allowlisted twin origins (`src/fetch.ts`),
+and the fallback id minter (`src/ids.ts`). None of that ever knew what a Claude
+tool was, and a Vercel AI SDK or LangGraph adapter needs exactly the same
+guarantee — so it now lives in the shared trace package instead of behind a
+Claude-shaped door. Wire is `private: true` and inlined into this package's
+bundle, so the published tarball is unchanged in shape: still no `@pome-sh/*`
+runtime dependency.
+
+What remains here is the Claude-specific half, and it is small: reading the SDK's
+real `tool_use_id` off the MCP `_meta["claudecode/toolUseId"]` key
+(`src/wrapHandler.ts`), the `tool()` / `query()` wrappers, and `withPome()`'s
+`POME_*` env-var host inference. No Vercel AI SDK or LangGraph integration is
+built by this change — it is preparation, so a future one does not re-derive the
+plumbing.
+
+One packaging fix rides along: `CORRELATION_HEADER` is re-exported through a
+local `src/correlation.ts` rather than straight from wire on the barrel, because
+tsup's `noExternal` covers the JS bundle only. A bare re-export leaves a literal
+`from '@pome-sh/wire/correlation'` in the shipped `dist/index.d.ts` — a specifier
+that resolves nowhere for a consumer, since wire is never published — and the JS
+keeps working, so the break lands on the consumer's `tsc` and nowhere else.
+`npm run test:pack` compiles a real consumer against the shipped declarations
+without `skipLibCheck`, which is what caught it.
+
 ## 0.3.1 — 2026-08-04
 
 Packaging only — no API or behavior change. The adapter is built with tsup and

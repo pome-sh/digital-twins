@@ -16,8 +16,10 @@
 //
 // [DECISION] FDRS-413 done-when reads: "TwinHttpEvent.tool_call_id matching an
 // originating ToolUseEvent.event_id". The locked adapter architecture
-// (FDRS-322) makes those two ids structurally distinct: tool_call_id is an
-// ALS-bound `tlc_<hex>` minted by `wrapHandler.generateToolCallId()`, while
+// (FDRS-322) makes those two ids structurally distinct: tool_call_id is
+// ALS-bound (the SDK's own `toolu_…` since F-1200, else a `tlc_<hex>` from
+// `@pome-sh/wire/correlation`'s `generateToolCallId()` — the module moved out of
+// the adapter in F-950), while
 // ToolUseEvent.event_id is a separate UUID minted in the signals writer. They
 // cannot be made string-equal without coupling that wasn't planned for in M0.
 // The intent of the line is to verify the run contains BOTH halves of an

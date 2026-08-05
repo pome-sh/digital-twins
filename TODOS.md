@@ -22,13 +22,22 @@ GitHub Packages rather than public npm.
 Depends on: the npm-deprecation lane and the tsup/release lane of the
 restructure landing first.
 
-## Extract framework-agnostic trace correlation
+## Extract framework-agnostic trace correlation — DONE (F-950)
 
-`packages/adapter-claude-sdk/src/{fetch,als}.ts` carries the
-`x-pome-correlation-id` injection and the AsyncLocalStorage plumbing that make
-per-tool-call correlation race-proof. Only the `tool()` / `query()` wrapping
-around it is Claude-specific. Split the correlation core into a
-framework-neutral module so Vercel AI SDK and LangGraph agents get the same
-guarantee instead of re-deriving it.
+The core is now `@pome-sh/wire/correlation` (subpath-only): the
+AsyncLocalStorage store (`withCorrelation` / `currentToolCallId`), the
+`x-pome-correlation-id` fetch injection, and the fallback id minter. The
+adapter's `src/{als,fetch,ids}.ts` are gone; what stayed Claude-specific is
+`readSdkToolUseId` plus the `tool()` / `query()` wrappers.
 
-Depends on: the `@pome-sh/wire` package (landed in F-942).
+No Vercel AI SDK or LangGraph adapter was built — that remains open, and the
+point of this ticket was that it no longer has to re-derive the plumbing.
+
+Still duplicated, deliberately out of F-950's scope: the header NAME. Both sides
+of this wire protocol hardcode the literal `"x-pome-correlation-id"` — the agent
+side now once, in `packages/wire/src/correlation/fetch.ts`, but the recorder side
+five more times (`packages/sdk/src/{recorder,mcp-jsonrpc,failure-injection}.ts`,
+`packages/twin-stripe/src/{session,idempotency}.ts`,
+`packages/twin-stripe/src/routes/_helpers.ts`). Those files already depend on
+wire; pointing them at `CORRELATION_HEADER` would make the constant single-source
+across the protocol. A rename today still needs a grep.
