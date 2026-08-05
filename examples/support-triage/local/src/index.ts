@@ -15,11 +15,11 @@
  * CLI injects on `pome run … --agent "npm run start"`, so both launchers
  * share this one code path.
  *
- * The product story lives in ONE line: DENY_ISSUE_LOOKUP below ships as `true`,
- * which strips the agent's read access to existing issues. It searches, as its
- * instructions tell it to, is refused, and honestly concludes nothing tracks the
- * bug — so it files a duplicate and fails the exam. Flip the constant, re-run,
- * and the same exam goes green.
+ * ⚠️ THE BASELINE BELOW IS NOT RED. Measured 2026-08-04 on `claude-opus-5`,
+ * n=5, hosted: `DENY_ISSUE_LOOKUP = true` scored 25 · 100 · 100 · 100 · 100 and
+ * no trial filed a duplicate. The re-cut is [F-1292]; ../VERIFICATION.md carries
+ * the run ids and the two routes the agent found around the denial. Do not
+ * describe this file's defect as a working lesson until that ticket closes.
  *
  * `query` comes from `@pome-sh/adapter-claude-sdk` rather than the raw SDK. It
  * is a drop-in — the message stream is byte-for-byte what the SDK yields — and
@@ -29,6 +29,7 @@
  * inert with no endpoint set, so a standalone run is unaffected.
  */
 
+import type { McpServerConfig } from "@anthropic-ai/claude-agent-sdk";
 import { query } from "@pome-sh/adapter-claude-sdk";
 
 // ─── The one line under test ───────────────────────────────────────────────
@@ -43,14 +44,20 @@ import { query } from "@pome-sh/adapter-claude-sdk";
 // nothing, and correctly concludes the bug is untracked. It then files a SECOND
 // issue for a bug issue #1 already tracks.
 //
-// WHY IT DOES NOT ROT. The system prompt below is the CORRECT one: it tells the
-// agent to search before filing, and a stronger model follows it more reliably,
-// not less. That is the whole point — perfect model behaviour is corrupted by
-// the committed config, and no amount of capability can call a tool that was
-// never exposed. This is what the earlier baseline could not promise: it lived
-// in a prompt line telling the agent NOT to search, which is a pattern-2 flaw
-// whose red is model-dependent and, worse, indistinguishable from an evaluator
-// that never ran.
+// IT DID ROT, AND HERE IS THE MEASUREMENT. This block used to claim the baseline
+// could not go green because "no amount of capability can call a tool that was
+// never exposed". That is true and beside the point: the model never needed the
+// denied tool. Measured on `claude-opus-5`, n=5 each:
+//
+//   open sandbox    4/5 green — via `update_issue` (a write that 404s on a
+//                   missing issue) and via the SDK's shell reading this file
+//   closed sandbox  5/5 green — the shell gone changed nothing. All five trials
+//                   used `list_issue_comments` AND `update_issue`, neither of
+//                   which is named below, and `search_code` for the root cause.
+//
+// Two more read paths turned up the moment the first three were shut. A denial
+// is only as strong as the enumeration behind it, and this one is not complete
+// — see ../VERIFICATION.md. Completing it is not the fix; F-1292 moves the flaw.
 //
 // The three names are the Claude Agent SDK's MCP tool ids — `mcp__<server>__<tool>`,
 // where the server is the `github` key of `mcpServers` below. They are the GitHub
@@ -78,6 +85,65 @@ const DENY_ISSUE_LOOKUP = true;
  */
 export function deniedTools(denyIssueLookup: boolean = DENY_ISSUE_LOOKUP): string[] {
   return ["WebSearch", "WebFetch", ...(denyIssueLookup ? ISSUE_LOOKUP_TOOLS : [])];
+}
+
+/**
+ * The SDK built-ins this examinee exposes to the model: **none**.
+ *
+ * This is the closed sandbox, and it is deliberately an ALLOWLIST rather than an
+ * addition to `deniedTools()`. `options.tools` replaces the base set of built-in
+ * tools, so an empty array is complete by construction — there is no list of
+ * names to keep current, and no way for a tool nobody thought of to arrive
+ * enabled. That is the failure mode the deny-list above already had (F-1292):
+ * every built-in was live, so `cat ../tasks/duplicate-issue.md` handed the
+ * examinee all four grading criteria and the complete seed; `Bash` reached the
+ * real internet, since the `network.mode: limited` clamp binds a managed clone's
+ * egress and never a local subprocess; and one measured trial read this very
+ * file and reported the deny-list as an intentional fixture.
+ *
+ * MCP tools are unaffected — they arrive from `mcpServers`, not from the
+ * built-in set — so the twin surface the exam is actually about stays whole.
+ * Verified live rather than from the docs: with `tools: []` the SDK's `init`
+ * message listed 100 tools, all `mcp__*`, and the run scored 100 on all four
+ * criteria (see ../VERIFICATION.md, `grp_f1292honest0805`).
+ *
+ * `allowedTools` is NOT a substitute. It only auto-approves; it does not
+ * restrict. Measured 2026-08-05: `allowedTools: ["mcp__github-twin__list_issues"]`
+ * left 152 tools live including `Bash`, `Read`, `Write` and `WebFetch`.
+ */
+export const BUILT_IN_TOOLS: string[] = [];
+
+/**
+ * The options this examinee actually runs with — the exam surface, composed in
+ * one place.
+ *
+ * A `function` declaration rather than a `const` arrow: this file's top-level
+ * `await main()` sits above it, and a `const` here would be a temporal dead zone
+ * at call time (the `scripts/smoke-examples.mjs` gate exists because exactly
+ * that crash once shipped in `examples/triage-agent`).
+ *
+ * Exported so `test/tool-policy.test.ts` can assert the two policy constants are
+ * WIRED IN, not merely declared. Asserting `BUILT_IN_TOOLS` is empty proves
+ * nothing on its own: delete `tools:` from this object and that assertion stays
+ * green while the sandbox reopens. A guard whose subject is no longer connected
+ * to anything passes forever, which is the same shape of mistake F-1292 is about.
+ */
+export function examineeOptions(mcpServers: Record<string, McpServerConfig>) {
+  return {
+    systemPrompt: SYSTEM_PROMPT,
+    permissionMode: "bypassPermissions" as const,
+    maxTurns: 30,
+    // The exam surface: the two twins over MCP, and nothing else. `tools` is the
+    // allowlist that closes the sandbox (empty = no SDK built-in reaches the
+    // model); `disallowedTools` is where the committed baseline defect lives.
+    // Its `WebSearch`/`WebFetch` entries are now a redundant second latch —
+    // `tools: []` already removed them — and are kept because the two options
+    // are independent knobs and the web clamp should not depend on which one a
+    // future SDK version reinterprets.
+    tools: BUILT_IN_TOOLS,
+    disallowedTools: deniedTools(),
+    mcpServers,
+  };
 }
 // ───────────────────────────────────────────────────────────────────────────
 
@@ -187,20 +253,7 @@ async function main() {
     },
   };
 
-  const run = query({
-    prompt: wiring.task,
-    options: {
-      systemPrompt: SYSTEM_PROMPT,
-      permissionMode: "bypassPermissions",
-      maxTurns: 30,
-      // Everything the two twins expose, minus `deniedTools()` — which is where
-      // the committed baseline defect lives. See the block at the top of this
-      // file; `WebSearch`/`WebFetch` are the unconditional closed-book clamp and
-      // are not part of the lesson.
-      disallowedTools: deniedTools(),
-      mcpServers,
-    },
-  });
+  const run = query({ prompt: wiring.task, options: examineeOptions(mcpServers) });
 
   let exitCode = 0;
   for await (const msg of run) {

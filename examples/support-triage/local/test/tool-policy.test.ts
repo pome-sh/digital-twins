@@ -17,7 +17,7 @@
 // are the twin's ONLY read paths to an issue, so a fourth one appearing upstream
 // would silently hand the baseline a way around its own defect.
 import { describe, expect, it } from "vitest";
-import { deniedTools } from "../src/index.ts";
+import { BUILT_IN_TOOLS, deniedTools, examineeOptions } from "../src/index.ts";
 
 const ISSUE_LOOKUP = [
   "mcp__github__search_issues",
@@ -66,5 +66,51 @@ describe("deniedTools — the committed baseline defect", () => {
   it("differs on exactly the issue-lookup tools", () => {
     const extra = deniedTools(true).filter((tool) => !deniedTools(false).includes(tool));
     expect(extra).toEqual(ISSUE_LOOKUP);
+  });
+});
+
+// The closed sandbox, pinned separately from the lesson because it survives every
+// re-cut of the lesson: whatever the baseline defect turns out to be, an examinee
+// that can `cat ../tasks/duplicate-issue.md` is reading its own grading criteria
+// and its own seed. Measured 2026-08-04 (F-1292): with the built-ins live, one
+// trial in five read this examinee's source and named the fixture.
+describe("BUILT_IN_TOOLS — the closed sandbox", () => {
+  it("exposes no SDK built-in at all", () => {
+    // Empty, not "empty of the dangerous ones". `options.tools` replaces the base
+    // set, so [] is complete by construction; a list of names to maintain is the
+    // enumeration failure that let the deny-list above be routed around.
+    expect(BUILT_IN_TOOLS).toEqual([]);
+  });
+
+  it("is an allowlist, so a newly-shipped built-in cannot arrive enabled", () => {
+    // The property, stated as the thing a reader might break: adding a name here
+    // to "just read one file" re-opens the book. Filesystem and shell are the
+    // ones that reach the task file; web is the one that leaves the seeded world.
+    for (const escape of ["Bash", "Read", "Glob", "Grep", "Write", "Edit", "WebSearch", "WebFetch"]) {
+      expect(BUILT_IN_TOOLS, `${escape} would make the exam open-book`).not.toContain(escape);
+    }
+  });
+});
+
+// Both policies above are inert unless they reach `query()`. Everything else in
+// this file would stay green if someone deleted `tools:` or `disallowedTools:`
+// from the options object — a guard disconnected from its subject passes forever,
+// which is the shape of mistake F-1292 is about. So assert the wiring itself.
+describe("examineeOptions — the policies are actually wired in", () => {
+  const mcpServers = { github: { type: "http" as const, url: "https://twin/github" } };
+
+  it("passes the empty built-in allowlist to the SDK", () => {
+    expect(examineeOptions(mcpServers).tools).toEqual([]);
+  });
+
+  it("passes the deny-list to the SDK", () => {
+    expect(examineeOptions(mcpServers).disallowedTools).toEqual(deniedTools());
+  });
+
+  it("still hands the twins through — closing the sandbox must not close the exam", () => {
+    // `tools: []` removes SDK built-ins only; MCP tools arrive via `mcpServers`.
+    // If this ever regressed the examinee would have no tools at all, and the
+    // run would look like a model failure rather than a wiring one.
+    expect(examineeOptions(mcpServers).mcpServers).toBe(mcpServers);
   });
 });
