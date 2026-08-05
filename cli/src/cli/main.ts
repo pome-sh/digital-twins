@@ -265,7 +265,7 @@ export function createProgram() {
     .allowUnknownOption()
     .allowExcessArguments()
     .description(
-      "Retired (F-893). Prints the Gen-2 wiring path: `claude mcp add … pome` + `npx skills add pome-sh/digital-twins`, then the pome-intake / REST-launch preflight.",
+      "Retired (F-893). Prints the Gen-2 wiring path: `claude mcp add … pome` + `npx skills add pome-sh/digital-twins --skill '*'`, then the pome-intake / REST-launch preflight.",
     )
     .action(async () => {
       const { runInstall } = await import("./install.js");
