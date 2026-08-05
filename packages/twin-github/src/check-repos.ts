@@ -8,7 +8,7 @@
 
 import { childStatePath, defineCheck, repoRef, VACUITY_SENTINEL } from "@pome-sh/sdk/checks";
 import { commitStatusState, filePath, statusContext } from "./check-params.js";
-import { labelNames, missOutcome, resolveRepo } from "./check-state.js";
+import { issueNumbers, labelNames, missOutcome, resolveRepo } from "./check-state.js";
 import { deltaWorld, finalWorld, repoState } from "./check-worlds.js";
 import type { Check } from "./check-kind.js";
 
@@ -90,6 +90,98 @@ export const noNewLabels: Check<{ repo: string }> = defineCheck({
       passed: false,
       reason: `labels created in ${repo}: ${created.map((name) => `\`${name}\``).join(", ")}`,
       evidenceStatePaths: definitions,
+    };
+  },
+});
+
+// F-1198. The sibling of `noNewLabels`, and it exists because the curriculum's
+// hero lesson could not be graded without it: `support-triage` teaches "do not
+// open a second issue for a bug that is already tracked", and until this check
+// the only way to say that was `[model]`. An agent that comments on the right
+// issue, posts the right link, AND ALSO files a duplicate scored 100 — which is
+// τ-bench's necessary-but-not-sufficient caveat arriving in our own catalog
+// (`docs/curriculum/failure-classes.md` §4.2, which names the rule we were
+// breaking).
+//
+// Modelled on `noNewLabels` rather than invented: same delta substrate, same
+// negative polarity, same "the repo is a selector" mutant argument. The one
+// difference worth stating is WHAT is compared. Labels compare NAMES because a
+// label is identified by its name; issues compare NUMBERS, because the number is
+// the only field an examinee cannot choose — a duplicate issue may carry the
+// same title, body and labels as the one it duplicates, and comparing any of
+// those would let a duplicate hide behind its own likeness.
+export const noNewIssues: Check<{ repo: string }> = defineCheck({
+  id: "github.no-new-issues",
+  description:
+    "Compares the issue NUMBERS present in the seed against the final state, and fails when " +
+    "finish carries one the seed did not. Numbers, not titles: a duplicate issue usually " +
+    "carries the same title as the one it duplicates. It says nothing about what happened to " +
+    "the seeded issues — closing, relabelling or commenting on one all PASS this check, so " +
+    "pair it with `github.issue-state` or `github.issue-comment-contains` when those matter. " +
+    "Its natural use is the inverse of `github.issue-exists`: a task whose examinee must " +
+    "recognise that an issue already exists and NOT open another. Needs the seed: it is a " +
+    "delta, not a state assertion.",
+  // The repo is named for `noNewLabels`'s reason, one step stronger: without it
+  // the sentence reads as a claim about the whole world, and issue numbers are
+  // per-repository — `#2` in one repo has nothing to do with `#2` in another.
+  template: "No new issues were created in `{repo}`",
+  params: { repo: repoRef },
+  substrate: "seed+final",
+  // Passes on the untouched seed; only the examinee acting can break it.
+  polarity: () => "negative",
+  // Nothing is hunted inside free text, so there is nothing a redactor could
+  // delete out from under this check.
+  subject: () => null,
+  // Same admission `noNewLabels` makes: the repo SELECTS, it is not a scanned
+  // literal. Falsifying it moves the verdict to "repo not found" for a reason
+  // that never reaches the comparison — a clean bill this check did not earn.
+  vacuityMutant: () => null,
+  discriminatingWorlds: () => ({
+    passing: deltaWorld(
+      repoState({ issues: [{ number: 1 }] }),
+      repoState({ issues: [{ number: 1 }] }),
+    ),
+    failing: deltaWorld(
+      repoState({ issues: [{ number: 1 }] }),
+      repoState({ issues: [{ number: 1 }, { number: 2 }] }),
+    ),
+  }),
+  evaluate({ repo }, { seed, final }) {
+    // The engine guards this before calling; guarding here too means a consumer
+    // that forgets gets a named skip rather than a vacuous pass.
+    if (seed === null) return { passed: false, reason: "seed_missing", status: "skipped" };
+
+    // The seed-side refusal cites nothing, for the reason `noNewLabels` states
+    // at the same line: a pointer always addresses `final`, so handing back one
+    // the lookup walked in the SEED would send a reader into a tree the report
+    // never renders. The reason still names the miss.
+    const seedRepo = resolveRepo(seed, repo, "the seed state");
+    if ("missing" in seedRepo) return missOutcome({ ...seedRepo, searched: undefined });
+    const finalRepo = resolveRepo(final, repo, "state_final");
+    if ("missing" in finalRepo) return missOutcome(finalRepo);
+
+    const before = issueNumbers(seedRepo.found);
+    const created = [...issueNumbers(finalRepo.found)]
+      .filter((number) => !before.has(number))
+      .sort((a, b) => a - b);
+    // The final issue LIST, not the rows that broke it — the same citation
+    // `noNewLabels` makes and for the same reason. The delta is computed from
+    // two trees and the reader has one on screen, so the honest pointer is the
+    // collection they can count for themselves; the reason carries the
+    // comparison. On a failure it is also the only pointer that resolves: the
+    // numbers named in the reason are exactly the rows the seed does not have.
+    const issues = [childStatePath(finalRepo.path, "issues")];
+    if (created.length === 0) {
+      return {
+        passed: true,
+        reason: `no issues were created in ${repo} (${before.size} at seed, unchanged at finish)`,
+        evidenceStatePaths: issues,
+      };
+    }
+    return {
+      passed: false,
+      reason: `issues created in ${repo}: ${created.map((number) => `#${number}`).join(", ")}`,
+      evidenceStatePaths: issues,
     };
   },
 });

@@ -1,6 +1,13 @@
 # @pome-sh/twin-slack — CHANGELOG
 
 
+## 0.3.3 — 2026-08-04
+
+Dependency-only patch (#302): `hono` `^4.12.31` → `^4.13.0`, `zod` `^4.1.13` → `^4.4.3`, `@hono/node-server` `^2.0.10` → `^2.1.0`.
+No source file changed and `npm run test:contract` is green, so the surface is
+identical — this exists so the npm artifact stops differing from `main`, which is
+the staleness the publish skip-guard cannot see.
+
 ## 0.3.2 — 2026-08-04
 
 - Re-pinned to `@pome-sh/sdk@0.11.0` / `@pome-sh/shared-types@0.14.0` for the F-1200 parent-vocabulary

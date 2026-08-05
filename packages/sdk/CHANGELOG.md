@@ -1,6 +1,13 @@
 # @pome-sh/sdk
 
 
+## 0.11.1 — 2026-08-04
+
+Dependency-only patch (#302): `hono` `^4.12.31` → `^4.13.0`, `zod` `^4.1.13` → `^4.4.3`.
+No source file changed and `npm run test:contract` is green, so the surface is
+identical — this exists so the npm artifact stops differing from `main`, which is
+the staleness the publish skip-guard cannot see.
+
 ## 0.11.0 — 2026-08-04
 
 Twin HTTP rows carry the new parent vocabulary (F-1200).

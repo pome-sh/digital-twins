@@ -136,6 +136,21 @@ export function findRepo(
   return null;
 }
 
+// The issue NUMBERS a repository export carries. `github.no-new-issues` compares
+// these across the seed/final delta, and it compares numbers rather than titles
+// for the reason its own description states: a duplicate issue usually carries
+// the same title as the one it duplicates, so any human-authored field would let
+// the duplicate hide behind its own likeness. A row with no usable number is
+// dropped rather than counted as `NaN`, which would compare unequal to itself
+// and read as a newly created issue on every run.
+export function issueNumbers(repo: GitHubCheckStateRepo): Set<number> {
+  const numbers = new Set<number>();
+  for (const issue of repo.issues ?? []) {
+    if (typeof issue.number === "number" && Number.isFinite(issue.number)) numbers.add(issue.number);
+  }
+  return numbers;
+}
+
 export function labelNames(repo: GitHubCheckStateRepo): Set<string> {
   const names = new Set<string>();
   for (const label of repo.labels ?? []) {

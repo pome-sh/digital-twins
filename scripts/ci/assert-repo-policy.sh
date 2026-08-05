@@ -3,9 +3,10 @@
 #
 # Split enforcement (classic + ruleset):
 #   Classic branch protection: strict required checks, no force-push/delete.
-#   Ruleset "main founder-bypass": PR + 1 approving review + conversation
-#   resolution + the same required checks, with team `founder` as bypass actor
-#   so founders can merge without an external approving review.
+#   Ruleset "main founder-bypass": PR required + conversation resolution + the
+#   same required checks, with zero required approving reviews (two-person
+#   founder team — either can merge on green CI). Team `founder` remains a
+#   bypass actor for conversation-resolution / future rules.
 #
 # GET .../branches/{branch}/protection and .../rulesets need Administration:read.
 # The default Actions GITHUB_TOKEN cannot be granted that scope (invalid in
@@ -21,11 +22,29 @@ RULESETS_OUT="$(mktemp)"
 LIST_OUT="$(mktemp)"
 trap 'rm -f "${OUT}" "${RULESETS_OUT}" "${LIST_OUT}"' EXIT
 
-REQUIRED_CHECKS=(
-  "typecheck-test"
-  "gitleaks + trufflehog"
-  "dependency review"
-)
+# F-1180 — the contexts live in config/required-checks.json, which
+# scripts/ci/verify-release-pr-checks.mjs also reads. Two hand-maintained
+# copies of the same list is the F-1135 shape: one goes stale while both still
+# look like they are watching.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REQUIRED_CHECKS_FILE="${REQUIRED_CHECKS_FILE:-${REPO_ROOT}/config/required-checks.json}"
+# Read into a variable first (not `mapfile < <(...)`, which is bash 4+ and
+# swallows the exit status): `set -e` must still fire if the file is unreadable.
+REQUIRED_CHECKS_RAW="$(
+  REQUIRED_CHECKS_FILE="${REQUIRED_CHECKS_FILE}" node -e '
+    const fs = require("fs");
+    const cfg = JSON.parse(fs.readFileSync(process.env.REQUIRED_CHECKS_FILE, "utf8"));
+    if (!Array.isArray(cfg.contexts) || cfg.contexts.length === 0) {
+      console.error("::error::config/required-checks.json must list a non-empty contexts array");
+      process.exit(1);
+    }
+    process.stdout.write(cfg.contexts.join("\n") + "\n");
+  '
+)"
+REQUIRED_CHECKS=()
+while IFS= read -r line; do
+  [[ -n "${line}" ]] && REQUIRED_CHECKS+=("${line}")
+done <<<"${REQUIRED_CHECKS_RAW}"
 FOUNDER_TEAM_ID="16601595"
 RULESET_NAME="main founder-bypass"
 
@@ -165,7 +184,7 @@ for (const ctx of required) {
   }
 }
 
-// --- Ruleset: PR reviews + conversation resolution + founder bypass ---
+// --- Ruleset: PR + conversation resolution (0 reviews) + founder bypass ---
 if (!Array.isArray(rulesets)) {
   errors.push("rulesets payload must be an array");
 } else {
@@ -199,8 +218,8 @@ if (!Array.isArray(rulesets)) {
       errors.push(`ruleset "${rulesetName}" must include a pull_request rule`);
     } else {
       const params = prRule.parameters;
-      if (Number(params.required_approving_review_count) < 1) {
-        errors.push("ruleset required_approving_review_count must be >= 1");
+      if (Number(params.required_approving_review_count) !== 0) {
+        errors.push("ruleset required_approving_review_count must be 0");
       }
       if (params.required_review_thread_resolution !== true) {
         errors.push("ruleset required_review_thread_resolution must be true");
@@ -233,7 +252,7 @@ if (errors.length) {
   process.exit(1);
 }
 console.log(
-  "ok: classic checks + no force-push/delete; ruleset PR/reviews/conversations with founder bypass",
+  "ok: classic checks + no force-push/delete; ruleset PR/conversations (0 required reviews) with founder bypass",
 );
 console.log("classic required contexts:", classicContexts.join(", "));
 NODE
