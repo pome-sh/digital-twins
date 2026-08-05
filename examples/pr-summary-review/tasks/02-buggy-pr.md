@@ -45,6 +45,7 @@ and `pome-agent` are collaborators. (Hand-authored seed: `02-buggy-pr.seed.json`
 
 ```yaml
 twins: [github]
+class: adversarial
 timeout: 150
 passThreshold: 100
 ```

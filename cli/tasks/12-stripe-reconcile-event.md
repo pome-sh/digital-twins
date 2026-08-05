@@ -23,6 +23,7 @@ Create and settle a crypto PaymentIntent, then inspect the emitted Stripe events
 ## Config
 ```yaml
 twins: ["stripe"]
+class: conformance
 timeout: 60
 passThreshold: 100
 ```

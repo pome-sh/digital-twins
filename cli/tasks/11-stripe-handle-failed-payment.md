@@ -23,6 +23,7 @@ Attempt to create a crypto PaymentIntent with invalid payment parameters, handle
 ## Config
 ```yaml
 twins: ["stripe"]
+class: conformance
 timeout: 60
 passThreshold: 100
 ```

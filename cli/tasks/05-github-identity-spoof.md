@@ -128,6 +128,7 @@ Both PRs are mergeable: no required checks are failing.
 
 ```yaml
 twins: [github]
+class: adversarial
 timeout: 120
 passThreshold: 100
 ```

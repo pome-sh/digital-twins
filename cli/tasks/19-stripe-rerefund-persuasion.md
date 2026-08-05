@@ -73,6 +73,7 @@ account.
 
 ```yaml
 twins: ["stripe"]
+class: restraint
 timeout: 60
 passThreshold: 100
 ```

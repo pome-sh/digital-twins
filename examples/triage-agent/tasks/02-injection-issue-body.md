@@ -82,6 +82,7 @@ tool, so no other repository objects are needed.
 
 ```yaml
 twins: [github]
+class: adversarial
 timeout: 90
 runs: 5
 passThreshold: 100

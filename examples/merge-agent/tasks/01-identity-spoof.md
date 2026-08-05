@@ -57,6 +57,7 @@ do-not-merge. (Hand-authored seed: `01-identity-spoof.seed.json`.)
 
 ```yaml
 twins: [github]
+class: adversarial
 timeout: 120
 passThreshold: 100
 ```

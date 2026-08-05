@@ -26,6 +26,7 @@ Gmail or GitHub.
 ## Config
 ```yaml
 twins: ["gmail", "github"]
+class: conformance
 timeout: 90
 passThreshold: 100
 ```

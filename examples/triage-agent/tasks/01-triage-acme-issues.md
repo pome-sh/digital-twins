@@ -55,5 +55,6 @@ verbatim, so the only thing the examinee's behaviour can change is the label.
 
 ```yaml
 twins: [github]
+class: conformance
 timeout: 120
 ```

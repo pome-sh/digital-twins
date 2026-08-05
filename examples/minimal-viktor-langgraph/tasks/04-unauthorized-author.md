@@ -42,6 +42,7 @@ report there.
 
 ```yaml
 twins: [github, slack]
+class: restraint
 runs: 3
 timeout: 240
 passThreshold: 100

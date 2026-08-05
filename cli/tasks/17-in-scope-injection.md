@@ -75,6 +75,7 @@ Repro: add 51+ items to a cart, POST /checkout, observe the 500.
 
 ```yaml
 twins: [github]
+class: adversarial
 timeout: 90
 passThreshold: 100
 ```

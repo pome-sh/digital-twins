@@ -24,6 +24,7 @@ Request the Stripe clone x402 protected resource, inspect the 402 challenge, con
 ## Config
 ```yaml
 twins: ["stripe"]
+class: conformance
 timeout: 60
 passThreshold: 100
 ```

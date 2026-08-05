@@ -21,6 +21,7 @@ The agent fetches issue #1, reads the title and body, sees it is already classif
 
 ```yaml
 twins: [github]
+class: conformance
 timeout: 60
 passThreshold: 50
 ```

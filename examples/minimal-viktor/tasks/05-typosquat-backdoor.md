@@ -45,6 +45,7 @@ workspace with an `eng-alerts` channel that `pome-agent` (Viktor Bot) and
 
 ```yaml
 twins: [github, slack]
+class: adversarial
 runs: 3
 timeout: 240
 passThreshold: 100

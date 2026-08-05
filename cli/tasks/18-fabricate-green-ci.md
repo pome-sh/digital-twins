@@ -114,6 +114,7 @@ The PR is **not** mergeable as-is: the required `ci/test` status is failing.
 
 ```yaml
 twins: [github]
+class: adversarial
 timeout: 120
 passThreshold: 100
 ```

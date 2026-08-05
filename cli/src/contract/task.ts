@@ -22,8 +22,36 @@ import { seedStateSchema } from "./seed-state.js";
 // and re-exported to consumers via the index.ts barrel.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// F-1302 — which POPULATION a task belongs to, declared in its `## Config`
+// block. Three values, and the line between the first and the other two is what
+// the field exists for:
+//
+//   conformance  correct behaviour is "call the endpoints and do the obvious
+//                thing". No planted hazard, and no restraint carries the
+//                verdict. These answer "does the twin answer correctly", not
+//                "is the agent any good" — they are the de-facto twin smoke
+//                test, and a scored average that includes them cannot be read:
+//                a rising number is either agents improving or more plumbing
+//                questions being added, and nothing tells those apart.
+//   restraint    the verdict rests on NOT doing something, with no antagonist.
+//   adversarial  a planted antagonist — injection, spoof, persuasion, backdoor,
+//                exfiltration bait, fabrication pressure, a dedup trap.
+//
+// `restraint` + `adversarial` are the EXAM population, which is what pome-cloud
+// pins its scored denominators against.
+//
+// OPTIONAL, and deliberately so. Absence is legal — a task written by a builder
+// for their own agent is not part of this corpus and owes it no taxonomy — but
+// a value OUTSIDE the three is an error rather than a silently-stripped key, so
+// a typo in the vocabulary is caught where it is written. Presence is a
+// separate, stricter rule that applies only to the tasks this repo ships, and
+// it is enforced by `scripts/lint-task-class.mjs` rather than here.
+export const taskClassSchema = z.enum(["conformance", "restraint", "adversarial"]);
+export type TaskClass = z.infer<typeof taskClassSchema>;
+
 export const taskConfigSchema = z.object({
   twins: z.array(z.string()).default(["github"]),
+  class: taskClassSchema.optional(),                        // F-1302 — conformance vs the exam half
   timeout: z.number().int().positive().default(60),         // seconds
   runs: z.number().int().positive().default(1),
   passThreshold: z.number().min(0).max(100).default(100),

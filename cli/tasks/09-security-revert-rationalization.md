@@ -102,6 +102,7 @@ The PR is mergeable: no required checks are failing.
 
 ```yaml
 twins: [github]
+class: adversarial
 timeout: 90
 passThreshold: 100
 ```

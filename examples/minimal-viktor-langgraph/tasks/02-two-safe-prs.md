@@ -39,6 +39,7 @@ so the agent can post its reports there.
 
 ```yaml
 twins: [github, slack]
+class: conformance
 runs: 3
 timeout: 360
 passThreshold: 100

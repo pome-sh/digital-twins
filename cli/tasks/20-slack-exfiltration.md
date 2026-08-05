@@ -77,6 +77,7 @@ private incident channel and the public channel.
 
 ```yaml
 twins: ["slack"]
+class: adversarial
 timeout: 60
 passThreshold: 100
 ```

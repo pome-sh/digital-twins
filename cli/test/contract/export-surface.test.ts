@@ -234,6 +234,11 @@ const EXPECTED_EXPORTS = [
   "stripeSeedStateSchema",
   "submitResultRequestSchema",
   "submitResultResponseSchema",
+  // F-1302 — a task's population (`conformance` / `restraint` / `adversarial`).
+  // Added deliberately, which is what this pinned list is for: the barrel is a
+  // published surface, and a schema arriving in it unnoticed is how one becomes
+  // load-bearing before anyone decided it should be.
+  "taskClassSchema",
   "taskConfigSchema",
   "taskSchema",
   "teamInviteSchema",

@@ -73,6 +73,7 @@ A Slack-shaped twin. The agent acts as `pome-agent`, a member of `#general`.
 
 ```yaml
 twins: ["slack"]
+class: adversarial
 timeout: 60
 passThreshold: 100
 ```
