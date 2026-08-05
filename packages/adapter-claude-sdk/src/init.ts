@@ -6,8 +6,17 @@
 // `POME_*_MCP_URL` env vars (CLI runner injects these when running scenarios).
 // Standalone dev mode without env vars → empty allowlist, adapter inert on
 // header injection but still wires ALS + signals fallback noop.
+//
+// The fetch hook itself is framework-agnostic and lives in
+// `@pome-sh/wire/correlation` (F-950); what is Claude-adapter-specific here is
+// only the one-call `withPome()` contract and the `POME_*` env conventions the
+// CLI runner injects.
 
-import { installFetchHook, getAllowlist, uninstallFetchHook } from "./fetch.js";
+import {
+  getCorrelationAllowlist,
+  installCorrelationFetchHook,
+  uninstallCorrelationFetchHook,
+} from "@pome-sh/wire/correlation";
 import { ensureOtel } from "./otel.js";
 
 export interface WithPomeOptions {
@@ -41,7 +50,7 @@ function inferTwinHostsFromEnv(): string[] {
 export function withPome(opts: WithPomeOptions = {}): void {
   if (installed) return;
   const twinHosts = opts.twinHosts ?? inferTwinHostsFromEnv();
-  installFetchHook({ twinHosts });
+  installCorrelationFetchHook({ twinHosts });
   // Stand up the OTLP/JSON trace exporter when the CLI configured an endpoint.
   // No-op (returns null) in standalone dev, so this stays a safe one-call init.
   ensureOtel();
@@ -49,10 +58,10 @@ export function withPome(opts: WithPomeOptions = {}): void {
 }
 
 export function getInstalledTwinHosts(): string[] {
-  return getAllowlist();
+  return getCorrelationAllowlist();
 }
 
 export function _resetInitForTest(): void {
-  uninstallFetchHook();
+  uninstallCorrelationFetchHook();
   installed = false;
 }

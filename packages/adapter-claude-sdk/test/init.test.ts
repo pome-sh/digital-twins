@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { uninstallFetchHook } from "../src/fetch.js";
+import { uninstallCorrelationFetchHook } from "@pome-sh/wire/correlation";
 import { _resetInitForTest, getInstalledTwinHosts, withPome } from "../src/init.js";
 
 const ENV_KEYS = [
@@ -19,7 +19,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  uninstallFetchHook();
+  uninstallCorrelationFetchHook();
   _resetInitForTest();
   globalThis.fetch = originalFetch;
   for (const k of ENV_KEYS) {

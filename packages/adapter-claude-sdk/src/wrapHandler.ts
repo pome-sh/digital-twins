@@ -1,10 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Wraps an MCP tool handler so each invocation runs inside an
-// AsyncLocalStorage scope carrying the tool call's id. The fetch hook
-// (`./fetch.ts`) reads that id from ALS and stamps it onto the
+// AsyncLocalStorage scope carrying the tool call's id. The fetch hook in
+// `@pome-sh/wire/correlation` reads that id from ALS and stamps it onto the
 // `x-pome-correlation-id` header for allowlisted twin origins, so the twin's
 // `TwinHttpEvent` row can be correlated back to the calling tool invocation.
+//
+// F-950: the store, the header injection and the fallback id minter are
+// framework-agnostic and now live in `@pome-sh/wire/correlation`. THIS FILE IS
+// THE CLAUDE-SPECIFIC HALF, and it is a small one: read the Claude Agent SDK's
+// own `tool_use_id` off the MCP `_meta` key its CLI stamps, then open a
+// correlation scope around the handler. A Vercel AI SDK or LangGraph adapter
+// would replace `readSdkToolUseId` and reuse everything else verbatim.
 //
 // FDRS-407: no longer writes a legacy `tool_call` signal. The on-disk
 // `ToolUseEvent` row is emitted by the message-stream wrapper (FDRS-408)
@@ -16,8 +23,7 @@
 // to the tool call that caused it, and every twin row stayed an orphan with a
 // null parent. See `readSdkToolUseId` for where the real id comes from.
 
-import { callContext } from "./als.js";
-import { generateToolCallId } from "./ids.js";
+import { generateToolCallId, withCorrelation } from "@pome-sh/wire/correlation";
 
 // The MCP `_meta` key the Claude Code CLI stamps on every `tools/call` it
 // dispatches to an in-process SDK MCP server. Measured against
@@ -51,6 +57,6 @@ export function wrapHandler<A, R>(handler: (args: A, extra: unknown) => R | Prom
     // header populated (and the pre-F-1200 behaviour intact) on any runtime that
     // does not stamp the real id.
     const tool_call_id = readSdkToolUseId(extra) ?? generateToolCallId();
-    return callContext.run({ tool_call_id }, () => Promise.resolve(handler(args, extra)));
+    return withCorrelation(tool_call_id, () => Promise.resolve(handler(args, extra)));
   };
 }

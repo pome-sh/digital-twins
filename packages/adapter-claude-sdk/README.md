@@ -70,6 +70,22 @@ allowlist) over a `pomeFetch` helper, sidechannel-only correlation, or
 side-effect import is captured in the `[DECISION]` comment on
 [FDRS-322](https://linear.app/pome-sh/issue/FDRS-322).
 
+### Where the correlation core lives (F-950)
+
+The correlation mechanism itself is **not in this package**. The
+`AsyncLocalStorage` store, the `x-pome-correlation-id` fetch injection, and the
+fallback id minter are framework-agnostic and live in
+[`@pome-sh/wire/correlation`](../wire/README.md#pome-shwirecorrelation), so a
+Vercel AI SDK or LangGraph adapter gets the same race-proof guarantee without
+re-deriving it. Wire is inlined into this package's bundle, so the published
+tarball still has no `@pome-sh/*` runtime dependency.
+
+What is Claude-specific, and stays here: reading the SDK's real `tool_use_id` off
+the MCP `_meta["claudecode/toolUseId"]` key (`src/wrapHandler.ts`), the `tool()`
+and `query()` wrappers, and `withPome()`'s `POME_*` env-var host inference. The
+split boundary is one line per framework — where the tool-call id comes from and
+where the scope opens.
+
 ## Caveats
 
 - **HTTP layer is `globalThis.fetch` only.** Node 18+ `undici`, browser fetch,

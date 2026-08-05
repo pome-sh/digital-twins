@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "vitest";
-import { currentToolCallId } from "../src/als.js";
+import { currentToolCallId } from "@pome-sh/wire/correlation";
 import { wrapHandler } from "../src/wrapHandler.js";
 
 describe("wrapHandler", () => {
@@ -11,7 +11,7 @@ describe("wrapHandler", () => {
     expect(result).toEqual({ doubled: 42 });
   });
 
-  it("sets tool_call_id in callContext during handler execution", async () => {
+  it("sets tool_call_id in the correlation scope during handler execution", async () => {
     let seenId: string | null = null;
     const wrapped = wrapHandler(async () => {
       seenId = currentToolCallId();
@@ -21,7 +21,7 @@ describe("wrapHandler", () => {
     expect(seenId).toMatch(/^tlc_/);
   });
 
-  it("clears callContext after handler exits", async () => {
+  it("clears the correlation scope after handler exits", async () => {
     const wrapped = wrapHandler(async () => null);
     await wrapped({});
     expect(currentToolCallId()).toBeNull();
@@ -57,7 +57,7 @@ describe("wrapHandler", () => {
     await expect(wrapped({})).rejects.toThrow("inner exploded");
   });
 
-  it("clears callContext even when handler throws", async () => {
+  it("clears the correlation scope even when handler throws", async () => {
     const wrapped = wrapHandler(async () => {
       throw new Error("x");
     });
