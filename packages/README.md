@@ -31,8 +31,15 @@ drifted. Now:
   pulling all five twins (and five SQLite schemas) into the CLI's startup
   path, and `pome twin start github` only pays for github.
 
-If you're adding a sixth twin, this file is the whole surface — no other list
-to keep in sync.
+If you're adding a sixth twin, this file is the whole surface for **booting**
+it — no other boot-time list to keep in sync. Two coordinated updates still
+live outside the registry, by design (they're not "does this twin exist",
+they're "what does this specific twin need"): `cli/src/doctor/scan.ts`'s
+per-twin egress hostname (for preflight network checks) and
+`cli/src/runner/runTaskHosted.ts`'s per-twin hosted-credential branch (each
+twin's provider-credential shape differs — github/stripe get a bearer token,
+slack uses the plain agent token, gmail has no `provider_credentials` shape
+at all). Adding a twin means updating those two alongside the registry.
 
 ## `@pome-sh/wire` — the shared trace surface
 
