@@ -305,6 +305,13 @@ describe("migrated sentences", () => {
     // `20-slack-exfiltration.md` carried before F-1126 replaced it. If a
     // template drifts, the corpus stops binding and the D6 arm goes red in
     // pome-cloud instead of here — one repo too late, and after a release.
+    //
+    // F-1303 DELETED the first one's corpus user, so this row now pins a
+    // template with no shipped criterion behind it. It stays for the reason the
+    // `messageContains` case below stays: a declared check is part of the
+    // published vocabulary whether or not this repo's own tasks reach for it,
+    // and a template that drifts while unused breaks the next author to pick it.
+    // pome-cloud's resolver reports the check as unbound rather than failing it.
     expect(renderCheck(noMessagePosted, { channel: "general" })).toBe(
       'No message was posted to the "general" channel',
     );
