@@ -28,9 +28,9 @@
 // WHAT IT IS NOT — and this is the correction worth recording, because the
 // obvious diagnosis is wrong. It is NOT the repository's fork-PR
 // contributor-approval policy (`approval_policy: first_time_contributors`).
-// `dependabot[bot]` and `renovate[bot]` open PRs on same-repo branches in this
-// repo under that exact setting and their runs go green. Only
-// `github-actions[bot]` parks. So loosening a repo setting fixes nothing; the
+// `renovate[bot]` opens PRs on same-repo branches in this repo under that
+// exact setting and its runs go green. Only `github-actions[bot]` parks. So
+// loosening a repo setting fixes nothing; the
 // axis is the token. This is GitHub's anti-recursion guard — deliberate design,
 // not a bug — and the only durable fix is to stop using the ambient token to
 // push the release branch. `RELEASE_BOT_TOKEN` (a PAT, the `SPECS_BOT_TOKEN`

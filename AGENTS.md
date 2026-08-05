@@ -73,8 +73,8 @@ ambient `GITHUB_TOKEN` leaves `main`'s three required contexts sitting in
 (only a failed one). This never worked; it looked like it did because someone
 always pushed an empty commit afterwards, and that human-triggered run satisfied
 the contexts. It is **not** the repo's fork-PR contributor-approval setting —
-dependabot and renovate open same-repo PRs here under that same setting and go
-green; only `github-actions[bot]` parks. `cli-release.yml` prefers the repo
+Renovate opens same-repo PRs here under that same setting and they go green;
+only `github-actions[bot]` parks. `cli-release.yml` prefers the repo
 secret `RELEASE_BOT_TOKEN` (a PAT with contents + pull-requests write, the
 `SPECS_BOT_TOKEN` equivalent from F-1115) and falls back to `GITHUB_TOKEN`.
 While that secret is missing, releases still open a PR but
@@ -97,9 +97,10 @@ section in the same PR.
 | Invariant | Enforced by |
 | --- | --- |
 | npm only | root `packageManager` is npm; CI/Docker use `npm ci` and committed `package-lock.json` |
+| Renovate is the sole dependency updater — fortnightly batched non-majors, ≤1 concurrent PR, security anytime; ignores release-gated `@pome-sh/*` npm bumps | [`renovate.json`](renovate.json) (Mend Renovate GitHub App) |
 | Capture is open, evaluation is the product — no local eval/scoring/judging/correlation anywhere in `cli/src/**`, `cli/scripts/**`, `packages/**`, or repo-root `scripts/**` | [`scripts/no-eval-in-oss.mjs`](scripts/no-eval-in-oss.mjs) (`npm run gate:no-eval`) in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) — repo-wide, path + module-name + import denylist, empty file allowlist. The module-name rule is a **prefix** match (`correlate*`/`score*`/`judge*`/`verdict*`); an infix like `runScorer.ts` relies on the import rule instead — accepted policy, not a gap. |
 | No cloud imports in OSS (`packages/`, `cli/src/`, `cli/scripts/`, `scripts/`) — including bare `pome-cloud/*` | [`scripts/lint-no-cloud-imports.sh`](scripts/lint-no-cloud-imports.sh) (+ fixture test `scripts/lint-no-cloud-imports.test.sh`) |
-| Public `main` protection (classic: strict required checks + no force-push/delete; ruleset `main founder-bypass`: PR + 1 review + conversation resolution + same checks, with team `founder` bypass so founders can self-merge) | [`scripts/ci/assert-repo-policy.sh`](scripts/ci/assert-repo-policy.sh) via [`.github/workflows/repo-policy.yml`](.github/workflows/repo-policy.yml) (offline fixtures in CI; live drift needs Actions secret `REPO_POLICY_TOKEN` — fine-grained PAT with Administration: Read-only; `GITHUB_TOKEN` cannot hold that scope) |
+| Public `main` protection (classic: strict required checks + no force-push/delete; ruleset `main founder-bypass`: PR + conversation resolution + same checks, zero required approving reviews so either founder can merge on green CI; team `founder` bypass kept) | [`scripts/ci/assert-repo-policy.sh`](scripts/ci/assert-repo-policy.sh) via [`.github/workflows/repo-policy.yml`](.github/workflows/repo-policy.yml) (offline fixtures in CI; live drift needs Actions secret `REPO_POLICY_TOKEN` — fine-grained PAT with Administration: Read-only; `GITHUB_TOKEN` cannot hold that scope) |
 | Twin image publish waits for both `ci.yml` and `secret-scan.yml` on the same SHA; PR image matrix builds only changed twins (full matrix on main/tags) | [`scripts/ci/wait-for-workflow.sh`](scripts/ci/wait-for-workflow.sh) in [`.github/workflows/twin-image.yml`](.github/workflows/twin-image.yml); regression: [`scripts/ci/wait-for-workflow.test.mjs`](scripts/ci/wait-for-workflow.test.mjs) |
 | Required `typecheck-test` always reports on PRs; heavy npm build/test/parity is skipped for docs/chore-only diffs | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) path-aware scope step |
 | No cross-package file copies | [`scripts/check-copy-markers.mjs`](scripts/check-copy-markers.mjs) (empty allowlist) |
@@ -118,8 +119,9 @@ section in the same PR.
 
 ## Public Repo Guardrails
 
-The public `main` branch requires reviewed PRs and green required checks before
-merge. Direct pushes are reserved for release automation only.
+The public `main` branch requires a PR and green required checks before merge
+(no approving-review gate — the founder team is two people). Direct pushes are
+reserved for release automation only.
 
 “Zero embedded cloud config” means no credentials and no non-overridable env
 wiring. An overrideable public API base (`https://api.pome.sh`, via

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://pome.sh/schemas/v1/pome.json",
+  "agent": {
+    "slug": "support-triage",
+    "name": "Support Triage",
+    "description": "Triages #support bug reports into GitHub issues, and is supposed to notice when one is already tracked",
+    "version": "v1",
+    "framework": "claude-agent-sdk"
+  },
+  "command": "npm --prefix local run start",
+  "twins": ["github", "slack"],
+  "tasks": "tasks",
+  "artifacts_dir": "runs",
+  "pass_threshold": 100
+}

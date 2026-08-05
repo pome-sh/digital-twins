@@ -6,8 +6,13 @@ issue in `acme/orders-service`, and posts the tracking link back to `#support`.
 Two twins in one run — the **Slack twin** (where the report arrives) and the
 **GitHub twin** (where the issue lives).
 
-The pack exists to demo a reproducible **FAIL → FIX → PASS** on Pome using two
-versions of the agent that differ by exactly **one line**:
+The pack exists to demo a reproducible **FAIL → FIX → PASS** on Pome, and it does
+it on **two runtimes**. The graded one — curriculum lesson #1 — is the local
+examinee, whose flaw is a committed tool-policy defect; jump to
+[the lesson](#lesson-the-agent-that-could-not-look-before-it-leapt).
+
+The managed-agent path tells the same story through a pair of prompts that differ
+by exactly **one line**:
 
 - `agents/support-triage-v1.yaml` — **baseline**. Its charter tells the agent
   *not* to search existing issues. On a re-reported bug it files a **duplicate**
@@ -37,27 +42,35 @@ open issue #1 for the coupon bug, then `#support` receives a *new* report of the
 | criterion | kind | checks |
 |---|---|---|
 | a `#support` message links `issues/1` | code:slack | the agent linked the *existing* issue, not a new one |
-| recognized the existing issue, opened no duplicate | model | the dedup decision |
+| no new issues in `acme/orders-service` | code:github | **the lesson itself** — a duplicate was not filed |
+| commented on issue #1 | model | the report was attached to the existing issue |
 | concrete repro steps | model | quality of the tracked report |
+
+The dedup decision used to be graded by the judge alone, which made it possible
+to link `issues/1` *and* file a duplicate and still score 100 — the exact
+necessary-but-not-sufficient hole `docs/curriculum/failure-classes.md` §4.2 warns
+about. `github.no-new-issues` closes it: the state claim is `[code]`, and the
+judge is left grading text, which is all §4.3 ever wanted from it.
 
 ## Run it against Pome
 
-The two versions are exercised as **two distinct agents** end-to-end, so the
-dashboard shows two separate identities with separate scores.
+The two versions are **one agent at two declared versions**, so the dashboard
+can show the v1→v2 delta rather than two unrelated identities with no
+relationship between them.
 
 1. **Register on Cloud Managed Agents** — create each agent from its YAML on
    Anthropic's Managed Agents platform (`ant beta:agents create`, model
    `claude-sonnet-5`).
-2. **Register on Pome** (control MCP) — one call per version, so each accrues its
-   own history:
+2. **Register on Pome** (control MCP) — once. The version is not part of the
+   identity; it is declared per run in step 3:
    ```
-   register_agent(name="support-triage-v1", twins=["github","slack"])
-   register_agent(name="support-triage-v2", twins=["github","slack"])
+   register_agent(name="support-triage", twins=["github","slack"])
    ```
-3. **Run** — for each agent id, `run_trials(task_id, agent_id, n=5)`. Each
-   trial returns an `examinee_launch` spec (per-session twin MCP URLs, a bearer,
-   `always_allow`, a `network.mode: limited` clamp, web tools off). Assemble the
-   examinee clone from that spec (mirrors
+3. **Run** — `run_trials(task_id, agent_id, agent_version="v1", n=5)`, then the
+   same call with `agent_version="v2"`. Each trial returns an `examinee_launch`
+   spec (per-session twin MCP URLs, a bearer, `always_allow`, a
+   `network.mode: limited` clamp, web tools off). Assemble the examinee clone
+   from that spec (mirrors
    `pome-run-task/references/launch-managed-agent.md`), give it
    `examinee_task.prompt`, and let it work.
 4. **Finalize** — `finalize_run(session_id, agent_token)` the instant the
@@ -65,26 +78,169 @@ dashboard shows two separate identities with separate scores.
    `get_report` for the score. Tear the clone down afterward — clones are
    ephemeral, one per trial.
 
-The self-fix loop is the swap between step 3's two agents: run v1 → watch it fail
-by filing a duplicate → switch to v2 (the one-line fix) → watch it pass.
+The self-fix loop is the swap between step 3's two versions: run v1 → watch it
+fail by filing a duplicate → re-run as v2 (the one-line fix) → watch it pass.
+Declare the version on **both** runs. Run-sets are partitioned by
+`(agent, task, agent_version)`, so two runs under one label are read as one
+agent tried twice — and the v1→v2 improvement gets reported as that agent
+being unreliable. Pass the v1 run's `group_id` as the v2 run's
+`baseline_group_id` and the report pairs them into a fail→green comparison.
+
+## Lesson: the agent that could not look before it leapt
+
+This is the curriculum's **lesson #1**, and the graded baseline lives in
+[`local/`](./local/) — the same agent as a Claude Agent SDK process on your
+machine. The one line under test is `DENY_ISSUE_LOOKUP` in
+[`local/src/index.ts`](./local/src/index.ts).
+
+> **Two runtimes, one story, two different flaws.** The `agents/*.yaml` pair
+> above tells this story on Anthropic's Managed Agents platform through a
+> *prompt* flaw — a charter line telling the agent not to search. That is a
+> **pattern-2** baseline (`pome-cloud docs/curriculum/failure-classes.md` §3):
+> legitimate, but its red is model-dependent. The local examinee is the
+> **pattern-1** version and it is the one the curriculum grades. Both are kept
+> because the pair is genuinely useful for the managed-agent path; only one is
+> the lesson.
+
+### What breaks
+
+A customer re-reports a bug that open issue #1 in `acme/orders-service` already
+tracks. The agent's instructions are **correct** — *search the open issues first;
+only open a new one if nothing already tracks the bug* — and it follows them. It
+reaches for the lookup and is refused, because the examinee's committed tool
+policy denies every read path into the repository's issues:
+
+```ts
+const ISSUE_LOOKUP_TOOLS = [
+  "mcp__github__search_issues",
+  "mcp__github__list_issues",
+  "mcp__github__get_issue",
+];
+const DENY_ISSUE_LOOKUP = true;   // ← ships as the baseline
+```
+
+So it concludes, honestly and wrongly, that the bug is untracked — and files a
+second issue for it. **The agent did nothing wrong.** Its context was corrupted
+before it ever reasoned.
+
+Two properties make this worth a lesson rather than a bug report:
+
+* ~~**It cannot rot green** (§3, pattern 1).~~ **This claim was measured false
+  on 2026-08-04** and is kept struck through rather than deleted, because the
+  reasoning error is the lesson. The argument was: *no model capability can call
+  a tool that was never exposed*. True, and beside the point — the model never
+  needed the denied tool. It built the read out of an allowed **write**
+  (`update_issue` 404s on a missing issue) and out of the SDK's **shell**. A
+  denial is only as strong as the enumeration behind it. See
+  [F-1292](https://linear.app/pome-sh/issue/F-1292).
+* **It is the most common real version of this bug.** Over-restrictive tool
+  allowlists are a production default. Nobody writes "don't dedup" in a system
+  prompt; plenty of people ship an agent that cannot see what it needs to.
+
+### Run the failing baseline
+
+The defect ships as the default, so the failing run is the plain one:
+
+```bash
+pome run tasks/duplicate-issue.md -n 5
+```
+
+`runs: 5` is in the task config on purpose — the report teaches **pass^k**, and
+one trial proves nothing.
+
+> ⚠️ **NOT verified red — measured 2026-08-04 and it PASSED 4 of 5.**
+> `claude-opus-5`, n=5, hosted: `25 · 100 · 100 · 100 · 100`. No trial filed a
+> duplicate. Four reached issue #1 anyway — one route was `update_issue` used as
+> an existence oracle, the other was the SDK's shell reading the fixture out of
+> this very file's neighbours. The numbers, the run ids and both routes are in
+> [`VERIFICATION.md`](./VERIFICATION.md); the re-cut is
+> [F-1292](https://linear.app/pome-sh/issue/F-1292).
+>
+> **Everything in the three sections below describes the baseline as designed,
+> not as it behaves.** Read them as the intent under repair.
+
+### Read the report
+
+The pivotal criterion is the `#support` message linking `issues/1`. Under the
+baseline the agent links `issues/2` — the one it just created — so the criterion
+fails on a deterministic state read rather than a judge's opinion, and the
+state-diff panel shows `issues: 1 → 2`.
+
+The span waterfall shows the rest of the story, and it is the part that makes the
+diagnosis fast: a `search_issues` tool span that returns a refusal, followed by
+`create_issue`. The agent tried.
+
+### The fix
+
+One line in [`local/src/index.ts`](./local/src/index.ts):
+
+```diff
+-const DENY_ISSUE_LOOKUP = true;
++const DENY_ISSUE_LOOKUP = false;
+```
+
+### Re-run green
+
+```bash
+pome run tasks/duplicate-issue.md -n 5
+```
+
+The agent searches, finds issue #1, comments on it, and posts *its* link back to
+`#support`. State-diff: `issues: 1 → 1` plus a comment.
+
+### Customize
+
+* **Deny one tool instead of three.** Leave `list_issues` reachable and watch the
+  agent route around the defect — a useful demonstration that a partial denial is
+  not a defect at all, and why the baseline names every read path.
+* **Move the flaw to the write side.** Deny `add_issue_comment` instead: now the
+  agent *finds* the duplicate and still cannot do the right thing, which is a
+  different failure with the same symptom. Worth running once to see how much the
+  report distinguishes them.
+
+### If your baseline passes / your fix fails
+
+* **Baseline passes (stays green).** Check the waterfall for a `search_issues` or
+  `list_issues` span that *succeeded* — if one did, the twin exposed a read path
+  the denial list does not name, and the fix is to add it (and to say so in
+  `ISSUE_LOOKUP_TOOLS`), not to weaken the criteria. `test/tool-policy.test.ts`
+  pins the list for exactly this reason.
+* **Fix fails (stays red).** If a criterion reads `NOT EVALUATED` rather than
+  failed, the run is `INCOMPLETE` — the grader could not see that state at all,
+  which is a wiring problem rather than an agent problem. `pome run` exits 1 on
+  that too, and the score names its own denominator. If the `[model]` criteria
+  are the red ones, raise `-n`: one clean set is a signal, not proof.
+
+### Known gap in the criteria
+
+The criteria above assert that the agent **linked the right issue**. They do not
+yet assert that it **opened no second one** — a negative assertion the declared
+GitHub vocabulary could not express until `github.no-new-issues`
+([F-1198](https://linear.app/pome-sh/issue/F-1198)). Until that check reaches the
+cloud's pin, an agent that comments on #1, posts the link *and also* files a
+duplicate passes. Said out loud here rather than left for a reader to discover,
+because this example is the one that defines the standard.
 
 ## Local examinee
 
 [`local/`](./local/) is the same agent as a minimal **Claude Agent SDK process
 on your machine** — no managed-agent platform needed. The coach spawns it as a
 subprocess after `run_task` (per-twin MCP URLs + bearer arrive via env), it
-works the task over MCP, and exits when done. The v1/v2 one-liner lives as a
-prompt constant in its code: v1 ships as the default, the fix is a one-line
-swap. See [`local/README.md`](./local/README.md).
+works the task over MCP, and exits when done. It imports `query` from
+`@pome-sh/adapter-claude-sdk` rather than the raw SDK — a drop-in that also
+emits gen_ai OTLP spans, so the report carries model, per-turn tokens and
+latency. See [`local/README.md`](./local/README.md).
 
 ## Layout
 
 ```
-agents/support-triage-v1.yaml   baseline (files a duplicate) — fails
-agents/support-triage-v2.yaml   fixed (searches first) — passes; one line different
+pome.json                       committed manifest: agent.slug + framework + tasks dir
+agents/support-triage-v1.yaml   managed-agent baseline (prompt flaw, pattern 2)
+agents/support-triage-v2.yaml   managed-agent fix; one line different
 tasks/duplicate-issue.md        the task (inline ## Seed State)
-local/                          the same agent as a local Claude Agent SDK examinee
-VERIFICATION.md                 measured v1-vs-v2 results with run ids
+local/                          the graded examinee — the pattern-1 baseline lives here
+local/test/tool-policy.test.ts  the lesson pinned as a property (both branches)
+VERIFICATION.md                 measured results, and what each measurement was of
 ```
 
 ## Notes

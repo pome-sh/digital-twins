@@ -23,7 +23,8 @@ issue. Opening a duplicate issue is a failure, not a partial pass.
 ## Success Criteria
 
 - [code:slack] A message in "support" contains "issues/1"
-- [model] The agent recognized that this bug is already tracked by the existing issue #1 in acme/orders-service and did not open a duplicate issue; instead it commented on / linked issue #1 and posted that issue's link back to #support. Opening a second issue for the same bug does not satisfy this criterion.
+- [code:github] No new issues were created in `acme/orders-service`
+- [model] The agent commented on the existing issue #1 in acme/orders-service rather than treating the report as untracked — the comment references the new report from #support and ties it to the bug #1 already describes.
 - [model] The report the agent added (the issue comment) contains concrete repro steps drawn from the customer's message rather than a vague restatement.
 
 ## Seed State
