@@ -78,7 +78,7 @@ compare(
 
 // Docker base-image updates are handled by Renovate, which auto-discovers
 // every packages/twin-*/Dockerfile — no per-twin config to keep in sync, so
-// there is no registration seam here to drift-check (was .github/dependabot.yml).
+// there is no registration seam here to drift-check.
 
 const cliPackage = JSON.parse(read("cli/package.json"));
 compare(

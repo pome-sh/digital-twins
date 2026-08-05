@@ -1,7 +1,7 @@
 {
   "name": "@pome-sh/twin-slack",
-  "version": "0.3.2",
-  "description": "Deterministic Slack Web API twin for agent testing \u2014 REST + MCP, SQLite-backed state.",
+  "version": "0.3.3",
+  "description": "Deterministic Slack Web API twin for agent testing — REST + MCP, SQLite-backed state.",
   "private": true,
   "type": "module",
   "main": "./dist/src/index.js",
@@ -43,18 +43,18 @@
     "fidelity:parity": "tsx scripts/fidelity-parity.ts"
   },
   "dependencies": {
-    "@hono/node-server": "^2.0.10",
+    "@hono/node-server": "^2.1.0",
     "@pome-sh/sdk": "*",
     "@pome-sh/shared-types": "*",
-    "hono": "^4.12.31",
-    "zod": "^4.1.13"
+    "hono": "^4.13.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@slack/web-api": "^8.0.0",
-    "@types/node": "^26.1.0",
+    "@types/node": "^26.1.2",
     "@vitest/coverage-v8": "4.1.10",
-    "tsx": "^4.23.1",
+    "tsx": "^4.23.5",
     "typescript": "^5.9.3",
     "vitest": "^4.1.10"
   },

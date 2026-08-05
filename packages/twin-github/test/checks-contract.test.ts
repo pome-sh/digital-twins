@@ -31,6 +31,7 @@ const CHECKS = GITHUB_CHECKS as readonly unknown[] as readonly OpenCheck[];
 // with no fixture fails rather than silently skipping every property here.
 const FIXTURES: Record<string, Record<string, string>> = {
   "github.no-new-labels": { repo: "acme/api" },
+  "github.no-new-issues": { repo: "acme/api" },
   "github.issue-exists": { issue: "1", repo: "acme/api" },
   "github.issue-state": { issue: "1", repo: "acme/api", state: "closed" },
   "github.issue-has-label": { issue: "1", repo: "acme/api", label: "bug" },
@@ -62,6 +63,12 @@ const FIXTURES: Record<string, Record<string, string>> = {
 //      is worth paying — but it must be admitted, not hidden.
 const HONEST_NULL_MUTANTS: Record<string, string> = {
   "github.no-new-labels": "the repo is a selector, not a scanned literal",
+  // F-1198, and it is argument 1 verbatim — same shape as its sibling above.
+  // The repo is the only slot and it purely selects; falsifying it early-returns
+  // "repo not found" on every seed, so the number comparison never runs. There is
+  // no second slot to falsify because the assertion is a set difference, not a
+  // literal hunted inside state.
+  "github.no-new-issues": "the repo is a selector, not a scanned literal",
   "github.issue-state": "the state is a closed set; the issue number only selects",
   "github.pr-state": "the state is a closed set; the PR number only selects",
   "github.pr-review-exists": "the review state is a closed set; the PR number only selects",

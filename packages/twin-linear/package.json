@@ -1,7 +1,7 @@
 {
   "name": "@pome-sh/twin-linear",
-  "version": "0.3.2",
-  "description": "Deterministic Linear-shaped twin for agent testing \u2014 SQLite-backed GraphQL + MCP + OAuth.",
+  "version": "0.3.3",
+  "description": "Deterministic Linear-shaped twin for agent testing — SQLite-backed GraphQL + MCP + OAuth.",
   "private": true,
   "type": "module",
   "main": "./dist/src/index.js",
@@ -42,16 +42,16 @@
     "fidelity:parity": "tsx scripts/fidelity-parity.ts"
   },
   "dependencies": {
-    "@hono/node-server": "^2.0.10",
+    "@hono/node-server": "^2.1.0",
     "@pome-sh/sdk": "*",
     "graphql": "^16.11.0",
-    "hono": "^4.12.31",
-    "zod": "^4.1.13"
+    "hono": "^4.13.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@linear/sdk": "^55.0.0",
-    "@types/node": "^26.1.0",
-    "tsx": "^4.23.1",
+    "@types/node": "^26.1.2",
+    "tsx": "^4.23.5",
     "typescript": "^5.9.3",
     "vitest": "^4.1.10"
   },
