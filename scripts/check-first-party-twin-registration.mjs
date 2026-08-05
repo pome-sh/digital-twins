@@ -92,12 +92,15 @@ compare(
     .map((name) => name.slice("@pome-sh/twin-".length)),
 );
 
-const rootPackage = JSON.parse(read("package.json"));
-for (const twin of canonical) {
-  if (!rootPackage.scripts.build.includes(`-w @pome-sh/twin-${twin}`)) {
-    failures.push(`package.json build: missing @pome-sh/twin-${twin}`);
-  }
-}
+// package.json's `build` script used to hand-name every twin
+// (`npm run build -w @pome-sh/twin-x && ...`), which was itself a drift-prone
+// registration seam. scripts/build.mjs replaced it with a topological sort
+// over the workspace's own dependency graph (`npm query .workspace`) — it
+// enumerates every workspace member with a `build` script and orders them by
+// their real `@pome-sh/*` edges, naming no package. A twin missing from the
+// build is no longer expressible: it would have to be missing from the
+// workspace entirely, which is a different failure this script cannot see
+// and don't need to — `npm query .workspace` would already refuse to resolve.
 
 for (const workflow of [
   ".github/workflows/twin-image.yml",
