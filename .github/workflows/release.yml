@@ -49,9 +49,25 @@ jobs:
           # not a skip.
           decide() {
             local name="$1" manifest="$2" output="$3"
-            local local_version registry_version
+            local local_version registry_version npm_view_err
             local_version="$(node -p "require('./${manifest}').version")"
-            registry_version="$(npm view "${name}" version 2>/dev/null || echo "0.0.0")"
+            npm_view_err="$(mktemp)"
+            if registry_version="$(npm view "${name}" version 2>"${npm_view_err}")"; then
+              :
+            elif grep -q "E404" "${npm_view_err}"; then
+              # Genuinely unpublished (brand-new package) — 0.0.0 is correct.
+              registry_version="0.0.0"
+            else
+              # A registry/network/auth error is NOT "unpublished": treating it
+              # as 0.0.0 would make any local version look publishable and
+              # bypass the floor check below, which exists specifically to
+              # stop retagging npm's latest backwards.
+              echo "::error::npm view ${name} failed for a reason other than 'not found':"
+              cat "${npm_view_err}" >&2
+              rm -f "${npm_view_err}"
+              exit 1
+            fi
+            rm -f "${npm_view_err}"
             echo "${name} — local: ${local_version}, registry: ${registry_version}"
             if [ "${local_version}" = "${registry_version}" ]; then
               echo "${output}=false" >> "$GITHUB_OUTPUT"
