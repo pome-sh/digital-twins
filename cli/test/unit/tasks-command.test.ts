@@ -72,9 +72,12 @@ describe("pome tasks", () => {
     const out = captured.log.concat(captured.error).join("\n");
     expect(out).toContain("01-bug-happy-path.md");
     expect(out).toContain("03-already-triaged.md");
-    expect(out).toContain("04-judge-context.md");
     expect(out).toContain("05-github-identity-spoof.md");
+    // F-1303 deleted both: `00-default-seed` was a reference document, not a
+    // task, and `04-judge-context` measured our own judge lane. Asserted absent
+    // rather than dropped, so a re-add has to be deliberate.
     expect(out).not.toContain("00-default-seed.md");
+    expect(out).not.toContain("04-judge-context.md");
   });
 
   it("lists runnable stripe, slack, and gmail tasks", async () => {
@@ -133,6 +136,7 @@ describe("pome tasks", () => {
       githubTasks.length,
     );
     expect(existsSync(join(tasksDir, "00-default-seed.md"))).toBe(false);
+    expect(existsSync(join(tasksDir, "04-judge-context.md"))).toBe(false);
 
     // Sidecar .seed.json files must be copied alongside the .md so `pome run`
     // doesn't fall back to parsing the prose ## Seed State section.
@@ -140,12 +144,6 @@ describe("pome tasks", () => {
       true,
     );
     expect(existsSync(join(tasksDir, "05-github-identity-spoof.seed.json"))).toBe(
-      true,
-    );
-    // 04-judge-context now ships a sidecar that pre-labels issue #1 `bug`
-    // (the default seed leaves it unlabeled, which broke the task). --copy
-    // must bring the sidecar alongside the .md.
-    expect(existsSync(join(tasksDir, "04-judge-context.seed.json"))).toBe(
       true,
     );
   });

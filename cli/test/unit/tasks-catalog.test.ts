@@ -30,15 +30,21 @@ describe("tasks catalog", () => {
     expect(findTwin("not-a-twin")).toBeNull();
   });
 
-  it("the only non-runnable entry is the github default seed", () => {
+  // F-1303 deleted `00-default-seed.md`, which was the only `runnable: false`
+  // entry — a "seed-only reference document (not a task)" that nonetheless
+  // contributed three `[code]` criteria to the scored corpus.
+  //
+  // Pinned at ZERO rather than deleted with it. `runnableTasks()` still filters,
+  // and a filter whose input can never match is indistinguishable from one that
+  // works — so the count is asserted, and the next entry to carry the flag
+  // (F-1305's twin-smoke tasks) has to turn this red on the way in.
+  it("no catalog entry is non-runnable today", () => {
     const nonRunnable = TASK_TWINS.flatMap((twin) =>
       twin.tasks
         .filter((t) => !t.runnable)
         .map((t) => ({ twin: twin.id, filename: t.filename })),
     );
-    expect(nonRunnable).toEqual([
-      { twin: "github", filename: "00-default-seed.md" },
-    ]);
+    expect(nonRunnable).toEqual([]);
   });
 
   it("every catalog filename resolves to a bundled task file", () => {
