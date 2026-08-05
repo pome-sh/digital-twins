@@ -168,3 +168,56 @@ describe("barrel re-export identity (leaf and barrel are the same object)", () =
     expect(api.redactSecrets).toBe(redaction.redactSecrets);
   });
 });
+
+// F-950. `correlation/` is a SUBPATH-ONLY surface (`@pome-sh/wire/correlation`),
+// the same call `otel/fixtures` makes. Importing it constructs an
+// AsyncLocalStorage and pulls in `node:async_hooks` + `node:crypto`; the five
+// twins, the sdk and the CLI all import the root barrel and none of them is the
+// agent side of this protocol, so only a framework adapter should pay for it.
+//
+// The root-barrel snapshot above is already the guard against a leak — an
+// `export * from "./correlation/index.js"` added to `src/index.ts` would fail
+// it. These cases are the other half: the subpath's own surface, which a future
+// Vercel AI SDK / LangGraph adapter imports by name and which must not drift
+// silently.
+describe("@pome-sh/wire/correlation subpath surface (F-950)", () => {
+  const EXPECTED_CORRELATION_EXPORTS = [
+    "CORRELATION_HEADER",
+    "correlationContext",
+    "currentToolCallId",
+    "generateToolCallId",
+    "getCorrelationAllowlist",
+    "installCorrelationFetchHook",
+    "setCorrelationAllowlist",
+    "uninstallCorrelationFetchHook",
+    "withCorrelation",
+  ] as const;
+
+  it("exports exactly the framework-agnostic correlation surface", async () => {
+    const correlation = await import("../src/correlation/index.js");
+    expect(Object.keys(correlation).sort()).toEqual([...EXPECTED_CORRELATION_EXPORTS]);
+  });
+
+  it("stays off the root barrel", async () => {
+    for (const name of EXPECTED_CORRELATION_EXPORTS) {
+      expect(Object.keys(api)).not.toContain(name);
+    }
+  });
+
+  it("re-exports the same objects as the leaves (one store, one header)", async () => {
+    const correlation = await import("../src/correlation/index.js");
+    const context = await import("../src/correlation/context.js");
+    const fetchHook = await import("../src/correlation/fetch.js");
+    expect(correlation.correlationContext).toBe(context.correlationContext);
+    expect(correlation.withCorrelation).toBe(context.withCorrelation);
+    expect(correlation.CORRELATION_HEADER).toBe(fetchHook.CORRELATION_HEADER);
+  });
+
+  it("pins the header name the twins' recorders read back", async () => {
+    // Both sides of one wire protocol: the recorders read this exact literal
+    // (`packages/sdk/src/recorder.ts`, `mcp-jsonrpc.ts`, the stripe/github
+    // twins). A rename here without a rename there breaks correlation silently.
+    const { CORRELATION_HEADER } = await import("../src/correlation/index.js");
+    expect(CORRELATION_HEADER).toBe("x-pome-correlation-id");
+  });
+});

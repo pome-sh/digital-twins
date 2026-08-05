@@ -1,7 +1,7 @@
 {
   "name": "@pome-sh/wire",
-  "version": "0.1.0",
-  "description": "Pome's wire format — Zod schemas for recorder events, the OpenTelemetry extension surface, and secret redaction. Shared by every twin, the sdk, the adapter and the CLI.",
+  "version": "0.2.0",
+  "description": "Pome's wire format — Zod schemas for recorder events, the OpenTelemetry extension surface, secret redaction, and framework-agnostic trace correlation. Shared by every twin, the sdk, the adapter and the CLI.",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
@@ -26,6 +26,10 @@
     "./redaction": {
       "types": "./dist/redaction.d.ts",
       "default": "./dist/redaction.js"
+    },
+    "./correlation": {
+      "types": "./dist/correlation/index.d.ts",
+      "default": "./dist/correlation/index.js"
     },
     "./package.json": "./package.json"
   },
