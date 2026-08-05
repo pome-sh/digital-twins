@@ -4,6 +4,25 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.21.2
+
+### Patch Changes
+
+- **F-948 live-audit fixes.** `pome twin reset linear` was rejected as
+  "Unknown twin" — `twin reset` hardcoded its own supported-twin set instead
+  of deriving it from the registry, so it silently fell out of sync when
+  linear shipped. `pome twin start --help` had the same drift: the `<name>`
+  argument's description listed four twins, missing linear. Both now derive
+  from `TWIN_NAME_LIST`.
+- The scaffolded quickstart agent (`examples/agents/scripted-triage-agent.ts`)
+  now runs via `node` instead of `npx tsx`. `pome run`'s egress-floor proxy
+  (deny-by-default: twin hosts + LLM providers + loopback only) was refusing
+  npx's own registry lookup for `tsx` on a machine that had never run it
+  before, so the documented zero-install quickstart (`pome init && pome run
+  --local tasks/01-bug-happy-path.md`) silently produced an empty trace.
+  Node ≥ 24 strips this file's type annotations natively, so no package
+  resolution — and no egress-floor conflict — is needed at all.
+
 ## 0.21.0
 
 ### Minor Changes
