@@ -11,6 +11,13 @@
 // mean each twin lands in its own lazily-loaded chunk: `pome twin start github`
 // never parses the other four twins or their SQLite schemas.
 //
+// Necessary but NOT sufficient, which is why F-1306 exists: splitting can only
+// defer what nothing on the startup path statically imports, and five modules
+// under `src/task/` imported three twins' package roots for a zod seed schema.
+// Both settings were doing their job and the claim was still false —
+// `pome --version` loaded 1183.6 KB, of which 697.9 KB was three twin servers.
+// `scripts/check-twin-chunk-laziness.mjs` asserts the graph these settings need.
+//
 // Entry name is `src/cli/main` rather than the default `main` deliberately —
 // `dist/src/cli/main.js` is the `bin` target, the path `contract/cli-start.test.mjs`
 // spawns, and the path quickstart-smoke runs. Keeping it identical means no

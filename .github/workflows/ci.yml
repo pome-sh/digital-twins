@@ -64,6 +64,16 @@ jobs:
       # F-778 — the legacy D/P criterion markers are retired; fail on any
       # reintroduction outside the parser's own legacy-detection code.
       - run: node scripts/lint-legacy-criterion-markers.mjs
+      # F-1306 — "each twin is a lazily-loaded chunk" was a comment in
+      # registry.ts and a 0.21.0 headline, and it was false for github, gmail and
+      # linear for six releases: five modules on the CLI's startup path imported
+      # those twins' package ROOTS to reach a zod seed schema, and a root export
+      # carries the domain and the Hono app too. `pome --version` parsed 698 KB of
+      # three twin servers. Nothing failed, so nothing noticed — it took a manual
+      # audit. Static-graph walk, no build and no install needed, so it belongs in
+      # this block rather than behind the heavy gate.
+      - run: node scripts/check-twin-chunk-laziness.mjs
+      - run: node scripts/check-twin-chunk-laziness.test.mjs
       # F-745 / D4 — no catch-and-continue in the SDK twin engine
       # (packages/sdk/src): every statement catch must throw, return an
       # error/sentinel, or reject. Dependency-free, runs before `npm ci`.
