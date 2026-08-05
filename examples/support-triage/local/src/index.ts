@@ -68,8 +68,17 @@ const ISSUE_LOOKUP_TOOLS = [
   "mcp__github__get_issue",
 ];
 
-// ⛔ Ships as `true` — the failing baseline. Set it to `false`; that is the fix.
-const DENY_ISSUE_LOOKUP = true;
+// RETIRED as the lesson, and now ships `false`. Founder ground rule, 2026-08-05:
+// an exam may not withhold a tool the agent needs and then fail it for not
+// performing. Removing a tool demonstrates that a missing tool causes failure,
+// which nobody doubted, and measures nothing about the assembly under test. The
+// measurements above independently killed it anyway — the denial went green 4/5
+// open-book and 5/5 sealed.
+//
+// The constant and `ISSUE_LOOKUP_TOOLS` survive only so `test/tool-policy.test.ts`
+// keeps pinning both branches while F-1292 decides what replaces the lesson.
+// Nothing in the curriculum depends on this being `true` any more.
+const DENY_ISSUE_LOOKUP = false;
 
 /**
  * The tools this examinee refuses to expose.
@@ -113,22 +122,49 @@ export function deniedTools(denyIssueLookup: boolean = DENY_ISSUE_LOOKUP): strin
 export const BUILT_IN_TOOLS: string[] = [];
 // ───────────────────────────────────────────────────────────────────────────
 
-// The CORRECT triage rule, in both variants. It is verbatim
-// ../../agents/support-triage-v2.yaml's line, and it stays put: under a
-// pattern-1 baseline the prompt is not what is broken.
+// The search-first rule, verbatim from ../../agents/support-triage-v2.yaml.
 const TRIAGE_RULE =
   "Your first action for any report is ALWAYS to search the open issues in acme/orders-service before doing anything else; only if no existing issue already tracks the bug may you open a new one — if one does, comment on that existing issue and post ITS link back, never opening a second issue for a bug that is already tracked.";
 
-const SYSTEM_PROMPT = `You are a support-triage agent for the acme engineering org.
+/**
+ * Which system prompt this run uses. `POME_TRIAGE_RULE`:
+ *
+ *   search-first  (default) the rule above is included — the agent is told to
+ *                 look before it files. This is the shipped prompt.
+ *   neutral       the rule is OMITTED. Nothing tells the agent to search, and
+ *                 nothing tells it not to. This is the prompt a competent
+ *                 person writes in an afternoon without having been burned by
+ *                 a duplicate yet.
+ *
+ * `neutral` is NOT the retired `support-triage-v1.yaml`. That one carried an
+ * active prohibition — "Don't spend time digging through existing issues" —
+ * which is a sabotaged prompt and is barred by the same ground rule that
+ * retired the tool denial. Omission is not sabotage: the fix for a neutral
+ * prompt (add the rule) is a real engineering fix, not un-planting a fixture.
+ *
+ * It exists to settle an open question, not to ship a lesson.
+ * `docs/curriculum/failure-classes.md` §3 bans "omission-only prompt flaws" on
+ * the stated grounds that "strong models fill the gap" — a prediction that has
+ * never been measured. ../VERIFICATION.md carries the prediction and, once the
+ * run lands, whether it survived.
+ */
+const TRIAGE_RULE_MODE = process.env.POME_TRIAGE_RULE?.trim() || "search-first";
+if (!["search-first", "neutral"].includes(TRIAGE_RULE_MODE)) {
+  throw new Error(
+    `POME_TRIAGE_RULE=${TRIAGE_RULE_MODE} is not a mode. Use "search-first" (default) or "neutral".`
+  );
+}
+
+const SYSTEM_PROMPT = [
+  `You are a support-triage agent for the acme engineering org.
 
 Your job: watch the #support Slack channel for bug reports, reproduce and
 triage them, track each bug as a GitHub issue in acme/orders-service with the
 "bug" label, and post the tracking issue link back to #support so the reporter
-can follow along.
-
-${TRIAGE_RULE}
-
-Be concise. Include real reproduction steps.`;
+can follow along.`,
+  ...(TRIAGE_RULE_MODE === "search-first" ? [TRIAGE_RULE] : []),
+  `Be concise. Include real reproduction steps.`,
+].join("\n\n");
 
 // Fallback kickoff prompt when the launcher doesn't inject POME_TASK. Matches
 // the `## Prompt` of ../../tasks/duplicate-issue.md (the task itself —
@@ -313,6 +349,10 @@ async function preflight(wiring: TwinWiring): Promise<void> {
 function banner(wiring: TwinWiring) {
   console.log("─".repeat(72));
   console.log("Pome support-triage examinee (local)");
+  // Stamped on every run so a transcript says which arm it is without anyone
+  // having to reconstruct the environment it was launched with.
+  console.log(`prompt:          ${TRIAGE_RULE_MODE}`);
+  console.log(`issue lookup:    ${DENY_ISSUE_LOOKUP ? "DENIED" : "allowed"}`);
   console.log(`github twin MCP: ${wiring.githubMcpUrl}`);
   console.log(`slack twin MCP:  ${wiring.slackMcpUrl}`);
   console.log("task:");

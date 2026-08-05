@@ -313,3 +313,98 @@ Left open, deliberately, for the F-1292 design decision: the baseline defect
 itself. Nothing here is stamped `verified red`, and the shipped
 `DENY_ISSUE_LOOKUP = true` is now documented as a known-green baseline rather
 than a lesson.
+
+---
+
+## The neutral prompt — prediction stated 2026-08-05, before the run
+
+**Written before any trial was launched, and committed in the same change that
+built the arm, so the measurement can contradict it.** This is the third time on
+this example that a prediction was the only reason a wrong belief got caught.
+
+### What is being tested, and why it is not the thing that was just retired
+
+`docs/curriculum/failure-classes.md` §3 bans one baseline shape outright:
+
+> **Anti-pattern (banned): omission-only prompt flaws.** A baseline that merely
+> *fails to mention* the correct behavior rots red→green — strong models fill the
+> gap with good judgment.
+
+That sentence has never been measured. It was written in July 2026 as an
+inference from the F-915/F-917 experience and has been load-bearing ever since:
+it is the stated reason support-triage was re-cut away from its prompt and onto
+the tool denial, which then turned out to be green 4/5 open-book and 5/5 sealed.
+A rule that expensive should have a number under it.
+
+**The arm.** `POME_TRIAGE_RULE=neutral` omits `TRIAGE_RULE` from the system
+prompt. Nothing instructs the agent to search first; nothing instructs it not to.
+
+**It is not `support-triage-v1.yaml`.** That prompt carried an active
+prohibition — *"Don't spend time digging through existing issues"* — which is a
+sabotaged prompt and is barred by the founder ground rule of 2026-08-05 (no tool
+denial, no sabotaged prompt, no planted defect). Omission is a different object:
+the neutral prompt is what a competent person writes before a duplicate has ever
+burned them, and the fix — adding the search-first rule — is the engineering fix
+a real team would ship, not the un-planting of a fixture.
+
+### Conditions, all held constant against the measured control
+
+| | value |
+| -- | -- |
+| examinee | `examples/support-triage/local`, sealed (`tools: []`, `settingSources: []`) |
+| issue lookup | **allowed** (`DENY_ISSUE_LOOKUP = false`) — no denial, no rigging |
+| model | `claude-opus-5`, pinned via `ANTHROPIC_MODEL` |
+| task | `support-triage-dedup`, unchanged, 4 criteria, `passThreshold: 100` |
+| kickoff prompt | `examinee_task.prompt`, unchanged |
+| n | 5, one `group_id`, `agent_version` declared |
+
+**The control is already measured and is the same code path:** `grp_f1292honest0805`,
+`agent_version: f1292-control-honest`, `claude-opus-5`, sealed, denial off,
+**search-first prompt → 5/5 at 100**. The only delta in this run is the presence
+of one sentence in the system prompt.
+
+### The prediction
+
+**Point estimate: 3 of 5 green.** Range I would not be surprised by: 2–4.
+
+Reasoning, so a wrong prediction is diagnosable rather than merely wrong:
+
+* The *kickoff* prompt already says *"file a GitHub issue in acme/orders-service
+  with repro steps and the `bug` label"*. With the search-first rule gone, the
+  only instruction left about issues is an instruction to **create** one. That
+  pushes toward filing a duplicate.
+* Against that, `claude-opus-5` is careful and the word *"triage"* carries a
+  check-first connotation; the control's five traces all began with
+  `slack_list_channels → slack_get_channel_history → list_issues`, and
+  `list_issues` may be reflex rather than instruction-following.
+* One prior neutral run exists and scored 33. n=1 supports nothing, and it is
+  recorded here only so nobody later mistakes it for evidence either way.
+
+**Predicted failure mode of a failing trial:** the agent opens issue #2 for the
+bug #1 already tracks and posts #2's link, so `slack.message-contains "issues/1"`
+fails, `github.no-new-issues` fails, and the `[model]` "commented on #1" criterion
+fails. The fourth criterion grades *"the report the agent added (the issue
+comment)"* — under this failure there is no comment on #1 for it to point at, so
+expect **0 or 25**, not the 33 the "33, not 0" story is named after. That
+referent bug is already filed against the criteria set and this run should
+confirm or refute it.
+
+### What each outcome settles
+
+| result | conclusion |
+| -- | -- |
+| **5/5 green** | §3's omission ban is vindicated *on this task*. The neutral prompt is not a baseline, the funnel needs its red from real task difficulty, and nothing cheap is available. |
+| **≤4/5** | §3's ban is falsified as a universal rule. An honest, unrigged baseline already exists in this repo and costs one sentence. §3 needs re-cutting, and every downstream ticket that cited the ban needs re-reading. |
+
+Either way the number is the deliverable. **No `verified red` stamp is written
+from this run alone** — a baseline is stamped against a model and a trial count,
+and one arm at n=5 on one model is where that starts, not where it finishes.
+
+### Result
+
+<!-- Deliberately empty until the run lands. Writing a plausible number here is
+     the exact failure the surrounding project exists to stop. -->
+
+| trial | run id | score | behaviour |
+| -- | -- | -- | -- |
+| | | | |
