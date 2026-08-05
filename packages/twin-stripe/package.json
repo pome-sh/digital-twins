@@ -18,6 +18,10 @@
     "./checks": {
       "types": "./dist/src/checks.d.ts",
       "default": "./dist/src/checks.js"
+    },
+    "./x402": {
+      "types": "./dist/src/x402.d.ts",
+      "default": "./dist/src/x402.js"
     }
   },
   "files": [
