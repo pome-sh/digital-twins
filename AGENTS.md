@@ -55,22 +55,12 @@ Those two packages are the ONLY things published to npm. Everything else
 `private: true` workspace member bundled into them by tsup
 (`noExternal: [/^@pome-sh\//]`).
 
-`.github/workflows/release.yml` is version-diff driven (npm OIDC Trusted
-Publishing, provenance on). To ship:
-
-1. Bump the version in that package's own `package.json` and write the
-   user-facing entry in its `CHANGELOG.md`.
-2. Merge to `main`. `release.yml` compares each package's local version against
-   the registry and publishes only the ones that differ. Publishing from a
-   version BEHIND npm `latest` is a hard failure, not a skip — that would retag
-   `latest` backwards.
-
-The two version INDEPENDENTLY: the CLI is on its own line, the adapter on its
-0.2.x line. There is no lockstep to enforce (nothing published depends on an
-internal version), so there is no sync-versions script. Changesets are gone.
-(F-1180's `RELEASE_BOT_TOKEN` / release-PR check verifier applied to the old
-Changesets version PR; this lane has no bot-pushed version PR, so that
-machinery is gone with `cli-release.yml`.)
+The full runbook — the version-diff-on-push model, why the two packages
+version independently, and the version-bump-required CI gate — lives in
+[`RELEASING.md`](RELEASING.md). One repo-specific historical note that
+doesn't belong there: F-1180's `RELEASE_BOT_TOKEN` / release-PR check verifier
+applied to the old Changesets version PR; this lane has no bot-pushed version
+PR, so that machinery is gone with `cli-release.yml`.
 
 ## Invariants ↔ CI checks (P8)
 
@@ -124,9 +114,12 @@ from the private `pome-sh/pome-cloud` repo — maintainers: see
 `docs/runbooks/twin-release-and-promotion.md` there.
 
 Only `@pome-sh/cli` and `@pome-sh/adapter-claude-sdk` are published to npm.
-Everything else is internal to the CLI tarball, so the per-package version-bump
-runbook (`PACKAGE_RELEASE.md`) is retired.
+Everything else is internal to the CLI tarball, so the old per-package
+version-bump runbook (`PACKAGE_RELEASE.md`, one changeset per `packages/*`
+member) is gone; see [`RELEASING.md`](RELEASING.md) for what replaced it.
 
 Everything else — architecture, per-package details, and the CI gotchas
 (no-cloud-imports, twin Docker build) — is documented at
-https://docs.pome.sh.
+https://docs.pome.sh. Internal package layout (the twin registry,
+`@pome-sh/wire`, private vs. published) is also mapped in
+[`packages/README.md`](packages/README.md).

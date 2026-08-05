@@ -72,7 +72,7 @@ pome login && pome run tasks/  # hosted: records + evaluates in one go
 
 The bundled task library includes GitHub, Stripe, Slack, Gmail, and Linear flows —
 several **adversarial** (identity spoofing, prompt injection, merging a backdoored
-PR, fabricating green CI). Browse with `pome tasks`. Four worked example agents
+PR, fabricating green CI). Browse with `pome tasks`. Eight worked example agents
 live under [`examples/`](./examples/).
 
 ## How it works
