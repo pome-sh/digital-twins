@@ -86,13 +86,6 @@ jobs:
       # ends with the CLI.
       - name: Build CLI
         run: npm run build
-      # `@pome-sh/shared-types` still publishes RAW `.ts` from its `exports`
-      # map, and its internal specifiers are `./x.js` — so the built CLI cannot
-      # import it until the in-place runtime JS exists. The old pipeline got
-      # those files for free inside the packed tarball; a workspace link does
-      # not. `contract/run.mjs` does the same thing before the black-box suite.
-      # (The wire-package lane replaces this with a normal dist build.)
-      - run: npm run build:runtime -w @pome-sh/shared-types
       - name: Run agent-trace overhead gate (PR/FAQ #1)
         working-directory: cli
         env:

@@ -68,19 +68,10 @@ jobs:
       # adapter-claude-sdk pinned shared-types one minor back. CI was green
       # throughout — everything it ran genuinely passed, against the wrong sdk.
       - run: node scripts/check-workspace-pins-match-workspace.mjs
-      # F-1135 — the version-bump gate now also fires when a bundled @pome-sh/*
-      # pin moves (cli/vendor/**, its old stand-in for that, no longer exists).
-      - run: node scripts/check-cli-version-bump.test.mjs
       - run: bash scripts/lint-no-cloud-imports.sh
       - run: bash scripts/lint-no-cloud-imports.test.sh
       - run: node scripts/ci/wait-for-workflow.test.mjs
       - run: node scripts/ci/assert-repo-policy.test.mjs
-      # F-1180 — the release PR's checks were parked at action_required for
-      # every release, and a parked run reads exactly like one that passed.
-      # These lock the classification (parked ≠ reporting), the retrigger
-      # ladder, and the fact that cli-release.yml still calls the verifier.
-      - run: node scripts/ci/verify-release-pr-checks.test.mjs
-      - run: node scripts/ci/check-release-staleness.test.mjs
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         if: steps.scope.outputs.heavy == 'true'
         with:
@@ -144,12 +135,37 @@ jobs:
           # instead of a second plain `npm test` pass for that workspace.
           npm test -w @pome-sh/shared-types -w @pome-sh/sdk -w @pome-sh/adapter-claude-sdk -w @pome-sh/twin-slack -w @pome-sh/twin-stripe -w @pome-sh/twin-gmail -w @pome-sh/twin-linear
           npm run test:coverage -w @pome-sh/twin-github
+          # Former cli-ci.yml (folded in here — one required check, one npm ci).
+          npm test -w @pome-sh/cli
+          # Every internal @pome-sh/* package is INLINED into the published CLI
+          # bundle, so its own `dependencies` are never installed for it: a
+          # third-party import the CLI does not declare (twin-linear needs
+          # `graphql`) becomes ERR_MODULE_NOT_FOUND inside a lazily-loaded twin
+          # chunk, on that twin only.
+          npm run gate:bundled-deps
           # Black-box twin runtime-contract suite (FDRS-711). Spawns the BUILT twins
           # via plain `node` — Node 24 to match the GHCR runtime image — and asserts
           # the control-plane surface frozen in CONTRACT.md.
           npm run test:contract
           # F-730 — fidelity:parity across first-party twins.
           npm run fidelity:parity -w @pome-sh/twin-github -w @pome-sh/twin-slack -w @pome-sh/twin-stripe -w @pome-sh/twin-gmail -w @pome-sh/twin-linear
+      # F-709 — the frozen M1 runtime-contract assertions, asserted against
+      # twins started via the CLI front door (`pome twin start <twin>`).
+      # Separate step so a failure here is not buried in the block above. The
+      # bundled CLI is self-contained (shared-types is inlined), so unlike the
+      # packaged twins it needs no in-place runtime JS emit first.
+      - name: Contract suite vs pome twin start
+        if: steps.scope.outputs.heavy == 'true'
+        run: node --test contract/cli-start.test.mjs
+      # The release gate, run on every PR: pack both published packages, install
+      # them in clean rooms with no access to this workspace, boot ALL FIVE twins
+      # from the CLI tarball, and typecheck a real consumer against the adapter's
+      # shipped declarations. This is the check that `bundleDependencies` never
+      # had — it declared seven bundled packages, shipped none, and npm reported
+      # a successful install.
+      - name: Clean-room pack test (both published packages)
+        if: steps.scope.outputs.heavy == 'true'
+        run: npm run test:pack
       - name: Heavy suite skipped (docs/chore-only)
         if: steps.scope.outputs.heavy != 'true'
         run: echo "Required check typecheck-test is green without npm ci — no package/script changes in this PR."

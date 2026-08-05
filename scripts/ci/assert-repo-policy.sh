@@ -22,10 +22,9 @@ RULESETS_OUT="$(mktemp)"
 LIST_OUT="$(mktemp)"
 trap 'rm -f "${OUT}" "${RULESETS_OUT}" "${LIST_OUT}"' EXIT
 
-# F-1180 — the contexts live in config/required-checks.json, which
-# scripts/ci/verify-release-pr-checks.mjs also reads. Two hand-maintained
-# copies of the same list is the F-1135 shape: one goes stale while both still
-# look like they are watching.
+# F-1180 — the contexts live in config/required-checks.json. A second
+# hand-maintained copy of the same list is the F-1135 shape: one goes stale
+# while both still look like they are watching.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 REQUIRED_CHECKS_FILE="${REQUIRED_CHECKS_FILE:-${REPO_ROOT}/config/required-checks.json}"
 # Read into a variable first (not `mapfile < <(...)`, which is bash 4+ and

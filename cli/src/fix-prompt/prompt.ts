@@ -11,8 +11,8 @@
 // relocated out of the deleted `src/evaluator/` tree.
 
 import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
+import { assetPath } from "../cli/assets.js";
 import type { CriterionResult, RecorderEvent } from "../types/shared.js";
 import type { Criterion, Task } from "../task/taskSchema.js";
 import { redactEvent, redactSecrets } from "../recorder/redaction.js";
@@ -25,13 +25,13 @@ const MAX_EVENTS = 50;
 const BODY_CHAR_LIMIT = 800;
 
 function loadSystemPrompt(): string {
-  const here = dirname(fileURLToPath(import.meta.url));
-  // Source layout:   src/fix-prompt/prompts/fix-prompt-v1.md
-  // Compiled layout: dist/src/fix-prompt/prompts/fix-prompt-v1.md
-  // tsconfig.build.json (via scripts/copy-prompts.mjs) copies the prompts/
-  // folder; assert presence here.
-  const path = join(here, "prompts", `fix-prompt-${FIX_PROMPT_TEMPLATE_VERSION}.md`);
-  return readFileSync(path, "utf8");
+  // `assets/fix-prompt/prompts/fix-prompt-v1.md` at the package root in every
+  // layout — see src/cli/assets.ts for why this is not resolved relative to
+  // this module.
+  return readFileSync(
+    assetPath("fix-prompt", "prompts", `fix-prompt-${FIX_PROMPT_TEMPLATE_VERSION}.md`),
+    "utf8",
+  );
 }
 
 export const FIX_PROMPT_SYSTEM_PROMPT = loadSystemPrompt();

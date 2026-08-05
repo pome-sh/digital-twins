@@ -102,10 +102,12 @@ The package publishes the `pome` binary from `dist/src/cli/main.js`.
 
 ### Versioning — every behavior change ships with a bump
 
-Any PR that touches `cli/src/**` must either add a changeset under
-`cli/.changeset/` or bump `cli/package.json` directly; CI enforces this
-via [`scripts/check-cli-version-bump.sh`](../scripts/check-cli-version-bump.sh).
-Preferred path: `cd cli && npm run changeset`.
+Bump `version` in `cli/package.json` and add the user-facing entry to
+`CHANGELOG.md` in the same PR. Merging to `main` is the release trigger:
+`.github/workflows/release.yml` compares the local version against npm and
+publishes when they differ. `pome --version` reports the bumped value from a
+build-time constant, so a user can always tell whether their install carries a
+given fix.
 
 ## License
 

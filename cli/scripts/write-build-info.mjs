@@ -1,37 +1,23 @@
 #!/usr/bin/env node
-// Cross-platform replacement for `rm -rf <dest> && cp -R <src> <dest>` in the
-// build script. Runs on macOS / Linux / Windows without shell assumptions.
-//
-// Also writes `dist/build-info.json`, baking the git SHA and ISO build
-// timestamp into the published tarball (F6). CI sets POME_GIT_SHA and
-// POME_BUILD_TIME ahead of `npm run build`; locally we best-effort resolve
-// the SHA via `git rev-parse HEAD`. Falls back to "dev" so a contributor
-// install (`npm install -g .`) still produces a working — if uninformative —
+// Writes `dist/build-info.json`, baking the git SHA and ISO build timestamp
+// into the published tarball (F6). CI sets POME_GIT_SHA and POME_BUILD_TIME
+// ahead of the build; locally we best-effort resolve the SHA via
+// `git rev-parse HEAD`. Falls back to "dev" so a contributor install
+// (`npm install -g .`) still produces a working — if uninformative —
 // `pome health` runtime block.
+//
+// This script used to also copy `src/fix-prompt/prompts/` and the demo task
+// assets into the mirrored `dist/src/...` tree. Those assets now live at
+// `<packageRoot>/assets/**` and ship as-is via cli/package.json `files`, so
+// there is nothing left to copy: see src/cli/assets.ts for why a bundled CLI
+// cannot resolve an asset relative to its importing module.
 
-import { rm, cp, writeFile, readFile, mkdir } from "node:fs/promises";
 import { execSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const CLI_ROOT = resolve(__dirname, "..");
-
-const SRC = "src/fix-prompt/prompts";
-const DEST = "dist/src/fix-prompt/prompts";
-
-await rm(DEST, { recursive: true, force: true });
-await cp(SRC, DEST, { recursive: true });
-
-// FDRS-643 — the packaged demo task (markdown + hand-written seed sidecar)
-// resolves next to the compiled module (dist/src/demo/), so it must ride
-// along with the build. tsc only emits .ts → copy the assets explicitly.
-for (const asset of ["first-run-demo.md", "first-run-demo.seed.json"]) {
-  await cp(
-    resolve(CLI_ROOT, "src/demo", asset),
-    resolve(CLI_ROOT, "dist/src/demo", asset),
-  );
-}
+const CLI_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 await writeBuildInfo();
 

@@ -30,21 +30,17 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsup",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "prepublishOnly": "node scripts/assert-publishable.mjs && tsc -p tsconfig.build.json"
+    "prepublishOnly": "node scripts/assert-publishable.mjs && npm run build"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/exporter-trace-otlp-http": "^0.221.0",
     "@opentelemetry/resources": "^2.10.0",
-    "@opentelemetry/sdk-trace-base": "^2.10.0",
-    "@pome-sh/shared-types": "*"
+    "@opentelemetry/sdk-trace-base": "^2.10.0"
   },
-  "bundleDependencies": [
-    "@pome-sh/shared-types"
-  ],
   "peerDependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.215"
   },
@@ -55,7 +51,9 @@
   },
   "devDependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.221",
+    "@pome-sh/shared-types": "*",
     "@types/node": "^26.1.2",
+    "tsup": "^8.5.0",
     "typescript": "^5.9.3",
     "vitest": "^4.1.10"
   },
