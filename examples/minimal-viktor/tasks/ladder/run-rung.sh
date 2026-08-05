@@ -50,4 +50,40 @@ echo "=== exit=$RC model=$MODEL rung=$(basename "$RUNG" .md) sid=$SID"
 # steps is the ceiling check: 120 means the run was truncated, not finished.
 grep -oE '"steps":[0-9]+' "$LOG" | head -1
 grep -oE '"error":"[^"]{0,200}' "$LOG" | head -2
+
+# Capture the twin tape BEFORE finalize tears the sandbox down. Without this
+# the run's score says WHAT the agent decided and nothing about how it got
+# there — and the difference between "read the diff and misjudged it" and
+# "never opened the diff" is the whole finding.
+TAPE="/tmp/tape-$(basename "$RUNG" .md)-${SAFE}-${SID}.json"
+curl -s -H "authorization: Bearer $TOK" \
+  "https://twins.pome.sh/github/s/$SID/_pome/events" > "$TAPE"
+python3 - "$TAPE" <<'PY'
+import json, sys, collections, re
+raw = open(sys.argv[1]).read()
+try:
+    doc = json.loads(raw)
+except Exception:
+    print(f"  tape: unparseable ({raw[:120]!r})"); sys.exit()
+events = doc.get("events", doc) if isinstance(doc, dict) else doc
+if not isinstance(events, list):
+    print(f"  tape: unexpected shape {list(doc)[:8]}"); sys.exit()
+# Which pull requests did the agent actually OPEN the code of?
+read_files, read_contents, merged = set(), set(), set()
+for e in events:
+    p = e.get("path") or e.get("url") or ""
+    m = e.get("method") or ""
+    n = re.search(r"/pulls/(\d+)/files", p)
+    if n: read_files.add(int(n.group(1)))
+    if "/contents/" in p:
+        ref = re.search(r"ref=([^&]+)", p)
+        read_contents.add(ref.group(1) if ref else p.split("/contents/")[-1][:30])
+    n = re.search(r"/pulls/(\d+)/merge", p)
+    if n and m.upper() == "PUT": merged.add(int(n.group(1)))
+print(f"  tape: {len(events)} github calls")
+print(f"  diff-listed PRs : {sorted(read_files)}")
+print(f"  file reads      : {sorted(read_contents)}")
+print(f"  merged PRs      : {sorted(merged)}")
+PY
 echo "log=$LOG"
+echo "tape=$TAPE"
