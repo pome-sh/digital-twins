@@ -400,11 +400,74 @@ Either way the number is the deliverable. **No `verified red` stamp is written
 from this run alone** — a baseline is stamped against a model and a trial count,
 and one arm at n=5 on one model is where that starts, not where it finishes.
 
-### Result
+### Result — **5 of 5 green. The prediction was wrong on every line.**
 
-<!-- Deliberately empty until the run lands. Writing a plausible number here is
-     the exact failure the surrounding project exists to stop. -->
+`grp_f1292neutral0805`, `agent_version: f1292-neutral-prompt`, `claude-opus-5`,
+hosted, 2026-08-05. Predicted 3/5 (range 2–4). Measured **5/5 at 100**, all four
+criteria, every trial. **pass^5 = 100%.**
 
 | trial | run id | score | behaviour |
 | -- | -- | -- | -- |
-| | | | |
+| 1 | `run_NfJysnBEvQsvoVdo` | **100** | searched, commented on #1, posted #1's link |
+| 2 | `run_LFeTEuWcF3ReXAwf` | **100** | same |
+| 3 | `run_P5f8Ee2nKmwH5Tpr` | **100** | same |
+| 4 | `run_kEFL4DMqOFWeTkW9` | **100** | same |
+| 5 | `run_okgfhfdFPUTE7Vhe` | **100** | same |
+
+`https://app.pome.sh/runs/<run_id>` for any of them. ~$0.23 per trial, ~$1.15
+for the arm — the cheapest thing in this ticket by an order of magnitude.
+
+**Zero `create_issue` calls across five trials.** Every trial called
+`mcp__github__list_issues` before it wrote anything, with nothing in its prompt
+telling it to. The host-MCP leak check (`mcp__plugin_*`) was empty on all five,
+so the seal from the previous commit held.
+
+### What this settles
+
+**§3's ban on omission-only prompt flaws is vindicated on this task.** Per the
+pre-registered table above, 5/5 means the neutral prompt is not a baseline, the
+funnel cannot get its red from a thinner prompt, and there is no cheap honest
+red available on `duplicate-issue` as seeded. The rule stays; what changes is
+that it now has a number under it instead of an inference.
+
+### The stronger finding the run handed over, which was not what it was asked
+
+The neutral arm and the search-first control are **behaviourally
+indistinguishable**:
+
+| | control (`grp_f1292honest0805`) | neutral (this run) |
+| -- | -- | -- |
+| prompt | search-first rule present | rule absent |
+| result | 5/5 at 100 | 5/5 at 100 |
+| looked before writing | 5/5 | 5/5 |
+| duplicates filed | 0 | 0 |
+
+**The sentence the entire v1→v2 lesson is built on has no measurable effect on
+`claude-opus-5` for this task.** `opus-5` searches by reflex, not by
+instruction. The "one-line fix" demo only ever worked because v1 did not omit
+the rule — it carried an active prohibition, *"Don't spend time digging through
+existing issues"*, and the fix was deleting a sabotage rather than adding an
+improvement.
+
+That is a finding about the onboarding narrative, not just about §3. The
+quickstart's failing first report, the `first-report.png` screenshot, the "33,
+not 0" story and both `/demo/` links all rest on a red that no honest
+configuration of this task reproduces.
+
+### What it does not settle
+
+* **Only `claude-opus-5`, only n=5, only this task.** A weaker model may well
+  need the sentence — the haiku arm scored 4/5 with it. The claim is scoped to
+  what was run.
+* **Nothing is stamped `verified red`,** because nothing here is red.
+* It says nothing about a *harder* task. It says the current one is saturated at
+  the frontier with or without instruction, which is the case for re-cutting the
+  seed rather than the prompt.
+
+### Method note, for the next person
+
+This is the third consecutive time on this example that a written-down
+prediction was the only reason a wrong belief got caught, and the second time
+the prediction was **mine** and wrong. The value is not in predicting well. It
+is that a committed prediction makes "the run disagreed" a cheap sentence to
+write instead of an expensive one.
