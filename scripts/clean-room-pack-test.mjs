@@ -10,9 +10,16 @@
 // shipped none, npm trusted the declaration and skipped fetching them, the
 // install reported success, and the CLI died on its first command.
 //
+// Both packages also get a files-field tarball audit (F-943): the real `tar`
+// listing is grepped for dangling `.map` files and a compiled `dist/examples/`
+// directory. tsup's `sourcemap: false` / `clean: true` config should already
+// make both impossible, but that was previously an unverified claim about the
+// build config, not an asserted property of the artifact actually published.
+//
 // The CLI checks:
 //   - packed manifest declares no `@pome-sh/*` and no `file:` dependency
 //   - no hard-link entries (npm registry rejects those with E415)
+//   - no dangling `.map` files, no compiled `dist/examples/` directory
 //   - `assets/` shipped (the fix-prompt system prompt is read at module scope)
 //   - `pome --help` and `pome --version` run
 //   - EVERY twin boots from the tarball and answers `/healthz` 200. All five,
@@ -23,6 +30,7 @@
 // The adapter checks:
 //   - packed manifest declares no `@pome-sh/*` dependency (its wire types are
 //     bundled; `@pome-sh/shared-types` is private)
+//   - no dangling `.map` files, no compiled `dist/examples/` directory
 //   - runtime import of `flushPomeTelemetry` with the peer installed
 //   - a real consumer file TYPECHECKS against the shipped `dist/index.d.ts`.
 //     Runtime-import-only would pass even if dts bundling dropped or
@@ -88,6 +96,40 @@ function assertNoHardLinks(tarball) {
   if (hardLinks.length > 0) {
     fail(`tarball contains hard links — npm would reject with E415:\n${hardLinks.join("\n")}`);
   }
+}
+
+// F-943 tarball-files-field audit: `npm pack` respects each package's `files`
+// field, but nothing previously asserted WHAT actually lands in the tgz.
+// tsup's `sourcemap: false` / `clean: true` config (Lane D) means a stray
+// `.map` or a leftover `dist/examples/` from a prior build shouldn't be
+// possible today — but that's exactly the kind of invariant that silently
+// stops holding the day someone flips a tsup option or a stale `dist/` gets
+// packed without a clean rebuild. Grep the real tarball listing so a
+// regression fails CI instead of shipping.
+function assertNoStrayTarballArtifacts(tarball, label) {
+  const listing = run("tar", ["-tf", tarball])
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    // npm wraps every entry in a top-level `package/` directory.
+    .map((line) => line.replace(/^package\//, ""));
+
+  const sourcemaps = listing.filter((path) => path.endsWith(".map"));
+  if (sourcemaps.length > 0) {
+    fail(`${label}: tarball contains dangling sourcemaps:\n${sourcemaps.join("\n")}`);
+  }
+
+  // A compiled `examples/` directory under `dist/` would mean the top-level
+  // workspace `examples/` (standalone demo projects, never meant to publish)
+  // got swept into the bundle output. `cli/examples/**` (raw .ts demo
+  // agents) is a deliberate, separate top-level `files` entry — this only
+  // guards the BUILD OUTPUT, not the package's own declared source examples.
+  const compiledExamples = listing.filter((path) => /^dist\/.*\bexamples\//.test(path));
+  if (compiledExamples.length > 0) {
+    fail(`${label}: tarball's dist/ contains a compiled examples/ directory:\n${compiledExamples.join("\n")}`);
+  }
+
+  console.log(`  ✓ ${label}: no dangling sourcemaps, no compiled dist/examples/`);
 }
 
 function assertManifestPure(installedPkgPath, label) {
@@ -163,6 +205,7 @@ console.log("\n@pome-sh/cli — clean-room pack test");
 const cliRoom = makeRoom("cli");
 const cliTarball = pack("@pome-sh/cli", join(cliRoom, "tarballs"));
 assertNoHardLinks(cliTarball);
+assertNoStrayTarballArtifacts(cliTarball, "@pome-sh/cli");
 
 const cliInstall = join(cliRoom, "install");
 mkdirSync(cliInstall, { recursive: true });
@@ -205,6 +248,7 @@ console.log("\n@pome-sh/adapter-claude-sdk — clean-room pack test");
 const adapterRoom = makeRoom("adapter");
 const adapterTarball = pack("@pome-sh/adapter-claude-sdk", join(adapterRoom, "tarballs"));
 assertNoHardLinks(adapterTarball);
+assertNoStrayTarballArtifacts(adapterTarball, "@pome-sh/adapter-claude-sdk");
 
 const adapterInstall = join(adapterRoom, "install");
 mkdirSync(adapterInstall, { recursive: true });
