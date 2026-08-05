@@ -29,6 +29,7 @@
  * inert with no endpoint set, so a standalone run is unaffected.
  */
 
+import type { McpServerConfig } from "@anthropic-ai/claude-agent-sdk";
 import { query } from "@pome-sh/adapter-claude-sdk";
 
 // ─── The one line under test ───────────────────────────────────────────────
@@ -111,6 +112,39 @@ export function deniedTools(denyIssueLookup: boolean = DENY_ISSUE_LOOKUP): strin
  * left 152 tools live including `Bash`, `Read`, `Write` and `WebFetch`.
  */
 export const BUILT_IN_TOOLS: string[] = [];
+
+/**
+ * The options this examinee actually runs with — the exam surface, composed in
+ * one place.
+ *
+ * A `function` declaration rather than a `const` arrow: this file's top-level
+ * `await main()` sits above it, and a `const` here would be a temporal dead zone
+ * at call time (the `scripts/smoke-examples.mjs` gate exists because exactly
+ * that crash once shipped in `examples/triage-agent`).
+ *
+ * Exported so `test/tool-policy.test.ts` can assert the two policy constants are
+ * WIRED IN, not merely declared. Asserting `BUILT_IN_TOOLS` is empty proves
+ * nothing on its own: delete `tools:` from this object and that assertion stays
+ * green while the sandbox reopens. A guard whose subject is no longer connected
+ * to anything passes forever, which is the same shape of mistake F-1292 is about.
+ */
+export function examineeOptions(mcpServers: Record<string, McpServerConfig>) {
+  return {
+    systemPrompt: SYSTEM_PROMPT,
+    permissionMode: "bypassPermissions" as const,
+    maxTurns: 30,
+    // The exam surface: the two twins over MCP, and nothing else. `tools` is the
+    // allowlist that closes the sandbox (empty = no SDK built-in reaches the
+    // model); `disallowedTools` is where the committed baseline defect lives.
+    // Its `WebSearch`/`WebFetch` entries are now a redundant second latch —
+    // `tools: []` already removed them — and are kept because the two options
+    // are independent knobs and the web clamp should not depend on which one a
+    // future SDK version reinterprets.
+    tools: BUILT_IN_TOOLS,
+    disallowedTools: deniedTools(),
+    mcpServers,
+  };
+}
 // ───────────────────────────────────────────────────────────────────────────
 
 // The CORRECT triage rule, in both variants. It is verbatim
@@ -219,24 +253,7 @@ async function main() {
     },
   };
 
-  const run = query({
-    prompt: wiring.task,
-    options: {
-      systemPrompt: SYSTEM_PROMPT,
-      permissionMode: "bypassPermissions",
-      maxTurns: 30,
-      // The exam surface: the two twins over MCP, and nothing else. `tools` is
-      // the allowlist that closes the sandbox (empty = no SDK built-in reaches
-      // the model); `disallowedTools` is where the committed baseline defect
-      // lives. Its `WebSearch`/`WebFetch` entries are now a redundant second
-      // latch — `tools: []` already removed them — and are kept because the two
-      // options are independent knobs and the web clamp should not depend on
-      // which one a future SDK version reinterprets.
-      tools: BUILT_IN_TOOLS,
-      disallowedTools: deniedTools(),
-      mcpServers,
-    },
-  });
+  const run = query({ prompt: wiring.task, options: examineeOptions(mcpServers) });
 
   let exitCode = 0;
   for await (const msg of run) {
