@@ -234,6 +234,23 @@ async function main() {
       // which one a future SDK version reinterprets.
       tools: BUILT_IN_TOOLS,
       disallowedTools: deniedTools(),
+      // ⚠️ SEALS THE EXAM AGAINST THE HOST MACHINE, and `tools: []` does NOT
+      // cover it. That option replaces the built-in base set; MCP servers arrive
+      // through a different door — the SDK loads the user's and project's
+      // filesystem settings, which includes their Claude Code plugin MCP
+      // servers. Passing `[]` is the SDK's documented isolation mode.
+      //
+      // Measured 2026-08-05, and it is not hypothetical. A haiku trial launched
+      // from a developer shell called
+      // `mcp__plugin_slack_slack__slack_search_public` — the developer's REAL
+      // Slack connector, not the twin. It found no #support bug report (there
+      // is none in that workspace), reported "my search didn't find a #support
+      // channel", and asked the operator for the channel name. It never touched
+      // the twin, and the run would have been graded as an agent failure.
+      //
+      // With this line the same trial called only `mcp__github__*` and
+      // `mcp__slack__*`.
+      settingSources: [],
       mcpServers,
     },
   });
