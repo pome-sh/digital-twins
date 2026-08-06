@@ -22,6 +22,7 @@ import {
   REQUIRED_META_FIELDS,
   adapterFor,
   deriveGolden,
+  deriveStatus,
   goldenPaths,
   loadSources,
   runCapture,
@@ -87,6 +88,22 @@ function sandbox() {
       `the producer does not name the twin "${id}" — adding a twin must be a data edit`
     );
   }
+
+  // The CLI entry guard must not be `import.meta.main`. This gate runs in
+  // ci.yml's always-on block, ABOVE `actions/setup-node` (which is itself
+  // gated on the heavy suite), so it executes on the runner image's unpinned
+  // Node. `import.meta.main` landed in Node 24.2/22.16; on anything older it
+  // is `undefined` and the whole gate exits 0 having checked nothing. The
+  // argv/import.meta.url comparison the rest of this repo's always-on gates
+  // use has no such floor.
+  assert(
+    !producerText.includes("import.meta.main"),
+    "the CLI entry guard does not depend on import.meta.main (it would make this gate a no-op on old Node)"
+  );
+  assert(
+    /process\.argv\[1\][\s\S]{0,120}import\.meta\.url/.test(producerText),
+    "the CLI entry guard compares process.argv[1] against import.meta.url"
+  );
 }
 
 // ── every capturable source declares the configuration it assumed ───────────
@@ -322,6 +339,53 @@ function sandbox() {
     rmSync(dir, { recursive: true, force: true });
   }
 
+  // 7. the DEFERRED twins' declared configuration is the thing F-1329's
+  //    capture will assume, so it has to be recorded and gated exactly like a
+  //    captured twin's. Without this, someone could change which header
+  //    Slack's future capture sends, or which env var holds its token, and
+  //    every gate would stay green.
+  for (const [twin, source] of Object.entries(sources.twins)) {
+    if (source.capture) continue;
+    const paths = goldenPaths({ repoRoot: ROOT, sources, twin });
+    const status = JSON.parse(readFileSync(paths.status, "utf8"));
+    if (source.configuration) {
+      assert(
+        JSON.stringify(status.configuration) === JSON.stringify(source.configuration),
+        `${twin}: the declared configuration round-trips into ${twin}.status.json`
+      );
+    }
+    if (source.authTokenEnv) {
+      assert(status.authTokenEnv === source.authTokenEnv, `${twin}: authTokenEnv round-trips into the status file`);
+    }
+    if (!source.configuration && !source.authTokenEnv) continue;
+
+    for (const mutate of [
+      (s) => {
+        s.configuration = { ...s.configuration, auth: "none" };
+      },
+      (s) => {
+        s.authTokenEnv = "SOMETHING_ELSE";
+      },
+      (s) => {
+        s.configuration = {
+          ...s.configuration,
+          requestHeaders: { ...s.configuration?.requestHeaders, "content-type": "text/plain" },
+        };
+      },
+    ]) {
+      const mutated = { ...source, configuration: { ...source.configuration } };
+      mutate(mutated);
+      if (JSON.stringify(deriveStatus({ source: mutated })) === JSON.stringify(deriveStatus({ source }))) {
+        assert(false, `${twin}: a change to the declared capture configuration left the status file identical`);
+      }
+      const dir = sandbox();
+      writeFileSync(goldenPaths({ repoRoot: dir, sources, twin }).status, deriveStatus({ source: mutated }));
+      const code = await runCapture({ repoRoot: dir, check: true, offline: true, ...SILENT });
+      assert(code !== 0, `${twin}: --check reds when the recorded capture configuration is changed`);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
   // 6. a missing golden is a red, not a silent skip.
   {
     const dir = sandbox();
@@ -377,18 +441,33 @@ function sandbox() {
 }
 
 // ── a substrate read that comes back malformed fails loudly ─────────────────
+// Four shapes an upstream read can come back wrong in. Each must refuse to
+// become a golden: an empty listing written as a golden is the worst outcome
+// available here, because it reads as "the vendor serves nothing" and turns
+// every tool a twin has into a divergence.
 {
-  const dir = sandbox();
-  const sources = loadSources({ repoRoot: dir });
+  const sources = loadSources({ repoRoot: ROOT });
   const twin = Object.keys(sources.twins).find((id) => sources.twins[id].capture);
-  const code = await runCapture({
-    repoRoot: dir,
-    twins: [twin],
-    readSubstrate: async () => ({ rawText: JSON.stringify({ jsonrpc: "2.0", id: 1, error: { code: -32601 } }) }),
-    ...SILENT,
-  });
-  assert(code !== 0, "a JSON-RPC error envelope is not written as a golden");
-  rmSync(dir, { recursive: true, force: true });
+  const cases = [
+    ["a JSON-RPC error envelope", JSON.stringify({ jsonrpc: "2.0", id: 1, error: { code: -32601 } })],
+    ["an empty tools array", JSON.stringify({ jsonrpc: "2.0", id: 1, result: { tools: [] } })],
+    ["a result with no tools key", JSON.stringify({ jsonrpc: "2.0", id: 1, result: {} })],
+    ["a body that is not JSON", "<html>502 Bad Gateway</html>"],
+  ];
+  for (const [label, rawText] of cases) {
+    const dir = sandbox();
+    const paths = goldenPaths({ repoRoot: dir, sources, twin });
+    const before = readFileSync(paths.raw, "utf8");
+    const code = await runCapture({
+      repoRoot: dir,
+      twins: [twin],
+      readSubstrate: async () => ({ rawText }),
+      ...SILENT,
+    });
+    assert(code !== 0, `${label} is not written as a golden`);
+    assert(readFileSync(paths.raw, "utf8") === before, `${label} left the committed raw.json untouched`);
+    rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 if (failures > 0) {

@@ -45,7 +45,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_SOURCES = "config/mcp-capture-sources.json";
@@ -356,6 +356,13 @@ export function deriveGolden({ source, rawText, captureDate }) {
  * The record for a twin this producer does NOT capture. A twin honestly marked
  * not-captured is an acceptable outcome; a twin silently missing from the
  * golden directory is not, because a consumer cannot tell it from an oversight.
+ *
+ * `configuration` and `authTokenEnv` are written here for the same reason they
+ * are written into a captured meta.json. A deferred twin's declared
+ * configuration is the thing F-1329's capture will ASSUME — it is the whole
+ * content of "F-1329 adds a token, not an adapter" — so leaving it out of the
+ * recorded artefact would let someone change what that capture reads while
+ * this gate stayed green.
  */
 export function deriveStatus({ source }) {
   return pretty({
@@ -366,6 +373,8 @@ export function deriveStatus({ source }) {
     endpoint: source.endpoint,
     reason: source.reason,
     ...(source.deferredTo ? { deferredTo: source.deferredTo } : {}),
+    ...(source.authTokenEnv ? { authTokenEnv: source.authTokenEnv } : {}),
+    ...(source.configuration ? { configuration: source.configuration } : {}),
     ...(source.evidence ? { evidence: source.evidence } : {}),
     ...(source.revisitWhen ? { revisitWhen: source.revisitWhen } : {}),
     consumerContract:
@@ -437,6 +446,19 @@ export async function runCapture(options = {}) {
     if (check) {
       // The date is a fact about the COMMITTED capture, so `--check` must not
       // red merely because the calendar moved.
+      //
+      // KNOWN AND UNAVOIDABLE: this makes captureDate self-referential. The
+      // gate reads the date out of the committed meta.json and feeds it back
+      // into the derivation, so a forgery that is CONSISTENT across meta.json
+      // and canonical.json — edit both, recompute both shas — passes. Offline
+      // there is nothing to corroborate it against: the bytes cannot say when
+      // they were fetched. Every other field is derived from the raw response
+      // and so cannot be forged this way; captureDate is the one that can.
+      //
+      // This matters to F-1328. A staleness alarm that reads meta.captureDate
+      // is reading the one field in the golden that this gate cannot check.
+      // It should date a golden from git history (the commit that last touched
+      // <twin>.raw.json) and treat the JSON field as a label, not evidence.
       let committed;
       try {
         committed = JSON.parse(readFileSync(paths.meta, "utf8"));
@@ -502,6 +524,21 @@ function parseArgv(argv) {
   return opts;
 }
 
-if (import.meta.main) {
+// Run as a script (not when imported by the test).
+//
+// This compares argv against the module URL rather than reading the `main`
+// flag off `import.meta`, and that is deliberate, not stylistic. This gate
+// runs in ci.yml's always-on block, which sits ABOVE `actions/setup-node`
+// (a step itself gated on the heavy suite), so it executes on whatever Node
+// the runner image ships. That flag landed in Node 24.2 / 22.16; on anything
+// older it reads `undefined`, this block never runs, and the gate exits 0
+// having checked nothing — the exact vacuous green the rest of this file
+// exists to prevent. The two scripts in this repo that do read that flag both
+// run after setup-node@24 in the heavy block, so they have a floor this one
+// does not. A test asserts the flag stays out of here.
+const invokedDirectly =
+  process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url;
+
+if (invokedDirectly) {
   process.exit(await runCapture(parseArgv(process.argv.slice(2))));
 }
