@@ -175,13 +175,20 @@ console.log("\nrelease.yml wiring");
   const publish = jobOf("publish");
   const publishWire = jobOf("publish-wire");
 
+  // A regex rather than `.includes("npm.pkg.github.com")`: this is a text
+  // search over workflow YAML, not URL-host validation, and the `.includes`
+  // spelling trips CodeQL's js/incomplete-url-substring-sanitization heuristic
+  // — which is a real bug pattern when you are checking an actual URL, and a
+  // false positive here. Saying it as a pattern match says what it is.
+  const READS_GITHUB_PACKAGES = /npm\.pkg\.github\.com/;
+
   check("all four jobs exist", [plan, planWire, publish, publishWire].every(Boolean));
   check(
     "plan (npmjs) does not read GitHub Packages",
-    !plan.includes("npm.pkg.github.com"),
+    !READS_GITHUB_PACKAGES.test(plan),
     "a GitHub Packages read in `plan` would let a GH outage block the npmjs publishes",
   );
-  check("plan-wire reads GitHub Packages", planWire.includes("npm.pkg.github.com"));
+  check("plan-wire reads GitHub Packages", READS_GITHUB_PACKAGES.test(planWire));
   check("publish needs plan only", /needs:\s*plan\s*$/m.test(publish) && !publish.includes("plan-wire"));
   check("publish-wire needs plan-wire only", publishWire.includes("needs: plan-wire"));
   // Inspect the actual publish command line, not the surrounding prose — the
