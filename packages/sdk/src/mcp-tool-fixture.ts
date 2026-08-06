@@ -29,10 +29,20 @@ import { z } from "zod";
 import type { ToolCallContext, ToolSpec } from "./index.js";
 
 /**
- * How the bytes in a fixture came to be. The first four values are F-1326's
- * vocabulary for reading an UPSTREAM surface, reused verbatim rather than
- * forked. The last two describe a table nobody read from upstream at all, and
- * exist so that fact has to be stated instead of implied:
+ * How the bytes in a fixture came to be. ONE vocabulary, shared with F-1326's
+ * upstream capture producer (`scripts/capture-mcp-tools-list.mjs`).
+ *
+ * The first four values are that producer's registry, verbatim and complete —
+ * including `not-captured`, which the producer uses for a twin whose upstream
+ * cannot be faithfully read. F-1327 has to read both trees, so this enum is
+ * required to be a SUPERSET of the producer's: `substrate-vocabulary.test.ts`
+ * imports the producer and asserts it, because two validators of the same
+ * field name in two languages with no import between them is exactly how a
+ * vocabulary silently forks.
+ *
+ * The last two are additions this side needs, and the producer has no use for.
+ * They describe a table nobody read from upstream at all, and exist so that
+ * fact has to be stated instead of implied:
  *
  * - `twin-code-transcription` — the fixture is a transcription of the listing
  *   the twin's own code already served. It says nothing about the vendor.
@@ -41,12 +51,19 @@ import type { ToolCallContext, ToolSpec } from "./index.js";
  *
  * A twin on either of the last two has never been compared to its upstream.
  * `transcription.comparedToUpstream` has to say so.
+ *
+ * The same value can legitimately differ between the two trees for one twin,
+ * because they describe different subjects: `fixtures/mcp-tools-list/github.*`
+ * is `oss-source` (what GitHub serves) while
+ * `packages/twin-github/fixtures/mcp-tools-list.*` is
+ * `twin-code-transcription` (what the twin serves). That is not drift. Which
+ * subject a file describes is fixed by where it lives.
  */
 export const mcpFixtureSubstrateSchema = z.enum([
   "live-wire-unauth",
   "live-wire-oauth",
   "oss-source",
-  "oss-package",
+  "not-captured",
   "twin-code-transcription",
   "twin-authored-from-vendor-docs",
 ]);
@@ -57,7 +74,6 @@ const UPSTREAM_SUBSTRATES = new Set<McpFixtureSubstrate>([
   "live-wire-unauth",
   "live-wire-oauth",
   "oss-source",
-  "oss-package",
 ]);
 
 /** Substrates whose content nobody read from upstream. */
@@ -65,6 +81,9 @@ const TWIN_OWNED_SUBSTRATES = new Set<McpFixtureSubstrate>([
   "twin-code-transcription",
   "twin-authored-from-vendor-docs",
 ]);
+
+/** Substrates that pin a public source tree, and must say which commit. */
+const OSS_SUBSTRATES = new Set<McpFixtureSubstrate>(["oss-source"]);
 
 const sha256Hex = z.string().regex(/^[0-9a-f]{64}$/, "must be a lowercase hex sha256");
 
@@ -95,6 +114,23 @@ export const mcpToolFixtureMetaSchema = z
      * with.
      */
     configuration: z.record(z.string(), z.unknown()).optional(),
+    /**
+     * The public source tree an `oss-source` capture was built from. Mandatory
+     * on that substrate and rejected everywhere else: the whole reason to read
+     * a vendor's OSS server rather than its wire is that the answer is
+     * reproducible, and it is only reproducible from a pinned commit. Same
+     * shape and same keys as F-1326's producer writes, so a golden it produced
+     * parses here unchanged — which is what F-1327 does when it adopts an
+     * upstream capture as a twin's fixture.
+     */
+    source: z
+      .strictObject({
+        repo: z.string().min(1),
+        commit: z.string().min(1),
+        package: z.string().min(1),
+        language: z.string().min(1).optional(),
+      })
+      .optional(),
     /** Mandatory on twin-owned substrates: what this is, and what it is not. */
     transcription: z
       .strictObject({
@@ -124,6 +160,35 @@ export const mcpToolFixtureMetaSchema = z
           `substrate '${meta.substrate}' means nobody read this table from upstream, so the fixture ` +
           `must carry a transcription record saying where the content came from and that it has ` +
           `never been compared to the vendor.`,
+      });
+    }
+    if (OSS_SUBSTRATES.has(meta.substrate) && !meta.source) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["source"],
+        message:
+          `substrate '${meta.substrate}' reads a public source tree, so the fixture must pin the ` +
+          `repo, commit and package it was built from. An unpinned OSS capture is not reproducible.`,
+      });
+    }
+    if (meta.source && !OSS_SUBSTRATES.has(meta.substrate)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["source"],
+        message: `substrate '${meta.substrate}' does not build from source, so \`source\` is a claim nothing here made.`,
+      });
+    }
+    // `not-captured` is the producer's value for a twin whose upstream cannot
+    // be read; it belongs on a `<twin>.status.json`, which carries no listing.
+    // A file that IS a tool table cannot also say nothing was captured.
+    if (meta.substrate === "not-captured") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["substrate"],
+        message:
+          `'not-captured' records the ABSENCE of a listing — it is legal in the shared vocabulary ` +
+          `and on a status file, but not on a tool table a twin serves. Use ` +
+          `'twin-code-transcription' if the table was transcribed from this twin's own code.`,
       });
     }
   });

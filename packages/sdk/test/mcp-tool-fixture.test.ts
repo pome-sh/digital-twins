@@ -109,12 +109,34 @@ describe("loadMcpToolFixture", () => {
     ).toThrow(/substrate/);
   });
 
+  const ossSource = { repo: "https://github.com/acme/widget-mcp", commit: "a".repeat(40), package: "./cmd/widget-mcp" };
+
   it("requires the assumed configuration on an OSS substrate", () => {
-    const noConfig = meta({ substrate: "oss-source" });
+    const noConfig = meta({ substrate: "oss-source", source: ossSource });
     delete (noConfig as Record<string, unknown>).configuration;
     expect(() => loadMcpToolFixture({ raw: JSON.parse(rawText), meta: noConfig })).toThrow(
       /configuration/
     );
+  });
+
+  it("requires an OSS substrate to pin the commit it was built from", () => {
+    expect(() =>
+      loadMcpToolFixture({ raw: JSON.parse(rawText), meta: meta({ substrate: "oss-source" }) })
+    ).toThrow(/source/);
+  });
+
+  it("refuses a pinned source on a substrate that builds nothing", () => {
+    expect(() =>
+      loadMcpToolFixture({ raw: JSON.parse(rawText), meta: meta({ source: ossSource }) })
+    ).toThrow(/source/);
+  });
+
+  it("accepts an oss-source fixture that pins repo, commit and package", () => {
+    const loaded = loadMcpToolFixture({
+      raw: JSON.parse(rawText),
+      meta: meta({ substrate: "oss-source", source: ossSource }),
+    });
+    expect(loaded.meta.source?.commit).toBe("a".repeat(40));
   });
 
   it("requires a transcription record on a twin-owned substrate", () => {

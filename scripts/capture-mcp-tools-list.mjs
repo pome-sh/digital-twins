@@ -217,6 +217,19 @@ const SUBSTRATES = {
   [SUBSTRATE_NONE]: { capturable: false, read: null },
 };
 
+/**
+ * The substrate vocabulary this producer accepts, exported so the other
+ * validator of the same field can be checked against it.
+ *
+ * `packages/sdk/src/mcp-tool-fixture.ts` validates `substrate` on the
+ * PER-TWIN tool-table fixtures (F-1325). Two validators of one field name, in
+ * two languages, in two trees, with no import between them is how a vocabulary
+ * forks without anyone noticing — and F-1327 has to read both trees. The SDK's
+ * enum is required to be a superset of this list; its
+ * `substrate-vocabulary.test.ts` imports this array and asserts it.
+ */
+export const KNOWN_SUBSTRATES = Object.freeze(Object.keys(SUBSTRATES));
+
 export function adapterFor(substrate) {
   const adapter = SUBSTRATES[substrate];
   if (!adapter) {
