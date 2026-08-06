@@ -1,6 +1,18 @@
 # @pome-sh/twin-gmail — CHANGELOG
 
 
+## 0.3.5 — 2026-08-06
+
+Its MCP tool table is now derived from `fixtures/mcp-tools-list.raw.json`
+rather than declared in TypeScript (F-1325). The fixture's provenance —
+substrate, endpoint, protocol version, capture date and the sha of the raw
+bytes — is validated at load, and the derivation is 1:1 in both directions, so
+a tool the fixture does not declare and a fixture tool nothing implements are
+each a throw at module load.
+
+Name-neutral by construction: `tools/list` and the legacy `/mcp/tools` surface
+are byte-identical before and after.
+
 ## 0.3.4 — 2026-08-06
 
 New `./seed` subpath export (F-1306): `gmailSeedSchema`, `parseSeed`,

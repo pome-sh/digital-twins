@@ -1,6 +1,18 @@
 # @pome-sh/twin-slack — CHANGELOG
 
 
+## 0.3.5 — 2026-08-06
+
+Its MCP tool table is now derived from `fixtures/mcp-tools-list.raw.json`
+rather than declared in TypeScript (F-1325). The fixture's provenance —
+substrate, endpoint, protocol version, capture date and the sha of the raw
+bytes — is validated at load, and the derivation is 1:1 in both directions, so
+a tool the fixture does not declare and a fixture tool nothing implements are
+each a throw at module load.
+
+Name-neutral by construction: `tools/list` and the legacy `/mcp/tools` surface
+are byte-identical before and after.
+
 ## 0.3.3 — 2026-08-04
 
 Dependency-only patch (#302): `hono` `^4.12.31` → `^4.13.0`, `zod` `^4.1.13` → `^4.4.3`, `@hono/node-server` `^2.0.10` → `^2.1.0`.
