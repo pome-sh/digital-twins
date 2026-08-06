@@ -18,6 +18,27 @@ export { recorderEventSchema, recorderFidelitySchema };
 export type { RecorderEvent, RecorderFidelity, TwinId };
 
 export { openTwinDatabase } from "./db.js";
+// F-1325 — a twin's MCP tool table is derived from a hash-locked fixture with
+// declared provenance, never hand-written in TypeScript.
+export {
+  canonicalMcpToolSchema,
+  deriveCanonicalMcpToolListing,
+  deriveMcpToolTable,
+  diffServedToolsAgainstFixture,
+  loadMcpToolFixture,
+  mcpFixtureSubstrateSchema,
+  mcpToolFixtureMetaSchema,
+  sha256,
+} from "./mcp-tool-fixture.js";
+export type {
+  CanonicalMcpTool,
+  DeriveMcpToolTableOptions,
+  LoadedMcpToolFixture,
+  McpFixtureSubstrate,
+  McpToolFixtureMeta,
+  McpToolFixtureModules,
+  McpToolImplementation,
+} from "./mcp-tool-fixture.js";
 export type { OpenTwinDatabaseOptions, TwinDatabase, TwinRunResult, TwinStatement, TwinTransaction } from "./db.js";
 export { redactEvent, redactSecrets } from "./redaction.js";
 
