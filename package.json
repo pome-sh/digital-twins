@@ -17,6 +17,8 @@
     "smoke:examples": "node scripts/smoke-examples.mjs",
     "probe:examples": "node scripts/probe-example-tools.mjs",
     "probe:twins": "node scripts/probe-twin-endpoints.mjs",
+    "capture:mcp-tools-list": "node scripts/capture-mcp-tools-list.mjs",
+    "gate:mcp-tools-list": "node scripts/capture-mcp-tools-list.mjs --check --offline",
     "lint:no-cloud-imports": "bash scripts/lint-no-cloud-imports.sh",
     "gate:no-eval": "node scripts/no-eval-in-oss.mjs",
     "gate:no-native": "node scripts/no-native-modules.mjs",
