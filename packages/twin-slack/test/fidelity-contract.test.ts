@@ -16,7 +16,7 @@ import {
   lintFidelityInventory,
   loadFidelityInventory,
 } from "@pome-sh/sdk/parity";
-import { listTools, MUTATING_TOOL_NAMES } from "../src/tools.js";
+import { MUTATING_TOOL_NAMES, slackToolFixture } from "../src/tools.js";
 import { openSlackTwinDatabase } from "../src/db.js";
 import { SlackDomain } from "../src/domain/index.js";
 import { defaultSeedState } from "../src/seed.js";
@@ -29,12 +29,12 @@ describe("FIDELITY.md contract", () => {
     expect(existsSync(FIDELITY_PATH)).toBe(true);
   });
 
-  it("keeps fidelity.inventory.json 1:1 with the live tool list", () => {
+  it("keeps fidelity.inventory.json 1:1 with the tool-table fixture", () => {
     const inventory = loadFidelityInventory(join(PKG_ROOT, "fidelity.inventory.json"));
     expect(
       compareToolNames(
         inventory.tools.map((tool) => tool.name),
-        listTools().map((tool) => tool.name)
+        [...slackToolFixture.toolNames]
       )
     ).toEqual({ missing: [], extra: [] });
   });

@@ -28,7 +28,7 @@ import { createSlackTwinApp } from "../src/twin.js";
 import { openSlackTwinDatabase } from "../src/db.js";
 import { SlackDomain } from "../src/domain/index.js";
 import { defaultSeedState } from "../src/seed.js";
-import { toolDefinitions } from "../src/tools.js";
+import { slackToolFixture } from "../src/tools.js";
 import { unsupportedEnvelope } from "../src/unsupported-envelope.js";
 import { TEST_AUTH_SECRET, TEST_SID, signTestToken } from "./_authHelper.js";
 
@@ -84,12 +84,12 @@ describe("socket boundary — real MCP SDK client over @hono/node-server", () =>
       expect(serverInfo?.name).toBe("twin-slack");
 
       const listResult = await client.listTools();
-      // Pin the catalog size independently of toolDefinitions so a silent
-      // catalog shrink cannot self-verify (both sides derive from the same
-      // array otherwise).
-      expect(toolDefinitions.length).toBe(11);
-      expect(listResult.tools).toHaveLength(toolDefinitions.length);
-      expect(listResult.tools.map((t) => t.name)).toEqual(toolDefinitions.map((t) => t.name));
+      // Pin the catalog size independently of the fixture so a silent catalog
+      // shrink cannot self-verify (both sides derive from the same listing
+      // otherwise).
+      expect(slackToolFixture.tools.length).toBe(11);
+      expect(listResult.tools).toHaveLength(slackToolFixture.tools.length);
+      expect(listResult.tools.map((t) => t.name)).toEqual([...slackToolFixture.toolNames]);
     } finally {
       await client.close();
     }

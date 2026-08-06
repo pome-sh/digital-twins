@@ -13,7 +13,7 @@ import { join } from "node:path";
 import { loadFidelityInventory, runParityCli, type ParityStep } from "@pome-sh/sdk/parity";
 import { defaultSeedState } from "../src/seed.js";
 import { createSlackTwinApp } from "../src/twin.js";
-import { listTools } from "../src/tools.js";
+import { slackToolFixture } from "../src/tools.js";
 
 type SlackEnvelope = { ok?: boolean; error?: string };
 
@@ -78,7 +78,7 @@ await runParityCli({
   app: createSlackTwinApp({ seed: defaultSeedState() }),
   twin: "slack",
   inventory: loadFidelityInventory(join(import.meta.dirname, "..", "fidelity.inventory.json")),
-  liveToolNames: listTools().map((tool) => tool.name),
+  liveToolNames: [...slackToolFixture.toolNames],
   steps,
   claims: { team_id: "T_POME", login: "pome-agent" },
   stepVerify: (body) => {

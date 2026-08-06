@@ -3,7 +3,7 @@ import { createSlackTwinApp } from "../src/twin.js";
 import { openSlackTwinDatabase } from "../src/db.js";
 import { SlackDomain } from "../src/domain/index.js";
 import { defaultSeedState } from "../src/seed.js";
-import { toolDefinitions } from "../src/tools.js";
+import { slackToolFixture } from "../src/tools.js";
 import { signTestToken, TEST_SID, withAuth } from "./_authHelper.js";
 
 const base = `/s/${TEST_SID}`;
@@ -25,8 +25,15 @@ describe("legacy MCP routes", () => {
     const app = freshApp();
     const res = await app.request(`${base}/mcp/tools`, withAuth(token, {}));
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { tools: Array<{ name: string }> };
-    expect(body.tools.map((t) => t.name).sort()).toEqual(toolDefinitions.map((t) => t.name).sort());
+    const body = (await res.json()) as {
+      tools: Array<{ name: string; input_schema: { additionalProperties: boolean } }>;
+    };
+    expect(body.tools.map((t) => t.name).sort()).toEqual([...slackToolFixture.toolNames].sort());
+    // The legacy surface keeps its snake_case key and the frozen
+    // additionalProperties:false projection (F-1325 moved the table, not the shape).
+    for (const tool of body.tools) {
+      expect(tool.input_schema.additionalProperties).toBe(false);
+    }
   });
 
   it("POST /mcp/call slack_list_channels succeeds", async () => {

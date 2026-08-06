@@ -1,0 +1,288 @@
+{
+  "meta": {
+    "twin": "slack",
+    "substrate": "twin-code-transcription",
+    "endpoint": "in-process://twin-slack/s/:sid/mcp",
+    "method": "tools/list",
+    "protocol": "JSON-RPC 2.0 over Streamable HTTP",
+    "protocolVersion": "2025-06-18",
+    "captureDate": "2026-08-06",
+    "rawFileSha256": "2125da69d748e6d151aa229ee2fb4b6e5219372c5c858bce900fa045c7a234d4",
+    "liveToolCount": 11,
+    "liveToolOrder": [
+      "slack_post_message",
+      "slack_reply_to_thread",
+      "slack_add_reaction",
+      "slack_get_channel_history",
+      "slack_get_thread_replies",
+      "slack_list_channels",
+      "slack_get_users",
+      "slack_get_user_profile",
+      "slack_search_messages",
+      "slack_get_reactions",
+      "slack_list_channel_members"
+    ],
+    "transcription": {
+      "readFrom": "twin-slack's own tools/list, booted on defaultSeedState() and driven through Hono's app.request, read immediately before this table became fixture-driven (F-1325)",
+      "contentOrigin": "packages/twin-slack/src/tools.ts — a hand-written TypeScript array. Commit 6abec3c copied its eleven names verbatim out of modelcontextprotocol/servers-archived/src/slack, an archived reference server, and nothing has read Slack's own tools/list since.",
+      "comparedToUpstream": "never. https://mcp.slack.com/mcp is OAuth-gated, so F-1326 recorded the upstream golden as deferred (fixtures/mcp-tools-list/slack.status.json, F-1329). Eight of these eleven names are believed to exist on no Slack deployment; reporting that is F-1327's job and renaming them is F-1330's. This fixture is deliberately NOT a claim about Slack."
+    },
+    "notes": [
+      "additionalProperties:false on every inputSchema is load-bearing and is frozen here verbatim: src/tools.ts builds each schema with z.strictObject and forces the draft-7 projection, and the divergence lane depends on seeing it on the wire.",
+      "Seeded from the code table rather than from upstream on purpose. F-1325 is name-neutral by construction: every byte this twin serves is identical before and after it."
+    ],
+    "derivedFrom": "mcp-tools-list.raw.json",
+    "derivation": "result.tools verbatim, listing order preserved; only whitespace differs from the raw file"
+  },
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "tools": [
+      {
+        "name": "slack_post_message",
+        "description": "Post a new message to a Slack channel",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "channel_id": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channel_id",
+            "text"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "slack_reply_to_thread",
+        "description": "Reply to a specific message thread in Slack",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "channel_id": {
+              "type": "string"
+            },
+            "thread_ts": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channel_id",
+            "thread_ts",
+            "text"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "slack_add_reaction",
+        "description": "Add a reaction emoji to a message",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "channel_id": {
+              "type": "string"
+            },
+            "timestamp": {
+              "type": "string"
+            },
+            "reaction": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channel_id",
+            "timestamp",
+            "reaction"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "slack_get_channel_history",
+        "description": "Get recent messages from a channel",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "channel_id": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "channel_id"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": true
+        }
+      },
+      {
+        "name": "slack_get_thread_replies",
+        "description": "Get all replies in a message thread",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "channel_id": {
+              "type": "string"
+            },
+            "thread_ts": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channel_id",
+            "thread_ts"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": true
+        }
+      },
+      {
+        "name": "slack_list_channels",
+        "description": "List public or pre-defined channels in the workspace with pagination",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "number"
+            },
+            "cursor": {
+              "type": "string"
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": true
+        }
+      },
+      {
+        "name": "slack_get_users",
+        "description": "Get a list of all users in the workspace with their basic profile information",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "cursor": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "number"
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": true
+        }
+      },
+      {
+        "name": "slack_get_user_profile",
+        "description": "Get detailed profile information for a specific user",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "user_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "user_id"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": true
+        }
+      },
+      {
+        "name": "slack_search_messages",
+        "description": "Search messages in the workspace by text query",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string"
+            },
+            "count": {
+              "type": "number"
+            },
+            "page": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": true
+        }
+      },
+      {
+        "name": "slack_get_reactions",
+        "description": "Get all reactions on a specific message",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "channel_id": {
+              "type": "string"
+            },
+            "timestamp": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channel_id",
+            "timestamp"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": true
+        }
+      },
+      {
+        "name": "slack_list_channel_members",
+        "description": "List the member user IDs of a channel with pagination",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "channel_id": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "number"
+            },
+            "cursor": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "channel_id"
+          ],
+          "additionalProperties": false
+        },
+        "annotations": {
+          "readOnlyHint": true
+        }
+      }
+    ]
+  }
+}
