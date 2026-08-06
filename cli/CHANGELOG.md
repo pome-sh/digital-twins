@@ -4,6 +4,22 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.21.7
+
+### Patch Changes
+
+- **No CLI change.** Version-only bump. F-950 moved the trace-correlation core
+  into `@pome-sh/wire` as the subpath-only `@pome-sh/wire/correlation`, and
+  `scripts/ci/check-version-bump-required.mjs` counts any `packages/wire/`
+  change as publish-relevant for the CLI, because the CLI inlines wire into its
+  bundle. Here it genuinely is not: `correlation` is deliberately off wire's
+  root barrel, nothing in `cli/` imports it, and the CLI bundle is
+  byte-identical in content. 0.21.6 was already spoken for by F-1306's real
+  lazy-chunk-loading release by the time this PR landed, so this is 0.21.7
+  instead — still bumped rather than weakening the gate, for the same reason
+  that release gave: a gate that is right 99% of the time and cheap to satisfy
+  is worth more than one with an exception list.
+
 ## 0.21.6
 
 ### Patch Changes

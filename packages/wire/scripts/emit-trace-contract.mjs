@@ -234,6 +234,12 @@ export function buildContract({ pkg, eventKinds, fixtures }) {
       recorderEvents: "@pome-sh/wire/recorder-events",
       otel: "@pome-sh/wire/otel",
       redaction: "@pome-sh/wire/redaction",
+      // F-950. `otel/fixtures` is deliberately absent from this map — it is a
+      // test/dev artifact, not part of the contract a consumer codes against.
+      // `correlation` is: it is the agent-side half of the
+      // `x-pome-correlation-id` protocol whose recorder side these event
+      // schemas describe.
+      correlation: "@pome-sh/wire/correlation",
     },
     canonicalSchemas: [...CANONICAL_SCHEMAS],
     // Union declaration order, not sorted: the contract mirrors the schema.

@@ -16,12 +16,20 @@
 //
 //     const myTool = tool("name", "desc", schema, handler);
 //     for await (const msg of query({ prompt, options: { ... } })) { ... }
+//
+// F-950: the correlation core this package used to own — the AsyncLocalStorage
+// store and the `x-pome-correlation-id` fetch injection — now lives in
+// `@pome-sh/wire/correlation`, framework-agnostic, so a Vercel AI SDK or
+// LangGraph adapter gets the same race-proof guarantee instead of re-deriving
+// it. `CORRELATION_HEADER` is re-exported from there and is unchanged for
+// consumers. What stays Claude-specific is the wrapping: `tool()`, `query()`,
+// and reading the SDK's own `tool_use_id` off the MCP `_meta` key.
 
 export { withPome, getInstalledTwinHosts } from "./init.js";
 export type { WithPomeOptions } from "./init.js";
 export { tool } from "./tool.js";
 export { query } from "./query.js";
-export { CORRELATION_HEADER } from "./fetch.js";
+export { CORRELATION_HEADER } from "./correlation.js";
 export { ADAPTER_SIGNALS_ENV } from "./signals.js";
 export {
   flushPomeTelemetry,

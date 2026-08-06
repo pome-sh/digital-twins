@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
+//
+// Moved from `packages/adapter-claude-sdk/test/ids.test.ts` by F-950.
+
 import { describe, expect, it } from "vitest";
-import { generateToolCallId } from "../src/ids.js";
+import { generateToolCallId } from "../src/correlation/id.js";
 
 describe("generateToolCallId", () => {
   it("has the tlc_ prefix", () => {

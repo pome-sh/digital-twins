@@ -6,6 +6,13 @@
 // `null` (or absent) instead of the handler's `tool_call_id`. Earlier tests
 // asserted only "header present", which masked the regression.
 //
+// F-950 moved the store and the fetch patch to `@pome-sh/wire/correlation`, so
+// this file is now the COMPOSITION guard: it drives the real Claude `tool()`
+// wrapper and `withPome()`, and asserts the guarantee still holds end to end
+// across the package boundary. Wire's own `test/correlation-fetch.test.ts` and
+// `test/correlation-context.test.ts` pin the neutral core in isolation; neither
+// of those would catch an adapter that forgot to open the scope.
+//
 // This test fails LOUDLY by:
 //   1. Capturing the live tool_call_id from ALS at handler entry.
 //   2. Forcing two microtask hops (chained awaits).
@@ -69,7 +76,7 @@ afterEach(async () => {
 describe("ALS propagation across chained awaits (FDRS-322 regression)", () => {
   it("outgoing fetch carries the SAME tool_call_id that the handler read at entry — survives two microtask hops", async () => {
     const { withPome, tool } = await import("../src/index.js");
-    const { currentToolCallId } = await import("../src/als.js");
+    const { currentToolCallId } = await import("@pome-sh/wire/correlation");
     withPome();
 
     let idAtEntry: string | null = null;
@@ -107,7 +114,7 @@ describe("ALS propagation across chained awaits (FDRS-322 regression)", () => {
 
   it("nested awaits inside Promise.all() still propagate the same tool_call_id", async () => {
     const { withPome, tool } = await import("../src/index.js");
-    const { currentToolCallId } = await import("../src/als.js");
+    const { currentToolCallId } = await import("@pome-sh/wire/correlation");
     withPome();
 
     let idAtEntry: string | null = null;

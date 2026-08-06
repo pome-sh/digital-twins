@@ -9,6 +9,14 @@
  * package; NOTHING here knows about sessions, tasks, runs or the cloud REST
  * surface — those live in `cli/src/contract/` (F-942).
  *
+ * Two SUBPATH-ONLY surfaces are deliberately absent from this barrel, because
+ * only some consumers should pay to load them: `@pome-sh/wire/otel/fixtures`
+ * (the golden-fixture corpus, a test/dev artifact) and
+ * `@pome-sh/wire/correlation` (F-950 — the agent-side AsyncLocalStorage +
+ * fetch-patching plumbing that stamps `x-pome-correlation-id`; importing it
+ * constructs an AsyncLocalStorage, and no twin is the agent side of that
+ * protocol). `test/export-surface.test.ts` pins both halves of that call.
+ *
  * This file is a THIN BARREL: it re-exports only.
  */
 
