@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createGitHubCloneApp } from "../src/twin.js";
-import { listTools } from "../src/tools.js";
+import { githubToolFixture } from "../src/tools.js";
 import { TEST_AUTH_SECRET, TEST_SID, signTestToken, withAuth } from "./_authHelper.js";
 
 const previousSecret = process.env.TWIN_AUTH_SECRET;
@@ -20,7 +20,7 @@ const base = `/s/${TEST_SID}`;
 describe("MCP tool contract", () => {
   it("lists and executes all 65 GitHub twin tools", async () => {
     const app = createGitHubCloneApp();
-    expect(listTools().map((tool) => tool.name)).toEqual([
+    expect([...githubToolFixture.toolNames]).toEqual([
       "search_repositories",
       "create_repository",
       "fork_repository",

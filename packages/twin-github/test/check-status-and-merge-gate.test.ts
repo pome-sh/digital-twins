@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { openGitHubCloneDatabase } from "../src/db.js";
 import { GitHubDomain } from "../src/domain/index.js";
-import { executeTool, isMutatingTool, listTools } from "../src/tools.js";
+import { executeTool, githubToolFixture, isMutatingTool } from "../src/tools.js";
 
 // Migrated from the CLI twin-github copy during the twin consolidation
 // (FDRS-648). `create_commit_status` / `create_check_run` 404 on an unknown
@@ -50,7 +50,7 @@ function repoExport(domain: GitHubDomain) {
 
 describe("twin-github check-run / commit-status tools (FDRS-524)", () => {
   it("registers both tools as mutating", () => {
-    const names = listTools().map((tool) => tool.name);
+    const names = githubToolFixture.toolNames;
     expect(names).toContain("create_commit_status");
     expect(names).toContain("create_check_run");
     expect(isMutatingTool("create_commit_status")).toBe(true);

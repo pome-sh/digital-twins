@@ -18,7 +18,7 @@
  * reversible/irreversible.
  */
 import { z } from "zod";
-import { toolDefinitions } from "./tools.js";
+import { githubToolFixture } from "./tools.js";
 
 export const githubAccessControlCategorySchema = z.enum([
   "issues",
@@ -231,7 +231,7 @@ export function githubAccessControlToolNames(
 
 /** Every sandboxed tool exists in the MCP catalog. */
 export function assertAccessControlCatalogMatchesTools() {
-  const toolNames = new Set<string>(toolDefinitions.map((tool) => tool.name));
+  const toolNames = new Set<string>(githubToolFixture.toolNames);
   const missing = githubAccessControlToolNames().filter((name) => !toolNames.has(name));
   if (missing.length > 0) {
     throw new Error(`access-control catalog references unknown tools: ${missing.join(", ")}`);

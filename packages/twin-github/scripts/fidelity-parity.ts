@@ -11,7 +11,7 @@ import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { loadFidelityInventory, runParityCli, type ParityStep } from "@pome-sh/sdk/parity";
 import { createGitHubCloneApp } from "../src/twin.js";
-import { listTools } from "../src/tools.js";
+import { githubToolFixture } from "../src/tools.js";
 
 const repo = { owner: "acme", repo: "api" };
 
@@ -156,7 +156,7 @@ await runParityCli({
   app: createGitHubCloneApp(),
   twin: "github",
   inventory: loadFidelityInventory(join(import.meta.dirname, "..", "fidelity.inventory.json")),
-  liveToolNames: listTools().map((tool) => tool.name),
+  liveToolNames: [...githubToolFixture.toolNames],
   steps,
   claims: { team_id: "tm_fidelity", login: "pome-agent" },
   restProbes: [

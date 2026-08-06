@@ -24,7 +24,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { createGitHubCloneApp } from "../src/twin.js";
 import { createRecorderStore } from "@pome-sh/sdk/server";
-import { toolDefinitions } from "../src/tools.js";
+import { githubToolFixture } from "../src/tools.js";
 import type { RecorderEvent } from "@pome-sh/wire";
 import type { GitHubStateSeed } from "../src/types.js";
 
@@ -145,19 +145,19 @@ async function main() {
     section("tools/list (real SDK over the wire)");
     const listResult = await client.listTools();
     record(`Tool count returned: ${listResult.tools.length}`);
-    record(`Expected count (toolDefinitions.length): ${toolDefinitions.length}`);
-    if (listResult.tools.length !== toolDefinitions.length) {
-      throw new Error(`tool count mismatch: got ${listResult.tools.length}, want ${toolDefinitions.length}`);
+    record(`Expected count (githubToolFixture.tools.length): ${githubToolFixture.tools.length}`);
+    if (listResult.tools.length !== githubToolFixture.tools.length) {
+      throw new Error(`tool count mismatch: got ${listResult.tools.length}, want ${githubToolFixture.tools.length}`);
     }
 
     const gotNames: string[] = listResult.tools.map((t) => t.name);
-    const wantNames: string[] = toolDefinitions.map((t) => t.name);
+    const wantNames: string[] = [...githubToolFixture.toolNames];
     const missing = wantNames.filter((n) => !gotNames.includes(n));
     const extra = gotNames.filter((n) => !wantNames.includes(n));
     if (missing.length || extra.length) {
       throw new Error(`tool name mismatch: missing=${JSON.stringify(missing)} extra=${JSON.stringify(extra)}`);
     }
-    record("All 65 tool names match toolDefinitions ✓");
+    record("All 65 tool names match the tool-table fixture ✓");
     record("Full tool list (from the wire):");
     record(pretty(listResult.tools));
 
