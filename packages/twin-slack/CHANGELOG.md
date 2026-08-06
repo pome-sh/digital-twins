@@ -13,6 +13,15 @@ each a throw at module load.
 Name-neutral by construction: `tools/list` and the legacy `/mcp/tools` surface
 are byte-identical before and after.
 
+**Removed from the package root**: `listTools`, `listToolsForMcp` and
+`toolDefinitions`. Nothing served them — the engine answers both `/mcp/tools`
+and `tools/list` from `definition.tools` — so they were a second projection of
+the same table. The replacements are `slackToolFixture`,
+`slackToolInputSchema` and `toolSchemas`. This package is `private: true` and
+on no registry, and neither published tarball re-exposes a twin package root,
+so no installable consumer can have been importing them; every in-repo caller
+moved in the same change.
+
 ## 0.3.3 — 2026-08-04
 
 Dependency-only patch (#302): `hono` `^4.12.31` → `^4.13.0`, `zod` `^4.1.13` → `^4.4.3`, `@hono/node-server` `^2.0.10` → `^2.1.0`.
