@@ -1,12 +1,14 @@
 # Releasing
 
-Three packages are published to **npm**: `@pome-sh/cli` and
-`@pome-sh/adapter-claude-sdk` for end users, and `@pome-sh/checks` — the grading
-vocabulary — for the cloud grader in `pome-sh/pome-cloud`. One package is
-published to **GitHub Packages** for internal cross-repo consumers:
-`@pome-sh/wire`. Everything else in this repo (`@pome-sh/sdk`, the five
-`@pome-sh/twin-*`) is `private: true` and bundled into those tarballs by tsup —
-it is never installed from a registry, so it never needs its own release.
+Four packages are published to **npm**: `@pome-sh/cli` and
+`@pome-sh/adapter-claude-sdk` for end users, `@pome-sh/checks` — the grading
+vocabulary — for the cloud grader in `pome-sh/pome-cloud`, and `@pome-sh/wire`
+for pome-cloud's migration off `@pome-sh/shared-types`. `@pome-sh/wire` is ALSO
+published to **GitHub Packages**, independently, from the same version line —
+it is the only package on two registries. Everything else in this repo
+(`@pome-sh/sdk`, the five `@pome-sh/twin-*`) is `private: true` and bundled
+into those tarballs by tsup — it is never installed from a registry, so it
+never needs its own release.
 
 `@pome-sh/checks` is the one whose *staleness* is a product bug rather than a
 missed feature: pome-cloud grades every `[code]` criterion out of it, so an
@@ -15,8 +17,8 @@ unpublished correction means a frozen grading engine (F-1308). See
 for why it is a separate package instead of un-privatising the twins.
 
 `@pome-sh/wire` is the odd one out and worth reading the section on before
-touching it: it is published AND still bundled. Publishing it did not change
-how the CLI or the adapter consume it.
+touching it: it is published to two registries AND still bundled. Publishing
+it did not change how the CLI or the adapter consume it.
 
 ## The model
 
@@ -71,52 +73,92 @@ All four packages are pre-1.0, so npm's `^0.x` caret semantics apply
   implementation swaps behind an unchanged surface, dependency bumps, bug
   fixes.
 
-## `@pome-sh/wire` — published AND bundled
+## `@pome-sh/wire` — published to TWO registries, and still bundled
 
-`@pome-sh/wire` is a third published artifact with a different registry and a
-different audience, and it did not stop being a bundled one (F-949).
+`@pome-sh/wire` is a published artifact on two registries with two different
+audiences, and it did not stop being a bundled one (F-949, extended to add the
+public-npm target for pome-cloud's `@pome-sh/shared-types` migration).
 
-|  | `@pome-sh/cli`, `@pome-sh/adapter-claude-sdk` | `@pome-sh/wire` |
-| --- | --- | --- |
-| Registry | `registry.npmjs.org` | `npm.pkg.github.com` (GitHub Packages) |
-| Audience | end users — `npx @pome-sh/cli`, `npm i @pome-sh/adapter-claude-sdk` | internal cross-repo consumers, i.e. `pome-sh/pome-cloud` |
-| Auth | npm OIDC Trusted Publishing (`id-token: write`, provenance attestation, no stored token) | `GITHUB_TOKEN` + `packages: write`, via an `.npmrc` auth line |
-| Jobs | `plan` → `publish` (a matrix over the two) | `plan-wire` → `publish-wire` |
-| Reachable without auth | yes | no — GitHub Packages requires a token even to read |
+|  | `@pome-sh/cli`, `@pome-sh/adapter-claude-sdk`, `@pome-sh/checks` | `@pome-sh/wire` on npmjs | `@pome-sh/wire` on GitHub Packages |
+| --- | --- | --- | --- |
+| Registry | `registry.npmjs.org` | `registry.npmjs.org` | `npm.pkg.github.com` (GitHub Packages) |
+| Audience | end users — `npx @pome-sh/cli`, `npm i @pome-sh/adapter-claude-sdk`, `npm i @pome-sh/checks` | `pome-sh/pome-cloud`, whose other `@pome-sh/*` deps (sdk, twin-*) only resolve from npmjs | `pome-sh/pome-cloud`'s original target, still supported |
+| Auth | npm OIDC Trusted Publishing (`id-token: write`, provenance attestation, no stored token) | same OIDC mechanism, same `publish` job | `GITHUB_TOKEN` + `packages: write`, via an `.npmrc` auth line |
+| Jobs | `plan` → `publish` (a matrix, wire is the fourth entry) | `plan` → `publish` | `plan-wire` → `publish-wire` |
+| Reachable without auth | yes | yes | no — GitHub Packages requires a token even to read |
+
+wire's `publishConfig.registry` in `packages/wire/package.json` still names
+GitHub Packages — that is its *default*, and `ci.yml`'s `gate:wire-manifest`
+asserts it on every PR — so the npmjs-lane `publish` job overrides it with an
+explicit `--registry https://registry.npmjs.org` flag for wire only. See the
+comment on that step in `release.yml`.
 
 **Publishing wire changed nothing about how this repo consumes it.** `cli/` and
 `packages/adapter-claude-sdk/` still declare it as a **devDependency** at `"*"`
 (workspace-resolved), and tsup's `noExternal: [/^@pome-sh\//]` still inlines
 its compiled output into both tarballs. Neither published npmjs tarball has an
 `@pome-sh/*` dependency, and `scripts/clean-room-pack-test.mjs` fails if that
-ever changes. Nobody installing the CLI or the adapter fetches wire. Do not
-"simplify" this by turning wire into a real dependency of either: that would
-put a GitHub-Packages-only, auth-required package in an end user's install
-graph, and their `npm i` would 401.
+ever changes. Nobody installing the CLI or the adapter fetches wire from either
+registry. Do not "simplify" this by turning wire into a real dependency of
+either: that would put a registry-resolved package in an end user's install
+graph for no reason tsup doesn't already solve.
 
-Why GitHub Packages rather than public npm: wire is trace-vocabulary
-infrastructure (Zod schemas, the OTel span extension, secret redaction) with no
-stable public API promise. Publishing it to npmjs would make it look like a
-supported end-user library and would invite pins we do not intend to honour.
-The only thing that genuinely needs it across a repo boundary is pome-cloud.
+Why wire went to GitHub Packages first, and why npmjs got added rather than
+replacing it: wire is trace-vocabulary infrastructure (Zod schemas, the OTel
+span extension, secret redaction) with no stable public API promise, and
+GitHub Packages kept it out of the public npm namespace where it would look
+like a supported end-user library. That reasoning still holds — nothing about
+wire's confidentiality or audit status changed — but a single `@pome-sh` scope
+can only resolve from one registry per *consumer*, and pome-cloud's other
+`@pome-sh/*` dependencies (sdk, twin-*) exist only on public npmjs. Routing
+wire through GitHub Packages for that consumer would require an `.npmrc`
+change pome-cloud cannot make without breaking those other installs, so wire
+now publishes to both, independently, from the same version line.
 
-`@pome-sh/wire` publishes as `@pome-sh/…` because GitHub Packages scopes npm
-packages to the account that owns the linked repository — the scope must equal
-the org name, and `@pome-sh` matches the `pome-sh` org. The package is linked to
-this repository through the `repository` field already in
-`packages/wire/package.json`, which must keep naming the repo's **canonical**
-path (`pome-sh/digital-twins`; `pome-sh/pome-twins` is an old name GitHub
-redirects, and some local git remotes still use it).
+`@pome-sh/wire` publishes as `@pome-sh/…` on GitHub Packages because that
+registry scopes npm packages to the account that owns the linked repository —
+the scope must equal the org name, and `@pome-sh` matches the `pome-sh` org.
+The package is linked to this repository through the `repository` field
+already in `packages/wire/package.json`, which must keep naming the repo's
+**canonical** path (`pome-sh/digital-twins`; `pome-sh/pome-twins` is an old
+name GitHub redirects, and some local git remotes still use it).
 
-The two lanes are deliberately independent — `plan`/`publish` never reads GitHub
-Packages and `plan-wire`/`publish-wire` never reads npmjs — so an outage or a
-permissions change on one registry cannot skip the other's publishes. That
-matters because a GitHub Packages read failure is a *hard* failure by design (a
-401 must never be read as "unpublished", which would bypass the floor check), so
-it would otherwise be an outage on one registry silently blocking releases on
-the other.
+### One-time manual bootstrap for wire's npmjs target
 
-### One-time manual step for a maintainer
+npm's OIDC Trusted Publishing cannot be configured for a package that has never
+been published — the Trusted Publisher settings live on the package's own
+npmjs.com page, and that page does not exist until a first version lands on the
+registry. `@pome-sh/wire` has never been on `registry.npmjs.org` (only on
+GitHub Packages), so the FIRST run of the `publish` job's OIDC-based `npm
+publish -w @pome-sh/wire --registry https://registry.npmjs.org` step **will
+fail** — this is npm's documented bootstrap limitation, not a bug in this
+workflow. A maintainer must, once:
+
+1. Publish the initial npmjs version out of band — a local `npm publish -w
+   @pome-sh/wire --access public --registry https://registry.npmjs.org` from a
+   clean build, authenticated with a classic token or `npm login` as someone
+   with publish rights on the `@pome-sh` org.
+2. On npmjs.com, under the now-existing `@pome-sh/wire` package's *Settings →
+   Trusted Publisher*, add this repository (`pome-sh/digital-twins`), the
+   workflow file (`.github/workflows/release.yml`), and the `publish` job —
+   the same way `@pome-sh/cli`, `@pome-sh/adapter-claude-sdk` and
+   `@pome-sh/checks` are already configured there.
+
+Until step 2 is done, every subsequent version bump's `publish` run for
+`@pome-sh/wire` on the npmjs lane fails the same way. This is a one-time
+bootstrap, not a per-release step, and it does not affect
+`publish-wire`/GitHub Packages, which has its own token-based auth and needs
+no npmjs configuration.
+
+The npmjs and GitHub Packages lanes are deliberately independent — `plan`/
+`publish` never reads GitHub Packages and `plan-wire`/`publish-wire` never
+reads npmjs — so an outage or a permissions change on one registry cannot skip
+the other's publishes. That matters because a GitHub Packages read failure is
+a *hard* failure by design (a 401 must never be read as "unpublished", which
+would bypass the floor check); without the independence it would otherwise be
+an outage on one registry silently blocking releases on the other.
+
+### One-time manual step for a maintainer (GitHub Packages)
 
 GitHub Packages' npm registry supports granular permissions, so a package's
 visibility is settable independently of its linked repository — **but only once

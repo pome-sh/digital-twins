@@ -22,34 +22,50 @@ name: release
 # declaration layer on its own restores that path without reversing the
 # privatisation that fixed the two-zod-identities bug (F-942).
 #
-# @pome-sh/wire is the THIRD publish target and the odd one out (F-949). Same
-# version-diff model, different registry and different audience: GitHub Packages
-# (npm.pkg.github.com), for cross-repo internal consumers like pome-cloud — not
-# end users. It stays bundled-inlined into the two npmjs tarballs exactly as
-# before (tsup `noExternal`); publishing it is ADDITIVE, not a replacement.
+# @pome-sh/wire (F-949) publishes to BOTH registries now, independently, from
+# the SAME version line. It originally shipped to GitHub Packages only, for
+# cross-repo internal consumers like pome-cloud — not end users. pome-cloud's
+# migration off the deprecated @pome-sh/shared-types needs to npm-install wire
+# too, and a scope can only resolve from one registry per consumer: pome-cloud's
+# other unavoidable @pome-sh/* deps (sdk, twin-*) exist only on public npmjs, so
+# routing @pome-sh/wire there for GitHub Packages would break those. Public npm
+# has no confidentiality downside for wire — it is trace-vocabulary Zod schemas
+# with no domain logic or secrets, already audited clean when the GitHub
+# Packages target shipped. Publishing to npmjs is ADDITIVE: the GitHub Packages
+# target is untouched, and wire stays bundled-inlined into the two npmjs
+# tarballs exactly as before (tsup `noExternal`).
 #
-# Hence FOUR jobs in two independent lanes — plan → publish for npmjs,
-# plan-wire → publish-wire for GitHub Packages — rather than a third matrix
-# entry and a third `decide` call:
+# Hence wire is now the npmjs lane's FOURTH matrix entry (`plan`/`publish`,
+# alongside cli/adapter/checks) AND still has its own GitHub Packages lane
+# (`plan-wire`/`publish-wire`) — not a replacement of one lane by the other:
 #
-#   - The auth MECHANISM differs. npmjs uses OIDC Trusted Publishing (no token,
-#     `id-token: write`, provenance); GitHub Packages uses GITHUB_TOKEN with
-#     `packages: write` and an .npmrc auth line. One job cannot honestly do
-#     both, and a shared job would carry four pieces of OIDC cargo (the
-#     setup-node v6 pin for actions/setup-node#1551, the npm@11.5.1 pin for the
-#     provenance crash, `NPM_CONFIG_PROVENANCE`, `id-token: write`) under a
-#     comment explaining that none of it applies to wire.
+#   - The auth MECHANISM differs per registry, not per package. npmjs uses OIDC
+#     Trusted Publishing (no token, `id-token: write`, provenance); GitHub
+#     Packages uses GITHUB_TOKEN with `packages: write` and an .npmrc auth line.
+#     One job cannot honestly do both, and a shared job would carry four pieces
+#     of OIDC cargo (the setup-node v6 pin for actions/setup-node#1551, the
+#     npm@11.5.1 pin for the provenance crash, `NPM_CONFIG_PROVENANCE`,
+#     `id-token: write`) under a comment explaining that none of it applies to
+#     the GitHub Packages publish.
 #   - The lanes must not be able to break each other. GitHub Packages requires
 #     auth even to READ, and a read failure is deliberately a hard failure (a
 #     401 must never be mistaken for "unpublished" — that would bypass the
 #     never-publish-behind-latest floor check). If that read lived in `plan`,
 #     any GitHub Packages 401/403/outage — or an org owner flipping the
 #     package's visibility settings — would fail `plan` and silently skip the
-#     @pome-sh/cli and @pome-sh/adapter-claude-sdk publishes, which have nothing
-#     to do with GitHub Packages. Blast radius now matches the artifact.
+#     @pome-sh/cli, @pome-sh/adapter-claude-sdk and @pome-sh/checks publishes,
+#     which have nothing to do with GitHub Packages. Blast radius now matches
+#     the artifact. Symmetrically, wire's npmjs decision/publish lives entirely
+#     in `plan`/`publish` so an npmjs outage cannot take down the GitHub
+#     Packages publish either.
+#   - Wire's own `publishConfig.registry` still points at GitHub Packages (and
+#     ci.yml's `gate:wire-manifest` still asserts that on every PR — it is what
+#     `publish-wire` relies on by default). The npmjs-lane `publish` step
+#     therefore passes an explicit `--registry https://registry.npmjs.org` for
+#     wire ONLY, which outranks `publishConfig`. See the comment on that step.
 #
 # The shared decision logic lives in scripts/ci/decide-publish.sh (tested by
-# scripts/ci/decide-publish.test.mjs) so the two lanes cannot drift.
+# scripts/ci/decide-publish.test.mjs) so the lanes cannot drift.
 on:
   push:
     branches: [main]
@@ -72,15 +88,17 @@ jobs:
       cli: ${{ steps.diff.outputs.cli }}
       adapter: ${{ steps.diff.outputs.adapter }}
       checks: ${{ steps.diff.outputs.checks }}
+      wireNpm: ${{ steps.diff.outputs.wireNpm }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
-      # Deliberately reads ONLY registry.npmjs.org. @pome-sh/wire's diff lives in
-      # `plan-wire` so that a GitHub Packages 401/outage cannot skip the two npmjs
-      # publishes: a failure here fails `plan`, and everything needing it is
-      # skipped. Blast radius matches the artifact.
+      # Deliberately reads ONLY registry.npmjs.org (the `registry` argument is
+      # omitted below, including for wire). @pome-sh/wire's GitHub Packages diff
+      # lives separately in `plan-wire` so that a GitHub Packages 401/outage
+      # cannot skip the npmjs publishes: a failure here fails `plan`, and
+      # everything needing it is skipped. Blast radius matches the artifact.
       - name: Compare local versions against npm
         id: diff
         run: |
@@ -88,6 +106,12 @@ jobs:
           scripts/ci/decide-publish.sh "@pome-sh/cli" "cli/package.json" "cli"
           scripts/ci/decide-publish.sh "@pome-sh/adapter-claude-sdk" "packages/adapter-claude-sdk/package.json" "adapter"
           scripts/ci/decide-publish.sh "@pome-sh/checks" "packages/checks/package.json" "checks"
+          # wire's npmjs decision — independent of, and output-named distinctly
+          # from, plan-wire's `wire` output below (that one reads GitHub
+          # Packages). Same manifest, same version line, two registries decided
+          # separately: wire could be publishable on npmjs while already
+          # up to date (or even behind) on GitHub Packages, or vice versa.
+          scripts/ci/decide-publish.sh "@pome-sh/wire" "packages/wire/package.json" "wireNpm"
 
   plan-wire:
     name: does @pome-sh/wire need publishing
@@ -126,7 +150,7 @@ jobs:
   publish:
     name: publish ${{ matrix.package }}
     needs: plan
-    if: needs.plan.outputs.cli == 'true' || needs.plan.outputs.adapter == 'true' || needs.plan.outputs.checks == 'true'
+    if: needs.plan.outputs.cli == 'true' || needs.plan.outputs.adapter == 'true' || needs.plan.outputs.checks == 'true' || needs.plan.outputs.wireNpm == 'true'
     runs-on: ubuntu-latest
     strategy:
       # Never cancel a sibling mid-publish: a half-published set is worse than
@@ -146,6 +170,22 @@ jobs:
           # need an .npmrc change it cannot make without breaking @pome-sh/cli.
           - package: "@pome-sh/checks"
             enabled: ${{ needs.plan.outputs.checks }}
+          # @pome-sh/wire — the odd one out twice over (F-949). It is on this
+          # npmjs lane ADDITIONALLY to (not instead of) its separate GitHub
+          # Packages jobs further down in this file: pome-cloud's migration off
+          # @pome-sh/shared-types needs to npm-install wire, and the rest of its
+          # unavoidable @pome-sh/* deps only exist on public npmjs, so wire has
+          # to resolve from there too. `enabled` is `wireNpm`, not `wire` — the
+          # latter is the OTHER job's GitHub Packages output; reusing that name
+          # here would silently wire this job to the wrong decision. wire's own
+          # `publishConfig.registry` still targets GitHub Packages, so its
+          # Publish step below (and only its) passes an explicit
+          # `--registry` to land on npmjs instead. It skips the
+          # `gate:checks-tarball` step (`matrix.package == '@pome-sh/checks'`
+          # only) since that audit is specific to `@pome-sh/checks`'s six-inlined-
+          # workspace tarball shape and has no wire equivalent.
+          - package: "@pome-sh/wire"
+            enabled: ${{ needs.plan.outputs.wireNpm }}
     permissions:
       contents: read
       id-token: write # npm OIDC Trusted Publishing (provenance)
@@ -212,9 +252,31 @@ jobs:
             exit 1
           fi
           echo "E415 hard-link check OK: $tgz"
+      # @pome-sh/wire's own package.json sets `publishConfig.registry` to
+      # GitHub Packages (npm.pkg.github.com) as its DEFAULT — see
+      # publish-wire's "Publish to GitHub Packages" step and
+      # RELEASING.md — and ci.yml's `gate:wire-manifest` asserts that value on
+      # every PR, so it cannot be changed or removed here without failing that
+      # gate. `publishConfig` outranks the ambient registry that
+      # `registry-url: https://registry.npmjs.org` above configured, so
+      # publishing wire on THIS lane with no override would either silently
+      # attempt GitHub Packages (wrong registry, and this job never
+      # authenticates against it — ENEEDAUTH) or, if it somehow succeeded,
+      # publish wire to GitHub Packages twice while npmjs got nothing. An
+      # explicit `--registry` flag outranks `publishConfig` and is the only
+      # thing that reliably wins here — the same reasoning `publish-wire`
+      # applies in the opposite direction for defence-in-depth. cli, adapter
+      # and checks have no `publishConfig.registry`, so they fall through to
+      # the plain `npm publish` and pick up the registry `setup-node` wrote.
       - name: Publish
         if: matrix.enabled == 'true'
-        run: npm publish -w ${{ matrix.package }} --access public
+        run: |
+          set -euo pipefail
+          if [ "${{ matrix.package }}" = "@pome-sh/wire" ]; then
+            npm publish -w "${{ matrix.package }}" --access public --registry https://registry.npmjs.org
+          else
+            npm publish -w "${{ matrix.package }}" --access public
+          fi
         env:
           NPM_CONFIG_PROVENANCE: "true"
 
