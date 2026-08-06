@@ -53,8 +53,9 @@ is a cross-repo decision, not a side effect of a file move.
   (`.github/workflows/twin-image.yml` filters on `packages/wire/**` and
   deliberately not on `cli/src/contract/**`).
 - **`packages/twin-github/src/access-control.ts`** — GitHub-specific endpoint
-  data, now beside the `toolDefinitions` that is the only thing able to
-  contradict it.
+  data, now beside the tool-table fixture that is the only thing able to
+  contradict it. Its catalog check reads `githubToolFixture.toolNames`, the
+  listing the twin actually serves (F-1325).
 
 ## How the partition is enforced
 
