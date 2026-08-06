@@ -36,7 +36,7 @@ export const noUnsupportedEndpoint: Check<Record<string, never>> = defineCheck({
   // and under position 2 an author PICKS the check rather than typing it — so
   // the legacy regex's optional twin word ("No unsupported GitHub endpoint was
   // called") and its plural/`were` variants are retired rather than ported,
-  // exactly as F-1075 retired `issue-has-label-generic`.
+  // exactly as the generic `issue-has-label` phrasing was retired.
   template: "No unsupported endpoint was called",
   params: {},
   substrate: "tape",
@@ -50,7 +50,7 @@ export const noUnsupportedEndpoint: Check<Record<string, never>> = defineCheck({
   // trigger is "a call with fidelity=unsupported exists", which lives on the
   // tape and not in the sentence. Reported as `no_trigger`, never as clean.
   vacuityMutant: () => null,
-  // F-1076 already shipped both of these as tests; this is the same pair,
+  // Both of these already shipped as tests; this is the same pair,
   // promoted to the declaration.
   discriminatingWorlds: () => ({
     passing: tapeWorld([

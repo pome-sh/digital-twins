@@ -36,7 +36,7 @@ import {
 
 // The workhorse of gmail's corpus: it binds three of the six criteria A3 found
 // unbound, because tasks 22 and 27 say the same sentence about `msg_support` and
-// task 23 says it about `msg_parity`. One check, three criteria — the same way
+// another says it about `msg_parity`. One check, three criteria — the same way
 // `github.no-new-labels` cleared five.
 export const messageHasLabel: Check<{ message: string; label: string }> = defineCheck({
   id: "gmail.message-has-label",
@@ -89,7 +89,7 @@ export const messageHasLabel: Check<{ message: string; label: string }> = define
       // places: the message row it resolved by id, and the join table it then
       // questioned. Labels are not nested under their message in this export —
       // that is the whole reason `messageCarriesLabel` exists — so one pointer
-      // could not say where this verdict came from (F-1197).
+      // could not say where this verdict came from.
       evidenceStatePaths: [found.path, carried.path],
     };
   },
@@ -99,7 +99,7 @@ export const messageHasLabel: Check<{ message: string; label: string }> = define
 // graded the retry/partial-failure curriculum class. The legacy pattern was
 // case-insensitive and tolerated `labelled`, a trailing period and three quote
 // styles; under position 2 an author PICKS the check rather than typing it, so
-// those variants are retired rather than ported — exactly as F-1075 retired
+// those variants are retired rather than ported — exactly as the generic
 // `issue-has-label-generic`.
 export const mailboxLabelCount: Check<{ mailbox: string; count: string; label: string }> =
   defineCheck({

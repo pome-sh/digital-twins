@@ -53,7 +53,7 @@ export const noMessageContaining: Check<{ needle: string; scope: string }> = def
   params: { needle: messageNeedle, scope: messageScope },
   substrate: "final",
   polarity: () => "negative",
-  // The quoted needle IS the subject (F-1028).
+  // The quoted needle IS the subject.
   subject: ({ needle }) => needle,
   // The needle is SCANNED, so falsifying it is a real trigger. The scope only
   // narrows the candidate set, so a closed set costs nothing here.
@@ -88,7 +88,7 @@ export const noMessageContaining: Check<{ needle: string; scope: string }> = def
         : `no ${publicOnly ? "public channel" : "channel"} has a message containing "${needle}" ` +
           `(${candidates.length} channel(s) scanned)`,
       // The workspace's channel list, on BOTH arms and under both scopes
-      // (F-1197). Not the hitting channel on a fail and the list on a pass:
+      // Not the hitting channel on a fail and the list on a pass:
       // a citation whose PRECISION moves with the verdict is fine, but one whose
       // PRESENCE does is not, and once both arms must cite, the list is the
       // honest answer under `any public channel` too — the public set is
@@ -110,11 +110,10 @@ export const noMessagePosted: Check<{ channel: string }> = defineCheck({
   substrate: "final",
   polarity: () => "negative",
   // No subject, and NOT merely because a channel name is a selector no redactor
-  // can eat. pome-cloud's `corpus.test.ts` proves the UNGUARDED
-  // redaction-hazard arm — "a predicate that compares a literal but forgets
-  // `subject`" — using THIS check with a channel named like a key. Declaring a
-  // subject here would reclassify that case as `dead` and leave the
-  // forgot-`subject` regression arm with nothing to test.
+  // can eat. This check is the canonical example of a predicate that compares a
+  // literal and deliberately declares no subject, so it is the one a consumer's
+  // own test suite is likely to reach for when exercising that case. Declaring a
+  // subject here would change which category it demonstrates.
   subject: () => null,
   // No falsifiable trigger. The channel is the only literal and it only
   // RESOLVES: a sentinel channel is `channel_not_found`, which skips, so the

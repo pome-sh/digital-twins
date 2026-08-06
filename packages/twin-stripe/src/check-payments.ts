@@ -10,8 +10,8 @@
 //
 //   A PaymentIntent exists with status "…"   ← task 13, `A backing PaymentIntent
 //                                              reaches succeeded`
-//   A charge exists with status "…"          ← task 12
-//   {event_type} is emitted                  ← task 12, and the one sentence in
+//   A charge exists with status "…"          ← the card-payment task
+//   {event_type} is emitted                  ← the same task, and the one sentence in
 //                                              this file that re-renders the
 //                                              corpus BYTE-IDENTICALLY
 //
@@ -102,7 +102,7 @@ export const paymentIntentAmount: Check<{ amount: string }> = defineCheck({
       reason: found
         ? `a PaymentIntent exists with amount ${wanted}`
         : `no PaymentIntent has amount ${wanted} (amounts: [${pis.map((pi) => pi.amount ?? "?").join(", ")}])`,
-      // The COLLECTION, not the matching row (F-1197). Every check in this file
+      // The COLLECTION, not the matching row. Every check in this file
       // scans a whole collection and answers a question about the set — "does
       // one exist with…" — so the set is what was read. Citing the hit on a pass
       // and the collection on a fail would make the pointer's shape track the
@@ -270,7 +270,7 @@ export const eventEmitted: Check<{ event_type: string }> = defineCheck({
     "distinguish them, because the criterion asking for it is about the outcome rather than the " +
     "rail. An absent `events` key is a SKIP.",
   // No quotes, and that is load-bearing: the corpus already says
-  // `payment_intent.succeeded is emitted`, so this template re-renders task 12's
+  // `payment_intent.succeeded is emitted`, so this template re-renders that task's
   // existing criterion byte-identically and the migration rewrites it not at
   // all. The dot lives inside the closed set's members, which `oneOf` escapes,
   // so it matches a dot rather than any character.

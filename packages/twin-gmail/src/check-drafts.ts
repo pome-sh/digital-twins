@@ -28,20 +28,19 @@ export const draftAddressedTo: Check<{ email: string }> = defineCheck({
   template: "A draft addressed to {email} exists",
   params: { email: emailAddress },
   substrate: "final",
-  // An achievement: task 22's seed ships one draft addressed to bob, so an
-  // examinee that does nothing does not satisfy this.
+  // An achievement: the seeded mailbox already contains a draft with a
+  // recipient, so an examinee that does nothing does not satisfy this.
   polarity: () => "positive",
   //
   // THE LOAD-BEARING DECLARATION ON THIS CHECK.
   //
-  // pome-cloud's `corpus.ts` has carried a prediction about this exact criterion
-  // since F-1028: `22-gmail-inbox-triage`'s `alice@example.com` "becomes visible
-  // here as 'unguarded' the day a gmail draft-recipient predicate lands without a
-  // `subject`, which is precisely when it starts to matter." An email address is
-  // squarely inside what a team's redaction config may destroy. Without this
-  // field the evaluator has no way to turn an impossible comparison into an
-  // honest skip, so the criterion scores a vacuous verdict at both doors
-  // instead — and the count of unguarded hazards must stay at zero.
+  // `subject` names the value the assertion is actually about, and on this check
+  // that value is an email address — squarely inside what a redaction config may
+  // legitimately destroy before an evaluator ever sees the state. Declaring it
+  // is what lets a consumer detect that the comparison has become impossible and
+  // record an honest skip. Without it there is nothing to detect: the address is
+  // simply absent, the comparison silently cannot match, and the criterion
+  // reports a vacuous verdict that reads like a real one.
   subject: ({ email }) => email,
   // The address is the scanned literal, so the mutant points at it. It stays
   // email-shaped so it re-binds to this same check: a mutant that stops matching
@@ -77,7 +76,7 @@ export const draftAddressedTo: Check<{ email: string }> = defineCheck({
         // address. A reader following this pointer lands on the thing the
         // sentence is about — "a draft addressed to X" — and the join to the
         // message is an implementation detail of how the twin exports, not the
-        // claim (F-1197).
+        // claim.
         evidenceStatePaths: [childStatePath(DRAFTS_PATH, index)],
       };
     }
@@ -121,8 +120,9 @@ export const draftCountAtLeast: Check<{ count: string }> = defineCheck({
   // is nothing to resolve: it is compared directly against a cardinality the
   // predicate computes, so falsifying it moves the verdict THROUGH the
   // assertion. That is the same argument `stripe.payment-intent-amount` makes,
-  // and it is why this check is the second entry in pome-cloud's
-  // `NUMERIC_SENTINEL_ALLOWED`.
+  // and it is why a numeric sentinel is admissible on this check and on very few
+  // others: an evaluator that allowlists the numeric sentinel per check should
+  // expect these two.
   vacuityMutant: (args) => ({ ...args, count: String(VACUITY_SENTINEL_NUMBER) }),
   discriminatingWorlds: ({ count }) => {
     const wanted = parseCount(count) ?? 1;

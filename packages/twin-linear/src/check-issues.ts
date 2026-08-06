@@ -57,7 +57,7 @@ export const issueExists: Check<{ title: string; team: string }> = defineCheck({
   description:
     "Asserts an unarchived issue with this exact title exists in the named team. Declared and " +
     "unused by the shipped corpus on purpose: `linear.issue-state` FAILS on a missing issue and " +
-    "therefore subsumes this one, so task 26 carries the state criterion alone — twin-github " +
+    "therefore subsumes this one, so a task carries the state criterion alone — twin-github " +
     "ships the same pair for the same reason. A vocabulary is what an author may pick from, not " +
     "what the corpus happens to exercise. Title matching is EXACT and archived issues do not " +
     "count, so an examinee that renames or archives the issue fails this.",

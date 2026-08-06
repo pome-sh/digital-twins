@@ -22,7 +22,7 @@ export const pullRequestStateCheck: Check<{ pr: string; repo: string; state: str
   template: "Pull request #{pr} in `{repo}` is {state}",
   params: { pr: prNumber, repo: repoRef, state: pullRequestState },
   substrate: "final",
-  // Per-arg, and the reason polarity takes the args at all: task 05 asserts
+  // Per-arg, and the reason polarity takes the args at all: one shipped task asserts
   // "PR #1 is merged" and "PR #2 is not merged" through this one template.
   // "open" is the same prohibition as the issue check's.
   polarity: ({ state }) => (state === "not merged" || state === "open" ? "negative" : "positive"),
@@ -74,7 +74,7 @@ export const pullRequestStateCheck: Check<{ pr: string; repo: string; state: str
           onMergeFlag ? "merged" : "state"
         } field in state_final (state_incomplete)`,
         // The ROW: the field this branch exists for is the absent one, so a
-        // pointer at it would resolve to nothing (F-1197).
+        // pointer at it would resolve to nothing.
         evidenceStatePaths: [found.path],
       };
     }

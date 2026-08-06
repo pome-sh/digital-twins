@@ -3,8 +3,7 @@
 ## 0.1.0
 
 First release. Carries the grading vocabulary of all five digital twins so a
-corrected check declaration can reach a cross-repo consumer through a normal
-publish + pin bump (F-1308).
+publish + pin bump.
 
 - The five check arrays (`GITHUB_CHECKS`, `SLACK_CHECKS`, `STRIPE_CHECKS`,
   `GMAIL_CHECKS`, `LINEAR_CHECKS`), keyed as `TWIN_CHECKS`.
