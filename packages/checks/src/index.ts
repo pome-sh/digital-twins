@@ -21,6 +21,18 @@ export { LINEAR_CHECKS } from "@pome-sh/twin-linear/checks";
 export { SLACK_CHECKS } from "@pome-sh/twin-slack/checks";
 export { STRIPE_CHECKS } from "@pome-sh/twin-stripe/checks";
 
+// Each twin declares its own `Check<TArgs>` = `CheckDefinition<<Twin>CheckState,
+// TArgs>` — five DIFFERENT types that happen to share a name, so the barrel
+// cannot export a bare `Check` without picking one arbitrarily. Prefixed here;
+// the per-twin subpaths keep the plain name. `CheckDefinition` (the generic both
+// are written in terms of) arrives via `./dsl.js`, and is what you want when the
+// twin is a parameter rather than known.
+export type { Check as GitHubCheck } from "@pome-sh/twin-github/checks";
+export type { Check as GmailCheck } from "@pome-sh/twin-gmail/checks";
+export type { Check as LinearCheck } from "@pome-sh/twin-linear/checks";
+export type { Check as SlackCheck } from "@pome-sh/twin-slack/checks";
+export type { Check as StripeCheck } from "@pome-sh/twin-stripe/checks";
+
 export type {
   GitHubCheckState,
   GitHubCheckStateComment,

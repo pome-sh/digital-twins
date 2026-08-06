@@ -50,7 +50,7 @@
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -60,6 +60,54 @@ const MANIFEST_PATH = join(ROOT, "packages", "checks", "package.json");
 
 /** Bytes that mean the twin engine got inlined. `DatabaseSync` is node:sqlite's export. */
 const ENGINE_MARKERS = ["node:sqlite", "DatabaseSync", "@hono/node-server", "hono/jwt"];
+
+/**
+ * Bare specifiers a shipped `.d.ts` may name. Everything else is unresolvable for
+ * a consumer: `@pome-sh/*` because those packages are `private: true` and on no
+ * registry, `hono` because it is not a dependency of this package.
+ *
+ * NOTE the quote-agnostic pattern. An earlier version of this gate matched only
+ * double quotes and reported "no external specifiers" for a `dist/index.d.ts`
+ * that was full of single-quoted ones — tsup emits single quotes. The gate was
+ * green while the declarations were entirely broken.
+ */
+const DECLARATION_EXTERNALS_ALLOWED = (specifier) =>
+  specifier === "zod" || specifier.startsWith("node:");
+const SPECIFIER_PATTERN = /(?:\bfrom\s*|\bimport\s*)\(?\s*(['"])([^'"]+)\1/g;
+
+/**
+ * Blank out comments, preserving length, before looking for specifiers. Doc
+ * comments contain quoted PROSE, and one of them — `could not tell "the path is
+ * absent" from "the path holds null"` — parses as `from "the path holds null"`
+ * and reds this gate over an English sentence. Any regex scanner over `.d.ts`
+ * needs this; `packages/checks/scripts/bundle-declarations.mjs` carries the same
+ * guard for the same reason.
+ */
+function maskComments(text) {
+  const out = text.split("");
+  let index = 0;
+  while (index < text.length) {
+    const two = text.slice(index, index + 2);
+    if (two === "//") {
+      while (index < text.length && text[index] !== "\n") out[index++] = " ";
+    } else if (two === "/*") {
+      const end = text.indexOf("*/", index + 2);
+      const stop = end === -1 ? text.length : end + 2;
+      while (index < stop) {
+        if (text[index] !== "\n") out[index] = " ";
+        index += 1;
+      }
+    } else if (text[index] === '"' || text[index] === "'") {
+      const quote = text[index++];
+      while (index < text.length && text[index] !== quote) {
+        if (text[index] === "\\") index += 1;
+        index += 1;
+      }
+      index += 1;
+    } else index += 1;
+  }
+  return out.join("");
+}
 
 const failures = [];
 const manifest = JSON.parse(readFileSync(MANIFEST_PATH, "utf8"));
@@ -251,6 +299,41 @@ function auditTarball() {
       );
     }
 
+    // The declarations must be self-contained. `noExternal` does not cover them:
+    // the declaration bundler leaves bare specifiers alone, so `export … from
+    // "@pome-sh/twin-github/checks"` lands verbatim in the shipped `.d.ts` and
+    // resolves nowhere for a consumer. `packages/checks/scripts/
+    // bundle-declarations.mjs` rewrites them; this is the tarball-side check that
+    // it ran and covered everything.
+    //
+    // The authoritative test is the consumer COMPILE in
+    // scripts/clean-room-pack-test.mjs, which catches type errors this cannot
+    // see. This is the cheap string-level half, so a regression is named here
+    // even when the heavier gate is not the thing that ran.
+    const declarationFiles = readdirSync(join(packageRoot, "dist"), { recursive: true })
+      .map(String)
+      .filter((file) => file.endsWith(".d.ts"))
+      .map((file) => join(packageRoot, "dist", file));
+    const unresolvable = [];
+    for (const file of declarationFiles) {
+      const text = maskComments(readFileSync(file, "utf8"));
+      for (const [, , specifier] of text.matchAll(SPECIFIER_PATTERN)) {
+        if (specifier.startsWith(".")) continue;
+        if (DECLARATION_EXTERNALS_ALLOWED(specifier)) continue;
+        unresolvable.push(`${relative(packageRoot, file)} -> ${specifier}`);
+      }
+    }
+    if (unresolvable.length > 0) {
+      failures.push(
+        `${unresolvable.length} shipped declaration specifier(s) a consumer cannot resolve ` +
+          "(TS2307, and every symbol behind an `export *` from one goes missing too):\n" +
+          unresolvable.map((entry) => `      - ${entry}`).join("\n"),
+      );
+    }
+    if (declarationFiles.length === 0) {
+      failures.push("the tarball ships no .d.ts at all — the declaration build did not run.");
+    }
+
     // 6 — exactly one copy of the DSL.
     for (const [marker, label] of [
       ["function defineCheck", "defineCheck"],
@@ -273,7 +356,7 @@ function auditTarball() {
     if (failures.length === 0) {
       console.log(
         `  ✓ ${declaredPaths.size} declared path(s) ship; no engine bytes, zod external, ` +
-          "one copy of the DSL, no hard links, no dangling sourcemaps",
+          "one copy of the DSL, self-contained declarations, no hard links, no dangling sourcemaps",
       );
     }
     if (!KEEP) rmSync(extractDirectory, { recursive: true, force: true });
@@ -295,5 +378,5 @@ if (failures.length > 0) {
 console.log(
   MANIFEST_ONLY
     ? "@pome-sh/checks manifest audit passed — private: false, access public, zero @pome-sh/* runtime deps, zod is a peer."
-    : "@pome-sh/checks tarball audit passed — installable with no @pome-sh/* dependency, no engine inlined, one zod and one DSL.",
+    : "@pome-sh/checks tarball audit passed — installable with no @pome-sh/* dependency, no engine inlined, one zod, one DSL, declarations resolve without the workspace.",
 );

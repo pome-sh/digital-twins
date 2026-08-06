@@ -23,9 +23,13 @@
       "types": "./dist/checks.d.ts",
       "default": "./dist/checks.js"
     },
-    "./failure-injection": {
-      "types": "./dist/failure-injection.d.ts",
-      "default": "./dist/failure-injection.js"
+    "./db": {
+      "types": "./dist/db.d.ts",
+      "default": "./dist/db.js"
+    },
+    "./failure-injection-rules": {
+      "types": "./dist/failure-injection-rules.d.ts",
+      "default": "./dist/failure-injection-rules.js"
     }
   },
   "repository": {

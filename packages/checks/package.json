@@ -1,7 +1,7 @@
 {
   "name": "@pome-sh/checks",
   "version": "0.1.0",
-  "description": "Pome's grading vocabulary — the check declarations, seed schemas and default seeds of all five digital twins, plus the check DSL they are written in. Declarations only: no twin server, no database, no routes, no tools.",
+  "description": "Pome's grading vocabulary \u2014 the check declarations, seed schemas and default seeds of all five digital twins, plus the check DSL they are written in. Declarations only: no twin server, no database, no routes, no tools.",
   "private": false,
   "type": "module",
   "main": "./dist/index.js",
@@ -66,7 +66,7 @@
     "checks"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && node scripts/bundle-declarations.mjs",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepublishOnly": "npm run build"

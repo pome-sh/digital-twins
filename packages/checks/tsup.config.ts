@@ -57,10 +57,24 @@ export default defineConfig({
   platform: "node",
   // Consumers import these types — `Check`, `CheckDefinition`, the per-twin
   // check-state shapes and the parsed-seed types are the surface pome-cloud
-  // typechecks `resolveTwinChecks` against. A dts rollup that silently drops a
-  // type still imports fine at runtime and only breaks the consumer's `tsc`,
-  // which is why the tarball gate compiles a real consumer file rather than
-  // just importing the module.
+  // typechecks `resolveTwinChecks` against.
+  //
+  // `dts: true` alone emits BROKEN declarations, and this is the one setting in
+  // this file that is not self-evidently right. `noExternal` governs the JS
+  // bundle only; the declaration bundler keeps bare specifiers external, so
+  // `export … from "@pome-sh/twin-github/checks"` lands verbatim in
+  // `dist/index.d.ts` — a specifier that resolves nowhere for a consumer,
+  // because that package is `private: true` and on no registry.
+  // `scripts/bundle-declarations.mjs`, sequenced after tsup by this package's
+  // `build` script, is what makes the output self-contained; its header records
+  // why `dts: { resolve: … }` cannot do it and why `onSuccess` is the wrong hook.
+  //
+  // Nothing fails at runtime when this regresses — the JS is fine — so the
+  // safety net is a consumer COMPILE, not an import:
+  // `scripts/clean-room-pack-test.mjs` installs the packed tarball in a clean
+  // room with no workspace access and runs `tsc` over a real consumer file with
+  // `skipLibCheck` OFF, which is what surfaces an unresolvable specifier inside
+  // a shipped `.d.ts` rather than silently tolerating it.
   dts: true,
   clean: true,
   splitting: true,

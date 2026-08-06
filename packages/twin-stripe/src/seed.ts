@@ -11,7 +11,7 @@
 // is indistinguishable from one created by `simulateCryptoDeposit` /
 // `POST /v1/refunds` on read.
 import { z } from "zod";
-// `@pome-sh/sdk/failure-injection` rather than `@pome-sh/sdk/server`: this
+// `@pome-sh/sdk/failure-injection-rules` rather than `@pome-sh/sdk/server`: this
 // module is part of the DECLARATION surface `@pome-sh/checks` bundles, and
 // `/server` is the whole twin engine — hono, hono/jwt, node:sqlite and the
 // recorder, 14 runtime modules — reached for one zod schema. The narrow
@@ -22,7 +22,7 @@ import { z } from "zod";
 import {
   failureInjectionRuleSchema,
   type FailureInjectionStore,
-} from "@pome-sh/sdk/failure-injection";
+} from "@pome-sh/sdk/failure-injection-rules";
 import { mintApiKey } from "./api-keys.js";
 import { ensureStripeTables } from "./domain/schema.js";
 import type { SeedState, TwinStripeDatabase } from "./types.js";
@@ -155,7 +155,15 @@ export function parseSeed(input: unknown): SeedState {
  * seed, so a misconfigured cloud deploy fails the twin server's
  * healthz instead of silently booting with an empty Stripe world.
  */
-export function loadSeedFromEnv(env: NodeJS.ProcessEnv = process.env): SeedState {
+/**
+ * `Record<string, string | undefined>` rather than `NodeJS.ProcessEnv`, which is
+ * structurally the same thing but an AMBIENT global. This signature is vendored
+ * into `@pome-sh/checks`'s published declarations, and an ambient reference there
+ * makes a consumer's `tsc` fail with TS2503 unless they happen to have
+ * `@types/node` installed — a dependency this package should not impose to
+ * describe a plain string map.
+ */
+export function loadSeedFromEnv(env: Record<string, string | undefined> = process.env): SeedState {
   const raw = env.POME_SEED_JSON;
   if (raw === undefined || raw === "") {
     return defaultSeed();

@@ -54,6 +54,8 @@ for the DSL alone.
 | `CHECKS_TWIN_NAMES`, `ChecksTwinName` | The five twin ids, and the type derived from them |
 | `parse<Twin>Seed`, `<twin>SeedSchema`, `default<Twin>Seed` | Seed contract per twin |
 | `defineCheck`, `parseCheck`, `renderCheck`, `checkPattern`, `checksDigest`, `templateSlots`, `statePath`, `childStatePath` | The DSL |
+| `GitHubCheck`, `GmailCheck`, `LinearCheck`, `SlackCheck`, `StripeCheck` | Each twin's check element type. Every twin declares its own `Check<TArgs>` over its own state, so the barrel prefixes them; the per-twin subpaths keep the plain name `Check` |
+| `CheckDefinition`, `Check…State` types | The generic declaration type, and each twin's state shape — what you want when the twin is a parameter rather than known |
 | `VACUITY_SENTINEL`, `VACUITY_SENTINEL_NUMBER`, `VACUITY_SENTINEL_SNAKE` | The values that mark an assertion no state can satisfy |
 
 `applySeed` and `loadSeedFromEnv` are **not** exported. The first writes rows
