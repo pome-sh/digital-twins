@@ -58,8 +58,35 @@
       ]
     },
     "packages/sdk": {
-      "entry": ["src/index.ts", "src/server.ts", "src/parity.ts", "src/checks.ts", "scripts/**/*.ts"],
-      "project": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts"]
+      "entry": [
+        "src/index.ts",
+        "src/server.ts",
+        "src/parity.ts",
+        "src/checks.ts",
+        "scripts/**/*.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "test/**/*.ts",
+        "scripts/**/*.ts"
+      ]
+    },
+    "packages/checks": {
+      "entry": [
+        "src/index.ts",
+        "src/dsl.ts",
+        "src/github.ts",
+        "src/gmail.ts",
+        "src/linear.ts",
+        "src/slack.ts",
+        "src/stripe.ts",
+        "tsup.config.ts",
+        "test/**/*.test.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "test/**/*.ts"
+      ]
     },
     "cli": {
       "entry": [

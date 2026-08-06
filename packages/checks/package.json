@@ -1,0 +1,93 @@
+{
+  "name": "@pome-sh/checks",
+  "version": "0.1.0",
+  "description": "Pome's grading vocabulary — the check declarations, seed schemas and default seeds of all five digital twins, plus the check DSL they are written in. Declarations only: no twin server, no database, no routes, no tools.",
+  "private": false,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./dsl": {
+      "types": "./dist/dsl.d.ts",
+      "default": "./dist/dsl.js"
+    },
+    "./github": {
+      "types": "./dist/github.d.ts",
+      "default": "./dist/github.js"
+    },
+    "./gmail": {
+      "types": "./dist/gmail.d.ts",
+      "default": "./dist/gmail.js"
+    },
+    "./linear": {
+      "types": "./dist/linear.d.ts",
+      "default": "./dist/linear.js"
+    },
+    "./slack": {
+      "types": "./dist/slack.d.ts",
+      "default": "./dist/slack.js"
+    },
+    "./stripe": {
+      "types": "./dist/stripe.d.ts",
+      "default": "./dist/stripe.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "!dist/**/*.map",
+    "package.json",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pome-sh/digital-twins.git",
+    "directory": "packages/checks"
+  },
+  "homepage": "https://github.com/pome-sh/digital-twins/tree/main/packages/checks",
+  "bugs": {
+    "url": "https://github.com/pome-sh/digital-twins/issues"
+  },
+  "license": "Apache-2.0",
+  "keywords": [
+    "pome",
+    "agent-testing",
+    "evaluation",
+    "grading",
+    "digital-twin",
+    "checks"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "peerDependencies": {
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@pome-sh/sdk": "*",
+    "@pome-sh/twin-github": "*",
+    "@pome-sh/twin-gmail": "*",
+    "@pome-sh/twin-linear": "*",
+    "@pome-sh/twin-slack": "*",
+    "@pome-sh/twin-stripe": "*",
+    "@types/node": "^26.1.2",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10",
+    "zod": "^4.4.3"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

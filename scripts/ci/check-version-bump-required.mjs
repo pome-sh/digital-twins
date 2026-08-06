@@ -71,6 +71,31 @@ const PACKAGES = [
     pathPrefixes: ["packages/adapter-claude-sdk/", "packages/wire/"],
   },
   {
+    // The grading vocabulary, published to npmjs for pome-cloud (F-1308).
+    //
+    // Its publish-relevant paths are the DECLARATION layer of six other
+    // packages, because that is what tsup inlines into its tarball: each twin's
+    // `check-*.ts` / `checks.ts` / `seed.ts`, and the sdk's `checks.ts` +
+    // `check-state-path.ts` + `check-discrimination.ts` + `failure-injection.ts`.
+    //
+    // Deliberately NOT the whole of `packages/twin-*/` or `packages/sdk/`. A
+    // change to a twin's routes, tools or domain does not alter one byte of this
+    // tarball, and making it demand a bump here would put a pointless version
+    // bump on most twin PRs — the gate would then read as noise, which is how a
+    // gate stops being read at all. The cost of drawing it narrowly is that a
+    // declaration file added under a NEW name outside these globs would not
+    // trigger it; `packages/checks/test/surface.test.ts` plus each twin's own
+    // `checks-contract.test.ts` are what cover that.
+    name: "@pome-sh/checks",
+    manifest: "packages/checks/package.json",
+    registry: "npm",
+    pathPrefixes: ["packages/checks/"],
+    pathPatterns: [
+      /^packages\/twin-[a-z]+\/src\/(checks|check-[a-z-]+|seed|tape-assertable-tools)\.ts$/,
+      /^packages\/sdk\/src\/(checks|check-state-path|check-discrimination|failure-injection)\.ts$/,
+    ],
+  },
+  {
     // Published to GitHub Packages, not npmjs (F-949), for cross-repo consumers
     // like pome-cloud. Its own independent version line and therefore its own
     // independent check.
@@ -92,8 +117,13 @@ const PACKAGES = [
 
 const failures = [];
 for (const pkg of PACKAGES) {
-  const touched = changedFiles.some((file) =>
-    pkg.pathPrefixes.some((prefix) => file.startsWith(prefix)),
+  const touched = changedFiles.some(
+    (file) =>
+      pkg.pathPrefixes.some((prefix) => file.startsWith(prefix)) ||
+      // `pathPatterns` exists for @pome-sh/checks, whose tarball is assembled
+      // from named FILES inside other packages rather than whole directories —
+      // a prefix would over-trigger on every twin route change.
+      (pkg.pathPatterns ?? []).some((pattern) => pattern.test(file)),
   );
   if (!touched) continue;
 

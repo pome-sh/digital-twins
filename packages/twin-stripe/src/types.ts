@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import type { TwinDatabase } from "@pome-sh/sdk";
-import type { FailureInjectionRule } from "@pome-sh/sdk/server";
+import type { FailureInjectionRule } from "@pome-sh/sdk/failure-injection";
 import type { RecorderEvent } from "@pome-sh/wire";
 
 // The engine's driver wrapper is the only database surface a twin sees
@@ -32,7 +32,7 @@ export type StripeFidelity = "semantic" | "unsupported";
 // Failure injection graduated into the engine (F-684 ruling): the rule
 // store + middleware are generic twin mechanism; the rule payloads stay in
 // the stripe seed. Re-exported so seed consumers keep one import site.
-export type { FailureInjectionMode, FailureInjectionRule } from "@pome-sh/sdk/server";
+export type { FailureInjectionMode, FailureInjectionRule } from "@pome-sh/sdk/failure-injection";
 
 // Forward-declared row shapes for the seed collections live in `seed.ts`
 // (they're zod-inferred there). The `SeedState` type here uses loose
