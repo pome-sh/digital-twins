@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The adapter is the second (and only other) published package. It bundles its
-// internal `@pome-sh/*` dependency — the wire types + redaction helpers — via
-// `noExternal`, because `@pome-sh/wire` is `private: true` and would be
-// unresolvable from the registry.
+// The adapter is the second of the two packages published to npm. It bundles
+// its internal `@pome-sh/*` dependency — the wire types + redaction helpers —
+// via `noExternal`. `@pome-sh/wire` IS published (F-949), but to GitHub
+// Packages, which requires a GitHub token even to read; declaring it as a real
+// dependency would 401 on an end user's `npm i`. Bundling is what keeps wire out
+// of their install graph, so `noExternal` must stay.
 //
 // Everything else stays external and stays a real dependency: the OpenTelemetry
 // packages (a consumer's app almost certainly has its own OTel SDK, and two

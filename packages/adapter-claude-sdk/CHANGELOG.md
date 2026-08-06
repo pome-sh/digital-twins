@@ -1,5 +1,23 @@
 # @pome-sh/adapter-claude-sdk — CHANGELOG
 
+## 0.3.3 — 2026-08-06
+
+No user-visible change. Version-only bump: F-949 made `@pome-sh/wire` an
+independently published artifact on GitHub Packages for cross-repo consumers,
+which touched `packages/wire/package.json` — publish-relevant for this package,
+because tsup inlines wire's compiled output into the bundle and its
+`dist/index.d.ts`. Only wire's packaging metadata changed, no wire source, so
+this tarball is byte-identical in content.
+
+One clarification to 0.3.2's note below: it says a bare re-export of
+`@pome-sh/wire/correlation` in the shipped `dist/index.d.ts` "resolves nowhere
+for a consumer, since wire is never published." Wire *is* now published — to
+GitHub Packages, which requires a GitHub token even to read — so that specifier
+still resolves nowhere for an end user, and the local `src/correlation.ts`
+re-export is still required. The conclusion is unchanged; only the reason is.
+Do not turn wire into a real dependency of this package on the strength of it
+being published: an end user's `npm i` would 401.
+
 ## 0.3.2 — 2026-08-06
 
 Internal restructure — no API, behaviour or type change for consumers.

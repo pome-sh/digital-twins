@@ -1,7 +1,12 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Clean-room release gate for the two published packages.
+// Clean-room release gate for the two packages published to npm. (`@pome-sh/wire`
+// is also published, but to GitHub Packages for cross-repo consumers, and is
+// audited separately by scripts/ci/check-wire-tarball.mjs — F-949. What matters
+// HERE is the assertion below that neither npm tarball declares an `@pome-sh/*`
+// dependency: that is what keeps wire inlined rather than installed, and it must
+// keep holding now that wire is resolvable-but-401 rather than nonexistent.)
 //
 // Packs `@pome-sh/cli` and `@pome-sh/adapter-claude-sdk`, installs each tarball
 // into a throwaway directory with NO access to this workspace, and drives them
@@ -29,7 +34,7 @@
 //
 // The adapter checks:
 //   - packed manifest declares no `@pome-sh/*` dependency (its wire types are
-//     bundled; `@pome-sh/wire` is private)
+//     bundled; `@pome-sh/wire` is not installable by an end user)
 //   - no dangling `.map` files, no compiled `dist/examples/` directory
 //   - runtime import of `flushPomeTelemetry` with the peer installed
 //   - a real consumer file TYPECHECKS against the shipped `dist/index.d.ts`.

@@ -10,9 +10,20 @@ redaction, and framework-agnostic tool-call correlation. The `pome` CLI, the twi
 engine (`@pome-sh/sdk`), the first-party twins and the Claude adapter all speak
 this vocabulary; the wire format is the contract, not any one library.
 
-Internal (`private: true`): it is never published. The CLI inlines it into its
-single bundle (`cli/tsup.config.ts` `noExternal`), and the twin images copy its
-built `dist/`.
+Internal infrastructure, published two ways and installed by end users through
+neither:
+
+- **Bundled** — the CLI and the Claude adapter inline it into their single
+  bundles (`cli/tsup.config.ts` `noExternal`), and the twin images copy its
+  built `dist/`. Both declare it as a `devDependency` at `"*"`, so no published
+  npm tarball has an `@pome-sh/wire` dependency and nothing on npmjs resolves
+  it. This is how every consumer *inside this repo* gets it.
+- **Published to GitHub Packages** (`npm.pkg.github.com`, not npmjs) as an
+  independently versioned artifact, for consumers in *other repositories* —
+  today that means `pome-sh/pome-cloud`, which needs the same trace vocabulary
+  and must not fork a second copy of these Zod schemas. Reading it requires a
+  GitHub token; it is not an end-user install surface and has no public API
+  promise. See [`RELEASING.md`](../../RELEASING.md).
 
 ## What is NOT here
 

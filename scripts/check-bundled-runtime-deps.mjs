@@ -88,14 +88,19 @@ if (missing.length > 0) {
   process.exit(1);
 }
 
-// Also flag @pome-sh/* left in the published runtime deps: those packages are
-// `private: true`, so a leaked spec would be unresolvable on install.
+// Also flag @pome-sh/* left in the published runtime deps: none of them is
+// installable by an end user, so a leaked spec breaks the install.
 const leakedInternal = [...declared].filter((spec) => spec.startsWith("@pome-sh/"));
 if (leakedInternal.length > 0) {
   console.error(
-    `Bundled-runtime-dependency gate FAILED: ${cliManifest.name} declares private internal packages as runtime dependencies: ${leakedInternal.join(", ")}`,
+    `Bundled-runtime-dependency gate FAILED: ${cliManifest.name} declares internal packages as runtime dependencies: ${leakedInternal.join(", ")}`,
   );
-  console.error("They are `private: true` and would be unresolvable from the registry.");
+  console.error(
+    "They are not installable by an end user: the sdk and the twins are `private: true`\n" +
+      "and on no registry at all, and `@pome-sh/wire` is published only to GitHub Packages,\n" +
+      "which answers 401 without a GitHub token (F-949). All of them are inlined by the\n" +
+      "bundler instead — remove the dependency, do not publish it.",
+  );
   process.exit(1);
 }
 

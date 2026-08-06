@@ -43,21 +43,29 @@ live at **https://docs.pome.sh**.
   ...` from the root. The former `cli/package-lock.json` and
   `cli/pnpm-workspace.yaml` (the changesets/manypkg root marker) are gone.
 - **Internal `@pome-sh/*` deps are `"*"`** — sdk, wire and the five
-  twins are `private: true` workspace members resolved by npm's workspace
-  linking, never from the registry. Never reintroduce an exact version pin
-  between them: the exact pins drifted and installed a second registry copy of
-  `@pome-sh/shared-types` (two zod schema identities at one runtime).
+  twins are workspace members resolved by npm's workspace linking, never from
+  a registry. Never reintroduce an exact version pin between them: the exact
+  pins drifted and installed a second registry copy of `@pome-sh/shared-types`
+  (two zod schema identities at one runtime). This holds for `@pome-sh/wire`
+  even though it is now published (F-949): in-repo consumers must keep
+  resolving it through the workspace, never through GitHub Packages.
 
-## Releases (`@pome-sh/cli`, `@pome-sh/adapter-claude-sdk`)
+## Releases (`@pome-sh/cli`, `@pome-sh/adapter-claude-sdk`, `@pome-sh/wire`)
 
-Those two packages are the ONLY things published to npm. Everything else
-(`@pome-sh/sdk`, `@pome-sh/wire`, the five `@pome-sh/twin-*`) is a
-`private: true` workspace member bundled into them by tsup
+`@pome-sh/cli` and `@pome-sh/adapter-claude-sdk` are the ONLY things published
+to npm for end users. `@pome-sh/wire` is published to **GitHub Packages**
+(`npm.pkg.github.com`) for internal cross-repo consumers — pome-cloud — while
+ALSO still being bundled into both npm tarballs by tsup; publishing it was
+additive and changed nothing about how this repo consumes it (F-949).
+Everything else (`@pome-sh/sdk`, the five `@pome-sh/twin-*`) is a
+`private: true` workspace member bundled into the two npm tarballs by tsup
 (`noExternal: [/^@pome-sh\//]`).
 
-The full runbook — the version-diff-on-push model, why the two packages
-version independently, and the version-bump-required CI gate — lives in
-[`RELEASING.md`](RELEASING.md). One repo-specific historical note that
+The full runbook — the version-diff-on-push model, why the three packages
+version independently, why the npmjs and GitHub Packages publishes are separate
+jobs with different auth (OIDC vs `GITHUB_TOKEN`), the one-time package
+visibility step a maintainer owns, and the version-bump-required CI gate —
+lives in [`RELEASING.md`](RELEASING.md). One repo-specific historical note that
 doesn't belong there: F-1180's `RELEASE_BOT_TOKEN` / release-PR check verifier
 applied to the old Changesets version PR; this lane has no bot-pushed version
 PR, so that machinery is gone with `cli-release.yml`.
@@ -84,8 +92,10 @@ section in the same PR.
 | Every third-party dep of a package INLINED into the CLI bundle is declared by the CLI (a bundled package's own `dependencies` are never installed for it) | [`scripts/check-bundled-runtime-deps.mjs`](scripts/check-bundled-runtime-deps.mjs) via `npm run gate:bundled-deps` in [`ci.yml`](.github/workflows/ci.yml) and [`release.yml`](.github/workflows/release.yml) |
 | Both published tarballs install and run with no access to this workspace; all five twins boot from the CLI tarball; a consumer typechecks against the adapter's shipped declarations | [`scripts/clean-room-pack-test.mjs`](scripts/clean-room-pack-test.mjs) via `npm run test:pack` in [`ci.yml`](.github/workflows/ci.yml) and [`release.yml`](.github/workflows/release.yml) |
 | Package barrels + file-size hygiene | [`scripts/lint-code-health.mjs`](scripts/lint-code-health.mjs) |
-| A published version is never behind npm `latest` — a publish must not retag `latest` backwards (an unpublished package's `0.0.0` baseline passes) | the `plan` job in [`.github/workflows/release.yml`](.github/workflows/release.yml) |
-| A PR touching a package's publish-relevant paths (`cli/`, `packages/twin-*/`, `packages/wire/`, `packages/sdk/` for the CLI; `packages/adapter-claude-sdk/`, `packages/wire/` for the adapter) must bump that package's own `package.json` version against the PR's base — `release.yml` only publishes on a version diff, so an unbumped change merges clean and silently never reaches npm | [`scripts/ci/check-version-bump-required.mjs`](scripts/ci/check-version-bump-required.mjs) in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (PR-only; see [`RELEASING.md`](RELEASING.md)) |
+| A published version is never behind its registry's `latest` — a publish must not retag `latest` backwards (an unpublished package's `0.0.0` baseline passes; a 404 is "unpublished", a 401/network error is a hard failure, which matters for GitHub Packages where an under-scoped read answers 401 for a package that exists) | [`scripts/ci/decide-publish.sh`](scripts/ci/decide-publish.sh), called by the `plan` and `plan-wire` jobs in [`.github/workflows/release.yml`](.github/workflows/release.yml); regression: [`scripts/ci/decide-publish.test.mjs`](scripts/ci/decide-publish.test.mjs) |
+| The npmjs and GitHub Packages release lanes cannot block each other — `plan`/`publish` never reads `npm.pkg.github.com` and `plan-wire`/`publish-wire` never reads npmjs. A GitHub Packages 401 (which an org owner can cause from the package settings UI, with no commit) is a hard failure by design, so a shared `plan` job would let it silently skip the `@pome-sh/cli` and `@pome-sh/adapter-claude-sdk` publishes | job wiring in [`.github/workflows/release.yml`](.github/workflows/release.yml); asserted by [`scripts/ci/decide-publish.test.mjs`](scripts/ci/decide-publish.test.mjs) |
+| A PR touching a package's publish-relevant paths (`cli/`, `packages/twin-*/`, `packages/wire/`, `packages/sdk/` for the CLI; `packages/adapter-claude-sdk/`, `packages/wire/` for the adapter; `packages/wire/` for wire itself) must bump that package's own `package.json` version **above** the PR's base — `release.yml` only publishes on a version diff, so an unbumped change merges clean and silently never reaches the registry, and a version that differs DOWNWARD (a stale branch rebased past a release) hard-fails the release floor check after merge, taking its whole lane's publishes with it. `packages/wire/` intentionally appears in all three entries: a wire change alters three separate published artifacts (the two npm tarballs it is inlined into, plus wire's own GitHub Packages release), so it needs three bumps. Version-only bumps of the other two are accepted rather than adding an exception list (see `cli/CHANGELOG.md` 0.21.7) | [`scripts/ci/check-version-bump-required.mjs`](scripts/ci/check-version-bump-required.mjs) in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (PR-only; see [`RELEASING.md`](RELEASING.md)) |
+| `@pome-sh/wire` is published to GitHub Packages ONLY, never npmjs; its manifest is `private: false` (not merely absent — `npm publish -w` on a `private: true` workspace warns and EXITS 0, so the regression is a green release that published nothing); and every path it declares in `exports`/`main`/`types` physically ships in its tarball, with no dangling `.map` and no hard links. Inside this workspace every consumer resolves wire through npm's workspace symlink to the full source tree, so an export pointing at a file `files` does not ship resolves forever here and dies with `ERR_PACKAGE_PATH_NOT_EXPORTED` only in a cross-repo consumer's repo. Registry selection is doubly pinned — `publishConfig.registry` in the manifest and an explicit `--registry` at publish time — because a mistaken publish to public npm cannot be taken back after 72 hours | [`scripts/ci/check-wire-tarball.mjs`](scripts/ci/check-wire-tarball.mjs) — `npm run gate:wire-tarball` in the `publish-wire` job of [`.github/workflows/release.yml`](.github/workflows/release.yml), and the network-free `--manifest-only` half in [`ci.yml`](.github/workflows/ci.yml)'s always-on block so the two silent-failure modes are caught pre-merge |
 | Every tool a bundled example registers is answered by the twin it targets, on that example's own task seed. A tool the twin refuses (4xx/5xx) reds the gate naming the example, the tool, and the twin's status; a newly added tool with no probe reds it too, as does an `expect_status` exemption that no longer fires. `typecheck:examples` is green on a well-typed tool whose endpoint 404s and `smoke:examples` returns before any tool fires, which is how `comment_on_pull_request` 404'd in two examples for their entire existence. Needs no model | [`scripts/probe-example-tools.mjs`](scripts/probe-example-tools.mjs) (`npm run probe:examples`) in [`.github/workflows/ci.yml`](.github/workflows/ci.yml), fixture arguments in [`config/example-tool-probes.json`](config/example-tool-probes.json); regression: [`scripts/probe-example-tools.test.mjs`](scripts/probe-example-tools.test.mjs) |
 | Every endpoint a twin DECLARES is called and answered. The endpoint set is read from each twin's own `tools/list`, never from the manifest, so a twin that gains a tool gains a probe with no hand edit and a declared tool no probe supplies arguments for is a red naming the twin and the endpoint; a refusal names the tool, the status, and the twin's own error text. The row above probes what seven bundled EXAMPLES expose, which reached 9 of the 137 declared tools and none of stripe's; slack's 8 and linear's 15 uncalled tools were reached by nothing over the MCP wire, because their own suites drive them through `executeTool()` on the domain — the layer `comment_on_pull_request` was NOT broken at. The two gates have different subjects and neither replaces the other: an example red points at `examples/`, a twin red at `packages/twin-*/`. Status is read from the twin's recorded event, not the HTTP response, because MCP JSON-RPC answers 200 for a tool that failed. Needs no model, no API key, and no socket — every twin boots in-process on `:memory:` against its own default seed. The delta this closed is measured in [`docs/declared-endpoint-coverage.md`](docs/declared-endpoint-coverage.md) | [`scripts/probe-twin-endpoints.mjs`](scripts/probe-twin-endpoints.mjs) (`npm run probe:twins`) in [`.github/workflows/ci.yml`](.github/workflows/ci.yml), fixture arguments in [`config/twin-endpoint-probes.json`](config/twin-endpoint-probes.json); regression: [`scripts/probe-twin-endpoints.test.mjs`](scripts/probe-twin-endpoints.test.mjs) |
 | Every member of the event union (`otelEventSchema` — the seven `eventSchema` variants plus `OtelSpanEvent`) has at least one wire fixture under `packages/wire/test/fixtures/v1/event/<Kind>/`, and the kind list in `trace-contract.json` is enumerated from the zod union rather than typed out. Adding a kind with no fixture, or renaming one and leaving its directory behind, fails BOTH `emit:trace-contract` and `--check` — regenerating is not an escape hatch. The old script read no schema at all: `canonicalSchemas` was a hardcoded four-string literal and the rest was a directory walk, so a new kind moved zero bytes and the byte-compare was green by construction, which is how M1 shipped `LlmTurnEvent` with no fixture anywhere | [`packages/wire/scripts/emit-trace-contract.mjs`](packages/wire/scripts/emit-trace-contract.mjs) (`npm run check:trace-contract -w @pome-sh/wire`) in [`.github/workflows/ci.yml`](.github/workflows/ci.yml); regression: [`packages/wire/scripts/emit-trace-contract.test.mjs`](packages/wire/scripts/emit-trace-contract.test.mjs). The dropped/renamed half is `typecheck` — `test/export-surface.test.ts` guards the per-kind types, `test/v1-event-corpus.test.ts` keys its coverage map on `OtelEvent["kind"]` |
@@ -116,7 +126,8 @@ signed digests before rebuilding runtime snapshots. That promotion is operated
 from the private `pome-sh/pome-cloud` repo — maintainers: see
 `docs/runbooks/twin-release-and-promotion.md` there.
 
-Only `@pome-sh/cli` and `@pome-sh/adapter-claude-sdk` are published to npm.
+Only `@pome-sh/cli` and `@pome-sh/adapter-claude-sdk` are published to npm;
+`@pome-sh/wire` is published to GitHub Packages for sibling repositories only.
 Everything else is internal to the CLI tarball, so the old per-package
 version-bump runbook (`PACKAGE_RELEASE.md`, one changeset per `packages/*`
 member) is gone; see [`RELEASING.md`](RELEASING.md) for what replaced it.

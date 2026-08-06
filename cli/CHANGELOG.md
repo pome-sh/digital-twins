@@ -4,6 +4,25 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.21.8
+
+### Patch Changes
+
+- **No CLI change.** Version-only bump, for the same reason 0.21.7 was: F-949
+  made `@pome-sh/wire` an independently published artifact on GitHub Packages
+  for cross-repo consumers, which touched `packages/wire/package.json` —
+  publish-relevant for the CLI, because the CLI inlines wire into its bundle.
+  Here it genuinely is not: only wire's packaging metadata changed, no wire
+  source, so the CLI bundle is byte-identical in content. Bumped anyway rather
+  than adding an exception list to the gate, per 0.21.7.
+
+  Nothing about how the CLI consumes wire changed and nothing may: wire is
+  still a `devDependency` at `"*"`, still inlined by tsup's `noExternal`, and
+  the published CLI tarball still declares no `@pome-sh/*` dependency. Wire's
+  GitHub Packages copy requires a GitHub token even to read, so an end user who
+  had to resolve it would get a 401 on `npm i` — the bundling is what keeps
+  that impossible.
+
 ## 0.21.7
 
 ### Patch Changes
