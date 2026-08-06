@@ -54,6 +54,20 @@ jobs:
       # the PR's actual base (a push to main has already merged).
       - if: github.event_name == 'pull_request'
         run: node scripts/ci/check-version-bump-required.mjs "${{ github.event.pull_request.base.sha }}"
+      # F-949 — @pome-sh/wire publishes to GitHub Packages, and the two ways that
+      # silently stops working are both readable straight from its package.json:
+      # `private: true` makes `npm publish -w` skip the workspace and EXIT 0 (a
+      # green release that published nothing), and a wrong `publishConfig.registry`
+      # would aim it at public npm, which cannot be undone after 72 hours. The
+      # full tarball audit needs a build and lives in release.yml's publish-wire
+      # job; these two assertions need neither, so they run pre-merge where the
+      # regression is still cheap to fix.
+      - run: node scripts/ci/check-wire-tarball.mjs --manifest-only
+      # Regression suite for the shared publish-decision logic. Asserts a 401
+      # from GitHub Packages is never read as "unpublished" (which would bypass
+      # the never-publish-behind-latest floor check) and that the npmjs and
+      # GitHub Packages lanes cannot block each other.
+      - run: node scripts/ci/decide-publish.test.mjs
       # F-1226 — the plugin manifest is what makes the `skills` installer render
       # one select-all row instead of six unticked checkboxes. It has to live in
       # the always-on block: adding a skill touches only `skills/`, which the

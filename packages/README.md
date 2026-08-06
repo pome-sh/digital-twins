@@ -6,7 +6,9 @@ not an install surface.** The only thing end users install is
 `@pome-sh/wire`, and all five twins inside its tarball. This doc is the
 internal architecture map for contributors — what each package is, why it's
 shaped the way it is, and which of the eight are actually reachable from
-outside this repo.
+outside this repo. (`@pome-sh/wire` is additionally published to GitHub
+Packages for sibling *repositories*, not for users — see "Private vs.
+published".)
 
 ## The registry: one typed source of truth for five twins
 
@@ -100,24 +102,38 @@ shape, auth, and MCP surfaces.
 
 ## Private vs. published
 
-Two packages in this repo are published to npm. Everything else under
-`packages/` is `private: true` and reaches users only as bytes inlined into
-one of those two tarballs — there is no `npm install` for it, ever.
+Two packages in this repo are published to **npm** for end users. One
+(`@pome-sh/wire`) is published to **GitHub Packages** for internal cross-repo
+consumers. Everything else under `packages/` is `private: true` and reaches
+users only as bytes inlined into one of the two npm tarballs — there is no
+`npm install` for it, ever.
 
-| Directory | Workspace name | Role | On npm? |
+| Directory | Workspace name | Role | Published? |
 | --- | --- | --- | --- |
 | [`sdk/`](./sdk/) | `@pome-sh/sdk` | Twin engine — HTTP mount, auth, recorder, MCP dispatch, SQLite | No — bundled into `@pome-sh/cli` |
-| [`wire/`](./wire/) | `@pome-sh/wire` | Trace surface — recorder-events, redaction, OTel schemas | No — bundled into `@pome-sh/cli` and `@pome-sh/adapter-claude-sdk` |
+| [`wire/`](./wire/) | `@pome-sh/wire` | Trace surface — recorder-events, redaction, OTel schemas | **Both** — bundled into `@pome-sh/cli` and `@pome-sh/adapter-claude-sdk`, *and* published to GitHub Packages (`npm.pkg.github.com`) for pome-cloud (F-949) |
 | [`twin-github/`](./twin-github/), `twin-stripe/`, `twin-slack/`, `twin-gmail/`, `twin-linear/` | `@pome-sh/twin-*` | The five digital twins | No — bundled into `@pome-sh/cli`; also published as signed GHCR container images for pome-cloud |
-| [`adapter-claude-sdk/`](./adapter-claude-sdk/) | `@pome-sh/adapter-claude-sdk` | Claude Agent SDK adapter for user agent code | **Yes** |
+| [`adapter-claude-sdk/`](./adapter-claude-sdk/) | `@pome-sh/adapter-claude-sdk` | Claude Agent SDK adapter for user agent code | **Yes** — npm |
 
-"Bundled" means tsup's `noExternal: [/^@pome-sh\//]` inlines the private
+"Bundled" means tsup's `noExternal: [/^@pome-sh\//]` inlines the internal
 package's compiled output straight into the publishing package's own `dist/`
-at build time (`cli/tsup.config.ts`); the private package never appears in the
+at build time (`cli/tsup.config.ts`); the internal package never appears in the
 published `package.json`'s `dependencies` and is never fetched from the
 registry at install time. The end-user **`pome` CLI** itself lives at repo
-root [`cli/`](../cli/), not under `packages/` — it's the other published
+root [`cli/`](../cli/), not under `packages/` — it's the other npm-published
 package, alongside `@pome-sh/adapter-claude-sdk` here.
 
-For how the two published packages version and release, see
+`@pome-sh/wire` is the only row that is both, and the distinction matters
+because the two paths never meet. `cli/` and `adapter-claude-sdk/` depend on it
+as a **devDependency** at `"*"` and tsup inlines it, so an end user's install
+graph contains no `@pome-sh/wire` at all — which is load-bearing, because the
+GitHub Packages copy requires a GitHub token even to read and would 401 for
+them. The GitHub Packages copy exists for exactly one reason: `pome-cloud`
+lives in a different repository and needs the same trace vocabulary, and
+duplicating Zod schemas across a repo boundary is what produced the two-schema-
+identities bug that dissolved `@pome-sh/shared-types` in the first place. See
+[`RELEASING.md`](../RELEASING.md) for the publish model and the one-time
+package-visibility step.
+
+For how the three published packages version and release, see
 [`RELEASING.md`](../RELEASING.md) at the repo root.

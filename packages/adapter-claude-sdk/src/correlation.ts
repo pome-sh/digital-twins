@@ -11,8 +11,11 @@
 // only; tsup's declaration bundler keeps bare specifiers external. Re-exporting
 // straight from the barrel therefore emits a literal
 // `export { CORRELATION_HEADER } from '@pome-sh/wire/correlation'` into
-// `dist/index.d.ts` — a specifier that resolves nowhere for a consumer, because
-// wire is `private: true` and is never published. The JS is fine (inlined), so
+// `dist/index.d.ts` — a specifier that resolves nowhere for a consumer. Wire is
+// published (F-949), but to GitHub Packages, which requires a GitHub token even
+// to read: an end user resolving that specifier gets a 401, not a package. So
+// the conclusion is unchanged and this file is still required. The JS is fine
+// (inlined), so
 // nothing breaks until the consumer runs `tsc`, which is the failure mode the
 // pack test's non-`skipLibCheck` consumer compile exists to catch. (Setting
 // `dts.resolve` instead makes the dts bundler drag in the whole wire barrel and

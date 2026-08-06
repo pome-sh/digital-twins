@@ -1,5 +1,5 @@
 name: release
-# The single release pipeline for the two published packages, replacing
+# The single release pipeline for the three published packages, replacing
 # cli-release.yml (Changesets + a manual "publish the @pome-sh/* batch first"
 # gate that produced 16 batch releases in 14 days, 4 of them consecutive
 # failures) and sdk-publish.yml.
@@ -12,6 +12,35 @@ name: release
 # are diff-gated separately: the CLI bundles the internal packages, the adapter
 # bundles the wire types, and neither depends on the other's version. There is
 # no lockstep to enforce and therefore no sync-versions script.
+#
+# @pome-sh/wire is the THIRD publish target and the odd one out (F-949). Same
+# version-diff model, different registry and different audience: GitHub Packages
+# (npm.pkg.github.com), for cross-repo internal consumers like pome-cloud — not
+# end users. It stays bundled-inlined into the two npmjs tarballs exactly as
+# before (tsup `noExternal`); publishing it is ADDITIVE, not a replacement.
+#
+# Hence FOUR jobs in two independent lanes — plan → publish for npmjs,
+# plan-wire → publish-wire for GitHub Packages — rather than a third matrix
+# entry and a third `decide` call:
+#
+#   - The auth MECHANISM differs. npmjs uses OIDC Trusted Publishing (no token,
+#     `id-token: write`, provenance); GitHub Packages uses GITHUB_TOKEN with
+#     `packages: write` and an .npmrc auth line. One job cannot honestly do
+#     both, and a shared job would carry four pieces of OIDC cargo (the
+#     setup-node v6 pin for actions/setup-node#1551, the npm@11.5.1 pin for the
+#     provenance crash, `NPM_CONFIG_PROVENANCE`, `id-token: write`) under a
+#     comment explaining that none of it applies to wire.
+#   - The lanes must not be able to break each other. GitHub Packages requires
+#     auth even to READ, and a read failure is deliberately a hard failure (a
+#     401 must never be mistaken for "unpublished" — that would bypass the
+#     never-publish-behind-latest floor check). If that read lived in `plan`,
+#     any GitHub Packages 401/403/outage — or an org owner flipping the
+#     package's visibility settings — would fail `plan` and silently skip the
+#     @pome-sh/cli and @pome-sh/adapter-claude-sdk publishes, which have nothing
+#     to do with GitHub Packages. Blast radius now matches the artifact.
+#
+# The shared decision logic lives in scripts/ci/decide-publish.sh (tested by
+# scripts/ci/decide-publish.test.mjs) so the two lanes cannot drift.
 on:
   push:
     branches: [main]
@@ -26,7 +55,7 @@ permissions:
 
 jobs:
   plan:
-    name: which packages need publishing
+    name: which npm packages need publishing
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -38,53 +67,50 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
-      - name: Compare local versions against the registry
+      # Deliberately reads ONLY registry.npmjs.org. @pome-sh/wire's diff lives in
+      # `plan-wire` so that a GitHub Packages 401/outage cannot skip the two npmjs
+      # publishes: a failure here fails `plan`, and everything needing it is
+      # skipped. Blast radius matches the artifact.
+      - name: Compare local versions against npm
         id: diff
         run: |
           set -euo pipefail
-          # Folded in from the deleted scripts/check-cli-version-floor.sh (F-724):
-          # never publish from a version base BEHIND npm's published latest —
-          # that retags `latest` backwards for every existing user. A version
-          # that differs but does not sort above the registry's is a hard fail,
-          # not a skip.
-          decide() {
-            local name="$1" manifest="$2" output="$3"
-            local local_version registry_version npm_view_err
-            local_version="$(node -p "require('./${manifest}').version")"
-            npm_view_err="$(mktemp)"
-            if registry_version="$(npm view "${name}" version 2>"${npm_view_err}")"; then
-              :
-            elif grep -q "E404" "${npm_view_err}"; then
-              # Genuinely unpublished (brand-new package) — 0.0.0 is correct.
-              registry_version="0.0.0"
-            else
-              # A registry/network/auth error is NOT "unpublished": treating it
-              # as 0.0.0 would make any local version look publishable and
-              # bypass the floor check below, which exists specifically to
-              # stop retagging npm's latest backwards.
-              echo "::error::npm view ${name} failed for a reason other than 'not found':"
-              cat "${npm_view_err}" >&2
-              rm -f "${npm_view_err}"
-              exit 1
-            fi
-            rm -f "${npm_view_err}"
-            echo "${name} — local: ${local_version}, registry: ${registry_version}"
-            if [ "${local_version}" = "${registry_version}" ]; then
-              echo "${output}=false" >> "$GITHUB_OUTPUT"
-              echo "  ↳ unchanged; nothing to publish."
-              return 0
-            fi
-            local highest
-            highest="$(printf '%s\n%s\n' "${local_version}" "${registry_version}" | sort -V | tail -n1)"
-            if [ "${highest}" != "${local_version}" ]; then
-              echo "::error::${name} local version ${local_version} is BEHIND npm latest ${registry_version}. Publishing would retag latest backwards."
-              exit 1
-            fi
-            echo "${output}=true" >> "$GITHUB_OUTPUT"
-            echo "  ↳ will publish ${local_version}."
-          }
-          decide "@pome-sh/cli" "cli/package.json" "cli"
-          decide "@pome-sh/adapter-claude-sdk" "packages/adapter-claude-sdk/package.json" "adapter"
+          scripts/ci/decide-publish.sh "@pome-sh/cli" "cli/package.json" "cli"
+          scripts/ci/decide-publish.sh "@pome-sh/adapter-claude-sdk" "packages/adapter-claude-sdk/package.json" "adapter"
+
+  plan-wire:
+    name: does @pome-sh/wire need publishing
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # GitHub Packages — unlike registry.npmjs.org — requires a token even to
+      # READ a version. Without this the read answers 401, and a 401 is a hard
+      # failure by design (never mistaken for "unpublished"), so this permission
+      # is what stands between the workflow and a permanently red wire release.
+      packages: read
+    outputs:
+      wire: ${{ steps.diff.outputs.wire }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      # Auth for the GitHub Packages read, and nothing else. Deliberately ONLY
+      # the `//host/:_authToken` line and never a `@pome-sh:registry=` scope
+      # mapping — see the header of decide-publish.sh for why that distinction
+      # is load-bearing. `$HOME/.npmrc` rather than a project `.npmrc` so the
+      # token never sits inside the workspace.
+      - name: Authenticate reads against GitHub Packages
+        env:
+          GITHUB_PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          printf '//npm.pkg.github.com/:_authToken=%s\n' "${GITHUB_PACKAGES_TOKEN}" >> "$HOME/.npmrc"
+      - name: Compare the local version against GitHub Packages
+        id: diff
+        run: |
+          set -euo pipefail
+          scripts/ci/decide-publish.sh "@pome-sh/wire" "packages/wire/package.json" "wire" "https://npm.pkg.github.com"
 
   publish:
     name: publish ${{ matrix.package }}
@@ -164,3 +190,69 @@ jobs:
         run: npm publish -w ${{ matrix.package }} --access public
         env:
           NPM_CONFIG_PROVENANCE: "true"
+
+  # @pome-sh/wire → GitHub Packages. See the file header for why this is its own
+  # lane. On what it deliberately does NOT run: `gate:bundled-deps` and
+  # `test:pack` are assertions about the two npmjs TARBALLS (no leaked
+  # @pome-sh/* deps, five twins boot, a consumer typechecks against the shipped
+  # declarations). They say nothing about wire's own tarball, and they still run
+  # on every PR and on both npmjs publishes — which is what keeps wire's
+  # bundled-inlining role verified. Publishing wire does not change that role:
+  # cli/ and adapter/ depend on it as a devDependency and tsup inlines it, so no
+  # end user ever resolves it from a registry.
+  publish-wire:
+    name: publish @pome-sh/wire (GitHub Packages)
+    needs: plan-wire
+    if: needs.plan-wire.outputs.wire == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # No `registry-url`: that would point the DEFAULT registry at GitHub
+      # Packages for the whole job and `npm ci` would try to fetch zod,
+      # typescript and vitest from there. Registry selection for wire is
+      # explicit at publish time instead.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      # wire has no internal @pome-sh/* dependency, so it is the first node in
+      # scripts/build.mjs's topological order and builds standalone. Explicit
+      # here (rather than relying on wire's own `prepublishOnly`) so a build
+      # failure reads as a build failure.
+      - name: Build @pome-sh/wire
+        run: npm run build -w @pome-sh/wire
+      - name: Typecheck and test @pome-sh/wire
+        run: |
+          set -euo pipefail
+          npm run typecheck -w @pome-sh/wire
+          npm test -w @pome-sh/wire
+      # trace-contract.json is in wire's `files`, so it SHIPS — and it embeds
+      # wire's own version. Without this the tarball can carry a contract
+      # descriptor claiming a different version than the package.json beside it.
+      - name: Trace-contract descriptor matches the shipped version
+        run: npm run check:trace-contract -w @pome-sh/wire
+      # wire's published dist is what a cross-repo consumer resolves through its
+      # `exports` map — an export pointing at a file the tarball does not carry
+      # is only observable from OUTSIDE the workspace, where npm's workspace
+      # symlink is not there to paper over it.
+      - name: Audit the wire tarball
+        run: npm run gate:wire-tarball
+      # Two independent guarantees that this cannot land on registry.npmjs.org:
+      # `publishConfig.registry` in packages/wire/package.json, and this
+      # explicit `--registry`. `publishConfig` alone is enough on every npm
+      # version this repo pins, but a publish to the wrong registry is not an
+      # error you can take back — public npm has no unpublish after 72 hours.
+      # No `--access public`: on GitHub Packages access is a property of the
+      # package/repository, not a publish flag.
+      - name: Publish to GitHub Packages
+        env:
+          GITHUB_PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          printf '//npm.pkg.github.com/:_authToken=%s\n' "${GITHUB_PACKAGES_TOKEN}" >> "$HOME/.npmrc"
+          npm publish -w @pome-sh/wire --registry https://npm.pkg.github.com
