@@ -6,5 +6,19 @@
   "endpoint": "https://mcp.slack.com/mcp",
   "reason": "OAuth-gated: unauthenticated tools/list returns 401 missing_token (re-probed 2026-08-06). Same reader as gmail's; F-1329 sets POME_SLACK_MCP_TOKEN and flips `capture` to true.",
   "deferredTo": "F-1329",
+  "authTokenEnv": "POME_SLACK_MCP_TOKEN",
+  "configuration": {
+    "auth": "bearer",
+    "deploymentSelector": "unknown until a credentialed capture confirms whether the listing is scoped to the installing workspace",
+    "requestHeaders": {
+      "content-type": "application/json",
+      "accept": "application/json, text/event-stream"
+    },
+    "requestBody": {
+      "method": "tools/list",
+      "jsonrpc": "2.0",
+      "id": 1
+    }
+  },
   "consumerContract": "F-1325's lane must report this twin as not-compared. It must never report it as zero coverage."
 }

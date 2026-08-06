@@ -79,7 +79,8 @@
       "knownRemoteOnlyToolsNotInCapture": [
         "create_pull_request_with_copilot"
       ],
-      "knownRemoteOnlyToolsEvidence": "README.md 'Additional Tools in Remote GitHub MCP Server' at the pinned commit lists create_pull_request_with_copilot under the Copilot toolset, which is Default:true, so the remote `default` surface is this capture plus that one tool. The other two remote-only groups (copilot_spaces, github_support_docs_search) are non-default toolsets and are correctly absent. A consumer of this golden must treat a github tool in that list as not-compared rather than as a gap."
+      "knownRemoteOnlyToolsEvidence": "README.md 'Additional Tools in Remote GitHub MCP Server' at the pinned commit lists create_pull_request_with_copilot under the Copilot toolset, which is Default:true, so the remote `default` surface is this capture plus that one tool. The other two remote-only groups (copilot_spaces, github_support_docs_search) are non-default toolsets and are correctly absent. A consumer of this golden must treat a github tool in that list as not-compared rather than as a gap.",
+      "unguardedDirection": "The asymmetry is on the record deliberately: there is no field, and no mechanism, for the OPPOSITE error — a tool in this capture that the remote deployment does not serve. `subset-of-remote` is an assumption about the remote's `default` composition matching the local one, sourced from the vendor's docs rather than from the remote itself, and only a credentialed read could confirm it. If the two ever diverge in that direction this golden over-reports and nothing here catches it. Whoever gains a credential for this endpoint should check that first."
     },
     "source": {
       "repo": "https://github.com/github/github-mcp-server",
