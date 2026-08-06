@@ -130,7 +130,7 @@ describe("Gmail MCP frozen contract", () => {
     expect(listed.result.tools).toEqual(canonicalListing.result.tools);
     expect(gmailTools).toHaveLength(13);
     expect(gmailTools.map((tool) => tool.name)).toEqual(
-      canonicalListing.meta.launchToolOrder
+      canonicalListing.meta.liveToolOrder
     );
     expect(
       gmailTools.filter((tool) => tool.mutation).map((tool) => tool.name)

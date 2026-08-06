@@ -14,9 +14,9 @@ Immutable upstream captures for `@pome-sh/twin-gmail`. Normal tests must not req
 
 | File | Purpose |
 | --- | --- |
-| `mcp-tools-list.raw.json` | Live unauthenticated `tools/list` (13 tools as returned) |
-| `mcp-tools-list.canonical.json` | Gate-1 launch 13-tool listing oracle (schemas from live capture) |
-| `mcp-tools-list.meta.json` | Endpoint, protocol version, SHA-256, Gate-1 promotions |
+| `mcp-tools-list.raw.json` | Live unauthenticated `tools/list` (13 tools as returned). **This file IS the tool table** — `src/mcp.ts` derives it (F-1325) |
+| `mcp-tools-list.canonical.json` | The same listing re-derived with its provenance attached and readable whitespace |
+| `mcp-tools-list.meta.json` | The provenance contract: substrate, endpoint, protocol version, capture date, `rawFileSha256`, assumed configuration |
 | `mcp-initialize.raw.json` / `.meta.json` | Live `initialize` (protocolVersion) |
 | `mcp-tools-call-unauth-error.raw.json` | Live unauthenticated `tools/call` error envelope |
 | `mcp-tools-call.representative.json` | Schema-derived representative success call shapes |
@@ -44,3 +44,4 @@ and `test/gate0-fixtures.test.mjs` will red.
 - `tools/list` and `initialize` were captured live without OAuth on 2026-07-20 against `https://gmailmcp.googleapis.com/mcp/v1`.
 - Authenticated `tools/call` success was **not** available; representative success fixtures are reconstructed from live `outputSchema` + public docs and are marked as such.
 - Gate 1 expands the OSS launch set to the full live 13-tool listing, promoting `get_message`, `apply_sensitive_thread_label`, and `apply_sensitive_message_label` that Gate 0 treated as preview drift.
+- **The 2026-08-06 re-capture is deliberately not adopted.** F-1326 re-read the same endpoint and got the same 13 names with different schemas and descriptions (`fixtures/mcp-tools-list/gmail.meta.json` at the repo root, `rawFileSha256` `93085540…`). This twin keeps serving the 2026-07-20 oracle: taking the newer bytes changes what the twin serves, and that behavioural change belongs to the ticket that rules on it, not to F-1325. The lane that reports the difference is F-1327.

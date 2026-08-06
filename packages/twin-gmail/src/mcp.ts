@@ -1,7 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { ToolCallContext, ToolSpec } from "@pome-sh/sdk";
+import {
+  deriveMcpToolTable,
+  loadMcpToolFixture,
+  type McpToolImplementation,
+  type ToolCallContext,
+  type ToolSpec,
+} from "@pome-sh/sdk";
 import { z } from "zod";
-import canonicalListing from "../fixtures/mcp-tools-list.canonical.json" with { type: "json" };
+import metaListing from "../fixtures/mcp-tools-list.meta.json" with { type: "json" };
+import rawListing from "../fixtures/mcp-tools-list.raw.json" with { type: "json" };
 import { GmailDomain } from "./domain/index.js";
 import { invalidArgument } from "./errors.js";
 import { identityFromSession } from "./identity.js";
@@ -39,13 +46,6 @@ import { gmailStateDelta } from "./state.js";
 import type { SemanticMessage } from "./types.js";
 
 type ToolName = keyof typeof mcpOutputSchemas;
-type CanonicalTool = {
-  name: ToolName;
-  description: string;
-  inputSchema: Record<string, unknown>;
-  outputSchema: Record<string, unknown>;
-  annotations: Record<string, unknown>;
-};
 type ToolImplementation = {
   schema: z.ZodType;
   mutation: boolean;
@@ -57,7 +57,16 @@ type ToolImplementation = {
   contentText?: (value: unknown) => string;
 };
 
-const canonicalTools = canonicalListing.result.tools as CanonicalTool[];
+/**
+ * The tool table Gmail serves, and its provenance. `loadMcpToolFixture`
+ * throws at module load if `mcp-tools-list.raw.json` no longer hashes to the
+ * sha its meta declares, so an edited oracle cannot quietly become the new
+ * truth (F-1325).
+ */
+export const gmailToolFixture = loadMcpToolFixture({
+  raw: rawListing,
+  meta: metaListing,
+});
 
 const implementations: Record<ToolName, ToolImplementation> = {
   create_draft: {
@@ -246,31 +255,27 @@ const implementations: Record<ToolName, ToolImplementation> = {
   },
 };
 
-export const gmailTools: ToolSpec<GmailDomain>[] = canonicalTools.map((canonical) => {
-  const implementation = implementations[canonical.name];
-  if (!implementation) throw new Error(`Missing Gmail MCP implementation: ${canonical.name}`);
-  return {
-    name: canonical.name,
-    description: canonical.description,
-    schema: implementation.schema,
-    inputSchema: canonical.inputSchema,
-    outputSchema: canonical.outputSchema,
-    annotations: canonical.annotations,
-    mutation: implementation.mutation,
-    includeIsError: true,
-    handler: (domain, args, ctx) => {
-      const output = implementation.handler(
-        domain,
-        args as Record<string, unknown>,
-        ctx
-      );
-      return mcpOutputSchemas[canonical.name].parse(output);
+/**
+ * Every Gmail handler's return value is parsed against the tool's own
+ * `outputSchema` before it reaches the wire, so a handler cannot answer a
+ * shape the listing does not advertise.
+ */
+const validatedImplementations = Object.fromEntries(
+  Object.entries(implementations).map(([name, implementation]) => [
+    name,
+    {
+      ...implementation,
+      handler: (domain: GmailDomain, args: Record<string, unknown>, ctx: ToolCallContext) =>
+        mcpOutputSchemas[name as ToolName].parse(implementation.handler(domain, args, ctx)),
     },
-    ...(implementation.contentText
-      ? { contentText: implementation.contentText }
-      : {}),
-  } as ToolSpec<GmailDomain>;
-});
+  ])
+) as Record<string, McpToolImplementation<GmailDomain>>;
+
+export const gmailTools: ToolSpec<GmailDomain>[] = deriveMcpToolTable(
+  gmailToolFixture,
+  validatedImplementations,
+  { includeIsError: true }
+);
 
 function labelThreadImplementation(add: boolean): ToolImplementation {
   return {
