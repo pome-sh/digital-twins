@@ -1,0 +1,24 @@
+{
+  "twin": "linear",
+  "substrate": "live-wire-oauth",
+  "captured": false,
+  "status": "deferred",
+  "endpoint": "https://mcp.linear.app/mcp",
+  "reason": "OAuth-gated: unauthenticated tools/list returns 401 invalid_token (re-probed 2026-08-06). Same reader as gmail's; F-1329 sets POME_LINEAR_MCP_TOKEN and flips `capture` to true.",
+  "deferredTo": "F-1329",
+  "authTokenEnv": "POME_LINEAR_MCP_TOKEN",
+  "configuration": {
+    "auth": "bearer",
+    "deploymentSelector": "unknown until a credentialed capture confirms whether the listing is scoped to the authorising workspace",
+    "requestHeaders": {
+      "content-type": "application/json",
+      "accept": "application/json, text/event-stream"
+    },
+    "requestBody": {
+      "method": "tools/list",
+      "jsonrpc": "2.0",
+      "id": 1
+    }
+  },
+  "consumerContract": "F-1325's lane must report this twin as not-compared. It must never report it as zero coverage."
+}

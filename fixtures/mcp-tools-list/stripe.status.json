@@ -1,0 +1,16 @@
+{
+  "twin": "stripe",
+  "substrate": "not-captured",
+  "captured": false,
+  "status": "not-captured",
+  "endpoint": "https://mcp.stripe.com",
+  "reason": "@stripe/mcp ships no tool table, and the live surface is per-credential — there is nothing deployment-invariant to freeze.",
+  "evidence": [
+    "@stripe/mcp@0.3.3 (latest on npm) ships 3 files / 182 lines in dist/. dist/index.js is a stdio<->HTTP proxy that forwards every message to https://mcp.stripe.com; `grep -c inputSchema dist/*.js` is 0. The package declares no tools.",
+    "dist/cli.js removed the --tools flag with the message 'Tool permissions are now controlled by your Restricted API Key (RAK)', so the served surface is a function of the caller's key, not of the deployment.",
+    "docs.stripe.com/mcp lists a Treasury tool group in Public preview behind a separate access request, so even two fully-scoped keys need not see the same listing.",
+    "Unauthenticated POST tools/list to https://mcp.stripe.com returns 401 {\"error\":\"Unauthorized. See https://docs.stripe.com/mcp for usage instructions.\"} (re-probed 2026-08-06)."
+  ],
+  "revisitWhen": "a credentialed capture lane exists and can record WHICH restricted key's permissions produced the listing",
+  "consumerContract": "F-1325's lane must report this twin as not-compared. It must never report it as zero coverage."
+}
