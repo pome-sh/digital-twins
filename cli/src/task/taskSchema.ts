@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
-import { seedSchema as githubSeedStateSchema } from "@pome-sh/twin-github";
-import { gmailSeedSchema as gmailSeedStateSchema } from "@pome-sh/twin-gmail";
-import { linearSeedSchema as linearSeedStateSchema } from "@pome-sh/twin-linear";
+// The `/seed` subpath, not the package root (F-1306): a schema is data, and the
+// roots carry each twin's domain + server. See `parseTask.ts`'s note.
+import { seedSchema as githubSeedStateSchema } from "@pome-sh/twin-github/seed";
+import { gmailSeedSchema as gmailSeedStateSchema } from "@pome-sh/twin-gmail/seed";
+import { linearSeedSchema as linearSeedStateSchema } from "@pome-sh/twin-linear/seed";
 // Criterion kinds are owned by the published contract. The markdown marker
 // grammar is `[code]`/`[model]` (F-778); `criterionSchema`'s tolerant input
 // (legacy `D`/`P` enum values) exists only for 0.3.0-era persisted artifacts,

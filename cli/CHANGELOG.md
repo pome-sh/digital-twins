@@ -4,6 +4,63 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.21.6
+
+### Patch Changes
+
+- **"Each twin is a lazily-loaded chunk" is now true** (F-1306). 0.21.0 shipped
+  that sentence as a headline, `cli/src/twin/registry.ts` says it in its header,
+  and `cli/tsup.config.ts` says it again. For three of the five twins it was
+  false, and had been for six releases. Measured against the built bundle with an
+  ESM loader hook that logs every module Node actually loads:
+
+  | invocation | before | after | Δ |
+  | --- | --- | --- | --- |
+  | `pome --version` | 1183.6 KB (19 files) | **587.1 KB** (22 files) | **−596.5 KB (−50%)** |
+  | `pome twin start github` | 1187.9 KB (21 files) | **791.4 KB** (24 files) | **−396.5 KB (−33%)** |
+
+  On `pome --version` — a command that reads a build-time constant and exits —
+  github's, gmail's and linear's full domains loaded: their SQLite schemas, their
+  Hono apps, their REST route tables, and linear's GraphQL executor. 697.9 KB of
+  three twin servers, parsed to print `0.21.5`. Now none of the five load, and
+  `pome twin start github` pays for github alone instead of also parsing gmail's
+  and linear's servers (492.8 KB → 0 KB).
+
+  **The cause was one import chain, not the bundler.** `splitting: true` and the
+  `import()` calls in `TWIN_REGISTRY` were doing their job; six modules on the
+  startup path defeated them by top-level-importing the twins' PACKAGE ROOTS to
+  reach a zod seed schema — `task/parseTask.ts`, `task/taskSchema.ts`,
+  `task/githubSeedCompat.ts`, `task/seed-compiler.ts` and
+  `task/seed-compiler-hosted.ts` — plus `task/seed-verifier.ts`, which really does
+  want `GitHubDomain` but is only reachable from `pome compile-seeds`. A root
+  export also carries the domain and the server, so wanting `seedSchema` bought
+  the whole twin.
+
+  The fix does not thread `async` through the parser. Each twin's `seed.ts` was
+  already a pure-data leaf (zod and nothing else), so it is now published as a
+  `./seed` subpath and the five schema readers import that instead — same
+  synchronous signatures, no test call site changed. `seed-verifier.ts`, the one
+  genuine domain consumer, became `async` behind an `import()`.
+
+- **A twin's assertable vocabulary no longer drags its tool table along.**
+  `@pome-sh/twin-github/checks` is loaded on every invocation on purpose —
+  `pome checks` lists, looks up and digests the vocabulary synchronously — but
+  `check-params.ts` read the two-element `TAPE_ASSERTABLE_TOOLS` list from
+  `tools.ts`, which is 649 lines of zod tool schemas and `executeTool`'s domain
+  dispatch. The constant moved to its own module (`tools.ts` re-exports it, so
+  nothing else moved), taking 33.8 KB out of the always-loaded set. The other four
+  twins' check graphs were already clean; this was the only accidental edge.
+
+- **A gate now asserts it**, because the claim above went six releases unchecked
+  and was found by a manual audit rather than by CI.
+  `scripts/check-twin-chunk-laziness.mjs` walks the CLI's static import graph and
+  fails if it reaches any twin's package root, `db.ts` or `domain/` — and fails
+  just as loudly if a twin's `checks.ts` STOPS being reachable, since the cheap
+  way to pass a laziness gate is to break `pome checks`. It reads the twins' real
+  `exports` maps, needs no build, and has its own nine-case regression suite
+  (`scripts/check-twin-chunk-laziness.test.mjs`) whose first job is proving the
+  gate can go red.
+
 ## 0.21.5
 
 ### Patch Changes

@@ -1,6 +1,18 @@
 # @pome-sh/twin-gmail — CHANGELOG
 
 
+## 0.3.4 — 2026-08-06
+
+New `./seed` subpath export (F-1306): `gmailSeedSchema`, `parseSeed`,
+`defaultSeedState` and the rest of `seed.ts` — a module whose only imports are
+`zod` and this twin's own fault/search-query validators. Nothing else changed.
+
+The CLI's task parser needs a seed schema on its startup path and was reading it
+from the package ROOT, which also exports `GmailDomain`, `openGmailTwinDatabase`
+and `createGmailTwinApp`. A schema lookup therefore loaded 252 KB of this twin's
+domain, REST routes and MCP surface on every `pome` invocation, including
+`pome --version`. The root keeps exporting all of these names.
+
 ## 0.3.3 — 2026-08-04
 
 Dependency-only patch (#302): `hono` `^4.12.31` → `^4.13.0`, `zod` `^4.1.13` → `^4.4.3`, `@hono/node-server` `^2.0.10` → `^2.1.0`.

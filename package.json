@@ -27,6 +27,7 @@
     "lint:parent-vocab": "node scripts/lint-parent-vocab.mjs",
     "lint:task-class": "node scripts/lint-task-class.mjs",
     "lint:skill-manifest": "node scripts/check-plugin-manifest-lists-every-skill.mjs",
+    "lint:twin-chunks": "node scripts/check-twin-chunk-laziness.mjs",
     "lint:dead-code": "knip --no-config-hints",
     "gate:bundled-deps": "node scripts/check-bundled-runtime-deps.mjs"
   },

@@ -450,26 +450,15 @@ export function isMutatingTool(name: string) {
 
 // F-1125 — the actions a tape check may assert "was never called" about.
 //
-// Membership is a PROMISE, not a label: every name here is stamped as
-// `RecorderEvent.tool` on BOTH doors an agent can reach the action through —
-// the MCP tool dispatch and the REST route that performs the same thing. That
-// is what makes `create_commit_status was never called` answerable, because an
-// agent that fabricates a status via `POST /repos/:owner/:repo/statuses/:sha`
-// must fail the check exactly as one going through `tools/call` does.
-//
-// The set is small on purpose and MUST NOT be widened by editing this line
-// alone. This twin has ~40 tools and only these two have their REST route
-// stamped; adding a third name without stamping its route would hand the check
-// a sentence it cannot honour — "never called" over a run that called it by
-// REST, the negative false-pass D4 forbids outright. `tool` is `null` on every
-// unstamped surface, and `null` means "no declared action for this surface",
-// never "no action happened".
-//
-// Two things make that hard to get wrong: `test/tool-stamping.test.ts` keeps one
-// REST probe per member and asserts its key set equals this set, and
-// `toolActionName`'s param pattern is generated from this set, so a criterion
-// cannot name an action outside it.
-export const TAPE_ASSERTABLE_TOOLS = ["create_commit_status", "create_check_run"] as const;
+// The constant MOVED to `./tape-assertable-tools.js` (F-1306) and is re-exported
+// here so `routes.ts`, the package root and `test/tool-stamping.test.ts` keep
+// reading it from where they always did. It left because `check-params.ts` reads
+// it too, and importing it from this module put ~40 zod tool schemas and
+// `executeTool`'s whole domain dispatch into the import graph of
+// `@pome-sh/twin-github/checks` — a subpath the CLI loads on every invocation
+// because `pome checks` needs the vocabulary synchronously. See that file for
+// why membership is a promise rather than a label.
+export { TAPE_ASSERTABLE_TOOLS } from "./tape-assertable-tools.js";
 
 export function executeTool(
   domain: GitHubDomain,

@@ -16,7 +16,8 @@ import { z } from "zod";
 import { resolveCredentials } from "../cli/credentials.js";
 import { HostedAuthError, HostedOrchError, HostedQuotaError } from "../hosted/errors.js";
 import { parseGitHubSeedState } from "./githubSeedCompat.js";
-import { seedSchema as seedStateSchema } from "@pome-sh/twin-github";
+// `/seed`, not the package root (F-1306) — see `parseTask.ts`'s note.
+import { seedSchema as seedStateSchema } from "@pome-sh/twin-github/seed";
 import type { CompileResult } from "./seed-compiler.js";
 
 const DEFAULT_TIMEOUT_MS = 60_000;

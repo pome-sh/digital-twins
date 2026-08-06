@@ -1,6 +1,19 @@
 # @pome-sh/twin-linear — CHANGELOG
 
 
+## 0.3.4 — 2026-08-06
+
+New `./seed` subpath export (F-1306): `linearSeedSchema`, `parseSeed`,
+`defaultSeedState` and the rest of `seed.ts` — a module whose only imports are
+`zod`, `./types.js` and `./webhook-url.js`. Nothing else changed.
+
+The CLI's task parser needs a seed schema on its startup path and was reading it
+from the package ROOT, which also exports `LinearDomain`,
+`openLinearTwinDatabase` and `createLinearTwinApp`. A schema lookup therefore
+loaded 241 KB of this twin's domain, GraphQL executor and MCP surface on every
+`pome` invocation, including `pome --version`. The root keeps exporting all of
+these names.
+
 ## 0.3.3 — 2026-08-04
 
 Dependency-only patch (#302): `hono` `^4.12.31` → `^4.13.0`, `zod` `^4.1.13` → `^4.4.3`, `@hono/node-server` `^2.0.10` → `^2.1.0`.

@@ -15,6 +15,21 @@
 //      all five twins (and five SQLite schemas) into the CLI's startup path;
 //   2. `pome twin start github` only pays for github.
 //
+// THIS MODULE IS NOT THE WHOLE STORY, and for six releases it was the wrong
+// half of it (F-1306). Everything above was true here and false in aggregate:
+// `cli/src/task/{parseTask,taskSchema,githubSeedCompat,seed-compiler,
+// seed-compiler-hosted}.ts` top-level-imported twin-github/gmail/linear's
+// PACKAGE ROOTS to reach a zod seed schema, and a root export carries the domain
+// and the Hono app too — so `pome --version` parsed 698 KB of three twin servers
+// while this file's header said it did not. A twin's laziness is a property of
+// the CLI's whole static graph, not of this file.
+//
+// If you need a twin's seed schema or its default world, import its `./seed`
+// subpath: `seed.ts` is a zod-only leaf, and that is why the fix needed no
+// `async` threading. `scripts/check-twin-chunk-laziness.mjs` is the standing
+// gate — it fails on any static edge from the CLI to a twin's root, `db.ts` or
+// `domain/`, so this comment cannot go stale again without CI saying so.
+//
 // `version` is the exception: it is a build-time JSON import of the twin's own
 // manifest, so it is inlined into the bundle and needs no module resolution at
 // runtime. `cli/src/recorder/specMeta.ts` reports these in every run's
