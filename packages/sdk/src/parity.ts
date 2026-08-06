@@ -7,7 +7,8 @@
 // "twin-infra copies: 0" gate).
 //
 // The runner asserts three rings agree before it reports green:
-//   1. live tool list (code truth from listTools())
+//   1. the tool-table fixture (`fixtures/mcp-tools-list.raw.json`, the
+//      hash-locked declaration each twin derives its listing from — F-1325)
 //   2. fidelity.inventory.json tools (the machine-readable inventory)
 //   3. scenario step coverage (every inventory tool exercised)
 // and that every step answers its expected status through the frozen
@@ -60,8 +61,13 @@ export interface RunParityOptions {
   app: ParityAppLike;
   twin: string;
   inventory: FidelityInventory;
-  /** `listTools()` names from the twin source — the code truth. */
-  liveToolNames: string[];
+  /**
+   * Tool names from the twin's `mcp-tools-list` fixture — the declaration the
+   * served listing is derived from (F-1325). NOT read off the code table: the
+   * inventory must be bound to the fixture, or the hand-written surface
+   * survives as a second source of truth.
+   */
+  fixtureToolNames: string[];
   steps: ParityStep[];
   restProbes?: ParityRestProbe[];
   /** Session id; default "fidelity-parity". */
@@ -101,14 +107,18 @@ export async function runFidelityParity(options: RunParityOptions): Promise<Pari
   const failures: string[] = [];
   const report: unknown[] = [];
 
-  // Ring 1 ⇔ ring 2: inventory tools must equal the live tool list.
+  // Ring 1 ⇔ ring 2: inventory tools must equal the fixture's declared tools.
   const inventoryNames = options.inventory.tools.map((entry) => entry.name);
-  const inventoryDiff = compareToolNames(inventoryNames, options.liveToolNames);
+  const inventoryDiff = compareToolNames(inventoryNames, options.fixtureToolNames);
   for (const name of inventoryDiff.missing) {
-    failures.push(`tool '${name}' is live in listTools() but missing from fidelity.inventory.json`);
+    failures.push(
+      `tool '${name}' is declared in the mcp-tools-list fixture but missing from fidelity.inventory.json`
+    );
   }
   for (const name of inventoryDiff.extra) {
-    failures.push(`tool '${name}' is in fidelity.inventory.json but not in listTools()`);
+    failures.push(
+      `tool '${name}' is in fidelity.inventory.json but not in the mcp-tools-list fixture`
+    );
   }
 
   // Ring 2 ⇔ ring 3: every inventory tool needs at least one scenario step.

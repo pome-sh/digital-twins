@@ -6,10 +6,11 @@ import {
   type FidelityInventory,
   type ParityStep,
 } from "@pome-sh/sdk/parity";
-import { composeMime, createGmailTwinApp, encodeGmailRaw, gmailTools } from "../src/index.js";
+import { composeMime, createGmailTwinApp, encodeGmailRaw, gmailToolFixture } from "../src/index.js";
 
 const email = "pome-agent@pome-twin.test";
-const launchToolNames = gmailTools.map((tool) => tool.name);
+// F-1325 — the inventory is bound to the tool-table fixture, not to the code.
+const launchToolNames: string[] = [...gmailToolFixture.toolNames];
 const rawInventory = JSON.parse(
   readFileSync(join(import.meta.dirname, "..", "fidelity.inventory.json"), "utf8"),
 ) as {
@@ -155,7 +156,7 @@ await runParityCli({
   app: createGmailTwinApp({ seed }),
   twin: "gmail",
   inventory: launchInventory,
-  liveToolNames: launchToolNames,
+  fixtureToolNames: launchToolNames,
   steps,
   claims: { team_id: "tm_gmail", gmail_email: email },
   restProbes: [

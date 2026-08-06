@@ -63,7 +63,7 @@ describe("runFidelityParity", () => {
       sid: TEST_SID,
       secret: TEST_AUTH_SECRET,
       inventory: toyInventory(),
-      liveToolNames: ["add_item", "count_items"],
+      fixtureToolNames: ["add_item", "count_items"],
       steps: TOY_STEPS,
       restProbes: [
         { surface: "unsupported-rest", path: "/nope/not-a-route", status: 501, expectUnsupportedEnvelope: true },
@@ -93,7 +93,7 @@ describe("runFidelityParity", () => {
       sid: TEST_SID,
       secret: TEST_AUTH_SECRET,
       inventory,
-      liveToolNames: ["add_item", "count_items"],
+      fixtureToolNames: ["add_item", "count_items"],
       steps: TOY_STEPS,
     });
     expect(result.ok).toBe(false);
@@ -108,7 +108,7 @@ describe("runFidelityParity", () => {
       sid: TEST_SID,
       secret: TEST_AUTH_SECRET,
       inventory: toyInventory(),
-      liveToolNames: ["add_item", "count_items"],
+      fixtureToolNames: ["add_item", "count_items"],
       steps: TOY_STEPS.filter((step) => step.tool !== "count_items"),
     });
     expect(result.ok).toBe(false);
@@ -127,7 +127,7 @@ describe("runFidelityParity", () => {
       sid: TEST_SID,
       secret: TEST_AUTH_SECRET,
       inventory: toyInventory(),
-      liveToolNames: ["add_item", "count_items"],
+      fixtureToolNames: ["add_item", "count_items"],
       steps,
     });
     expect(result.ok).toBe(false);

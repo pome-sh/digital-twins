@@ -156,7 +156,7 @@ await runParityCli({
   app: createGitHubCloneApp(),
   twin: "github",
   inventory: loadFidelityInventory(join(import.meta.dirname, "..", "fidelity.inventory.json")),
-  liveToolNames: [...githubToolFixture.toolNames],
+  fixtureToolNames: [...githubToolFixture.toolNames],
   steps,
   claims: { team_id: "tm_fidelity", login: "pome-agent" },
   restProbes: [

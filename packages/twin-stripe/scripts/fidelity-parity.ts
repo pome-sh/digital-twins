@@ -188,7 +188,7 @@ await runParityCli({
   app: createTwinStripeApp(),
   twin: "stripe",
   inventory: loadFidelityInventory(join(import.meta.dirname, "..", "fidelity.inventory.json")),
-  liveToolNames: [...stripeToolFixture.toolNames],
+  fixtureToolNames: [...stripeToolFixture.toolNames],
   steps,
   restProbes: [
     { surface: "unsupported-rest", path: "/v1/checkout/sessions", status: 501, expectUnsupportedEnvelope: true },

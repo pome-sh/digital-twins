@@ -78,7 +78,7 @@ await runParityCli({
   app: createSlackTwinApp({ seed: defaultSeedState() }),
   twin: "slack",
   inventory: loadFidelityInventory(join(import.meta.dirname, "..", "fidelity.inventory.json")),
-  liveToolNames: [...slackToolFixture.toolNames],
+  fixtureToolNames: [...slackToolFixture.toolNames],
   steps,
   claims: { team_id: "T_POME", login: "pome-agent" },
   stepVerify: (body) => {
