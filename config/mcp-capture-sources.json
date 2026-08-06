@@ -1,0 +1,124 @@
+{
+  "$comment": [
+    "F-1326 — the declared source table for the upstream tools/list capture producer.",
+    "Read by scripts/capture-mcp-tools-list.mjs. Adding a twin is a data edit here; the",
+    "producer contains no twin ids and no switch over them (F-1117's sources.json shape).",
+    "",
+    "`substrate` names HOW the upstream surface is read, and picks the adapter:",
+    "  live-wire-unauth  unauthenticated JSON-RPC tools/list against the vendor endpoint",
+    "  live-wire-oauth   the SAME reader plus a bearer from `authTokenEnv` (F-1329)",
+    "  oss-source        build the vendor's public server from a pinned commit and ask it",
+    "  not-captured      the substrate is not faithfully readable without a credential",
+    "",
+    "`configuration` is mandatory on every capturable source and is copied verbatim into",
+    "meta.json. A capture with no declared configuration FAILS rather than defaulting: an",
+    "unstated assumption about which deployment was read is the F-1179 failure — a lane",
+    "reporting divergence that is not real is worse than one honestly reporting not-compared."
+  ],
+  "goldenDir": "fixtures/mcp-tools-list",
+  "twins": {
+    "gmail": {
+      "substrate": "live-wire-unauth",
+      "capture": true,
+      "endpoint": "https://gmailmcp.googleapis.com/mcp/v1",
+      "method": "tools/list",
+      "protocol": "JSON-RPC 2.0 over HTTP",
+      "protocolVersion": "2025-03-26",
+      "configuration": {
+        "auth": "none",
+        "deploymentSelector": "none — the endpoint exposes no toolset, tool-filter or read-only selector, so there is exactly one surface to read",
+        "requestHeaders": {
+          "content-type": "application/json",
+          "accept": "application/json, text/event-stream"
+        },
+        "requestBody": { "method": "tools/list", "jsonrpc": "2.0", "id": 1 },
+        "matchesExaminee": "an examinee pointing an MCP client at this URL gets this listing; there is no configuration axis on which the two could differ",
+        "completeness": "exact"
+      }
+    },
+    "github": {
+      "substrate": "oss-source",
+      "capture": true,
+      "endpoint": "https://api.githubcopilot.com/mcp/",
+      "method": "tools/list",
+      "protocol": "JSON-RPC 2.0 over stdio (the public server, built from source)",
+      "protocolVersion": "2025-06-18",
+      "source": {
+        "repo": "https://github.com/github/github-mcp-server",
+        "commit": "e6e3a4e8414686d9763e5e4840e1e0d61db9a992",
+        "package": "./cmd/github-mcp-server",
+        "language": "go"
+      },
+      "configuration": {
+        "toolsets": "default",
+        "whyThisToolset": [
+          "examples/support-triage declares mcp_servers[name=github].url = https://api.githubcopilot.com/mcp/ (agents/support-triage-v1.yaml and -v2.yaml, byte-identical on that line).",
+          "docs/remote-server.md at the pinned commit maps that exact URL to the `default` toolset. `all` is a DIFFERENT URL: https://api.githubcopilot.com/mcp/x/all.",
+          "Measured at the pinned commit: --toolsets=default returns 44 tools, --toolsets=all returns 85. Reading the union would invent 41 tools no examinee of ours can call."
+        ],
+        "readOnly": false,
+        "lockdown": false,
+        "insiders": false,
+        "featureFlags": [],
+        "scopeFiltering": "none — docs/scope-filtering.md filters tools by a classic PAT's OAuth scopes; with no readable scopes the server logs `continuing without scope filtering` and serves the unfiltered toolset, which is what an examinee with full scopes gets",
+        "serverArgs": ["stdio", "--toolsets=default"],
+        "serverEnv": { "GITHUB_PERSONAL_ACCESS_TOKEN": "f1326-unauthenticated-capture" },
+        "serverEnvNote": "the token is deliberately not a credential; it only gets the server past its startup check. Verified: a valid-shaped ghp_ placeholder and this string produce a byte-identical tools/list.",
+        "completeness": "subset-of-remote",
+        "knownRemoteOnlyToolsNotInCapture": ["create_pull_request_with_copilot"],
+        "knownRemoteOnlyToolsEvidence": "README.md 'Additional Tools in Remote GitHub MCP Server' at the pinned commit lists create_pull_request_with_copilot under the Copilot toolset, which is Default:true, so the remote `default` surface is this capture plus that one tool. The other two remote-only groups (copilot_spaces, github_support_docs_search) are non-default toolsets and are correctly absent. A consumer of this golden must treat a github tool in that list as not-compared rather than as a gap."
+      }
+    },
+    "stripe": {
+      "substrate": "not-captured",
+      "capture": false,
+      "endpoint": "https://mcp.stripe.com",
+      "reason": "@stripe/mcp ships no tool table, and the live surface is per-credential — there is nothing deployment-invariant to freeze.",
+      "evidence": [
+        "@stripe/mcp@0.3.3 (latest on npm) ships 3 files / 182 lines in dist/. dist/index.js is a stdio<->HTTP proxy that forwards every message to https://mcp.stripe.com; `grep -c inputSchema dist/*.js` is 0. The package declares no tools.",
+        "dist/cli.js removed the --tools flag with the message 'Tool permissions are now controlled by your Restricted API Key (RAK)', so the served surface is a function of the caller's key, not of the deployment.",
+        "docs.stripe.com/mcp lists a Treasury tool group in Public preview behind a separate access request, so even two fully-scoped keys need not see the same listing.",
+        "Unauthenticated POST tools/list to https://mcp.stripe.com returns 401 {\"error\":\"Unauthorized. See https://docs.stripe.com/mcp for usage instructions.\"} (re-probed 2026-08-06)."
+      ],
+      "revisitWhen": "a credentialed capture lane exists and can record WHICH restricted key's permissions produced the listing"
+    },
+    "slack": {
+      "substrate": "live-wire-oauth",
+      "capture": false,
+      "deferredTo": "F-1329",
+      "endpoint": "https://mcp.slack.com/mcp",
+      "method": "tools/list",
+      "protocol": "JSON-RPC 2.0 over HTTP",
+      "authTokenEnv": "POME_SLACK_MCP_TOKEN",
+      "reason": "OAuth-gated: unauthenticated tools/list returns 401 missing_token (re-probed 2026-08-06). Same reader as gmail's; F-1329 sets POME_SLACK_MCP_TOKEN and flips `capture` to true.",
+      "configuration": {
+        "auth": "bearer",
+        "deploymentSelector": "unknown until a credentialed capture confirms whether the listing is scoped to the installing workspace",
+        "requestHeaders": {
+          "content-type": "application/json",
+          "accept": "application/json, text/event-stream"
+        },
+        "requestBody": { "method": "tools/list", "jsonrpc": "2.0", "id": 1 }
+      }
+    },
+    "linear": {
+      "substrate": "live-wire-oauth",
+      "capture": false,
+      "deferredTo": "F-1329",
+      "endpoint": "https://mcp.linear.app/mcp",
+      "method": "tools/list",
+      "protocol": "JSON-RPC 2.0 over HTTP",
+      "authTokenEnv": "POME_LINEAR_MCP_TOKEN",
+      "reason": "OAuth-gated: unauthenticated tools/list returns 401 invalid_token (re-probed 2026-08-06). Same reader as gmail's; F-1329 sets POME_LINEAR_MCP_TOKEN and flips `capture` to true.",
+      "configuration": {
+        "auth": "bearer",
+        "deploymentSelector": "unknown until a credentialed capture confirms whether the listing is scoped to the authorising workspace",
+        "requestHeaders": {
+          "content-type": "application/json",
+          "accept": "application/json, text/event-stream"
+        },
+        "requestBody": { "method": "tools/list", "jsonrpc": "2.0", "id": 1 }
+      }
+    }
+  }
+}
