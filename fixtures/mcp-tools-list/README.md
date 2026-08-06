@@ -25,6 +25,19 @@ bytes is a change in what the vendor serves. The staleness alarm over them is F-
 | slack | `live-wire-oauth` | `slack.status.json` | deferred to F-1329 (needs a token, not an adapter) |
 | linear | `live-wire-oauth` | `linear.status.json` | deferred to F-1329 (needs a token, not an adapter) |
 
+## gmail: there is a second tools/list in this repo, and it is stale
+
+[`packages/twin-gmail/fixtures/mcp-tools-list.*`](../../packages/twin-gmail/fixtures/) is **not**
+this. It is the twin's own frozen Gate-1 launch oracle (captureDate 2026-07-20), imported by
+`twin-gmail/src/mcp.ts` and asserted by that package's suite. It is authoritative for *which tools
+the twin implements*. `gmail.*` here is authoritative for *what Google currently serves*, and only
+this one gets re-captured.
+
+Known delta, measured 2026-08-06: same 13 names in the same order, but **10 of the 13 differ** in
+`description` and/or `inputSchema` (`search_threads` schema 3849→4274 chars, `create_label`
+2813→3195, `list_labels` description 393→293). Nothing in CI relates the two files, so when F-1325's
+lane reports schema divergence on gmail, check the oracle's date before concluding the twin drifted.
+
 ## The three files
 
 - `<twin>.raw.json` — the upstream response, **verbatim**. Never reformatted; no trailing newline.
