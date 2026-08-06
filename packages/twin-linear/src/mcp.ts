@@ -1,9 +1,16 @@
 // file-size: Linear MCP tool surface — one registry of tool defs + handlers pending further split.
 // SPDX-License-Identifier: Apache-2.0
 // file-size: MCP launch tool table co-located with canonical fixture mapping.
-import type { ToolCallContext, ToolSpec } from "@pome-sh/sdk";
+import {
+  deriveMcpToolTable,
+  loadMcpToolFixture,
+  type McpToolImplementation,
+  type ToolCallContext,
+  type ToolSpec,
+} from "@pome-sh/sdk";
 import type { z } from "zod";
-import canonicalListing from "../fixtures/mcp-tools-list.canonical.json" with { type: "json" };
+import metaListing from "../fixtures/mcp-tools-list.meta.json" with { type: "json" };
+import rawListing from "../fixtures/mcp-tools-list.raw.json" with { type: "json" };
 import type { LinearDomain } from "./domain/index.js";
 import { badUserInput, notFound } from "./errors.js";
 import { actorFromToolContext } from "./identity.js";
@@ -40,13 +47,18 @@ import {
   type LinearProjectState,
 } from "./types.js";
 
-type CanonicalTool = {
-  name: string;
-  description: string;
-  inputSchema: Record<string, unknown>;
-};
-
-const canonicalTools = canonicalListing.result.tools as CanonicalTool[];
+/**
+ * The tool table Linear serves, and its provenance. The substrate is
+ * `twin-authored-from-vendor-docs`: the NAMES come from Linear's published MCP
+ * launch documentation and the schemas are twin-owned, which the fixture's own
+ * notes had always admitted while its `source` field read like a capture
+ * (F-1325). Re-sourcing it from `https://mcp.linear.app/mcp` needs an OAuth
+ * token and is F-1329's.
+ */
+export const linearToolFixture = loadMcpToolFixture({
+  raw: rawListing,
+  meta: metaListing,
+});
 
 function mutate<T>(domain: LinearDomain, ctx: ToolCallContext, op: () => T | Promise<T>): Promise<T> | T {
   const before = domain.exportState();
@@ -506,25 +518,27 @@ const implementations: Record<string, ToolImpl> = {
   },
 };
 
-const genericOutputSchema = {
-  type: "object",
-  additionalProperties: true,
-} as const;
+/**
+ * `tools/call` with no `arguments` reaches a handler as `undefined`; every
+ * Linear handler reads its arguments as a record, so the empty object is
+ * supplied here rather than in twenty-two handlers.
+ */
+const boundImplementations = Object.fromEntries(
+  Object.entries(implementations).map(([name, impl]) => [
+    name,
+    {
+      schema: impl.schema as unknown as z.ZodType<unknown>,
+      mutation: impl.mutation,
+      handler: (domain: LinearDomain, args: unknown, ctx: ToolCallContext) =>
+        impl.handler(domain, (args ?? {}) as Record<string, unknown>, ctx),
+    },
+  ])
+) as Record<string, McpToolImplementation<LinearDomain>>;
 
-export const linearTools: ToolSpec<LinearDomain>[] = canonicalTools.map((tool) => {
-  const impl = implementations[tool.name];
-  if (!impl) throw new Error(`Missing MCP implementation for ${tool.name}`);
-  return {
-    name: tool.name,
-    description: tool.description,
-    schema: impl.schema as unknown as z.ZodType<unknown>,
-    mutation: impl.mutation,
-    inputSchema: tool.inputSchema,
-    outputSchema: genericOutputSchema,
-    includeIsError: true,
-    handler: (domain, args, ctx) =>
-      impl.handler(domain, (args ?? {}) as Record<string, unknown>, ctx),
-  };
-});
+export const linearTools: ToolSpec<LinearDomain>[] = deriveMcpToolTable(
+  linearToolFixture,
+  boundImplementations,
+  { includeIsError: true }
+);
 
 export const LINEAR_MCP_TOOL_COUNT = linearTools.length;

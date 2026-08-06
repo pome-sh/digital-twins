@@ -38,9 +38,9 @@ const LINEAR_LAUNCH_TOOLS = [
 
 test("MCP canonical launchToolOrder matches Gate-1 freeze", () => {
   const canonical = readJson("fixtures/mcp-tools-list.canonical.json");
-  assert.equal(canonical.meta.launchToolCount, LINEAR_LAUNCH_TOOLS.length);
+  assert.equal(canonical.meta.liveToolCount, LINEAR_LAUNCH_TOOLS.length);
   assert.equal(LINEAR_LAUNCH_TOOLS.length, 22);
-  assert.deepEqual(canonical.meta.launchToolOrder, LINEAR_LAUNCH_TOOLS);
+  assert.deepEqual(canonical.meta.liveToolOrder, LINEAR_LAUNCH_TOOLS);
   const names = canonical.result.tools.map((t) => t.name);
   assert.equal(names.length, LINEAR_LAUNCH_TOOLS.length);
   assert.deepEqual(names, LINEAR_LAUNCH_TOOLS);

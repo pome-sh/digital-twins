@@ -96,8 +96,8 @@ describe("Linear MCP frozen contract", () => {
     ).json()) as { result: { tools: Array<{ name: string }> } };
     const names = listed.result.tools.map((tool) => tool.name);
     expect(names).toHaveLength(22);
-    expect(names).toEqual(canonicalListing.meta.launchToolOrder);
-    expect(linearTools.map((tool) => tool.name)).toEqual(canonicalListing.meta.launchToolOrder);
+    expect(names).toEqual(canonicalListing.meta.liveToolOrder);
+    expect(linearTools.map((tool) => tool.name)).toEqual(canonicalListing.meta.liveToolOrder);
   });
 
   it("creates and updates issues through save_issue", async () => {

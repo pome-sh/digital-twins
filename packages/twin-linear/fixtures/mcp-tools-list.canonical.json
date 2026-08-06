@@ -1,18 +1,15 @@
 {
   "meta": {
-    "source": "documented_official_linear_mcp_launch_set",
-    "endpoint": "https://mcp.linear.app/mcp",
+    "twin": "linear",
+    "substrate": "twin-authored-from-vendor-docs",
+    "endpoint": "in-process://twin-linear/s/:sid/mcp",
     "method": "tools/list",
-    "protocol": "JSON-RPC 2.0 streamable HTTP",
-    "captureDate": "2026-07-22",
-    "launchToolCount": 22,
-    "notes": [
-      "Gate-1 Wave 4 expands Gate 0's 18-tool freeze: delete_comment + documents list/get/save; save_issue estimate/parentId/relations; save_comment parentId.",
-      "Documents/initiatives/milestones beyond this minimal set stay named gaps.",
-      "GraphQL keeps issueCreate/issueUpdate for SDK parity; MCP follows the vendor listing.",
-      "Schemas are twin-owned Gate-1 fixtures matching documented tool names and agent-eval needs."
-    ],
-    "launchToolOrder": [
+    "protocol": "JSON-RPC 2.0 over Streamable HTTP",
+    "protocolVersion": "2025-06-18",
+    "captureDate": "2026-08-06",
+    "rawFileSha256": "f764e11486c25738b1952b6e83e4919fcb84c3c36cd36ef801b326fb40ed111d",
+    "liveToolCount": 22,
+    "liveToolOrder": [
       "list_issues",
       "get_issue",
       "save_issue",
@@ -35,7 +32,21 @@
       "list_documents",
       "get_document",
       "save_document"
-    ]
+    ],
+    "transcription": {
+      "readFrom": "twin-linear's own tools/list, booted on defaultSeedState() and driven through Hono's app.request, read immediately before this table became fixture-driven (F-1325)",
+      "contentOrigin": "the tool NAMES come from Linear's published MCP launch documentation; the inputSchemas are twin-owned Gate-1 fixtures, as this fixture's own notes have always admitted. The pre-F-1325 provenance read `source: documented_official_linear_mcp_launch_set`, which reads like a capture. It was never one.",
+      "comparedToUpstream": "never. https://mcp.linear.app/mcp is OAuth-gated, so F-1326 recorded the upstream golden as deferred (fixtures/mcp-tools-list/linear.status.json). Re-sourcing this table needs that token and belongs to F-1329, not here."
+    },
+    "notes": [
+      "Gate-1 Wave 4 expands Gate 0's 18-tool freeze: delete_comment plus documents list/get/save; save_issue estimate/parentId/relations; save_comment parentId.",
+      "Documents, initiatives and milestones beyond this minimal set stay named gaps.",
+      "GraphQL keeps issueCreate/issueUpdate for SDK parity; MCP follows the documented listing.",
+      "This listing carries the generic outputSchema the twin serves on every tool. The pre-F-1325 canonical omitted it, so the committed oracle described less than the wire did.",
+      "Seeded from the served table rather than from upstream on purpose. F-1325 is name-neutral by construction: every byte this twin serves is identical before and after it."
+    ],
+    "derivedFrom": "mcp-tools-list.raw.json",
+    "derivation": "result.tools verbatim, listing order preserved; only whitespace differs from the raw file"
   },
   "jsonrpc": "2.0",
   "id": 1,
@@ -47,14 +58,36 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "team": { "type": "string", "description": "Team key or id" },
-            "assignee": { "type": "string", "description": "User email, id, or \"me\"" },
-            "state": { "type": "string", "description": "Workflow state name or id" },
-            "limit": { "type": "number", "description": "Max results (default 50, max 250)" },
-            "cursor": { "type": "string", "description": "Pagination cursor" },
-            "query": { "type": "string", "description": "Title/description search" }
+            "team": {
+              "type": "string",
+              "description": "Team key or id"
+            },
+            "assignee": {
+              "type": "string",
+              "description": "User email, id, or \"me\""
+            },
+            "state": {
+              "type": "string",
+              "description": "Workflow state name or id"
+            },
+            "limit": {
+              "type": "number",
+              "description": "Max results (default 50, max 250)"
+            },
+            "cursor": {
+              "type": "string",
+              "description": "Pagination cursor"
+            },
+            "query": {
+              "type": "string",
+              "description": "Title/description search"
+            }
           },
           "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": true
         }
       },
       {
@@ -63,10 +96,19 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "id": { "type": "string", "description": "Issue id or identifier" }
+            "id": {
+              "type": "string",
+              "description": "Issue id or identifier"
+            }
           },
-          "required": ["id"],
+          "required": [
+            "id"
+          ],
           "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": true
         }
       },
       {
@@ -75,23 +117,81 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "id": { "type": "string", "description": "Issue id or identifier (update)" },
-            "title": { "type": "string" },
-            "team": { "type": "string" },
-            "description": { "type": "string" },
-            "assignee": { "type": "string" },
-            "state": { "type": "string" },
-            "priority": { "type": "number" },
-            "estimate": { "type": ["number", "null"], "description": "Estimate points; null clears on update" },
-            "labels": { "type": "array", "items": { "type": "string" } },
-            "project": { "type": "string" },
-            "cycle": { "type": "string" },
-            "parentId": { "type": ["string", "null"], "description": "Parent issue id/identifier; null removes" },
-            "blocks": { "type": "array", "items": { "type": "string" }, "description": "Append-only blocked issues" },
-            "blockedBy": { "type": "array", "items": { "type": "string" }, "description": "Append-only blockers" },
-            "relatedTo": { "type": "array", "items": { "type": "string" }, "description": "Append-only related issues" }
+            "id": {
+              "type": "string",
+              "description": "Issue id or identifier (update)"
+            },
+            "title": {
+              "type": "string"
+            },
+            "team": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "assignee": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            },
+            "priority": {
+              "type": "number"
+            },
+            "estimate": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "description": "Estimate points; null clears on update"
+            },
+            "labels": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "project": {
+              "type": "string"
+            },
+            "cycle": {
+              "type": "string"
+            },
+            "parentId": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Parent issue id/identifier; null removes"
+            },
+            "blocks": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Append-only blocked issues"
+            },
+            "blockedBy": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Append-only blockers"
+            },
+            "relatedTo": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Append-only related issues"
+            }
           },
           "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": true
         }
       },
       {
@@ -100,12 +200,24 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "issueId": { "type": "string" },
-            "limit": { "type": "number" },
-            "cursor": { "type": "string" }
+            "issueId": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "number"
+            },
+            "cursor": {
+              "type": "string"
+            }
           },
-          "required": ["issueId"],
+          "required": [
+            "issueId"
+          ],
           "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": true
         }
       },
       {
@@ -114,13 +226,29 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "id": { "type": "string", "description": "Comment id (edit)" },
-            "issueId": { "type": "string" },
-            "parentId": { "type": "string", "description": "Parent comment id for threaded replies" },
-            "body": { "type": "string" }
+            "id": {
+              "type": "string",
+              "description": "Comment id (edit)"
+            },
+            "issueId": {
+              "type": "string"
+            },
+            "parentId": {
+              "type": "string",
+              "description": "Parent comment id for threaded replies"
+            },
+            "body": {
+              "type": "string"
+            }
           },
-          "required": ["body"],
+          "required": [
+            "body"
+          ],
           "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": true
         }
       },
       {
@@ -129,10 +257,19 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "id": { "type": "string", "description": "Comment ID" }
+            "id": {
+              "type": "string",
+              "description": "Comment ID"
+            }
           },
-          "required": ["id"],
+          "required": [
+            "id"
+          ],
           "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": true
         }
       },
       {
@@ -141,10 +278,18 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "limit": { "type": "number" },
-            "cursor": { "type": "string" }
+            "limit": {
+              "type": "number"
+            },
+            "cursor": {
+              "type": "string"
+            }
           },
           "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": true
         }
       },
       {
@@ -153,10 +298,19 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "query": { "type": "string", "description": "Team id, key, or name" }
+            "query": {
+              "type": "string",
+              "description": "Team id, key, or name"
+            }
           },
-          "required": ["query"],
+          "required": [
+            "query"
+          ],
           "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": true
         }
       },
       {
@@ -165,10 +319,18 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "limit": { "type": "number" },
-            "cursor": { "type": "string" }
+            "limit": {
+              "type": "number"
+            },
+            "cursor": {
+              "type": "string"
+            }
           },
           "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": true
         }
       },
       {
@@ -177,10 +339,19 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "query": { "type": "string", "description": "User id, email, or name" }
+            "query": {
+              "type": "string",
+              "description": "User id, email, or name"
+            }
           },
-          "required": ["query"],
+          "required": [
+            "query"
+          ],
           "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": true
         }
       },
       {
@@ -189,10 +360,18 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "team": { "type": "string" }
+            "team": {
+              "type": "string"
+            }
           },
-          "required": ["team"],
+          "required": [
+            "team"
+          ],
           "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": true
         }
       },
       {
@@ -201,11 +380,21 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "id": { "type": "string" },
-            "name": { "type": "string" },
-            "team": { "type": "string" }
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "team": {
+              "type": "string"
+            }
           },
           "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": true
         }
       },
       {
@@ -214,11 +403,21 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "team": { "type": "string" },
-            "limit": { "type": "number" },
-            "cursor": { "type": "string" }
+            "team": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "number"
+            },
+            "cursor": {
+              "type": "string"
+            }
           },
           "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": true
         }
       },
       {
@@ -227,13 +426,27 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "name": { "type": "string" },
-            "color": { "type": "string" },
-            "description": { "type": "string" },
-            "team": { "type": "string" }
+            "name": {
+              "type": "string"
+            },
+            "color": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "team": {
+              "type": "string"
+            }
           },
-          "required": ["name"],
+          "required": [
+            "name"
+          ],
           "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": true
         }
       },
       {
@@ -242,11 +455,21 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "team": { "type": "string" },
-            "limit": { "type": "number" },
-            "cursor": { "type": "string" }
+            "team": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "number"
+            },
+            "cursor": {
+              "type": "string"
+            }
           },
           "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": true
         }
       },
       {
@@ -255,10 +478,18 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "query": { "type": "string" }
+            "query": {
+              "type": "string"
+            }
           },
-          "required": ["query"],
+          "required": [
+            "query"
+          ],
           "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": true
         }
       },
       {
@@ -267,13 +498,27 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "id": { "type": "string" },
-            "name": { "type": "string" },
-            "team": { "type": "string" },
-            "description": { "type": "string" },
-            "state": { "type": "string" }
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "team": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            }
           },
           "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": true
         }
       },
       {
@@ -282,12 +527,24 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "teamId": { "type": "string" },
-            "limit": { "type": "number" },
-            "cursor": { "type": "string" }
+            "teamId": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "number"
+            },
+            "cursor": {
+              "type": "string"
+            }
           },
-          "required": ["teamId"],
+          "required": [
+            "teamId"
+          ],
           "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": true
         }
       },
       {
@@ -296,10 +553,18 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "query": { "type": "string" }
+            "query": {
+              "type": "string"
+            }
           },
-          "required": ["query"],
+          "required": [
+            "query"
+          ],
           "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": true
         }
       },
       {
@@ -308,13 +573,27 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "projectId": { "type": "string" },
-            "teamId": { "type": "string" },
-            "query": { "type": "string" },
-            "limit": { "type": "number" },
-            "cursor": { "type": "string" }
+            "projectId": {
+              "type": "string"
+            },
+            "teamId": {
+              "type": "string"
+            },
+            "query": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "number"
+            },
+            "cursor": {
+              "type": "string"
+            }
           },
           "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": true
         }
       },
       {
@@ -323,10 +602,19 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "id": { "type": "string", "description": "Document ID or slug" }
+            "id": {
+              "type": "string",
+              "description": "Document ID or slug"
+            }
           },
-          "required": ["id"],
+          "required": [
+            "id"
+          ],
           "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": true
         }
       },
       {
@@ -335,17 +623,39 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "id": { "type": "string" },
-            "title": { "type": "string" },
-            "content": { "type": "string" },
-            "project": { "type": "string" },
-            "team": { "type": "string" },
-            "issue": { "type": "string" },
-            "cycle": { "type": "string" },
-            "icon": { "type": "string" },
-            "color": { "type": "string" }
+            "id": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "content": {
+              "type": "string"
+            },
+            "project": {
+              "type": "string"
+            },
+            "team": {
+              "type": "string"
+            },
+            "issue": {
+              "type": "string"
+            },
+            "cycle": {
+              "type": "string"
+            },
+            "icon": {
+              "type": "string"
+            },
+            "color": {
+              "type": "string"
+            }
           },
           "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": true
         }
       }
     ]

@@ -4,7 +4,7 @@ Emulate’s Linear package may be used as a **coverage checklist**. It is **neve
 
 ## Oracles
 
-1. Frozen official Linear MCP launch listing → [`fixtures/mcp-tools-list.canonical.json`](fixtures/mcp-tools-list.canonical.json)
+1. The MCP tool table this twin serves → [`fixtures/mcp-tools-list.raw.json`](fixtures/mcp-tools-list.raw.json) (+ `.meta.json`, `.canonical.json`). Documented Linear names, twin-owned schemas, never compared to `https://mcp.linear.app/mcp` — see the fixtures README.
 2. Frozen GraphQL operation inventory → [`fixtures/graphql-surface.json`](fixtures/graphql-surface.json)
 3. Linear public GraphQL / OAuth / webhook docs
 4. `@linear/sdk` smoke tests against root `/graphql`
