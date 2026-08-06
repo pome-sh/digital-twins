@@ -5,12 +5,12 @@
 
 import { describe, expect, it } from "vitest";
 import { createStripeApp, rest, withAuth, callTool } from "./_appHelper.js";
-import { toolDefinitions } from "../src/tools.js";
+import { stripeToolFixture } from "../src/tools.js";
 
-const TOOL_NAMES = toolDefinitions.map((t) => t.name);
+const TOOL_NAMES = [...stripeToolFixture.toolNames];
 
 describe("MCP tools", () => {
-  it("listTools returns 26 tools", async () => {
+  it("GET /mcp/tools returns 26 tools", async () => {
     const app = await createStripeApp();
     const tools = await rest(app, "GET", "/mcp/tools");
     expect(tools.status).toBe(200);

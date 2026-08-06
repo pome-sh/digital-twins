@@ -5,11 +5,27 @@
 // Tool names mirror stripe-node — `create_payment_intent`,
 // `retrieve_charge`, `list_events`, etc. Same shape as twin-github's
 // tools.ts so the MCP wrapper in app.ts (AGENT-A) just works:
-// `executeTool(domain, name, args)` and `listTools()`.
+// `executeTool(domain, name, args)`.
 
+import { loadMcpToolFixture } from "@pome-sh/sdk";
 import { z } from "zod";
+import metaListing from "../fixtures/mcp-tools-list.meta.json" with { type: "json" };
+import rawListing from "../fixtures/mcp-tools-list.raw.json" with { type: "json" };
 import type { StripeDomain } from "./domain/index.js";
 import { TwinError } from "./errors.js";
+
+/**
+ * The tool table Stripe serves. Every name, description and input schema on
+ * the wire comes from this fixture; the array below declares only how each
+ * tool's arguments are validated (F-1325).
+ *
+ * Its substrate is `twin-code-transcription` — this listing was read off this
+ * twin. There is nothing to compare it to: `@stripe/mcp` declares no tools of
+ * its own and the live surface is a function of the caller's Restricted API
+ * Key, so F-1326 recorded stripe as `not-captured` rather than inventing a
+ * deployment-invariant table.
+ */
+export const stripeToolFixture = loadMcpToolFixture({ raw: rawListing, meta: metaListing });
 
 // ---------- shared shapes ----------
 
@@ -64,11 +80,15 @@ function flattenCreated(input: { created?: number | { gt?: number; gte?: number;
 
 // ---------- tool definitions ----------
 
-export const toolDefinitions = [
+/**
+ * How each tool's arguments are validated, indexed by the name the fixture
+ * declares. `stripeToolInputSchema` is the projection that produced every
+ * `inputSchema` in the fixture, and the contract suite runs it over each
+ * schema here and demands those bytes back.
+ */
+export const toolArgumentSchemas = [
   {
     name: "create_payment_intent",
-    description:
-      "Create a PaymentIntent: crypto-deposit (the x402 entry point) or card (optionally with payment_method / customer / confirm).",
     schema: z.object({
       amount: z.coerce.number().int().positive(),
       currency: z.string().min(1),
@@ -88,24 +108,18 @@ export const toolDefinitions = [
   },
   {
     name: "retrieve_payment_intent",
-    description: "Retrieve a PaymentIntent by id.",
     schema: z.object({ id: z.string().min(1) }),
   },
   {
     name: "list_payment_intents",
-    description: "List PaymentIntents with optional filters.",
     schema: z.object({ ...limitShape, ...createdRange }),
   },
   {
     name: "confirm_payment_intent",
-    description:
-      "Confirm a PaymentIntent. Card PIs attempt the charge synchronously (magic test PMs decline); crypto-deposit PIs are idempotent here.",
     schema: z.object({ id: z.string().min(1), payment_method: z.string().optional() }),
   },
   {
     name: "update_payment_intent",
-    description:
-      "Update a non-terminal PaymentIntent (amount, metadata, payment_method, customer). The card retry step: attach a new PM after a decline, then confirm again.",
     schema: z.object({
       id: z.string().min(1),
       amount: z.coerce.number().int().optional(),
@@ -116,22 +130,18 @@ export const toolDefinitions = [
   },
   {
     name: "cancel_payment_intent",
-    description: "Cancel a PaymentIntent. Refused once succeeded.",
     schema: z.object({ id: z.string().min(1) }),
   },
   {
     name: "simulate_crypto_deposit",
-    description: "Test helper: drive a crypto-deposit PI from requires_action through processing to succeeded.",
     schema: z.object({ id: z.string().min(1) }),
   },
   {
     name: "retrieve_charge",
-    description: "Retrieve a Charge by id.",
     schema: z.object({ id: z.string().min(1) }),
   },
   {
     name: "list_charges",
-    description: "List charges with optional payment_intent / customer / created filters.",
     schema: z.object({
       ...limitShape,
       ...createdRange,
@@ -141,8 +151,6 @@ export const toolDefinitions = [
   },
   {
     name: "create_refund",
-    description:
-      "Refund a charge, fully or partially. Stripe refuses a refund on a charge that is already fully refunded, or one that would exceed the remaining refundable amount.",
     schema: z.object({
       charge: z.string().min(1),
       amount: z.coerce.number().int().positive().optional(),
@@ -151,12 +159,10 @@ export const toolDefinitions = [
   },
   {
     name: "retrieve_refund",
-    description: "Retrieve a Refund by id.",
     schema: z.object({ id: z.string().min(1) }),
   },
   {
     name: "list_refunds",
-    description: "List refunds, optionally filtered by charge or payment_intent.",
     schema: z.object({
       ...limitShape,
       ...createdRange,
@@ -166,7 +172,6 @@ export const toolDefinitions = [
   },
   {
     name: "create_customer",
-    description: "Create a customer. All fields optional, like real Stripe.",
     schema: z.object({
       name: z.string().optional(),
       email: z.string().optional(),
@@ -177,13 +182,10 @@ export const toolDefinitions = [
   },
   {
     name: "retrieve_customer",
-    description: "Retrieve a Customer by id. Deleted customers return the {deleted: true} stub.",
     schema: z.object({ id: z.string().min(1) }),
   },
   {
     name: "update_customer",
-    description:
-      "Update a customer's fields. Metadata merges per-key; a null or empty value unsets the key.",
     schema: z.object({
       id: z.string().min(1),
       name: z.string().optional(),
@@ -196,12 +198,10 @@ export const toolDefinitions = [
   },
   {
     name: "delete_customer",
-    description: "Delete a customer (soft delete; its payment methods are detached).",
     schema: z.object({ id: z.string().min(1) }),
   },
   {
     name: "list_customers",
-    description: "List customers with optional email / created filters.",
     schema: z.object({
       ...limitShape,
       ...createdRange,
@@ -210,7 +210,6 @@ export const toolDefinitions = [
   },
   {
     name: "list_customer_payment_methods",
-    description: "List the payment methods attached to a customer.",
     schema: z.object({
       customer: z.string().min(1),
       type: z.string().optional(),
@@ -219,8 +218,6 @@ export const toolDefinitions = [
   },
   {
     name: "create_payment_method",
-    description:
-      "Create a card payment method from test card details (e.g. number 4242424242424242).",
     schema: z.object({
       type: z.literal("card"),
       card: z.object({
@@ -233,28 +230,22 @@ export const toolDefinitions = [
   },
   {
     name: "retrieve_payment_method",
-    description: "Retrieve a PaymentMethod by id.",
     schema: z.object({ id: z.string().min(1) }),
   },
   {
     name: "attach_payment_method",
-    description:
-      "Attach a payment method to a customer. One customer per PM; a detached PM cannot be reattached.",
     schema: z.object({ id: z.string().min(1), customer: z.string().min(1) }),
   },
   {
     name: "detach_payment_method",
-    description: "Detach a payment method from its customer.",
     schema: z.object({ id: z.string().min(1) }),
   },
   {
     name: "retrieve_balance",
-    description: "Retrieve the current balance (available + pending per currency).",
     schema: z.object({}).optional(),
   },
   {
     name: "list_balance_transactions",
-    description: "List balance transactions (charges, refunds, fees).",
     schema: z.object({
       ...limitShape,
       ...createdRange,
@@ -263,12 +254,10 @@ export const toolDefinitions = [
   },
   {
     name: "retrieve_event",
-    description: "Retrieve an event by id.",
     schema: z.object({ id: z.string().min(1) }),
   },
   {
     name: "list_events",
-    description: "List events. Filter by type and created.",
     schema: z.object({
       ...limitShape,
       ...createdRange,
@@ -277,15 +266,7 @@ export const toolDefinitions = [
   },
 ] as const;
 
-export type ToolName = (typeof toolDefinitions)[number]["name"];
-
-export function listTools() {
-  return toolDefinitions.map((tool) => ({
-    name: tool.name,
-    description: tool.description,
-    input_schema: schemaToJson(tool.schema),
-  }));
-}
+export type ToolName = (typeof toolArgumentSchemas)[number]["name"];
 
 /** Names of tools that mutate state. The MCP route uses this for recorder annotation. */
 export function isMutatingTool(name: string): boolean {
@@ -312,7 +293,7 @@ export function executeTool(
   name: string,
   input: unknown
 ): unknown {
-  const definition = toolDefinitions.find((tool) => tool.name === name);
+  const definition = toolArgumentSchemas.find((tool) => tool.name === name);
   if (!definition) {
     throw new TwinError(
       "invalid_request_error",
@@ -402,8 +383,14 @@ export function executeTool(
   }
 }
 
-/** Best-effort `z.toJSONSchema` shim. Falls back to an empty object. */
-function schemaToJson(schema: z.ZodTypeAny): unknown {
+/**
+ * The frozen wire projection of a Stripe tool's arguments — a best-effort
+ * `z.toJSONSchema` shim that falls back to an empty object. Nothing serves it
+ * any more (the fixture does), but the contract suite still runs it over every
+ * schema above and compares, so the validator and the declaration cannot part
+ * company.
+ */
+export function stripeToolInputSchema(schema: z.ZodType): unknown {
   const candidate = (z as unknown as { toJSONSchema?: (schema: z.ZodTypeAny) => unknown }).toJSONSchema;
   if (typeof candidate === "function") {
     try {

@@ -14,7 +14,7 @@ import {
   lintFidelityInventory,
   loadFidelityInventory,
 } from "@pome-sh/sdk/parity";
-import { listTools } from "../src/tools.js";
+import { stripeToolFixture } from "../src/tools.js";
 import { openTwinStripeDatabase } from "../src/db.js";
 import { StripeDomain } from "../src/domain/index.js";
 import { applySeed, parseSeed } from "../src/seed.js";
@@ -28,7 +28,7 @@ describe("Stripe fidelity contract", () => {
     expect(
       compareToolNames(
         inventory.tools.map((tool) => tool.name),
-        listTools().map((tool) => tool.name)
+        [...stripeToolFixture.toolNames]
       )
     ).toEqual({ missing: [], extra: [] });
   });

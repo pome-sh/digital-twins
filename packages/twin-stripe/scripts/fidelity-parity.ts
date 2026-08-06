@@ -16,7 +16,7 @@
 import { join } from "node:path";
 import { loadFidelityInventory, runParityCli, type ParityStep } from "@pome-sh/sdk/parity";
 import { createTwinStripeApp } from "../src/twin.js";
-import { listTools } from "../src/tools.js";
+import { stripeToolFixture } from "../src/tools.js";
 
 const createPi = {
   amount: 20000,
@@ -188,7 +188,7 @@ await runParityCli({
   app: createTwinStripeApp(),
   twin: "stripe",
   inventory: loadFidelityInventory(join(import.meta.dirname, "..", "fidelity.inventory.json")),
-  liveToolNames: listTools().map((tool) => tool.name),
+  liveToolNames: [...stripeToolFixture.toolNames],
   steps,
   restProbes: [
     { surface: "unsupported-rest", path: "/v1/checkout/sessions", status: 501, expectUnsupportedEnvelope: true },
