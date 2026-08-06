@@ -30,7 +30,7 @@ export const labelExists: Check<{ label: string }> = defineCheck({
   template: "A label named {label} exists",
   params: { label: labelName },
   substrate: "final",
-  // An achievement — task 23's seed defines no `Parity Complete`, so the
+  // An achievement — the seed defines no `Parity Complete`, so the
   // examinee has to create it.
   polarity: () => "positive",
   // The name is a caller-supplied literal compared against state.
@@ -57,7 +57,7 @@ export const labelExists: Check<{ label: string }> = defineCheck({
           reason: `no label named "${label}" exists`,
           // The label COLLECTION — the honest citation for a lookup that found
           // nothing, and the arm a reader most wants to open: see for yourself
-          // that the name is not in it (F-1197).
+          // that the name is not in it.
           ...(found.searched === undefined ? {} : { evidenceStatePaths: [found.searched] }),
         };
       }

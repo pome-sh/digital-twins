@@ -100,16 +100,47 @@ Each directory has its own README (ports, env, runtime contract) and a
 frozen [`CONTRACT.md`](../CONTRACT.md) — entry point, env surface, `/healthz`
 shape, auth, and MCP surfaces.
 
+## `@pome-sh/checks` — the grading vocabulary, as its own artifact
+
+[`checks/`](./checks/) contains no declarations of its own. It re-exports each
+twin's `check-*.ts` vocabulary and seed contract, plus the check DSL from
+`@pome-sh/sdk/checks`, and tsup inlines their compiled output into its `dist/`.
+One package, one version line, zero `@pome-sh/*` runtime dependencies.
+
+It exists because the twins are `private: true` and pome-cloud grades every
+`[code]` criterion out of these declarations from a **different repository**
+(F-1308). Privatising the twins fixed a real bug — two zod schema identities for
+one wire type (F-942) — but it also meant a corrected check declaration could
+never reach the thing that grades with it. Publishing the declaration layer on
+its own restores that path without reversing the fix.
+
+Two properties are load-bearing and gated by
+[`scripts/ci/check-checks-tarball.mjs`](../scripts/ci/check-checks-tarball.mjs):
+
+- **zod is a `peerDependency`, never bundled.** The seed schemas are zod values;
+  two copies means two schema identities, which is F-942 again in a new package.
+- **the twin engine is not inlined.** `twin-stripe`'s seed needs one zod schema
+  that `@pome-sh/sdk/server` also re-exports, and importing that barrel pulls
+  hono, `hono/jwt` and `node:sqlite` — 14 runtime modules — into a package whose
+  job is to hand out declarations. `@pome-sh/sdk/failure-injection` is the narrow
+  subpath that exists so it doesn't.
+
+`applySeed` and `loadSeedFromEnv` are deliberately not re-exported: they write
+SQLite rows and read `process.env`. The twin *runtime* channel is GHCR and stays
+GHCR; only the *vocabulary* travels by npm.
+
 ## Private vs. published
 
-Two packages in this repo are published to **npm** for end users. One
-(`@pome-sh/wire`) is published to **GitHub Packages** for internal cross-repo
-consumers. Everything else under `packages/` is `private: true` and reaches
-users only as bytes inlined into one of the two npm tarballs — there is no
-`npm install` for it, ever.
+Three packages in this repo are published to **npm**: two for end users
+(`@pome-sh/cli`, `@pome-sh/adapter-claude-sdk`) and one for the cloud grader
+(`@pome-sh/checks`). One (`@pome-sh/wire`) is published to **GitHub Packages**
+for internal cross-repo consumers. Everything else under `packages/` is
+`private: true` and reaches users only as bytes inlined into one of those
+tarballs — there is no `npm install` for it, ever.
 
 | Directory | Workspace name | Role | Published? |
 | --- | --- | --- | --- |
+| [`checks/`](./checks/) | `@pome-sh/checks` | Grading vocabulary — the five twins' check declarations, seed schemas and default seeds, plus the check DSL | **Yes** — npm, for pome-cloud (F-1308) |
 | [`sdk/`](./sdk/) | `@pome-sh/sdk` | Twin engine — HTTP mount, auth, recorder, MCP dispatch, SQLite | No — bundled into `@pome-sh/cli` |
 | [`wire/`](./wire/) | `@pome-sh/wire` | Trace surface — recorder-events, redaction, OTel schemas | **Both** — bundled into `@pome-sh/cli` and `@pome-sh/adapter-claude-sdk`, *and* published to GitHub Packages (`npm.pkg.github.com`) for pome-cloud (F-949) |
 | [`twin-github/`](./twin-github/), `twin-stripe/`, `twin-slack/`, `twin-gmail/`, `twin-linear/` | `@pome-sh/twin-*` | The five digital twins | No — bundled into `@pome-sh/cli`; also published as signed GHCR container images for pome-cloud |

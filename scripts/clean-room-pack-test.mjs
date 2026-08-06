@@ -380,5 +380,164 @@ try {
 }
 console.log("  ✓ consumer file typechecks against the shipped dist/index.d.ts");
 
+// ── @pome-sh/checks ─────────────────────────────────────────────────────────
+//
+// This package needs the consumer COMPILE more than either of the others, and it
+// is the reason this section exists. Its whole job is to re-export declarations
+// out of six `private: true` workspace packages, and `noExternal` governs only
+// the JS bundle: the declaration bundler leaves bare `@pome-sh/*` specifiers
+// behind, pointing at packages that are on no registry. The JS import keeps
+// working, so nothing fails until a consumer runs `tsc` — 11 × TS2307 for the
+// specifiers, and every DSL symbol behind `export * from "@pome-sh/sdk/checks"`
+// missing outright. It shipped that way until a review caught it by hand.
+//
+// `skipLibCheck` is OFF, deliberately: with it on, an unresolvable specifier
+// INSIDE a shipped `.d.ts` is silently tolerated and this degrades to "does the
+// import resolve", which the runtime check already covers.
+console.log("\n@pome-sh/checks — clean-room pack test");
+const checksRoom = makeRoom("checks");
+const checksTarball = pack("@pome-sh/checks", join(checksRoom, "tarballs"));
+assertNoHardLinks(checksTarball);
+assertNoStrayTarballArtifacts(checksTarball, "@pome-sh/checks");
+
+const checksInstall = join(checksRoom, "install");
+mkdirSync(checksInstall, { recursive: true });
+writeFileSync(
+  join(checksInstall, "package.json"),
+  JSON.stringify({ name: "checks-room", private: true, type: "module" }, null, 2),
+);
+const zodRange = JSON.parse(
+  readFileSync(join(ROOT, "packages", "checks", "package.json"), "utf8"),
+).peerDependencies.zod;
+run(
+  "npm",
+  [
+    "install",
+    checksTarball,
+    `zod@${zodRange}`,
+    "typescript",
+    "--no-audit",
+    "--no-fund",
+    "--ignore-scripts",
+  ],
+  { cwd: checksInstall },
+);
+// Same assertion as the other two, and it bites harder here: a leaked
+// `@pome-sh/*` dependency would 404 rather than merely be redundant, because
+// those packages are private at these versions.
+assertManifestPure(
+  join(checksInstall, "node_modules", "@pome-sh", "checks", "package.json"),
+  "@pome-sh/checks",
+);
+
+writeFileSync(
+  join(checksInstall, "runtime-check.mjs"),
+  [
+    'import { GITHUB_CHECKS, TWIN_CHECKS, defineCheck, checksDigest, parseGitHubSeed, defaultGitHubSeed } from "@pome-sh/checks";',
+    'import { STRIPE_CHECKS } from "@pome-sh/checks/stripe";',
+    'import { defineCheck as viaDsl } from "@pome-sh/checks/dsl";',
+    'if (!Array.isArray(GITHUB_CHECKS) || GITHUB_CHECKS.length === 0) throw new Error("GITHUB_CHECKS is empty");',
+    'if (Object.keys(TWIN_CHECKS).length !== 5) throw new Error("TWIN_CHECKS does not cover five twins");',
+    'if (typeof defineCheck !== "function") throw new Error("defineCheck is not a function");',
+    "// One copy of the DSL across entries, or the barrel and a subpath hand out",
+    "// different objects for the same primitive (the splitting: true invariant).",
+    'if (viaDsl !== defineCheck) throw new Error("defineCheck differs between ./dsl and the barrel");',
+    'if (!checksDigest(GITHUB_CHECKS).startsWith("sha256:")) throw new Error("checksDigest returned junk");',
+    "// The seed round-trip is the other half of what pome-cloud actually does.",
+    "parseGitHubSeed(defaultGitHubSeed());",
+    'if (STRIPE_CHECKS.length === 0) throw new Error("STRIPE_CHECKS is empty");',
+    'console.log("checks runtime import OK");',
+  ].join("\n"),
+);
+run(process.execPath, [join(checksInstall, "runtime-check.mjs")], { cwd: checksInstall });
+console.log("  ✓ runtime import, one-copy DSL identity, seed round-trip");
+
+writeFileSync(
+  join(checksInstall, "consumer.ts"),
+  `import {
+  GITHUB_CHECKS,
+  TWIN_CHECKS,
+  CHECKS_TWIN_NAMES,
+  defineCheck,
+  renderCheck,
+  parseCheck,
+  checkPattern,
+  checksDigest,
+  templateSlots,
+  statePath,
+  childStatePath,
+  parseGitHubSeed,
+  githubSeedSchema,
+  defaultGitHubSeed,
+  type GitHubCheck,
+  type GitHubCheckState,
+  type ChecksTwinName,
+  type CheckDefinition,
+} from "@pome-sh/checks";
+import { GITHUB_CHECKS as viaSubpath, parseSeed, seedSchema } from "@pome-sh/checks/github";
+import { z } from "zod";
+
+// The element type is the surface pome-cloud's resolveTwinChecks binds against.
+const first: GitHubCheck<Record<string, string>> = GITHUB_CHECKS[0]!;
+const id: string = first.id;
+const generic: CheckDefinition<GitHubCheckState, Record<string, string>> = first;
+const pattern: RegExp = checkPattern(first);
+const digest: string = checksDigest(GITHUB_CHECKS);
+const slots: { literals: string[]; params: string[] } = templateSlots(first.template);
+const twin: ChecksTwinName = CHECKS_TWIN_NAMES[0];
+const everyTwin: readonly unknown[] = TWIN_CHECKS[twin];
+
+// The seed schema must be a zod schema built from the CONSUMER's zod, or
+// composition fails at the boundary (F-942, two schema identities).
+const composed = z.object({ seed: githubSeedSchema });
+const parsed = parseGitHubSeed(defaultGitHubSeed());
+const alsoParsed = parseSeed(defaultGitHubSeed());
+
+export function main(): void {
+  void [
+    id, generic, pattern, digest, slots, twin, everyTwin, composed, parsed, alsoParsed,
+    viaSubpath, seedSchema, defineCheck, renderCheck, parseCheck, statePath, childStatePath,
+  ];
+}
+`,
+);
+writeFileSync(
+  join(checksInstall, "tsconfig.json"),
+  JSON.stringify(
+    {
+      compilerOptions: {
+        target: "ES2022",
+        // No `lib: ["DOM"]` and no `types: ["node"]`, on purpose. A declarations
+        // package has no business requiring either, and dropping them is what
+        // catches an ambient leak — `NodeJS.ProcessEnv` reached the published
+        // surface through a vendored `loadSeedFromEnv` signature and only showed
+        // up once a consumer compiled without @types/node.
+        lib: ["ES2022"],
+        module: "NodeNext",
+        moduleResolution: "NodeNext",
+        strict: true,
+        noEmit: true,
+        skipLibCheck: false,
+      },
+      files: ["consumer.ts"],
+    },
+    null,
+    2,
+  ),
+);
+try {
+  run(join(checksInstall, "node_modules", ".bin", "tsc"), ["-p", "tsconfig.json"], {
+    cwd: checksInstall,
+  });
+} catch (err) {
+  fail(
+    "@pome-sh/checks: a consumer file failed to typecheck against the shipped declarations.\n" +
+      "This is the failure mode `noExternal` does not cover — the declaration bundler leaves\n" +
+      "bare @pome-sh/* specifiers that resolve nowhere for a consumer, and the JS keeps working.\n" +
+      `${err.stdout ?? ""}${err.stderr ?? ""}`,
+  );
+}
+console.log("  ✓ consumer file typechecks against the shipped declarations (skipLibCheck off)");
+
 cleanup();
-console.log("\n✅ clean-room pack test passed for both published packages.");
+console.log("\n✅ clean-room pack test passed for all three published packages.");

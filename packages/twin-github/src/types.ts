@@ -1,5 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { TwinDatabase } from "@pome-sh/sdk";
+// `@pome-sh/sdk/db` rather than the `@pome-sh/sdk` root, for the same reason
+// `seed.ts` uses `@pome-sh/sdk/failure-injection`: this module is vendored into
+// `@pome-sh/checks`'s published declarations, and the sdk ROOT's `.d.ts` pulls the
+// whole engine's type surface with it — `hono`, the DOM `Response`, the auth
+// module. `db.d.ts` is one self-contained interface file with no imports at all.
+import type { TwinDatabase } from "@pome-sh/sdk/db";
 
 export type { RecorderEvent } from "@pome-sh/wire";
 

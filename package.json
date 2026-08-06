@@ -31,7 +31,9 @@
     "lint:dead-code": "knip --no-config-hints",
     "gate:bundled-deps": "node scripts/check-bundled-runtime-deps.mjs",
     "gate:wire-tarball": "node scripts/ci/check-wire-tarball.mjs",
-    "gate:wire-manifest": "node scripts/ci/check-wire-tarball.mjs --manifest-only"
+    "gate:wire-manifest": "node scripts/ci/check-wire-tarball.mjs --manifest-only",
+    "gate:checks-tarball": "node scripts/ci/check-checks-tarball.mjs",
+    "gate:checks-manifest": "node scripts/ci/check-checks-tarball.mjs --manifest-only"
   },
   "engines": {
     "node": ">=24",

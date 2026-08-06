@@ -25,100 +25,23 @@
 // …, deterministically. Other routes don't influence the counter — only
 // requests to a tuple that has at least one registered rule are counted.
 
+//
+// The rule shape, schema, mode enum and store now live in
+// `./failure-injection-rules.js` (no `hono`, so the declaration surface a twin's
+// seed pulls in stays resolvable for a consumer with no hono installed). They are
+// re-exported here so `@pome-sh/sdk/server` is unchanged.
 import { randomUUID } from "node:crypto";
 import type { MiddlewareHandler } from "hono";
-import { z } from "zod";
 import type { RecorderEvent } from "@pome-sh/wire";
 import { recordedRequestHeaders } from "./request-capture.js";
+import {
+  FAILURE_INJECTION_OVERRIDE_KEY,
+  type FailureInjectionOverride,
+  type FailureInjectionRule,
+  type FailureInjectionStore,
+} from "./failure-injection-rules.js";
 
-export const FAILURE_INJECTION_OVERRIDE_KEY = "failureInjectionOverride";
-
-export type FailureInjectionOverride = {
-  status: number;
-  body: unknown;
-};
-
-export type FailureInjectionMode = "before_handler" | "after_handler";
-
-export type FailureInjectionRule = {
-  method: string;
-  path: string;
-  attempt: number;
-  mode: FailureInjectionMode;
-  status: number;
-  body: unknown;
-};
-
-export const failureInjectionRuleSchema = z.object({
-  method: z.string().min(1).transform((s) => s.toUpperCase()),
-  path: z.string().min(1),
-  attempt: z.number().int().positive(),
-  mode: z
-    .enum(["before_handler", "after_handler"] as const satisfies readonly FailureInjectionMode[])
-    .default("after_handler"),
-  status: z.number().int().min(100).max(599),
-  body: z.unknown(),
-});
-
-export type FailureInjectionStore = {
-  setRules(rules: FailureInjectionRule[]): void;
-  clear(): void;
-  matchAndConsume(
-    accountId: string,
-    method: string,
-    path: string
-  ): FailureInjectionRule | null;
-};
-
-export function createFailureInjectionStore(): FailureInjectionStore {
-  // The store is intentionally global across accounts. The (account_id,
-  // method, path) counter keys keep accounts independent for matching;
-  // rules themselves apply to whichever account issues the matching
-  // request. Single-account scenarios (the common case, including the
-  // FDRS-316 hero) don't need to express scope per rule.
-  let rules: FailureInjectionRule[] = [];
-  const counters = new Map<string, number>();
-  const tuplesWithRules = new Set<string>();
-
-  function tupleKey(method: string, path: string) {
-    return `${method.toUpperCase()}\0${path}`;
-  }
-  function counterKey(accountId: string, method: string, path: string) {
-    return `${accountId}\0${method.toUpperCase()}\0${path}`;
-  }
-  function rebuildIndex() {
-    tuplesWithRules.clear();
-    for (const r of rules) tuplesWithRules.add(tupleKey(r.method, r.path));
-  }
-
-  return {
-    setRules(next) {
-      rules = next.slice();
-      counters.clear();
-      rebuildIndex();
-    },
-    clear() {
-      rules = [];
-      counters.clear();
-      tuplesWithRules.clear();
-    },
-    matchAndConsume(accountId, method, path) {
-      const tk = tupleKey(method, path);
-      if (!tuplesWithRules.has(tk)) return null;
-      const ck = counterKey(accountId, method, path);
-      const count = (counters.get(ck) ?? 0) + 1;
-      counters.set(ck, count);
-      return (
-        rules.find(
-          (r) =>
-            r.method.toUpperCase() === method.toUpperCase() &&
-            r.path === path &&
-            r.attempt === count
-        ) ?? null
-      );
-    },
-  };
-}
+export * from "./failure-injection-rules.js";
 
 export interface FailureInjectionMiddlewareOptions {
   /** Sink for before_handler events. Optional — a recorderless app still injects. */

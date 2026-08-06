@@ -63,6 +63,16 @@ jobs:
       # job; these two assertions need neither, so they run pre-merge where the
       # regression is still cheap to fix.
       - run: node scripts/ci/check-wire-tarball.mjs --manifest-only
+      # F-1308 — @pome-sh/checks carries the grading vocabulary to pome-cloud and
+      # is the one published package that inlines SIX `private: true` workspace
+      # packages. The two ways it silently stops being installable are both
+      # readable straight from its package.json: `private: true` makes
+      # `npm publish -w` warn and EXIT 0, and a leaked `@pome-sh/*` runtime
+      # dependency 404s on the consumer's install because those versions are on no
+      # registry. Neither needs a build, so both are caught pre-merge; the tarball
+      # half (engine bytes, zod identity, one copy of the DSL) needs `dist` and
+      # runs in release.yml's publish job.
+      - run: node scripts/ci/check-checks-tarball.mjs --manifest-only
       # Regression suite for the shared publish-decision logic. Asserts a 401
       # from GitHub Packages is never read as "unpublished" (which would bypass
       # the never-publish-behind-latest floor check) and that the npmjs and
@@ -190,7 +200,12 @@ jobs:
           node scripts/probe-twin-endpoints.test.mjs
           # twin-github runs with coverage thresholds (90% lines/funcs/statements)
           # instead of a second plain `npm test` pass for that workspace.
-          npm test -w @pome-sh/wire -w @pome-sh/sdk -w @pome-sh/adapter-claude-sdk -w @pome-sh/twin-slack -w @pome-sh/twin-stripe -w @pome-sh/twin-gmail -w @pome-sh/twin-linear
+          npm test -w @pome-sh/wire -w @pome-sh/sdk -w @pome-sh/adapter-claude-sdk -w @pome-sh/twin-slack -w @pome-sh/twin-stripe -w @pome-sh/twin-gmail -w @pome-sh/twin-linear -w @pome-sh/checks
+          # F-1308 — the tarball half of the @pome-sh/checks audit: the engine is
+          # not inlined, zod stayed external (one schema identity), the DSL exists
+          # exactly once across seven entries, and every `exports` subpath ships.
+          # Needs the build above, which is why it is here and not in the cheap block.
+          npm run gate:checks-tarball
           npm run test:coverage -w @pome-sh/twin-github
           # Former cli-ci.yml (folded in here — one required check, one npm ci).
           npm test -w @pome-sh/cli

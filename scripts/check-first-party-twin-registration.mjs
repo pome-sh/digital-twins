@@ -52,6 +52,17 @@ compare(
   "cli/src/twin/registry.ts TWIN_NAME_LIST",
   quotedArray("cli/src/twin/registry.ts", "TWIN_NAME_LIST"),
 );
+// F-1308 — `@pome-sh/checks` carries every twin's grading vocabulary to
+// pome-cloud, and its barrel names the five twins explicitly (five `export`
+// blocks and a keyed `TWIN_CHECKS` record; there is no way to derive them, since
+// each twin's array has a different element type). A sixth twin missing here
+// does not fail to compile and does not fail any twin's own contract suite — it
+// produces a criterion that silently never binds, which is the exact failure
+// this package exists to prevent.
+compare(
+  "packages/checks/src/index.ts CHECKS_TWIN_NAMES",
+  quotedArray("packages/checks/src/index.ts", "CHECKS_TWIN_NAMES"),
+);
 
 const contractNames = [
   ...read("contract/helpers.mjs").matchAll(/\{\s*name:\s*"([a-z][a-z0-9-]*)",\s*pkg:\s*"packages\/twin-/g),

@@ -375,7 +375,15 @@ export function parseSeed(input: unknown): ParsedLinearStateSeed {
   return linearSeedSchema.parse(input);
 }
 
-export function loadSeedFromEnv(env: NodeJS.ProcessEnv = process.env): ParsedLinearStateSeed {
+/**
+ * `Record<string, string | undefined>` rather than `NodeJS.ProcessEnv`, which is
+ * structurally the same thing but an AMBIENT global. This signature is vendored
+ * into `@pome-sh/checks`'s published declarations, and an ambient reference there
+ * makes a consumer's `tsc` fail with TS2503 unless they happen to have
+ * `@types/node` installed — a dependency this package should not impose to
+ * describe a plain string map.
+ */
+export function loadSeedFromEnv(env: Record<string, string | undefined> = process.env): ParsedLinearStateSeed {
   const raw = env.POME_SEED_JSON;
   if (!raw) return parseSeed(defaultSeedState());
   let parsed: unknown;

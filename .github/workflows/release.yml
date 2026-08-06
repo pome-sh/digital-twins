@@ -1,5 +1,5 @@
 name: release
-# The single release pipeline for the three published packages, replacing
+# The single release pipeline for the four published packages, replacing
 # cli-release.yml (Changesets + a manual "publish the @pome-sh/* batch first"
 # gate that produced 16 batch releases in 14 days, 4 of them consecutive
 # failures) and sdk-publish.yml.
@@ -8,10 +8,19 @@ name: release
 # package.json, merge, and this workflow publishes it. Nothing to remember, no
 # version PR, no changeset files.
 #
-# @pome-sh/cli and @pome-sh/adapter-claude-sdk version INDEPENDENTLY (D11) and
-# are diff-gated separately: the CLI bundles the internal packages, the adapter
-# bundles the wire types, and neither depends on the other's version. There is
-# no lockstep to enforce and therefore no sync-versions script.
+# @pome-sh/cli, @pome-sh/adapter-claude-sdk and @pome-sh/checks version
+# INDEPENDENTLY (D11) and are diff-gated separately: the CLI bundles the internal
+# packages, the adapter bundles the wire types, @pome-sh/checks bundles the five
+# twins' declaration layer plus the sdk check DSL, and none depends on another's
+# published version. There is no lockstep to enforce and therefore no
+# sync-versions script.
+#
+# @pome-sh/checks is the npmjs lane's third matrix entry (F-1308). It exists
+# because @pome-sh/sdk and the five @pome-sh/twin-* packages are `private: true`
+# and stay that way, which froze pome-cloud's grading vocabulary: it npm-installs
+# the check declarations and could no longer receive a correction. Publishing the
+# declaration layer on its own restores that path without reversing the
+# privatisation that fixed the two-zod-identities bug (F-942).
 #
 # @pome-sh/wire is the THIRD publish target and the odd one out (F-949). Same
 # version-diff model, different registry and different audience: GitHub Packages
@@ -62,6 +71,7 @@ jobs:
     outputs:
       cli: ${{ steps.diff.outputs.cli }}
       adapter: ${{ steps.diff.outputs.adapter }}
+      checks: ${{ steps.diff.outputs.checks }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -77,6 +87,7 @@ jobs:
           set -euo pipefail
           scripts/ci/decide-publish.sh "@pome-sh/cli" "cli/package.json" "cli"
           scripts/ci/decide-publish.sh "@pome-sh/adapter-claude-sdk" "packages/adapter-claude-sdk/package.json" "adapter"
+          scripts/ci/decide-publish.sh "@pome-sh/checks" "packages/checks/package.json" "checks"
 
   plan-wire:
     name: does @pome-sh/wire need publishing
@@ -115,10 +126,10 @@ jobs:
   publish:
     name: publish ${{ matrix.package }}
     needs: plan
-    if: needs.plan.outputs.cli == 'true' || needs.plan.outputs.adapter == 'true'
+    if: needs.plan.outputs.cli == 'true' || needs.plan.outputs.adapter == 'true' || needs.plan.outputs.checks == 'true'
     runs-on: ubuntu-latest
     strategy:
-      # Never cancel a sibling mid-publish: a half-published pair is worse than
+      # Never cancel a sibling mid-publish: a half-published set is worse than
       # one failure to investigate.
       fail-fast: false
       matrix:
@@ -127,6 +138,14 @@ jobs:
             enabled: ${{ needs.plan.outputs.cli }}
           - package: "@pome-sh/adapter-claude-sdk"
             enabled: ${{ needs.plan.outputs.adapter }}
+          # @pome-sh/checks — the grading vocabulary, for pome-cloud (F-1308).
+          # Same lane, same OIDC trusted publishing, its own version line. It is
+          # the third npmjs package rather than a second GitHub Packages one
+          # because a scope can only route to one registry: pome-cloud's whole
+          # `@pome-sh` scope resolves from npmjs, so a GitHub Packages copy would
+          # need an .npmrc change it cannot make without breaking @pome-sh/cli.
+          - package: "@pome-sh/checks"
+            enabled: ${{ needs.plan.outputs.checks }}
     permissions:
       contents: read
       id-token: write # npm OIDC Trusted Publishing (provenance)
@@ -171,6 +190,14 @@ jobs:
       - name: Clean-room pack test
         if: matrix.enabled == 'true'
         run: npm run test:pack
+      # @pome-sh/checks is the only published package whose install would 404:
+      # it inlines six `private: true` workspace packages, so a leaked
+      # @pome-sh/* dependency is unresolvable rather than merely wrong. Also
+      # asserts the twin engine did not ride along and that zod stayed external
+      # (two zod copies = two schema identities, F-942).
+      - name: Audit the @pome-sh/checks tarball
+        if: matrix.enabled == 'true' && matrix.package == '@pome-sh/checks'
+        run: npm run gate:checks-tarball
       - name: Guard against hard-link tarball (E415)
         if: matrix.enabled == 'true'
         run: |

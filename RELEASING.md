@@ -1,11 +1,18 @@
 # Releasing
 
-Two packages are published to **npm** for end users: `@pome-sh/cli` and
-`@pome-sh/adapter-claude-sdk`. One package is published to **GitHub Packages**
-for internal cross-repo consumers: `@pome-sh/wire`. Everything else in this
-repo (`@pome-sh/sdk`, the five `@pome-sh/twin-*`) is `private: true` and
-bundled into the two npm tarballs by tsup — it is never installed from a
-registry, so it never needs its own release.
+Three packages are published to **npm**: `@pome-sh/cli` and
+`@pome-sh/adapter-claude-sdk` for end users, and `@pome-sh/checks` — the grading
+vocabulary — for the cloud grader in `pome-sh/pome-cloud`. One package is
+published to **GitHub Packages** for internal cross-repo consumers:
+`@pome-sh/wire`. Everything else in this repo (`@pome-sh/sdk`, the five
+`@pome-sh/twin-*`) is `private: true` and bundled into those tarballs by tsup —
+it is never installed from a registry, so it never needs its own release.
+
+`@pome-sh/checks` is the one whose *staleness* is a product bug rather than a
+missed feature: pome-cloud grades every `[code]` criterion out of it, so an
+unpublished correction means a frozen grading engine (F-1308). See
+[`packages/README.md`](packages/README.md#pome-shchecks--the-grading-vocabulary-as-its-own-artifact)
+for why it is a separate package instead of un-privatising the twins.
 
 `@pome-sh/wire` is the odd one out and worth reading the section on before
 touching it: it is published AND still bundled. Publishing it did not change
@@ -19,6 +26,7 @@ version-diff driven, on every push to `main`:
 1. Bump the version in the package's own `package.json` —
    `cli/package.json` for the CLI,
    `packages/adapter-claude-sdk/package.json` for the adapter,
+   `packages/checks/package.json` for the grading vocabulary,
    `packages/wire/package.json` for wire — and add the entry to that
    package's own `CHANGELOG.md`.
 2. Merge the PR to `main`.
@@ -38,12 +46,13 @@ now-deleted `PACKAGE_RELEASE.md`) produced 16 batch releases in 14 days, four
 of them consecutive failures, before this repo collapsed to one CLI and one
 adapter as the only publishable surfaces.
 
-## The three packages version independently
+## The four packages version independently
 
-`@pome-sh/cli`, `@pome-sh/adapter-claude-sdk` and `@pome-sh/wire` are on their
-own version lines (D11) and are diff-gated separately in the same workflow run
-— the CLI bundles the internal packages, the adapter bundles `@pome-sh/wire`,
-and none depends on another's published version. There is no lockstep to
+`@pome-sh/cli`, `@pome-sh/adapter-claude-sdk`, `@pome-sh/checks` and
+`@pome-sh/wire` are on their own version lines (D11) and are diff-gated
+separately in the same workflow run — the CLI bundles the internal packages, the
+adapter bundles `@pome-sh/wire`, `@pome-sh/checks` bundles the twins' declaration
+layer, and none depends on another's published version. There is no lockstep to
 enforce and no sync-versions script.
 
 Independent version *lines* is not the same as independent *bumps*, and the one
@@ -52,7 +61,7 @@ both npm tarballs, a change under `packages/wire/` is publish-relevant for all
 three, so it needs all three bumped. Anything else — a CLI-only change, an
 adapter-only change — bumps only its own package. See "Before you merge".
 
-All three packages are pre-1.0, so npm's `^0.x` caret semantics apply
+All four packages are pre-1.0, so npm's `^0.x` caret semantics apply
 (`^0.N.x` never crosses into `0.N+1`) — **minor plays the major role**:
 
 - **Minor (`0.N+1.0`)** — anything a consumer must act on: a breaking change
@@ -137,6 +146,37 @@ Until that is done, treat wire's contents as public. Nothing secret may ever go
 into it — which is true regardless: wire is types and redaction logic, no
 credentials, no domain data, no control-plane contract (that lives in
 `cli/src/contract/`).
+
+## `@pome-sh/checks` — versioning a vocabulary
+
+A grading vocabulary breaks differently from a library. A renamed or removed
+check id does not fail anyone's build: it stops *binding*, the criterion scores
+nothing, and the run still reports a number. Treat every check id, template and
+polarity as public surface.
+
+- **Minor (`0.N+1.0`)** — a check id renamed or removed, a template reworded so
+  its generated pattern changes, a polarity flipped, a seed schema tightened.
+- **Patch (`0.N.x`)** — a check added, an export added, wording that leaves the
+  pattern identical, internals.
+
+**A change to a declaration file needs TWO bumps** — `@pome-sh/checks` and the
+CLI (which bundles the same twin sources). The gate names both; the publish-
+relevant paths for `@pome-sh/checks` are the declaration files specifically
+(`packages/twin-*/src/{checks,check-*,seed,tape-assertable-tools}.ts`,
+`packages/sdk/src/{checks,check-state-path,check-discrimination,failure-injection}.ts`),
+not the whole of `packages/twin-*/`, so a twin's route or tool change does not
+demand a vocabulary release it would not appear in.
+
+**There is no drift gate, and that is the design** — F-1308's checklist asks for
+one or for the reason there isn't. There is no second copy of any declaration to
+drift: `packages/checks/src/*.ts` contains only `export … from` lines, and the
+bytes come from the twin at build time. The failure a drift gate would catch
+cannot be expressed here. What *can* still drift is the twin LIST (five explicit
+export blocks), so
+[`scripts/check-first-party-twin-registration.mjs`](scripts/check-first-party-twin-registration.mjs)
+compares `CHECKS_TWIN_NAMES` against `config/first-party-twins.json`, and
+`packages/checks/test/surface.test.ts` asserts every twin's vocabulary is
+non-empty and every default seed parses under its own schema.
 
 ## Before you merge
 

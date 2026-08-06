@@ -76,7 +76,15 @@ export function parseSeed(input: unknown): SlackStateSeed {
  * or schema-invalid seed so a misconfigured cloud deploy fails healthz
  * rather than silently booting with the default world.
  */
-export function loadSeedFromEnv(env: NodeJS.ProcessEnv = process.env): SlackStateSeed {
+/**
+ * `Record<string, string | undefined>` rather than `NodeJS.ProcessEnv`, which is
+ * structurally the same thing but an AMBIENT global. This signature is vendored
+ * into `@pome-sh/checks`'s published declarations, and an ambient reference there
+ * makes a consumer's `tsc` fail with TS2503 unless they happen to have
+ * `@types/node` installed — a dependency this package should not impose to
+ * describe a plain string map.
+ */
+export function loadSeedFromEnv(env: Record<string, string | undefined> = process.env): SlackStateSeed {
   const raw = env.POME_SEED_JSON;
   if (raw === undefined || raw === "") {
     return defaultSeedState();

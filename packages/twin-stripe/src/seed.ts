@@ -11,13 +11,29 @@
 // is indistinguishable from one created by `simulateCryptoDeposit` /
 // `POST /v1/refunds` on read.
 import { z } from "zod";
+// `@pome-sh/sdk/failure-injection-rules` rather than `@pome-sh/sdk/server`: this
+// module is part of the DECLARATION surface `@pome-sh/checks` bundles, and
+// `/server` is the whole twin engine — hono, hono/jwt, node:sqlite and the
+// recorder, 14 runtime modules — reached for one zod schema. The narrow
+// subpath is 2. Importing the barrel here put an HTTP server and a SQLite
+// driver inside a package whose entire job is to hand out zod schemas and
+// check declarations. `twin.ts` and `routes/_helpers.ts` still use `/server`,
+// which is correct: they ARE the server.
 import {
   failureInjectionRuleSchema,
   type FailureInjectionStore,
-} from "@pome-sh/sdk/server";
+} from "@pome-sh/sdk/failure-injection-rules";
 import { mintApiKey } from "./api-keys.js";
 import { ensureStripeTables } from "./domain/schema.js";
 import type { SeedState, TwinStripeDatabase } from "./types.js";
+
+// `parseSeed` RETURNS a `SeedState`, so a consumer reaching this module through
+// `@pome-sh/twin-stripe/seed` could not name its own variable's type: the symbol
+// was declared in `./types.js`, which is not a subpath export. The other four
+// twins export their parsed-seed type from `seed.ts` beside `parseSeed`
+// (`ParsedGitHubStateSeed`, `ParsedGmailStateSeed`, `ParsedLinearStateSeed`);
+// this is stripe catching up, not a new surface.
+export type { SeedState } from "./types.js";
 
 export const DEFAULT_SID = "default";
 export const DEFAULT_API_KEY = "sk_test_pome_default";
@@ -139,7 +155,15 @@ export function parseSeed(input: unknown): SeedState {
  * seed, so a misconfigured cloud deploy fails the twin server's
  * healthz instead of silently booting with an empty Stripe world.
  */
-export function loadSeedFromEnv(env: NodeJS.ProcessEnv = process.env): SeedState {
+/**
+ * `Record<string, string | undefined>` rather than `NodeJS.ProcessEnv`, which is
+ * structurally the same thing but an AMBIENT global. This signature is vendored
+ * into `@pome-sh/checks`'s published declarations, and an ambient reference there
+ * makes a consumer's `tsc` fail with TS2503 unless they happen to have
+ * `@types/node` installed — a dependency this package should not impose to
+ * describe a plain string map.
+ */
+export function loadSeedFromEnv(env: Record<string, string | undefined> = process.env): SeedState {
   const raw = env.POME_SEED_JSON;
   if (raw === undefined || raw === "") {
     return defaultSeed();

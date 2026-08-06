@@ -28,7 +28,7 @@ export const noUnsupportedEndpoint: Check<Record<string, never>> = defineCheck({
     "or a 422 from a route the twin does implement is a semantic answer and passes this check. " +
     "The tape is scoped to this twin by the engine before the check sees it, so an unsupported " +
     "call to a DIFFERENT twin in a multi-twin session cannot fail it — which matters here, " +
-    "because task 27 runs gmail and github together.",
+    "because a single task may run gmail and github together.",
   // No slots, and no twin word. The legacy cloud rule accepted "No unsupported
   // Gmail endpoint was called" alongside the bare form, plus plural and `were`
   // variants, because an author typed English. Under position 2 an author PICKS

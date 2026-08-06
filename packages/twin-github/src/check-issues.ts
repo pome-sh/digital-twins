@@ -80,7 +80,7 @@ export const issueStateCheck: Check<{ issue: string; repo: string; state: string
   template: "Issue #{issue} in `{repo}` is in state {state}",
   params: { issue: issueNumber, repo: repoRef, state: issueState },
   substrate: "final",
-  // Per-arg. "is closed" asks the examinee to close it; "is open" is F-915's
+  // Per-arg. "is closed" asks the examinee to close it; "is open" is the twin's
   // "the agent did not close issue #1" — a prohibition wearing a state word.
   polarity: ({ state }) => (state === "open" ? "negative" : "positive"),
   subject: () => null,
@@ -113,7 +113,7 @@ export const issueStateCheck: Check<{ issue: string; repo: string; state: string
         // The ROW, not `…/state` — the field this branch exists for is the one
         // that is absent, and a pointer at it would not resolve. Pointing at the
         // row is what lets a reader see the gap for themselves instead of taking
-        // the reason's word for it (F-1197).
+        // the reason's word for it.
         evidenceStatePaths: [found.path],
       };
     }
@@ -139,7 +139,7 @@ export const issueHasLabel: Check<{ issue: string; repo: string; label: string }
   substrate: "final",
   polarity: () => "positive",
   // The label is a caller-supplied literal compared against the state tree, so
-  // a redactor that destroys it makes this check unable to fire (F-1028).
+  // a redactor that destroys it makes this check unable to fire.
   subject: ({ label }) => label,
   // The label is what the scan ranges over; the issue number only resolves.
   vacuityMutant: (args) => ({ ...args, label: VACUITY_SENTINEL }),

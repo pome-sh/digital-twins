@@ -14,7 +14,7 @@ import type { Check } from "./check-kind.js";
 
 export const noNewLabels: Check<{ repo: string }> = defineCheck({
   id: "github.no-new-labels",
-  // F-1074 — the same explanation the comment below carries, in the one place
+  // The same explanation the comment below carries, in the one place
   // an author can actually reach it.
   description:
     "Compares the repository's label DEFINITIONS in the seed against the final state. " +

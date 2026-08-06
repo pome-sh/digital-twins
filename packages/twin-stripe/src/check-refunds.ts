@@ -76,7 +76,7 @@ export const refundExists: Check<{ charge: string }> = defineCheck({
         rows.found.length > 0
           ? `charge "${args.charge}" has ${rows.found.length} refund row(s)`
           : `charge "${args.charge}" has no refund rows`,
-      // The refund COLLECTION (F-1197). Rows are not nested under their charge —
+      // The refund COLLECTION. Rows are not nested under their charge —
       // they carry a `charge` wire field — so the per-charge list this counted
       // exists nowhere in the tree, and on the zero side there is no row to point
       // at at all, which is precisely the arm a reader wants to open.
