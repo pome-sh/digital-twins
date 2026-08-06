@@ -1,0 +1,94 @@
+{
+  "twin": "github",
+  "substrate": "oss-source",
+  "endpoint": "https://api.githubcopilot.com/mcp/",
+  "method": "tools/list",
+  "protocol": "JSON-RPC 2.0 over stdio (the public server, built from source)",
+  "protocolVersion": "2025-06-18",
+  "captureDate": "2026-08-06",
+  "rawFileSha256": "25367e3f89a830c1649ae47508c501a831c43f61d2f505d72655b44269921bdf",
+  "liveToolCount": 44,
+  "liveToolOrder": [
+    "add_comment_to_pending_review",
+    "add_issue_comment",
+    "add_reply_to_pull_request_comment",
+    "assign_copilot_to_issue",
+    "create_branch",
+    "create_or_update_file",
+    "create_pull_request",
+    "create_repository",
+    "delete_file",
+    "fork_repository",
+    "get_commit",
+    "get_file_contents",
+    "get_label",
+    "get_latest_release",
+    "get_me",
+    "get_release_by_tag",
+    "get_tag",
+    "get_team_members",
+    "get_teams",
+    "issue_read",
+    "issue_write",
+    "list_branches",
+    "list_commits",
+    "list_issue_fields",
+    "list_issue_types",
+    "list_issues",
+    "list_pull_requests",
+    "list_releases",
+    "list_repository_collaborators",
+    "list_tags",
+    "merge_pull_request",
+    "pull_request_read",
+    "pull_request_review_write",
+    "push_files",
+    "request_copilot_review",
+    "search_code",
+    "search_commits",
+    "search_issues",
+    "search_pull_requests",
+    "search_repositories",
+    "search_users",
+    "sub_issue_write",
+    "update_pull_request",
+    "update_pull_request_branch"
+  ],
+  "configuration": {
+    "toolsets": "default",
+    "whyThisToolset": [
+      "examples/support-triage declares mcp_servers[name=github].url = https://api.githubcopilot.com/mcp/ (agents/support-triage-v1.yaml and -v2.yaml, byte-identical on that line).",
+      "docs/remote-server.md at the pinned commit maps that exact URL to the `default` toolset. `all` is a DIFFERENT URL: https://api.githubcopilot.com/mcp/x/all.",
+      "Measured at the pinned commit: --toolsets=default returns 44 tools, --toolsets=all returns 85. Reading the union would invent 41 tools no examinee of ours can call."
+    ],
+    "readOnly": false,
+    "lockdown": false,
+    "insiders": false,
+    "featureFlags": [],
+    "scopeFiltering": "none — docs/scope-filtering.md filters tools by a classic PAT's OAuth scopes; with no readable scopes the server logs `continuing without scope filtering` and serves the unfiltered toolset, which is what an examinee with full scopes gets",
+    "serverArgs": [
+      "stdio",
+      "--toolsets=default"
+    ],
+    "serverEnv": {
+      "GITHUB_PERSONAL_ACCESS_TOKEN": "f1326-unauthenticated-capture"
+    },
+    "serverEnvNote": "the token is deliberately not a credential; it only gets the server past its startup check. Verified: a valid-shaped ghp_ placeholder and this string produce a byte-identical tools/list.",
+    "completeness": "subset-of-remote",
+    "knownRemoteOnlyToolsNotInCapture": [
+      "create_pull_request_with_copilot"
+    ],
+    "knownRemoteOnlyToolsEvidence": "README.md 'Additional Tools in Remote GitHub MCP Server' at the pinned commit lists create_pull_request_with_copilot under the Copilot toolset, which is Default:true, so the remote `default` surface is this capture plus that one tool. The other two remote-only groups (copilot_spaces, github_support_docs_search) are non-default toolsets and are correctly absent. A consumer of this golden must treat a github tool in that list as not-compared rather than as a gap."
+  },
+  "source": {
+    "repo": "https://github.com/github/github-mcp-server",
+    "commit": "e6e3a4e8414686d9763e5e4840e1e0d61db9a992",
+    "package": "./cmd/github-mcp-server",
+    "language": "go"
+  },
+  "canonicalFileSha256": "b778b1efe7a46d21497de798b5b5ba5f6ac7c261e2025e5d116181b268602819",
+  "files": {
+    "raw": "github.raw.json",
+    "canonical": "github.canonical.json"
+  }
+}

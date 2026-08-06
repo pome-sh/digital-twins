@@ -1,0 +1,398 @@
+#!/usr/bin/env node
+// SPDX-License-Identifier: Apache-2.0
+//
+// Regression coverage for scripts/capture-mcp-tools-list.mjs (F-1326).
+//
+// No network, no `go`, no clone: every case here drives the producer through
+// its injected `readSubstrate` seam, or through `--offline`, which re-derives
+// meta + canonical from the COMMITTED raw.json. The committed raw.json IS the
+// fixture of the upstream response — a second copy of the same bytes under
+// scripts/fixtures/ would be one more thing to drift.
+//
+// The block that matters most is "the guard fires" (F-1170): a --check that
+// has never been watched go red is not a guard. Each of the four ways a
+// golden can be wrong — edited raw, edited canonical, edited meta provenance,
+// hand-typed sha — gets its own red here.
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import {
+  REQUIRED_META_FIELDS,
+  adapterFor,
+  deriveGolden,
+  goldenPaths,
+  loadSources,
+  runCapture,
+  sha256,
+} from "./capture-mcp-tools-list.mjs";
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+
+let failures = 0;
+function assert(cond, msg) {
+  if (cond) return;
+  failures += 1;
+  console.error(`FAIL  ${msg}`);
+}
+async function assertRejects(fn, match, msg) {
+  try {
+    await fn();
+  } catch (err) {
+    assert(String(err.message).includes(match), `${msg} (message was: ${err.message})`);
+    return;
+  }
+  assert(false, `${msg} (did not throw)`);
+}
+function assertThrows(fn, match, msg) {
+  try {
+    fn();
+  } catch (err) {
+    assert(String(err.message).includes(match), `${msg} (message was: ${err.message})`);
+    return;
+  }
+  assert(false, `${msg} (did not throw)`);
+}
+
+const quiet = () => {};
+// Silence the producer's own stderr in the guard-fires block: those reds are the
+// assertion, not a failure of this suite.
+const SILENT = { log: quiet, err: quiet };
+
+function sandbox() {
+  const dir = mkdtempSync(join(tmpdir(), "f1326-"));
+  cpSync(join(ROOT, "config/mcp-capture-sources.json"), join(dir, "config/mcp-capture-sources.json"), {
+    recursive: true,
+  });
+  cpSync(join(ROOT, "fixtures/mcp-tools-list"), join(dir, "fixtures/mcp-tools-list"), { recursive: true });
+  return dir;
+}
+
+// ── the declared source table ───────────────────────────────────────────────
+// F-1117's shape: adding a twin is a data edit, never a new `case:`. The gate
+// on that is that nothing in the producer enumerates twin ids.
+{
+  const sources = loadSources({ repoRoot: ROOT });
+  const ids = Object.keys(sources.twins);
+  assert(ids.length >= 5, `source table declares every first-party twin (got ${ids.join(", ")})`);
+  for (const id of ["gmail", "github", "stripe", "slack", "linear"]) {
+    assert(ids.includes(id), `source table declares ${id}`);
+  }
+
+  const producerText = readFileSync(join(ROOT, "scripts/capture-mcp-tools-list.mjs"), "utf8");
+  for (const id of ["gmail", "github", "stripe", "slack", "linear"]) {
+    assert(
+      !new RegExp(`["'\`]${id}["'\`]`).test(producerText),
+      `the producer does not name the twin "${id}" — adding a twin must be a data edit`
+    );
+  }
+}
+
+// ── every capturable source declares the configuration it assumed ───────────
+// "A capture without one FAILS rather than defaulting." The failure has to be
+// at load, not at write: a producer that defaults is a producer that records a
+// configuration nobody chose.
+{
+  assertThrows(
+    () =>
+      loadSources({
+        repoRoot: ROOT,
+        table: {
+          goldenDir: "fixtures/mcp-tools-list",
+          twins: { acme: { substrate: "live-wire-unauth", capture: true, endpoint: "https://x/mcp" } },
+        },
+      }),
+    "configuration",
+    "a capturable source with no `configuration` is rejected"
+  );
+  assertThrows(
+    () =>
+      loadSources({
+        repoRoot: ROOT,
+        table: {
+          goldenDir: "fixtures/mcp-tools-list",
+          twins: {
+            acme: { substrate: "live-wire-unauth", capture: true, endpoint: "https://x/mcp", configuration: {} },
+          },
+        },
+      }),
+    "configuration",
+    "a capturable source with an EMPTY `configuration` is rejected"
+  );
+  assertThrows(
+    () =>
+      loadSources({
+        repoRoot: ROOT,
+        table: {
+          goldenDir: "fixtures/mcp-tools-list",
+          twins: { acme: { substrate: "invented-substrate", capture: true, configuration: { a: 1 } } },
+        },
+      }),
+    "substrate",
+    "an unknown substrate is rejected rather than silently skipped"
+  );
+  assertThrows(
+    () =>
+      loadSources({
+        repoRoot: ROOT,
+        table: {
+          goldenDir: "fixtures/mcp-tools-list",
+          twins: { acme: { substrate: "not-captured", capture: false } },
+        },
+      }),
+    "reason",
+    "a not-captured twin must say WHY"
+  );
+}
+
+// ── F-1329 adds a token, not an adapter ─────────────────────────────────────
+// live-wire-oauth and live-wire-unauth must resolve to the SAME reader. If they
+// ever diverge, "F-1329 adds a token" stops being true and nobody finds out
+// until F-1329.
+{
+  assert(
+    adapterFor("live-wire-oauth").read === adapterFor("live-wire-unauth").read,
+    "live-wire-oauth and live-wire-unauth share one reader"
+  );
+  await assertRejects(
+    () =>
+      adapterFor("live-wire-oauth").read({
+        twin: "acme",
+        endpoint: "https://example.invalid/mcp",
+        substrate: "live-wire-oauth",
+        authTokenEnv: "F1326_TOKEN_THAT_IS_NOT_SET",
+        configuration: { auth: "bearer" },
+      }),
+    "F1326_TOKEN_THAT_IS_NOT_SET",
+    "the oauth reader refuses to fall back to an unauthenticated request"
+  );
+}
+
+// ── derivation: sha is computed, never carried ──────────────────────────────
+{
+  const rawText = JSON.stringify({
+    jsonrpc: "2.0",
+    id: 1,
+    result: { tools: [{ name: "b_tool" }, { name: "a_tool" }] },
+  });
+  const source = {
+    twin: "acme",
+    substrate: "live-wire-unauth",
+    endpoint: "https://example.invalid/mcp",
+    method: "tools/list",
+    protocol: "JSON-RPC 2.0 over HTTP",
+    protocolVersion: "2025-03-26",
+    configuration: { auth: "none" },
+  };
+  const golden = deriveGolden({ source, rawText, captureDate: "2026-08-06" });
+  const meta = JSON.parse(golden.meta);
+  const canonical = JSON.parse(golden.canonical);
+
+  assert(golden.raw === rawText, "raw.json is the upstream bytes verbatim");
+  assert(meta.rawFileSha256 === sha256(rawText), "rawFileSha256 is computed from the raw bytes");
+  assert(meta.canonicalFileSha256 === sha256(golden.canonical), "canonicalFileSha256 is computed");
+  for (const field of REQUIRED_META_FIELDS) {
+    assert(meta[field] !== undefined, `meta.json carries the provenance field \`${field}\``);
+  }
+  assert(meta.liveToolCount === 2, "liveToolCount comes from the response, not the table");
+  assert(
+    JSON.stringify(meta.liveToolOrder) === JSON.stringify(["b_tool", "a_tool"]),
+    "liveToolOrder preserves upstream order (it is a fact about the deployment)"
+  );
+  assert(
+    JSON.stringify(canonical.result) === JSON.stringify(JSON.parse(rawText).result),
+    "canonical.result is the raw result, verbatim"
+  );
+
+  // A capture whose sha was hand-typed cannot survive: derivation ignores any
+  // sha present on the source table.
+  const tampered = deriveGolden({
+    source: { ...source, rawFileSha256: "0".repeat(64) },
+    rawText,
+    captureDate: "2026-08-06",
+  });
+  assert(
+    JSON.parse(tampered.meta).rawFileSha256 === sha256(rawText),
+    "a sha declared on the source table is ignored — it is always recomputed"
+  );
+}
+
+// ── substrate + configuration round-trip into meta.json ─────────────────────
+// One case per adapter, driven off the REAL committed source table so a twin
+// whose configuration stops reaching meta.json reds here.
+{
+  const sources = loadSources({ repoRoot: ROOT });
+  for (const [twin, source] of Object.entries(sources.twins)) {
+    if (!source.capture) continue;
+    const paths = goldenPaths({ repoRoot: ROOT, sources, twin });
+    const rawText = readFileSync(paths.raw, "utf8");
+    const committed = JSON.parse(readFileSync(paths.meta, "utf8"));
+    const meta = JSON.parse(
+      deriveGolden({ source, rawText, captureDate: committed.captureDate }).meta
+    );
+    assert(meta.substrate === source.substrate, `${twin}: substrate round-trips into meta.json`);
+    assert(
+      JSON.stringify(meta.configuration) === JSON.stringify(source.configuration),
+      `${twin}: the configuration the adapter assumed round-trips into meta.json`
+    );
+    assert(
+      Object.keys(meta.configuration).length > 0,
+      `${twin}: the recorded configuration is not empty`
+    );
+  }
+}
+
+// ── the committed goldens are what the producer derives ─────────────────────
+{
+  const code = await runCapture({ repoRoot: ROOT, check: true, offline: true, ...SILENT });
+  assert(code === 0, "`--check --offline` is green against the committed goldens");
+}
+
+// ── the guard fires (F-1170) ────────────────────────────────────────────────
+// Four independent edits, four reds, and nothing written back.
+{
+  const sources = loadSources({ repoRoot: ROOT });
+  const captured = Object.entries(sources.twins).filter(([, s]) => s.capture);
+  assert(captured.length > 0, "at least one twin is captured (otherwise the guard guards nothing)");
+
+  for (const [twin] of captured) {
+    // 1. canonical edited
+    {
+      const dir = sandbox();
+      const paths = goldenPaths({ repoRoot: dir, sources, twin });
+      const canonical = JSON.parse(readFileSync(paths.canonical, "utf8"));
+      canonical.result.tools.push({ name: "a_tool_nobody_can_call" });
+      writeFileSync(paths.canonical, `${JSON.stringify(canonical, null, 2)}\n`);
+      const before = readFileSync(paths.canonical, "utf8");
+      const code = await runCapture({ repoRoot: dir, check: true, offline: true, ...SILENT });
+      assert(code !== 0, `${twin}: --check reds when canonical.json gains a tool`);
+      assert(readFileSync(paths.canonical, "utf8") === before, `${twin}: --check wrote nothing`);
+      rmSync(dir, { recursive: true, force: true });
+    }
+    // 2. raw edited (canonical + sha both stop matching)
+    {
+      const dir = sandbox();
+      const paths = goldenPaths({ repoRoot: dir, sources, twin });
+      const raw = JSON.parse(readFileSync(paths.raw, "utf8"));
+      raw.result.tools.pop();
+      writeFileSync(paths.raw, JSON.stringify(raw));
+      const code = await runCapture({ repoRoot: dir, check: true, offline: true, ...SILENT });
+      assert(code !== 0, `${twin}: --check reds when raw.json loses a tool`);
+      rmSync(dir, { recursive: true, force: true });
+    }
+    // 3. meta provenance edited — the substrate claim itself
+    {
+      const dir = sandbox();
+      const paths = goldenPaths({ repoRoot: dir, sources, twin });
+      const meta = JSON.parse(readFileSync(paths.meta, "utf8"));
+      meta.substrate = "live-wire-unauth-but-actually-invented";
+      writeFileSync(paths.meta, `${JSON.stringify(meta, null, 2)}\n`);
+      const code = await runCapture({ repoRoot: dir, check: true, offline: true, ...SILENT });
+      assert(code !== 0, `${twin}: --check reds when meta.json misstates the substrate`);
+      rmSync(dir, { recursive: true, force: true });
+    }
+    // 4. sha hand-typed to something plausible
+    {
+      const dir = sandbox();
+      const paths = goldenPaths({ repoRoot: dir, sources, twin });
+      const meta = JSON.parse(readFileSync(paths.meta, "utf8"));
+      meta.rawFileSha256 = "f".repeat(64);
+      writeFileSync(paths.meta, `${JSON.stringify(meta, null, 2)}\n`);
+      const code = await runCapture({ repoRoot: dir, check: true, offline: true, ...SILENT });
+      assert(code !== 0, `${twin}: --check reds when rawFileSha256 is hand-typed`);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  // 5. a not-captured / deferred twin whose recorded reason no longer matches
+  //    the table is a red too — an unexplained `not-captured` is the failure
+  //    mode this ticket exists to avoid.
+  {
+    const uncaptured = Object.entries(sources.twins).filter(([, s]) => !s.capture);
+    assert(uncaptured.length > 0, "the table records at least one uncaptured twin");
+    const [twin] = uncaptured[0];
+    const dir = sandbox();
+    const paths = goldenPaths({ repoRoot: dir, sources, twin });
+    const status = JSON.parse(readFileSync(paths.status, "utf8"));
+    status.reason = "no reason given";
+    writeFileSync(paths.status, `${JSON.stringify(status, null, 2)}\n`);
+    const code = await runCapture({ repoRoot: dir, check: true, offline: true, ...SILENT });
+    assert(code !== 0, `${twin}: --check reds when the recorded not-captured reason is edited away`);
+    rmSync(dir, { recursive: true, force: true });
+  }
+
+  // 6. a missing golden is a red, not a silent skip.
+  {
+    const dir = sandbox();
+    const [twin] = captured[0];
+    rmSync(goldenPaths({ repoRoot: dir, sources, twin }).canonical);
+    const code = await runCapture({ repoRoot: dir, check: true, offline: true, ...SILENT });
+    assert(code !== 0, `${twin}: --check reds when a golden file is missing`);
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+// ── --check never writes, even when it would be green ───────────────────────
+{
+  const dir = sandbox();
+  const sources = loadSources({ repoRoot: dir });
+  const twin = Object.keys(sources.twins).find((id) => sources.twins[id].capture);
+  const paths = goldenPaths({ repoRoot: dir, sources, twin });
+  const before = ["raw", "meta", "canonical"].map((k) => readFileSync(paths[k], "utf8"));
+  const code = await runCapture({ repoRoot: dir, check: true, offline: true, ...SILENT });
+  assert(code === 0, "sandbox copy of the goldens is green");
+  const after = ["raw", "meta", "canonical"].map((k) => readFileSync(paths[k], "utf8"));
+  assert(JSON.stringify(before) === JSON.stringify(after), "--check left every golden byte-identical");
+  rmSync(dir, { recursive: true, force: true });
+}
+
+// ── write mode round-trips through an injected substrate reader ─────────────
+// The write path is exercised without a socket: the fake reader stands in for
+// whichever adapter the substrate names.
+{
+  const dir = sandbox();
+  const sources = loadSources({ repoRoot: dir });
+  const twin = Object.keys(sources.twins).find((id) => sources.twins[id].capture);
+  const paths = goldenPaths({ repoRoot: dir, sources, twin });
+  const rawText = JSON.stringify({ jsonrpc: "2.0", id: 1, result: { tools: [{ name: "only_tool" }] } });
+
+  const code = await runCapture({
+    repoRoot: dir,
+    twins: [twin],
+    today: "2026-01-02",
+    readSubstrate: async () => ({ rawText }),
+    ...SILENT,
+  });
+  assert(code === 0, "write mode succeeds against an injected reader");
+  assert(readFileSync(paths.raw, "utf8") === rawText, "write mode wrote the reader's bytes verbatim");
+  const meta = JSON.parse(readFileSync(paths.meta, "utf8"));
+  assert(meta.captureDate === "2026-01-02", "write mode stamps the capture date");
+  assert(meta.liveToolCount === 1, "write mode recomputed liveToolCount");
+  assert(meta.rawFileSha256 === sha256(rawText), "write mode recomputed the sha");
+
+  const recheck = await runCapture({ repoRoot: dir, check: true, offline: true, ...SILENT });
+  assert(recheck === 0, "what write mode produced is what --check accepts");
+  rmSync(dir, { recursive: true, force: true });
+}
+
+// ── a substrate read that comes back malformed fails loudly ─────────────────
+{
+  const dir = sandbox();
+  const sources = loadSources({ repoRoot: dir });
+  const twin = Object.keys(sources.twins).find((id) => sources.twins[id].capture);
+  const code = await runCapture({
+    repoRoot: dir,
+    twins: [twin],
+    readSubstrate: async () => ({ rawText: JSON.stringify({ jsonrpc: "2.0", id: 1, error: { code: -32601 } }) }),
+    ...SILENT,
+  });
+  assert(code !== 0, "a JSON-RPC error envelope is not written as a golden");
+  rmSync(dir, { recursive: true, force: true });
+}
+
+if (failures > 0) {
+  console.error(`\ncapture-mcp-tools-list.test.mjs: ${failures} failure(s)`);
+  process.exit(1);
+}
+console.log("capture-mcp-tools-list.test.mjs: all assertions passed");
