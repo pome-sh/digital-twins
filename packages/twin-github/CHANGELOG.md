@@ -14,13 +14,25 @@ guessed: nullable, with a required `base: { ref, sha }` and optional integer
 the field, so `src/upstream-types.ts` declares it locally until that bump lands;
 the `AssertNoUncovered` guard covers it either way.
 
-It is populated from twin state, not a constant. GitHub models a stack as its
-own entity; the twin has no stack table, so it reads one off the chain of OPEN
-pull requests linked `base_ref` -> `head_ref` in a repository. `base`, `size`
-and `position` are exact consequences of that chain; `id` and `number` are
-derived from the chain's bottom PR, so every member of one stack reports one
-identity. A PR that is not in such a chain reports `stack: null`. The limits are
-written up in `FIDELITY.md` divergence #11.
+It is populated from twin state, not a constant. GitHub models a stack as its own
+entity; the twin has no stack table, so it reads one off the pull requests linked
+`base_ref` -> `head_ref` inside a repository, matched on repo id as well as ref
+name so a fork's identically-named branch cannot invent a link. `base`, `size`
+and `position` are exact consequences of that chain; `id` and `number` derive
+from its bottom open member.
+
+Because that identity is shared across members, the answer has to be a property
+of the chain rather than of the pull request you happened to ask about. So the
+whole connected component is resolved and then required to be one unambiguous
+line: **any two PRs reporting the same `stack.id` report the same `size` and the
+same membership, with positions exactly `1..size`**. A component that forks or
+cycles reports `stack: null` from every member instead of handing out an identity
+two of them would disagree about. Linkage spans pull requests of every state, so
+a closed middle link does not sever a live chain, while membership counts only
+open members; fewer than two leaves no stack. A stack whose base branch has no
+resolved sha is not named either, since the vendor schema types `base.sha`
+non-null. All four limits are tested, and written up in `FIDELITY.md`
+divergence #11.
 
 
 ## 0.9.2 — 2026-08-06

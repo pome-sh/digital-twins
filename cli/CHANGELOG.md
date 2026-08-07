@@ -12,7 +12,8 @@ packaging restructure: bump `version` here and in `package.json`, and merging to
   (`GET /repos/:o/:r/pulls` and `.../pulls/:n`), which GitHub added to its
   `pull-request` and `pull-request-simple` schemas on 2026-08-02 (F-1178). An
   agent asked to review or merge a stacked PR against the twin can now see the
-  stack it belongs to. `packages/twin-github` changed, and the CLI inlines it.
+  stack it belongs to, and two PRs in one stack always agree on its identity,
+  size and membership. `packages/twin-github` changed, and the CLI inlines it.
 
 ## 0.21.12
 

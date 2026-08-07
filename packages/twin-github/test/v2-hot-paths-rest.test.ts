@@ -210,17 +210,32 @@ describe("REST / cluster C — pull requests deeper", () => {
   // read from that schema, not guessed from the name: nullable, with a REQUIRED
   // `base: { ref, sha }` and optional integer `size` / `position` / `id` /
   // `number`. Both surfaces carry it, so both are asserted here.
+  type StackJson = { base: { ref: string; sha: string }; size: number; position: number; id: number; number: number };
+
+  // Puts one commit on `ref` so a PR opened from it has a diff.
+  async function branchWithWork(a: ReturnType<typeof createGitHubCloneApp>, ref: string) {
+    await jsonReq(a, "POST", "/repos/acme/api/git/refs", { ref: `refs/heads/${ref}` });
+    await jsonReq(a, "PUT", `/repos/acme/api/contents/${ref}.ts`, { message: "m", content: "1\n", branch: ref });
+  }
+
+  async function openPull(a: ReturnType<typeof createGitHubCloneApp>, title: string, head: string, base: string) {
+    const pr = await jsonReq(a, "POST", "/repos/acme/api/pulls", { title, head, base });
+    expect(pr.status).toBe(201);
+    return (pr.body as { number: number }).number;
+  }
+
+  async function stackOf(a: ReturnType<typeof createGitHubCloneApp>, pull: number) {
+    const detail = await jsonReq(a, "GET", `/repos/acme/api/pulls/${pull}`);
+    expect(detail.status).toBe(200);
+    return (detail.body as { stack: StackJson | null }).stack;
+  }
+
   async function openStack(a: ReturnType<typeof createGitHubCloneApp>) {
-    for (const ref of ["stack-lower", "stack-upper"]) {
-      await jsonReq(a, "POST", "/repos/acme/api/git/refs", { ref: `refs/heads/${ref}` });
-      await jsonReq(a, "PUT", `/repos/acme/api/contents/${ref}.ts`, { message: "m", content: "1\n", branch: ref });
-    }
+    for (const ref of ["stack-lower", "stack-upper"]) await branchWithWork(a, ref);
     // The upper PR's base branch IS the lower PR's head branch — a stack.
-    const lower = await jsonReq(a, "POST", "/repos/acme/api/pulls", { title: "Lower", head: "stack-lower", base: "main" });
-    const upper = await jsonReq(a, "POST", "/repos/acme/api/pulls", { title: "Upper", head: "stack-upper", base: "stack-lower" });
     return {
-      lower: (lower.body as { number: number }).number,
-      upper: (upper.body as { number: number }).number
+      lower: await openPull(a, "Lower", "stack-lower", "main"),
+      upper: await openPull(a, "Upper", "stack-upper", "stack-lower")
     };
   }
 
@@ -246,7 +261,7 @@ describe("REST / cluster C — pull requests deeper", () => {
 
     const lowerPr = (await jsonReq(a, "GET", `/repos/acme/api/pulls/${lower}`)).body as {
       base: { sha: string };
-      stack: { base: { ref: string; sha: string }; size: number; position: number; id: number; number: number };
+      stack: StackJson;
     };
     const upperPr = (await jsonReq(a, "GET", `/repos/acme/api/pulls/${upper}`)).body as typeof lowerPr;
 
@@ -268,21 +283,181 @@ describe("REST / cluster C — pull requests deeper", () => {
     // id from every member.
     expect(upperPr.stack.id).toBe(lowerPr.stack.id);
     expect(Number.isInteger(lowerPr.stack.id)).toBe(true);
+    expect(typeof lowerPr.stack.base.sha).toBe("string");
   });
 
-  it("GET /pulls carries the same stack objects as the detail surface", async () => {
+  it("GET /pulls carries the same concrete stack values as the detail surface", async () => {
     const a = app();
     const { lower, upper } = await openStack(a);
     const list = (await jsonReq(a, "GET", "/repos/acme/api/pulls")).body as Array<{
       number: number;
-      stack: unknown;
+      base: { sha: string };
+      stack: StackJson | null;
+    }>;
+    const listed = (pull: number) => list.find((item) => item.number === pull)!;
+
+    // Concrete values on the LIST surface, not merely "equal to whatever detail
+    // said" — a convergence-only assertion passes for any constant, null
+    // included, so it cannot show the list surface derives a real stack.
+    expect(listed(lower).stack).toMatchObject({
+      base: { ref: "main", sha: listed(lower).base.sha },
+      size: 2,
+      position: 1,
+      number: lower
+    });
+    expect(listed(upper).stack).toMatchObject({ size: 2, position: 2, number: lower });
+    expect(listed(upper).stack!.id).toBe(listed(lower).stack!.id);
+
+    // ...and the two surfaces still agree field for field.
+    for (const pull of [lower, upper]) {
+      expect(listed(pull).stack).toEqual(await stackOf(a, pull));
+    }
+  });
+
+  // The identity is shared across members, so the answer must be a property of
+  // the chain rather than of the PR the walk started from. A fork is where a
+  // per-start walk breaks: two PRs would claim one `stack.id` while reporting
+  // different sizes and memberships. Asserted from EVERY member.
+  it("refuses to name a stack when the chain forks, from every member of the fork", async () => {
+    const a = app();
+    for (const ref of ["fork-bottom", "fork-left", "fork-right"]) await branchWithWork(a, ref);
+    const bottom = await openPull(a, "Bottom", "fork-bottom", "main");
+    const left = await openPull(a, "Left", "fork-left", "fork-bottom");
+    const right = await openPull(a, "Right", "fork-right", "fork-bottom");
+    expect(left).toBeLessThan(right);
+
+    for (const pull of [bottom, left, right]) {
+      expect(await stackOf(a, pull)).toBeNull();
+    }
+  });
+
+  // The invariant the fork case exists to protect, asserted over a repo that
+  // holds a clean stack AND a fork at once: any two PRs reporting the same
+  // `stack.id` agree on `size` and on membership, and their positions are
+  // exactly 1..size with no repeats.
+  it("keeps stack identity coherent: equal stack.id implies equal size, membership and unique positions", async () => {
+    const a = app();
+    for (const ref of ["clean-lower", "clean-upper", "amb-bottom", "amb-left", "amb-right"]) await branchWithWork(a, ref);
+    await openPull(a, "Clean lower", "clean-lower", "main");
+    await openPull(a, "Clean upper", "clean-upper", "clean-lower");
+    await openPull(a, "Amb bottom", "amb-bottom", "main");
+    await openPull(a, "Amb left", "amb-left", "amb-bottom");
+    await openPull(a, "Amb right", "amb-right", "amb-bottom");
+
+    const list = (await jsonReq(a, "GET", "/repos/acme/api/pulls")).body as Array<{
+      number: number;
+      stack: StackJson | null;
     }>;
 
-    for (const pull of [lower, upper]) {
-      const detail = (await jsonReq(a, "GET", `/repos/acme/api/pulls/${pull}`)).body as { stack: unknown };
-      expect(list.find((item) => item.number === pull)!.stack).toEqual(detail.stack);
+    const byId = new Map<number, Array<{ number: number; stack: StackJson }>>();
+    for (const item of list) {
+      if (item.stack === null) continue;
+      const bucket = byId.get(item.stack.id) ?? [];
+      bucket.push({ number: item.number, stack: item.stack });
+      byId.set(item.stack.id, bucket);
     }
-    expect(list.find((item) => item.number === upper)!.stack).toMatchObject({ position: 2, size: 2 });
+
+    // The clean stack is the only thing that got an identity at all.
+    expect(byId.size).toBe(1);
+    for (const [, members] of byId) {
+      const size = members[0]!.stack.size;
+      expect(members.every((member) => member.stack.size === size)).toBe(true);
+      // Every member of a shared id agrees the stack has `size` members, and the
+      // number of PRs reporting that id IS that size — no absent siblings.
+      expect(members).toHaveLength(size);
+      expect([...members].map((member) => member.stack.position).sort()).toEqual(
+        Array.from({ length: size }, (_, index) => index + 1)
+      );
+      // Same membership: one bottom `number`, one base, agreed by all.
+      expect(new Set(members.map((member) => member.stack.number)).size).toBe(1);
+      expect(new Set(members.map((member) => JSON.stringify(member.stack.base))).size).toBe(1);
+    }
+  });
+
+  it("terminates and reports no stack when the base chain is a cycle", async () => {
+    const a = app();
+    for (const ref of ["cycle-a", "cycle-b"]) await branchWithWork(a, ref);
+    // cycle-b sits on cycle-a, then cycle-a is retargeted onto cycle-b.
+    const first = await openPull(a, "Cycle A", "cycle-a", "main");
+    const second = await openPull(a, "Cycle B", "cycle-b", "cycle-a");
+    const retargeted = await jsonReq(a, "PATCH", `/repos/acme/api/pulls/${first}`, { base: "cycle-b" });
+    expect(retargeted.status).toBe(200);
+
+    for (const pull of [first, second]) {
+      expect(await stackOf(a, pull)).toBeNull();
+    }
+  });
+
+  // Linkage traverses pull requests of every state so a closed middle link does
+  // not silently sever a live chain; MEMBERSHIP is the open members only.
+  it("links through a closed middle PR and counts only the open members", async () => {
+    const a = app();
+    for (const ref of ["mid-bottom", "mid-middle", "mid-top"]) await branchWithWork(a, ref);
+    const bottom = await openPull(a, "Mid bottom", "mid-bottom", "main");
+    const middle = await openPull(a, "Mid middle", "mid-middle", "mid-bottom");
+    const top = await openPull(a, "Mid top", "mid-top", "mid-middle");
+
+    expect(await stackOf(a, bottom)).toMatchObject({ size: 3, position: 1 });
+    expect(await stackOf(a, top)).toMatchObject({ size: 3, position: 3 });
+
+    const closed = await jsonReq(a, "PATCH", `/repos/acme/api/pulls/${middle}`, { state: "closed" });
+    expect(closed.status).toBe(200);
+
+    // The chain is still live: bottom and top remain one stack of two, and the
+    // closed middle is not counted.
+    const bottomStack = await stackOf(a, bottom);
+    const topStack = await stackOf(a, top);
+    expect(bottomStack).toMatchObject({ base: { ref: "main" }, size: 2, position: 1, number: bottom });
+    expect(topStack).toMatchObject({ size: 2, position: 2, number: bottom });
+    expect(topStack!.id).toBe(bottomStack!.id);
+    // A closed PR reports no stack of its own.
+    expect(await stackOf(a, middle)).toBeNull();
+  });
+
+  it("reports no stack once only one open member is left", async () => {
+    const a = app();
+    const { lower, upper } = await openStack(a);
+    const closed = await jsonReq(a, "PATCH", `/repos/acme/api/pulls/${lower}`, { state: "closed" });
+    expect(closed.status).toBe(200);
+
+    expect(await stackOf(a, upper)).toBeNull();
+    expect(await stackOf(a, lower)).toBeNull();
+  });
+
+  // Links match the repo id as well as the ref name. The twin models fork PRs
+  // (`head_repo_id` differs from `base_repo_id`), so matching on ref name alone
+  // would link a fork's head branch to an upstream PR's identically-named base
+  // branch and invent a stack out of a name collision.
+  it("does not invent a stack from a fork branch sharing an upstream base ref name", async () => {
+    const a = app();
+    for (const ref of ["collide", "collide-upper"]) await branchWithWork(a, ref);
+    // Upstream PR based ON the `collide` branch of acme/api.
+    const upstream = await openPull(a, "Upstream", "collide-upper", "collide");
+
+    // Fork copies every branch, so the fork has its own `collide` — same name,
+    // different repo.
+    const fork = await jsonReq(a, "POST", "/repos/acme/api/forks", {});
+    expect(fork.status).toBe(201);
+    const forkOwner = (fork.body as { owner: { login: string } }).owner.login;
+    const forked = await openPull(a, "From fork", `${forkOwner}:collide`, "main");
+
+    // Neither is stacked: the fork's `collide` is not the branch the upstream PR
+    // is based on.
+    expect(await stackOf(a, upstream)).toBeNull();
+    expect(await stackOf(a, forked)).toBeNull();
+  });
+
+  it("does not let the state filter or pagination change a PR's stack", async () => {
+    const a = app();
+    const { lower, upper } = await openStack(a);
+    const openOnly = (await jsonReq(a, "GET", "/repos/acme/api/pulls?state=open&per_page=1&page=2")).body as Array<{
+      number: number;
+      stack: StackJson | null;
+    }>;
+    const paged = openOnly.find((item) => item.number === lower || item.number === upper);
+    expect(paged).toBeDefined();
+    expect(paged!.stack).toEqual(await stackOf(a, paged!.number));
+    expect(paged!.stack).toMatchObject({ size: 2, number: lower });
   });
 
   it("GET /pulls/:n/commits lists commits", async () => {
