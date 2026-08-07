@@ -78,6 +78,17 @@ jobs:
       # the never-publish-behind-latest floor check) and that the npmjs and
       # GitHub Packages lanes cannot block each other.
       - run: node scripts/ci/decide-publish.test.mjs
+      # F-1350 — release-alarm.yml watches release.yml from outside it, on its
+      # own daily trigger. Its package list is PARSED out of release.yml's
+      # decide-publish.sh calls rather than typed a second time, so a release
+      # restructure the parser cannot follow must red the PR that causes it:
+      # an alarm watching zero packages passes forever. Both lines are
+      # network-free, and they live in the always-on block on purpose — the
+      # scope step above classifies a `.github/workflows/release.yml`-only diff
+      # as docs-only, so a heavy-block gate would be skipped by exactly the PR
+      # that blinds the alarm.
+      - run: node scripts/ci/release-alarm.mjs --targets
+      - run: node scripts/ci/release-alarm.test.mjs
       # F-1226 — the plugin manifest is what makes the `skills` installer render
       # one select-all row instead of six unticked checkboxes. It has to live in
       # the always-on block: adding a skill touches only `skills/`, which the
