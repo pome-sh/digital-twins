@@ -120,9 +120,12 @@ describe("zod schema identity", () => {
 });
 
 describe("dsl", () => {
-  // The symbols pome-cloud's 13 `@pome-sh/sdk/checks` import sites use. `export *`
+  // The symbols pome-cloud's 13 `@pome-sh/checks/dsl` import sites use. `export *`
   // means an ADDITION needs no edit here; this list is what makes a REMOVAL a
   // named failure in this repo instead of a TypeError in the consumer's.
+  //
+  // Those sites read `@pome-sh/sdk/checks` until F-1349 moved them, which is the
+  // ticket that made this list describe a real consumer rather than a planned one.
   it("re-exports the check DSL pome-cloud imports", () => {
     for (const name of [
       "defineCheck",
@@ -156,6 +159,20 @@ describe("dsl", () => {
 describe("per-twin subpaths", () => {
   // Each subpath keeps the twin's OWN names, so a pome-cloud import site moves
   // by changing the specifier and nothing else.
+  //
+  // F-1349 made this arm load-bearing rather than illustrative: pome-cloud now
+  // imports these subpaths for real, and it reaches for the TWIN'S names, not
+  // the barrel's prefixed aliases. `defaultSeedState` (github/gmail/linear/slack)
+  // and `defaultSeed` (stripe) are what `criterion-discrimination.ts` and
+  // `apps/mcp/src/task/parseTask.ts` bind their null-agent worlds from; the
+  // barrel exports the same values as `defaultGitHubSeed` and friends, so the
+  // barrel arm above stays green if a subpath drops or renames them.
+  //
+  // The seed-schema expectation is per-twin and EXACT for the same reason. It
+  // used to be `["seedSchema","gmailSeedSchema","linearSeedSchema"].some(n => n in module)`,
+  // which passes as long as ANY of the three is present — so gmail exporting
+  // `seedSchema` instead of `gmailSeedSchema` would have been green here and a
+  // compile error in `apps/mcp/src/task/taskSchema.ts`.
   const modules = { github, gmail, linear, slack, stripe } as const;
   const arrays = {
     github: "GITHUB_CHECKS",
@@ -164,13 +181,48 @@ describe("per-twin subpaths", () => {
     slack: "SLACK_CHECKS",
     stripe: "STRIPE_CHECKS",
   } as const;
+  // The exact name each subpath must expose, twin by twin. Not a list to search:
+  // the point is that gmail's schema is called `gmailSeedSchema` and github's is
+  // called `seedSchema`, and a consumer's import breaks if either moves.
+  const seedSchemas = {
+    github: "seedSchema",
+    gmail: "gmailSeedSchema",
+    linear: "linearSeedSchema",
+    slack: "seedSchema",
+    stripe: "seedSchema",
+  } as const;
+  const defaultSeeds = {
+    github: "defaultSeedState",
+    gmail: "defaultSeedState",
+    linear: "defaultSeedState",
+    slack: "defaultSeedState",
+    stripe: "defaultSeed",
+  } as const;
 
   for (const [twin, module] of Object.entries(modules)) {
-    it(`${twin} exposes its array, parseSeed and a schema under the twin's own names`, () => {
-      expect(module).toHaveProperty(arrays[twin as keyof typeof arrays]);
+    it(`${twin} exposes its array, parseSeed, seed schema and default seed under the twin's own names`, () => {
+      const key = twin as keyof typeof modules;
+      expect(module).toHaveProperty(arrays[key]);
       expect(module).toHaveProperty("parseSeed");
-      const schemaNames = ["seedSchema", "gmailSeedSchema", "linearSeedSchema"];
-      expect(schemaNames.some((name) => name in module), `${twin} seed schema`).toBe(true);
+      expect(module, `${twin}: pome-cloud imports { ${seedSchemas[key]} } from @pome-sh/checks/${twin}`).toHaveProperty(
+        seedSchemas[key],
+      );
+      expect(module, `${twin}: pome-cloud imports { ${defaultSeeds[key]} } from @pome-sh/checks/${twin}`).toHaveProperty(
+        defaultSeeds[key],
+      );
+    });
+
+    // Presence is not enough for the default seed: it is a FACTORY, and one that
+    // returned a stale shared object would hand every graded run the same mutated
+    // world. The barrel arm round-trips these through their own schema; this
+    // asserts the subpath hands out the same callable, since that is the one
+    // pome-cloud actually calls.
+    it(`${twin}'s subpath default seed is callable and parses`, () => {
+      const key = twin as keyof typeof modules;
+      const make = (module as Record<string, unknown>)[defaultSeeds[key]] as () => unknown;
+      const parse = (module as Record<string, unknown>).parseSeed as (raw: unknown) => unknown;
+      expect(typeof make, `${twin} default seed`).toBe("function");
+      expect(() => parse(make()), twin).not.toThrow();
     });
 
     // `applySeed` writes SQLite rows and `loadSeedFromEnv` reads process.env.
