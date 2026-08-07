@@ -1,0 +1,1012 @@
+{
+  "twin": "linear",
+  "package": "@pome-sh/twin-linear",
+  "artifact_version": 1,
+  "generated_by": "npm run emit:route-inputs",
+  "source": [
+    "packages/twin-linear/src/route-inputs.ts",
+    "packages/twin-linear/src/graphql/argument-surface.ts"
+  ],
+  "surface_count": 45,
+  "input_count": 120,
+  "surfaces": [
+    {
+      "method": "GET",
+      "path": "/graphql",
+      "surface": "GET /graphql",
+      "inputs": [
+        {
+          "name": "operationName",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "query",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "variables",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/oauth/authorize",
+      "surface": "GET /oauth/authorize",
+      "inputs": [
+        {
+          "name": "actor",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "client_id",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "code_challenge",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "code_challenge_method",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "redirect_uri",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "response_type",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "scope",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "state",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/graphql",
+      "surface": "POST /graphql",
+      "inputs": [
+        {
+          "name": "operationName",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "query",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "variables",
+          "location": "body",
+          "required": false,
+          "type": "object|string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/oauth/authorize/callback",
+      "surface": "POST /oauth/authorize/callback",
+      "inputs": [
+        {
+          "name": "actor",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "client_id",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "code_challenge",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "code_challenge_method",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "redirect_uri",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "scope",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "state",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "user_ref",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/oauth/revoke",
+      "surface": "POST /oauth/revoke",
+      "inputs": [
+        {
+          "name": "access_token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "refresh_token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/oauth/token",
+      "surface": "POST /oauth/token",
+      "inputs": [
+        {
+          "name": "Authorization",
+          "location": "header",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "client_id",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "client_secret",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "code",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "code_verifier",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "grant_type",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "redirect_uri",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "refresh_token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "scope",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    }
+  ],
+  "graphql_surfaces": [
+    {
+      "surface": "GQL agentActivityCreate",
+      "root": "mutation",
+      "inputs": [
+        {
+          "name": "input",
+          "location": "argument",
+          "required": true,
+          "type": "AgentActivityCreateInput!"
+        }
+      ]
+    },
+    {
+      "surface": "GQL agentSession",
+      "root": "query",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "argument",
+          "required": true,
+          "type": "String!"
+        }
+      ]
+    },
+    {
+      "surface": "GQL agentSessionCreateOnComment",
+      "root": "mutation",
+      "inputs": [
+        {
+          "name": "input",
+          "location": "argument",
+          "required": true,
+          "type": "AgentSessionCreateOnComment!"
+        }
+      ]
+    },
+    {
+      "surface": "GQL agentSessionCreateOnIssue",
+      "root": "mutation",
+      "inputs": [
+        {
+          "name": "input",
+          "location": "argument",
+          "required": true,
+          "type": "AgentSessionCreateOnIssue!"
+        }
+      ]
+    },
+    {
+      "surface": "GQL agentSessions",
+      "root": "query",
+      "inputs": [
+        {
+          "name": "after",
+          "location": "argument",
+          "required": false,
+          "type": "String"
+        },
+        {
+          "name": "before",
+          "location": "argument",
+          "required": false,
+          "type": "String"
+        },
+        {
+          "name": "first",
+          "location": "argument",
+          "required": false,
+          "type": "Int"
+        },
+        {
+          "name": "last",
+          "location": "argument",
+          "required": false,
+          "type": "Int"
+        }
+      ]
+    },
+    {
+      "surface": "GQL agentSessionUpdate",
+      "root": "mutation",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "argument",
+          "required": false,
+          "type": "String"
+        },
+        {
+          "name": "input",
+          "location": "argument",
+          "required": true,
+          "type": "AgentSessionUpdateInput!"
+        }
+      ]
+    },
+    {
+      "surface": "GQL comment",
+      "root": "query",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "argument",
+          "required": true,
+          "type": "String!"
+        }
+      ]
+    },
+    {
+      "surface": "GQL commentCreate",
+      "root": "mutation",
+      "inputs": [
+        {
+          "name": "input",
+          "location": "argument",
+          "required": true,
+          "type": "CommentCreateInput!"
+        }
+      ]
+    },
+    {
+      "surface": "GQL commentDelete",
+      "root": "mutation",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "argument",
+          "required": true,
+          "type": "String!"
+        }
+      ]
+    },
+    {
+      "surface": "GQL comments",
+      "root": "query",
+      "inputs": [
+        {
+          "name": "after",
+          "location": "argument",
+          "required": false,
+          "type": "String"
+        },
+        {
+          "name": "before",
+          "location": "argument",
+          "required": false,
+          "type": "String"
+        },
+        {
+          "name": "first",
+          "location": "argument",
+          "required": false,
+          "type": "Int"
+        },
+        {
+          "name": "last",
+          "location": "argument",
+          "required": false,
+          "type": "Int"
+        }
+      ]
+    },
+    {
+      "surface": "GQL commentUpdate",
+      "root": "mutation",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "argument",
+          "required": false,
+          "type": "String"
+        },
+        {
+          "name": "input",
+          "location": "argument",
+          "required": true,
+          "type": "CommentUpdateInput!"
+        },
+        {
+          "name": "skipEditedAt",
+          "location": "argument",
+          "required": false,
+          "type": "Boolean"
+        }
+      ]
+    },
+    {
+      "surface": "GQL cycle",
+      "root": "query",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "argument",
+          "required": true,
+          "type": "String!"
+        }
+      ]
+    },
+    {
+      "surface": "GQL cycles",
+      "root": "query",
+      "inputs": [
+        {
+          "name": "after",
+          "location": "argument",
+          "required": false,
+          "type": "String"
+        },
+        {
+          "name": "before",
+          "location": "argument",
+          "required": false,
+          "type": "String"
+        },
+        {
+          "name": "first",
+          "location": "argument",
+          "required": false,
+          "type": "Int"
+        },
+        {
+          "name": "last",
+          "location": "argument",
+          "required": false,
+          "type": "Int"
+        }
+      ]
+    },
+    {
+      "surface": "GQL issue",
+      "root": "query",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "argument",
+          "required": true,
+          "type": "String!"
+        }
+      ]
+    },
+    {
+      "surface": "GQL issueAddLabel",
+      "root": "mutation",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "argument",
+          "required": true,
+          "type": "String!"
+        },
+        {
+          "name": "labelId",
+          "location": "argument",
+          "required": true,
+          "type": "String!"
+        }
+      ]
+    },
+    {
+      "surface": "GQL issueArchive",
+      "root": "mutation",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "argument",
+          "required": true,
+          "type": "String!"
+        },
+        {
+          "name": "trash",
+          "location": "argument",
+          "required": false,
+          "type": "Boolean"
+        }
+      ]
+    },
+    {
+      "surface": "GQL issueCreate",
+      "root": "mutation",
+      "inputs": [
+        {
+          "name": "input",
+          "location": "argument",
+          "required": true,
+          "type": "IssueCreateInput!"
+        }
+      ]
+    },
+    {
+      "surface": "GQL issueDelete",
+      "root": "mutation",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "argument",
+          "required": true,
+          "type": "String!"
+        },
+        {
+          "name": "permanentlyDelete",
+          "location": "argument",
+          "required": false,
+          "type": "Boolean"
+        }
+      ]
+    },
+    {
+      "surface": "GQL issueLabel",
+      "root": "query",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "argument",
+          "required": true,
+          "type": "String!"
+        }
+      ]
+    },
+    {
+      "surface": "GQL issueLabelCreate",
+      "root": "mutation",
+      "inputs": [
+        {
+          "name": "input",
+          "location": "argument",
+          "required": true,
+          "type": "IssueLabelCreateInput!"
+        },
+        {
+          "name": "replaceTeamLabels",
+          "location": "argument",
+          "required": false,
+          "type": "Boolean"
+        }
+      ]
+    },
+    {
+      "surface": "GQL issueLabelDelete",
+      "root": "mutation",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "argument",
+          "required": true,
+          "type": "String!"
+        }
+      ]
+    },
+    {
+      "surface": "GQL issueLabels",
+      "root": "query",
+      "inputs": [
+        {
+          "name": "after",
+          "location": "argument",
+          "required": false,
+          "type": "String"
+        },
+        {
+          "name": "before",
+          "location": "argument",
+          "required": false,
+          "type": "String"
+        },
+        {
+          "name": "first",
+          "location": "argument",
+          "required": false,
+          "type": "Int"
+        },
+        {
+          "name": "last",
+          "location": "argument",
+          "required": false,
+          "type": "Int"
+        }
+      ]
+    },
+    {
+      "surface": "GQL issueLabelUpdate",
+      "root": "mutation",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "argument",
+          "required": false,
+          "type": "String"
+        },
+        {
+          "name": "input",
+          "location": "argument",
+          "required": true,
+          "type": "IssueLabelUpdateInput!"
+        },
+        {
+          "name": "replaceTeamLabels",
+          "location": "argument",
+          "required": false,
+          "type": "Boolean"
+        }
+      ]
+    },
+    {
+      "surface": "GQL issueRemoveLabel",
+      "root": "mutation",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "argument",
+          "required": true,
+          "type": "String!"
+        },
+        {
+          "name": "labelId",
+          "location": "argument",
+          "required": true,
+          "type": "String!"
+        }
+      ]
+    },
+    {
+      "surface": "GQL issues",
+      "root": "query",
+      "inputs": [
+        {
+          "name": "after",
+          "location": "argument",
+          "required": false,
+          "type": "String"
+        },
+        {
+          "name": "before",
+          "location": "argument",
+          "required": false,
+          "type": "String"
+        },
+        {
+          "name": "filter",
+          "location": "argument",
+          "required": false,
+          "type": "IssueFilter"
+        },
+        {
+          "name": "first",
+          "location": "argument",
+          "required": false,
+          "type": "Int"
+        },
+        {
+          "name": "last",
+          "location": "argument",
+          "required": false,
+          "type": "Int"
+        },
+        {
+          "name": "orderBy",
+          "location": "argument",
+          "required": false,
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "surface": "GQL issueUnarchive",
+      "root": "mutation",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "argument",
+          "required": true,
+          "type": "String!"
+        }
+      ]
+    },
+    {
+      "surface": "GQL issueUpdate",
+      "root": "mutation",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "argument",
+          "required": false,
+          "type": "String"
+        },
+        {
+          "name": "input",
+          "location": "argument",
+          "required": true,
+          "type": "IssueUpdateInput!"
+        }
+      ]
+    },
+    {
+      "surface": "GQL project",
+      "root": "query",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "argument",
+          "required": true,
+          "type": "String!"
+        }
+      ]
+    },
+    {
+      "surface": "GQL projects",
+      "root": "query",
+      "inputs": [
+        {
+          "name": "after",
+          "location": "argument",
+          "required": false,
+          "type": "String"
+        },
+        {
+          "name": "before",
+          "location": "argument",
+          "required": false,
+          "type": "String"
+        },
+        {
+          "name": "first",
+          "location": "argument",
+          "required": false,
+          "type": "Int"
+        },
+        {
+          "name": "last",
+          "location": "argument",
+          "required": false,
+          "type": "Int"
+        }
+      ]
+    },
+    {
+      "surface": "GQL team",
+      "root": "query",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "argument",
+          "required": true,
+          "type": "String!"
+        }
+      ]
+    },
+    {
+      "surface": "GQL teams",
+      "root": "query",
+      "inputs": [
+        {
+          "name": "after",
+          "location": "argument",
+          "required": false,
+          "type": "String"
+        },
+        {
+          "name": "before",
+          "location": "argument",
+          "required": false,
+          "type": "String"
+        },
+        {
+          "name": "filter",
+          "location": "argument",
+          "required": false,
+          "type": "TeamFilter"
+        },
+        {
+          "name": "first",
+          "location": "argument",
+          "required": false,
+          "type": "Int"
+        },
+        {
+          "name": "includeArchived",
+          "location": "argument",
+          "required": false,
+          "type": "Boolean"
+        },
+        {
+          "name": "last",
+          "location": "argument",
+          "required": false,
+          "type": "Int"
+        },
+        {
+          "name": "orderBy",
+          "location": "argument",
+          "required": false,
+          "type": "PaginationOrderBy"
+        }
+      ]
+    },
+    {
+      "surface": "GQL user",
+      "root": "query",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "argument",
+          "required": true,
+          "type": "String!"
+        }
+      ]
+    },
+    {
+      "surface": "GQL users",
+      "root": "query",
+      "inputs": [
+        {
+          "name": "after",
+          "location": "argument",
+          "required": false,
+          "type": "String"
+        },
+        {
+          "name": "before",
+          "location": "argument",
+          "required": false,
+          "type": "String"
+        },
+        {
+          "name": "filter",
+          "location": "argument",
+          "required": false,
+          "type": "UserFilter"
+        },
+        {
+          "name": "first",
+          "location": "argument",
+          "required": false,
+          "type": "Int"
+        },
+        {
+          "name": "last",
+          "location": "argument",
+          "required": false,
+          "type": "Int"
+        }
+      ]
+    },
+    {
+      "surface": "GQL webhook",
+      "root": "query",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "argument",
+          "required": true,
+          "type": "String!"
+        }
+      ]
+    },
+    {
+      "surface": "GQL webhookCreate",
+      "root": "mutation",
+      "inputs": [
+        {
+          "name": "input",
+          "location": "argument",
+          "required": true,
+          "type": "WebhookCreateInput!"
+        }
+      ]
+    },
+    {
+      "surface": "GQL webhookDelete",
+      "root": "mutation",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "argument",
+          "required": true,
+          "type": "String!"
+        }
+      ]
+    },
+    {
+      "surface": "GQL webhooks",
+      "root": "query",
+      "inputs": [
+        {
+          "name": "after",
+          "location": "argument",
+          "required": false,
+          "type": "String"
+        },
+        {
+          "name": "before",
+          "location": "argument",
+          "required": false,
+          "type": "String"
+        },
+        {
+          "name": "first",
+          "location": "argument",
+          "required": false,
+          "type": "Int"
+        },
+        {
+          "name": "last",
+          "location": "argument",
+          "required": false,
+          "type": "Int"
+        }
+      ]
+    },
+    {
+      "surface": "GQL workflowState",
+      "root": "query",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "argument",
+          "required": true,
+          "type": "String!"
+        }
+      ]
+    },
+    {
+      "surface": "GQL workflowStates",
+      "root": "query",
+      "inputs": [
+        {
+          "name": "after",
+          "location": "argument",
+          "required": false,
+          "type": "String"
+        },
+        {
+          "name": "before",
+          "location": "argument",
+          "required": false,
+          "type": "String"
+        },
+        {
+          "name": "first",
+          "location": "argument",
+          "required": false,
+          "type": "Int"
+        },
+        {
+          "name": "last",
+          "location": "argument",
+          "required": false,
+          "type": "Int"
+        }
+      ]
+    }
+  ]
+}
