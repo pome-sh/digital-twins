@@ -57,11 +57,11 @@ const PATH_SAMPLES: Record<string, string> = {
   comment_id: "1",
 };
 
-/** The pattern with every `:param` (and any `{regex}` tail) and `*` filled in. */
+/** The pattern with every `:param` (and any `{regex}` tail) and every `*` filled in. */
 function concretePath(declaration: RouteInputDeclaration): string {
   return declaration.path
     .replace(/:([A-Za-z0-9_]+)(?:\{[^}]*\})?/g, (_whole, param: string) => PATH_SAMPLES[param] ?? "x")
-    .replace("*", "README.md");
+    .replaceAll("*", "README.md");
 }
 
 const SAMPLE_BY_TYPE: Record<string, unknown> = {
