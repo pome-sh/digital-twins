@@ -51,6 +51,7 @@ import {
   issueExactlyOneLabel,
   issueExists,
   issueHasLabel,
+  issueNotRelabelledOrReassigned,
   issueStateCheck,
 } from "./check-issues.js";
 import {
@@ -58,7 +59,13 @@ import {
   pullRequestReviewExists,
   pullRequestStateCheck,
 } from "./check-pulls.js";
-import { commitStatus, fileExists, noNewIssues, noNewLabels } from "./check-repos.js";
+import {
+  commitStatus,
+  fileExists,
+  noCommitStatusChanged,
+  noNewIssues,
+  noNewLabels,
+} from "./check-repos.js";
 import { noUnsupportedEndpoint, toolNeverCalled } from "./check-tape.js";
 
 export type { Check } from "./check-kind.js";
@@ -91,11 +98,21 @@ export const GITHUB_CHECKS = [
   // say, and an author reaching for one usually wants to see the other.
   noNewIssues,
   noNewLabels,
+  // F-1304, and it belongs with the two above rather than beside the positive
+  // issue assertions: it is the third repo-or-issue delta, and the one an author
+  // reaches for when the task's obligation is to leave a settled decision alone.
+  // Read its header before proposing a positive "still has label X" instead —
+  // that shape is what it replaces, and why.
+  issueNotRelabelledOrReassigned,
   pullRequestStateCheck,
   pullRequestCommentExists,
   pullRequestReviewExists,
   fileExists,
   commitStatus,
+  // The delta beside `commitStatus`, same pairing logic as the issue ones above:
+  // an author reaching for "the status is red" usually wants "and nobody made it
+  // green", and only the second survives the seed already being red.
+  noCommitStatusChanged,
   // Last, because the listing order runs from the assertion an author reaches
   // for first to the ones a specialised task needs — and these are the only ones
   // that assert about the RUN rather than the world it left behind.

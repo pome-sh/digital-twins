@@ -498,6 +498,8 @@ describe("every check, against a repo that is not in the state", () => {
       "github.pr-review-exists": { review: "APPROVED", pr: "1", repo: "acme/missing" },
       "github.file-exists": { path: "a.ts", repo: "acme/missing" },
       "github.commit-status": { context: "ci/build", repo: "acme/missing", state: "success" },
+      "github.no-commit-status-changed": { repo: "acme/missing" },
+      "github.issue-triage-unchanged": { issue: "1", repo: "acme/missing" },
     };
     for (const declared of GITHUB_CHECKS as readonly unknown[] as readonly OpenCheck[]) {
       const outcome = declared.evaluate(fixtures[declared.id] ?? {}, {

@@ -15,7 +15,8 @@ import {
   login,
 } from "./check-params.js";
 import { appliedLabelNames, missOutcome, resolveIssue, sameLabel } from "./check-state.js";
-import { finalWorld, repoState } from "./check-worlds.js";
+import type { GitHubCheckStateIssue } from "./check-state.js";
+import { deltaWorld, finalWorld, repoState } from "./check-worlds.js";
 import type { Check } from "./check-kind.js";
 
 export const issueExists: Check<{ issue: string; repo: string }> = defineCheck({
@@ -286,6 +287,130 @@ export const issueCommentContains: Check<{ needle: string; issue: string; repo: 
       // pass and absent on a fail. A pointer that appears only when the verdict
       // is good is worse than none: its absence would read as a verdict class.
       evidenceStatePaths: [childStatePath(found.path, "comments")],
+    };
+  },
+});
+
+// F-1304 — the standing obligation in a leave-it-alone task, expressed as a
+// delta so it stops reading as a free point.
+//
+// Task 03 (`already-triaged`) asks the agent to triage a NEW issue while leaving
+// a settled one alone. The "leave it alone" half was carried by two POSITIVE
+// assertions about the settled issue — `issue-exactly-one-label` and
+// `issue-assignee` — both true on the seed, both therefore landing
+// `PASS_TO_PASS` / `already_satisfied`, and both pinned in pome-cloud's
+// `KNOWN_NON_DISCRIMINATING` since F-1075. Six milestones of notes there
+// described the repair as "a seed edit" and none of them worked, for a reason
+// the notes eventually stated correctly: a restraint task's correct finish state
+// IS its seed state, so EVERY final-state assertion it can carry is true before
+// the examinee starts.
+//
+// That argument is airtight for a check that reads ONE world and collapses the
+// moment a check can read two. The examinee cannot change whether issue #1 was
+// seeded with `feature`; it can absolutely change whether issue #1 still has
+// exactly that at finish. Same fact, same substrate, but as a comparison it is a
+// prohibition an agent breaks by acting rather than an achievement it is handed.
+//
+// Scoped to labels and assignees rather than the whole row on purpose. "Nothing
+// about this issue changed" would fire on a comment, and commenting on an issue
+// you decided not to re-triage is good behaviour, not a violation. What this
+// asserts is exactly the triage decision: who owns it and how it is classified.
+export const issueNotRelabelledOrReassigned: Check<{ issue: string; repo: string }> = defineCheck({
+  id: "github.issue-triage-unchanged",
+  description:
+    "Compares one issue's applied labels and assignees in the seed against the same issue at " +
+    "finish, and fails if either set moved — a label added or removed, an assignee added or " +
+    "removed. Label comparison is case-insensitive, matching `github.issue-has-label`. It says " +
+    "nothing about the issue's state, title, body or comments, so closing an issue or " +
+    "commenting on it does NOT fail this: the assertion is the triage decision, not the row. " +
+    "An issue whose `labels` or `assignees` array is absent on either side is SKIPPED, because " +
+    "absent is missing evidence rather than an empty set.",
+  template: "Issue #{issue} in `{repo}` was not relabelled or reassigned",
+  params: { issue: issueNumber, repo: repoRef },
+  // A delta, and unanswerable without the seed — which is the entire point.
+  substrate: "seed+final",
+  // A prohibition: true on the untouched seed, breakable only by the examinee.
+  polarity: () => "negative",
+  // Both slots are selectors. Nothing is a caller-supplied literal hunted for
+  // inside the state, so no redactor can delete anything out from under it.
+  subject: () => null,
+  // Falsifying either slot yields a "not found" skip — a reason that never
+  // reaches the assertion. `no_trigger`.
+  vacuityMutant: () => null,
+  // The issue is present in BOTH worlds and carries a label and an assignee in
+  // both; only the triage moves. A world where the seed's issue were untriaged
+  // would prove a weaker property than the one this check exists for.
+  discriminatingWorlds: ({ issue }) => {
+    const seeded = () =>
+      repoState({
+        issues: [{ number: Number(issue), labels: [{ name: "feature" }], assignees: ["alice"] }],
+      });
+    return {
+      passing: deltaWorld(seeded(), seeded()),
+      failing: deltaWorld(
+        seeded(),
+        repoState({
+          issues: [
+            { number: Number(issue), labels: [{ name: "feature" }, { name: "bug" }], assignees: ["alice"] },
+          ],
+        }),
+      ),
+    };
+  },
+  evaluate({ issue, repo }, { seed, final }) {
+    // The engine guards this before calling; the check guards too, so a consumer
+    // that forgets gets a named skip rather than a vacuous pass.
+    if (seed === null) return { passed: false, status: "skipped", reason: "seed_missing" };
+
+    const before = resolveIssue(seed, repo, issue);
+    // A seed miss cites nothing: its pointer addresses the SEED tree, and a
+    // pointer always addresses `final`.
+    if ("missing" in before) return { passed: false, status: "skipped", reason: before.missing };
+    const after = resolveIssue(final, repo, issue);
+    if ("missing" in after) return missOutcome(after);
+
+    // The arm that makes this a delta and not a state assertion.
+    if (
+      before.found.labels == null ||
+      after.found.labels == null ||
+      before.found.assignees == null ||
+      after.found.assignees == null
+    ) {
+      return {
+        passed: false,
+        status: "skipped",
+        reason: `issue #${issue} has no labels/assignees arrays on one side (state_incomplete)`,
+        evidenceStatePaths: [after.path],
+      };
+    }
+
+    const labelsOf = (row: GitHubCheckStateIssue) =>
+      new Set(appliedLabelNames(row).map((name) => name.toLowerCase()));
+    const seededLabels = labelsOf(before.found);
+    const finalLabels = labelsOf(after.found);
+    const seededAssignees = new Set(before.found.assignees);
+    const finalAssignees = new Set(after.found.assignees);
+
+    const sameSet = (a: Set<string>, b: Set<string>) =>
+      a.size === b.size && [...a].every((member) => b.has(member));
+
+    const labelsMoved = !sameSet(seededLabels, finalLabels);
+    const assigneesMoved = !sameSet(seededAssignees, finalAssignees);
+    const moved = [
+      labelsMoved ? `labels [${[...seededLabels].join(", ")}] -> [${[...finalLabels].join(", ")}]` : null,
+      assigneesMoved
+        ? `assignees [${[...seededAssignees].join(", ")}] -> [${[...finalAssignees].join(", ")}]`
+        : null,
+    ].filter((row): row is string => row !== null);
+
+    return {
+      passed: moved.length === 0,
+      reason:
+        moved.length === 0
+          ? `issue #${issue} still has labels [${[...finalLabels].join(", ")}] and ` +
+            `assignees [${[...finalAssignees].join(", ")}], unchanged from the seed`
+          : `issue #${issue} was re-triaged: ${moved.join("; ")}`,
+      evidenceStatePaths: [after.path],
     };
   },
 });
