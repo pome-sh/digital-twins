@@ -1,17 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { Hono } from "hono";
+import type { DeclarableRouter } from "@pome-sh/sdk/route-inputs";
 import {
   asInputError,
-  booleanQuery,
-  emailFromContext,
-  messageFormat,
+  emailFrom,
   normalizeListBinding,
-  numberQuery,
-  objectField,
   paginate,
-  readJsonObject,
-  repeatedQuery,
-  routeParam,
   stringArray,
   stringField,
   type JsonObject,
@@ -19,283 +12,219 @@ import {
 import { invalidArgument } from "./errors.js";
 import type { GmailRouteKit } from "./rest-routes-kit.js";
 import { historyResource, labelDetail, labelSummary } from "./rest-serializers.js";
+import { GMAIL_ROUTES } from "./route-inputs.js";
 import type { SeedFilter } from "./types.js";
 
-const USERS = "/gmail/v1/users/:userId";
-
-export function registerResourceRoutes(app: Hono, kit: GmailRouteKit): void {
+export function registerResourceRoutes(app: DeclarableRouter, kit: GmailRouteKit): void {
   const { serializers, domain } = kit;
 
-  app.get(`${USERS}/profile`, kit.read((c) => ({ body: domain.profile(emailFromContext(c)) })));
+  kit.read(app, GMAIL_ROUTES.getProfile, ({ path }, c) => ({
+    body: domain.profile(emailFrom(path.userId, c)),
+  }));
 
-  app.get(
-    `${USERS}/threads`,
-    kit.read((c) => {
-      const email = emailFromContext(c);
-      const query = c.req.query("q") ?? "";
-      const includeSpamTrash = booleanQuery(c, "includeSpamTrash");
-      const labelIds = repeatedQuery(c, "labelIds");
-      let threads = asInputError(() =>
-        domain.searchThreads(email, query, { includeTrash: includeSpamTrash })
-      );
-      if (labelIds.length) {
-        threads = threads.filter((thread) => labelIds.every((label) => thread.labelIds.includes(label)));
-      }
-      const maxResults = numberQuery(c, "maxResults", 100, 500);
-      const snapshot = domain.currentHistoryIdFor(email);
-      const binding = normalizeListBinding("threads.list", email, { query, includeSpamTrash, labelIds });
-      const { page, nextPageToken } = paginate(threads, {
-        maxResults,
-        pageToken: c.req.query("pageToken"),
-        binding,
-        snapshot,
-      });
-      return {
-        body: {
-          ...(page.length
-            ? {
-                threads: page.map((thread) => ({
-                  id: thread.id,
-                  historyId: domain.latestThreadHistory(email, thread.id),
-                  ...(thread.messages.at(-1)?.snippet ? { snippet: thread.messages.at(-1)!.snippet } : {}),
-                })),
-              }
-            : {}),
-          resultSizeEstimate: threads.length,
-          ...(nextPageToken ? { nextPageToken } : {}),
-        },
-      };
-    })
-  );
+  kit.read(app, GMAIL_ROUTES.listThreads, ({ path, query }, c) => {
+    const email = emailFrom(path.userId, c);
+    const { q, includeSpamTrash, labelIds } = query;
+    let threads = asInputError(() => domain.searchThreads(email, q, { includeTrash: includeSpamTrash }));
+    if (labelIds.length) {
+      threads = threads.filter((thread) => labelIds.every((label) => thread.labelIds.includes(label)));
+    }
+    const snapshot = domain.currentHistoryIdFor(email);
+    const binding = normalizeListBinding("threads.list", email, { query: q, includeSpamTrash, labelIds });
+    const { page, nextPageToken } = paginate(threads, {
+      maxResults: query.maxResults,
+      pageToken: query.pageToken,
+      binding,
+      snapshot,
+    });
+    return {
+      body: {
+        ...(page.length
+          ? {
+              threads: page.map((thread) => ({
+                id: thread.id,
+                historyId: domain.latestThreadHistory(email, thread.id),
+                ...(thread.messages.at(-1)?.snippet ? { snippet: thread.messages.at(-1)!.snippet } : {}),
+              })),
+            }
+          : {}),
+        resultSizeEstimate: threads.length,
+        ...(nextPageToken ? { nextPageToken } : {}),
+      },
+    };
+  });
 
-  app.get(
-    `${USERS}/threads/:id`,
-    kit.read((c) => {
-      const email = emailFromContext(c);
-      const format = messageFormat(c, false);
-      return {
-        body: serializers.thread(
-          email,
-          domain.getThread(email, routeParam(c, "id")),
-          format as "minimal" | "full" | "metadata",
-          repeatedQuery(c, "metadataHeaders")
-        ),
-      };
-    })
-  );
-
-  app.post(
-    `${USERS}/threads/:id/modify`,
-    kit.write(async (c) => {
-      const email = emailFromContext(c);
-      const body = await readJsonObject(c);
-      const thread = domain.modifyThreadLabels(
+  kit.read(app, GMAIL_ROUTES.getThread, ({ path, query }, c) => {
+    const email = emailFrom(path.userId, c);
+    return {
+      body: serializers.thread(
         email,
-        routeParam(c, "id"),
-        stringArray(body, "addLabelIds"),
-        stringArray(body, "removeLabelIds")
-      );
-      return { body: serializers.thread(email, thread, "minimal") };
-    })
-  );
+        domain.getThread(email, path.id),
+        query.format,
+        query.metadataHeaders
+      ),
+    };
+  });
 
-  app.post(
-    `${USERS}/threads/:id/trash`,
-    kit.write((c) => {
-      const email = emailFromContext(c);
-      return {
-        body: serializers.thread(
-          email,
-          domain.modifyThreadLabels(email, routeParam(c, "id"), ["TRASH"], ["INBOX"]),
-          "minimal"
-        ),
-      };
-    })
-  );
+  kit.write(app, GMAIL_ROUTES.modifyThread, ({ path, body }, c) => {
+    const email = emailFrom(path.userId, c);
+    const thread = domain.modifyThreadLabels(email, path.id, body.addLabelIds, body.removeLabelIds);
+    return { body: serializers.thread(email, thread, "minimal") };
+  });
 
-  app.post(
-    `${USERS}/threads/:id/untrash`,
-    kit.write((c) => {
-      const email = emailFromContext(c);
-      return {
-        body: serializers.thread(
-          email,
-          domain.modifyThreadLabels(email, routeParam(c, "id"), [], ["TRASH"]),
-          "minimal"
-        ),
-      };
-    })
-  );
+  kit.write(app, GMAIL_ROUTES.trashThread, ({ path }, c) => {
+    const email = emailFrom(path.userId, c);
+    return {
+      body: serializers.thread(
+        email,
+        domain.modifyThreadLabels(email, path.id, ["TRASH"], ["INBOX"]),
+        "minimal"
+      ),
+    };
+  });
 
-  app.delete(
-    `${USERS}/threads/:id`,
-    kit.write((c) => {
-      domain.deleteThread(emailFromContext(c), routeParam(c, "id"));
-      return { status: 204, body: null };
-    })
-  );
+  kit.write(app, GMAIL_ROUTES.untrashThread, ({ path }, c) => {
+    const email = emailFrom(path.userId, c);
+    return {
+      body: serializers.thread(email, domain.modifyThreadLabels(email, path.id, [], ["TRASH"]), "minimal"),
+    };
+  });
 
-  app.get(`${USERS}/labels`, kit.read((c) => ({ body: { labels: domain.labels(emailFromContext(c)).map(labelSummary) } })));
-  app.get(
-    `${USERS}/labels/:id`,
-    kit.read((c) => ({ body: labelDetail(domain.label(emailFromContext(c), routeParam(c, "id"))) }))
-  );
+  kit.write(app, GMAIL_ROUTES.deleteThread, ({ path }, c) => {
+    domain.deleteThread(emailFrom(path.userId, c), path.id);
+    return { status: 204, body: null };
+  });
 
-  app.post(
-    `${USERS}/labels`,
-    kit.write(async (c) => {
-      const email = emailFromContext(c);
-      const body = await readJsonObject(c);
-      if (body.type !== undefined && body.type !== "user") invalidArgument("Only user labels can be created");
-      const created = domain.createLabel(email, stringField(body, "name", true)!, colorInput(body));
-      return { body: labelDetail(domain.label(email, created.id)) };
-    })
-  );
+  kit.read(app, GMAIL_ROUTES.listLabels, ({ path }, c) => ({
+    body: { labels: domain.labels(emailFrom(path.userId, c)).map(labelSummary) },
+  }));
 
-  app.put(
-    `${USERS}/labels/:id`,
-    kit.write(async (c) => {
-      const body = await readJsonObject(c);
-      const label = domain.updateLabel(
-        emailFromContext(c),
-        routeParam(c, "id"),
-        { name: stringField(body, "name", true), color: colorInput(body) },
-        true
-      );
-      return { body: labelDetail(label) };
-    })
-  );
+  kit.read(app, GMAIL_ROUTES.getLabel, ({ path }, c) => ({
+    body: labelDetail(domain.label(emailFrom(path.userId, c), path.id)),
+  }));
 
-  app.patch(
-    `${USERS}/labels/:id`,
-    kit.write(async (c) => {
-      const body = await readJsonObject(c);
-      const label = domain.updateLabel(
-        emailFromContext(c),
-        routeParam(c, "id"),
-        { name: stringField(body, "name"), color: colorInput(body) },
-        false
-      );
-      return { body: labelDetail(label) };
-    })
-  );
+  kit.write(app, GMAIL_ROUTES.createLabel, ({ path, body }, c) => {
+    const email = emailFrom(path.userId, c);
+    if (body.type !== undefined && body.type !== "user") invalidArgument("Only user labels can be created");
+    const created = domain.createLabel(email, body.name, body.color);
+    return { body: labelDetail(domain.label(email, created.id)) };
+  });
 
-  app.delete(
-    `${USERS}/labels/:id`,
-    kit.write((c) => {
-      domain.deleteLabel(emailFromContext(c), routeParam(c, "id"));
-      return { status: 204, body: null };
-    })
-  );
+  kit.write(app, GMAIL_ROUTES.updateLabel, ({ path, body }, c) => {
+    const label = domain.updateLabel(
+      emailFrom(path.userId, c),
+      path.id,
+      { name: body.name, color: body.color },
+      true
+    );
+    return { body: labelDetail(label) };
+  });
+
+  kit.write(app, GMAIL_ROUTES.patchLabel, ({ path, body }, c) => {
+    const label = domain.updateLabel(
+      emailFrom(path.userId, c),
+      path.id,
+      { name: body.name, color: body.color },
+      false
+    );
+    return { body: labelDetail(label) };
+  });
+
+  kit.write(app, GMAIL_ROUTES.deleteLabel, ({ path }, c) => {
+    domain.deleteLabel(emailFrom(path.userId, c), path.id);
+    return { status: 204, body: null };
+  });
 
   registerHistory(app, kit);
   registerSettings(app, kit);
 
-  app.post(`${USERS}/watch`, kit.unsupported("users.watch requires Pub/Sub and is not supported"));
-  app.post(`${USERS}/stop`, kit.unsupported("users.stop requires Pub/Sub and is not supported"));
+  kit.unsupported(app, GMAIL_ROUTES.watch, "users.watch requires Pub/Sub and is not supported");
+  kit.unsupported(app, GMAIL_ROUTES.stop, "users.stop requires Pub/Sub and is not supported");
 }
 
-function registerHistory(app: Hono, kit: GmailRouteKit): void {
-  app.get(
-    `${USERS}/history`,
-    kit.read((c) => {
-      const email = emailFromContext(c);
-      const startHistoryId = c.req.query("startHistoryId");
-      if (!startHistoryId) invalidArgument("startHistoryId is required");
-      const historyTypes = repeatedQuery(c, "historyTypes");
-      const allowed = new Set(["messageAdded", "messageDeleted", "labelAdded", "labelRemoved"]);
-      if (historyTypes.some((type) => !allowed.has(type))) invalidArgument("Invalid historyTypes");
-      const result = kit.context.domain.listHistory(email, startHistoryId, {
-        types: historyTypes.length ? historyTypes : undefined,
-      });
-      const labelId = c.req.query("labelId");
-      const resources = result.history
-        .filter((event) => !labelId || event.labelIds.includes(labelId))
-        .map(historyResource)
-        .filter((item): item is Record<string, unknown> => item !== null);
-      const maxResults = numberQuery(c, "maxResults", 100, 500);
-      const binding = normalizeListBinding("history.list", email, { startHistoryId, historyTypes, labelId });
-      const { page, nextPageToken } = paginate(resources, {
-        maxResults,
-        pageToken: c.req.query("pageToken"),
-        binding,
-        snapshot: result.historyId,
-      });
-      return {
-        body: {
-          ...(page.length ? { history: page } : {}),
-          historyId: result.historyId,
-          ...(nextPageToken ? { nextPageToken } : {}),
-        },
-      };
-    })
-  );
+function registerHistory(app: DeclarableRouter, kit: GmailRouteKit): void {
+  kit.read(app, GMAIL_ROUTES.listHistory, ({ path, query }, c) => {
+    const email = emailFrom(path.userId, c);
+    const { startHistoryId, historyTypes, labelId } = query;
+    const allowed = new Set(["messageAdded", "messageDeleted", "labelAdded", "labelRemoved"]);
+    if (historyTypes.some((type) => !allowed.has(type))) invalidArgument("Invalid historyTypes");
+    const result = kit.context.domain.listHistory(email, startHistoryId, {
+      types: historyTypes.length ? historyTypes : undefined,
+    });
+    const resources = result.history
+      .filter((event) => !labelId || event.labelIds.includes(labelId))
+      .map(historyResource)
+      .filter((item): item is Record<string, unknown> => item !== null);
+    const binding = normalizeListBinding("history.list", email, { startHistoryId, historyTypes, labelId });
+    const { page, nextPageToken } = paginate(resources, {
+      maxResults: query.maxResults,
+      pageToken: query.pageToken,
+      binding,
+      snapshot: result.historyId,
+    });
+    return {
+      body: {
+        ...(page.length ? { history: page } : {}),
+        historyId: result.historyId,
+        ...(nextPageToken ? { nextPageToken } : {}),
+      },
+    };
+  });
 }
 
-function registerSettings(app: Hono, kit: GmailRouteKit): void {
+function registerSettings(app: DeclarableRouter, kit: GmailRouteKit): void {
   const { domain } = kit;
-  app.get(
-    `${USERS}/settings/filters`,
-    kit.read((c) => ({ body: { filter: domain.filters(emailFromContext(c)) } }))
-  );
-  app.get(
-    `${USERS}/settings/filters/:id`,
-    kit.read((c) => ({ body: domain.filter(emailFromContext(c), routeParam(c, "id")) }))
-  );
-  app.post(
-    `${USERS}/settings/filters`,
-    kit.write(async (c) => {
-      const body = await readJsonObject(c);
-      return {
-        body: asInputError(() =>
-          domain.createFilter(
-            emailFromContext(c),
-            filterCriteria(objectField(body, "criteria") ?? {}),
-            filterAction(objectField(body, "action") ?? {})
-          )
-        ),
-      };
-    })
-  );
-  app.delete(
-    `${USERS}/settings/filters/:id`,
-    kit.write((c) => {
-      domain.deleteFilter(emailFromContext(c), routeParam(c, "id"));
-      return { status: 204, body: null };
-    })
-  );
 
-  app.get(
-    `${USERS}/settings/forwardingAddresses`,
-    kit.read((c) => ({ body: { forwardingAddresses: domain.forwardingAddresses(emailFromContext(c)) } }))
-  );
-  app.get(
-    `${USERS}/settings/forwardingAddresses/:forwardingEmail`,
-    kit.read((c) => ({
-      body: domain.forwardingAddress(emailFromContext(c), decodeURIComponent(routeParam(c, "forwardingEmail"))),
-    }))
-  );
-  app.get(
-    `${USERS}/settings/sendAs`,
-    kit.read((c) => ({ body: { sendAs: domain.sendAs(emailFromContext(c)) } }))
-  );
-  app.get(
-    `${USERS}/settings/sendAs/:sendAsEmail`,
-    kit.read((c) => ({
-      body: domain.sendAsAddress(emailFromContext(c), decodeURIComponent(routeParam(c, "sendAsEmail"))),
-    }))
-  );
+  kit.read(app, GMAIL_ROUTES.listFilters, ({ path }, c) => ({
+    body: { filter: domain.filters(emailFrom(path.userId, c)) },
+  }));
+
+  kit.read(app, GMAIL_ROUTES.getFilter, ({ path }, c) => ({
+    body: domain.filter(emailFrom(path.userId, c), path.id),
+  }));
+
+  kit.write(app, GMAIL_ROUTES.createFilter, ({ path, body }, c) => ({
+    body: asInputError(() =>
+      domain.createFilter(
+        emailFrom(path.userId, c),
+        filterCriteria(body.criteria ?? {}),
+        filterAction(body.action ?? {})
+      )
+    ),
+  }));
+
+  kit.write(app, GMAIL_ROUTES.deleteFilter, ({ path }, c) => {
+    domain.deleteFilter(emailFrom(path.userId, c), path.id);
+    return { status: 204, body: null };
+  });
+
+  kit.read(app, GMAIL_ROUTES.listForwardingAddresses, ({ path }, c) => ({
+    body: { forwardingAddresses: domain.forwardingAddresses(emailFrom(path.userId, c)) },
+  }));
+
+  kit.read(app, GMAIL_ROUTES.getForwardingAddress, ({ path }, c) => ({
+    body: domain.forwardingAddress(
+      emailFrom(path.userId, c),
+      decodeURIComponent(path.forwardingEmail)
+    ),
+  }));
+
+  kit.read(app, GMAIL_ROUTES.listSendAs, ({ path }, c) => ({
+    body: { sendAs: domain.sendAs(emailFrom(path.userId, c)) },
+  }));
+
+  kit.read(app, GMAIL_ROUTES.getSendAs, ({ path }, c) => ({
+    body: domain.sendAsAddress(emailFrom(path.userId, c), decodeURIComponent(path.sendAsEmail)),
+  }));
 }
 
-function colorInput(body: JsonObject): { textColor?: string; backgroundColor?: string } | undefined {
-  const color = objectField(body, "color");
-  if (!color) return undefined;
-  return {
-    textColor: stringField(color, "textColor"),
-    backgroundColor: stringField(color, "backgroundColor"),
-  };
-}
-
+/**
+ * A filter's criteria, field by field.
+ *
+ * Deliberately still imperative: the declaration names `criteria`, which is the
+ * top-level input pome-cloud compares, and this walk is what produces
+ * `Invalid sizeComparison` rather than a generic schema failure.
+ */
 function filterCriteria(body: JsonObject): SeedFilter["criteria"] {
   const criteria: NonNullable<SeedFilter["criteria"]> = {};
   for (const key of ["from", "to", "subject", "query", "negatedQuery"] as const) {

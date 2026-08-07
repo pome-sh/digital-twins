@@ -1,63 +1,111 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Slack Web API domain routes (F-683). Pure domain shape: every handler maps
-// wire args (query + form/JSON body, Slack's native encodings) onto a
-// SlackDomain call and wraps the result in the Slack `{ok:true, ...}`
-// envelope. Everything cross-cutting — auth, recording, redaction, error
+// Slack Web API domain routes (F-683, F-1179). Pure domain shape: every handler
+// maps DECLARED inputs onto a SlackDomain call and wraps the result in the
+// Slack `{ok:true, ...}` envelope. The declaration in `./route-inputs.ts` is
+// both the mounted method/path and the only parse — a handler is handed the
+// parsed inputs and no request object, so it cannot read around its own
+// declaration. Everything cross-cutting — auth, recording, redaction, error
 // envelopes, the 501 catch-all — is the engine's (`@pome-sh/sdk`), wired
 // through the twin manifest in ./twin.ts.
 
 import type { Context, Hono } from "hono";
 import type { RouteContext } from "@pome-sh/sdk";
+import {
+  UndeclaredInputError,
+  mountDeclaredRoute,
+  type DeclaredRouteInputs,
+  type RouteInputDeclaration,
+  type RouteInputSpec,
+} from "@pome-sh/sdk/route-inputs";
 import type { StateDelta } from "@pome-sh/wire";
 import type { SlackDomain, Actor } from "./domain/index.js";
-import { TwinError } from "./errors.js";
+import { TwinError, validationFailed } from "./errors.js";
+import {
+  SLACK_READS,
+  SLACK_WRITES,
+  type SlackDeclaredArgs,
+  type SlackInputShape,
+  type SlackReadSurfaces,
+  type SlackWriteSurface,
+} from "./route-inputs.js";
 import { slackOk } from "./serializers.js";
-import { asBool, asNumber, asOptionalString, asString, parseFormOrJson } from "./util.js";
 
-type Args = Record<string, unknown>;
 type DeltaHook = (delta: StateDelta) => void;
-
-async function readArgs(c: Context): Promise<Args> {
-  const method = c.req.method.toUpperCase();
-  if (method === "GET" || method === "HEAD") {
-    return { ...c.req.query() };
-  }
-  // For POST/PUT — merge query and body so endpoints can accept either.
-  const body = await parseFormOrJson(c);
-  return { ...c.req.query(), ...body };
-}
 
 function actorFrom(c: Context): Actor {
   const session = c.get("session") as { login?: unknown } | undefined;
   return { login: typeof session?.login === "string" ? session.login : undefined };
 }
 
-const optNum = (value: unknown, fallback: number) =>
-  value === undefined ? undefined : asNumber(value, fallback);
+/**
+ * Parse a request through its own declaration, projecting the declaration's
+ * refusals into Slack's `{ok:false, error}` envelope.
+ *
+ * `UndeclaredInputError` becomes `invalid_arguments` — Slack's own documented
+ * code for an argument it does not accept (`errors.ts`) — carrying the offending
+ * names in `response_metadata.messages`, which is where `slackErrorEnvelope`
+ * already reports a bad ARGUMENT VALUE. A `z.ZodError` needs no conversion:
+ * that same hook already renders it as 200 `{ok:false, error:"invalid_arguments",
+ * response_metadata:{messages}}`, so a bad declared value is never a 500.
+ */
+async function parseDeclared<S extends RouteInputSpec>(
+  declaration: RouteInputDeclaration<S>,
+  c: Context
+): Promise<DeclaredRouteInputs<S>> {
+  try {
+    return await declaration.parse(c.req);
+  } catch (error) {
+    if (error instanceof UndeclaredInputError) {
+      validationFailed("invalid_arguments", {
+        response_metadata: { messages: [error.message] },
+      });
+    }
+    throw error;
+  }
+}
 
 export function registerSlackRoutes(app: Hono, { domain, recorder }: RouteContext<SlackDomain>): void {
-  /** Read endpoint mounted on GET + POST (Slack accepts both). */
-  const read = (path: string, call: (args: Args, actor: Actor) => Record<string, unknown>) => {
-    const handler = recorder.handle({ mutation: false }, async (c) => ({
-      status: 200,
-      body: slackOk(call(await readArgs(c), actorFrom(c))),
-    }));
-    app.get(path, handler);
-    app.post(path, handler);
+  /**
+   * A read endpoint. Slack serves its reads on GET and on POST, so this mounts
+   * two routes from two declarations over one shape: GET takes the arguments as
+   * query inputs, POST as form/JSON body inputs.
+   */
+  const read = <S extends SlackInputShape>(
+    surfaces: SlackReadSurfaces<S>,
+    call: (args: SlackDeclaredArgs<S>, actor: Actor) => Record<string, unknown>
+  ) => {
+    mountDeclaredRoute(
+      app,
+      surfaces.get,
+      recorder.handle({ mutation: false }, async (c) => ({
+        status: 200,
+        body: slackOk(call((await parseDeclared(surfaces.get, c)).query, actorFrom(c))),
+      }))
+    );
+    mountDeclaredRoute(
+      app,
+      surfaces.post,
+      recorder.handle({ mutation: false }, async (c) => ({
+        status: 200,
+        body: slackOk(call((await parseDeclared(surfaces.post, c)).body, actorFrom(c))),
+      }))
+    );
   };
 
-  /** Mutation endpoint (POST only) with state-delta capture. */
-  const write = (
-    path: string,
-    call: (args: Args, actor: Actor, delta: DeltaHook) => Record<string, unknown>,
+  /** A mutation endpoint (POST only) with state-delta capture. */
+  const write = <S extends SlackInputShape>(
+    declaration: SlackWriteSurface<S>,
+    call: (args: SlackDeclaredArgs<S>, actor: Actor, delta: DeltaHook) => Record<string, unknown>,
     mutated: (result: Record<string, unknown>) => boolean = () => true
   ) => {
-    app.post(
-      path,
+    mountDeclaredRoute(
+      app,
+      declaration,
       recorder.handle({ mutation: true }, async (c) => {
         let delta: StateDelta = null;
-        const result = call(await readArgs(c), actorFrom(c), (d) => {
+        const inputs = await parseDeclared(declaration, c);
+        const result = call(inputs.body, actorFrom(c), (d) => {
           delta = d;
         });
         return { status: 200, body: slackOk(result), delta, mutation: mutated(result) };
@@ -66,369 +114,334 @@ export function registerSlackRoutes(app: Hono, { domain, recorder }: RouteContex
   };
 
   // ── Auth ──────────────────────────────────────────────────────────────────
-  read("/auth.test", (_args, actor) => domain.authTest(actor));
+  read(SLACK_READS.authTest, (_args, actor) => domain.authTest(actor));
 
   // ── Conversations ─────────────────────────────────────────────────────────
-  read("/conversations.list", (args) =>
+  read(SLACK_READS.conversationsList, (args) =>
     domain.conversationsList({
-      types: asOptionalString(args.types),
-      exclude_archived: asBool(args.exclude_archived, false),
-      limit: optNum(args.limit, 100),
-      cursor: asOptionalString(args.cursor),
-      team_id: asOptionalString(args.team_id),
+      types: args.types,
+      exclude_archived: args.exclude_archived,
+      limit: args.limit,
+      cursor: args.cursor,
+      team_id: args.team_id,
     })
   );
 
-  read("/conversations.info", (args, actor) => {
-    const channel = asOptionalString(args.channel);
-    if (!channel) throw new TwinError("channel_not_found", 400, "channel_not_found");
+  read(SLACK_READS.conversationsInfo, (args, actor) => {
+    if (!args.channel) throw new TwinError("channel_not_found", 400, "channel_not_found");
     return domain.conversationsInfo(
-      { channel, include_num_members: asBool(args.include_num_members, false) },
+      { channel: args.channel, include_num_members: args.include_num_members },
       actor
     );
   });
 
-  write("/conversations.create", (args, actor, delta) =>
+  write(SLACK_WRITES.conversationsCreate, (args, actor, delta) =>
     domain.conversationsCreate(
-      {
-        name: asString(args.name),
-        is_private: asBool(args.is_private, false),
-        team_id: asOptionalString(args.team_id),
-      },
+      { name: args.name, is_private: args.is_private, team_id: args.team_id },
       actor,
       delta
     )
   );
 
-  write("/conversations.archive", (args, actor, delta) =>
-    domain.conversationsArchive({ channel: asString(args.channel) }, actor, delta)
+  write(SLACK_WRITES.conversationsArchive, (args, actor, delta) =>
+    domain.conversationsArchive({ channel: args.channel }, actor, delta)
   );
 
-  write("/conversations.invite", (args, actor, delta) =>
-    domain.conversationsInvite({ channel: asString(args.channel), users: asString(args.users) }, actor, delta)
+  write(SLACK_WRITES.conversationsInvite, (args, actor, delta) =>
+    domain.conversationsInvite({ channel: args.channel, users: args.users }, actor, delta)
   );
 
-  write("/conversations.join", (args, actor, delta) =>
-    domain.conversationsJoin({ channel: asString(args.channel) }, actor, delta)
+  write(SLACK_WRITES.conversationsJoin, (args, actor, delta) =>
+    domain.conversationsJoin({ channel: args.channel }, actor, delta)
   );
 
-  write("/conversations.leave", (args, actor, delta) =>
-    domain.conversationsLeave({ channel: asString(args.channel) }, actor, delta)
+  write(SLACK_WRITES.conversationsLeave, (args, actor, delta) =>
+    domain.conversationsLeave({ channel: args.channel }, actor, delta)
   );
 
-  write("/conversations.kick", (args, actor, delta) =>
-    domain.conversationsKick({ channel: asString(args.channel), user: asString(args.user) }, actor, delta)
+  write(SLACK_WRITES.conversationsKick, (args, actor, delta) =>
+    domain.conversationsKick({ channel: args.channel, user: args.user }, actor, delta)
   );
 
-  read("/conversations.members", (args, actor) =>
+  read(SLACK_READS.conversationsMembers, (args, actor) =>
     domain.conversationsMembers(
-      {
-        channel: asString(args.channel),
-        limit: optNum(args.limit, 100),
-        cursor: asOptionalString(args.cursor),
-      },
+      { channel: args.channel, limit: args.limit, cursor: args.cursor },
       actor
     )
   );
 
-  read("/conversations.history", (args, actor) =>
+  read(SLACK_READS.conversationsHistory, (args, actor) =>
     domain.conversationsHistory(
       {
-        channel: asString(args.channel),
-        cursor: asOptionalString(args.cursor),
-        inclusive: asBool(args.inclusive, false),
-        latest: asOptionalString(args.latest),
-        limit: optNum(args.limit, 100),
-        oldest: asOptionalString(args.oldest),
+        channel: args.channel,
+        cursor: args.cursor,
+        inclusive: args.inclusive,
+        latest: args.latest,
+        limit: args.limit,
+        oldest: args.oldest,
       },
       actor
     )
   );
 
-  read("/conversations.replies", (args, actor) =>
+  read(SLACK_READS.conversationsReplies, (args, actor) =>
     domain.conversationsReplies(
       {
-        channel: asString(args.channel),
-        ts: asString(args.ts),
-        cursor: asOptionalString(args.cursor),
-        inclusive: asBool(args.inclusive, false),
-        latest: asOptionalString(args.latest),
-        limit: optNum(args.limit, 100),
-        oldest: asOptionalString(args.oldest),
+        channel: args.channel,
+        ts: args.ts,
+        cursor: args.cursor,
+        inclusive: args.inclusive,
+        latest: args.latest,
+        limit: args.limit,
+        oldest: args.oldest,
       },
       actor
     )
   );
 
   write(
-    "/conversations.open",
+    SLACK_WRITES.conversationsOpen,
     (args, actor, delta) =>
       domain.conversationsOpen(
-        {
-          users: asOptionalString(args.users),
-          channel: asOptionalString(args.channel),
-          return_im: asBool(args.return_im, false),
-        },
+        { users: args.users, channel: args.channel, return_im: args.return_im },
         actor,
         delta
       ),
     (result) => !result.already_open
   );
 
-  write("/conversations.setTopic", (args, actor, delta) =>
-    domain.conversationsSetTopic(
-      { channel: asString(args.channel), topic: asString(args.topic) },
-      actor,
-      delta
-    )
+  write(SLACK_WRITES.conversationsSetTopic, (args, actor, delta) =>
+    domain.conversationsSetTopic({ channel: args.channel, topic: args.topic }, actor, delta)
   );
 
-  write("/conversations.setPurpose", (args, actor, delta) =>
-    domain.conversationsSetPurpose(
-      { channel: asString(args.channel), purpose: asString(args.purpose) },
-      actor,
-      delta
-    )
+  write(SLACK_WRITES.conversationsSetPurpose, (args, actor, delta) =>
+    domain.conversationsSetPurpose({ channel: args.channel, purpose: args.purpose }, actor, delta)
   );
 
   // ── Chat ──────────────────────────────────────────────────────────────────
-  write("/chat.postMessage", (args, actor, delta) =>
+  write(SLACK_WRITES.chatPostMessage, (args, actor, delta) =>
     domain.chatPostMessage(
       {
-        channel: asString(args.channel),
-        text: asOptionalString(args.text),
-        blocks: asOptionalString(args.blocks),
-        attachments: asOptionalString(args.attachments),
-        thread_ts: asOptionalString(args.thread_ts),
-        reply_broadcast: asBool(args.reply_broadcast, false),
-        icon_emoji: asOptionalString(args.icon_emoji),
-        icon_url: asOptionalString(args.icon_url),
-        username: asOptionalString(args.username),
-        as_user: asBool(args.as_user, false),
+        channel: args.channel,
+        text: args.text,
+        blocks: args.blocks,
+        attachments: args.attachments,
+        thread_ts: args.thread_ts,
+        reply_broadcast: args.reply_broadcast,
+        icon_emoji: args.icon_emoji,
+        icon_url: args.icon_url,
+        username: args.username,
+        as_user: args.as_user,
       },
       actor,
       delta
     )
   );
 
-  write("/chat.update", (args, actor, delta) =>
+  write(SLACK_WRITES.chatUpdate, (args, actor, delta) =>
     domain.chatUpdate(
       {
-        channel: asString(args.channel),
-        ts: asString(args.ts),
-        text: asOptionalString(args.text),
-        blocks: asOptionalString(args.blocks),
-        attachments: asOptionalString(args.attachments),
+        channel: args.channel,
+        ts: args.ts,
+        text: args.text,
+        blocks: args.blocks,
+        attachments: args.attachments,
       },
       actor,
       delta
     )
   );
 
-  write("/chat.delete", (args, actor, delta) =>
-    domain.chatDelete({ channel: asString(args.channel), ts: asString(args.ts) }, actor, delta)
+  write(SLACK_WRITES.chatDelete, (args, actor, delta) =>
+    domain.chatDelete({ channel: args.channel, ts: args.ts }, actor, delta)
   );
 
-  write("/chat.scheduleMessage", (args, actor, delta) =>
+  write(SLACK_WRITES.chatScheduleMessage, (args, actor, delta) =>
     domain.chatScheduleMessage(
       {
-        channel: asString(args.channel),
-        text: asString(args.text),
-        post_at: asNumber(args.post_at, 0),
-        thread_ts: asOptionalString(args.thread_ts),
-        blocks: asOptionalString(args.blocks),
+        channel: args.channel,
+        text: args.text,
+        post_at: args.post_at,
+        thread_ts: args.thread_ts,
+        blocks: args.blocks,
       },
       actor,
       delta
     )
   );
 
-  write("/chat.deleteScheduledMessage", (args, actor, delta) =>
+  write(SLACK_WRITES.chatDeleteScheduledMessage, (args, actor, delta) =>
     domain.chatDeleteScheduledMessage(
-      { channel: asString(args.channel), scheduled_message_id: asString(args.scheduled_message_id) },
+      { channel: args.channel, scheduled_message_id: args.scheduled_message_id },
       actor,
       delta
     )
   );
 
   // ── Reactions ─────────────────────────────────────────────────────────────
-  write("/reactions.add", (args, actor, delta) =>
+  write(SLACK_WRITES.reactionsAdd, (args, actor, delta) =>
     domain.reactionsAdd(
-      { channel: asString(args.channel), timestamp: asString(args.timestamp), name: asString(args.name) },
+      { channel: args.channel, timestamp: args.timestamp, name: args.name },
       actor,
       delta
     )
   );
 
-  write("/reactions.remove", (args, actor, delta) =>
+  write(SLACK_WRITES.reactionsRemove, (args, actor, delta) =>
     domain.reactionsRemove(
-      { channel: asString(args.channel), timestamp: asString(args.timestamp), name: asString(args.name) },
+      { channel: args.channel, timestamp: args.timestamp, name: args.name },
       actor,
       delta
     )
   );
 
-  read("/reactions.get", (args, actor) =>
+  read(SLACK_READS.reactionsGet, (args, actor) =>
     domain.reactionsGet(
-      {
-        channel: asString(args.channel),
-        timestamp: asString(args.timestamp),
-        full: asBool(args.full, false),
-      },
+      { channel: args.channel, timestamp: args.timestamp, full: args.full },
       actor
     )
   );
 
   // ── Users ─────────────────────────────────────────────────────────────────
-  read("/users.list", (args) =>
+  read(SLACK_READS.usersList, (args) =>
     domain.usersList({
-      cursor: asOptionalString(args.cursor),
-      limit: optNum(args.limit, 100),
-      include_locale: asBool(args.include_locale, false),
-      team_id: asOptionalString(args.team_id),
+      cursor: args.cursor,
+      limit: args.limit,
+      include_locale: args.include_locale,
+      team_id: args.team_id,
     })
   );
 
-  read("/users.info", (args) =>
-    domain.usersInfo({ user: asString(args.user), include_locale: asBool(args.include_locale, false) })
+  read(SLACK_READS.usersInfo, (args) =>
+    domain.usersInfo({ user: args.user, include_locale: args.include_locale })
   );
 
-  read("/users.lookupByEmail", (args) => domain.usersLookupByEmail({ email: asString(args.email) }));
+  read(SLACK_READS.usersLookupByEmail, (args) => domain.usersLookupByEmail({ email: args.email }));
 
-  read("/users.profile.get", (args, actor) =>
-    domain.usersProfileGet(
-      { user: asOptionalString(args.user), include_labels: asBool(args.include_labels, false) },
-      actor
-    )
+  read(SLACK_READS.usersProfileGet, (args, actor) =>
+    domain.usersProfileGet({ user: args.user, include_labels: args.include_labels }, actor)
   );
 
-  write("/users.profile.set", (args, actor, delta) =>
+  write(SLACK_WRITES.usersProfileSet, (args, actor, delta) =>
     domain.usersProfileSet(
-      {
-        user: asOptionalString(args.user),
-        profile: asOptionalString(args.profile),
-        name: asOptionalString(args.name),
-        value: asOptionalString(args.value),
-      },
+      { user: args.user, profile: args.profile, name: args.name, value: args.value },
       actor,
       delta
     )
   );
 
   // ── Pins ──────────────────────────────────────────────────────────────────
-  write("/pins.add", (args, actor, delta) =>
-    domain.pinsAdd({ channel: asString(args.channel), timestamp: asString(args.timestamp) }, actor, delta)
+  write(SLACK_WRITES.pinsAdd, (args, actor, delta) =>
+    domain.pinsAdd({ channel: args.channel, timestamp: args.timestamp }, actor, delta)
   );
 
-  write("/pins.remove", (args, actor, delta) =>
-    domain.pinsRemove({ channel: asString(args.channel), timestamp: asString(args.timestamp) }, actor, delta)
+  write(SLACK_WRITES.pinsRemove, (args, actor, delta) =>
+    domain.pinsRemove({ channel: args.channel, timestamp: args.timestamp }, actor, delta)
   );
 
-  read("/pins.list", (args, actor) => domain.pinsList({ channel: asString(args.channel) }, actor));
+  read(SLACK_READS.pinsList, (args, actor) => domain.pinsList({ channel: args.channel }, actor));
 
   // ── Search ────────────────────────────────────────────────────────────────
-  read("/search.messages", (args, actor) =>
+  read(SLACK_READS.searchMessages, (args, actor) =>
     domain.searchMessages(
       {
-        query: asString(args.query),
-        count: optNum(args.count, 20),
-        page: optNum(args.page, 1),
-        sort: asOptionalString(args.sort),
-        sort_dir: asOptionalString(args.sort_dir),
-        highlight: asBool(args.highlight, false),
+        query: args.query,
+        count: args.count,
+        page: args.page,
+        sort: args.sort,
+        sort_dir: args.sort_dir,
+        highlight: args.highlight,
       },
       actor
     )
   );
 
   // ── Files (metadata-only) ─────────────────────────────────────────────────
-  write("/files.upload", (args, actor, delta) =>
+  write(SLACK_WRITES.filesUpload, (args, actor, delta) =>
     domain.filesUpload(
       {
-        channels: asOptionalString(args.channels),
-        channel: asOptionalString(args.channel),
-        filename: asOptionalString(args.filename),
-        title: asOptionalString(args.title),
-        filetype: asOptionalString(args.filetype),
-        content: asOptionalString(args.content),
-        initial_comment: asOptionalString(args.initial_comment),
-        thread_ts: asOptionalString(args.thread_ts),
+        channels: args.channels,
+        channel: args.channel,
+        filename: args.filename,
+        title: args.title,
+        filetype: args.filetype,
+        content: args.content,
+        initial_comment: args.initial_comment,
+        thread_ts: args.thread_ts,
       },
       actor,
       delta
     )
   );
 
-  read("/files.info", (args) => domain.filesInfo({ file: asString(args.file) }));
+  read(SLACK_READS.filesInfo, (args) => domain.filesInfo({ file: args.file }));
 
-  read("/files.list", (args) =>
+  read(SLACK_READS.filesList, (args) =>
     domain.filesList({
-      channel: asOptionalString(args.channel),
-      user: asOptionalString(args.user),
-      count: optNum(args.count, 100),
-      page: optNum(args.page, 1),
-      types: asOptionalString(args.types),
+      channel: args.channel,
+      user: args.user,
+      count: args.count,
+      page: args.page,
+      types: args.types,
     })
   );
 
-  write("/files.delete", (args, actor, delta) =>
-    domain.filesDelete({ file: asString(args.file) }, actor, delta)
+  write(SLACK_WRITES.filesDelete, (args, actor, delta) =>
+    domain.filesDelete({ file: args.file }, actor, delta)
   );
 
   // ── Bookmarks ─────────────────────────────────────────────────────────────
-  write("/bookmarks.add", (args, actor, delta) =>
+  write(SLACK_WRITES.bookmarksAdd, (args, actor, delta) =>
     domain.bookmarksAdd(
       {
-        channel_id: asString(args.channel_id),
-        title: asString(args.title),
-        type: asOptionalString(args.type),
-        link: asOptionalString(args.link),
-        emoji: asOptionalString(args.emoji),
-        entity_id: asOptionalString(args.entity_id),
+        channel_id: args.channel_id,
+        title: args.title,
+        type: args.type,
+        link: args.link,
+        emoji: args.emoji,
+        entity_id: args.entity_id,
       },
       actor,
       delta
     )
   );
 
-  write("/bookmarks.remove", (args, actor, delta) =>
+  write(SLACK_WRITES.bookmarksRemove, (args, actor, delta) =>
     domain.bookmarksRemove(
-      { channel_id: asString(args.channel_id), bookmark_id: asString(args.bookmark_id) },
+      { channel_id: args.channel_id, bookmark_id: args.bookmark_id },
       actor,
       delta
     )
   );
 
-  read("/bookmarks.list", (args) => domain.bookmarksList({ channel_id: asString(args.channel_id) }));
+  read(SLACK_READS.bookmarksList, (args) => domain.bookmarksList({ channel_id: args.channel_id }));
 
   // ── Team ──────────────────────────────────────────────────────────────────
-  read("/team.info", (args) => domain.teamInfo({ team: asOptionalString(args.team) }));
+  read(SLACK_READS.teamInfo, (args) => domain.teamInfo({ team: args.team }));
 
   // ── Canvases (Wave 3) ─────────────────────────────────────────────────────
-  write("/canvases.create", (args, actor, delta) =>
+  write(SLACK_WRITES.canvasesCreate, (args, actor, delta) =>
     domain.canvasesCreate(
       {
-        title: asOptionalString(args.title),
+        title: args.title,
         document_content: args.document_content,
-        channel_id: asOptionalString(args.channel_id),
+        channel_id: args.channel_id,
       },
       actor,
       delta
     )
   );
 
-  write("/canvases.edit", (args, actor, delta) =>
-    domain.canvasesEdit(
-      { canvas_id: asString(args.canvas_id), changes: args.changes },
-      actor,
-      delta
-    )
+  write(SLACK_WRITES.canvasesEdit, (args, actor, delta) =>
+    domain.canvasesEdit({ canvas_id: args.canvas_id, changes: args.changes }, actor, delta)
   );
 
-  write("/canvases.delete", (args, actor, delta) =>
-    domain.canvasesDelete({ canvas_id: asString(args.canvas_id) }, actor, delta)
+  write(SLACK_WRITES.canvasesDelete, (args, actor, delta) =>
+    domain.canvasesDelete({ canvas_id: args.canvas_id }, actor, delta)
   );
 
   // ── Emoji (Wave 3) ────────────────────────────────────────────────────────
-  read("/emoji.list", (args) => domain.emojiList(args));
+  read(SLACK_READS.emojiList, (args) =>
+    domain.emojiList({ include_categories: args.include_categories })
+  );
 }

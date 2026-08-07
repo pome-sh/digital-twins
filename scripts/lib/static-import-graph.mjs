@@ -90,14 +90,36 @@ export function stripNonCode(source) {
       index = stop;
       continue;
     }
+    if (char === '"' || char === "'") {
+      // Copied through VERBATIM rather than blanked — a module specifier lives
+      // in one of these, and the callers' patterns read it — but consumed as one
+      // unit so nothing inside can open a comment or a template literal.
+      //
+      // Not cosmetic. `twin-stripe/src/session.ts` mounts middleware at
+      // `session.use("/x402/*", …)`, and `twin-stripe/src/errors.ts` (a named
+      // cross-runtime leaf) describes a surface as `"Stripe-shaped REST under
+      // /v1/*"`. Scanning those character by character reads the `/*` as a
+      // block-comment opener and blanks everything up to the next `*/` — 37
+      // lines in session.ts, the rest of the file in errors.ts. Every import
+      // below the opener then vanishes, so a reachability gate reports the file
+      // as clean and a portability gate as safe. A false GREEN, which is the
+      // failure mode these gates exist to prevent.
+      let cursor = index + 1;
+      while (cursor < source.length && source[cursor] !== char && source[cursor] !== "\n") {
+        cursor += source[cursor] === "\\" ? 2 : 1;
+      }
+      // An unterminated string (only reachable in invalid source) stops at the
+      // newline, so one bad line can never swallow the rest of the file.
+      const stop = source[cursor] === char ? Math.min(cursor + 1, source.length) : cursor;
+      out += source.slice(index, stop);
+      index = stop;
+      continue;
+    }
     out += char;
     index += 1;
   }
   return out;
 }
-// Ordinary quoted strings are left alone deliberately: they cannot span lines, and
-// every pattern below is anchored to the start of one, so a specifier inside a
-// single-line string can never sit where an import statement would.
 
 /**
  * Runtime static import specifiers in one TypeScript source.

@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Hono } from "hono";
 import {
-  asBool,
-  asNumber,
-  asString,
   cursorDecode,
   cursorEncode,
   csvList,
@@ -35,20 +32,10 @@ describe("util helpers", () => {
     expect(cursorDecode(null)).toBeNull();
   });
 
-  it("asBool coerces string truthiness", () => {
-    expect(asBool("true")).toBe(true);
-    expect(asBool("false")).toBe(false);
-    expect(asBool("1")).toBe(true);
-  });
-
-  it("asNumber parses string numbers", () => {
-    expect(asNumber("10", 0)).toBe(10);
-    expect(asNumber("bad", 5)).toBe(5);
-  });
-
-  it("asString stringifies non-strings", () => {
-    expect(asString(42)).toBe("42");
-  });
+  // The `asBool` / `asNumber` / `asString` coercions these three blocks pinned
+  // are gone with F-1179: route inputs are declared and parsed by
+  // `src/route-inputs.ts`, whose behaviour is pinned by
+  // `test/route-input-declarations.test.ts` against the real HTTP surface.
 
   it("csvList splits comma-separated values", () => {
     expect(csvList("a, b ,c")).toEqual(["a", "b", "c"]);

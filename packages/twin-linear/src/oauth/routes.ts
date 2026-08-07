@@ -1,23 +1,55 @@
 // SPDX-License-Identifier: Apache-2.0
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { Context } from "hono";
+import {
+  UndeclaredInputError,
+  mountDeclaredRoute,
+  type DeclarableRouter,
+  type DeclaredRouteInputs,
+  type RouteInputDeclaration,
+  type RouteInputSpec,
+} from "@pome-sh/sdk/route-inputs";
 import type { LinearDomain } from "../domain/index.js";
 import { token } from "../ids.js";
+import { LINEAR_ROUTES } from "../route-inputs.js";
 import { OAUTH_CODE_TTL_SECONDS, type LinearOAuthApp, type LinearTokenActorType } from "../types.js";
 
-export function registerOAuthRoutes(
-  app: { get: Function; post: Function },
-  commands: LinearDomain
-): void {
-  app.get("/oauth/authorize", (c: Context) => {
-    const clientId = c.req.query("client_id") ?? "";
-    const redirectUri = c.req.query("redirect_uri") ?? "";
-    const responseType = c.req.query("response_type") ?? "code";
-    const state = c.req.query("state") ?? "";
-    const scope = c.req.query("scope") ?? "read";
-    const requestedActor = normalizeActor(c.req.query("actor"));
-    const codeChallenge = c.req.query("code_challenge") ?? "";
-    const codeChallengeMethod = c.req.query("code_challenge_method") ?? "";
+/**
+ * Parse a request through its declaration, or `null` after answering.
+ *
+ * These four routes sit OUTSIDE the recorder (`withPublicOAuth` mounts them
+ * ahead of `bearerAuth`, since authorize/token/revoke must be reachable without
+ * one), so there is no `errorEnvelope` hook to project a refusal through. A
+ * `null` return means the response has already been sent.
+ */
+async function parseDeclared<S extends RouteInputSpec>(
+  declaration: RouteInputDeclaration<S>,
+  c: Context,
+  onUndeclared: (error: UndeclaredInputError) => Response
+): Promise<{ input: DeclaredRouteInputs<S> } | { response: Response }> {
+  try {
+    return { input: await declaration.parse(c.req) };
+  } catch (error) {
+    if (error instanceof UndeclaredInputError) return { response: onUndeclared(error) };
+    throw error;
+  }
+}
+
+export function registerOAuthRoutes(app: DeclarableRouter, commands: LinearDomain): void {
+  mountDeclaredRoute(app, LINEAR_ROUTES.oauthAuthorize, async (c: Context) => {
+    const parsed = await parseDeclared(LINEAR_ROUTES.oauthAuthorize, c, (error) =>
+      c.html(errorPage("Unknown parameter", `The ${error.first} parameter is not supported.`), 400)
+    );
+    if ("response" in parsed) return parsed.response;
+    const query = parsed.input.query;
+    const clientId = query.client_id ?? "";
+    const redirectUri = query.redirect_uri ?? "";
+    const responseType = query.response_type ?? "code";
+    const state = query.state ?? "";
+    const scope = query.scope ?? "read";
+    const requestedActor = normalizeActor(query.actor);
+    const codeChallenge = query.code_challenge ?? "";
+    const codeChallengeMethod = query.code_challenge_method ?? "";
 
     if (responseType !== "code") {
       return c.html(errorPage("Unsupported response_type", "Only response_type=code is supported."), 400);
@@ -110,8 +142,12 @@ export function registerOAuthRoutes(
     );
   });
 
-  app.post("/oauth/authorize/callback", async (c: Context) => {
-    const body = await c.req.parseBody();
+  mountDeclaredRoute(app, LINEAR_ROUTES.oauthAuthorizeCallback, async (c: Context) => {
+    const parsed = await parseDeclared(LINEAR_ROUTES.oauthAuthorizeCallback, c, (error) =>
+      c.html(errorPage("Unknown parameter", `The ${error.first} parameter is not supported.`), 400)
+    );
+    if ("response" in parsed) return parsed.response;
+    const body = parsed.input.body;
     const clientId = bodyStr(body.client_id);
     const redirectUri = bodyStr(body.redirect_uri);
     const state = bodyStr(body.state);
@@ -175,10 +211,14 @@ export function registerOAuthRoutes(
     return c.redirect(url.toString());
   });
 
-  app.post("/oauth/token", async (c: Context) => {
-    const body = await c.req.parseBody();
+  mountDeclaredRoute(app, LINEAR_ROUTES.oauthToken, async (c: Context) => {
+    const parsed = await parseDeclared(LINEAR_ROUTES.oauthToken, c, (error) =>
+      oauthError("invalid_request", `Unknown parameter: ${error.first}.`)
+    );
+    if ("response" in parsed) return parsed.response;
+    const { body, header } = parsed.input;
     const grantType = bodyStr(body.grant_type);
-    const clientAuth = clientCredentials(c.req.header("Authorization"), body);
+    const clientAuth = clientCredentials(header.Authorization, body);
     const oauthApp = requireRegisteredOAuthApp(commands, clientAuth.clientId);
     if (!oauthApp) {
       return oauthError("invalid_client", "The OAuth app is not registered.");
@@ -262,8 +302,12 @@ export function registerOAuthRoutes(
     );
   });
 
-  app.post("/oauth/revoke", async (c: Context) => {
-    const body = await c.req.parseBody();
+  mountDeclaredRoute(app, LINEAR_ROUTES.oauthRevoke, async (c: Context) => {
+    const parsed = await parseDeclared(LINEAR_ROUTES.oauthRevoke, c, (error) =>
+      oauthError("invalid_request", `Unknown parameter: ${error.first}.`)
+    );
+    if ("response" in parsed) return parsed.response;
+    const body = parsed.input.body;
     const value = bodyStr(body.token) || bodyStr(body.access_token) || bodyStr(body.refresh_token);
     if (value) commands.revokeToken(value);
     return c.body(null, 200);

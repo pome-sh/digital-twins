@@ -7,20 +7,10 @@
 // carries the canonical state_delta through to respond().
 
 import type { Hono } from "hono";
-import { z } from "zod";
 import type { StripeDomain } from "../domain/index.js";
+import { STRIPE_ROUTES } from "../route-inputs.js";
 import type { Recorder } from "../types.js";
-import { accountId, created, handle, ok, parseListQuery, readBodyForm } from "./_helpers.js";
-
-// Every field optional, like real Stripe. Metadata values keep "" and null
-// so the domain can apply Stripe's per-key unset semantics on update.
-const customerFieldsSchema = z.object({
-  name: z.string().nullish(),
-  email: z.string().nullish(),
-  description: z.string().nullish(),
-  phone: z.string().nullish(),
-  metadata: z.record(z.string(), z.string().nullable()).optional(),
-});
+import { accountId, created, declaredRoute, listQuery, ok } from "./_helpers.js";
 
 export function registerCustomersRoutes(
   router: Hono,
@@ -28,53 +18,40 @@ export function registerCustomersRoutes(
   recorder: Recorder | undefined,
   runId: string
 ) {
-  router.post("/v1/customers", (c) =>
-    handle(c, recorder, runId, async () => {
-      const input = customerFieldsSchema.parse(await readBodyForm(c));
-      const { body, delta } = domain.createCustomer(accountId(c), input);
-      return created(body, delta);
-    })
-  );
+  declaredRoute(router, STRIPE_ROUTES.createCustomer, recorder, runId, ({ body }, c) => {
+    const { body: response, delta } = domain.createCustomer(accountId(c), body);
+    return created(response, delta);
+  });
 
-  router.get("/v1/customers/:id/payment_methods", (c) =>
-    handle(c, recorder, runId, () => {
-      const list = parseListQuery(c);
-      return ok(
-        domain.listCustomerPaymentMethods(accountId(c), c.req.param("id")!, {
-          ...list,
-          type: c.req.query("type"),
+  declaredRoute(
+    router,
+    STRIPE_ROUTES.listCustomerPaymentMethods,
+    recorder,
+    runId,
+    ({ path, query }, c) =>
+      ok(
+        domain.listCustomerPaymentMethods(accountId(c), path.id, {
+          ...listQuery(query),
+          type: query.type,
         })
-      );
-    })
+      )
   );
 
-  router.get("/v1/customers/:id", (c) =>
-    handle(c, recorder, runId, () =>
-      ok(domain.retrieveCustomer(accountId(c), c.req.param("id")!))
-    )
+  declaredRoute(router, STRIPE_ROUTES.retrieveCustomer, recorder, runId, ({ path }, c) =>
+    ok(domain.retrieveCustomer(accountId(c), path.id))
   );
 
-  router.post("/v1/customers/:id", (c) =>
-    handle(c, recorder, runId, async () => {
-      const input = customerFieldsSchema.parse(await readBodyForm(c));
-      const { body, delta } = domain.updateCustomer(accountId(c), c.req.param("id")!, input);
-      return ok(body, true, delta);
-    })
-  );
+  declaredRoute(router, STRIPE_ROUTES.updateCustomer, recorder, runId, ({ path, body }, c) => {
+    const { body: response, delta } = domain.updateCustomer(accountId(c), path.id, body);
+    return ok(response, true, delta);
+  });
 
-  router.delete("/v1/customers/:id", (c) =>
-    handle(c, recorder, runId, () => {
-      const { body, delta } = domain.deleteCustomer(accountId(c), c.req.param("id")!);
-      return ok(body, true, delta);
-    })
-  );
+  declaredRoute(router, STRIPE_ROUTES.deleteCustomer, recorder, runId, ({ path }, c) => {
+    const { body, delta } = domain.deleteCustomer(accountId(c), path.id);
+    return ok(body, true, delta);
+  });
 
-  router.get("/v1/customers", (c) =>
-    handle(c, recorder, runId, () => {
-      const list = parseListQuery(c);
-      return ok(
-        domain.listCustomers(accountId(c), { ...list, email: c.req.query("email") })
-      );
-    })
+  declaredRoute(router, STRIPE_ROUTES.listCustomers, recorder, runId, ({ query }, c) =>
+    ok(domain.listCustomers(accountId(c), { ...listQuery(query), email: query.email }))
   );
 }

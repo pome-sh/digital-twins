@@ -121,6 +121,17 @@ jobs:
       # above, no build and no install needed.
       - run: node scripts/check-twin-leaf-portability.mjs
       - run: node scripts/check-twin-leaf-portability.test.mjs
+      # F-1179 — every input a twin's REST/GraphQL handlers see arrives through
+      # the route's own declaration, which is what gets published to
+      # pome-cloud's declared-fidelity lane. One `c.req.query("sort")` typechecks,
+      # passes every test, and silently drops that name from the published
+      # surface — after which the lane compares the vendor's inputs against an
+      # incomplete list and reports no drift. A pass nobody measured is worse
+      # than the `not-compared` it reported before. No type can stop that line,
+      # so the invariant is this reachability walk: same static graph as the two
+      # gates above, no build and no install needed.
+      - run: node scripts/lint-route-input-declarations.mjs
+      - run: node scripts/lint-route-input-declarations.test.mjs
       # F-745 / D4 — no catch-and-continue in the SDK twin engine
       # (packages/sdk/src): every statement catch must throw, return an
       # error/sentinel, or reject. Dependency-free, runs before `npm ci`.
@@ -198,6 +209,14 @@ jobs:
           # dependency order so those subpaths resolve before typecheck/test.
           npm run build
           npm run typecheck
+          # F-1179 — packages/twin-*/route-inputs.json is DERIVED from each twin's
+          # route declarations and read by pome-cloud through the POME_TWIN_SRC
+          # checkout seam. Without this line the JSON is just another hand-kept
+          # list of parameter names drifting from the handlers — the second source
+          # of truth the ticket exists to not create. Needs the build above,
+          # because the emitter imports the twins' compiled declarations rather
+          # than reading TypeScript with a regex.
+          npm run gate:route-inputs
           # F-866 — the bundled examples/ projects are standalone npm packages
           # (own lockfiles), not workspaces, so `npm run typecheck` above misses
           # them. Typecheck each against the just-built adapter so a zod-4 / SDK

@@ -3,8 +3,9 @@
 
 import type { Hono } from "hono";
 import type { StripeDomain } from "../domain/index.js";
+import { STRIPE_ROUTES } from "../route-inputs.js";
 import type { Recorder } from "../types.js";
-import { handle, ok, parseListQuery, accountId } from "./_helpers.js";
+import { accountId, declaredRoute, listQuery, ok } from "./_helpers.js";
 
 export function registerBalanceRoutes(
   router: Hono,
@@ -12,19 +13,11 @@ export function registerBalanceRoutes(
   recorder: Recorder | undefined,
   runId: string
 ) {
-  router.get("/v1/balance", (c) =>
-    handle(c, recorder, runId, () => ok(domain.retrieveBalance(accountId(c))))
+  declaredRoute(router, STRIPE_ROUTES.retrieveBalance, recorder, runId, (_input, c) =>
+    ok(domain.retrieveBalance(accountId(c)))
   );
 
-  router.get("/v1/balance_transactions", (c) =>
-    handle(c, recorder, runId, () => {
-      const list = parseListQuery(c);
-      return ok(
-        domain.listBalanceTransactions(accountId(c), {
-          ...list,
-          type: c.req.query("type"),
-        })
-      );
-    })
+  declaredRoute(router, STRIPE_ROUTES.listBalanceTransactions, recorder, runId, ({ query }, c) =>
+    ok(domain.listBalanceTransactions(accountId(c), { ...listQuery(query), type: query.type }))
   );
 }

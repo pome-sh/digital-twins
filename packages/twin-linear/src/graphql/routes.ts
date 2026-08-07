@@ -2,9 +2,18 @@
 import { getOperationAST, graphql, parse, type GraphQLError, type GraphQLFormattedError } from "graphql";
 import type { Context } from "hono";
 import type { RouteContext } from "@pome-sh/sdk";
+import {
+  UndeclaredInputError,
+  mountDeclaredRoute,
+  type DeclarableRouter,
+  type DeclaredRouteInputs,
+  type RouteInputDeclaration,
+  type RouteInputSpec,
+} from "@pome-sh/sdk/route-inputs";
 import type { SessionValue } from "@pome-sh/sdk/server";
 import type { LinearDomain } from "../domain/index.js";
 import { LinearTwinError, badUserInput } from "../errors.js";
+import { LINEAR_ROUTES } from "../route-inputs.js";
 // GraphQL v16 dropped `formatError` on `graphql()` — project twin errors after execute.
 import { byteLength } from "../ids.js";
 import { actorFromSession } from "../identity.js";
@@ -13,31 +22,54 @@ import { GRAPHQL_QUERY_MAX_BYTES, GRAPHQL_SELECTION_DEPTH_MAX } from "../types.j
 import { createRootValue } from "./resolvers.js";
 import { linearGraphQLSchema } from "./schema.js";
 
-export function registerGraphqlRoutes(
-  app: { get: Function; post: Function },
-  ctx: RouteContext<LinearDomain>
-): void {
-  app.get(
-    "/graphql",
+export function registerGraphqlRoutes(app: DeclarableRouter, ctx: RouteContext<LinearDomain>): void {
+  mountDeclaredRoute(
+    app,
+    LINEAR_ROUTES.graphqlGet,
     ctx.recorder.handle({ mutation: false }, async (c) => {
-      const query = c.req.query("query") ?? "";
-      return executeRecordedGraphQL(ctx, c, query, {
-        variables: parseVariables(c.req.query("variables")),
-        operationName: c.req.query("operationName") ?? undefined,
+      const { query } = await parseDeclared(LINEAR_ROUTES.graphqlGet, c);
+      return executeRecordedGraphQL(ctx, c, query.query ?? "", {
+        variables: parseVariables(query.variables),
+        operationName: query.operationName,
       });
     })
   );
 
-  app.post(
-    "/graphql",
+  mountDeclaredRoute(
+    app,
+    LINEAR_ROUTES.graphqlPost,
     ctx.recorder.handle({ mutation: false }, async (c) => {
-      const body = await readGraphQLBody(c);
-      return executeRecordedGraphQL(ctx, c, body.query, {
-        variables: body.variables,
+      const { body } = await parseDeclared(LINEAR_ROUTES.graphqlPost, c);
+      return executeRecordedGraphQL(ctx, c, body.query ?? "", {
+        // Form-posted variables arrive as a JSON string, JSON-posted ones as an
+        // object. The declaration accepts both spellings, so both are handled
+        // here rather than at two content-type-sniffing call sites.
+        variables: typeof body.variables === "string" ? parseVariables(body.variables) : body.variables,
         operationName: body.operationName,
       });
     })
   );
+}
+
+/**
+ * Project the declaration's refusals into a GraphQL-shaped error.
+ *
+ * A transport key nobody declared is a client mistake, not a schema one, so it
+ * answers `BAD_USER_INPUT` the same way a malformed query does — GraphQL has no
+ * other channel for it.
+ */
+async function parseDeclared<S extends RouteInputSpec>(
+  declaration: RouteInputDeclaration<S>,
+  c: Context
+): Promise<DeclaredRouteInputs<S>> {
+  try {
+    return await declaration.parse(c.req);
+  } catch (error) {
+    if (error instanceof UndeclaredInputError) {
+      badUserInput(`Unknown ${error.location} parameter: ${error.first}`);
+    }
+    throw error;
+  }
 }
 
 async function executeRecordedGraphQL(
@@ -145,31 +177,6 @@ function isMutationOperation(source: string, operationName?: string): boolean {
   } catch {
     return /^\s*mutation\b/i.test(source);
   }
-}
-
-async function readGraphQLBody(c: Context): Promise<{
-  query: string;
-  variables?: Record<string, unknown>;
-  operationName?: string;
-}> {
-  const contentType = c.req.header("content-type") ?? "";
-  if (contentType.includes("application/x-www-form-urlencoded")) {
-    const body = await c.req.parseBody();
-    return {
-      query: typeof body.query === "string" ? body.query : "",
-      variables: parseVariables(typeof body.variables === "string" ? body.variables : undefined),
-      operationName:
-        typeof body.operationName === "string" && body.operationName
-          ? body.operationName
-          : undefined,
-    };
-  }
-  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-  return {
-    query: typeof body.query === "string" ? body.query : "",
-    variables: isRecord(body.variables) ? body.variables : undefined,
-    operationName: typeof body.operationName === "string" ? body.operationName : undefined,
-  };
 }
 
 function parseVariables(raw: string | undefined): Record<string, unknown> | undefined {

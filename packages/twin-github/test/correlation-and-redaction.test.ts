@@ -124,7 +124,12 @@ describe("FDRS-402 — centralized redactor on request_body / response_body", ()
         nested: { authorization: "Bearer leaked" }
       })
     }));
-    expect(response.status).toBe(201);
+    // `token`, `api_key` and `nested` are not declared inputs of
+    // `POST /repos/{owner}/{repo}/issues` — on this twin or on GitHub — so
+    // since F-1179 the route refuses them instead of silently dropping them.
+    // The recorder still captures and redacts the body it refused, which is the
+    // half that matters here: a rejected request's body ships in the trace too.
+    expect(response.status).toBe(422);
 
     const event = lastEvent(recorder.events());
     const recordedRequest = event.request_body as Record<string, unknown>;

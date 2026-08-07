@@ -133,7 +133,7 @@ describe("REST / cluster B — commits & diffs", () => {
   it("GET /pulls/:n/diff returns the unified-diff envelope", async () => {
     const a = app();
     await jsonReq(a, "POST", "/repos/acme/api/git/refs", { ref: "refs/heads/diff-rest" });
-    await jsonReq(a, "PUT", "/repos/acme/api/contents/diff.ts?branch=diff-rest", { message: "m", content: "x\n", branch: "diff-rest" });
+    await jsonReq(a, "PUT", "/repos/acme/api/contents/diff.ts", { message: "m", content: "x\n", branch: "diff-rest" });
     const pr = await jsonReq(a, "POST", "/repos/acme/api/pulls", { title: "Diff REST", head: "diff-rest", base: "main" });
     const number = (pr.body as { number: number }).number;
     const response = await jsonReq(a, "GET", `/repos/acme/api/pulls/${number}/diff`);

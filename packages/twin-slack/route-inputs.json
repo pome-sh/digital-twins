@@ -1,0 +1,1899 @@
+{
+  "twin": "slack",
+  "package": "@pome-sh/twin-slack",
+  "artifact_version": 1,
+  "generated_by": "npm run emit:route-inputs",
+  "source": [
+    "packages/twin-slack/src/route-inputs.ts"
+  ],
+  "surface_count": 62,
+  "input_count": 242,
+  "surfaces": [
+    {
+      "method": "GET",
+      "path": "/auth.test",
+      "surface": "GET /auth.test",
+      "inputs": [
+        {
+          "name": "token",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/bookmarks.list",
+      "surface": "GET /bookmarks.list",
+      "inputs": [
+        {
+          "name": "channel_id",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/conversations.history",
+      "surface": "GET /conversations.history",
+      "inputs": [
+        {
+          "name": "channel",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "cursor",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "inclusive",
+          "location": "query",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "latest",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "limit",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "oldest",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/conversations.info",
+      "surface": "GET /conversations.info",
+      "inputs": [
+        {
+          "name": "channel",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "include_num_members",
+          "location": "query",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "token",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/conversations.list",
+      "surface": "GET /conversations.list",
+      "inputs": [
+        {
+          "name": "cursor",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "exclude_archived",
+          "location": "query",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "limit",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "team_id",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "types",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/conversations.members",
+      "surface": "GET /conversations.members",
+      "inputs": [
+        {
+          "name": "channel",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "cursor",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "limit",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "token",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/conversations.replies",
+      "surface": "GET /conversations.replies",
+      "inputs": [
+        {
+          "name": "channel",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "cursor",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "inclusive",
+          "location": "query",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "latest",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "limit",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "oldest",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "ts",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/emoji.list",
+      "surface": "GET /emoji.list",
+      "inputs": [
+        {
+          "name": "include_categories",
+          "location": "query",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "token",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/files.info",
+      "surface": "GET /files.info",
+      "inputs": [
+        {
+          "name": "file",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/files.list",
+      "surface": "GET /files.list",
+      "inputs": [
+        {
+          "name": "channel",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "count",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "token",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "types",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "user",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/pins.list",
+      "surface": "GET /pins.list",
+      "inputs": [
+        {
+          "name": "channel",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/reactions.get",
+      "surface": "GET /reactions.get",
+      "inputs": [
+        {
+          "name": "channel",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "full",
+          "location": "query",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "timestamp",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/search.messages",
+      "surface": "GET /search.messages",
+      "inputs": [
+        {
+          "name": "count",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "highlight",
+          "location": "query",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "query",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "sort",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "sort_dir",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/team.info",
+      "surface": "GET /team.info",
+      "inputs": [
+        {
+          "name": "team",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/users.info",
+      "surface": "GET /users.info",
+      "inputs": [
+        {
+          "name": "include_locale",
+          "location": "query",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "token",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "user",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/users.list",
+      "surface": "GET /users.list",
+      "inputs": [
+        {
+          "name": "cursor",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "include_locale",
+          "location": "query",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "limit",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "team_id",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/users.lookupByEmail",
+      "surface": "GET /users.lookupByEmail",
+      "inputs": [
+        {
+          "name": "email",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/users.profile.get",
+      "surface": "GET /users.profile.get",
+      "inputs": [
+        {
+          "name": "include_labels",
+          "location": "query",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "token",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "user",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/auth.test",
+      "surface": "POST /auth.test",
+      "inputs": [
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/bookmarks.add",
+      "surface": "POST /bookmarks.add",
+      "inputs": [
+        {
+          "name": "channel_id",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "emoji",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "entity_id",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "link",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "title",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "type",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/bookmarks.list",
+      "surface": "POST /bookmarks.list",
+      "inputs": [
+        {
+          "name": "channel_id",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/bookmarks.remove",
+      "surface": "POST /bookmarks.remove",
+      "inputs": [
+        {
+          "name": "bookmark_id",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "channel_id",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/canvases.create",
+      "surface": "POST /canvases.create",
+      "inputs": [
+        {
+          "name": "channel_id",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "document_content",
+          "location": "body",
+          "required": false,
+          "type": null
+        },
+        {
+          "name": "title",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/canvases.delete",
+      "surface": "POST /canvases.delete",
+      "inputs": [
+        {
+          "name": "canvas_id",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/canvases.edit",
+      "surface": "POST /canvases.edit",
+      "inputs": [
+        {
+          "name": "canvas_id",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "changes",
+          "location": "body",
+          "required": false,
+          "type": null
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/chat.delete",
+      "surface": "POST /chat.delete",
+      "inputs": [
+        {
+          "name": "channel",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "ts",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/chat.deleteScheduledMessage",
+      "surface": "POST /chat.deleteScheduledMessage",
+      "inputs": [
+        {
+          "name": "channel",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "scheduled_message_id",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/chat.postMessage",
+      "surface": "POST /chat.postMessage",
+      "inputs": [
+        {
+          "name": "as_user",
+          "location": "body",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "attachments",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "blocks",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "channel",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "icon_emoji",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "icon_url",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "reply_broadcast",
+          "location": "body",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "text",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "thread_ts",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "username",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/chat.scheduleMessage",
+      "surface": "POST /chat.scheduleMessage",
+      "inputs": [
+        {
+          "name": "blocks",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "channel",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "post_at",
+          "location": "body",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "text",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "thread_ts",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/chat.update",
+      "surface": "POST /chat.update",
+      "inputs": [
+        {
+          "name": "attachments",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "blocks",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "channel",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "text",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "ts",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/conversations.archive",
+      "surface": "POST /conversations.archive",
+      "inputs": [
+        {
+          "name": "channel",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/conversations.create",
+      "surface": "POST /conversations.create",
+      "inputs": [
+        {
+          "name": "is_private",
+          "location": "body",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "name",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "team_id",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/conversations.history",
+      "surface": "POST /conversations.history",
+      "inputs": [
+        {
+          "name": "channel",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "cursor",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "inclusive",
+          "location": "body",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "latest",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "limit",
+          "location": "body",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "oldest",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/conversations.info",
+      "surface": "POST /conversations.info",
+      "inputs": [
+        {
+          "name": "channel",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "include_num_members",
+          "location": "body",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/conversations.invite",
+      "surface": "POST /conversations.invite",
+      "inputs": [
+        {
+          "name": "channel",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "users",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/conversations.join",
+      "surface": "POST /conversations.join",
+      "inputs": [
+        {
+          "name": "channel",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/conversations.kick",
+      "surface": "POST /conversations.kick",
+      "inputs": [
+        {
+          "name": "channel",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "user",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/conversations.leave",
+      "surface": "POST /conversations.leave",
+      "inputs": [
+        {
+          "name": "channel",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/conversations.list",
+      "surface": "POST /conversations.list",
+      "inputs": [
+        {
+          "name": "cursor",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "exclude_archived",
+          "location": "body",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "limit",
+          "location": "body",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "team_id",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "types",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/conversations.members",
+      "surface": "POST /conversations.members",
+      "inputs": [
+        {
+          "name": "channel",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "cursor",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "limit",
+          "location": "body",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/conversations.open",
+      "surface": "POST /conversations.open",
+      "inputs": [
+        {
+          "name": "channel",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "return_im",
+          "location": "body",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "users",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/conversations.replies",
+      "surface": "POST /conversations.replies",
+      "inputs": [
+        {
+          "name": "channel",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "cursor",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "inclusive",
+          "location": "body",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "latest",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "limit",
+          "location": "body",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "oldest",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "ts",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/conversations.setPurpose",
+      "surface": "POST /conversations.setPurpose",
+      "inputs": [
+        {
+          "name": "channel",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "purpose",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/conversations.setTopic",
+      "surface": "POST /conversations.setTopic",
+      "inputs": [
+        {
+          "name": "channel",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "topic",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/emoji.list",
+      "surface": "POST /emoji.list",
+      "inputs": [
+        {
+          "name": "include_categories",
+          "location": "body",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/files.delete",
+      "surface": "POST /files.delete",
+      "inputs": [
+        {
+          "name": "file",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/files.info",
+      "surface": "POST /files.info",
+      "inputs": [
+        {
+          "name": "file",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/files.list",
+      "surface": "POST /files.list",
+      "inputs": [
+        {
+          "name": "channel",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "count",
+          "location": "body",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "page",
+          "location": "body",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "types",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "user",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/files.upload",
+      "surface": "POST /files.upload",
+      "inputs": [
+        {
+          "name": "channel",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "channels",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "content",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "filename",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "filetype",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "initial_comment",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "thread_ts",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "title",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/pins.add",
+      "surface": "POST /pins.add",
+      "inputs": [
+        {
+          "name": "channel",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "timestamp",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/pins.list",
+      "surface": "POST /pins.list",
+      "inputs": [
+        {
+          "name": "channel",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/pins.remove",
+      "surface": "POST /pins.remove",
+      "inputs": [
+        {
+          "name": "channel",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "timestamp",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/reactions.add",
+      "surface": "POST /reactions.add",
+      "inputs": [
+        {
+          "name": "channel",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "name",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "timestamp",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/reactions.get",
+      "surface": "POST /reactions.get",
+      "inputs": [
+        {
+          "name": "channel",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "full",
+          "location": "body",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "timestamp",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/reactions.remove",
+      "surface": "POST /reactions.remove",
+      "inputs": [
+        {
+          "name": "channel",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "name",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "timestamp",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/search.messages",
+      "surface": "POST /search.messages",
+      "inputs": [
+        {
+          "name": "count",
+          "location": "body",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "highlight",
+          "location": "body",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "page",
+          "location": "body",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "query",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "sort",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "sort_dir",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/team.info",
+      "surface": "POST /team.info",
+      "inputs": [
+        {
+          "name": "team",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/users.info",
+      "surface": "POST /users.info",
+      "inputs": [
+        {
+          "name": "include_locale",
+          "location": "body",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "user",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/users.list",
+      "surface": "POST /users.list",
+      "inputs": [
+        {
+          "name": "cursor",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "include_locale",
+          "location": "body",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "limit",
+          "location": "body",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "team_id",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/users.lookupByEmail",
+      "surface": "POST /users.lookupByEmail",
+      "inputs": [
+        {
+          "name": "email",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/users.profile.get",
+      "surface": "POST /users.profile.get",
+      "inputs": [
+        {
+          "name": "include_labels",
+          "location": "body",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "user",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/users.profile.set",
+      "surface": "POST /users.profile.set",
+      "inputs": [
+        {
+          "name": "name",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "profile",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "token",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "user",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "value",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    }
+  ]
+}

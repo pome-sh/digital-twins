@@ -27,6 +27,10 @@
       "types": "./dist/db.d.ts",
       "default": "./dist/db.js"
     },
+    "./route-inputs": {
+      "types": "./dist/route-inputs.d.ts",
+      "default": "./dist/route-inputs.js"
+    },
     "./mcp-tool-fixture": {
       "types": "./dist/mcp-tool-fixture.d.ts",
       "default": "./dist/mcp-tool-fixture.js"

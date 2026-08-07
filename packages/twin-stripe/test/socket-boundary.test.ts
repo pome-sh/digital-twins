@@ -188,8 +188,8 @@ describe("socket boundary — form-encoded bodies over a real socket", () => {
     form.set("currency", "usd");
     form.set("payment_method_types[0]", "crypto");
     // The twin requires the x402 crypto-deposit mode + a supported network;
-    // the nested bracket keys also exercise formToObject's deep-path decoding
-    // over the socket.
+    // the nested bracket keys also exercise the declaration's `bodyEncoding:
+    // "form"` deep-path decoding over the socket.
     form.set("payment_method_options[crypto][mode]", "deposit");
     form.set("payment_method_options[crypto][deposit_options][networks][0]", "base");
     const response = await fetch(`${baseUrl}/s/${TEST_SID}/v1/payment_intents`, {

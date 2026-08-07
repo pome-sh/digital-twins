@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Per-route helpers: response shaping, error → Stripe envelope conversion,
-// recorder emission, query parsing.
+// recorder emission, and the declaration-driven route wrapper.
 //
 // Owned by AGENT-B. AGENT-A's app.ts can import and use these directly.
 
@@ -12,6 +12,14 @@ import {
   recordedRequestHeaders,
   type FailureInjectionOverride,
 } from "@pome-sh/sdk/server";
+import {
+  UndeclaredInputError,
+  mountDeclaredRoute,
+  type DeclarableRouter,
+  type DeclaredRouteInputs,
+  type RouteInputDeclaration,
+  type RouteInputSpec,
+} from "@pome-sh/sdk/route-inputs";
 import { TwinError, stripeError } from "../errors.js";
 import { setHandlerResult } from "../idempotency.js";
 import type {
@@ -252,131 +260,93 @@ function errorMessage(body: unknown): string {
   return "request failed";
 }
 
-/** Pull standard list-query params off the Hono Context. */
-export function parseListQuery(c: Context) {
-  const limit = c.req.query("limit");
-  const numericLimit = limit !== undefined ? Number(limit) : undefined;
-  const created = createdRangeFromQuery(c);
-  return {
-    limit: Number.isFinite(numericLimit) ? numericLimit : undefined,
-    starting_after: c.req.query("starting_after"),
-    ending_before: c.req.query("ending_before"),
-    ...created,
-  } as Record<string, unknown>;
+/**
+ * Mount a route at the method and path its own declaration carries, and hand
+ * the handler `declaration.parse()`'s output as its only view of the request.
+ *
+ * `c` still reaches the handler because identity is not a route input:
+ * `accountId(c)` reads the session the auth middleware resolved. Every REQUEST
+ * value comes from the first argument.
+ */
+export function declaredRoute<S extends RouteInputSpec>(
+  router: DeclarableRouter,
+  declaration: RouteInputDeclaration<S>,
+  recorder: Recorder | undefined,
+  runId: string,
+  fn: (input: DeclaredRouteInputs<S>, c: Context) => RouteResult | Promise<RouteResult>
+): void {
+  mountDeclaredRoute(router, declaration, (c: Context) =>
+    handle(c, recorder, runId, async () => fn(await parseDeclared(declaration, c), c))
+  );
 }
 
-/**
- * Stripe accepts both JSON and form-urlencoded bodies. Real Stripe bills
- * itself as form-only on POST; the SDKs tend to send form. For agent-friendly
- * v1 we accept JSON too. Return whichever parses; empty-body POSTs return
- * `{}`. (Moved here from routes/payment-intents.ts when F-732 gave it a
- * second and third consumer.)
- */
-export async function readBodyForm(c: Context): Promise<unknown> {
-  const contentType = c.req.header("content-type") ?? "";
-  if (contentType.includes("application/json")) {
-    try {
-      return await c.req.json();
-    } catch {
-      return {};
-    }
-  }
-  if (contentType.includes("application/x-www-form-urlencoded") || contentType.includes("multipart/form-data")) {
-    try {
-      const form = await c.req.parseBody({ all: true });
-      return formToObject(form as Record<string, unknown>);
-    } catch {
-      return {};
-    }
-  }
-  // No content-type or unknown: try JSON, fall back to form, fall back to {}.
+/** Project the declaration's refusals into Stripe's own envelope. Real Stripe
+ *  answers an unknown parameter with `parameter_unknown`, which is what an
+ *  undeclared input IS — so that is the code, rather than reusing
+ *  `parameter_invalid` for a different failure. */
+async function parseDeclared<S extends RouteInputSpec>(
+  declaration: RouteInputDeclaration<S>,
+  c: Context
+) {
   try {
-    return await c.req.json();
-  } catch {
-    try {
-      const form = await c.req.parseBody({ all: true });
-      return formToObject(form as Record<string, unknown>);
-    } catch {
-      return {};
+    return await declaration.parse(c.req);
+  } catch (error) {
+    if (error instanceof UndeclaredInputError) {
+      throw new TwinError(
+        "invalid_request_error",
+        "parameter_unknown",
+        `Received unknown parameter: ${error.first}`,
+        { param: error.first, statusCode: 400 }
+      );
     }
+    throw error;
   }
 }
+
+/** The declared list query, as the domain's list inputs take it. */
+export type DeclaredListQuery = {
+  readonly limit?: number | undefined;
+  readonly starting_after?: string | undefined;
+  readonly ending_before?: string | undefined;
+  readonly created?: string | Record<string, string> | undefined;
+};
 
 /**
- * Stripe's bracket-form encoding: `payment_method_types[0]=crypto&
- * payment_method_options[crypto][mode]=deposit`. Convert to nested object.
+ * Flatten the declared list query into the shape every `list*` domain input
+ * already takes — `limit` / cursors verbatim, plus `created_gt`/`created_gte`/
+ * `created_lt`/`created_lte`.
+ *
+ * The flattening lives here rather than in the declaration because `created` is
+ * ONE parameter on the wire (and one in Stripe's OpenAPI); the four keys are an
+ * internal calling convention, and declaring them would report drift that is
+ * not real.
  */
-function formToObject(form: Record<string, unknown>): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const [rawKey, value] of Object.entries(form)) {
-    const path = parseBracketPath(rawKey);
-    setDeep(out, path, value);
-  }
-  return out;
+export function listQuery(query: DeclaredListQuery): Record<string, unknown> {
+  return {
+    limit: query.limit,
+    starting_after: query.starting_after,
+    ending_before: query.ending_before,
+    ...flattenCreated(query.created),
+  };
 }
 
-/** Keys that walk Object.prototype and would let a request pollute every
- *  other object in the same JS process. Real Stripe form-encoding never
- *  uses these names; rejecting them costs nothing and closes the
- *  prototype-pollution primitive. */
-const POLLUTION_KEYS = new Set(["__proto__", "constructor", "prototype"]);
-
-function parseBracketPath(key: string): Array<string | number> {
-  const parts: Array<string | number> = [];
-  const regex = /([^\[\]]+)|\[([^\[\]]*)\]/g;
-  let match: RegExpExecArray | null;
-  while ((match = regex.exec(key)) !== null) {
-    const piece = match[1] ?? match[2] ?? "";
-    if (/^\d+$/.test(piece)) parts.push(Number(piece));
-    else parts.push(piece);
-  }
-  return parts;
-}
-
-function setDeep(target: Record<string, unknown>, path: Array<string | number>, value: unknown) {
-  // Reject any path that walks through __proto__, constructor, or
-  // prototype. A malicious form body with `__proto__[polluted]=pwned`
-  // would otherwise mutate Object.prototype and corrupt every other
-  // object in this process for the rest of the sandbox's lifetime.
-  for (const key of path) {
-    if (typeof key === "string" && POLLUTION_KEYS.has(key)) {
-      // Drop the assignment silently — the field would not be a real
-      // Stripe parameter anyway. Real Stripe returns 400 for unknown
-      // params; v1 deliberately accepts unknowns to keep the agent
-      // surface flexible, so silent drop is the closest fidelity.
-      return;
-    }
-  }
-  let cursor: Record<string | number, unknown> = target;
-  for (let i = 0; i < path.length; i++) {
-    const key = path[i]!;
-    const isLast = i === path.length - 1;
-    if (isLast) {
-      cursor[key] = value;
-    } else {
-      const nextKey = path[i + 1]!;
-      if (cursor[key] === undefined) {
-        cursor[key] = typeof nextKey === "number" ? [] : {};
-      }
-      cursor = cursor[key] as Record<string | number, unknown>;
-    }
-  }
-}
-
-function createdRangeFromQuery(c: Context) {
+function flattenCreated(created: DeclaredListQuery["created"]): Record<string, number> {
   const out: Record<string, number> = {};
-  const flat = c.req.query("created");
+  if (created === undefined) return out;
+  // `created=1700000000` means "that exact second", the same closed range real
+  // Stripe reads it as. `value` is what the declaration calls a flat `created=`
+  // that arrived alongside sub-keys.
+  const flat = typeof created === "string" ? created : created.value;
   if (flat !== undefined && /^\d+$/.test(flat)) {
     out.created_gte = Number(flat);
     out.created_lte = Number(flat);
   }
-  const gt = c.req.query("created[gt]");
-  const gte = c.req.query("created[gte]");
-  const lt = c.req.query("created[lt]");
-  const lte = c.req.query("created[lte]");
-  if (gt && /^\d+$/.test(gt)) out.created_gt = Number(gt);
-  if (gte && /^\d+$/.test(gte)) out.created_gte = Number(gte);
-  if (lt && /^\d+$/.test(lt)) out.created_lt = Number(lt);
-  if (lte && /^\d+$/.test(lte)) out.created_lte = Number(lte);
+  if (typeof created === "string") return out;
+  for (const op of ["gt", "gte", "lt", "lte"] as const) {
+    const value = created[op];
+    // A non-numeric bound is ignored rather than refused, which is what this
+    // twin has always done with `created[gte]=yesterday`.
+    if (value !== undefined && /^\d+$/.test(value)) out[`created_${op}`] = Number(value);
+  }
   return out;
 }

@@ -4,6 +4,24 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.21.14
+
+### Patch Changes
+
+- Every REST and GraphQL route in all five bundled twins now declares the inputs
+  it accepts, and the declaration is the parser the handler validates against
+  (F-1179). `packages/twin-*` and `packages/sdk` changed, which is
+  publish-relevant for the CLI because it inlines both into its bundle.
+
+  What a CLI user can observe: the twins are stricter about request parameters
+  than they were. An undeclared query key or top-level body key is now refused
+  with the twin's own 4xx envelope instead of being silently dropped, and values
+  that used to be coerced loosely are validated — `?state=merged` on GitHub
+  issues used to list everything and now answers 422, `?page=abc` and
+  `?per_page=0` are rejected rather than reaching the domain as `NaN` and `0`,
+  Slack booleans accept only `true`/`false`, and Gmail's `?format=FULL` must be
+  lowercase. Nothing about a well-formed request changes.
+
 ## 0.21.13
 
 ### Patch Changes

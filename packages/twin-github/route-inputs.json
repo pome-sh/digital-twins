@@ -1,0 +1,2238 @@
+{
+  "twin": "github",
+  "package": "@pome-sh/twin-github",
+  "artifact_version": 1,
+  "generated_by": "npm run emit:route-inputs",
+  "source": [
+    "packages/twin-github/src/route-inputs.ts"
+  ],
+  "surface_count": 65,
+  "input_count": 295,
+  "surfaces": [
+    {
+      "method": "DELETE",
+      "path": "/repos/:owner/:repo/contents/*",
+      "surface": "DELETE /repos/:owner/:repo/contents/*",
+      "inputs": [
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "path",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "branch",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "message",
+          "location": "body",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "sha",
+          "location": "body",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/repos/:owner/:repo/git/refs/heads/*",
+      "surface": "DELETE /repos/:owner/:repo/git/refs/heads/*",
+      "inputs": [
+        {
+          "name": "branch",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/repos/:owner/:repo/issues/:number/labels/:name",
+      "surface": "DELETE /repos/:owner/:repo/issues/:number/labels/:name",
+      "inputs": [
+        {
+          "name": "name",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "number",
+          "location": "path",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/repos/:owner/:repo/issues/comments/:comment_id",
+      "surface": "DELETE /repos/:owner/:repo/issues/comments/:comment_id",
+      "inputs": [
+        {
+          "name": "comment_id",
+          "location": "path",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/repos/:owner/:repo/milestones/:number",
+      "surface": "DELETE /repos/:owner/:repo/milestones/:number",
+      "inputs": [
+        {
+          "name": "number",
+          "location": "path",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/:owner/:repo",
+      "surface": "GET /repos/:owner/:repo",
+      "inputs": [
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/:owner/:repo/branches",
+      "surface": "GET /repos/:owner/:repo/branches",
+      "inputs": [
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "per_page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/:owner/:repo/branches/*",
+      "surface": "GET /repos/:owner/:repo/branches/*",
+      "inputs": [
+        {
+          "name": "branch",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/:owner/:repo/collaborators",
+      "surface": "GET /repos/:owner/:repo/collaborators",
+      "inputs": [
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/:owner/:repo/collaborators/:username",
+      "surface": "GET /repos/:owner/:repo/collaborators/:username",
+      "inputs": [
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "username",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/:owner/:repo/commits",
+      "surface": "GET /repos/:owner/:repo/commits",
+      "inputs": [
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "per_page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "sha",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/:owner/:repo/commits/:ref",
+      "surface": "GET /repos/:owner/:repo/commits/:ref",
+      "inputs": [
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "ref",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/:owner/:repo/commits/:ref/check-runs",
+      "surface": "GET /repos/:owner/:repo/commits/:ref/check-runs",
+      "inputs": [
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "ref",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "per_page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/:owner/:repo/commits/:ref/status",
+      "surface": "GET /repos/:owner/:repo/commits/:ref/status",
+      "inputs": [
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "ref",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/:owner/:repo/compare/:basehead{.+}",
+      "surface": "GET /repos/:owner/:repo/compare/:basehead{.+}",
+      "inputs": [
+        {
+          "name": "basehead",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/:owner/:repo/contents",
+      "surface": "GET /repos/:owner/:repo/contents",
+      "inputs": [
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "ref",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/:owner/:repo/contents/*",
+      "surface": "GET /repos/:owner/:repo/contents/*",
+      "inputs": [
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "path",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "ref",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/:owner/:repo/issues",
+      "surface": "GET /repos/:owner/:repo/issues",
+      "inputs": [
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "assignee",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "labels",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "per_page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "state",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/:owner/:repo/issues/:number",
+      "surface": "GET /repos/:owner/:repo/issues/:number",
+      "inputs": [
+        {
+          "name": "number",
+          "location": "path",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/:owner/:repo/issues/:number/comments",
+      "surface": "GET /repos/:owner/:repo/issues/:number/comments",
+      "inputs": [
+        {
+          "name": "number",
+          "location": "path",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "per_page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/:owner/:repo/issues/:number/labels",
+      "surface": "GET /repos/:owner/:repo/issues/:number/labels",
+      "inputs": [
+        {
+          "name": "number",
+          "location": "path",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/:owner/:repo/labels",
+      "surface": "GET /repos/:owner/:repo/labels",
+      "inputs": [
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/:owner/:repo/milestones",
+      "surface": "GET /repos/:owner/:repo/milestones",
+      "inputs": [
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "per_page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "state",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/:owner/:repo/pulls",
+      "surface": "GET /repos/:owner/:repo/pulls",
+      "inputs": [
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "per_page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "state",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/:owner/:repo/pulls/:number",
+      "surface": "GET /repos/:owner/:repo/pulls/:number",
+      "inputs": [
+        {
+          "name": "number",
+          "location": "path",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/:owner/:repo/pulls/:number/comments",
+      "surface": "GET /repos/:owner/:repo/pulls/:number/comments",
+      "inputs": [
+        {
+          "name": "number",
+          "location": "path",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "per_page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/:owner/:repo/pulls/:number/commits",
+      "surface": "GET /repos/:owner/:repo/pulls/:number/commits",
+      "inputs": [
+        {
+          "name": "number",
+          "location": "path",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "per_page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/:owner/:repo/pulls/:number/diff",
+      "surface": "GET /repos/:owner/:repo/pulls/:number/diff",
+      "inputs": [
+        {
+          "name": "number",
+          "location": "path",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/:owner/:repo/pulls/:number/files",
+      "surface": "GET /repos/:owner/:repo/pulls/:number/files",
+      "inputs": [
+        {
+          "name": "number",
+          "location": "path",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "per_page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/:owner/:repo/pulls/:number/reviews",
+      "surface": "GET /repos/:owner/:repo/pulls/:number/reviews",
+      "inputs": [
+        {
+          "name": "number",
+          "location": "path",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "per_page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/:owner/:repo/pulls/:number/status",
+      "surface": "GET /repos/:owner/:repo/pulls/:number/status",
+      "inputs": [
+        {
+          "name": "number",
+          "location": "path",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/:owner/:repo/releases",
+      "surface": "GET /repos/:owner/:repo/releases",
+      "inputs": [
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "per_page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/:owner/:repo/releases/latest",
+      "surface": "GET /repos/:owner/:repo/releases/latest",
+      "inputs": [
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/:owner/:repo/releases/tags/*",
+      "surface": "GET /repos/:owner/:repo/releases/tags/*",
+      "inputs": [
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "tag",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/:owner/:repo/tags",
+      "surface": "GET /repos/:owner/:repo/tags",
+      "inputs": [
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "per_page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/search/code",
+      "surface": "GET /search/code",
+      "inputs": [
+        {
+          "name": "owner",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "per_page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "q",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/search/commits",
+      "surface": "GET /search/commits",
+      "inputs": [
+        {
+          "name": "owner",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "per_page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "q",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/search/issues",
+      "surface": "GET /search/issues",
+      "inputs": [
+        {
+          "name": "owner",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "per_page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "q",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "state",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/search/repositories",
+      "surface": "GET /search/repositories",
+      "inputs": [
+        {
+          "name": "page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "per_page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "q",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/search/users",
+      "surface": "GET /search/users",
+      "inputs": [
+        {
+          "name": "page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "per_page",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "q",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/repos/:owner/:repo/issues/:number",
+      "surface": "PATCH /repos/:owner/:repo/issues/:number",
+      "inputs": [
+        {
+          "name": "number",
+          "location": "path",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "assignees",
+          "location": "body",
+          "required": false,
+          "type": "array"
+        },
+        {
+          "name": "body",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "labels",
+          "location": "body",
+          "required": false,
+          "type": "array"
+        },
+        {
+          "name": "state",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "title",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/repos/:owner/:repo/issues/comments/:comment_id",
+      "surface": "PATCH /repos/:owner/:repo/issues/comments/:comment_id",
+      "inputs": [
+        {
+          "name": "comment_id",
+          "location": "path",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "body",
+          "location": "body",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/repos/:owner/:repo/milestones/:number",
+      "surface": "PATCH /repos/:owner/:repo/milestones/:number",
+      "inputs": [
+        {
+          "name": "number",
+          "location": "path",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "description",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "due_on",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "state",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "title",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/repos/:owner/:repo/pulls/:number",
+      "surface": "PATCH /repos/:owner/:repo/pulls/:number",
+      "inputs": [
+        {
+          "name": "number",
+          "location": "path",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "base",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "body",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "state",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "title",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/orgs/:owner/repos",
+      "surface": "POST /orgs/:owner/repos",
+      "inputs": [
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "description",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "name",
+          "location": "body",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "owner",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "private",
+          "location": "body",
+          "required": false,
+          "type": "boolean"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/repos/:owner/:repo/check-runs",
+      "surface": "POST /repos/:owner/:repo/check-runs",
+      "inputs": [
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "completed_at",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "conclusion",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "details_url",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "external_id",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "head_sha",
+          "location": "body",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "name",
+          "location": "body",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "output",
+          "location": "body",
+          "required": false,
+          "type": "object"
+        },
+        {
+          "name": "started_at",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "status",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/repos/:owner/:repo/forks",
+      "surface": "POST /repos/:owner/:repo/forks",
+      "inputs": [
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "organization",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/repos/:owner/:repo/git/refs",
+      "surface": "POST /repos/:owner/:repo/git/refs",
+      "inputs": [
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "ref",
+          "location": "body",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "sha",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/repos/:owner/:repo/issues",
+      "surface": "POST /repos/:owner/:repo/issues",
+      "inputs": [
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "assignees",
+          "location": "body",
+          "required": false,
+          "type": "array"
+        },
+        {
+          "name": "body",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "labels",
+          "location": "body",
+          "required": false,
+          "type": "array"
+        },
+        {
+          "name": "title",
+          "location": "body",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/repos/:owner/:repo/issues/:number/assignees",
+      "surface": "POST /repos/:owner/:repo/issues/:number/assignees",
+      "inputs": [
+        {
+          "name": "number",
+          "location": "path",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "assignees",
+          "location": "body",
+          "required": true,
+          "type": "array"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/repos/:owner/:repo/issues/:number/comments",
+      "surface": "POST /repos/:owner/:repo/issues/:number/comments",
+      "inputs": [
+        {
+          "name": "number",
+          "location": "path",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "body",
+          "location": "body",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/repos/:owner/:repo/issues/:number/labels",
+      "surface": "POST /repos/:owner/:repo/issues/:number/labels",
+      "inputs": [
+        {
+          "name": "number",
+          "location": "path",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "labels",
+          "location": "body",
+          "required": true,
+          "type": "array"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/repos/:owner/:repo/labels",
+      "surface": "POST /repos/:owner/:repo/labels",
+      "inputs": [
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "color",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "description",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "name",
+          "location": "body",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/repos/:owner/:repo/milestones",
+      "surface": "POST /repos/:owner/:repo/milestones",
+      "inputs": [
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "description",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "due_on",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "state",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "title",
+          "location": "body",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/repos/:owner/:repo/pulls",
+      "surface": "POST /repos/:owner/:repo/pulls",
+      "inputs": [
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "base",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "body",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "head",
+          "location": "body",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "title",
+          "location": "body",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/repos/:owner/:repo/pulls/:number/comments",
+      "surface": "POST /repos/:owner/:repo/pulls/:number/comments",
+      "inputs": [
+        {
+          "name": "number",
+          "location": "path",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "body",
+          "location": "body",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "commit_id",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "line",
+          "location": "body",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "name": "path",
+          "location": "body",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "side",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/repos/:owner/:repo/pulls/:number/comments/:comment_id/replies",
+      "surface": "POST /repos/:owner/:repo/pulls/:number/comments/:comment_id/replies",
+      "inputs": [
+        {
+          "name": "comment_id",
+          "location": "path",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "name": "number",
+          "location": "path",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "body",
+          "location": "body",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/repos/:owner/:repo/pulls/:number/reviews",
+      "surface": "POST /repos/:owner/:repo/pulls/:number/reviews",
+      "inputs": [
+        {
+          "name": "number",
+          "location": "path",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "body",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "event",
+          "location": "body",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/repos/:owner/:repo/releases",
+      "surface": "POST /repos/:owner/:repo/releases",
+      "inputs": [
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "body",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "draft",
+          "location": "body",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "name": "name",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "prerelease",
+          "location": "body",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "name": "tag_name",
+          "location": "body",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "target_commitish",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/repos/:owner/:repo/statuses/:sha",
+      "surface": "POST /repos/:owner/:repo/statuses/:sha",
+      "inputs": [
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "sha",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "context",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "description",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "state",
+          "location": "body",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "target_url",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/user/repos",
+      "surface": "POST /user/repos",
+      "inputs": [
+        {
+          "name": "description",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "name",
+          "location": "body",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "owner",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "private",
+          "location": "body",
+          "required": false,
+          "type": "boolean"
+        }
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/repos/:owner/:repo/collaborators/:username",
+      "surface": "PUT /repos/:owner/:repo/collaborators/:username",
+      "inputs": [
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "username",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "permission",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/repos/:owner/:repo/contents/*",
+      "surface": "PUT /repos/:owner/:repo/contents/*",
+      "inputs": [
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "path",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "branch",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "content",
+          "location": "body",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "encoding",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "message",
+          "location": "body",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "sha",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/repos/:owner/:repo/pulls/:number/merge",
+      "surface": "PUT /repos/:owner/:repo/pulls/:number/merge",
+      "inputs": [
+        {
+          "name": "number",
+          "location": "path",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "commit_message",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "commit_title",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/repos/:owner/:repo/pulls/:number/update-branch",
+      "surface": "PUT /repos/:owner/:repo/pulls/:number/update-branch",
+      "inputs": [
+        {
+          "name": "number",
+          "location": "path",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "name": "owner",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repo",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "expected_head_sha",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    }
+  ]
+}

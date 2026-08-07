@@ -6,8 +6,11 @@
 // Object.prototype, polluting every later object in the same JS
 // process for the rest of the sandbox's lifetime.
 //
-// Fix lives in src/routes/payment-intents.ts setDeep() — rejects any
-// path that includes `__proto__`, `constructor`, or `prototype`.
+// Fix lives in the shared bracket-form expander, `expandBrackets()` in
+// packages/sdk/src/route-inputs.ts — it drops any path that includes
+// `__proto__`, `constructor` or `prototype`, and the undeclared-input check
+// then refuses the dropped key. (F-1179 moved it out of this twin's own
+// `setDeep()`; the assertions below are unchanged and still pass.)
 import { afterEach, describe, expect, it } from "vitest";
 import { createStripeApp, withAuth } from "./_appHelper.js";
 
