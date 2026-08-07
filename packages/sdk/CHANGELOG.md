@@ -1,6 +1,21 @@
 # @pome-sh/sdk
 
 
+## 0.11.4 — 2026-08-07
+
+`loadMcpToolFixture` and the rest of `mcp-tool-fixture.ts` are now reachable on
+their own `@pome-sh/sdk/mcp-tool-fixture` subpath, alongside `./server`,
+`./parity`, `./checks` and `./db`. The root barrel still exports them — Node
+callers are unaffected.
+
+The root barrel is not a free way to reach a dependency-free module: it
+re-exports `openTwinDatabase` from `./db.js`, whose first line is
+`import { DatabaseSync } from "node:sqlite"`. Importing `@pome-sh/sdk` for
+`loadMcpToolFixture` therefore loads the SQLite driver, and any runtime without
+that builtin — bun, which is what pome-cloud's fidelity-watch runs — cannot load
+the importing module at all. `mcp-tool-fixture.ts` has no imports of its own;
+this subpath is how a caller gets it that way.
+
 ## 0.11.3 — 2026-08-06
 
 A shared, hash-locked MCP tool-table fixture loader (F-1325).

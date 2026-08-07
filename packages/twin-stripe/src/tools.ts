@@ -7,7 +7,13 @@
 // tools.ts so the MCP wrapper in app.ts (AGENT-A) just works:
 // `executeTool(domain, name, args)`.
 
-import { loadMcpToolFixture } from "@pome-sh/sdk";
+// `@pome-sh/sdk/mcp-tool-fixture` rather than the `@pome-sh/sdk` root: the root
+// barrel re-exports `openTwinDatabase`, so importing it EXECUTES `db.ts`'s
+// `import { DatabaseSync } from "node:sqlite"`. pome-cloud's fidelity-watch
+// imports THIS module under bun — `sandboxes/stripe/level2.test.ts` reads
+// `isMutatingTool` off it — and bun implements no `node:sqlite`. The loader
+// module has no imports at all.
+import { loadMcpToolFixture } from "@pome-sh/sdk/mcp-tool-fixture";
 import { z } from "zod";
 import metaListing from "../fixtures/mcp-tools-list.meta.json" with { type: "json" };
 import rawListing from "../fixtures/mcp-tools-list.raw.json" with { type: "json" };
