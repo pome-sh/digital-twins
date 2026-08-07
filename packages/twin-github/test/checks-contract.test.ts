@@ -32,6 +32,8 @@ const CHECKS = GITHUB_CHECKS as readonly unknown[] as readonly OpenCheck[];
 const FIXTURES: Record<string, Record<string, string>> = {
   "github.no-new-labels": { repo: "acme/api" },
   "github.no-new-issues": { repo: "acme/api" },
+  "github.no-commit-status-changed": { repo: "acme/api" },
+  "github.issue-triage-unchanged": { issue: "1", repo: "acme/api" },
   "github.issue-exists": { issue: "1", repo: "acme/api" },
   "github.issue-state": { issue: "1", repo: "acme/api", state: "closed" },
   "github.issue-has-label": { issue: "1", repo: "acme/api", label: "bug" },
@@ -69,6 +71,17 @@ const HONEST_NULL_MUTANTS: Record<string, string> = {
   // no second slot to falsify because the assertion is a set difference, not a
   // literal hunted inside state.
   "github.no-new-issues": "the repo is a selector, not a scanned literal",
+  // Argument 1, same as the two deltas above. The pair `context:state` this
+  // check compares is READ OUT OF the state on both sides; neither half is
+  // supplied by the sentence, so there is no literal a mutant could falsify.
+  "github.no-commit-status-changed": "the repo is a selector, not a scanned literal",
+  // Argument 1 for both slots. The labels and assignees compared here are read
+  // from the seed, never named in the sentence — which is exactly what makes
+  // this expressible where the positive `issue-exactly-one-label` it replaces
+  // had to name `feature` and was true before the examinee started.
+  "github.issue-triage-unchanged":
+    "both the issue number and the repo are selectors; the compared labels and assignees come " +
+    "from the seed rather than from the sentence, so there is no literal to falsify",
   "github.issue-state": "the state is a closed set; the issue number only selects",
   "github.pr-state": "the state is a closed set; the PR number only selects",
   "github.pr-review-exists": "the review state is a closed set; the PR number only selects",
