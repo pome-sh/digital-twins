@@ -1,6 +1,28 @@
 # @pome-sh/twin-github — CHANGELOG
 
 
+## 0.9.3 — 2026-08-08
+
+`stack` is modelled on both pull-request read surfaces (F-1178). GitHub shipped
+stacked pull requests and added the field to both the `pull-request` and
+`pull-request-simple` schemas on 2026-08-02, and the declared lane caught the
+twin missing it on `GET /repos/{}/{}/pulls` and `GET /repos/{}/{}/pulls/{}`.
+
+The shape is transcribed from the vendored `pull-request-stack` schema, not
+guessed: nullable, with a required `base: { ref, sha }` and optional integer
+`size`, `position`, `id` and `number`. `@octokit/openapi-types@28.0.0` predates
+the field, so `src/upstream-types.ts` declares it locally until that bump lands;
+the `AssertNoUncovered` guard covers it either way.
+
+It is populated from twin state, not a constant. GitHub models a stack as its
+own entity; the twin has no stack table, so it reads one off the chain of OPEN
+pull requests linked `base_ref` -> `head_ref` in a repository. `base`, `size`
+and `position` are exact consequences of that chain; `id` and `number` are
+derived from the chain's bottom PR, so every member of one stack reports one
+identity. A PR that is not in such a chain reports `stack: null`. The limits are
+written up in `FIDELITY.md` divergence #11.
+
+
 ## 0.9.2 — 2026-08-06
 
 Its MCP tool table is now derived from `fixtures/mcp-tools-list.raw.json`

@@ -1,7 +1,7 @@
 {
   "twin": "github",
   "package": "@pome-sh/twin-github",
-  "updated": "2026-07-12",
+  "updated": "2026-08-08",
   "notes": "Tool surface lints 1:1 against FIDELITY.md; REST surface lints 1:1 against FIDELITY_MATRIX.md (FIDELITY.md documents REST as prose). Heat tiers ruled 2026-07-11 on F-729 (list 2/3 + [DECISION], approve-as-drafted); annotations landed via F-735. Evidence codes per packages/sdk/ENDPOINT-TIERS.md. Warm surfaces implemented at semantic stay code-unchanged per the M5 additive-only ruling and are listed in FIDELITY.md's tier-mismatch ledger.",
   "tools": [
     {

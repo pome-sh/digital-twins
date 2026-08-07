@@ -1,6 +1,6 @@
 # GitHub Twin Fidelity Matrix
 
-Last verified: 2026-07-12
+Last verified: 2026-08-08
 
 | Surface | Heat | Tier | Contract |
 | --- | --- | --- | --- |
@@ -25,10 +25,10 @@ Last verified: 2026-07-12
 | `GET /repos/:owner/:repo/collaborators` | hot | semantic | Lists seeded collaborators as GitHub user objects. |
 | `GET /repos/:owner/:repo/collaborators/:username` | hot | semantic | Returns `204` for present collaborators and `404` for absent users. |
 | `PUT /repos/:owner/:repo/collaborators/:username` | warm | semantic | Creates invitation (201) for new users; returns 204 for existing collaborators. |
-| `GET /repos/:owner/:repo/pulls` | hot | semantic | Lists pull requests with supported state and pagination filters. |
+| `GET /repos/:owner/:repo/pulls` | hot | semantic | Lists pull requests with supported state and pagination filters. Carries `stack` (F-1178), derived from the open-PR base chain. |
 | `POST /repos/:owner/:repo/pulls` | hot | semantic | Creates clone-backed PRs from existing branches. |
 | `PATCH /repos/:owner/:repo/pulls/:number` | hot | semantic | Title/body/state/base mutations; recomputes PR files on base change. |
-| `GET /repos/:owner/:repo/pulls/:number/*` | hot | semantic | Supported PR detail, files, reviews, comments, status, merge, and update-branch routes are stateful; update-branch performs a semantic merge of base into head (F-735). |
+| `GET /repos/:owner/:repo/pulls/:number/*` | hot | semantic | Supported PR detail, files, reviews, comments, status, merge, and update-branch routes are stateful; update-branch performs a semantic merge of base into head (F-735). PR detail carries `stack` (F-1178), derived from the open-PR base chain. |
 | `GET /repos/:owner/:repo/pulls/:number/commits` | hot | semantic | Oldest-first commit walk between base_sha..head_sha. |
 | `GET /repos/:owner/:repo/pulls/:number/diff` | hot | shape | Unified-diff-shaped envelope; patches are simplified placeholders. Hot gap, deferred post-M5 (F-729 G1). |
 | `POST /repos/:owner/:repo/pulls/:number/comments` | hot | semantic | Creates inline review comments; 422 if path is not in the PR. |

@@ -21,6 +21,7 @@ import type {
   RepoRow,
   TagRow,
 } from "../types.js";
+import type { PullRequestStack } from "../upstream-types.js";
 import { conflict, notFound, validationFailed } from "../errors.js";
 import { fileSha, linesChanged, makeSha, nowIso, paginate, stableNumericId, treeSha } from "../util.js";
 import { defaultSeedState, parseSeed } from "../seed.js";
@@ -954,6 +955,56 @@ export class GitHubDomain {
     }
   }
 
+  // F-1178 — the `stack` member of GitHub's `pull-request` / `pull-request-simple`
+  // schemas. GitHub models a stack as its own entity with its own id and number;
+  // the twin has no stack table, so it reads a stack off the state that DOES
+  // encode one — the chain of OPEN pull requests in a repository linked
+  // `base_ref` -> `head_ref`. A PR whose base branch is another open PR's head
+  // branch is stacked on top of it, which is what stacking means; a chain of one
+  // is not a stack, and `stack` is null (the schema is `nullable: true`).
+  pullRequestStack(pr: PullRequestRow): PullRequestStack {
+    if (pr.state !== "open") return null;
+    const open = this.listPullRequestRows(pr.repo_id).filter((row) => row.state === "open");
+    // `listPullRequestRows` is number-ascending, so `find` keeps the walk
+    // deterministic if one branch happens to back more than one open PR.
+    const below = (row: PullRequestRow) => open.find((other) => other.number !== row.number && other.head_ref === row.base_ref);
+    const above = (row: PullRequestRow) => open.find((other) => other.number !== row.number && other.base_ref === row.head_ref);
+
+    const chain = [pr];
+    const seen = new Set([pr.number]);
+    for (let lower = below(pr); lower && !seen.has(lower.number); lower = below(lower)) {
+      seen.add(lower.number);
+      chain.unshift(lower);
+    }
+    for (let upper = above(pr); upper && !seen.has(upper.number); upper = above(upper)) {
+      seen.add(upper.number);
+      chain.push(upper);
+    }
+    if (chain.length < 2) return null;
+
+    const bottom = chain[0]!;
+    const bottomBaseRepo = this.requireRepoById(bottom.base_repo_id);
+    return {
+      base: {
+        ref: bottom.base_ref,
+        // Same pre-resolution null as head.sha / base.sha (FDRS-454): the twin
+        // surfaces null while a branch has no resolved head, where upstream
+        // types a non-null string.
+        sha: (this.getBranch(bottomBaseRepo.id, bottom.base_ref)?.head_sha ?? bottom.base_sha) as string,
+      },
+      size: chain.length,
+      position: chain.findIndex((row) => row.number === pr.number) + 1,
+      // The twin has no stack row, so it has no stack id or number of its own.
+      // Both are derived from the chain's BOTTOM pull request — the thing that
+      // identifies a chain in the twin's state — via the same `stableNumericId`
+      // derivation every other id in this twin uses. What an agent needs from
+      // these two is that every member of one stack reports the same pair, and
+      // that is what deriving them from a single member guarantees.
+      id: stableNumericId(`${bottomBaseRepo.full_name}/stack/${bottom.number}`),
+      number: bottom.number,
+    };
+  }
+
   // Single-PR GET (full PullRequest shape: keeps merged / commits / additions /
   // deletions / changed_files).
   serializePull(pr: PullRequestRow) {
@@ -962,7 +1013,7 @@ export class GitHubDomain {
     const files = this.db.prepare("SELECT * FROM pull_request_files WHERE repo_id = ? AND pull_number = ?").all(pr.repo_id, pr.number) as PullRequestFileRow[];
     const headSha = this.getBranch(headRepo.id, pr.head_ref)?.head_sha ?? pr.head_sha;
     const baseSha = this.getBranch(baseRepo.id, pr.base_ref)?.head_sha ?? pr.base_sha;
-    return pullRequestJson(pr, baseRepo, headRepo, 1, files.length, headSha, baseSha);
+    return pullRequestJson(pr, baseRepo, headRepo, 1, files.length, headSha, baseSha, this.pullRequestStack(pr));
   }
 
   // LIST endpoint (leaner PullRequestSimple shape: drops the single-PR-only
@@ -972,7 +1023,7 @@ export class GitHubDomain {
     const headRepo = this.requireRepoById(pr.head_repo_id);
     const headSha = this.getBranch(headRepo.id, pr.head_ref)?.head_sha ?? pr.head_sha;
     const baseSha = this.getBranch(baseRepo.id, pr.base_ref)?.head_sha ?? pr.base_sha;
-    return pullRequestListJson(pr, baseRepo, headRepo, headSha, baseSha);
+    return pullRequestListJson(pr, baseRepo, headRepo, headSha, baseSha, this.pullRequestStack(pr));
   }
 
 

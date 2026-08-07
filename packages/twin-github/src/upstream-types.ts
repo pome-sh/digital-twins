@@ -10,7 +10,35 @@
 // type-level guard rail — runtime behavior is unchanged.
 import type { components } from "@octokit/openapi-types";
 
-export type PullRequest = components["schemas"]["pull-request"];
+// F-1178 — GitHub shipped stacked pull requests. The vendored REST description
+// gained `pull-request.stack` and `pull-request-simple.stack` on 2026-08-02
+// (`pome-sh/openapi-spec-mcp` commit `f0d07e7`, `specs/github.json` blob
+// `af4eeae`; both absent at `a8f0142`, 2026-07-31), each `$ref`ing one new
+// `pull-request-stack` schema. `@octokit/openapi-types@28.0.0` ships
+// openapi-version 22.0.0, which predates that, so `components["schemas"]` has
+// no `pull-request-stack` to alias yet and the anchor carries the shape here —
+// transcribed field for field from the vendored schema, not inferred from the
+// name. Delete this and alias `components["schemas"]["pull-request-stack"]` once
+// the @octokit bump lands.
+//
+// Verbatim from `components.schemas["pull-request-stack"]`: `type: object`,
+// `nullable: true`, `required: [base]`; `base` is `required: [ref, sha]` with
+// both `type: string`; `size` / `position` / `id` / `number` are
+// `type: integer`, optional.
+export type PullRequestStack = {
+  /** The base ref of the stack this pull request belongs to. */
+  base: { ref: string; sha: string };
+  /** The total number of pull requests in the stack. */
+  size?: number;
+  /** The one-based position of this PR in the stack; 1 is the bottom. */
+  position?: number;
+  /** The ID of the stack that this pull request belongs to. */
+  id?: number;
+  /** The number of the stack that this pull request belongs to. */
+  number?: number;
+} | null;
+
+export type PullRequest = components["schemas"]["pull-request"] & { stack?: PullRequestStack };
 export type Repository = components["schemas"]["repository"];
 export type SimpleUser = components["schemas"]["simple-user"];
 

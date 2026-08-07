@@ -203,6 +203,88 @@ describe("REST / cluster C — pull requests deeper", () => {
     expect(item).toMatchObject({ number: n, state: "open", title: "CR", merged: false });
   });
 
+  // F-1178 — GitHub shipped stacked pull requests and added `stack` to BOTH the
+  // `pull-request` and `pull-request-simple` schemas, each `$ref`ing one new
+  // `pull-request-stack` schema (vendored REST description at openapi-spec-mcp
+  // commit f0d07e7, 2026-08-02; absent at a8f0142, 2026-07-31). Its shape is
+  // read from that schema, not guessed from the name: nullable, with a REQUIRED
+  // `base: { ref, sha }` and optional integer `size` / `position` / `id` /
+  // `number`. Both surfaces carry it, so both are asserted here.
+  async function openStack(a: ReturnType<typeof createGitHubCloneApp>) {
+    for (const ref of ["stack-lower", "stack-upper"]) {
+      await jsonReq(a, "POST", "/repos/acme/api/git/refs", { ref: `refs/heads/${ref}` });
+      await jsonReq(a, "PUT", `/repos/acme/api/contents/${ref}.ts`, { message: "m", content: "1\n", branch: ref });
+    }
+    // The upper PR's base branch IS the lower PR's head branch — a stack.
+    const lower = await jsonReq(a, "POST", "/repos/acme/api/pulls", { title: "Lower", head: "stack-lower", base: "main" });
+    const upper = await jsonReq(a, "POST", "/repos/acme/api/pulls", { title: "Upper", head: "stack-upper", base: "stack-lower" });
+    return {
+      lower: (lower.body as { number: number }).number,
+      upper: (upper.body as { number: number }).number
+    };
+  }
+
+  it("GET /pulls/:n and GET /pulls both carry stack: null for an unstacked PR", async () => {
+    const a = app();
+    const n = await openPr(a);
+
+    const detail = await jsonReq(a, "GET", `/repos/acme/api/pulls/${n}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body).toHaveProperty("stack");
+    expect((detail.body as { stack: unknown }).stack).toBeNull();
+
+    const list = await jsonReq(a, "GET", "/repos/acme/api/pulls");
+    expect(list.status).toBe(200);
+    const item = (list.body as Array<Record<string, unknown>>).find((pr) => pr.number === n);
+    expect(item).toHaveProperty("stack");
+    expect(item!.stack).toBeNull();
+  });
+
+  it("GET /pulls/:n carries the vendor stack shape for every member of a stack", async () => {
+    const a = app();
+    const { lower, upper } = await openStack(a);
+
+    const lowerPr = (await jsonReq(a, "GET", `/repos/acme/api/pulls/${lower}`)).body as {
+      base: { sha: string };
+      stack: { base: { ref: string; sha: string }; size: number; position: number; id: number; number: number };
+    };
+    const upperPr = (await jsonReq(a, "GET", `/repos/acme/api/pulls/${upper}`)).body as typeof lowerPr;
+
+    // `base` is the stack's base — the BOTTOM pull request's base ref/sha, for
+    // both members, not each member's own base.
+    expect(lowerPr.stack).toMatchObject({
+      base: { ref: "main", sha: lowerPr.base.sha },
+      size: 2,
+      position: 1,
+      number: lower
+    });
+    expect(upperPr.stack).toMatchObject({
+      base: { ref: "main", sha: lowerPr.base.sha },
+      size: 2,
+      position: 2,
+      number: lower
+    });
+    // One stack, one identity: an agent grouping PRs by stack must see the same
+    // id from every member.
+    expect(upperPr.stack.id).toBe(lowerPr.stack.id);
+    expect(Number.isInteger(lowerPr.stack.id)).toBe(true);
+  });
+
+  it("GET /pulls carries the same stack objects as the detail surface", async () => {
+    const a = app();
+    const { lower, upper } = await openStack(a);
+    const list = (await jsonReq(a, "GET", "/repos/acme/api/pulls")).body as Array<{
+      number: number;
+      stack: unknown;
+    }>;
+
+    for (const pull of [lower, upper]) {
+      const detail = (await jsonReq(a, "GET", `/repos/acme/api/pulls/${pull}`)).body as { stack: unknown };
+      expect(list.find((item) => item.number === pull)!.stack).toEqual(detail.stack);
+    }
+    expect(list.find((item) => item.number === upper)!.stack).toMatchObject({ position: 2, size: 2 });
+  });
+
   it("GET /pulls/:n/commits lists commits", async () => {
     const a = app();
     const n = await openPr(a);

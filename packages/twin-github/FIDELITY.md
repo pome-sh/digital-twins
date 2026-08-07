@@ -4,7 +4,7 @@
 universal clone. This page documents exactly which surfaces are faithful to
 GitHub today, at what tier, and how fidelity is verified.
 
-Last verified: 2026-07-12.
+Last verified: 2026-08-08.
 
 ## What "fidelity" means here
 
@@ -72,13 +72,13 @@ in the package README. Changing any of those is a breaking change for
 | `remove_issue_label` | SQLite issue labels | hot | semantic | `mcp-contract.test.ts` | Removing a missing label returns 404. |
 | `list_collaborators` | SQLite collaborators | hot | semantic | `mcp-contract.test.ts` | Permission filtering is not implemented. |
 | `add_assignees` | SQLite issue assignees | hot | semantic | `mcp-contract.test.ts` | Requires seeded collaborators. |
-| `get_pull_request` | SQLite pull requests | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts` | Drafts, mergeability background jobs, and review decisions are simplified. |
+| `get_pull_request` | SQLite pull requests | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts`, `v2-hot-paths-rest.test.ts` | Drafts, mergeability background jobs, and review decisions are simplified. `stack` is derived from the open-PR base chain (divergence #11). |
 | `get_pull_request_reviews` | SQLite PR reviews | hot | semantic | `mcp-contract.test.ts`, `state-export.test.ts` | Review dismissal is not implemented. |
 | `create_pull_request_review` | SQLite PR reviews | hot | semantic | `mcp-contract.test.ts`, `state-export.test.ts` | Inline review comments are not created by this tool. |
 | `get_pull_request_comments` | SQLite PR review comments | hot | semantic | `mcp-contract.test.ts` | Review comment creation is not exposed yet. |
 | `get_pull_request_files` | SQLite computed PR files | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts` | Patches are simplified placeholders. |
 | `get_pull_request_status` | SQLite commit statuses | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts` | Check suites and check runs are not modeled. |
-| `list_pull_requests` | SQLite pull requests | hot | semantic | `mcp-contract.test.ts` | Sorting and advanced filters are simplified. |
+| `list_pull_requests` | SQLite pull requests | hot | semantic | `mcp-contract.test.ts`, `v2-hot-paths-rest.test.ts` | Sorting and advanced filters are simplified. `stack` is derived from the open-PR base chain (divergence #11). |
 | `merge_pull_request` | SQLite merge mutation | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts` | Merge methods are simplified to one deterministic local merge. |
 | `update_pull_request_branch` | SQLite merge of base into head | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts`, `m5-hot-gaps.test.ts` | Merge commit carries a single parent; conflicting paths resolve head-wins (no 422 merge-conflict); 202-shaped no-op instead of GitHub's 422 when base has no new commits or when its changes are already contained on head (merge commits are only created when files change); no async update job. |
 | `create_pull_request` | SQLite pull requests/files | hot | semantic | `mcp-contract.test.ts`, `concurrency.test.ts` | Cross-repo forks are supported only when the fork exists in the clone. |
@@ -254,6 +254,27 @@ upstream so a divergence that upstream "heals" becomes a tier-upgrade signal.
     and label/assignee modeling are simplified. On an L1 read surface
     (`GET /repos/:o/:r/pulls`, `.../pulls/:n`) these upstream-only omissions are
     accepted (INFO), not drift.
+
+    **`stack` is modelled, not omitted (F-1178).** GitHub shipped stacked pull
+    requests and added `stack` to both the `pull-request` and
+    `pull-request-simple` schemas on 2026-08-02; the declared lane caught it as
+    shape drift on both routes, and the twin now emits it. It is not on the
+    omission list above, and it is not a hardcoded constant: GitHub models a
+    stack as its own entity with its own id and number, and the twin has no
+    stack table, so it reads a stack off the state that does encode one — the
+    chain of OPEN pull requests in a repository linked `base_ref` -> `head_ref`.
+    `base.ref` / `base.sha`, `size` and `position` are exact consequences of
+    that chain. The two fields the twin cannot read from state are `id` and
+    `number`: both are derived from the chain's BOTTOM pull request (`id` via
+    the same `stableNumericId` derivation as every other twin id, `number` as
+    that PR's number), which is what keeps every member of one stack reporting
+    one identity — the property an agent grouping PRs by stack depends on — but
+    means the twin's stack numbers share the per-repo number space that issues
+    and PRs draw from, where GitHub's do not. Three further limits: a stack is
+    inferred from base targeting rather than declared, so PRs that merely
+    happen to chain read as stacked; a non-open PR reports `stack: null`,
+    because the chain is built from open PRs; and a chain that forks takes the
+    lowest-numbered branch, since a GitHub stack is linear.
 12. **Pull-request `merge_commit_sha` is GitHub's ephemeral test-merge commit.**
     `merge_commit_sha` is the sha GitHub computes by speculatively merging the PR
     head into the base to test mergeability — non-deterministic and not a commit in
