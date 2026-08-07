@@ -8,62 +8,10 @@
 // create/finalize/pay) stays unlisted-cold on the /v1/* 501 catch-all.
 
 import type { Hono } from "hono";
-import { z } from "zod";
 import type { StripeDomain } from "../domain/index.js";
+import { STRIPE_ROUTES } from "../route-inputs.js";
 import type { Recorder } from "../types.js";
-import { accountId, created, handle, ok, parseListQuery, readBodyForm } from "./_helpers.js";
-
-// Stripe's form encoding surfaces booleans as "true"/"false" strings
-// (same shape as routes/payment-intents.ts).
-const formBool = z
-  .union([z.boolean(), z.enum(["true", "false"]).transform((v) => v === "true")])
-  .optional();
-
-// Metadata values keep "" and null so the domain can apply Stripe's per-key
-// unset semantics on update (same as the customers surface).
-const metadataSchema = z.record(z.string(), z.string().nullable()).optional();
-
-const productFieldsSchema = z.object({
-  name: z.string().min(1).optional(),
-  description: z.string().nullish(),
-  active: formBool,
-  metadata: metadataSchema,
-});
-
-const createPriceSchema = z.object({
-  currency: z.string().min(1).optional(),
-  product: z.string().min(1).optional(),
-  unit_amount: z.coerce.number().int().nonnegative().optional(),
-  recurring: z
-    .object({
-      interval: z.string().min(1),
-      interval_count: z.coerce.number().int().positive().optional(),
-    })
-    .optional(),
-  nickname: z.string().nullish(),
-  lookup_key: z.string().nullish(),
-  active: formBool,
-  metadata: metadataSchema,
-});
-
-const createSubscriptionSchema = z.object({
-  customer: z.string().min(1).optional(),
-  items: z
-    .array(
-      z.object({
-        price: z.string().min(1).optional(),
-        quantity: z.coerce.number().int().positive().optional(),
-      })
-    )
-    .optional(),
-  cancel_at_period_end: formBool,
-  metadata: metadataSchema,
-});
-
-const updateSubscriptionSchema = z.object({
-  cancel_at_period_end: formBool,
-  metadata: metadataSchema,
-});
+import { accountId, created, declaredRoute, listQuery, ok } from "./_helpers.js";
 
 export function registerBillingRoutes(
   router: Hono,
@@ -73,119 +21,78 @@ export function registerBillingRoutes(
 ) {
   // ---------- Products ----------
 
-  router.post("/v1/products", (c) =>
-    handle(c, recorder, runId, async () => {
-      const input = productFieldsSchema.parse(await readBodyForm(c));
-      const { body, delta } = domain.createProduct(accountId(c), input);
-      return created(body, delta);
-    })
+  declaredRoute(router, STRIPE_ROUTES.createProduct, recorder, runId, ({ body }, c) => {
+    const { body: response, delta } = domain.createProduct(accountId(c), body);
+    return created(response, delta);
+  });
+
+  declaredRoute(router, STRIPE_ROUTES.retrieveProduct, recorder, runId, ({ path }, c) =>
+    ok(domain.retrieveProduct(accountId(c), path.id))
   );
 
-  router.get("/v1/products/:id", (c) =>
-    handle(c, recorder, runId, () =>
-      ok(domain.retrieveProduct(accountId(c), c.req.param("id")!))
-    )
-  );
-
-  router.get("/v1/products", (c) =>
-    handle(c, recorder, runId, () => {
-      const list = parseListQuery(c);
-      return ok(
-        domain.listProducts(accountId(c), { ...list, active: queryBool(c.req.query("active")) })
-      );
-    })
+  declaredRoute(router, STRIPE_ROUTES.listProducts, recorder, runId, ({ query }, c) =>
+    ok(domain.listProducts(accountId(c), { ...listQuery(query), active: query.active }))
   );
 
   // ---------- Prices ----------
 
-  router.post("/v1/prices", (c) =>
-    handle(c, recorder, runId, async () => {
-      const input = createPriceSchema.parse(await readBodyForm(c));
-      const { body, delta } = domain.createPrice(accountId(c), input);
-      return created(body, delta);
-    })
+  declaredRoute(router, STRIPE_ROUTES.createPrice, recorder, runId, ({ body }, c) => {
+    const { body: response, delta } = domain.createPrice(accountId(c), body);
+    return created(response, delta);
+  });
+
+  declaredRoute(router, STRIPE_ROUTES.retrievePrice, recorder, runId, ({ path }, c) =>
+    ok(domain.retrievePrice(accountId(c), path.id))
   );
 
-  router.get("/v1/prices/:id", (c) =>
-    handle(c, recorder, runId, () =>
-      ok(domain.retrievePrice(accountId(c), c.req.param("id")!))
+  declaredRoute(router, STRIPE_ROUTES.listPrices, recorder, runId, ({ query }, c) =>
+    ok(
+      domain.listPrices(accountId(c), {
+        ...listQuery(query),
+        product: query.product,
+        active: query.active,
+      })
     )
-  );
-
-  router.get("/v1/prices", (c) =>
-    handle(c, recorder, runId, () => {
-      const list = parseListQuery(c);
-      return ok(
-        domain.listPrices(accountId(c), {
-          ...list,
-          product: c.req.query("product"),
-          active: queryBool(c.req.query("active")),
-        })
-      );
-    })
   );
 
   // ---------- Subscriptions ----------
 
-  router.post("/v1/subscriptions", (c) =>
-    handle(c, recorder, runId, async () => {
-      const input = createSubscriptionSchema.parse(await readBodyForm(c));
-      const { body, delta } = domain.createSubscription(accountId(c), input);
-      return created(body, delta);
-    })
+  declaredRoute(router, STRIPE_ROUTES.createSubscription, recorder, runId, ({ body }, c) => {
+    const { body: response, delta } = domain.createSubscription(accountId(c), body);
+    return created(response, delta);
+  });
+
+  declaredRoute(router, STRIPE_ROUTES.retrieveSubscription, recorder, runId, ({ path }, c) =>
+    ok(domain.retrieveSubscription(accountId(c), path.id))
   );
 
-  router.get("/v1/subscriptions/:id", (c) =>
-    handle(c, recorder, runId, () =>
-      ok(domain.retrieveSubscription(accountId(c), c.req.param("id")!))
+  declaredRoute(router, STRIPE_ROUTES.updateSubscription, recorder, runId, ({ path, body }, c) => {
+    const { body: response, delta } = domain.updateSubscription(accountId(c), path.id, body);
+    return ok(response, true, delta);
+  });
+
+  declaredRoute(router, STRIPE_ROUTES.cancelSubscription, recorder, runId, ({ path }, c) => {
+    const { body, delta } = domain.cancelSubscription(accountId(c), path.id);
+    return ok(body, true, delta);
+  });
+
+  declaredRoute(router, STRIPE_ROUTES.listSubscriptions, recorder, runId, ({ query }, c) =>
+    ok(
+      domain.listSubscriptions(accountId(c), {
+        ...listQuery(query),
+        customer: query.customer,
+        status: query.status,
+      })
     )
-  );
-
-  router.post("/v1/subscriptions/:id", (c) =>
-    handle(c, recorder, runId, async () => {
-      const input = updateSubscriptionSchema.parse(await readBodyForm(c));
-      const { body, delta } = domain.updateSubscription(accountId(c), c.req.param("id")!, input);
-      return ok(body, true, delta);
-    })
-  );
-
-  router.delete("/v1/subscriptions/:id", (c) =>
-    handle(c, recorder, runId, () => {
-      const { body, delta } = domain.cancelSubscription(accountId(c), c.req.param("id")!);
-      return ok(body, true, delta);
-    })
-  );
-
-  router.get("/v1/subscriptions", (c) =>
-    handle(c, recorder, runId, () => {
-      const list = parseListQuery(c);
-      return ok(
-        domain.listSubscriptions(accountId(c), {
-          ...list,
-          customer: c.req.query("customer"),
-          status: c.req.query("status"),
-        })
-      );
-    })
   );
 
   // ---------- Invoices (reads only) ----------
 
-  router.get("/v1/invoices/:id", (c) =>
-    handle(c, recorder, runId, () =>
-      ok(domain.retrieveInvoice(accountId(c), c.req.param("id")!))
-    )
+  declaredRoute(router, STRIPE_ROUTES.retrieveInvoice, recorder, runId, ({ path }, c) =>
+    ok(domain.retrieveInvoice(accountId(c), path.id))
   );
 
-  router.get("/v1/invoices", (c) =>
-    handle(c, recorder, runId, () =>
-      ok(domain.listInvoices(accountId(c), parseListQuery(c)))
-    )
+  declaredRoute(router, STRIPE_ROUTES.listInvoices, recorder, runId, ({ query }, c) =>
+    ok(domain.listInvoices(accountId(c), listQuery(query)))
   );
-}
-
-function queryBool(value: string | undefined): boolean | undefined {
-  if (value === "true") return true;
-  if (value === "false") return false;
-  return undefined;
 }

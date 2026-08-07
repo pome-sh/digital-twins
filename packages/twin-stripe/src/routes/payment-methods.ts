@@ -7,11 +7,11 @@
 // ruling — the customer-scoped list is the hot read.
 
 import type { Hono } from "hono";
-import type { StripeDomain } from "../domain/index.js";
-import type { CreatePaymentMethodInput } from "../domain/index.js";
+import type { CreatePaymentMethodInput, StripeDomain } from "../domain/index.js";
 import type { Recorder } from "../types.js";
 import { TwinError } from "../errors.js";
-import { accountId, created, handle, ok, readBodyForm } from "./_helpers.js";
+import { STRIPE_ROUTES } from "../route-inputs.js";
+import { accountId, created, declaredRoute, ok } from "./_helpers.js";
 
 export function registerPaymentMethodsRoutes(
   router: Hono,
@@ -19,47 +19,40 @@ export function registerPaymentMethodsRoutes(
   recorder: Recorder | undefined,
   runId: string
 ) {
-  router.post("/v1/payment_methods", (c) =>
-    handle(c, recorder, runId, async () => {
-      // Validation (with Stripe's parameter_missing / card_error codes)
-      // lives in the domain, so the raw body passes through untyped.
-      const body = (await readBodyForm(c)) as CreatePaymentMethodInput;
-      const { body: response, delta } = domain.createPaymentMethod(accountId(c), body);
-      return created(response, delta);
-    })
+  declaredRoute(router, STRIPE_ROUTES.createPaymentMethod, recorder, runId, ({ body }, c) => {
+    // The declaration names `type` and `card` but leaves their VALUES unchecked:
+    // validation lives in the domain, which answers with Stripe's own
+    // parameter_missing / card_error codes and their `card[exp_month]` params.
+    const { body: response, delta } = domain.createPaymentMethod(
+      accountId(c),
+      body as CreatePaymentMethodInput
+    );
+    return created(response, delta);
+  });
+
+  declaredRoute(router, STRIPE_ROUTES.retrievePaymentMethod, recorder, runId, ({ path }, c) =>
+    ok(domain.retrievePaymentMethod(accountId(c), path.id))
   );
 
-  router.get("/v1/payment_methods/:id", (c) =>
-    handle(c, recorder, runId, () =>
-      ok(domain.retrievePaymentMethod(accountId(c), c.req.param("id")!))
-    )
-  );
-
-  router.post("/v1/payment_methods/:id/attach", (c) =>
-    handle(c, recorder, runId, async () => {
-      const body = (await readBodyForm(c)) as { customer?: unknown };
-      const customer = typeof body.customer === "string" ? body.customer : "";
-      if (!customer) {
-        throw new TwinError(
-          "invalid_request_error",
-          "parameter_missing",
-          "Missing required param: customer.",
-          { param: "customer", statusCode: 400 }
-        );
-      }
-      const { body: response, delta } = domain.attachPaymentMethod(
-        accountId(c),
-        c.req.param("id")!,
-        customer
+  declaredRoute(router, STRIPE_ROUTES.attachPaymentMethod, recorder, runId, ({ path, body }, c) => {
+    if (!body.customer) {
+      throw new TwinError(
+        "invalid_request_error",
+        "parameter_missing",
+        "Missing required param: customer.",
+        { param: "customer", statusCode: 400 }
       );
-      return ok(response, true, delta);
-    })
-  );
+    }
+    const { body: response, delta } = domain.attachPaymentMethod(
+      accountId(c),
+      path.id,
+      body.customer
+    );
+    return ok(response, true, delta);
+  });
 
-  router.post("/v1/payment_methods/:id/detach", (c) =>
-    handle(c, recorder, runId, () => {
-      const { body, delta } = domain.detachPaymentMethod(accountId(c), c.req.param("id")!);
-      return ok(body, true, delta);
-    })
-  );
+  declaredRoute(router, STRIPE_ROUTES.detachPaymentMethod, recorder, runId, ({ path }, c) => {
+    const { body, delta } = domain.detachPaymentMethod(accountId(c), path.id);
+    return ok(body, true, delta);
+  });
 }

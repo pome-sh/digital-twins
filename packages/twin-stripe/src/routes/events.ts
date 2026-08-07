@@ -3,8 +3,9 @@
 
 import type { Hono } from "hono";
 import type { StripeDomain } from "../domain/index.js";
+import { STRIPE_ROUTES } from "../route-inputs.js";
 import type { Recorder } from "../types.js";
-import { handle, ok, parseListQuery, accountId } from "./_helpers.js";
+import { accountId, declaredRoute, listQuery, ok } from "./_helpers.js";
 
 export function registerEventsRoutes(
   router: Hono,
@@ -12,21 +13,11 @@ export function registerEventsRoutes(
   recorder: Recorder | undefined,
   runId: string
 ) {
-  router.get("/v1/events/:id", (c) =>
-    handle(c, recorder, runId, () =>
-      ok(domain.retrieveEvent(accountId(c), c.req.param("id")!))
-    )
+  declaredRoute(router, STRIPE_ROUTES.retrieveEvent, recorder, runId, ({ path }, c) =>
+    ok(domain.retrieveEvent(accountId(c), path.id))
   );
 
-  router.get("/v1/events", (c) =>
-    handle(c, recorder, runId, () => {
-      const list = parseListQuery(c);
-      return ok(
-        domain.listEvents(accountId(c), {
-          ...list,
-          type: c.req.query("type"),
-        })
-      );
-    })
+  declaredRoute(router, STRIPE_ROUTES.listEvents, recorder, runId, ({ query }, c) =>
+    ok(domain.listEvents(accountId(c), { ...listQuery(query), type: query.type }))
   );
 }

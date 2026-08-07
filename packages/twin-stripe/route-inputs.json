@@ -1,0 +1,1047 @@
+{
+  "twin": "stripe",
+  "package": "@pome-sh/twin-stripe",
+  "artifact_version": 1,
+  "generated_by": "npm run emit:route-inputs",
+  "source": [
+    "packages/twin-stripe/src/route-inputs.ts"
+  ],
+  "surface_count": 38,
+  "input_count": 128,
+  "surfaces": [
+    {
+      "method": "DELETE",
+      "path": "/v1/customers/:id",
+      "surface": "DELETE /v1/customers/:id",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/subscriptions/:id",
+      "surface": "DELETE /v1/subscriptions/:id",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/balance_transactions",
+      "surface": "GET /v1/balance_transactions",
+      "inputs": [
+        {
+          "name": "created",
+          "location": "query",
+          "required": false,
+          "type": "object|string"
+        },
+        {
+          "name": "ending_before",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "limit",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "starting_after",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "type",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/charges",
+      "surface": "GET /v1/charges",
+      "inputs": [
+        {
+          "name": "created",
+          "location": "query",
+          "required": false,
+          "type": "object|string"
+        },
+        {
+          "name": "customer",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "ending_before",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "limit",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "payment_intent",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "starting_after",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/charges/:id",
+      "surface": "GET /v1/charges/:id",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/customers",
+      "surface": "GET /v1/customers",
+      "inputs": [
+        {
+          "name": "created",
+          "location": "query",
+          "required": false,
+          "type": "object|string"
+        },
+        {
+          "name": "email",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "ending_before",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "limit",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "starting_after",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/customers/:id",
+      "surface": "GET /v1/customers/:id",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/customers/:id/payment_methods",
+      "surface": "GET /v1/customers/:id/payment_methods",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "created",
+          "location": "query",
+          "required": false,
+          "type": "object|string"
+        },
+        {
+          "name": "ending_before",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "limit",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "starting_after",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "type",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/events",
+      "surface": "GET /v1/events",
+      "inputs": [
+        {
+          "name": "created",
+          "location": "query",
+          "required": false,
+          "type": "object|string"
+        },
+        {
+          "name": "ending_before",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "limit",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "starting_after",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "type",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/events/:id",
+      "surface": "GET /v1/events/:id",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/invoices",
+      "surface": "GET /v1/invoices",
+      "inputs": [
+        {
+          "name": "created",
+          "location": "query",
+          "required": false,
+          "type": "object|string"
+        },
+        {
+          "name": "ending_before",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "limit",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "starting_after",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/invoices/:id",
+      "surface": "GET /v1/invoices/:id",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/payment_intents",
+      "surface": "GET /v1/payment_intents",
+      "inputs": [
+        {
+          "name": "created",
+          "location": "query",
+          "required": false,
+          "type": "object|string"
+        },
+        {
+          "name": "ending_before",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "limit",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "starting_after",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/payment_intents/:id",
+      "surface": "GET /v1/payment_intents/:id",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/payment_methods/:id",
+      "surface": "GET /v1/payment_methods/:id",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/prices",
+      "surface": "GET /v1/prices",
+      "inputs": [
+        {
+          "name": "active",
+          "location": "query",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "created",
+          "location": "query",
+          "required": false,
+          "type": "object|string"
+        },
+        {
+          "name": "ending_before",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "limit",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "product",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "starting_after",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/prices/:id",
+      "surface": "GET /v1/prices/:id",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/products",
+      "surface": "GET /v1/products",
+      "inputs": [
+        {
+          "name": "active",
+          "location": "query",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "created",
+          "location": "query",
+          "required": false,
+          "type": "object|string"
+        },
+        {
+          "name": "ending_before",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "limit",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "starting_after",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/products/:id",
+      "surface": "GET /v1/products/:id",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/refunds",
+      "surface": "GET /v1/refunds",
+      "inputs": [
+        {
+          "name": "charge",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "created",
+          "location": "query",
+          "required": false,
+          "type": "object|string"
+        },
+        {
+          "name": "ending_before",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "limit",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "payment_intent",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "starting_after",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/refunds/:id",
+      "surface": "GET /v1/refunds/:id",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/subscriptions",
+      "surface": "GET /v1/subscriptions",
+      "inputs": [
+        {
+          "name": "created",
+          "location": "query",
+          "required": false,
+          "type": "object|string"
+        },
+        {
+          "name": "customer",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "ending_before",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "limit",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "starting_after",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "status",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/subscriptions/:id",
+      "surface": "GET /v1/subscriptions/:id",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/v1/customers",
+      "surface": "POST /v1/customers",
+      "inputs": [
+        {
+          "name": "description",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "email",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "metadata",
+          "location": "body",
+          "required": false,
+          "type": "object"
+        },
+        {
+          "name": "name",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "phone",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/v1/customers/:id",
+      "surface": "POST /v1/customers/:id",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "description",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "email",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "metadata",
+          "location": "body",
+          "required": false,
+          "type": "object"
+        },
+        {
+          "name": "name",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "phone",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/v1/payment_intents",
+      "surface": "POST /v1/payment_intents",
+      "inputs": [
+        {
+          "name": "amount",
+          "location": "body",
+          "required": true,
+          "type": "integer"
+        },
+        {
+          "name": "capture_method",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "confirm",
+          "location": "body",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "confirmation_method",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "currency",
+          "location": "body",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "customer",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "metadata",
+          "location": "body",
+          "required": false,
+          "type": "object"
+        },
+        {
+          "name": "payment_method",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "payment_method_options",
+          "location": "body",
+          "required": false,
+          "type": "object"
+        },
+        {
+          "name": "payment_method_types",
+          "location": "body",
+          "required": true,
+          "type": "array"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/v1/payment_intents/:id",
+      "surface": "POST /v1/payment_intents/:id",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "amount",
+          "location": "body",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "customer",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "metadata",
+          "location": "body",
+          "required": false,
+          "type": "object"
+        },
+        {
+          "name": "payment_method",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/v1/payment_intents/:id/cancel",
+      "surface": "POST /v1/payment_intents/:id/cancel",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/v1/payment_intents/:id/confirm",
+      "surface": "POST /v1/payment_intents/:id/confirm",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "payment_method",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/v1/payment_methods",
+      "surface": "POST /v1/payment_methods",
+      "inputs": [
+        {
+          "name": "card",
+          "location": "body",
+          "required": false,
+          "type": null
+        },
+        {
+          "name": "type",
+          "location": "body",
+          "required": false,
+          "type": null
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/v1/payment_methods/:id/attach",
+      "surface": "POST /v1/payment_methods/:id/attach",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "customer",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/v1/payment_methods/:id/detach",
+      "surface": "POST /v1/payment_methods/:id/detach",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/v1/prices",
+      "surface": "POST /v1/prices",
+      "inputs": [
+        {
+          "name": "active",
+          "location": "body",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "currency",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "lookup_key",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "metadata",
+          "location": "body",
+          "required": false,
+          "type": "object"
+        },
+        {
+          "name": "nickname",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "product",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "recurring",
+          "location": "body",
+          "required": false,
+          "type": "object"
+        },
+        {
+          "name": "unit_amount",
+          "location": "body",
+          "required": false,
+          "type": "integer"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/v1/products",
+      "surface": "POST /v1/products",
+      "inputs": [
+        {
+          "name": "active",
+          "location": "body",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "description",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "metadata",
+          "location": "body",
+          "required": false,
+          "type": "object"
+        },
+        {
+          "name": "name",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/v1/refunds",
+      "surface": "POST /v1/refunds",
+      "inputs": [
+        {
+          "name": "Idempotency-Key",
+          "location": "header",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "amount",
+          "location": "body",
+          "required": false,
+          "type": "number"
+        },
+        {
+          "name": "charge",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "reason",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/v1/subscriptions",
+      "surface": "POST /v1/subscriptions",
+      "inputs": [
+        {
+          "name": "cancel_at_period_end",
+          "location": "body",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "customer",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "items",
+          "location": "body",
+          "required": false,
+          "type": "array"
+        },
+        {
+          "name": "metadata",
+          "location": "body",
+          "required": false,
+          "type": "object"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/v1/subscriptions/:id",
+      "surface": "POST /v1/subscriptions/:id",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "cancel_at_period_end",
+          "location": "body",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "metadata",
+          "location": "body",
+          "required": false,
+          "type": "object"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/v1/test_helpers/payment_intents/:id/simulate_crypto_deposit",
+      "surface": "POST /v1/test_helpers/payment_intents/:id/simulate_crypto_deposit",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    }
+  ]
+}
