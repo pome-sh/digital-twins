@@ -343,8 +343,8 @@
         {
           "name": "id",
           "location": "argument",
-          "required": false,
-          "type": "String"
+          "required": true,
+          "type": "String!"
         },
         {
           "name": "input",
