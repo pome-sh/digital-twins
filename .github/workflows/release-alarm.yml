@@ -1,0 +1,270 @@
+name: release alarm
+
+# F-1350 — a failed release must reach a human without a human going looking.
+#
+# On 2026-08-06 four consecutive push-triggered `release.yml` runs failed over
+# eleven hours. Nothing fired: `release.yml` has no failure path, so a publish
+# that died reads exactly like a merge that owed no publish. Two of the four
+# were the merges of F-1308 and F-949's wire work — the packages the grading
+# vocabulary depends on — reporting themselves as merged while publishing
+# nothing. The first signal was a human noticing two packages missing from npm.
+#
+# ── Why this is a SEPARATE workflow file ─────────────────────────────────────
+#
+# `check-release-staleness.yml` said it before it was deleted alongside the
+# Changesets flow it watched (`a3c9441`, "replace two release systems with
+# one"):
+#
+#   "Deliberately a SEPARATE workflow file from cli-release.yml, with its own
+#    independent trigger. The alarm has to survive the thing it is watching: a
+#    cli-release.yml that is broken, disabled, or never triggered would take an
+#    embedded check down with it, and 'no release PR and no alarm' is precisely
+#    the silence this ticket is about."
+#
+# Deleting it with its subject was reasonable; not replacing it was the gap. The
+# reasoning transferred to the new release system and the file did not. An
+# `if: failure()` step inside `release.yml` still cannot see the silence that
+# bit the CLI release in F-1180 — a release workflow that never triggers at all
+# takes an embedded check down with it, and "never ran" is the silence this repo
+# has now been bitten by twice.
+#
+# ── Why it lives in digital-twins and not in pome-cloud ──────────────────────
+#
+# A real choice; pome-cloud is the consumer that CARES whether `@pome-sh/checks`
+# published, and an alarm in the repo whose CI is broken can be broken by the
+# same cause. Four reasons it belongs here anyway:
+#
+#   1. Shared fate does not actually favour pome-cloud. The causes that would
+#      take this workflow down with `release.yml` — Actions disabled, billing
+#      exhausted, the org suspended — are ORG-scoped, and pome-cloud is the same
+#      org and the same billing account. Moving the alarm one repo sideways buys
+#      protection only against someone disabling Actions on this repo alone,
+#      while costing everything below. The cause that DID produce the eleven
+#      hours (an npm Trusted Publishing identity mismatch after a workflow
+#      rename) lives entirely inside `release.yml`'s publish step and cannot
+#      touch a separately-triggered sibling.
+#   2. The issue has to be filed where the fix happens. `issues: write` is
+#      per-repo: filing into digital-twins from pome-cloud needs a long-lived
+#      cross-repo PAT in pome-cloud's secrets — the exact credential
+#      `vocabulary-parity.yml` refused to introduce in the other direction. The
+#      alternative, filing in pome-cloud, puts the alarm in the repo that cannot
+#      act on it: every recovery (re-dispatch `release.yml`, repair the npm
+#      Trusted Publisher) is a digital-twins operation.
+#   3. One of the five publish targets is only readable from here. `@pome-sh/wire`
+#      on GitHub Packages needs a token even to READ a version, and the ambient
+#      `packages: read` below covers it exactly as `release.yml`'s `plan-wire`
+#      job does. A pome-cloud alarm would need another PAT or would carry a
+#      blind spot on a fifth of what it watches — and blind spots are the
+#      subject of this ticket.
+#   4. This repo is public, so its Actions minutes are free; pome-cloud's are
+#      billed. Smallest of the four, but it points the same way.
+#
+# ── Both directions ──────────────────────────────────────────────────────────
+#
+# Everything green produces no issue, no comment, and a green run, and a
+# recovered failure CLOSES the tracking issue. An alarm that cries wolf gets
+# muted, and a stale open issue teaches people to skim past the next real one.
+on:
+  schedule:
+    # Daily, off the top of the hour to dodge GitHub's cron-queue congestion.
+    # Daily rather than hourly because the bar in the ticket is "a signal a
+    # human receives within a day", and because the outcome this checks —
+    # is the package on the registry — does not become more true at 03:00.
+    #
+    # The one thing that can silence THIS file: GitHub disables scheduled
+    # workflows in a repository after 60 days with no commits. That is a
+    # property of the repo, not of the release, and it is why `--targets` and
+    # the regression suite also run in ci.yml on every PR — a repo quiet enough
+    # to lose its cron is a repo whose release nobody is triggering either.
+    - cron: "37 6 * * *"
+  workflow_dispatch:
+  # Changing the checker or its subject must prove the checker still parses on
+  # the PR that changes it. ci.yml runs the same two commands in its always-on
+  # block (they need no network and cannot be skipped); this arm additionally
+  # proves THIS FILE's job wiring still works, which is the part a syntax-valid
+  # workflow can get wrong and only discover at the next cron.
+  pull_request:
+    paths:
+      - "scripts/ci/release-alarm.mjs"
+      - "scripts/ci/release-alarm.test.mjs"
+      - ".github/workflows/release-alarm.yml"
+      - ".github/workflows/release.yml"
+      - "scripts/ci/decide-publish.sh"
+
+concurrency:
+  group: release-alarm-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  alarm:
+    name: every version main declares is on its registry
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      # Declared even though this repo is public and its runs are publicly
+      # readable: a `permissions:` block sets every scope it omits to `none`,
+      # and an alarm that silently 403s on the run list is an alarm that
+      # reports the release path healthy because it could not see it.
+      actions: read
+      issues: write # the tracking issue
+      packages: read # @pome-sh/wire's GitHub Packages version, as plan-wire reads it
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      # Gate on the checker's own tests BEFORE checking, so a red run is a real
+      # claim about the release and not a broken checker. Same ordering as the
+      # deleted check-release-staleness.yml.
+      - name: Regression-test the checker
+        run: node scripts/ci/release-alarm.test.mjs
+
+      # The dead-guard assertion: release.yml still yields publish targets. An
+      # alarm whose package list has quietly gone empty passes forever.
+      - name: The publish targets are still derivable from release.yml
+        run: node scripts/ci/release-alarm.mjs --targets
+
+      # Auth for the GitHub Packages READ only — never a `@pome-sh:registry=`
+      # scope mapping, which would redirect every @pome-sh/* read (including
+      # cli's and the adapter's) to a registry where they do not exist and make
+      # each look brand new. `$HOME/.npmrc` so the token never sits in the
+      # workspace. Same shape as release.yml's plan-wire job.
+      - name: Authenticate reads against GitHub Packages
+        if: github.event_name != 'pull_request'
+        env:
+          GITHUB_PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          printf '//npm.pkg.github.com/:_authToken=%s\n' "${GITHUB_PACKAGES_TOKEN}" >> "$HOME/.npmrc"
+
+      # Reads live registry and run state, so it only means anything off a PR
+      # branch — a PR checkout is not main, and its manifests are not what
+      # release.yml will publish.
+      - name: Did every version main declares actually reach its registry?
+        id: check
+        if: github.event_name != 'pull_request'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node scripts/ci/release-alarm.mjs
+
+      # Scoped to the check step's own outcome rather than a bare `if: failure()`
+      # so a checkout or runner fault does not file a confident "the release is
+      # broken" issue about a check that never ran.
+      - name: File or update the tracking issue
+        if: steps.check.outcome == 'failure'
+        continue-on-error: true # alerting must never be the reason the job is red
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          # Empty when the checker died before reaching a verdict (a throw, a gh
+          # failure). Saying so beats printing nothing on an issue filed because
+          # something is wrong.
+          ALARM_REASON: ${{ steps.check.outputs.reason }}
+          ALARM_REPORT: ${{ steps.check.outputs.report }}
+        run: |
+          set -u
+          title="The twins release is not delivering"
+
+          gh label create release-alarm \
+            --color B60205 \
+            --description "release.yml failed, never ran, or published nothing" \
+            --repo "$GITHUB_REPOSITORY" || true
+
+          # Built in a file so this step's YAML indentation cannot leak into the
+          # issue body. The static half is a QUOTED heredoc: it is markdown full
+          # of backticks, and nothing in it should ever be expanded by the shell.
+          body="$(mktemp)"
+          {
+            printf '%s\n\n' "${ALARM_REASON:-The release alarm failed before it reached a verdict — see the run log.}"
+            cat <<'MD'
+          <details><summary>What the alarm read</summary>
+
+          ```
+          MD
+            printf '%s\n' "${ALARM_REPORT:-(no report was produced)}"
+            cat <<'MD'
+          ```
+
+          </details>
+
+          **UNPUBLISHED / BEHIND** — a version on `main` that its registry does not serve. Re-dispatch the release once the cause is fixed: `gh workflow run release.yml --ref main`. A 404 at the publish step is an AUTH failure (npm Trusted Publishing matches repo *and* workflow filename), not a missing package.
+
+          **NEVER_RAN** — a push to `main` that triggered no release at all. Check Actions is enabled, and whether the push came from a bot using the ambient `GITHUB_TOKEN`, which GitHub refuses to let trigger workflows.
+
+          **STUCK** — `release.yml` sets `cancel-in-progress: false`, so one hung run holds the concurrency lock and every release behind it waits.
+
+          **UNMEASURED** — the alarm could not read a registry. That is not the same claim as "unpublished"; nothing is known about that package yet.
+
+          MD
+            printf 'Detected by release-alarm: %s\n\n' "$RUN_URL"
+            printf 'This issue is reused across consecutive failures (commented on, not re-filed) and closes itself once the release delivers again — so a release that stays broken stays visible instead of burying itself.\n'
+          } > "$body"
+
+          existing="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --label release-alarm \
+            --json number --jq '.[0].number' 2>/dev/null || true)"
+          if [ -n "$existing" ]; then
+            { printf 'Still not delivering on the latest run.\n\n'; cat "$body"; } > "${body}.c"
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body-file "${body}.c" || true
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" \
+              --body-file "$body" --label release-alarm \
+            || gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file "$body" || true
+          fi
+
+      # The other direction. Without this the tracking issue outlives the
+      # problem, and an open issue nobody closes is how a label stops being read
+      # — which is this ticket's own defect wearing a different hat.
+      - name: Close the tracking issue once the release delivers again
+        if: steps.check.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          ALARM_REPORT: ${{ steps.check.outputs.report }}
+        run: |
+          set -u
+          existing="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --label release-alarm \
+            --json number --jq '.[0].number' 2>/dev/null || true)"
+          if [ -z "$existing" ]; then
+            echo "Release is delivering and no tracking issue is open — nothing to say."
+            exit 0
+          fi
+          body="$(mktemp)"
+          {
+            cat <<'MD'
+          Delivering again: every version `main` declares is on its registry, and the release path is alive.
+
+          <details><summary>What the alarm read</summary>
+
+          ```
+          MD
+            printf '%s\n' "${ALARM_REPORT:-(no report was produced)}"
+            cat <<'MD'
+          ```
+
+          </details>
+
+          MD
+            printf 'Closed by release-alarm: %s\n' "$RUN_URL"
+          } > "$body"
+          gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body-file "$body" || true
+          gh issue close "$existing" --repo "$GITHUB_REPOSITORY" || true
+
+      # `continue-on-error` above keeps the job green so alerting failures never
+      # masquerade as release failures — so the run's own conclusion has to be
+      # set here, or a red release would show a green check and we are back to
+      # silence with extra steps.
+      - name: Fail the run when the alarm fired
+        if: steps.check.outcome == 'failure'
+        run: |
+          echo "::error::The release alarm fired — see the tracking issue and the step log above."
+          exit 1
