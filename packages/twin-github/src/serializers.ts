@@ -35,6 +35,7 @@ import type {
   PullRequest,
   PullRequestReview,
   PullRequestSimple,
+  PullRequestStack,
   Release,
   Repository,
   ReviewComment,
@@ -391,7 +392,10 @@ export function issueCommentJson(
 // shape). The list serializer omits these; the detail serializer keeps them.
 // See https://docs.github.com/en/rest/pulls/pulls — PullRequestSimple vs
 // PullRequest.
-function pullRequestSimpleJson(pr: PullRequestRow, baseRepo: RepoRow, headRepo: RepoRow, headSha: string | null = null, baseSha: string | null = null) {
+// `stack` is on BOTH schemas, so it belongs here rather than in the detail-only
+// half: the caller passes what the domain derived, because only the domain can
+// see the sibling pull requests a stack is made of.
+function pullRequestSimpleJson(pr: PullRequestRow, baseRepo: RepoRow, headRepo: RepoRow, headSha: string | null = null, baseSha: string | null = null, stack: PullRequestStack = null) {
   return {
     id: stableNumericId(`${baseRepo.full_name}/pull/${pr.number}`),
     node_id: `PR_${stableNumericId(`${baseRepo.full_name}/pull/${pr.number}`)}`,
@@ -433,21 +437,22 @@ function pullRequestSimpleJson(pr: PullRequestRow, baseRepo: RepoRow, headRepo: 
     created_at: pr.created_at,
     updated_at: pr.updated_at,
     closed_at: pr.closed_at,
-    merged_at: pr.merged_at
+    merged_at: pr.merged_at,
+    stack
   } satisfies DeepPartial<PullRequestSimple>;
 }
 
 // LIST serializer (`GET /repos/:o/:r/pulls`) — the leaner PullRequestSimple
 // shape. Does not include merged / commits / additions / deletions /
 // changed_files (those are single-PR-only).
-export function pullRequestListJson(pr: PullRequestRow, baseRepo: RepoRow, headRepo: RepoRow, headSha: string | null = null, baseSha: string | null = null) {
-  return pullRequestSimpleJson(pr, baseRepo, headRepo, headSha, baseSha);
+export function pullRequestListJson(pr: PullRequestRow, baseRepo: RepoRow, headRepo: RepoRow, headSha: string | null = null, baseSha: string | null = null, stack: PullRequestStack = null) {
+  return pullRequestSimpleJson(pr, baseRepo, headRepo, headSha, baseSha, stack);
 }
 
 // Single-PR serializer (`GET /repos/:o/:r/pulls/:n`) — the full PullRequest
 // shape, which extends PullRequestSimple with the diff-stat fields.
-export function pullRequestJson(pr: PullRequestRow, baseRepo: RepoRow, headRepo: RepoRow, commits = 1, changedFiles = 0, headSha: string | null = null, baseSha: string | null = null) {
-  const simple = pullRequestSimpleJson(pr, baseRepo, headRepo, headSha, baseSha);
+export function pullRequestJson(pr: PullRequestRow, baseRepo: RepoRow, headRepo: RepoRow, commits = 1, changedFiles = 0, headSha: string | null = null, baseSha: string | null = null, stack: PullRequestStack = null) {
+  const simple = pullRequestSimpleJson(pr, baseRepo, headRepo, headSha, baseSha, stack);
   return {
     ...simple,
     merged: Boolean(pr.merged),

@@ -112,9 +112,13 @@ export function createPullRequest(domain: GitHubDomain, input: { owner: string; 
 
 export function listPullRequests(domain: GitHubDomain, input: { owner: string; repo: string; state?: "open" | "closed" | "all" } & PageOptions) {
   const repo = domain.requireRepo(input.owner, input.repo);
-  let rows = domain.listPullRequestRows(repo.id);
+  const all = domain.listPullRequestRows(repo.id);
+  let rows = all;
   if (input.state && input.state !== "all") rows = rows.filter((pr) => pr.state === input.state);
-  return paginate(rows, input.page, input.per_page ?? input.perPage).map((pr) => domain.serializePullSimple(pr));
+  // `all`, not `rows`: a PR's stack is a fact about the whole repo, so the state
+  // filter and the page must not change it. Reading it once here is also what
+  // keeps serializing a page of N from re-reading the table N times (F-1178).
+  return paginate(rows, input.page, input.per_page ?? input.perPage).map((pr) => domain.serializePullSimple(pr, all));
 }
 
 

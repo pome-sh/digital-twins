@@ -1,6 +1,40 @@
 # @pome-sh/twin-github — CHANGELOG
 
 
+## 0.9.3 — 2026-08-08
+
+`stack` is modelled on both pull-request read surfaces (F-1178). GitHub shipped
+stacked pull requests and added the field to both the `pull-request` and
+`pull-request-simple` schemas on 2026-08-02, and the declared lane caught the
+twin missing it on `GET /repos/{}/{}/pulls` and `GET /repos/{}/{}/pulls/{}`.
+
+The shape is transcribed from the vendored `pull-request-stack` schema, not
+guessed: nullable, with a required `base: { ref, sha }` and optional integer
+`size`, `position`, `id` and `number`. `@octokit/openapi-types@28.0.0` predates
+the field, so `src/upstream-types.ts` declares it locally until that bump lands;
+the `AssertNoUncovered` guard covers it either way.
+
+It is populated from twin state, not a constant. GitHub models a stack as its own
+entity; the twin has no stack table, so it reads one off the pull requests linked
+`base_ref` -> `head_ref` inside a repository, matched on repo id as well as ref
+name so a fork's identically-named branch cannot invent a link. `base`, `size`
+and `position` are exact consequences of that chain; `id` and `number` derive
+from its bottom open member.
+
+Because that identity is shared across members, the answer has to be a property
+of the chain rather than of the pull request you happened to ask about. So the
+whole connected component is resolved and then required to be one unambiguous
+line: **any two PRs reporting the same `stack.id` report the same `size` and the
+same membership, with positions exactly `1..size`**. A component that forks or
+cycles reports `stack: null` from every member instead of handing out an identity
+two of them would disagree about. Linkage spans pull requests of every state, so
+a closed middle link does not sever a live chain, while membership counts only
+open members; fewer than two leaves no stack. A stack whose base branch has no
+resolved sha is not named either, since the vendor schema types `base.sha`
+non-null. All four limits are tested, and written up in `FIDELITY.md`
+divergence #11.
+
+
 ## 0.9.2 — 2026-08-06
 
 Its MCP tool table is now derived from `fixtures/mcp-tools-list.raw.json`
