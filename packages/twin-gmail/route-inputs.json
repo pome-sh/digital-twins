@@ -1,0 +1,1663 @@
+{
+  "twin": "gmail",
+  "package": "@pome-sh/twin-gmail",
+  "artifact_version": 1,
+  "generated_by": "npm run emit:route-inputs",
+  "source": [
+    "packages/twin-gmail/src/route-inputs.ts"
+  ],
+  "surface_count": 60,
+  "input_count": 205,
+  "surfaces": [
+    {
+      "method": "DELETE",
+      "path": "/gmail/v1/users/:userId/drafts/:id",
+      "surface": "DELETE /gmail/v1/users/:userId/drafts/:id",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/gmail/v1/users/:userId/labels/:id",
+      "surface": "DELETE /gmail/v1/users/:userId/labels/:id",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/gmail/v1/users/:userId/messages/:id",
+      "surface": "DELETE /gmail/v1/users/:userId/messages/:id",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/gmail/v1/users/:userId/settings/filters/:id",
+      "surface": "DELETE /gmail/v1/users/:userId/settings/filters/:id",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/gmail/v1/users/:userId/threads/:id",
+      "surface": "DELETE /gmail/v1/users/:userId/threads/:id",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/gmail/v1/users/:userId/drafts",
+      "surface": "GET /gmail/v1/users/:userId/drafts",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "includeSpamTrash",
+          "location": "query",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "maxResults",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "pageToken",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "q",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/gmail/v1/users/:userId/drafts/:id",
+      "surface": "GET /gmail/v1/users/:userId/drafts/:id",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "format",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/gmail/v1/users/:userId/history",
+      "surface": "GET /gmail/v1/users/:userId/history",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "historyTypes",
+          "location": "query",
+          "required": false,
+          "type": "array"
+        },
+        {
+          "name": "labelId",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "maxResults",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "pageToken",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "startHistoryId",
+          "location": "query",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/gmail/v1/users/:userId/labels",
+      "surface": "GET /gmail/v1/users/:userId/labels",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/gmail/v1/users/:userId/labels/:id",
+      "surface": "GET /gmail/v1/users/:userId/labels/:id",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/gmail/v1/users/:userId/messages",
+      "surface": "GET /gmail/v1/users/:userId/messages",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "includeSpamTrash",
+          "location": "query",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "labelIds",
+          "location": "query",
+          "required": false,
+          "type": "array"
+        },
+        {
+          "name": "maxResults",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "pageToken",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "q",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/gmail/v1/users/:userId/messages/:id",
+      "surface": "GET /gmail/v1/users/:userId/messages/:id",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "format",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "metadataHeaders",
+          "location": "query",
+          "required": false,
+          "type": "array"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/gmail/v1/users/:userId/messages/:messageId/attachments/:id",
+      "surface": "GET /gmail/v1/users/:userId/messages/:messageId/attachments/:id",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "messageId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/gmail/v1/users/:userId/profile",
+      "surface": "GET /gmail/v1/users/:userId/profile",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/gmail/v1/users/:userId/settings/filters",
+      "surface": "GET /gmail/v1/users/:userId/settings/filters",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/gmail/v1/users/:userId/settings/filters/:id",
+      "surface": "GET /gmail/v1/users/:userId/settings/filters/:id",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/gmail/v1/users/:userId/settings/forwardingAddresses",
+      "surface": "GET /gmail/v1/users/:userId/settings/forwardingAddresses",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/gmail/v1/users/:userId/settings/forwardingAddresses/:forwardingEmail",
+      "surface": "GET /gmail/v1/users/:userId/settings/forwardingAddresses/:forwardingEmail",
+      "inputs": [
+        {
+          "name": "forwardingEmail",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/gmail/v1/users/:userId/settings/sendAs",
+      "surface": "GET /gmail/v1/users/:userId/settings/sendAs",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/gmail/v1/users/:userId/settings/sendAs/:sendAsEmail",
+      "surface": "GET /gmail/v1/users/:userId/settings/sendAs/:sendAsEmail",
+      "inputs": [
+        {
+          "name": "sendAsEmail",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/gmail/v1/users/:userId/threads",
+      "surface": "GET /gmail/v1/users/:userId/threads",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "includeSpamTrash",
+          "location": "query",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "labelIds",
+          "location": "query",
+          "required": false,
+          "type": "array"
+        },
+        {
+          "name": "maxResults",
+          "location": "query",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "name": "pageToken",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "q",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/gmail/v1/users/:userId/threads/:id",
+      "surface": "GET /gmail/v1/users/:userId/threads/:id",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "format",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "metadataHeaders",
+          "location": "query",
+          "required": false,
+          "type": "array"
+        }
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/gmail/v1/users/:userId/labels/:id",
+      "surface": "PATCH /gmail/v1/users/:userId/labels/:id",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "color",
+          "location": "body",
+          "required": false,
+          "type": "object"
+        },
+        {
+          "name": "labelListVisibility",
+          "location": "body",
+          "required": false,
+          "type": null
+        },
+        {
+          "name": "messageListVisibility",
+          "location": "body",
+          "required": false,
+          "type": null
+        },
+        {
+          "name": "name",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "type",
+          "location": "body",
+          "required": false,
+          "type": null
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/gmail/v1/users/:userId/drafts",
+      "surface": "POST /gmail/v1/users/:userId/drafts",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "uploadType",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "id",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "message",
+          "location": "body",
+          "required": true,
+          "type": "object"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/gmail/v1/users/:userId/drafts/send",
+      "surface": "POST /gmail/v1/users/:userId/drafts/send",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "uploadType",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "id",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "message",
+          "location": "body",
+          "required": false,
+          "type": "object"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/gmail/v1/users/:userId/labels",
+      "surface": "POST /gmail/v1/users/:userId/labels",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "color",
+          "location": "body",
+          "required": false,
+          "type": "object"
+        },
+        {
+          "name": "labelListVisibility",
+          "location": "body",
+          "required": false,
+          "type": null
+        },
+        {
+          "name": "messageListVisibility",
+          "location": "body",
+          "required": false,
+          "type": null
+        },
+        {
+          "name": "name",
+          "location": "body",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "type",
+          "location": "body",
+          "required": false,
+          "type": null
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/gmail/v1/users/:userId/messages",
+      "surface": "POST /gmail/v1/users/:userId/messages",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "deleted",
+          "location": "query",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "internalDateSource",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "uploadType",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "classificationLabelValues",
+          "location": "body",
+          "required": false,
+          "type": null
+        },
+        {
+          "name": "id",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "labelIds",
+          "location": "body",
+          "required": false,
+          "type": "array"
+        },
+        {
+          "name": "raw",
+          "location": "body",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "threadId",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/gmail/v1/users/:userId/messages/:id/modify",
+      "surface": "POST /gmail/v1/users/:userId/messages/:id/modify",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "addClassificationLabels",
+          "location": "body",
+          "required": false,
+          "type": null
+        },
+        {
+          "name": "addLabelIds",
+          "location": "body",
+          "required": false,
+          "type": "array"
+        },
+        {
+          "name": "removeClassificationLabelIds",
+          "location": "body",
+          "required": false,
+          "type": null
+        },
+        {
+          "name": "removeLabelIds",
+          "location": "body",
+          "required": false,
+          "type": "array"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/gmail/v1/users/:userId/messages/:id/trash",
+      "surface": "POST /gmail/v1/users/:userId/messages/:id/trash",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/gmail/v1/users/:userId/messages/:id/untrash",
+      "surface": "POST /gmail/v1/users/:userId/messages/:id/untrash",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/gmail/v1/users/:userId/messages/batchDelete",
+      "surface": "POST /gmail/v1/users/:userId/messages/batchDelete",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "ids",
+          "location": "body",
+          "required": false,
+          "type": "array"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/gmail/v1/users/:userId/messages/batchModify",
+      "surface": "POST /gmail/v1/users/:userId/messages/batchModify",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "addClassificationLabels",
+          "location": "body",
+          "required": false,
+          "type": null
+        },
+        {
+          "name": "addLabelIds",
+          "location": "body",
+          "required": false,
+          "type": "array"
+        },
+        {
+          "name": "ids",
+          "location": "body",
+          "required": false,
+          "type": "array"
+        },
+        {
+          "name": "removeClassificationLabelIds",
+          "location": "body",
+          "required": false,
+          "type": null
+        },
+        {
+          "name": "removeLabelIds",
+          "location": "body",
+          "required": false,
+          "type": "array"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/gmail/v1/users/:userId/messages/import",
+      "surface": "POST /gmail/v1/users/:userId/messages/import",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "deleted",
+          "location": "query",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "internalDateSource",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "neverMarkSpam",
+          "location": "query",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "processForCalendar",
+          "location": "query",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "uploadType",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "classificationLabelValues",
+          "location": "body",
+          "required": false,
+          "type": null
+        },
+        {
+          "name": "id",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "labelIds",
+          "location": "body",
+          "required": false,
+          "type": "array"
+        },
+        {
+          "name": "raw",
+          "location": "body",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "threadId",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/gmail/v1/users/:userId/messages/send",
+      "surface": "POST /gmail/v1/users/:userId/messages/send",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "uploadType",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "classificationLabelValues",
+          "location": "body",
+          "required": false,
+          "type": null
+        },
+        {
+          "name": "id",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "labelIds",
+          "location": "body",
+          "required": false,
+          "type": "array"
+        },
+        {
+          "name": "raw",
+          "location": "body",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "threadId",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/gmail/v1/users/:userId/settings/filters",
+      "surface": "POST /gmail/v1/users/:userId/settings/filters",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "action",
+          "location": "body",
+          "required": false,
+          "type": "object"
+        },
+        {
+          "name": "criteria",
+          "location": "body",
+          "required": false,
+          "type": "object"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/gmail/v1/users/:userId/stop",
+      "surface": "POST /gmail/v1/users/:userId/stop",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/gmail/v1/users/:userId/threads/:id/modify",
+      "surface": "POST /gmail/v1/users/:userId/threads/:id/modify",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "addLabelIds",
+          "location": "body",
+          "required": false,
+          "type": "array"
+        },
+        {
+          "name": "removeLabelIds",
+          "location": "body",
+          "required": false,
+          "type": "array"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/gmail/v1/users/:userId/threads/:id/trash",
+      "surface": "POST /gmail/v1/users/:userId/threads/:id/trash",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/gmail/v1/users/:userId/threads/:id/untrash",
+      "surface": "POST /gmail/v1/users/:userId/threads/:id/untrash",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/gmail/v1/users/:userId/watch",
+      "surface": "POST /gmail/v1/users/:userId/watch",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/resumable/upload/gmail/v1/users/:userId/drafts",
+      "surface": "POST /resumable/upload/gmail/v1/users/:userId/drafts",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/resumable/upload/gmail/v1/users/:userId/drafts/:id",
+      "surface": "POST /resumable/upload/gmail/v1/users/:userId/drafts/:id",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/resumable/upload/gmail/v1/users/:userId/drafts/send",
+      "surface": "POST /resumable/upload/gmail/v1/users/:userId/drafts/send",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/resumable/upload/gmail/v1/users/:userId/messages",
+      "surface": "POST /resumable/upload/gmail/v1/users/:userId/messages",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/resumable/upload/gmail/v1/users/:userId/messages/import",
+      "surface": "POST /resumable/upload/gmail/v1/users/:userId/messages/import",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/resumable/upload/gmail/v1/users/:userId/messages/send",
+      "surface": "POST /resumable/upload/gmail/v1/users/:userId/messages/send",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/upload/gmail/v1/users/:userId/drafts",
+      "surface": "POST /upload/gmail/v1/users/:userId/drafts",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "uploadType",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "id",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "message",
+          "location": "body",
+          "required": true,
+          "type": "object"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/upload/gmail/v1/users/:userId/drafts/send",
+      "surface": "POST /upload/gmail/v1/users/:userId/drafts/send",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "uploadType",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "id",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "message",
+          "location": "body",
+          "required": false,
+          "type": "object"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/upload/gmail/v1/users/:userId/messages",
+      "surface": "POST /upload/gmail/v1/users/:userId/messages",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "deleted",
+          "location": "query",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "internalDateSource",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "uploadType",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "classificationLabelValues",
+          "location": "body",
+          "required": false,
+          "type": null
+        },
+        {
+          "name": "id",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "labelIds",
+          "location": "body",
+          "required": false,
+          "type": "array"
+        },
+        {
+          "name": "raw",
+          "location": "body",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "threadId",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/upload/gmail/v1/users/:userId/messages/import",
+      "surface": "POST /upload/gmail/v1/users/:userId/messages/import",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "deleted",
+          "location": "query",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "internalDateSource",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "neverMarkSpam",
+          "location": "query",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "processForCalendar",
+          "location": "query",
+          "required": false,
+          "type": "boolean|string"
+        },
+        {
+          "name": "uploadType",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "classificationLabelValues",
+          "location": "body",
+          "required": false,
+          "type": null
+        },
+        {
+          "name": "id",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "labelIds",
+          "location": "body",
+          "required": false,
+          "type": "array"
+        },
+        {
+          "name": "raw",
+          "location": "body",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "threadId",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/upload/gmail/v1/users/:userId/messages/send",
+      "surface": "POST /upload/gmail/v1/users/:userId/messages/send",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "uploadType",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "classificationLabelValues",
+          "location": "body",
+          "required": false,
+          "type": null
+        },
+        {
+          "name": "id",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "labelIds",
+          "location": "body",
+          "required": false,
+          "type": "array"
+        },
+        {
+          "name": "raw",
+          "location": "body",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "threadId",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/gmail/v1/users/:userId/drafts/:id",
+      "surface": "PUT /gmail/v1/users/:userId/drafts/:id",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "uploadType",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "id",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "message",
+          "location": "body",
+          "required": true,
+          "type": "object"
+        }
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/gmail/v1/users/:userId/labels/:id",
+      "surface": "PUT /gmail/v1/users/:userId/labels/:id",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "color",
+          "location": "body",
+          "required": false,
+          "type": "object"
+        },
+        {
+          "name": "labelListVisibility",
+          "location": "body",
+          "required": false,
+          "type": null
+        },
+        {
+          "name": "messageListVisibility",
+          "location": "body",
+          "required": false,
+          "type": null
+        },
+        {
+          "name": "name",
+          "location": "body",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "type",
+          "location": "body",
+          "required": false,
+          "type": null
+        }
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/resumable/upload/gmail/v1/users/:userId/drafts",
+      "surface": "PUT /resumable/upload/gmail/v1/users/:userId/drafts",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/resumable/upload/gmail/v1/users/:userId/drafts/:id",
+      "surface": "PUT /resumable/upload/gmail/v1/users/:userId/drafts/:id",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/resumable/upload/gmail/v1/users/:userId/drafts/send",
+      "surface": "PUT /resumable/upload/gmail/v1/users/:userId/drafts/send",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/resumable/upload/gmail/v1/users/:userId/messages",
+      "surface": "PUT /resumable/upload/gmail/v1/users/:userId/messages",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/resumable/upload/gmail/v1/users/:userId/messages/import",
+      "surface": "PUT /resumable/upload/gmail/v1/users/:userId/messages/import",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/resumable/upload/gmail/v1/users/:userId/messages/send",
+      "surface": "PUT /resumable/upload/gmail/v1/users/:userId/messages/send",
+      "inputs": [
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/upload/gmail/v1/users/:userId/drafts/:id",
+      "surface": "PUT /upload/gmail/v1/users/:userId/drafts/:id",
+      "inputs": [
+        {
+          "name": "id",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "userId",
+          "location": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "uploadType",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "id",
+          "location": "body",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "message",
+          "location": "body",
+          "required": true,
+          "type": "object"
+        }
+      ]
+    }
+  ]
+}

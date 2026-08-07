@@ -14,25 +14,14 @@ export type JsonObject = Record<string, unknown>;
 
 export { normalizeListBinding };
 
-export function emailFromContext(c: Context): string {
-  return resolveUserEmail(routeParam(c, "userId"), c.get("session") as SessionValue | undefined);
-}
-
-export function routeParam(c: Context, name: string): string {
-  const value = c.req.param(name);
-  if (!value) invalidArgument(`Missing path parameter: ${name}`);
-  return value;
-}
-
-export async function readJsonObject(c: Context): Promise<JsonObject> {
-  try {
-    const value = await c.req.json();
-    if (!value || typeof value !== "object" || Array.isArray(value)) invalidArgument("Invalid request body");
-    return value as JsonObject;
-  } catch (error) {
-    if (error instanceof GmailError) throw error;
-    invalidArgument("Invalid JSON payload received.");
-  }
+/**
+ * The mailbox this request speaks for.
+ *
+ * `userId` arrives already parsed by the route's declaration; the session is
+ * identity, not a route input, so reading it here stays legal.
+ */
+export function emailFrom(userId: string, c: Context): string {
+  return resolveUserEmail(userId, c.get("session") as SessionValue | undefined);
 }
 
 export function stringField(body: JsonObject, name: string, required = false): string | undefined {
@@ -51,48 +40,34 @@ export function stringArray(body: JsonObject, name: string, limit = 100): string
   return [...new Set(value as string[])];
 }
 
-export function objectField(body: JsonObject, name: string, required = false): JsonObject | undefined {
-  const value = body[name];
-  if (value === undefined && !required) return undefined;
-  if (!value || typeof value !== "object" || Array.isArray(value)) invalidArgument(`Invalid ${name}`);
-  return value as JsonObject;
-}
-
-export function booleanQuery(c: Context, name: string, fallback = false): boolean {
-  const value = c.req.query(name);
-  if (value === undefined) return fallback;
-  if (value === "true") return true;
-  if (value === "false") return false;
-  invalidArgument(`Invalid value for ${name}`);
-}
-
-export function numberQuery(c: Context, name: string, fallback: number, max: number): number {
-  const raw = c.req.query(name);
-  if (raw === undefined) return fallback;
-  const value = Number(raw);
-  if (!Number.isInteger(value) || value < 1 || value > max) invalidArgument(`Invalid value for ${name}`);
-  return value;
-}
-
-export function repeatedQuery(c: Context, name: string): string[] {
-  return new URL(c.req.url).searchParams.getAll(name);
-}
-
-export function messageFormat(c: Context, allowRaw = true): MessageFormat {
-  const raw = (c.req.query("format") ?? "full").toLowerCase();
-  const allowed = allowRaw ? ["minimal", "full", "raw", "metadata"] : ["minimal", "full", "metadata"];
-  if (!allowed.includes(raw)) invalidArgument("Invalid format");
-  return raw as MessageFormat;
-}
-
-export function rejectUnsupportedQuery(c: Context, names: string[]): void {
-  for (const name of names) {
-    if (booleanQuery(c, name, false)) unsupported(`${name}=true is not supported by the Gmail twin`);
+/**
+ * `?deleted=true` and friends: query params the twin ACCEPTS and then refuses,
+ * so they are declared inputs rather than silently ignored ones. Insertion
+ * order decides which flag answers first, as the old name list did.
+ */
+export function rejectUnsupportedFlags(flags: Record<string, boolean>): void {
+  for (const [name, value] of Object.entries(flags)) {
+    if (value) unsupported(`${name}=true is not supported by the Gmail twin`);
   }
 }
 
-export function rejectClassification(body: JsonObject): void {
+/** `?uploadType=resumable` is accepted, then refused. */
+export function rejectResumable(uploadType: string | undefined): void {
+  if (uploadType === "resumable") unsupported("Resumable Gmail uploads are not supported");
+}
+
+export function rejectClassification(body: {
+  addClassificationLabels?: unknown;
+  removeClassificationLabelIds?: unknown;
+}): void {
   if (body.addClassificationLabels !== undefined || body.removeClassificationLabelIds !== undefined) {
+    unsupported("Gmail classification labels require Google Drive Labels and are not supported");
+  }
+}
+
+/** The Message-resource half of the same refusal. */
+export function rejectClassificationValues(resource: { classificationLabelValues?: unknown }): void {
+  if (resource.classificationLabelValues !== undefined) {
     unsupported("Gmail classification labels require Google Drive Labels and are not supported");
   }
 }
@@ -122,8 +97,4 @@ export function asInputError<T>(fn: () => T): T {
     if (error instanceof GmailError) throw error;
     invalidArgument(error instanceof Error ? error.message : "Invalid request");
   }
-}
-
-export function unsupportedResult(message: string): never {
-  unsupported(message);
 }
