@@ -1,47 +1,97 @@
 {
-  "_meta": {
-    "version": 1,
-    "source_hash": "sha256:hand-authored",
-    "model": "hand-authored",
-    "compiled_at": "2026-06-07T00:00:00.000Z"
+  "stripe": {
+    "api_keys": [
+      {
+        "key": "sk_test_pome_default",
+        "sid": "default",
+        "account_id": "acct_default"
+      }
+    ],
+    "payment_intents": [
+      {
+        "id": "pi_test_200",
+        "account_id": "acct_default",
+        "amount": 20000,
+        "currency": "usd",
+        "status": "succeeded",
+        "client_secret": "pi_test_200_secret",
+        "latest_charge_id": "ch_test_200",
+        "capture_method": "automatic",
+        "confirmation_method": "automatic",
+        "payment_method_types": [
+          "crypto"
+        ],
+        "created": 1700000000,
+        "updated": 1700000000,
+        "captured_at": 1700000000
+      }
+    ],
+    "charges": [
+      {
+        "id": "ch_test_200",
+        "account_id": "acct_default",
+        "payment_intent_id": "pi_test_200",
+        "amount": 20000,
+        "amount_captured": 20000,
+        "amount_refunded": 20000,
+        "status": "succeeded",
+        "currency": "usd",
+        "captured": true,
+        "refunded": true,
+        "created": 1700000000
+      }
+    ],
+    "refunds": [
+      {
+        "id": "re_test_200",
+        "account_id": "acct_default",
+        "charge_id": "ch_test_200",
+        "payment_intent_id": "pi_test_200",
+        "amount": 20000,
+        "currency": "usd",
+        "status": "succeeded",
+        "reason": "requested_by_customer",
+        "created": 1700086400
+      }
+    ]
   },
-  "api_keys": [
-    {
-      "key": "sk_test_pome_default",
-      "sid": "default",
-      "account_id": "acct_default"
-    }
-  ],
-  "payment_intents": [
-    {
-      "id": "pi_test_200",
-      "account_id": "acct_default",
-      "amount": 20000,
-      "currency": "usd",
-      "status": "succeeded",
-      "client_secret": "pi_test_200_secret",
-      "latest_charge_id": "ch_test_200",
-      "capture_method": "automatic",
-      "confirmation_method": "automatic",
-      "payment_method_types": ["crypto"],
-      "created": 1700000000,
-      "updated": 1700000000,
-      "captured_at": 1700000000
-    }
-  ],
-  "charges": [
-    {
-      "id": "ch_test_200",
-      "account_id": "acct_default",
-      "payment_intent_id": "pi_test_200",
-      "amount": 20000,
-      "amount_captured": 20000,
-      "amount_refunded": 20000,
-      "status": "succeeded",
-      "currency": "usd",
-      "captured": true,
-      "refunded": true,
-      "created": 1700000000
-    }
-  ]
+  "slack": {
+    "team": {
+      "id": "T_ACME",
+      "name": "Acme",
+      "domain": "acme"
+    },
+    "users": [
+      {
+        "id": "U_PRIMARY",
+        "name": "pome-agent",
+        "real_name": "Acme Support Bot"
+      },
+      {
+        "id": "U_MAYA",
+        "name": "maya",
+        "real_name": "Maya Okonkwo"
+      }
+    ],
+    "channels": [
+      {
+        "id": "C_SUPPORT",
+        "name": "support",
+        "is_private": false,
+        "topic": "Customer support escalations and refund decisions.",
+        "purpose": "Where the support desk logs what it did and why.",
+        "creator": "U_MAYA",
+        "members": [
+          "U_PRIMARY",
+          "U_MAYA"
+        ],
+        "messages": [
+          {
+            "user": "U_MAYA",
+            "text": "heads up, the billing export is running slow again this morning"
+          }
+        ]
+      }
+    ]
+  }
 }
