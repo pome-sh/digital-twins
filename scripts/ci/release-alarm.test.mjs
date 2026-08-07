@@ -26,6 +26,11 @@ import { check, compareVersions, parseTargets } from "./release-alarm.mjs";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const SCRIPT = join(ROOT, "scripts/ci/release-alarm.mjs");
 const REPO = "pome-sh/digital-twins";
+// Compared with `===`, never with `.includes`: a host substring match is a
+// weaker claim than the one being made here (the registry IS this one, not
+// merely contains its name), and CodeQL's js/incomplete-url-substring-
+// sanitization is right to flag the weaker form.
+const GH_PACKAGES = "https://npm.pkg.github.com";
 const NOW = Date.parse("2026-08-06T12:00:00Z");
 const HEAD_SHA = "9119a07f0000000000000000000000000000abcd";
 
@@ -117,7 +122,7 @@ console.log("parseTargets");
   check_(
     "keeps wire's two registries as two targets",
     targets.filter((t) => t.name === "@pome-sh/wire").length === 2 &&
-      targets.some((t) => t.registry.includes("npm.pkg.github.com")),
+      targets.some((t) => t.registry === GH_PACKAGES),
   );
   check_(
     "every derived manifest exists",
@@ -198,16 +203,19 @@ console.log("UNPUBLISHED — main declares a version npm does not serve");
     registry: {
       "@pome-sh/checks": { version: "0.1.0" },
       "@pome-sh/wire@npm": { version: "0.3.0" },
-      "@pome-sh/wire@https://npm.pkg.github.com": { version: "0.4.0" },
+      [`@pome-sh/wire@${GH_PACKAGES}`]: { version: "0.4.0" },
     },
     runs: [{ ageMin: 200, conclusion: "failure" }],
   });
   check_("fires", kinds(r).filter((k) => k === "UNPUBLISHED").length === 2, r.alarms.join("\n"));
   check_("names the package", r.alarms.some((a) => a.includes("@pome-sh/checks 0.2.0")));
+  // wire is behind on npmjs and current on GitHub Packages. Two targets, ONE
+  // alarm — counted rather than host-matched, which is the sharper claim: a
+  // checker that judged wire once would give either two alarms or none.
   check_(
     "the two wire registries are judged separately",
-    r.alarms.some((a) => a.includes("@pome-sh/wire") && a.includes("registry.npmjs.org")) &&
-      !r.alarms.some((a) => a.includes("npm.pkg.github.com") && a.startsWith("UNPUBLISHED")),
+    r.alarms.filter((a) => a.startsWith("UNPUBLISHED") && a.includes("@pome-sh/wire")).length === 1,
+    r.alarms.join("\n"),
   );
   check_("also reports the failed run, with its URL", r.alarms.some((a) => a.startsWith("FAILED") && a.includes("/actions/runs/")));
 }
@@ -266,16 +274,29 @@ console.log("FAILED — a broken release path with nothing owed");
 
 console.log("UNMEASURED — an unreadable registry is never read as 'unpublished'");
 {
+  // wire is in sync on npmjs and unreadable on GitHub Packages: the ONLY
+  // correct output is one UNMEASURED and nothing else. A checker that folded a
+  // 401 into "unpublished" would add an UNPUBLISHED here, and one that gave up
+  // on the whole package would lose the npmjs judgement — both are counted for.
   const r = run({
     versions: { "@pome-sh/wire": "0.4.0" },
-    registry: { "@pome-sh/wire@https://npm.pkg.github.com": { error: "npm error code E401" } },
+    registry: {
+      "@pome-sh/wire@npm": { version: "0.4.0" },
+      [`@pome-sh/wire@${GH_PACKAGES}`]: { error: "npm error code E401" },
+    },
   });
-  check_("fires", kinds(r).includes("UNMEASURED"), r.alarms.join("\n"));
+  check_("fires", kinds(r).filter((k) => k === "UNMEASURED").length === 1, r.alarms.join("\n"));
   check_(
-    "not reported as UNPUBLISHED for that registry",
-    !r.alarms.some((a) => a.startsWith("UNPUBLISHED") && a.includes("npm.pkg.github.com")),
+    "a 401 is never folded into UNPUBLISHED or BEHIND",
+    !kinds(r).includes("UNPUBLISHED") && !kinds(r).includes("BEHIND"),
+    r.alarms.join("\n"),
   );
-  check_("the readable npmjs copy is still judged", r.report.includes("@pome-sh/wire @ registry.npmjs.org"));
+  check_(
+    "the readable npmjs copy is still judged, and separately",
+    r.report.split("\n").filter((l) => l.startsWith("@pome-sh/wire @")).length === 2 &&
+      r.report.includes("declared 0.4.0, registry 0.4.0 ✓"),
+    r.report,
+  );
 }
 
 // ── the incident this exists for, replayed from the real record ─────────────
@@ -309,7 +330,7 @@ console.log("2026-08-06, replayed");
       [
         `scripts/ci/decide-publish.sh "@pome-sh/cli" "cli/package.json" "cli"`,
         `scripts/ci/decide-publish.sh "@pome-sh/adapter-claude-sdk" "packages/adapter-claude-sdk/package.json" "adapter"`,
-        `scripts/ci/decide-publish.sh "@pome-sh/wire" "packages/wire/package.json" "wire" "https://npm.pkg.github.com"`,
+        `scripts/ci/decide-publish.sh "@pome-sh/wire" "packages/wire/package.json" "wire" "${GH_PACKAGES}"`,
       ].join("\n"),
       {
         "cli/package.json": "0.21.8",
