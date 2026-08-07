@@ -4,16 +4,9 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
-## 0.21.13
+## 0.21.14
 
 ### Patch Changes
-
-- The bundled GitHub twin now models `stack` on both pull-request read surfaces
-  (`GET /repos/:o/:r/pulls` and `.../pulls/:n`), which GitHub added to its
-  `pull-request` and `pull-request-simple` schemas on 2026-08-02 (F-1178). An
-  agent asked to review or merge a stacked PR against the twin can now see the
-  stack it belongs to, and two PRs in one stack always agree on its identity,
-  size and membership. `packages/twin-github` changed, and the CLI inlines it.
 
 - Every REST and GraphQL route in all five bundled twins now declares the inputs
   it accepts, and the declaration is the parser the handler validates against
@@ -28,6 +21,17 @@ packaging restructure: bump `version` here and in `package.json`, and merging to
   `?per_page=0` are rejected rather than reaching the domain as `NaN` and `0`,
   Slack booleans accept only `true`/`false`, and Gmail's `?format=FULL` must be
   lowercase. Nothing about a well-formed request changes.
+
+## 0.21.13
+
+### Patch Changes
+
+- The bundled GitHub twin now models `stack` on both pull-request read surfaces
+  (`GET /repos/:o/:r/pulls` and `.../pulls/:n`), which GitHub added to its
+  `pull-request` and `pull-request-simple` schemas on 2026-08-02 (F-1178). An
+  agent asked to review or merge a stacked PR against the twin can now see the
+  stack it belongs to, and two PRs in one stack always agree on its identity,
+  size and membership. `packages/twin-github` changed, and the CLI inlines it.
 
 ## 0.21.12
 
