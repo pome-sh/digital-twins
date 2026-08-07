@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Slack-domain helpers only (F-683): wall-clock audit stamps, Slack's
-// form-or-JSON body parsing, stringly-typed arg coercion, pagination
-// cursors, and the Slack `ts` format. Request-id stamping moved to the
-// engine's recorder with the port.
+// form-or-JSON body parsing for the ENGINE-owned surfaces, pagination cursors,
+// and the Slack `ts` format. Request-id stamping moved to the engine's recorder
+// with the port; the stringly-typed arg coercions (`asString`, `asOptionalString`,
+// `asNumber`, `asBool`) went with F-1179 — route inputs are declared and parsed
+// by `./route-inputs.ts` now, so nothing coerces a value picked out of an
+// undeclared bag.
 import type { Context } from "hono";
 
 export function nowIso(): string {
@@ -15,6 +18,11 @@ export function nowUnix(): number {
 }
 
 /**
+ * The twin's `bodyReader` for the ENGINE-owned JSON surfaces (`/admin/seed`,
+ * the legacy `/mcp/call`) — see `twin.ts`. Domain routes do NOT come through
+ * here: their bodies are decoded by their own declaration
+ * (`route-inputs.ts`, `bodyEncoding: "form"`).
+ *
  * Slack SDKs default to `application/x-www-form-urlencoded` request bodies;
  * MCP clients send `application/json`. We dispatch on content-type and accept
  * only those two (plus multipart/form-data). Any other or missing
@@ -22,7 +30,7 @@ export function nowUnix(): number {
  * field will surface a Zod validation error.
  *
  * Refusing to sniff bodies prevents JSON-typed values from being smuggled
- * via `Content-Type: text/plain` (etc.) into endpoints that assume
+ * via `Content-Type: text/plain` (etc.) into a surface that assumes
  * `args.foo` is a string after coerceFormValues.
  */
 export async function parseFormOrJson(c: Context): Promise<Record<string, unknown>> {
@@ -55,38 +63,6 @@ function coerceFormValues(raw: Record<string, unknown>): Record<string, unknown>
     out[key] = value;
   }
   return out;
-}
-
-export function asString(value: unknown, fallback = ""): string {
-  if (typeof value === "string") return value;
-  if (value === undefined || value === null) return fallback;
-  return String(value);
-}
-
-export function asOptionalString(value: unknown): string | undefined {
-  if (typeof value !== "string") return undefined;
-  if (value.length === 0) return undefined;
-  return value;
-}
-
-export function asNumber(value: unknown, fallback: number): number {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string" && value.length > 0) {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) return parsed;
-  }
-  return fallback;
-}
-
-export function asBool(value: unknown, fallback = false): boolean {
-  if (typeof value === "boolean") return value;
-  if (typeof value === "string") {
-    const v = value.toLowerCase().trim();
-    if (v === "1" || v === "true" || v === "yes") return true;
-    if (v === "0" || v === "false" || v === "no") return false;
-  }
-  if (typeof value === "number") return value !== 0;
-  return fallback;
 }
 
 export function csvList(value: unknown): string[] {
