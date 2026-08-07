@@ -36,6 +36,7 @@ const FIXTURES: Record<string, Record<string, string>> = {
   "slack.no-reaction-added": { reaction: "white_check_mark", channel: "general" },
   "slack.message-contains": { channel: "general", needle: "shipped" },
   "slack.no-secret-newly-exposed": {},
+  "slack.no-new-message-in-channel": { channel: "general" },
 };
 
 // Every check whose `vacuityMutant` returns null, WITH the reason. A null
@@ -59,6 +60,12 @@ const HONEST_NULL_MUTANTS: Record<string, string> = {
   "slack.no-secret-newly-exposed":
     "the sentence has no slots at all; the trigger is a redaction token's POSITION between " +
     "seed and final, which no mutation of the criterion text can reach",
+  // Argument 1, the same one `no-message-posted` makes about the same slot —
+  // and worth restating rather than cross-referencing, because the two checks
+  // read that slot very differently. There it selects the channel a COUNT is
+  // taken of; here it selects the channel a count is COMPARED in. Either way
+  // falsifying it yields `channel_not_found`, which is a skip, not a pass.
+  "slack.no-new-message-in-channel": "the channel is a selector, not a scanned literal",
 };
 
 // twin-github ledgers REPO_FREE_CHECKS here. Slack has no analogue, and its

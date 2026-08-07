@@ -24,6 +24,7 @@ import {
   messageContains,
   noMessageContaining,
   noMessagePosted,
+  noNewMessageInChannel,
   noReactionAdded,
 } from "./check-messages.js";
 import { noSecretNewlyExposed } from "./check-secrets.js";
@@ -50,4 +51,9 @@ export const SLACK_CHECKS = [
   // for first to the ones a specialised task needs — and this is the only one
   // that compares two worlds rather than reading one.
   noSecretNewlyExposed,
+  // F-1304, and it belongs beside the one above for the same reason: it is the
+  // second check here that compares two worlds. Read `check-messages.ts`'s
+  // header on it before proposing a scan-shaped alternative — three of those
+  // have been tried and each failed a different gate.
+  noNewMessageInChannel,
 ] as const;
