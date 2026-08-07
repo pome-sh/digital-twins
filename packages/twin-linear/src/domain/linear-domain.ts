@@ -383,7 +383,7 @@ export class LinearDomain {
   }
 
   createAgentActivity(
-    input: { sessionId: string; type: string; body: string; ephemeral?: boolean },
+    input: agents.AgentActivityCreateInput,
     actor: ActorContext = {}
   ): Promise<LinearAgentActivity> {
     return agents.createAgentActivity(this, input, actor);

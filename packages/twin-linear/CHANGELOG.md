@@ -1,6 +1,45 @@
 # @pome-sh/twin-linear — CHANGELOG
 
 
+## 0.4.0 — 2026-08-08
+
+**Breaking.** The four agent-session mutation inputs now take Linear's field
+names, and only Linear's (F-1176). F-1172 fixed the `AgentSession` output type
+and left the inputs inventing fields; verified against live introspection at
+`https://api.linear.app/graphql`:
+
+| input | removed | now |
+| -- | -- | -- |
+| `AgentSessionCreateOnIssue` | `appUserId`, `plan` | `issueId`, `externalUrls` |
+| `AgentSessionCreateOnComment` | `appUserId`, `plan` | `commentId`, `externalUrls` |
+| `AgentSessionUpdateInput` | `id`, `status` | `plan`, `externalUrls` |
+| `AgentActivityCreateInput` | `sessionId`, `type`, `body` | `agentSessionId`, `content`, `signal`, `ephemeral` |
+
+`agentSessionUpdate(id:)` is now `String!` — upstream `id` is a mutation
+argument on this mutation, never a field of the input.
+
+**Session status is no longer settable.** Linear declares no `status` on
+`AgentSessionUpdateInput`; status follows the emitted activity, as Linear's agent
+guide describes ("updated automatically based on the agent's emitted
+activities"). `agentActivityCreate` now moves it: `thought`/`action` → `active`,
+`elicitation` → `awaitingInput`, `response` → `complete`, `error` → `error`,
+`prompt` → `pending`. Linear does not publish that table, so it is registered as
+a twin-owned divergence in `REFERENCE-DIVERGENCES.md`.
+
+`AgentActivity` follows the input: `content: JSON!` and `signal` replace `type`
+and `body`, `session` becomes `agentSession`, and `user` is non-null. Accepting
+Linear's `content` while emitting an invented `body` would round-trip to neither
+Linear nor itself.
+
+`agent_activities` gains `content_json` and `signal` and drops `body`. An
+existing `LINEAR_TWIN_DB` file migrates on open; `action` rows recorded before
+this release backfill with an empty `parameter`, because the old shape had
+nowhere to keep one.
+
+The subset guard now covers all four inputs plus `AgentActivity` and
+`AgentActivitySignal` — nine guarded types, up from three — and carries tests
+proving it fails on an invented member rather than passing vacuously.
+
 ## 0.3.5 — 2026-08-06
 
 Its MCP tool table is now derived from `fixtures/mcp-tools-list.raw.json`

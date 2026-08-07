@@ -260,7 +260,8 @@ CREATE TABLE IF NOT EXISTS agent_activities (
   session_id TEXT NOT NULL,
   user_id TEXT,
   type TEXT NOT NULL,
-  body TEXT NOT NULL,
+  content_json TEXT NOT NULL,
+  signal TEXT,
   ephemeral INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
@@ -339,6 +340,41 @@ export function migrate(db: LinearTwinDatabase): void {
   ensureColumn(db, "issues", "parent_id", "TEXT");
   ensureColumn(db, "comments", "parent_id", "TEXT");
   migrateAgentSessions(db);
+  migrateAgentActivities(db);
+}
+
+/**
+ * F-1176 — carry a pre-`content` `agent_activities` table forward.
+ *
+ * The twin used to store an activity as a flat `type` + `body` pair. Linear's
+ * `AgentActivityCreateInput` takes a single `content` object discriminated on
+ * `type`, so the body moves inside it. Same reasoning as
+ * `migrateAgentSessions`: `CREATE TABLE IF NOT EXISTS` will not reshape an
+ * existing `LINEAR_TWIN_DB` file, and an unmigrated one would fail later at
+ * `mapAgentActivity` instead of here.
+ *
+ * `action` activities recorded before this change carry only a body, so they
+ * backfill as `{type: "action", action: <body>, parameter: ""}` — Linear's
+ * `parameter` is non-null and the old shape had nowhere to keep one.
+ */
+function migrateAgentActivities(db: LinearTwinDatabase): void {
+  const columns = (db.prepare("PRAGMA table_info(agent_activities)").all() as Array<{ name: string }>).map(
+    (column) => column.name
+  );
+  if (columns.includes("content_json")) return;
+
+  db.exec("ALTER TABLE agent_activities ADD COLUMN content_json TEXT NOT NULL DEFAULT '{}'");
+  if (!columns.includes("signal")) db.exec("ALTER TABLE agent_activities ADD COLUMN signal TEXT");
+  if (columns.includes("body")) {
+    db.exec(
+      `UPDATE agent_activities
+          SET content_json = CASE
+                WHEN type = 'action' THEN json_object('type', type, 'action', body, 'parameter', '')
+                ELSE json_object('type', type, 'body', body)
+              END`
+    );
+    db.exec("ALTER TABLE agent_activities DROP COLUMN body");
+  }
 }
 
 /**

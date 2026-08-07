@@ -1,7 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 import { z } from "zod";
 import { badUserInput } from "../errors.js";
-import type { IssueCreateInput, IssueUpdateInput } from "../domain/index.js";
+import type {
+  AgentActivityCreateInput,
+  AgentSessionOnCommentInput,
+  AgentSessionOnIssueInput,
+  AgentSessionPatch,
+  IssueCreateInput,
+  IssueUpdateInput,
+} from "../domain/index.js";
+import { normalizeActivitySignal, parseActivityContent } from "../domain/normalize.js";
 
 const optionalString = z.string().nullish();
 const optionalStringArray = z.array(z.string()).nullish();
@@ -98,11 +106,15 @@ const agentSessionExternalUrlSchema = z
   .strict();
 const optionalExternalUrls = z.array(agentSessionExternalUrlSchema).nullish();
 
+/**
+ * The four agent-session mutation inputs mirror Linear's field names exactly
+ * (F-1176). Each is a SUBSET of the upstream input — never a superset. Notably
+ * `AgentSessionUpdateInput` has no `status` and no `id`: `id` is a mutation
+ * argument upstream, and status follows the emitted activity.
+ */
 export const agentSessionOnIssueInputSchema = z
   .object({
     issueId: z.string().min(1),
-    appUserId: z.string().optional(),
-    plan: optionalString,
     externalUrls: optionalExternalUrls,
   })
   .strict();
@@ -110,16 +122,12 @@ export const agentSessionOnIssueInputSchema = z
 export const agentSessionOnCommentInputSchema = z
   .object({
     commentId: z.string().min(1),
-    appUserId: z.string().optional(),
-    plan: optionalString,
     externalUrls: optionalExternalUrls,
   })
   .strict();
 
 export const agentSessionUpdateInputSchema = z
   .object({
-    id: z.string().min(1).optional(),
-    status: z.string().optional(),
     plan: optionalString,
     externalUrls: optionalExternalUrls,
   })
@@ -127,9 +135,9 @@ export const agentSessionUpdateInputSchema = z
 
 export const agentActivityCreateInputSchema = z
   .object({
-    sessionId: z.string().min(1),
-    type: z.string().min(1),
-    body: z.string().min(1),
+    agentSessionId: z.string().min(1),
+    content: z.unknown(),
+    signal: z.string().optional(),
     ephemeral: z.boolean().optional(),
   })
   .strict();
@@ -231,46 +239,31 @@ export function parseWebhookCreateInput(input: unknown) {
   };
 }
 
-export function parseAgentSessionOnIssueInput(input: unknown) {
+export function parseAgentSessionOnIssueInput(input: unknown): AgentSessionOnIssueInput {
   const raw = parseOrBadUserInput(agentSessionOnIssueInputSchema, input, "agentSessionCreateOnIssue input");
-  return {
-    issueId: raw.issueId,
-    appUserId: raw.appUserId,
-    plan: raw.plan ?? null,
-    externalUrls: raw.externalUrls ?? null,
-  };
+  return { issueId: raw.issueId, externalUrls: raw.externalUrls ?? null };
 }
 
-export function parseAgentSessionOnCommentInput(input: unknown) {
+export function parseAgentSessionOnCommentInput(input: unknown): AgentSessionOnCommentInput {
   const raw = parseOrBadUserInput(
     agentSessionOnCommentInputSchema,
     input,
     "agentSessionCreateOnComment input"
   );
-  return {
-    commentId: raw.commentId,
-    appUserId: raw.appUserId,
-    plan: raw.plan ?? null,
-    externalUrls: raw.externalUrls ?? null,
-  };
+  return { commentId: raw.commentId, externalUrls: raw.externalUrls ?? null };
 }
 
-export function parseAgentSessionUpdateInput(input: unknown) {
+export function parseAgentSessionUpdateInput(input: unknown): AgentSessionPatch {
   const raw = parseOrBadUserInput(agentSessionUpdateInputSchema, input, "agentSessionUpdate input");
-  return {
-    id: raw.id,
-    status: raw.status,
-    plan: raw.plan,
-    externalUrls: raw.externalUrls,
-  };
+  return { plan: raw.plan, externalUrls: raw.externalUrls };
 }
 
-export function parseAgentActivityCreateInput(input: unknown) {
+export function parseAgentActivityCreateInput(input: unknown): AgentActivityCreateInput {
   const raw = parseOrBadUserInput(agentActivityCreateInputSchema, input, "agentActivityCreate input");
   return {
-    sessionId: raw.sessionId,
-    type: raw.type,
-    body: raw.body,
+    agentSessionId: raw.agentSessionId,
+    content: parseActivityContent(raw.content),
+    signal: raw.signal === undefined ? undefined : normalizeActivitySignal(raw.signal),
     ephemeral: raw.ephemeral,
   };
 }
