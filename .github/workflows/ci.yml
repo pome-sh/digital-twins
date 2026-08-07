@@ -98,6 +98,18 @@ jobs:
       # this block rather than behind the heavy gate.
       - run: node scripts/check-twin-chunk-laziness.mjs
       - run: node scripts/check-twin-chunk-laziness.test.mjs
+      # pome-cloud's fidelity-watch reads twin declarations — the stripe tool
+      # table, github's and slack's 501 envelopes, linear's GraphQL schema —
+      # straight out of a pome-twins checkout, under BUN, which implements no
+      # `node:sqlite`. F-1325 pointed every twin's tool table at the sdk ROOT
+      # barrel for its (dependency-free) fixture loader; the barrel re-exports
+      # `openTwinDatabase`, so `import "@pome-sh/sdk"` executes
+      # `import { DatabaseSync } from "node:sqlite"`. Every twins suite runs on
+      # Node and stayed green; pome-cloud's daily cron went red the next morning
+      # in a repo this repo's CI does not run. Same static-graph walk as the gate
+      # above, no build and no install needed.
+      - run: node scripts/check-twin-leaf-portability.mjs
+      - run: node scripts/check-twin-leaf-portability.test.mjs
       # F-745 / D4 — no catch-and-continue in the SDK twin engine
       # (packages/sdk/src): every statement catch must throw, return an
       # error/sentinel, or reject. Dependency-free, runs before `npm ci`.

@@ -30,6 +30,7 @@
     "lint:task-class": "node scripts/lint-task-class.mjs",
     "lint:skill-manifest": "node scripts/check-plugin-manifest-lists-every-skill.mjs",
     "lint:twin-chunks": "node scripts/check-twin-chunk-laziness.mjs",
+    "lint:twin-leaves": "node scripts/check-twin-leaf-portability.mjs",
     "lint:dead-code": "knip --no-config-hints",
     "gate:bundled-deps": "node scripts/check-bundled-runtime-deps.mjs",
     "gate:wire-tarball": "node scripts/ci/check-wire-tarball.mjs",
