@@ -4,6 +4,19 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.21.12
+
+### Patch Changes
+
+- **No CLI change.** Version-only bump: the twin tool tables moved off the
+  `@pome-sh/sdk` root barrel and onto the new `@pome-sh/sdk/mcp-tool-fixture`
+  subpath, so `packages/twin-*` and `packages/sdk` changed — publish-relevant
+  for the CLI, because the CLI inlines both into its bundle. Nothing a CLI user
+  sees moves: the same loader, the same fixtures, the same `tools/list` bytes.
+  The import site changed because the root barrel re-exports `openTwinDatabase`
+  and therefore `node:sqlite`, which loads the tool tables only on Node, and
+  pome-cloud reads them under bun.
+
 ## 0.21.11
 
 ### Patch Changes

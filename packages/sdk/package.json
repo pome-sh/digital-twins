@@ -1,6 +1,6 @@
 {
   "name": "@pome-sh/sdk",
-  "version": "0.11.3",
+  "version": "0.11.4",
   "description": "Twin engine for Pome digital twins \u2014 defineTwin() + serve(): HTTP mounting, bearer auth, trace recorder, MCP dispatch, SQLite-backed state.",
   "private": true,
   "type": "module",
@@ -26,6 +26,10 @@
     "./db": {
       "types": "./dist/db.d.ts",
       "default": "./dist/db.js"
+    },
+    "./mcp-tool-fixture": {
+      "types": "./dist/mcp-tool-fixture.d.ts",
+      "default": "./dist/mcp-tool-fixture.js"
     },
     "./failure-injection-rules": {
       "types": "./dist/failure-injection-rules.d.ts",

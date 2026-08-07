@@ -1,13 +1,18 @@
 // file-size: Linear MCP tool surface — one registry of tool defs + handlers pending further split.
 // SPDX-License-Identifier: Apache-2.0
 // file-size: MCP launch tool table co-located with canonical fixture mapping.
+// The two VALUES come from `@pome-sh/sdk/mcp-tool-fixture`, not the root barrel:
+// the barrel re-exports `openTwinDatabase`, so importing it EXECUTES `db.ts`'s
+// `import { DatabaseSync } from "node:sqlite"` and this module stops loading in
+// any runtime without that builtin (bun, which is what pome-cloud's
+// fidelity-watch runs). `ToolCallContext`/`ToolSpec` stay on the root as
+// `import type` — erased before emit, so they carry no runtime edge.
 import {
   deriveMcpToolTable,
   loadMcpToolFixture,
   type McpToolImplementation,
-  type ToolCallContext,
-  type ToolSpec,
-} from "@pome-sh/sdk";
+} from "@pome-sh/sdk/mcp-tool-fixture";
+import type { ToolCallContext, ToolSpec } from "@pome-sh/sdk";
 import type { z } from "zod";
 import metaListing from "../fixtures/mcp-tools-list.meta.json" with { type: "json" };
 import rawListing from "../fixtures/mcp-tools-list.raw.json" with { type: "json" };

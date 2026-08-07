@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
-import { loadMcpToolFixture } from "@pome-sh/sdk";
+// `@pome-sh/sdk/mcp-tool-fixture` rather than the `@pome-sh/sdk` root: the root
+// barrel re-exports `openTwinDatabase`, so importing it EXECUTES `db.ts`'s
+// `import { DatabaseSync } from "node:sqlite"`. pome-cloud's fidelity-watch
+// loads twin tool tables under bun, which implements no `node:sqlite`, and this
+// file's own dependencies are a fixture loader, zod and types. The loader module
+// has no imports at all.
+import { loadMcpToolFixture } from "@pome-sh/sdk/mcp-tool-fixture";
 import { z } from "zod";
 import type { StateDelta } from "@pome-sh/wire";
 import metaListing from "../fixtures/mcp-tools-list.meta.json" with { type: "json" };
