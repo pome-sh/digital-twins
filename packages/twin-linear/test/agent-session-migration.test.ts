@@ -158,3 +158,61 @@ describe("a pre-rename agent_sessions table migrates on open (F-1172)", () => {
     db.close();
   });
 });
+
+/**
+ * F-1176: `agent_activities` used to store a flat `type` + `body` pair. Linear's
+ * `AgentActivityCreateInput` takes a single `content` object, so the body moved
+ * inside it — same no-op-CREATE-TABLE hazard as above, one table over.
+ */
+function seedPreContentDatabase(): string {
+  const dir = mkdtempSync(join(tmpdir(), "twin-linear-activity-migration-"));
+  temporaries.push(dir);
+  const path = join(dir, "linear.db");
+
+  const db = openLinearTwinDatabase(path);
+  const commands = new LinearDomain(db);
+  commands.seed(testSeed());
+  const issue = commands.listIssues()[0]!;
+  const appUser = commands.listUsers().find((user) => user.app) ?? commands.listUsers()[0]!;
+
+  db.prepare(
+    `INSERT INTO agent_sessions(id, issue_id, comment_id, app_user_id, status, plan, external_urls_json, created_at, updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?)`
+  ).run("legacy_session", issue.id, null, appUser.id, "active", null, "[]", "2026-08-02T00:00:00.000Z", "2026-08-02T00:00:00.000Z");
+
+  // Put agent_activities back into the pre-content shape.
+  db.exec("ALTER TABLE agent_activities ADD COLUMN body TEXT NOT NULL DEFAULT ''");
+  db.exec("ALTER TABLE agent_activities DROP COLUMN content_json");
+  db.exec("ALTER TABLE agent_activities DROP COLUMN signal");
+  const insert = db.prepare(
+    `INSERT INTO agent_activities(id, session_id, user_id, type, body, ephemeral, created_at, updated_at)
+       VALUES (?,?,?,?,?,?,?,?)`
+  );
+  insert.run("legacy_thought", "legacy_session", appUser.id, "thought", "thinking", 1, "2026-08-02T00:00:00.000Z", "2026-08-02T00:00:00.000Z");
+  insert.run("legacy_action", "legacy_session", appUser.id, "action", "search_issues", 1, "2026-08-02T00:00:01.000Z", "2026-08-02T00:00:01.000Z");
+  db.close();
+  return path;
+}
+
+describe("a pre-content agent_activities table migrates on open (F-1176)", () => {
+  it("folds type + body into Linear's content object", () => {
+    const path = seedPreContentDatabase();
+    const activities = new LinearDomain(openLinearTwinDatabase(path)).listAgentActivities("legacy_session");
+
+    expect(activities.map((activity) => activity.content)).toEqual([
+      { type: "thought", body: "thinking" },
+      // The old shape had nowhere to keep a parameter, so it backfills empty
+      // rather than inventing one.
+      { type: "action", action: "search_issues", parameter: "" },
+    ]);
+    expect(activities.every((activity) => activity.signal === null)).toBe(true);
+  });
+
+  it("is idempotent, and does not re-run on an already-migrated file", () => {
+    const path = seedPreContentDatabase();
+    const before = new LinearDomain(openLinearTwinDatabase(path)).listAgentActivities("legacy_session");
+    expect(new LinearDomain(openLinearTwinDatabase(path)).listAgentActivities("legacy_session")).toEqual(
+      before
+    );
+  });
+});

@@ -203,7 +203,8 @@ export type AgentActivityRow = {
   session_id: string;
   user_id: string | null;
   type: string;
-  body: string;
+  content_json: string;
+  signal: string | null;
   ephemeral: number;
   created_at: string;
   updated_at: string;
@@ -399,7 +400,8 @@ export function mapAgentActivity(row: AgentActivityRow): LinearAgentActivity {
     sessionId: row.session_id,
     userId: row.user_id,
     type: row.type as LinearAgentActivity["type"],
-    body: row.body,
+    content: JSON.parse(row.content_json) as LinearAgentActivity["content"],
+    signal: row.signal as LinearAgentActivity["signal"],
     ephemeral: !!row.ephemeral,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

@@ -4,6 +4,20 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.21.15
+
+### Patch Changes
+
+- **Breaking for agents driving Linear agent sessions.** The bundled Linear
+  twin's four agent-session mutation inputs now take Linear's field names, and
+  only Linear's (F-1176). `AgentSessionUpdateInput` drops `id` and `status`,
+  `AgentSessionCreateOnIssue` / `OnComment` drop `appUserId` and `plan`, and
+  `AgentActivityCreateInput` takes `agentSessionId` + `content` in place of
+  `sessionId` / `type` / `body`. Session status is no longer settable — Linear
+  has no field for it, so status follows the emitted activity. No task in the
+  corpus drove these mutations, so nothing in `cli/tasks/` or `examples/`
+  changed.
+
 ## 0.21.14
 
 ### Patch Changes

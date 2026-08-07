@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
+import { z } from "zod";
 import { LinearTwinError, badUserInput } from "../errors.js";
 import { byteLength } from "../ids.js";
 import {
   BODY_MAX_BYTES,
   TITLE_MAX_BYTES,
+  type LinearAgentActivityContent,
+  type LinearAgentActivitySignal,
   type LinearAgentActivityType,
   type LinearAgentSessionStatus,
   type LinearIssuePriority,
@@ -80,15 +83,82 @@ export function normalizeSessionStatus(value: string): LinearAgentSessionStatus 
   return value as LinearAgentSessionStatus;
 }
 
-export function normalizeActivityType(value: string): LinearAgentActivityType {
-  const allowed: LinearAgentActivityType[] = [
-    "thought",
-    "elicitation",
-    "action",
-    "response",
-    "error",
-    "prompt",
-  ];
-  if (!allowed.includes(value as LinearAgentActivityType)) badUserInput(`Invalid agent activity type: ${value}`);
-  return value as LinearAgentActivityType;
+/** Linear's `AgentActivitySignal` members, verbatim (F-1176). */
+export const AGENT_ACTIVITY_SIGNALS: LinearAgentActivitySignal[] = ["stop", "continue", "auth", "select"];
+
+/**
+ * `AgentActivityCreateInput.content`, member-for-member with Linear's
+ * `AgentActivityContent` union (F-1176). Strict on purpose: an unknown key here
+ * is a caller writing against a shape Linear does not accept, and the twin's
+ * rule is a loud error over a silent stub.
+ *
+ * `bodyData` / `resultData` are omitted — Linear derives them server-side from
+ * the markdown body, and the twin does not model rich text.
+ */
+const agentActivityContentSchema = z.union([
+  z.object({ type: z.enum(["thought", "elicitation", "response"]), body: z.string().min(1) }).strict(),
+  z.object({ type: z.literal("prompt"), body: z.string().min(1), title: z.string().optional() }).strict(),
+  z
+    .object({ type: z.literal("error"), body: z.string().min(1), reasonCode: z.string().optional() })
+    .strict(),
+  z
+    .object({
+      type: z.literal("action"),
+      action: z.string().min(1),
+      parameter: z.string(),
+      result: z.string().optional(),
+    })
+    .strict(),
+]);
+
+export function parseActivityContent(value: unknown): LinearAgentActivityContent {
+  const parsed = agentActivityContentSchema.safeParse(value);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    badUserInput(
+      `agentActivityCreate content: ${issue ? `${issue.path.join(".") || "content"} ${issue.message}` : "invalid"}`
+    );
+  }
+  const content = parsed.data as LinearAgentActivityContent;
+  if ("body" in content) assertBody(content.body);
+  return content;
+}
+
+export function normalizeActivitySignal(value: string): LinearAgentActivitySignal {
+  if (!AGENT_ACTIVITY_SIGNALS.includes(value as LinearAgentActivitySignal)) {
+    badUserInput(`Invalid agent activity signal: ${value}`);
+  }
+  return value as LinearAgentActivitySignal;
+}
+
+/**
+ * The status an emitted activity moves its session to (F-1176).
+ *
+ * Upstream truth, verified: `AgentSessionUpdateInput` has no `status` field at
+ * all, and Linear's agent guide states that session state is "updated
+ * automatically based on the agent's emitted activities. No manual state
+ * management is required." So status following activities is Linear's model,
+ * not the twin's invention.
+ *
+ * The table itself IS twin-owned — Linear does not publish which activity type
+ * yields which status, and introspection cannot show behaviour. It is
+ * registered as a known divergence in `REFERENCE-DIVERGENCES.md`. The mapping
+ * is the semantically forced one: work in progress is `active`, asking the user
+ * something waits on them, a final answer or a failure ends the session, and a
+ * fresh prompt puts the session back in the queue.
+ */
+export function deriveSessionStatus(type: LinearAgentActivityType): LinearAgentSessionStatus {
+  switch (type) {
+    case "thought":
+    case "action":
+      return "active";
+    case "elicitation":
+      return "awaitingInput";
+    case "response":
+      return "complete";
+    case "error":
+      return "error";
+    case "prompt":
+      return "pending";
+  }
 }

@@ -18,6 +18,7 @@ export type LinearWorkflowStateType =
 export type LinearTokenType = "personal" | "oauth_access" | "oauth_refresh" | "client_credentials";
 export type LinearTokenActorType = "user" | "app";
 export type LinearIssuePriority = 0 | 1 | 2 | 3 | 4;
+/** Linear's `AgentActivityType` enum, member-for-member. */
 export type LinearAgentActivityType =
   | "thought"
   | "elicitation"
@@ -25,6 +26,30 @@ export type LinearAgentActivityType =
   | "response"
   | "error"
   | "prompt";
+/** Linear's `AgentActivitySignal` enum, member-for-member (F-1176). */
+export type LinearAgentActivitySignal = "stop" | "continue" | "auth" | "select";
+/**
+ * One member of Linear's `AgentActivityContent` union, as it arrives on
+ * `AgentActivityCreateInput.content` (F-1176). Five of the six members carry a
+ * `body`; `action` carries a call and its parameter instead.
+ */
+export type LinearAgentActivityBodyContent = {
+  type: "thought" | "elicitation" | "response" | "error" | "prompt";
+  body: string;
+  /** `prompt` only. */
+  title?: string;
+  /** `error` only. */
+  reasonCode?: string;
+};
+export type LinearAgentActivityActionContent = {
+  type: "action";
+  action: string;
+  parameter: string;
+  result?: string;
+};
+export type LinearAgentActivityContent =
+  | LinearAgentActivityBodyContent
+  | LinearAgentActivityActionContent;
 /** Linear's `AgentSessionStatus` enum, member-for-member (F-1172). */
 export type LinearAgentSessionStatus =
   | "pending"
@@ -251,8 +276,10 @@ export type LinearAgentActivity = {
   id: string;
   sessionId: string;
   userId: string | null;
+  /** The discriminant of `content`, kept as a column so status can be derived and indexed. */
   type: LinearAgentActivityType;
-  body: string;
+  content: LinearAgentActivityContent;
+  signal: LinearAgentActivitySignal | null;
   ephemeral: boolean;
   createdAt: string;
   updatedAt: string;

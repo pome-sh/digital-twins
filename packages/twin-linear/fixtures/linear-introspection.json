@@ -1,14 +1,62 @@
 {
   "_readme": "Committed slice of Linear's real GraphQL introspection. A type absent here is UNGUARDED. Regenerate with `node scripts/regen-linear-introspection.mjs`; never hand-edit.",
   "source": "https://api.linear.app/graphql",
-  "fetched_at": "2026-08-02T14:52:09.995Z",
+  "fetched_at": "2026-08-07T23:11:18.871Z",
   "query_sha256": "6029c665c71a485e86c4524bfa6793eb6cb2f0f6ab48e6277bc4d5a62fbe1079",
   "guarded_types": [
+    "AgentActivity",
+    "AgentActivityCreateInput",
+    "AgentActivitySignal",
     "AgentSession",
+    "AgentSessionCreateOnComment",
+    "AgentSessionCreateOnIssue",
     "AgentSessionExternalUrlInput",
-    "AgentSessionStatus"
+    "AgentSessionStatus",
+    "AgentSessionUpdateInput"
   ],
   "types": {
+    "AgentActivity": {
+      "kind": "OBJECT",
+      "fields": {
+        "agentSession": "AgentSession!",
+        "archivedAt": "DateTime",
+        "content": "AgentActivityContent!",
+        "contextualMetadata": "JSON",
+        "createdAt": "DateTime!",
+        "ephemeral": "Boolean!",
+        "id": "ID!",
+        "pushSummary": "AgentActivityPushSummary",
+        "queued": "Boolean!",
+        "sentAt": "DateTime",
+        "signal": "AgentActivitySignal",
+        "signalMetadata": "JSON",
+        "sourceComment": "Comment",
+        "sourceMetadata": "JSON",
+        "updatedAt": "DateTime!",
+        "user": "User!"
+      }
+    },
+    "AgentActivityCreateInput": {
+      "kind": "INPUT_OBJECT",
+      "inputFields": {
+        "agentSessionId": "String!",
+        "content": "JSONObject!",
+        "contextualMetadata": "JSONObject",
+        "ephemeral": "Boolean",
+        "id": "String",
+        "signal": "AgentActivitySignal",
+        "signalMetadata": "JSONObject"
+      }
+    },
+    "AgentActivitySignal": {
+      "kind": "ENUM",
+      "enumValues": [
+        "auth",
+        "continue",
+        "select",
+        "stop"
+      ]
+    },
     "AgentSession": {
       "kind": "OBJECT",
       "fields": {
@@ -44,6 +92,22 @@
         "workspaceDiffFiles": "[AgentSessionWorkspaceDiffFile!]"
       }
     },
+    "AgentSessionCreateOnComment": {
+      "kind": "INPUT_OBJECT",
+      "inputFields": {
+        "commentId": "String!",
+        "externalLink": "String",
+        "externalUrls": "[AgentSessionExternalUrlInput!]"
+      }
+    },
+    "AgentSessionCreateOnIssue": {
+      "kind": "INPUT_OBJECT",
+      "inputFields": {
+        "externalLink": "String",
+        "externalUrls": "[AgentSessionExternalUrlInput!]",
+        "issueId": "String!"
+      }
+    },
     "AgentSessionExternalUrlInput": {
       "kind": "INPUT_OBJECT",
       "inputFields": {
@@ -61,6 +125,18 @@
         "pending",
         "stale"
       ]
+    },
+    "AgentSessionUpdateInput": {
+      "kind": "INPUT_OBJECT",
+      "inputFields": {
+        "addedExternalUrls": "[AgentSessionExternalUrlInput!]",
+        "dismissedAt": "DateTime",
+        "externalLink": "String",
+        "externalUrls": "[AgentSessionExternalUrlInput!]",
+        "plan": "JSONObject",
+        "removedExternalUrls": "[String!]",
+        "userState": "[AgentSessionUserStateInput!]"
+      }
     }
   }
 }

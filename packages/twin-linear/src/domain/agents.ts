@@ -2,10 +2,12 @@
 import { notFound } from "../errors.js";
 import type {
   LinearAgentActivity,
+  LinearAgentActivityContent,
+  LinearAgentActivitySignal,
   LinearAgentSession,
   LinearAgentSessionExternalUrl,
 } from "../types.js";
-import { assertBody, normalizeActivityType, normalizeSessionStatus } from "./normalize.js";
+import { deriveSessionStatus } from "./normalize.js";
 import type { ActorContext, LinearDomain } from "./linear-domain.js";
 import { mapAgentActivity, mapAgentSession, type AgentActivityRow, type AgentSessionRow } from "./rows.js";
 import { emitWebhook } from "./webhooks.js";
@@ -23,24 +25,39 @@ export function getAgentSession(domain: LinearDomain, ref: string): LinearAgentS
   return row ? mapAgentSession(row) : null;
 }
 
+/**
+ * Linear's `AgentSessionCreateOnIssue`, plus `appUserId`, which is NOT part of
+ * that input upstream and is NOT accepted over GraphQL (F-1176). It exists here
+ * because the twin creates sessions internally too — a delegated issue or an
+ * @mention names the app the session belongs to, and upstream that identity
+ * arrives with the credential rather than in the input.
+ */
 export type AgentSessionOnIssueInput = {
   issueId: string;
   appUserId?: string;
-  plan?: string | null;
   externalUrls?: LinearAgentSessionExternalUrl[] | null;
 };
 
 export type AgentSessionOnCommentInput = {
   commentId: string;
   appUserId?: string;
+  externalUrls?: LinearAgentSessionExternalUrl[] | null;
+};
+
+/**
+ * `AgentSessionUpdateInput`, which upstream carries no `status` (F-1176). Status
+ * moves through `createAgentActivity`.
+ */
+export type AgentSessionPatch = {
   plan?: string | null;
   externalUrls?: LinearAgentSessionExternalUrl[] | null;
 };
 
-export type AgentSessionPatch = {
-  status?: string;
-  plan?: string | null;
-  externalUrls?: LinearAgentSessionExternalUrl[] | null;
+export type AgentActivityCreateInput = {
+  agentSessionId: string;
+  content: LinearAgentActivityContent;
+  signal?: LinearAgentActivitySignal;
+  ephemeral?: boolean;
 };
 
 export async function createAgentSessionOnIssue(
@@ -68,7 +85,7 @@ export async function createAgentSessionOnIssue(
       null,
       agent.id,
       "pending",
-      input.plan ?? null,
+      null,
       JSON.stringify(input.externalUrls ?? []),
       now,
       now
@@ -111,7 +128,7 @@ export async function createAgentSessionOnComment(
       comment.id,
       agent.id,
       "pending",
-      input.plan ?? null,
+      null,
       JSON.stringify(input.externalUrls ?? []),
       now,
       now
@@ -135,14 +152,12 @@ export function updateAgentSession(
   domain.db
     .prepare(
       `UPDATE agent_sessions SET
-          status = COALESCE(?, status),
           plan = CASE WHEN ? THEN ? ELSE plan END,
           external_urls_json = CASE WHEN ? THEN ? ELSE external_urls_json END,
           updated_at = ?
          WHERE id = ?`
     )
     .run(
-      input.status ? normalizeSessionStatus(input.status) : null,
       input.plan !== undefined ? 1 : 0,
       input.plan ?? null,
       input.externalUrls !== undefined ? 1 : 0,
@@ -153,31 +168,49 @@ export function updateAgentSession(
   return domain.requireAgentSession(session.id);
 }
 
+/**
+ * Emitting an activity is also how a session's status moves (F-1176). Linear has
+ * no `status` on `AgentSessionUpdateInput`; the status follows the activity, and
+ * `deriveSessionStatus` holds the mapping.
+ */
 export async function createAgentActivity(
   domain: LinearDomain,
-  input: { sessionId: string; type: string; body: string; ephemeral?: boolean },
+  input: AgentActivityCreateInput,
   actor: ActorContext = {}
 ): Promise<LinearAgentActivity> {
   domain.requireScopes(actor, ["write"]);
-  assertBody(input.body);
-  const session = domain.requireAgentSession(input.sessionId);
+  const session = domain.requireAgentSession(input.agentSessionId);
   const viewer = domain.resolveViewer(actor);
-  const type = normalizeActivityType(input.type);
+  const type = input.content.type;
   const now = domain.tick();
   const id = domain.nextId("agent_activity");
   const ephemeral =
     typeof input.ephemeral === "boolean" ? input.ephemeral : type === "thought" || type === "action";
   domain.db
     .prepare(
-      `INSERT INTO agent_activities(id, session_id, user_id, type, body, ephemeral, created_at, updated_at)
-         VALUES (?,?,?,?,?,?,?,?)`
+      `INSERT INTO agent_activities(id, session_id, user_id, type, content_json, signal, ephemeral, created_at, updated_at)
+         VALUES (?,?,?,?,?,?,?,?,?)`
     )
-    .run(id, session.id, viewer.id, type, input.body, ephemeral ? 1 : 0, now, now);
+    .run(
+      id,
+      session.id,
+      viewer.id,
+      type,
+      JSON.stringify(input.content),
+      input.signal ?? null,
+      ephemeral ? 1 : 0,
+      now,
+      now
+    );
+  const status = deriveSessionStatus(type);
+  domain.db
+    .prepare("UPDATE agent_sessions SET status = ?, updated_at = ? WHERE id = ?")
+    .run(status, now, session.id);
   if (type === "prompt") {
     await emitWebhook(domain, {
       type: "AgentSessionEvent",
       action: "prompted",
-      data: { id: session.id, status: session.status },
+      data: { id: session.id, status },
       actor: viewer,
       teamId: session.issueId ? domain.requireIssue(session.issueId).teamId : null,
     });

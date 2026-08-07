@@ -199,17 +199,10 @@ export function createRootValue(ctx: GraphQLRuntimeContext): Record<string, unkn
       );
       return payload({ agentSession: formatAgentSession(session) });
     },
-    agentSessionUpdate: ({ id, input }: { id?: string; input: unknown }) => {
-      const parsed = parseAgentSessionUpdateInput(input);
-      const session = commands.updateAgentSession(
-        String(id ?? parsed.id),
-        {
-          status: parsed.status,
-          plan: parsed.plan,
-          externalUrls: parsed.externalUrls,
-        },
-        actor
-      );
+    agentSessionUpdate: ({ id, input }: { id: string; input: unknown }) => {
+      // `id` is a mutation argument upstream, and non-null — it is not a field
+      // of AgentSessionUpdateInput (F-1176).
+      const session = commands.updateAgentSession(id, parseAgentSessionUpdateInput(input), actor);
       return payload({ agentSession: formatAgentSession(session) });
     },
     agentActivityCreate: async ({ input }: { input: unknown }) => {
