@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * fidelity:parity for twin-linear — inventory MCP names must match the live
- * `linearTools` export, and every graphql-surface.json operation must be listed
- * in the inventory GraphQL rows.
+ * fidelity:parity for twin-linear — inventory MCP names must match the
+ * tool-table fixture the served listing is derived from (F-1325), and every
+ * graphql-surface.json operation must be listed in the inventory GraphQL rows.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { linearTools } from "../src/mcp.js";
+import { linearToolFixture } from "../src/mcp.js";
 
 type InventoryTool = { name: string; heat?: string; fidelity?: string };
 type InventoryGraphql = { name: string; heat?: string; fidelity?: string };
@@ -34,12 +34,13 @@ const surface = JSON.parse(
 
 const failures: string[] = [];
 
-const liveToolNames = linearTools.map((tool) => tool.name).sort();
+// F-1325 — the inventory is bound to the tool-table fixture, not to the code.
+const fixtureToolNames = [...linearToolFixture.toolNames].sort();
 const inventoryToolNames = inventory.tools.map((tool) => tool.name).sort();
 
-if (JSON.stringify(liveToolNames) !== JSON.stringify(inventoryToolNames)) {
+if (JSON.stringify(fixtureToolNames) !== JSON.stringify(inventoryToolNames)) {
   failures.push(
-    `MCP tool name mismatch.\n  live: ${liveToolNames.join(", ")}\n  inventory: ${inventoryToolNames.join(", ")}`,
+    `MCP tool name mismatch.\n  fixture: ${fixtureToolNames.join(", ")}\n  inventory: ${inventoryToolNames.join(", ")}`,
   );
 }
 
@@ -63,5 +64,5 @@ if (failures.length > 0) {
 
 const surfaceOpCount = surfaceOps.length;
 console.log(
-  `twin-linear fidelity:parity ok — ${liveToolNames.length} MCP tools, ${surfaceOpCount} GraphQL surface ops`,
+  `twin-linear fidelity:parity ok — ${fixtureToolNames.length} MCP tools, ${surfaceOpCount} GraphQL surface ops`,
 );

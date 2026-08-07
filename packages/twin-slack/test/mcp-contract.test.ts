@@ -6,7 +6,12 @@
 // declared in-test so the contract has no external dependency.
 
 import { describe, expect, it } from "vitest";
-import { listToolsForMcp, listTools, MUTATING_TOOL_NAMES, toolDefinitions } from "../src/tools.js";
+import {
+  MUTATING_TOOL_NAMES,
+  slackToolFixture,
+  slackToolInputSchema,
+  toolSchemas,
+} from "../src/tools.js";
 
 interface ExpectedTool {
   name: string;
@@ -89,7 +94,7 @@ const EXPECTED_MUTATORS = new Set(EXPECTED_TOOLS.filter((t) => !t.readOnly).map(
 
 describe("MCP tools contract", () => {
   it("exposes exactly the 11 visible Slack-agent tools", () => {
-    expect(toolDefinitions.map((t) => t.name).sort()).toEqual(EXPECTED_NAMES);
+    expect([...slackToolFixture.toolNames].sort()).toEqual(EXPECTED_NAMES);
     expect(EXPECTED_TOOLS.length).toBe(11);
   });
 
@@ -99,7 +104,7 @@ describe("MCP tools contract", () => {
   });
 
   it("each visible tool emits additionalProperties:false JSON-Schema", () => {
-    for (const tool of listToolsForMcp()) {
+    for (const tool of slackToolFixture.tools) {
       expect(tool.inputSchema.additionalProperties).toBe(false);
       expect(tool.inputSchema.type).toBe("object");
     }
@@ -107,7 +112,7 @@ describe("MCP tools contract", () => {
 
   it("tool descriptions are pinned exactly", () => {
     const byName = new Map(EXPECTED_TOOLS.map((t) => [t.name, t]));
-    for (const tool of toolDefinitions) {
+    for (const tool of slackToolFixture.tools) {
       const expected = byName.get(tool.name);
       expect(expected, `tool ${tool.name} missing from EXPECTED_TOOLS`).toBeDefined();
       expect(tool.description).toBe(expected!.description);
@@ -116,28 +121,33 @@ describe("MCP tools contract", () => {
 
   it("tool required-fields match the pinned set exactly", () => {
     const byName = new Map(EXPECTED_TOOLS.map((t) => [t.name, t]));
-    for (const tool of listToolsForMcp()) {
+    for (const tool of slackToolFixture.tools) {
       const expected = byName.get(tool.name)!;
-      const actualRequired = [...tool.inputSchema.required].sort();
+      const actualRequired = [...(tool.inputSchema.required as string[])].sort();
       const expectedRequired = [...expected.required].sort();
       expect(actualRequired).toEqual(expectedRequired);
     }
   });
 
-  it("listTools() returns snake_case input_schema (legacy)", () => {
-    const tools = listTools();
-    expect(tools.length).toBe(11);
-    expect(tools[0]).toHaveProperty("input_schema");
+  // F-1325 — the fixture carries the inputSchema the wire serves, and the zod
+  // schemas below it are what `tools/call` validates against. Nothing keeps
+  // the two together except this: run the frozen draft-7 projection over every
+  // declared schema and demand the fixture's bytes back.
+  it("every declared schema projects to exactly the inputSchema the fixture serves", () => {
+    expect(Object.keys(toolSchemas).sort()).toEqual([...slackToolFixture.toolNames].sort());
+    for (const tool of slackToolFixture.tools) {
+      const projected = slackToolInputSchema(toolSchemas[tool.name as keyof typeof toolSchemas]);
+      expect(projected, tool.name).toEqual(tool.inputSchema);
+    }
   });
 
-  it("listToolsForMcp() returns camelCase inputSchema (MCP spec)", () => {
-    const tools = listToolsForMcp();
-    expect(tools.length).toBe(11);
-    expect(tools[0]).toHaveProperty("inputSchema");
+  it("the fixture serves camelCase inputSchema (MCP spec)", () => {
+    expect(slackToolFixture.tools.length).toBe(11);
+    expect(slackToolFixture.tools[0]).toHaveProperty("inputSchema");
   });
 
   it("readOnlyHint is present on read tools, absent on mutators", () => {
-    const tools = listToolsForMcp();
+    const tools = slackToolFixture.tools;
     const mutators = tools.filter((t) => !("annotations" in t));
     const readers = tools.filter((t) => t.annotations?.readOnlyHint === true);
     expect(mutators.length).toBe(3);

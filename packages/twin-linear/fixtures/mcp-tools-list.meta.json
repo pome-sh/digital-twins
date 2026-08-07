@@ -1,0 +1,52 @@
+{
+  "twin": "linear",
+  "substrate": "twin-authored-from-vendor-docs",
+  "endpoint": "in-process://twin-linear/s/:sid/mcp",
+  "method": "tools/list",
+  "protocol": "JSON-RPC 2.0 over Streamable HTTP",
+  "protocolVersion": "2025-06-18",
+  "captureDate": "2026-08-06",
+  "rawFileSha256": "f764e11486c25738b1952b6e83e4919fcb84c3c36cd36ef801b326fb40ed111d",
+  "liveToolCount": 22,
+  "liveToolOrder": [
+    "list_issues",
+    "get_issue",
+    "save_issue",
+    "list_comments",
+    "save_comment",
+    "delete_comment",
+    "list_teams",
+    "get_team",
+    "list_users",
+    "get_user",
+    "list_issue_statuses",
+    "get_issue_status",
+    "list_issue_labels",
+    "create_issue_label",
+    "list_projects",
+    "get_project",
+    "save_project",
+    "list_cycles",
+    "search_documentation",
+    "list_documents",
+    "get_document",
+    "save_document"
+  ],
+  "transcription": {
+    "readFrom": "twin-linear's own tools/list, booted on defaultSeedState() and driven through Hono's app.request, read immediately before this table became fixture-driven (F-1325)",
+    "contentOrigin": "the tool NAMES come from Linear's published MCP launch documentation; the inputSchemas are twin-owned Gate-1 fixtures, as this fixture's own notes have always admitted. The pre-F-1325 provenance read `source: documented_official_linear_mcp_launch_set`, which reads like a capture. It was never one.",
+    "comparedToUpstream": "never. https://mcp.linear.app/mcp is OAuth-gated, so F-1326 recorded the upstream golden as deferred (fixtures/mcp-tools-list/linear.status.json). Re-sourcing this table needs that token and belongs to F-1329, not here."
+  },
+  "notes": [
+    "Gate-1 Wave 4 expands Gate 0's 18-tool freeze: delete_comment plus documents list/get/save; save_issue estimate/parentId/relations; save_comment parentId.",
+    "Documents, initiatives and milestones beyond this minimal set stay named gaps.",
+    "GraphQL keeps issueCreate/issueUpdate for SDK parity; MCP follows the documented listing.",
+    "This listing carries the generic outputSchema the twin serves on every tool. The pre-F-1325 canonical omitted it, so the committed oracle described less than the wire did.",
+    "Seeded from the served table rather than from upstream on purpose. F-1325 is name-neutral by construction: every byte this twin serves is identical before and after it."
+  ],
+  "canonicalFileSha256": "ff65fdd9e6085e255066e1cf0935993634131d862068d82e0f349c5e7882ff91",
+  "files": {
+    "raw": "mcp-tools-list.raw.json",
+    "canonical": "mcp-tools-list.canonical.json"
+  }
+}

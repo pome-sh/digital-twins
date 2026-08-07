@@ -17,6 +17,8 @@
 import { z, ZodError } from "zod";
 import {
   defineTwin,
+  deriveMcpToolTable,
+  type McpToolImplementation,
   type ToolCallContext,
   type TwinDefinition,
 } from "@pome-sh/sdk";
@@ -40,7 +42,7 @@ import { idempotencyMiddleware } from "./idempotency.js";
 import { registerStripeRoutes } from "./routes/index.js";
 import { applySeed, defaultSeed, seedSchema } from "./seed.js";
 import { registerX402Routes } from "./session.js";
-import { executeTool, isMutatingTool, listTools, toolDefinitions } from "./tools.js";
+import { executeTool, isMutatingTool, stripeToolFixture, toolArgumentSchemas } from "./tools.js";
 import type { SeedState, TwinStripeDatabase } from "./types.js";
 
 // Stripe admin/seed is tolerant: an absent body falls back to the default
@@ -105,9 +107,22 @@ function stripeErrorEnvelope(err: unknown): { status: number; body: unknown } {
   );
 }
 
-// listTools() carries the frozen tool-list wire shape (z.toJSONSchema with
-// the {} fallback for optional schemas).
-const toolListing = new Map(listTools().map((tool) => [tool.name, tool]));
+// F-1325 — the tool table is the fixture. `deriveMcpToolTable` supplies every
+// name, description and input schema (the frozen z.toJSONSchema projection,
+// {} fallback and all) from `fixtures/mcp-tools-list.raw.json`, and refuses to
+// build if the schemas in tools.ts and the fixture disagree in either
+// direction.
+const stripeToolImplementations = Object.fromEntries(
+  toolArgumentSchemas.map((def) => [
+    def.name,
+    {
+      schema: def.schema as unknown as z.ZodType<unknown>,
+      mutation: isMutatingTool(def.name),
+      handler: (domain: StripeDomain, args: unknown, ctx: ToolCallContext) =>
+        executeTool(domain, accountIdFrom(ctx.session), def.name, args),
+    },
+  ])
+) as Record<string, McpToolImplementation<StripeDomain>>;
 
 export type CreateStripeTwinDefinitionOptions = {
   /** The database every hook (auth lookup, idempotency, admin) closes over. */
@@ -248,15 +263,7 @@ export function createStripeTwinDefinition(
       // Frozen stripe admin-gate 403 body.
       forbidden: () => forbidden("Forbidden"),
     },
-    tools: toolDefinitions.map((def) => ({
-      name: def.name,
-      description: def.description,
-      schema: def.schema as unknown as z.ZodType<unknown>,
-      mutation: isMutatingTool(def.name),
-      inputSchema: toolListing.get(def.name)?.input_schema as Record<string, unknown>,
-      handler: (domain: StripeDomain, args: unknown, ctx: ToolCallContext) =>
-        executeTool(domain, accountIdFrom(ctx.session), def.name, args),
-    })),
+    tools: deriveMcpToolTable(stripeToolFixture, stripeToolImplementations),
     // Frozen healthz extras: fidelity + tthw_seconds on top of the contract
     // core {ok, twin, implementation, tools, runtime}.
     healthz: () => ({ fidelity: "semantic", tthw_seconds: tthwSeconds(startedAtMs) }),

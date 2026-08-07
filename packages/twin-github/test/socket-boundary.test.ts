@@ -26,7 +26,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createGitHubCloneApp } from "../src/twin.js";
-import { toolDefinitions } from "../src/tools.js";
+import { githubToolFixture } from "../src/tools.js";
 import { unsupportedEnvelope } from "../src/unsupported-envelope.js";
 import { TEST_AUTH_SECRET, TEST_SID, signTestToken } from "./_authHelper.js";
 
@@ -121,9 +121,9 @@ describe("socket boundary — real MCP SDK client over @hono/node-server", () =>
       expect(serverInfo?.name).toBe("twin-github");
 
       const listResult = await client.listTools();
-      expect(listResult.tools).toHaveLength(toolDefinitions.length);
-      expect(toolDefinitions.length).toBe(65);
-      expect(listResult.tools.map((t) => t.name)).toEqual(toolDefinitions.map((t) => t.name));
+      expect(listResult.tools).toHaveLength(githubToolFixture.tools.length);
+      expect(githubToolFixture.tools.length).toBe(65);
+      expect(listResult.tools.map((t) => t.name)).toEqual([...githubToolFixture.toolNames]);
       for (const tool of listResult.tools) {
         expect(tool.inputSchema).toEqual(expect.objectContaining({ type: "object" }));
       }

@@ -13,5 +13,11 @@ export { registerStripeRoutes } from "./routes/index.js";
 export { registerX402Routes } from "./session.js";
 export { paymentMiddleware } from "./x402.js";
 export { mintApiKey, resolveSidFromKey, revokeApiKey } from "./api-keys.js";
-export { listTools, executeTool, isMutatingTool, toolDefinitions } from "./tools.js";
+export {
+  executeTool,
+  isMutatingTool,
+  stripeToolFixture,
+  stripeToolInputSchema,
+  toolArgumentSchemas,
+} from "./tools.js";
 export type { Recorder, ResolvedSession, SeedState, TwinStripeDatabase } from "./types.js";

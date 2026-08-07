@@ -27,7 +27,7 @@ export {
   parseMime,
   stripBcc,
 } from "./mime.js";
-export { gmailTools } from "./mcp.js";
+export { gmailToolFixture, gmailTools } from "./mcp.js";
 export { projectGmailRecording } from "./recording.js";
 export {
   matchesSearch,

@@ -1,0 +1,936 @@
+{
+  "meta": {
+    "twin": "stripe",
+    "substrate": "twin-code-transcription",
+    "endpoint": "in-process://twin-stripe/s/:sid/mcp",
+    "method": "tools/list",
+    "protocol": "JSON-RPC 2.0 over Streamable HTTP",
+    "protocolVersion": "2025-06-18",
+    "captureDate": "2026-08-06",
+    "rawFileSha256": "7bb87c5d6d99fea8dad1069a501f9801811e42c7cf81723b6b3d4e75aacc5bba",
+    "liveToolCount": 26,
+    "liveToolOrder": [
+      "create_payment_intent",
+      "retrieve_payment_intent",
+      "list_payment_intents",
+      "confirm_payment_intent",
+      "update_payment_intent",
+      "cancel_payment_intent",
+      "simulate_crypto_deposit",
+      "retrieve_charge",
+      "list_charges",
+      "create_refund",
+      "retrieve_refund",
+      "list_refunds",
+      "create_customer",
+      "retrieve_customer",
+      "update_customer",
+      "delete_customer",
+      "list_customers",
+      "list_customer_payment_methods",
+      "create_payment_method",
+      "retrieve_payment_method",
+      "attach_payment_method",
+      "detach_payment_method",
+      "retrieve_balance",
+      "list_balance_transactions",
+      "retrieve_event",
+      "list_events"
+    ],
+    "transcription": {
+      "readFrom": "twin-stripe's own tools/list, booted on defaultSeed() and driven through Hono's app.request, read immediately before this table became fixture-driven (F-1325)",
+      "contentOrigin": "packages/twin-stripe/src/tools.ts — a hand-written TypeScript array of 26 tools. Each inputSchema is z.toJSONSchema() of that tool's zod schema, frozen here verbatim including the $schema key it emits.",
+      "comparedToUpstream": "never, and not comparable today. @stripe/mcp is a stdio-to-HTTP proxy that declares no tools of its own and the served listing is a function of the caller's Restricted API Key, so F-1326 recorded stripe as not-captured (fixtures/mcp-tools-list/stripe.status.json) rather than inventing a deployment-invariant table."
+    },
+    "notes": [
+      "Seeded from the code table rather than from upstream on purpose. F-1325 is name-neutral by construction: every byte this twin serves is identical before and after it."
+    ],
+    "derivedFrom": "mcp-tools-list.raw.json",
+    "derivation": "result.tools verbatim, listing order preserved; only whitespace differs from the raw file"
+  },
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "tools": [
+      {
+        "name": "create_payment_intent",
+        "description": "Create a PaymentIntent: crypto-deposit (the x402 entry point) or card (optionally with payment_method / customer / confirm).",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "amount": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "currency": {
+              "type": "string",
+              "minLength": 1
+            },
+            "payment_method_types": {
+              "minItems": 1,
+              "maxItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "crypto",
+                  "card"
+                ]
+              }
+            },
+            "payment_method_options": {
+              "type": "object",
+              "properties": {
+                "crypto": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "type": "string",
+                      "const": "deposit"
+                    },
+                    "deposit_options": {
+                      "type": "object",
+                      "properties": {
+                        "networks": {
+                          "minItems": 1,
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "mode"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "crypto"
+              ],
+              "additionalProperties": false
+            },
+            "payment_method": {
+              "type": "string"
+            },
+            "customer": {
+              "type": "string"
+            },
+            "confirm": {
+              "type": "boolean"
+            },
+            "metadata": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "capture_method": {
+              "type": "string"
+            },
+            "confirmation_method": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "amount",
+            "currency",
+            "payment_method_types"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "retrieve_payment_intent",
+        "description": "Retrieve a PaymentIntent by id.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "list_payment_intents",
+        "description": "List PaymentIntents with optional filters.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "created": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "gt": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "gte": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "lt": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "lte": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "confirm_payment_intent",
+        "description": "Confirm a PaymentIntent. Card PIs attempt the charge synchronously (magic test PMs decline); crypto-deposit PIs are idempotent here.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "payment_method": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "update_payment_intent",
+        "description": "Update a non-terminal PaymentIntent (amount, metadata, payment_method, customer). The card retry step: attach a new PM after a decline, then confirm again.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "amount": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "metadata": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "payment_method": {
+              "type": "string"
+            },
+            "customer": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "cancel_payment_intent",
+        "description": "Cancel a PaymentIntent. Refused once succeeded.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "simulate_crypto_deposit",
+        "description": "Test helper: drive a crypto-deposit PI from requires_action through processing to succeeded.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "retrieve_charge",
+        "description": "Retrieve a Charge by id.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "list_charges",
+        "description": "List charges with optional payment_intent / customer / created filters.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "created": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "gt": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "gte": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "lt": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "lte": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "payment_intent": {
+              "type": "string"
+            },
+            "customer": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "create_refund",
+        "description": "Refund a charge, fully or partially. Stripe refuses a refund on a charge that is already fully refunded, or one that would exceed the remaining refundable amount.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "charge": {
+              "type": "string",
+              "minLength": 1
+            },
+            "amount": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "charge"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "retrieve_refund",
+        "description": "Retrieve a Refund by id.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "list_refunds",
+        "description": "List refunds, optionally filtered by charge or payment_intent.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "created": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "gt": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "gte": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "lt": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "lte": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "charge": {
+              "type": "string"
+            },
+            "payment_intent": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "create_customer",
+        "description": "Create a customer. All fields optional, like real Stripe.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "email": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "phone": {
+              "type": "string"
+            },
+            "metadata": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "retrieve_customer",
+        "description": "Retrieve a Customer by id. Deleted customers return the {deleted: true} stub.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "update_customer",
+        "description": "Update a customer's fields. Metadata merges per-key; a null or empty value unsets the key.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "name": {
+              "type": "string"
+            },
+            "email": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "phone": {
+              "type": "string"
+            },
+            "metadata": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "delete_customer",
+        "description": "Delete a customer (soft delete; its payment methods are detached).",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "list_customers",
+        "description": "List customers with optional email / created filters.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "created": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "gt": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "gte": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "lt": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "lte": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "email": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "list_customer_payment_methods",
+        "description": "List the payment methods attached to a customer.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "customer": {
+              "type": "string",
+              "minLength": 1
+            },
+            "type": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          "required": [
+            "customer"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "create_payment_method",
+        "description": "Create a card payment method from test card details (e.g. number 4242424242424242).",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "card"
+            },
+            "card": {
+              "type": "object",
+              "properties": {
+                "number": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "exp_month": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "exp_year": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "cvc": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "number",
+                "exp_month",
+                "exp_year"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "type",
+            "card"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "retrieve_payment_method",
+        "description": "Retrieve a PaymentMethod by id.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "attach_payment_method",
+        "description": "Attach a payment method to a customer. One customer per PM; a detached PM cannot be reattached.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "customer": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "id",
+            "customer"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "detach_payment_method",
+        "description": "Detach a payment method from its customer.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "retrieve_balance",
+        "description": "Retrieve the current balance (available + pending per currency).",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "list_balance_transactions",
+        "description": "List balance transactions (charges, refunds, fees).",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "created": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "gt": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "gte": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "lt": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "lte": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "type": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "retrieve_event",
+        "description": "Retrieve an event by id.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "list_events",
+        "description": "List events. Filter by type and created.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "created": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "gt": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "gte": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "lt": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "lte": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "type": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    ]
+  }
+}

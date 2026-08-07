@@ -1,29 +1,53 @@
 {
+  "twin": "gmail",
+  "substrate": "live-wire-unauth",
   "endpoint": "https://gmailmcp.googleapis.com/mcp/v1",
   "method": "tools/list",
-  "protocol": "JSON-RPC 2.0",
+  "protocol": "JSON-RPC 2.0 over HTTP (accept: application/json, text/event-stream)",
   "protocolVersion": "2025-03-26",
   "captureDate": "2026-07-20",
-  "httpStatus": 200,
-  "sha256": "6ef35bad568967015c101f89e995148c4eb2131b3a6dd244f7237058abae8e7a",
-  "canonicalSha256": "56b5e86181c13ead63fdc8ea0d4bedc6860c1a3fdb17372fdca76591e48a4eed",
-  "request": {
-    "headers": {
+  "rawFileSha256": "6ef35bad568967015c101f89e995148c4eb2131b3a6dd244f7237058abae8e7a",
+  "liveToolCount": 13,
+  "liveToolOrder": [
+    "create_draft",
+    "list_drafts",
+    "get_thread",
+    "get_message",
+    "search_threads",
+    "label_thread",
+    "unlabel_thread",
+    "apply_sensitive_thread_label",
+    "list_labels",
+    "label_message",
+    "unlabel_message",
+    "apply_sensitive_message_label",
+    "create_label"
+  ],
+  "configuration": {
+    "auth": "none — the unauthenticated read answered HTTP 200 for both tools/list and initialize (Developer Preview)",
+    "deploymentSelector": "none — the endpoint exposes no toolset, tool-filter or read-only selector, so there is exactly one surface to read",
+    "requestHeaders": {
       "content-type": "application/json",
       "accept": "application/json, text/event-stream"
     },
-    "body": {
+    "requestBody": {
       "method": "tools/list",
       "jsonrpc": "2.0",
       "id": 1
-    }
+    },
+    "matchesExaminee": "an examinee pointing an MCP client at this URL gets this listing; there is no configuration axis on which the two could differ",
+    "completeness": "exact"
   },
-  "auth": "none (unauthenticated capture succeeded for tools/list and initialize)",
-  "liveToolCount": 13,
-  "launchToolCount": 13,
-  "gate1PromotedFromPreview": [
-    "get_message",
-    "apply_sensitive_thread_label",
-    "apply_sensitive_message_label"
-  ]
+  "notes": [
+    "Gate 1 expands the OSS launch set from the Gate-0 ten-tool freeze to the full live 13-tool listing. The three promoted from Developer Preview are get_message, apply_sensitive_thread_label and apply_sensitive_message_label.",
+    "Schemas, annotations and descriptions are the live capture's, verbatim.",
+    "DELIBERATE DIVERGENCE: F-1326 re-read the same endpoint on 2026-08-06 and got the same 13 names with different schemas and descriptions (fixtures/mcp-tools-list/gmail.meta.json, rawFileSha256 93085540…). This twin keeps serving the 2026-07-20 oracle. Adopting the newer bytes changes what the twin serves, which is a behavioural change F-1325 does not make; the lane that compares the two is F-1327. This is not an oversight.",
+    "Authenticated tools/call success envelopes were unavailable; the reconstructed shapes live in mcp-tools-call.representative.json and the live unauthenticated error envelope in mcp-tools-call-unauth-error.raw.json.",
+    "initialize returned protocolVersion=2025-03-26 (mcp-initialize.raw.json)."
+  ],
+  "canonicalFileSha256": "44ae70afa53697967b7b38e9320b9032a906a9d42201eab08c8f1f3b89ca3c52",
+  "files": {
+    "raw": "mcp-tools-list.raw.json",
+    "canonical": "mcp-tools-list.canonical.json"
+  }
 }

@@ -251,7 +251,7 @@ export function lintFidelityInventory(
   return problems;
 }
 
-/** Set-compare tool names: inventory vs the live `listTools()` surface. */
+/** Set-compare tool names: inventory vs the tool-table fixture. */
 export function compareToolNames(
   inventoryNames: string[],
   liveNames: string[]

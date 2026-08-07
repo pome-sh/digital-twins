@@ -4,6 +4,17 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.21.11
+
+### Patch Changes
+
+- **No CLI change.** Version-only bump: F-1325 made every twin derive its MCP
+  tool table from a fixture, which touches `packages/twin-*` and
+  `packages/sdk` — publish-relevant for the CLI, because the CLI inlines both
+  into its bundle. The twins' `tools/list` output is byte-identical before and
+  after, so the behaviour a CLI user sees is unchanged; the bundle's bytes are
+  not, which is what this bump is for.
+
 ## 0.21.8
 
 ### Patch Changes

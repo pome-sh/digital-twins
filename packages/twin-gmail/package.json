@@ -1,6 +1,6 @@
 {
   "name": "@pome-sh/twin-gmail",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "description": "Deterministic Gmail-shaped twin for agent testing — SQLite-backed domain core.",
   "private": true,
   "type": "module",

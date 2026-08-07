@@ -12,7 +12,7 @@ import {
   lintFidelityInventory,
   loadFidelityInventory,
 } from "@pome-sh/sdk/parity";
-import { listTools } from "../src/tools.js";
+import { githubToolFixture } from "../src/tools.js";
 
 const root = resolve(import.meta.dirname, "..");
 const inventory = loadFidelityInventory(resolve(root, "fidelity.inventory.json"));
@@ -24,7 +24,7 @@ describe("fidelity contract documentation", () => {
     expect(
       compareToolNames(
         inventory.tools.map((tool) => tool.name),
-        listTools().map((tool) => tool.name)
+        [...githubToolFixture.toolNames]
       )
     ).toEqual({ missing: [], extra: [] });
   });

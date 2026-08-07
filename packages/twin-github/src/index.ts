@@ -10,6 +10,6 @@ export type {
 } from "./domain/index.js";
 export { defaultSeedState, parseSeed, seedSchema } from "./seed.js";
 export type { ParsedGitHubStateSeed } from "./seed.js";
-export { executeTool, listTools, toolDefinitions } from "./tools.js";
+export { executeTool, githubToolFixture, githubToolInputSchema, toolArgumentSchemas } from "./tools.js";
 export type { GitHubCloneAppOptions } from "./twin.js";
 export type { GitHubCloneDatabase, GitHubStateSeed, RecorderEvent } from "./types.js";

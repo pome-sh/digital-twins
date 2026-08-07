@@ -147,5 +147,7 @@ if (covPath) {
 
 then `npm run build -w @pome-sh/sdk` (the twins import the SDK through its
 `dist/`, so editing `src/` alone records nothing) and run each suite with
-`POME_F1305_COVERAGE_PATH` set. Diff the distinct tool names against
-`listTools()`. Revert the hook afterwards.
+`POME_F1305_COVERAGE_PATH` set. Diff the distinct tool names against the
+twin's tool-table fixture (`githubToolFixture.toolNames` and its siblings, or
+`packages/twin-*/fixtures/mcp-tools-list.raw.json` straight off disk — F-1325
+retired the per-twin `listTools()` helpers). Revert the hook afterwards.

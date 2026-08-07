@@ -9,7 +9,13 @@
 // db driver) lives in the engine.
 
 import { z, ZodError } from "zod";
-import { defineTwin, type ToolCallContext, type TwinDefinition } from "@pome-sh/sdk";
+import {
+  defineTwin,
+  deriveMcpToolTable,
+  type McpToolImplementation,
+  type ToolCallContext,
+  type TwinDefinition,
+} from "@pome-sh/sdk";
 import {
   UnknownToolError,
   createApp,
@@ -27,7 +33,7 @@ import { GitHubDomain } from "./domain/index.js";
 import { TwinError, githubError } from "./errors.js";
 import { registerGitHubRoutes } from "./routes.js";
 import { defaultSeedState, parseSeed, type ParsedGitHubStateSeed } from "./seed.js";
-import { executeTool, isMutatingTool, listTools, toolDefinitions } from "./tools.js";
+import { executeTool, githubToolFixture, isMutatingTool, toolArgumentSchemas } from "./tools.js";
 import type { GitHubCloneDatabase, GitHubStateSeed } from "./types.js";
 import { unsupportedEnvelope } from "./unsupported-envelope.js";
 
@@ -108,9 +114,24 @@ function githubErrorEnvelope(err: unknown): { status: number; body: unknown } {
   };
 }
 
-// listTools() carries the frozen tool-list wire shape: the twin-zod
-// serialization emitted on both list surfaces since before the port.
-const toolListing = new Map(listTools().map((tool) => [tool.name, tool]));
+// F-1325 — the tool table is the fixture. `deriveMcpToolTable` supplies every
+// name, description and input schema (the twin-zod serialization emitted on
+// both list surfaces since before the port) from
+// `fixtures/mcp-tools-list.raw.json`, and refuses to build if the schemas in
+// tools.ts and the fixture disagree in either direction.
+const githubToolImplementations = Object.fromEntries(
+  toolArgumentSchemas.map((def) => [
+    def.name,
+    {
+      schema: def.schema as unknown as z.ZodType<unknown>,
+      mutation: isMutatingTool(def.name),
+      handler: (domain: GitHubDomain, args: unknown, ctx: ToolCallContext) =>
+        executeTool(domain, def.name, args, ctx.reportDelta, {
+          actor: actorFromSession(ctx.session),
+        }),
+    },
+  ])
+) as Record<string, McpToolImplementation<GitHubDomain>>;
 
 export const githubTwinDefinition: TwinDefinition<GitHubCloneDatabase, ParsedGitHubStateSeed, GitHubDomain> =
   defineTwin({
@@ -139,17 +160,7 @@ export const githubTwinDefinition: TwinDefinition<GitHubCloneDatabase, ParsedGit
       // The admin-gate 403 body is the gate's default GitHub envelope
       // ({message: "Forbidden"}); no per-twin override needed.
     },
-    tools: toolDefinitions.map((def) => ({
-      name: def.name,
-      description: def.description,
-      schema: def.schema as unknown as z.ZodType<unknown>,
-      mutation: isMutatingTool(def.name),
-      inputSchema: toolListing.get(def.name)?.input_schema as Record<string, unknown>,
-      handler: (domain: GitHubDomain, args: unknown, ctx: ToolCallContext) =>
-        executeTool(domain, def.name, args, ctx.reportDelta, {
-          actor: actorFromSession(ctx.session),
-        }),
-    })),
+    tools: deriveMcpToolTable(githubToolFixture, githubToolImplementations),
     // Frozen healthz shape: {ok, twin, implementation, fidelity, tools,
     // access_control, runtime} — no version field (github never carried it).
     healthz: () => ({

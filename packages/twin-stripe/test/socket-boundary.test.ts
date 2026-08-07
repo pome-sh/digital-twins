@@ -23,7 +23,7 @@ import { serve } from "@hono/node-server";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { listTools } from "../src/tools.js";
+import { stripeToolFixture } from "../src/tools.js";
 import { createStripeApp, TEST_SID } from "./_appHelper.js";
 
 let server: ReturnType<typeof serve> | undefined;
@@ -129,16 +129,16 @@ describe("socket boundary — real MCP SDK client over @hono/node-server", () =>
       expect(serverInfo?.name).toBe("twin-stripe");
 
       const listResult = await client.listTools();
-      const catalog = listTools();
-      // Pin the catalog size independently of listTools() so a silent catalog
-      // shrink cannot self-verify (both sides derive from the same array
+      const catalog = stripeToolFixture.tools;
+      // Pin the catalog size independently of the fixture so a silent catalog
+      // shrink cannot self-verify (both sides derive from the same listing
       // otherwise).
       expect(catalog.length).toBe(26);
       expect(listResult.tools).toHaveLength(catalog.length);
-      expect(listResult.tools.map((t) => t.name)).toEqual(catalog.map((t) => t.name));
+      expect(listResult.tools.map((t) => t.name)).toEqual([...stripeToolFixture.toolNames]);
       for (const tool of listResult.tools) {
-        // MCP tools/list must expose camelCase inputSchema (mapped from the
-        // legacy input_schema of listTools()).
+        // MCP tools/list must expose camelCase inputSchema; the legacy
+        // /mcp/tools surface keeps snake_case input_schema.
         expect(tool.inputSchema).toEqual(expect.objectContaining({ type: "object" }));
       }
     } finally {

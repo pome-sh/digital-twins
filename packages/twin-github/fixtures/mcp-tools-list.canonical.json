@@ -1,0 +1,2643 @@
+{
+  "meta": {
+    "twin": "github",
+    "substrate": "twin-code-transcription",
+    "endpoint": "in-process://twin-github/s/:sid/mcp",
+    "method": "tools/list",
+    "protocol": "JSON-RPC 2.0 over Streamable HTTP",
+    "protocolVersion": "2025-06-18",
+    "captureDate": "2026-08-06",
+    "rawFileSha256": "33b1264298ed3be13f75f8aa76ef88b44e97777f8c546e53d7ba20675457b2c1",
+    "liveToolCount": 65,
+    "liveToolOrder": [
+      "search_repositories",
+      "create_repository",
+      "fork_repository",
+      "get_repository",
+      "search_code",
+      "search_users",
+      "get_file_contents",
+      "list_commits",
+      "create_or_update_file",
+      "create_branch",
+      "push_files",
+      "get_issue",
+      "update_issue",
+      "search_issues",
+      "list_issues",
+      "add_issue_comment",
+      "list_issue_comments",
+      "create_issue",
+      "list_repository_labels",
+      "create_label",
+      "list_issue_labels",
+      "add_issue_labels",
+      "remove_issue_label",
+      "list_collaborators",
+      "add_assignees",
+      "get_pull_request",
+      "get_pull_request_reviews",
+      "create_pull_request_review",
+      "get_pull_request_comments",
+      "get_pull_request_files",
+      "get_pull_request_status",
+      "list_pull_requests",
+      "merge_pull_request",
+      "update_pull_request_branch",
+      "create_pull_request",
+      "list_branches",
+      "get_branch",
+      "delete_branch",
+      "delete_file",
+      "get_commit",
+      "compare_commits",
+      "get_pull_request_diff",
+      "update_pull_request",
+      "get_pull_request_commits",
+      "create_pull_request_review_comment",
+      "add_reply_to_pull_request_comment",
+      "update_issue_comment",
+      "delete_issue_comment",
+      "list_milestones",
+      "create_milestone",
+      "update_milestone",
+      "delete_milestone",
+      "create_commit_status",
+      "get_combined_status_for_ref",
+      "create_check_run",
+      "list_check_runs_for_ref",
+      "list_tags",
+      "list_releases",
+      "get_latest_release",
+      "create_release",
+      "get_me",
+      "add_collaborator",
+      "search_commits",
+      "get_release_by_tag",
+      "get_tag"
+    ],
+    "transcription": {
+      "readFrom": "twin-github's own tools/list, booted on defaultSeedState() and driven through Hono's app.request, read immediately before this table became fixture-driven (F-1325)",
+      "contentOrigin": "packages/twin-github/src/tools.ts — a hand-written TypeScript array of 65 tools. Each inputSchema is z.toJSONSchema() of that tool's zod schema, frozen here verbatim including the $schema key it emits.",
+      "comparedToUpstream": "never. F-1326's upstream golden (fixtures/mcp-tools-list/github.canonical.json) records 44 tools for the `default` toolset that examples/support-triage actually points at, against the 65 declared here. That gap is real; reporting it is F-1327's job and this fixture deliberately does not close it."
+    },
+    "notes": [
+      "65 tools, deliberately. This is a transcription of what the twin already served, not a reduction to the upstream 44.",
+      "Seeded from the code table rather than from upstream on purpose. F-1325 is name-neutral by construction: every byte this twin serves is identical before and after it."
+    ],
+    "derivedFrom": "mcp-tools-list.raw.json",
+    "derivation": "result.tools verbatim, listing order preserved; only whitespace differs from the raw file"
+  },
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "tools": [
+      {
+        "name": "search_repositories",
+        "description": "Search local repositories by name or description.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string"
+            },
+            "q": {
+              "type": "string"
+            },
+            "page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "per_page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "perPage": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "create_repository",
+        "description": "Create a repository with an initial README and main branch.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": {
+              "type": "string"
+            },
+            "private": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "fork_repository",
+        "description": "Fork a repository into the current user or an organization.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "organization": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "get_repository",
+        "description": "Get one repository.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "search_code",
+        "description": "Search files in the local GitHub twin.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string"
+            },
+            "q": {
+              "type": "string"
+            },
+            "owner": {
+              "type": "string"
+            },
+            "repo": {
+              "type": "string"
+            },
+            "page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "per_page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "perPage": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "search_users",
+        "description": "Search seeded users and organizations.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string"
+            },
+            "q": {
+              "type": "string"
+            },
+            "page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "per_page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "perPage": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "get_file_contents",
+        "description": "Read a file or directory from a repository branch.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "path": {
+              "type": "string"
+            },
+            "ref": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "list_commits",
+        "description": "List commits for a repository.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sha": {
+              "type": "string"
+            },
+            "page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "per_page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "perPage": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "create_or_update_file",
+        "description": "Create or update one file and advance the branch head atomically.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "message": {
+              "type": "string",
+              "minLength": 1
+            },
+            "content": {
+              "type": "string"
+            },
+            "branch": {
+              "type": "string"
+            },
+            "sha": {
+              "type": "string"
+            },
+            "encoding": {
+              "type": "string",
+              "enum": [
+                "utf-8",
+                "base64"
+              ]
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "path",
+            "message",
+            "content"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "create_branch",
+        "description": "Create a branch from an existing branch or SHA.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "branch": {
+              "type": "string",
+              "minLength": 1
+            },
+            "from_branch": {
+              "type": "string"
+            },
+            "sha": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "branch"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "push_files",
+        "description": "Push multiple files in a single commit.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "branch": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string",
+              "minLength": 1
+            },
+            "files": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "content": {
+                    "type": "string"
+                  },
+                  "encoding": {
+                    "type": "string",
+                    "enum": [
+                      "utf-8",
+                      "base64"
+                    ]
+                  }
+                },
+                "required": [
+                  "path",
+                  "content"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "message",
+            "files"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "get_issue",
+        "description": "Get one issue.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "issue_number": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "issueNumber": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "update_issue",
+        "description": "Update an issue title, body, state, labels, or assignees.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "issue_number": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "issueNumber": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "title": {
+              "type": "string"
+            },
+            "body": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "open",
+                "closed"
+              ]
+            },
+            "labels": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "assignees": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "search_issues",
+        "description": "Search all local issues.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string"
+            },
+            "q": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "open",
+                "closed",
+                "all"
+              ]
+            },
+            "page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "per_page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "perPage": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "list_issues",
+        "description": "List repository issues with common filters.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "open",
+                "closed",
+                "all"
+              ]
+            },
+            "labels": {
+              "type": "string"
+            },
+            "assignee": {
+              "type": "string"
+            },
+            "page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "per_page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "perPage": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "add_issue_comment",
+        "description": "Add an issue comment.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "issue_number": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "issueNumber": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "body": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "body"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "list_issue_comments",
+        "description": "List comments on an issue.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "issue_number": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "issueNumber": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "per_page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "perPage": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "create_issue",
+        "description": "Create an issue.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1
+            },
+            "body": {
+              "type": "string"
+            },
+            "labels": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "assignees": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "title"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "list_repository_labels",
+        "description": "List labels defined on a repository.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "create_label",
+        "description": "Create a repository label.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "color": {
+              "default": "ededed",
+              "type": "string"
+            },
+            "description": {
+              "default": "",
+              "type": "string"
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "name",
+            "color",
+            "description"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "list_issue_labels",
+        "description": "List labels applied to an issue.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "issue_number": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "issueNumber": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "add_issue_labels",
+        "description": "Apply one or more labels to an issue.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "issue_number": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "issueNumber": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "labels": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "labels"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "remove_issue_label",
+        "description": "Remove one label from an issue.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "issue_number": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "issueNumber": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "label"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "list_collaborators",
+        "description": "List repository collaborators.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "add_assignees",
+        "description": "Add assignees to an issue.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "issue_number": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "issueNumber": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "assignees": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "assignees"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "get_pull_request",
+        "description": "Get one pull request.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "pull_number": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "pullNumber": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "get_pull_request_reviews",
+        "description": "List pull request reviews.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "pull_number": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "pullNumber": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "per_page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "perPage": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "create_pull_request_review",
+        "description": "Create a pull request review.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "pull_number": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "pullNumber": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "event": {
+              "type": "string",
+              "enum": [
+                "APPROVE",
+                "REQUEST_CHANGES",
+                "COMMENT"
+              ]
+            },
+            "body": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "event"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "get_pull_request_comments",
+        "description": "List review comments on a pull request.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "pull_number": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "pullNumber": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "per_page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "perPage": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "get_pull_request_files",
+        "description": "List files changed by a pull request.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "pull_number": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "pullNumber": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "per_page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "perPage": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "get_pull_request_status",
+        "description": "Get combined status for a pull request head commit.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "pull_number": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "pullNumber": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "list_pull_requests",
+        "description": "List repository pull requests.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "open",
+                "closed",
+                "all"
+              ]
+            },
+            "page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "per_page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "perPage": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "merge_pull_request",
+        "description": "Merge a pull request using simplified local merge semantics.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "pull_number": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "pullNumber": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "commit_title": {
+              "type": "string"
+            },
+            "commit_message": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "update_pull_request_branch",
+        "description": "Update a PR branch from its base branch.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "pull_number": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "pullNumber": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "expected_head_sha": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "create_pull_request",
+        "description": "Create a pull request from a head branch to a base branch.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1
+            },
+            "body": {
+              "type": "string"
+            },
+            "head": {
+              "type": "string",
+              "minLength": 1
+            },
+            "base": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "title",
+            "head"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "list_branches",
+        "description": "List branches for a repository.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "per_page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "perPage": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "get_branch",
+        "description": "Get one branch by name.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "branch": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "branch"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "delete_branch",
+        "description": "Delete a branch (cannot delete the default branch or a branch backing an open PR).",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "branch": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "branch"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "delete_file",
+        "description": "Delete one file and advance the branch head atomically.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "message": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sha": {
+              "type": "string",
+              "minLength": 1
+            },
+            "branch": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "path",
+            "message",
+            "sha"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "get_commit",
+        "description": "Get one commit with its file changes and stats.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ref": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "ref"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "compare_commits",
+        "description": "Compare two commits, branches, or tags. Returns ahead/behind/identical/diverged.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "base": {
+              "type": "string",
+              "minLength": 1
+            },
+            "head": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "base",
+            "head"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "get_pull_request_diff",
+        "description": "Get a unified-diff-style text representation of a pull request.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "pull_number": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "pullNumber": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "update_pull_request",
+        "description": "Update a pull request title, body, state, or base branch.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "pull_number": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "pullNumber": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "title": {
+              "type": "string"
+            },
+            "body": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "open",
+                "closed"
+              ]
+            },
+            "base": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "get_pull_request_commits",
+        "description": "List commits on a pull request, oldest first.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "pull_number": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "pullNumber": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "per_page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "perPage": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "create_pull_request_review_comment",
+        "description": "Create an inline review comment on a pull request at a file path and line.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "pull_number": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "pullNumber": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "body": {
+              "type": "string",
+              "minLength": 1
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "line": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "side": {
+              "type": "string",
+              "enum": [
+                "LEFT",
+                "RIGHT"
+              ]
+            },
+            "commit_id": {
+              "type": "string"
+            },
+            "commitId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "body",
+            "path",
+            "line"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "add_reply_to_pull_request_comment",
+        "description": "Reply to an existing pull request review comment.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "pull_number": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "pullNumber": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "comment_id": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "commentId": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "body": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "body"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "update_issue_comment",
+        "description": "Update the body of an existing issue comment.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "comment_id": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "commentId": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "body": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "body"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "delete_issue_comment",
+        "description": "Delete an issue comment by ID.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "comment_id": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "commentId": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "list_milestones",
+        "description": "List milestones for a repository.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "open",
+                "closed",
+                "all"
+              ]
+            },
+            "page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "per_page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "perPage": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "create_milestone",
+        "description": "Create a milestone.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": {
+              "type": "string"
+            },
+            "due_on": {
+              "type": "string"
+            },
+            "dueOn": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "open",
+                "closed"
+              ]
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "title"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "update_milestone",
+        "description": "Update a milestone.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "milestone_number": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "milestoneNumber": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "title": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "due_on": {
+              "type": "string"
+            },
+            "dueOn": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "open",
+                "closed"
+              ]
+            }
+          },
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "delete_milestone",
+        "description": "Delete a milestone.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "milestone_number": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "milestoneNumber": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "create_commit_status",
+        "description": "Create a commit status (pending/success/failure/error) on a commit SHA.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sha": {
+              "type": "string",
+              "minLength": 1
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "error",
+                "failure",
+                "pending",
+                "success"
+              ]
+            },
+            "context": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "target_url": {
+              "type": "string"
+            },
+            "targetUrl": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "sha",
+            "state"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "get_combined_status_for_ref",
+        "description": "Get the combined status for a ref (SHA, branch, or tag).",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ref": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "ref"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "create_check_run",
+        "description": "Create a check run on a commit SHA.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "head_sha": {
+              "type": "string",
+              "minLength": 1
+            },
+            "headSha": {
+              "type": "string",
+              "minLength": 1
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "queued",
+                "in_progress",
+                "completed"
+              ]
+            },
+            "conclusion": {
+              "type": "string",
+              "enum": [
+                "success",
+                "failure",
+                "neutral",
+                "cancelled",
+                "timed_out",
+                "action_required",
+                "skipped",
+                "stale"
+              ]
+            },
+            "details_url": {
+              "type": "string"
+            },
+            "detailsUrl": {
+              "type": "string"
+            },
+            "external_id": {
+              "type": "string"
+            },
+            "externalId": {
+              "type": "string"
+            },
+            "output": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "started_at": {
+              "type": "string"
+            },
+            "startedAt": {
+              "type": "string"
+            },
+            "completed_at": {
+              "type": "string"
+            },
+            "completedAt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "name"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "list_check_runs_for_ref",
+        "description": "List check runs for a ref (SHA, branch, or tag).",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "per_page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "perPage": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "ref"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "list_tags",
+        "description": "List tags for a repository, most recent first.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "per_page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "perPage": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "list_releases",
+        "description": "List releases for a repository, most recent first.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "per_page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "perPage": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "get_latest_release",
+        "description": "Get the latest published (non-draft, non-prerelease) release.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "create_release",
+        "description": "Create a release. Auto-creates the tag if it doesn't exist.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tag_name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tagName": {
+              "type": "string",
+              "minLength": 1
+            },
+            "target_commitish": {
+              "type": "string"
+            },
+            "targetCommitish": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "body": {
+              "type": "string"
+            },
+            "draft": {
+              "type": "boolean"
+            },
+            "prerelease": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "get_me",
+        "description": "Get the authenticated user.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "add_collaborator",
+        "description": "Add a collaborator to a repository. Returns 201 + invitation envelope for new users, 204 when already a collaborator.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "username": {
+              "type": "string",
+              "minLength": 1
+            },
+            "permission": {
+              "type": "string",
+              "enum": [
+                "pull",
+                "push",
+                "admin",
+                "maintain",
+                "triage"
+              ]
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "username"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "search_commits",
+        "description": "Search commits on repository default branches by message or author.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string"
+            },
+            "q": {
+              "type": "string"
+            },
+            "owner": {
+              "type": "string"
+            },
+            "repo": {
+              "type": "string"
+            },
+            "page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "per_page": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "perPage": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "get_release_by_tag",
+        "description": "Get a release by its tag name.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tag": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "tag"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "get_tag",
+        "description": "Get a tag by name, including the commit it points at.",
+        "inputSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tag": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "owner",
+            "repo",
+            "tag"
+          ],
+          "additionalProperties": false
+        }
+      }
+    ]
+  }
+}

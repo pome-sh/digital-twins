@@ -7,8 +7,11 @@
  * `pome-cloud` (dashboard toggles). Until F-942 it lived in
  * `@pome-sh/shared-types` and this file was a three-function shim over it — so
  * a catalog entry naming a tool that does not exist was a change in one package
- * caught (if at all) by a test in another. The data now sits next to
- * `toolDefinitions`, which is the only thing that can contradict it.
+ * caught (if at all) by a test in another. The data now sits next to the
+ * tool-table fixture that is the only thing able to contradict it, and
+ * `assertAccessControlCatalogMatchesTools` reads the names straight off
+ * `githubToolFixture` — the same listing the twin serves (F-1325), not a
+ * second copy of it.
  *
  * Display labels follow the hosted Twins Manage UI: `{METHOD} {operation}`
  * where `operation` is camelCase (with a few legacy aliases like `addComment`).
@@ -18,7 +21,7 @@
  * reversible/irreversible.
  */
 import { z } from "zod";
-import { toolDefinitions } from "./tools.js";
+import { githubToolFixture } from "./tools.js";
 
 export const githubAccessControlCategorySchema = z.enum([
   "issues",
@@ -231,7 +234,7 @@ export function githubAccessControlToolNames(
 
 /** Every sandboxed tool exists in the MCP catalog. */
 export function assertAccessControlCatalogMatchesTools() {
-  const toolNames = new Set<string>(toolDefinitions.map((tool) => tool.name));
+  const toolNames = new Set<string>(githubToolFixture.toolNames);
   const missing = githubAccessControlToolNames().filter((name) => !toolNames.has(name));
   if (missing.length > 0) {
     throw new Error(`access-control catalog references unknown tools: ${missing.join(", ")}`);

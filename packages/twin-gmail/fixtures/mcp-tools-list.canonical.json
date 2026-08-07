@@ -1,13 +1,13 @@
 {
   "meta": {
-    "source": "live_unauthenticated_tools_list_gate1_launch_set",
+    "twin": "gmail",
+    "substrate": "live-wire-unauth",
     "endpoint": "https://gmailmcp.googleapis.com/mcp/v1",
     "method": "tools/list",
     "protocol": "JSON-RPC 2.0 over HTTP (accept: application/json, text/event-stream)",
     "protocolVersion": "2025-03-26",
     "captureDate": "2026-07-20",
     "rawFileSha256": "6ef35bad568967015c101f89e995148c4eb2131b3a6dd244f7237058abae8e7a",
-    "launchToolCount": 13,
     "liveToolCount": 13,
     "liveToolOrder": [
       "create_draft",
@@ -24,60 +24,37 @@
       "apply_sensitive_message_label",
       "create_label"
     ],
-    "launchToolOrder": [
-      "create_draft",
-      "list_drafts",
-      "get_thread",
-      "get_message",
-      "search_threads",
-      "label_thread",
-      "unlabel_thread",
-      "apply_sensitive_thread_label",
-      "list_labels",
-      "label_message",
-      "unlabel_message",
-      "apply_sensitive_message_label",
-      "create_label"
-    ],
-    "gate0LaunchToolOrder": [
-      "create_draft",
-      "list_drafts",
-      "get_thread",
-      "search_threads",
-      "label_thread",
-      "unlabel_thread",
-      "list_labels",
-      "label_message",
-      "unlabel_message",
-      "create_label"
-    ],
-    "gate1PromotedFromPreview": [
-      "get_message",
-      "apply_sensitive_thread_label",
-      "apply_sensitive_message_label"
-    ],
+    "configuration": {
+      "auth": "none — the unauthenticated read answered HTTP 200 for both tools/list and initialize (Developer Preview)",
+      "deploymentSelector": "none — the endpoint exposes no toolset, tool-filter or read-only selector, so there is exactly one surface to read",
+      "requestHeaders": {
+        "content-type": "application/json",
+        "accept": "application/json, text/event-stream"
+      },
+      "requestBody": {
+        "method": "tools/list",
+        "jsonrpc": "2.0",
+        "id": 1
+      },
+      "matchesExaminee": "an examinee pointing an MCP client at this URL gets this listing; there is no configuration axis on which the two could differ",
+      "completeness": "exact"
+    },
     "notes": [
-      "Raw live tools/list returned 13 tools without auth (Developer Preview).",
-      "Gate 1 expands the OSS launch set from the Gate 0 ten-tool freeze to the full live 13-tool listing.",
-      "Schemas/annotations/descriptions for all launch tools are copied verbatim from the live capture.",
-      "Promoted Gate-1 tools: get_message, apply_sensitive_thread_label, apply_sensitive_message_label.",
-      "Authenticated tools/call success envelopes were unavailable; see mcp-tools-call.representative.json and mcp-tools-call-unauth-error.raw.json.",
-      "initialize returned protocolVersion=2025-03-26 (see mcp-initialize.raw.json)."
+      "Gate 1 expands the OSS launch set from the Gate-0 ten-tool freeze to the full live 13-tool listing. The three promoted from Developer Preview are get_message, apply_sensitive_thread_label and apply_sensitive_message_label.",
+      "Schemas, annotations and descriptions are the live capture's, verbatim.",
+      "DELIBERATE DIVERGENCE: F-1326 re-read the same endpoint on 2026-08-06 and got the same 13 names with different schemas and descriptions (fixtures/mcp-tools-list/gmail.meta.json, rawFileSha256 93085540…). This twin keeps serving the 2026-07-20 oracle. Adopting the newer bytes changes what the twin serves, which is a behavioural change F-1325 does not make; the lane that compares the two is F-1327. This is not an oversight.",
+      "Authenticated tools/call success envelopes were unavailable; the reconstructed shapes live in mcp-tools-call.representative.json and the live unauthenticated error envelope in mcp-tools-call-unauth-error.raw.json.",
+      "initialize returned protocolVersion=2025-03-26 (mcp-initialize.raw.json)."
     ],
-    "canonicalSha256": "56b5e86181c13ead63fdc8ea0d4bedc6860c1a3fdb17372fdca76591e48a4eed"
+    "derivedFrom": "mcp-tools-list.raw.json",
+    "derivation": "result.tools verbatim, listing order preserved; only whitespace differs from the raw file"
   },
   "jsonrpc": "2.0",
   "id": 1,
   "result": {
     "tools": [
       {
-        "annotations": {
-          "destructiveHint": false,
-          "idempotentHint": false,
-          "openWorldHint": false,
-          "readOnlyHint": false,
-          "title": "Creates a new draft email in the authenticated user's Gmail account."
-        },
+        "name": "create_draft",
         "description": "Creates a new draft email in the authenticated user's Gmail account.\n\nThis tool takes recipient addresses, a subject, and body content as inputs. It returns the ID of the created Gmail draft. If the draft is created as a reply to an existing message, the ID of the original message should be passed to the tool in the replyToMessageId field. Creating drafts with attachments is not supported yet.\n",
         "inputSchema": {
           "$defs": {
@@ -162,7 +139,6 @@
           },
           "type": "object"
         },
-        "name": "create_draft",
         "outputSchema": {
           "description": "Details of a draft.",
           "properties": {
@@ -213,16 +189,17 @@
             }
           },
           "type": "object"
-        }
-      },
-      {
+        },
         "annotations": {
           "destructiveHint": false,
           "idempotentHint": false,
           "openWorldHint": false,
-          "readOnlyHint": true,
-          "title": "Lists draft emails from the authenticated user's Gmail account."
-        },
+          "readOnlyHint": false,
+          "title": "Creates a new draft email in the authenticated user's Gmail account."
+        }
+      },
+      {
+        "name": "list_drafts",
         "description": "Lists draft emails from the authenticated user's Gmail account.\n\nThis tool can filter drafts based on a query string and supports pagination. It returns a list of drafts, including their IDs and subjects (unless `view` is set to `DRAFT_VIEW_METADATA_ONLY`). `page_token` can be used to paginate the results. To retrieve subsequent pages of results, use the `page_token` returned in the previous response.\n\nThe `view` parameter controls which fields are populated in the response. By default (or with `DRAFT_VIEW_FULL`), it returns full content. Use `DRAFT_VIEW_METADATA_ONLY` to exclude sensitive content like subject and body. \n",
         "inputSchema": {
           "description": "Request message for ListDrafts RPC.",
@@ -257,7 +234,6 @@
           },
           "type": "object"
         },
-        "name": "list_drafts",
         "outputSchema": {
           "$defs": {
             "Draft": {
@@ -327,16 +303,17 @@
             }
           },
           "type": "object"
+        },
+        "annotations": {
+          "destructiveHint": false,
+          "idempotentHint": false,
+          "openWorldHint": false,
+          "readOnlyHint": true,
+          "title": "Lists draft emails from the authenticated user's Gmail account."
         }
       },
       {
-        "annotations": {
-          "destructiveHint": false,
-          "idempotentHint": true,
-          "openWorldHint": false,
-          "readOnlyHint": true,
-          "title": "Retrieves a specific email thread from the authenticated user's Gmail account."
-        },
+        "name": "get_thread",
         "description": "Retrieves a specific email thread from the authenticated user's Gmail account, including a list of its messages.\n\nThe optional `message_format` parameter controls the format of the messages returned. By default (or with `FULL_CONTENT`), it returns the full content of messages. Use `MINIMAL` to include only subject and snippet (excluding body). Use `METADATA_ONLY` to include only basic metadata (message ID, thread ID, labels, timestamp, and size estimate). \n",
         "inputSchema": {
           "description": "Request message for GetThread RPC.",
@@ -367,7 +344,6 @@
           ],
           "type": "object"
         },
-        "name": "get_thread",
         "outputSchema": {
           "$defs": {
             "AttachmentMetadata": {
@@ -476,16 +452,17 @@
             }
           },
           "type": "object"
-        }
-      },
-      {
+        },
         "annotations": {
           "destructiveHint": false,
           "idempotentHint": true,
           "openWorldHint": false,
           "readOnlyHint": true,
-          "title": "Retrieves a specific email message from the authenticated user's Gmail account."
-        },
+          "title": "Retrieves a specific email thread from the authenticated user's Gmail account."
+        }
+      },
+      {
+        "name": "get_message",
         "description": "Retrieves a specific email message from the authenticated user's Gmail account by its unique message ID.\n\nUse this tool to inspect a single, individual email when you already know its message ID. If the user wants to read a specific email in detail, check the exact wording of a message, or examine attachment metadata for a single email, this is the right tool. It is not suitable for retrieving entire conversations or viewing back-and-forth discussion threads; use the 'get_thread' tool instead.\nKey indicators include if the user asks for the full content of a specific message ID returned by a previous search, or if the query asks to inspect a specific individual email rather than an entire thread.\nExample user prompts are: \"Get the full text of message ID 18f123456789abcd.\", \"Read the latest message in that thread from Alice.\", and \"What are the attachment names in the email I just received from HR?\" \n\nThe optional `messageFormat` parameter controls the format of the message returned. By default (or with `FULL_CONTENT`), it returns the full content of the message. Use `MINIMAL` to include only subject and snippet (excluding body). Use `METADATA_ONLY` to include only basic metadata (message ID, thread ID, labels, timestamp, and size estimate). \n",
         "inputSchema": {
           "description": "Request message for GetMessage RPC.",
@@ -516,7 +493,6 @@
           ],
           "type": "object"
         },
-        "name": "get_message",
         "outputSchema": {
           "$defs": {
             "AttachmentMetadata": {
@@ -608,16 +584,17 @@
             }
           },
           "type": "object"
-        }
-      },
-      {
+        },
         "annotations": {
           "destructiveHint": false,
           "idempotentHint": true,
           "openWorldHint": false,
           "readOnlyHint": true,
-          "title": "Searches for email threads from the authenticated user's Gmail account."
-        },
+          "title": "Retrieves a specific email message from the authenticated user's Gmail account."
+        }
+      },
+      {
+        "name": "search_threads",
         "description": "Lists email threads from the authenticated user's Gmail account.\n\nThis tool can filter threads based on a query string and supports pagination. It returns a list of threads, including their IDs and related messages. Each related message contains details like a snippet of the message body, the subject, the sender, the recipients etc. The `view` parameter controls which fields are populated in the related messages. By default (or with `THREAD_VIEW_MINIMAL`), it includes subject and snippet. Use `THREAD_VIEW_METADATA_ONLY` to exclude subject and snippet. Note that the full message bodies are not returned by this tool; use the 'get_thread' tool with a thread ID to fetch the full message body if needed. Threads with excluded criteria may still appear in the results. This occurs because Gmail identifies matching messages first. For example, if you search for -is:starred, Gmail will find an entire thread if it contains at least one unstarred message, even if other emails in that same conversation are starred.\n",
         "inputSchema": {
           "description": "Request message for SearchThreads RPC.",
@@ -656,7 +633,6 @@
           },
           "type": "object"
         },
-        "name": "search_threads",
         "outputSchema": {
           "$defs": {
             "AttachmentMetadata": {
@@ -787,16 +763,17 @@
             }
           },
           "type": "object"
-        }
-      },
-      {
+        },
         "annotations": {
           "destructiveHint": false,
           "idempotentHint": true,
           "openWorldHint": false,
-          "readOnlyHint": false,
-          "title": "Adds labels to a thread."
-        },
+          "readOnlyHint": true,
+          "title": "Searches for email threads from the authenticated user's Gmail account."
+        }
+      },
+      {
+        "name": "label_thread",
         "description": "Adds labels to an entire thread in the authenticated user's Gmail account. This operation affects all messages currently in the thread and any future messages added to it.\n\nIf unsure of the thread ID, use the `search_threads` tool first.\n\nIf unsure of a user label's ID, use the `list_labels` tool first to discover available labels and their IDs. To add a trash label or a spam label on to a thread, please use the `apply_sensitive_thread_label` tool instead.\n",
         "inputSchema": {
           "description": "Request message for LabelThread RPC.",
@@ -819,21 +796,21 @@
           ],
           "type": "object"
         },
-        "name": "label_thread",
         "outputSchema": {
           "description": "Response message for LabelThread RPC.",
           "properties": {},
           "type": "object"
-        }
-      },
-      {
+        },
         "annotations": {
-          "destructiveHint": true,
+          "destructiveHint": false,
           "idempotentHint": true,
           "openWorldHint": false,
           "readOnlyHint": false,
-          "title": "Removes labels from a thread."
-        },
+          "title": "Adds labels to a thread."
+        }
+      },
+      {
+        "name": "unlabel_thread",
         "description": "Removes labels from an entire thread in the authenticated user's Gmail account. If unsure of the thread ID, use the `search_threads` tool first. If unsure of a user label's ID, use the `list_labels` tool first.",
         "inputSchema": {
           "description": "Request message for UnlabelThread RPC.",
@@ -856,21 +833,21 @@
           ],
           "type": "object"
         },
-        "name": "unlabel_thread",
         "outputSchema": {
           "description": "Response message for UnlabelThread RPC.",
           "properties": {},
           "type": "object"
-        }
-      },
-      {
+        },
         "annotations": {
           "destructiveHint": true,
           "idempotentHint": true,
           "openWorldHint": false,
           "readOnlyHint": false,
-          "title": "Adds a sensitive label (Trash or Spam) to a thread."
-        },
+          "title": "Removes labels from a thread."
+        }
+      },
+      {
+        "name": "apply_sensitive_thread_label",
         "description": "Adds a sensitive label (Trash or Spam) to an entire thread in the authenticated user's Gmail account. This operation affects all messages currently in the thread and any future messages added to it.\n\nUse this tool to trash or mark a thread as spam. If unsure of the thread ID, use the `search_threads` tool first.\n",
         "inputSchema": {
           "description": "Request message for ApplySensitiveThreadLabel RPC.",
@@ -900,21 +877,21 @@
           ],
           "type": "object"
         },
-        "name": "apply_sensitive_thread_label",
         "outputSchema": {
           "description": "Response message for ApplySensitiveThreadLabel RPC.",
           "properties": {},
           "type": "object"
+        },
+        "annotations": {
+          "destructiveHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false,
+          "readOnlyHint": false,
+          "title": "Adds a sensitive label (Trash or Spam) to a thread."
         }
       },
       {
-        "annotations": {
-          "destructiveHint": false,
-          "idempotentHint": true,
-          "openWorldHint": false,
-          "readOnlyHint": true,
-          "title": "Lists user labels."
-        },
+        "name": "list_labels",
         "description": "Lists all user-defined labels available in the authenticated user's Gmail account. Use this tool to discover the `id` of a user label before calling `label_thread`, `unlabel_thread`, `label_message`, or `unlabel_message`. System labels are not returned by this tool but can be used with their well-known IDs: 'INBOX', 'TRASH', 'SPAM', 'STARRED', 'UNREAD', 'IMPORTANT', 'CHAT', 'DRAFT', 'SENT'.",
         "inputSchema": {
           "description": "Request message for ListLabels RPC.",
@@ -931,7 +908,6 @@
           },
           "type": "object"
         },
-        "name": "list_labels",
         "outputSchema": {
           "$defs": {
             "Label": {
@@ -992,16 +968,17 @@
             }
           },
           "type": "object"
-        }
-      },
-      {
+        },
         "annotations": {
           "destructiveHint": false,
           "idempotentHint": true,
           "openWorldHint": false,
-          "readOnlyHint": false,
-          "title": "Adds labels to a message."
-        },
+          "readOnlyHint": true,
+          "title": "Lists user labels."
+        }
+      },
+      {
+        "name": "label_message",
         "description": "Adds one or more labels to a specific message in the authenticated user's Gmail account.\n\nTo find the message ID, use tools like `search_threads` or `get_thread`. If unsure of a user label's ID, use the `list_labels` tool first to discover available labels and their IDs. To add a trash label or a spam label on to a message, please use the `apply_sensitive_message_label` tool instead.\n",
         "inputSchema": {
           "description": "Request message for LabelMessage RPC.",
@@ -1024,21 +1001,21 @@
           ],
           "type": "object"
         },
-        "name": "label_message",
         "outputSchema": {
           "description": "Response message for LabelMessage RPC.",
           "properties": {},
           "type": "object"
-        }
-      },
-      {
+        },
         "annotations": {
-          "destructiveHint": true,
+          "destructiveHint": false,
           "idempotentHint": true,
           "openWorldHint": false,
           "readOnlyHint": false,
-          "title": "Removes labels from a message."
-        },
+          "title": "Adds labels to a message."
+        }
+      },
+      {
+        "name": "unlabel_message",
         "description": "Removes one or more labels from a specific message in the authenticated user's Gmail account. To find the message ID, use tools like `search_threads` or `get_thread`. If unsure of a user label's ID, use the `list_labels` tool first to discover available labels and their IDs.",
         "inputSchema": {
           "description": "Request message for UnlabelMessage RPC.",
@@ -1061,21 +1038,21 @@
           ],
           "type": "object"
         },
-        "name": "unlabel_message",
         "outputSchema": {
           "description": "Response message for UnlabelMessage RPC.",
           "properties": {},
           "type": "object"
-        }
-      },
-      {
+        },
         "annotations": {
           "destructiveHint": true,
           "idempotentHint": true,
           "openWorldHint": false,
           "readOnlyHint": false,
-          "title": "Adds a sensitive label (Trash or Spam) to a message."
-        },
+          "title": "Removes labels from a message."
+        }
+      },
+      {
+        "name": "apply_sensitive_message_label",
         "description": "Adds a sensitive label (Trash or Spam) to a specific message in the authenticated user's Gmail account.\n\nUse this tool to trash or mark a message as spam. To find the message ID, use tools like `search_threads` or `get_thread`.\n",
         "inputSchema": {
           "description": "Request message for ApplySensitiveMessageLabel RPC.",
@@ -1105,21 +1082,21 @@
           ],
           "type": "object"
         },
-        "name": "apply_sensitive_message_label",
         "outputSchema": {
           "description": "Response message for ApplySensitiveMessageLabel RPC.",
           "properties": {},
           "type": "object"
+        },
+        "annotations": {
+          "destructiveHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false,
+          "readOnlyHint": false,
+          "title": "Adds a sensitive label (Trash or Spam) to a message."
         }
       },
       {
-        "annotations": {
-          "destructiveHint": false,
-          "idempotentHint": false,
-          "openWorldHint": false,
-          "readOnlyHint": false,
-          "title": "Creates a new label."
-        },
+        "name": "create_label",
         "description": "Creates a new label in the authenticated user's Gmail account.\nSupports creating nested labels (sub-labels) using a forward slash (e.g., 'Projects/Alpha/Sprint-1').\nBy default, parent labels will be automatically created if they do not exist.\n",
         "inputSchema": {
           "$defs": {
@@ -1158,7 +1135,6 @@
           ],
           "type": "object"
         },
-        "name": "create_label",
         "outputSchema": {
           "$defs": {
             "LabelColor": {
@@ -1202,6 +1178,13 @@
             }
           },
           "type": "object"
+        },
+        "annotations": {
+          "destructiveHint": false,
+          "idempotentHint": false,
+          "openWorldHint": false,
+          "readOnlyHint": false,
+          "title": "Creates a new label."
         }
       }
     ]

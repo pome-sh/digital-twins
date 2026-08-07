@@ -24,7 +24,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { createGitHubCloneApp } from "../src/twin.js";
 import { createRecorderStore } from "@pome-sh/sdk/server";
-import { toolDefinitions } from "../src/tools.js";
+import { githubToolFixture } from "../src/tools.js";
 import type { RecorderEvent } from "@pome-sh/wire";
 import type { GitHubStateSeed } from "../src/types.js";
 
@@ -145,19 +145,19 @@ async function main() {
     section("tools/list (real SDK over the wire)");
     const listResult = await client.listTools();
     record(`Tool count returned: ${listResult.tools.length}`);
-    record(`Expected count (toolDefinitions.length): ${toolDefinitions.length}`);
-    if (listResult.tools.length !== toolDefinitions.length) {
-      throw new Error(`tool count mismatch: got ${listResult.tools.length}, want ${toolDefinitions.length}`);
+    record(`Expected count (githubToolFixture.tools.length): ${githubToolFixture.tools.length}`);
+    if (listResult.tools.length !== githubToolFixture.tools.length) {
+      throw new Error(`tool count mismatch: got ${listResult.tools.length}, want ${githubToolFixture.tools.length}`);
     }
 
     const gotNames: string[] = listResult.tools.map((t) => t.name);
-    const wantNames: string[] = toolDefinitions.map((t) => t.name);
+    const wantNames: string[] = [...githubToolFixture.toolNames];
     const missing = wantNames.filter((n) => !gotNames.includes(n));
     const extra = gotNames.filter((n) => !wantNames.includes(n));
     if (missing.length || extra.length) {
       throw new Error(`tool name mismatch: missing=${JSON.stringify(missing)} extra=${JSON.stringify(extra)}`);
     }
-    record("All 65 tool names match toolDefinitions ✓");
+    record("All 65 tool names match the tool-table fixture ✓");
     record("Full tool list (from the wire):");
     record(pretty(listResult.tools));
 
@@ -217,11 +217,23 @@ async function main() {
     const diff = diffEvents(legacyEvent, mcpEvent);
     record(`Per-field comparison (excluding volatile ts/request_id/correlation_id/latency_ms):`);
     record(pretty(diff));
-    const onlyExpectedDiffs = Object.keys(diff).every((k) => k === "path");
+    // `request_headers` records what the CLIENT sent, so it is a fact about the
+    // caller and not about surface parity: the two halves of this comparison are
+    // deliberately two different clients. The MCP SDK client sends
+    // `accept: application/json, text/event-stream`, an `mcp-protocol-version`
+    // header and its own content-length; the legacy shim is a plain fetch and
+    // sends none of them. Demanding those match is demanding two different HTTP
+    // clients emit identical headers, which is never true — the diff is still
+    // printed above so a reader can see exactly what differs.
+    const SURFACE_SHAPED = new Set(["path", "request_headers"]);
+    const onlyExpectedDiffs = Object.keys(diff).every((k) => SURFACE_SHAPED.has(k));
     if (!onlyExpectedDiffs) {
-      throw new Error(`unexpected field divergence beyond 'path': ${JSON.stringify(Object.keys(diff))}`);
+      throw new Error(
+        `unexpected field divergence beyond ${[...SURFACE_SHAPED].join("/")}: ${JSON.stringify(Object.keys(diff))}`
+      );
     }
-    record("✓ Only `path` differs between surfaces (the intentional, surface-identifying field).");
+    record("✓ Only `path` (the surface-identifying field) and `request_headers` (the caller's own");
+    record("  headers — two different clients) differ between surfaces.");
     record("✓ request_body, response_body, state_mutation, state_delta, status, fidelity, error all identical.");
 
     section("RESULT");

@@ -35,7 +35,7 @@ tokens from the seed for official-client parity.
 | Path | Role |
 | --- | --- |
 | [`fixtures/graphql-surface.json`](fixtures/graphql-surface.json) | Frozen GraphQL query/mutation/OAuth operation floor |
-| [`fixtures/mcp-tools-list.canonical.json`](fixtures/mcp-tools-list.canonical.json) | Official Linear MCP launch set (22 tools) |
+| [`fixtures/mcp-tools-list.*.json`](fixtures/) | The 22-tool MCP listing this twin serves, and its provenance (F-1325). Names are Linear-documented; schemas are twin-owned |
 | [`fidelity.inventory.json`](fidelity.inventory.json) | Heat × fidelity × evidence for every launch MCP/GraphQL row |
 | [`REFERENCE-DIVERGENCES.md`](REFERENCE-DIVERGENCES.md) | Emulate rejected; never an oracle |
 | [`LIMITS.md`](LIMITS.md) | Seed/GraphQL/MCP/state-export caps |

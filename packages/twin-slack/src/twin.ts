@@ -8,7 +8,13 @@
 // /_pome/*, admin gate, db driver) lives in the engine.
 
 import { z, ZodError } from "zod";
-import { defineTwin, type ToolCallContext, type TwinDefinition } from "@pome-sh/sdk";
+import {
+  defineTwin,
+  deriveMcpToolTable,
+  type McpToolImplementation,
+  type ToolCallContext,
+  type TwinDefinition,
+} from "@pome-sh/sdk";
 import {
   UnknownToolError,
   createApp,
@@ -23,7 +29,7 @@ import { SlackDomain, type Actor } from "./domain/index.js";
 import { TwinError, twinErrorFromSqliteConstraint } from "./errors.js";
 import { registerSlackRoutes } from "./routes.js";
 import { defaultSeedState } from "./seed.js";
-import { executeTool, isMutatingTool, listTools, toolDefinitions } from "./tools.js";
+import { executeTool, isMutatingTool, slackToolFixture, toolSchemas } from "./tools.js";
 import { slackError } from "./serializers.js";
 import type { SlackStateSeed, SlackTwinDatabase } from "./types.js";
 import { parseFormOrJson } from "./util.js";
@@ -97,9 +103,30 @@ function slackErrorEnvelope(err: unknown): { status: number; body: unknown } {
   };
 }
 
-// listTools() carries the frozen tool-list wire shape: forced draft-7
-// `additionalProperties:false` input_schema + readOnlyHint annotations.
-const toolListing = new Map(listTools().map((tool) => [tool.name, tool]));
+// F-1325 — the tool table is the fixture. `deriveMcpToolTable` supplies every
+// name, description, input schema (the frozen draft-7
+// `additionalProperties:false` form) and annotation from
+// `fixtures/mcp-tools-list.raw.json`, and refuses to build if the schemas below
+// and the fixture disagree in either direction.
+const slackToolImplementations = Object.fromEntries(
+  Object.entries(toolSchemas).map(([name, schema]) => [
+    name,
+    {
+      schema: schema as unknown as z.ZodType<unknown>,
+      mutation: isMutatingTool(name),
+      handler: (domain: SlackDomain, args: unknown, ctx: ToolCallContext) =>
+        wrapSlackOk(
+          executeTool(
+            domain,
+            name,
+            args as Record<string, unknown>,
+            ctx.reportDelta,
+            actorFromSession(ctx.session)
+          )
+        ),
+    },
+  ])
+) as Record<string, McpToolImplementation<SlackDomain>>;
 
 export const slackTwinDefinition: TwinDefinition<SlackTwinDatabase, SlackSeed, SlackDomain> = defineTwin({
   id: "slack",
@@ -151,27 +178,7 @@ export const slackTwinDefinition: TwinDefinition<SlackTwinDatabase, SlackSeed, S
     // Frozen slack admin-gate 403 body.
     forbidden: () => ({ status: 403, body: slackError("restricted_action") }),
   },
-  tools: toolDefinitions.map((def) => {
-    const listed = toolListing.get(def.name);
-    return {
-      name: def.name,
-      description: def.description,
-      schema: def.schema as unknown as z.ZodType<unknown>,
-      mutation: isMutatingTool(def.name),
-      inputSchema: listed?.input_schema as unknown as Record<string, unknown>,
-      ...("annotations" in (listed ?? {}) ? { annotations: (listed as { annotations: Record<string, unknown> }).annotations } : {}),
-      handler: (domain: SlackDomain, args: unknown, ctx: ToolCallContext) =>
-        wrapSlackOk(
-          executeTool(
-            domain,
-            def.name,
-            args as Record<string, unknown>,
-            ctx.reportDelta,
-            actorFromSession(ctx.session)
-          )
-        ),
-    };
-  }),
+  tools: deriveMcpToolTable(slackToolFixture, slackToolImplementations),
   // Frozen healthz shape: {ok, twin, implementation, tools, runtime} — no
   // version/fidelity extras (slack never carried them).
   healthz: () => ({}),

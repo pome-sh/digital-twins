@@ -1,6 +1,22 @@
 # @pome-sh/sdk
 
 
+## 0.11.3 — 2026-08-06
+
+A shared, hash-locked MCP tool-table fixture loader (F-1325).
+
+`loadMcpToolFixture` validates a declared provenance contract — `substrate`,
+`endpoint`, `method`, `protocol`, `protocolVersion`, `captureDate`,
+`rawFileSha256`, and the `configuration` an upstream substrate was read under —
+and asserts the raw listing hashes to the sha its meta declares.
+`deriveMcpToolTable` joins that listing to a twin's implementations 1:1 in both
+directions; `diffServedToolsAgainstFixture` and
+`deriveCanonicalMcpToolListing` are its test-facing halves.
+
+`runFidelityParity` now takes `fixtureToolNames` instead of `liveToolNames`:
+`fidelity.inventory.json` is bound to the fixture rather than to the code
+table.
+
 ## 0.11.1 — 2026-08-04
 
 Dependency-only patch (#302): `hono` `^4.12.31` → `^4.13.0`, `zod` `^4.1.13` → `^4.4.3`.

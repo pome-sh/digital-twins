@@ -3,7 +3,14 @@ export { createSlackTwinApp, slackTwinDefinition } from "./twin.js";
 export { SlackDomain } from "./domain/index.js";
 export { openSlackTwinDatabase, migrate, resetDatabase } from "./db.js";
 export { seedSchema, parseSeed, loadSeedFromEnv, defaultSeedState } from "./seed.js";
-export { toolDefinitions, listTools, listToolsForMcp, executeTool, MUTATING_TOOL_NAMES, isMutatingTool } from "./tools.js";
+export {
+  executeTool,
+  isMutatingTool,
+  MUTATING_TOOL_NAMES,
+  slackToolFixture,
+  slackToolInputSchema,
+  toolSchemas,
+} from "./tools.js";
 export type {
   BookmarkRow,
   ChannelMemberRow,

@@ -1,11 +1,11 @@
-Twin booted on http://127.0.0.1:63272
-MCP endpoint: http://127.0.0.1:63272/s/validate-mcp-session/mcp
+Twin booted on http://127.0.0.1:53987
+MCP endpoint: http://127.0.0.1:53987/s/validate-mcp-session/mcp
 MCP client.connect() OK (initialize handshake completed)
 
 ━━━ tools/list (real SDK over the wire) ━━━
-Tool count returned: 62
-Expected count (toolDefinitions.length): 62
-All 62 tool names match toolDefinitions ✓
+Tool count returned: 65
+Expected count (githubToolFixture.tools.length): 65
+All 65 tool names match the tool-table fixture ✓
 Full tool list (from the wire):
 [
   {
@@ -2459,6 +2459,100 @@ Full tool list (from the wire):
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false
     }
+  },
+  {
+    "name": "search_commits",
+    "description": "Search commits on repository default branches by message or author.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string"
+        },
+        "q": {
+          "type": "string"
+        },
+        "owner": {
+          "type": "string"
+        },
+        "repo": {
+          "type": "string"
+        },
+        "page": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "per_page": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "perPage": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "get_release_by_tag",
+    "description": "Get a release by its tag name.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repo": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tag": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "tag"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "get_tag",
+    "description": "Get a tag by name, including the commit it points at.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repo": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tag": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "tag"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    }
   }
 ]
 
@@ -2468,7 +2562,7 @@ Raw callTool() result:
   "content": [
     {
       "type": "text",
-      "text": "{\"id\":3605789809,\"node_id\":\"PR_3605789809\",\"number\":1,\"state\":\"open\",\"locked\":false,\"title\":\"MCP wire-fixture PR\",\"body\":\"Strict-read fixture for validate-mcp.\",\"user\":{\"login\":\"alice\",\"id\":92903040,\"node_id\":\"U_92903040\",\"avatar_url\":\"https://avatars.githubusercontent.com/u/92903040?v=4\",\"html_url\":\"https://github.com/alice\",\"type\":\"User\",\"site_admin\":false},\"html_url\":\"https://github.com/acme/api/pull/1\",\"url\":\"https://api.github.com/repos/acme/api/pulls/1\",\"issue_url\":\"https://api.github.com/repos/acme/api/issues/1\",\"commits_url\":\"https://api.github.com/repos/acme/api/pulls/1/commits\",\"review_comments_url\":\"https://api.github.com/repos/acme/api/pulls/1/comments\",\"review_comment_url\":\"https://api.github.com/repos/acme/api/pulls/comments{/number}\",\"comments_url\":\"https://api.github.com/repos/acme/api/issues/1/comments\",\"statuses_url\":\"https://api.github.com/repos/acme/api/statuses/{sha}\",\"head\":{\"label\":\"acme:feature/x\",\"ref\":\"feature/x\",\"sha\":\"77aa148dab938e2d7f684c8636d54e078693edc1\",\"repo\":{\"id\":1,\"node_id\":\"R_1\",\"name\":\"api\",\"full_name\":\"acme/api\",\"owner\":{\"login\":\"acme\",\"id\":2988346,\"node_id\":\"U_2988346\",\"avatar_url\":\"https://avatars.githubusercontent.com/u/2988346?v=4\",\"html_url\":\"https://github.com/acme\",\"type\":\"Organization\",\"site_admin\":false},\"private\":false,\"html_url\":\"https://github.com/acme/api\",\"description\":\"Validation fixture for MCP wire-protocol round-trip.\",\"fork\":false,\"url\":\"https://api.github.com/repos/acme/api\",\"contents_url\":\"https://api.github.com/repos/acme/api/contents/{+path}\",\"issues_url\":\"https://api.github.com/repos/acme/api/issues{/number}\",\"pulls_url\":\"https://api.github.com/repos/acme/api/pulls{/number}\",\"default_branch\":\"main\",\"created_at\":\"2026-07-07T21:15:53.165Z\",\"updated_at\":\"2026-07-07T21:15:53.166Z\",\"pushed_at\":\"2026-07-07T21:15:53.166Z\"},\"user\":{\"login\":\"acme\",\"id\":2988346,\"node_id\":\"U_2988346\",\"avatar_url\":\"https://avatars.githubusercontent.com/u/2988346?v=4\",\"html_url\":\"https://github.com/acme\",\"type\":\"Organization\",\"site_admin\":false}},\"base\":{\"label\":\"acme:main\",\"ref\":\"main\",\"sha\":\"cfee91c41eed6016b5596f8e079065d69adb0ecc\",\"repo\":{\"id\":1,\"node_id\":\"R_1\",\"name\":\"api\",\"full_name\":\"acme/api\",\"owner\":{\"login\":\"acme\",\"id\":2988346,\"node_id\":\"U_2988346\",\"avatar_url\":\"https://avatars.githubusercontent.com/u/2988346?v=4\",\"html_url\":\"https://github.com/acme\",\"type\":\"Organization\",\"site_admin\":false},\"private\":false,\"html_url\":\"https://github.com/acme/api\",\"description\":\"Validation fixture for MCP wire-protocol round-trip.\",\"fork\":false,\"url\":\"https://api.github.com/repos/acme/api\",\"contents_url\":\"https://api.github.com/repos/acme/api/contents/{+path}\",\"issues_url\":\"https://api.github.com/repos/acme/api/issues{/number}\",\"pulls_url\":\"https://api.github.com/repos/acme/api/pulls{/number}\",\"default_branch\":\"main\",\"created_at\":\"2026-07-07T21:15:53.165Z\",\"updated_at\":\"2026-07-07T21:15:53.166Z\",\"pushed_at\":\"2026-07-07T21:15:53.166Z\"},\"user\":{\"login\":\"acme\",\"id\":2988346,\"node_id\":\"U_2988346\",\"avatar_url\":\"https://avatars.githubusercontent.com/u/2988346?v=4\",\"html_url\":\"https://github.com/acme\",\"type\":\"Organization\",\"site_admin\":false}},\"merge_commit_sha\":null,\"draft\":false,\"created_at\":\"2026-07-07T21:15:53.167Z\",\"updated_at\":\"2026-07-07T21:15:53.167Z\",\"closed_at\":null,\"merged_at\":null,\"merged\":false,\"commits\":1,\"additions\":0,\"deletions\":0,\"changed_files\":1}"
+      "text": "{\"id\":3605789809,\"node_id\":\"PR_3605789809\",\"number\":1,\"state\":\"open\",\"locked\":false,\"title\":\"MCP wire-fixture PR\",\"body\":\"Strict-read fixture for validate-mcp.\",\"user\":{\"login\":\"alice\",\"id\":92903040,\"node_id\":\"U_92903040\",\"avatar_url\":\"https://avatars.githubusercontent.com/u/92903040?v=4\",\"html_url\":\"https://github.com/alice\",\"type\":\"User\",\"site_admin\":false},\"html_url\":\"https://github.com/acme/api/pull/1\",\"url\":\"https://api.github.com/repos/acme/api/pulls/1\",\"issue_url\":\"https://api.github.com/repos/acme/api/issues/1\",\"commits_url\":\"https://api.github.com/repos/acme/api/pulls/1/commits\",\"review_comments_url\":\"https://api.github.com/repos/acme/api/pulls/1/comments\",\"review_comment_url\":\"https://api.github.com/repos/acme/api/pulls/comments{/number}\",\"comments_url\":\"https://api.github.com/repos/acme/api/issues/1/comments\",\"statuses_url\":\"https://api.github.com/repos/acme/api/statuses/{sha}\",\"head\":{\"label\":\"acme:feature/x\",\"ref\":\"feature/x\",\"sha\":\"8c833e58f2ff448526305a0b6847031f45a3482a\",\"repo\":{\"id\":1,\"node_id\":\"R_1\",\"name\":\"api\",\"full_name\":\"acme/api\",\"owner\":{\"login\":\"acme\",\"id\":2988346,\"node_id\":\"U_2988346\",\"avatar_url\":\"https://avatars.githubusercontent.com/u/2988346?v=4\",\"html_url\":\"https://github.com/acme\",\"type\":\"Organization\",\"site_admin\":false},\"private\":false,\"html_url\":\"https://github.com/acme/api\",\"description\":\"Validation fixture for MCP wire-protocol round-trip.\",\"fork\":false,\"url\":\"https://api.github.com/repos/acme/api\",\"contents_url\":\"https://api.github.com/repos/acme/api/contents/{+path}\",\"issues_url\":\"https://api.github.com/repos/acme/api/issues{/number}\",\"pulls_url\":\"https://api.github.com/repos/acme/api/pulls{/number}\",\"default_branch\":\"main\",\"created_at\":\"2026-08-06T17:31:09.714Z\",\"updated_at\":\"2026-08-06T17:31:09.717Z\",\"pushed_at\":\"2026-08-06T17:31:09.717Z\"},\"user\":{\"login\":\"acme\",\"id\":2988346,\"node_id\":\"U_2988346\",\"avatar_url\":\"https://avatars.githubusercontent.com/u/2988346?v=4\",\"html_url\":\"https://github.com/acme\",\"type\":\"Organization\",\"site_admin\":false}},\"base\":{\"label\":\"acme:main\",\"ref\":\"main\",\"sha\":\"af4557244d97f626baa80033750cffecbd51b3b4\",\"repo\":{\"id\":1,\"node_id\":\"R_1\",\"name\":\"api\",\"full_name\":\"acme/api\",\"owner\":{\"login\":\"acme\",\"id\":2988346,\"node_id\":\"U_2988346\",\"avatar_url\":\"https://avatars.githubusercontent.com/u/2988346?v=4\",\"html_url\":\"https://github.com/acme\",\"type\":\"Organization\",\"site_admin\":false},\"private\":false,\"html_url\":\"https://github.com/acme/api\",\"description\":\"Validation fixture for MCP wire-protocol round-trip.\",\"fork\":false,\"url\":\"https://api.github.com/repos/acme/api\",\"contents_url\":\"https://api.github.com/repos/acme/api/contents/{+path}\",\"issues_url\":\"https://api.github.com/repos/acme/api/issues{/number}\",\"pulls_url\":\"https://api.github.com/repos/acme/api/pulls{/number}\",\"default_branch\":\"main\",\"created_at\":\"2026-08-06T17:31:09.714Z\",\"updated_at\":\"2026-08-06T17:31:09.717Z\",\"pushed_at\":\"2026-08-06T17:31:09.717Z\"},\"user\":{\"login\":\"acme\",\"id\":2988346,\"node_id\":\"U_2988346\",\"avatar_url\":\"https://avatars.githubusercontent.com/u/2988346?v=4\",\"html_url\":\"https://github.com/acme\",\"type\":\"Organization\",\"site_admin\":false}},\"merge_commit_sha\":null,\"draft\":false,\"created_at\":\"2026-08-06T17:31:09.717Z\",\"updated_at\":\"2026-08-06T17:31:09.717Z\",\"closed_at\":null,\"merged_at\":null,\"merged\":false,\"commits\":1,\"additions\":0,\"deletions\":0,\"changed_files\":1}"
     }
   ]
 }
@@ -2493,6 +2587,19 @@ Legacy /mcp/call event:
       "pull_number": 1
     }
   },
+  "request_headers": {
+    "accept": "*/*",
+    "accept-encoding": "gzip, deflate",
+    "accept-language": "*",
+    "authorization": "[REDACTED]",
+    "connection": "keep-alive",
+    "content-length": "85",
+    "content-type": "application/json",
+    "host": "127.0.0.1:53987",
+    "sec-fetch-mode": "cors",
+    "user-agent": "node"
+  },
+  "tool": "get_pull_request",
   "status": 200,
   "response_body": {
     "id": 3605789809,
@@ -2522,7 +2629,7 @@ Legacy /mcp/call event:
     "head": {
       "label": "acme:feature/x",
       "ref": "feature/x",
-      "sha": "77aa148dab938e2d7f684c8636d54e078693edc1",
+      "sha": "8c833e58f2ff448526305a0b6847031f45a3482a",
       "repo": {
         "id": 1,
         "node_id": "R_1",
@@ -2546,9 +2653,9 @@ Legacy /mcp/call event:
         "issues_url": "https://api.github.com/repos/acme/api/issues{/number}",
         "pulls_url": "https://api.github.com/repos/acme/api/pulls{/number}",
         "default_branch": "main",
-        "created_at": "2026-07-07T21:15:53.165Z",
-        "updated_at": "2026-07-07T21:15:53.166Z",
-        "pushed_at": "2026-07-07T21:15:53.166Z"
+        "created_at": "2026-08-06T17:31:09.714Z",
+        "updated_at": "2026-08-06T17:31:09.717Z",
+        "pushed_at": "2026-08-06T17:31:09.717Z"
       },
       "user": {
         "login": "acme",
@@ -2563,7 +2670,7 @@ Legacy /mcp/call event:
     "base": {
       "label": "acme:main",
       "ref": "main",
-      "sha": "cfee91c41eed6016b5596f8e079065d69adb0ecc",
+      "sha": "af4557244d97f626baa80033750cffecbd51b3b4",
       "repo": {
         "id": 1,
         "node_id": "R_1",
@@ -2587,9 +2694,9 @@ Legacy /mcp/call event:
         "issues_url": "https://api.github.com/repos/acme/api/issues{/number}",
         "pulls_url": "https://api.github.com/repos/acme/api/pulls{/number}",
         "default_branch": "main",
-        "created_at": "2026-07-07T21:15:53.165Z",
-        "updated_at": "2026-07-07T21:15:53.166Z",
-        "pushed_at": "2026-07-07T21:15:53.166Z"
+        "created_at": "2026-08-06T17:31:09.714Z",
+        "updated_at": "2026-08-06T17:31:09.717Z",
+        "pushed_at": "2026-08-06T17:31:09.717Z"
       },
       "user": {
         "login": "acme",
@@ -2603,8 +2710,8 @@ Legacy /mcp/call event:
     },
     "merge_commit_sha": null,
     "draft": false,
-    "created_at": "2026-07-07T21:15:53.167Z",
-    "updated_at": "2026-07-07T21:15:53.167Z",
+    "created_at": "2026-08-06T17:31:09.717Z",
+    "updated_at": "2026-08-06T17:31:09.717Z",
     "closed_at": null,
     "merged_at": null,
     "merged": false,
@@ -2637,6 +2744,20 @@ New /mcp (JSON-RPC) event:
       "pull_number": 1
     }
   },
+  "request_headers": {
+    "accept": "application/json, text/event-stream",
+    "accept-encoding": "gzip, deflate",
+    "accept-language": "*",
+    "authorization": "[REDACTED]",
+    "connection": "keep-alive",
+    "content-length": "141",
+    "content-type": "application/json",
+    "host": "127.0.0.1:53987",
+    "mcp-protocol-version": "2025-06-18",
+    "sec-fetch-mode": "cors",
+    "user-agent": "node"
+  },
+  "tool": "get_pull_request",
   "status": 200,
   "response_body": {
     "id": 3605789809,
@@ -2666,7 +2787,7 @@ New /mcp (JSON-RPC) event:
     "head": {
       "label": "acme:feature/x",
       "ref": "feature/x",
-      "sha": "77aa148dab938e2d7f684c8636d54e078693edc1",
+      "sha": "8c833e58f2ff448526305a0b6847031f45a3482a",
       "repo": {
         "id": 1,
         "node_id": "R_1",
@@ -2690,9 +2811,9 @@ New /mcp (JSON-RPC) event:
         "issues_url": "https://api.github.com/repos/acme/api/issues{/number}",
         "pulls_url": "https://api.github.com/repos/acme/api/pulls{/number}",
         "default_branch": "main",
-        "created_at": "2026-07-07T21:15:53.165Z",
-        "updated_at": "2026-07-07T21:15:53.166Z",
-        "pushed_at": "2026-07-07T21:15:53.166Z"
+        "created_at": "2026-08-06T17:31:09.714Z",
+        "updated_at": "2026-08-06T17:31:09.717Z",
+        "pushed_at": "2026-08-06T17:31:09.717Z"
       },
       "user": {
         "login": "acme",
@@ -2707,7 +2828,7 @@ New /mcp (JSON-RPC) event:
     "base": {
       "label": "acme:main",
       "ref": "main",
-      "sha": "cfee91c41eed6016b5596f8e079065d69adb0ecc",
+      "sha": "af4557244d97f626baa80033750cffecbd51b3b4",
       "repo": {
         "id": 1,
         "node_id": "R_1",
@@ -2731,9 +2852,9 @@ New /mcp (JSON-RPC) event:
         "issues_url": "https://api.github.com/repos/acme/api/issues{/number}",
         "pulls_url": "https://api.github.com/repos/acme/api/pulls{/number}",
         "default_branch": "main",
-        "created_at": "2026-07-07T21:15:53.165Z",
-        "updated_at": "2026-07-07T21:15:53.166Z",
-        "pushed_at": "2026-07-07T21:15:53.166Z"
+        "created_at": "2026-08-06T17:31:09.714Z",
+        "updated_at": "2026-08-06T17:31:09.717Z",
+        "pushed_at": "2026-08-06T17:31:09.717Z"
       },
       "user": {
         "login": "acme",
@@ -2747,8 +2868,8 @@ New /mcp (JSON-RPC) event:
     },
     "merge_commit_sha": null,
     "draft": false,
-    "created_at": "2026-07-07T21:15:53.167Z",
-    "updated_at": "2026-07-07T21:15:53.167Z",
+    "created_at": "2026-08-06T17:31:09.717Z",
+    "updated_at": "2026-08-06T17:31:09.717Z",
     "closed_at": null,
     "merged_at": null,
     "merged": false,
@@ -2769,9 +2890,37 @@ Per-field comparison (excluding volatile ts/request_id/correlation_id/latency_ms
   "path": {
     "legacy": "/s/validate-mcp-session/mcp/call",
     "mcp": "/s/validate-mcp-session/mcp"
+  },
+  "request_headers": {
+    "legacy": {
+      "accept": "*/*",
+      "accept-encoding": "gzip, deflate",
+      "accept-language": "*",
+      "authorization": "[REDACTED]",
+      "connection": "keep-alive",
+      "content-length": "85",
+      "content-type": "application/json",
+      "host": "127.0.0.1:53987",
+      "sec-fetch-mode": "cors",
+      "user-agent": "node"
+    },
+    "mcp": {
+      "accept": "application/json, text/event-stream",
+      "accept-encoding": "gzip, deflate",
+      "accept-language": "*",
+      "authorization": "[REDACTED]",
+      "connection": "keep-alive",
+      "content-length": "141",
+      "content-type": "application/json",
+      "host": "127.0.0.1:53987",
+      "mcp-protocol-version": "2025-06-18",
+      "sec-fetch-mode": "cors",
+      "user-agent": "node"
+    }
   }
 }
-✓ Only `path` differs between surfaces (the intentional, surface-identifying field).
+✓ Only `path` (the surface-identifying field) and `request_headers` (the caller's own
+  headers — two different clients) differ between surfaces.
 ✓ request_body, response_body, state_mutation, state_delta, status, fidelity, error all identical.
 
 ━━━ RESULT ━━━

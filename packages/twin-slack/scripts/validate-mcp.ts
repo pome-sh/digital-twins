@@ -26,7 +26,7 @@ import { openSlackTwinDatabase } from "../src/db.js";
 import { SlackDomain } from "../src/domain/index.js";
 import { createRecorderStore } from "@pome-sh/sdk/server";
 import { defaultSeedState } from "../src/seed.js";
-import { toolDefinitions } from "../src/tools.js";
+import { slackToolFixture } from "../src/tools.js";
 import type { RecorderEvent } from "@pome-sh/wire";
 
 const OUTPUT_PATH = join(dirname(fileURLToPath(import.meta.url)), "validate-mcp.output.txt");
@@ -86,8 +86,8 @@ async function main() {
   });
   await client.connect(transport);
   const tools = await client.listTools();
-  record(`tools/list returned ${tools.tools.length} tools (expected ${toolDefinitions.length})`);
-  if (tools.tools.length !== toolDefinitions.length) {
+  record(`tools/list returned ${tools.tools.length} tools (expected ${slackToolFixture.tools.length})`);
+  if (tools.tools.length !== slackToolFixture.tools.length) {
     throw new Error("tools/list length mismatch");
   }
   for (const t of tools.tools) record(`  - ${t.name}: ${t.description}`);
