@@ -1,6 +1,31 @@
 # @pome-sh/twin-slack — CHANGELOG
 
 
+## 0.3.6 — 2026-08-08
+
+`slack.no-reaction-added` declares `subject: ({ reaction }) => reaction`. It
+declared `null` while the comment beside it said the reaction name is SCANNED
+and its `vacuityMutant` falsified exactly that slot (F-1157).
+
+The consequence was not a blind grader but a wrong verdict, because the check is
+NEGATIVE: a redactor masking `reactions[].name` makes the filter match nothing,
+so `No "white_check_mark" reaction was added` PASSES over an export in which the
+agent added that reaction. It was the only `vacuous_pass` across all five twins'
+45 declarations, found by destroying the literal in the check's own declared
+failing world and watching that world start to pass.
+
+With the subject declared, the engine skips such a criterion at the door instead
+of scoring it. No sentence, no parse and no passing-world verdict moves.
+
+**This does not close F-1159**, which is the same check passing vacuously for a
+different reason: `(final.reactions ?? [])` scores the same negative criterion
+`passed` when the export carries no `reactions` collection at all. A masked value
+and an absent section are different causes, and the probe that found the first
+replaces strings rather than deleting collections, so it is structurally unable
+to see the second. That guard still lives in the consuming engine's
+`STATE_SECTION_GUARDS`; the gap is marked at the call site.
+
+
 ## 0.3.5 — 2026-08-06
 
 Its MCP tool table is now derived from `fixtures/mcp-tools-list.raw.json`

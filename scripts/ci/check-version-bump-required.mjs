@@ -76,7 +76,8 @@ const PACKAGES = [
     // Its publish-relevant paths are the DECLARATION layer of six other
     // packages, because that is what tsup inlines into its tarball: each twin's
     // `check-*.ts` / `checks.ts` / `seed.ts`, and the sdk's `checks.ts` +
-    // `check-state-path.ts` + `check-discrimination.ts` + `failure-injection.ts`.
+    // `check-state-path.ts` + `check-discrimination.ts` + `check-redaction.ts` +
+    // `failure-injection.ts`.
     //
     // Deliberately NOT the whole of `packages/twin-*/` or `packages/sdk/`. A
     // change to a twin's routes, tools or domain does not alter one byte of this
@@ -92,7 +93,7 @@ const PACKAGES = [
     pathPrefixes: ["packages/checks/"],
     pathPatterns: [
       /^packages\/twin-[a-z]+\/src\/(checks|check-[a-z-]+|seed|tape-assertable-tools)\.ts$/,
-      /^packages\/sdk\/src\/(checks|check-state-path|check-discrimination|failure-injection)\.ts$/,
+      /^packages\/sdk\/src\/(checks|check-state-path|check-discrimination|check-redaction|failure-injection)\.ts$/,
     ],
   },
   {

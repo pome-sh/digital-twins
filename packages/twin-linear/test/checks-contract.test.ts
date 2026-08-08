@@ -14,12 +14,14 @@ import {
   checkPattern,
   parseCheck,
   probeDiscrimination,
+  probeRedactionSurvival,
   probeStateCitation,
   renderCheck,
   VACUITY_SENTINEL,
   VACUITY_SENTINEL_NUMBER,
   type CheckDefinition,
   type CheckSubstrateKind,
+  type RedactionGuard,
 } from "@pome-sh/sdk/checks";
 import { describe, expect, it } from "vitest";
 import { LINEAR_CHECKS } from "../src/checks.js";
@@ -470,5 +472,85 @@ describe("declared state citations", () => {
         ).toBeUndefined();
       }
     }
+  });
+});
+
+// Which door stands between a redactor that eats a slot's literal and a wrong
+// verdict — one row per declared slot, MEASURED rather than argued (F-1157).
+//
+// The vocabulary of the values is in the sdk's `check-redaction.ts`. Only one of
+// them is a wrong verdict rather than a missing one — `vacuous_pass`, where the
+// check's OWN failing world starts passing once the literal is gone — and the
+// assertion below forbids it outright rather than ledgering it.
+//
+// Linear is the twin with the most `false_fail` rows, and they are one decision
+// rather than fourteen: `resolveIssue` and its team lookup return a real
+// `failed` where gmail's, slack's and stripe's selector misses return `skipped`.
+// That difference predates this gate and is deliberate — a Linear criterion
+// names an issue by TITLE, and a title that resolves to nothing is a claim about
+// the world an author can act on rather than a substrate the grader could not
+// read. It is worth knowing that the same choice means a redactor masking
+// `issues[].title` or a team key marks a correct agent down instead of dropping
+// the criterion. Counted here, per F-1157's second finding; not changed here,
+// because changing it moves every selector-miss verdict this twin produces.
+const REDACTION_GUARDS: Record<string, RedactionGuard> = {
+  "linear.issue-exists · title": "declared_subject",
+  "linear.issue-exists · team": "false_fail",
+  "linear.issue-state · title": "false_fail",
+  "linear.issue-state · team": "false_fail",
+  "linear.issue-state · state": "declared_subject",
+  "linear.issue-has-label · title": "false_fail",
+  "linear.issue-has-label · team": "false_fail",
+  "linear.issue-has-label · label": "declared_subject",
+  "linear.issue-estimate · title": "false_fail",
+  "linear.issue-estimate · team": "false_fail",
+  // A number compared against a number, never a string in the tree.
+  "linear.issue-estimate · estimate": "absent_from_world",
+  "linear.issue-assignee · title": "false_fail",
+  "linear.issue-assignee · team": "false_fail",
+  "linear.issue-assignee · user": "declared_subject",
+  "linear.issue-comment-contains · title": "false_fail",
+  "linear.issue-comment-contains · team": "false_fail",
+  "linear.issue-comment-contains · needle": "declared_subject",
+  "linear.issue-threaded-reply · title": "false_fail",
+  "linear.issue-threaded-reply · team": "false_fail",
+};
+
+describe("declared redaction survival", () => {
+  it("never turns a failing world into a passing one by destroying a literal", () => {
+    for (const check of CHECKS) {
+      const verdict = probeRedactionSurvival(check, FIXTURES[check.id]!);
+      // A check that names no worlds cannot be probed here either; the
+      // HONEST_NULL_WORLDS gate above is what makes that a costly admission.
+      if (verdict.kind === "declined") continue;
+      for (const row of verdict.rows) {
+        expect(
+          row.guard,
+          `${check.id}'s {${row.param}}: ${row.detail}. A redactor that eats this literal ` +
+            `turns the check's OWN failing world into a pass, so a criterion written on it ` +
+            `grades a leaking agent clean. Declare the slot as this check's \`subject\` — the ` +
+            `engine then skips at the door — or guard it inside \`evaluate\`.`,
+        ).not.toBe("vacuous_pass");
+        expect(
+          row.guard,
+          `${check.id}'s {${row.param}} crashed the evaluator: ${row.detail}. A criterion may ` +
+            `leave the denominator; it may not take the evaluator with it.`,
+        ).not.toBe("throws");
+      }
+    }
+  });
+
+  it("classifies every slot exactly as REDACTION_GUARDS records", () => {
+    // The count, held as a value so it cannot quietly change. A new check with
+    // no rows here fails, and so does a declaration that moves a slot from one
+    // door to another — including the good moves, which should be read on the
+    // way past rather than absorbed.
+    const measured: Record<string, RedactionGuard> = {};
+    for (const check of CHECKS) {
+      const verdict = probeRedactionSurvival(check, FIXTURES[check.id]!);
+      if (verdict.kind === "declined") continue;
+      for (const row of verdict.rows) measured[`${check.id} · ${row.param}`] = row.guard;
+    }
+    expect(measured).toEqual(REDACTION_GUARDS);
   });
 });

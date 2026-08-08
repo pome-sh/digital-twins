@@ -480,19 +480,20 @@ export function parseCheck<TState, TArgs extends Record<string, string>>(
   return args as TArgs;
 }
 
-// The probe lives in its own module because it EXERCISES declarations, where
-// everything above DEFINES the grammar — and because this file hit the 500-LOC
-// health limit, which was a fair reading of that seam rather than an obstacle.
-//
-// Re-exported here so `@pome-sh/sdk/checks` keeps one import site: consumers ask
-// the vocabulary module about the vocabulary, and the split stays internal.
+// Everything above DEFINES the grammar; the three modules below EXERCISE a
+// declaration written in it — do its declared worlds disagree (F-1126), does its
+// state citation resolve (F-1197), and what protects a slot the `subject` arm
+// never looks at when a redactor eats its literal (F-1157). Each split off when
+// this file reached the 500-LOC health limit, a fair reading of that seam. All
+// three are re-exported here so `@pome-sh/sdk/checks` keeps ONE import site:
+// consumers ask the vocabulary module about the vocabulary, and the split stays
+// internal.
 export { probeDiscrimination } from "./check-discrimination.js";
-
-// F-1197 — the pointer grammar `CheckOutcome.evidenceStatePaths` is written in,
-// re-exported for the same reason: a declaration builds a pointer, a consumer
-// resolves one, and both reach for `@pome-sh/sdk/checks` rather than learning
-// which internal module the split put them in.
 export {
   statePath, childStatePath, resolveStatePath, probeStateCitation,
   type StateCitationArm, type StateCitationVerdict,
 } from "./check-state-path.js";
+export {
+  REDACTION_PLACEHOLDER, isRedacted, probeRedactionSurvival,
+  type RedactionGuard, type RedactionSurvivalRow, type RedactionSurvivalVerdict,
+} from "./check-redaction.js";

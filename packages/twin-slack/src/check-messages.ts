@@ -147,7 +147,23 @@ export const noReactionAdded: Check<{ reaction: string; channel: string }> = def
   params: { reaction: emojiName, channel: channelName },
   substrate: "final",
   polarity: () => "negative",
-  subject: () => null,
+  // The reaction name, because that is the literal this predicate compares
+  // against `reactions[].name` — the line below has said so since the check
+  // shipped, and this field said `null` anyway (F-1157).
+  //
+  // It is the sharpest case in the vocabulary for why that mattered. A NEGATIVE
+  // criterion asserting a scanned literal is absent reads a redactor's work as
+  // its own verdict: mask `reactions[].name` and the filter matches nothing, so
+  // `No "white_check_mark" reaction was added` passes — over an export where the
+  // agent added exactly that reaction. `probeRedactionSurvival` found it by
+  // destroying this literal in the FAILING world declared below and watching
+  // that world start to pass; it was the one `vacuous_pass` across all five
+  // twins' 45 declarations.
+  //
+  // Contrast `slack.no-message-posted` above, whose null is deliberate: its only
+  // literal RESOLVES a channel and the count it asserts on is derived. This one
+  // scans.
+  subject: ({ reaction }) => reaction,
   // The channel RESOLVES (a miss already skips); the reaction name is SCANNED.
   // D10: falsify the scanned one.
   vacuityMutant: (args) => ({ ...args, reaction: VACUITY_SENTINEL }),
@@ -163,6 +179,19 @@ export const noReactionAdded: Check<{ reaction: string; channel: string }> = def
   evaluate({ reaction, channel }, { final }) {
     const found = resolveChannel(final, channel);
     if ("missing" in found) return missSkip(found);
+    // ⚠️ `?? []` IS A KNOWN GAP, AND F-1157's subject declaration above did not
+    // close it. An export carrying no `reactions` collection at all filters to
+    // zero rows and scores this negative criterion `passed` — an agent that did
+    // react collects the point. Same direction of failure as the redaction case,
+    // different cause: that one is a masked VALUE, this one an absent SECTION.
+    //
+    // F-1159 is the ticket, and the guard for it lives in the consuming engine's
+    // `STATE_SECTION_GUARDS` today rather than here, which is the wrong repo for
+    // a guard whose state is this file's. Moving it costs a twins release plus a
+    // cloud pin bump, so it is deliberately not folded into F-1157's diff. The
+    // shape it wants is twin-github's, where `pull.reviews == null` and
+    // `pull.comments == null` each skip with "absent is not the same as none"
+    // beside them.
     const hit = (final.reactions ?? []).some(
       (row) => row.channel_id === found.found.id && row.name === reaction,
     );

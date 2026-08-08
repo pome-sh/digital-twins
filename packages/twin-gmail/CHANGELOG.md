@@ -1,6 +1,29 @@
 # @pome-sh/twin-gmail — CHANGELOG
 
 
+## 0.3.6 — 2026-08-08
+
+`gmail.mailbox-label-count` now tells its two ways of not finding a mailbox
+apart (F-1157). Both are still a `skipped` — no verdict changes — but the reason
+does.
+
+`DEFAULT_REDACTION_CONFIG` masks `mailboxes[].email`, which leaves the row in
+place with the address replaced. The check reported that as
+`mailbox_not_found ("pome-agent@pome-twin.test")`, which reads as a seed that
+forgot to declare a mailbox and sent whoever triaged the row to
+`examples/gmail-retry-notify/` to find a seed that is correct. That case now
+says `mailbox_redacted ("…")`; an export listing real addresses, none of them
+this one, still says `mailbox_not_found`.
+
+The recogniser is best-effort — a team whose redactor writes some other
+placeholder falls back to the old name — and the refusal is not: the skip
+happens on both branches, so no verdict rides on the guess.
+
+`subject` could not have done this. It names ONE literal, this check's is the
+`{label}` it actually scans, and the engine's redaction-survival arm reads the
+declaration rather than the state by design.
+
+
 ## 0.3.5 — 2026-08-06
 
 Its MCP tool table is now derived from `fixtures/mcp-tools-list.raw.json`

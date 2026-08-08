@@ -11,10 +11,13 @@ import {
   checkPattern,
   parseCheck,
   probeDiscrimination,
+  probeRedactionSurvival,
   probeStateCitation,
+  REDACTION_PLACEHOLDER,
   renderCheck,
   type CheckDefinition,
   type CheckSubstrateKind,
+  type RedactionGuard,
 } from "@pome-sh/sdk/checks";
 import { describe, expect, it } from "vitest";
 import { GMAIL_CHECKS, type GmailCheckState } from "../src/checks.js";
@@ -26,6 +29,7 @@ import {
   oneMessagePerRecipient,
 } from "../src/check-messages.js";
 import { noUnsupportedEndpoint } from "../src/check-tape.js";
+import { finalWorld } from "../src/check-worlds.js";
 
 // The declarations are a heterogeneous tuple, so iterating them yields a union
 // whose args type differs per check, while the fixtures below are looked up by
@@ -469,5 +473,129 @@ describe("declared state citations", () => {
         ).toBeUndefined();
       }
     }
+  });
+});
+
+describe("gmail.mailbox-label-count's two ways of not finding a mailbox", () => {
+  // F-1157. Both are a skip and neither is a wrong verdict, so this is entirely
+  // about the NAME a reader gets — which is the whole cost the ticket measured.
+  // `mailbox_not_found` sends whoever triages the row to
+  // `examples/gmail-retry-notify/` looking for a seed that forgot to declare a
+  // mailbox; when a redactor ate the address instead, that seed is correct and
+  // the reader has been sent to the wrong repo.
+  const ARGS = { mailbox: "pome-agent@pome-twin.test", count: "5", label: "SENT" };
+  const worldWithMailboxes = (mailboxes: { email: string }[]) =>
+    finalWorld({
+      mailboxes,
+      messages: [],
+      drafts: [],
+      labels: [],
+      messageLabels: [],
+      exportBounds: { messageBodiesOmitted: true, largeMailbox: false, truncatedCollections: [] },
+    });
+
+  it("says mailbox_not_found when the export lists real addresses and none is this one", () => {
+    const outcome = mailboxLabelCount.evaluate(
+      ARGS,
+      worldWithMailboxes([{ email: "someone-else@pome-twin.test" }]),
+    );
+    expect(outcome.status).toBe("skipped");
+    expect(outcome.reason).toBe('mailbox_not_found ("pome-agent@pome-twin.test")');
+  });
+
+  it("says mailbox_redacted when the export lists a mailbox whose address was masked", () => {
+    const outcome = mailboxLabelCount.evaluate(ARGS, worldWithMailboxes([{ email: REDACTION_PLACEHOLDER }]));
+    expect(outcome.status).toBe("skipped");
+    expect(outcome.reason).toBe('mailbox_redacted ("pome-agent@pome-twin.test")');
+  });
+
+  it("still refuses when the placeholder is not one it recognises", () => {
+    // The recogniser is best-effort — a team's redactor may write anything — and
+    // this pins the degradation: the reason falls back to the old name, the
+    // SKIP does not fall back to anything. No verdict rides on the guess.
+    const outcome = mailboxLabelCount.evaluate(ARGS, worldWithMailboxes([{ email: "***" }]));
+    expect(outcome.status).toBe("skipped");
+    expect(outcome.reason).toBe('mailbox_not_found ("pome-agent@pome-twin.test")');
+  });
+});
+
+// Which door stands between a redactor that eats a slot's literal and a wrong
+// verdict — one row per declared slot, MEASURED rather than argued (F-1157).
+//
+// This twin is where the class was found. `gmail.mailbox-label-count` declares
+// `subject: ({ label }) => label`; `SENT` survives every redactor, so the
+// engine's redaction-survival arm waves the criterion through. The slot that
+// actually got eaten in production was `{mailbox}` —
+// `DEFAULT_REDACTION_CONFIG` masks `mailboxes[].email` — and that arm never
+// looks at it, by design: it reads the DECLARATION and never the state, which
+// is what makes the authoring door and the scoring door agree by construction.
+//
+// So the skip surfaced from inside `evaluate`, wearing a name chosen for a
+// different condition (`mailbox_not_found`, which reads as a seed that forgot to
+// declare a mailbox — and that seed declares it). Safe, but safe by that one
+// check's own guard, per check, with nothing measuring the class. `mailbox`
+// reading `abstains` below is that guard, now counted.
+//
+// The vocabulary of the values is in `check-redaction.ts`. The one that matters
+// is `vacuous_pass` — the check's own FAILING world starts passing with the
+// literal gone — and the assertion below forbids it outright rather than
+// ledgering it, because it is the one entry here that would be a wrong verdict
+// rather than a missing one.
+const REDACTION_GUARDS: Record<string, RedactionGuard> = {
+  // The message id SELECTS, and a selector miss is gmail's `missSkip`: the
+  // criterion leaves the denominator rather than false-failing a correct agent.
+  "gmail.message-has-label · message": "abstains",
+  "gmail.message-has-label · label": "declared_subject",
+  "gmail.label-exists · label": "declared_subject",
+  "gmail.draft-addressed-to · email": "declared_subject",
+  // A count is compared against an arity the predicate DERIVES. There is no
+  // occurrence of `two` in the tree for a redactor to reach.
+  "gmail.draft-count-at-least · count": "absent_from_world",
+  // The witness. See above — and `check-messages.ts`, where the reason string
+  // now separates "the export does not list it" from "the export lists it and
+  // we cannot read which one it is".
+  "gmail.mailbox-label-count · mailbox": "abstains",
+  "gmail.mailbox-label-count · count": "absent_from_world",
+  "gmail.mailbox-label-count · label": "declared_subject",
+  "gmail.one-message-per-recipient · label": "declared_subject",
+  "gmail.one-message-per-recipient · count": "absent_from_world",
+};
+
+describe("declared redaction survival", () => {
+  it("never turns a failing world into a passing one by destroying a literal", () => {
+    for (const check of CHECKS) {
+      const verdict = probeRedactionSurvival(check, FIXTURES[check.id]!);
+      // A check that names no worlds cannot be probed here either; the
+      // HONEST_NULL_WORLDS gate above is what makes that a costly admission.
+      if (verdict.kind === "declined") continue;
+      for (const row of verdict.rows) {
+        expect(
+          row.guard,
+          `${check.id}'s {${row.param}}: ${row.detail}. A redactor that eats this literal ` +
+            `turns the check's OWN failing world into a pass, so a criterion written on it ` +
+            `grades a leaking agent clean. Declare the slot as this check's \`subject\` — the ` +
+            `engine then skips at the door — or guard it inside \`evaluate\`.`,
+        ).not.toBe("vacuous_pass");
+        expect(
+          row.guard,
+          `${check.id}'s {${row.param}} crashed the evaluator: ${row.detail}. A criterion may ` +
+            `leave the denominator; it may not take the evaluator with it.`,
+        ).not.toBe("throws");
+      }
+    }
+  });
+
+  it("classifies every slot exactly as REDACTION_GUARDS records", () => {
+    // The count, held as a value so it cannot quietly change. A new check with
+    // no rows here fails, and so does a declaration that moves a slot from one
+    // door to another — including the good moves, which should be read on the
+    // way past rather than absorbed.
+    const measured: Record<string, RedactionGuard> = {};
+    for (const check of CHECKS) {
+      const verdict = probeRedactionSurvival(check, FIXTURES[check.id]!);
+      if (verdict.kind === "declined") continue;
+      for (const row of verdict.rows) measured[`${check.id} · ${row.param}`] = row.guard;
+    }
+    expect(measured).toEqual(REDACTION_GUARDS);
   });
 });
