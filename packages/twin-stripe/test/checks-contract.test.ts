@@ -13,10 +13,12 @@ import {
   checkPattern,
   parseCheck,
   probeDiscrimination,
+  probeRedactionSurvival,
   probeStateCitation,
   renderCheck,
   type CheckDefinition,
   type CheckSubstrateKind,
+  type RedactionGuard,
 } from "@pome-sh/sdk/checks";
 import { describe, expect, it } from "vitest";
 import { STRIPE_CHECKS, type StripeCheckState } from "../src/checks.js";
@@ -536,5 +538,78 @@ describe("declared state citations", () => {
         ).toBeUndefined();
       }
     }
+  });
+});
+
+// Which door stands between a redactor that eats a slot's literal and a wrong
+// verdict — one row per declared slot, MEASURED rather than argued (F-1157).
+//
+// The vocabulary of the values is in the sdk's `check-redaction.ts`. Only one of
+// them is a wrong verdict rather than a missing one — `vacuous_pass`, where the
+// check's OWN failing world starts passing once the literal is gone — and the
+// assertion below forbids it outright rather than ledgering it.
+//
+// Stripe's `false_fail` rows are all one shape: a status or type from a CLOSED
+// set (`succeeded`, `requires_action`, `payment_intent.succeeded`,
+// `invalid_request_error`) compared against the field the object carries. Every
+// one of those checks is POSITIVE, which is why masking the field marks a
+// correct agent down rather than blessing a wrong one — the direction that turns
+// a blind grader into a vacuous pass is the negative one, and stripe's single
+// negative check (`no-refund-on-charge`) declares its charge as the subject.
+//
+// The `abstains` rows are `resolveCharge`'s skip. Note that `{charge}` reads
+// `abstains` on the two refund checks and `declared_subject` on the third: same
+// slot, same literal, different door, because only on the third is the charge
+// the thing being ASSERTED about rather than selected with.
+const REDACTION_GUARDS: Record<string, RedactionGuard> = {
+  // Amounts are exported as integer minor units, never as the criterion's string.
+  "stripe.payment-intent-amount · amount": "absent_from_world",
+  "stripe.payment-intent-status · status": "false_fail",
+  "stripe.payment-intent-with-status-exists · status": "false_fail",
+  "stripe.charge-exists-with-status · status": "false_fail",
+  "stripe.event-emitted · event_type": "false_fail",
+  "stripe.refund-exists · charge": "abstains",
+  "stripe.refund-count · charge": "abstains",
+  "stripe.refund-count · count": "absent_from_world",
+  "stripe.no-refund-on-charge · charge": "declared_subject",
+  "stripe.request-rejected-with-error · error_type": "false_fail",
+};
+
+describe("declared redaction survival", () => {
+  it("never turns a failing world into a passing one by destroying a literal", () => {
+    for (const check of CHECKS) {
+      const verdict = probeRedactionSurvival(check, FIXTURES[check.id]!);
+      // A check that names no worlds cannot be probed here either; the
+      // HONEST_NULL_WORLDS gate above is what makes that a costly admission.
+      if (verdict.kind === "declined") continue;
+      for (const row of verdict.rows) {
+        expect(
+          row.guard,
+          `${check.id}'s {${row.param}}: ${row.detail}. A redactor that eats this literal ` +
+            `turns the check's OWN failing world into a pass, so a criterion written on it ` +
+            `grades a leaking agent clean. Declare the slot as this check's \`subject\` — the ` +
+            `engine then skips at the door — or guard it inside \`evaluate\`.`,
+        ).not.toBe("vacuous_pass");
+        expect(
+          row.guard,
+          `${check.id}'s {${row.param}} crashed the evaluator: ${row.detail}. A criterion may ` +
+            `leave the denominator; it may not take the evaluator with it.`,
+        ).not.toBe("throws");
+      }
+    }
+  });
+
+  it("classifies every slot exactly as REDACTION_GUARDS records", () => {
+    // The count, held as a value so it cannot quietly change. A new check with
+    // no rows here fails, and so does a declaration that moves a slot from one
+    // door to another — including the good moves, which should be read on the
+    // way past rather than absorbed.
+    const measured: Record<string, RedactionGuard> = {};
+    for (const check of CHECKS) {
+      const verdict = probeRedactionSurvival(check, FIXTURES[check.id]!);
+      if (verdict.kind === "declined") continue;
+      for (const row of verdict.rows) measured[`${check.id} · ${row.param}`] = row.guard;
+    }
+    expect(measured).toEqual(REDACTION_GUARDS);
   });
 });

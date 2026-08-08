@@ -11,10 +11,12 @@ import {
   checkPattern,
   parseCheck,
   probeDiscrimination,
+  probeRedactionSurvival,
   probeStateCitation,
   renderCheck,
   type CheckDefinition,
   type CheckSubstrateKind,
+  type RedactionGuard,
 } from "@pome-sh/sdk/checks";
 import { describe, expect, it } from "vitest";
 import { GITHUB_CHECKS, type GitHubCheckState } from "../src/checks.js";
@@ -462,5 +464,111 @@ describe("declared state citations", () => {
         ).toBeUndefined();
       }
     }
+  });
+});
+
+// Which door stands between a redactor that eats a slot's literal and a wrong
+// verdict — one row per declared slot, MEASURED rather than argued (F-1157).
+//
+// The vocabulary of the values is in the sdk's `check-redaction.ts`. Only one of
+// them is a wrong verdict rather than a missing one — `vacuous_pass`, where the
+// check's OWN failing world starts passing once the literal is gone — and the
+// assertion below forbids it outright rather than ledgering it.
+//
+// GitHub is the twin that made the probe honest, and the reason is `{repo}`. An
+// exported repository spells its name THREE ways (`full_name`, and `owner` +
+// `name` separately) and `findRepo` tries two of them, so masking `acme/api`
+// leaves the lookup working off the components — the predicate does its job,
+// correctly, on a spelling the redactor did not eat. That is
+// `discriminates_anyway`, and an earlier probe that only asked "does the passing
+// world still pass" called all ten of them a vacuous pass.
+//
+// The `false_fail` rows are the class F-1157 asked to have counted before
+// deciding whether it needs a guard, and there are three. Each is a `oneOf` slot
+// compared against a state field (`{state}`, `{review}`), so a redactor that
+// masked that field would mark a correct agent down rather than bless a wrong
+// one. Nothing first-party masks a GitHub issue state or a review verdict; this
+// is the count, not a to-do.
+const REDACTION_GUARDS: Record<string, RedactionGuard> = {
+  // Issue and PR numbers are exported as NUMBERS, so the criterion's string `1`
+  // matches nothing a redactor could reach in either world.
+  "github.issue-exists · issue": "absent_from_world",
+  "github.issue-exists · repo": "discriminates_anyway",
+  "github.issue-state · issue": "absent_from_world",
+  "github.issue-state · repo": "discriminates_anyway",
+  "github.issue-state · state": "false_fail",
+  "github.issue-has-label · issue": "absent_from_world",
+  "github.issue-has-label · repo": "discriminates_anyway",
+  "github.issue-has-label · label": "declared_subject",
+  "github.issue-exactly-one-label · issue": "absent_from_world",
+  "github.issue-exactly-one-label · repo": "discriminates_anyway",
+  "github.issue-exactly-one-label · label": "declared_subject",
+  "github.issue-assignee · issue": "absent_from_world",
+  "github.issue-assignee · repo": "discriminates_anyway",
+  "github.issue-assignee · login": "declared_subject",
+  "github.issue-comment-contains · needle": "declared_subject",
+  "github.issue-comment-contains · issue": "absent_from_world",
+  "github.issue-comment-contains · repo": "discriminates_anyway",
+  // The two delta checks. They compare seed and final SETS and name no literal
+  // beyond the repo they scope to, which is why the redaction question reaches
+  // only the selector on both.
+  "github.no-new-issues · repo": "discriminates_anyway",
+  "github.no-new-labels · repo": "discriminates_anyway",
+  "github.pr-state · pr": "absent_from_world",
+  "github.pr-state · repo": "discriminates_anyway",
+  // `not merged` is a rendering of `merged: 0`, never a string in the export.
+  "github.pr-state · state": "absent_from_world",
+  "github.pr-comment-exists · pr": "absent_from_world",
+  "github.pr-comment-exists · repo": "discriminates_anyway",
+  "github.pr-review-exists · review": "false_fail",
+  "github.pr-review-exists · pr": "absent_from_world",
+  "github.pr-review-exists · repo": "discriminates_anyway",
+  "github.file-exists · path": "declared_subject",
+  "github.file-exists · repo": "discriminates_anyway",
+  "github.commit-status · context": "declared_subject",
+  "github.commit-status · repo": "discriminates_anyway",
+  "github.commit-status · state": "false_fail",
+  // A tape check, and the tape is redacted on the way to disk by a DIFFERENT
+  // redactor than the one this probe models. The subject arm covers it either
+  // way.
+  "github.tool-never-called · tool": "declared_subject",
+};
+
+describe("declared redaction survival", () => {
+  it("never turns a failing world into a passing one by destroying a literal", () => {
+    for (const check of CHECKS) {
+      const verdict = probeRedactionSurvival(check, FIXTURES[check.id]!);
+      // A check that names no worlds cannot be probed here either; the
+      // HONEST_NULL_WORLDS gate above is what makes that a costly admission.
+      if (verdict.kind === "declined") continue;
+      for (const row of verdict.rows) {
+        expect(
+          row.guard,
+          `${check.id}'s {${row.param}}: ${row.detail}. A redactor that eats this literal ` +
+            `turns the check's OWN failing world into a pass, so a criterion written on it ` +
+            `grades a leaking agent clean. Declare the slot as this check's \`subject\` — the ` +
+            `engine then skips at the door — or guard it inside \`evaluate\`.`,
+        ).not.toBe("vacuous_pass");
+        expect(
+          row.guard,
+          `${check.id}'s {${row.param}} crashed the evaluator: ${row.detail}. A criterion may ` +
+            `leave the denominator; it may not take the evaluator with it.`,
+        ).not.toBe("throws");
+      }
+    }
+  });
+
+  it("classifies every slot exactly as REDACTION_GUARDS records", () => {
+    // The count, held as a value so it cannot quietly change. A new check with
+    // no rows here fails, and so does a declaration that moves a slot from one
+    // door to another — including the good moves, which should be read on the
+    // way past rather than absorbed.
+    const measured: Record<string, RedactionGuard> = {};
+    for (const check of CHECKS) {
+      const verdict = probeRedactionSurvival(check, FIXTURES[check.id]!);
+      if (verdict.kind === "declined") continue;
+      for (const row of verdict.rows) measured[`${check.id} · ${row.param}`] = row.guard;
+    }
+    expect(measured).toEqual(REDACTION_GUARDS);
   });
 });

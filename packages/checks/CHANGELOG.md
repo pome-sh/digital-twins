@@ -1,5 +1,25 @@
 # @pome-sh/checks
 
+## 0.1.2
+
+Carries F-1157 to the grader. Three things move in `dist/`:
+
+- `@pome-sh/checks/dsl` gains `probeRedactionSurvival`, `REDACTION_PLACEHOLDER`
+  and `isRedacted` — the measurement of what protects a criterion whose
+  redaction-destroyed literal is NOT its declared `subject`. `REDACTION_PLACEHOLDER`
+  is the check-side half of a cross-repo contract: the token pome-cloud's state
+  redactor writes is the token these predicates recognise, and it is declared
+  once here rather than spelled twice.
+- `@pome-sh/checks/gmail` — `gmail.mailbox-label-count` answers
+  `mailbox_redacted ("…")` where the mailbox row survived with its address
+  masked, and keeps `mailbox_not_found ("…")` for an export that lists real
+  addresses and not this one. Same `skipped` status either way; only the reason
+  a report renders changes.
+- `@pome-sh/checks/slack` — `slack.no-reaction-added` declares its reaction name
+  as its `subject`, so the engine's redaction-survival arm skips such a
+  criterion at the door instead of letting a masked `reactions[].name` satisfy
+  a negative assertion.
+
 ## 0.1.1
 
 No change to the published surface — `dist/` is byte-identical to 0.1.0, so no

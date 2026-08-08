@@ -1,6 +1,36 @@
 # @pome-sh/sdk
 
 
+## 0.11.5 — 2026-08-08
+
+New `check-redaction.ts`, reachable from `@pome-sh/sdk/checks`:
+`probeRedactionSurvival`, `REDACTION_PLACEHOLDER` and `isRedacted` (F-1157).
+
+`subject` closes the DETECTABLE half of the redaction class, and closes it at
+the engine's door — a criterion whose declared subject the redactor destroys is
+skipped before `evaluate` is called. That arm reads the DECLARATION and never
+the state, deliberately, because it is what makes the authoring door and the
+scoring door agree by construction. Nothing measured the other half: a slot the
+subject arm does not name, which a redactor eats anyway.
+
+`probeRedactionSurvival` measures it, per declared slot, by destroying that
+slot's literal inside the check's own `discriminatingWorlds` and reading both
+verdicts. The question is asked of the FAILING world — does a real `failed`
+become a real `passed` — because the passing world passes by construction and
+cannot tell a predicate that re-derived the fact from one whose assertion went
+trivial. An earlier version asked only the passing arm and reported all ten of
+twin-github's `{repo}` slots as vacuous passes, when `findRepo` had simply
+matched on `owner`/`name` after `full_name` was masked.
+
+Seven outcomes, of which one is a wrong verdict rather than a missing one:
+`vacuous_pass`, `abstains`, `false_fail`, `discriminates_anyway`,
+`declared_subject`, `absent_from_world`, `throws`. Each twin's
+`checks-contract.test.ts` forbids `vacuous_pass` and `throws` outright and
+ledgers the rest, so the class is counted rather than assumed.
+
+Additive: no existing export moved and no declaration's behaviour changed.
+
+
 ## 0.11.4 — 2026-08-07
 
 `loadMcpToolFixture` and the rest of `mcp-tool-fixture.ts` are now reachable on

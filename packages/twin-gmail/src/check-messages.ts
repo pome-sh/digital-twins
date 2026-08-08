@@ -12,7 +12,7 @@
 // Declarations only. The grammar rules they obey are in `checks.ts`, which
 // assembles them.
 
-import { defineCheck, VACUITY_SENTINEL } from "@pome-sh/sdk/checks";
+import { defineCheck, isRedacted, VACUITY_SENTINEL } from "@pome-sh/sdk/checks";
 import type { Check } from "./check-kind.js";
 import { countWord, exactCount, labelRef, mailboxRef, messageId, parseCount } from "./check-params.js";
 import {
@@ -153,7 +153,33 @@ export const mailboxLabelCount: Check<{ mailbox: string; count: string; label: s
         final.mailboxes != null &&
         !final.mailboxes.some((mb) => (mb.email ?? "").toLowerCase() === mailbox.toLowerCase())
       ) {
-        return { passed: false, status: "skipped", reason: `mailbox_not_found ("${mailbox}")` };
+        // TWO ways to not find it, and only one of them is a seed defect
+        // (F-1157). `DEFAULT_REDACTION_CONFIG` — the strictest team, and what a
+        // corpus is deliberately measured against — masks `mailboxes[].email`,
+        // which leaves the ROW in place with the address replaced: the mailbox
+        // is in the export and simply unreadable. Reporting that as
+        // `mailbox_not_found` sends whoever triages the row to
+        // `examples/gmail-retry-notify/` looking for a seed that forgot a
+        // mailbox, and that seed declares it.
+        //
+        // `subject` cannot make this distinction for us. It names ONE literal,
+        // this check's is the `{label}` it actually scans, and the engine's
+        // redaction-survival arm reads the DECLARATION rather than the state by
+        // design — which is what makes the authoring door and the scoring door
+        // agree by construction. So the slot that got eaten here is one no arm
+        // upstream can see, and naming it is the check's own job.
+        //
+        // The recogniser is best-effort by construction: a team whose redactor
+        // writes some other placeholder falls back to `mailbox_not_found`, which
+        // is the status quo rather than a regression. What is NOT best-effort is
+        // the refusal — the skip happens on both branches, so the criterion
+        // leaves the denominator either way and no verdict rides on the guess.
+        const eaten = final.mailboxes.some((mb) => isRedacted(mb.email));
+        return {
+          passed: false,
+          status: "skipped",
+          reason: eaten ? `mailbox_redacted ("${mailbox}")` : `mailbox_not_found ("${mailbox}")`,
+        };
       }
       const ids = labelIdsFor(final, label);
       const labeled = new Set(

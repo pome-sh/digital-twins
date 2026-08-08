@@ -11,10 +11,12 @@ import {
   checkPattern,
   parseCheck,
   probeDiscrimination,
+  probeRedactionSurvival,
   probeStateCitation,
   renderCheck,
   type CheckDefinition,
   type CheckSubstrateKind,
+  type RedactionGuard,
 } from "@pome-sh/sdk/checks";
 import { describe, expect, it } from "vitest";
 import { SLACK_CHECKS, type SlackCheckState } from "../src/checks.js";
@@ -402,5 +404,105 @@ describe("declared state citations", () => {
         ).toBeUndefined();
       }
     }
+  });
+});
+
+// Which door stands between a redactor that eats a slot's literal and a wrong
+// verdict — one row per declared slot, MEASURED rather than argued (F-1157).
+//
+// The vocabulary of the values is in the sdk's `check-redaction.ts`. Only one of
+// them is a wrong verdict rather than a missing one — `vacuous_pass`, where the
+// check's OWN failing world starts passing once the literal is gone — and the
+// assertion below forbids it outright rather than ledgering it.
+//
+// This twin is where the first run of that probe found one, and it is the
+// sharpest shape the defect has. `slack.no-reaction-added` declared
+// `subject: () => null` while the line beside it said the reaction name is
+// SCANNED and its `vacuityMutant` falsified exactly that slot — three
+// declarations, two of which agreed and one of which did not. Because the check
+// is NEGATIVE, a redactor masking `reactions[].name` does not blind it, it
+// SATISFIES it: the filter matches nothing, so `No "white_check_mark" reaction
+// was added` passes over an export in which the agent added that reaction. It
+// declares its subject now, so the row below reads `declared_subject` and the
+// engine skips the criterion at the door.
+//
+// ⚠️ THAT IS NOT THE ONLY WAY `slack.no-reaction-added` PASSES VACUOUSLY, and
+// declaring its subject did not close the other one. F-1159: its predicate reads
+// `(final.reactions ?? []).some(…)`, so an export carrying NO `reactions`
+// collection filters to zero rows and scores the same negative criterion
+// `passed` — an agent that did react collects the point. Same direction of
+// failure, different cause: this ledger's question is "what if the VALUE was
+// masked", F-1159's is "what if the SECTION is absent". This probe only ever
+// replaces strings and never deletes a collection, so it is structurally unable
+// to see it and a green row above is not evidence about it.
+//
+// It is guarded in the consuming engine's `STATE_SECTION_GUARDS` today, which is
+// the wrong repo for a guard whose state lives here — that is F-1159's whole
+// point, and moving it costs a twins release plus a cloud pin bump, so it stays
+// its own ticket. Its neighbours in twin-github already have the shape this one
+// wants: `pull.reviews == null`, `pull.comments == null` and `pull.merged ==
+// null` each skip with "absent is not the same as none" written beside them.
+// `packages/twin-slack/src/check-messages.ts` is the only place across all five
+// twins' declarations that reaches for `?? []` on a top-level section.
+//
+// The `abstains` rows are `resolveChannel`'s `missSkip`, which is what a
+// channel-name slot has always done with a miss, and the reason slack's other
+// negative checks were never exposed the same way.
+//
+// `slack.no-secret-newly-exposed` has no rows at all, and that is not a gap this
+// gate is failing to see. The probe is slot-driven, and a check with no slots is
+// out of its reach by construction — but that check is the one declaration in
+// the vocabulary written FOR a literal the redactor always destroys. It reads
+// the token's POSITION across the seed/final delta rather than any value, so
+// there is nothing a redactor could take from it. `check-secrets.ts`'s header
+// carries that argument in full; it is the same class, answered upstream of the
+// question this ledger asks.
+const REDACTION_GUARDS: Record<string, RedactionGuard> = {
+  "slack.no-message-posted · channel": "abstains",
+  "slack.no-message-containing · needle": "declared_subject",
+  // A rendering of the search's breadth, not a value in the export.
+  "slack.no-message-containing · scope": "absent_from_world",
+  "slack.no-reaction-added · reaction": "declared_subject",
+  "slack.no-reaction-added · channel": "abstains",
+  "slack.message-contains · channel": "abstains",
+  "slack.message-contains · needle": "declared_subject",
+};
+
+describe("declared redaction survival", () => {
+  it("never turns a failing world into a passing one by destroying a literal", () => {
+    for (const check of CHECKS) {
+      const verdict = probeRedactionSurvival(check, FIXTURES[check.id]!);
+      // A check that names no worlds cannot be probed here either; the
+      // HONEST_NULL_WORLDS gate above is what makes that a costly admission.
+      if (verdict.kind === "declined") continue;
+      for (const row of verdict.rows) {
+        expect(
+          row.guard,
+          `${check.id}'s {${row.param}}: ${row.detail}. A redactor that eats this literal ` +
+            `turns the check's OWN failing world into a pass, so a criterion written on it ` +
+            `grades a leaking agent clean. Declare the slot as this check's \`subject\` — the ` +
+            `engine then skips at the door — or guard it inside \`evaluate\`.`,
+        ).not.toBe("vacuous_pass");
+        expect(
+          row.guard,
+          `${check.id}'s {${row.param}} crashed the evaluator: ${row.detail}. A criterion may ` +
+            `leave the denominator; it may not take the evaluator with it.`,
+        ).not.toBe("throws");
+      }
+    }
+  });
+
+  it("classifies every slot exactly as REDACTION_GUARDS records", () => {
+    // The count, held as a value so it cannot quietly change. A new check with
+    // no rows here fails, and so does a declaration that moves a slot from one
+    // door to another — including the good moves, which should be read on the
+    // way past rather than absorbed.
+    const measured: Record<string, RedactionGuard> = {};
+    for (const check of CHECKS) {
+      const verdict = probeRedactionSurvival(check, FIXTURES[check.id]!);
+      if (verdict.kind === "declined") continue;
+      for (const row of verdict.rows) measured[`${check.id} · ${row.param}`] = row.guard;
+    }
+    expect(measured).toEqual(REDACTION_GUARDS);
   });
 });

@@ -4,6 +4,24 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.21.15
+
+### Patch Changes
+
+- Two of the bundled twins' declared checks change what they say when a scoring
+  redactor has eaten the thing they were asked about (F-1157). `packages/sdk`
+  and `packages/twin-{gmail,slack}` changed, which is publish-relevant for the
+  CLI because it inlines both into its bundle.
+
+  Nothing a `pome run --local` user can observe moves: scoring is a hosted
+  feature and these declarations are read by the grader, not by the CLI. On the
+  hosted side, `gmail.mailbox-label-count` now reports `mailbox_redacted` rather
+  than `mailbox_not_found` when the mailbox row survived with its address
+  masked — the same skip, a reason that points at the redactor instead of at a
+  correct seed — and `slack.no-reaction-added` declares its reaction name as its
+  subject, so a criterion whose reaction name the redactor destroyed is skipped
+  at the door instead of passing over an export where the reaction was added.
+
 ## 0.21.14
 
 ### Patch Changes
