@@ -50,9 +50,10 @@
 //
 // It prints the env var to run the capture with, and the path to read it from.
 import { createHash, randomBytes } from "node:crypto";
-import { createServer } from "node:http";
-import { spawn } from "node:child_process";
-import { chmodSync, writeFileSync } from "node:fs";
+import { createServer as createHttpServer } from "node:http";
+import { createServer as createHttpsServer } from "node:https";
+import { execFileSync, spawn } from "node:child_process";
+import { chmodSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -94,8 +95,46 @@ const VENDORS = {
     resource: "https://mcp.slack.com/mcp",
     port: 16737,
     defaultScopes: null, // must be stated: see the header on what scopes decide
+    // SLACK REFUSES AN http:// REDIRECT, INCLUDING ON LOCALHOST. Its OAuth page:
+    // "The `redirect_uri` must use HTTPS … A Redirect URL must also use HTTPS",
+    // with no localhost exception, and the examples mark `http://` and
+    // `http://…:8080` as BAD. Registering `http://127.0.0.1:…` therefore fails
+    // at app-configuration time — before any of this runs — and the error names
+    // the redirect rather than anything about MCP.
+    //
+    // So this callback is served over TLS with a throwaway self-signed cert,
+    // which is what makes `https://localhost:<port>/oauth/callback` a legal
+    // Redirect URL to register. The browser will interrupt once with a
+    // certificate warning; that is expected, and the cert is generated fresh per
+    // run into the temp dir. linear and stripe both accepted the plain-http
+    // loopback at registration (probed 2026-08-09), so they do not pay for this.
+    tls: true,
+    redirectHost: "localhost",
   },
 };
+
+/** A throwaway localhost cert, so the loopback callback can be served over TLS. */
+function selfSignedCert() {
+  const dir = tmpdir();
+  const key = join(dir, `pome-mcp-cb-key-${process.pid}.pem`);
+  const cert = join(dir, `pome-mcp-cb-cert-${process.pid}.pem`);
+  try {
+    execFileSync(
+      "openssl",
+      // prettier-ignore
+      ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
+       "-keyout", key, "-out", cert, "-subj", "/CN=localhost",
+       "-addext", "subjectAltName=DNS:localhost,IP:127.0.0.1"],
+      { stdio: "ignore" }
+    );
+  } catch (err) {
+    throw new Error(
+      `could not generate a localhost certificate with \`openssl\` (${err.message}). Slack refuses an ` +
+        `http:// redirect, so the callback has to be served over TLS.`
+    );
+  }
+  return { key: readFileSync(key), cert: readFileSync(cert) };
+}
 
 function parseArgv(argv) {
   const [vendor, ...rest] = argv;
@@ -141,9 +180,10 @@ async function registerClient(vendor, redirectUri) {
 }
 
 /** Serve exactly one callback, then stop. Returns the query it was called with. */
-function awaitCallback(port) {
+function awaitCallback(vendor) {
+  const { port, tls } = vendor;
   return new Promise((resolve, reject) => {
-    const server = createServer((req, res) => {
+    const handler = (req, res) => {
       const url = new URL(req.url, `http://127.0.0.1:${port}`);
       if (url.pathname !== "/oauth/callback") {
         res.writeHead(404).end();
@@ -161,7 +201,8 @@ function awaitCallback(port) {
       server.close();
       if (err) reject(new Error(`${err}: ${url.searchParams.get("error_description") ?? "(no description)"}`));
       else resolve({ code: url.searchParams.get("code"), state: url.searchParams.get("state") });
-    });
+    };
+    const server = tls ? createHttpsServer(selfSignedCert(), handler) : createHttpServer(handler);
     server.on("error", (e) =>
       reject(new Error(`cannot listen on 127.0.0.1:${port} (${e.code}) — the redirect URI is registered against this exact port`))
     );
@@ -188,7 +229,9 @@ async function main() {
     );
   }
 
-  const redirectUri = `http://127.0.0.1:${vendor.port}/oauth/callback`;
+  const scheme = vendor.tls ? "https" : "http";
+  const host = vendor.redirectHost ?? "127.0.0.1";
+  const redirectUri = `${scheme}://${host}:${vendor.port}/oauth/callback`;
   let clientId = opts.clientId;
   let clientSecret = opts.clientSecret;
   if (!clientId) {
@@ -224,7 +267,7 @@ async function main() {
   console.log(`\nOpen this and approve (it should open by itself):\n\n  ${authUrl}\n`);
   spawn("open", [authUrl.toString()], { stdio: "ignore", detached: true }).unref();
 
-  const cb = await awaitCallback(vendor.port);
+  const cb = await awaitCallback(vendor);
   if (cb.state !== state) {
     throw new Error("state mismatch — the redirect did not come from the request this process started");
   }
