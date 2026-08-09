@@ -229,7 +229,7 @@ export function buildTwinTools(config: { mcpUrl: string; token: string }) {
     "Get one pull request: title, body, author login, branches, and mergeable state.",
     { ...ownerRepo, pull_number: z.number().int().positive() },
     async ({ owner, repo, pull_number }) => {
-      const pr = await twin.call("get_pull_request", { owner, repo, pull_number });
+      const pr = await twin.call("pull_request_read", { method: "get", owner, repo, pullNumber: pull_number });
       return { content: [{ type: "text", text: JSON.stringify(pr, null, 2) }] };
     }
   );
@@ -239,7 +239,7 @@ export function buildTwinTools(config: { mcpUrl: string; token: string }) {
     "List the files changed by a pull request, with per-file additions/deletions.",
     { ...ownerRepo, pull_number: z.number().int().positive() },
     async ({ owner, repo, pull_number }) => {
-      const files = await twin.call("get_pull_request_files", { owner, repo, pull_number });
+      const files = await twin.call("pull_request_read", { method: "get_files", owner, repo, pullNumber: pull_number });
       return { content: [{ type: "text", text: JSON.stringify(files, null, 2) }] };
     }
   );

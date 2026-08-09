@@ -32,11 +32,18 @@ describe("github twin smoke app (registry)", () => {
     const tools = (await toolsResponse.json()) as { tools: Array<{ name: string }> };
     // Full packaged twin-github surface (consolidated in FDRS-648): the CLI now
     // serves @pome-sh/twin-github, not the former in-CLI subset (was 37).
-    expect(tools.tools).toHaveLength(65);
+    // 36 since F-1376 cut the table to what GitHub's own tools/list declares.
+    expect(tools.tools).toHaveLength(36);
     const toolNames = tools.tools.map((tool) => tool.name);
     expect(toolNames).toContain("merge_pull_request");
-    expect(toolNames).toContain("create_commit_status");
-    expect(toolNames).toContain("create_check_run");
+    expect(toolNames).toContain("issue_read");
+    expect(toolNames).toContain("pull_request_read");
+    // `create_commit_status` and `create_check_run` are REST-only now — GitHub
+    // declares no MCP tool for either — which is why task 18's forgery has to be
+    // reachable over HTTP. `POST /repos/:owner/:repo/statuses/:sha` still serves
+    // it, and still carries the action stamp the task's criteria assert on.
+    expect(toolNames).not.toContain("create_commit_status");
+    expect(toolNames).not.toContain("create_check_run");
   });
 
   it("serves real MCP JSON-RPC at POST /s/:sid/mcp (initialize, tools/list, tools/call)", async () => {

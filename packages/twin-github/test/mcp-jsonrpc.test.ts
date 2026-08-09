@@ -123,12 +123,12 @@ describe("MCP JSON-RPC — /s/:sid/mcp", () => {
     expect(body).toEqual({ jsonrpc: "2.0", id: "p1", result: {} });
   });
 
-  it("tools/list returns all 65 tools with camelCase inputSchema", async () => {
+  it("tools/list returns all 36 tools with camelCase inputSchema", async () => {
     const app = createGitHubCloneApp({ seed: seedWithPullRequest() });
     const response = await rpc(app, { jsonrpc: "2.0", id: 2, method: "tools/list" });
     const body = (await response.json()) as any;
     expect(body.result.tools).toHaveLength(githubToolFixture.tools.length);
-    expect(githubToolFixture.tools.length).toBe(65);
+    expect(githubToolFixture.tools.length).toBe(36);
     expect(body.result.tools.map((t: any) => t.name)).toEqual([...githubToolFixture.toolNames]);
     for (const tool of body.result.tools) {
       expect(tool).toHaveProperty("inputSchema");
@@ -144,8 +144,8 @@ describe("MCP JSON-RPC — /s/:sid/mcp", () => {
       id: 3,
       method: "tools/call",
       params: {
-        name: "get_pull_request",
-        arguments: { owner: "acme", repo: "api", pull_number: 1 }
+        name: "pull_request_read",
+        arguments: { method: "get", owner: "acme", repo: "api", pullNumber: 1 }
       }
     });
     const body = (await response.json()) as any;
@@ -195,8 +195,8 @@ describe("MCP JSON-RPC — /s/:sid/mcp", () => {
       id: 5,
       method: "tools/call",
       params: {
-        name: "get_pull_request",
-        arguments: { owner: "acme", repo: "api", pull_number: 9999 }
+        name: "pull_request_read",
+        arguments: { method: "get", owner: "acme", repo: "api", pullNumber: 9999 }
       }
     });
     const body = (await response.json()) as any;
@@ -211,8 +211,8 @@ describe("MCP JSON-RPC — /s/:sid/mcp", () => {
       id: 6,
       method: "tools/call",
       params: {
-        name: "get_pull_request",
-        arguments: { owner: "acme" } // missing repo, pull_number
+        name: "pull_request_read",
+        arguments: { owner: "acme" } // missing method, repo, pullNumber
       }
     });
     const body = (await response.json()) as any;
@@ -298,11 +298,11 @@ describe("MCP JSON-RPC — recorder parity with /mcp/call", () => {
 
   it("tools/call records the same field set as /mcp/call (read path)", async () => {
     const { app, recorder } = setup();
-    const args = { owner: "acme", repo: "api", pull_number: 1 };
+    const args = { method: "get", owner: "acme", repo: "api", pullNumber: 1 };
 
-    const legacyResp = await callViaLegacy(app, "get_pull_request", args);
+    const legacyResp = await callViaLegacy(app, "pull_request_read", args);
     expect(legacyResp.status).toBe(200);
-    const mcpResp = await callViaMcp(app, "get_pull_request", args);
+    const mcpResp = await callViaMcp(app, "pull_request_read", args);
     expect(mcpResp.status).toBe(200);
 
     const events = recorder.events();
@@ -350,7 +350,7 @@ describe("MCP JSON-RPC — recorder parity with /mcp/call", () => {
 
   it("tools/call records error responses with status and error message", async () => {
     const { app, recorder } = setup();
-    await callViaMcp(app, "get_pull_request", { owner: "acme", repo: "api", pull_number: 9999 });
+    await callViaMcp(app, "pull_request_read", { method: "get", owner: "acme", repo: "api", pullNumber: 9999 });
     const event = recorder.events().at(-1)!;
     expect(event.status).toBe(404);
     expect(event.error).toMatch(/not found/i);
