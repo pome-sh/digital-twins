@@ -5,6 +5,7 @@ import {
   expandSurfaceCell,
   fidelityInventorySchema,
   lintFidelityInventory,
+  lintFidelityRestRoutes,
   parseFidelityDocRows,
   runFidelityParity,
   type FidelityInventory,
@@ -263,6 +264,102 @@ describe("parseFidelityDocRows / lintFidelityInventory", () => {
     expect(lintFidelityInventory(toyInventory(), docs).join("\n")).toContain(
       "documented twice with conflicting tiers ('shape' vs 'semantic')"
     );
+  });
+});
+
+// F-1368 — the arm that compares the `rest` half to the routes the twin really
+// registers. Everything above this point compares two DOCUMENTS to each other.
+describe("lintFidelityRestRoutes", () => {
+  const REGISTERED = ["GET /items", "GET /items/*", "POST /items"];
+
+  /** `GET /items` (the toy's one row) plus whatever the case adds. */
+  function inventoryWith(...rows: Record<string, unknown>[]): FidelityInventory {
+    const inventory = toyInventory();
+    return fidelityInventorySchema.parse({
+      ...inventory,
+      rest: [...inventory.rest, ...rows.map((row) => ({ heat: "unclassified", fidelity: "semantic", justification: BASELINE, ...row }))],
+    });
+  }
+
+  it("passes when every route has exactly one row and every row a route", () => {
+    expect(
+      lintFidelityRestRoutes(
+        inventoryWith({ name: "GET /items/:id", routes: ["GET /items/*"] }, { name: "POST /items" }),
+        REGISTERED
+      )
+    ).toEqual([]);
+  });
+
+  it("reports a route the inventory does not account for", () => {
+    // The F-1368 direction: a route is added to the twin and the inventory —
+    // the denominator every fidelity lane counts against — stays green.
+    expect(lintFidelityRestRoutes(inventoryWith({ name: "POST /items" }), REGISTERED).join("\n"))
+      .toContain("route 'GET /items/*' is registered but absent from fidelity.inventory.json");
+  });
+
+  it("reports a row that names no registered route", () => {
+    expect(
+      lintFidelityRestRoutes(inventoryWith({ name: "DELETE /items" }), REGISTERED).join("\n")
+    ).toContain("rest 'DELETE /items' names no route the twin registers");
+  });
+
+  it("reports a `routes` entry the twin does not register", () => {
+    // The spelling link is checked, not trusted: a row may name its surface the
+    // way the vendor documents it, but the pattern it points at has to exist.
+    expect(
+      lintFidelityRestRoutes(
+        inventoryWith({ name: "GET /items/:id", routes: ["GET /items/:id"] }, { name: "POST /items" }),
+        REGISTERED
+      ).join("\n")
+    ).toContain("rest 'GET /items/:id' lists route 'GET /items/:id', which the twin does not register");
+  });
+
+  it("reports a route two rows both claim", () => {
+    // An umbrella row that swallows a sibling's route would otherwise leave the
+    // sibling looking inventoried while its own row went missing unnoticed.
+    expect(
+      lintFidelityRestRoutes(
+        inventoryWith(
+          { name: "GET /items/:id", routes: ["GET /items/*"] },
+          { name: "GET /items/*", routes: ["GET /items/*"] },
+          { name: "POST /items" }
+        ),
+        REGISTERED
+      ).join("\n")
+    ).toContain("route 'GET /items/*' is accounted for by 2 rest rows");
+  });
+
+  it("accepts an `unregistered` row and flags it once the twin serves it", () => {
+    const unserved = {
+      name: "DELETE /items",
+      fidelity: "unsupported",
+      heat: "cold",
+      unregistered: { kind: "unserved", reason: "loud 501; the catch-all answers it" },
+    };
+    expect(
+      lintFidelityRestRoutes(inventoryWith(unserved, { name: "GET /items/*" }, { name: "POST /items" }), REGISTERED)
+    ).toEqual([]);
+
+    // Self-expiring, the way `doc_drift` is.
+    expect(
+      lintFidelityRestRoutes(
+        inventoryWith(unserved, { name: "GET /items/*" }, { name: "POST /items" }),
+        [...REGISTERED, "DELETE /items"]
+      ).join("\n")
+    ).toContain("rest 'DELETE /items' is declared unregistered ('unserved') but the twin registers");
+  });
+
+  it("refuses a row that both accounts for routes and says it accounts for none", () => {
+    expect(
+      lintFidelityRestRoutes(
+        inventoryWith({
+          name: "POST /items",
+          routes: ["POST /items"],
+          unregistered: { kind: "engine", reason: "transport" },
+        }, { name: "GET /items/*" }),
+        REGISTERED
+      ).join("\n")
+    ).toContain("carries both `routes` and `unregistered`");
   });
 });
 

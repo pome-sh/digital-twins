@@ -12,6 +12,11 @@
 // doc gaps are declared in `doc_drift`: the lint accepts exactly those
 // gaps and fails loudly once the docs catch up, so a declaration can never
 // outlive the drift it describes.
+//
+// That lint compares two DOCUMENTS. `lintFidelityRestRoutes` (F-1368) is the
+// arm that compares the `rest` half to the code: the routes the twin actually
+// registers, in both directions, so a route can no longer be added or removed
+// with the inventory staying green.
 
 import { readFileSync } from "node:fs";
 import { z } from "zod";
@@ -28,6 +33,52 @@ export const fidelitySurfaceSchema = z.strictObject({
   justification: z.string().min(1),
 });
 export type FidelitySurface = z.infer<typeof fidelitySurfaceSchema>;
+
+/**
+ * Why a `rest` row stands for none of the routes the twin registers (F-1368).
+ *
+ * Both kinds are real rows about real behaviour — they are simply not answered
+ * by a route in the twin's own declared set, so the 1:1 comparison has to be
+ * told which and why rather than being handed a count that does not line up.
+ */
+export const fidelityUnregisteredSchema = z.strictObject({
+  kind: z.enum([
+    // Served, but by the engine rather than by this twin's route registrar —
+    // the MCP transport rows. Outside the declared set by construction, and a
+    // twin declaring them would publish the engine's surface as its own.
+    "engine",
+    // Served by nobody. The row documents a surface the twin deliberately does
+    // not implement; the loud-501 catch-all is what answers it.
+    "unserved",
+  ]),
+  reason: z.string().min(1),
+});
+export type FidelityUnregistered = z.infer<typeof fidelityUnregisteredSchema>;
+
+/**
+ * A `rest` row, plus the link from its DOCUMENTATION name to the router
+ * patterns that name is about.
+ *
+ * The two spellings are allowed to differ, and should be: a row names one
+ * vendor surface the way the vendor documents it (`GET /repos/:owner/:repo/
+ * branches/:branch`), while the router spells the same thing the way hono
+ * matches it (`.../branches/*`), sometimes across two patterns. Forcing the
+ * row to carry the router's spelling would degrade the document to satisfy a
+ * linter. So the row carries the link instead, and
+ * `lintFidelityRestRoutes` checks it in both directions.
+ */
+export const fidelityRestSurfaceSchema = fidelitySurfaceSchema.extend({
+  /**
+   * The route surfaces (`"<METHOD> <path>"`, exactly as the declaration spells
+   * them) this row accounts for. Omitted means the row's own `name` IS the
+   * surface, which is the common case. Never a list of DIFFERENT vendor
+   * endpoints: an umbrella row hides every surface under it from the count,
+   * which is the failure F-1368 is about.
+   */
+  routes: z.array(z.string().min(1)).min(1).optional(),
+  unregistered: fidelityUnregisteredSchema.optional(),
+});
+export type FidelityRestSurface = z.infer<typeof fidelityRestSurfaceSchema>;
 
 export const fidelityDocDriftSchema = z.strictObject({
   kind: z.enum(["tool", "rest"]),
@@ -46,7 +97,7 @@ export const fidelityInventorySchema = z.strictObject({
   updated: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   notes: z.string().optional(),
   tools: z.array(fidelitySurfaceSchema).min(1),
-  rest: z.array(fidelitySurfaceSchema),
+  rest: z.array(fidelityRestSurfaceSchema),
   doc_drift: z.array(fidelityDocDriftSchema).default([]),
 });
 export type FidelityInventory = z.infer<typeof fidelityInventorySchema>;
@@ -246,6 +297,85 @@ export function lintFidelityInventory(
           `doc_drift ${kind} '${declared.name}' (${declared.ticket}) is stale — ${labels} now documents it; remove the declaration`
         );
       }
+    }
+  }
+  return problems;
+}
+
+// ─── Lint: rest rows ⇔ the routes the twin really registers ──────────────────
+
+/**
+ * 1:1-lint the `rest` rows against the twin's own route surfaces (F-1368).
+ *
+ * `lintFidelityInventory` above diffs the inventory against the FIDELITY doc
+ * tables, so the two documents agree with each other — and neither is compared
+ * to the code that serves traffic. A route could be added to or removed from a
+ * twin and both stayed green. The inventory is the denominator every fidelity
+ * lane counts against, so an unverified one makes a surface INVISIBLE rather
+ * than `not-compared`: nothing anywhere says it was never measured.
+ *
+ * `registered` is the twin's route surfaces (`"<METHOD> <path>"`), which for
+ * every twin is `<TWIN>_ROUTE_INPUTS.map((d) => d.surface)` — the declarations
+ * the routes are literally mounted FROM (F-1179), pinned equal to the
+ * registrar's calls and to the booted app's table by each twin's own
+ * `route-input-declarations.test.ts`.
+ *
+ * Both directions are checked, and a row that resolves to no route has to say
+ * why (`unregistered`) instead of being quietly skipped.
+ */
+export function lintFidelityRestRoutes(
+  inventory: FidelityInventory,
+  registered: readonly string[]
+): string[] {
+  const problems: string[] = [];
+  const mounted = new Set(registered);
+  /** Route surface → the rest rows accounting for it. */
+  const claims = new Map<string, string[]>();
+
+  for (const row of inventory.rest) {
+    if (row.unregistered && row.routes) {
+      problems.push(
+        `rest '${row.name}' carries both \`routes\` and \`unregistered\` — a row either ` +
+          `accounts for routes or says why it accounts for none, never both`
+      );
+      continue;
+    }
+    if (row.unregistered) {
+      // Self-expiring, the way `doc_drift` is: the day the twin registers this
+      // surface, the declaration that it registers nothing becomes a lie.
+      if (mounted.has(row.name)) {
+        problems.push(
+          `rest '${row.name}' is declared unregistered ('${row.unregistered.kind}') but the twin ` +
+            `registers exactly that surface; remove the declaration`
+        );
+      }
+      continue;
+    }
+    for (const surface of row.routes ?? [row.name]) {
+      if (!mounted.has(surface)) {
+        problems.push(
+          row.routes
+            ? `rest '${row.name}' lists route '${surface}', which the twin does not register`
+            : `rest '${row.name}' names no route the twin registers; add \`routes\` naming the ` +
+              `surface(s) it stands for, or \`unregistered\` saying why it stands for none`
+        );
+        continue;
+      }
+      claims.set(surface, [...(claims.get(surface) ?? []), row.name]);
+    }
+  }
+
+  for (const surface of new Set(registered)) {
+    const claimed = claims.get(surface);
+    if (!claimed) {
+      problems.push(`route '${surface}' is registered but absent from fidelity.inventory.json`);
+      continue;
+    }
+    if (claimed.length > 1) {
+      problems.push(
+        `route '${surface}' is accounted for by ${claimed.length} rest rows ` +
+          `(${claimed.map((name) => `'${name}'`).join(", ")}); exactly one row owns a route`
+      );
     }
   }
   return problems;

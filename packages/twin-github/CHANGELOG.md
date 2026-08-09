@@ -1,6 +1,43 @@
 # @pome-sh/twin-github — CHANGELOG
 
 
+## 0.10.1 — 2026-08-09
+
+`fidelity.inventory.json`'s `rest` half is now compared to the routes the twin
+actually mounts, in both directions, and all 66 are accounted for (F-1368). No
+route, tool, handler or response changed.
+
+62 rest rows stood against 66 registered routes. Nothing detected the
+difference, because `lintFidelityInventory` only diffs the inventory against
+`FIDELITY_MATRIX.md` — two documents agreeing with each other, neither compared
+to the code. A route could be added to this twin and both stayed green.
+
+Where the 18 unnamed routes were:
+
+* **Thirteen behind two umbrella rows.** `GET /search/*` stood for the five
+  search endpoints and `GET /repos/:owner/:repo/pulls/:number/*` for eight PR
+  endpoints — including the `POST` reviews write and the `PUT` merge and
+  update-branch mutations, which that `GET` name cannot even describe. Both are
+  now one row per route, here and in `FIDELITY_MATRIX.md`.
+* **Four spelled the way GitHub documents them**, not the way hono matches
+  them: `.../branches/:branch`, `.../git/refs/heads/:branch`,
+  `.../releases/tags/:tag`, `.../compare/:basehead`. The rows keep the vendor's
+  spelling and name the router's pattern in the new `routes` field.
+* **One with no row at all:** `GET /repos/:owner/:repo/contents` — the
+  repository-root listing. GitHub documents it as the empty-path case of
+  `/contents/{path}`, which hono cannot match with a wildcard, so that one row
+  now names both patterns.
+
+The two `POST /mcp/*` transport rows and the six documented-unsupported rows
+(Actions, git trees, org teams, sub-issues, issue types, and the loud-501
+catch-all) carry an `unregistered` declaration saying which they are and why, so
+they are distinguished from route rows rather than making the counts not line up
+by design. Each declaration goes red if the twin ever starts serving that
+surface.
+
+From here, adding a route without inventorying it fails CI.
+
+
 ## 0.10.0 — 2026-08-09
 
 The MCP tool table is cut from 65 tools to the 36 GitHub's own `tools/list`
