@@ -190,11 +190,21 @@ function awaitCallback(vendor) {
         return;
       }
       const err = url.searchParams.get("error");
-      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      // NOTHING FROM THE QUERY STRING IS REFLECTED INTO THIS PAGE. An earlier
+      // draft interpolated `error` and `error_description` into the HTML and
+      // CodeQL called it correctly (`js/reflected-xss`, high): the vendor
+      // controls those values, and a redirect crafted at this loopback port
+      // would execute in the operator's browser. Escaping would close it; not
+      // reflecting closes it and is also the better place for the message —
+      // the operator is reading the terminal, not a tab they are about to shut.
+      res.writeHead(200, {
+        "content-type": "text/html; charset=utf-8",
+        "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'",
+      });
       res.end(
         `<!doctype html><meta charset=utf-8><body style="font:16px system-ui;padding:3rem">` +
           (err
-            ? `<h2>Authorization refused</h2><p><code>${err}: ${url.searchParams.get("error_description") ?? ""}</code></p>`
+            ? `<h2>Authorization refused.</h2><p>The reason is printed in your terminal.</p>`
             : `<h2>Authorized.</h2><p>Close this tab and return to the terminal.</p>`) +
           `</body>`
       );
