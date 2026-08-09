@@ -13,7 +13,7 @@
 // has never been watched go red is not a guard. Each of the four ways a
 // golden can be wrong — edited raw, edited canonical, edited meta provenance,
 // hand-typed sha — gets its own red here.
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -468,6 +468,119 @@ function sandbox() {
     assert(readFileSync(paths.raw, "utf8") === before, `${label} left the committed raw.json untouched`);
     rmSync(dir, { recursive: true, force: true });
   }
+}
+
+// ── a deferred oauth row is CAPTURE-READY, not merely declared (F-1329) ──────
+// The whole content of "F-1329 adds a token, not an adapter" is that the errand
+// is one env var away. It was not: slack and linear declared no
+// `protocolVersion`, which `loadSources` requires on every capturable source, so
+// flipping `capture` threw `must declare protocolVersion` before opening a
+// socket — a schema error, read by whoever had just finished an OAuth flow, in
+// the one moment they have every reason to blame their own credential.
+//
+// Asserted over EVERY deferred oauth row rather than the two that exist today,
+// so a sixth twin added the same way is caught by this file and not by a human
+// mid-errand.
+{
+  const table = JSON.parse(readFileSync(join(ROOT, "config/mcp-capture-sources.json"), "utf8"));
+  const deferred = Object.entries(table.twins).filter(
+    ([, row]) => row.substrate === "live-wire-oauth" && !row.capture
+  );
+  assert(deferred.length > 0, "the source table still has deferred oauth rows for this guard to cover");
+  for (const [twin] of deferred) {
+    const flipped = JSON.parse(JSON.stringify(table));
+    flipped.twins[twin].capture = true;
+    let loaded;
+    try {
+      loaded = loadSources({ table: flipped });
+    } catch (err) {
+      assert(false, `${twin}: flipping \`capture\` alone must not throw — F-1329 is a token, not a schema edit (${err.message})`);
+      continue;
+    }
+    assert(
+      Boolean(loaded.twins[twin].authTokenEnv),
+      `${twin}: a deferred oauth row names the env var that will carry its token`
+    );
+  }
+}
+
+// ── the recorded refusal is RETIRED by the capture that supersedes it ────────
+// pome-cloud's `loadUpstreamMcpGolden` resolves `<twin>.status.json` FIRST and
+// never looks at the raw/meta beside it. Nothing used to delete that file, so
+// F-1329's first credentialed capture would have committed a real golden while
+// the lane went on publishing "401 missing_token" — the errand landing and
+// reading as though it had not, with nothing red anywhere.
+{
+  const sources = loadSources({ repoRoot: ROOT });
+  const twin = Object.keys(sources.twins).find((id) => sources.twins[id].capture);
+
+  // (a) --check reds when both artefacts exist, and says which one wins.
+  {
+    const dir = sandbox();
+    const paths = goldenPaths({ repoRoot: dir, sources, twin });
+    writeFileSync(paths.status, `${JSON.stringify({ twin, captured: false, reason: "stale" }, null, 2)}\n`);
+    const code = await runCapture({ repoRoot: dir, twins: [twin], check: true, offline: true, ...SILENT });
+    assert(code !== 0, "a golden sitting beside a leftover status.json fails --check");
+    let named = false;
+    await runCapture({
+      repoRoot: dir,
+      twins: [twin],
+      check: true,
+      offline: true,
+      log: quiet,
+      err: (line) => {
+        if (String(line).includes(`${twin}.status.json`)) named = true;
+      },
+    });
+    assert(named, "the failure names the status file to delete, not just 'a difference'");
+    rmSync(dir, { recursive: true, force: true });
+  }
+
+  // (b) a real capture deletes it, so the commit cannot land half-applied.
+  {
+    const dir = sandbox();
+    const paths = goldenPaths({ repoRoot: dir, sources, twin });
+    const rawText = readFileSync(paths.raw, "utf8");
+    writeFileSync(paths.status, `${JSON.stringify({ twin, captured: false, reason: "stale" }, null, 2)}\n`);
+    const code = await runCapture({
+      repoRoot: dir,
+      twins: [twin],
+      readSubstrate: async () => ({ rawText }),
+      ...SILENT,
+    });
+    assert(code === 0, "the capture itself succeeds");
+    assert(!existsSync(paths.status), "a successful capture retires the status file it supersedes");
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+// ── SET-BUT-BLANK is not UNSET (F-1184) ─────────────────────────────────────
+// F-1184: a value blanked in the secret store must not reach a runner and read
+// as "no credential configured" — the operator who blanked it and the operator
+// who never set it need different instructions. `if (!token)` said "is not set"
+// for both, and let whitespace through entirely: `Bearer    ` went on the wire
+// and came back as the VENDOR's 401, which reads as a bad token and sends
+// whoever just minted one back through the OAuth flow.
+{
+  const ENV = "F1329_BLANK_PROBE";
+  const source = {
+    twin: "acme",
+    endpoint: "https://example.invalid/mcp",
+    substrate: "live-wire-oauth",
+    authTokenEnv: ENV,
+    configuration: { auth: "bearer" },
+  };
+  const read = () => adapterFor("live-wire-oauth").read(source);
+
+  delete process.env[ENV];
+  await assertRejects(read, "is not set", "an ABSENT token says 'is not set'");
+
+  for (const [label, value] of [["empty string", ""], ["whitespace only", "   \t "]]) {
+    process.env[ENV] = value;
+    await assertRejects(read, "SET BUT BLANK", `a ${label} is reported as SET BUT BLANK, not as unset`);
+    await assertRejects(read, "secret store", `a ${label} points at the secret store, not the OAuth flow`);
+  }
+  delete process.env[ENV];
 }
 
 if (failures > 0) {
