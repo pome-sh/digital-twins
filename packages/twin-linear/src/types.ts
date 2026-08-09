@@ -18,6 +18,7 @@ export type LinearWorkflowStateType =
 export type LinearTokenType = "personal" | "oauth_access" | "oauth_refresh" | "client_credentials";
 export type LinearTokenActorType = "user" | "app";
 export type LinearIssuePriority = 0 | 1 | 2 | 3 | 4;
+/** Linear's `AgentActivityType` enum, member-for-member — the `content` discriminator. */
 export type LinearAgentActivityType =
   | "thought"
   | "elicitation"
@@ -25,6 +26,26 @@ export type LinearAgentActivityType =
   | "response"
   | "error"
   | "prompt";
+/** Linear's `AgentActivitySignal` enum, member-for-member (F-1176). */
+export type LinearAgentActivitySignal = "stop" | "continue" | "auth" | "select";
+/**
+ * Linear's `AgentActivityContent` union, member-for-member (F-1176).
+ *
+ * Upstream this is a real GraphQL union discriminated on `type`, whose six
+ * members are `AgentActivity{Thought,Action,Response,Elicitation,Error,Prompt}
+ * Content`. Five of the six carry `body`; `action` carries `action` /
+ * `parameter` / `result` instead, which is why an activity's payload cannot be
+ * flattened back to the `{ type, body }` pair the twin used to accept.
+ *
+ * `bodyData` / `resultData` are upstream's structured companions to the text
+ * fields. The twin does not derive them, but it accepts and stores them rather
+ * than refusing an agent that was written against real Linear and sends them.
+ */
+export type LinearAgentActivityContent =
+  | { type: "thought" | "response" | "elicitation"; body: string; bodyData?: unknown }
+  | { type: "prompt"; body: string; title?: string | null; bodyData?: unknown }
+  | { type: "error"; body: string; reasonCode?: string | null; bodyData?: unknown }
+  | { type: "action"; action: string; parameter: string; result?: string | null; resultData?: unknown };
 /** Linear's `AgentSessionStatus` enum, member-for-member (F-1172). */
 export type LinearAgentSessionStatus =
   | "pending"
@@ -249,10 +270,15 @@ export type LinearAgentSession = {
 
 export type LinearAgentActivity = {
   id: string;
-  sessionId: string;
-  userId: string | null;
-  type: LinearAgentActivityType;
-  body: string;
+  agentSessionId: string;
+  /**
+   * Non-null, matching Linear's `AgentActivity.user: User!`. The column is
+   * still nullable — its FK is `ON DELETE SET NULL` — so this is enforced at
+   * the read boundary, next to the status check, rather than assumed.
+   */
+  userId: string;
+  content: LinearAgentActivityContent;
+  signal: LinearAgentActivitySignal | null;
   ephemeral: boolean;
   createdAt: string;
   updatedAt: string;
