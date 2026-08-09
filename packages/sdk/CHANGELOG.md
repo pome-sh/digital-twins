@@ -1,6 +1,37 @@
 # @pome-sh/sdk
 
 
+## 0.11.6 — 2026-08-09
+
+New `lintFidelityRestRoutes`, reachable from `@pome-sh/sdk/parity`, plus the
+`routes` and `unregistered` fields it reads on a `rest` row
+(`fidelityRestSurfaceSchema`) (F-1368).
+
+`lintFidelityInventory` compares two DOCUMENTS — `fidelity.inventory.json` and
+the FIDELITY doc tables — so they agree with each other and neither is compared
+to the code that serves traffic. twin-github's 62 `rest` rows stood against 66
+routes the twin really mounts, and nothing could see it. That matters more than
+a wrong count: the inventory is the denominator every fidelity lane divides by,
+so a surface absent from it does not report `not-compared`, it reports nothing
+at all.
+
+The new lint takes the twin's route surfaces — `<TWIN>_ROUTE_INPUTS.map((d) =>
+d.surface)`, the declarations the routes are mounted FROM (F-1179) — and checks
+both directions: every registered route is accounted for by exactly one row, and
+every row resolves to a registered route.
+
+A row is not forced to adopt the router's spelling. `GET /repos/:owner/:repo/
+branches/:branch` is how GitHub documents the surface and `.../branches/*` is
+how hono matches it; the row keeps the first and names the second in `routes`,
+which is checked to exist. A row that stands for no route at all says why in
+`unregistered` — `engine` for a surface the sdk's own transport mounts,
+`unserved` for one the loud-501 catch-all answers — and that declaration goes
+red the day the twin starts registering it, the way a `doc_drift` entry does.
+
+Additive: `routes` and `unregistered` are optional, so an inventory that carries
+neither parses and lints exactly as before.
+
+
 ## 0.11.5 — 2026-08-08
 
 New `check-redaction.ts`, reachable from `@pome-sh/sdk/checks`:

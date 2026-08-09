@@ -4,6 +4,21 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.22.1
+
+### Patch Changes
+
+- No behaviour change for anyone running `pome`. The bundled `twin-github`'s
+  `fidelity.inventory.json` is now compared to the routes the twin actually
+  mounts (F-1368) — 62 rest rows had stood against 66 registered routes, with
+  nothing able to see the difference because the only existing check diffed the
+  inventory against `FIDELITY_MATRIX.md` and neither document was ever compared
+  to the code. The inventory and matrix gained rows; no route, tool, handler or
+  response moved.
+
+  The comparator itself is `lintFidelityRestRoutes` in `@pome-sh/sdk/parity`,
+  bumped alongside for it.
+
 ## 0.22.0
 
 ### Minor Changes

@@ -250,9 +250,12 @@ export {
   expandSurfaceCell,
   fidelityDocDriftSchema,
   fidelityInventorySchema,
+  fidelityRestSurfaceSchema,
   fidelitySurfaceSchema,
+  fidelityUnregisteredSchema,
   heatTierSchema,
   lintFidelityInventory,
+  lintFidelityRestRoutes,
   loadFidelityInventory,
   parseFidelityDocRows,
 } from "./fidelity-inventory.js";
@@ -261,6 +264,8 @@ export type {
   FidelityDocRow,
   FidelityDocSource,
   FidelityInventory,
+  FidelityRestSurface,
   FidelitySurface,
+  FidelityUnregistered,
   HeatTier,
 } from "./fidelity-inventory.js";
