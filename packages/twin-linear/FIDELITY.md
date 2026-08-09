@@ -107,3 +107,27 @@ vendor-declared inputs on matched surfaces from `not-compared` into a real
 two-way comparison — and makes `missingRequired` live. Surfaces with no declared
 inputs are omitted rather than published with an empty list: comparing nothing
 against nothing would render as a match nobody measured.
+
+
+### Undeclared inputs: `ignore` (F-1372)
+
+**Linear ignores a request parameter it does not recognise, so this twin
+discards them too.** Four of this twin's six HTTP routes are OAuth, where it is
+not Linear's choice to make: RFC 6749 says *"The authorization server MUST
+ignore unrecognized request parameters"* in **§3.1** for the authorization
+endpoint and again in **§3.2** for the token endpoint, and `/oauth/revoke`
+follows the token endpoint's conventions (RFC 7009).
+
+Measured 2026-08-09 against real Linear:
+
+- `GET /oauth/authorize` served its consent page identically with and without
+  an unknown parameter — 24,446 bytes either way, differing only in a
+  per-request CSP nonce.
+- `POST /oauth/token` answered the same `invalid_client` both ways.
+- `POST /graphql` answered identically for an unknown top-level envelope key
+  and for an unknown query-string key.
+
+The transcript, including the one case this does **not** cover — `extensions`,
+a GraphQL-over-HTTP envelope member this twin declares nowhere and Linear
+rejects for its own reasons — is in
+[`docs/undeclared-route-inputs.md`](../../docs/undeclared-route-inputs.md).

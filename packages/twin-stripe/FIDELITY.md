@@ -419,3 +419,17 @@ vendor-declared inputs on matched surfaces from `not-compared` into a real
 two-way comparison — and makes `missingRequired` live. Surfaces with no declared
 inputs are omitted rather than published with an empty list: comparing nothing
 against nothing would render as a match nobody measured.
+
+### Undeclared inputs: `refuse` (F-1372, affirmed)
+
+**Stripe refuses a parameter it does not know, so the strict default stays.**
+Stripe's published error-code reference carries `parameter_unknown` — "The
+request contains one or more unexpected parameters. Remove these and try again."
+This twin has been speaking Stripe's own word for it since F-1179 without anyone
+checking: `routes/errors.ts` already renders `UndeclaredInputError` as
+`parameter_unknown`.
+
+Affirmed on published behaviour rather than measured directly: Stripe answers
+401 to a keyless request before it looks at a parameter, so reaching the
+validation layer needs a live secret key. See
+[`docs/undeclared-route-inputs.md`](../../docs/undeclared-route-inputs.md).

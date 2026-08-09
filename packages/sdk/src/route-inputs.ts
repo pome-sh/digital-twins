@@ -27,8 +27,9 @@
 //     handler ever sees a request value).
 //   * A handler receives `parse()`'s output and nothing else. It is handed no
 //     request object to read around the declaration with.
-//   * `parse()` REFUSES a query key or a top-level body key the declaration
-//     does not name. Undeclared input is not ignored, it is an error.
+//   * What `parse()` does with a query key or a top-level body key the
+//     declaration does NOT name is the twin's ruling, not this module's — see
+//     `UndeclaredDisposition` below. Either way the handler never sees it.
 //
 // Those three together make the two failure modes the ticket names structurally
 // impossible rather than merely absent today: a handler cannot accept a
@@ -44,14 +45,26 @@
 // imperative reads. This module and that gate are two halves of one
 // invariant; neither is sufficient alone.
 //
+// # What happens to an undeclared query or body key is the VENDOR's answer
+//
+// F-1179 shipped one answer for all five twins: refuse. F-1372 measured the
+// vendors and found they disagree, so the answer moved to the twin
+// (`UndeclaredDisposition`, `routeInputDeclarer()`), with the measurements in
+// `docs/undeclared-route-inputs.md`. Neither disposition changes what a handler
+// can see, and neither changes the published artifact: `inputs` is derived from
+// the declared schemas alone, so `route-inputs.json` is byte-identical either
+// way and a declaration that is short of the vendor's real surface is still the
+// declared-fidelity lane's finding to report. The disposition only decides
+// whether the twin ANSWERS an agent the way the vendor would.
+//
 // # Deliberately NOT strict about headers
 //
-// Query and body keys are refused when undeclared. Headers are not: every HTTP
-// client on earth sends a dozen headers no API declares, and rejecting them
-// would make the twins unreachable. The declaration still governs which
-// headers a handler can SEE — `parse()` returns only declared ones — so a
-// header the twin actually reads is always named. Unnamed headers are ignored,
-// which is what every vendor does with them.
+// Headers are never refused, whatever the twin's disposition: every HTTP client
+// on earth sends a dozen headers no API declares, and rejecting them would make
+// the twins unreachable. The declaration still governs which headers a handler
+// can SEE — `parse()` returns only declared ones — so a header the twin
+// actually reads is always named. Unnamed headers are ignored, which is what
+// every vendor does with them.
 //
 // # Portability
 //
@@ -122,6 +135,26 @@ export type BodyEncoding =
    * input named by `mediaField`.
    */
   | "media";
+
+/**
+ * What a route does with a query key or a top-level body key its declaration
+ * does not name (F-1372).
+ *
+ * This is a FIDELITY setting, so it is answered per twin from a measurement of
+ * the vendor rather than chosen — `docs/undeclared-route-inputs.md` carries the
+ * transcript behind each twin's answer, and says which twin has not been
+ * measured yet. Refusing where the vendor accepts scores an agent for a failure
+ * it did not commit; accepting where the vendor refuses hides one it did.
+ *
+ * Neither setting lets a handler see the input: `parse()` returns declared
+ * names only, and `inputs` is derived from the declared schemas, so the
+ * published artifact does not move either.
+ */
+export type UndeclaredDisposition =
+  /** 4xx, as `UndeclaredInputError` — the twin's error hook renders the vendor's envelope. */
+  | "refuse"
+  /** Drop it and serve the request, which is what the vendor does. */
+  | "ignore";
 
 /** HTTP methods a declaration can be registered on. */
 export type RouteMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "ALL";
@@ -200,6 +233,13 @@ export interface RouteInputSpec {
   /** For `bodyEncoding: "media"`, the (optionally dotted) body path the media
    *  bytes land on, e.g. `"raw"` or `"message.raw"`. */
   mediaField?: string;
+  /**
+   * Defaults to `"refuse"` — a route that says nothing gets the strict answer,
+   * so a twin that ignores undeclared input has to say so. Set it once per twin
+   * through `routeInputDeclarer()` rather than here: a disposition written per
+   * route is a per-route ruling nobody made.
+   */
+  undeclared?: UndeclaredDisposition;
 }
 
 export interface RouteInputDeclaration<S extends RouteInputSpec = RouteInputSpec> {
@@ -208,6 +248,13 @@ export interface RouteInputDeclaration<S extends RouteInputSpec = RouteInputSpec
   /** `"<METHOD> <path>"` — the identity this surface publishes under. */
   readonly surface: string;
   readonly bodyEncoding: BodyEncoding;
+  /**
+   * What `parse()` does with an undeclared query or body key. Published on the
+   * declaration so a twin's own suite can assert the disposition it was ruled
+   * to have AND the behaviour that disposition implies — the reverted first
+   * attempt at F-1372 moved the source and left the tests behind.
+   */
+  readonly undeclared: UndeclaredDisposition;
   /** Every input, sorted by location then name. Derived, never written. */
   readonly inputs: readonly DeclaredInput[];
   /** Just the names, deduplicated — the shape pome-cloud's comparator diffs. */
@@ -217,8 +264,10 @@ export interface RouteInputDeclaration<S extends RouteInputSpec = RouteInputSpec
    * a handler gets.
    *
    * Throws `UndeclaredInputError` for a query or top-level body key this
-   * declaration does not name, `z.ZodError` when a declared input fails its own
-   * schema, and `MalformedBodyError` when `bodyEncoding: "json"` cannot decode.
+   * declaration does not name — when `undeclared` is `"refuse"`; under
+   * `"ignore"` the key is dropped and the request is served. Also `z.ZodError`
+   * when a declared input fails its own schema, and `MalformedBodyError` when
+   * `bodyEncoding: "json"` cannot decode.
    */
   parse(
     request: RouteRequestSource
@@ -313,6 +362,7 @@ export function declareRouteInputs<const S extends RouteInputSpec>(
     throw new Error(`route-inputs: path must start with '/' (got '${spec.path}')`);
   }
   const surface = `${spec.method} ${spec.path}`;
+  const undeclared: UndeclaredDisposition = spec.undeclared ?? "refuse";
   const pathShape = spec.pathParams ?? {};
   const queryShape = spec.query ?? {};
   const headerShape = spec.headers ?? {};
@@ -396,6 +446,7 @@ export function declareRouteInputs<const S extends RouteInputSpec>(
     path: spec.path,
     surface,
     bodyEncoding,
+    undeclared,
     inputs,
     // Deduplicated: pome-cloud's comparator diffs NAME sets, and a name that
     // arrives in two locations is still one name to it.
@@ -406,7 +457,13 @@ export function declareRouteInputs<const S extends RouteInputSpec>(
       ) as Infer<S["pathParams"]>;
 
       const searchParams = new URL(request.url, "http://twin.invalid").searchParams;
-      refuseUndeclared("query", surface, [...searchParams.keys()], declaredQuery, bracketedQueryNames);
+      if (undeclared === "refuse") {
+        refuseUndeclared("query", surface, [...searchParams.keys()], declaredQuery, bracketedQueryNames);
+      }
+      // Under `"ignore"` nothing is dropped here, because nothing was ever
+      // picked up: `readQuery` reads the DECLARED names out of the search params
+      // rather than filtering everything that arrived. Same for the body, where
+      // `bodySchema` is a plain `z.object` and strips what it does not name.
       const query = querySchema.parse(
         readQuery(searchParams, declaredQuery, bracketedQueryNames, arrayQuery)
       ) as Infer<S["query"]>;
@@ -418,11 +475,43 @@ export function declareRouteInputs<const S extends RouteInputSpec>(
       ) as Infer<S["headers"]>;
 
       const raw = await decodeBody(request, bodyEncoding, surface, spec.mediaField);
-      refuseUndeclared("body", surface, Object.keys(raw), declaredBody, new Set());
+      if (undeclared === "refuse") {
+        refuseUndeclared("body", surface, Object.keys(raw), declaredBody, new Set());
+      }
       const body = bodySchema.parse(raw) as Infer<S["body"]>;
 
       return { path, query, header, body };
     },
+  };
+}
+
+/**
+ * Bind `declareRouteInputs` to one twin's ruling on undeclared input (F-1372).
+ *
+ * A twin calls this ONCE, at the top of its declarations module, and every
+ * declaration below inherits the disposition. That is the whole point: the
+ * ruling is per VENDOR, so writing it on each of twin-github's 66 specs would
+ * put 66 copies of one decision where 66 different answers could drift apart,
+ * and a route that quietly disagreed with its own twin would look deliberate.
+ *
+ * Which is why a spec handed to a bound declarer may not carry its own
+ * `undeclared`. Spreading the binding over it would make the route's own
+ * spelling lose silently — the one shape where a reader and the running code
+ * disagree and nothing says so — and honouring it instead would reintroduce the
+ * per-route ruling this exists to prevent. Neither, so: throw.
+ */
+export function routeInputDeclarer(
+  undeclared: UndeclaredDisposition
+): <const S extends RouteInputSpec>(spec: S) => RouteInputDeclaration<S> {
+  return (spec) => {
+    if (spec.undeclared !== undefined) {
+      throw new Error(
+        `route-inputs: ${spec.method} ${spec.path} sets undeclared: '${spec.undeclared}' on its ` +
+          `own spec, but its twin already rules '${undeclared}' for every route — ` +
+          `the disposition is one ruling per twin (F-1372)`
+      );
+    }
+    return declareRouteInputs({ ...spec, undeclared });
   };
 }
 
@@ -693,8 +782,10 @@ function setPath(
  *
  * `__proto__` / `constructor` / `prototype` paths are dropped: a form body
  * spelling one of them would otherwise mutate `Object.prototype` for the rest
- * of the process's life. They are not parameter names on any vendor surface,
- * and a dropped key is refused by the undeclared-input check right after this.
+ * of the process's life. They are not parameter names on any vendor surface, so
+ * dropping them here is the whole protection — what the caller is then told is
+ * the twin's `UndeclaredDisposition`, a 4xx naming the key under `"refuse"` and
+ * silence under `"ignore"`, and neither can reach the prototype.
  */
 const POLLUTION_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 

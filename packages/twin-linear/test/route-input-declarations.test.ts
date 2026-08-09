@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1179 — twin-linear's declared input surface.
+// F-1179 / F-1372 — twin-linear's declared input surface.
 //
 // Linear is the twin the other four were rebuilt to resemble: its OPERATION
 // arguments were already readable with zero transcription, out of the executable
 // schema `/graphql` runs every request against. What was NOT declared was the
 // HTTP transport around it — the GraphQL envelope and the four OAuth endpoints —
-// and this suite covers both halves: that the transport now refuses an input it
-// does not name, and that the argument projection is the schema rather than a
-// second description of it.
+// and this suite covers both halves: that the transport handles an input it
+// does not name the way F-1372 measured Linear handling one, and that the
+// argument projection is the schema rather than a second description of it.
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { sign } from "hono/jwt";
-import { diffRegisteredRoutes } from "@pome-sh/sdk/route-inputs";
+import { diffRegisteredRoutes, type UndeclaredDisposition } from "@pome-sh/sdk/route-inputs";
 import {
   DEFAULT_LINEAR_EMAIL,
   DEFAULT_LINEAR_SID,
@@ -51,6 +51,16 @@ afterAll(() => {
 /** The probe name: something no vendor and no twin declares anywhere. */
 const UNDECLARED = "pome_undeclared_probe";
 
+/**
+ * F-1372's ruling for this twin: Linear ignores a parameter it does not
+ * recognise, on all six routes. Four are OAuth, where RFC 6749 §3.1 and §3.2
+ * both say the authorization server "MUST ignore unrecognized request
+ * parameters"; real Linear was measured obeying that, and answering `/graphql`
+ * identically with and without an unknown envelope or query key, on 2026-08-09
+ * (`docs/undeclared-route-inputs.md`).
+ */
+const RULED: UndeclaredDisposition = "ignore";
+
 /** A URL for a declaration, with its path params filled in plausibly. */
 function urlFor(path: string): string {
   const filled = path.replace(/:([A-Za-z0-9_]+)/g, "placeholder");
@@ -64,39 +74,55 @@ function authHeaders(extra: Record<string, string> = {}): Record<string, string>
 }
 
 describe("route input declarations", () => {
-  it("refuses an input the declaration does not name", async () => {
+  it("is ruled `ignore` on undeclared input, on every route", () => {
     expect(LINEAR_ROUTE_INPUTS.length).toBeGreaterThan(0);
+    const dissenting = LINEAR_ROUTE_INPUTS.filter((d) => d.undeclared !== RULED).map(
+      (d) => `${d.surface} is '${d.undeclared}'`
+    );
+    expect(dissenting, `these routes disagree with the twin's F-1372 ruling ('${RULED}')`).toEqual(
+      []
+    );
+  });
+
+  it("serves a request carrying an input the declaration does not name, unchanged", async () => {
+    expect(LINEAR_ROUTE_INPUTS.length).toBeGreaterThan(0);
+    // Two twins taken through the SAME sequence of requests, one of them with
+    // the probe added to every one. A parameter that is genuinely ignored
+    // cannot change an answer, so the two have to agree request for request —
+    // including on the 400s an empty OAuth body earns, which is a much stronger
+    // claim than "the probed call was not a 4xx".
+    const plain = createLinearTwinApp();
+    const probed = createLinearTwinApp();
+    const read = async (app: ReturnType<typeof createLinearTwinApp>, url: string, init: RequestInit) =>
+      `${(await app.request(url, init)).status}`;
 
     for (const declaration of LINEAR_ROUTE_INPUTS) {
-      // ── query ──────────────────────────────────────────────────────────────
-      const queryUrl = `${urlFor(declaration.path)}?${UNDECLARED}=x`;
-      const viaQuery = await app.request(queryUrl, {
-        method: declaration.method === "ALL" ? "GET" : declaration.method,
-        headers: authHeaders(
-          declaration.bodyEncoding === "none"
-            ? {}
-            : { "content-type": "application/x-www-form-urlencoded" }
-        ),
-        ...(declaration.bodyEncoding === "none" ? {} : { body: "" }),
+      const url = urlFor(declaration.path);
+      const method = declaration.method === "ALL" ? "GET" : declaration.method;
+      const form = declaration.bodyEncoding === "none";
+      const init = (): RequestInit => ({
+        method,
+        headers: authHeaders(form ? {} : { "content-type": "application/x-www-form-urlencoded" }),
+        ...(form ? {} : { body: "" }),
       });
+
+      // ── query ──────────────────────────────────────────────────────────────
       expect(
-        viaQuery.status,
-        `${declaration.surface} accepted an undeclared query key`
-      ).toBeGreaterThanOrEqual(400);
-      expect(viaQuery.status, `${declaration.surface} answered 501`).not.toBe(501);
+        await read(probed, `${url}?${UNDECLARED}=x`, init()),
+        `${declaration.surface} answered differently for an undeclared query key`
+      ).toBe(await read(plain, url, init()));
 
       // ── body ───────────────────────────────────────────────────────────────
-      if (declaration.bodyEncoding === "none") continue;
-      const viaBody = await app.request(urlFor(declaration.path), {
+      if (form) continue;
+      const body = (extra: boolean): RequestInit => ({
         method: "POST",
         headers: authHeaders({ "content-type": "application/x-www-form-urlencoded" }),
-        body: new URLSearchParams({ [UNDECLARED]: "x" }).toString(),
+        body: extra ? new URLSearchParams({ [UNDECLARED]: "x" }).toString() : "",
       });
       expect(
-        viaBody.status,
-        `${declaration.surface} accepted an undeclared body key`
-      ).toBeGreaterThanOrEqual(400);
-      expect(viaBody.status, `${declaration.surface} answered 501`).not.toBe(501);
+        await read(probed, url, body(true)),
+        `${declaration.surface} answered differently for an undeclared body key`
+      ).toBe(await read(plain, url, body(false)));
     }
   });
 

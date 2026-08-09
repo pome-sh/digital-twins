@@ -1,23 +1,32 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1179 — the twin's declared route input surface, driven over the real HTTP
-// wire.
+// F-1179 / F-1372 — the twin's declared route input surface, driven over the
+// real HTTP wire.
 //
-// Both assertions here are about the two failure modes the declaration
-// mechanism exists to make structurally impossible, not about any one route:
+// The assertions here are about failure modes the declaration mechanism exists
+// to make structurally impossible, not about any one route:
 //
-//   1. A handler can never see an input its declaration does not name. Probed
-//      through `app.request` rather than `declaration.parse` in isolation,
-//      because "the parser refuses it" and "the handler cannot see it" are
-//      different claims and only the second one matters.
-//   2. The declared set and the registered set are the same set. The method and
+//   1. Every declaration carries the disposition F-1372 ruled for THIS twin.
+//      Pinned as a literal below, because the point of the pin is to be the
+//      thing that goes red when `src/route-inputs.ts` changes its mind — a test
+//      that read the disposition off the source and asserted whatever it found
+//      would go green on a flip nobody sanctioned.
+//   2. That disposition is what the wire does. Probed through `app.request`
+//      rather than `declaration.parse` in isolation, because "the parser does
+//      this" and "the twin answers this" are different claims and only the
+//      second one is what an agent meets.
+//   3. The declared set and the registered set are the same set. The method and
 //      path cannot drift (the route is mounted FROM the declaration), but
 //      EXISTENCE can — a route registered without a declaration would be a hole
 //      in the published surface with every other check green.
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Hono } from "hono";
-import { diffRegisteredRoutes, type RouteInputDeclaration } from "@pome-sh/sdk/route-inputs";
+import {
+  diffRegisteredRoutes,
+  type RouteInputDeclaration,
+  type UndeclaredDisposition,
+} from "@pome-sh/sdk/route-inputs";
 import { GITHUB_ROUTE_INPUTS } from "../src/route-inputs.js";
 import { registerGitHubRoutes } from "../src/routes.js";
 import { createGitHubCloneApp } from "../src/twin.js";
@@ -39,6 +48,15 @@ const base = `/s/${TEST_SID}`;
 
 /** A query/body key no GitHub surface has ever declared. */
 const PROBE = "pome_undeclared_probe";
+
+/**
+ * F-1372's ruling for this twin: real GitHub answers an unknown query parameter
+ * and an unknown top-level body key exactly as it answers the request without
+ * them — measured over ten surfaces on 2026-08-09, bodies hashed — so the twin
+ * discards them too rather than 4xx'ing an agent GitHub would have served
+ * (`docs/undeclared-route-inputs.md`).
+ */
+const RULED: UndeclaredDisposition = "ignore";
 
 /**
  * A value per path param that satisfies that param's own schema, so the probe
@@ -87,7 +105,7 @@ async function probe(
   app: Hono,
   declaration: RouteInputDeclaration,
   init: { query?: string; body?: unknown }
-): Promise<{ status: number; field: string | undefined }> {
+): Promise<{ status: number; text: string }> {
   const request: RequestInit = {
     method: declaration.method,
     headers: { "content-type": "application/json" },
@@ -97,38 +115,69 @@ async function probe(
     `${base}${concretePath(declaration)}${init.query ?? ""}`,
     withAuth(token, request)
   );
-  const text = await response.text();
-  const parsed = text ? (JSON.parse(text) as { errors?: Array<{ field?: string }> }) : null;
-  return { status: response.status, field: parsed?.errors?.[0]?.field };
+  return { status: response.status, text: await response.text() };
 }
 
-describe("declared route inputs (F-1179)", () => {
-  it("refuses an input the declaration does not name", async () => {
-    // One app for every probe: a refused request never reaches the domain, so
-    // there is no state to isolate between them.
-    const app = createGitHubCloneApp();
+describe("declared route inputs (F-1179, F-1372)", () => {
+  it("is ruled `ignore` on undeclared input, on every route", () => {
+    expect(GITHUB_ROUTE_INPUTS.length).toBeGreaterThan(0);
+    const dissenting = GITHUB_ROUTE_INPUTS.filter((d) => d.undeclared !== RULED).map(
+      (d) => `${d.surface} is '${d.undeclared}'`
+    );
+    // One ruling per twin, so a route that answered differently from its
+    // neighbours would be a per-route decision nobody took — and it would
+    // publish an input surface whose meaning changed depending which route you
+    // asked. `routeInputDeclarer()` is what makes this hold by construction;
+    // this is the assertion that it still does.
+    expect(dissenting, `these routes disagree with the twin's F-1372 ruling ('${RULED}')`).toEqual(
+      []
+    );
+  });
+
+  it("serves a request carrying an input the declaration does not name, unchanged", async () => {
+    // Two apps driven through the SAME sequence of requests, one of them with
+    // the probe added to every call. An input that is genuinely discarded
+    // cannot change an answer, so the runs have to agree step for step — on the
+    // 404s and 422s the path samples provoke as much as on the 200s, which is a
+    // far stronger claim than "the probed call was not a 4xx".
+    const plain = createGitHubCloneApp();
+    const probed = createGitHubCloneApp();
 
     for (const declaration of GITHUB_ROUTE_INPUTS) {
-      const query = await probe(app, declaration, { query: `?${PROBE}=x`, ...bodyFor(declaration) });
-      // 501 is the engine's unsupported catch-all — it would mean the probe
-      // never reached this route at all, so the refusal proved nothing.
-      expect(query.status, `${declaration.surface} answered 501 for ?${PROBE}=`).not.toBe(501);
-      expect(query.status, `${declaration.surface} did not refuse ?${PROBE}=`).toBeGreaterThanOrEqual(400);
-      expect(query.status, `${declaration.surface} did not refuse ?${PROBE}=`).toBeLessThan(500);
-      expect(query.field, `${declaration.surface} refused ?${PROBE}= for another reason`).toBe(PROBE);
+      const bare = await probe(plain, declaration, bodyFor(declaration));
+      const withQuery = await probe(probed, declaration, {
+        query: `?${PROBE}=x`,
+        ...bodyFor(declaration),
+      });
+      // 501 is the engine's unsupported catch-all — it would mean neither
+      // request reached this route at all, so their agreeing proved nothing.
+      expect(bare.status, `${declaration.surface} answered 501 without the probe`).not.toBe(501);
+      expect(
+        withQuery.status,
+        `${declaration.surface} answered ${withQuery.status} for ?${PROBE}= but ` +
+          `${bare.status} without it: ${withQuery.text}`
+      ).toBe(bare.status);
+      expect(
+        withQuery.text,
+        `${declaration.surface} mentioned ?${PROBE}= in its answer, so it noticed`
+      ).not.toContain(PROBE);
 
       if (declaration.bodyEncoding === "none") continue;
 
-      const body = await probe(app, declaration, {
+      const bareBody = await probe(plain, declaration, { body: sampleBody(declaration) });
+      const probedBody = await probe(probed, declaration, {
         body: { ...sampleBody(declaration), [PROBE]: "x" },
       });
-      expect(body.status, `${declaration.surface} answered 501 for an undeclared body key`).not.toBe(501);
+      expect(bareBody.status, `${declaration.surface} answered 501 without the probe`).not.toBe(501);
       expect(
-        body.status,
-        `${declaration.surface} did not refuse the undeclared body key ${PROBE}`
-      ).toBeGreaterThanOrEqual(400);
-      expect(body.status, `${declaration.surface} 5xx'd on an undeclared body key`).toBeLessThan(500);
-      expect(body.field, `${declaration.surface} refused ${PROBE} for another reason`).toBe(PROBE);
+        probedBody.status,
+        `${declaration.surface} answered ${probedBody.status} for an undeclared body key but ` +
+          `${bareBody.status} without it: ${probedBody.text}`
+      ).toBe(bareBody.status);
+      expect(
+        probedBody.text,
+        `${declaration.surface} mentioned the undeclared body key in its answer`
+      ).not.toContain(PROBE);
     }
   });
 

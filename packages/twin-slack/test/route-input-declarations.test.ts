@@ -1,18 +1,20 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1179 — the twin's published input surface, driven over real HTTP.
+// F-1179 / F-1372 — the twin's published input surface, driven over real HTTP.
 //
-// The two properties here are the ones nothing else can see. `app.test.ts` and
-// friends prove the endpoints WORK; these prove the declaration is the only way
-// in (an unnamed argument is refused, not ignored) and that it covers every
-// route that exists (no route mounted without a declaration, no declaration
-// nothing mounts). Either hole would leave `route-inputs.json` an incomplete
-// list that pome-cloud's lane still compares — a pass nobody measured.
+// The properties here are the ones nothing else can see. `app.test.ts` and
+// friends prove the endpoints WORK; these prove that the declaration is the
+// only way IN (an argument it does not name never reaches a handler, whatever
+// the twin answers the caller), that the twin answers such an argument the way
+// F-1372 ruled Slack answers it, and that the declarations cover every route
+// that exists. A hole in the last one would leave `route-inputs.json` an
+// incomplete list that pome-cloud's lane still compares — a pass nobody
+// measured.
 
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Hono } from "hono";
 import { createRecorderHandle } from "@pome-sh/sdk/server";
-import { diffRegisteredRoutes } from "@pome-sh/sdk/route-inputs";
+import { diffRegisteredRoutes, type UndeclaredDisposition } from "@pome-sh/sdk/route-inputs";
 import { createSlackTwinApp } from "../src/twin.js";
 import { openSlackTwinDatabase } from "../src/db.js";
 import { SlackDomain } from "../src/domain/index.js";
@@ -23,6 +25,15 @@ import { signTestToken, TEST_AUTH_SECRET, TEST_SID, withAuth } from "./_authHelp
 
 /** A query/body key no Slack method declares, and no vendor ever will. */
 const PROBE = "pome_undeclared_probe";
+
+/**
+ * F-1372's ruling for this twin: `api.test` — the one Web API method that
+ * answers without a token — accepted `pome_undeclared_probe` as a GET query key
+ * and as a POST form field and echoed it back under `ok:true` (measured
+ * 2026-08-09), and Slack's error vocabulary has no code for an argument it does
+ * not know. So the twin discards it (`docs/undeclared-route-inputs.md`).
+ */
+const RULED: UndeclaredDisposition = "ignore";
 
 beforeAll(() => {
   process.env.TWIN_AUTH_SECRET = TEST_AUTH_SECRET;
@@ -39,20 +50,22 @@ function freshApp() {
 type Envelope = { ok?: unknown; error?: unknown; response_metadata?: { messages?: unknown } };
 
 /**
+ * What a Slack answer is, for comparison purposes.
+ *
  * Slack answers an application-level refusal with HTTP **200** and
  * `{ok:false, error}` — `twin.ts`'s `slackErrorEnvelope`, frozen because the
- * official SDKs read a non-200 as a transport failure. So the ENVELOPE is the
- * assertion; a 4xx is accepted too, for any surface that ever answers one.
+ * official SDKs read a non-200 as a transport failure. So the status alone
+ * distinguishes almost nothing here and the ENVELOPE has to be part of the
+ * comparison: `ok` and the error code are where a Slack method says no.
  */
-async function expectRefusal(response: Response, label: string) {
-  const body = (await response.json()) as Envelope;
-  expect(response.status < 500, `${label} — status ${response.status}, body ${JSON.stringify(body)}`).toBe(
-    true
-  );
-  expect(body.ok, `${label} accepted an undeclared input: ${JSON.stringify(body)}`).toBe(false);
-  expect(body.error, `${label} refused with the wrong Slack code`).toBe("invalid_arguments");
-  // The refusal names the offending key, so the caller can fix the call.
-  expect(JSON.stringify(body.response_metadata ?? ""), label).toContain(PROBE);
+async function answer(response: Response): Promise<{ status: number; ok: unknown; error: unknown; text: string }> {
+  const text = await response.text();
+  const body = (text ? JSON.parse(text) : {}) as Envelope;
+  return { status: response.status, ok: body.ok, error: body.error, text };
+}
+
+function summary(a: Awaited<ReturnType<typeof answer>>): string {
+  return `${a.status} ok=${String(a.ok)} error=${String(a.error)}`;
 }
 
 describe("declared route inputs", () => {
@@ -61,44 +74,75 @@ describe("declared route inputs", () => {
     token = await signTestToken();
   });
 
-  it("refuses an input the declaration does not name", async () => {
+  it("is ruled `ignore` on undeclared input, on every route", () => {
     expect(SLACK_ROUTE_INPUTS.length).toBeGreaterThan(0);
+    const dissenting = SLACK_ROUTE_INPUTS.filter((d) => d.undeclared !== RULED).map(
+      (d) => `${d.surface} is '${d.undeclared}'`
+    );
+    // One ruling per twin: `token` rides on all 62 surfaces, so a route
+    // answering differently from its neighbours would make "does Slack mind an
+    // extra field" depend on which method you called.
+    expect(dissenting, `these routes disagree with the twin's F-1372 ruling ('${RULED}')`).toEqual(
+      []
+    );
+  });
+
+  it("serves a request carrying an input the declaration does not name, unchanged", async () => {
+    // Two twins driven through the SAME sequence of calls, one of them with the
+    // probe added to every one. A discarded argument cannot change an answer,
+    // so the two have to agree call for call — including on the
+    // `channel_not_found`s the bare paths provoke, which is a much stronger
+    // claim than "the probed call came back ok".
+    const plain = freshApp();
+    const probed = freshApp();
+    const at = (app: Hono, path: string, init: RequestInit) =>
+      app.request(`/s/${TEST_SID}${path}`, withAuth(token, init));
+
     for (const declaration of SLACK_ROUTE_INPUTS) {
-      const app = freshApp();
-      const url = `/s/${TEST_SID}${declaration.path}?${PROBE}=x`;
+      const { path, method, surface } = declaration;
 
       // An undeclared QUERY key, on both methods. On POST the arguments are
       // declared as body inputs, so the whole query string is undeclared there.
-      await expectRefusal(
-        await app.request(url, withAuth(token, { method: declaration.method })),
-        `${declaration.surface} (undeclared query key)`
+      const bare = await answer(await at(plain, path, { method }));
+      const withQuery = await answer(await at(probed, `${path}?${PROBE}=x`, { method }));
+      expect(summary(withQuery), `${surface} (undeclared query key): ${withQuery.text}`).toBe(
+        summary(bare)
+      );
+      expect(withQuery.text, `${surface} named the undeclared query key in its answer`).not.toContain(
+        PROBE
       );
 
-      if (declaration.method !== "POST") continue;
+      if (method !== "POST") continue;
 
       // An undeclared top-level BODY field, in both encodings Slack accepts.
-      await expectRefusal(
-        await app.request(
-          `/s/${TEST_SID}${declaration.path}`,
-          withAuth(token, {
+      for (const [label, headers, body] of [
+        ["JSON", { "content-type": "application/json" }, JSON.stringify({})],
+        [
+          "form",
+          { "content-type": "application/x-www-form-urlencoded" },
+          new URLSearchParams().toString(),
+        ],
+      ] as const) {
+        const bareBody = await answer(await at(plain, path, { method: "POST", headers, body }));
+        const probedBody = await answer(
+          await at(probed, path, {
             method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ [PROBE]: "x" }),
+            headers,
+            body:
+              label === "JSON"
+                ? JSON.stringify({ [PROBE]: "x" })
+                : new URLSearchParams({ [PROBE]: "x" }).toString(),
           })
-        ),
-        `${declaration.surface} (undeclared JSON body field)`
-      );
-      await expectRefusal(
-        await app.request(
-          `/s/${TEST_SID}${declaration.path}`,
-          withAuth(token, {
-            method: "POST",
-            headers: { "content-type": "application/x-www-form-urlencoded" },
-            body: new URLSearchParams({ [PROBE]: "x" }).toString(),
-          })
-        ),
-        `${declaration.surface} (undeclared form body field)`
-      );
+        );
+        expect(
+          summary(probedBody),
+          `${surface} (undeclared ${label} body field): ${probedBody.text}`
+        ).toBe(summary(bareBody));
+        expect(
+          probedBody.text,
+          `${surface} named the undeclared ${label} body field in its answer`
+        ).not.toContain(PROBE);
+      }
     }
   });
 

@@ -18,7 +18,30 @@
 //     what this module declares.
 
 import { z } from "zod";
-import { declareRouteInputs, type RouteInputDeclaration } from "@pome-sh/sdk/route-inputs";
+import { routeInputDeclarer, type RouteInputDeclaration } from "@pome-sh/sdk/route-inputs";
+
+/**
+ * F-1372 — Linear ignores a request parameter it does not recognise on all six
+ * of these routes, so this twin does too.
+ *
+ * Four of them are OAuth, where it is not even Linear's choice: RFC 6749 says
+ * "The authorization server MUST ignore unrecognized request parameters" in
+ * §3.1 for the authorization endpoint AND in §3.2 for the token endpoint, and
+ * `/oauth/revoke` follows the token endpoint's conventions (RFC 7009). Real
+ * Linear was measured obeying it on 2026-08-09: `/oauth/authorize` answered its
+ * consent page identically with and without an unknown parameter (24,446 bytes
+ * either way, differing only in a per-request CSP nonce), and `/oauth/token`
+ * answered the same `invalid_client` both ways — the unknown parameter changed
+ * nothing about either.
+ *
+ * The other two are `/graphql`, measured the same day: an unknown top-level
+ * envelope key, and an unknown query-string key, each left Linear's answer
+ * exactly as it was. See `docs/undeclared-route-inputs.md`, which also records
+ * the one thing this does NOT cover — `extensions`, a GraphQL-over-HTTP
+ * envelope member this twin declares nowhere and Linear rejects for its own
+ * reasons.
+ */
+const declareInputs = routeInputDeclarer("ignore");
 
 /**
  * The GraphQL request envelope. `variables` arrives as a JSON *string* on GET
@@ -41,7 +64,7 @@ const AUTHORIZE_PARAMS = {
 } as const;
 
 export const LINEAR_ROUTES = {
-  graphqlGet: declareRouteInputs({
+  graphqlGet: declareInputs({
     method: "GET",
     path: "/graphql",
     query: {
@@ -51,7 +74,7 @@ export const LINEAR_ROUTES = {
     },
   }),
 
-  graphqlPost: declareRouteInputs({
+  graphqlPost: declareInputs({
     method: "POST",
     path: "/graphql",
     bodyEncoding: "form",
@@ -62,13 +85,13 @@ export const LINEAR_ROUTES = {
     },
   }),
 
-  oauthAuthorize: declareRouteInputs({
+  oauthAuthorize: declareInputs({
     method: "GET",
     path: "/oauth/authorize",
     query: { ...AUTHORIZE_PARAMS, response_type: z.string().optional() },
   }),
 
-  oauthAuthorizeCallback: declareRouteInputs({
+  oauthAuthorizeCallback: declareInputs({
     method: "POST",
     path: "/oauth/authorize/callback",
     bodyEncoding: "form",
@@ -78,7 +101,7 @@ export const LINEAR_ROUTES = {
     body: { ...AUTHORIZE_PARAMS, user_ref: z.string().optional() },
   }),
 
-  oauthToken: declareRouteInputs({
+  oauthToken: declareInputs({
     method: "POST",
     path: "/oauth/token",
     bodyEncoding: "form",
@@ -97,7 +120,7 @@ export const LINEAR_ROUTES = {
     },
   }),
 
-  oauthRevoke: declareRouteInputs({
+  oauthRevoke: declareInputs({
     method: "POST",
     path: "/oauth/revoke",
     bodyEncoding: "form",

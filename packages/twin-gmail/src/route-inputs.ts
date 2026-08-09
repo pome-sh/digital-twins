@@ -1,3 +1,4 @@
+// file-size: one declaration per REST surface, 60 of them, and `GMAIL_ROUTE_INPUTS` is the complete set the artifact emitter publishes — splitting the list across files would mean this twin's input surface no longer has a single place to read, which is the second-source-of-truth F-1179 exists to remove. Same reason as twin-github's list.
 // SPDX-License-Identifier: Apache-2.0
 //
 // F-1179 — every REST input this twin accepts, declared by the schemas that
@@ -15,11 +16,32 @@
 import { z } from "zod";
 import {
   booleanInput,
-  declareRouteInputs,
   integerInput,
   repeatedInput,
+  routeInputDeclarer,
   type RouteInputDeclaration,
 } from "@pome-sh/sdk/route-inputs";
+
+/**
+ * F-1372 — Gmail refuses a query parameter it does not know, so the strict
+ * default is affirmed here rather than merely inherited.
+ *
+ * Gmail's REST surface is gRPC transcoded — the 401 it answers an anonymous
+ * caller with names its backend method, `caribou.api.proto.MailboxService`
+ * (measured 2026-08-09) — and the transcoder binds each query parameter to a
+ * field of the request proto, answering 400 `INVALID_ARGUMENT` "Unknown name
+ * \"x\": Cannot bind query parameter. Field 'x' could not be found in request
+ * message." for one that maps to no field. That is not a per-API choice Gmail
+ * could have made differently; it is the layer every `*.googleapis.com` method
+ * is served through.
+ *
+ * It is affirmed rather than measured directly, and that limit is the reason
+ * why: Google checks credentials BEFORE it binds parameters, so an anonymous
+ * probe answers 401 whatever the parameter is, and reaching the binding layer
+ * needs a real OAuth token for a real mailbox. `docs/undeclared-route-inputs.md`
+ * records the probe, what it proved, and what it could not.
+ */
+const declareInputs = routeInputDeclarer("refuse");
 
 const USERS = "/gmail/v1/users/:userId";
 const MESSAGES = `${USERS}/messages`;
@@ -227,13 +249,13 @@ const REFUSED_ITEM_PUT = { method: "PUT", pathParams: USER_ITEM } as const;
 
 export const GMAIL_ROUTES = {
   // messages
-  listMessages: declareRouteInputs({
+  listMessages: declareInputs({
     method: "GET",
     path: MESSAGES,
     pathParams: USER,
     query: { ...SEARCH_QUERY, ...LIST_QUERY, labelIds: repeatedInput() },
   }),
-  batchModifyMessages: declareRouteInputs({
+  batchModifyMessages: declareInputs({
     method: "POST",
     path: `${MESSAGES}/batchModify`,
     pathParams: USER,
@@ -244,176 +266,176 @@ export const GMAIL_ROUTES = {
       ...CLASSIFICATION_BODY,
     },
   }),
-  batchDeleteMessages: declareRouteInputs({
+  batchDeleteMessages: declareInputs({
     method: "POST",
     path: `${MESSAGES}/batchDelete`,
     pathParams: USER,
     bodyEncoding: "json",
     body: { ids: stringListInput(1000) },
   }),
-  sendMessage: declareRouteInputs({ ...MESSAGE_SEND_SHAPE, path: `${MESSAGES}/send` }),
-  sendMessageUpload: declareRouteInputs({
+  sendMessage: declareInputs({ ...MESSAGE_SEND_SHAPE, path: `${MESSAGES}/send` }),
+  sendMessageUpload: declareInputs({
     ...MESSAGE_SEND_SHAPE,
     path: `${MESSAGES_UPLOAD}/send`,
   }),
-  importMessage: declareRouteInputs({ ...MESSAGE_IMPORT_SHAPE, path: `${MESSAGES}/import` }),
-  importMessageUpload: declareRouteInputs({
+  importMessage: declareInputs({ ...MESSAGE_IMPORT_SHAPE, path: `${MESSAGES}/import` }),
+  importMessageUpload: declareInputs({
     ...MESSAGE_IMPORT_SHAPE,
     path: `${MESSAGES_UPLOAD}/import`,
   }),
-  insertMessage: declareRouteInputs({ ...MESSAGE_INSERT_SHAPE, path: MESSAGES }),
-  insertMessageUpload: declareRouteInputs({ ...MESSAGE_INSERT_SHAPE, path: MESSAGES_UPLOAD }),
-  getMessage: declareRouteInputs({
+  insertMessage: declareInputs({ ...MESSAGE_INSERT_SHAPE, path: MESSAGES }),
+  insertMessageUpload: declareInputs({ ...MESSAGE_INSERT_SHAPE, path: MESSAGES_UPLOAD }),
+  getMessage: declareInputs({
     method: "GET",
     path: `${MESSAGES}/:id`,
     pathParams: USER_ITEM,
     query: MESSAGE_FORMAT_QUERY,
   }),
-  modifyMessage: declareRouteInputs({
+  modifyMessage: declareInputs({
     method: "POST",
     path: `${MESSAGES}/:id/modify`,
     pathParams: USER_ITEM,
     bodyEncoding: "json",
     body: { ...LABEL_MODIFY_BODY, ...CLASSIFICATION_BODY },
   }),
-  trashMessage: declareRouteInputs({
+  trashMessage: declareInputs({
     method: "POST",
     path: `${MESSAGES}/:id/trash`,
     pathParams: USER_ITEM,
   }),
-  untrashMessage: declareRouteInputs({
+  untrashMessage: declareInputs({
     method: "POST",
     path: `${MESSAGES}/:id/untrash`,
     pathParams: USER_ITEM,
   }),
-  deleteMessage: declareRouteInputs({
+  deleteMessage: declareInputs({
     method: "DELETE",
     path: `${MESSAGES}/:id`,
     pathParams: USER_ITEM,
   }),
-  getAttachment: declareRouteInputs({
+  getAttachment: declareInputs({
     method: "GET",
     path: `${MESSAGES}/:messageId/attachments/:id`,
     pathParams: { ...USER_ITEM, messageId: z.string().min(1) },
   }),
-  resumableInsertMessage: declareRouteInputs({ ...REFUSED, path: `${RESUMABLE}/messages` }),
-  resumableInsertMessagePut: declareRouteInputs({
+  resumableInsertMessage: declareInputs({ ...REFUSED, path: `${RESUMABLE}/messages` }),
+  resumableInsertMessagePut: declareInputs({
     ...REFUSED_PUT,
     path: `${RESUMABLE}/messages`,
   }),
-  resumableSendMessage: declareRouteInputs({ ...REFUSED, path: `${RESUMABLE}/messages/send` }),
-  resumableSendMessagePut: declareRouteInputs({
+  resumableSendMessage: declareInputs({ ...REFUSED, path: `${RESUMABLE}/messages/send` }),
+  resumableSendMessagePut: declareInputs({
     ...REFUSED_PUT,
     path: `${RESUMABLE}/messages/send`,
   }),
-  resumableImportMessage: declareRouteInputs({
+  resumableImportMessage: declareInputs({
     ...REFUSED,
     path: `${RESUMABLE}/messages/import`,
   }),
-  resumableImportMessagePut: declareRouteInputs({
+  resumableImportMessagePut: declareInputs({
     ...REFUSED_PUT,
     path: `${RESUMABLE}/messages/import`,
   }),
 
   // drafts
-  listDrafts: declareRouteInputs({
+  listDrafts: declareInputs({
     method: "GET",
     path: DRAFTS,
     pathParams: USER,
     query: { ...SEARCH_QUERY, ...LIST_QUERY },
   }),
-  createDraft: declareRouteInputs({ ...DRAFT_CREATE_SHAPE, path: DRAFTS }),
-  createDraftUpload: declareRouteInputs({ ...DRAFT_CREATE_SHAPE, path: DRAFTS_UPLOAD }),
-  sendDraft: declareRouteInputs({ ...DRAFT_SEND_SHAPE, path: `${DRAFTS}/send` }),
-  sendDraftUpload: declareRouteInputs({ ...DRAFT_SEND_SHAPE, path: `${DRAFTS_UPLOAD}/send` }),
-  getDraft: declareRouteInputs({
+  createDraft: declareInputs({ ...DRAFT_CREATE_SHAPE, path: DRAFTS }),
+  createDraftUpload: declareInputs({ ...DRAFT_CREATE_SHAPE, path: DRAFTS_UPLOAD }),
+  sendDraft: declareInputs({ ...DRAFT_SEND_SHAPE, path: `${DRAFTS}/send` }),
+  sendDraftUpload: declareInputs({ ...DRAFT_SEND_SHAPE, path: `${DRAFTS_UPLOAD}/send` }),
+  getDraft: declareInputs({
     method: "GET",
     path: `${DRAFTS}/:id`,
     pathParams: USER_ITEM,
     query: { format: MESSAGE_FORMAT_QUERY.format },
   }),
-  updateDraft: declareRouteInputs({ ...DRAFT_UPDATE_SHAPE, path: `${DRAFTS}/:id` }),
-  updateDraftUpload: declareRouteInputs({
+  updateDraft: declareInputs({ ...DRAFT_UPDATE_SHAPE, path: `${DRAFTS}/:id` }),
+  updateDraftUpload: declareInputs({
     ...DRAFT_UPDATE_SHAPE,
     path: `${DRAFTS_UPLOAD}/:id`,
   }),
-  deleteDraft: declareRouteInputs({
+  deleteDraft: declareInputs({
     method: "DELETE",
     path: `${DRAFTS}/:id`,
     pathParams: USER_ITEM,
   }),
-  resumableCreateDraft: declareRouteInputs({ ...REFUSED, path: `${RESUMABLE}/drafts` }),
-  resumableCreateDraftPut: declareRouteInputs({ ...REFUSED_PUT, path: `${RESUMABLE}/drafts` }),
-  resumableSendDraft: declareRouteInputs({ ...REFUSED, path: `${RESUMABLE}/drafts/send` }),
-  resumableSendDraftPut: declareRouteInputs({
+  resumableCreateDraft: declareInputs({ ...REFUSED, path: `${RESUMABLE}/drafts` }),
+  resumableCreateDraftPut: declareInputs({ ...REFUSED_PUT, path: `${RESUMABLE}/drafts` }),
+  resumableSendDraft: declareInputs({ ...REFUSED, path: `${RESUMABLE}/drafts/send` }),
+  resumableSendDraftPut: declareInputs({
     ...REFUSED_PUT,
     path: `${RESUMABLE}/drafts/send`,
   }),
-  resumableUpdateDraft: declareRouteInputs({ ...REFUSED_ITEM, path: `${RESUMABLE}/drafts/:id` }),
-  resumableUpdateDraftPut: declareRouteInputs({
+  resumableUpdateDraft: declareInputs({ ...REFUSED_ITEM, path: `${RESUMABLE}/drafts/:id` }),
+  resumableUpdateDraftPut: declareInputs({
     ...REFUSED_ITEM_PUT,
     path: `${RESUMABLE}/drafts/:id`,
   }),
 
   // profile, threads
-  getProfile: declareRouteInputs({ method: "GET", path: `${USERS}/profile`, pathParams: USER }),
-  listThreads: declareRouteInputs({
+  getProfile: declareInputs({ method: "GET", path: `${USERS}/profile`, pathParams: USER }),
+  listThreads: declareInputs({
     method: "GET",
     path: `${USERS}/threads`,
     pathParams: USER,
     query: { ...SEARCH_QUERY, ...LIST_QUERY, labelIds: repeatedInput() },
   }),
-  getThread: declareRouteInputs({
+  getThread: declareInputs({
     method: "GET",
     path: `${USERS}/threads/:id`,
     pathParams: USER_ITEM,
     query: THREAD_FORMAT_QUERY,
   }),
-  modifyThread: declareRouteInputs({
+  modifyThread: declareInputs({
     method: "POST",
     path: `${USERS}/threads/:id/modify`,
     pathParams: USER_ITEM,
     bodyEncoding: "json",
     body: LABEL_MODIFY_BODY,
   }),
-  trashThread: declareRouteInputs({
+  trashThread: declareInputs({
     method: "POST",
     path: `${USERS}/threads/:id/trash`,
     pathParams: USER_ITEM,
   }),
-  untrashThread: declareRouteInputs({
+  untrashThread: declareInputs({
     method: "POST",
     path: `${USERS}/threads/:id/untrash`,
     pathParams: USER_ITEM,
   }),
-  deleteThread: declareRouteInputs({
+  deleteThread: declareInputs({
     method: "DELETE",
     path: `${USERS}/threads/:id`,
     pathParams: USER_ITEM,
   }),
 
   // labels
-  listLabels: declareRouteInputs({ method: "GET", path: `${USERS}/labels`, pathParams: USER }),
-  getLabel: declareRouteInputs({
+  listLabels: declareInputs({ method: "GET", path: `${USERS}/labels`, pathParams: USER }),
+  getLabel: declareInputs({
     method: "GET",
     path: `${USERS}/labels/:id`,
     pathParams: USER_ITEM,
   }),
-  createLabel: declareRouteInputs({
+  createLabel: declareInputs({
     method: "POST",
     path: `${USERS}/labels`,
     pathParams: USER,
     bodyEncoding: "json",
     body: { name: z.string().min(1), ...LABEL_BODY },
   }),
-  updateLabel: declareRouteInputs({
+  updateLabel: declareInputs({
     method: "PUT",
     path: `${USERS}/labels/:id`,
     pathParams: USER_ITEM,
     bodyEncoding: "json",
     body: { name: z.string().min(1), ...LABEL_BODY },
   }),
-  patchLabel: declareRouteInputs({
+  patchLabel: declareInputs({
     method: "PATCH",
     path: `${USERS}/labels/:id`,
     pathParams: USER_ITEM,
@@ -422,14 +444,14 @@ export const GMAIL_ROUTES = {
     // "Label name is required"; `.min(1)` here would move that error.
     body: { name: z.string().optional(), ...LABEL_BODY },
   }),
-  deleteLabel: declareRouteInputs({
+  deleteLabel: declareInputs({
     method: "DELETE",
     path: `${USERS}/labels/:id`,
     pathParams: USER_ITEM,
   }),
 
   // history
-  listHistory: declareRouteInputs({
+  listHistory: declareInputs({
     method: "GET",
     path: `${USERS}/history`,
     pathParams: USER,
@@ -442,52 +464,52 @@ export const GMAIL_ROUTES = {
   }),
 
   // settings
-  listFilters: declareRouteInputs({
+  listFilters: declareInputs({
     method: "GET",
     path: `${USERS}/settings/filters`,
     pathParams: USER,
   }),
-  getFilter: declareRouteInputs({
+  getFilter: declareInputs({
     method: "GET",
     path: `${USERS}/settings/filters/:id`,
     pathParams: USER_ITEM,
   }),
-  createFilter: declareRouteInputs({
+  createFilter: declareInputs({
     method: "POST",
     path: `${USERS}/settings/filters`,
     pathParams: USER,
     bodyEncoding: "json",
     body: { criteria: jsonObjectInput.optional(), action: jsonObjectInput.optional() },
   }),
-  deleteFilter: declareRouteInputs({
+  deleteFilter: declareInputs({
     method: "DELETE",
     path: `${USERS}/settings/filters/:id`,
     pathParams: USER_ITEM,
   }),
-  listForwardingAddresses: declareRouteInputs({
+  listForwardingAddresses: declareInputs({
     method: "GET",
     path: `${USERS}/settings/forwardingAddresses`,
     pathParams: USER,
   }),
-  getForwardingAddress: declareRouteInputs({
+  getForwardingAddress: declareInputs({
     method: "GET",
     path: `${USERS}/settings/forwardingAddresses/:forwardingEmail`,
     pathParams: { ...USER, forwardingEmail: z.string().min(1) },
   }),
-  listSendAs: declareRouteInputs({
+  listSendAs: declareInputs({
     method: "GET",
     path: `${USERS}/settings/sendAs`,
     pathParams: USER,
   }),
-  getSendAs: declareRouteInputs({
+  getSendAs: declareInputs({
     method: "GET",
     path: `${USERS}/settings/sendAs/:sendAsEmail`,
     pathParams: { ...USER, sendAsEmail: z.string().min(1) },
   }),
 
   // Pub/Sub
-  watch: declareRouteInputs({ ...REFUSED, path: `${USERS}/watch` }),
-  stop: declareRouteInputs({ ...REFUSED, path: `${USERS}/stop` }),
+  watch: declareInputs({ ...REFUSED, path: `${USERS}/watch` }),
+  stop: declareInputs({ ...REFUSED, path: `${USERS}/stop` }),
 } as const;
 
 /** Every REST route this twin serves. Read by the artifact emitter and the 1:1 test. */

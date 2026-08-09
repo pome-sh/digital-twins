@@ -8,7 +8,7 @@
 
 import type { Hono } from "hono";
 import { describe, expect, it } from "vitest";
-import { diffRegisteredRoutes } from "@pome-sh/sdk/route-inputs";
+import { diffRegisteredRoutes, type UndeclaredDisposition } from "@pome-sh/sdk/route-inputs";
 import type { StripeDomain } from "../src/domain/index.js";
 import { STRIPE_ROUTE_INPUTS } from "../src/route-inputs.js";
 import { registerStripeRoutes } from "../src/routes/index.js";
@@ -17,12 +17,35 @@ import { createStripeApp, rest } from "./_appHelper.js";
 /** A name no Stripe surface has ever accepted, in either location. */
 const PROBE = "pome_undeclared_probe";
 
+/**
+ * F-1372's ruling for this twin: Stripe publishes `parameter_unknown` — "The
+ * request contains one or more unexpected parameters. Remove these and try
+ * again." — so the strict default F-1179 shipped is what Stripe does, and it
+ * stays. The error code asserted below is Stripe's own word for it.
+ *
+ * Pinned as a literal rather than read off the declarations: a flip in
+ * `src/route-inputs.ts` has to come here to be sanctioned, which is the half
+ * the reverted first attempt at F-1372 skipped. See
+ * `docs/undeclared-route-inputs.md`.
+ */
+const RULED: UndeclaredDisposition = "refuse";
+
 /** The router pattern with a stand-in for every `:param`. */
 function concretePath(path: string): string {
   return path.replace(/:([A-Za-z0-9_]+)/g, (_whole, name: string) => `probe_${name}`);
 }
 
 describe("declared route inputs", () => {
+  it("is ruled `refuse` on undeclared input, on every route", () => {
+    expect(STRIPE_ROUTE_INPUTS.length).toBeGreaterThan(0);
+    const dissenting = STRIPE_ROUTE_INPUTS.filter((d) => d.undeclared !== RULED).map(
+      (d) => `${d.surface} is '${d.undeclared}'`
+    );
+    expect(dissenting, `these routes disagree with the twin's F-1372 ruling ('${RULED}')`).toEqual(
+      []
+    );
+  });
+
   it("refuses an input the declaration does not name", async () => {
     const app = await createStripeApp();
 
