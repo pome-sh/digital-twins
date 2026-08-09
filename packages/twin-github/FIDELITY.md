@@ -478,3 +478,25 @@ vendor-declared inputs on matched surfaces from `not-compared` into a real
 two-way comparison — and makes `missingRequired` live. Surfaces with no declared
 inputs are omitted rather than published with an empty list: comparing nothing
 against nothing would render as a match nobody measured.
+
+### Undeclared inputs: `ignore` (F-1372)
+
+**Real GitHub answers 200 to a query parameter it does not know, and to an
+unknown top-level body key, so this twin discards them too.** Measured
+2026-08-09 over ten live surfaces — `/rate_limit`, `/users/octocat`,
+`/orgs/github`, `/users/:username/repos`, `/repos/:owner/:repo` with its
+`/issues`, `/commits`, `/branches` and `/contents/*` children, and
+`/search/repositories` — each returning a byte-identical answer with and without
+`?pome_undeclared_probe=x`, plus `POST /markdown` for the body case. The transcript is in
+[`docs/undeclared-route-inputs.md`](../../docs/undeclared-route-inputs.md).
+
+F-1179 shipped this twin refusing, which was a divergence of our own making in
+the worst direction: an agent written against real GitHub sends a parameter
+this twin has not got around to declaring, GitHub serves it, the twin 4xx'd, and
+the exam recorded a failure the agent did not commit.
+
+Nothing above this heading changes. The handler still sees only what the
+declaration names — `parse()` returns declared names and nothing else in either
+disposition — and the 295 published inputs are byte-identical, so what this
+twin is short of GitHub's real surface is still the declared-fidelity lane's
+finding to report. The disposition decides only what the CALLER is told.

@@ -22,10 +22,32 @@
 
 import { z } from "zod";
 import {
-  declareRouteInputs,
   integerInput,
+  routeInputDeclarer,
   type RouteInputDeclaration,
 } from "@pome-sh/sdk/route-inputs";
+
+/**
+ * F-1372 — GitHub accepts a query parameter it does not know and discards it,
+ * so this twin does too.
+ *
+ * Measured 2026-08-09 against `api.github.com`: ten surfaces across every shape
+ * this twin serves — `/rate_limit`, `/users/octocat`, `/orgs/github`,
+ * `/users/:username/repos`, `/repos/:owner/:repo` with its `/issues`,
+ * `/commits`, `/branches` and `/contents/*` children, and
+ * `/search/repositories` — each answered 200 with `?pome_undeclared_probe=x`
+ * appended, and the two bodies hashed the same on every one. `POST /markdown`
+ * did the same for an unknown top-level BODY key.
+ * `docs/undeclared-route-inputs.md` carries the transcript.
+ *
+ * F-1179 shipped this twin refusing, which is the divergence that matters most:
+ * an agent written against real GitHub sends a parameter this twin has not got
+ * around to declaring, real GitHub serves it, the twin 4xx'd, and the exam
+ * recorded a failure the agent did not commit. The declaration below does not
+ * widen by one field to buy that back — what this twin is short of GitHub is
+ * still pome-cloud's finding to report, and `route-inputs.json` is unchanged.
+ */
+const declareInputs = routeInputDeclarer("ignore");
 
 // ─── Shared input vocabulary ────────────────────────────────────────────────
 
@@ -68,12 +90,12 @@ const commentBody = { body: z.string().min(1) };
 
 export const GITHUB_ROUTES = {
   // ----- search -----
-  searchRepositories: declareRouteInputs({
+  searchRepositories: declareInputs({
     method: "GET",
     path: "/search/repositories",
     query: { q: z.string().optional(), ...pageQuery },
   }),
-  searchCode: declareRouteInputs({
+  searchCode: declareInputs({
     method: "GET",
     path: "/search/code",
     query: {
@@ -83,7 +105,7 @@ export const GITHUB_ROUTES = {
       ...pageQuery,
     },
   }),
-  searchIssues: declareRouteInputs({
+  searchIssues: declareInputs({
     method: "GET",
     path: "/search/issues",
     query: {
@@ -94,12 +116,12 @@ export const GITHUB_ROUTES = {
       ...pageQuery,
     },
   }),
-  searchUsers: declareRouteInputs({
+  searchUsers: declareInputs({
     method: "GET",
     path: "/search/users",
     query: { q: z.string().optional(), ...pageQuery },
   }),
-  searchCommits: declareRouteInputs({
+  searchCommits: declareInputs({
     method: "GET",
     path: "/search/commits",
     query: {
@@ -111,12 +133,12 @@ export const GITHUB_ROUTES = {
   }),
 
   // ----- repositories -----
-  getRepository: declareRouteInputs({
+  getRepository: declareInputs({
     method: "GET",
     path: "/repos/:owner/:repo",
     pathParams: { ...repoParams },
   }),
-  createUserRepository: declareRouteInputs({
+  createUserRepository: declareInputs({
     method: "POST",
     path: "/user/repos",
     bodyEncoding: "json",
@@ -129,14 +151,14 @@ export const GITHUB_ROUTES = {
   // one would turn that into a 422 for a request the twin has always accepted —
   // a divergence this ticket invented rather than found. The declaration records
   // what is true: two locations, one of which the handler ignores.
-  createOrgRepository: declareRouteInputs({
+  createOrgRepository: declareInputs({
     method: "POST",
     path: "/orgs/:owner/repos",
     pathParams: { owner: repoParams.owner },
     bodyEncoding: "json",
     body: { ...repositoryBody, owner: z.string().min(1).optional() },
   }),
-  forkRepository: declareRouteInputs({
+  forkRepository: declareInputs({
     method: "POST",
     path: "/repos/:owner/:repo/forks",
     pathParams: { ...repoParams },
@@ -145,19 +167,19 @@ export const GITHUB_ROUTES = {
   }),
 
   // ----- contents & commits -----
-  getRepositoryRootContents: declareRouteInputs({
+  getRepositoryRootContents: declareInputs({
     method: "GET",
     path: "/repos/:owner/:repo/contents",
     pathParams: { ...repoParams },
     query: { ref: z.string().optional() },
   }),
-  getFileContents: declareRouteInputs({
+  getFileContents: declareInputs({
     method: "GET",
     path: "/repos/:owner/:repo/contents/*",
     pathParams: { ...repoParams, path: z.string().min(1) },
     query: { ref: z.string().optional() },
   }),
-  createOrUpdateFile: declareRouteInputs({
+  createOrUpdateFile: declareInputs({
     method: "PUT",
     path: "/repos/:owner/:repo/contents/*",
     pathParams: { ...repoParams, path: z.string().min(1) },
@@ -170,13 +192,13 @@ export const GITHUB_ROUTES = {
       encoding: z.enum(["utf-8", "base64"]).optional(),
     },
   }),
-  listCommits: declareRouteInputs({
+  listCommits: declareInputs({
     method: "GET",
     path: "/repos/:owner/:repo/commits",
     pathParams: { ...repoParams },
     query: { sha: z.string().optional(), ...pageQuery },
   }),
-  createRef: declareRouteInputs({
+  createRef: declareInputs({
     method: "POST",
     path: "/repos/:owner/:repo/git/refs",
     pathParams: { ...repoParams },
@@ -185,7 +207,7 @@ export const GITHUB_ROUTES = {
   }),
 
   // ----- issues -----
-  listIssues: declareRouteInputs({
+  listIssues: declareInputs({
     method: "GET",
     path: "/repos/:owner/:repo/issues",
     pathParams: { ...repoParams },
@@ -196,7 +218,7 @@ export const GITHUB_ROUTES = {
       ...pageQuery,
     },
   }),
-  createIssue: declareRouteInputs({
+  createIssue: declareInputs({
     method: "POST",
     path: "/repos/:owner/:repo/issues",
     pathParams: { ...repoParams },
@@ -208,12 +230,12 @@ export const GITHUB_ROUTES = {
       assignees: z.array(z.string()).optional(),
     },
   }),
-  getIssue: declareRouteInputs({
+  getIssue: declareInputs({
     method: "GET",
     path: "/repos/:owner/:repo/issues/:number",
     pathParams: { ...repoParams, number: numberParam },
   }),
-  updateIssue: declareRouteInputs({
+  updateIssue: declareInputs({
     method: "PATCH",
     path: "/repos/:owner/:repo/issues/:number",
     pathParams: { ...repoParams, number: numberParam },
@@ -226,25 +248,25 @@ export const GITHUB_ROUTES = {
       assignees: z.array(z.string()).optional(),
     },
   }),
-  listIssueComments: declareRouteInputs({
+  listIssueComments: declareInputs({
     method: "GET",
     path: "/repos/:owner/:repo/issues/:number/comments",
     pathParams: { ...repoParams, number: numberParam },
     query: { ...pageQuery },
   }),
-  addIssueComment: declareRouteInputs({
+  addIssueComment: declareInputs({
     method: "POST",
     path: "/repos/:owner/:repo/issues/:number/comments",
     pathParams: { ...repoParams, number: numberParam },
     bodyEncoding: "json",
     body: { ...commentBody },
   }),
-  listRepositoryLabels: declareRouteInputs({
+  listRepositoryLabels: declareInputs({
     method: "GET",
     path: "/repos/:owner/:repo/labels",
     pathParams: { ...repoParams },
   }),
-  createRepositoryLabel: declareRouteInputs({
+  createRepositoryLabel: declareInputs({
     method: "POST",
     path: "/repos/:owner/:repo/labels",
     pathParams: { ...repoParams },
@@ -255,34 +277,34 @@ export const GITHUB_ROUTES = {
       description: z.string().default(""),
     },
   }),
-  listIssueLabels: declareRouteInputs({
+  listIssueLabels: declareInputs({
     method: "GET",
     path: "/repos/:owner/:repo/issues/:number/labels",
     pathParams: { ...repoParams, number: numberParam },
   }),
-  addIssueLabels: declareRouteInputs({
+  addIssueLabels: declareInputs({
     method: "POST",
     path: "/repos/:owner/:repo/issues/:number/labels",
     pathParams: { ...repoParams, number: numberParam },
     bodyEncoding: "json",
     body: { labels: z.array(z.string().min(1)).min(1) },
   }),
-  deleteIssueLabel: declareRouteInputs({
+  deleteIssueLabel: declareInputs({
     method: "DELETE",
     path: "/repos/:owner/:repo/issues/:number/labels/:name",
     pathParams: { ...repoParams, number: numberParam, name: z.string().min(1) },
   }),
-  listCollaborators: declareRouteInputs({
+  listCollaborators: declareInputs({
     method: "GET",
     path: "/repos/:owner/:repo/collaborators",
     pathParams: { ...repoParams },
   }),
-  checkCollaborator: declareRouteInputs({
+  checkCollaborator: declareInputs({
     method: "GET",
     path: "/repos/:owner/:repo/collaborators/:username",
     pathParams: { ...repoParams, username: z.string().min(1) },
   }),
-  addAssignees: declareRouteInputs({
+  addAssignees: declareInputs({
     method: "POST",
     path: "/repos/:owner/:repo/issues/:number/assignees",
     pathParams: { ...repoParams, number: numberParam },
@@ -291,13 +313,13 @@ export const GITHUB_ROUTES = {
   }),
 
   // ----- pull requests -----
-  listPullRequests: declareRouteInputs({
+  listPullRequests: declareInputs({
     method: "GET",
     path: "/repos/:owner/:repo/pulls",
     pathParams: { ...repoParams },
     query: { state: stateFilter, ...pageQuery },
   }),
-  createPullRequest: declareRouteInputs({
+  createPullRequest: declareInputs({
     method: "POST",
     path: "/repos/:owner/:repo/pulls",
     pathParams: { ...repoParams },
@@ -309,24 +331,24 @@ export const GITHUB_ROUTES = {
       base: z.string().optional(),
     },
   }),
-  getPullRequest: declareRouteInputs({
+  getPullRequest: declareInputs({
     method: "GET",
     path: "/repos/:owner/:repo/pulls/:number",
     pathParams: { ...repoParams, number: numberParam },
   }),
-  listPullRequestFiles: declareRouteInputs({
+  listPullRequestFiles: declareInputs({
     method: "GET",
     path: "/repos/:owner/:repo/pulls/:number/files",
     pathParams: { ...repoParams, number: numberParam },
     query: { ...pageQuery },
   }),
-  listPullRequestReviews: declareRouteInputs({
+  listPullRequestReviews: declareInputs({
     method: "GET",
     path: "/repos/:owner/:repo/pulls/:number/reviews",
     pathParams: { ...repoParams, number: numberParam },
     query: { ...pageQuery },
   }),
-  createPullRequestReview: declareRouteInputs({
+  createPullRequestReview: declareInputs({
     method: "POST",
     path: "/repos/:owner/:repo/pulls/:number/reviews",
     pathParams: { ...repoParams, number: numberParam },
@@ -336,25 +358,25 @@ export const GITHUB_ROUTES = {
       body: z.string().optional(),
     },
   }),
-  listPullRequestComments: declareRouteInputs({
+  listPullRequestComments: declareInputs({
     method: "GET",
     path: "/repos/:owner/:repo/pulls/:number/comments",
     pathParams: { ...repoParams, number: numberParam },
     query: { ...pageQuery },
   }),
-  getPullRequestStatus: declareRouteInputs({
+  getPullRequestStatus: declareInputs({
     method: "GET",
     path: "/repos/:owner/:repo/pulls/:number/status",
     pathParams: { ...repoParams, number: numberParam },
   }),
-  mergePullRequest: declareRouteInputs({
+  mergePullRequest: declareInputs({
     method: "PUT",
     path: "/repos/:owner/:repo/pulls/:number/merge",
     pathParams: { ...repoParams, number: numberParam },
     bodyEncoding: "json-optional",
     body: { commit_title: z.string().optional(), commit_message: z.string().optional() },
   }),
-  updatePullRequestBranch: declareRouteInputs({
+  updatePullRequestBranch: declareInputs({
     method: "PUT",
     path: "/repos/:owner/:repo/pulls/:number/update-branch",
     pathParams: { ...repoParams, number: numberParam },
@@ -363,7 +385,7 @@ export const GITHUB_ROUTES = {
   }),
 
   // ----- v2 cluster A — branches & files -----
-  listBranches: declareRouteInputs({
+  listBranches: declareInputs({
     method: "GET",
     path: "/repos/:owner/:repo/branches",
     pathParams: { ...repoParams },
@@ -371,17 +393,17 @@ export const GITHUB_ROUTES = {
   }),
   // `branch` is the wildcard: a branch name may contain `/`, so the tail is the
   // whole remainder of the path. The mechanism reads and URL-decodes it.
-  getBranch: declareRouteInputs({
+  getBranch: declareInputs({
     method: "GET",
     path: "/repos/:owner/:repo/branches/*",
     pathParams: { ...repoParams, branch: z.string().min(1) },
   }),
-  deleteBranch: declareRouteInputs({
+  deleteBranch: declareInputs({
     method: "DELETE",
     path: "/repos/:owner/:repo/git/refs/heads/*",
     pathParams: { ...repoParams, branch: z.string().min(1) },
   }),
-  deleteFile: declareRouteInputs({
+  deleteFile: declareInputs({
     method: "DELETE",
     path: "/repos/:owner/:repo/contents/*",
     pathParams: { ...repoParams, path: z.string().min(1) },
@@ -394,26 +416,26 @@ export const GITHUB_ROUTES = {
   }),
 
   // ----- v2 cluster B — commits & diffs -----
-  getCommit: declareRouteInputs({
+  getCommit: declareInputs({
     method: "GET",
     path: "/repos/:owner/:repo/commits/:ref",
     pathParams: { ...repoParams, ref: z.string().min(1) },
   }),
   // `:basehead{.+}` is a NAMED param with a regex tail, not a wildcard; the
   // handler is what splits `base...head` out of it.
-  compareCommits: declareRouteInputs({
+  compareCommits: declareInputs({
     method: "GET",
     path: "/repos/:owner/:repo/compare/:basehead{.+}",
     pathParams: { ...repoParams, basehead: z.string().min(1) },
   }),
-  getPullRequestDiff: declareRouteInputs({
+  getPullRequestDiff: declareInputs({
     method: "GET",
     path: "/repos/:owner/:repo/pulls/:number/diff",
     pathParams: { ...repoParams, number: numberParam },
   }),
 
   // ----- v2 cluster C — pull requests deeper -----
-  updatePullRequest: declareRouteInputs({
+  updatePullRequest: declareInputs({
     method: "PATCH",
     path: "/repos/:owner/:repo/pulls/:number",
     pathParams: { ...repoParams, number: numberParam },
@@ -425,13 +447,13 @@ export const GITHUB_ROUTES = {
       base: z.string().optional(),
     },
   }),
-  listPullRequestCommits: declareRouteInputs({
+  listPullRequestCommits: declareInputs({
     method: "GET",
     path: "/repos/:owner/:repo/pulls/:number/commits",
     pathParams: { ...repoParams, number: numberParam },
     query: { ...pageQuery },
   }),
-  createPullRequestReviewComment: declareRouteInputs({
+  createPullRequestReviewComment: declareInputs({
     method: "POST",
     path: "/repos/:owner/:repo/pulls/:number/comments",
     pathParams: { ...repoParams, number: numberParam },
@@ -444,7 +466,7 @@ export const GITHUB_ROUTES = {
       commit_id: z.string().optional(),
     },
   }),
-  replyToPullRequestReviewComment: declareRouteInputs({
+  replyToPullRequestReviewComment: declareInputs({
     method: "POST",
     path: "/repos/:owner/:repo/pulls/:number/comments/:comment_id/replies",
     pathParams: { ...repoParams, number: numberParam, comment_id: numberParam },
@@ -453,27 +475,27 @@ export const GITHUB_ROUTES = {
   }),
 
   // ----- v2 cluster D — issue comments deeper -----
-  updateIssueComment: declareRouteInputs({
+  updateIssueComment: declareInputs({
     method: "PATCH",
     path: "/repos/:owner/:repo/issues/comments/:comment_id",
     pathParams: { ...repoParams, comment_id: numberParam },
     bodyEncoding: "json",
     body: { ...commentBody },
   }),
-  deleteIssueComment: declareRouteInputs({
+  deleteIssueComment: declareInputs({
     method: "DELETE",
     path: "/repos/:owner/:repo/issues/comments/:comment_id",
     pathParams: { ...repoParams, comment_id: numberParam },
   }),
 
   // ----- v2 cluster E — milestones -----
-  listMilestones: declareRouteInputs({
+  listMilestones: declareInputs({
     method: "GET",
     path: "/repos/:owner/:repo/milestones",
     pathParams: { ...repoParams },
     query: { state: stateFilter, ...pageQuery },
   }),
-  createMilestone: declareRouteInputs({
+  createMilestone: declareInputs({
     method: "POST",
     path: "/repos/:owner/:repo/milestones",
     pathParams: { ...repoParams },
@@ -485,7 +507,7 @@ export const GITHUB_ROUTES = {
       state: stateWrite,
     },
   }),
-  updateMilestone: declareRouteInputs({
+  updateMilestone: declareInputs({
     method: "PATCH",
     path: "/repos/:owner/:repo/milestones/:number",
     pathParams: { ...repoParams, number: numberParam },
@@ -497,14 +519,14 @@ export const GITHUB_ROUTES = {
       state: stateWrite,
     },
   }),
-  deleteMilestone: declareRouteInputs({
+  deleteMilestone: declareInputs({
     method: "DELETE",
     path: "/repos/:owner/:repo/milestones/:number",
     pathParams: { ...repoParams, number: numberParam },
   }),
 
   // ----- v2 cluster F — commit status + checks -----
-  createCommitStatus: declareRouteInputs({
+  createCommitStatus: declareInputs({
     method: "POST",
     path: "/repos/:owner/:repo/statuses/:sha",
     pathParams: { ...repoParams, sha: z.string().min(1) },
@@ -516,12 +538,12 @@ export const GITHUB_ROUTES = {
       target_url: z.string().optional(),
     },
   }),
-  getCombinedStatusForRef: declareRouteInputs({
+  getCombinedStatusForRef: declareInputs({
     method: "GET",
     path: "/repos/:owner/:repo/commits/:ref/status",
     pathParams: { ...repoParams, ref: z.string().min(1) },
   }),
-  createCheckRun: declareRouteInputs({
+  createCheckRun: declareInputs({
     method: "POST",
     path: "/repos/:owner/:repo/check-runs",
     pathParams: { ...repoParams },
@@ -549,7 +571,7 @@ export const GITHUB_ROUTES = {
       completed_at: z.string().optional(),
     },
   }),
-  listCheckRunsForRef: declareRouteInputs({
+  listCheckRunsForRef: declareInputs({
     method: "GET",
     path: "/repos/:owner/:repo/commits/:ref/check-runs",
     pathParams: { ...repoParams, ref: z.string().min(1) },
@@ -557,29 +579,29 @@ export const GITHUB_ROUTES = {
   }),
 
   // ----- v2 cluster G — tags & releases -----
-  listTags: declareRouteInputs({
+  listTags: declareInputs({
     method: "GET",
     path: "/repos/:owner/:repo/tags",
     pathParams: { ...repoParams },
     query: { ...pageQuery },
   }),
-  listReleases: declareRouteInputs({
+  listReleases: declareInputs({
     method: "GET",
     path: "/repos/:owner/:repo/releases",
     pathParams: { ...repoParams },
     query: { ...pageQuery },
   }),
-  getLatestRelease: declareRouteInputs({
+  getLatestRelease: declareInputs({
     method: "GET",
     path: "/repos/:owner/:repo/releases/latest",
     pathParams: { ...repoParams },
   }),
-  getReleaseByTag: declareRouteInputs({
+  getReleaseByTag: declareInputs({
     method: "GET",
     path: "/repos/:owner/:repo/releases/tags/*",
     pathParams: { ...repoParams, tag: z.string().min(1) },
   }),
-  createRelease: declareRouteInputs({
+  createRelease: declareInputs({
     method: "POST",
     path: "/repos/:owner/:repo/releases",
     pathParams: { ...repoParams },
@@ -597,8 +619,8 @@ export const GITHUB_ROUTES = {
   // ----- v2 cluster H — identity & collaborators -----
   // The authenticated login comes from the session claim, not from a request
   // input, so this surface declares nothing.
-  getAuthenticatedUser: declareRouteInputs({ method: "GET", path: "/user" }),
-  addCollaborator: declareRouteInputs({
+  getAuthenticatedUser: declareInputs({ method: "GET", path: "/user" }),
+  addCollaborator: declareInputs({
     method: "PUT",
     path: "/repos/:owner/:repo/collaborators/:username",
     pathParams: { ...repoParams, username: z.string().min(1) },

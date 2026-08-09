@@ -4,6 +4,31 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.21.16
+
+### Patch Changes
+
+- Three of the five bundled twins stop refusing a route input they do not
+  declare, because the vendors they clone do not refuse one (F-1372).
+  `packages/sdk` and all five `packages/twin-*` changed, which is
+  publish-relevant for the CLI because it inlines them into its bundle.
+
+  This one IS observable from `pome run --local`. F-1179 gave every twin the
+  same answer to "an agent sent a query parameter this route does not declare" —
+  4xx — as a default nobody had measured. Measured now, per vendor: GitHub
+  answers 200 and discards, Slack accepts and echoes, and Linear is required to
+  ignore it by RFC 6749 §3.1 and §3.2, which its own OAuth routes implement. So
+  `twin-github`, `twin-slack` and `twin-linear` serve such a request instead of
+  refusing it, and an agent written against the real vendor no longer collects a
+  failure the vendor would not have given it. `twin-gmail` and `twin-stripe`
+  keep refusing, which is what Google's transcoder and Stripe's
+  `parameter_unknown` do.
+
+  Nothing about what a handler can SEE moved — an undeclared input still never
+  reaches one — and `packages/twin-*/route-inputs.json` is byte-identical, so
+  the declared surface every consumer reads is unchanged. The evidence for each
+  twin is in `docs/undeclared-route-inputs.md`.
+
 ## 0.21.15
 
 ### Patch Changes

@@ -55,10 +55,29 @@
 import { z } from "zod";
 import {
   booleanInput,
-  declareRouteInputs,
   integerInput,
+  routeInputDeclarer,
   type RouteInputDeclaration,
 } from "@pome-sh/sdk/route-inputs";
+
+/**
+ * F-1372 — Slack accepts an argument it does not know and gets on with the
+ * call, so this twin does too.
+ *
+ * Measured 2026-08-09 against `slack.com/api`: `api.test` — the one Web API
+ * method that answers without a token — returned `{"ok":true,"args":
+ * {"pome_undeclared_probe":"x"}}` for the argument as a GET query key and again
+ * as a POST form field. Slack's own Web API page names three ways to pass
+ * arguments and no way to get one rejected: there is no `unknown_argument` in
+ * its error vocabulary, and `invalid_arguments` — the code this twin refuses
+ * with today — is documented for arguments a method HAS whose values are wrong.
+ * `docs/undeclared-route-inputs.md` carries the transcript.
+ *
+ * The `token` argument is the reason this matters more here than anywhere else:
+ * it rides on every method, so an SDK that sends one extra field alongside it
+ * met a refusal on all 62 surfaces at once.
+ */
+const declareInputs = routeInputDeclarer("ignore");
 
 /** A route's declared input names and the schemas that validate them. */
 export type SlackInputShape = Record<string, z.ZodType>;
@@ -104,8 +123,8 @@ function slackRead<S extends SlackInputShape>(
 ): SlackReadSurfaces<WithAmbient<S>> {
   const shape = { ...AMBIENT_INPUTS, ...args } as WithAmbient<S>;
   return {
-    get: declareRouteInputs({ method: "GET", path, query: shape }),
-    post: declareRouteInputs({ method: "POST", path, body: shape, bodyEncoding: "form" }),
+    get: declareInputs({ method: "GET", path, query: shape }),
+    post: declareInputs({ method: "POST", path, body: shape, bodyEncoding: "form" }),
   };
 }
 
@@ -114,7 +133,7 @@ function slackWrite<S extends SlackInputShape>(
   args: S
 ): SlackWriteSurface<WithAmbient<S>> {
   const shape = { ...AMBIENT_INPUTS, ...args } as WithAmbient<S>;
-  return declareRouteInputs({ method: "POST", path, body: shape, bodyEncoding: "form" });
+  return declareInputs({ method: "POST", path, body: shape, bodyEncoding: "form" });
 }
 
 // ─── The twin's coercions, as schemas ────────────────────────────────────────
