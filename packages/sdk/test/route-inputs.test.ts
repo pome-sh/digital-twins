@@ -234,6 +234,15 @@ describe("parse — `undeclared: 'ignore'`, the disposition a twin opts into", (
     expect(Object.prototype).not.toHaveProperty("polluted");
   });
 
+  it("refuses to build a route that rules on its own disposition", () => {
+    // The binder spreads its disposition over the spec, so a route spelling its
+    // own would lose silently — code and reader disagreeing with nothing to say
+    // so. Honouring it would be worse: a per-route ruling nobody took.
+    expect(() =>
+      lenient({ method: "GET", path: "/x", undeclared: "refuse", query: { a: z.string() } })
+    ).toThrow(/one ruling per twin/);
+  });
+
   it("publishes the same inputs either way, so the artifact does not move", () => {
     const strict = declareRouteInputs({
       method: "GET",

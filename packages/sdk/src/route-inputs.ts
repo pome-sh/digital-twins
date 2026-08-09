@@ -493,11 +493,26 @@ export function declareRouteInputs<const S extends RouteInputSpec>(
  * ruling is per VENDOR, so writing it on each of twin-github's 66 specs would
  * put 66 copies of one decision where 66 different answers could drift apart,
  * and a route that quietly disagreed with its own twin would look deliberate.
+ *
+ * Which is why a spec handed to a bound declarer may not carry its own
+ * `undeclared`. Spreading the binding over it would make the route's own
+ * spelling lose silently — the one shape where a reader and the running code
+ * disagree and nothing says so — and honouring it instead would reintroduce the
+ * per-route ruling this exists to prevent. Neither, so: throw.
  */
 export function routeInputDeclarer(
   undeclared: UndeclaredDisposition
 ): <const S extends RouteInputSpec>(spec: S) => RouteInputDeclaration<S> {
-  return (spec) => declareRouteInputs({ ...spec, undeclared });
+  return (spec) => {
+    if (spec.undeclared !== undefined) {
+      throw new Error(
+        `route-inputs: ${spec.method} ${spec.path} sets undeclared: '${spec.undeclared}' on its ` +
+          `own spec, but its twin already rules '${undeclared}' for every route — ` +
+          `the disposition is one ruling per twin (F-1372)`
+      );
+    }
+    return declareRouteInputs({ ...spec, undeclared });
+  };
 }
 
 /** `z.object(shape)` with bracketed markers unwrapped. */
