@@ -30,28 +30,28 @@ const LINEAR_GRAPHQL_URL = "https://api.linear.app/graphql";
  * The upstream types the twin models and must not drift from. Extend this list
  * (and re-run) when the twin starts emulating another Linear type.
  *
- * SCOPE — READ THIS BEFORE ASSUMING COVERAGE. These are the OUTPUT-side types
- * plus the one input object the twin mirrors exactly. The twin's MUTATION INPUT
- * types are deliberately NOT guarded yet, because they still diverge from
- * Linear and adding them here would fail immediately:
+ * SCOPE — this covers the agent-session family on BOTH sides of the wire since
+ * F-1176: the output types, the enums, and every mutation input the twin
+ * declares for them. F-1172 covered the output type only, and said so here;
+ * that carve-out is gone because the inputs were reconciled rather than
+ * registered.
  *
- *   - `AgentSessionUpdateInput` upstream declares externalLink, externalUrls,
- *     addedExternalUrls, removedExternalUrls, plan, dismissedAt, userState —
- *     no `status` and no `id`. Upstream, session status moves via agent
- *     activities, not through `agentSessionUpdate` at all. The twin declares
- *     id, status, plan, externalUrls.
- *   - `AgentSessionCreateOnIssue` / `AgentSessionCreateOnComment` are not
- *     Linear type names at all (upstream has `AgentSessionCreateInput`: id,
- *     issueId, appUserId, context) and the twin adds `plan`.
- *   - `AgentActivityCreateInput` — twin: sessionId, type, body, ephemeral;
- *     Linear: id, agentSessionId, signal, signalMetadata, contextualMetadata,
- *     content, ephemeral.
- *
- * These predate F-1172 (the old `state` / `agentUserId` were equally invented)
- * and reconciling them is its own piece of work, tracked separately. Until
- * then: the guard proves nothing about the mutation-input surface.
+ * Two Linear types this list deliberately omits, because the twin declares
+ * neither: `AgentSessionCreateInput` (the pull-request-scoped create, and where
+ * `appUserId` actually lives upstream) and `AgentSessionUserStateInput`.
+ * Guarding a type the twin does not model would prove nothing.
  */
-const GUARDED_TYPES = ["AgentSession", "AgentSessionStatus", "AgentSessionExternalUrlInput"];
+const GUARDED_TYPES = [
+  "AgentActivity",
+  "AgentActivityCreateInput",
+  "AgentActivitySignal",
+  "AgentSession",
+  "AgentSessionCreateOnComment",
+  "AgentSessionCreateOnIssue",
+  "AgentSessionExternalUrlInput",
+  "AgentSessionStatus",
+  "AgentSessionUpdateInput",
+];
 
 const QUERY = `query PomeTwinLinearIntrospection($name: String!) {
   __type(name: $name) {

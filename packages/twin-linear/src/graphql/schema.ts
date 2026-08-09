@@ -9,6 +9,7 @@ export const linearGraphQLSchema: GraphQLSchema = buildSchema(`
   scalar PaginationOrderBy
   scalar DateTime
   scalar JSON
+  scalar JSONObject
 
   type Query {
     viewer: User!
@@ -61,7 +62,7 @@ export const linearGraphQLSchema: GraphQLSchema = buildSchema(`
     webhookDelete(id: String!): DeletePayload!
     agentSessionCreateOnIssue(input: AgentSessionCreateOnIssue!): AgentSessionPayload!
     agentSessionCreateOnComment(input: AgentSessionCreateOnComment!): AgentSessionPayload!
-    agentSessionUpdate(id: String, input: AgentSessionUpdateInput!): AgentSessionPayload!
+    agentSessionUpdate(id: String!, input: AgentSessionUpdateInput!): AgentSessionPayload!
     agentActivityCreate(input: AgentActivityCreateInput!): AgentActivityPayload!
   }
 
@@ -324,15 +325,29 @@ export const linearGraphQLSchema: GraphQLSchema = buildSchema(`
     activities(first: Int, after: String, last: Int, before: String): AgentActivityConnection!
   }
 
+  """Linear's AgentActivitySignal, member-for-member (F-1176)."""
+  enum AgentActivitySignal {
+    stop
+    continue
+    auth
+    select
+  }
+
   type AgentActivity {
-    id: String!
-    type: String!
-    body: String!
+    id: ID!
+    """
+    Linear's AgentActivityContent union, carried as an opaque payload: a
+    {type, body} object for five of the six members, {type, action, parameter}
+    for the action member. The union itself is a scalar-level divergence,
+    written up in REFERENCE-DIVERGENCES.md (F-1176).
+    """
+    content: JSON!
+    signal: AgentActivitySignal
     ephemeral: Boolean!
-    createdAt: String!
-    updatedAt: String!
-    session: AgentSession!
-    user: User
+    createdAt: DateTime!
+    updatedAt: DateTime!
+    agentSession: AgentSession!
+    user: User!
   }
 
   type NodeRef {
@@ -492,31 +507,30 @@ export const linearGraphQLSchema: GraphQLSchema = buildSchema(`
     label: String!
   }
 
+  """Linear's AgentSessionCreateOnIssue, minus the fields the twin does not model (F-1176)."""
   input AgentSessionCreateOnIssue {
     issueId: String!
-    appUserId: String
-    plan: String
     externalUrls: [AgentSessionExternalUrlInput!]
   }
 
   input AgentSessionCreateOnComment {
     commentId: String!
-    appUserId: String
-    plan: String
     externalUrls: [AgentSessionExternalUrlInput!]
   }
 
+  """
+  Linear declares no status and no id field here (F-1176). Status follows the
+  agent's activities; id is the mutation's own non-null argument.
+  """
   input AgentSessionUpdateInput {
-    id: String
-    status: AgentSessionStatus
     plan: String
     externalUrls: [AgentSessionExternalUrlInput!]
   }
 
   input AgentActivityCreateInput {
-    sessionId: String!
-    type: String!
-    body: String!
+    agentSessionId: String!
+    content: JSONObject!
+    signal: AgentActivitySignal
     ephemeral: Boolean
   }
 `);

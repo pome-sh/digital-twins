@@ -383,7 +383,7 @@ export class LinearDomain {
   }
 
   createAgentActivity(
-    input: { sessionId: string; type: string; body: string; ephemeral?: boolean },
+    input: agents.AgentActivityCreateInput,
     actor: ActorContext = {}
   ): Promise<LinearAgentActivity> {
     return agents.createAgentActivity(this, input, actor);
@@ -393,8 +393,8 @@ export class LinearDomain {
     return agents.getAgentActivity(this, ref);
   }
 
-  listAgentActivities(sessionId: string): LinearAgentActivity[] {
-    return agents.listAgentActivities(this, sessionId);
+  listAgentActivities(agentSessionId: string): LinearAgentActivity[] {
+    return agents.listAgentActivities(this, agentSessionId);
   }
 
   listOAuthApps(): LinearOAuthApp[] {

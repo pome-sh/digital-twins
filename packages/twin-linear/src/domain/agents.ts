@@ -2,10 +2,15 @@
 import { notFound } from "../errors.js";
 import type {
   LinearAgentActivity,
+  LinearAgentActivitySignal,
   LinearAgentSession,
   LinearAgentSessionExternalUrl,
 } from "../types.js";
-import { assertBody, normalizeActivityType, normalizeSessionStatus } from "./normalize.js";
+import {
+  AGENT_ACTIVITY_SESSION_STATUS,
+  normalizeActivityContent,
+  normalizeActivitySignal,
+} from "./normalize.js";
 import type { ActorContext, LinearDomain } from "./linear-domain.js";
 import { mapAgentActivity, mapAgentSession, type AgentActivityRow, type AgentSessionRow } from "./rows.js";
 import { emitWebhook } from "./webhooks.js";
@@ -23,24 +28,40 @@ export function getAgentSession(domain: LinearDomain, ref: string): LinearAgentS
   return row ? mapAgentSession(row) : null;
 }
 
+/**
+ * `appUserId` is deliberately NOT on the wire (F-1176) — Linear's
+ * `AgentSessionCreateOnIssue` declares `issueId`, `externalLink` and
+ * `externalUrls`, and nothing else. It stays here because the twin's OWN
+ * delegate and mention paths create sessions for a named app user, which is
+ * what Linear does implicitly from the delegation that triggered them.
+ */
 export type AgentSessionOnIssueInput = {
   issueId: string;
   appUserId?: string;
-  plan?: string | null;
   externalUrls?: LinearAgentSessionExternalUrl[] | null;
 };
 
 export type AgentSessionOnCommentInput = {
   commentId: string;
   appUserId?: string;
+  externalUrls?: LinearAgentSessionExternalUrl[] | null;
+};
+
+/**
+ * No `status`. Upstream `AgentSessionUpdateInput` has no such field: a session's
+ * status follows the activities its agent emits (F-1176). See
+ * `AGENT_ACTIVITY_SESSION_STATUS`.
+ */
+export type AgentSessionPatch = {
   plan?: string | null;
   externalUrls?: LinearAgentSessionExternalUrl[] | null;
 };
 
-export type AgentSessionPatch = {
-  status?: string;
-  plan?: string | null;
-  externalUrls?: LinearAgentSessionExternalUrl[] | null;
+export type AgentActivityCreateInput = {
+  agentSessionId: string;
+  content: unknown;
+  signal?: string | null;
+  ephemeral?: boolean;
 };
 
 export async function createAgentSessionOnIssue(
@@ -68,7 +89,7 @@ export async function createAgentSessionOnIssue(
       null,
       agent.id,
       "pending",
-      input.plan ?? null,
+      null,
       JSON.stringify(input.externalUrls ?? []),
       now,
       now
@@ -111,7 +132,7 @@ export async function createAgentSessionOnComment(
       comment.id,
       agent.id,
       "pending",
-      input.plan ?? null,
+      null,
       JSON.stringify(input.externalUrls ?? []),
       now,
       now
@@ -135,14 +156,12 @@ export function updateAgentSession(
   domain.db
     .prepare(
       `UPDATE agent_sessions SET
-          status = COALESCE(?, status),
           plan = CASE WHEN ? THEN ? ELSE plan END,
           external_urls_json = CASE WHEN ? THEN ? ELSE external_urls_json END,
           updated_at = ?
          WHERE id = ?`
     )
     .run(
-      input.status ? normalizeSessionStatus(input.status) : null,
       input.plan !== undefined ? 1 : 0,
       input.plan ?? null,
       input.externalUrls !== undefined ? 1 : 0,
@@ -155,29 +174,40 @@ export function updateAgentSession(
 
 export async function createAgentActivity(
   domain: LinearDomain,
-  input: { sessionId: string; type: string; body: string; ephemeral?: boolean },
+  input: AgentActivityCreateInput,
   actor: ActorContext = {}
 ): Promise<LinearAgentActivity> {
   domain.requireScopes(actor, ["write"]);
-  assertBody(input.body);
-  const session = domain.requireAgentSession(input.sessionId);
+  const session = domain.requireAgentSession(input.agentSessionId);
   const viewer = domain.resolveViewer(actor);
-  const type = normalizeActivityType(input.type);
+  const content = normalizeActivityContent(input.content);
+  const signal: LinearAgentActivitySignal | null = input.signal
+    ? normalizeActivitySignal(input.signal)
+    : null;
   const now = domain.tick();
   const id = domain.nextId("agent_activity");
   const ephemeral =
-    typeof input.ephemeral === "boolean" ? input.ephemeral : type === "thought" || type === "action";
+    typeof input.ephemeral === "boolean"
+      ? input.ephemeral
+      : content.type === "thought" || content.type === "action";
   domain.db
     .prepare(
-      `INSERT INTO agent_activities(id, session_id, user_id, type, body, ephemeral, created_at, updated_at)
+      `INSERT INTO agent_activities(id, session_id, user_id, content_json, signal, ephemeral, created_at, updated_at)
          VALUES (?,?,?,?,?,?,?,?)`
     )
-    .run(id, session.id, viewer.id, type, input.body, ephemeral ? 1 : 0, now, now);
-  if (type === "prompt") {
+    .run(id, session.id, viewer.id, JSON.stringify(content), signal, ephemeral ? 1 : 0, now, now);
+  // The session follows the activity — upstream has no other way to move it,
+  // and no `status` on `agentSessionUpdate` to do it by hand (F-1176).
+  const status = AGENT_ACTIVITY_SESSION_STATUS[content.type];
+  domain.db
+    .prepare("UPDATE agent_sessions SET status = ?, updated_at = ? WHERE id = ?")
+    .run(status, now, session.id);
+  if (content.type === "prompt") {
     await emitWebhook(domain, {
       type: "AgentSessionEvent",
       action: "prompted",
-      data: { id: session.id, status: session.status },
+      // The status the activity just produced, not the one it replaced.
+      data: { id: session.id, status },
       actor: viewer,
       teamId: session.issueId ? domain.requireIssue(session.issueId).teamId : null,
     });
@@ -194,10 +224,10 @@ export function getAgentActivity(domain: LinearDomain, ref: string): LinearAgent
   return row ? mapAgentActivity(row) : null;
 }
 
-export function listAgentActivities(domain: LinearDomain, sessionId: string): LinearAgentActivity[] {
+export function listAgentActivities(domain: LinearDomain, agentSessionId: string): LinearAgentActivity[] {
   return (
     domain.db
       .prepare("SELECT * FROM agent_activities WHERE session_id = ? ORDER BY created_at, id")
-      .all(sessionId) as AgentActivityRow[]
+      .all(agentSessionId) as AgentActivityRow[]
   ).map(mapAgentActivity);
 }

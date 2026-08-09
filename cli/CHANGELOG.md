@@ -4,6 +4,24 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.21.17
+
+### Patch Changes
+
+- The bundled Linear twin's agent-session mutation inputs are Linear's own now
+  (F-1176), which is publish-relevant for the CLI because it inlines the twin
+  into its bundle. `packages/twin-linear` went to 0.4.0; see its CHANGELOG for
+  the full surface.
+
+  Observable from `pome run --local` if a task drives agent sessions over
+  GraphQL. `agentSessionUpdate` no longer takes `status` or an `id` input field
+  (its `id` argument is non-null, as upstream), the two creates no longer take
+  `appUserId` or `plan`, and `agentActivityCreate` takes
+  `{ agentSessionId, content, signal }` rather than `{ sessionId, type, body }`.
+  A session's status now moves through the activities the agent emits, because
+  upstream there is no other way to move it. No bundled task or example drove
+  any of these, so nothing in `cli/tasks/` or `examples/` changed.
+
 ## 0.21.16
 
 ### Patch Changes

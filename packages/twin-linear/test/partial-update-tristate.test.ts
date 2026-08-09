@@ -62,19 +62,43 @@ async function graphql(
   };
 }
 
+/** Create a session over GraphQL, then give it a plan — the only way in, since F-1176. */
+async function sessionWithPlan(instance: ReturnType<typeof createLinearTwinApp>, plan: string) {
+  const issues = await graphql(instance, `query { issues(first: 1) { nodes { id } } }`);
+  const issueId = issues.data?.issues.nodes[0].id as string;
+  const created = await graphql(
+    instance,
+    `mutation ($input: AgentSessionCreateOnIssue!) {
+       agentSessionCreateOnIssue(input: $input) { agentSession { id } }
+     }`,
+    { input: { issueId, externalUrls: [{ url: "https://example.test/run/1", label: "run" }] } }
+  );
+  const sessionId = created.data?.agentSessionCreateOnIssue.agentSession.id as string;
+  await graphql(
+    instance,
+    `mutation ($id: String!, $input: AgentSessionUpdateInput!) {
+       agentSessionUpdate(id: $id, input: $input) { agentSession { id } }
+     }`,
+    { id: sessionId, input: { plan } }
+  );
+  return sessionId;
+}
+
 function callTool(commands: LinearDomain, name: string, args: Record<string, unknown>) {
   const tool = linearTools.find((candidate) => candidate.name === name);
   if (!tool) throw new Error(`Unknown MCP tool: ${name}`);
   return tool.handler(commands, args, { reportDelta: () => {} } as never);
 }
 
+// Linear's `AgentSessionCreateOnIssue` carries no `plan` (F-1176), so a seeded
+// session's plan arrives through the update mutation that does.
 async function seededSession(commands: LinearDomain, plan: string) {
   const issue = commands.listIssues()[0]!;
-  return commands.createAgentSessionOnIssue({
+  const session = await commands.createAgentSessionOnIssue({
     issueId: issue.id,
-    plan,
     externalUrls: [{ url: "https://example.test/run/1", label: "run" }],
   });
+  return commands.updateAgentSession(session.id, { plan });
 }
 
 describe("agentSessionUpdate partial-update tri-state (F-1166)", () => {
@@ -83,24 +107,24 @@ describe("agentSessionUpdate partial-update tri-state (F-1166)", () => {
     const session = await seededSession(commands, "PLAN-RESIDUE");
 
     const updated = commands.updateAgentSession(session.id, {
-      status: "active",
       plan: undefined,
-      externalUrls: undefined,
+      externalUrls: [{ url: "https://example.test/run/2", label: "rerun" }],
     });
 
     expect(updated.plan).toBe("PLAN-RESIDUE");
-    expect(updated.externalUrls).toEqual([{ url: "https://example.test/run/1", label: "run" }]);
-    expect(updated.status).toBe("active");
+    expect(updated.externalUrls).toEqual([{ url: "https://example.test/run/2", label: "rerun" }]);
   });
 
   it("leaves plan untouched when the key is absent", async () => {
     const commands = domain();
     const session = await seededSession(commands, "PLAN-RESIDUE");
 
-    const updated = commands.updateAgentSession(session.id, { status: "active" });
+    const updated = commands.updateAgentSession(session.id, {
+      externalUrls: [{ url: "https://example.test/run/2", label: "rerun" }],
+    });
 
     expect(updated.plan).toBe("PLAN-RESIDUE");
-    expect(updated.externalUrls).toEqual([{ url: "https://example.test/run/1", label: "run" }]);
+    expect(updated.externalUrls).toEqual([{ url: "https://example.test/run/2", label: "rerun" }]);
   });
 
   it("clears plan when the key is present and null", async () => {
@@ -123,64 +147,36 @@ describe("agentSessionUpdate partial-update tri-state (F-1166)", () => {
   });
 
   it("parses a present-but-undefined plan as 'not provided', not as null", () => {
-    expect(parseAgentSessionUpdateInput({ id: "x", status: "active", plan: undefined }).plan).toBeUndefined();
-    expect(parseAgentSessionUpdateInput({ id: "x", status: "active" }).plan).toBeUndefined();
-    expect(parseAgentSessionUpdateInput({ id: "x", plan: null }).plan).toBeNull();
-    expect(parseAgentSessionUpdateInput({ id: "x", plan: "PLAN" }).plan).toBe("PLAN");
-    expect(
-      parseAgentSessionUpdateInput({ id: "x", status: "active", externalUrls: undefined }).externalUrls
-    ).toBeUndefined();
-    expect(parseAgentSessionUpdateInput({ id: "x", externalUrls: null }).externalUrls).toBeNull();
+    expect(parseAgentSessionUpdateInput({ plan: undefined }).plan).toBeUndefined();
+    expect(parseAgentSessionUpdateInput({}).plan).toBeUndefined();
+    expect(parseAgentSessionUpdateInput({ plan: null }).plan).toBeNull();
+    expect(parseAgentSessionUpdateInput({ plan: "PLAN" }).plan).toBe("PLAN");
+    expect(parseAgentSessionUpdateInput({ externalUrls: undefined }).externalUrls).toBeUndefined();
+    expect(parseAgentSessionUpdateInput({ externalUrls: null }).externalUrls).toBeNull();
   });
 
-  it("preserves plan across a GraphQL agentSessionUpdate that only sets status", async () => {
+  it("preserves plan across a GraphQL agentSessionUpdate that only sets externalUrls", async () => {
     const instance = app();
-    const issues = await graphql(instance, `query { issues(first: 1) { nodes { id } } }`);
-    const issueId = issues.data?.issues.nodes[0].id as string;
-
-    const created = await graphql(
-      instance,
-      `mutation ($input: AgentSessionCreateOnIssue!) {
-         agentSessionCreateOnIssue(input: $input) { agentSession { id plan externalUrls } }
-       }`,
-      {
-        input: {
-          issueId,
-          plan: "PLAN-RESIDUE",
-          externalUrls: [{ url: "https://example.test/run/1", label: "run" }],
-        },
-      }
-    );
-    const sessionId = created.data?.agentSessionCreateOnIssue.agentSession.id as string;
+    const sessionId = await sessionWithPlan(instance, "PLAN-RESIDUE");
 
     const updated = await graphql(
       instance,
       `mutation ($id: String!, $input: AgentSessionUpdateInput!) {
          agentSessionUpdate(id: $id, input: $input) { agentSession { id status plan externalUrls } }
        }`,
-      { id: sessionId, input: { status: "active" } }
+      { id: sessionId, input: { externalUrls: [{ url: "https://example.test/run/2", label: "rerun" }] } }
     );
 
     expect(updated.errors).toBeUndefined();
     expect(updated.data?.agentSessionUpdate.agentSession).toMatchObject({
-      status: "active",
       plan: "PLAN-RESIDUE",
-      externalUrls: [{ url: "https://example.test/run/1", label: "run" }],
+      externalUrls: [{ url: "https://example.test/run/2", label: "rerun" }],
     });
   });
 
   it("still clears plan through GraphQL when null is sent explicitly", async () => {
     const instance = app();
-    const issues = await graphql(instance, `query { issues(first: 1) { nodes { id } } }`);
-    const issueId = issues.data?.issues.nodes[0].id as string;
-    const created = await graphql(
-      instance,
-      `mutation ($input: AgentSessionCreateOnIssue!) {
-         agentSessionCreateOnIssue(input: $input) { agentSession { id } }
-       }`,
-      { input: { issueId, plan: "PLAN-RESIDUE" } }
-    );
-    const sessionId = created.data?.agentSessionCreateOnIssue.agentSession.id as string;
+    const sessionId = await sessionWithPlan(instance, "PLAN-RESIDUE");
 
     const updated = await graphql(
       instance,

@@ -318,13 +318,13 @@ export function createFormatters(commands: LinearDomain, actor: ActorContext): G
 
   const formatAgentActivity = (activity: LinearAgentActivity) => ({
     id: activity.id,
-    type: activity.type,
-    body: activity.body,
+    content: activity.content,
+    signal: activity.signal,
     ephemeral: activity.ephemeral,
     createdAt: activity.createdAt,
     updatedAt: activity.updatedAt,
-    session: () => formatAgentSession(commands.requireAgentSession(activity.sessionId)),
-    user: () => (activity.userId ? formatUser(commands.requireUser(activity.userId)) : null),
+    agentSession: () => formatAgentSession(commands.requireAgentSession(activity.agentSessionId)),
+    user: () => formatUser(commands.requireUser(activity.userId)),
   });
 
   function formatIssue(issue: LinearIssue) {
