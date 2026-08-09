@@ -18,7 +18,7 @@ afterAll(() => {
 const base = `/s/${TEST_SID}`;
 
 describe("MCP tool contract", () => {
-  it("lists and executes all 65 GitHub twin tools", async () => {
+  it("lists and executes all 36 GitHub twin tools", async () => {
     const app = createGitHubCloneApp();
     expect([...githubToolFixture.toolNames]).toEqual([
       "search_repositories",

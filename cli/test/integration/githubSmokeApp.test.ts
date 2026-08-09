@@ -79,7 +79,7 @@ describe("github twin smoke app (registry)", () => {
       body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list" })
     });
     const listJson = (await listRes.json()) as { result: { tools: Array<{ name: string; inputSchema: unknown }> } };
-    expect(listJson.result.tools).toHaveLength(65);
+    expect(listJson.result.tools).toHaveLength(36);
     expect(listJson.result.tools[0]).toHaveProperty("inputSchema");
     expect(listJson.result.tools[0]).not.toHaveProperty("input_schema");
 
