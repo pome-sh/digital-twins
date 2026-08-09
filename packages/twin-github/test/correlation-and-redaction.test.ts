@@ -125,11 +125,15 @@ describe("FDRS-402 — centralized redactor on request_body / response_body", ()
       })
     }));
     // `token`, `api_key` and `nested` are not declared inputs of
-    // `POST /repos/{owner}/{repo}/issues` — on this twin or on GitHub — so
-    // since F-1179 the route refuses them instead of silently dropping them.
-    // The recorder still captures and redacts the body it refused, which is the
-    // half that matters here: a rejected request's body ships in the trace too.
-    expect(response.status).toBe(422);
+    // `POST /repos/{owner}/{repo}/issues` — on this twin or on GitHub. F-1179
+    // had the route refuse them with a 422; F-1372 measured GitHub accepting
+    // and discarding an undeclared key, so the issue is created and the three
+    // extra fields go nowhere near the handler.
+    //
+    // Which makes this the case that matters most for the redactor: the body
+    // ships in the trace whether or not the route did anything with it, so a
+    // secret in a field nobody reads is still a secret in the tape.
+    expect(response.status).toBe(201);
 
     const event = lastEvent(recorder.events());
     const recordedRequest = event.request_body as Record<string, unknown>;

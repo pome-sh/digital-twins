@@ -387,3 +387,22 @@ vendor-declared inputs on matched surfaces from `not-compared` into a real
 two-way comparison — and makes `missingRequired` live. Surfaces with no declared
 inputs are omitted rather than published with an empty list: comparing nothing
 against nothing would render as a match nobody measured.
+
+### Undeclared inputs: `ignore` (F-1372)
+
+**Slack accepts an argument it does not know and gets on with the call, so this
+twin discards it too.** Measured 2026-08-09: `api.test` — the one Web API method
+that answers without a token — returned
+`{"ok":true,"args":{"pome_undeclared_probe":"x"}}` for the probe as a GET query
+key and again as a POST form field. Slack's own Web API page names three ways to
+pass arguments and no way to have one rejected, and its error vocabulary has no
+`unknown_argument`; `invalid_arguments` — the code this twin refused with — is
+for arguments a method HAS whose values are wrong. The transcript is in
+[`docs/undeclared-route-inputs.md`](../../docs/undeclared-route-inputs.md).
+
+This twin had the most to lose from the strict default: `token` is declared on
+all 62 surfaces because it rides on every method, so a client sending one extra
+field alongside it met a refusal everywhere at once.
+
+Nothing above this heading changes. The handler still sees only what the
+declaration names, and the 242 published inputs are byte-identical.

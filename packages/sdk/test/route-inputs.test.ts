@@ -16,6 +16,7 @@ import {
   integerInput,
   jsonSchemaTypeOf,
   repeatedInput,
+  routeInputDeclarer,
   type RouteRequestSource,
 } from "../src/route-inputs.js";
 
@@ -97,7 +98,7 @@ describe("declareRouteInputs — the declaration is derived, never written", () 
   });
 });
 
-describe("parse — undeclared input is refused, not ignored", () => {
+describe("parse — undeclared input, under the default disposition", () => {
   const declaration = declareRouteInputs({
     method: "GET",
     path: "/repos/:owner/:repo/issues",
@@ -157,6 +158,97 @@ describe("parse — undeclared input is refused, not ignored", () => {
   it("reads a declared header the handler can then see, and nothing else", async () => {
     const parsed = await declaration.parse(request({ url: "http://t/x", params: { owner: "o", repo: "r" } }));
     expect(parsed).toEqual({ path: { owner: "o", repo: "r" }, query: {}, header: {}, body: {} });
+  });
+
+  it("says which disposition it has, so a twin's own suite can pin the ruling", () => {
+    expect(declaration.undeclared).toBe("refuse");
+  });
+});
+
+// ─── F-1372 ──────────────────────────────────────────────────────────────────
+
+describe("parse — `undeclared: 'ignore'`, the disposition a twin opts into", () => {
+  // GitHub and Slack are ruled `ignore` because that is what they were measured
+  // doing (`docs/undeclared-route-inputs.md`). The property that makes the
+  // ruling safe to take is the one asserted throughout here: ignoring is about
+  // what the CALLER is told, never about what the handler is handed. A handler
+  // under `ignore` sees exactly what it sees under `refuse`.
+  const lenient = routeInputDeclarer("ignore");
+
+  const read = lenient({
+    method: "GET",
+    path: "/repos/:owner/:repo/issues",
+    pathParams: { owner: z.string(), repo: z.string() },
+    query: { state: z.enum(["open", "closed", "all"]).optional() },
+  });
+
+  it("serves a query key the declaration does not name, and the handler never sees it", async () => {
+    const parsed = await read.parse(
+      request({ url: "http://t/x?state=open&sort=created", params: { owner: "o", repo: "r" } })
+    );
+    expect(parsed.query).toEqual({ state: "open" });
+    expect(Object.keys(parsed.query)).not.toContain("sort");
+  });
+
+  it("serves a top-level body key the declaration does not name, and drops it", async () => {
+    const write = lenient({ method: "POST", path: "/x", body: { title: z.string() } });
+    const parsed = await write.parse(request({ json: { title: "t", assignee: "nobody" } }));
+    expect(parsed.body).toEqual({ title: "t" });
+  });
+
+  it("still rejects a DECLARED input whose value is wrong", async () => {
+    // The disposition governs names the declaration does not have, and nothing
+    // else. A twin that ignored its own schemas would answer 200 to
+    // `?state=merged` and silently list everything — the bug F-1179's
+    // `stateFilter` was tightened to kill.
+    await expect(
+      read.parse(request({ url: "http://t/x?state=merged", params: { owner: "o", repo: "r" } }))
+    ).rejects.toBeInstanceOf(z.ZodError);
+  });
+
+  it("still refuses undeclared input on a declaration that did not opt in", async () => {
+    const strict = declareRouteInputs({ method: "GET", path: "/x", query: { a: z.string().optional() } });
+    expect(strict.undeclared).toBe("refuse");
+    await expect(strict.parse(request({ url: "http://t/x?b=1" }))).rejects.toBeInstanceOf(
+      UndeclaredInputError
+    );
+  });
+
+  it("drops a `__proto__` form key without polluting and without erroring", async () => {
+    // Under `refuse` the pollution keys were dropped by `expandBrackets` and
+    // then refused by the undeclared-input check, so two things stood between
+    // `__proto__[polluted]=pwned` and `Object.prototype`. Under `ignore` the
+    // request is SERVED, so only the first one is left — twin-slack takes form
+    // bodies and is ruled `ignore`, which is that exact combination.
+    const write = lenient({
+      method: "POST",
+      path: "/x",
+      bodyEncoding: "form",
+      body: { title: z.string() },
+    });
+    const parsed = await write.parse(
+      request({ form: { "__proto__[polluted]": ["pwned"], title: ["t"] } })
+    );
+    expect(parsed.body).toEqual({ title: "t" });
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    expect(Object.prototype).not.toHaveProperty("polluted");
+  });
+
+  it("publishes the same inputs either way, so the artifact does not move", () => {
+    const strict = declareRouteInputs({
+      method: "GET",
+      path: "/repos/:owner/:repo/issues",
+      pathParams: { owner: z.string(), repo: z.string() },
+      query: { state: z.enum(["open", "closed", "all"]).optional() },
+    });
+    // `inputs` is derived from the declared schemas alone. A twin that flips its
+    // disposition therefore publishes a byte-identical `route-inputs.json`, and
+    // pome-cloud's declared-fidelity lane reports exactly the same gaps against
+    // the vendor before and after — which is why the case for `ignore` had to
+    // rest on fidelity rather than on anything the lane would notice.
+    expect(read.inputs).toEqual(strict.inputs);
+    expect(read.names).toEqual(strict.names);
+    expect(read.undeclared).toBe("ignore");
   });
 });
 

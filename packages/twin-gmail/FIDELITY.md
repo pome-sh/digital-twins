@@ -93,3 +93,19 @@ vendor-declared inputs on matched surfaces from `not-compared` into a real
 two-way comparison — and makes `missingRequired` live. Surfaces with no declared
 inputs are omitted rather than published with an empty list: comparing nothing
 against nothing would render as a match nobody measured.
+
+### Undeclared inputs: `refuse` (F-1372, affirmed)
+
+**Gmail refuses a query parameter it does not know, so the strict default
+stays.** Gmail is served through Google's HTTP-to-gRPC transcoder — the 401 it
+gives an anonymous caller names its backend method,
+`caribou.api.proto.MailboxService` (measured 2026-08-09) — and that layer binds
+each query parameter to a field of the request proto, answering 400
+`INVALID_ARGUMENT` (`Cannot bind query parameter. Field 'x' could not be found
+in request message.`) for one that maps to no field.
+
+Affirmed on published behaviour rather than measured directly: Google checks
+credentials before it binds parameters, so an anonymous probe answers 401
+whatever it carries, and reaching the binding layer needs a real OAuth token for
+a real mailbox. The probes, and what they could not establish, are recorded in
+[`docs/undeclared-route-inputs.md`](../../docs/undeclared-route-inputs.md).
