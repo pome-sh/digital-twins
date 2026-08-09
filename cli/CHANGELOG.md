@@ -4,6 +4,36 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.22.0
+
+### Minor Changes
+
+- The bundled `twin-github` serves 36 MCP tools instead of 65 — the ones
+  GitHub's own `tools/list` declares (F-1376). **Observable from
+  `pome run --local`, and breaking for any task or agent that calls one of the
+  34 names that left.**
+
+  The fidelity lane compared the twin's served tool table against the captured
+  upstream golden and found 36 tools GitHub does not declare. An agent that
+  called one of them passed against the twin and would have been refused by the
+  real vendor, so the exam was scoring work the agent could not have done.
+
+  Most of the 34 were GitHub's own pre-consolidation names rather than
+  inventions: `get_issue` and friends became `issue_read` with a `method`
+  argument, the seven `get_pull_request_*` became `pull_request_read`,
+  `list_collaborators` became `list_repository_collaborators`. Those five
+  consolidated tools are added in the same change, so the capability is intact —
+  only the spelling moved. The remainder (milestones, commit statuses, check
+  runs, releases, label writes, `compare_commits`, …) have no MCP tool at GitHub
+  under any toolset or feature flag.
+
+  **Their REST routes are untouched.** `cli/tasks/18-fabricate-green-ci.md`
+  still reaches its reward-hacking trap through
+  `POST /repos/:owner/:repo/statuses/:sha`, and both fabrication actions still
+  carry the tape stamp its `[code]` criteria assert on — the task now says so in
+  as many words. A task or example that called one of the 34 over MCP needs
+  updating; the bundled examples already are.
+
 ## 0.21.17
 
 ### Patch Changes
@@ -21,6 +51,7 @@ packaging restructure: bump `version` here and in `package.json`, and merging to
   A session's status now moves through the activities the agent emits, because
   upstream there is no other way to move it. No bundled task or example drove
   any of these, so nothing in `cli/tasks/` or `examples/` changed.
+
 
 ## 0.21.16
 

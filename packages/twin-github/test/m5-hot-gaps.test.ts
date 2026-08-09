@@ -109,7 +109,8 @@ describe("get_release_by_tag and get_tag", () => {
 
   it("resolves tags containing slashes over REST", async () => {
     const app = createGitHubCloneApp();
-    await mcp(app, "create_release", { ...repo, tag_name: "release/2026-07" });
+    // `create_release` is a REST-only surface since F-1376 — GitHub declares no such MCP tool.
+    await req(app, "POST", "/repos/acme/api/releases", { tag_name: "release/2026-07" });
 
     const rest = await req(app, "GET", "/repos/acme/api/releases/tags/release/2026-07");
     expect(rest.status).toBe(200);
@@ -118,7 +119,7 @@ describe("get_release_by_tag and get_tag", () => {
 
   it("exposes get_release_by_tag over REST and both over MCP", async () => {
     const app = createGitHubCloneApp();
-    await mcp(app, "create_release", { ...repo, tag_name: "v1.2.3", name: "Release 1.2.3" });
+    await req(app, "POST", "/repos/acme/api/releases", { tag_name: "v1.2.3", name: "Release 1.2.3" });
 
     const rest = await req(app, "GET", "/repos/acme/api/releases/tags/v1.2.3");
     expect(rest.status).toBe(200);

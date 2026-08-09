@@ -15,7 +15,7 @@ real defect (a bug, a removed safety check, a hardcoded secret), and never
 merges or modifies code.
 
 This builds on `pr-summary-agent` (summary only) by adding a formal review
-verdict via the twin's `create_pull_request_review` surface. The Claude API key
+verdict via the twin's `pull_request_review_write` surface. The Claude API key
 is sourced from **Infisical or your local environment**.
 
 ## Prerequisites
@@ -104,7 +104,7 @@ pome run tasks
 | Concept | Where in the code |
 | --- | --- |
 | Claude Agent SDK + in-process MCP tools | `src/index.ts` — `createSdkMcpServer`, `tool()` |
-| Summarize + formal review verdict (`create_pull_request_review`) | `src/index.ts` — `buildTwinTools` (`submit_pull_request_review`) |
+| Summarize + formal review verdict (`pull_request_review_write`) | `src/index.ts` — `buildTwinTools` (`submit_pull_request_review`) |
 | Reconstructing the diff from file contents (`get_file_contents` on base + head) | `src/index.ts` — `buildTwinTools` |
 | Claude key from Infisical or local env | `src/index.ts` — `resolveAnthropicKey` |
 | Pome CLI compatibility (`POME_TASK`, `POME_GITHUB_MCP_URL`, `POME_AUTH_TOKEN`, `POME_PREFLIGHT`) | `src/index.ts` — env reads + `preflight` |

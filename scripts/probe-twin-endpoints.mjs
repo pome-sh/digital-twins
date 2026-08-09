@@ -35,6 +35,16 @@
 //    status, the twin's error text, and the METHOD + PATH, which is what lets a
 //    red name the route instead of naming the gate.
 //
+// 3. A STEP MAY BE A SETUP CALL RATHER THAN A PROBE (F-1376). Some declared
+//    tools only answer once something exists, and the write that creates it is
+//    not always a tool. twin-github's three release readers are the case: GitHub
+//    declares no `create_release` MCP tool, so the twin does not serve one, but
+//    it still serves `POST /repos/:owner/:repo/releases`. A manifest entry
+//    carrying `setup` instead of `tool` performs that REST call, can be aliased
+//    with `as` like any probe, and is deliberately NOT counted as coverage:
+//    `probedNames` is built from `tool` alone, so a setup step can never quietly
+//    stand in for the probe of a tool nothing calls.
+//
 // No model, no API key, no network: every twin boots in-process against
 // `:memory:` SQLite on its own default seed and is driven through `app.request`.
 
@@ -122,6 +132,18 @@ export const TWIN_BOOT = {
  * `pull_number` makes the twin answer 422 and the gate would report a twin
  * defect that is really a manifest typo.
  */
+/**
+ * Resolve `$alias.a.b` inside a path SEGMENT, leaving every other segment alone.
+ * Segment-wise rather than a free string replace so a literal `$` in a path
+ * cannot be mistaken for a reference.
+ */
+export function resolvePath(path, results) {
+  return path
+    .split("/")
+    .map((segment) => (segment.startsWith("$") ? String(resolveArgs(segment, results)) : segment))
+    .join("/");
+}
+
 export function resolveArgs(args, results) {
   if (Array.isArray(args)) return args.map((item) => resolveArgs(item, results));
   if (args && typeof args === "object") {
@@ -164,9 +186,21 @@ export function evaluateTwinProbeRun({ twin, declared, probes, calls }) {
   const at = (kind, tool, detail) => findings.push({ kind, twin, tool, detail });
 
   const declaredNames = declared.map((tool) => tool.name);
-  const probedNames = new Set(probes.map((probe) => probe.tool));
+  // `tool` only: a `setup` step is state-building, never coverage.
+  const probedNames = new Set(probes.filter((probe) => probe.tool).map((probe) => probe.tool));
 
   for (const [index, probe] of probes.entries()) {
+    // A setup step has no declared-tool identity to check, but it must still
+    // WORK — a silent 4xx here would surface as an unexplained refusal on the
+    // probe that depends on it.
+    if (probe.setup) {
+      const call = calls[index];
+      const label = `setup ${probe.setup.method} ${probe.setup.path}`;
+      if (!call) at("driver-error", label, "the driver reported no result for this setup step");
+      else if (call.failed) at("driver-error", label, call.failed);
+      else if (call.status >= 400) at("refused", label, JSON.stringify(call));
+      continue;
+    }
     if (!declaredNames.includes(probe.tool)) {
       at("unknown-endpoint", probe.tool, `probed but the twin declares no such tool`);
       continue;
@@ -331,19 +365,31 @@ export async function probeTwin(id, entry, deps = {}) {
   // Sequential, in declared order: probes mutate twin state and a later probe
   // routinely depends on an id an earlier one minted.
   for (const [index, probe] of probes.entries()) {
-    if (!declared.some((tool) => tool.name === probe.tool)) {
+    if (!probe.setup && !declared.some((tool) => tool.name === probe.tool)) {
       calls.push(null);
       continue;
     }
     let args;
     try {
-      args = resolveArgs(probe.args ?? {}, results);
+      args = resolveArgs(probe.args ?? probe.setup?.body ?? {}, results);
     } catch (err) {
       calls.push({ failed: err.message });
       continue;
     }
     const before = store.count?.() ?? store.events().length;
-    await callTool(app, token, probe.tool, args, index + 1);
+    if (probe.setup) {
+      // `$alias.path` resolves in a path SEGMENT as well as in the arguments —
+      // twin-github's review-comment setup hangs off a pull request an earlier
+      // probe minted, so a literal-only path would have made the step unable to
+      // address the thing it is setting up.
+      await app.request(`/s/${PROBE_SID}${resolvePath(probe.setup.path, results)}`, {
+        method: probe.setup.method,
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        ...(probe.setup.method === "GET" ? {} : { body: JSON.stringify(args) }),
+      });
+    } else {
+      await callTool(app, token, probe.tool, args, index + 1);
+    }
     const row = store.events()[before];
     if (!row) {
       calls.push({ failed: "the twin recorded no event for this call" });
@@ -355,7 +401,8 @@ export async function probeTwin(id, entry, deps = {}) {
     // return value. It has been through `redactEvent` — a reference to a key
     // named `token` / `secret` / `api_key` resolves to "[REDACTED]" rather than
     // failing, which is why nothing in the manifest chains through one.
-    if (row.status < 400) results[probe.as ?? probe.tool] = row.response_body;
+    const alias = probe.as ?? probe.tool;
+    if (row.status < 400 && alias) results[alias] = row.response_body;
   }
 
   return evaluateTwinProbeRun({ twin: id, declared, probes, calls });

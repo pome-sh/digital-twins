@@ -68,7 +68,12 @@ describe("fidelity contract documentation", () => {
 describe("heat tiers (F-729 ruling, F-735 re-cut)", () => {
   const surfaces = [...inventory.tools, ...inventory.rest];
   const ENGINE_INTROSPECTION = ["POST /mcp/call", "POST /mcp/tools/:name"];
-  const DEFERRED_HOT_GAPS = ["get_pull_request_diff", "GET /repos/:owner/:repo/pulls/:number/diff"];
+  // The MCP half of G1 left the inventory in F-1376: `get_pull_request_diff` is
+  // not a tool GitHub declares, and its replacement `pull_request_read` carries
+  // the placeholder-patch gap on ONE of nine methods, which a per-tool tier
+  // cannot express. FIDELITY.md's hot-gap deferral says so; the REST route is
+  // still one surface doing one thing, so it keeps the tier and the deferral.
+  const DEFERRED_HOT_GAPS = ["GET /repos/:owner/:repo/pulls/:number/diff"];
 
   function ledgerSection(): string {
     const start = fidelity.indexOf("## Tier-mismatch ledger");

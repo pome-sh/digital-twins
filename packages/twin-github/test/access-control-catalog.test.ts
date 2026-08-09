@@ -16,10 +16,17 @@ describe("github access-control catalog", () => {
     );
   });
 
-  it("covers 52 endpoints (25 v1 + 27 v2)", () => {
-    expect(GITHUB_ACCESS_CONTROL_CATALOG.endpoints).toHaveLength(52);
+  // 57 since F-1376 added the five consolidated MCP tools GitHub declares. The
+  // count GREW while the tool table shrank, and that is the point: `tool` is the
+  // policy key a builder's allow/deny is stored against, so a REST operation
+  // whose MCP tool GitHub does not declare keeps its entry, and the consolidated
+  // tool that now reaches the same domain call gets one of its own. Dropping the
+  // first would un-gate a live surface; omitting the second would let an agent
+  // walk around a denial by spelling the call the way GitHub spells it.
+  it("covers 57 endpoints (30 v1 + 27 v2)", () => {
+    expect(GITHUB_ACCESS_CONTROL_CATALOG.endpoints).toHaveLength(57);
     expect(GITHUB_ACCESS_CONTROL_CATALOG.endpoints.filter((e) => e.v2)).toHaveLength(27);
-    expect(GITHUB_ACCESS_CONTROL_CATALOG.endpoints.filter((e) => !e.v2)).toHaveLength(25);
+    expect(GITHUB_ACCESS_CONTROL_CATALOG.endpoints.filter((e) => !e.v2)).toHaveLength(30);
   });
 
   it("uses unique tool ids", () => {
@@ -72,7 +79,7 @@ describe("github access-control catalog", () => {
     }
   });
 
-  it("matches the legacy dashboard default summary (17 allowed / 8 denied of 25)", () => {
+  it("matches the legacy dashboard default summary (21 allowed / 9 denied of 30)", () => {
     const v1 = {
       ...GITHUB_ACCESS_CONTROL_CATALOG,
       endpoints: GITHUB_ACCESS_CONTROL_CATALOG.endpoints.filter((e) => !e.v2),
@@ -80,7 +87,7 @@ describe("github access-control catalog", () => {
         GITHUB_ACCESS_CONTROL_CATALOG.endpoints.filter((e) => !e.v2)
       ),
     };
-    expect(summarizeGitHubAccessControlCatalog(v1)).toEqual({ total: 25, allowed: 17, denied: 8 });
+    expect(summarizeGitHubAccessControlCatalog(v1)).toEqual({ total: 30, allowed: 21, denied: 9 });
   });
 
   it("formats labels like the hosted Manage UI", () => {

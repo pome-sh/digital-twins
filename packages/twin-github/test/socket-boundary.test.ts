@@ -110,7 +110,7 @@ function authHeaders(extra: Record<string, string> = {}) {
 }
 
 describe("socket boundary — real MCP SDK client over @hono/node-server", () => {
-  it("completes the initialize handshake and lists all 65 tools through JSON-RPC framing", async () => {
+  it("completes the initialize handshake and lists all 36 tools through JSON-RPC framing", async () => {
     const transport = new StreamableHTTPClientTransport(new URL(mcpUrl), {
       requestInit: { headers: authHeaders() }
     });
@@ -122,7 +122,7 @@ describe("socket boundary — real MCP SDK client over @hono/node-server", () =>
 
       const listResult = await client.listTools();
       expect(listResult.tools).toHaveLength(githubToolFixture.tools.length);
-      expect(githubToolFixture.tools.length).toBe(65);
+      expect(githubToolFixture.tools.length).toBe(36);
       expect(listResult.tools.map((t) => t.name)).toEqual([...githubToolFixture.toolNames]);
       for (const tool of listResult.tools) {
         expect(tool.inputSchema).toEqual(expect.objectContaining({ type: "object" }));
@@ -140,8 +140,8 @@ describe("socket boundary — real MCP SDK client over @hono/node-server", () =>
     try {
       await client.connect(transport);
       const callResult = await client.callTool({
-        name: "get_pull_request",
-        arguments: { owner: "acme", repo: "api", pull_number: 1 }
+        name: "pull_request_read",
+        arguments: { method: "get", owner: "acme", repo: "api", pullNumber: 1 }
       });
       expect(callResult.isError).toBeFalsy();
       const content = callResult.content as Array<{ type: string; text?: string }>;

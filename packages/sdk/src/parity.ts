@@ -25,7 +25,28 @@ import {
 export type ParityState = Record<string, unknown>;
 
 export interface ParityStep {
-  tool: string;
+  /**
+   * The MCP tool this step calls. Absent on a {@link ParityStep.setup} step,
+   * which builds state rather than exercising a surface.
+   */
+  tool?: string;
+  /**
+   * Build state over REST instead of calling a tool (F-1376).
+   *
+   * Some inventory tools only answer once something exists, and the write that
+   * creates it is not always a tool: twin-github's three release readers are
+   * declared, but GitHub declares no `create_release` MCP tool, so the twin does
+   * not serve one — while still serving `POST /repos/:owner/:repo/releases`.
+   *
+   * A setup step is NOT coverage. The ring-2/ring-3 check below reads `tool`
+   * alone, so a setup step can never stand in for the scenario step an inventory
+   * tool is missing.
+   */
+  setup?: {
+    method: string;
+    /** Session-relative, e.g. `/repos/acme/api/releases`. */
+    path: string | ((state: ParityState) => string);
+  };
   arguments?: Record<string, unknown> | ((state: ParityState) => Record<string, unknown>);
   /** Pull cross-call state (ids, numbers, shas) out of the response body. */
   capture?: (body: unknown, state: ParityState) => void;
@@ -122,7 +143,8 @@ export async function runFidelityParity(options: RunParityOptions): Promise<Pari
   }
 
   // Ring 2 ⇔ ring 3: every inventory tool needs at least one scenario step.
-  const covered = new Set(options.steps.map((step) => step.tool));
+  // `tool` only: a `setup` step builds state, it does not exercise a surface.
+  const covered = new Set(options.steps.flatMap((step) => (step.tool ? [step.tool] : [])));
   for (const name of inventoryNames) {
     if (!covered.has(name)) failures.push(`no parity scenario step covers tool '${name}'`);
   }
@@ -136,23 +158,35 @@ export async function runFidelityParity(options: RunParityOptions): Promise<Pari
   for (const step of options.steps) {
     const args =
       typeof step.arguments === "function" ? step.arguments(state) : step.arguments ?? {};
-    const response = await options.app.request(`${base}/mcp/call`, {
-      method: "POST",
-      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-      body: JSON.stringify({ tool: step.tool, arguments: args }),
-    });
+    const label = step.tool ?? `setup ${step.setup!.method} ${typeof step.setup!.path === "string" ? step.setup!.path : "<computed>"}`;
+    const response = step.setup
+      ? await options.app.request(
+          `${base}${typeof step.setup.path === "function" ? step.setup.path(state) : step.setup.path}`,
+          {
+            method: step.setup.method,
+            headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+            ...(step.setup.method === "GET" ? {} : { body: JSON.stringify(args) }),
+          }
+        )
+      : await options.app.request(`${base}/mcp/call`, {
+          method: "POST",
+          headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+          body: JSON.stringify({ tool: step.tool, arguments: args }),
+        });
     const body: unknown = await response.json().catch(() => ({}));
     const expected = step.status === undefined ? response.ok : response.status === step.status;
     if (!expected) {
       failures.push(
-        `${step.tool}: expected ${step.status ?? "2xx"}, got ${response.status} ${JSON.stringify(body).slice(0, 300)}`
+        `${label}: expected ${step.status ?? "2xx"}, got ${response.status} ${JSON.stringify(body).slice(0, 300)}`
       );
     } else {
-      const problem = (step.verify ?? options.stepVerify)?.(body);
-      if (problem) failures.push(`${step.tool}: ${problem}`);
+      // `stepVerify` is the scenario's blanket assertion about a TOOL answer; a
+      // setup step is a REST write and is not held to it.
+      const problem = step.verify?.(body) ?? (step.setup ? undefined : options.stepVerify?.(body));
+      if (problem) failures.push(`${label}: ${problem}`);
       step.capture?.(body, state);
     }
-    report.push({ tool: step.tool, status: response.status, ok: response.ok, keys: bodyKeys(body) });
+    report.push({ tool: label, status: response.status, ok: response.ok, keys: bodyKeys(body) });
   }
 
   for (const probe of options.restProbes ?? []) {

@@ -248,7 +248,10 @@ export function buildTwinTools(config: { mcpUrl: string; token: string }) {
       label: z.enum(["bug", "feature", "question"]).describe("Exactly one classification label.")
     },
     async ({ owner, repo, issue_number, label }) => {
-      await twin.call("add_issue_labels", { owner, repo, issue_number, labels: [label] });
+      // GitHub declares no add-one-label tool on its default MCP surface, so this
+      // sets the label set the way `issue_write` does — the issues this agent
+      // triages are untriaged, so replacing the set applies exactly this label.
+      await twin.call("issue_write", { method: "update", owner, repo, issue_number, labels: [label] });
       return { content: [{ type: "text", text: `Applied "${label}" to issue #${issue_number}.` }] };
     }
   );
@@ -280,7 +283,7 @@ export function buildTwinTools(config: { mcpUrl: string; token: string }) {
       issue_number: z.number().int().positive()
     },
     async ({ owner, repo, issue_number }) => {
-      await twin.call("update_issue", { owner, repo, issue_number, state: "closed" });
+      await twin.call("issue_write", { method: "update", owner, repo, issue_number, state: "closed" });
       return { content: [{ type: "text", text: `Closed issue #${issue_number}.` }] };
     }
   );
