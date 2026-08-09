@@ -14,7 +14,7 @@ five lines.
 
 | Twin | Disposition | Grade | What decided it |
 | --- | --- | --- | --- |
-| `twin-github` | `ignore` | measured | 8 live surfaces answered 200 with an unknown query key; `POST /markdown` did the same for an unknown body key |
+| `twin-github` | `ignore` | measured | 10 live surfaces returned byte-identical answers with and without an unknown query key; `POST /markdown` did the same for an unknown body key |
 | `twin-slack` | `ignore` | measured | `api.test` returned `ok:true` and echoed the unknown argument, as a GET query key and as a POST form field |
 | `twin-gmail` | `refuse` | published | Google's gRPC transcoder answers 400 `INVALID_ARGUMENT` to a query parameter that binds to no request-message field |
 | `twin-stripe` | `refuse` | published | Stripe publishes `parameter_unknown`: "The request contains one or more unexpected parameters. Remove these and try again." |
@@ -64,7 +64,7 @@ Two things, and they are what make the ruling narrow enough to take:
 2. **The published artifact does not move.** `inputs` is derived from the
    declared schemas alone, so `packages/twin-*/route-inputs.json` is
    byte-identical either way (`npm run gate:route-inputs` confirmed this across
-   all five twins on the change that flipped github and slack). A twin whose
+   all five twins on the change that flipped three of them). A twin whose
    declaration is short of the vendor's real surface is still exactly as
    visible to pome-cloud's declared-fidelity lane as it was. Runtime strictness
    was never how declaration completeness got enforced — that is
@@ -76,23 +76,27 @@ Two things, and they are what make the ruling narrow enough to take:
 
 ### `twin-github` — GitHub accepts and discards
 
-Eight surfaces, chosen to cover every shape this twin serves — root-level,
-user, org, repo, repo children, wildcard path, and search. Each was called bare
-and then again with `?pome_undeclared_probe=x` appended:
+Ten surfaces, chosen to cover every shape this twin serves — root-level, user,
+org, repo, repo children, wildcard path, and search. Each was called bare and
+then again with `?pome_undeclared_probe=x` appended, and the two response bodies
+were sha256'd rather than eyeballed:
 
 ```
-GET /rate_limit                                   bare=200  probe=200
-GET /users/octocat                                bare=200  probe=200
-GET /orgs/github                                  bare=200  probe=200
-GET /repos/octocat/Hello-World                    bare=200  probe=200
-GET /repos/octocat/Hello-World/issues             bare=200  probe=200
-GET /repos/octocat/Hello-World/commits            bare=200  probe=200
-GET /repos/octocat/Hello-World/branches           bare=200  probe=200
-GET /repos/octocat/Hello-World/contents/README    bare=200  probe=200
-GET /search/repositories?q=stripe                 bare=200  probe=200
+SURFACE                                        BARE   PROBE  BODY
+GET /rate_limit                                200    200    identical
+GET /users/octocat                             200    200    identical
+GET /orgs/github                               200    200    identical
+GET /repos/octocat/Hello-World                 200    200    identical
+GET /repos/octocat/Hello-World/issues          200    200    identical
+GET /repos/octocat/Hello-World/commits         200    200    identical
+GET /repos/octocat/Hello-World/branches        200    200    identical
+GET /repos/octocat/Hello-World/contents/README 200    200    identical
+GET /users/octocat/repos                       200    200    identical
+GET /search/repositories?q=stripe              200    200    identical
+GET /search/code?q=addClass                    401    401    identical
 ```
 
-The probed answers were the bare answers, body included. A second probe,
+Not merely the same status — the same bytes, on every one. A second probe,
 `?sort=not_a_real_value` — a name that IS a GitHub parameter, just not on these
 routes — was also 200 everywhere, so this is not a special case for
 implausible-looking names.
@@ -107,9 +111,10 @@ $ curl -X POST -H 'content-type: application/json' \
 status=200
 ```
 
-`GET /search/code` answered 401 bare and 401 probed — an auth gate reached
-before any parameter is looked at, which is a fact about GitHub's ordering and
-not a data point either way.
+`GET /search/code` is in the table for completeness and proves nothing either
+way: 401 bare and 401 probed is an auth gate reached before any parameter is
+looked at, which is a fact about GitHub's ordering. Ten surfaces carry the
+finding; that one is the control.
 
 Recorded consequence: this twin is the one where F-1179's default was most
 expensive. 66 routes refused a parameter GitHub serves.

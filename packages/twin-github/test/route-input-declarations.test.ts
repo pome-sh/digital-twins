@@ -50,10 +50,11 @@ const base = `/s/${TEST_SID}`;
 const PROBE = "pome_undeclared_probe";
 
 /**
- * F-1372's ruling for this twin: real GitHub answers 200 to an unknown query
- * parameter and to an unknown top-level body key, measured over eight surfaces
- * on 2026-08-09, so the twin discards them too rather than 4xx'ing an agent
- * GitHub would have served (`docs/undeclared-route-inputs.md`).
+ * F-1372's ruling for this twin: real GitHub answers an unknown query parameter
+ * and an unknown top-level body key exactly as it answers the request without
+ * them — measured over ten surfaces on 2026-08-09, bodies hashed — so the twin
+ * discards them too rather than 4xx'ing an agent GitHub would have served
+ * (`docs/undeclared-route-inputs.md`).
  */
 const RULED: UndeclaredDisposition = "ignore";
 

@@ -483,11 +483,11 @@ against nothing would render as a match nobody measured.
 
 **Real GitHub answers 200 to a query parameter it does not know, and to an
 unknown top-level body key, so this twin discards them too.** Measured
-2026-08-09 over eight live surfaces — `/rate_limit`, `/users/octocat`,
-`/orgs/github`, `/repos/:owner/:repo` with its `/issues`, `/commits`,
-`/branches` and `/contents/*` children, and `/search/repositories` — each
-answering identically with and without `?pome_undeclared_probe=x`, plus
-`POST /markdown` for the body case. The transcript is in
+2026-08-09 over ten live surfaces — `/rate_limit`, `/users/octocat`,
+`/orgs/github`, `/users/:username/repos`, `/repos/:owner/:repo` with its
+`/issues`, `/commits`, `/branches` and `/contents/*` children, and
+`/search/repositories` — each returning a byte-identical answer with and without
+`?pome_undeclared_probe=x`, plus `POST /markdown` for the body case. The transcript is in
 [`docs/undeclared-route-inputs.md`](../../docs/undeclared-route-inputs.md).
 
 F-1179 shipped this twin refusing, which was a divergence of our own making in

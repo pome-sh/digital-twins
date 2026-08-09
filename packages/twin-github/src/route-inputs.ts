@@ -31,12 +31,13 @@ import {
  * F-1372 — GitHub accepts a query parameter it does not know and discards it,
  * so this twin does too.
  *
- * Measured 2026-08-09 against `api.github.com`: eight surfaces across every
- * shape this twin serves — `/rate_limit`, `/users/octocat`, `/orgs/github`,
- * `/repos/:owner/:repo`, its `/issues`, `/commits`, `/branches` and
- * `/contents/*` children, plus `/search/repositories` — each answered 200 with
- * `?pome_undeclared_probe=x` appended, byte for byte the bare answer, and
- * `POST /markdown` did the same for an unknown top-level BODY key.
+ * Measured 2026-08-09 against `api.github.com`: ten surfaces across every shape
+ * this twin serves — `/rate_limit`, `/users/octocat`, `/orgs/github`,
+ * `/users/:username/repos`, `/repos/:owner/:repo` with its `/issues`,
+ * `/commits`, `/branches` and `/contents/*` children, and
+ * `/search/repositories` — each answered 200 with `?pome_undeclared_probe=x`
+ * appended, and the two bodies hashed the same on every one. `POST /markdown`
+ * did the same for an unknown top-level BODY key.
  * `docs/undeclared-route-inputs.md` carries the transcript.
  *
  * F-1179 shipped this twin refusing, which is the divergence that matters most:
