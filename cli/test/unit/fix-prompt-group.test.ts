@@ -227,6 +227,44 @@ describe("run-set fix prompt (FDRS-644)", () => {
     expect(prompt).toContain(`"${CRITERIA.comment}"`);
   });
 
+  it("names a seed-excluded criterion apart from the abstentions (F-1392)", () => {
+    // A criterion the seed already satisfied is `skipped` on the wire like an
+    // abstention and means the opposite: the grader DID reach a verdict, and
+    // the verdict is that the criterion was never at risk. Folded into "not
+    // uniformly evaluated", it sends the reader's coding agent looking for an
+    // instrument gap that does not exist — the same conflation F-1392 removed
+    // from the run-level tally.
+    const preSatisfiedResult: CriterionResult = {
+      criterion: { type: "code", text: CRITERIA.comment },
+      passed: false,
+      skipped: true,
+      reason: "already_true_in_seed",
+    };
+    const trials = [
+      trial(1, {
+        passed: false,
+        results: [result(CRITERIA.severity, false, "under-rated"), preSatisfiedResult],
+      }),
+      trial(2, {
+        passed: false,
+        results: [result(CRITERIA.severity, false, "under-rated"), preSatisfiedResult],
+      }),
+    ];
+    const prompt = buildGroupFixUserPrompt({
+      taskName: "scn",
+      groupId: "grp_test",
+      task,
+      trials,
+    });
+    expect(prompt).toContain(
+      `already true in the seed in every completed trial — excluded from the score, nothing here to fix: "${CRITERIA.comment}"`,
+    );
+    expect(prompt).not.toContain("not uniformly evaluated");
+    expect(prompt).not.toContain(
+      `passed in every completed trial: "${CRITERIA.comment}"`,
+    );
+  });
+
   it("flattens hostile judge reasons — no markdown-heading injection (adversarial fix)", () => {
     const hostile = trial(1, {
       passed: false,

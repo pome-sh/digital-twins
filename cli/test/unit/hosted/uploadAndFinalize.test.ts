@@ -10,9 +10,8 @@ import {
   type UploadClient,
 } from "../../../src/hosted/uploadAndFinalize.js";
 import { scoreStatus } from "../../../src/hosted/evalResultView.js";
-import type { CriterionResult as WireCriterionResult } from "../../../src/hosted/evalResultView.js";
 import { HostedOrchError } from "../../../src/hosted/errors.js";
-import type { FinalizeResponse } from "../../../src/contract/index.js";
+import { finalizeResponseSchema, type FinalizeResponse } from "../../../src/contract/index.js";
 
 describe("redactJsonl (FDRS-656 review)", () => {
   it("drops whitespace-only lines so validation and upload agree on row counts", () => {
@@ -239,19 +238,64 @@ describe("scoreFromFinalizeResponse — the seed-pre-satisfied exemption (F-1392
     expect(scoreStatus(score, 100)).toBe("incomplete");
   });
 
-  it("STILL calls the run incomplete when an ERRORED criterion is present, even alongside a pre-satisfied one", () => {
-    // `outcome` is evalResultView's own additive/optional discriminator
-    // (FDRS-591/611) — the wire contract's `criterionResultSchema`
-    // (contract/run.ts) doesn't carry it yet, so it never survives a real
-    // /finalize response. Cast past that gap here to exercise the defensive
-    // `errored` branch `outcomeOf` already supports.
-    const finalized = finalizeResponse(
-      [
+  it("STILL calls the run incomplete when a judge-unavailable criterion sits beside a pre-satisfied one", () => {
+    // The wire shape a judge failure actually arrives in: `skipped: true`
+    // with its own reason. It is not the exempt reason, so it blocks the pass
+    // exactly like any other abstention.
+    const finalized = finalizeResponse([
+      {
+        criterion: { type: "code", text: "No unsupported endpoint was called" },
+        passed: true,
+        skipped: false,
+        reason: "matched",
+      },
+      {
+        criterion: { type: "code", text: "github.no-new-issues" },
+        passed: false,
+        skipped: true,
+        reason: "already_true_in_seed",
+      },
+      {
+        criterion: { type: "model", text: "Severity is set correctly" },
+        passed: false,
+        skipped: true,
+        reason: "judge_unavailable",
+        confidence: 0,
+        judge_model: "test-judge",
+      },
+    ]);
+
+    const score = scoreFromFinalizeResponse(finalized);
+    expect(score.preSatisfied).toBe(1);
+    expect(score.skipped).toBe(2);
+    expect(score.can_pass).toBe(false);
+    expect(scoreStatus(score, 100)).toBe("incomplete");
+  });
+
+  it("cannot see an `errored` criterion at all — `outcome` does not survive the wire", () => {
+    // F-1392 review: a fixture that sets `outcome: "errored"` only typechecks
+    // through a cast, and a cast in a fixture is usually a fixture describing
+    // a state the system cannot produce. This is that case, pinned rather
+    // than cast past. `outcome` is `evalResultView`'s own additive
+    // discriminator (FDRS-591/611); neither this repo's
+    // `criterionResultSchema` nor pome-cloud's carries it, and
+    // `finalizeResponseSchema` is a tolerant reader that STRIPS unknown keys,
+    // so a cloud emitting `outcome` today would have it dropped before
+    // `scoreFromFinalizeResponse` ever saw it. `errored` is therefore always
+    // 0 on the hosted path, and the `errored` term in `can_pass` is a guard
+    // for a producer that does not exist yet — not a branch a wire fixture
+    // can exercise. If this test ever goes red, the wire grew the field and
+    // the errored path became real.
+    const parsed = finalizeResponseSchema.parse({
+      run_id: "run_x",
+      score: 100,
+      dashboard_url: "https://app.pome.sh/runs/run_x",
+      criteria_results: [
         {
-          criterion: { type: "code", text: "github.no-new-issues" },
-          passed: false,
-          skipped: true,
-          reason: "already_true_in_seed",
+          criterion: { type: "code", text: "No unsupported endpoint was called" },
+          passed: true,
+          skipped: false,
+          reason: "matched",
         },
         {
           criterion: { type: "model", text: "Severity is set correctly" },
@@ -262,12 +306,15 @@ describe("scoreFromFinalizeResponse — the seed-pre-satisfied exemption (F-1392
           confidence: 0,
           judge_model: "test-judge",
         },
-      ] as WireCriterionResult[] as FinalizeResponse["criteria_results"],
-    );
+      ],
+    });
 
-    const score = scoreFromFinalizeResponse(finalized);
-    expect(score.preSatisfied).toBe(1);
-    expect(score.errored).toBe(1);
+    expect(parsed.criteria_results?.[1]).not.toHaveProperty("outcome");
+    const score = scoreFromFinalizeResponse(parsed);
+    expect(score.errored).toBe(0);
+    expect(score.skipped).toBe(1);
+    // Still incomplete — via the skipped bucket, which is the only bucket the
+    // wire can put it in.
     expect(score.can_pass).toBe(false);
     expect(scoreStatus(score, 100)).toBe("incomplete");
   });
@@ -277,6 +324,12 @@ describe("scoreFromFinalizeResponse — the seed-pre-satisfied exemption (F-1392
     // guard (`totalRequired > 0`) is untouched by this exemption. F-1392
     // narrows what counts as an ABSTENTION; it does not relax the older rule
     // that a run with nothing passed or failed at all cannot pass regardless.
+    //
+    // This is the one shape where the CLI and the dashboard still word the
+    // same run differently — the dashboard renders FAILED at 0/100 rather
+    // than incomplete. Both refuse to pass it; only the word differs. The
+    // whole table, including this row, is in
+    // `cross-surface-agreement.test.ts`.
     const finalized = finalizeResponse([
       {
         criterion: { type: "code", text: "github.no-new-issues" },

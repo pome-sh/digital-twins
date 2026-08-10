@@ -190,11 +190,16 @@ export interface RunSet {
  *  `runTaskHosted.ts`'s `exitCode === 0` at write time — itself derived from
  *  `scoreStatus(scoreFromFinalizeResponse(finalized), passThreshold)`. Once
  *  that root predicate stopped treating a pre-satisfied `skipped` as an
- *  abstention, a trial holding only one gets `passed: true` on disk, so a
- *  group holding it no longer trips `anyFailed` and is no longer misrouted to
- *  `pome fix-prompt` as an agent defect. Nothing to change here — the fix
- *  lives upstream, and `evalResultCache.test.ts` pins the group-level
- *  behavior directly against the written artifact. */
+ *  abstention, a trial whose only non-passing criterion is pre-satisfied gets
+ *  `passed: true` on disk, so a group holding it no longer trips `anyFailed`
+ *  and is no longer misrouted to `pome fix-prompt` as an agent defect. (A
+ *  trial where EVERY criterion was pre-satisfied still writes `passed: false`
+ *  — no denominator, no verified pass — and still routes there; what it now
+ *  gets when it arrives is a prompt that names the exclusion instead of
+ *  reporting it as a criterion nobody evaluated, `fix-prompt/prompt.ts`.)
+ *  Nothing to change here — the fix lives upstream, and
+ *  `evalResultCache.test.ts` pins the group-level behavior directly against
+ *  the written artifact. */
 export function groupRunSets(trials: TrialVerdict[]): RunSet[] {
   const byKey = new Map<string, TrialVerdict[]>();
   for (const trial of trials) {

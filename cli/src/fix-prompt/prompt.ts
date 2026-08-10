@@ -16,7 +16,7 @@ import { assetPath } from "../cli/assets.js";
 import type { CriterionResult, RecorderEvent } from "../types/shared.js";
 import type { Criterion, Task } from "../task/taskSchema.js";
 import { redactEvent, redactSecrets } from "../recorder/redaction.js";
-import { outcomeOf } from "../hosted/evalResultView.js";
+import { isPreSatisfied, outcomeOf } from "../hosted/evalResultView.js";
 import type { VerdictArtifact } from "../hosted/evalResultCache.js";
 
 export const FIX_PROMPT_TEMPLATE_VERSION = "v1";
@@ -169,18 +169,30 @@ function flattenLine(text: string, max = 300): string {
  *  which trials failed it and what the judge said, failing-first. Criteria
  *  that never failed split honestly: "passed everywhere" requires every
  *  outcome to actually be `passed` — skipped/errored are named as such,
- *  never counted as passes. */
+ *  never counted as passes.
+ *
+ *  F-1392 — a criterion the seed already satisfied is `skipped` on the wire
+ *  and used to land in "not uniformly evaluated", which sends the reader's
+ *  coding agent hunting for a grader gap that does not exist. It is its own
+ *  class here, for the same reason it is its own count in `Score`: the grader
+ *  reached a verdict, and the verdict is that the criterion was never at
+ *  risk. `isPreSatisfied` is the shared predicate, not a second reading of
+ *  the reason string. */
 function renderGroupedSignatures(trials: TrialFixInput[]): string {
   const byCriterion = new Map<
     string,
     { marker: string; hits: Array<{ label: string; reason: string }> }
   >();
-  // Criterion text → the set of non-failed outcomes seen for it.
+  // Criterion text → the set of outcome classes seen for it. "excluded" is a
+  // class here and not in `outcomeOf` (the per-criterion marker stays `-`,
+  // F-1392's trap): this map exists to decide which NOTE a criterion belongs
+  // under, and "the seed already satisfied it" is a different note from "the
+  // grader never reached it".
   const outcomesSeen = new Map<string, Set<string>>();
   for (const trial of trials) {
     for (const result of trial.verdict.criteria_results) {
       const key = result.criterion.text;
-      const outcome = outcomeOf(result);
+      const outcome = isPreSatisfied(result) ? "excluded" : outcomeOf(result);
       if (outcome === "failed") {
         const entry = byCriterion.get(key) ?? {
           marker: criterionMarker(result.criterion),
@@ -196,10 +208,12 @@ function renderGroupedSignatures(trials: TrialFixInput[]): string {
   }
 
   const passedEverywhere: string[] = [];
+  const preSatisfiedEverywhere: string[] = [];
   const notUniformlyEvaluated: string[] = [];
   for (const [key, seen] of outcomesSeen) {
     if (byCriterion.has(key)) continue;
     if (seen.size === 1 && seen.has("passed")) passedEverywhere.push(key);
+    else if (seen.size === 1 && seen.has("excluded")) preSatisfiedEverywhere.push(key);
     else notUniformlyEvaluated.push(key);
   }
 
@@ -212,7 +226,12 @@ function renderGroupedSignatures(trials: TrialFixInput[]): string {
       );
       return `${idx + 1}. ${marker} ${flattenLine(text)} — failed in ${hits.length} of ${completed} completed trials\n${lines.join("\n")}`;
     });
-  if (blocks.length === 0 && passedEverywhere.length === 0 && notUniformlyEvaluated.length === 0) {
+  if (
+    blocks.length === 0 &&
+    passedEverywhere.length === 0 &&
+    preSatisfiedEverywhere.length === 0 &&
+    notUniformlyEvaluated.length === 0
+  ) {
     return "(no criteria recorded)";
   }
   const notes: string[] = [];
@@ -224,9 +243,18 @@ function renderGroupedSignatures(trials: TrialFixInput[]): string {
       `passed in every completed trial: ${passedEverywhere.map((t) => `"${flattenLine(t)}"`).join(" · ")}`,
     );
   }
-  if (notUniformlyEvaluated.length > 0) {
+  if (preSatisfiedEverywhere.length > 0) {
     notes.push(
-      `not uniformly evaluated (skipped or errored in some trials — no pass is claimed for these): ${notUniformlyEvaluated.map((t) => `"${flattenLine(t)}"`).join(" · ")}`,
+      `already true in the seed in every completed trial — excluded from the score, nothing here to fix: ${preSatisfiedEverywhere.map((t) => `"${flattenLine(t)}"`).join(" · ")}`,
+    );
+  }
+  if (notUniformlyEvaluated.length > 0) {
+    // "not evaluated", not "skipped or errored": a criterion that mixes a
+    // seed exclusion with a real pass across trials lands here too, and the
+    // old parenthetical asserted an instrument gap that may not have
+    // happened.
+    notes.push(
+      `not uniformly evaluated (not evaluated in some trials — no pass is claimed for these): ${notUniformlyEvaluated.map((t) => `"${flattenLine(t)}"`).join(" · ")}`,
     );
   }
   return [...blocks, ...notes].join("\n");

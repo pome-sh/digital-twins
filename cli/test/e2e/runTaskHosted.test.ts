@@ -291,18 +291,20 @@ describe("pome run --hosted (e2e via spawn)", () => {
   // this `skipped` result like any other abstention and printed INCOMPLETE /
   // exit 1 on a run the dashboard renders PASS.
   it("prints PASS and exits 0 when the only skipped criterion is pre-satisfied (already_true_in_seed)", async () => {
+    // The wire shape exactly as pome-cloud serializes it: no `outcome` field
+    // (`criterionResultSchema` has none on either side, and the CLI's
+    // `finalizeResponseSchema` strips unknown keys), so the exemption has to
+    // work off `skipped` + `reason` — which is the whole point.
     finalizeResponseOverrides = {
       criteria_results: [
         {
           criterion: { type: "code", text: "No unsupported endpoint was called" },
-          outcome: "passed",
           passed: true,
           skipped: false,
           reason: "matched",
         },
         {
           criterion: { type: "code", text: "github.no-new-issues" },
-          outcome: "skipped",
           passed: false,
           skipped: true,
           reason: "already_true_in_seed",

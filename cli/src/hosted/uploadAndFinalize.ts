@@ -325,6 +325,15 @@ export async function uploadRunBlobs(
  * `can_pass` — this is the same exemption pome-cloud's `isRunIncomplete`
  * applies over the same `criteria_results` (F-1296), narrowed to nothing
  * else.
+ *
+ * `errored` is a DISPLAY-MODEL state with no wire producer today: it is
+ * reachable only through `CriterionResult.outcome`, which neither this repo's
+ * `criterionResultSchema` nor pome-cloud's carries, so `finalizeResponseSchema`
+ * strips it off every real /finalize response and `outcomeOf` falls back to
+ * passed/skipped. The term stays in the arithmetic because a cloud that starts
+ * emitting it must not thereby acquire a pass — but no wire fixture can
+ * exercise it, and a test that fabricates one is testing the display model, not
+ * this function (`incompleteVerdict.test.ts` does exactly that, and says so).
  */
 export function scoreFromFinalizeResponse(finalized: FinalizeResponse): Score {
   const hasCriteriaResults = finalized.criteria_results !== undefined;
