@@ -40,6 +40,7 @@ vi.mock("../../src/runner/runTaskHosted.js", () => ({
       failed: 0,
       skipped: 0,
       errored: 0,
+      preSatisfied: 0,
       total_required: 1,
       evaluated: true,
       can_pass: true,

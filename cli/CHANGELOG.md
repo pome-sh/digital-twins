@@ -4,6 +4,23 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.1
+
+### Patch Changes
+
+- `pome run --hosted` no longer exits 1 on a run the dashboard renders PASS
+  (F-1392). pome-cloud's F-1296 excludes a criterion the seed already
+  satisfied from the abstention count before deciding a run is incomplete;
+  the CLI counted it like any other unresolved criterion, so a task whose
+  seed already satisfied one check (and nothing else was left ungraded)
+  printed `INCOMPLETE` and failed CI. `scoreFromFinalizeResponse` now
+  exempts a `skipped` result stamped `already_true_in_seed`
+  (`isPreSatisfied`/`PRE_SATISFIED_REASON` in `evalResultView.ts`) from
+  `can_pass`, matching the dashboard's `isRunIncomplete` predicate
+  exactly. Any other skipped reason, and every errored result, still makes
+  a run incomplete. `runScoreLine` now names a pre-satisfied criterion apart
+  from genuine abstentions instead of folding it into "not evaluated".
+
 ## 0.23.0
 
 ### Minor Changes

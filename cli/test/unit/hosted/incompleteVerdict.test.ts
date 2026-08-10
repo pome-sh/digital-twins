@@ -21,6 +21,8 @@
 import { describe, expect, it } from "vitest";
 import type { CriterionResult } from "../../../src/contract/index.js";
 import {
+  isPreSatisfied,
+  PRE_SATISFIED_REASON,
   runScoreLine,
   scoreStatus,
   taskPassed,
@@ -39,11 +41,20 @@ const abstained = (text: string): CriterionResult => ({
   skipped: true,
   reason: "tool_not_recorded",
 });
+// F-1392 — the one exemption: excluded because the seed already satisfied it,
+// not because the grader couldn't reach a verdict.
+const preSatisfied = (text: string): CriterionResult => ({
+  criterion: { type: "code", text },
+  passed: false,
+  skipped: true,
+  reason: PRE_SATISFIED_REASON,
+});
 
 function score(results: CriterionResult[], satisfaction: number): Score {
   const passed = results.filter((r) => !r.skipped && r.passed).length;
   const failed = results.filter((r) => !r.skipped && !r.passed).length;
   const skipped = results.filter((r) => r.skipped).length;
+  const preSatisfiedCount = results.filter((r) => isPreSatisfied(r)).length;
   const totalRequired = passed + failed;
   return {
     satisfaction,
@@ -51,9 +62,10 @@ function score(results: CriterionResult[], satisfaction: number): Score {
     failed,
     skipped,
     errored: 0,
+    preSatisfied: preSatisfiedCount,
     total_required: totalRequired,
     evaluated: totalRequired > 0,
-    can_pass: totalRequired > 0 && skipped === 0,
+    can_pass: totalRequired > 0 && skipped - preSatisfiedCount === 0,
     results,
     judge_model: null,
     judge_tokens_in: null,
@@ -120,5 +132,67 @@ describe("runScoreLine — the copy stops blaming the agent", () => {
     expect(runScoreLine(score([ok("a")], 100), 100, "cloud score")).toBe(
       "score: 100/100",
     );
+  });
+});
+
+// F-1392 — pome-cloud's F-1296 excludes a criterion the seed already
+// satisfied from the abstention denominator (`isRunIncomplete` in
+// apps/dashboard/src/lib/run-status.ts). The CLI counted every `skipped`
+// result with no exemption, so a run the dashboard calls PASS came out
+// `incomplete` / exit 1 in CI. These tests pin the fix at the `isPreSatisfied`
+// predicate and its two call sites (`scoreStatus` via `can_pass`, and
+// `runScoreLine`'s copy).
+describe("isPreSatisfied / PRE_SATISFIED_REASON — the one exemption, keyed on the shared reason string", () => {
+  it("is true only for a skipped result with the exact reason", () => {
+    expect(isPreSatisfied({ skipped: true, reason: PRE_SATISFIED_REASON })).toBe(true);
+    expect(isPreSatisfied({ skipped: true, reason: "tool_not_recorded" })).toBe(false);
+    // Same reason string but NOT skipped (shouldn't happen on the wire, but
+    // the predicate must not key on the string alone).
+    expect(isPreSatisfied({ skipped: false, reason: PRE_SATISFIED_REASON })).toBe(false);
+  });
+});
+
+describe("scoreStatus — a pre-satisfied criterion is not an abstention (F-1392)", () => {
+  it("returns pass for a run whose ONLY non-passing criterion is pre-satisfied", () => {
+    const s = score([ok("a"), ok("b"), preSatisfied("github.no-new-issues")], 100);
+    expect(s.can_pass).toBe(true);
+    expect(scoreStatus(s, 100)).toBe("pass");
+    expect(taskPassed(s, 100)).toBe(true);
+  });
+
+  it("STILL returns incomplete when a genuine abstention accompanies the pre-satisfied one", () => {
+    const s = score(
+      [ok("a"), preSatisfied("github.no-new-issues"), abstained("d")],
+      100,
+    );
+    expect(s.can_pass).toBe(false);
+    expect(scoreStatus(s, 100)).toBe("incomplete");
+  });
+
+  it("STILL refuses to inflate a partial run for any OTHER skip reason — narrowing must not become a loosening", () => {
+    const s = score([ok("a"), ok("b"), ok("c"), abstained("d")], 100);
+    expect(s.can_pass).toBe(false);
+    expect(scoreStatus(s, 100)).toBe("incomplete");
+  });
+});
+
+describe("runScoreLine — pre-satisfied criteria are named apart from abstentions (F-1392)", () => {
+  it("names the pre-satisfied count separately from the not-evaluated count, mirroring the dashboard's verdict line", () => {
+    // 1 real abstention + 1 pre-satisfied — still incomplete (the abstention),
+    // but the line must not say "2 of 4 criteria not evaluated": only the
+    // real abstention failed to reach a verdict.
+    const s = score(
+      [ok("a"), ok("b"), abstained("c"), preSatisfied("github.no-new-issues")],
+      100,
+    );
+    const line = runScoreLine(s, 100, "cloud score");
+    expect(line).toContain("incomplete");
+    expect(line).toContain("1 of 4 criteria not evaluated");
+    expect(line).toContain("1 already true in the seed");
+  });
+
+  it("renders the plain passing line when the only skip is pre-satisfied", () => {
+    const s = score([ok("a"), preSatisfied("github.no-new-issues")], 100);
+    expect(runScoreLine(s, 100, "cloud score")).toBe("score: 100/100");
   });
 });

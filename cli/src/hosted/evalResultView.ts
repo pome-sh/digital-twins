@@ -69,6 +69,13 @@ export type Score = {
   failed: number;
   skipped: number;
   errored: number;
+  // F-1392 — the SUBSET of `skipped` excluded because the seed already
+  // satisfied it (`PRE_SATISFIED_REASON`/`isPreSatisfied` above). Not a
+  // separate outcome — these criteria still count in `skipped` and still
+  // render with the `-` marker (`outcomeOf` keeps mapping them to
+  // `"skipped"`) — but they are not abstentions, so `can_pass` and
+  // `runScoreLine` subtract this count back out of the "not evaluated" tally.
+  preSatisfied: number;
   // = passed + failed. The satisfaction denominator.
   total_required: number;
   // false when total_required === 0 (nothing was evaluated). Renders as
@@ -92,6 +99,34 @@ export function outcomeOf(result: CriterionResult): CriterionOutcome {
   return result.passed ? "passed" : "failed";
 }
 
+// F-1296 (pome-cloud) stamps this reason on a criterion the seed already
+// satisfied — the control plane graded the FINAL state alone, found the
+// criterion true before the agent ran, and moved it out of the score
+// denominator so a task cannot earn credit for doing nothing (AutomationBench's
+// "no reward for doing nothing" rule). Restated here rather than imported: the
+// CLI shares no code with the control plane, and this travels as a string on
+// the `criteria_results` wire shape (`apps/control-plane/src/services/
+// evaluators/deterministic/pre-satisfied.ts` on the pome-cloud side).
+//
+// F-1392 — the CLI is the fifth surface this string has to agree with
+// (score-merge, run-report, run-status and drift-telemetry are the other
+// four, per pre-satisfied.ts's own doc comment). Defined ONCE and read from
+// here at every call site so the string is never repeated inline.
+export const PRE_SATISFIED_REASON = "already_true_in_seed";
+
+/**
+ * Was this criterion excluded for having already been true in the seed?
+ *
+ * Mirrors the dashboard's `isPreSatisfiedResult`
+ * (apps/dashboard/src/lib/run-status.ts) over the same `criteria_results`
+ * wire shape — same predicate, same reason string, two repos.
+ */
+export function isPreSatisfied(
+  result: Pick<CriterionResult, "skipped" | "reason">,
+): boolean {
+  return result.skipped && result.reason === PRE_SATISFIED_REASON;
+}
+
 export type ScoreStatus = "pass" | "fail" | "incomplete";
 
 // Single source of truth for "did this run pass?", applied to a CLOUD score.
@@ -104,11 +139,18 @@ export type ScoreStatus = "pass" | "fail" | "incomplete";
 // partial run into a pass — the same refusal pome-cloud added server-side in
 // F-925 — so the rename must not become a loosening.
 //
-// One rule, two repos: `can_pass` is false for ANY abstention
-// (`uploadAndFinalize.ts`), and pome-cloud's `isRunIncomplete` says
-// `notEvaluated > 0` over the same `criteria_results`. Deliberately NOT read
-// from the wire's `all_skipped`, which is the narrower every-abstained
-// predicate and would loosen this guard.
+// One rule, two repos: `can_pass` is false for any abstention EXCEPT a
+// criterion the seed already satisfied (`PRE_SATISFIED_REASON` above) —
+// `uploadAndFinalize.ts`'s `scoreFromFinalizeResponse` subtracts
+// `preSatisfied` out of the `skipped` tally before deciding `can_pass`, and
+// pome-cloud's `isRunIncomplete` subtracts the same `preSatisfied` count out
+// of `notEvaluated` over the same `criteria_results`
+// (apps/dashboard/src/lib/run-status.ts). F-1392 — the CLI used to count
+// every `skipped` result with no exemption, which called a run INCOMPLETE
+// that the dashboard called PASS. ANY OTHER skipped reason, and every
+// `errored`, still fails this guard — only the one named exemption is
+// narrowed. Deliberately NOT read from the wire's `all_skipped`, which is the
+// narrower every-abstained predicate and would loosen this guard.
 export function scoreStatus(score: Score, passThreshold: number): ScoreStatus {
   if (!score.evaluated || !score.can_pass) return "incomplete";
   return score.satisfaction >= passThreshold ? "pass" : "fail";
@@ -171,9 +213,20 @@ export function runScoreLine(
     // fact the cloud's own header now states. The old copy said "cannot pass",
     // which is a verdict about the AGENT for a gap in the GRADER — the exact
     // inversion F-925 exists to stop, one surface over.
-    const notEvaluated = score.skipped + score.errored;
-    const total = score.total_required + notEvaluated;
-    return `score: incomplete — ${notEvaluated} of ${total} criteria not evaluated; ${scoreCountsSummary(score)}; ${unevaluatedNumericLabel}: ${score.satisfaction}/100`;
+    //
+    // F-1392 — `preSatisfied` criteria are named APART from the abstentions
+    // instead of folded into "not evaluated", the way the dashboard's
+    // `verdictLine` does (run-status.ts:175-196): a pre-satisfied criterion
+    // reached a verdict (the grader wasn't gapped), it just tested nothing.
+    // Only reachable here at all when some OTHER criterion is still a genuine
+    // abstention/error — a run whose only non-passing criterion is
+    // pre-satisfied is already `pass`, not `incomplete`.
+    const allExcluded = score.skipped + score.errored;
+    const unreached = allExcluded - score.preSatisfied;
+    const total = score.total_required + allExcluded;
+    const preSatisfiedClause =
+      score.preSatisfied > 0 ? ` (${score.preSatisfied} already true in the seed)` : "";
+    return `score: incomplete — ${unreached} of ${total} criteria not evaluated${preSatisfiedClause}; ${scoreCountsSummary(score)}; ${unevaluatedNumericLabel}: ${score.satisfaction}/100`;
   }
   return `score: ${score.satisfaction}/100`;
 }

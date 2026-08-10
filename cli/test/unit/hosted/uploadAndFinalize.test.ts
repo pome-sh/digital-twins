@@ -3,8 +3,16 @@
 
 import { gunzipSync } from "node:zlib";
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { redactJsonl, uploadRunBlobs, type UploadClient } from "../../../src/hosted/uploadAndFinalize.js";
+import {
+  redactJsonl,
+  scoreFromFinalizeResponse,
+  uploadRunBlobs,
+  type UploadClient,
+} from "../../../src/hosted/uploadAndFinalize.js";
+import { scoreStatus } from "../../../src/hosted/evalResultView.js";
+import type { CriterionResult as WireCriterionResult } from "../../../src/hosted/evalResultView.js";
 import { HostedOrchError } from "../../../src/hosted/errors.js";
+import type { FinalizeResponse } from "../../../src/contract/index.js";
 
 describe("redactJsonl (FDRS-656 review)", () => {
   it("drops whitespace-only lines so validation and upload agree on row counts", () => {
@@ -163,5 +171,135 @@ describe("uploadRunBlobs — meta.json (D18.1)", () => {
 
     const keys = await uploadRunBlobs(client, "ses_1", BLOBS);
     expect(keys.metaKey).toBeNull();
+  });
+});
+
+// F-1392 — pome-cloud's F-1296 moved a seed-pre-satisfied criterion out of
+// the dashboard's abstention denominator (`isRunIncomplete` in
+// apps/dashboard/src/lib/run-status.ts: `notEvaluated - preSatisfied > 0`).
+// The CLI never learned: `scoreFromFinalizeResponse` counted every `skipped`
+// result with no exemption, so a run the dashboard renders PASS came out
+// `can_pass: false` → `incomplete` → exit 1 in CI. These tests pin the fix
+// AND its narrowness: only the one named reason is exempt.
+function finalizeResponse(
+  criteria_results: FinalizeResponse["criteria_results"],
+  score = 100,
+): FinalizeResponse {
+  return {
+    run_id: "run_x",
+    score,
+    dashboard_url: "https://app.pome.sh/runs/run_x",
+    criteria_results,
+  };
+}
+
+describe("scoreFromFinalizeResponse — the seed-pre-satisfied exemption (F-1392)", () => {
+  it("yields can_pass: true and scoreStatus 'pass' when the only non-passing criterion is pre-satisfied", () => {
+    const finalized = finalizeResponse([
+      {
+        criterion: { type: "code", text: "No unsupported endpoint was called" },
+        passed: true,
+        skipped: false,
+        reason: "matched",
+      },
+      {
+        criterion: { type: "code", text: "github.no-new-issues" },
+        passed: false,
+        skipped: true,
+        reason: "already_true_in_seed",
+      },
+    ]);
+
+    const score = scoreFromFinalizeResponse(finalized);
+    expect(score.preSatisfied).toBe(1);
+    expect(score.skipped).toBe(1);
+    expect(score.can_pass).toBe(true);
+    expect(scoreStatus(score, 100)).toBe("pass");
+  });
+
+  it("STILL calls the run incomplete when a DIFFERENT skip reason is present (no loosening)", () => {
+    const finalized = finalizeResponse([
+      {
+        criterion: { type: "code", text: "No unsupported endpoint was called" },
+        passed: true,
+        skipped: false,
+        reason: "matched",
+      },
+      {
+        criterion: { type: "code", text: "some other criterion" },
+        passed: false,
+        skipped: true,
+        reason: "cloud could not evaluate this criterion",
+      },
+    ]);
+
+    const score = scoreFromFinalizeResponse(finalized);
+    expect(score.preSatisfied).toBe(0);
+    expect(score.can_pass).toBe(false);
+    expect(scoreStatus(score, 100)).toBe("incomplete");
+  });
+
+  it("STILL calls the run incomplete when an ERRORED criterion is present, even alongside a pre-satisfied one", () => {
+    // `outcome` is evalResultView's own additive/optional discriminator
+    // (FDRS-591/611) — the wire contract's `criterionResultSchema`
+    // (contract/run.ts) doesn't carry it yet, so it never survives a real
+    // /finalize response. Cast past that gap here to exercise the defensive
+    // `errored` branch `outcomeOf` already supports.
+    const finalized = finalizeResponse(
+      [
+        {
+          criterion: { type: "code", text: "github.no-new-issues" },
+          passed: false,
+          skipped: true,
+          reason: "already_true_in_seed",
+        },
+        {
+          criterion: { type: "model", text: "Severity is set correctly" },
+          outcome: "errored",
+          passed: false,
+          skipped: true,
+          reason: "judge_unavailable",
+          confidence: 0,
+          judge_model: "test-judge",
+        },
+      ] as WireCriterionResult[] as FinalizeResponse["criteria_results"],
+    );
+
+    const score = scoreFromFinalizeResponse(finalized);
+    expect(score.preSatisfied).toBe(1);
+    expect(score.errored).toBe(1);
+    expect(score.can_pass).toBe(false);
+    expect(scoreStatus(score, 100)).toBe("incomplete");
+  });
+
+  it("a run with ONLY pre-satisfied criteria and nothing else evaluated is still incomplete (nothing was actually graded)", () => {
+    // total_required stays 0 and can_pass stays false — the pre-existing A5
+    // guard (`totalRequired > 0`) is untouched by this exemption. F-1392
+    // narrows what counts as an ABSTENTION; it does not relax the older rule
+    // that a run with nothing passed or failed at all cannot pass regardless.
+    const finalized = finalizeResponse([
+      {
+        criterion: { type: "code", text: "github.no-new-issues" },
+        passed: false,
+        skipped: true,
+        reason: "already_true_in_seed",
+      },
+    ]);
+
+    const score = scoreFromFinalizeResponse(finalized);
+    expect(score.can_pass).toBe(false);
+    expect(score.evaluated).toBe(false);
+    expect(scoreStatus(score, 100)).toBe("incomplete");
+  });
+
+  it("keeps the FDRS-618 compat: no criteria_results at all still means can_pass true", () => {
+    const finalized: FinalizeResponse = {
+      run_id: "run_x",
+      score: 100,
+      dashboard_url: "https://app.pome.sh/runs/run_x",
+    };
+    const score = scoreFromFinalizeResponse(finalized);
+    expect(score.can_pass).toBe(true);
+    expect(score.preSatisfied).toBe(0);
   });
 });

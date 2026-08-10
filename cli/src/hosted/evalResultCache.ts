@@ -184,7 +184,17 @@ export interface RunSet {
 }
 
 /** Group trials into run sets: trials sharing a group_id form one set; a
- *  null group_id is its own single-run set. */
+ *  null group_id is its own single-run set.
+ *
+ *  F-1392 note on `anyFailed` below: it reads `!t.verdict.passed`, which is
+ *  `runTaskHosted.ts`'s `exitCode === 0` at write time — itself derived from
+ *  `scoreStatus(scoreFromFinalizeResponse(finalized), passThreshold)`. Once
+ *  that root predicate stopped treating a pre-satisfied `skipped` as an
+ *  abstention, a trial holding only one gets `passed: true` on disk, so a
+ *  group holding it no longer trips `anyFailed` and is no longer misrouted to
+ *  `pome fix-prompt` as an agent defect. Nothing to change here — the fix
+ *  lives upstream, and `evalResultCache.test.ts` pins the group-level
+ *  behavior directly against the written artifact. */
 export function groupRunSets(trials: TrialVerdict[]): RunSet[] {
   const byKey = new Map<string, TrialVerdict[]>();
   for (const trial of trials) {
