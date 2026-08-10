@@ -21,6 +21,7 @@
 import { describe, expect, it } from "vitest";
 import type { CriterionResult } from "../../../src/contract/index.js";
 import {
+  evaluationCounts,
   isPreSatisfied,
   PRE_SATISFIED_REASON,
   runScoreLine,
@@ -250,5 +251,68 @@ describe("runScoreLine — pre-satisfied criteria are named apart from abstentio
     const line = runScoreLine(s, 100, "cloud score");
     expect(line).toContain("1 of 2 criteria not evaluated (1 already true in the seed)");
     expect(line).not.toContain("nothing was at risk");
+  });
+});
+
+// F-1195 — `evaluationCounts` is the ONE place this arithmetic exists, so
+// `verdict.json` and `runScoreLine`'s "N of M criteria not evaluated" cannot
+// drift apart. These pin the four counts directly against the shapes
+// `verdict.json` needs to name: a full pass, an unevaluated criterion (the
+// original bug — a bare `score`/`pass_threshold` pair with no denominator),
+// and a pre-satisfied exclusion (must agree with the dashboard).
+describe("evaluationCounts — the counts verdict.json and the terminal both read", () => {
+  it("a fully-evaluated run: evaluated = total, nothing left out", () => {
+    const s = score([ok("a"), ok("b")], 100);
+    expect(evaluationCounts(s)).toEqual({
+      evaluated: 2,
+      notEvaluated: 0,
+      preSatisfied: 0,
+      total: 2,
+    });
+  });
+
+  it("an abstained criterion counts as not-evaluated, not folded into evaluated", () => {
+    // This is the F-1195 bug shape: 100/100 over what DID run, with a third
+    // criterion that never did.
+    const s = score([ok("a"), ok("b"), abstained("c")], 100);
+    expect(evaluationCounts(s)).toEqual({
+      evaluated: 2,
+      notEvaluated: 1,
+      preSatisfied: 0,
+      total: 3,
+    });
+  });
+
+  it("a pre-satisfied criterion is excluded from evaluated AND from notEvaluated", () => {
+    const s = score([ok("a"), preSatisfied("github.no-new-issues")], 100);
+    expect(evaluationCounts(s)).toEqual({
+      evaluated: 1,
+      notEvaluated: 0,
+      preSatisfied: 1,
+      total: 2,
+    });
+  });
+
+  it("a genuine abstention beside a pre-satisfied exclusion counts them separately", () => {
+    const s = score(
+      [ok("a"), abstained("b"), preSatisfied("github.no-new-issues")],
+      100,
+    );
+    expect(evaluationCounts(s)).toEqual({
+      evaluated: 1,
+      notEvaluated: 1,
+      preSatisfied: 1,
+      total: 3,
+    });
+  });
+
+  it("every criterion pre-satisfied: no denominator, everything in preSatisfied", () => {
+    const s = score([preSatisfied("github.no-new-issues")], 0);
+    expect(evaluationCounts(s)).toEqual({
+      evaluated: 0,
+      notEvaluated: 0,
+      preSatisfied: 1,
+      total: 1,
+    });
   });
 });

@@ -38,7 +38,12 @@ function verdict(over: Partial<VerdictArtifact>): VerdictArtifact {
     judge_model: "test-judge",
     score: 100,
     pass_threshold: 100,
+    state: "pass",
     passed: true,
+    evaluated: 1,
+    not_evaluated: 0,
+    pre_satisfied: 0,
+    total: 1,
     criteria_results: [
       {
         criterion: { type: "model", text: "Severity is set correctly" },

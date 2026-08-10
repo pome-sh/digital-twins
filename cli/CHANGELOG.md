@@ -4,6 +4,27 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.2
+
+### Patch Changes
+
+- `verdict.json` now names the run's third state and carries the counts
+  `score` is computed over (F-1195). Before this, a hosted run whose criteria
+  couldn't all be graded wrote `score: 100, pass_threshold: 100, passed:
+  false` with no denominator and no field naming the third state anywhere in
+  the artifact — a CI script trusting `score >= pass_threshold` read `true`
+  on a run where a third of the criteria never ran. `verdict.json` now
+  carries `state` (`"pass"` / `"fail"` / `"incomplete"`, the same word
+  `scoreStatus` gives the terminal and the dashboard) plus `evaluated` /
+  `not_evaluated` / `pre_satisfied` / `total` counts, computed by one shared
+  helper (`evaluationCounts` in `evalResultView.ts`) so the artifact and the
+  terminal's "N of M criteria not evaluated" line can't drift apart.
+  `VERDICT_ARTIFACT_VERSION` bumps 1 → 2 with the new fields required; a v1
+  file on disk is refused (no dual-format reader) but `pome fix-prompt`
+  discovery now names that skip explicitly instead of reporting it exactly
+  like an empty `runs/`. `cli/README.md`'s exit-code contract now points CI
+  at `state` instead of "read the verdict word printed beside the score".
+
 ## 0.23.1
 
 ### Patch Changes

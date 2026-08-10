@@ -79,8 +79,15 @@ Three rules CI must honor:
   whose criteria could not all be graded exits `1` rather than mapping its
   partial score to a code — a run whose checks never ran is not a green CI
   signal. The cost is stated rather than hidden: **`1` cannot tell "the agent
-  regressed" from "we could not grade it."** Read the verdict word printed
-  beside the score (`INCOMPLETE` vs a sub-threshold number) to separate them.
+  regressed" from "we could not grade it."** To separate them programmatically,
+  do not compare `score` against `pass_threshold` yourself — a run with a third
+  of its criteria unevaluated can still read `score: 100, pass_threshold: 100`
+  with nothing in those two fields alone saying so. Read `state` in the
+  `verdict.json` a hosted `pome run` writes to
+  `<artifacts-dir>/<task-slug>/<session-id>/verdict.json`: `"pass"`, `"fail"`,
+  or `"incomplete"` — the same word the terminal prints beside the score. The
+  `evaluated` / `not_evaluated` / `pre_satisfied` / `total` counts alongside
+  `score` show what fraction of criteria that number is actually over.
 - **Trial groups map as a whole.** `pome run -n k` (k>1) collapses the whole
   group to one code: `0` = at least one trial completed and every completed
   trial passed; `1` = at least one completed trial failed its threshold **or was

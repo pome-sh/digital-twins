@@ -29,6 +29,8 @@ function trial(
   n: number,
   opts: { passed: boolean; results: CriterionResult[] },
 ): TrialFixInput {
+  const skippedCount = opts.results.filter((r) => r.skipped).length;
+  const evaluatedCount = opts.results.length - skippedCount;
   const verdict: VerdictArtifact = {
     version: VERDICT_ARTIFACT_VERSION,
     source: "cloud-finalize",
@@ -41,7 +43,12 @@ function trial(
     judge_model: "test-judge",
     score: opts.passed ? 100 : 50,
     pass_threshold: 100,
+    state: opts.passed ? "pass" : "fail",
     passed: opts.passed,
+    evaluated: evaluatedCount,
+    not_evaluated: skippedCount,
+    pre_satisfied: 0,
+    total: opts.results.length,
     criteria_results: opts.results,
     duration_ms: 1000,
     finalized_at: `2026-07-06T00:0${n}:00.000Z`,

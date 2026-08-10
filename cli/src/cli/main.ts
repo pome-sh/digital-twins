@@ -73,6 +73,7 @@ import {
 import {
   discoverRunSet,
   loadTrialEvents,
+  VERDICT_ARTIFACT_VERSION,
 } from "../hosted/evalResultCache.js";
 import type { Task } from "../task/taskSchema.js";
 import { parseTaskFile } from "../task/parseTask.js";
@@ -1208,6 +1209,16 @@ export function createProgram() {
       const root = target ?? "runs";
       const discovery = await discoverRunSet(resolve(root));
       if (discovery.totalSets === 0) {
+        // F-1195 — a v1 verdict.json is a RECOGNIZABLE prior artifact
+        // version, not a foreign file: name the skip instead of reporting
+        // the same "no runs" a truly empty runs/ would get.
+        if (discovery.staleVersionCount > 0) {
+          console.error(
+            `${discovery.staleVersionCount} verdict.json file(s) under ${root} were written by an older CLI (artifact version < ${VERDICT_ARTIFACT_VERSION}) and can't be read by this version — re-run \`pome run\` to produce trials fix-prompt can use.`,
+          );
+          process.exitCode = 5;
+          return;
+        }
         console.error(
           `No finalized run sets under ${root} — hosted \`pome run\` records a verdict.json per trial; run one first (or point fix-prompt at your artifacts dir).`,
         );

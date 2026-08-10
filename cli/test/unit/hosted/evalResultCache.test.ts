@@ -15,7 +15,9 @@ import {
   latestFailedRunSet,
   loadTrialEvents,
   readVerdictArtifact,
+  readVerdictArtifactDetailed,
   scanVerdictArtifacts,
+  scanVerdictArtifactsDetailed,
   writeVerdictArtifact,
   type VerdictArtifact,
 } from "../../../src/hosted/evalResultCache.js";
@@ -33,7 +35,12 @@ function verdict(over: Partial<VerdictArtifact>): VerdictArtifact {
     judge_model: "test-judge",
     score: 100,
     pass_threshold: 100,
+    state: "pass",
     passed: true,
+    evaluated: 1,
+    not_evaluated: 0,
+    pre_satisfied: 0,
+    total: 1,
     criteria_results: [
       {
         criterion: { type: "model", text: "Severity is set correctly" },
@@ -45,6 +52,36 @@ function verdict(over: Partial<VerdictArtifact>): VerdictArtifact {
     duration_ms: 1000,
     finalized_at: "2026-07-06T00:00:00.000Z",
     ...over,
+  };
+}
+
+/** F-1195 — a verdict.json exactly as a pre-F-1195 CLI wrote it: recognizable
+ *  (source/session_id/task_name/task_path/criteria_results all present and
+ *  shaped) but missing `state` and the four counts, at `version: 1`. */
+function v1OnDiskArtifact(sessionId: string): Record<string, unknown> {
+  return {
+    version: 1,
+    source: "cloud-finalize",
+    task_name: "scn",
+    task_path: "tasks/scn.md",
+    group_id: null,
+    session_id: sessionId,
+    cloud_run_id: "run_v1",
+    cloud_dashboard_url: "https://app.pome.sh/runs/run_v1",
+    judge_model: "test-judge",
+    score: 100,
+    pass_threshold: 100,
+    passed: false,
+    criteria_results: [
+      {
+        criterion: { type: "model", text: "Severity is set correctly" },
+        passed: true,
+        skipped: false,
+        reason: "ok",
+      },
+    ],
+    duration_ms: 1000,
+    finalized_at: "2026-07-06T00:00:00.000Z",
   };
 }
 
@@ -278,5 +315,87 @@ describe("verdict artifact (FDRS-644)", () => {
     );
     const events = await loadTrialEvents(tmp);
     expect(events).toHaveLength(1);
+  });
+
+  // F-1195 — a v1 artifact is RECOGNIZABLE (it has every field a verdict.json
+  // has always had), just missing `state` and the four counts this ticket
+  // added. `readVerdictArtifact` still refuses it (no dual-format reader —
+  // zero customers), but the detailed API must say WHY, distinctly from a
+  // foreign/corrupt file, so a v1 run never looks identical to "no run
+  // happened here" to fix-prompt discovery.
+  describe("v1 verdict.json is a named stale-version skip, not a silent drop (F-1195)", () => {
+    it("readVerdictArtifact still returns null for a v1 file (no dual-format reader)", async () => {
+      const tmp = await mkdtemp(join(tmpdir(), "verdict-v1-"));
+      const dir = join(tmp, "scn", "ses_v1");
+      await mkdir(dir, { recursive: true });
+      await writeFile(join(dir, "verdict.json"), JSON.stringify(v1OnDiskArtifact("ses_v1")), "utf8");
+      expect(await readVerdictArtifact(dir)).toBeNull();
+    });
+
+    it("readVerdictArtifactDetailed names it stale-version with the on-disk version number", async () => {
+      const tmp = await mkdtemp(join(tmpdir(), "verdict-v1-detail-"));
+      const dir = join(tmp, "scn", "ses_v1");
+      await mkdir(dir, { recursive: true });
+      await writeFile(join(dir, "verdict.json"), JSON.stringify(v1OnDiskArtifact("ses_v1")), "utf8");
+      expect(await readVerdictArtifactDetailed(dir)).toEqual({
+        status: "stale-version",
+        version: 1,
+      });
+      // A genuinely foreign file is still a plain "unreadable", not confused
+      // for a stale version.
+      const foreignDir = join(tmp, "scn", "foreign");
+      await mkdir(foreignDir, { recursive: true });
+      await writeFile(join(foreignDir, "verdict.json"), '{"hello":"world"}', "utf8");
+      expect(await readVerdictArtifactDetailed(foreignDir)).toEqual({ status: "unreadable" });
+    });
+
+    it("scanVerdictArtifactsDetailed separates stale-version dirs from readable trials", async () => {
+      const tmp = await mkdtemp(join(tmpdir(), "verdict-v1-scan-"));
+      await writeTrial(tmp, "scn", "ses_current", {});
+      const staleDir = join(tmp, "scn", "ses_v1");
+      await mkdir(staleDir, { recursive: true });
+      await writeFile(join(staleDir, "verdict.json"), JSON.stringify(v1OnDiskArtifact("ses_v1")), "utf8");
+
+      const { trials, staleVersionDirs } = await scanVerdictArtifactsDetailed(tmp);
+      expect(trials.map((t) => t.verdict.session_id)).toEqual(["ses_current"]);
+      expect(staleVersionDirs).toEqual([staleDir]);
+      // The plain (non-detailed) scan still only returns readable trials.
+      expect((await scanVerdictArtifacts(tmp)).map((t) => t.verdict.session_id)).toEqual([
+        "ses_current",
+      ]);
+    });
+
+    it("discoverRunSet(root) reports staleVersionCount alongside totalSets:0 instead of looking like an empty runs/", async () => {
+      const tmp = await mkdtemp(join(tmpdir(), "verdict-v1-root-"));
+      const staleDir = join(tmp, "scn", "ses_v1");
+      await mkdir(staleDir, { recursive: true });
+      await writeFile(join(staleDir, "verdict.json"), JSON.stringify(v1OnDiskArtifact("ses_v1")), "utf8");
+
+      const discovery = await discoverRunSet(tmp);
+      expect(discovery.kind).toBe("root");
+      expect(discovery.totalSets).toBe(0);
+      expect(discovery.set).toBeNull();
+      expect(discovery.staleVersionCount).toBe(1);
+
+      // A truly empty runs/ still reports staleVersionCount: 0 — the two
+      // "nothing to read" cases stay distinguishable.
+      const empty = await mkdtemp(join(tmpdir(), "verdict-v1-empty-"));
+      const emptyDiscovery = await discoverRunSet(empty);
+      expect(emptyDiscovery.totalSets).toBe(0);
+      expect(emptyDiscovery.staleVersionCount).toBe(0);
+    });
+
+    it("discoverRunSet(trial dir) pointed straight at a v1 verdict.json names the skip", async () => {
+      const tmp = await mkdtemp(join(tmpdir(), "verdict-v1-trialdir-"));
+      const staleDir = join(tmp, "scn", "ses_v1");
+      await mkdir(staleDir, { recursive: true });
+      await writeFile(join(staleDir, "verdict.json"), JSON.stringify(v1OnDiskArtifact("ses_v1")), "utf8");
+
+      const discovery = await discoverRunSet(staleDir);
+      expect(discovery.kind).toBe("trial-dir");
+      expect(discovery.set).toBeNull();
+      expect(discovery.totalSets).toBe(0);
+      expect(discovery.staleVersionCount).toBe(1);
+    });
   });
 });
