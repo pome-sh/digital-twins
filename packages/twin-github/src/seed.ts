@@ -30,6 +30,56 @@ export const seedSchema = z.object({
         )
         .default([]),
       files: z.array(z.object({ path: z.string().min(1), content: z.string(), branch: z.string().optional() })).default([]),
+      // F-1421 — milestones, tags and releases are repository-level entities the
+      // twin already SERVES (`GET /milestones`, `/tags`, `/releases`,
+      // `/releases/latest`, `/releases/tags/:tag`) and the seed could not
+      // express. Zod strips unknown keys, so a seed naming one reached the
+      // domain as nothing at all and those routes could only ever answer `[]`
+      // — a shape of infidelity no shape-diff can see, because an empty array
+      // on both sides compares zero elements.
+      milestones: z
+        .array(
+          z.object({
+            // Assigned sequentially from 1 in seed order when omitted, the way
+            // `nextMilestoneNumber` hands them out. Honored when given, so a
+            // seed that pins `PATCH /milestones/2` addresses the milestone it
+            // named rather than one silently renumbered under it.
+            number: z.number().int().positive().optional(),
+            title: z.string().min(1),
+            description: z.string().default(""),
+            state: z.enum(["open", "closed"]).default("open"),
+            // GitHub's own spelling: an ISO 8601 timestamp. Absent means the
+            // milestone has no due date (`due_on: null` on the wire).
+            due_on: z.string().optional()
+          })
+        )
+        .default([]),
+      // A tag names a commit. `target` is any ref the twin resolves — a branch
+      // name or a SHA — and defaults to the repository's default-branch head. A
+      // release whose `tag_name` matches an entry here reuses that tag rather
+      // than minting a second one: `createRelease` looks the tag up first.
+      tags: z
+        .array(
+          z.object({
+            name: z.string().min(1),
+            target: z.string().min(1).optional()
+          })
+        )
+        .default([]),
+      releases: z
+        .array(
+          z.object({
+            tag_name: z.string().min(1),
+            // Nullable upstream, so an absent `name` means `null` — not `""`.
+            name: z.string().optional(),
+            body: z.string().default(""),
+            target_commitish: z.string().min(1).optional(),
+            draft: z.boolean().default(false),
+            prerelease: z.boolean().default(false),
+            author: z.string().min(1).optional()
+          })
+        )
+        .default([]),
       issues: z
         .array(
           z.object({
@@ -38,7 +88,21 @@ export const seedSchema = z.object({
             body: z.string().default(""),
             state: z.enum(["open", "closed"]).default("open"),
             labels: z.array(z.string().min(1)).default([]),
-            assignees: z.array(z.string().min(1)).default([])
+            assignees: z.array(z.string().min(1)).default([]),
+            // The issue's conversation timeline, served at
+            // `GET /repos/:o/:r/issues/:n/comments` (F-1421). `author` is
+            // seeded honestly rather than taken from the write path, which
+            // stamps every comment `pome-agent`: a world in which the agent
+            // under test wrote every comment on the issue it is being asked to
+            // read is not one worth testing against.
+            comments: z
+              .array(
+                z.object({
+                  body: z.string().min(1),
+                  author: z.string().min(1).optional()
+                })
+              )
+              .default([])
           })
         )
         .default([]),
@@ -72,6 +136,38 @@ export const seedSchema = z.object({
                   context: z.string().min(1).default("ci/build"),
                   state: z.enum(["error", "failure", "pending", "success"]).default("success"),
                   description: z.string().default("")
+                })
+              )
+              .default([]),
+            // F-1421 — the PR's CONVERSATION timeline. Same table, same route
+            // and same number space as an issue's comments, because GitHub
+            // models a pull request as an issue (F-1151). This is the third
+            // thing a reader could call "a comment on the PR" and the seed
+            // keeps all three apart: `reviews[].body` is the prose on a review
+            // verdict, `review_comments[]` below is anchored to a file and
+            // line, and THIS one is the timeline.
+            comments: z
+              .array(
+                z.object({
+                  body: z.string().min(1),
+                  author: z.string().min(1).optional()
+                })
+              )
+              .default([]),
+            // F-1421 — inline review comments, served at
+            // `GET /repos/:o/:r/pulls/:n/comments`. Seeded through the domain's
+            // own write path, so `path` must name a file the PR changes and
+            // `line` must exist in it: a seeded review comment is one
+            // `POST /pulls/:n/comments` could have produced, not a row only the
+            // seeder can make.
+            review_comments: z
+              .array(
+                z.object({
+                  body: z.string().min(1),
+                  path: z.string().min(1),
+                  line: z.number().int().positive().default(1),
+                  side: z.enum(["LEFT", "RIGHT"]).default("RIGHT"),
+                  author: z.string().min(1).optional()
                 })
               )
               .default([])

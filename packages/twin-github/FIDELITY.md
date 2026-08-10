@@ -337,6 +337,31 @@ upstream so a divergence that upstream "heals" becomes a tier-upgrade signal.
     seeded sandbox's smaller label set and different collaborator set, not a serializer
     bug. On these L1 read surfaces the item-count difference is an accepted divergence
     (INFO), not drift.
+21. **The review-comment LIST serves a leaner object than the review-comment CREATE
+    (open gap, not accepted).** `GET /repos/:o/:r/pulls/:n/comments` builds its
+    elements inline — `{id, path, body, user, created_at, updated_at}` — while
+    `POST` to the same route serves the same row through
+    `pullRequestReviewCommentJson`, which adds `line`, `side`, `commit_id`,
+    `original_*`, `in_reply_to_id`, `pull_request_url`, `html_url`, `diff_hunk`
+    and the rest. One row, two shapes, one route family. This is NOT an accepted
+    INFO divergence like the omission bullets above: the twin already has the
+    faithful serializer and the list simply does not call it. It went unmeasured
+    because the surface answered `[]` on every seed anyone could write until
+    F-1421 made a review comment seedable — the first real element on this
+    surface is what makes the gap visible. Fixing it widens a served shape, so it
+    is owed its own change and its own fidelity accounting.
+22. **`pull_request_read`'s `get_comments` answers from the wrong table (open gap,
+    not accepted).** GitHub distinguishes the issue-level `get_comments` from the
+    diff-level `get_review_comments`; the twin answers BOTH from
+    `pull_request_review_comments`, on a comment that says it "stores one comment
+    thread per PR and answers both from it rather than inventing a split it does
+    not model". That was true when it was written and F-1151 made it false: a PR's
+    conversation has its own table (`issue_comments`, keyed on the PR's number),
+    `exportState` keeps the three comment surfaces apart, and the REST routes
+    already serve them separately. So `get_comments` returns inline review
+    comments to a caller asking for the timeline. Same visibility story as bullet
+    21 — F-1421 makes both surfaces seedable, so the two now have different
+    contents to tell apart.
 
 ## How fidelity is verified
 

@@ -1,6 +1,85 @@
 # @pome-sh/twin-github — CHANGELOG
 
 
+## 0.10.2 — 2026-08-10
+
+The seed can name a milestone, a tag, a release and a comment, and the twin
+serves them (F-1421). No route, tool, handler or response shape changed.
+
+`seedSchema` had no field for five of the entities this twin SERVES —
+milestones, tags, releases, issue comments and pull-request review comments —
+and zod strips unknown keys, so a seed naming one arrived at the domain as
+nothing at all. `GET /repos/:o/:r/milestones`, `/tags`, `/releases`,
+`/issues/:n/comments` and `/pulls/:n/comments` could only ever answer `[]`, on
+every seed anyone could write. The tables, the domain operations and the routes
+were all already there; the seed was the only thing that could not reach them.
+
+That is worse than wrong, it is invisible: a shape-diff returns before the
+per-element comparison when EITHER side is empty, so `[] vs []` compares zero
+elements and publishes green. Those five surfaces had been publishing green
+against an equally empty golden since 2026-05-31, and F-1420 — which seeds the
+upstream half — would have turned that vacuous green into an equally vacuous
+`array-length-changed` red without this change.
+
+New seed fields, every one optional and defaulting to `[]`, so an existing seed
+parses to the same value it did before and the default world does not move:
+
+- `repositories[].milestones[]` — `{number?, title, description?, state?,
+  due_on?}`. `number` is honored when given and assigned sequentially from 1
+  otherwise.
+- `repositories[].tags[]` — `{name, target?}`, `target` being any ref the twin
+  resolves (a branch name or a SHA), defaulting to the default branch's head.
+- `repositories[].releases[]` — `{tag_name, name?, body?, target_commitish?,
+  draft?, prerelease?, author?}`. A release naming a seeded tag reuses it rather
+  than minting a second.
+- `repositories[].issues[].comments[]` and
+  `repositories[].pull_requests[].comments[]` — `{body, author?}`. One shape,
+  because it is one table and one route: GitHub serves a pull request's
+  conversation through the issue-comment endpoints (F-1151).
+- `repositories[].pull_requests[].review_comments[]` — `{body, path, line?,
+  side?, author?}`, the inline surface.
+
+Two things worth knowing about how they are applied.
+
+**Review comments go through the domain's write path**, not a raw INSERT. So
+`path` must name a file the pull request changes and `line` must exist in that
+file: a seeded review comment is one `POST /pulls/:n/comments` could have
+produced, and a seed planting one it could not FAILS rather than creating a row
+only the seeder can make.
+
+**Comment authors are seeded honestly.** `addIssueComment` stamps `user_login =
+"pome-agent"` unconditionally, and an issue whose only commenter is the agent
+under test is not an issue worth handing that agent — so the seed writes the
+author directly, the same bargain the seeded PR reviews already struck for the
+same reason.
+
+`GET /releases/latest` and `GET /releases/tags/:tag` answer 200 from a seed as
+of this version. Both are registered exceptions in pome-cloud's Level-1 coverage
+list whose stated reason is "the seed schema cannot seed a release"; that reason
+is now false, and the exceptions are retired alongside this change. An exception
+list that outlives its reason starts lying.
+
+`test/seed-entities.test.ts` runs each of the seven surfaces against TWO worlds
+that differ only in the value the seed plants, asserting that the served element
+carries THIS world's value and that the other world's differs. Asserting the
+array came back non-empty would have been the same mistake one level up — it
+passes against a twin answering a constant.
+
+Two things this version does NOT change, named because it is what makes them
+observable for the first time:
+
+- `GET /pulls/:number/comments` serves a leaner element than the twin's own
+  review-comment object — no `line`, `side`, `commit_id` or `pull_request_url` —
+  while `POST` to the same route serves all of them from the same row.
+- `pull_request_read`'s `get_comments` still answers from the review-comment
+  table, on a comment says the twin "stores one comment thread per PR". F-1151
+  gave the conversation its own table and `exportState` keeps the three apart,
+  so that comment is stale and the method is pointed at the wrong one.
+
+Both are served-shape questions with their own fidelity accounting, not the
+modelling gap this version closes.
+
+
 ## 0.10.1 — 2026-08-09
 
 `fidelity.inventory.json`'s `rest` half is now compared to the routes the twin

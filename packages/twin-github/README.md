@@ -189,19 +189,46 @@ curl -s -X POST http://127.0.0.1:3333/admin/seed \
           { "path": "README.md", "content": "# My App\n" },
           { "path": "src/index.ts", "content": "export const ok = true;\n" }
         ],
+        "milestones": [
+          { "number": 1, "title": "v1.0", "description": "Ship checkout", "due_on": "2026-09-30T00:00:00Z" }
+        ],
+        "tags": [{ "name": "v1.0.0", "target": "main" }],
+        "releases": [
+          { "tag_name": "v1.0.0", "name": "v1.0.0", "body": "First cut.", "author": "agent-user" }
+        ],
         "issues": [
           {
             "number": 1,
             "title": "Fix checkout error",
             "body": "Users see a 500 after submitting checkout.",
             "labels": ["bug"],
-            "assignees": []
+            "assignees": [],
+            "comments": [
+              { "body": "Reproduced on staging.", "author": "agent-user" }
+            ]
           }
         ]
       }
     ]
   }'
 ```
+
+Notes on the less obvious fields:
+
+- **`milestones[].number`, `issues[].number`, `pull_requests[].number`** are
+  honored when given. Issues and pull requests draw from ONE per-repo counter,
+  so two seeded issues put the first seeded PR at `#3`.
+- **`tags[].target`** is any ref the twin resolves — a branch name or a SHA —
+  and defaults to the default branch's head. A `releases[]` entry whose
+  `tag_name` matches a seeded tag reuses it; one whose tag is not seeded mints
+  it from `target_commitish`.
+- **`comments[]`** is the conversation timeline, and it hangs off a
+  `pull_requests[]` entry as readily as an `issues[]` one — GitHub serves both
+  through `/issues/:number/comments`. The inline review surface is
+  `pull_requests[].review_comments[]`, whose `path` must name a file the pull
+  request changes and whose `line` must exist in it.
+- **`author` / `assignees` / `collaborators`** logins that are not in `users[]`
+  are created as plain users rather than rejected.
 
 3. Give your agent these inputs:
 

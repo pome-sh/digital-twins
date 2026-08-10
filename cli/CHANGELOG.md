@@ -4,6 +4,26 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.7
+
+### Patch Changes
+
+- Carries twin-github 0.10.2 (F-1421) into the bundled twin. A task seed may now
+  name a milestone, a tag, a release, an issue comment and a pull-request review
+  comment; before this, `seedSchema` had no field for any of them, zod stripped
+  them, and the five routes the twin serves them from could only ever answer
+  `[]`. No CLI source changed — the twins are inlined into this tarball, so a
+  twin change is a change to what `pome twin start github` boots.
+- The task-file path picks the new fields up for free: `cli/src/task/taskSchema.ts`
+  imports `@pome-sh/twin-github/seed`'s own `seedSchema` rather than restating it,
+  which is exactly why it does not have to be edited here. `cli/src/contract/seed-state.ts`'s
+  `githubSeedStateSchema` — the published-contract description of the same world
+  — is a hand-copy and does NOT gain them, so it goes one step further out of
+  date. It narrows nothing on the runtime seed path (`contract/rest.ts` forwards
+  a seed as a shape-blind `z.record`, deliberately, for this exact reason), and
+  it already lagged on `assignee` vs `assignees[]`. Reconciling the two is its
+  own change, not a rider on this one.
+
 ## 0.23.6
 
 ### Patch Changes
