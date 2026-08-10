@@ -4,6 +4,21 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.6
+
+### Patch Changes
+
+- `cross-surface-agreement.test.ts`'s transcription of the dashboard's
+  run-state predicate no longer asserts a shape pome-cloud PR #632 (F-1399)
+  retired (F-1413). pome-cloud moved the incomplete-run arithmetic into
+  `@pome-cloud/contract`'s `isIncompleteTally`, which adds an
+  `evaluated === 0` clause: a run whose every criterion was excluded as
+  already true in the seed now reads `incomplete` on the dashboard instead
+  of `fail`, matching the word the CLI already used. The transcription's
+  seed-excluded row is updated to `incomplete`, its `divergence` marker is
+  gone, and the "exactly one known divergence" assertion is now a
+  zero-divergence guard. Test-only; no runtime behavior changes.
+
 ## 0.23.5
 
 ### Patch Changes
