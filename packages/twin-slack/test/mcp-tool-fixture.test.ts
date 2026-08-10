@@ -73,15 +73,43 @@ describe("slack MCP tool fixture", () => {
     expect(sha256(read(meta.files.canonical))).toBe(meta.canonicalFileSha256);
   });
 
-  it("declares a substrate that admits nobody read this from Slack", () => {
-    expect(meta.substrate).toBe("twin-code-transcription");
-    expect(meta.transcription?.comparedToUpstream).toMatch(/never/);
-    expect(meta.transcription?.contentOrigin).toMatch(/servers-archived/);
+  it("declares the live OAuth capture as its substrate, not a transcription", () => {
+    // F-1330. While this said `twin-code-transcription` it was telling the
+    // truth: nobody had read Slack's tools/list, and eight of the eleven names
+    // served existed on no Slack deployment. F-1329's grant is what made a
+    // capture possible, and this is the twin adopting it.
+    expect(meta.substrate).toBe("live-wire-oauth");
+    expect(meta.endpoint).toBe("https://mcp.slack.com/mcp");
+    expect(meta.transcription).toBeUndefined();
+    expect(meta.configuration?.derivation).toMatch(/can only subtract/);
   });
 
-  it("keeps additionalProperties:false on the wire", async () => {
+  it("is the upstream golden minus exactly the tools ruled unexposed", () => {
+    // The claim `substrate: live-wire-oauth` makes is that these bytes are
+    // Slack's. Check it against the golden rather than trusting the label.
+    const golden = JSON.parse(
+      readFileSync(join(import.meta.dirname, "..", "..", "..", "fixtures", "mcp-tools-list", "slack.raw.json"), "utf8")
+    ) as { result: { tools: Array<{ name: string }> } };
+    const goldenByName = new Map(golden.result.tools.map((tool) => [tool.name, tool]));
+
+    expect(golden.result.tools.length).toBe(19);
+    expect(slackToolFixture.tools.length).toBe(18);
+    const dropped = golden.result.tools
+      .map((tool) => tool.name)
+      .filter((name) => !slackToolFixture.toolNames.includes(name));
+    expect(dropped).toEqual(["slack_send_message_draft"]);
+
+    // Every surviving tool, byte for byte — name, description, inputSchema and
+    // annotations. Nothing here may re-describe or re-shape what Slack serves.
+    for (const tool of slackToolFixture.tools) {
+      expect(tool, tool.name).toEqual(goldenByName.get(tool.name));
+    }
+  });
+
+  it("serves no additionalProperties, because Slack's listing declares none", async () => {
     const tools = (await servedTools()) as Array<{ inputSchema: Record<string, unknown> }>;
-    for (const tool of tools) expect(tool.inputSchema.additionalProperties).toBe(false);
+    expect(tools.length).toBe(18);
+    for (const tool of tools) expect(tool.inputSchema.additionalProperties).toBeUndefined();
   });
 
   it("serves exactly the fixture's listing over tools/list", async () => {

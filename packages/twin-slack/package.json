@@ -1,6 +1,6 @@
 {
   "name": "@pome-sh/twin-slack",
-  "version": "0.3.6",
+  "version": "0.4.0",
   "description": "Deterministic Slack Web API twin for agent testing \u2014 REST + MCP, SQLite-backed state.",
   "private": true,
   "type": "module",
@@ -37,6 +37,8 @@
     "seed": "tsx scripts/seed.ts",
     "smoke": "tsx scripts/smoke.ts",
     "validate:mcp": "tsx scripts/validate-mcp.ts",
+    "fixture:mcp": "tsx scripts/adopt-upstream-mcp-fixture.ts",
+    "gate:mcp-fixture": "tsx scripts/adopt-upstream-mcp-fixture.ts --check",
     "verify:cloud-token": "tsx scripts/verify-cloud-token.ts",
     "agent:claude": "tsx examples/claude-slack-agent.ts",
     "start": "node dist/src/server.js",

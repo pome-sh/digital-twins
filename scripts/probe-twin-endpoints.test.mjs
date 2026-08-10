@@ -186,8 +186,8 @@ assert(
 {
   const findings = evaluateTwinProbeRun({
     twin: "slack",
-    declared: [{ name: "slack_post_message" }, { name: "slack_get_reactions" }],
-    probes: [{ tool: "slack_post_message" }],
+    declared: [{ name: "slack_send_message" }, { name: "slack_get_reactions" }],
+    probes: [{ tool: "slack_send_message" }],
     calls: [call(200)],
   });
   assert(findings.length === 1 && findings[0].kind === "unprobed-endpoint", "a declared tool with no probe is a finding");
@@ -300,13 +300,22 @@ assert(
 }
 
 // The anti-drift clause, end to end, on the twin that most needs it: slack
-// declares 11 tools and its own suite reached 3 over the wire.
+// declared 11 tools and its own suite reached 3 over the wire. It declares 18
+// now (F-1330 replaced the table with Slack's own), and the count below is
+// derived from the twin rather than typed, so the clause survives the next one.
 {
+  // Derived, not typed: an empty manifest reds one unprobed-endpoint per
+  // declared tool, which is the count the one-probe run should leave behind
+  // minus the tool it covers.
+  const declaredCount = (await probeTwin("slack", { probes: [] })).length;
   const findings = await probeTwin("slack", {
-    probes: [{ tool: "slack_list_channels", args: { limit: 10 } }],
+    probes: [{ tool: "slack_search_channels", args: { query: "general", limit: 10 } }],
   });
   const unprobed = findings.filter((f) => f.kind === "unprobed-endpoint");
-  assert(unprobed.length === 10, `every declared tool with no probe reds the gate (got ${unprobed.length})`);
+  assert(
+    unprobed.length === declaredCount - 1,
+    `every declared tool with no probe reds the gate (got ${unprobed.length} of ${declaredCount - 1})`,
+  );
   assert(
     unprobed.some((f) => f.tool === "slack_get_reactions"),
     "the anti-drift finding names each uncovered endpoint",

@@ -36,7 +36,7 @@ describe("twin-slack HTTP contract", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.twin).toBe("slack");
-    expect(body.tools).toBe(11);
+    expect(body.tools).toBe(18);
     expect(body.ok).toBe(true);
   });
 

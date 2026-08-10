@@ -260,7 +260,12 @@ every trial.** `agent_version: f1292-control-honest`, group
 
 The five traces are the same eight-step shape with no variance worth reporting:
 `slack_list_channels` → `slack_get_channel_history` → `list_issues` →
-`get_file_contents` → `add_issue_comment` → `slack_reply_to_thread`. The
+`get_file_contents` → `add_issue_comment` → `slack_reply_to_thread`. (Those four
+Slack names are the surface twin-slack served on 2026-08-05 and no longer does:
+F-1330 replaced them with Slack's own — `slack_search_channels`,
+`slack_read_channel` and `slack_send_message` with a `thread_ts`. They are left
+as recorded, because this is what those five runs did, not a claim about what a
+run today would do.) The
 examinee was the shipped one with three deltas — `DENY_ISSUE_LOOKUP = false`,
 `tools: []`, `model: "claude-opus-5"` — and the system prompt byte-identical.
 

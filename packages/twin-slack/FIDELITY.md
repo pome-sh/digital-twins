@@ -4,7 +4,7 @@
 not a universal clone. This page documents exactly which surfaces are
 faithful to real Slack today, at what tier, and how fidelity is verified.
 
-Last verified: 2026-07-22.
+Last verified: 2026-08-10.
 
 ## What "fidelity" means here
 
@@ -48,22 +48,42 @@ in the package README. Changing any of those is a breaking change for
 
 | Tool | Backing surface | Heat | Tier | Tests | Known deviations |
 | --- | --- | --- | --- | --- | --- |
-| `slack_post_message` | SQLite messages | hot | semantic | `mcp-contract.test.ts`, `domain-chat.test.ts`, `recorder-state-delta.test.ts` | Block-kit rendering is not validated; emoji shortcodes are preserved literally. |
-| `slack_reply_to_thread` | SQLite messages (thread_ts FK) | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts` | Routes via `chat.postMessage({thread_ts})`; `reply_broadcast` is recorded but not re-fanned out. |
-| `slack_add_reaction` | SQLite reactions | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts`, `concurrency.test.ts` | Reactions are unique per `(channel, ts, name, user)`; skin-tone modifier suffixes are preserved as-is. |
-| `slack_get_channel_history` | SQLite messages | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts`, `performance.test.ts` | `oldest`/`latest`/`inclusive` filters supported; per-message metadata follows real Slack envelope. |
-| `slack_get_thread_replies` | SQLite messages | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts`, `domain-chat.test.ts` | Parent decorated with `thread_ts === ts`, `subscribed: false`, `is_locked: false` per real Slack invariant. |
-| `slack_list_channels` | SQLite channels | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts`, `performance.test.ts` | `types` filter supports `public_channel,private_channel,mpim,im`; cursor pagination via base64url offsets. |
-| `slack_get_users` | SQLite users | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts` | Deleted users are included with `deleted: true`; profile pagination matches real Slack envelope. |
-| `slack_get_user_profile` | SQLite users.profile_json | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts` | Returns the full profile JSON; custom fields preserved verbatim through the round-trip. |
-| `slack_search_messages` | SQLite messages (LIKE search) | hot | semantic | `mcp-contract.test.ts`, `tools-execute.test.ts` | F-736 hot-gap fill over `search.messages`: substring match, not Slack's query grammar (divergence #8). |
-| `slack_get_reactions` | SQLite reactions | hot | semantic | `mcp-contract.test.ts`, `tools-execute.test.ts` | F-736 hot-gap fill over `reactions.get`; returns the message with its grouped reactions. |
-| `slack_list_channel_members` | SQLite channel_members | hot | semantic | `mcp-contract.test.ts`, `tools-execute.test.ts` | F-736 hot-gap fill over `conversations.members`; returns user IDs with cursor pagination. |
+| `slack_send_message` | SQLite messages | hot | semantic | `mcp-contract.test.ts`, `domain-chat.test.ts`, `recorder-state-delta.test.ts` | Takes `message`, not `text`. `thread_ts` makes it a reply — Slack has no separate thread-reply tool. Block-kit rendering is not validated; `draft_id` and `unfurl_app_links` are accepted and ignored (no draft store, no app-link unfurler). |
+| `slack_schedule_message` | SQLite scheduled_messages | hot | semantic | `mcp-contract.test.ts`, `tools-execute.test.ts` | Over `chat.scheduleMessage`. No fire path — a scheduled message persists until explicitly deleted, so `post_at` is stored, not honoured. |
+| `slack_add_reaction` | SQLite reactions | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts`, `concurrency.test.ts` | Takes `message_ts` and `emoji`. Reactions are unique per `(channel, ts, name, user)`; skin-tone modifier suffixes are preserved as-is. |
+| `slack_create_conversation` | SQLite channels | hot | semantic | `mcp-contract.test.ts`, `tools-execute.test.ts`, `domain-conversations.test.ts` | Both modes: `channel_name` creates and optionally invites `user_ids`; `user_ids` alone opens a DM or group DM. Naming neither answers `invalid_arguments`. |
+| `slack_create_canvas` | SQLite canvases | warm | shape | `mcp-contract.test.ts`, `tools-execute.test.ts`, `domain-wave3.test.ts` | Markdown blob + title. Canvas-flavored Markdown is stored verbatim, never parsed — user/channel card syntax and Salesforce records are not rendered. |
+| `slack_update_canvas` | SQLite canvases | warm | shape | `mcp-contract.test.ts`, `tools-execute.test.ts`, `domain-wave3.test.ts` | Every operation in `sections` applies, in order, against one snapshot; the flat `action`/`content`/`section_id` form is accepted too. No section model, so `section_id` targets are coarse whole-document ops (divergence #16). |
+| `slack_search_public` | SQLite messages (LIKE search) | hot | semantic | `mcp-contract.test.ts`, `tools-execute.test.ts` | Public channels only. Substring match, not Slack's query grammar (divergence #8); the search-refinement arguments (`content_types`, `after`/`before`, `sort`, `include_context`, `response_format`) are accepted and ignored. |
+| `slack_search_public_and_private` | SQLite messages (LIKE search) | hot | semantic | `mcp-contract.test.ts`, `tools-execute.test.ts` | Same engine, actor-scoped: public channels plus the private channels, DMs and group DMs the caller is in. Same accepted-and-ignored refinement arguments. |
+| `slack_search_channels` | SQLite channels | hot | semantic | `mcp-contract.test.ts`, `tools-execute.test.ts`, `performance.test.ts` | `query` is required and filters on name/topic/purpose by case-insensitive substring. `channel_types` maps to `conversations.list`'s `types`; cursor pagination is applied before the filter, as Slack's is. |
+| `slack_search_users` | SQLite users | hot | semantic | `mcp-contract.test.ts`, `tools-execute.test.ts` | `query` is required and filters on name/real_name/email/title. Deleted users are included with `deleted: true`. |
+| `slack_read_channel` | SQLite messages | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts`, `performance.test.ts` | `oldest`/`latest`/`cursor` supported; per-message metadata follows the real Slack envelope. `response_format` is accepted and ignored — the envelope is always the detailed one. |
+| `slack_read_thread` | SQLite messages | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts`, `domain-chat.test.ts` | Takes `message_ts`. Parent decorated with `thread_ts === ts`, `subscribed: false`, `is_locked: false` per real Slack invariant. |
+| `slack_read_canvas` | SQLite canvases | warm | shape | `mcp-contract.test.ts`, `tools-execute.test.ts` | Returns the markdown and a `section_id_mapping` of exactly one entry covering the whole document — the twin has no section model, and reporting per-heading ids an edit could not honour would be worse than reporting one that it can. |
+| `slack_read_user_profile` | SQLite users.profile_json | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts` | `user_id` is optional and defaults to the calling user. Returns the full profile JSON; custom fields preserved verbatim through the round-trip. |
+| `slack_list_channel_members` | SQLite channel_members | hot | semantic | `mcp-contract.test.ts`, `tools-execute.test.ts` | Over `conversations.members`; returns user IDs with cursor pagination. `response_format`, `include_deleted` and `include_bots` are accepted and ignored — the twin returns ids, never inlined profiles. |
+| `slack_read_file` | SQLite files | warm | shape | `mcp-contract.test.ts`, `tools-execute.test.ts` | Over `files.info`: metadata only, no binary storage, so no `mimeType`-tagged content or base64 body. Shape is at the warm target. |
+| `slack_search_emojis` | SQLite emoji | warm | semantic | `mcp-contract.test.ts`, `tools-execute.test.ts` | Over `emoji.list`, filtered by case-insensitive substring across comma-separated terms as Slack documents. Semantic is above the warm target: see the tier-mismatch ledger. |
+| `slack_get_reactions` | SQLite reactions | hot | semantic | `mcp-contract.test.ts`, `tools-execute.test.ts` | Takes `message_ts`. Returns the message with its grouped reactions. |
 
-The visible MCP tool count is pinned at 11 in `test/mcp-contract.test.ts`
-(8 pre-M5 tools + the 3 F-736 hot-gap read tools ruled in F-729/SL2);
-descriptions, required fields, mutating set, and `additionalProperties:false`
-are all locked. Any drift breaks the contract test loudly.
+The visible MCP tool count is pinned at 18 in `test/mcp-contract.test.ts`,
+and the names, required fields and mutating set are Slack's own — read off
+F-1329's live OAuth capture of `https://mcp.slack.com/mcp` and adopted by
+F-1330. `fixtures/mcp-tools-list.raw.json` is that capture minus the one tool
+ruled unexposed, produced by a script that can only subtract; the contract test
+additionally asserts that the eight names commit `6abec3c` invented are served
+by nothing. No `inputSchema` declares `additionalProperties`, because none of
+Slack's does — the pre-F-1330 `additionalProperties:false` hard-rejected calls
+that got the name right and carried a real Slack parameter. Any drift breaks the
+contract test loudly.
+
+**The one tool Slack declares and this twin does not serve** is
+`slack_send_message_draft`, ruled `cold` (a client-UI concept with no Web API
+analog). It is registered in pome-cloud's `known-divergences/slack.mcp.yaml`
+with that reason and reasoned per-tool in
+[`docs/slack-mcp-unexposed-tools.md`](../../docs/slack-mcp-unexposed-tools.md),
+so the MCP divergence lane reads a decision rather than an omission.
 
 ## REST routes
 
@@ -91,7 +111,7 @@ are all locked. Any drift breaks the contract test loudly.
 | `files.upload` / `info` / `list` / `delete` | warm | shape | `domain.test.ts`, `app-routes.test.ts` | Metadata-only; no binary storage. URL fields point to deterministic `pome-twin-files.slack.com` hosts. Shape is at the warm target (SL5). |
 | `bookmarks.add` / `remove` / `list` | warm | semantic | `domain.test.ts`, `app-routes.test.ts` | `link` type accepted; other bookmark types are unsupported per real Slack 2024 changelog. Warm-ruled: see the tier-mismatch ledger. |
 | `team.info` | warm | semantic | `app-routes.test.ts` | Returns workspace metadata; enterprise fields are NULL for non-Enterprise twins. Warm-ruled context read: see the tier-mismatch ledger. |
-| `canvases.create` / `canvases.edit` / `canvases.delete` | warm | shape | `domain-wave3.test.ts`, `app-routes.test.ts` | Wave 3 (SL3). Markdown title/content persistence; section_id-relative edits are coarse whole-document ops (shape at warm target). |
+| `canvases.create` / `canvases.edit` / `canvases.delete` | warm | shape | `domain-wave3.test.ts`, `app-routes.test.ts` | Wave 3 (SL3). Markdown title/content persistence; section_id-relative edits are coarse whole-document ops (shape at warm target). Since F-1330 `edit` applies every operation in `changes`, in order, against one snapshot — it used to apply the first and answer ok for the rest. Reading a canvas is MCP-only (`slack_read_canvas`); real Slack reads one over `files.info`, which this twin backs from a separate table. |
 | `conversations.setTopic` / `conversations.setPurpose` | warm | semantic | `domain-wave3.test.ts`, `domain-conversations.test.ts` | Wave 3 (SL4). Membership required; `too_long` at 250 chars; IM/MPIM → `method_not_supported_for_channel_type`. Warm-ruled: see the tier-mismatch ledger. |
 | `emoji.list` | warm | semantic | `domain-wave3.test.ts`, `app-routes.test.ts` | Wave 3 (SL4). Seeded custom emoji map; `alias:` protocol preserved. Warm-ruled: see the tier-mismatch ledger. |
 
@@ -106,7 +126,9 @@ Per the F-729 twin-slack ruling, the hot and warm sets are exhaustive. Wave 3
 filled the remaining warm gaps (SL3 canvases, SL4 topic/purpose + emoji.list).
 Named cold rows document the loud 501 for surfaces agents plausibly probe.
 Message drafts are deliberately absent: a client-UI concept with no Web API
-analog to name a row for (PS).
+analog to name a row for (PS). Slack's MCP server does declare a
+`slack_send_message_draft` tool, and since F-1330 that absence is registered
+rather than silent — see the MCP tools section above.
 
 | Endpoint | Heat | Tier | Notes |
 | --- | --- | --- | --- |
@@ -143,6 +165,7 @@ does not trigger removals.
 | `conversations.setTopic` | warm | semantic | shape | Classic agent task; Wave 3 fill above warm shape target; F-440 additive-only window. |
 | `conversations.setPurpose` | warm | semantic | shape | Topic sibling; Wave 3 fill above warm shape target; F-440 additive-only window. |
 | `emoji.list` | warm | semantic | shape | Vendor emoji-search adjacency; Wave 3 fill above warm shape target; F-440 additive-only window. |
+| `slack_search_emojis` | warm | semantic | shape | The MCP tool F-1330 wired over `emoji.list`; inherits its depth, so it inherits its mismatch. F-440 additive-only window. |
 
 ## Fidelity-watch coverage (status.pome.sh)
 
@@ -153,8 +176,11 @@ out. The number is built from source, never hand-typed
 > **Denominator reconcile deferred (SL5).** The 45 predates the F-736 re-cut:
 > it counts `files.info` / `files.list` / `files.delete` as semantic (the
 > table above rules them shape ×4 — the table wins) and does not yet include
-> the three F-736 MCP read tools (`slack_search_messages`,
-> `slack_get_reactions`, `slack_list_channel_members`). Reconciling
+> the three F-736 MCP read tools (`slack_get_reactions`,
+> `slack_list_channel_members`, and the search tool then called
+> `slack_search_messages`). It also predates F-1330, which took the tool table
+> from 11 fabricated names to Slack's 18 — so every MCP name in the
+> denominator below is stale, not just the count. Reconciling
 > pome-cloud's `sandboxes/slack/surfaces.ts` is deliberately deferred until
 > the F-440 launch gate finishes its consecutive-green count (additive-only
 > collision), tracked by F-737.
@@ -162,7 +188,7 @@ out. The number is built from source, never hand-typed
 - **Denominator (45)** — the full semantic surface inventory: 8 MCP tools + 37
   semantic REST methods (`files.upload` is shape-tier, excluded). MCP tools and
   REST methods are counted as **distinct public contracts**: an agent calls
-  `slack_list_channels`, a REST client calls `conversations.list`. They share a
+  `slack_search_channels`, a REST client calls `conversations.list`. They share a
   backend, but each is a surface we hold to fidelity on its own. Source:
   the Twin Fidelity Watch's `sandboxes/slack/surfaces.ts` (`SEMANTIC_SURFACES`, in pome-cloud).
 - **Numerator (19)** — surfaces with their own external-verification evidence,
@@ -171,8 +197,9 @@ out. The number is built from source, never hand-typed
     upstream golden). `conversations.info` and `conversations.history` are each
     captured under two scenarios (public/private channel, empty/non-empty history),
     so the table shows 18 read rows but 16 distinct methods.
-  - **3 mutating MCP tools** (`slack_post_message`, `slack_reply_to_thread`,
-    `slack_add_reaction`), write round-tripped against the seeded twin **oracle**
+  - **3 mutating MCP tools** (the two names F-1330 folded into
+    `slack_send_message`, plus `slack_add_reaction`), write round-tripped
+    against the seeded twin **oracle**
     (L2). This is L2-vs-oracle, **not** L1-vs-real-Slack — the daily cron does no
     mutating writes against the real workspace.
 - **Rolling out (26)** — 5 read MCP tools (their underlying REST reads are verified;

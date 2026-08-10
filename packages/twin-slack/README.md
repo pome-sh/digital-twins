@@ -48,7 +48,7 @@ curl -X POST http://127.0.0.1:3333/s/demo/chat.postMessage \
 curl -s -X POST http://127.0.0.1:3333/s/demo/mcp/call \
   -H "Authorization: Bearer $TOKEN" \
   -H 'content-type: application/json' \
-  -d '{"tool":"slack_list_channels","arguments":{"limit":10}}'
+  -d '{"tool":"slack_search_channels","arguments":{"query":"general","limit":10}}'
 ```
 
 The default seed creates:
@@ -95,16 +95,33 @@ path's `:sid`.
 
 ### Visible MCP tools
 
+The names, arguments and descriptions are Slack's own — `fixtures/mcp-tools-list.raw.json`
+is F-1329's live capture of `https://mcp.slack.com/mcp`, adopted by F-1330. See
+[FIDELITY.md](FIDELITY.md#mcp-tools) for the per-tool fidelity and deviations.
+
 | Tool | Inputs | Description |
 |---|---|---|
-| `slack_post_message` | `channel_id, text` | Post a message |
-| `slack_reply_to_thread` | `channel_id, thread_ts, text` | Reply in a thread |
-| `slack_add_reaction` | `channel_id, timestamp, reaction` | Add a reaction emoji |
-| `slack_get_channel_history` | `channel_id` (opt `limit`) | Get channel history |
-| `slack_get_thread_replies` | `channel_id, thread_ts` | Get thread replies |
-| `slack_list_channels` | opt `limit`, `cursor` | List channels |
-| `slack_get_users` | opt `cursor`, `limit` | List workspace users |
-| `slack_get_user_profile` | `user_id` | Get user profile |
+| `slack_send_message` | `channel_id, message` (opt `thread_ts`, `reply_broadcast`) | Send a message; `thread_ts` makes it a thread reply |
+| `slack_schedule_message` | `channel_id, message, post_at` | Schedule a message |
+| `slack_add_reaction` | `channel_id, message_ts, emoji` | Add a reaction emoji |
+| `slack_create_conversation` | opt `channel_name`, `user_ids`, `is_private` | Create a channel, DM or group DM |
+| `slack_create_canvas` | `title, content` | Create a canvas |
+| `slack_update_canvas` | `canvas_id` (opt `sections`) | Edit a canvas |
+| `slack_search_public` | `query` | Search public channels |
+| `slack_search_public_and_private` | `query` | Search everything the caller can see |
+| `slack_search_channels` | `query` | Search channels by name |
+| `slack_search_users` | `query` | Search users |
+| `slack_read_channel` | `channel_id` (opt `limit`, `cursor`, `oldest`, `latest`) | Read channel history |
+| `slack_read_thread` | `channel_id, message_ts` | Read thread replies |
+| `slack_read_canvas` | `canvas_id` | Read a canvas |
+| `slack_read_user_profile` | opt `user_id` | Get a user profile (defaults to the caller) |
+| `slack_list_channel_members` | `channel_id` | List channel members |
+| `slack_read_file` | `file_id` | Read file metadata |
+| `slack_search_emojis` | `query` | Search custom emoji |
+| `slack_get_reactions` | `channel_id, message_ts` | Get reactions on a message |
+
+Slack also declares `slack_send_message_draft`, which this twin deliberately
+does not serve — see [`docs/slack-mcp-unexposed-tools.md`](../../docs/slack-mcp-unexposed-tools.md).
 
 ### Use in a new project
 

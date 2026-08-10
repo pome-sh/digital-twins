@@ -64,7 +64,7 @@ describe("error semantics and recorder", () => {
           id: 2,
           method: "tools/call",
           // missing required channel_id and text
-          params: { name: "slack_post_message", arguments: {} },
+          params: { name: "slack_send_message", arguments: {} },
         }),
       })
     );
@@ -92,7 +92,7 @@ describe("error semantics and recorder", () => {
           jsonrpc: "2.0",
           id: 3,
           method: "tools/call",
-          params: { name: "slack_post_message", arguments: { channel_id: "C_NONEXIST", text: "x" } },
+          params: { name: "slack_send_message", arguments: { channel_id: "C_NONEXIST", message: "x" } },
         }),
       })
     );

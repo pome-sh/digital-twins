@@ -220,7 +220,7 @@ trial 3  ✓  100      11.3s
 
 The run-set page keeps both sets side by side — `0/3` at 19:34, `3/3` at 19:35 —
 so the fix is a delta you can point at, not a number you have to remember. And
-`STEP report` now has a `TOOL slack_post_message` child.
+`STEP report` now has a `TOOL slack_send_message` child.
 
 Tasks 04, 05 and 06 flip with the same line — they are all non-MERGE outcomes.
 Tasks 01 and 02 are green either way, and that is worth seeing on purpose: an

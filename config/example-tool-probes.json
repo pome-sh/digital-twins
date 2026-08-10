@@ -50,8 +50,8 @@
         "args": { "owner": "viktor-hq", "repo": "orders-service", "path": "orders.py", "ref": "main" }
       },
       { "tool": "list_collaborators", "args": { "owner": "viktor-hq", "repo": "orders-service" } },
-      { "tool": "slack_list_channels", "args": {} },
-      { "tool": "slack_post_message", "args": { "channel": "eng-alerts", "text": "F-1152 probe." } },
+      { "tool": "slack_search_channels", "args": { "query": "eng" } },
+      { "tool": "slack_send_message", "args": { "channel_id": "eng-alerts", "message": "F-1152 probe." } },
       {
         "tool": "request_changes",
         "args": { "owner": "viktor-hq", "repo": "orders-service", "number": 1, "body": "F-1152 probe." }
@@ -79,7 +79,7 @@
         "args": { "owner": "viktor-hq", "repo": "orders-service", "path": "orders.py", "ref": "main" }
       },
       { "tool": "list_collaborators", "args": { "owner": "viktor-hq", "repo": "orders-service" } },
-      { "tool": "slack_post_message", "args": { "channel": "eng-alerts", "text": "F-1152 probe." } },
+      { "tool": "slack_send_message", "args": { "channel_id": "eng-alerts", "message": "F-1152 probe." } },
       {
         "tool": "request_changes",
         "args": { "owner": "viktor-hq", "repo": "orders-service", "number": 1, "body": "F-1152 probe." }

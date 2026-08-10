@@ -66,7 +66,10 @@ export const PER_TWIN = {
     // no tool is 400 {ok:false, error:"invalid_arguments"}, and admin errors
     // (a form seed whose string value fails the seed schema) are 500
     // internal_error — the admin surface has its own envelope.
-    aliasTool: "slack_list_channels",
+    // `slack_read_user_profile` because this probe sends no arguments at all
+    // ({name, params:{}} and a bare `tool=` form body) and it is one of the
+    // two Slack tools with an empty `required` — it defaults to the caller.
+    aliasTool: "slack_read_user_profile",
     adminSeedForm: { status: 500, check: (b) => b.ok === false && b.error === "internal_error" },
     adminSeedMalformed: { status: 200, check: (b) => b.ok === true },
     mcpCallAlias: { status: 200, check: (b) => b.ok === true },

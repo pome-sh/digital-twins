@@ -73,7 +73,7 @@ function authHeaders(extra: Record<string, string> = {}) {
 }
 
 describe("socket boundary — real MCP SDK client over @hono/node-server", () => {
-  it("completes the initialize handshake and lists the 11 agent tools through JSON-RPC framing", async () => {
+  it("completes the initialize handshake and lists the 18 agent tools through JSON-RPC framing", async () => {
     const transport = new StreamableHTTPClientTransport(new URL(mcpUrl), {
       requestInit: { headers: authHeaders() }
     });
@@ -87,7 +87,7 @@ describe("socket boundary — real MCP SDK client over @hono/node-server", () =>
       // Pin the catalog size independently of the fixture so a silent catalog
       // shrink cannot self-verify (both sides derive from the same listing
       // otherwise).
-      expect(slackToolFixture.tools.length).toBe(11);
+      expect(slackToolFixture.tools.length).toBe(18);
       expect(listResult.tools).toHaveLength(slackToolFixture.tools.length);
       expect(listResult.tools.map((t) => t.name)).toEqual([...slackToolFixture.toolNames]);
     } finally {
@@ -103,7 +103,7 @@ describe("socket boundary — real MCP SDK client over @hono/node-server", () =>
     try {
       await client.connect(transport);
 
-      const listRes = await client.callTool({ name: "slack_list_channels", arguments: { limit: 10 } });
+      const listRes = await client.callTool({ name: "slack_search_channels", arguments: { query: "general", limit: 10 } });
       expect(listRes.isError).toBeFalsy();
       const listContent = listRes.content as Array<{ type: string; text?: string }>;
       expect(listContent[0]!.type).toBe("text");
@@ -115,8 +115,8 @@ describe("socket boundary — real MCP SDK client over @hono/node-server", () =>
       expect(channels.channels.map((ch) => ch.id)).toContain("C_GENERAL");
 
       const postRes = await client.callTool({
-        name: "slack_post_message",
-        arguments: { channel_id: "C_GENERAL", text: "via socket-boundary suite" }
+        name: "slack_send_message",
+        arguments: { channel_id: "C_GENERAL", message: "via socket-boundary suite" }
       });
       expect(postRes.isError).toBeFalsy();
       const postContent = postRes.content as Array<{ type: string; text?: string }>;

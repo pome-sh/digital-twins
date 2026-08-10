@@ -6,9 +6,9 @@
 // `@modelcontextprotocol/sdk` `Client` over `StreamableHTTPClientTransport`
 // with a Bearer header, and:
 //
-//   1. Verifies tools/list returns the 11 visible Slack-agent tools via
+//   1. Verifies tools/list returns the 18 Slack tools this twin serves via
 //      real JSON-RPC framing.
-//   2. Calls slack_list_channels and slack_post_message end-to-end.
+//   2. Calls slack_search_channels and slack_send_message end-to-end.
 //   3. Calls the same tools via the legacy `/mcp/call` REST shim and diffs
 //      the recorder events to prove field-shape parity.
 //
@@ -92,14 +92,17 @@ async function main() {
   }
   for (const t of tools.tools) record(`  - ${t.name}: ${t.description}`);
 
-  section("2. tools/call slack_list_channels via JSON-RPC");
-  const listRes = await client.callTool({ name: "slack_list_channels", arguments: { limit: 10 } });
+  section("2. tools/call slack_search_channels via JSON-RPC");
+  const listRes = await client.callTool({
+    name: "slack_search_channels",
+    arguments: { query: "general", limit: 10 },
+  });
   record(pretty(listRes));
 
-  section("3. tools/call slack_post_message via JSON-RPC");
+  section("3. tools/call slack_send_message via JSON-RPC");
   const postRes = await client.callTool({
-    name: "slack_post_message",
-    arguments: { channel_id: "C_GENERAL", text: "via validate-mcp" },
+    name: "slack_send_message",
+    arguments: { channel_id: "C_GENERAL", message: "via validate-mcp" },
   });
   record(pretty(postRes));
 
@@ -107,7 +110,7 @@ async function main() {
   const legacyRes = await fetch(`${baseUrl}/s/${SID}/mcp/call`, {
     method: "POST",
     headers: { "content-type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ tool: "slack_list_channels", arguments: { limit: 10 } }),
+    body: JSON.stringify({ tool: "slack_search_channels", arguments: { query: "general", limit: 10 } }),
   });
   const legacyBody = await legacyRes.json();
   record(`legacy /mcp/call status=${legacyRes.status}`);

@@ -8,8 +8,8 @@ const response = await fetch(`${baseUrl}/call`, {
   method: "POST",
   headers: { "content-type": "application/json", Authorization: `Bearer ${token}` },
   body: JSON.stringify({
-    tool: "slack_list_channels",
-    arguments: { limit: 10 },
+    tool: "slack_search_channels",
+    arguments: { query: "general", limit: 10 },
   }),
 });
 

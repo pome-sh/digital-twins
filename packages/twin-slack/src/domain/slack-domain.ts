@@ -6,6 +6,7 @@ import {
   canvasesCreate as canvasesCreateImpl,
   canvasesDelete as canvasesDeleteImpl,
   canvasesEdit as canvasesEditImpl,
+  canvasesRead as canvasesReadImpl,
 } from "./canvases.js";
 import { emojiList as emojiListImpl, seedEmojiRows } from "./emoji.js";
 import {
@@ -444,6 +445,7 @@ export class SlackDomain {
       sort?: string;
       sort_dir?: string;
       highlight?: boolean;
+      scope?: "public" | "all";
     },
     actor: Actor = {}
   ): Record<string, unknown> {
@@ -548,6 +550,21 @@ export class SlackDomain {
       },
       args,
       onDelta
+    );
+  }
+
+
+  canvasesRead(args: { canvas_id: string }, actor: Actor = {}): Record<string, unknown> {
+    const workspace = this.requireWorkspace();
+    return canvasesReadImpl(
+      {
+        db: this.db,
+        workspaceId: workspace.id,
+        actor: this.resolveActorUser(actor),
+        allocId: (prefix) => this.allocId(workspace.id, prefix),
+        requireChannel: (ref) => this.requireChannel(ref),
+      },
+      args
     );
   }
 

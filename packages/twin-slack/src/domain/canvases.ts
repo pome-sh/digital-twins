@@ -4,6 +4,10 @@
 // title only — section_id-relative edits are accepted but applied as coarse
 // whole-document ops (insert_after/before → append; section replace → full
 // replace; section delete → no-op). Matches warm × shape target.
+//
+// F-1330 added the read half, because Slack declares `slack_read_canvas` and
+// this module had create/edit/delete only, and made `canvasesEdit` apply every
+// operation in its `changes` array rather than just the first.
 
 import type { StateDelta } from "@pome-sh/wire";
 import { slackError } from "../errors.js";
@@ -66,6 +70,43 @@ export function canvasesCreate(
   return out;
 }
 
+/**
+ * Read a canvas (F-1330). Slack's `slack_read_canvas` returns the document's
+ * markdown plus a `section_id_mapping` an agent feeds back into
+ * `slack_update_canvas`.
+ *
+ * Shape tier, and the mapping is where that shows: this twin stores a canvas
+ * as one markdown blob with no section model, so it reports ONE section
+ * covering the whole document rather than inventing per-heading ids an edit
+ * could not honour. An agent that round-trips read → update through this id
+ * gets the document-level behaviour `applyChange` already implements.
+ */
+export function canvasesRead(
+  host: CanvasHost,
+  args: { canvas_id: string }
+): Record<string, unknown> {
+  if (!args.canvas_id) slackError("invalid_arguments", 400);
+  const canvas = host.db.prepare(`SELECT * FROM canvases WHERE id = ?`).get(args.canvas_id) as
+    | CanvasRow
+    | undefined;
+  if (!canvas) slackError("canvas_not_found", 404);
+  assertCanvasAccess(host, canvas!);
+  return {
+    canvas_id: canvas!.id,
+    title: canvas!.title,
+    content: canvas!.markdown,
+    channel_id: canvas!.channel_id,
+    section_id_mapping: { [documentSectionId(canvas!.id)]: canvas!.title || canvas!.id },
+    date_created: canvas!.created_at,
+    date_updated: canvas!.updated_at,
+  };
+}
+
+/** The single section id `canvasesRead` reports, derived so it is stable per canvas. */
+export function documentSectionId(canvasId: string): string {
+  return `t_${canvasId}_document`;
+}
+
 export function canvasesEdit(
   host: CanvasHost,
   args: { canvas_id: string; changes: unknown },
@@ -79,9 +120,15 @@ export function canvasesEdit(
   assertCanvasAccess(host, before);
   const changes = coerceChanges(args.changes);
   if (!changes || changes.length === 0) slackError("invalid_arguments", 400);
-  // Real Slack currently accepts one operation per call; we apply the first.
-  const change = changes[0]!;
-  const next = applyChange(before!, change);
+  // Every operation, in order, against one snapshot — which is what both
+  // `canvases.edit` and `slack_update_canvas` document ("applied atomically
+  // against a single document snapshot", max 100). Applying only the first and
+  // answering ok was a silent drop: an agent batching three edits was told all
+  // three landed (F-1330).
+  let next = { title: before!.title, markdown: before!.markdown };
+  for (const change of changes) {
+    next = applyChange({ ...before!, ...next }, change);
+  }
   const now = nowIso();
   const out = host.db.transaction(() => {
     host.db
