@@ -99,12 +99,10 @@ export const sensitiveMessageLabelInputSchema = z
   })
   .passthrough();
 
-export const listLabelsInputSchema = z
-  .object({
-    pageSize,
-    pageToken,
-  })
-  .passthrough();
+// F-1400: no arguments. The 2026-07-20 capture declared `pageSize`/`pageToken`
+// here and the twin paginated; the 2026-08-10 one declares an empty property
+// set, so there is no page to ask for and none is offered back.
+export const listLabelsInputSchema = z.object({}).passthrough();
 
 export const messageLabelsInputSchema = z
   .object({
@@ -147,6 +145,7 @@ const messageOutputSchema = z
   .object({
     attachmentIds: z.array(z.string()).optional(),
     attachments: z.array(attachmentOutputSchema).optional(),
+    bccRecipients: z.array(z.string()).optional(),
     ccRecipients: z.array(z.string()).optional(),
     date: z.string().optional(),
     htmlBody: z.string().optional(),
@@ -171,6 +170,8 @@ const labelOutputSchema = z
   .object({
     color: labelColorSchema.optional(),
     labelId: z.string().optional(),
+    messagesTotal: z.number().int().optional(),
+    messagesUnread: z.number().int().optional(),
     name: z.string().optional(),
     threadsTotal: z.number().int().optional(),
     threadsUnread: z.number().int().optional(),
@@ -194,9 +195,7 @@ export const mcpOutputSchemas = {
   label_thread: z.object({}).passthrough(),
   unlabel_thread: z.object({}).passthrough(),
   apply_sensitive_thread_label: z.object({}).passthrough(),
-  list_labels: z
-    .object({ labels: z.array(labelOutputSchema).optional(), nextPageToken: z.string().optional() })
-    .passthrough(),
+  list_labels: z.object({ labels: z.array(labelOutputSchema).optional() }).passthrough(),
   label_message: z.object({}).passthrough(),
   unlabel_message: z.object({}).passthrough(),
   apply_sensitive_message_label: z.object({}).passthrough(),
@@ -210,7 +209,6 @@ export type GetMessageInput = z.output<typeof getMessageInputSchema>;
 export type SearchThreadsInput = z.output<typeof searchThreadsInputSchema>;
 export type ThreadLabelsInput = z.output<typeof threadLabelsInputSchema>;
 export type SensitiveThreadLabelInput = z.output<typeof sensitiveThreadLabelInputSchema>;
-export type ListLabelsInput = z.output<typeof listLabelsInputSchema>;
 export type MessageLabelsInput = z.output<typeof messageLabelsInputSchema>;
 export type SensitiveMessageLabelInput = z.output<typeof sensitiveMessageLabelInputSchema>;
 export type CreateLabelInput = z.output<typeof createLabelInputSchema>;

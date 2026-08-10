@@ -39,4 +39,11 @@ Live authenticated Gmail calls were **not** run (no OAuth credentials). Offline 
 
 - Google OAuth/OIDC consent screens, refresh tokens, JWKS, and scope issuance are **out of scope**. Pome session auth + frozen `gmail_email` claim only.
 - External SMTP delivery, Pub/Sub push, forwarding delivery, Calendar, Drive, Contacts, CSE, HTTP batch, and resumable upload are **out of scope** (loud failure, never silent success).
-- Live Developer Preview MCP may expose tools beyond the launch 10; the twin does **not** expand the listing to chase preview drift without a new Gate 0 ruling.
+- The MCP listing is not a ruling this twin makes. Since F-1400 `fixtures/mcp-tools-list.raw.json` is
+  `fixtures/mcp-tools-list/gmail.raw.json` byte for byte — Google's own `tools/list`, adopted by
+  `scripts/adopt-upstream-mcp-fixture.ts`, which subtracts nothing. So "the twin exposes a tool Google
+  does not" and "Google exposes one the twin withholds" are both unrepresentable, and the question that
+  remains is the only interesting one: whether the twin BEHAVES like the listing it serves. Refreshing
+  the capture is deliberate and human-reviewed (`npm run capture:mcp-tools-list -- --twin gmail`, then
+  `npm run fixture:mcp -w @pome-sh/twin-gmail`), and adopting the text without moving the handlers is
+  the defect, not the fix.

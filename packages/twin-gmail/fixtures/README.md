@@ -21,27 +21,52 @@ Immutable upstream captures for `@pome-sh/twin-gmail`. Normal tests must not req
 | `mcp-tools-call-unauth-error.raw.json` | Live unauthenticated `tools/call` error envelope |
 | `mcp-tools-call.representative.json` | Schema-derived representative success call shapes |
 
-### This is not the upstream golden — see `fixtures/mcp-tools-list/gmail.*` (F-1326)
+### This IS the upstream golden — `fixtures/mcp-tools-list/gmail.*`, adopted (F-1400)
 
-Two files in this repo hold a Gmail `tools/list`. They answer different questions and only one of
-them tracks the vendor:
+`mcp-tools-list.raw.json` is byte-for-byte
+[`fixtures/mcp-tools-list/gmail.raw.json`](../../../fixtures/mcp-tools-list/), and the two
+`rawFileSha256` values are the same number. Nothing is subtracted, nothing is re-described, and the
+capture date here is the capture's own — copied by the producer, not kept by hand.
 
-| file | authoritative for | freshness |
-| --- | --- | --- |
-| `mcp-tools-list.canonical.json` (here) | the **twin's launch set** — which tools `@pome-sh/twin-gmail` implements, and the frozen Gate-1 oracle its own suite asserts against | frozen at the 2026-07-20 capture on purpose; moving it is a twin scope change |
-| [`fixtures/mcp-tools-list/gmail.*`](../../../fixtures/mcp-tools-list/) | **what Google currently serves** | re-captured on demand by `scripts/capture-mcp-tools-list.mjs` |
+```bash
+node scripts/capture-mcp-tools-list.mjs --twin gmail   # re-read Google, from the repo root
+npm run fixture:mcp -w @pome-sh/twin-gmail             # adopt it here
+npm run gate:mcp-fixture -w @pome-sh/twin-gmail        # --check: what CI runs
+```
 
-Known delta, measured 2026-08-06: same 13 tool names in the same order, but **10 of the 13 differ**
-in `description` and/or `inputSchema` (`search_threads` schema 3849→4274 chars, `create_label`
-2813→3195, `list_labels` description 393→293). That is upstream drift since this file was captured,
-not a twin defect. When F-1325's lane reports schema divergence on those ten, read it as **this
-oracle being stale against the vendor** before touching `src/mcp.ts` — and note that re-cutting the
-twin against the newer surface means updating this fixture in the same change, or `test/mcp.test.ts`
-and `test/gate0-fixtures.test.mjs` will red.
+**It was not always so, and the cost is the reason this section exists.** These files shipped for
+seventeen days as a 2026-07-20 read of an endpoint that had moved. Nothing related the two files, so
+the fixture's own sha stayed green — a stale capture is internally consistent — and pome-cloud's
+`mcp_diff` reported **34 findings across 11 tools**, every one of them Google's listing moving. The 2
+tools it called matched were the 2 Google had left byte-identical.
+
+**Adopting the text alone would have been the defect, not the fix.** The newer listing declares
+`Message.bccRecipients`, `Label.messagesTotal`/`messagesUnread`, and a `list_labels` that returns ALL
+labels (the July prose said "all user-defined") taking no page arguments at all. Serving those words
+over the old handlers would advertise three capabilities the twin does not have, which is the
+false-capability shape [F-1330](https://linear.app/pome-sh/issue/F-1330) exists to stop, arrived at
+from the other direction. `test/mcp.test.ts` holds the handlers to the listing, reading the advertised
+property set out of the fixture rather than naming fields, so the next field Google adds is a red here
+and not a silent absence.
+
+What this lane still cannot see: because the served table IS the vendored capture, the only divergence
+it can ever report is capture staleness. Whether the twin behaves like the tools it serves is answered
+by pome-cloud's read leg and write round trip
+([F-1397](https://linear.app/pome-sh/issue/F-1397)).
+
+#### One advertised field is still unserved, and it is named rather than missing
+
+`search_threads` declares `resultCountEstimate` (int64-as-string, "treated as a lower bound") and
+this twin never returns it. That is **not** part of F-1400's adoption: the 2026-07-20 capture declared
+it too, so it is a gap this twin has always had and no comparison between the two captures reports.
+It is cheap to close — the domain knows the exact match count before it paginates — and deliberately
+left out of the change that moved the capture, so the adoption's behavioural surface is only the
+three claims that actually moved. Every other field either of the two schemas declares is served
+whenever the data exists; `nextPageToken` only when there is another page, and `color` / `htmlBody` /
+`attachments` only when the record carries one.
 
 ### Provenance notes
 
-- `tools/list` and `initialize` were captured live without OAuth on 2026-07-20 against `https://gmailmcp.googleapis.com/mcp/v1`.
+- `tools/list` was captured live without OAuth on **2026-08-10** against `https://gmailmcp.googleapis.com/mcp/v1`; `initialize` on 2026-07-20 against the same endpoint (protocolVersion `2025-03-26`, unchanged).
 - Authenticated `tools/call` success was **not** available; representative success fixtures are reconstructed from live `outputSchema` + public docs and are marked as such.
-- Gate 1 expands the OSS launch set to the full live 13-tool listing, promoting `get_message`, `apply_sensitive_thread_label`, and `apply_sensitive_message_label` that Gate 0 treated as preview drift.
-- **The 2026-08-06 re-capture is deliberately not adopted.** F-1326 re-read the same endpoint and got the same 13 names with different schemas and descriptions (`fixtures/mcp-tools-list/gmail.meta.json` at the repo root, `rawFileSha256` `93085540…`). This twin keeps serving the 2026-07-20 oracle: taking the newer bytes changes what the twin serves, and that behavioural change belongs to the ticket that rules on it, not to F-1325. The lane that reports the difference is F-1327.
+- Gate 1 expanded the OSS launch set to the full live 13-tool listing, promoting `get_message`, `apply_sensitive_thread_label`, and `apply_sensitive_message_label` that Gate 0 treated as preview drift. All 13 survive in the adopted capture, in the same order.

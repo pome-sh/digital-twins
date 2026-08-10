@@ -4,10 +4,10 @@
     "substrate": "live-wire-unauth",
     "endpoint": "https://gmailmcp.googleapis.com/mcp/v1",
     "method": "tools/list",
-    "protocol": "JSON-RPC 2.0 over HTTP (accept: application/json, text/event-stream)",
+    "protocol": "JSON-RPC 2.0 over HTTP",
     "protocolVersion": "2025-03-26",
-    "captureDate": "2026-07-20",
-    "rawFileSha256": "6ef35bad568967015c101f89e995148c4eb2131b3a6dd244f7237058abae8e7a",
+    "captureDate": "2026-08-10",
+    "rawFileSha256": "fd2b12868289aee89798c218a7ea2307fc475935d3d912c2a3c35b5d75ae21ee",
     "liveToolCount": 13,
     "liveToolOrder": [
       "create_draft",
@@ -25,7 +25,7 @@
       "create_label"
     ],
     "configuration": {
-      "auth": "none — the unauthenticated read answered HTTP 200 for both tools/list and initialize (Developer Preview)",
+      "auth": "none",
       "deploymentSelector": "none — the endpoint exposes no toolset, tool-filter or read-only selector, so there is exactly one surface to read",
       "requestHeaders": {
         "content-type": "application/json",
@@ -36,13 +36,15 @@
         "jsonrpc": "2.0",
         "id": 1
       },
-      "matchesExaminee": "an examinee pointing an MCP client at this URL gets this listing; there is no configuration axis on which the two could differ",
-      "completeness": "exact"
+      "matchesExaminee": "exactly, for all 13 tools — name, description, inputSchema, outputSchema and annotations are Google's own bytes, and an examinee pointing an MCP client at the endpoint above gets this listing.",
+      "completeness": "exact",
+      "derivation": "the upstream golden in full — all 13 tools, no subtraction. Produced by scripts/adopt-upstream-mcp-fixture.ts from fixtures/mcp-tools-list/gmail.raw.json at rawFileSha256 fd2b12868289aee89798c218a7ea2307fc475935d3d912c2a3c35b5d75ae21ee, whose bytes this file copies verbatim."
     },
     "notes": [
-      "Gate 1 expands the OSS launch set from the Gate-0 ten-tool freeze to the full live 13-tool listing. The three promoted from Developer Preview are get_message, apply_sensitive_thread_label and apply_sensitive_message_label.",
-      "Schemas, annotations and descriptions are the live capture's, verbatim.",
-      "DELIBERATE DIVERGENCE: F-1326 re-read the same endpoint on 2026-08-06 and got the same 13 names with different schemas and descriptions (fixtures/mcp-tools-list/gmail.meta.json, rawFileSha256 93085540…). This twin keeps serving the 2026-07-20 oracle. Adopting the newer bytes changes what the twin serves, which is a behavioural change F-1325 does not make; the lane that compares the two is F-1327. This is not an oversight.",
+      "F-1400: these bytes are Google's, adopted rather than transcribed. The fixture that shipped before this one was the same endpoint read on 2026-07-20 and was never refreshed, so the twin advertised a seventeen-day-old listing and pome-cloud's mcp_diff reported 34 findings across 11 tools — all of them the vendor moving, none of them a twin defect. Produced by scripts/adopt-upstream-mcp-fixture.ts; `npm run gate:mcp-fixture -w @pome-sh/twin-gmail` re-derives and diffs.",
+      "13 tools, which is every tool the capture carries. Unlike twin-slack's adoption there is no suppression list: nothing here is withheld, so raw.json is byte-identical to fixtures/mcp-tools-list/gmail.raw.json and the two shas agree.",
+      "Descriptions, schemas and annotations are the capture's verbatim. Three of its claims are behavioural and were implemented in the same change rather than merely served: Message.bccRecipients, Label.messagesTotal/messagesUnread, and a list_labels that answers with ALL labels — the July listing said 'all user-defined labels' and the twin returned exactly those.",
+      "list_labels takes no arguments in this listing. The July capture declared pageSize/pageToken and the twin paginated; Google has since removed both, along with nextPageToken from the response, so the twin answers every label in one page. LIMITS.md's MCP page-size row no longer names this tool.",
       "Authenticated tools/call success envelopes were unavailable; the reconstructed shapes live in mcp-tools-call.representative.json and the live unauthenticated error envelope in mcp-tools-call-unauth-error.raw.json.",
       "initialize returned protocolVersion=2025-03-26 (mcp-initialize.raw.json)."
     ],
@@ -55,7 +57,7 @@
     "tools": [
       {
         "name": "create_draft",
-        "description": "Creates a new draft email in the authenticated user's Gmail account.\n\nThis tool takes recipient addresses, a subject, and body content as inputs. It returns the ID of the created Gmail draft. If the draft is created as a reply to an existing message, the ID of the original message should be passed to the tool in the replyToMessageId field. Creating drafts with attachments is not supported yet.\n",
+        "description": "Creates a new draft email in the authenticated user's Gmail account.\n\nThis tool takes recipient addresses, a subject, and body content as inputs. If the draft is created as a reply to an existing message, the ID of the original message should be passed to the tool in the replyToMessageId field.\n\nReturns a Draft object with only the `id` field populated.\n",
         "inputSchema": {
           "$defs": {
             "Attachment": {
@@ -93,7 +95,7 @@
           "description": "Request message for CreateDraft RPC.",
           "properties": {
             "attachments": {
-              "description": "Optional. The attachments to include in the email. The combined size of attachments in the message cannot exceed 25MB. If you need to send files larger than 25MB, upload the file to Drive first and then insert the Drive link into body or html_body.",
+              "description": "Optional. The attachments to include in the email. The combined size of attachments in the message cannot exceed 25MB. If you need to send files larger than 25MB, upload the file to Drive first and then insert the Drive link into `body` or `html_body`.",
               "items": {
                 "$ref": "#/$defs/Attachment"
               },
@@ -107,7 +109,7 @@
               "type": "array"
             },
             "body": {
-              "description": "Optional. The main body content of the email draft. If html_body is also provided, this field is treated as the plain-text alternative.",
+              "description": "Optional. The main body content of the email draft. If `html_body` is also provided, this field is treated as the plain-text alternative.",
               "type": "string"
             },
             "cc": {
@@ -195,7 +197,7 @@
           "idempotentHint": false,
           "openWorldHint": false,
           "readOnlyHint": false,
-          "title": "Creates a new draft email in the authenticated user's Gmail account."
+          "title": "Create draft email"
         }
       },
       {
@@ -214,11 +216,11 @@
               "type": "string"
             },
             "query": {
-              "description": "Examples: \"subject:OneMCP Update\" \"from:gduser1@workspacesamples.dev\" \"to:gduser2@workspacesamples.dev AND newer_than:7d\" \"project proposal has:attachment\" \"is:unread\" A space or a dash (`-`) will separate a number while a dot (`.`) will be a decimal. For example, `01.2047-100` is considered two numbers: `01.2047` and `100`. Note: If we want to ensure all drafts for the query are returned, we can paginate the results by making repeated calls to the tool until the response contains an empty list of drafts.",
+              "description": "Examples: - `subject:OneMCP Update` - `from:gduser1@workspacesamples.dev` - `to:gduser2@workspacesamples.dev AND newer_than:7d` - `project proposal has:attachment` - `is:unread` A space or a dash (`-`) will separate a number while a dot (`.`) will be a decimal. For example, `01.2047-100` is considered two numbers: `01.2047` and `100`. Note: If we want to ensure all drafts for the query are returned, we can paginate the results by making repeated calls to the tool until the response contains an empty list of drafts.",
               "type": "string"
             },
             "view": {
-              "description": "Optional. Controls the fields populated for drafts in the draft list.",
+              "description": "Optional. Controls the fields populated for drafts in the draft list. Defaults to returning metadata only (`id`, `thread_id`, `to_recipients`, `cc_recipients`, `bcc_recipients`, `date`). Set to `DRAFT_VIEW_FULL` to include `subject` and `plaintext_body` content.",
               "enum": [
                 "DRAFT_VIEW_UNSPECIFIED",
                 "DRAFT_VIEW_METADATA_ONLY",
@@ -226,9 +228,9 @@
               ],
               "type": "string",
               "x-google-enum-descriptions": [
-                "Maps to DRAFT_VIEW_FULL for backward compatibility.",
-                "Metadata only: does not include subject, plaintext_body, html_body.",
-                "Metadata + UGC (Default behavior)."
+                "Unspecified view. Defaults to DRAFT_VIEW_METADATA_ONLY.",
+                "Returns metadata only (`id`, `thread_id`, `to_recipients`, `cc_recipients`, `bcc_recipients`, `date`); omits `subject` and `plaintext_body` content.",
+                "Returns full draft content, including `subject` and `plaintext_body` in addition to draft metadata."
               ]
             }
           },
@@ -309,17 +311,17 @@
           "idempotentHint": false,
           "openWorldHint": false,
           "readOnlyHint": true,
-          "title": "Lists draft emails from the authenticated user's Gmail account."
+          "title": "List draft emails"
         }
       },
       {
         "name": "get_thread",
-        "description": "Retrieves a specific email thread from the authenticated user's Gmail account, including a list of its messages.\n\nThe optional `message_format` parameter controls the format of the messages returned. By default (or with `FULL_CONTENT`), it returns the full content of messages. Use `MINIMAL` to include only subject and snippet (excluding body). Use `METADATA_ONLY` to include only basic metadata (message ID, thread ID, labels, timestamp, and size estimate). \n",
+        "description": "Retrieves a specific email thread from the authenticated user's Gmail account, including a list of its messages.\n\nThe optional `messageFormat` parameter controls the format of the messages returned. By default (or with `FULL_CONTENT`), it returns the full content of messages. Use `MINIMAL` to include only subject and snippet (excluding body). Use `METADATA_ONLY` to include only basic metadata (message ID, thread ID, labels, timestamp, and size estimate). \n",
         "inputSchema": {
           "description": "Request message for GetThread RPC.",
           "properties": {
             "messageFormat": {
-              "description": "Optional. Specifies the format of the messages returned within the thread. Defaults to FULL_CONTENT. Note: If you need body content or attachments, use FULL_CONTENT. When using MINIMAL, the plaintext_body and attachment_ids fields will not be populated. If you are unsure which format to use, rely on the default behavior by using FULL_CONTENT.",
+              "description": "Optional. Specifies the format of the messages returned within the thread. Defaults to `FULL_CONTENT`. Note: `MINIMAL` format returns `id`, `snippet`, `subject`, `sender`, `to_recipients`, `cc_recipients`, `bcc_recipients`, `date`, `label_ids`. `METADATA_ONLY` format returns `id`, `sender`, `to_recipients`, `cc_recipients`, `bcc_recipients`, `date`, `label_ids`. `FULL_CONTENT` returns `id`, `snippet`, `subject`, `sender`, `to_recipients`, `cc_recipients`, `bcc_recipients`, `date`, `label_ids`, `attachment_ids`, `plaintext_body`, `html_body`, `attachments`.",
               "enum": [
                 "MESSAGE_FORMAT_UNSPECIFIED",
                 "MINIMAL",
@@ -384,6 +386,13 @@
                   "readOnly": true,
                   "type": "array"
                 },
+                "bccRecipients": {
+                  "description": "BCC recipient email addresses.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
                 "ccRecipients": {
                   "description": "CC recipient email addresses.",
                   "items": {
@@ -404,7 +413,7 @@
                   "type": "string"
                 },
                 "labelIds": {
-                  "description": "The ids of the labels attached to the message. Includes ids of user labels and standard system labels limited to \"INBOX\", \"SPAM\", \"TRASH\", \"UNREAD\", \"STARRED\", \"IMPORTANT\", \"SENT\", \"DRAFT\", \"CHAT\".",
+                  "description": "The ids of the labels attached to the message. Includes ids of user labels and standard system labels limited to `INBOX`, `SPAM`, `TRASH`, `UNREAD`, `STARRED`, `IMPORTANT`, `SENT`, `DRAFT`, `CHAT`.",
                   "items": {
                     "type": "string"
                   },
@@ -458,7 +467,7 @@
           "idempotentHint": true,
           "openWorldHint": false,
           "readOnlyHint": true,
-          "title": "Retrieves a specific email thread from the authenticated user's Gmail account."
+          "title": "Get email thread"
         }
       },
       {
@@ -533,6 +542,13 @@
               "readOnly": true,
               "type": "array"
             },
+            "bccRecipients": {
+              "description": "BCC recipient email addresses.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
             "ccRecipients": {
               "description": "CC recipient email addresses.",
               "items": {
@@ -553,7 +569,7 @@
               "type": "string"
             },
             "labelIds": {
-              "description": "The ids of the labels attached to the message. Includes ids of user labels and standard system labels limited to \"INBOX\", \"SPAM\", \"TRASH\", \"UNREAD\", \"STARRED\", \"IMPORTANT\", \"SENT\", \"DRAFT\", \"CHAT\".",
+              "description": "The ids of the labels attached to the message. Includes ids of user labels and standard system labels limited to `INBOX`, `SPAM`, `TRASH`, `UNREAD`, `STARRED`, `IMPORTANT`, `SENT`, `DRAFT`, `CHAT`.",
               "items": {
                 "type": "string"
               },
@@ -590,7 +606,7 @@
           "idempotentHint": true,
           "openWorldHint": false,
           "readOnlyHint": true,
-          "title": "Retrieves a specific email message from the authenticated user's Gmail account."
+          "title": "Get email message"
         }
       },
       {
@@ -600,7 +616,7 @@
           "description": "Request message for SearchThreads RPC.",
           "properties": {
             "includeTrash": {
-              "description": "Optional. Include drafts from TRASH in the results. Defaults to false.",
+              "description": "Optional. Include threads from TRASH in the results. Defaults to false.",
               "type": "boolean"
             },
             "pageSize": {
@@ -613,11 +629,11 @@
               "type": "string"
             },
             "query": {
-              "description": "Optional. A query string to filter the threads. Natural language queries must be pre-converted into Gmail syntax queries to use this tool. If omitted, all threads (excluding spam and trash by default) are listed. Supported Operators by Category: Sender & Recipient: from: - Sent from a specific person. to: - Sent to a specific person. cc: - Specific people in Cc. bcc: - Specific people in Bcc. deliveredto: - Delivered to a specific address. list: - From a specific mailing list. Time & Date: after:YYYY/MM/DD / newer:YYYY/MM/DD - Received after a date. before:YYYY/MM/DD / older:YYYY/MM/DD - Received before a date. older_than: - Older than a duration (e.g., 1y, 2d). newer_than: - Newer than a duration. Content: subject: - Words in the subject line. has: - Has specific content types (attachment, drive, youtube, document). filename: - Attachment with a specific name or type. \"\" - Search for an exact word or phrase. (e.g., \"holiday\", \"holiday vacation\"). + - Match a word exactly. (e.g., +holiday, +unicorn) rfc822msgid: - Specific message ID header. AROUND - Find words near each other (e.g., holiday AROUND 10 vacation). Labels & Categories: label: - Under a specific label. The tool accepts label IDs, not display names. Use the list_labels tool to get the ID. category: - In a category (primary, social, promotions, updates, forums, reservations, purchases). in: - Search in specific labels (archive, snoozed, trash, sent, inbox). E.g., `in:trash`, `in:inbox`. Archived and sent messages are included by default; use `-in:archive` and `-in:sent` to exclude them. Drafts are explicitly excluded by default by the tool. Use `in:inbox` to restrict search to the inbox only. has:userlabels - Has any user labels. has:nouserlabels - Does not have any user labels. has:*-star - Specific star colors (if enabled, e.g., has:yellow-star). in:draft - Search in drafts. -in:draft means exclude drafts from the search results. in:sent - Search in sent messages. in:anywhere - Search in all folders (including spam and trash). Status: is: - Search by status (important, starred, unread, read, muted). Size: size: - Specific size in bytes. larger: / smaller: - Larger or smaller than a size (e.g., 10M for 10 MB). Logic & Grouping: AND - Match all criteria (default behavior). OR or { } - Match one or more criteria (e.g., from:amy OR from:david, {from:amy from:david}). - (minus) - Exclude criteria (e.g., -movie). ( ) - Group multiple search terms (e.g., subject:(dinner film)). Examples: \"subject:OneMCP Update\" \"from:user@example.com\" \"to:user2@example.com AND newer_than:7d\" \"project proposal has:attachment\" \"is:unread -in:draft\"",
+              "description": "Optional. A query string to filter the threads. Natural language queries must be pre-converted into Gmail syntax queries to use this tool. If omitted, all threads (excluding spam and trash by default) are listed. Supported Operators by Category: Sender & Recipient: - `from:` — Sent from a specific person. - `to:` — Sent to a specific person. - `cc:` — Specific people in Cc. - `bcc:` — Specific people in Bcc. - `deliveredto:` — Delivered to a specific address. - `list:` — From a specific mailing list. Time & Date: - `after:YYYY/MM/DD` / `newer:YYYY/MM/DD` — Received after a date. - `before:YYYY/MM/DD` / `older:YYYY/MM/DD` — Received before a date. - `older_than:` — Older than a duration (for example, `1y`, `2d`). - `newer_than:` — Newer than a duration. Content: - `subject:` — Words in the subject line. - `has:` — Has specific content types (attachment, drive, youtube, document). - `filename:` — Attachment with a specific name or type. - `\"\"` — Search for an exact word or phrase. (for example, `\"holiday\"`, `\"holiday vacation\"`). - `+` — Match a word exactly. (for example, `+holiday`, `+unicorn`) - `rfc822msgid:` — Specific message ID header. - `AROUND ` — Find words near each other (for example, `holiday AROUND 10 vacation`). Labels & Categories: - `label:` — Under a specific label. The tool accepts label IDs, not display names. Use the list_labels tool to get the ID. - `category:` — In a category (primary, social, promotions, updates, forums, reservations, purchases). - `in:` — Search in specific labels (archive, snoozed, trash, sent, inbox). For example, `in:trash`, `in:inbox`. Archived and sent messages are included by default; use `-in:archive` and `-in:sent` to exclude them. Drafts are explicitly excluded by default by the tool. Use `in:inbox` to restrict search to the inbox only. - `has:userlabels` — Has any user labels. - `has:nouserlabels` — Does not have any user labels. - `has:*-star` — Specific star colors (if enabled, for example, `has:yellow-star`). - `in:draft` — Search in drafts. -in:draft means exclude drafts from the search results. - `in:sent` — Search in sent messages. - `in:anywhere` — Search in all folders (including spam and trash). Status: - `is:` — Search by status (important, starred, unread, read, muted). Size: - `size:` — Specific size in bytes. - `larger:` / `smaller:` — Larger or smaller than a size (for example, `10M` for 10 MB). Logic & Grouping: - `AND` — Match all criteria (default behavior). - `OR` or `{ }` — Match one or more criteria (for example, `from:amy OR from:david`, `{from:amy from:david}`). - `-` (minus) — Exclude criteria (for example, `-movie`). - `( )` — Group multiple search terms (for example, `subject:(dinner film)`). Examples: - `subject:OneMCP Update` - `from:user@example.com` - `to:user2@example.com AND newer_than:7d` - `project proposal has:attachment` - `is:unread -in:draft`",
               "type": "string"
             },
             "view": {
-              "description": "Optional. Controls the fields populated for threads in the thread list.",
+              "description": "Optional. Controls the fields populated for threads in the thread list. Defaults to `THREAD_VIEW_MINIMAL`. `THREAD_VIEW_MINIMAL` returns `id`, `snippet`, `subject`, `sender`, `to_recipients`, `cc_recipients`, `bcc_recipients`, `date`, `label_ids`. `THREAD_VIEW_METADATA_ONLY` returns `id`, `sender`, `to_recipients`, `cc_recipients`, `bcc_recipients`, `date`, `label_ids`.",
               "enum": [
                 "THREAD_VIEW_UNSPECIFIED",
                 "THREAD_VIEW_METADATA_ONLY",
@@ -625,9 +641,9 @@
               ],
               "type": "string",
               "x-google-enum-descriptions": [
-                "Maps to DRAFT_VIEW_FULL for backward compatibility.",
-                "Metadata only: does not include subject, plaintext_body, html_body.",
-                "Minimal: includes subject and snippet, but no body."
+                "Maps to THREAD_VIEW_MINIMAL for backward compatibility.",
+                "Returns `id`, `sender`, `to_recipients`, `cc_recipients`, `bcc_recipients`, `date`, `label_ids`.",
+                "Returns `id`, `snippet`, `subject`, `sender`, `to_recipients`, `cc_recipients`, `bcc_recipients`, `date`, `label_ids`."
               ]
             }
           },
@@ -673,6 +689,13 @@
                   "readOnly": true,
                   "type": "array"
                 },
+                "bccRecipients": {
+                  "description": "BCC recipient email addresses.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
                 "ccRecipients": {
                   "description": "CC recipient email addresses.",
                   "items": {
@@ -693,7 +716,7 @@
                   "type": "string"
                 },
                 "labelIds": {
-                  "description": "The ids of the labels attached to the message. Includes ids of user labels and standard system labels limited to \"INBOX\", \"SPAM\", \"TRASH\", \"UNREAD\", \"STARRED\", \"IMPORTANT\", \"SENT\", \"DRAFT\", \"CHAT\".",
+                  "description": "The ids of the labels attached to the message. Includes ids of user labels and standard system labels limited to `INBOX`, `SPAM`, `TRASH`, `UNREAD`, `STARRED`, `IMPORTANT`, `SENT`, `DRAFT`, `CHAT`.",
                   "items": {
                     "type": "string"
                   },
@@ -769,17 +792,17 @@
           "idempotentHint": true,
           "openWorldHint": false,
           "readOnlyHint": true,
-          "title": "Searches for email threads from the authenticated user's Gmail account."
+          "title": "Search email threads"
         }
       },
       {
         "name": "label_thread",
-        "description": "Adds labels to an entire thread in the authenticated user's Gmail account. This operation affects all messages currently in the thread and any future messages added to it.\n\nIf unsure of the thread ID, use the `search_threads` tool first.\n\nIf unsure of a user label's ID, use the `list_labels` tool first to discover available labels and their IDs. To add a trash label or a spam label on to a thread, please use the `apply_sensitive_thread_label` tool instead.\n",
+        "description": "Adds labels to an entire thread in the authenticated user's Gmail account. This operation affects all messages currently in the thread and any future messages added to it.\n\nIf unsure of the thread ID, use the `search_threads` tool first.\n\nIf unsure of a user label's ID, use the `list_labels` tool first to discover available labels and their IDs. To add a Trash label or a Spam label to a thread, or move a specific thread to Trash, please use the `apply_sensitive_thread_label` tool instead.\n",
         "inputSchema": {
           "description": "Request message for LabelThread RPC.",
           "properties": {
             "labelIds": {
-              "description": "Required. The unique identifiers of the labels to add. Can be a system label ID (e.g., 'INBOX', 'TRASH', 'SPAM', 'STARRED', 'UNREAD', 'IMPORTANT') or a user-defined label ID. The tool accepts `label_ids` and not label names. Use the list_labels tool to get the corresponding label id to a display name for user-defined labels.",
+              "description": "Required. The unique identifiers of the labels to add. Can be a system label ID (e.g., `INBOX`, `STARRED`, `UNREAD`, `IMPORTANT`) or a user-defined label ID. The tool accepts `label_ids` and not label names. Use the `list_labels` tool to get the corresponding label id to a display name for user-defined labels.",
               "items": {
                 "type": "string"
               },
@@ -806,7 +829,7 @@
           "idempotentHint": true,
           "openWorldHint": false,
           "readOnlyHint": false,
-          "title": "Adds labels to a thread."
+          "title": "Add labels to thread"
         }
       },
       {
@@ -816,7 +839,7 @@
           "description": "Request message for UnlabelThread RPC.",
           "properties": {
             "labelIds": {
-              "description": "Required. The unique identifiers of the labels to remove. Can be a system label ID (e.g., 'INBOX', 'TRASH', 'SPAM', 'STARRED', 'UNREAD', 'IMPORTANT') or a user-defined label ID. The tool accepts `label_ids` and not label names. Use the list_labels tool to get the corresponding label id to a display name for user-defined labels.",
+              "description": "Required. The unique identifiers of the labels to remove. Can be a system label ID (e.g., `INBOX`, `TRASH`, `SPAM`, `STARRED`, `UNREAD`, `IMPORTANT`) or a user-defined label ID. The tool accepts `label_ids` and not label names. Use the `list_labels` tool to get the corresponding label id to a display name for user-defined labels.",
               "items": {
                 "type": "string"
               },
@@ -843,12 +866,12 @@
           "idempotentHint": true,
           "openWorldHint": false,
           "readOnlyHint": false,
-          "title": "Removes labels from a thread."
+          "title": "Remove labels from thread"
         }
       },
       {
         "name": "apply_sensitive_thread_label",
-        "description": "Adds a sensitive label (Trash or Spam) to an entire thread in the authenticated user's Gmail account. This operation affects all messages currently in the thread and any future messages added to it.\n\nUse this tool to trash or mark a thread as spam. If unsure of the thread ID, use the `search_threads` tool first.\n",
+        "description": "Adds a sensitive label (Trash or Spam) to an entire thread in the authenticated user's Gmail account. This operation affects all messages currently in the thread and any future messages added to it.\n\nUse this tool to trash a thread, mark a thread as spam, or move the specified thread to Trash.\n\nTo find the thread ID, use the `search_threads` tool first.\n",
         "inputSchema": {
           "description": "Request message for ApplySensitiveThreadLabel RPC.",
           "properties": {
@@ -887,25 +910,15 @@
           "idempotentHint": true,
           "openWorldHint": false,
           "readOnlyHint": false,
-          "title": "Adds a sensitive label (Trash or Spam) to a thread."
+          "title": "Apply sensitive label (Trash or Spam) to thread"
         }
       },
       {
         "name": "list_labels",
-        "description": "Lists all user-defined labels available in the authenticated user's Gmail account. Use this tool to discover the `id` of a user label before calling `label_thread`, `unlabel_thread`, `label_message`, or `unlabel_message`. System labels are not returned by this tool but can be used with their well-known IDs: 'INBOX', 'TRASH', 'SPAM', 'STARRED', 'UNREAD', 'IMPORTANT', 'CHAT', 'DRAFT', 'SENT'.",
+        "description": "Lists all labels available in the authenticated user's Gmail account. Use this tool to discover the `id` of a label before calling `label_thread`, `unlabel_thread`, `label_message`, or `unlabel_message`. Note: the system labels, `DRAFT` and `SENT`, cannot be set on messages and are read only.",
         "inputSchema": {
           "description": "Request message for ListLabels RPC.",
-          "properties": {
-            "pageSize": {
-              "description": "Optional. The maximum number of labels to return.",
-              "format": "int32",
-              "type": "integer"
-            },
-            "pageToken": {
-              "description": "Optional. Page token to retrieve a specific page of results in the list.",
-              "type": "string"
-            }
-          },
+          "properties": {},
           "type": "object"
         },
         "outputSchema": {
@@ -920,6 +933,16 @@
                 "labelId": {
                   "description": "The unique identifier of the label.",
                   "type": "string"
+                },
+                "messagesTotal": {
+                  "description": "The total number of messages under the label.",
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "messagesUnread": {
+                  "description": "The number of unread messages under the label.",
+                  "format": "int32",
+                  "type": "integer"
                 },
                 "name": {
                   "description": "The human-readable display name of the label.",
@@ -942,11 +965,11 @@
               "description": "The color of the label.",
               "properties": {
                 "backgroundColor": {
-                  "description": "The background color of the label, represented as a hex string (e.g., \"#ffffff\"). Only the following predefined set of color values are allowed: # 000000, #434343, #666666, #999999, #cccccc, #efefef, #f3f3f3, #ffffff, # fb4c2f, #ffad47, #fad165, #16a766, #43d692, #4a86e8, #a479e2, #f691b3, # f6c5be, #ffe6c7, #fef1d1, #b9e4d0, #c6f3de, #c9daf8, #e4d7f5, #fcdee8, # efa093, #ffd6a2, #fce8b3, #89d3b2, #a0eac9, #a4c2f4, #d0bcf1, #fbc8d9, # e66550, #ffbc6b, #fcda83, #44b984, #68dfa9, #6d9eeb, #b694e8, #f7a7c0, # cc3a21, #eaa041, #f2c960, #149e60, #3dc789, #3c78d8, #8e63ce, #e07798, # ac2b16, #cf8933, #d5ae49, #0b804b, #2a9c68, #285bac, #653e9b, #b65775, # 822111, #a46a21, #aa8831, #076239, #1a764d, #1c4587, #41236d, #83334c, # 464646, #e7e7e7, #0d3472, #b6cff5, #0d3b44, #98d7e4, #3d188e, #e3d7ff, # 711a36, #fbd3e0, #8a1c0a, #f2b2a8, #7a2e0b, #ffc8af, #7a4706, #ffdeb5, # 594c05, #fbe983, #684e07, #fdedc1, #0b4f30, #b3efd3, #04502e, #a2dcc1, # c2c2c2, #4986e7, #2da2bb, #b99aff, #994a64, #f691b2, #ff7537, #ffad46, # 662e37, #ebdbde, #cca6ac, #094228, #42d692, #16a765",
+                  "description": "The background color of the label, represented as a hex string (e.g., \"#ffffff\"). Only the following predefined set of color values are allowed: `#000000`, `#434343`, `#666666`, `#999999`, `#cccccc`, `#efefef`, `#f3f3f3`, `#ffffff`, `#fb4c2f`, `#ffad47`, `#fad165`, `#16a766`, `#43d692`, `#4a86e8`, `#a479e2`, `#f691b3`, `#f6c5be`, `#ffe6c7`, `#fef1d1`, `#b9e4d0`, `#c6f3de`, `#c9daf8`, `#e4d7f5`, `#fcdee8`, `#efa093`, `#ffd6a2`, `#fce8b3`, `#89d3b2`, `#a0eac9`, `#a4c2f4`, `#d0bcf1`, `#fbc8d9`, `#e66550`, `#ffbc6b`, `#fcda83`, `#44b984`, `#68dfa9`, `#6d9eeb`, `#b694e8`, `#f7a7c0`, `#cc3a21`, `#eaa041`, `#f2c960`, `#149e60`, `#3dc789`, `#3c78d8`, `#8e63ce`, `#e07798`, `#ac2b16`, `#cf8933`, `#d5ae49`, `#0b804b`, `#2a9c68`, `#285bac`, `#653e9b`, `#b65775`, `#822111`, `#a46a21`, `#aa8831`, `#076239`, `#1a764d`, `#1c4587`, `#41236d`, `#83334c`, `#464646`, `#e7e7e7`, `#0d3472`, `#b6cff5`, `#0d3b44`, `#98d7e4`, `#3d188e`, `#e3d7ff`, `#711a36`, `#fbd3e0`, `#8a1c0a`, `#f2b2a8`, `#7a2e0b`, `#ffc8af`, `#7a4706`, `#ffdeb5`, `#594c05`, `#fbe983`, `#684e07`, `#fdedc1`, `#0b4f30`, `#b3efd3`, `#04502e`, `#a2dcc1`, `#c2c2c2`, `#4986e7`, `#2da2bb`, `#b99aff`, `#994a64`, `#f691b2`, `#ff7537`, `#ffad46`, `#662e37`, `#ebdbde`, `#cca6ac`, `#094228`, `#42d692`, `#16a765`",
                   "type": "string"
                 },
                 "textColor": {
-                  "description": "The text color of the label, represented as a hex string (e.g., \"#000000\"). Only the following predefined set of color values are allowed: # 000000, #434343, #666666, #999999, #cccccc, #efefef, #f3f3f3, #ffffff, # fb4c2f, #ffad47, #fad165, #16a766, #43d692, #4a86e8, #a479e2, #f691b3, # f6c5be, #ffe6c7, #fef1d1, #b9e4d0, #c6f3de, #c9daf8, #e4d7f5, #fcdee8, # efa093, #ffd6a2, #fce8b3, #89d3b2, #a0eac9, #a4c2f4, #d0bcf1, #fbc8d9, # e66550, #ffbc6b, #fcda83, #44b984, #68dfa9, #6d9eeb, #b694e8, #f7a7c0, # cc3a21, #eaa041, #f2c960, #149e60, #3dc789, #3c78d8, #8e63ce, #e07798, # ac2b16, #cf8933, #d5ae49, #0b804b, #2a9c68, #285bac, #653e9b, #b65775, # 822111, #a46a21, #aa8831, #076239, #1a764d, #1c4587, #41236d, #83334c, # 464646, #e7e7e7, #0d3472, #b6cff5, #0d3b44, #98d7e4, #3d188e, #e3d7ff, # 711a36, #fbd3e0, #8a1c0a, #f2b2a8, #7a2e0b, #ffc8af, #7a4706, #ffdeb5, # 594c05, #fbe983, #684e07, #fdedc1, #0b4f30, #b3efd3, #04502e, #a2dcc1, # c2c2c2, #4986e7, #2da2bb, #b99aff, #994a64, #f691b2, #ff7537, #ffad46, # 662e37, #ebdbde, #cca6ac, #094228, #42d692, #16a765",
+                  "description": "The text color of the label, represented as a hex string (e.g., \"#000000\"). Only the following predefined set of color values are allowed: `#000000`, `#434343`, `#666666`, `#999999`, `#cccccc`, `#efefef`, `#f3f3f3`, `#ffffff`, `#fb4c2f`, `#ffad47`, `#fad165`, `#16a766`, `#43d692`, `#4a86e8`, `#a479e2`, `#f691b3`, `#f6c5be`, `#ffe6c7`, `#fef1d1`, `#b9e4d0`, `#c6f3de`, `#c9daf8`, `#e4d7f5`, `#fcdee8`, `#efa093`, `#ffd6a2`, `#fce8b3`, `#89d3b2`, `#a0eac9`, `#a4c2f4`, `#d0bcf1`, `#fbc8d9`, `#e66550`, `#ffbc6b`, `#fcda83`, `#44b984`, `#68dfa9`, `#6d9eeb`, `#b694e8`, `#f7a7c0`, `#cc3a21`, `#eaa041`, `#f2c960`, `#149e60`, `#3dc789`, `#3c78d8`, `#8e63ce`, `#e07798`, `#ac2b16`, `#cf8933`, `#d5ae49`, `#0b804b`, `#2a9c68`, `#285bac`, `#653e9b`, `#b65775`, `#822111`, `#a46a21`, `#aa8831`, `#076239`, `#1a764d`, `#1c4587`, `#41236d`, `#83334c`, `#464646`, `#e7e7e7`, `#0d3472`, `#b6cff5`, `#0d3b44`, `#98d7e4`, `#3d188e`, `#e3d7ff`, `#711a36`, `#fbd3e0`, `#8a1c0a`, `#f2b2a8`, `#7a2e0b`, `#ffc8af`, `#7a4706`, `#ffdeb5`, `#594c05`, `#fbe983`, `#684e07`, `#fdedc1`, `#0b4f30`, `#b3efd3`, `#04502e`, `#a2dcc1`, `#c2c2c2`, `#4986e7`, `#2da2bb`, `#b99aff`, `#994a64`, `#f691b2`, `#ff7537`, `#ffad46`, `#662e37`, `#ebdbde`, `#cca6ac`, `#094228`, `#42d692`, `#16a765`",
                   "type": "string"
                 }
               },
@@ -956,15 +979,11 @@
           "description": "Response message for ListLabels RPC.",
           "properties": {
             "labels": {
-              "description": "List of user labels in the user's account.",
+              "description": "List of all labels in the user's account.",
               "items": {
                 "$ref": "#/$defs/Label"
               },
               "type": "array"
-            },
-            "nextPageToken": {
-              "description": "Token to retrieve the next page of results in the list.",
-              "type": "string"
             }
           },
           "type": "object"
@@ -974,17 +993,17 @@
           "idempotentHint": true,
           "openWorldHint": false,
           "readOnlyHint": true,
-          "title": "Lists user labels."
+          "title": "List labels"
         }
       },
       {
         "name": "label_message",
-        "description": "Adds one or more labels to a specific message in the authenticated user's Gmail account.\n\nTo find the message ID, use tools like `search_threads` or `get_thread`. If unsure of a user label's ID, use the `list_labels` tool first to discover available labels and their IDs. To add a trash label or a spam label on to a message, please use the `apply_sensitive_message_label` tool instead.\n",
+        "description": "Adds one or more labels to a specific message in the authenticated user's Gmail account.\n\nTo find the message ID, use tools like `search_threads` or `get_thread`. If unsure of a user label's ID, use the `list_labels` tool first to discover available labels and their IDs.\nTo add a Trash label or a Spam label to a message, or move a specific message to Trash, please use the `apply_sensitive_message_label` tool instead.\n",
         "inputSchema": {
           "description": "Request message for LabelMessage RPC.",
           "properties": {
             "labelIds": {
-              "description": "Required. The IDs of the labels to add. Can be a system label ID (e.g., 'INBOX', 'TRASH', 'SPAM', 'STARRED', 'UNREAD', 'IMPORTANT') or a user-defined label ID. The tool accepts `label_ids` and not label names. Use the list_labels tool to get the corresponding label id to a display name for user-defined labels.",
+              "description": "Required. The IDs of the labels to add. Can be a system label ID (e.g., `INBOX`, `STARRED`, `UNREAD`, `IMPORTANT`) or a user-defined label ID. The tool accepts `label_ids` and not label names. Use the `list_labels` tool to get the corresponding label id to a display name for user-defined labels.",
               "items": {
                 "type": "string"
               },
@@ -1011,7 +1030,7 @@
           "idempotentHint": true,
           "openWorldHint": false,
           "readOnlyHint": false,
-          "title": "Adds labels to a message."
+          "title": "Add labels to message"
         }
       },
       {
@@ -1021,7 +1040,7 @@
           "description": "Request message for UnlabelMessage RPC.",
           "properties": {
             "labelIds": {
-              "description": "Required. The IDs of the labels to remove. Can be a system label ID (e.g., 'INBOX', 'TRASH', 'SPAM', 'STARRED', 'UNREAD', 'IMPORTANT') or a user-defined label ID. The tool accepts `label_ids` and not label names. Use the list_labels tool to get the corresponding label id to a display name for user-defined labels.",
+              "description": "Required. The IDs of the labels to remove. Can be a system label ID (e.g., `INBOX`, `TRASH`, `SPAM`, `STARRED`, `UNREAD`, `IMPORTANT`) or a user-defined label ID. The tool accepts `label_ids` and not label names. Use the `list_labels` tool to get the corresponding label id to a display name for user-defined labels.",
               "items": {
                 "type": "string"
               },
@@ -1048,12 +1067,12 @@
           "idempotentHint": true,
           "openWorldHint": false,
           "readOnlyHint": false,
-          "title": "Removes labels from a message."
+          "title": "Remove labels from message"
         }
       },
       {
         "name": "apply_sensitive_message_label",
-        "description": "Adds a sensitive label (Trash or Spam) to a specific message in the authenticated user's Gmail account.\n\nUse this tool to trash or mark a message as spam. To find the message ID, use tools like `search_threads` or `get_thread`.\n",
+        "description": "Adds a sensitive label (Trash or Spam) to a specific message in the authenticated user's Gmail account.\n\nUse this tool to trash a message, mark a message as spam, or move the specified message to Trash.\n\nTo find the message ID, use tools like `search_threads` or `get_thread`. To find the draft message ID, use tools like `list_drafts`.\n",
         "inputSchema": {
           "description": "Request message for ApplySensitiveMessageLabel RPC.",
           "properties": {
@@ -1092,7 +1111,7 @@
           "idempotentHint": true,
           "openWorldHint": false,
           "readOnlyHint": false,
-          "title": "Adds a sensitive label (Trash or Spam) to a message."
+          "title": "Apply sensitive label (Trash or Spam) to message"
         }
       },
       {
@@ -1104,11 +1123,11 @@
               "description": "The color of the label.",
               "properties": {
                 "backgroundColor": {
-                  "description": "The background color of the label, represented as a hex string (e.g., \"#ffffff\"). Only the following predefined set of color values are allowed: # 000000, #434343, #666666, #999999, #cccccc, #efefef, #f3f3f3, #ffffff, # fb4c2f, #ffad47, #fad165, #16a766, #43d692, #4a86e8, #a479e2, #f691b3, # f6c5be, #ffe6c7, #fef1d1, #b9e4d0, #c6f3de, #c9daf8, #e4d7f5, #fcdee8, # efa093, #ffd6a2, #fce8b3, #89d3b2, #a0eac9, #a4c2f4, #d0bcf1, #fbc8d9, # e66550, #ffbc6b, #fcda83, #44b984, #68dfa9, #6d9eeb, #b694e8, #f7a7c0, # cc3a21, #eaa041, #f2c960, #149e60, #3dc789, #3c78d8, #8e63ce, #e07798, # ac2b16, #cf8933, #d5ae49, #0b804b, #2a9c68, #285bac, #653e9b, #b65775, # 822111, #a46a21, #aa8831, #076239, #1a764d, #1c4587, #41236d, #83334c, # 464646, #e7e7e7, #0d3472, #b6cff5, #0d3b44, #98d7e4, #3d188e, #e3d7ff, # 711a36, #fbd3e0, #8a1c0a, #f2b2a8, #7a2e0b, #ffc8af, #7a4706, #ffdeb5, # 594c05, #fbe983, #684e07, #fdedc1, #0b4f30, #b3efd3, #04502e, #a2dcc1, # c2c2c2, #4986e7, #2da2bb, #b99aff, #994a64, #f691b2, #ff7537, #ffad46, # 662e37, #ebdbde, #cca6ac, #094228, #42d692, #16a765",
+                  "description": "The background color of the label, represented as a hex string (e.g., \"#ffffff\"). Only the following predefined set of color values are allowed: `#000000`, `#434343`, `#666666`, `#999999`, `#cccccc`, `#efefef`, `#f3f3f3`, `#ffffff`, `#fb4c2f`, `#ffad47`, `#fad165`, `#16a766`, `#43d692`, `#4a86e8`, `#a479e2`, `#f691b3`, `#f6c5be`, `#ffe6c7`, `#fef1d1`, `#b9e4d0`, `#c6f3de`, `#c9daf8`, `#e4d7f5`, `#fcdee8`, `#efa093`, `#ffd6a2`, `#fce8b3`, `#89d3b2`, `#a0eac9`, `#a4c2f4`, `#d0bcf1`, `#fbc8d9`, `#e66550`, `#ffbc6b`, `#fcda83`, `#44b984`, `#68dfa9`, `#6d9eeb`, `#b694e8`, `#f7a7c0`, `#cc3a21`, `#eaa041`, `#f2c960`, `#149e60`, `#3dc789`, `#3c78d8`, `#8e63ce`, `#e07798`, `#ac2b16`, `#cf8933`, `#d5ae49`, `#0b804b`, `#2a9c68`, `#285bac`, `#653e9b`, `#b65775`, `#822111`, `#a46a21`, `#aa8831`, `#076239`, `#1a764d`, `#1c4587`, `#41236d`, `#83334c`, `#464646`, `#e7e7e7`, `#0d3472`, `#b6cff5`, `#0d3b44`, `#98d7e4`, `#3d188e`, `#e3d7ff`, `#711a36`, `#fbd3e0`, `#8a1c0a`, `#f2b2a8`, `#7a2e0b`, `#ffc8af`, `#7a4706`, `#ffdeb5`, `#594c05`, `#fbe983`, `#684e07`, `#fdedc1`, `#0b4f30`, `#b3efd3`, `#04502e`, `#a2dcc1`, `#c2c2c2`, `#4986e7`, `#2da2bb`, `#b99aff`, `#994a64`, `#f691b2`, `#ff7537`, `#ffad46`, `#662e37`, `#ebdbde`, `#cca6ac`, `#094228`, `#42d692`, `#16a765`",
                   "type": "string"
                 },
                 "textColor": {
-                  "description": "The text color of the label, represented as a hex string (e.g., \"#000000\"). Only the following predefined set of color values are allowed: # 000000, #434343, #666666, #999999, #cccccc, #efefef, #f3f3f3, #ffffff, # fb4c2f, #ffad47, #fad165, #16a766, #43d692, #4a86e8, #a479e2, #f691b3, # f6c5be, #ffe6c7, #fef1d1, #b9e4d0, #c6f3de, #c9daf8, #e4d7f5, #fcdee8, # efa093, #ffd6a2, #fce8b3, #89d3b2, #a0eac9, #a4c2f4, #d0bcf1, #fbc8d9, # e66550, #ffbc6b, #fcda83, #44b984, #68dfa9, #6d9eeb, #b694e8, #f7a7c0, # cc3a21, #eaa041, #f2c960, #149e60, #3dc789, #3c78d8, #8e63ce, #e07798, # ac2b16, #cf8933, #d5ae49, #0b804b, #2a9c68, #285bac, #653e9b, #b65775, # 822111, #a46a21, #aa8831, #076239, #1a764d, #1c4587, #41236d, #83334c, # 464646, #e7e7e7, #0d3472, #b6cff5, #0d3b44, #98d7e4, #3d188e, #e3d7ff, # 711a36, #fbd3e0, #8a1c0a, #f2b2a8, #7a2e0b, #ffc8af, #7a4706, #ffdeb5, # 594c05, #fbe983, #684e07, #fdedc1, #0b4f30, #b3efd3, #04502e, #a2dcc1, # c2c2c2, #4986e7, #2da2bb, #b99aff, #994a64, #f691b2, #ff7537, #ffad46, # 662e37, #ebdbde, #cca6ac, #094228, #42d692, #16a765",
+                  "description": "The text color of the label, represented as a hex string (e.g., \"#000000\"). Only the following predefined set of color values are allowed: `#000000`, `#434343`, `#666666`, `#999999`, `#cccccc`, `#efefef`, `#f3f3f3`, `#ffffff`, `#fb4c2f`, `#ffad47`, `#fad165`, `#16a766`, `#43d692`, `#4a86e8`, `#a479e2`, `#f691b3`, `#f6c5be`, `#ffe6c7`, `#fef1d1`, `#b9e4d0`, `#c6f3de`, `#c9daf8`, `#e4d7f5`, `#fcdee8`, `#efa093`, `#ffd6a2`, `#fce8b3`, `#89d3b2`, `#a0eac9`, `#a4c2f4`, `#d0bcf1`, `#fbc8d9`, `#e66550`, `#ffbc6b`, `#fcda83`, `#44b984`, `#68dfa9`, `#6d9eeb`, `#b694e8`, `#f7a7c0`, `#cc3a21`, `#eaa041`, `#f2c960`, `#149e60`, `#3dc789`, `#3c78d8`, `#8e63ce`, `#e07798`, `#ac2b16`, `#cf8933`, `#d5ae49`, `#0b804b`, `#2a9c68`, `#285bac`, `#653e9b`, `#b65775`, `#822111`, `#a46a21`, `#aa8831`, `#076239`, `#1a764d`, `#1c4587`, `#41236d`, `#83334c`, `#464646`, `#e7e7e7`, `#0d3472`, `#b6cff5`, `#0d3b44`, `#98d7e4`, `#3d188e`, `#e3d7ff`, `#711a36`, `#fbd3e0`, `#8a1c0a`, `#f2b2a8`, `#7a2e0b`, `#ffc8af`, `#7a4706`, `#ffdeb5`, `#594c05`, `#fbe983`, `#684e07`, `#fdedc1`, `#0b4f30`, `#b3efd3`, `#04502e`, `#a2dcc1`, `#c2c2c2`, `#4986e7`, `#2da2bb`, `#b99aff`, `#994a64`, `#f691b2`, `#ff7537`, `#ffad46`, `#662e37`, `#ebdbde`, `#cca6ac`, `#094228`, `#42d692`, `#16a765`",
                   "type": "string"
                 }
               },
@@ -1141,11 +1160,11 @@
               "description": "The color of the label.",
               "properties": {
                 "backgroundColor": {
-                  "description": "The background color of the label, represented as a hex string (e.g., \"#ffffff\"). Only the following predefined set of color values are allowed: # 000000, #434343, #666666, #999999, #cccccc, #efefef, #f3f3f3, #ffffff, # fb4c2f, #ffad47, #fad165, #16a766, #43d692, #4a86e8, #a479e2, #f691b3, # f6c5be, #ffe6c7, #fef1d1, #b9e4d0, #c6f3de, #c9daf8, #e4d7f5, #fcdee8, # efa093, #ffd6a2, #fce8b3, #89d3b2, #a0eac9, #a4c2f4, #d0bcf1, #fbc8d9, # e66550, #ffbc6b, #fcda83, #44b984, #68dfa9, #6d9eeb, #b694e8, #f7a7c0, # cc3a21, #eaa041, #f2c960, #149e60, #3dc789, #3c78d8, #8e63ce, #e07798, # ac2b16, #cf8933, #d5ae49, #0b804b, #2a9c68, #285bac, #653e9b, #b65775, # 822111, #a46a21, #aa8831, #076239, #1a764d, #1c4587, #41236d, #83334c, # 464646, #e7e7e7, #0d3472, #b6cff5, #0d3b44, #98d7e4, #3d188e, #e3d7ff, # 711a36, #fbd3e0, #8a1c0a, #f2b2a8, #7a2e0b, #ffc8af, #7a4706, #ffdeb5, # 594c05, #fbe983, #684e07, #fdedc1, #0b4f30, #b3efd3, #04502e, #a2dcc1, # c2c2c2, #4986e7, #2da2bb, #b99aff, #994a64, #f691b2, #ff7537, #ffad46, # 662e37, #ebdbde, #cca6ac, #094228, #42d692, #16a765",
+                  "description": "The background color of the label, represented as a hex string (e.g., \"#ffffff\"). Only the following predefined set of color values are allowed: `#000000`, `#434343`, `#666666`, `#999999`, `#cccccc`, `#efefef`, `#f3f3f3`, `#ffffff`, `#fb4c2f`, `#ffad47`, `#fad165`, `#16a766`, `#43d692`, `#4a86e8`, `#a479e2`, `#f691b3`, `#f6c5be`, `#ffe6c7`, `#fef1d1`, `#b9e4d0`, `#c6f3de`, `#c9daf8`, `#e4d7f5`, `#fcdee8`, `#efa093`, `#ffd6a2`, `#fce8b3`, `#89d3b2`, `#a0eac9`, `#a4c2f4`, `#d0bcf1`, `#fbc8d9`, `#e66550`, `#ffbc6b`, `#fcda83`, `#44b984`, `#68dfa9`, `#6d9eeb`, `#b694e8`, `#f7a7c0`, `#cc3a21`, `#eaa041`, `#f2c960`, `#149e60`, `#3dc789`, `#3c78d8`, `#8e63ce`, `#e07798`, `#ac2b16`, `#cf8933`, `#d5ae49`, `#0b804b`, `#2a9c68`, `#285bac`, `#653e9b`, `#b65775`, `#822111`, `#a46a21`, `#aa8831`, `#076239`, `#1a764d`, `#1c4587`, `#41236d`, `#83334c`, `#464646`, `#e7e7e7`, `#0d3472`, `#b6cff5`, `#0d3b44`, `#98d7e4`, `#3d188e`, `#e3d7ff`, `#711a36`, `#fbd3e0`, `#8a1c0a`, `#f2b2a8`, `#7a2e0b`, `#ffc8af`, `#7a4706`, `#ffdeb5`, `#594c05`, `#fbe983`, `#684e07`, `#fdedc1`, `#0b4f30`, `#b3efd3`, `#04502e`, `#a2dcc1`, `#c2c2c2`, `#4986e7`, `#2da2bb`, `#b99aff`, `#994a64`, `#f691b2`, `#ff7537`, `#ffad46`, `#662e37`, `#ebdbde`, `#cca6ac`, `#094228`, `#42d692`, `#16a765`",
                   "type": "string"
                 },
                 "textColor": {
-                  "description": "The text color of the label, represented as a hex string (e.g., \"#000000\"). Only the following predefined set of color values are allowed: # 000000, #434343, #666666, #999999, #cccccc, #efefef, #f3f3f3, #ffffff, # fb4c2f, #ffad47, #fad165, #16a766, #43d692, #4a86e8, #a479e2, #f691b3, # f6c5be, #ffe6c7, #fef1d1, #b9e4d0, #c6f3de, #c9daf8, #e4d7f5, #fcdee8, # efa093, #ffd6a2, #fce8b3, #89d3b2, #a0eac9, #a4c2f4, #d0bcf1, #fbc8d9, # e66550, #ffbc6b, #fcda83, #44b984, #68dfa9, #6d9eeb, #b694e8, #f7a7c0, # cc3a21, #eaa041, #f2c960, #149e60, #3dc789, #3c78d8, #8e63ce, #e07798, # ac2b16, #cf8933, #d5ae49, #0b804b, #2a9c68, #285bac, #653e9b, #b65775, # 822111, #a46a21, #aa8831, #076239, #1a764d, #1c4587, #41236d, #83334c, # 464646, #e7e7e7, #0d3472, #b6cff5, #0d3b44, #98d7e4, #3d188e, #e3d7ff, # 711a36, #fbd3e0, #8a1c0a, #f2b2a8, #7a2e0b, #ffc8af, #7a4706, #ffdeb5, # 594c05, #fbe983, #684e07, #fdedc1, #0b4f30, #b3efd3, #04502e, #a2dcc1, # c2c2c2, #4986e7, #2da2bb, #b99aff, #994a64, #f691b2, #ff7537, #ffad46, # 662e37, #ebdbde, #cca6ac, #094228, #42d692, #16a765",
+                  "description": "The text color of the label, represented as a hex string (e.g., \"#000000\"). Only the following predefined set of color values are allowed: `#000000`, `#434343`, `#666666`, `#999999`, `#cccccc`, `#efefef`, `#f3f3f3`, `#ffffff`, `#fb4c2f`, `#ffad47`, `#fad165`, `#16a766`, `#43d692`, `#4a86e8`, `#a479e2`, `#f691b3`, `#f6c5be`, `#ffe6c7`, `#fef1d1`, `#b9e4d0`, `#c6f3de`, `#c9daf8`, `#e4d7f5`, `#fcdee8`, `#efa093`, `#ffd6a2`, `#fce8b3`, `#89d3b2`, `#a0eac9`, `#a4c2f4`, `#d0bcf1`, `#fbc8d9`, `#e66550`, `#ffbc6b`, `#fcda83`, `#44b984`, `#68dfa9`, `#6d9eeb`, `#b694e8`, `#f7a7c0`, `#cc3a21`, `#eaa041`, `#f2c960`, `#149e60`, `#3dc789`, `#3c78d8`, `#8e63ce`, `#e07798`, `#ac2b16`, `#cf8933`, `#d5ae49`, `#0b804b`, `#2a9c68`, `#285bac`, `#653e9b`, `#b65775`, `#822111`, `#a46a21`, `#aa8831`, `#076239`, `#1a764d`, `#1c4587`, `#41236d`, `#83334c`, `#464646`, `#e7e7e7`, `#0d3472`, `#b6cff5`, `#0d3b44`, `#98d7e4`, `#3d188e`, `#e3d7ff`, `#711a36`, `#fbd3e0`, `#8a1c0a`, `#f2b2a8`, `#7a2e0b`, `#ffc8af`, `#7a4706`, `#ffdeb5`, `#594c05`, `#fbe983`, `#684e07`, `#fdedc1`, `#0b4f30`, `#b3efd3`, `#04502e`, `#a2dcc1`, `#c2c2c2`, `#4986e7`, `#2da2bb`, `#b99aff`, `#994a64`, `#f691b2`, `#ff7537`, `#ffad46`, `#662e37`, `#ebdbde`, `#cca6ac`, `#094228`, `#42d692`, `#16a765`",
                   "type": "string"
                 }
               },
@@ -1161,6 +1180,16 @@
             "labelId": {
               "description": "The unique identifier of the label.",
               "type": "string"
+            },
+            "messagesTotal": {
+              "description": "The total number of messages under the label.",
+              "format": "int32",
+              "type": "integer"
+            },
+            "messagesUnread": {
+              "description": "The number of unread messages under the label.",
+              "format": "int32",
+              "type": "integer"
             },
             "name": {
               "description": "The human-readable display name of the label.",
@@ -1184,7 +1213,7 @@
           "idempotentHint": false,
           "openWorldHint": false,
           "readOnlyHint": false,
-          "title": "Creates a new label."
+          "title": "Create label"
         }
       }
     ]

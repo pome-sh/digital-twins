@@ -1,6 +1,56 @@
 # @pome-sh/twin-gmail — CHANGELOG
 
 
+## 0.4.0 — 2026-08-10
+
+The MCP listing this twin serves is Google's current one, and the handlers
+answer what it claims (F-1400).
+
+`fixtures/mcp-tools-list.raw.json` was an unauthenticated read of
+`gmailmcp.googleapis.com/mcp/v1` dated 2026-07-20, and nothing refreshed it.
+The upstream golden beside it in this repo had moved on 2026-08-06, nothing in
+CI related the two files, and the fixture's own sha stayed green throughout —
+a stale capture is internally consistent. pome-cloud's `mcp_diff` reported 34
+findings across 11 tools; every one was Google's listing moving, and the 2
+tools it called matched were the 2 Google had left byte-identical.
+
+The fixture is now the golden, adopted rather than edited.
+`scripts/adopt-upstream-mcp-fixture.ts` copies the capture's bytes through
+untouched — no suppression list, because this twin withholds nothing — so
+`raw.json` is `fixtures/mcp-tools-list/gmail.raw.json` byte for byte and the
+two `rawFileSha256` values are asserted equal. The capture date is the
+capture's own, not a field kept by hand.
+
+**Adopting the text alone would have been the defect.** Three of the newer
+listing's claims are behavioural, and the handlers moved with them:
+
+- `Message.bccRecipients` is served wherever `toRecipients`/`ccRecipients`
+  are — `get_message`, `get_thread`, and the threads `search_threads` nests.
+- `Label.messagesTotal` / `messagesUnread` are served by `list_labels` and
+  `create_label`. The domain had counted both all along and the REST
+  serializer already published all four; the MCP projection dropped two.
+- `list_labels` answers **all** labels, system included, the way the adopted
+  description says. It called `listUserLabels`, which is what the July
+  listing's "all user-defined labels" described.
+
+`list_labels` also takes no arguments now: Google removed `pageSize` and
+`pageToken` from its input schema and `nextPageToken` from its output, so the
+twin answers every label in one page. `LIMITS.md`'s MCP page-size row no
+longer names it. An examinee that sends the retired arguments is not refused —
+no Gmail input schema declares `additionalProperties: false`.
+
+`npm run gate:mcp-fixture -w @pome-sh/twin-gmail` is the gate that was
+missing: refreshing the golden without re-adopting is now a red.
+
+One advertised field is still unserved and is now written down rather than
+merely absent: `search_threads.resultCountEstimate`. The July capture declared
+it too, so it is a standing gap that no comparison between the two captures
+reports, and it is left out of this change on purpose — the adoption's
+behavioural surface is the three claims that moved and nothing else.
+`fixtures/README.md` names it. Everything else either schema declares is
+served whenever the record carries it.
+
+
 ## 0.3.6 — 2026-08-08
 
 `gmail.mailbox-label-count` now tells its two ways of not finding a mailbox

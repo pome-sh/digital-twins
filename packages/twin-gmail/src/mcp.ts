@@ -18,7 +18,7 @@ import rawListing from "../fixtures/mcp-tools-list.raw.json" with { type: "json"
 // domain barrel reaches `db.ts` -> the sdk root -> `node:sqlite`. tsc and bun
 // both elide it today because nothing uses it as a value — spelling that out
 // keeps it true if someone later does.
-import type { GmailDomain } from "./domain/index.js";
+import type { GmailDomain, LabelResource } from "./domain/index.js";
 import { invalidArgument } from "./errors.js";
 import { identityFromSession } from "./identity.js";
 import {
@@ -39,7 +39,6 @@ import {
   type GetMessageInput,
   type GetThreadInput,
   type ListDraftsInput,
-  type ListLabelsInput,
   type MessageLabelsInput,
   type SearchThreadsInput,
   type SensitiveMessageLabelInput,
@@ -201,23 +200,15 @@ const implementations: Record<ToolName, ToolImplementation> = {
   list_labels: {
     schema: listLabelsInputSchema,
     mutation: false,
-    handler: (domain, args, ctx) => {
-      const input = args as ListLabelsInput;
-      const email = identityFromSession(ctx.session).email;
-      const page = paginate(
-        domain,
-        email,
-        "labels.list",
-        domain.listUserLabels(email),
-        input.pageSize,
-        input.pageToken,
-        {}
-      );
-      return {
-        labels: page.items.map(labelResult),
-        ...(page.nextPageToken ? { nextPageToken: page.nextPageToken } : {}),
-      };
-    },
+    // "Lists all labels available in the authenticated user's Gmail account."
+    // ALL of them, system included, and in one answer — the adopted listing
+    // takes no page arguments and offers no nextPageToken back. The July
+    // listing this twin used to serve said "all user-defined labels", which is
+    // what `listUserLabels` returns and what this handler used to call; the
+    // widening is Google's and F-1400 is the twin following it.
+    handler: (domain, _args, ctx) => ({
+      labels: domain.labels(identityFromSession(ctx.session).email).map(labelResult),
+    }),
   },
   label_message: labelMessageImplementation(true),
   unlabel_message: labelMessageImplementation(false),
@@ -257,9 +248,7 @@ const implementations: Record<ToolName, ToolImplementation> = {
           }
         }
         const created = domain.createLabel(email, input.displayName, input.color);
-        const label = domain.listUserLabels(email).find((item) => item.id === created.id);
-        if (!label) throw new Error("Created label was not found");
-        return labelResult(label);
+        return labelResult(domain.label(email, created.id));
       }),
   },
 };
@@ -376,6 +365,10 @@ function messageResult(
     sender: message.from,
     toRecipients: message.to,
     ccRecipients: message.cc,
+    // F-1400: the adopted listing declares it on Message, so it is served
+    // wherever the other two recipient lists are — `get_message`, `get_thread`
+    // and the threads `search_threads` nests.
+    bccRecipients: message.bcc,
   };
   if (format === "minimal") return minimal;
   return {
@@ -395,17 +388,26 @@ function messageResult(
   };
 }
 
-function labelResult(label: {
-  id: string;
-  name: string;
-  color?: { textColor?: string; backgroundColor?: string };
-  threadsTotal: number;
-  threadsUnread: number;
-}) {
+/**
+ * The listing's `Label`, and only its fields — `LabelResource` also carries the
+ * twin's own `type`, which Google's schema does not declare and the output
+ * validator would pass through unnoticed.
+ */
+function labelResult(label: LabelResource) {
+  const color = {
+    ...(label.textColor ? { textColor: label.textColor } : {}),
+    ...(label.backgroundColor ? { backgroundColor: label.backgroundColor } : {}),
+  };
   return {
     labelId: label.id,
     name: label.name,
-    ...(label.color ? { color: label.color } : {}),
+    ...(Object.keys(color).length > 0 ? { color } : {}),
+    // F-1400: the August listing declares the message counters beside the
+    // thread ones. The domain has counted both all along — the REST
+    // serializer already published all four — so this was a projection that
+    // dropped two fields, not a measurement the twin could not make.
+    messagesTotal: label.messagesTotal,
+    messagesUnread: label.messagesUnread,
     threadsTotal: label.threadsTotal,
     threadsUnread: label.threadsUnread,
   };

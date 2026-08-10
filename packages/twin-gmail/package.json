@@ -1,6 +1,6 @@
 {
   "name": "@pome-sh/twin-gmail",
-  "version": "0.3.6",
+  "version": "0.4.0",
   "description": "Deterministic Gmail-shaped twin for agent testing — SQLite-backed domain core.",
   "private": true,
   "type": "module",
@@ -42,6 +42,8 @@
     "prepack": "npm run build",
     "test": "node --test test/gate0-fixtures.test.mjs && vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "fixture:mcp": "tsx scripts/adopt-upstream-mcp-fixture.ts",
+    "gate:mcp-fixture": "tsx scripts/adopt-upstream-mcp-fixture.ts --check",
     "fidelity:parity": "tsx scripts/fidelity-parity.ts",
     "preview:drift": "tsx scripts/preview-drift.ts"
   },

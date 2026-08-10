@@ -4,6 +4,24 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.3
+
+### Patch Changes
+
+- The bundled Gmail twin serves Google's current `tools/list` and behaves like
+  it (F-1400, `@pome-sh/twin-gmail` 0.4.0). Its fixture was an unauthenticated
+  read dated 2026-07-20 that nothing refreshed, so the twin advertised a
+  seventeen-day-old listing and pome-cloud's `mcp_diff` reported 34 findings
+  across 11 tools — all of them the vendor moving. The fixture is now the
+  upstream golden byte for byte, adopted by a producer that subtracts nothing,
+  and the three behavioural claims in the newer listing were implemented rather
+  than merely served: `Message.bccRecipients` on `get_message` / `get_thread` /
+  `search_threads`, `Label.messagesTotal` / `messagesUnread` on `list_labels` /
+  `create_label`, and a `list_labels` that returns **all** labels rather than
+  only user-defined ones. `list_labels` no longer takes `pageSize` / `pageToken`
+  (Google removed them) and no longer returns `nextPageToken`; sending them is
+  ignored, not refused.
+
 ## 0.23.2
 
 ### Patch Changes
