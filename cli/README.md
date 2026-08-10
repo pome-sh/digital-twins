@@ -99,6 +99,16 @@ Three rules CI must honor:
   excluded from the verdict fraction (`3 of 4 passed · 1 incomplete`) so neither
   is counted as a pass nor charged to the agent as a loss — but a group holding
   one cannot exit `0`.
+- **`pome fix-prompt` uses the same codes, and its `1` is only ever
+  INCOMPLETE.** Building a prompt for a failed run set exits `0` (the prompt is
+  on stdout, and stdout being non-empty is the signal that there was something
+  to fix); an all-green root exits `0` with nothing on stdout; a bad argument or
+  a root with no readable run sets exits `5`. `1` is reserved for the one case
+  where the newest non-passing set was never fully graded: no prompt is built,
+  because a run whose checks never ran is not evidence of an agent defect. This
+  matches `pome run`, where `1` also covers INCOMPLETE — the two commands do not
+  disagree about what an ungraded run exits, and `verdict.json`'s `state` stays
+  the field to read when a script needs the reason rather than the code.
 
 ## Development
 

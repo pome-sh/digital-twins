@@ -27,7 +27,7 @@ function result(text: string, passed: boolean, reason: string): CriterionResult 
 
 function trial(
   n: number,
-  opts: { passed: boolean; results: CriterionResult[] },
+  opts: { passed: boolean; results: CriterionResult[]; incomplete?: boolean },
 ): TrialFixInput {
   const skippedCount = opts.results.filter((r) => r.skipped).length;
   const evaluatedCount = opts.results.length - skippedCount;
@@ -43,7 +43,7 @@ function trial(
     judge_model: "test-judge",
     score: opts.passed ? 100 : 50,
     pass_threshold: 100,
-    state: opts.passed ? "pass" : "fail",
+    state: opts.incomplete ? "incomplete" : opts.passed ? "pass" : "fail",
     passed: opts.passed,
     evaluated: evaluatedCount,
     not_evaluated: skippedCount,
@@ -270,6 +270,105 @@ describe("run-set fix prompt (FDRS-644)", () => {
     expect(prompt).not.toContain(
       `passed in every completed trial: "${CRITERIA.comment}"`,
     );
+  });
+
+  // F-1404 — a set reaches this builder holding an INCOMPLETE trial two ways:
+  // "fail wins over incomplete" routes a mixed set here, and a trial dir the
+  // user points at directly targets its set whatever the outcome. Either way
+  // the prompt is handed to a coding agent as grounds for a fix, so it may not
+  // state anything about the ungraded trial that the grading never checked.
+  describe("an INCOMPLETE trial in the set (F-1404)", () => {
+    const ungraded: CriterionResult = {
+      criterion: { type: "model", text: CRITERIA.comment },
+      passed: false,
+      skipped: true,
+      reason: "tool_not_recorded",
+    };
+
+    function mixedWithIncomplete(): TrialFixInput[] {
+      return [
+        trial(1, {
+          passed: false,
+          results: [result(CRITERIA.severity, false, "under-rated")],
+        }),
+        trial(2, {
+          passed: false,
+          incomplete: true,
+          results: [ungraded],
+        }),
+      ];
+    }
+
+    it("is never listed as a failing trial, nor counted as a non-pass", () => {
+      const prompt = buildGroupFixUserPrompt({
+        taskName: "scn",
+        groupId: "grp_test",
+        task,
+        trials: mixedWithIncomplete(),
+      });
+      // The denominator is the GRADED trials — trial 2 was never graded, so
+      // "0 of 2 completed trials passed" would charge it as a loss.
+      expect(prompt).toContain("0 of 1 completed trials passed");
+      expect(prompt).not.toContain("of 2 completed trials passed");
+      // The old output said `trial 2 · ses_2 — failed: (see verdict)`.
+      expect(prompt).not.toContain("## Other failing trials");
+      expect(prompt).not.toContain("trial 2 · ses_2 — failed");
+    });
+
+    it("gets its own named section saying no claim is made about it", () => {
+      const prompt = buildGroupFixUserPrompt({
+        taskName: "scn",
+        groupId: "grp_test",
+        task,
+        trials: mixedWithIncomplete(),
+      });
+      expect(prompt).toContain("· 1 INCOMPLETE");
+      expect(prompt).toContain("## Trials the grader never finished (INCOMPLETE)");
+      expect(prompt).toContain("neither\npasses nor failures");
+      expect(prompt).toContain("trial 2 · ses_2 — 1 criterion(s) never graded");
+      expect(prompt).toContain("runs/scn/ses_2/events.jsonl");
+    });
+
+    it("never anchors the representative trace on an ungraded trial", () => {
+      // The incomplete trial holds a graded FAILURE too, and comes first — the
+      // old `!passed` predicate made it eligible, and the tie on failed-count
+      // handed it the "most-failing trial" heading.
+      const trials = [
+        trial(1, {
+          passed: false,
+          incomplete: true,
+          results: [result(CRITERIA.severity, false, "under-rated"), ungraded],
+        }),
+        trial(2, {
+          passed: false,
+          results: [result(CRITERIA.severity, false, "under-rated too")],
+        }),
+      ];
+      expect(representativeFailingTrial(trials)?.label).toBe("trial 2 · ses_2");
+      const prompt = buildGroupFixUserPrompt({
+        taskName: "scn",
+        groupId: "grp_test",
+        task,
+        trials,
+      });
+      expect(prompt).toContain("## Trace of the most-failing trial (trial 2 · ses_2)");
+      // Per-criterion denominator is the trials that GRADED it (both here) —
+      // never a count that can exceed the number of hits.
+      expect(prompt).toContain(`${CRITERIA.severity} — failed in 2 of 2 trials that graded it`);
+    });
+
+    it("an all-incomplete set claims no fraction at all (no 0-of-0)", () => {
+      const prompt = buildGroupFixUserPrompt({
+        taskName: "scn",
+        groupId: null,
+        task,
+        trials: [trial(1, { passed: false, incomplete: true, results: [ungraded] })],
+      });
+      expect(prompt).toContain("no trial in this set was graded end to end");
+      expect(prompt).not.toContain("0 of 0");
+      expect(prompt).not.toContain("## Trace of the most-failing trial");
+      expect(prompt).toContain("## Trials the grader never finished (INCOMPLETE)");
+    });
   });
 
   it("flattens hostile judge reasons — no markdown-heading injection (adversarial fix)", () => {

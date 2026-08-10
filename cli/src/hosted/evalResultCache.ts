@@ -282,6 +282,19 @@ export async function scanVerdictArtifacts(
   return (await scanVerdictArtifactsDetailed(artifactsRoot)).trials;
 }
 
+// F-1404 — the three-way verdict a run SET can carry, named like
+// `ScoreStatus` (the per-trial word) because it is built from it: "fail" =
+// at least one trial genuinely failed (graded, unsatisfied) — the only
+// outcome that asserts an agent defect. "incomplete" = no trial failed, but
+// at least one trial's grading never finished — a grader/seed gap, not
+// evidence the agent did anything wrong; "fail" wins when a set has both,
+// since a real failure is signal worth naming over a sibling's gap.
+// "pass" = EVERY trial's state is exactly "pass", tested that way round on
+// purpose: "pass" is the one outcome claiming a verified result, so it is
+// never the fallthrough. An unrecognized state reads "incomplete", not green
+// (`isVerdictArtifact` already refuses such a file — second line of defense).
+export type RunSetOutcome = "fail" | "incomplete" | "pass";
+
 export interface RunSet {
   /** null = a single run that never had a group. */
   groupId: string | null;
@@ -291,35 +304,24 @@ export interface RunSet {
   /** Trials sorted by finalized_at ascending. */
   trials: TrialVerdict[];
   latestFinalizedAt: string;
-  anyFailed: boolean;
+  /** F-1404 — derived from the on-disk `state` (see `RunSetOutcome`), never
+   *  from `passed` alone: `passed` is false for BOTH a genuine failure and a
+   *  trial the grader never finished, so it can't tell "agent defect" from
+   *  "never graded" apart. The ONE computation both the routing decision
+   *  (`latestFailedRunSet` / `latestIncompleteRunSet`) and the message shown
+   *  to the user read, so they cannot disagree. */
+  outcome: RunSetOutcome;
 }
 
 /** Group trials into run sets: trials sharing a group_id form one set; a
  *  null group_id is its own single-run set.
  *
- *  F-1392 note on `anyFailed` below: it reads `!t.verdict.passed`, which is
- *  `runTaskHosted.ts`'s `exitCode === 0` at write time — itself derived from
- *  `scoreStatus(scoreFromFinalizeResponse(finalized), passThreshold)`. Once
- *  that root predicate stopped treating a pre-satisfied `skipped` as an
- *  abstention, a trial whose only non-passing criterion is pre-satisfied gets
- *  `passed: true` on disk, so a group holding it no longer trips `anyFailed`
- *  and is no longer misrouted to `pome fix-prompt` as an agent defect. (A
- *  trial where EVERY criterion was pre-satisfied still writes `passed: false`
- *  — no denominator, no verified pass — and still routes there; what it now
- *  gets when it arrives is a prompt that names the exclusion instead of
- *  reporting it as a criterion nobody evaluated, `fix-prompt/prompt.ts`.)
- *  Nothing to change here — the fix lives upstream, and
- *  `evalResultCache.test.ts` pins the group-level behavior directly against
- *  the written artifact.
- *
- *  F-1195 note: `state` is now on the artifact, so `anyFailed` COULD read
- *  `state === "fail"` and stop routing a merely INCOMPLETE trial to
- *  `pome fix-prompt` as an agent defect. Deliberately not done here — it is
- *  not a one-liner: with no failed set, `main.ts` falls to its `!discovery.set`
- *  branch and prints "the latest run sets under runs all passed", which is
- *  false about an incomplete run and is the same defect pointed the other way.
- *  That needs a third message, so it is F-1404, not a drive-by in a ticket
- *  about what the artifact SAYS. */
+ *  F-1404 — `outcome` reads the on-disk `state` (F-1195), not `!passed`
+ *  (F-1392's finding: `!passed` is true for both a genuine failure and an
+ *  incomplete trial, so a set holding only incomplete trials used to trip
+ *  the old `anyFailed` and get handed to `pome fix-prompt` as an agent
+ *  defect). `evalResultCache.test.ts` pins all three outcomes against the
+ *  written artifact. */
 export function groupRunSets(trials: TrialVerdict[]): RunSet[] {
   const byKey = new Map<string, TrialVerdict[]>();
   for (const trial of trials) {
@@ -334,23 +336,38 @@ export function groupRunSets(trials: TrialVerdict[]): RunSet[] {
       a.verdict.finalized_at.localeCompare(b.verdict.finalized_at),
     );
     const last = bucket[bucket.length - 1]!;
+    const hasFailed = bucket.some((t) => t.verdict.state === "fail");
+    const allPassed = bucket.every((t) => t.verdict.state === "pass");
     sets.push({
       groupId: bucket[0]!.verdict.group_id,
       taskName: bucket[0]!.verdict.task_name,
       taskPath: bucket[0]!.verdict.task_path,
       trials: bucket,
       latestFinalizedAt: last.verdict.finalized_at,
-      anyFailed: bucket.some((t) => !t.verdict.passed),
+      outcome: hasFailed ? "fail" : allPassed ? "pass" : "incomplete",
     });
   }
   sets.sort((a, b) => a.latestFinalizedAt.localeCompare(b.latestFinalizedAt));
   return sets;
 }
 
-/** The newest run set with at least one failed (completed) trial. */
+/** The newest run set with at least one genuinely FAILED (graded, not
+ *  satisfied) trial — the only outcome `pome fix-prompt` may hand to a
+ *  coding agent as an agent defect. */
 export function latestFailedRunSet(sets: RunSet[]): RunSet | null {
   for (let i = sets.length - 1; i >= 0; i -= 1) {
-    if (sets[i]!.anyFailed) return sets[i]!;
+    if (sets[i]!.outcome === "fail") return sets[i]!;
+  }
+  return null;
+}
+
+/** F-1404 — the newest run set whose worst outcome is INCOMPLETE: no trial
+ *  failed, but at least one trial's grading never finished. Callers use this
+ *  to name the gap distinctly from both "fix this" (a fail set exists) and
+ *  "nothing to fix" (every set passed) — never silently folded into either. */
+export function latestIncompleteRunSet(sets: RunSet[]): RunSet | null {
+  for (let i = sets.length - 1; i >= 0; i -= 1) {
+    if (sets[i]!.outcome === "incomplete") return sets[i]!;
   }
   return null;
 }
@@ -358,9 +375,18 @@ export function latestFailedRunSet(sets: RunSet[]): RunSet | null {
 export interface RunSetDiscovery {
   kind: "trial-dir" | "root";
   /** The set to build a fix prompt from (per `kind` semantics: a trial dir
-   *  targets ITS set regardless of outcome; a root targets the latest
-   *  FAILED set). Null when nothing matches. */
+   *  targets ITS set regardless of outcome; a root targets the latest set
+   *  whose outcome is `"fail"`). Null when nothing matches — for `kind:
+   *  "root"` that means either every set passed, or the newest non-passing
+   *  set is `incompleteSet` below rather than a failure to hand to an
+   *  agent. */
   set: RunSet | null;
+  /** F-1404 — `kind: "root"` only, and only populated when `set` is null:
+   *  the newest run set whose outcome is `"incomplete"`. Kept distinct from
+   *  `set` so a caller can never conflate "route this to fix-prompt" with
+   *  "something was never graded" — the routing decision and the message it
+   *  prints must never disagree. */
+  incompleteSet: RunSet | null;
   /** Total finalized run sets seen — lets the caller distinguish "no runs
    *  at all" from "runs exist but none failed". */
   totalSets: number;
@@ -376,7 +402,10 @@ export interface RunSetDiscovery {
  * Resolve what `pome fix-prompt [target]` should read.
  * - `target` = a trial run dir (has verdict.json): that trial's whole set —
  *   the user pointed at it, outcome doesn't matter.
- * - `target` = an artifacts root: the latest failed set under it.
+ * - `target` = an artifacts root: the latest set with a genuine FAILURE
+ *   under it; if none, the newest INCOMPLETE set is surfaced separately
+ *   (`incompleteSet`) so the caller can name the gap instead of either
+ *   routing it to an agent or claiming everything passed.
  */
 export async function discoverRunSet(target: string): Promise<RunSetDiscovery> {
   const anchorResult = await readVerdictArtifactDetailed(target);
@@ -385,7 +414,13 @@ export async function discoverRunSet(target: string): Promise<RunSetDiscovery> {
     // is a prior version — name it rather than falling through to the "root"
     // branch below, which would scan `target` as if it were an artifacts
     // root (two levels too shallow) and report a plain "no runs".
-    return { kind: "trial-dir", set: null, totalSets: 0, staleVersionCount: 1 };
+    return {
+      kind: "trial-dir",
+      set: null,
+      incompleteSet: null,
+      totalSets: 0,
+      staleVersionCount: 1,
+    };
   }
   if (anchorResult.status === "ok") {
     const anchor = anchorResult.trial;
@@ -406,19 +441,28 @@ export async function discoverRunSet(target: string): Promise<RunSetDiscovery> {
     return {
       kind: "trial-dir",
       set: own,
+      incompleteSet: null,
       totalSets: Math.max(sets.length, 1),
       staleVersionCount: staleVersionDirs.length,
     };
   }
 
   if (!existsSync(target)) {
-    return { kind: "root", set: null, totalSets: 0, staleVersionCount: 0 };
+    return {
+      kind: "root",
+      set: null,
+      incompleteSet: null,
+      totalSets: 0,
+      staleVersionCount: 0,
+    };
   }
   const { trials, staleVersionDirs } = await scanVerdictArtifactsDetailed(target);
   const sets = groupRunSets(trials);
+  const failedSet = latestFailedRunSet(sets);
   return {
     kind: "root",
-    set: latestFailedRunSet(sets),
+    set: failedSet,
+    incompleteSet: failedSet ? null : latestIncompleteRunSet(sets),
     totalSets: sets.length,
     staleVersionCount: staleVersionDirs.length,
   };

@@ -4,6 +4,55 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.5
+
+### Patch Changes
+
+- `pome fix-prompt` no longer routes an INCOMPLETE trial to your coding agent
+  as an agent defect (F-1404). A run set's `outcome` (`groupRunSets` in
+  `evalResultCache.ts`) was computed from `!verdict.passed`, which is false
+  for a genuine failure and for a trial the grader never finished alike — so
+  a `runs/` whose only non-passing trials were incomplete got picked by
+  `latestFailedRunSet` and handed to `pome fix-prompt` as if the agent had a
+  defect, when nothing had established that: a criterion just never got
+  graded. `outcome` now reads the on-disk `state` (`"fail"` / `"incomplete"`
+  / `"pass"`, from F-1195's verdict.json field) instead, so it can tell the
+  two apart.
+
+  A root whose only non-passing run set is incomplete now gets a third,
+  distinct message instead of either the old misroute or a false "the latest
+  run sets under runs all passed": it names which set (a newer one may have
+  passed, so it is the most recent NON-PASSING set, not "the latest"), says
+  how many trials were left ungraded, and tells you to re-run the task.
+  Pointing `fix-prompt` straight at a trial directory is unchanged — it still
+  targets that trial's whole set regardless of outcome, since the user
+  pointed at it directly. `pome fix-prompt`'s exit codes are now written down
+  in the README beside `pome run`'s: `1` is only ever the incomplete case,
+  and it means the same thing there as it does for `pome run`.
+
+  That third message does not absolve the agent blindly, either. A trial's
+  `state` is `incomplete` for ANY ungraded criterion, so an incomplete set can
+  still hold criteria the judge did grade and did fail; saying "a grading gap,
+  not an agent defect" over those would understate exactly as badly as the old
+  misroute overstated. The message now counts the graded failures, says they
+  are real, and points at the trial-directory form when you want a prompt
+  built from the part that was graded.
+
+- The run-set fix prompt itself stops describing an ungraded trial as a
+  failing one (F-1404). A set reaches the prompt builder holding an
+  `INCOMPLETE` trial whenever a genuine failure sits beside one, or when you
+  point `fix-prompt` at a trial directory yourself — and the prompt handed to
+  your coding agent used to list that trial under "Other failing trials",
+  count it as a non-pass in a fraction labelled "completed trials", and let it
+  win the "most-failing trial" heading that anchors the one trace. All three
+  asserted an outcome the grading never reached. Every fraction is now over
+  graded trials only, per-criterion counts read "failed in N of M trials that
+  graded it" (the old denominator could exceed its own numerator once a set
+  held an incomplete trial), a set with nothing graded end to end says so
+  instead of printing "0 of 0 completed trials passed", and the ungraded
+  trials get their own closing section stating that no pass and no failure is
+  claimed for them.
+
 ## 0.23.4
 
 ### Patch Changes
