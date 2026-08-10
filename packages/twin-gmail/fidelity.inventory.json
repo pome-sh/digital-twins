@@ -1,8 +1,8 @@
 {
   "twin": "gmail",
   "package": "@pome-sh/twin-gmail",
-  "updated": "2026-07-22",
-  "notes": "Heat from Gmail task chains is cross-validated against the captured Gate-1 13-tool launch set (Gate 0 ten tools plus get_message / apply_sensitive_*). Launch MCP tools and in-scope REST rows are semantic over one deterministic domain; users.watch, users.stop, and resumable uploads remain named cold 501/unsupported gaps.",
+  "updated": "2026-08-10",
+  "notes": "Heat from Gmail task chains is cross-validated against the captured Gate-1 13-tool launch set (Gate 0 ten tools plus get_message / apply_sensitive_*). Launch MCP tools and in-scope REST rows are semantic over one deterministic domain; users.watch, users.stop, and resumable uploads remain named cold 501/unsupported gaps. F-1400: the 13 tool rows are bound to fixtures/mcp-tools-list.raw.json, which since 2026-08-10 IS fixtures/mcp-tools-list/gmail.raw.json byte for byte — Google's own listing, adopted with nothing subtracted, so the set can no longer drift from the vendor's in either direction. The adoption was a capability change and the handlers moved with it: Message.bccRecipients, Label.messagesTotal/messagesUnread, and a list_labels that returns ALL labels (system included) and takes no page arguments.",
   "evidenceCodes": {
     "TC:inbox-triage": "Search/read threads and messages for agent email triage",
     "TC:compose-draft": "Create/list/update drafts without sending",

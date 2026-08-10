@@ -38,7 +38,7 @@ revealing mailbox existence.
 | Path | Role |
 | --- | --- |
 | [`fixtures/rest-surface.json`](fixtures/rest-surface.json) | Frozen launch REST method/parameter/media matrix from Gmail v1 discovery |
-| [`fixtures/mcp-tools-list.*.json`](fixtures/) | Official Gmail MCP `tools/list` raw + canonical (13-tool Gate-1 launch set) |
+| [`fixtures/mcp-tools-list.*.json`](fixtures/) | Google's own MCP `tools/list`, raw + canonical (13 tools). Byte-identical to the upstream golden at [`fixtures/mcp-tools-list/gmail.*`](../../fixtures/mcp-tools-list/); adopted by `scripts/adopt-upstream-mcp-fixture.ts`, never hand-edited |
 | [`fidelity.inventory.json`](fidelity.inventory.json) | Heat × fidelity × evidence for every launch REST/MCP row |
 | [`FIDELITY.md`](FIDELITY.md) | Human-readable heat × fidelity tables (linted against inventory) |
 | [`REFERENCE-DIVERGENCES.md`](REFERENCE-DIVERGENCES.md) | Emulate rejected; never an oracle |
@@ -53,9 +53,24 @@ See [`fixtures/README.md`](fixtures/README.md) for capture provenance and SHA-25
 `label_message`, `unlabel_message`, `apply_sensitive_message_label`,
 `create_label`.
 
-Order and schemas are frozen from the live Developer Preview listing capture.
-Gate 1 promotes `get_message` and the two `apply_sensitive_*` tools that were
-previously named cold preview drift under the Gate 0 ten-tool freeze.
+Names, order, descriptions and schemas are Google's, adopted verbatim from the
+capture dated in [`fixtures/mcp-tools-list.meta.json`](fixtures/mcp-tools-list.meta.json)
+— nothing is added and nothing is withheld. Gate 1 promoted `get_message` and
+the two `apply_sensitive_*` tools that were previously named cold preview drift
+under the Gate 0 ten-tool freeze; all thirteen survive in the current capture.
+
+Refreshing that listing is deliberate, human-reviewed, and moves the twin's
+behaviour, not just its text:
+
+```bash
+node scripts/capture-mcp-tools-list.mjs --twin gmail   # from the repo root: re-read Google
+npm run fixture:mcp -w @pome-sh/twin-gmail             # adopt the capture
+npm test -w @pome-sh/twin-gmail                        # what the new listing now claims
+```
+
+`list_labels` takes no arguments and returns every label, system ones included.
+It paginated over user labels only until the 2026-08-10 capture, which is when
+Google's own listing stopped saying so ([F-1400](https://linear.app/pome-sh/issue/F-1400)).
 
 ## Named 501 gaps (not fake success)
 

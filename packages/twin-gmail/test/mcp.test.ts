@@ -222,7 +222,7 @@ describe("Gmail MCP frozen contract", () => {
         threadId: "thread_trash_target",
         labelOption: "TRASH",
       }),
-      await call(app, 9, "list_labels", { pageSize: 50 }),
+      await call(app, 9, "list_labels", {}),
       await call(app, 10, "label_message", {
         messageId: "msg_seed",
         labelIds: ["STARRED"],
@@ -582,6 +582,154 @@ describe("MCP page tokens", () => {
       )
     ).json()) as { result: { isError?: boolean } };
     expect(foreign.result.isError).toBe(true);
+  });
+});
+
+// F-1400 — the listing is Google's, so every claim in it is a claim about this
+// twin. These are the three the August capture added that the handlers did not
+// answer: adopting the bytes without them would advertise capabilities the twin
+// does not have, which is the failure F-1330 exists to prevent reached from the
+// other side. The two shape tests read the ADVERTISED property set out of the
+// fixture rather than listing fields by hand, so the next field Google adds is
+// a red here and not a silent absence.
+describe("the adopted listing's claims are behaviours", () => {
+  function fixtureTool(name: string) {
+    const tool = canonicalListing.result.tools.find((entry) => entry.name === name);
+    if (!tool) throw new Error(`${name} is not in the fixture`);
+    return tool as {
+      name: string;
+      inputSchema: { properties?: Record<string, unknown> };
+      outputSchema: Record<string, unknown>;
+    };
+  }
+
+  /** The property names an advertised schema declares, at a `$defs` path or the root. */
+  function advertisedFields(name: string, def?: string): string[] {
+    const schema = fixtureTool(name).outputSchema as {
+      properties?: Record<string, unknown>;
+      $defs?: Record<string, { properties?: Record<string, unknown> }>;
+    };
+    const target = def ? schema.$defs?.[def] : schema;
+    return Object.keys(target?.properties ?? {}).sort();
+  }
+
+  /** A message carrying every optional part, so no advertised field is absent for want of data. */
+  function fullyPopulatedSeed() {
+    const state = seed();
+    return {
+      ...state,
+      primaryMailbox: {
+        ...state.primaryMailbox,
+        messages: [
+          {
+            ...state.primaryMailbox.messages[0]!,
+            cc: ["carol@example.com"],
+            bcc: ["dan@example.com"],
+            html: "<p>Unread body</p>",
+            attachments: [
+              {
+                filename: "note.txt",
+                mimeType: "text/plain",
+                data: Buffer.from("attached").toString("base64"),
+              },
+            ],
+          },
+        ],
+        labels: [
+          { id: "Label_seed", name: "triage", color: { textColor: "#000000", backgroundColor: "#ffffff" } },
+        ],
+      },
+    };
+  }
+
+  it("answers every field the Message schema advertises, bccRecipients included", async () => {
+    const app = createGmailTwinApp({ seed: fullyPopulatedSeed() });
+
+    const message = await call(app, 1, "get_message", {
+      messageId: "msg_seed",
+      messageFormat: "FULL_CONTENT",
+    });
+    expect(message.result.isError).toBe(false);
+    expect(Object.keys(message.result.structuredContent ?? {}).sort()).toEqual(
+      advertisedFields("get_message")
+    );
+    expect(message.result.structuredContent).toMatchObject({
+      toRecipients: [email],
+      ccRecipients: ["carol@example.com"],
+      bccRecipients: ["dan@example.com"],
+    });
+
+    // The same shape reached through the two tools that nest it.
+    const thread = await call(app, 2, "get_thread", {
+      threadId: "thread_seed",
+      messageFormat: "FULL_CONTENT",
+    });
+    const nested = (thread.result.structuredContent?.messages as Array<Record<string, unknown>>)[0]!;
+    expect(Object.keys(nested).sort()).toEqual(advertisedFields("get_thread", "Message"));
+
+    const searched = await call(app, 3, "search_threads", { query: "", view: "THREAD_VIEW_MINIMAL" });
+    const searchedMessage = (
+      (searched.result.structuredContent?.threads as Array<{ messages: Array<Record<string, unknown>> }>)[0]!
+        .messages
+    )[0]!;
+    expect(searchedMessage).toHaveProperty("bccRecipients", ["dan@example.com"]);
+  });
+
+  it("lists ALL labels, the way the adopted description says, and counts messages as well as threads", async () => {
+    const app = createGmailTwinApp({ seed: fullyPopulatedSeed() });
+
+    const listed = await call(app, 1, "list_labels", {});
+    expect(listed.result.isError).toBe(false);
+    const labels = listed.result.structuredContent?.labels as Array<Record<string, unknown>>;
+
+    // "Lists all labels available in the authenticated user's Gmail account" —
+    // the July listing said "all user-defined labels" and the handler answered
+    // exactly those. The twin's own REST surface is the oracle for "all".
+    const rested = (await (await rest(app, "/labels")).json()) as {
+      labels: Array<{ id: string }>;
+    };
+    expect(labels.map((label) => label.labelId).sort()).toEqual(
+      rested.labels.map((label) => label.id).sort()
+    );
+    expect(labels.map((label) => label.name)).toContain("INBOX");
+    expect(labels.map((label) => label.name)).toContain("triage");
+
+    const inbox = labels.find((label) => label.name === "INBOX")!;
+    expect(inbox).toMatchObject({ messagesTotal: 1, messagesUnread: 1, threadsTotal: 1, threadsUnread: 1 });
+
+    const triage = labels.find((label) => label.name === "triage")!;
+    expect(Object.keys(triage).sort()).toEqual(advertisedFields("list_labels", "Label"));
+
+    // create_label advertises the same Label shape at its root.
+    const created = await call(app, 2, "create_label", {
+      displayName: "Projects/Alpha",
+      color: { textColor: "#000000", backgroundColor: "#ffffff" },
+    });
+    expect(Object.keys(created.result.structuredContent ?? {}).sort()).toEqual(
+      advertisedFields("create_label")
+    );
+    expect(created.result.structuredContent).toMatchObject({
+      name: "Projects/Alpha",
+      messagesTotal: 0,
+      messagesUnread: 0,
+      threadsTotal: 0,
+      threadsUnread: 0,
+    });
+  });
+
+  it("takes no page arguments on list_labels, because the listing declares none", async () => {
+    const app = createGmailTwinApp({ seed: fullyPopulatedSeed() });
+
+    // `toEqual([])`, not `toMatchObject({properties:{}})` — the latter is subset
+    // matching and would pass against any property set at all.
+    expect(Object.keys(fixtureTool("list_labels").inputSchema.properties ?? {})).toEqual([]);
+    expect(advertisedFields("list_labels")).toEqual(["labels"]);
+
+    // Every label in one answer, and no token offering a page that cannot be asked for.
+    const listed = await call(app, 1, "list_labels", {});
+    expect(listed.result.structuredContent).not.toHaveProperty("nextPageToken");
+    const rested = (await (await rest(app, "/labels")).json()) as { labels: unknown[] };
+    expect((listed.result.structuredContent?.labels as unknown[]).length).toBe(rested.labels.length);
   });
 });
 

@@ -3,10 +3,10 @@
   "substrate": "live-wire-unauth",
   "endpoint": "https://gmailmcp.googleapis.com/mcp/v1",
   "method": "tools/list",
-  "protocol": "JSON-RPC 2.0 over HTTP (accept: application/json, text/event-stream)",
+  "protocol": "JSON-RPC 2.0 over HTTP",
   "protocolVersion": "2025-03-26",
-  "captureDate": "2026-07-20",
-  "rawFileSha256": "6ef35bad568967015c101f89e995148c4eb2131b3a6dd244f7237058abae8e7a",
+  "captureDate": "2026-08-10",
+  "rawFileSha256": "fd2b12868289aee89798c218a7ea2307fc475935d3d912c2a3c35b5d75ae21ee",
   "liveToolCount": 13,
   "liveToolOrder": [
     "create_draft",
@@ -24,7 +24,7 @@
     "create_label"
   ],
   "configuration": {
-    "auth": "none — the unauthenticated read answered HTTP 200 for both tools/list and initialize (Developer Preview)",
+    "auth": "none",
     "deploymentSelector": "none — the endpoint exposes no toolset, tool-filter or read-only selector, so there is exactly one surface to read",
     "requestHeaders": {
       "content-type": "application/json",
@@ -35,17 +35,19 @@
       "jsonrpc": "2.0",
       "id": 1
     },
-    "matchesExaminee": "an examinee pointing an MCP client at this URL gets this listing; there is no configuration axis on which the two could differ",
-    "completeness": "exact"
+    "matchesExaminee": "exactly, for all 13 tools — name, description, inputSchema, outputSchema and annotations are Google's own bytes, and an examinee pointing an MCP client at the endpoint above gets this listing.",
+    "completeness": "exact",
+    "derivation": "the upstream golden in full — all 13 tools, no subtraction. Produced by scripts/adopt-upstream-mcp-fixture.ts from fixtures/mcp-tools-list/gmail.raw.json at rawFileSha256 fd2b12868289aee89798c218a7ea2307fc475935d3d912c2a3c35b5d75ae21ee, whose bytes this file copies verbatim."
   },
   "notes": [
-    "Gate 1 expands the OSS launch set from the Gate-0 ten-tool freeze to the full live 13-tool listing. The three promoted from Developer Preview are get_message, apply_sensitive_thread_label and apply_sensitive_message_label.",
-    "Schemas, annotations and descriptions are the live capture's, verbatim.",
-    "DELIBERATE DIVERGENCE: F-1326 re-read the same endpoint on 2026-08-06 and got the same 13 names with different schemas and descriptions (fixtures/mcp-tools-list/gmail.meta.json, rawFileSha256 93085540…). This twin keeps serving the 2026-07-20 oracle. Adopting the newer bytes changes what the twin serves, which is a behavioural change F-1325 does not make; the lane that compares the two is F-1327. This is not an oversight.",
+    "F-1400: these bytes are Google's, adopted rather than transcribed. The fixture that shipped before this one was the same endpoint read on 2026-07-20 and was never refreshed, so the twin advertised a seventeen-day-old listing and pome-cloud's mcp_diff reported 34 findings across 11 tools — all of them the vendor moving, none of them a twin defect. Produced by scripts/adopt-upstream-mcp-fixture.ts; `npm run gate:mcp-fixture -w @pome-sh/twin-gmail` re-derives and diffs.",
+    "13 tools, which is every tool the capture carries. Unlike twin-slack's adoption there is no suppression list: nothing here is withheld, so raw.json is byte-identical to fixtures/mcp-tools-list/gmail.raw.json and the two shas agree.",
+    "Descriptions, schemas and annotations are the capture's verbatim. Three of its claims are behavioural and were implemented in the same change rather than merely served: Message.bccRecipients, Label.messagesTotal/messagesUnread, and a list_labels that answers with ALL labels — the July listing said 'all user-defined labels' and the twin returned exactly those.",
+    "list_labels takes no arguments in this listing. The July capture declared pageSize/pageToken and the twin paginated; Google has since removed both, along with nextPageToken from the response, so the twin answers every label in one page. LIMITS.md's MCP page-size row no longer names this tool.",
     "Authenticated tools/call success envelopes were unavailable; the reconstructed shapes live in mcp-tools-call.representative.json and the live unauthenticated error envelope in mcp-tools-call-unauth-error.raw.json.",
     "initialize returned protocolVersion=2025-03-26 (mcp-initialize.raw.json)."
   ],
-  "canonicalFileSha256": "44ae70afa53697967b7b38e9320b9032a906a9d42201eab08c8f1f3b89ca3c52",
+  "canonicalFileSha256": "91d290ddb244d0736df1a6b81901aabf754b8d474c9343b487b65d3485dfaa19",
   "files": {
     "raw": "mcp-tools-list.raw.json",
     "canonical": "mcp-tools-list.canonical.json"

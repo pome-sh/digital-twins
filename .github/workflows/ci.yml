@@ -224,6 +224,11 @@ jobs:
           # golden it claims to be. Needs the build above: the script imports
           # @pome-sh/sdk to re-derive the canonical bytes.
           npm run gate:mcp-fixture -w @pome-sh/twin-slack
+          # F-1400 — the same gate for twin-gmail, whose fixture is Google's
+          # listing with NOTHING subtracted. It served a capture seventeen days
+          # stale for want of exactly this line: the sha in its meta.json was
+          # green the whole time, because a stale file is internally consistent.
+          npm run gate:mcp-fixture -w @pome-sh/twin-gmail
           # F-866 — the bundled examples/ projects are standalone npm packages
           # (own lockfiles), not workspaces, so `npm run typecheck` above misses
           # them. Typecheck each against the just-built adapter so a zod-4 / SDK

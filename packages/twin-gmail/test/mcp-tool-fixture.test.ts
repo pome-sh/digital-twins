@@ -85,6 +85,46 @@ describe("gmail MCP tool fixture", () => {
     expect(meta.endpoint).toBe("https://gmailmcp.googleapis.com/mcp/v1");
   });
 
+  // F-1400. The two halves below are what stops this fixture ageing in place
+  // again. It shipped for seventeen days as a 2026-07-20 read of an endpoint
+  // that had moved, and nothing in this repo related it to the golden beside
+  // it, so pome-cloud's lane reported 34 findings that were all one stale file.
+  it("is the upstream golden in full — every tool, byte for byte, nothing withheld", () => {
+    const golden = JSON.parse(
+      readFileSync(
+        join(import.meta.dirname, "..", "..", "..", "fixtures", "mcp-tools-list", "gmail.raw.json"),
+        "utf8"
+      )
+    ) as { result: { tools: Array<{ name: string }> } };
+    const goldenByName = new Map(golden.result.tools.map((tool) => [tool.name, tool]));
+
+    // Unlike twin-slack's adoption nothing here is subtracted, so the sets are
+    // equal and so is the ORDER — `liveToolOrder` is the served order.
+    expect(gmailToolFixture.toolNames).toEqual(golden.result.tools.map((tool) => tool.name));
+    for (const tool of gmailToolFixture.tools) {
+      expect(tool, tool.name).toEqual(goldenByName.get(tool.name));
+    }
+  });
+
+  it("carries the capture's own provenance, so it cannot go stale while looking current", () => {
+    const goldenMeta = JSON.parse(
+      readFileSync(
+        join(import.meta.dirname, "..", "..", "..", "fixtures", "mcp-tools-list", "gmail.meta.json"),
+        "utf8"
+      )
+    ) as Record<string, string>;
+
+    // Nothing was dropped, so the two files hold the same bytes and the digests
+    // agree. This is the claim "adopted, not edited" as an equality rather than
+    // a sentence: any re-description, rename or re-shape breaks it.
+    expect(meta.rawFileSha256).toBe(goldenMeta.rawFileSha256);
+    expect(meta.captureDate).toBe(goldenMeta.captureDate);
+    expect(meta.substrate).toBe(goldenMeta.substrate);
+    expect(meta.endpoint).toBe(goldenMeta.endpoint);
+    expect(meta.protocolVersion).toBe(goldenMeta.protocolVersion);
+    expect(meta.configuration?.derivation).toMatch(/no subtraction/);
+  });
+
   it("serves exactly the fixture's listing over tools/list", async () => {
     expect(diffServedToolsAgainstFixture(await servedTools(), gmailToolFixture)).toEqual([]);
   });

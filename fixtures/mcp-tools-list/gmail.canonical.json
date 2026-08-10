@@ -6,8 +6,8 @@
     "method": "tools/list",
     "protocol": "JSON-RPC 2.0 over HTTP",
     "protocolVersion": "2025-03-26",
-    "captureDate": "2026-08-06",
-    "rawFileSha256": "93085540b47ec49a2c79289760c11b8776daaec487f147f52eb90d13a9f330a3",
+    "captureDate": "2026-08-10",
+    "rawFileSha256": "fd2b12868289aee89798c218a7ea2307fc475935d3d912c2a3c35b5d75ae21ee",
     "liveToolCount": 13,
     "liveToolOrder": [
       "create_draft",
@@ -52,9 +52,9 @@
           "idempotentHint": false,
           "openWorldHint": false,
           "readOnlyHint": false,
-          "title": "Creates a new draft email in the authenticated user's Gmail account."
+          "title": "Create draft email"
         },
-        "description": "Creates a new draft email in the authenticated user's Gmail account.\n\nThis tool takes recipient addresses, a subject, and body content as inputs. If the draft is created as a reply to an existing message, the ID of the original message should be passed to the tool in the replyToMessageId field.\n\nReturns only the unique ID (id) of the draft message. \n\nLimitation: Creating drafts with attachments is not supported yet.\n",
+        "description": "Creates a new draft email in the authenticated user's Gmail account.\n\nThis tool takes recipient addresses, a subject, and body content as inputs. If the draft is created as a reply to an existing message, the ID of the original message should be passed to the tool in the replyToMessageId field.\n\nReturns a Draft object with only the `id` field populated.\n",
         "inputSchema": {
           "$defs": {
             "Attachment": {
@@ -92,7 +92,7 @@
           "description": "Request message for CreateDraft RPC.",
           "properties": {
             "attachments": {
-              "description": "Optional. The attachments to include in the email. The combined size of attachments in the message cannot exceed 25MB. If you need to send files larger than 25MB, upload the file to Drive first and then insert the Drive link into body or html_body.",
+              "description": "Optional. The attachments to include in the email. The combined size of attachments in the message cannot exceed 25MB. If you need to send files larger than 25MB, upload the file to Drive first and then insert the Drive link into `body` or `html_body`.",
               "items": {
                 "$ref": "#/$defs/Attachment"
               },
@@ -106,7 +106,7 @@
               "type": "array"
             },
             "body": {
-              "description": "Optional. The main body content of the email draft. If html_body is also provided, this field is treated as the plain-text alternative.",
+              "description": "Optional. The main body content of the email draft. If `html_body` is also provided, this field is treated as the plain-text alternative.",
               "type": "string"
             },
             "cc": {
@@ -197,7 +197,7 @@
           "idempotentHint": false,
           "openWorldHint": false,
           "readOnlyHint": true,
-          "title": "Lists draft emails from the authenticated user's Gmail account."
+          "title": "List draft emails"
         },
         "description": "Lists draft emails from the authenticated user's Gmail account.\n\nThis tool can filter drafts based on a query string and supports pagination. It returns a list of drafts, including their IDs and subjects (unless `view` is set to `DRAFT_VIEW_METADATA_ONLY`). `page_token` can be used to paginate the results. To retrieve subsequent pages of results, use the `page_token` returned in the previous response.\n\nThe `view` parameter controls which fields are populated in the response. By default (or with `DRAFT_VIEW_FULL`), it returns full content. Use `DRAFT_VIEW_METADATA_ONLY` to exclude sensitive content like subject and body. \n",
         "inputSchema": {
@@ -217,7 +217,7 @@
               "type": "string"
             },
             "view": {
-              "description": "Optional. Controls the fields populated for drafts in the draft list. By default (or with `DRAFT_VIEW_FULL`), it returns full content, which has draft ID, threadID, to, cc, bcc, date, subject, and body. Use `DRAFT_VIEW_METADATA_ONLY` to exclude subject and body.",
+              "description": "Optional. Controls the fields populated for drafts in the draft list. Defaults to returning metadata only (`id`, `thread_id`, `to_recipients`, `cc_recipients`, `bcc_recipients`, `date`). Set to `DRAFT_VIEW_FULL` to include `subject` and `plaintext_body` content.",
               "enum": [
                 "DRAFT_VIEW_UNSPECIFIED",
                 "DRAFT_VIEW_METADATA_ONLY",
@@ -225,9 +225,9 @@
               ],
               "type": "string",
               "x-google-enum-descriptions": [
-                "Maps to DRAFT_VIEW_FULL for backward compatibility.",
-                "Metadata only: does not include subject, plaintext_body, html_body.",
-                "Metadata + UGC (Default behavior)."
+                "Unspecified view. Defaults to DRAFT_VIEW_METADATA_ONLY.",
+                "Returns metadata only (`id`, `thread_id`, `to_recipients`, `cc_recipients`, `bcc_recipients`, `date`); omits `subject` and `plaintext_body` content.",
+                "Returns full draft content, including `subject` and `plaintext_body` in addition to draft metadata."
               ]
             }
           },
@@ -311,14 +311,14 @@
           "idempotentHint": true,
           "openWorldHint": false,
           "readOnlyHint": true,
-          "title": "Retrieves a specific email thread from the authenticated user's Gmail account."
+          "title": "Get email thread"
         },
         "description": "Retrieves a specific email thread from the authenticated user's Gmail account, including a list of its messages.\n\nThe optional `messageFormat` parameter controls the format of the messages returned. By default (or with `FULL_CONTENT`), it returns the full content of messages. Use `MINIMAL` to include only subject and snippet (excluding body). Use `METADATA_ONLY` to include only basic metadata (message ID, thread ID, labels, timestamp, and size estimate). \n",
         "inputSchema": {
           "description": "Request message for GetThread RPC.",
           "properties": {
             "messageFormat": {
-              "description": "Optional. Specifies the format of the messages returned within the thread. Defaults to FULL_CONTENT. Note: MINIMAL format returns id, snippet, subject, sender, toRecipients, ccRecipients, bccRecipients, date, labelIds. METADATA_ONLY format returns id, sender, toRecipients, ccRecipients, bccRecipients, date, labelIds. FULL_CONTENT returns id, snippet, subject, sender, toRecipients, ccRecipients, bccRecipients, date, labelIds, attachmentIds, plaintextBody, htmlBody, attachments.",
+              "description": "Optional. Specifies the format of the messages returned within the thread. Defaults to `FULL_CONTENT`. Note: `MINIMAL` format returns `id`, `snippet`, `subject`, `sender`, `to_recipients`, `cc_recipients`, `bcc_recipients`, `date`, `label_ids`. `METADATA_ONLY` format returns `id`, `sender`, `to_recipients`, `cc_recipients`, `bcc_recipients`, `date`, `label_ids`. `FULL_CONTENT` returns `id`, `snippet`, `subject`, `sender`, `to_recipients`, `cc_recipients`, `bcc_recipients`, `date`, `label_ids`, `attachment_ids`, `plaintext_body`, `html_body`, `attachments`.",
               "enum": [
                 "MESSAGE_FORMAT_UNSPECIFIED",
                 "MINIMAL",
@@ -467,7 +467,7 @@
           "idempotentHint": true,
           "openWorldHint": false,
           "readOnlyHint": true,
-          "title": "Retrieves a specific email message from the authenticated user's Gmail account."
+          "title": "Get email message"
         },
         "description": "Retrieves a specific email message from the authenticated user's Gmail account by its unique message ID.\n\nUse this tool to inspect a single, individual email when you already know its message ID. If the user wants to read a specific email in detail, check the exact wording of a message, or examine attachment metadata for a single email, this is the right tool. It is not suitable for retrieving entire conversations or viewing back-and-forth discussion threads; use the 'get_thread' tool instead.\nKey indicators include if the user asks for the full content of a specific message ID returned by a previous search, or if the query asks to inspect a specific individual email rather than an entire thread.\nExample user prompts are: \"Get the full text of message ID 18f123456789abcd.\", \"Read the latest message in that thread from Alice.\", and \"What are the attachment names in the email I just received from HR?\" \n\nThe optional `messageFormat` parameter controls the format of the message returned. By default (or with `FULL_CONTENT`), it returns the full content of the message. Use `MINIMAL` to include only subject and snippet (excluding body). Use `METADATA_ONLY` to include only basic metadata (message ID, thread ID, labels, timestamp, and size estimate). \n",
         "inputSchema": {
@@ -606,7 +606,7 @@
           "idempotentHint": true,
           "openWorldHint": false,
           "readOnlyHint": true,
-          "title": "Searches for email threads from the authenticated user's Gmail account."
+          "title": "Search email threads"
         },
         "description": "Lists email threads from the authenticated user's Gmail account.\n\nThis tool can filter threads based on a query string and supports pagination. It returns a list of threads, including their IDs and related messages. Each related message contains details like a snippet of the message body, the subject, the sender, the recipients etc. The `view` parameter controls which fields are populated in the related messages. By default (or with `THREAD_VIEW_MINIMAL`), it includes subject and snippet. Use `THREAD_VIEW_METADATA_ONLY` to exclude subject and snippet. Note that the full message bodies are not returned by this tool; use the 'get_thread' tool with a thread ID to fetch the full message body if needed. Threads with excluded criteria may still appear in the results. This occurs because Gmail identifies matching messages first. For example, if you search for -is:starred, Gmail will find an entire thread if it contains at least one unstarred message, even if other emails in that same conversation are starred.\n",
         "inputSchema": {
@@ -630,7 +630,7 @@
               "type": "string"
             },
             "view": {
-              "description": "Optional. Controls the fields populated for threads in the thread list. Defaults to THREAD_VIEW_MINIMAL. THREAD_VIEW_MINIMAL returns id, snippet, subject, from, to, cc, bcc, date, labelIds. THREAD_VIEW_METADATA_ONLY returns id, from, to, cc, bcc, date, labelIds.",
+              "description": "Optional. Controls the fields populated for threads in the thread list. Defaults to `THREAD_VIEW_MINIMAL`. `THREAD_VIEW_MINIMAL` returns `id`, `snippet`, `subject`, `sender`, `to_recipients`, `cc_recipients`, `bcc_recipients`, `date`, `label_ids`. `THREAD_VIEW_METADATA_ONLY` returns `id`, `sender`, `to_recipients`, `cc_recipients`, `bcc_recipients`, `date`, `label_ids`.",
               "enum": [
                 "THREAD_VIEW_UNSPECIFIED",
                 "THREAD_VIEW_METADATA_ONLY",
@@ -639,8 +639,8 @@
               "type": "string",
               "x-google-enum-descriptions": [
                 "Maps to THREAD_VIEW_MINIMAL for backward compatibility.",
-                "Returns id, from, to, cc, bcc, date, labelIds.",
-                "Returns id, snippet, subject, from, to, cc, bcc, date, labelIds."
+                "Returns `id`, `sender`, `to_recipients`, `cc_recipients`, `bcc_recipients`, `date`, `label_ids`.",
+                "Returns `id`, `snippet`, `subject`, `sender`, `to_recipients`, `cc_recipients`, `bcc_recipients`, `date`, `label_ids`."
               ]
             }
           },
@@ -792,14 +792,14 @@
           "idempotentHint": true,
           "openWorldHint": false,
           "readOnlyHint": false,
-          "title": "Adds labels to a thread."
+          "title": "Add labels to thread"
         },
         "description": "Adds labels to an entire thread in the authenticated user's Gmail account. This operation affects all messages currently in the thread and any future messages added to it.\n\nIf unsure of the thread ID, use the `search_threads` tool first.\n\nIf unsure of a user label's ID, use the `list_labels` tool first to discover available labels and their IDs. To add a Trash label or a Spam label to a thread, or move a specific thread to Trash, please use the `apply_sensitive_thread_label` tool instead.\n",
         "inputSchema": {
           "description": "Request message for LabelThread RPC.",
           "properties": {
             "labelIds": {
-              "description": "Required. The unique identifiers of the labels to add. Can be a system label ID (e.g., 'INBOX', 'STARRED', 'UNREAD', 'IMPORTANT') or a user-defined label ID. The tool accepts `label_ids` and not label names. Use the list_labels tool to get the corresponding label id to a display name for user-defined labels.",
+              "description": "Required. The unique identifiers of the labels to add. Can be a system label ID (e.g., `INBOX`, `STARRED`, `UNREAD`, `IMPORTANT`) or a user-defined label ID. The tool accepts `label_ids` and not label names. Use the `list_labels` tool to get the corresponding label id to a display name for user-defined labels.",
               "items": {
                 "type": "string"
               },
@@ -829,14 +829,14 @@
           "idempotentHint": true,
           "openWorldHint": false,
           "readOnlyHint": false,
-          "title": "Removes labels from a thread."
+          "title": "Remove labels from thread"
         },
         "description": "Removes labels from an entire thread in the authenticated user's Gmail account. If unsure of the thread ID, use the `search_threads` tool first. If unsure of a user label's ID, use the `list_labels` tool first.",
         "inputSchema": {
           "description": "Request message for UnlabelThread RPC.",
           "properties": {
             "labelIds": {
-              "description": "Required. The unique identifiers of the labels to remove. Can be a system label ID (e.g., 'INBOX', 'TRASH', 'SPAM', 'STARRED', 'UNREAD', 'IMPORTANT') or a user-defined label ID. The tool accepts `label_ids` and not label names. Use the list_labels tool to get the corresponding label id to a display name for user-defined labels.",
+              "description": "Required. The unique identifiers of the labels to remove. Can be a system label ID (e.g., `INBOX`, `TRASH`, `SPAM`, `STARRED`, `UNREAD`, `IMPORTANT`) or a user-defined label ID. The tool accepts `label_ids` and not label names. Use the `list_labels` tool to get the corresponding label id to a display name for user-defined labels.",
               "items": {
                 "type": "string"
               },
@@ -866,7 +866,7 @@
           "idempotentHint": true,
           "openWorldHint": false,
           "readOnlyHint": false,
-          "title": "Adds a sensitive label (Trash or Spam) to a thread."
+          "title": "Apply sensitive label (Trash or Spam) to thread"
         },
         "description": "Adds a sensitive label (Trash or Spam) to an entire thread in the authenticated user's Gmail account. This operation affects all messages currently in the thread and any future messages added to it.\n\nUse this tool to trash a thread, mark a thread as spam, or move the specified thread to Trash.\n\nTo find the thread ID, use the `search_threads` tool first.\n",
         "inputSchema": {
@@ -910,22 +910,12 @@
           "idempotentHint": true,
           "openWorldHint": false,
           "readOnlyHint": true,
-          "title": "Lists labels."
+          "title": "List labels"
         },
         "description": "Lists all labels available in the authenticated user's Gmail account. Use this tool to discover the `id` of a label before calling `label_thread`, `unlabel_thread`, `label_message`, or `unlabel_message`. Note: the system labels, `DRAFT` and `SENT`, cannot be set on messages and are read only.",
         "inputSchema": {
           "description": "Request message for ListLabels RPC.",
-          "properties": {
-            "pageSize": {
-              "description": "Optional. The maximum number of labels to return.",
-              "format": "int32",
-              "type": "integer"
-            },
-            "pageToken": {
-              "description": "Optional. Page token to retrieve a specific page of results in the list.",
-              "type": "string"
-            }
-          },
+          "properties": {},
           "type": "object"
         },
         "name": "list_labels",
@@ -987,15 +977,11 @@
           "description": "Response message for ListLabels RPC.",
           "properties": {
             "labels": {
-              "description": "List of labels in the user's account.",
+              "description": "List of all labels in the user's account.",
               "items": {
                 "$ref": "#/$defs/Label"
               },
               "type": "array"
-            },
-            "nextPageToken": {
-              "description": "Token to retrieve the next page of results in the list.",
-              "type": "string"
             }
           },
           "type": "object"
@@ -1007,14 +993,14 @@
           "idempotentHint": true,
           "openWorldHint": false,
           "readOnlyHint": false,
-          "title": "Adds labels to a message."
+          "title": "Add labels to message"
         },
         "description": "Adds one or more labels to a specific message in the authenticated user's Gmail account.\n\nTo find the message ID, use tools like `search_threads` or `get_thread`. If unsure of a user label's ID, use the `list_labels` tool first to discover available labels and their IDs.\nTo add a Trash label or a Spam label to a message, or move a specific message to Trash, please use the `apply_sensitive_message_label` tool instead.\n",
         "inputSchema": {
           "description": "Request message for LabelMessage RPC.",
           "properties": {
             "labelIds": {
-              "description": "Required. The IDs of the labels to add. Can be a system label ID (e.g., 'INBOX', 'STARRED', 'UNREAD', 'IMPORTANT') or a user-defined label ID. The tool accepts `label_ids` and not label names. Use the list_labels tool to get the corresponding label id to a display name for user-defined labels.",
+              "description": "Required. The IDs of the labels to add. Can be a system label ID (e.g., `INBOX`, `STARRED`, `UNREAD`, `IMPORTANT`) or a user-defined label ID. The tool accepts `label_ids` and not label names. Use the `list_labels` tool to get the corresponding label id to a display name for user-defined labels.",
               "items": {
                 "type": "string"
               },
@@ -1044,14 +1030,14 @@
           "idempotentHint": true,
           "openWorldHint": false,
           "readOnlyHint": false,
-          "title": "Removes labels from a message."
+          "title": "Remove labels from message"
         },
         "description": "Removes one or more labels from a specific message in the authenticated user's Gmail account. To find the message ID, use tools like `search_threads` or `get_thread`. If unsure of a user label's ID, use the `list_labels` tool first to discover available labels and their IDs.",
         "inputSchema": {
           "description": "Request message for UnlabelMessage RPC.",
           "properties": {
             "labelIds": {
-              "description": "Required. The IDs of the labels to remove. Can be a system label ID (e.g., 'INBOX', 'TRASH', 'SPAM', 'STARRED', 'UNREAD', 'IMPORTANT') or a user-defined label ID. The tool accepts `label_ids` and not label names. Use the list_labels tool to get the corresponding label id to a display name for user-defined labels.",
+              "description": "Required. The IDs of the labels to remove. Can be a system label ID (e.g., `INBOX`, `TRASH`, `SPAM`, `STARRED`, `UNREAD`, `IMPORTANT`) or a user-defined label ID. The tool accepts `label_ids` and not label names. Use the `list_labels` tool to get the corresponding label id to a display name for user-defined labels.",
               "items": {
                 "type": "string"
               },
@@ -1081,7 +1067,7 @@
           "idempotentHint": true,
           "openWorldHint": false,
           "readOnlyHint": false,
-          "title": "Adds a sensitive label (Trash or Spam) to a message."
+          "title": "Apply sensitive label (Trash or Spam) to message"
         },
         "description": "Adds a sensitive label (Trash or Spam) to a specific message in the authenticated user's Gmail account.\n\nUse this tool to trash a message, mark a message as spam, or move the specified message to Trash.\n\nTo find the message ID, use tools like `search_threads` or `get_thread`. To find the draft message ID, use tools like `list_drafts`.\n",
         "inputSchema": {
@@ -1125,7 +1111,7 @@
           "idempotentHint": false,
           "openWorldHint": false,
           "readOnlyHint": false,
-          "title": "Creates a new label."
+          "title": "Create label"
         },
         "description": "Creates a new label in the authenticated user's Gmail account.\nSupports creating nested labels (sub-labels) using a forward slash (e.g., 'Projects/Alpha/Sprint-1').\nBy default, parent labels will be automatically created if they do not exist.\n",
         "inputSchema": {

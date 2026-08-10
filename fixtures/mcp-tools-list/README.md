@@ -70,18 +70,24 @@ The 22 the write scope adds are every write Linear has and nothing else — the 
 under-report, and a later capture of this twin may never be read-only. The scope set was never a
 permission question; it decided what the listing CONTAINED.
 
-## gmail: there is a second tools/list in this repo, and it is stale
+## gmail: the second tools/list in this repo is now these bytes
 
-[`packages/twin-gmail/fixtures/mcp-tools-list.*`](../../packages/twin-gmail/fixtures/) is **not**
-this. It is the twin's own frozen Gate-1 launch oracle (captureDate 2026-07-20), imported by
-`twin-gmail/src/mcp.ts` and asserted by that package's suite. It is authoritative for *which tools
-the twin implements*. `gmail.*` here is authoritative for *what Google currently serves*, and only
-this one gets re-captured.
+[`packages/twin-gmail/fixtures/mcp-tools-list.*`](../../packages/twin-gmail/fixtures/) used to be a
+separate frozen oracle. Since [F-1400](https://linear.app/pome-sh/issue/F-1400) its `raw.json` is
+`gmail.raw.json` **byte for byte** — same `rawFileSha256`, nothing subtracted — adopted by
+`packages/twin-gmail/scripts/adopt-upstream-mcp-fixture.ts` and diffed in CI by
+`npm run gate:mcp-fixture -w @pome-sh/twin-gmail`. Refreshing this golden without re-adopting is now
+a red rather than a silent divergence.
 
-Known delta, measured 2026-08-06: same 13 names in the same order, but **10 of the 13 differ** in
-`description` and/or `inputSchema` (`search_threads` schema 3849→4274 chars, `create_label`
-2813→3195, `list_labels` description 393→293). Nothing in CI relates the two files, so when F-1325's
-lane reports schema divergence on gmail, check the oracle's date before concluding the twin drifted.
+That gate is the thing that was missing. The twin shipped a 2026-07-20 read for seventeen days while
+this file moved to 2026-08-06; nothing in CI related them, the twin's own sha stayed green because a
+stale capture is internally consistent, and F-1325's lane reported 34 findings across 11 tools that
+were all one file's date. Adopting the newer bytes was a capability change, not a text change —
+`Message.bccRecipients`, `Label.messagesTotal`/`messagesUnread`, and a `list_labels` that returns all
+labels and takes no page arguments — so the handlers moved in the same commit.
+
+`twin-slack` is the same shape with one difference: it subtracts one ruled-cold tool, so its raw file
+is the golden MINUS that entry and the two shas differ by construction. gmail withholds nothing.
 
 ## The three files
 

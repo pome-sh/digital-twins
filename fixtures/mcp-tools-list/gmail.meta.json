@@ -5,8 +5,8 @@
   "method": "tools/list",
   "protocol": "JSON-RPC 2.0 over HTTP",
   "protocolVersion": "2025-03-26",
-  "captureDate": "2026-08-06",
-  "rawFileSha256": "93085540b47ec49a2c79289760c11b8776daaec487f147f52eb90d13a9f330a3",
+  "captureDate": "2026-08-10",
+  "rawFileSha256": "fd2b12868289aee89798c218a7ea2307fc475935d3d912c2a3c35b5d75ae21ee",
   "liveToolCount": 13,
   "liveToolOrder": [
     "create_draft",
@@ -38,7 +38,7 @@
     "matchesExaminee": "an examinee pointing an MCP client at this URL gets this listing; there is no configuration axis on which the two could differ",
     "completeness": "exact"
   },
-  "canonicalFileSha256": "09d8f110787ef57e236de38409477e47e2cd2a2032fa6f3e2a6b58528ef7ebf0",
+  "canonicalFileSha256": "fba4f18c43a17a5f1d0e9fe41f3c9864c9d9b8f92ad64840e2658e96f9469b59",
   "files": {
     "raw": "gmail.raw.json",
     "canonical": "gmail.canonical.json"
