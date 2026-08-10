@@ -172,10 +172,11 @@ describe("scoreStatus — a pre-satisfied criterion is not an abstention (F-1392
     // The A5 guard (`total_required > 0`) predates this exemption and
     // outranks it: nothing passed and nothing failed, so there is no score to
     // clear a threshold with. `runScoreLine` names this state rather than
-    // reporting a contradictory count, and
-    // `cross-surface-agreement.test.ts` records that the dashboard words the
-    // same run differently (it renders FAILED at 0/100) — the two agree that
-    // it is not a pass, which is what the exit code encodes.
+    // reporting a contradictory count. The dashboard reads this run the same
+    // way since F-1399 — `cross-surface-agreement.test.ts` is where that
+    // agreement is CHECKED and `evalResultView.ts`'s `scoreStatus` comment is
+    // where it is explained. Neither is restated here: a restated claim about
+    // another repo is one that goes false on its own (F-1413).
     const s = score([preSatisfied("github.no-new-issues")], 0);
     expect(s.preSatisfied).toBe(1);
     expect(s.total_required).toBe(0);

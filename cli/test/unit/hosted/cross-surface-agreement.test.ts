@@ -222,6 +222,20 @@ const table: Row[] = [
   },
 ];
 
+/** Tracked-by-name lookup for the tests below that single a row out.
+ *
+ *  Not `table.find((r) => r.divergence)`: that predicate selected the row only
+ *  while the row was MARKED as a divergence, so closing the divergence handed
+ *  its caller `undefined` and the test kept passing on a `!`-asserted ghost
+ *  (F-1413). Renaming a row must red with a readable message instead. */
+function rowNamed(name: string): Row {
+  const row = table.find((r) => r.name === name);
+  if (row === undefined) {
+    throw new Error(`no table row named "${name}" — a test below tracks it by name`);
+  }
+  return row;
+}
+
 describe("CLI and dashboard answer `what state is this run in?` the same way (F-1392)", () => {
   for (const row of table) {
     const label = row.divergence ? `${row.name} [known divergence]` : row.name;
@@ -237,6 +251,40 @@ describe("CLI and dashboard answer `what state is this run in?` the same way (F-
       );
     });
   }
+
+  // ── isIncompleteTally's FIRST clause, which no row above reaches ─────────
+  //
+  // `total === 0 ⇒ never incomplete` is transcribed above as the `total > 0 &&`
+  // conjunct, and every row in the table has criteria, so nothing exercises
+  // it: delete that conjunct and the whole table stays green. A transcribed
+  // clause with no assertion on it is this file's own defect one level down,
+  // so it gets assertions here.
+  //
+  // It is NOT a table row because the table's third assertion — the two
+  // surfaces never split on `passed` — is false for this input at
+  // satisfaction 100, and that is not a divergence to mark. It is a shape only
+  // ONE surface can be asked about. `taskSchema` (`src/task/taskSchema.ts`:
+  // `criteria: z.array(criterionSchema).min(1)`) refuses a task carrying no
+  // criteria, so a hosted `pome run` always has criteria for /finalize to
+  // answer about; an empty `criteria_results` arriving at the CLI means the
+  // grader returned nothing for criteria that DO exist, which is precisely
+  // what the A5 guard is for. pome-cloud's clause 1 exists for rows the CLI
+  // never produces — a replay run (`replay-run.ts` writes `criteriaResults:
+  // []` by construction and encodes the finding in the score itself) and a
+  // production run not yet scored by online eval.
+  describe("a run that recorded no criteria at all (isIncompleteTally clause 1)", () => {
+    it("is never `incomplete` on the dashboard — it falls through to the score", () => {
+      expect(dashboardRunStatus([], 100)).toBe("pass");
+      expect(dashboardRunStatus([], 0)).toBe("fail");
+    });
+
+    it("is `incomplete` to the CLI, which is the A5 guard and not a divergence", () => {
+      // Same wire shape, different question — see the note above for why the
+      // CLI cannot be handed a run this clause was written for.
+      expect(cliRunStatus([], 100)).toBe("incomplete");
+      expect(cliRunStatus([], 0)).toBe("incomplete");
+    });
+  });
 
   // ── The third surface: verdict.json's `state` (F-1195) ───────────────────
   //
@@ -293,9 +341,7 @@ describe("CLI and dashboard answer `what state is this run in?` the same way (F-
     }
 
     it("records the same word as the dashboard now that F-1399 closed the divergence, and the closure is stated in the artifact's own doc", async () => {
-      const row = table.find(
-        (r) => r.name === "every criterion seed-excluded — no denominator",
-      )!;
+      const row = rowNamed("every criterion seed-excluded — no denominator");
       const cliWord = cliRunStatus(row.results, row.satisfaction);
       // The all-pre-satisfied run: F-1399 added `isIncompleteTally`'s
       // `evaluated === 0` clause, so the dashboard now reads `incomplete`

@@ -89,12 +89,12 @@ export interface VerdictArtifact {
    *
    *  F-1399 closed the other one: a run whose criteria were ALL pre-satisfied
    *  used to read `incomplete` here (no denominator, so no verified pass —
-   *  the A5 guard) against `fail` on the dashboard, which exempted every
-   *  abstention and then read a satisfaction of 0 off an empty denominator.
-   *  Neither passed it and both exited non-zero, so no CI caller could act on
-   *  the difference — but pome-cloud's shared `isIncompleteTally` (`@pome-
-   *  cloud/contract`) now adds an `evaluated === 0` clause, so the dashboard
-   *  reads `incomplete` here too. */
+   *  the A5 guard) against `fail` on the dashboard. pome-cloud's shared
+   *  incomplete-run predicate now adds an `evaluated === 0` clause, so both
+   *  surfaces say `incomplete`. The reasoning is in `evalResultView.ts`'s
+   *  `scoreStatus` comment and stated only there: one place to correct when
+   *  pome-cloud changes this again, rather than four that go false
+   *  independently (F-1413). */
   state: ScoreStatus;
   passed: boolean;
   /** F-1195 — `EvaluationCounts` from `evalResultView.ts`, so `score` is
