@@ -22,8 +22,10 @@ import type {
   LinearWorkflowState,
   LinearWorkflowStateType,
   LinearAgentSessionExternalUrl,
+  LinearAgentActivityContent,
+  LinearAgentActivitySignal,
 } from "../types.js";
-import { readSessionStatus } from "./normalize.js";
+import { readActivityUserId, readSessionStatus } from "./normalize.js";
 
 export type OrgRow = {
   id: string;
@@ -202,8 +204,8 @@ export type AgentActivityRow = {
   id: string;
   session_id: string;
   user_id: string | null;
-  type: string;
-  body: string;
+  content_json: string;
+  signal: string | null;
   ephemeral: number;
   created_at: string;
   updated_at: string;
@@ -396,10 +398,10 @@ export function mapAgentSession(row: AgentSessionRow): LinearAgentSession {
 export function mapAgentActivity(row: AgentActivityRow): LinearAgentActivity {
   return {
     id: row.id,
-    sessionId: row.session_id,
-    userId: row.user_id,
-    type: row.type as LinearAgentActivity["type"],
-    body: row.body,
+    agentSessionId: row.session_id,
+    userId: readActivityUserId(row.id, row.user_id),
+    content: JSON.parse(row.content_json) as LinearAgentActivityContent,
+    signal: row.signal as LinearAgentActivitySignal | null,
     ephemeral: !!row.ephemeral,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

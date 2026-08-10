@@ -18,17 +18,16 @@ const repo = { owner: "acme", repo: "api" };
 const steps: ParityStep[] = [
   // Reads against the seeded world
   { tool: "search_repositories", arguments: { query: "acme" } },
-  { tool: "get_repository", arguments: { ...repo } },
   { tool: "search_code", arguments: { query: "handler" } },
   { tool: "search_users", arguments: { query: "alice" } },
   { tool: "get_file_contents", arguments: { ...repo, path: "README.md" } },
   { tool: "list_commits", arguments: { ...repo } },
-  { tool: "list_branches", arguments: { ...repo } },
   {
-    tool: "get_branch",
-    arguments: { ...repo, branch: "main" },
+    tool: "list_branches",
+    arguments: { ...repo },
     capture: (body, state) => {
-      state.mainSha = (body as { commit?: { sha?: string } }).commit?.sha;
+      const main = (body as Array<{ name?: string; commit?: { sha?: string } }>).find((b) => b.name === "main");
+      state.mainSha = main?.commit?.sha;
     },
   },
   // Repositories + branches + files
@@ -47,50 +46,19 @@ const steps: ParityStep[] = [
   },
   { tool: "delete_file", arguments: (state) => ({ ...repo, path: "delete-me.txt", message: "Remove delete-me", sha: state.deleteMeSha }) },
   { tool: "get_commit", arguments: { ...repo, ref: "main" } },
-  { tool: "compare_commits", arguments: { ...repo, base: "main", head: "parity" } },
-  // Issues + comments
-  { tool: "get_issue", arguments: { ...repo, issue_number: 1 } },
-  { tool: "update_issue", arguments: { ...repo, issue_number: 1, state: "open" } },
+  // Issues — GitHub's consolidated pair, every method this twin answers
+  { tool: "issue_read", arguments: { method: "get", ...repo, issue_number: 1 } },
+  { tool: "issue_read", arguments: { method: "get_comments", ...repo, issue_number: 1 } },
+  { tool: "issue_read", arguments: { method: "get_labels", ...repo, issue_number: 1 } },
+  { tool: "issue_write", arguments: { method: "update", ...repo, issue_number: 1, state: "open" } },
+  { tool: "issue_write", arguments: { method: "create", ...repo, title: "Parity issue via issue_write" } },
   { tool: "search_issues", arguments: { query: "500" } },
   { tool: "list_issues", arguments: { ...repo, state: "all" } },
-  {
-    tool: "add_issue_comment",
-    arguments: { ...repo, issue_number: 1, body: "Parity comment" },
-    capture: (body, state) => {
-      state.issueCommentId = (body as { id?: number }).id;
-    },
-  },
-  { tool: "list_issue_comments", arguments: { ...repo, issue_number: 1 } },
-  { tool: "update_issue_comment", arguments: (state) => ({ ...repo, comment_id: state.issueCommentId, body: "Parity comment (edited)" }) },
-  { tool: "delete_issue_comment", arguments: (state) => ({ ...repo, comment_id: state.issueCommentId }) },
+  { tool: "add_issue_comment", arguments: { ...repo, issue_number: 1, body: "Parity comment" } },
   { tool: "create_issue", arguments: { ...repo, title: "Parity issue" } },
-  // Labels
-  { tool: "list_repository_labels", arguments: { ...repo } },
-  { tool: "create_label", arguments: { ...repo, name: "parity-label", color: "ededed" } },
-  { tool: "list_issue_labels", arguments: { ...repo, issue_number: 1 } },
-  { tool: "add_issue_labels", arguments: { ...repo, issue_number: 1, labels: ["parity-label"] } },
-  { tool: "remove_issue_label", arguments: { ...repo, issue_number: 1, label: "parity-label" } },
   // Collaborators + identity
-  { tool: "list_collaborators", arguments: { ...repo } },
-  { tool: "add_assignees", arguments: { ...repo, issue_number: 1, assignees: ["alice"] } },
-  { tool: "add_collaborator", arguments: { ...repo, username: "bob" } },
+  { tool: "list_repository_collaborators", arguments: { ...repo } },
   { tool: "get_me" },
-  // Milestones
-  { tool: "list_milestones", arguments: { ...repo } },
-  {
-    tool: "create_milestone",
-    arguments: { ...repo, title: "Parity milestone" },
-    capture: (body, state) => {
-      state.milestoneNumber = (body as { number?: number }).number;
-    },
-  },
-  { tool: "update_milestone", arguments: (state) => ({ ...repo, milestone_number: state.milestoneNumber, description: "Parity milestone (updated)" }) },
-  { tool: "delete_milestone", arguments: (state) => ({ ...repo, milestone_number: state.milestoneNumber }) },
-  // Commit statuses + check runs (against the pre-branch main head)
-  { tool: "create_commit_status", arguments: (state) => ({ ...repo, sha: state.mainSha, state: "success", context: "parity" }) },
-  { tool: "get_combined_status_for_ref", arguments: { ...repo, ref: "main" } },
-  { tool: "create_check_run", arguments: (state) => ({ ...repo, name: "parity-check", head_sha: state.mainSha, status: "completed", conclusion: "success" }) },
-  { tool: "list_check_runs_for_ref", arguments: { ...repo, ref: "main" } },
   // Pull request chain
   {
     tool: "create_pull_request",
@@ -99,29 +67,36 @@ const steps: ParityStep[] = [
       state.pullNumber = (body as { number?: number }).number;
     },
   },
-  { tool: "get_pull_request", arguments: (state) => ({ ...repo, pull_number: state.pullNumber }) },
-  { tool: "get_pull_request_reviews", arguments: (state) => ({ ...repo, pull_number: state.pullNumber }) },
+  // pull_request_read — every method this twin answers, one step each, so a
+  // method wired to the wrong domain call is a named failure rather than a hole.
+  ...["get", "get_diff", "get_status", "get_files", "get_commits", "get_reviews", "get_comments", "get_review_comments", "get_check_runs"].map(
+    (method): ParityStep => ({
+      tool: "pull_request_read",
+      arguments: (state) => ({ method, ...repo, pullNumber: state.pullNumber }),
+    })
+  ),
   { tool: "create_pull_request_review", arguments: (state) => ({ ...repo, pull_number: state.pullNumber, event: "APPROVE" }) },
+  { tool: "pull_request_review_write", arguments: (state) => ({ method: "create", ...repo, pullNumber: state.pullNumber, event: "COMMENT", body: "Parity review via the consolidated writer" }) },
+  // GitHub declares no `create_pull_request_review_comment` MCP tool (F-1376),
+  // so the reply tool's subject is built over the REST route the twin still
+  // serves. Not coverage — `add_reply_to_pull_request_comment` below is.
   {
-    tool: "create_pull_request_review_comment",
-    arguments: (state) => ({ ...repo, pull_number: state.pullNumber, body: "Inline parity", path: "parity.txt", line: 1 }),
+    setup: { method: "POST", path: (state) => `/repos/acme/api/pulls/${String(state.pullNumber)}/comments` },
+    arguments: { body: "Inline parity", path: "parity.txt", line: 1 },
     capture: (body, state) => {
       state.reviewCommentId = (body as { id?: number }).id;
     },
   },
   { tool: "add_reply_to_pull_request_comment", arguments: (state) => ({ ...repo, pull_number: state.pullNumber, comment_id: state.reviewCommentId, body: "Parity reply" }) },
-  { tool: "get_pull_request_comments", arguments: (state) => ({ ...repo, pull_number: state.pullNumber }) },
-  { tool: "get_pull_request_files", arguments: (state) => ({ ...repo, pull_number: state.pullNumber }) },
-  { tool: "get_pull_request_status", arguments: (state) => ({ ...repo, pull_number: state.pullNumber }) },
-  { tool: "get_pull_request_diff", arguments: (state) => ({ ...repo, pull_number: state.pullNumber }) },
-  { tool: "get_pull_request_commits", arguments: (state) => ({ ...repo, pull_number: state.pullNumber }) },
   { tool: "list_pull_requests", arguments: { ...repo, state: "all" } },
   { tool: "update_pull_request", arguments: (state) => ({ ...repo, pull_number: state.pullNumber, title: "Parity PR (renamed)" }) },
   { tool: "update_pull_request_branch", arguments: (state) => ({ ...repo, pull_number: state.pullNumber }) },
   { tool: "merge_pull_request", arguments: (state) => ({ ...repo, pull_number: state.pullNumber }) },
-  { tool: "delete_branch", arguments: { ...repo, branch: "parity" } },
-  // Tags + releases
-  { tool: "create_release", arguments: { ...repo, tag_name: "v0.0.1-parity", name: "Parity release" } },
+  // Tags + releases. `create_release` is REST-only for the same reason.
+  {
+    setup: { method: "POST", path: "/repos/acme/api/releases" },
+    arguments: { tag_name: "v0.0.1-parity", name: "Parity release" },
+  },
   { tool: "list_tags", arguments: { ...repo } },
   { tool: "list_releases", arguments: { ...repo } },
   { tool: "get_latest_release", arguments: { ...repo } },

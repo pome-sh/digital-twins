@@ -109,7 +109,7 @@ trace under `runs/<task-slug>/<run-id>/`.
 | Concept | Where in the code |
 | --- | --- |
 | Claude Agent SDK + in-process MCP tools | `src/index.ts` — `createSdkMcpServer`, `tool()` |
-| Wrapping PR endpoints (`list_pull_requests`, `get_pull_request_files`, `get_file_contents`, …) | `src/index.ts` — `buildTwinTools` |
+| Wrapping PR endpoints (`list_pull_requests`, `pull_request_read`, `get_file_contents`, …) | `src/index.ts` — `buildTwinTools` |
 | Calling the twin's MCP surface (`POST /s/:sid/mcp/call`) | `src/index.ts` — `TwinMcpClient` |
 | Claude key from Infisical or local env | `src/index.ts` — `resolveAnthropicKey` |
 | Env-only twin auth (token pass-through or local JWT mint) | `src/index.ts` — `resolveAuthToken` |

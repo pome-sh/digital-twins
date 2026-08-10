@@ -22,6 +22,7 @@ import {
   formatFindings,
   probeTwin,
   resolveArgs,
+  resolvePath,
   TWIN_BOOT,
 } from "./probe-twin-endpoints.mjs";
 
@@ -101,6 +102,46 @@ assert(
   }).length === 0,
   "evaluateTwinProbeRun is silent on a clean run",
 );
+
+// 0. setup steps (F-1376): state-building, never coverage.
+//
+// twin-github's three release readers only answer once a release exists, and
+// GitHub declares no `create_release` MCP tool for the twin to serve — so the
+// write that builds their subject is a REST call, not a probe. The risk that
+// buys is a setup step quietly counting as coverage for the tool it names, which
+// would make the anti-drift clause silent on exactly the tools hardest to reach.
+{
+  const setup = { method: "POST", path: "/repos/acme/api/releases" };
+  const findings = evaluateTwinProbeRun({
+    twin: "github",
+    declared: [...DECLARED, { name: "merge_pull_request" }],
+    // A setup step naming the SAME route family as a declared tool, and no probe
+    // for `merge_pull_request`.
+    probes: [{ tool: "add_issue_comment" }, { setup, as: "release" }],
+    calls: [call(200), call(201, { method: "POST", path: "/s/probe/repos/acme/api/releases" })],
+  });
+  assert(
+    findings.some((f) => f.kind === "unprobed-endpoint" && f.tool === "merge_pull_request"),
+    "a setup step does not count as coverage for a tool nothing probes",
+  );
+  assert(
+    !findings.some((f) => f.kind === "unknown-endpoint"),
+    "a setup step is not held to the declared-tool list — it has no tool identity",
+  );
+
+  // …but it must still WORK. A silent 4xx here surfaces later as an
+  // unexplained refusal on whichever probe depended on the state it built.
+  const broken = evaluateTwinProbeRun({
+    twin: "github",
+    declared: DECLARED,
+    probes: [{ tool: "add_issue_comment" }, { tool: "merge_pull_request" }, { setup }],
+    calls: [call(200), call(200), call(422, { path: "/s/probe/repos/acme/api/releases" })],
+  });
+  assert(
+    broken.some((f) => f.kind === "refused" && f.tool === "setup POST /repos/acme/api/releases"),
+    "a failing setup step reds the gate, named by its route",
+  );
+}
 
 // 1. refused — THE incident, in the shape this gate sees it. The twin answered
 // `404 Issue not found` for add_issue_comment at a pull request's number.
@@ -312,3 +353,26 @@ if (failures > 0) {
   process.exit(1);
 }
 console.log("probe-twin-endpoints: all assertions passed.");
+
+// resolvePath (F-1376): a setup step addresses state an earlier probe minted, so
+// `$alias` resolves in a path SEGMENT — and only in a whole segment, so a
+// literal `$` cannot be mistaken for a reference.
+{
+  const results = { review_pr: { number: 4 } };
+  assert(
+    resolvePath("/repos/acme/api/pulls/$review_pr.number/comments", results) ===
+      "/repos/acme/api/pulls/4/comments",
+    "resolvePath resolves an alias in a path segment",
+  );
+  assert(
+    resolvePath("/repos/acme/api/releases", results) === "/repos/acme/api/releases",
+    "resolvePath leaves a literal path alone",
+  );
+  let threw = false;
+  try {
+    resolvePath("/repos/acme/api/pulls/$nope.number/comments", results);
+  } catch {
+    threw = true;
+  }
+  assert(threw, "resolvePath fails loudly on an unresolvable segment rather than sending the literal");
+}

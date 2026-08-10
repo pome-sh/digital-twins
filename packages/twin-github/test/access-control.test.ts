@@ -57,7 +57,7 @@ describe("access-control catalog", () => {
     ].sort());
   });
 
-  it("reports 52-endpoint default summary on /healthz", async () => {
+  it("reports 57-endpoint default summary on /healthz", async () => {
     const app = createGitHubCloneApp();
     const res = await app.request("http://pome.local/healthz");
     expect(res.status).toBe(200);
@@ -65,7 +65,7 @@ describe("access-control catalog", () => {
       access_control: ReturnType<typeof summarizeGitHubAccessControlCatalog>;
     };
     expect(body.access_control).toEqual(summarizeGitHubAccessControlCatalog());
-    expect(body.access_control.total).toBe(52);
+    expect(body.access_control.total).toBe(57);
   });
 
   it("serves the full catalog at /_pome/access-control", async () => {
@@ -79,8 +79,8 @@ describe("access-control catalog", () => {
       summary: ReturnType<typeof summarizeGitHubAccessControlCatalog>;
     };
     expect(body.version).toBe(2);
-    expect(body.endpoints).toHaveLength(52);
-    expect(body.summary.total).toBe(52);
+    expect(body.endpoints).toHaveLength(57);
+    expect(body.summary.total).toBe(57);
     expect(body.endpoints.some((e: { tool: string }) => e.tool === "create_check_run")).toBe(true);
     expect(body.categories).toHaveLength(10);
     expect(body.categories.find((g: { category: string }) => g.category === "status_checks")?.endpoints.some(

@@ -253,28 +253,28 @@ describe("recorder state_delta — multi-row mutation views", () => {
 });
 
 describe("recorder state_delta — v2 hot-path mutations", () => {
-  it("legacy MCP create_milestone records the mutating tool state_delta", async () => {
+  // Was `create_milestone` until F-1376 dropped it from the tool table (GitHub
+  // declares no milestone MCP tool). The claim under test is about the MCP door's
+  // state_delta recording, not about milestones, so it moved to a mutating tool
+  // GitHub does declare. `POST /repos/:owner/:repo/milestones` still records its
+  // own delta — `v2-hot-paths-rest.test.ts` covers that door.
+  it("MCP issue_write records the mutating tool state_delta", async () => {
     const { app, recorder } = setupApp();
+    const args = { method: "create", owner: "acme", repo: "api", title: "mcp issue" };
     const response = await app.request(`${base}/mcp/call`, withAuth(token, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        tool: "create_milestone",
-        arguments: { owner: "acme", repo: "api", title: "mcp milestone" }
-      })
+      body: JSON.stringify({ tool: "issue_write", arguments: args })
     }));
     expect(response.status).toBe(200);
 
     const event = lastEvent(recorder.events());
     expect(event.path).toBe(`${base}/mcp/call`);
     expect(event.state_mutation).toBe(true);
-    expect(event.request_body).toEqual({
-      tool: "create_milestone",
-      arguments: { owner: "acme", repo: "api", title: "mcp milestone" }
-    });
+    expect(event.request_body).toEqual({ tool: "issue_write", arguments: args });
     expect(event.state_delta).not.toBeNull();
     expect(event.state_delta!.before).toBeNull();
-    expect(event.state_delta!.after).toMatchObject({ title: "mcp milestone", state: "open" });
+    expect(event.state_delta!.after).toMatchObject({ title: "mcp issue", state: "open" });
   });
 
   it("REST add_collaborator records the invited user state_delta", async () => {

@@ -93,12 +93,15 @@ export function exportLinearState(db: LinearTwinDatabase): LinearStateExport {
   );
 
   const agentActivities = capped(
-    db
-      .prepare(
-        `SELECT id, session_id AS sessionId, user_id AS userId, type, body, ephemeral,
-                created_at AS createdAt FROM agent_activities ORDER BY created_at DESC, id DESC`
-      )
-      .all() as unknown[],
+    (
+      db
+        .prepare(
+          `SELECT id, session_id AS agentSessionId, user_id AS userId, content_json AS content,
+                  signal, ephemeral, created_at AS createdAt
+           FROM agent_activities ORDER BY created_at DESC, id DESC`
+        )
+        .all() as Array<Record<string, unknown>>
+    ).map((row) => ({ ...row, content: parseJson(row.content) })),
     "agentActivities",
     truncatedCollections,
     true

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { z } from "zod";
 import { badUserInput } from "../errors.js";
+import { AGENT_ACTIVITY_SIGNALS } from "../domain/normalize.js";
 import type { IssueCreateInput, IssueUpdateInput } from "../domain/index.js";
 
 const optionalString = z.string().nullish();
@@ -98,11 +99,13 @@ const agentSessionExternalUrlSchema = z
   .strict();
 const optionalExternalUrls = z.array(agentSessionExternalUrlSchema).nullish();
 
+// F-1176 — these four mirror Linear's mutation inputs. `appUserId` and a
+// create-time `plan` are gone (Linear declares neither), `status` is gone (a
+// session's status follows its activities), and `id` is the mutation's own
+// non-null argument rather than an input field.
 export const agentSessionOnIssueInputSchema = z
   .object({
     issueId: z.string().min(1),
-    appUserId: z.string().optional(),
-    plan: optionalString,
     externalUrls: optionalExternalUrls,
   })
   .strict();
@@ -110,16 +113,12 @@ export const agentSessionOnIssueInputSchema = z
 export const agentSessionOnCommentInputSchema = z
   .object({
     commentId: z.string().min(1),
-    appUserId: z.string().optional(),
-    plan: optionalString,
     externalUrls: optionalExternalUrls,
   })
   .strict();
 
 export const agentSessionUpdateInputSchema = z
   .object({
-    id: z.string().min(1).optional(),
-    status: z.string().optional(),
     plan: optionalString,
     externalUrls: optionalExternalUrls,
   })
@@ -127,9 +126,14 @@ export const agentSessionUpdateInputSchema = z
 
 export const agentActivityCreateInputSchema = z
   .object({
-    sessionId: z.string().min(1),
-    type: z.string().min(1),
-    body: z.string().min(1),
+    agentSessionId: z.string().min(1),
+    // `JSONObject!` upstream. The envelope is checked here; which of Linear's
+    // six `AgentActivityContent` members it is, and whether it is well formed,
+    // is the domain's `normalizeActivityContent` — the same split as
+    // `priority` and `normalizePriority`, and the reason a bad content names
+    // itself rather than surfacing as a stray "expected string".
+    content: z.record(z.string(), z.unknown()),
+    signal: z.enum(AGENT_ACTIVITY_SIGNALS).nullish(),
     ephemeral: z.boolean().optional(),
   })
   .strict();
@@ -233,12 +237,7 @@ export function parseWebhookCreateInput(input: unknown) {
 
 export function parseAgentSessionOnIssueInput(input: unknown) {
   const raw = parseOrBadUserInput(agentSessionOnIssueInputSchema, input, "agentSessionCreateOnIssue input");
-  return {
-    issueId: raw.issueId,
-    appUserId: raw.appUserId,
-    plan: raw.plan ?? null,
-    externalUrls: raw.externalUrls ?? null,
-  };
+  return { issueId: raw.issueId, externalUrls: raw.externalUrls ?? null };
 }
 
 export function parseAgentSessionOnCommentInput(input: unknown) {
@@ -247,30 +246,20 @@ export function parseAgentSessionOnCommentInput(input: unknown) {
     input,
     "agentSessionCreateOnComment input"
   );
-  return {
-    commentId: raw.commentId,
-    appUserId: raw.appUserId,
-    plan: raw.plan ?? null,
-    externalUrls: raw.externalUrls ?? null,
-  };
+  return { commentId: raw.commentId, externalUrls: raw.externalUrls ?? null };
 }
 
 export function parseAgentSessionUpdateInput(input: unknown) {
   const raw = parseOrBadUserInput(agentSessionUpdateInputSchema, input, "agentSessionUpdate input");
-  return {
-    id: raw.id,
-    status: raw.status,
-    plan: raw.plan,
-    externalUrls: raw.externalUrls,
-  };
+  return { plan: raw.plan, externalUrls: raw.externalUrls };
 }
 
 export function parseAgentActivityCreateInput(input: unknown) {
   const raw = parseOrBadUserInput(agentActivityCreateInputSchema, input, "agentActivityCreate input");
   return {
-    sessionId: raw.sessionId,
-    type: raw.type,
-    body: raw.body,
+    agentSessionId: raw.agentSessionId,
+    content: raw.content,
+    signal: raw.signal ?? null,
     ephemeral: raw.ephemeral,
   };
 }

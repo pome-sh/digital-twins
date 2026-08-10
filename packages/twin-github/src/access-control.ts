@@ -21,6 +21,7 @@
  * reversible/irreversible.
  */
 import { z } from "zod";
+import { GITHUB_ROUTES } from "./route-inputs.js";
 import { githubToolFixture } from "./tools.js";
 
 export const githubAccessControlCategorySchema = z.enum([
@@ -105,8 +106,19 @@ function entry(
   return { tool, operation, method, category, default_allowed: defaultAllowed, v2 };
 }
 
+// F-1376 — the consolidated MCP tools GitHub declares are policy keys in their
+// own right, and they are listed FIRST in each category so a reader meets them
+// before the single-purpose names they cover.
+//
+// They have to be here. `issue_write` reaches the same domain call
+// `update_issue` does, so a catalog that gated only `update_issue` would let an
+// agent walk around a builder's denial by spelling the call the way GitHub
+// spells it. Each one inherits the most restrictive default of the operations it
+// subsumes.
 const ENDPOINTS: GitHubAccessControlEndpoint[] = [
   // Issues
+  entry("issue_read", "issueRead", "GET", "issues", true),
+  entry("issue_write", "issueWrite", "POST", "issues", true),
   entry("list_issues", "listIssues", "GET", "issues", true),
   entry("get_issue", "getIssue", "GET", "issues", true),
   entry("create_issue", "createIssue", "POST", "issues", true),
@@ -119,19 +131,21 @@ const ENDPOINTS: GitHubAccessControlEndpoint[] = [
   entry("delete_issue_comment", "deleteIssueComment", "DELETE", "issue_comments", false, true),
 
   // Pull requests
+  entry("pull_request_read", "pullRequestRead", "GET", "pull_requests", true),
+  entry("pull_request_review_write", "pullRequestReviewWrite", "POST", "pull_requests", false),
   entry("list_pull_requests", "listPullRequests", "GET", "pull_requests", true),
   entry("get_pull_request", "getPullRequest", "GET", "pull_requests", true),
   entry("create_pull_request", "createPullRequest", "POST", "pull_requests", true),
   entry("update_pull_request", "updatePullRequest", "PATCH", "pull_requests", true, true),
   entry("merge_pull_request", "mergePullRequest", "POST", "pull_requests", false),
   entry("create_pull_request_review", "createReview", "POST", "pull_requests", false),
-  entry("get_pull_request_reviews", "getPullRequestReviews", "GET", "pull_requests", true),
-  entry("get_pull_request_comments", "getPullRequestComments", "GET", "pull_requests", true),
-  entry("get_pull_request_files", "getPullRequestFiles", "GET", "pull_requests", true),
+  entry("get_pull_request_reviews", "listPullRequestReviews", "GET", "pull_requests", true),
+  entry("get_pull_request_comments", "listPullRequestComments", "GET", "pull_requests", true),
+  entry("get_pull_request_files", "listPullRequestFiles", "GET", "pull_requests", true),
   entry("get_pull_request_status", "getPullRequestStatus", "GET", "pull_requests", true),
   entry("update_pull_request_branch", "updatePullRequestBranch", "POST", "pull_requests", false),
   entry("get_pull_request_diff", "getPullRequestDiff", "GET", "pull_requests", true, true),
-  entry("get_pull_request_commits", "getPullRequestCommits", "GET", "pull_requests", true, true),
+  entry("get_pull_request_commits", "listPullRequestCommits", "GET", "pull_requests", true, true),
   entry("create_pull_request_review_comment", "createPullRequestReviewComment", "POST", "pull_requests", true, true),
   entry("add_reply_to_pull_request_comment", "addReplyToPullRequestComment", "POST", "pull_requests", true, true),
 
@@ -169,11 +183,12 @@ const ENDPOINTS: GitHubAccessControlEndpoint[] = [
   entry("create_release", "createRelease", "POST", "tags_releases", false, true),
 
   // Labels
-  entry("create_label", "createLabel", "POST", "labels", false),
+  entry("create_label", "createRepositoryLabel", "POST", "labels", false),
   entry("add_issue_labels", "addIssueLabels", "POST", "labels", false),
-  entry("remove_issue_label", "removeIssueLabel", "DELETE", "labels", false),
+  entry("remove_issue_label", "deleteIssueLabel", "DELETE", "labels", false),
 
   // Collaborators & identity
+  entry("list_repository_collaborators", "listRepositoryCollaborators", "GET", "collaborators", true),
   entry("list_collaborators", "listCollaborators", "GET", "collaborators", true),
   entry("get_me", "getMe", "GET", "collaborators", true, true),
   entry("add_collaborator", "addCollaborator", "PUT", "collaborators", false, true),
@@ -232,12 +247,38 @@ export function githubAccessControlToolNames(
 
 // ---------------------------------------------------------------- tool wiring
 
-/** Every sandboxed tool exists in the MCP catalog. */
+/**
+ * Every catalog entry names a surface this twin actually has.
+ *
+ * ── WHY THIS IS NO LONGER "IS IT AN MCP TOOL" ───────────────────────────────
+ *
+ * It used to be, and that was right for as long as this twin's MCP tool table
+ * and its REST route table named the same operations. F-1376 ended that: GitHub
+ * declares no MCP tool for milestones, commit statuses, check runs or
+ * issue-comment editing, so those thirty-four tools stopped being served — but
+ * every one of them is still reachable over the REST door, which is exactly how
+ * an examinee could have reached them at GitHub in the first place.
+ *
+ * A catalog keyed only to the MCP table would have had to drop those entries,
+ * and dropping them is not a no-op: `tool` is the POLICY KEY pome-cloud stores a
+ * builder's allow/deny against, so deleting an entry silently un-gates a live
+ * REST operation in the dashboard. The check that matters is "does this name
+ * point at something this twin serves", and after F-1376 that question has two
+ * answers, so it reads both tables.
+ *
+ * Both halves are derived, never listed here: `githubToolFixture.toolNames` is
+ * the served MCP listing (F-1325) and `GITHUB_ROUTES`' keys are the declared
+ * REST surface (F-1179). A typo in a catalog entry still fails.
+ */
 export function assertAccessControlCatalogMatchesTools() {
-  const toolNames = new Set<string>(githubToolFixture.toolNames);
-  const missing = githubAccessControlToolNames().filter((name) => !toolNames.has(name));
+  const served = new Set<string>([...githubToolFixture.toolNames, ...Object.keys(GITHUB_ROUTES)]);
+  const missing = GITHUB_ACCESS_CONTROL_CATALOG.endpoints
+    .filter((endpoint) => !served.has(endpoint.tool) && !served.has(endpoint.operation))
+    .map((endpoint) => `${endpoint.tool} (${endpoint.operation})`);
   if (missing.length > 0) {
-    throw new Error(`access-control catalog references unknown tools: ${missing.join(", ")}`);
+    throw new Error(
+      `access-control catalog references surfaces this twin does not serve over MCP or REST: ${missing.join(", ")}`
+    );
   }
 }
 

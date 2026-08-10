@@ -10,8 +10,10 @@ import { describe, expect, it } from "vitest";
 import {
   compareToolNames,
   lintFidelityInventory,
+  lintFidelityRestRoutes,
   loadFidelityInventory,
 } from "@pome-sh/sdk/parity";
+import { GITHUB_ROUTE_INPUTS } from "../src/route-inputs.js";
 import { githubToolFixture } from "../src/tools.js";
 
 const root = resolve(import.meta.dirname, "..");
@@ -35,6 +37,27 @@ describe("fidelity contract documentation", () => {
         { label: "FIDELITY.md", kind: "tool", markdown: fidelity },
         { label: "FIDELITY_MATRIX.md", kind: "rest", markdown: matrix },
       ])
+    ).toEqual([]);
+  });
+
+  it("keeps fidelity.inventory.json's rest rows 1:1 with the routes the twin mounts", () => {
+    // F-1368. The lint above compares two DOCUMENTS — the inventory and
+    // FIDELITY_MATRIX.md — so they agreed with each other and with nothing that
+    // serves traffic; 62 rest rows stood against 66 real routes and nothing
+    // could see it. A surface absent from the inventory is not `not-compared`,
+    // it is invisible, and the inventory is the denominator every fidelity lane
+    // counts against.
+    //
+    // `GITHUB_ROUTE_INPUTS` is the right subject rather than a second reading of
+    // the router: `routes.ts` mounts every route FROM these declarations
+    // (F-1179), and `route-input-declarations.test.ts` pins that export equal
+    // to the registrar's calls AND to the booted app's own table. So comparing
+    // against it is comparing against what answers requests.
+    expect(
+      lintFidelityRestRoutes(
+        inventory,
+        GITHUB_ROUTE_INPUTS.map((declaration) => declaration.surface)
+      )
     ).toEqual([]);
   });
 
@@ -68,7 +91,12 @@ describe("fidelity contract documentation", () => {
 describe("heat tiers (F-729 ruling, F-735 re-cut)", () => {
   const surfaces = [...inventory.tools, ...inventory.rest];
   const ENGINE_INTROSPECTION = ["POST /mcp/call", "POST /mcp/tools/:name"];
-  const DEFERRED_HOT_GAPS = ["get_pull_request_diff", "GET /repos/:owner/:repo/pulls/:number/diff"];
+  // The MCP half of G1 left the inventory in F-1376: `get_pull_request_diff` is
+  // not a tool GitHub declares, and its replacement `pull_request_read` carries
+  // the placeholder-patch gap on ONE of nine methods, which a per-tool tier
+  // cannot express. FIDELITY.md's hot-gap deferral says so; the REST route is
+  // still one surface doing one thing, so it keeps the tier and the deferral.
+  const DEFERRED_HOT_GAPS = ["GET /repos/:owner/:repo/pulls/:number/diff"];
 
   function ledgerSection(): string {
     const start = fidelity.indexOf("## Tier-mismatch ledger");

@@ -259,8 +259,8 @@ CREATE TABLE IF NOT EXISTS agent_activities (
   id TEXT PRIMARY KEY,
   session_id TEXT NOT NULL,
   user_id TEXT,
-  type TEXT NOT NULL,
-  body TEXT NOT NULL,
+  content_json TEXT NOT NULL DEFAULT '{}',
+  signal TEXT,
   ephemeral INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
@@ -339,6 +339,51 @@ export function migrate(db: LinearTwinDatabase): void {
   ensureColumn(db, "issues", "parent_id", "TEXT");
   ensureColumn(db, "comments", "parent_id", "TEXT");
   migrateAgentSessions(db);
+  migrateAgentActivities(db);
+}
+
+/**
+ * F-1176 — carry a pre-`content` `agent_activities` table forward.
+ *
+ * Same reasoning as `migrateAgentSessions` below: `CREATE TABLE IF NOT EXISTS`
+ * leaves an existing file on its old columns, and dropping `type` / `body`
+ * without carrying them over would answer `{}` for every activity ever
+ * recorded.
+ *
+ * The carry is literal — an old row that said `type=thought, body=X` becomes
+ * `{"type":"thought","body":"X"}`, which is exactly what it meant. That is a
+ * valid `AgentActivityContent` for five of the six types. It is NOT one for
+ * `action`, whose upstream member carries `action` / `parameter` and no `body`
+ * at all — but the honest carry of a legacy row is what it said, and inventing
+ * an `action` / `parameter` split out of one free-text field would be worse.
+ * Nothing re-validates content on read, and no writer produces that shape
+ * again.
+ */
+function migrateAgentActivities(db: LinearTwinDatabase): void {
+  const columns = (db.prepare("PRAGMA table_info(agent_activities)").all() as Array<{ name: string }>).map(
+    (column) => column.name
+  );
+  if (!columns.includes("content_json")) {
+    db.exec("ALTER TABLE agent_activities ADD COLUMN content_json TEXT NOT NULL DEFAULT '{}'");
+  }
+  if (!columns.includes("signal")) db.exec("ALTER TABLE agent_activities ADD COLUMN signal TEXT");
+  if (columns.includes("type") && columns.includes("body")) {
+    db.exec(
+      `UPDATE agent_activities
+          SET content_json = json_object('type', type, 'body', body)
+        WHERE content_json = '{}'`
+    );
+  }
+  if (columns.includes("type")) db.exec("ALTER TABLE agent_activities DROP COLUMN type");
+  if (columns.includes("body")) db.exec("ALTER TABLE agent_activities DROP COLUMN body");
+  // Linear declares `AgentActivity.user: User!`. A row whose author was cleared
+  // by the `ON DELETE SET NULL` foreign key adopts its session's app user
+  // rather than reaching `readActivityUserId` and failing the whole read.
+  db.exec(
+    `UPDATE agent_activities
+        SET user_id = (SELECT app_user_id FROM agent_sessions WHERE agent_sessions.id = session_id)
+      WHERE user_id IS NULL`
+  );
 }
 
 /**

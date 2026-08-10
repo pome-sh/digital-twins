@@ -1,5 +1,23 @@
 # @pome-sh/checks
 
+## 0.1.3
+
+No change to the published surface — `dist/` is byte-identical to 0.1.2, so no
+declaration moved and no consumer's verdict changes. The declaration layer has
+not been touched since 0.1.2 was cut (`38acaf9`), which is the version-bump
+gate doing its job rather than an absence of work.
+
+What this version is for: it is the first release cut by following
+[`RELEASING.md`](../../RELEASING.md) end to end since the `packages-v*` batch
+flow was replaced by version-diff-on-push, and it exists to prove that runbook
+is followable — bump, merge, `release.yml` publishes, pome-cloud pins. The
+consumer half is the part that was actually owed: pome-cloud has been pinned at
+0.1.1 since before 0.1.2 shipped, so F-1157's redaction-survival vocabulary has
+not reached the grader.
+
+Version-only bumps are accepted here rather than carrying an exception list,
+per `cli/CHANGELOG.md` 0.21.7.
+
 ## 0.1.2
 
 Carries F-1157 to the grader. Three things move in `dist/`:

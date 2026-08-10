@@ -75,10 +75,32 @@ describe("github MCP tool fixture", () => {
 
   it("declares a substrate that admits nobody read this from GitHub", () => {
     expect(meta.substrate).toBe("twin-code-transcription");
+    // Still `never`, and the word is doing more work than it looks like after
+    // F-1376. The tool NAMES here were compared to GitHub's — as two committed
+    // documents, by pome-cloud's MCP lane — and that comparison is why 34 of
+    // them are gone. Nothing has driven api.githubcopilot.com/mcp/ and compared
+    // ANSWERS, so the behaviour, the argument schemas and the descriptions
+    // below are as unverified as they were on 2026-08-06, and the substrate
+    // must keep saying so.
     expect(meta.transcription?.comparedToUpstream).toMatch(/never/);
-    // The 65-vs-44 gap against F-1326's upstream golden is recorded, not closed.
     expect(meta.transcription?.comparedToUpstream).toMatch(/44 tools/);
-    expect(meta.liveToolCount).toBe(65);
+    expect(meta.liveToolCount).toBe(36);
+  });
+
+  // F-1376's arithmetic, pinned where it can be read against the upstream
+  // golden in this repo rather than only in pome-cloud's lane.
+  it("serves exactly two tools GitHub's captured default surface does not declare", () => {
+    const upstream = new Set(
+      (JSON.parse(
+        readFileSync(join(import.meta.dirname, "..", "..", "..", "fixtures", "mcp-tools-list", "github.meta.json"), "utf8")
+      ) as { liveToolOrder: string[] }).liveToolOrder
+    );
+    const twinOnly = githubToolFixture.toolNames.filter((name) => !upstream.has(name));
+    // Both are real GitHub tools, served from Default:true toolsets behind the
+    // client-settable X-MCP-Features flags `issues_granular` and
+    // `pull_requests_granular`, and both carry an entry in pome-cloud's
+    // known-divergences/github.mcp.yaml. See docs/github-mcp-twin-only-tools.md.
+    expect(twinOnly).toEqual(["create_issue", "create_pull_request_review"]);
   });
 
   // F-1325 — the fixture carries the inputSchema the wire serves, and the zod

@@ -38,12 +38,14 @@ describe("github_clone app", () => {
     expect((await app.request("/admin/reset", { method: "POST" })).status).toBe(200);
 
     const tools = await json(await app.request(`${base}/mcp/tools`, withAuth(token)));
-    expect(tools.tools).toHaveLength(65);
+    expect(tools.tools).toHaveLength(36);
     expect(tools.tools.map((tool: { name: string }) => tool.name)).toContain("create_pull_request");
-    expect(tools.tools.map((tool: { name: string }) => tool.name)).toContain("create_label");
+    expect(tools.tools.map((tool: { name: string }) => tool.name)).toContain("issue_write");
     expect(tools.tools.map((tool: { name: string }) => tool.name)).toContain("list_branches");
-    expect(tools.tools.map((tool: { name: string }) => tool.name)).toContain("create_release");
     expect(tools.tools.map((tool: { name: string }) => tool.name)).toContain("get_me");
+    // F-1376: labels and releases have no MCP tool at GitHub, so none here either.
+    expect(tools.tools.map((tool: { name: string }) => tool.name)).not.toContain("create_label");
+    expect(tools.tools.map((tool: { name: string }) => tool.name)).not.toContain("create_release");
   });
 
   it("exposes /s/:sid/healthz under bearer auth and rejects sid mismatch", async () => {
@@ -91,7 +93,7 @@ describe("github_clone app", () => {
     });
     expect(pr.number).toBe(2);
 
-    const files = await call(app, "get_pull_request_files", { owner: "acme", repo: "api", pull_number: pr.number });
+    const files = await call(app, "pull_request_read", { method: "get_files", owner: "acme", repo: "api", pullNumber: pr.number });
     expect(files.map((file: { filename: string }) => file.filename)).toContain("src/orders.ts");
 
     const review = await call(app, "create_pull_request_review", {

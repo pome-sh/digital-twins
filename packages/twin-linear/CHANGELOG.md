@@ -1,6 +1,74 @@
 # @pome-sh/twin-linear — CHANGELOG
 
 
+## 0.4.0 — 2026-08-09
+
+The agent-session **mutation inputs** are Linear's now, and so is the model they
+imply (F-1176). 0.3.0 fixed the output type and said so in the guard's own
+words — *do not read this file as evidence about the input surface*. This is
+that surface.
+
+**Breaking, on all four inputs.** Every field below is one Linear does not
+declare, verified against `https://api.linear.app/graphql` directly:
+
+| Mutation | Was | Is |
+| --- | --- | --- |
+| `agentSessionUpdate` | `id: String` argument; input `{ id, status, plan, externalUrls }` | `id: String!` argument; input `{ plan, externalUrls }` |
+| `agentSessionCreateOnIssue` | `{ issueId, appUserId, plan, externalUrls }` | `{ issueId, externalUrls }` |
+| `agentSessionCreateOnComment` | `{ commentId, appUserId, plan, externalUrls }` | `{ commentId, externalUrls }` |
+| `agentActivityCreate` | `{ sessionId, type, body, ephemeral }` | `{ agentSessionId, content, signal, ephemeral }` |
+
+**A session's status now follows its activities.** This is the behavioural half,
+and it is why the change is a minor rather than a patch: upstream there is no
+`status` on `agentSessionUpdate` at all, so an agent written against real Linear
+literally could not drive the twin the way the twin expected, and vice versa. A
+session still starts `pending`; `thought` / `action` make it `active`,
+`elicitation` `awaitingInput`, `response` `complete`, `error` `error`, and
+`prompt` returns it to `pending`. That table is the one invented thing in the
+change — Linear says only that state "is updated automatically based on the
+agent's emitted activities" and never publishes which yields which — so it is
+named, bounded, and written up in `REFERENCE-DIVERGENCES.md`. Set a plan through
+`agentSessionUpdate`, which is where Linear declares `plan`; it is no longer on
+create.
+
+**`content` replaces `type` + `body`.** Linear's `AgentActivityContent` is a
+union discriminated on `type` whose six members are
+`AgentActivity{Thought,Action,Response,Elicitation,Error,Prompt}Content`. Five
+carry `body`; `action` carries `action` / `parameter` / `result` and no `body`
+at all, which is why the old flat pair could not survive. The twin parses
+`content` against those six members and refuses a malformed one at the boundary.
+`AgentActivity` moves with it — accepting Linear's `content` while emitting an
+invented `body` would round-trip to neither Linear nor itself — so the output
+type is now `{ id, content, signal, ephemeral, createdAt, updatedAt,
+agentSession, user }`. `session` was the twin's own spelling and is gone; `user`
+is non-null, as Linear declares it.
+
+**An existing `LINEAR_TWIN_DB` file migrates in place on open.**
+`agent_activities` gains `content_json` and `signal`, carries each old row's
+`{ type, body }` into content verbatim, drops `type` and `body`, and re-adopts
+any activity whose author the `ON DELETE SET NULL` foreign key had cleared. The
+carry is literal even for `action`, whose upstream member has no `body`:
+inventing an `action` / `parameter` split out of one free-text field would be
+worse than a faithful record of what the row said. Idempotent, and a no-op on a
+database created by the current schema.
+
+**The guard covers the whole family now.** `GUARDED_TYPES` gains
+`AgentSessionUpdateInput`, `AgentSessionCreateOnIssue` / `OnComment`,
+`AgentActivityCreateInput`, `AgentActivity` and `AgentActivitySignal` — it went
+red on all of them the moment they were added, which was the point — and
+`test/linear-schema-subset.test.ts` gains a block that proves the guard can
+fail, driving the same comparison against a schema built to be wrong. The
+SCOPE note that carved the input surface out of F-1172's claim is deleted.
+
+Two scalar-level gaps stay open and are written up rather than fixed, because
+the guard is name-based by F-1172's design: input `plan` is `String` where
+upstream is `JSONObject`, and output `content` is `JSON!` where upstream is the
+union. Input `content` **is** `JSONObject!`, as upstream.
+
+`packages/twin-linear/route-inputs.json` changes by two lines —
+`agentSessionUpdate`'s `id` argument is `String!`, required — which is the
+declared-fidelity lane seeing the second, smaller divergence close.
+
 ## 0.3.5 — 2026-08-06
 
 Its MCP tool table is now derived from `fixtures/mcp-tools-list.raw.json`

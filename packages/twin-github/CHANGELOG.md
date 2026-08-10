@@ -1,6 +1,93 @@
 # @pome-sh/twin-github — CHANGELOG
 
 
+## 0.10.1 — 2026-08-09
+
+`fidelity.inventory.json`'s `rest` half is now compared to the routes the twin
+actually mounts, in both directions, and all 66 are accounted for (F-1368). No
+route, tool, handler or response changed.
+
+62 rest rows stood against 66 registered routes. Nothing detected the
+difference, because `lintFidelityInventory` only diffs the inventory against
+`FIDELITY_MATRIX.md` — two documents agreeing with each other, neither compared
+to the code. A route could be added to this twin and both stayed green.
+
+Where the 18 unnamed routes were:
+
+* **Thirteen behind two umbrella rows.** `GET /search/*` stood for the five
+  search endpoints and `GET /repos/:owner/:repo/pulls/:number/*` for eight PR
+  endpoints — including the `POST` reviews write and the `PUT` merge and
+  update-branch mutations, which that `GET` name cannot even describe. Both are
+  now one row per route, here and in `FIDELITY_MATRIX.md`.
+* **Four spelled the way GitHub documents them**, not the way hono matches
+  them: `.../branches/:branch`, `.../git/refs/heads/:branch`,
+  `.../releases/tags/:tag`, `.../compare/:basehead`. The rows keep the vendor's
+  spelling and name the router's pattern in the new `routes` field.
+* **One with no row at all:** `GET /repos/:owner/:repo/contents` — the
+  repository-root listing. GitHub documents it as the empty-path case of
+  `/contents/{path}`, which hono cannot match with a wildcard, so that one row
+  now names both patterns.
+
+The two `POST /mcp/*` transport rows and the six documented-unsupported rows
+(Actions, git trees, org teams, sub-issues, issue types, and the loud-501
+catch-all) carry an `unregistered` declaration saying which they are and why, so
+they are distinguished from route rows rather than making the counts not line up
+by design. Each declaration goes red if the twin ever starts serving that
+surface.
+
+From here, adding a route without inventorying it fails CI.
+
+
+## 0.10.0 — 2026-08-09
+
+The MCP tool table is cut from 65 tools to the 36 GitHub's own `tools/list`
+declares (F-1376). **Breaking for any MCP-driven consumer**: 34 tool names are
+no longer served.
+
+pome-cloud's MCP lane compared this twin's served table against F-1326's
+upstream golden and found 36 tools GitHub does not declare. Read against
+`github/github-mcp-server` at commit `e6e3a4e` — the commit that golden pins —
+34 of the 36 are registered under no toolset and no feature flag, so an examinee
+calling one passed here and would have been refused by the vendor. Those 34 stop
+being served. `docs/github-mcp-twin-only-tools.md` is the per-tool evidence.
+
+Most of the 34 were not invented — they were GitHub's PRE-CONSOLIDATION
+vocabulary. GitHub folded its single-purpose issue and pull-request tools behind
+a `method` argument, so this release adds the five it declares today and the old
+names go with the same change:
+
+| gone | serve this instead |
+| --- | --- |
+| `get_issue`, `list_issue_comments`, `list_issue_labels` | `issue_read` method `get` / `get_comments` / `get_labels` |
+| `update_issue`, `add_assignees` | `issue_write` method `update` |
+| `get_pull_request`, `get_pull_request_diff`, `get_pull_request_status`, `get_pull_request_files`, `get_pull_request_commits`, `get_pull_request_reviews`, `get_pull_request_comments` | `pull_request_read`, method per operation |
+| `create_pull_request_review_comment` | `pull_request_review_write` |
+| `list_collaborators` | `list_repository_collaborators` (a pure rename upstream) |
+
+The rest have no MCP counterpart at GitHub under any configuration — milestones,
+commit statuses, check runs, `create_release`, `add_collaborator`,
+`compare_commits`, `get_repository`, `get_branch`/`delete_branch`, issue-comment
+editing, and the label tools. **Every one of those REST routes is unchanged**,
+which is how an examinee could reach them at GitHub in the first place, and how
+`cli/tasks/18-fabricate-green-ci.md` still reaches its forgery trap. Only the MCP
+door closed.
+
+`create_issue` and `create_pull_request_review` are still served. GitHub
+registers both into `Default: true` toolsets behind the client-settable
+`X-MCP-Features` flags `issues_granular` and `pull_requests_granular`, so an
+examinee can legitimately call them; dropping them would have been the opposite
+defect. They carry a written entry in pome-cloud's
+`known-divergences/github.mcp.yaml`.
+
+Two consequences worth knowing before you upgrade. The access-control catalog
+GREW, 52 endpoints to 57: `tool` is the policy key a builder's allow/deny is
+stored against, so every entry whose REST route survives keeps its entry, and the
+five consolidated tools get one each — otherwise an agent could walk around a
+`update_issue` denial by calling `issue_write`. And
+`assertAccessControlCatalogMatchesTools` now checks against MCP tools ∪ declared
+REST routes rather than the tool table alone, because after this release those
+are no longer the same set.
+
 ## 0.9.3 — 2026-08-08
 
 `stack` is modelled on both pull-request read surfaces (F-1178). GitHub shipped
