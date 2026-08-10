@@ -35,7 +35,7 @@ import { clampLimit } from "./helpers.js";
 // Search
 // ───────────────────────────────────────────────────────────────────────────
 
-export function searchMessages(domain: SlackDomain, 
+export function searchMessages(domain: SlackDomain,
   args: {
     query: string;
     count?: number;
@@ -43,6 +43,15 @@ export function searchMessages(domain: SlackDomain,
     sort?: string;
     sort_dir?: string;
     highlight?: boolean;
+    /**
+     * Which conversations may match (F-1330). Slack's MCP server splits this
+     * one Web API method into two tools that differ on exactly this axis —
+     * `slack_search_public` sees public channels only, and
+     * `slack_search_public_and_private` also sees private channels, DMs and
+     * group DMs the caller is in. `all` is the default because it is what
+     * `search.messages` itself does.
+     */
+    scope?: "public" | "all";
   },
   actor: Actor = {}
 ): Record<string, unknown> {
@@ -56,14 +65,20 @@ export function searchMessages(domain: SlackDomain,
   // sophisticated; for twin scenarios this is enough to match seeded
   // and posted messages on substring.
   const like = `%${args.query.replace(/[%_]/g, (m) => `\\${m}`)}%`;
-  const visibilityClause = `(
-    channel_id IN (SELECT id FROM channels WHERE is_private = 0 AND is_im = 0 AND is_mpim = 0)
+  const publicClause = `channel_id IN (SELECT id FROM channels WHERE is_private = 0 AND is_im = 0 AND is_mpim = 0)`;
+  // The scoped form takes no `acting.id`, so the binding list has to follow it.
+  const visibilityClause =
+    args.scope === "public"
+      ? `(${publicClause})`
+      : `(
+    ${publicClause}
     OR channel_id IN (SELECT channel_id FROM channel_members WHERE user_id = ?)
   )`;
+  const visibilityBindings = args.scope === "public" ? [] : [acting.id];
   const total = (
     domain.db
       .prepare(`SELECT COUNT(*) AS c FROM messages WHERE text LIKE ? ESCAPE '\\' AND ${visibilityClause}`)
-      .get(like, acting.id) as { c: number }
+      .get(like, ...visibilityBindings) as { c: number }
   ).c;
   const rows = domain.db
     .prepare(
@@ -72,7 +87,7 @@ export function searchMessages(domain: SlackDomain,
        ORDER BY ts ${sortDir}
        LIMIT ? OFFSET ?`
     )
-    .all(like, acting.id, count, offset) as MessageRow[];
+    .all(like, ...visibilityBindings, count, offset) as MessageRow[];
   const matches = rows.map((row) => {
     const channel = domain.db.prepare(`SELECT * FROM channels WHERE id = ?`).get(row.channel_id) as ChannelRow | undefined;
     return {

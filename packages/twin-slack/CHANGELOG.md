@@ -1,6 +1,71 @@
 # @pome-sh/twin-slack — CHANGELOG
 
 
+## 0.4.0 — 2026-08-10
+
+**Breaking.** It serves the tools Slack declares. Every tool name and almost
+every argument name changed (F-1330).
+
+The eleven names it served before came from
+`modelcontextprotocol/servers-archived/src/slack`, an archived reference server,
+copied into TypeScript by commit `6abec3c` in June. Three of them exist at
+Slack. Eight do not, and never have — this was not drift, and no Slack changelog
+records any such rename. An examinee written against real Slack emitted
+`slack_send_message`, this twin answered only `slack_post_message`, and the exam
+scored a failure the agent did not commit.
+
+`fixtures/mcp-tools-list.raw.json` is now Slack's own listing: F-1329's live
+OAuth capture of `https://mcp.slack.com/mcp` (19 tools), minus the one ruled
+unexposed. Names, descriptions, input schemas and annotations are the vendor's,
+byte for byte.
+
+| was | is |
+| --- | --- |
+| `slack_post_message` | `slack_send_message` — `text` → `message` |
+| `slack_reply_to_thread` | gone; `slack_send_message` with `thread_ts` |
+| `slack_get_channel_history` | `slack_read_channel` |
+| `slack_get_thread_replies` | `slack_read_thread` — `thread_ts` → `message_ts` |
+| `slack_get_user_profile` | `slack_read_user_profile` — `user_id` now optional |
+| `slack_get_users` | `slack_search_users` — `query` **required** |
+| `slack_list_channels` | `slack_search_channels` — `query` **required** |
+| `slack_search_messages` | `slack_search_public` **and** `slack_search_public_and_private` |
+| `slack_add_reaction` | same name — `timestamp` → `message_ts`, `reaction` → `emoji` |
+| `slack_get_reactions` | same name — `timestamp` → `message_ts` |
+| `slack_list_channel_members` | same name, plus the arguments Slack declares |
+
+Seven tools are newly served, all of them Slack's:
+`slack_schedule_message` and `slack_create_conversation` (hot),
+`slack_read_file`, `slack_search_emojis`, `slack_create_canvas`,
+`slack_update_canvas` and `slack_read_canvas` (warm). Six were pure wiring over
+domains that already existed; `slack_read_canvas` had none, so `canvasesRead`
+was added at the shape tier its heat asks for.
+
+**`additionalProperties` is gone, and that is a fix in the other direction.**
+The schemas were `z.strictObject`, so a call that got the name right and carried
+a real Slack argument (`message`, `reply_broadcast`, `oldest`, `cursor`,
+`response_format`) was hard-rejected. No `inputSchema` Slack serves declares
+`additionalProperties`, so none of these does; validation is `z.looseObject`.
+
+`slack_send_message_draft` is the one tool Slack declares that this twin does
+not serve — `cold`, a client-UI concept with no Web API analog. It is registered
+in pome-cloud's `known-divergences/slack.mcp.yaml` and reasoned in
+`docs/slack-mcp-unexposed-tools.md`, so the MCP lane reads a decision rather
+than an omission.
+
+Two smaller behaviour changes came with it. `canvases.edit` now applies every
+operation in its `changes` array, in order, against one snapshot — it used to
+apply the first and answer ok for the rest, which told an agent batching three
+edits that all three landed. And `search.messages` takes an optional `scope`,
+because the two search tools Slack serves over it differ on exactly that axis.
+
+`slackToolInputSchema` is removed. Byte-pinning the validator against the
+fixture stopped being possible when the fixture became the vendor's — Slack's
+schemas carry prose no zod schema projects to — so the pin moved to the argument
+surface: `toolSchemaConformance()` reports any key, required field or
+unknown-argument rejection on which the validator and Slack's declaration
+disagree, and the contract suite demands it be empty.
+
+
 ## 0.3.6 — 2026-08-08
 
 `slack.no-reaction-added` declares `subject: ({ reaction }) => reaction`. It

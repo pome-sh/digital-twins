@@ -1,74 +1,116 @@
 {
   "twin": "slack",
   "package": "@pome-sh/twin-slack",
-  "updated": "2026-07-22",
-  "notes": "Re-cut against packages/sdk/ENDPOINT-TIERS.md per the F-729 twin-slack ruling (SL1-SL5), implemented by F-736; Wave 3 filled remaining warm gaps (SL3 canvases shape, SL4 setTopic/setPurpose + emoji.list semantic). Heat is ruled, fidelity is measured; both tables lint 1:1 against FIDELITY.md. Cold rows are named-only — the remaining upstream tail stays implicitly cold via the 501 catch-all. Warm surfaces above their shape target are mirrored in FIDELITY.md's tier-mismatch ledger (M5 additive-only ruling: no code demotions this milestone). Message drafts have no Web API analog to name a row for (PS, client-UI concept) — recorded here, not as a surface.",
+  "updated": "2026-08-10",
+  "notes": "Re-cut against packages/sdk/ENDPOINT-TIERS.md per the F-729 twin-slack ruling (SL1-SL5), implemented by F-736; Wave 3 filled remaining warm gaps (SL3 canvases shape, SL4 setTopic/setPurpose + emoji.list semantic). F-1330 re-cut the TOOLS half against what Slack actually declares: the eleven names here were copied out of an archived reference server by commit 6abec3c and only three of them existed at Slack. The tool table is now F-1329's live OAuth capture of mcp.slack.com/mcp (19 tools) minus the one ruled cold, and its 18 rows below carry F-1330's gate-1 heat ruling for the seven newly exposed. Heat is ruled, fidelity is measured; both tables lint 1:1 against FIDELITY.md. Cold rows are named-only — the remaining upstream tail stays implicitly cold via the 501 catch-all. Warm surfaces above their shape target are mirrored in FIDELITY.md's tier-mismatch ledger (M5 additive-only ruling: no code demotions this milestone; F-1330 gate 2 ruled that M5 does not bind the removal of a name no Slack deployment ever served). Message drafts remain unexposed — a client-UI concept with no Web API analog (PS) — but are no longer silently absent: slack_send_message_draft is registered in pome-cloud's known-divergences/slack.mcp.yaml and reasoned in docs/slack-mcp-unexposed-tools.md.",
   "tools": [
     {
-      "name": "slack_post_message",
+      "name": "slack_send_message",
       "heat": "hot",
       "fidelity": "semantic",
-      "justification": "Ruled hot (F-729): TC:post-and-read — the core agent messaging chain; MCP: vendor first-party server ships the message write."
+      "justification": "Ruled hot (F-729): TC:post-and-read — the core agent messaging chain; MCP:send_message (vendor first-party tool). F-1330 renamed it off the fabricated slack_post_message, moved text→message, and folded slack_reply_to_thread into it via thread_ts — which is where Slack itself puts the thread reply."
     },
     {
-      "name": "slack_reply_to_thread",
+      "name": "slack_schedule_message",
       "heat": "hot",
       "fidelity": "semantic",
-      "justification": "Ruled hot (F-729): TC:post-and-read — threaded follow-up on the messaging chain; MCP: vendor thread read/write tools."
+      "justification": "Ruled hot (F-1330 gate 1): TC:post-and-read with a delay — the rubric's own example chain (\"post the report to the channel\"); MCP:schedule_message (vendor first-party tool). Wiring over the existing semantic chat.scheduleMessage domain, not new depth."
     },
     {
       "name": "slack_add_reaction",
       "heat": "hot",
       "fidelity": "semantic",
-      "justification": "Ruled hot (F-729): MCP:add_reaction (vendor first-party tool); TC:post-and-read — ack/verify step on the messaging chain."
+      "justification": "Ruled hot (F-729): MCP:add_reaction (vendor first-party tool); TC:post-and-read — ack/verify step on the messaging chain. F-1330 corrected its parameters to Slack's: message_ts and emoji, not timestamp and reaction."
     },
     {
-      "name": "slack_get_channel_history",
+      "name": "slack_create_conversation",
       "heat": "hot",
       "fidelity": "semantic",
-      "justification": "Ruled hot (F-729): TC:post-and-read — the channel read agents poll after posting; MCP: vendor channel-read tool."
+      "justification": "Ruled hot (F-1330 gate 1): MCP:create_conversation (vendor first-party tool); TC — an agent told to message people with no channel opens one first, so it sits on the head of the messaging chain. Wiring over the existing semantic conversations.create / open / invite domains."
     },
     {
-      "name": "slack_get_thread_replies",
-      "heat": "hot",
-      "fidelity": "semantic",
-      "justification": "Ruled hot (F-729): TC:post-and-read — thread read on the messaging chain; MCP: vendor thread-read tool."
+      "name": "slack_create_canvas",
+      "heat": "warm",
+      "fidelity": "shape",
+      "justification": "Ruled warm (F-1330 gate 1): MCP:create_canvas (vendor first-party tool), but a side artefact rather than a core chain — a triage agent reads a canvas far more often than it authors one. Wiring over the existing shape-tier canvases.create domain, at its warm target."
     },
     {
-      "name": "slack_list_channels",
-      "heat": "hot",
-      "fidelity": "semantic",
-      "justification": "Ruled hot (F-729): TC:discovery — channel lookup precedes nearly every chain; MCP: vendor channel search/read tools."
+      "name": "slack_update_canvas",
+      "heat": "warm",
+      "fidelity": "shape",
+      "justification": "Ruled warm (F-1330 gate 1): MCP:update_canvas (vendor first-party tool); side artefact, same reasoning as create. Shape at the warm target: the twin has no section model, so section-relative edits apply as whole-document ops (divergence #16)."
     },
     {
-      "name": "slack_get_users",
+      "name": "slack_search_public",
       "heat": "hot",
       "fidelity": "semantic",
-      "justification": "Ruled hot (F-729): TC:discovery — user lookup precedes DMs, invites, and mentions; MCP: vendor user-search tool."
+      "justification": "Ruled hot (F-729, SL2): TC:discovery; MCP:search_public (vendor first-party tool). F-1330 split the fabricated slack_search_messages into the two tools Slack actually serves; this one is scoped to public channels. Backed by the existing semantic search.messages domain."
     },
     {
-      "name": "slack_get_user_profile",
+      "name": "slack_search_public_and_private",
       "heat": "hot",
       "fidelity": "semantic",
-      "justification": "Ruled hot (F-729): TC:discovery; MCP:read_user_profile (vendor first-party tool)."
+      "justification": "Ruled hot (F-729, SL2): TC:discovery; MCP:search_public_and_private (vendor first-party tool). The other half of F-1330's one-tool-to-two split — same domain, actor-scoped visibility across private channels and DMs."
     },
     {
-      "name": "slack_search_messages",
+      "name": "slack_search_channels",
       "heat": "hot",
       "fidelity": "semantic",
-      "justification": "Ruled hot (F-729, SL2): TC:discovery; MCP: vendor search suite (5 search tools). F-736 hot-gap fill — an MCP-only agent could not search before this tool; backed by the existing semantic search.messages domain."
+      "justification": "Ruled hot (F-729): TC:discovery — channel lookup precedes nearly every chain; MCP:search_channels (vendor first-party tool). F-1330 renamed it off slack_list_channels and made `query` required, which is a behaviour change, not a rename: the old tool took none and returned everything."
     },
     {
-      "name": "slack_get_reactions",
+      "name": "slack_search_users",
       "heat": "hot",
       "fidelity": "semantic",
-      "justification": "Ruled hot (F-729, SL2): MCP:get_reactions (vendor first-party tool); TC:post-and-read verify step. F-736 hot-gap fill backed by the existing semantic reactions.get domain."
+      "justification": "Ruled hot (F-729): TC:discovery — user lookup precedes DMs, invites and mentions; MCP:search_users (vendor first-party tool). F-1330 renamed it off slack_get_users and made `query` required."
+    },
+    {
+      "name": "slack_read_channel",
+      "heat": "hot",
+      "fidelity": "semantic",
+      "justification": "Ruled hot (F-729): TC:post-and-read — the channel read agents poll after posting; MCP:read_channel (vendor first-party tool). F-1330 renamed it off slack_get_channel_history."
+    },
+    {
+      "name": "slack_read_thread",
+      "heat": "hot",
+      "fidelity": "semantic",
+      "justification": "Ruled hot (F-729): TC:post-and-read — thread read on the messaging chain; MCP:read_thread (vendor first-party tool). F-1330 renamed it off slack_get_thread_replies and moved thread_ts→message_ts."
+    },
+    {
+      "name": "slack_read_canvas",
+      "heat": "warm",
+      "fidelity": "shape",
+      "justification": "Ruled warm (F-1330 gate 1): MCP:read_canvas (vendor first-party tool) — a context read on a side artefact. The one tool in this batch that was NOT pure wiring: domain/canvases.ts carried create/edit/delete and no read, so F-1330 added canvasesRead at the shape tier its heat asks for. MCP-only — Slack reads a canvas over files.info, which this twin backs from a separate table."
+    },
+    {
+      "name": "slack_read_user_profile",
+      "heat": "hot",
+      "fidelity": "semantic",
+      "justification": "Ruled hot (F-729): TC:discovery; MCP:read_user_profile (vendor first-party tool — named by its real name in this file's own rest rows since F-729, while the tool row carried the fabricated slack_get_user_profile). F-1330 closed that contradiction."
     },
     {
       "name": "slack_list_channel_members",
       "heat": "hot",
       "fidelity": "semantic",
-      "justification": "Ruled hot (F-729, SL2): MCP:list_channel_members (vendor first-party tool); TC:discovery. F-736 hot-gap fill backed by the existing semantic conversations.members domain."
+      "justification": "Ruled hot (F-729, SL2): MCP:list_channel_members (vendor first-party tool); TC:discovery. One of the three names that already matched Slack — F-1330 left the name and added the parameters Slack declares (response_format, include_deleted, include_bots)."
+    },
+    {
+      "name": "slack_read_file",
+      "heat": "warm",
+      "fidelity": "shape",
+      "justification": "Ruled warm (F-1330 gate 1): MCP:read_file (vendor first-party tool) — a context read, not a chain an agent drives. Wiring over the existing shape-tier files.info domain, at its warm target."
+    },
+    {
+      "name": "slack_search_emojis",
+      "heat": "warm",
+      "fidelity": "semantic",
+      "justification": "Ruled warm (F-1330 gate 1): MCP:search_emojis (vendor first-party tool); a side lookup, not a chain. Wiring over the existing emoji.list domain, which is semantic — above the warm shape target, so it joins the tier-mismatch ledger rather than being demoted."
+    },
+    {
+      "name": "slack_get_reactions",
+      "heat": "hot",
+      "fidelity": "semantic",
+      "justification": "Ruled hot (F-729, SL2): MCP:get_reactions (vendor first-party tool); TC:post-and-read verify step. One of the three names that already matched Slack — F-1330 kept it and moved timestamp→message_ts."
     }
   ],
   "rest": [

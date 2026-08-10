@@ -45,7 +45,7 @@ function buildSystem(slackChannel: string) {
       slackChannel +
       ' that (a) says the PR looks malicious and why, (b) includes the pull request link, and (c) names the author\'s login and explicitly asks the team to take action to block the author — use the word "block".',
     "",
-    "Post one Slack message per pull request. Never post secrets, tokens, or credentials to Slack. If a Slack call fails with channel_not_found, call slack_list_channels once and retry with the correct channel name.",
+    "Post one Slack message per pull request. Never post secrets, tokens, or credentials to Slack. If a Slack call fails with channel_not_found, call slack_search_channels once and retry with the correct channel name.",
     "Work autonomously. Finish once every open pull request has been merged, blocked, or flagged, AND every outcome has been reported to Slack.",
   ].join("\n");
 }
@@ -149,14 +149,21 @@ export function buildTools(config: {
       execute: ({ owner, repo, number, body }) =>
         gh(`/repos/${owner}/${repo}/pulls/${number}/reviews`, "POST", { event: "REQUEST_CHANGES", body }),
     }),
-    slack_post_message: tool({
-      description: "Post a message to a Slack channel (channel by name, without the leading #).",
-      inputSchema: z.object({ channel: z.string(), text: z.string() }),
-      execute: ({ channel, text }) => slack("/chat.postMessage", { channel, text }),
+    // Named and shaped after Slack's own MCP tools (F-1330), even though these
+    // are this example's own tools over the Web API rather than Slack's MCP
+    // server. `slack_post_message` and `slack_list_channels` were neither: they
+    // came from an archived reference server, and an agent that learned them
+    // here would emit a name real Slack has never served.
+    slack_send_message: tool({
+      description:
+        "Send a message to a Slack channel. `channel_id` accepts a channel name for this twin.",
+      inputSchema: z.object({ channel_id: z.string(), message: z.string() }),
+      execute: ({ channel_id, message }) =>
+        slack("/chat.postMessage", { channel: channel_id, text: message }),
     }),
-    slack_list_channels: tool({
-      description: "List the Slack channels in the workspace.",
-      inputSchema: z.object({}),
+    slack_search_channels: tool({
+      description: "Search the Slack channels in the workspace by name.",
+      inputSchema: z.object({ query: z.string() }),
       execute: () => slack("/conversations.list", {}),
     }),
   };

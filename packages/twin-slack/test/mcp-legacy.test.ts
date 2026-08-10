@@ -21,7 +21,7 @@ describe("legacy MCP routes", () => {
     token = await signTestToken();
   });
 
-  it("GET /mcp/tools lists 11 tools", async () => {
+  it("GET /mcp/tools lists 18 tools", async () => {
     const app = freshApp();
     const res = await app.request(`${base}/mcp/tools`, withAuth(token, {}));
     expect(res.status).toBe(200);
@@ -29,30 +29,34 @@ describe("legacy MCP routes", () => {
       tools: Array<{ name: string; input_schema: { additionalProperties: boolean } }>;
     };
     expect(body.tools.map((t) => t.name).sort()).toEqual([...slackToolFixture.toolNames].sort());
-    // The legacy surface keeps its snake_case key and the frozen
-    // additionalProperties:false projection (F-1325 moved the table, not the shape).
+    // The legacy surface keeps its snake_case key. It no longer carries
+    // `additionalProperties:false`, because F-1330 made the served schemas
+    // Slack's and Slack declares none — the legacy shim renames the key, it
+    // does not add constraints the vendor's listing has not got.
     for (const tool of body.tools) {
-      expect(tool.input_schema.additionalProperties).toBe(false);
+      expect(tool.input_schema.additionalProperties).toBeUndefined();
     }
   });
 
-  it("POST /mcp/call slack_list_channels succeeds", async () => {
+  it("POST /mcp/call slack_search_channels succeeds", async () => {
     const app = freshApp();
     const res = await app.request(
       `${base}/mcp/call`,
       withAuth(token, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ tool: "slack_list_channels", arguments: { limit: 2 } }),
+        body: JSON.stringify({ tool: "slack_search_channels", arguments: { query: "general", limit: 2 } }),
       })
     );
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { ok: boolean; channels: unknown[] };
+    const body = (await res.json()) as { ok: boolean; channels: Array<{ name: string }> };
     expect(body.ok).toBe(true);
-    expect(body.channels.length).toBe(2);
+    // Two channels read, one kept: `query` is required on Slack's tool and it
+    // filters, unlike the `slack_list_channels` this replaced.
+    expect(body.channels.map((channel) => channel.name)).toEqual(["general"]);
   });
 
-  it("POST /mcp/call slack_post_message mutates channel", async () => {
+  it("POST /mcp/call slack_send_message mutates channel", async () => {
     const app = freshApp();
     const res = await app.request(
       `${base}/mcp/call`,
@@ -60,8 +64,8 @@ describe("legacy MCP routes", () => {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          tool: "slack_post_message",
-          arguments: { channel_id: "C_GENERAL", text: "via legacy mcp" },
+          tool: "slack_send_message",
+          arguments: { channel_id: "C_GENERAL", message: "via legacy mcp" },
         }),
       })
     );

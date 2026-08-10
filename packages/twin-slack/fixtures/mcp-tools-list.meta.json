@@ -1,36 +1,49 @@
 {
   "twin": "slack",
-  "substrate": "twin-code-transcription",
-  "endpoint": "in-process://twin-slack/s/:sid/mcp",
+  "substrate": "live-wire-oauth",
+  "endpoint": "https://mcp.slack.com/mcp",
   "method": "tools/list",
-  "protocol": "JSON-RPC 2.0 over Streamable HTTP",
+  "protocol": "JSON-RPC 2.0 over HTTP",
   "protocolVersion": "2025-06-18",
-  "captureDate": "2026-08-06",
-  "rawFileSha256": "2125da69d748e6d151aa229ee2fb4b6e5219372c5c858bce900fa045c7a234d4",
-  "liveToolCount": 11,
+  "captureDate": "2026-08-10",
+  "rawFileSha256": "95a99db4025486b00b4b5c7f7035fc8f4e059af4e79abfbf175c205c5db82b3f",
+  "liveToolCount": 18,
   "liveToolOrder": [
-    "slack_post_message",
-    "slack_reply_to_thread",
+    "slack_send_message",
+    "slack_schedule_message",
     "slack_add_reaction",
-    "slack_get_channel_history",
-    "slack_get_thread_replies",
-    "slack_list_channels",
-    "slack_get_users",
-    "slack_get_user_profile",
-    "slack_search_messages",
-    "slack_get_reactions",
-    "slack_list_channel_members"
+    "slack_create_conversation",
+    "slack_create_canvas",
+    "slack_update_canvas",
+    "slack_search_public",
+    "slack_search_public_and_private",
+    "slack_search_channels",
+    "slack_search_users",
+    "slack_read_channel",
+    "slack_read_thread",
+    "slack_read_canvas",
+    "slack_read_user_profile",
+    "slack_list_channel_members",
+    "slack_read_file",
+    "slack_search_emojis",
+    "slack_get_reactions"
   ],
-  "transcription": {
-    "readFrom": "twin-slack's own tools/list, booted on defaultSeedState() and driven through Hono's app.request, read immediately before this table became fixture-driven (F-1325)",
-    "contentOrigin": "packages/twin-slack/src/tools.ts — a hand-written TypeScript array. Commit 6abec3c copied its eleven names verbatim out of modelcontextprotocol/servers-archived/src/slack, an archived reference server, and nothing has read Slack's own tools/list since.",
-    "comparedToUpstream": "never. https://mcp.slack.com/mcp is OAuth-gated, so F-1326 recorded the upstream golden as deferred (fixtures/mcp-tools-list/slack.status.json, F-1329). Eight of these eleven names are believed to exist on no Slack deployment; reporting that is F-1327's job and renaming them is F-1330's. This fixture is deliberately NOT a claim about Slack."
+  "configuration": {
+    "auth": "bearer",
+    "grantedScopes": "channels:history,groups:history,im:history,mpim:history,channels:read,emoji:read,files:read,canvases:read,groups:read,im:read,lists:read,mpim:read,reactions:read,users:read,users:read.email,channels:write,chat:write,files:write,canvases:write,groups:write,im:write,lists:write,mpim:write,reactions:write,search:read.public,search:read.private,search:read.mpim,search:read.im,search:read.files,search:read.users",
+    "responseFraming": "application/json",
+    "deploymentSelector": "the installing Slack workspace. Captured 2026-08-10 from an INTERNAL Slack app installed to the pome twin sandbox workspace, under a user token (xoxp) carrying every scope mcp.slack.com advertises in its protected-resource metadata (all 30). The capture is F-1329's, and this file is F-1330 adopting it: fixtures/mcp-tools-list/slack.raw.json at rawFileSha256 c6b29aba1d382175ca560228d10cc2665a0710b68298895721f7fcb4bcc25974.",
+    "derivation": "the upstream golden's 19 tools MINUS the 1 this twin does not expose. Produced by scripts/adopt-upstream-mcp-fixture.ts, which can only subtract: it re-hashes the golden, refuses a suppression naming a tool the capture does not carry, and copies every surviving name, description, inputSchema and annotation through byte for byte. `npm run gate:mcp-fixture -w @pome-sh/twin-slack` re-derives and diffs.",
+    "unexposed": "slack_send_message_draft — cold under packages/sdk/ENDPOINT-TIERS.md (a client-UI concept with no Web API analog), ruled in F-1330's gate 1 and registered in pome-cloud's known-divergences/slack.mcp.yaml. Per-tool reasoning: docs/slack-mcp-unexposed-tools.md.",
+    "matchesExaminee": "for the 18 tools served, exactly — name, description, inputSchema and annotations are the vendor's own bytes. An examinee's agent that calls slack_send_message_draft against real Slack is answered there and refused here, which is the one deliberate difference and is registered as such."
   },
   "notes": [
-    "additionalProperties:false on every inputSchema is load-bearing and is frozen here verbatim: src/tools.ts builds each schema with z.strictObject and forces the draft-7 projection, and the divergence lane depends on seeing it on the wire.",
-    "Seeded from the code table rather than from upstream on purpose. F-1325 is name-neutral by construction: every byte this twin serves is identical before and after it."
+    "F-1330: this listing stopped being a transcription of the twin's own TypeScript and became the vendor's. Before it, the twin served 11 names copied by commit 6abec3c out of modelcontextprotocol/servers-archived/src/slack; only 3 of them existed at Slack, and even those three took different parameters. An examinee written against real Slack emitted slack_send_message and was scored a failure it did not commit.",
+    "No inputSchema here declares additionalProperties, because none of Slack's does. That is a REVERSAL: the pre-F-1330 fixture forced additionalProperties:false on all eleven, so a correctly-named call carrying a live parameter (message, reply_broadcast, oldest, cursor, response_format) was hard-rejected. src/tools.ts now validates with z.looseObject to match.",
+    "Descriptions are the capture's verbatim, including the sentences that name the CAPTURE workspace's logged-in user (U0B79GFLEH0) in slack_send_message, slack_search_public, slack_search_public_and_private, slack_search_users and slack_list_channel_members. Slack templates that ID per installation and the twin's seeded agent is a different user, so those five sentences are wrong about this twin's world. They are served unedited on purpose: no constant is right across seeds, and inventing one would trade the vendor's provenance for the twin's guess — which is the class of defect this ticket exists to remove. Making descriptions seed-aware is a separate ruling.",
+    "18 tools, not 19. Which one is missing and why is in `configuration.unexposed`; it is a registered divergence, not an omission."
   ],
-  "canonicalFileSha256": "fc8fb7a0cc46ae7747bc1452d6c255194270bf10b4cba0888932661996eebfc6",
+  "canonicalFileSha256": "52db6b129031fbaee9e85b8f20c02982d9fdba8308ce69bf8bd2b27f28c40d7d",
   "files": {
     "raw": "mcp-tools-list.raw.json",
     "canonical": "mcp-tools-list.canonical.json"

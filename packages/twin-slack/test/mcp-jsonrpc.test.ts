@@ -60,19 +60,19 @@ describe("MCP JSON-RPC dispatch", () => {
     expect((body as { result: unknown }).result).toEqual({});
   });
 
-  it("tools/list returns 11 tools with inputSchema", async () => {
+  it("tools/list returns 18 tools with inputSchema", async () => {
     const { body } = await jsonRpc(token, { jsonrpc: "2.0", id: 1, method: "tools/list" });
     const tools = (body as { result: { tools: Array<{ name: string; inputSchema: unknown }> } }).result.tools;
-    expect(tools.length).toBe(11);
+    expect(tools.length).toBe(18);
     expect(tools.every((t) => Boolean(t.inputSchema))).toBe(true);
   });
 
-  it("tools/call slack_list_channels returns ok:true content", async () => {
+  it("tools/call slack_search_channels returns ok:true content", async () => {
     const { body } = await jsonRpc(token, {
       jsonrpc: "2.0",
       id: 1,
       method: "tools/call",
-      params: { name: "slack_list_channels", arguments: { limit: 5 } },
+      params: { name: "slack_search_channels", arguments: { query: "general", limit: 5 } },
     });
     const result = (body as { result: { content: Array<{ text: string }>; isError?: boolean } }).result;
     expect(result.isError).toBeUndefined();
@@ -100,7 +100,7 @@ describe("MCP JSON-RPC dispatch", () => {
       jsonrpc: "2.0",
       id: 1,
       method: "tools/call",
-      params: { name: "slack_post_message", arguments: { channel_id: "C_GENERAL" /* missing text */ } },
+      params: { name: "slack_send_message", arguments: { channel_id: "C_GENERAL" /* missing message */ } },
     });
     const result = (body as { result: { isError?: boolean; content: Array<{ text: string }> } }).result;
     expect(result.isError).toBe(true);
@@ -114,7 +114,7 @@ describe("MCP JSON-RPC dispatch", () => {
       jsonrpc: "2.0",
       id: 1,
       method: "tools/call",
-      params: { name: "slack_get_user_profile", arguments: { user_id: "U_NOPE" } },
+      params: { name: "slack_read_user_profile", arguments: { user_id: "U_NOPE" } },
     });
     const result = (body as { result: { isError?: boolean; content: Array<{ text: string }> } }).result;
     expect(result.isError).toBe(true);
@@ -171,12 +171,12 @@ describe("MCP JSON-RPC dispatch", () => {
     expect(res.status).toBe(405);
   });
 
-  it("tools/call slack_post_message succeeds", async () => {
+  it("tools/call slack_send_message succeeds", async () => {
     const { body } = await jsonRpc(token, {
       jsonrpc: "2.0",
       id: 9,
       method: "tools/call",
-      params: { name: "slack_post_message", arguments: { channel_id: "C_GENERAL", text: "rpc post" } },
+      params: { name: "slack_send_message", arguments: { channel_id: "C_GENERAL", message: "rpc post" } },
     });
     const result = (body as { result: { content: Array<{ text: string }> } }).result;
     const parsed = JSON.parse(result.content[0]!.text) as { ok: boolean; ts: string };

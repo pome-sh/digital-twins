@@ -8,9 +8,9 @@ export {
   isMutatingTool,
   MUTATING_TOOL_NAMES,
   slackToolFixture,
-  slackToolInputSchema,
   toolSchemas,
 } from "./tools.js";
+export { toolSchemaConformance } from "./tool-schema-conformance.js";
 export type {
   BookmarkRow,
   ChannelMemberRow,

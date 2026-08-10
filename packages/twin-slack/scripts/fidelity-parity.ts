@@ -19,44 +19,87 @@ type SlackEnvelope = { ok?: boolean; error?: string };
 
 const steps: ParityStep[] = [
   {
-    tool: "slack_list_channels",
+    tool: "slack_search_channels",
+    arguments: { query: "general" },
     capture: (body, state) => {
       const channels = (body as { channels?: Array<{ id?: string; name?: string }> }).channels ?? [];
       state.channelId = channels.find((channel) => channel.name === "general")?.id;
     },
+    verify: (body) => {
+      const channels = (body as { channels?: Array<{ name?: string }> }).channels ?? [];
+      return channels.every((channel) => channel.name?.includes("general"))
+        ? undefined
+        : "search returned a channel the query does not match";
+    },
   },
   {
-    tool: "slack_post_message",
-    arguments: (state) => ({ channel_id: state.channelId, text: "Parity message" }),
+    tool: "slack_send_message",
+    arguments: (state) => ({ channel_id: state.channelId, message: "Parity message" }),
     capture: (body, state) => {
       state.ts = (body as { ts?: string }).ts;
     },
   },
-  { tool: "slack_reply_to_thread", arguments: (state) => ({ channel_id: state.channelId, thread_ts: state.ts, text: "Parity reply" }) },
-  { tool: "slack_add_reaction", arguments: (state) => ({ channel_id: state.channelId, timestamp: state.ts, reaction: "thumbsup" }) },
-  { tool: "slack_get_channel_history", arguments: (state) => ({ channel_id: state.channelId }) },
-  { tool: "slack_get_thread_replies", arguments: (state) => ({ channel_id: state.channelId, thread_ts: state.ts }) },
+  // No slack_reply_to_thread step: Slack folds the thread reply into the send
+  // via thread_ts, and so does this twin since F-1330.
   {
-    tool: "slack_get_users",
+    tool: "slack_send_message",
+    arguments: (state) => ({
+      channel_id: state.channelId,
+      message: "Parity reply",
+      thread_ts: state.ts,
+    }),
+  },
+  {
+    tool: "slack_schedule_message",
+    arguments: (state) => ({
+      channel_id: state.channelId,
+      message: "Parity scheduled",
+      post_at: 4102444800,
+    }),
+  },
+  {
+    tool: "slack_add_reaction",
+    arguments: (state) => ({ channel_id: state.channelId, message_ts: state.ts, emoji: "thumbsup" }),
+  },
+  { tool: "slack_read_channel", arguments: (state) => ({ channel_id: state.channelId }) },
+  {
+    tool: "slack_read_thread",
+    arguments: (state) => ({ channel_id: state.channelId, message_ts: state.ts }),
+  },
+  {
+    tool: "slack_search_users",
+    arguments: { query: "alice" },
     capture: (body, state) => {
       const members = (body as { members?: Array<{ id?: string; name?: string }> }).members ?? [];
       state.aliceId = members.find((member) => member.name === "alice")?.id;
     },
   },
-  { tool: "slack_get_user_profile", arguments: (state) => ({ user_id: state.aliceId }) },
-  // F-736 hot-gap read tools: search the posted message, read back the
-  // reaction added above, list the members of the channel we posted into.
+  { tool: "slack_read_user_profile", arguments: (state) => ({ user_id: state.aliceId }) },
   {
-    tool: "slack_search_messages",
+    tool: "slack_create_conversation",
+    arguments: (state) => ({ user_ids: [state.aliceId] }),
+  },
+  // Slack serves two search tools over the one Web API method; the scope is
+  // the only thing that separates them, so both are driven.
+  {
+    tool: "slack_search_public",
     arguments: { query: "Parity" },
     verify: (body) => {
       const matches = (body as { messages?: { matches?: unknown[] } }).messages?.matches ?? [];
-      return matches.length > 0 ? undefined : "search returned no match for the posted message";
+      return matches.length > 0 ? undefined : "public search returned no match for the posted message";
+    },
+  },
+  {
+    tool: "slack_search_public_and_private",
+    arguments: { query: "Parity" },
+    verify: (body) => {
+      const matches = (body as { messages?: { matches?: unknown[] } }).messages?.matches ?? [];
+      return matches.length > 0 ? undefined : "scoped search returned no match for the posted message";
     },
   },
   {
     tool: "slack_get_reactions",
-    arguments: (state) => ({ channel_id: state.channelId, timestamp: state.ts }),
+    arguments: (state) => ({ channel_id: state.channelId, message_ts: state.ts }),
     verify: (body) => {
       const reactions = (body as { message?: { reactions?: Array<{ name?: string }> } }).message?.reactions ?? [];
       return reactions.some((r) => r.name === "thumbsup")
@@ -70,6 +113,51 @@ const steps: ParityStep[] = [
     verify: (body) => {
       const members = (body as { members?: string[] }).members ?? [];
       return members.length > 0 ? undefined : "channel member list came back empty";
+    },
+  },
+  { tool: "slack_search_emojis", arguments: { query: "pome" } },
+  // Canvases: create, edit, read back. The read is the tool F-1330 had to
+  // implement rather than wire — there was no canvas read in the domain.
+  {
+    tool: "slack_create_canvas",
+    arguments: { title: "Parity canvas", content: "# Parity\nFirst line." },
+    capture: (body, state) => {
+      state.canvasId = (body as { canvas_id?: string }).canvas_id;
+    },
+  },
+  {
+    tool: "slack_update_canvas",
+    arguments: (state) => ({
+      canvas_id: state.canvasId,
+      sections: [{ edit_type: "append", content: "Second line." }],
+    }),
+  },
+  {
+    tool: "slack_read_canvas",
+    arguments: (state) => ({ canvas_id: state.canvasId }),
+    verify: (body) => {
+      const content = (body as { content?: string }).content ?? "";
+      return content.includes("Second line.")
+        ? undefined
+        : "canvas read did not show the appended section";
+    },
+  },
+  // Slack declares no file-upload MCP tool, so slack_read_file's subject is
+  // minted over the REST route the twin still serves. A setup step is not
+  // coverage — the ring-2/ring-3 check reads `tool` alone.
+  {
+    setup: { method: "POST", path: "/files.upload" },
+    arguments: { channels: "C_GENERAL", filename: "parity.txt", content: "parity" },
+    capture: (body, state) => {
+      state.fileId = (body as { file?: { id?: string } }).file?.id;
+    },
+  },
+  {
+    tool: "slack_read_file",
+    arguments: (state) => ({ file_id: state.fileId }),
+    verify: (body) => {
+      const file = (body as { file?: { name?: string } }).file;
+      return file?.name === "parity.txt" ? undefined : "file read did not return the uploaded file";
     },
   },
 ];

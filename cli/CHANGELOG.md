@@ -4,6 +4,26 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.0
+
+### Minor Changes
+
+- The bundled `twin-slack` serves the tools Slack declares. Every Slack MCP tool
+  name changed, and most argument names with them (F-1330).
+
+  An agent you run against `pome twin start slack` must be updated:
+  `slack_post_message` → `slack_send_message` (with `message`, not `text`),
+  `slack_list_channels` → `slack_search_channels` (`query` is now required),
+  `slack_get_channel_history` → `slack_read_channel`, and so on — the full table
+  is in `packages/twin-slack/CHANGELOG.md` 0.4.0. `slack_reply_to_thread` is
+  gone: Slack folds the thread reply into `slack_send_message` via `thread_ts`.
+  Seven tools Slack serves and the twin did not are now served.
+
+  The names it served before were copied out of an archived reference server and
+  three of them existed at Slack, so an agent written against the real vendor was
+  being marked down for calls it made correctly. The tool table is now the
+  vendor's own captured listing.
+
 ## 0.22.1
 
 ### Patch Changes

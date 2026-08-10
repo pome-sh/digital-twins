@@ -166,7 +166,7 @@ let threadParentTs = "";
       jsonrpc: "2.0",
       id: 2,
       method: "tools/call",
-      params: { name: "slack_list_channels", arguments: { limit: 10 } },
+      params: { name: "slack_search_channels", arguments: { query: "general", limit: 10 } },
     }),
   });
   const body = (await res.json()) as { result: { content: Array<{ type: string; text: string }>; isError?: boolean } };

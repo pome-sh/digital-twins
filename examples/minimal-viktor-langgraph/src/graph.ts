@@ -316,7 +316,7 @@ export function buildGraph(model: BaseChatModel, config: TwinConfig, channel: st
           `⚠️ PR #${number} looks malicious: ${d.reason} ` +
           `Author ${author} — please block this author. ${link(number)}`;
       }
-      await tools.slack_post_message.invoke({ channel, text });
+      await tools.slack_send_message.invoke({ channel_id: channel, message: text });
       reports.push(text);
     }
     return { reports };

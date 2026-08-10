@@ -147,12 +147,16 @@ export function buildTools(config: TwinConfig) {
     },
   );
 
-  const slack_post_message = tool(
-    ({ channel, text }) => slack("/chat.postMessage", { channel, text }),
+  // Slack's own tool name and argument names (F-1330). This is the example's
+  // tool over the Web API, not Slack's MCP server — but a name Slack has never
+  // served teaches the wrong vocabulary, and `slack_post_message` was one.
+  const slack_send_message = tool(
+    ({ channel_id, message }) => slack("/chat.postMessage", { channel: channel_id, text: message }),
     {
-      name: "slack_post_message",
-      description: "Post a message to a Slack channel (channel by name, without the leading #).",
-      schema: z.object({ channel: z.string(), text: z.string() }),
+      name: "slack_send_message",
+      description:
+        "Send a message to a Slack channel. `channel_id` accepts a channel name for this twin.",
+      schema: z.object({ channel_id: z.string(), message: z.string() }),
     },
   );
 
@@ -165,7 +169,7 @@ export function buildTools(config: TwinConfig) {
     list_collaborators,
     merge_pull_request,
     request_changes,
-    slack_post_message,
+    slack_send_message,
   };
 }
 

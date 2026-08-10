@@ -217,6 +217,13 @@ jobs:
           # because the emitter imports the twins' compiled declarations rather
           # than reading TypeScript with a regex.
           npm run gate:route-inputs
+          # F-1330 — twin-slack's tool table is Slack's own listing minus the
+          # tools ruled unexposed, produced by a script that can only subtract.
+          # The sha in its meta.json catches a hand edit to the raw file; only
+          # this line catches the raw file quietly diverging from the upstream
+          # golden it claims to be. Needs the build above: the script imports
+          # @pome-sh/sdk to re-derive the canonical bytes.
+          npm run gate:mcp-fixture -w @pome-sh/twin-slack
           # F-866 — the bundled examples/ projects are standalone npm packages
           # (own lockfiles), not workspaces, so `npm run typecheck` above misses
           # them. Typecheck each against the just-built adapter so a zod-4 / SDK

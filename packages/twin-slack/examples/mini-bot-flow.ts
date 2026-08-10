@@ -18,51 +18,52 @@ async function tool(name: string, args: Record<string, unknown>) {
 }
 
 // 1. Discover the workspace.
-const channels = (await tool("slack_list_channels", { limit: 25 })) as {
+const channels = (await tool("slack_search_channels", { query: "general", limit: 25 })) as {
   channels: Array<{ id: string; name: string }>;
 };
 const general = channels.channels.find((c) => c.name === "general");
 if (!general) throw new Error("seeded #general channel missing");
 
-const users = (await tool("slack_get_users", { limit: 50 })) as {
+const users = (await tool("slack_search_users", { query: "", limit: 50 })) as {
   members: Array<{ id: string; name: string }>;
 };
 console.log(`workspace has ${users.members.length} users across ${channels.channels.length} channels`);
 
 // 2. Post a parent message.
-const parent = (await tool("slack_post_message", {
+const parent = (await tool("slack_send_message", {
   channel_id: general.id,
-  text: "Bot flow: starting a thread",
+  message: "Bot flow: starting a thread",
 })) as { ts: string };
 console.log(`posted parent ts=${parent.ts}`);
 
-// 3. Reply twice in the thread.
-await tool("slack_reply_to_thread", {
+// 3. Reply twice in the thread — same tool, with thread_ts. Slack has no
+// separate thread-reply tool, and neither does this twin (F-1330).
+await tool("slack_send_message", {
   channel_id: general.id,
   thread_ts: parent.ts,
-  text: "Bot flow: reply #1",
+  message: "Bot flow: reply #1",
 });
-await tool("slack_reply_to_thread", {
+await tool("slack_send_message", {
   channel_id: general.id,
   thread_ts: parent.ts,
-  text: "Bot flow: reply #2",
+  message: "Bot flow: reply #2",
 });
 
 // 4. React.
 await tool("slack_add_reaction", {
   channel_id: general.id,
-  timestamp: parent.ts,
-  reaction: "rocket",
+  message_ts: parent.ts,
+  emoji: "rocket",
 });
 
 // 5. Read it back.
-const replies = (await tool("slack_get_thread_replies", {
+const replies = (await tool("slack_read_thread", {
   channel_id: general.id,
-  thread_ts: parent.ts,
+  message_ts: parent.ts,
 })) as { messages: Array<{ text: string }> };
 console.log(`thread shows ${replies.messages.length} messages: ${replies.messages.map((m) => m.text).join(" | ")}`);
 
-const history = (await tool("slack_get_channel_history", {
+const history = (await tool("slack_read_channel", {
   channel_id: general.id,
   limit: 5,
 })) as { messages: Array<{ ts: string }> };

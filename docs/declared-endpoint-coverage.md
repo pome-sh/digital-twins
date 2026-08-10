@@ -4,6 +4,16 @@ The delta F-1305 asks for first, written down. Measured on `11f1db2`, not
 recalled: every number below came from booting the twins and counting what was
 called, and the method is reproducible from this file.
 
+> **This page is a measurement, and it is stale on purpose.** Two of the twin
+> tool tables it counts have moved since `11f1db2`: F-1376 took github from 65
+> tools to 36, and F-1330 replaced slack's 11 with the 18 Slack actually
+> declares — so eight of the slack names below no longer exist. The numbers are
+> left as recorded, because rewriting a measurement to match today's tables
+> would destroy the only evidence that the gap this page found was real. What
+> closed the gap is the gate the page argues for: `npm run probe:twins` calls
+> every tool every twin declares, from the twin's own `tools/list`, and reds on
+> any it cannot reach. That gate is current; this page is its motivation.
+
 ## What "a declared endpoint" is
 
 Prod `list_twins` advertises **111 endpoints** — github 65, slack 11, gmail 13,
@@ -56,6 +66,7 @@ that is only ever exercised on its error path.
 - slack: `slack_reply_to_thread`, `slack_add_reaction`,
   `slack_get_channel_history`, `slack_get_thread_replies`, `slack_get_users`,
   `slack_search_messages`, `slack_get_reactions`, `slack_list_channel_members`
+  (six of these eight names were retired by F-1330 — they were never Slack's)
 - linear: `list_comments`, `list_teams`, `get_team`, `list_users`, `get_user`,
   `list_issue_statuses`, `get_issue_status`, `list_issue_labels`,
   `create_issue_label`, `list_projects`, `get_project`, `save_project`,
