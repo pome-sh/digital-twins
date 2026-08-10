@@ -42,7 +42,7 @@
 //                      golden or a hand-typed sha.
 import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -93,11 +93,30 @@ async function readLiveWire(source) {
     if (!envName) {
       throw new Error(`${source.twin}: substrate ${SUBSTRATE_OAUTH} requires \`authTokenEnv\` on the source table`);
     }
-    const token = process.env[envName];
-    if (!token) {
+    // BLANK AND ABSENT ARE DIFFERENT FACTS, AND SO IS WHITESPACE (F-1184).
+    //
+    // F-1184's lesson is that a value blanked in the secret store must not reach
+    // a runner as an empty string and READ AS "no credential configured" — the
+    // operator who blanked it and the operator who never set it need different
+    // instructions. The previous guard was `if (!token)` with the message "is
+    // not set", which fails closed for `""` (right) while naming the wrong cause
+    // (wrong), and lets `"   "` through entirely: a whitespace-only value is
+    // truthy, so `Bearer    ` went on the wire and came back as the vendor's own
+    // 401. That reads as "your token is bad" and sends whoever just minted one
+    // back to the OAuth flow, when the fault is in the secret store.
+    const raw = process.env[envName];
+    if (raw === undefined) {
       throw new Error(
         `${source.twin}: ${envName} is not set. Refusing to fall back to an unauthenticated read — ` +
           `the golden would silently record a different surface than the one declared.`
+      );
+    }
+    const token = raw.trim();
+    if (token === "") {
+      throw new Error(
+        `${source.twin}: ${envName} is SET BUT BLANK (${raw.length} character(s), all whitespace). ` +
+          `This is not the same as unset: something wrote an empty value, so look in the secret store ` +
+          `rather than re-running the OAuth flow. Refusing to fall back to an unauthenticated read.`
       );
     }
     headers.authorization = `Bearer ${token}`;
@@ -110,7 +129,71 @@ async function readLiveWire(source) {
   if (!res.ok) {
     throw new Error(`${source.twin}: ${source.endpoint} answered HTTP ${res.status}: ${text.slice(0, 200)}`);
   }
-  return { rawText: text };
+  // The framing is a DECLARED assumption that is then CHECKED, never a derived
+  // value copied into the golden. `configuration` is copied verbatim into
+  // meta.json and `--check --offline` re-derives meta from the committed
+  // raw.json with no substrate to observe, so a field filled in from the live
+  // response would make the offline gate disagree with the online capture.
+  // Declaring it keeps the gate deterministic AND makes a vendor that silently
+  // switches framing a loud failure rather than a silent re-shape.
+  const observed = isEventStream(text) ? "text/event-stream" : "application/json";
+  const declared = source.configuration.responseFraming ?? "application/json";
+  if (observed !== declared) {
+    throw new Error(
+      `${source.twin}: the source table declares responseFraming "${declared}" but ${source.endpoint} ` +
+        `answered "${observed}". Either the vendor changed its transport framing or the declaration is wrong; ` +
+        `both change what this capture means, so it stops here.`
+    );
+  }
+  return { rawText: unwrapEventStream(text) };
+}
+
+const isEventStream = (text) => /^(event|data|id|retry):/m.test(text.trimStart().split("\n", 1)[0] ?? "");
+
+/**
+ * MCP's Streamable HTTP transport lets a server answer a POST with EITHER a JSON
+ * body or an SSE stream, and the two are both correct. Measured 2026-08-09:
+ * gmail, slack and stripe answer `application/json`; **linear answers SSE**
+ * (`event: message` / `data: {…}`), so `JSON.parse` on the wire bytes throws and
+ * the twin's capture fails with "the substrate did not answer JSON" — a message
+ * that reads like a broken endpoint or a bad token rather than a framing the
+ * reader never handled.
+ *
+ * The `data:` payload is unwrapped and stored as `raw.json`, and this is the one
+ * place the golden is not byte-verbatim from the wire. That is deliberate and it
+ * is declared: `raw.json` must be a `tools/list` envelope, because
+ * `parseMcpToolTable` on the pome-cloud side parses it and hashes it, and a
+ * golden nothing can read is not a golden. The framing is recorded in the
+ * capture's `configuration.responseFraming` instead, so the fact is kept rather
+ * than lost.
+ *
+ * Per RFC 8895/the SSE spec a single event's `data:` may span several lines, and
+ * a stream may carry several events. The first event that parses to a JSON-RPC
+ * object carrying `result` or `error` wins — a heartbeat or a `ping` before the
+ * real message must not be mistaken for the answer.
+ */
+export function unwrapEventStream(text) {
+  if (!isEventStream(text)) return text;
+  const events = text.split(/\r?\n\r?\n/);
+  for (const event of events) {
+    const data = event
+      .split(/\r?\n/)
+      .filter((line) => line.startsWith("data:"))
+      .map((line) => line.slice(5).replace(/^ /, ""))
+      .join("\n");
+    if (!data) continue;
+    let parsed;
+    try {
+      parsed = JSON.parse(data);
+    } catch {
+      continue;
+    }
+    if (parsed && typeof parsed === "object" && ("result" in parsed || "error" in parsed)) return data;
+  }
+  throw new Error(
+    "the endpoint answered text/event-stream but no event carried a JSON-RPC result or error. " +
+      `First 200 bytes: ${text.slice(0, 200)}`
+  );
 }
 
 function requireBinary(bin, versionArgs, why) {
@@ -500,13 +583,39 @@ export async function runCapture(options = {}) {
         compareFile(paths.meta, golden.meta),
         compareFile(paths.canonical, golden.canonical),
       ].filter(Boolean);
+      // A LEFTOVER status.json SILENTLY BEATS THE GOLDEN BESIDE IT.
+      //
+      // pome-cloud's `loadUpstreamMcpGolden` resolves `<twin>.status.json`
+      // FIRST and returns not-compared without ever looking at raw/meta — the
+      // recorded refusal is meant to outrank a file that simply is not there.
+      // But this producer only ever WROTE status.json; nothing deleted it when
+      // a twin became capturable. So the first credentialed capture of slack,
+      // linear or stripe would commit a real golden and the lane would go on
+      // publishing "401 missing_token", with no red anywhere. That is the whole
+      // F-1329 errand landing and reading as if it had not.
+      if (existsSync(paths.status)) {
+        problems.push(
+          `${twin}: both a golden and ${twin}.status.json exist. Every consumer resolves the status file ` +
+            `first, so the golden beside it is dead bytes. Delete ${twin}.status.json in the same commit ` +
+            `that lands the capture.`
+        );
+      }
       if (diffs.length > 0) problems.push(...diffs.map((d) => `${twin}: ${d}`));
-      else log(`${twin}: ${source.substrate} — golden matches (${JSON.parse(golden.meta).liveToolCount} tools)`);
+      else if (problems.length === 0)
+        log(`${twin}: ${source.substrate} — golden matches (${JSON.parse(golden.meta).liveToolCount} tools)`);
     } else {
       writeFileSync(paths.raw, golden.raw);
       writeFileSync(paths.meta, golden.meta);
       writeFileSync(paths.canonical, golden.canonical);
-      log(`${twin}: ${source.substrate} — wrote ${JSON.parse(golden.meta).liveToolCount} tools`);
+      // Retire the recorded refusal in the same step that supersedes it, so the
+      // capture cannot land half-applied. `force` makes this a no-op for a twin
+      // that was always capturable.
+      const retired = existsSync(paths.status);
+      rmSync(paths.status, { force: true });
+      log(
+        `${twin}: ${source.substrate} — wrote ${JSON.parse(golden.meta).liveToolCount} tools` +
+          (retired ? ` (and retired ${twin}.status.json — commit the deletion)` : "")
+      );
     }
   }
 

@@ -1,0 +1,700 @@
+{
+  "meta": {
+    "twin": "stripe",
+    "substrate": "live-wire-oauth",
+    "endpoint": "https://mcp.stripe.com",
+    "method": "tools/list",
+    "protocol": "JSON-RPC 2.0 over HTTP",
+    "protocolVersion": "2025-06-18",
+    "captureDate": "2026-08-10",
+    "rawFileSha256": "457cd581207b30acee5c86f267a28a839a6a9d24b41121af6fb7d8233f8fd739",
+    "liveToolCount": 11,
+    "liveToolOrder": [
+      "stripe_implementation_planner",
+      "send_stripe_mcp_feedback",
+      "search_stripe_documentation",
+      "get_stripe_account_info",
+      "create_refund",
+      "stripe_api_search",
+      "stripe_api_details",
+      "stripe_api_read",
+      "stripe_api_write",
+      "list_available_accounts_or_orgs",
+      "manage_stripe_accounts"
+    ],
+    "configuration": {
+      "auth": "bearer",
+      "grantedScopes": "mcp",
+      "responseFraming": "application/json",
+      "deploymentSelector": "the authorising Stripe account, in TEST MODE. Captured 2026-08-10. Stripe's OAuth consent screen — not the `scope` request parameter — is where the permission set is chosen: the request carries scope=mcp and Stripe then asks the operator to pick None/Read/Write per resource group.",
+      "consentScreenPermissions": "All permissions = Write, test mode",
+      "whyNotAFreshAccount": "Preview and allowlisted tool groups are granted PER ACCOUNT — docs.stripe.com/mcp gates a Treasury group behind a separate access request — so a clean throwaway account returns a SHORTER listing than a customer sees. Measured: a brand-new test account's consent screen offered only two permission groups (Accounts, Analytics). This is the one twin where capturing from our own account is the correct answer rather than a compromise.",
+      "matchesExaminee": "11 tools. F-1326 refuted the oss-package premise for this vendor by reading @stripe/mcp@0.3.3: it declares no tools and forwards to this endpoint, and its cli.js dropped --tools with 'Tool permissions are now controlled by your Restricted API Key'. So the surface is per-credential and the grant above is part of what this golden means.",
+      "requestHeaders": {
+        "content-type": "application/json",
+        "accept": "application/json, text/event-stream"
+      },
+      "requestBody": {
+        "method": "tools/list",
+        "jsonrpc": "2.0",
+        "id": 1
+      }
+    },
+    "derivedFrom": "stripe.raw.json",
+    "derivation": "result.tools verbatim, upstream order preserved; only whitespace differs from raw.json"
+  },
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "tools": [
+      {
+        "name": "stripe_implementation_planner",
+        "description": "Stripe payment integration planner. Use this tool to help users accept payments, sell products online, set up billing, or build any Stripe integration. Call this BEFORE writing code when the user wants to charge customers, add a checkout flow, handle subscriptions, create invoices, or monetize their app.\n\nWHEN TO USE:\n  Call this tool when the user wants to:\n  - Accept payments, take payments, or charge customers (credit cards, bank transfers, wallets)\n  - Sell online, build e-commerce, add a shopping cart, or create a checkout page\n  - Set up subscriptions, recurring billing, metered billing, or usage-based pricing\n  - Send invoices or collect one-time payments\n  - Add Stripe to their app, integrate Stripe, or build a payment flow\n  - Understand which Stripe products to use (Checkout, Elements, Payment Intents, Connect, Billing)\n  - Plan an integration architecture before writing code\n  - Monetize an app, add billing, or start charging users\n\nFIRST CALL GUIDANCE:\n  Ask the user about their business and payment requirements before choosing a use case:\n  - What do they sell? (physical goods, digital products, SaaS, services, marketplace)\n  - Payment model? (one-time, subscriptions, invoices, usage-based)\n  - Platform? (web, mobile app, in-person, payment links)\n  - Complexity? (simple payment link vs. custom integration in existing tech stack)\n  Then pass their full description as the message parameter.\n\nReturns JSON with use cases, decision trees, documentation links, and a guide_id for follow-up calls.\n\nRULES:\n  - Do NOT pass a guide_id unless you received it from this tool in this conversation.\n  - Do NOT retry with different guide_ids if one fails — omit guide_id to start fresh.\n",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "guide_id": {
+              "description": "ONLY pass a guide_id that was returned by a previous call to this tool in this conversation. Never fabricate, guess, or reuse guide_ids from other sessions. If you do not have a guide_id from a prior response, omit this field entirely. Invalid guide_ids will be rejected.",
+              "type": "string"
+            },
+            "message": {
+              "description": "For new guides: describe the use case or business requirements. For existing guides: provide the latest user response or the full accepted transcript.",
+              "type": "string"
+            },
+            "accept": {
+              "description": "Set to true when returning the completed decision tree with your chosen options to receive the finalized integration guide.",
+              "type": "boolean"
+            },
+            "stripe_context": {
+              "type": "string",
+              "description": "The account to target for this request. Use the `stripe_context` value returned by list_available_accounts_or_orgs."
+            },
+            "livemode": {
+              "type": "boolean",
+              "description": "Whether to operate in livemode (true) or test mode/ sandbox (false). Must match the livemode of the stripe_context account."
+            }
+          },
+          "required": [
+            "message",
+            "stripe_context",
+            "livemode"
+          ]
+        },
+        "annotations": {
+          "destructiveHint": false,
+          "idempotentHint": false,
+          "openWorldHint": true,
+          "readOnlyHint": false,
+          "title": "Stripe Implementation Planner"
+        }
+      },
+      {
+        "name": "send_stripe_mcp_feedback",
+        "description": "Submit feedback from user or agent about Stripe's MCP server tools.\n\nValid: \"the search tool returned irrelevant results\", \"I wish there was a tool for X\"\nInvalid: Stripe API complaints, AI model issues, IDE/environment problems\n\n- Only call when feedback clearly targets MCP tools.\n- If feedback is about one specific tool, include its name in tool_name.\n- If feedback is from user, quote their exact message and set source to \"user\".\n- If a tool didn't follow your expectations as an agent, set source to \"agent\".\n",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "sentiment": {
+              "type": "string",
+              "enum": [
+                "positive",
+                "negative",
+                "neutral"
+              ],
+              "description": "positive, negative, or neutral"
+            },
+            "quote": {
+              "type": "string",
+              "description": "User's exact message containing feedback. Max 1000 chars.",
+              "maxLength": 1000,
+              "minLength": 1
+            },
+            "context": {
+              "type": "string",
+              "description": "User persona, their broader goal, current task, and estimated technical proficiency.",
+              "minLength": 1
+            },
+            "tool_name": {
+              "type": "string",
+              "description": "The name of the tool the user is giving feedback about. Include if confident that feedback is about a specific tool."
+            },
+            "source": {
+              "type": "string",
+              "description": "user or agent",
+              "enum": [
+                "user",
+                "agent"
+              ]
+            }
+          },
+          "required": [
+            "sentiment",
+            "quote",
+            "context",
+            "source"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "message": {
+              "type": "string"
+            },
+            "success": {
+              "type": "boolean"
+            },
+            "_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "message",
+            "success",
+            "_id"
+          ]
+        },
+        "annotations": {
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false,
+          "readOnlyHint": false,
+          "title": "Send MCP Server Feedback"
+        }
+      },
+      {
+        "name": "search_stripe_documentation",
+        "description": "Search the Stripe documentation for the given question and language.\n\nIt takes two arguments:\n- question (str): The user question to search an answer for in the Stripe documentation.\n- language (str, optional): The programming language to search for in the documentation.\n",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "question": {
+              "type": "string",
+              "description": "The user question about integrating with Stripe will be used to search the documentation.",
+              "maxLength": 1000
+            },
+            "language": {
+              "type": "string",
+              "description": "The programming language to search for in the documentation.",
+              "enum": [
+                "dotnet",
+                "go",
+                "java",
+                "node",
+                "php",
+                "ruby",
+                "python",
+                "curl"
+              ]
+            },
+            "search_only_api_ref": {
+              "type": "boolean",
+              "description": "When set to true, search only in the Stripe API reference documentation instead of the full documentation set. Use true when users need specific API implementation details, code examples, or parameter references. Use false (default) for conceptual explanations, best practices, integration guides, or troubleshooting help."
+            }
+          },
+          "required": [
+            "question"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "results": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "subtitle": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "type": {
+                    "type": "string"
+                  },
+                  "content": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "content"
+                ]
+              }
+            }
+          },
+          "required": [
+            "results"
+          ]
+        },
+        "annotations": {
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": true,
+          "readOnlyHint": true,
+          "title": "Search Stripe documentation"
+        }
+      },
+      {
+        "name": "get_stripe_account_info",
+        "description": "This will get the account info for the logged in Stripe account.\n",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "stripe_context": {
+              "type": "string",
+              "description": "The account to target for this request. Use the `stripe_context` value returned by list_available_accounts_or_orgs."
+            },
+            "livemode": {
+              "type": "boolean",
+              "description": "Whether to operate in livemode (true) or test mode/ sandbox (false). Must match the livemode of the stripe_context account."
+            }
+          },
+          "required": [
+            "stripe_context",
+            "livemode"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "account_id": {
+              "type": "string"
+            },
+            "display_name": {
+              "type": "string"
+            },
+            "dashboard_api_keys_link": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          "required": [
+            "account_id",
+            "display_name",
+            "dashboard_api_keys_link"
+          ]
+        },
+        "annotations": {
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": true,
+          "readOnlyHint": true,
+          "title": "Get Stripe account information"
+        }
+      },
+      {
+        "name": "create_refund",
+        "description": "This tool will refund a payment intent in Stripe.\n",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "payment_intent": {
+              "description": "The ID of the PaymentIntent to refund.",
+              "type": "string"
+            },
+            "amount": {
+              "description": "The amount to refund in currency minor units, e.g. cents for USD and yen for JPY.",
+              "type": "integer"
+            },
+            "reason": {
+              "description": "The reason for the refund.",
+              "enum": [
+                "duplicate",
+                "fraudulent",
+                "requested_by_customer"
+              ],
+              "type": "string"
+            },
+            "human_confirmation": {
+              "type": "object",
+              "description": "This tool might require human confirmation. To run it, first invoke it with the desired parameters, ignoring the `approval_token` parameter.\nIf it requires human confirmation, the response will include an approval request ID and a URL to an approval page for the human to approve the tool call.\nYou, as the LLM agent, should:\n\n1. Present this URL to the human as a clickable markdown link. Tell them that they have to approve this tool call at that URL, and that they should tell you when they have approved the operation.\n2. The human will approve that call.\n3. After the human tells you they have approved the operation, you must call the tool again with the `approval_token` parameter and the exact same parameters. The operation will then go through.\n",
+              "properties": {
+                "approval_token": {
+                  "type": "string",
+                  "description": "The ID of the approval token for the request. This is required on only the post-human-confirmation invocation. An example ID is `approval_123`."
+                }
+              }
+            },
+            "stripe_context": {
+              "type": "string",
+              "description": "The account to target for this request. Use the `stripe_context` value returned by list_available_accounts_or_orgs."
+            },
+            "livemode": {
+              "type": "boolean",
+              "description": "Whether to operate in livemode (true) or test mode/ sandbox (false). Must match the livemode of the stripe_context account."
+            }
+          },
+          "required": [
+            "payment_intent",
+            "stripe_context",
+            "livemode"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "amount": {
+              "type": "number"
+            }
+          }
+        },
+        "annotations": {
+          "destructiveHint": true,
+          "idempotentHint": false,
+          "openWorldHint": true,
+          "readOnlyHint": false,
+          "title": "Create refund"
+        }
+      },
+      {
+        "name": "stripe_api_search",
+        "description": "Search for Stripe API operations by providing an intent and a resource to operate on.\n\nFor the resource, use a specific, descriptive phrase (e.g. \"issuing card transactions\", \"payout methods\", \"outbound payments\") rather than a single generic noun — Stripe has many similar resources, and the extra qualifiers help disambiguate between them rather than causing a miss. Only fall back to the bare core noun (e.g. \"transactions\") if a specific multi-word search returns no results.\n\nReturns matching operations with their HTTP method, path, summary, and top-level parameter names with types. Does not include parameter descriptions, enum values, or nested object fields — use stripe_api_details to get those before calling the relevant Stripe API execution tool.\n",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "intent": {
+              "type": "string",
+              "description": "The intent of the operation",
+              "examples": [
+                "create",
+                "list",
+                "refund"
+              ]
+            },
+            "resource": {
+              "type": "string",
+              "description": "Target resource the operation is looking to manipulate",
+              "examples": [
+                "customer",
+                "payout methods",
+                "issuing card transactions"
+              ]
+            },
+            "limit": {
+              "description": "Maximum number of results to return",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20,
+              "default": 5
+            },
+            "stripe_context": {
+              "type": "string",
+              "description": "The account to target for this request. Use the `stripe_context` value returned by list_available_accounts_or_orgs."
+            },
+            "livemode": {
+              "type": "boolean",
+              "description": "Whether to operate in livemode (true) or test mode/ sandbox (false). Must match the livemode of the stripe_context account."
+            }
+          },
+          "required": [
+            "intent",
+            "resource",
+            "stripe_context",
+            "livemode"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "openapi_spec_version": {
+              "description": "The OpenAPI Specification Version that the MCP Server used to look for the operation",
+              "type": "string"
+            },
+            "data": {
+              "description": "List of operations matching the criteria",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "method": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "summary": {
+                    "type": "string"
+                  },
+                  "llm_context": {
+                    "type": "string",
+                    "description": "Supplemental LLM guidance for this operation, if provided"
+                  }
+                },
+                "required": [
+                  "id",
+                  "method",
+                  "path"
+                ]
+              }
+            }
+          },
+          "required": [
+            "openapi_spec_version",
+            "data"
+          ]
+        },
+        "annotations": {
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false,
+          "readOnlyHint": true,
+          "title": "Search Stripe API operations"
+        }
+      },
+      {
+        "name": "stripe_api_details",
+        "description": "Get detailed parameter information for a specific Stripe API operation.\nProvide the stripe_api_operation_id from stripe_api_search results to see all path, query, and body parameters with their types, descriptions, and whether they are required.\n\nUse before calling the relevant Stripe API execution tool for operations with nested object fields.\n\nThe response may include an \"LLM Context\" section with usage guidance specific to the operation — follow any instructions there.\n",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "stripe_api_operation_id": {
+              "description": "The operation ID to get details for (e.g. 'PostCustomers', 'GetPaymentIntents')",
+              "type": "string"
+            },
+            "stripe_context": {
+              "type": "string",
+              "description": "The account to target for this request. Use the `stripe_context` value returned by list_available_accounts_or_orgs."
+            },
+            "livemode": {
+              "type": "boolean",
+              "description": "Whether to operate in livemode (true) or test mode/ sandbox (false). Must match the livemode of the stripe_context account."
+            }
+          },
+          "required": [
+            "stripe_api_operation_id",
+            "stripe_context",
+            "livemode"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "openapi_spec_version": {
+              "description": "The OpenAPI Specification Version that the MCP Server used to look for the operation",
+              "type": "string"
+            },
+            "llm_context": {
+              "description": "Supplemental usage guidance for this operation, if available",
+              "type": "string"
+            }
+          },
+          "required": [
+            "openapi_spec_version"
+          ]
+        },
+        "annotations": {
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false,
+          "readOnlyHint": true,
+          "title": "Get Stripe API operation details"
+        }
+      },
+      {
+        "name": "stripe_api_read",
+        "description": "Read data from any Stripe API GET operation:\n1. Use stripe_api_search to find the operation ID.\n2. Use stripe_api_details to understand its parameters (required for operations with nested object fields like address, metadata, or restrictions).\n3. Call this tool with the stripe_api_operation_id and a parameters object containing path and query parameters. For mutations (POST/PATCH/PUT/DELETE), use stripe_api_write instead.\nMonetary values in responses are in the smallest currency unit (e.g. 1000 = $10.00 USD for most currencies).\n",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "stripe_api_operation_id": {
+              "description": "The operation ID to execute",
+              "type": "string",
+              "examples": [
+                "PostCustomers",
+                "GetPaymentIntents"
+              ]
+            },
+            "parameters": {
+              "description": "Parameters for the API call. Include path parameters (e.g. 'customer' for /v1/customers/{customer}), query parameters, and body parameters. Array fields (e.g. line_items) must be passed as a JSON array value, not as a plain string.",
+              "type": "object"
+            },
+            "stripe_context": {
+              "type": "string",
+              "description": "The account to target for this request. Use the `stripe_context` value returned by list_available_accounts_or_orgs."
+            },
+            "livemode": {
+              "type": "boolean",
+              "description": "Whether to operate in livemode (true) or test mode/ sandbox (false). Must match the livemode of the stripe_context account."
+            }
+          },
+          "required": [
+            "stripe_api_operation_id",
+            "parameters",
+            "stripe_context",
+            "livemode"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": true
+        },
+        "annotations": {
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": true,
+          "readOnlyHint": true,
+          "title": "Read Stripe API data"
+        }
+      },
+      {
+        "name": "stripe_api_write",
+        "description": "Write data via any Stripe API POST/PATCH/PUT/DELETE operation:\n1. Use stripe_api_search to find the operation ID.\n2. Use stripe_api_details to understand its parameters (required for operations with nested object fields like address, metadata, or restrictions).\n3. Call this tool with the stripe_api_operation_id and a parameters object containing path, query, and body parameters. For read-only lookups (GET), use stripe_api_read instead.\nAll monetary amounts must be in the smallest currency unit (e.g. 1000 = $10.00 USD for most currencies).\n",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "stripe_api_operation_id": {
+              "description": "The operation ID to execute",
+              "type": "string",
+              "examples": [
+                "PostCustomers",
+                "GetPaymentIntents"
+              ]
+            },
+            "parameters": {
+              "description": "Parameters for the API call. Include path parameters (e.g. 'customer' for /v1/customers/{customer}), query parameters, and body parameters. Array fields (e.g. line_items) must be passed as a JSON array value, not as a plain string.",
+              "type": "object"
+            },
+            "human_confirmation": {
+              "type": "object",
+              "description": "This tool might require human confirmation. To run it, first invoke it with the desired parameters, ignoring the `approval_token` parameter.\nIf it requires human confirmation, the response will include an approval request ID and a URL to an approval page for the human to approve the tool call.\nYou, as the LLM agent, should:\n\n1. Present this URL to the human as a clickable markdown link. Tell them that they have to approve this tool call at that URL, and that they should tell you when they have approved the operation.\n2. The human will approve that call.\n3. After the human tells you they have approved the operation, you must call the tool again with the `approval_token` parameter and the exact same parameters. The operation will then go through.\n",
+              "properties": {
+                "approval_token": {
+                  "type": "string",
+                  "description": "The ID of the approval token for the request. This is required on only the post-human-confirmation invocation. An example ID is `approval_123`."
+                }
+              }
+            },
+            "stripe_context": {
+              "type": "string",
+              "description": "The account to target for this request. Use the `stripe_context` value returned by list_available_accounts_or_orgs."
+            },
+            "livemode": {
+              "type": "boolean",
+              "description": "Whether to operate in livemode (true) or test mode/ sandbox (false). Must match the livemode of the stripe_context account."
+            }
+          },
+          "required": [
+            "stripe_api_operation_id",
+            "parameters",
+            "stripe_context",
+            "livemode"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": true
+        },
+        "annotations": {
+          "destructiveHint": true,
+          "idempotentHint": false,
+          "openWorldHint": true,
+          "readOnlyHint": false,
+          "title": "Write Stripe API data"
+        }
+      },
+      {
+        "name": "list_available_accounts_or_orgs",
+        "description": "Lists all Stripe accounts in this session with their stripe_context and livemode values.\n\n[USAGE NOTES]\n- Call this first to get stripe_context and livemode before any account-specific operation.\n\n[AGENT BEHAVIOR]\n- After calling, ask the user which account to use unless already specified.\n- Warn the user before switching between testmode and livemode.\n",
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "accounts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "stripe_context": {
+                    "type": [
+                      "string"
+                    ],
+                    "description": "Value to pass as Stripe-Context tool param when targeting this account, can be account_id or org_id"
+                  },
+                  "livemode": {
+                    "type": [
+                      "boolean"
+                    ],
+                    "description": "Whether the account is in livemode"
+                  },
+                  "name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Name of the account or org"
+                  }
+                },
+                "required": [
+                  "stripe_context",
+                  "livemode"
+                ]
+              }
+            }
+          },
+          "required": [
+            "accounts"
+          ]
+        },
+        "annotations": {
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false,
+          "readOnlyHint": true,
+          "title": "List available accounts or orgs"
+        }
+      },
+      {
+        "name": "manage_stripe_accounts",
+        "description": "Returns a URL to the Stripe Dashboard where users can add accounts, remove accounts, or change permissions for this session.\n\n[USAGE NOTES]\n- Use when the user wants to add, remove, or modify permissions for an account.\n- Call this directly — no need to call list_available_accounts_or_orgs first.\n\n[AGENT BEHAVIOR]\n- Present the URL to the user and wait for them to confirm they completed their changes.\n- After confirmation, call list_available_accounts_or_orgs to sync the updated account list.\n",
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "reconsent_url": {
+              "type": "string",
+              "description": "URL to the Stripe Dashboard page where the user can manage accounts and permissions"
+            }
+          },
+          "required": [
+            "reconsent_url"
+          ]
+        },
+        "annotations": {
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false,
+          "readOnlyHint": true,
+          "title": "Manage Stripe accounts"
+        }
+      }
+    ],
+    "resultType": "complete",
+    "cacheScope": "private",
+    "ttlMs": 0,
+    "_meta": {
+      "openai/widgetSessionId": "00d5a750-e998-43dd-a3b3-c0fb35915c8b"
+    }
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "twin": "slack",
+  "substrate": "live-wire-oauth",
+  "endpoint": "https://mcp.slack.com/mcp",
+  "method": "tools/list",
+  "protocol": "JSON-RPC 2.0 over HTTP",
+  "protocolVersion": "2025-06-18",
+  "captureDate": "2026-08-10",
+  "rawFileSha256": "c6b29aba1d382175ca560228d10cc2665a0710b68298895721f7fcb4bcc25974",
+  "liveToolCount": 19,
+  "liveToolOrder": [
+    "slack_send_message",
+    "slack_schedule_message",
+    "slack_add_reaction",
+    "slack_create_conversation",
+    "slack_create_canvas",
+    "slack_update_canvas",
+    "slack_search_public",
+    "slack_search_public_and_private",
+    "slack_search_channels",
+    "slack_search_users",
+    "slack_read_channel",
+    "slack_read_thread",
+    "slack_read_canvas",
+    "slack_read_user_profile",
+    "slack_list_channel_members",
+    "slack_read_file",
+    "slack_send_message_draft",
+    "slack_search_emojis",
+    "slack_get_reactions"
+  ],
+  "configuration": {
+    "auth": "bearer",
+    "grantedScopes": "channels:history,groups:history,im:history,mpim:history,channels:read,emoji:read,files:read,canvases:read,groups:read,im:read,lists:read,mpim:read,reactions:read,users:read,users:read.email,channels:write,chat:write,files:write,canvases:write,groups:write,im:write,lists:write,mpim:write,reactions:write,search:read.public,search:read.private,search:read.mpim,search:read.im,search:read.files,search:read.users",
+    "responseFraming": "application/json",
+    "deploymentSelector": "the installing Slack workspace. Captured 2026-08-10 from an INTERNAL Slack app installed to the pome twin sandbox workspace, under a user token (xoxp) carrying every scope mcp.slack.com advertises in its protected-resource metadata (all 30).",
+    "whyNotReadOnly": "Slack's MCP page lists its required scopes PER TOOL, and four of them are writes (chat:write, channels:write, reactions:write, canvases:write). A read-only grant would plausibly return a listing missing the vendor's write tools, and the lane would then report twin-slack's write tools as mcp-tool-twin-only — a CRITICAL asserting the twin invented a capability that really exists. The golden must describe what an examinee's agent sees. This deliberately overrides F-1329's original 'all three are read-scoped' criterion; the capture issues one tools/list and invokes no tool, and the grant was revoked immediately after.",
+    "matchesExaminee": "19 tools, which is exactly the count Slack's own MCP documentation states the server exposes.",
+    "requestHeaders": {
+      "content-type": "application/json",
+      "accept": "application/json, text/event-stream"
+    },
+    "requestBody": {
+      "method": "tools/list",
+      "jsonrpc": "2.0",
+      "id": 1
+    }
+  },
+  "canonicalFileSha256": "eddd677269957fe6936112940ed9b2cda72269f99f0abb42dca819031342126d",
+  "files": {
+    "raw": "slack.raw.json",
+    "canonical": "slack.canonical.json"
+  }
+}

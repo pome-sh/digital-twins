@@ -13,7 +13,7 @@
 // has never been watched go red is not a guard. Each of the four ways a
 // golden can be wrong — edited raw, edited canonical, edited meta provenance,
 // hand-typed sha — gets its own red here.
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -27,6 +27,7 @@ import {
   loadSources,
   runCapture,
   sha256,
+  unwrapEventStream,
 } from "./capture-mcp-tools-list.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -68,6 +69,44 @@ function sandbox() {
   });
   cpSync(join(ROOT, "fixtures/mcp-tools-list"), join(dir, "fixtures/mcp-tools-list"), { recursive: true });
   return dir;
+}
+
+
+/**
+ * A sandbox whose source table carries one SYNTHETIC uncaptured twin.
+ *
+ * F-1329 captured the last three deferred twins, so `sources.twins` now has no
+ * `capture: false` row at all. The guards below cover the not-captured path —
+ * the recorded-reason gate and the declared-configuration round-trip — and if
+ * they simply iterated the real table they would now iterate NOTHING and report
+ * the same green as a satisfied guard. That is this repo's F-1170 rule, and the
+ * fix is a fixture rather than a weakened assertion: the behaviour is still
+ * reachable the moment a sixth twin is added deferred, so it stays tested.
+ */
+function sandboxWithDeferredTwin() {
+  const dir = sandbox();
+  const twin = "deferred-probe";
+  const cfgPath = join(dir, "config/mcp-capture-sources.json");
+  const table = JSON.parse(readFileSync(cfgPath, "utf8"));
+  const source = {
+    twin,
+    substrate: "live-wire-oauth",
+    capture: false,
+    endpoint: "https://mcp.example.invalid/mcp",
+    method: "tools/list",
+    protocol: "JSON-RPC 2.0 over HTTP",
+    protocolVersion: "2025-06-18",
+    authTokenEnv: "F1329_DEFERRED_PROBE_TOKEN",
+    reason: "OAuth-gated, and nobody has minted a grant for this fixture.",
+    deferredTo: "F-1329",
+    configuration: { auth: "bearer", requestHeaders: { "content-type": "application/json" } },
+  };
+  const { twin: _omit, ...declared } = source;
+  table.twins[twin] = declared;
+  writeFileSync(cfgPath, `${JSON.stringify(table, null, 2)}\n`);
+  const sources = loadSources({ sourcesPath: cfgPath });
+  writeFileSync(goldenPaths({ repoRoot: dir, sources, twin }).status, deriveStatus({ source }));
+  return { dir, twin, source, sources };
 }
 
 // ── the declared source table ───────────────────────────────────────────────
@@ -326,15 +365,19 @@ function sandbox() {
   //    the table is a red too — an unexplained `not-captured` is the failure
   //    mode this ticket exists to avoid.
   {
-    const uncaptured = Object.entries(sources.twins).filter(([, s]) => !s.capture);
-    assert(uncaptured.length > 0, "the table records at least one uncaptured twin");
-    const [twin] = uncaptured[0];
-    const dir = sandbox();
-    const paths = goldenPaths({ repoRoot: dir, sources, twin });
+    const { dir, twin, sources: sandboxSources } = sandboxWithDeferredTwin();
+    const paths = goldenPaths({ repoRoot: dir, sources: sandboxSources, twin });
     const status = JSON.parse(readFileSync(paths.status, "utf8"));
     status.reason = "no reason given";
     writeFileSync(paths.status, `${JSON.stringify(status, null, 2)}\n`);
-    const code = await runCapture({ repoRoot: dir, check: true, offline: true, ...SILENT });
+    const code = await runCapture({
+      repoRoot: dir,
+      sourcesPath: join(dir, "config/mcp-capture-sources.json"),
+      twins: [twin],
+      check: true,
+      offline: true,
+      ...SILENT,
+    });
     assert(code !== 0, `${twin}: --check reds when the recorded not-captured reason is edited away`);
     rmSync(dir, { recursive: true, force: true });
   }
@@ -344,9 +387,9 @@ function sandbox() {
   //    captured twin's. Without this, someone could change which header
   //    Slack's future capture sends, or which env var holds its token, and
   //    every gate would stay green.
-  for (const [twin, source] of Object.entries(sources.twins)) {
-    if (source.capture) continue;
-    const paths = goldenPaths({ repoRoot: ROOT, sources, twin });
+  {
+    const { dir: statusDir, twin, source, sources: sandboxSources } = sandboxWithDeferredTwin();
+    const paths = goldenPaths({ repoRoot: statusDir, sources: sandboxSources, twin });
     const status = JSON.parse(readFileSync(paths.status, "utf8"));
     if (source.configuration) {
       assert(
@@ -357,7 +400,6 @@ function sandbox() {
     if (source.authTokenEnv) {
       assert(status.authTokenEnv === source.authTokenEnv, `${twin}: authTokenEnv round-trips into the status file`);
     }
-    if (!source.configuration && !source.authTokenEnv) continue;
 
     for (const mutate of [
       (s) => {
@@ -378,12 +420,20 @@ function sandbox() {
       if (JSON.stringify(deriveStatus({ source: mutated })) === JSON.stringify(deriveStatus({ source }))) {
         assert(false, `${twin}: a change to the declared capture configuration left the status file identical`);
       }
-      const dir = sandbox();
-      writeFileSync(goldenPaths({ repoRoot: dir, sources, twin }).status, deriveStatus({ source: mutated }));
-      const code = await runCapture({ repoRoot: dir, check: true, offline: true, ...SILENT });
+      const { dir, sources: mutSources } = sandboxWithDeferredTwin();
+      writeFileSync(goldenPaths({ repoRoot: dir, sources: mutSources, twin }).status, deriveStatus({ source: mutated }));
+      const code = await runCapture({
+        repoRoot: dir,
+        sourcesPath: join(dir, "config/mcp-capture-sources.json"),
+        twins: [twin],
+        check: true,
+        offline: true,
+        ...SILENT,
+      });
       assert(code !== 0, `${twin}: --check reds when the recorded capture configuration is changed`);
       rmSync(dir, { recursive: true, force: true });
     }
+    rmSync(statusDir, { recursive: true, force: true });
   }
 
   // 6. a missing golden is a red, not a silent skip.
@@ -467,6 +517,215 @@ function sandbox() {
     assert(code !== 0, `${label} is not written as a golden`);
     assert(readFileSync(paths.raw, "utf8") === before, `${label} left the committed raw.json untouched`);
     rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+// ── a deferred oauth row is CAPTURE-READY, not merely declared (F-1329) ──────
+// The whole content of "F-1329 adds a token, not an adapter" is that the errand
+// is one env var away. It was not: slack and linear declared no
+// `protocolVersion`, which `loadSources` requires on every capturable source, so
+// flipping `capture` threw `must declare protocolVersion` before opening a
+// socket — a schema error, read by whoever had just finished an OAuth flow, in
+// the one moment they have every reason to blame their own credential.
+//
+// Asserted over EVERY deferred oauth row rather than the two that exist today,
+// so a sixth twin added the same way is caught by this file and not by a human
+// mid-errand.
+{
+  const table = JSON.parse(readFileSync(join(ROOT, "config/mcp-capture-sources.json"), "utf8"));
+  // Every oauth row, captured or deferred. F-1329 captured all three, so keying
+  // this on `!row.capture` would now select NOTHING and report the same green as
+  // a satisfied guard — the shape the flip-throws bug hid behind in the first
+  // place. The durable invariant is the one that made the flip safe: an oauth
+  // row carries the two fields a capture needs, whether or not it is capturing
+  // today.
+  //
+  // Named `gatedSources`, not `oauth`: CodeQL's `js/clear-text-logging` treats a
+  // binding whose IDENTIFIER matches an auth keyword as a sensitive source, and
+  // this suite's `assert()` helper ends in `console.error`. Nothing here holds a
+  // secret — the source table stores env var NAMES, never values — but a
+  // name-based heuristic cannot know that, and a suppression comment would sit
+  // there long after anyone remembers why.
+  const gatedSources = Object.entries(table.twins).filter(([, row]) => row.substrate === "live-wire-oauth");
+  assert(gatedSources.length > 0, "the source table has live-wire-oauth rows for this guard to cover");
+  for (const [twin, row] of gatedSources) {
+    assert(Boolean(row.authTokenEnv), `${twin}: an oauth row names the env var that carries its token`);
+    assert(
+      Boolean(row.protocolVersion),
+      `${twin}: an oauth row declares protocolVersion — without it, flipping \`capture\` throws a SCHEMA ` +
+        `error before the socket opens, at whoever has just finished an OAuth flow`
+    );
+
+    // …and a row that is NOT capturing must be one env var away from capturing.
+    // Proven by flipping it, on a deep copy, for real.
+    const flipped = JSON.parse(JSON.stringify(table));
+    flipped.twins[twin].capture = true;
+    delete flipped.twins[twin].reason;
+    try {
+      loadSources({ table: flipped });
+    } catch (err) {
+      assert(false, `${twin}: flipping \`capture\` must not throw — F-1329 is a token, not a schema edit (${err.message})`);
+    }
+  }
+}
+
+// ── the recorded refusal is RETIRED by the capture that supersedes it ────────
+// pome-cloud's `loadUpstreamMcpGolden` resolves `<twin>.status.json` FIRST and
+// never looks at the raw/meta beside it. Nothing used to delete that file, so
+// F-1329's first credentialed capture would have committed a real golden while
+// the lane went on publishing "401 missing_token" — the errand landing and
+// reading as though it had not, with nothing red anywhere.
+{
+  const sources = loadSources({ repoRoot: ROOT });
+  const twin = Object.keys(sources.twins).find((id) => sources.twins[id].capture);
+
+  // (a) --check reds when both artefacts exist, and says which one wins.
+  {
+    const dir = sandbox();
+    const paths = goldenPaths({ repoRoot: dir, sources, twin });
+    writeFileSync(paths.status, `${JSON.stringify({ twin, captured: false, reason: "stale" }, null, 2)}\n`);
+    const code = await runCapture({ repoRoot: dir, twins: [twin], check: true, offline: true, ...SILENT });
+    assert(code !== 0, "a golden sitting beside a leftover status.json fails --check");
+    let named = false;
+    await runCapture({
+      repoRoot: dir,
+      twins: [twin],
+      check: true,
+      offline: true,
+      log: quiet,
+      err: (line) => {
+        if (String(line).includes(`${twin}.status.json`)) named = true;
+      },
+    });
+    assert(named, "the failure names the status file to delete, not just 'a difference'");
+    rmSync(dir, { recursive: true, force: true });
+  }
+
+  // (b) a real capture deletes it, so the commit cannot land half-applied.
+  {
+    const dir = sandbox();
+    const paths = goldenPaths({ repoRoot: dir, sources, twin });
+    const rawText = readFileSync(paths.raw, "utf8");
+    writeFileSync(paths.status, `${JSON.stringify({ twin, captured: false, reason: "stale" }, null, 2)}\n`);
+    const code = await runCapture({
+      repoRoot: dir,
+      twins: [twin],
+      readSubstrate: async () => ({ rawText }),
+      ...SILENT,
+    });
+    assert(code === 0, "the capture itself succeeds");
+    assert(!existsSync(paths.status), "a successful capture retires the status file it supersedes");
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+// ── SET-BUT-BLANK is not UNSET (F-1184) ─────────────────────────────────────
+// F-1184: a value blanked in the secret store must not reach a runner and read
+// as "no credential configured" — the operator who blanked it and the operator
+// who never set it need different instructions. `if (!token)` said "is not set"
+// for both, and let whitespace through entirely: `Bearer    ` went on the wire
+// and came back as the VENDOR's 401, which reads as a bad token and sends
+// whoever just minted one back through the OAuth flow.
+{
+  const ENV = "F1329_BLANK_PROBE";
+  const source = {
+    twin: "acme",
+    endpoint: "https://example.invalid/mcp",
+    substrate: "live-wire-oauth",
+    authTokenEnv: ENV,
+    configuration: { auth: "bearer" },
+  };
+  const read = () => adapterFor("live-wire-oauth").read(source);
+
+  delete process.env[ENV];
+  await assertRejects(read, "is not set", "an ABSENT token says 'is not set'");
+
+  for (const [label, value] of [["empty string", ""], ["whitespace only", "   \t "]]) {
+    process.env[ENV] = value;
+    await assertRejects(read, "SET BUT BLANK", `a ${label} is reported as SET BUT BLANK, not as unset`);
+    await assertRejects(read, "secret store", `a ${label} points at the secret store, not the OAuth flow`);
+  }
+  delete process.env[ENV];
+}
+
+// ── the Streamable HTTP transport may frame the answer as SSE (F-1329) ──────
+// MCP lets a server answer a POST with either a JSON body or an SSE stream, and
+// both are correct. Measured 2026-08-09: gmail, slack and stripe answer
+// application/json; LINEAR answers SSE. Before this, `JSON.parse` on the wire
+// bytes threw "the substrate did not answer JSON" — a message that reads like a
+// broken endpoint or a bad token rather than a framing nothing handled.
+{
+  const envelope = { jsonrpc: "2.0", id: 1, result: { tools: [{ name: "get_issue" }] } };
+  const payload = JSON.stringify(envelope);
+
+  assert(unwrapEventStream(payload) === payload, "a plain JSON body is returned untouched");
+  assert(
+    unwrapEventStream(`event: message\ndata: ${payload}\n\n`) === payload,
+    "a single SSE event is unwrapped to its data payload"
+  );
+  assert(
+    unwrapEventStream(`data: ${payload}\r\n\r\n`) === payload,
+    "CRLF-framed SSE is unwrapped (the spec allows either line ending)"
+  );
+
+  // A heartbeat or a `ping` BEFORE the real message must not be mistaken for the
+  // answer: the first event carrying `result` or `error` wins, not the first
+  // event that parses.
+  const withNoise =
+    `event: ping\ndata: {"jsonrpc":"2.0","method":"ping"}\n\n` + `event: message\ndata: ${payload}\n\n`;
+  assert(unwrapEventStream(withNoise) === payload, "a leading ping event is skipped, not returned as the answer");
+
+  // Multi-line data is one payload, per the SSE spec.
+  const split = `event: message\ndata: {"jsonrpc":"2.0","id":1,\ndata: "result":{"tools":[{"name":"get_issue"}]}}\n\n`;
+  assert(
+    JSON.parse(unwrapEventStream(split)).result.tools.length === 1,
+    "a data payload split across several `data:` lines is rejoined"
+  );
+
+  assertThrows(
+    () => unwrapEventStream("event: message\ndata: not json\n\n"),
+    "no event carried a JSON-RPC result or error",
+    "an SSE stream with no usable event fails loudly rather than returning garbage"
+  );
+}
+
+// ── the framing is DECLARED and then CHECKED, never inferred ────────────────
+// `configuration` is copied verbatim into meta.json and `--check --offline`
+// re-derives it with no substrate to observe, so a framing filled in from the
+// live response would make the offline gate disagree with the online capture.
+// Declaring it keeps the gate deterministic AND makes a vendor that silently
+// switches transport framing a loud failure instead of a silent re-shape.
+{
+  const envelope = JSON.stringify({ jsonrpc: "2.0", id: 1, result: { tools: [{ name: "t" }] } });
+  const realFetch = globalThis.fetch;
+  const serve = (body) => {
+    globalThis.fetch = async () => new Response(body, { status: 200, headers: { "content-type": "text/plain" } });
+  };
+  const source = (framing) => ({
+    twin: "acme",
+    substrate: "live-wire-unauth",
+    endpoint: "https://example.invalid/mcp",
+    method: "tools/list",
+    configuration: { auth: "none", ...(framing ? { responseFraming: framing } : {}) },
+  });
+  try {
+    serve(`event: message\ndata: ${envelope}\n\n`);
+    await assertRejects(
+      () => adapterFor("live-wire-unauth").read(source(undefined)),
+      'declares responseFraming "application/json"',
+      "an undeclared SSE response is refused, not silently unwrapped"
+    );
+    const ok = await adapterFor("live-wire-unauth").read(source("text/event-stream"));
+    assert(ok.rawText === envelope, "a declared SSE response is unwrapped to the envelope");
+
+    serve(envelope);
+    await assertRejects(
+      () => adapterFor("live-wire-unauth").read(source("text/event-stream")),
+      'answered "application/json"',
+      "a vendor that STOPS using SSE is a loud failure too — the declaration is checked both ways"
+    );
+  } finally {
+    globalThis.fetch = realFetch;
   }
 }
 
