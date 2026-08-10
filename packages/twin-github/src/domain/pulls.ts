@@ -59,7 +59,6 @@ import {
   reviewJson,
   statusJson,
   tagJson,
-  userJson,
 } from "../serializers.js";
 import type { GitHubDomain } from "./github-domain.js";
 import { contentLineCount, normalizePath } from "./helpers.js";
@@ -173,14 +172,15 @@ export function getPullRequestComments(domain: GitHubDomain, input: { owner: str
   const repo = domain.requireRepo(input.owner, input.repo);
   domain.requirePullRequest(repo.id, input.pull_number);
   const rows = domain.listPullRequestReviewCommentRows(repo.id, input.pull_number);
-  return paginate(rows, input.page, input.per_page ?? input.perPage).map((comment) => ({
-    id: comment.id,
-    path: comment.path,
-    body: comment.body,
-    user: userJson(comment.user_login),
-    created_at: comment.created_at,
-    updated_at: comment.updated_at
-  }));
+  // F-1422 — the same serializer `POST` to this route uses. It built its
+  // elements inline out of six columns while the row already held `line`,
+  // `side` and `commit_sha`, all validated on the way in: one row, two shapes,
+  // and the read side was the lean one. Real GitHub serves the `review-comment`
+  // schema from both verbs, so anything this list omits that the CREATE serves
+  // is a field-removed finding against upstream.
+  return paginate(rows, input.page, input.per_page ?? input.perPage).map((comment) =>
+    pullRequestReviewCommentJson(comment, repo)
+  );
 }
 
 

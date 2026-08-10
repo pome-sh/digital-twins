@@ -4,6 +4,18 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.8
+
+### Patch Changes
+
+- Carries twin-github 0.10.3 (F-1422) into the bundled twin.
+  `GET /repos/:o/:r/pulls/:n/comments` now serves the review-comment object
+  `POST` to the same route already served — `line`, `side`, `commit_id`,
+  `pull_request_url` and the rest — instead of six columns of a row that held
+  more. An agent reading a PR's inline comments through `pome twin start github`
+  can now tell WHERE each comment is anchored; before, it got the prose and the
+  filename and had to guess the line. No CLI source changed.
+
 ## 0.23.7
 
 ### Patch Changes

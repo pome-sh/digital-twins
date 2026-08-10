@@ -1361,15 +1361,13 @@ export class GitHubDomain {
   }
 
 
+  // F-1422 — `PullRequestReviewCommentRow`, not a six-key structural subset of
+  // it. The query is `SELECT *` and always was, so the narrow cast described
+  // less than the reader was handed and every caller inherited that description
+  // as its ceiling: `getPullRequestComments` served exactly the six keys named
+  // here while `line`, `side` and `commit_sha` sat unreachable in the same row.
   listPullRequestReviewCommentRows(repoId: number, pullNumber: number) {
-    return this.db.prepare("SELECT * FROM pull_request_review_comments WHERE repo_id = ? AND pull_number = ? ORDER BY id ASC").all(repoId, pullNumber) as Array<{
-      id: number;
-      path: string;
-      body: string;
-      user_login: string;
-      created_at: string;
-      updated_at: string;
-    }>;
+    return this.db.prepare("SELECT * FROM pull_request_review_comments WHERE repo_id = ? AND pull_number = ? ORDER BY id ASC").all(repoId, pullNumber) as PullRequestReviewCommentRow[];
   }
 
 

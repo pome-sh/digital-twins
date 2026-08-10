@@ -1,6 +1,61 @@
 # @pome-sh/twin-github — CHANGELOG
 
 
+## 0.10.3 — 2026-08-10
+
+`GET /repos/:o/:r/pulls/:n/comments` serves the review-comment object, not six
+columns of it (F-1422).
+
+The LIST route built its elements inline — `{id, path, body, user, created_at,
+updated_at}` — while `POST` to the same route served the SAME ROW through
+`pullRequestReviewCommentJson`, which carries `line`, `side`, `commit_id`,
+`pull_request_url`, `position`, `html_url`, the `original_*` twins and the rest.
+The write path validates `line` against the target file's real line count and
+refuses one past the end; the read path then dropped the value it had just
+checked. One row had two shapes depending on which verb you used, and the read
+side — the one a fidelity lane measures and an agent reads — was the lean one.
+
+The fix is one line of routing: the LIST maps through the same serializer the
+CREATE uses. `listPullRequestReviewCommentRows` also stops casting a `SELECT *`
+to a six-key structural subset of `PullRequestReviewCommentRow` — that cast is
+what made the omission look deliberate to every reader after it.
+
+What this means for a caller:
+
+- `GET /repos/:o/:r/pulls/:n/comments` elements gain `url`, `node_id`,
+  `pull_request_review_id`, `diff_hunk`, `position`, `original_position`,
+  `commit_id`, `original_commit_id`, `in_reply_to_id`, `side`, `line`,
+  `original_line`, `start_line`, `original_start_line`, `start_side`,
+  `html_url` and `pull_request_url`. The six they already had are unchanged.
+- `pull_request_read`'s `get_review_comments` and `get_comments` answer from the
+  same domain call, so both widen with it.
+- Nothing narrows, and no other route, tool or handler moved.
+
+This was invisible rather than merely wrong, which is why it survived: the
+surface answered `[]` on every seed anyone could write until 0.10.2 (F-1421)
+made a review comment seedable, and a shape-diff compares no elements when
+either side is empty. The first real element on this surface is what makes an
+omitted field a `field-removed` finding — drift, on a `semantic`-tier read
+surface.
+
+`test/review-comment-list-shape.test.ts` states the property that was violated
+rather than a field checklist: the LIST element and the CREATE response are the
+same object for the same comment. A checklist goes stale the next time the
+serializer grows a leaf; the property does not. It also plants a wrong `line` —
+two worlds differing only in the seeded anchor — so the new fields are shown to
+be COMPARED and not merely present. A field that is serialized but never
+compared publishes green whatever it holds, which is the same defect one level
+over.
+
+FIDELITY.md divergence 21 changes subject accordingly: it recorded the two
+shapes as an open gap and now records what is genuinely absent from the one
+shape versus real GitHub — `author_association`, `reactions`, `subject_type` —
+plus the two the twin serves as placeholders rather than measurements
+(`diff_hunk`, `position`). The matching `read_subset` entry lives in pome-cloud's
+`known-divergences/github.yaml`; without that cloud-side half the daily cron
+still reds, because a `FIDELITY.md` bullet alone relaxes no verdict.
+
+
 ## 0.10.2 — 2026-08-10
 
 The seed can name a milestone, a tag, a release and a comment, and the twin
