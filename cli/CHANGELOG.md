@@ -4,6 +4,36 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.6
+
+### Patch Changes
+
+- The CLI's copies of the dashboard's run-state predicate no longer assert a
+  shape pome-cloud PR #632 (F-1399) retired (F-1413). pome-cloud moved the
+  incomplete-run arithmetic into `@pome-cloud/contract`'s `isIncompleteTally`,
+  which adds an `evaluated === 0` clause: a run whose every criterion was
+  excluded as already true in the seed now reads `incomplete` on the dashboard
+  instead of `fail`, matching the word the CLI already used.
+  `cross-surface-agreement.test.ts`'s transcription is updated clause by
+  clause, its seed-excluded row is `incomplete` with no `divergence` marker,
+  and "exactly one known divergence" is now a zero-divergence guard.
+- Four other places in the CLI asserted the retired behaviour in prose and
+  stayed green while doing it — `scoreStatus`'s comment in
+  `evalResultView.ts` (which claimed the dashboard "renders FAILED"),
+  `VerdictArtifact.state`'s doc, and comments in `incompleteVerdict.test.ts`
+  and `uploadAndFinalize.test.ts` (F-1413). Claims about pome-cloud's
+  run-state behaviour are now stated once, in `evalResultView.ts`, and
+  pointed at from the rest instead of restated — a restated claim about
+  another repo is one that goes false on its own.
+- `isIncompleteTally`'s first clause (`total === 0` is never `incomplete`) is
+  transcribed but was reachable by no row in the table, so deleting it left
+  every test green; it now has its own assertions, alongside why the CLI's
+  `incomplete` for the same wire shape is the A5 guard rather than a
+  cross-surface divergence. The row lookup in the artifact test no longer
+  selects by `divergence` marker, which returned `undefined` the moment the
+  divergence was closed.
+- Test- and comment-only; no runtime behavior changes.
+
 ## 0.23.5
 
 ### Patch Changes

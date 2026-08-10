@@ -325,10 +325,10 @@ describe("scoreFromFinalizeResponse — the seed-pre-satisfied exemption (F-1392
     // narrows what counts as an ABSTENTION; it does not relax the older rule
     // that a run with nothing passed or failed at all cannot pass regardless.
     //
-    // This is the one shape where the CLI and the dashboard still word the
-    // same run differently — the dashboard renders FAILED at 0/100 rather
-    // than incomplete. Both refuse to pass it; only the word differs. The
-    // whole table, including this row, is in
+    // The dashboard reads this shape `incomplete` too since F-1399; it used
+    // to render FAILED at 0/100, which is the claim this comment carried
+    // until F-1413 caught it going false. That agreement is checked rather
+    // than restated: the whole table, including this row, is in
     // `cross-surface-agreement.test.ts`.
     const finalized = finalizeResponse([
       {

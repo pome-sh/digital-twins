@@ -143,32 +143,39 @@ export type ScoreStatus = "pass" | "fail" | "incomplete";
 // criterion the seed already satisfied (`PRE_SATISFIED_REASON` above) —
 // `uploadAndFinalize.ts`'s `scoreFromFinalizeResponse` subtracts
 // `preSatisfied` out of the `skipped` tally before deciding `can_pass`, and
-// pome-cloud's `isRunIncomplete` subtracts the same `preSatisfied` count out
-// of `notEvaluated` over the same `criteria_results`
-// (apps/dashboard/src/lib/run-status.ts). F-1392 — the CLI used to count
-// every `skipped` result with no exemption, which called a run INCOMPLETE
-// that the dashboard called PASS. ANY OTHER skipped reason, and every
-// `errored`, still fails this guard — only the one named exemption is
+// pome-cloud subtracts the same `preSatisfied` count out of `notEvaluated`
+// over the same `criteria_results`. Since F-1399 that subtraction lives in
+// `@pome-cloud/contract`'s `isIncompleteTally`, which the dashboard's
+// `isRunIncomplete` (apps/dashboard/src/lib/run-status.ts) and the markdown
+// report both CALL rather than each keeping a copy of. F-1392 — the CLI used
+// to count every `skipped` result with no exemption, which called a run
+// INCOMPLETE that the dashboard called PASS. ANY OTHER skipped reason, and
+// every `errored`, still fails this guard — only the one named exemption is
 // narrowed. Deliberately NOT read from the wire's `all_skipped`, which is the
 // narrower every-abstained predicate and would loosen this guard.
 //
-// The one input the two surfaces still word differently, stated so nobody
-// reads the paragraph above as more agreement than there is: a run whose
-// criteria are ALL pre-satisfied (nothing passed, nothing failed, so no
-// denominator). Here it is `incomplete` — `evaluated` is false and the A5
-// guard predates and outranks this exemption. On the dashboard
-// `isRunIncomplete` is false (every abstention is exempt) and
-// `deriveRunStatus` falls through to `satisfaction_score === 100`, which is 0
-// for an empty denominator (`score-merge.ts`), so it renders FAILED while its
-// own `verdictLine` says "nothing was at risk". The two surfaces agree on the
-// only thing a CI caller can act on — neither passes it, both exit non-zero —
-// and disagree on the word. Filed as F-1399 against pome-cloud rather than
-// papered over here: calling it `fail` locally would blame the agent for a run in which
-// nothing was ever at risk, which is the F-925 inversion pointed the other
-// way. `runScoreLine` names this state explicitly instead of printing "0 of N
-// criteria not evaluated".
-// `cross-surface-agreement.test.ts` walks both predicates over one table of
-// wire fixtures so this paragraph cannot quietly stop being true.
+// The all-pre-satisfied run — nothing passed, nothing failed, so no
+// denominator — is `incomplete` here: `evaluated` is false and the A5 guard
+// predates and outranks the exemption. Calling it `fail` locally would blame
+// the agent for a run in which nothing was ever at risk, which is the F-925
+// inversion pointed the other way. `runScoreLine` names this state explicitly
+// instead of printing "0 of N criteria not evaluated".
+//
+// F-1399 — the dashboard used to answer that same run `fail`, and this
+// paragraph used to say so at length. `isIncompleteTally`'s third clause
+// (`evaluated === 0`) closed it: both surfaces read it `incomplete` now, and
+// the last shape they still word differently is a task whose `passThreshold`
+// is not 100 (the dashboard's bar is a hard `satisfaction_score === 100` and
+// it has no field to learn the task's threshold from).
+//
+// F-1413 is what the correction cost, and is why the prose is here and not
+// also somewhere else: pome-cloud shipped the fix and every copy of the old
+// claim in this repo went false while staying green.
+// `cross-surface-agreement.test.ts` pins the two PREDICATES row by row, which
+// is what keeps the arithmetic honest — but it cannot pin a sentence. So
+// claims about pome-cloud's run-state behaviour are stated ONCE, here, and
+// pointed at from the tests and from `VerdictArtifact.state`'s doc rather
+// than restated in each.
 export function scoreStatus(score: Score, passThreshold: number): ScoreStatus {
   if (!score.evaluated || !score.can_pass) return "incomplete";
   return score.satisfaction >= passThreshold ? "pass" : "fail";
@@ -271,7 +278,7 @@ export function runScoreLine(
     //
     // F-1392 — `preSatisfied` criteria are named APART from the abstentions
     // instead of folded into "not evaluated", the way the dashboard's
-    // `verdictLine` does (run-status.ts:173-199): a pre-satisfied criterion
+    // `verdictLine` does (run-status.ts:174-206): a pre-satisfied criterion
     // reached a verdict (the grader wasn't gapped), it just tested nothing.
     const { notEvaluated: unreached, total } = evaluationCounts(score);
     // The all-excluded run: nothing passed, nothing failed, and every
