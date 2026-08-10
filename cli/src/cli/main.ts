@@ -1208,20 +1208,24 @@ export function createProgram() {
       // no network and no local judging — the verdicts were the cloud's.
       const root = target ?? "runs";
       const discovery = await discoverRunSet(resolve(root));
-      if (discovery.totalSets === 0) {
-        // F-1195 — a v1 verdict.json is a RECOGNIZABLE prior artifact
-        // version, not a foreign file: name the skip instead of reporting
-        // the same "no runs" a truly empty runs/ would get.
-        if (discovery.staleVersionCount > 0) {
-          console.error(
-            `${discovery.staleVersionCount} verdict.json file(s) under ${root} were written by an older CLI (artifact version < ${VERDICT_ARTIFACT_VERSION}) and can't be read by this version — re-run \`pome run\` to produce trials fix-prompt can use.`,
-          );
-          process.exitCode = 5;
-          return;
-        }
+      // F-1195 — a verdict.json this CLI can't read is a RECOGNIZABLE prior
+      // artifact version, not a foreign file, and the skip is named EVERY
+      // time it happens — not only when nothing else was found. A runs/ that
+      // holds one readable trial beside two stale ones would otherwise build
+      // a prompt from a third of the run set and say nothing about the rest,
+      // which is the same silent drop as reporting "no runs" for a dir full
+      // of them.
+      if (discovery.staleVersionCount > 0) {
         console.error(
-          `No finalized run sets under ${root} — hosted \`pome run\` records a verdict.json per trial; run one first (or point fix-prompt at your artifacts dir).`,
+          `${discovery.staleVersionCount} verdict.json file(s) under ${root} are not artifact version ${VERDICT_ARTIFACT_VERSION} (the only version this CLI reads) and were skipped — re-run \`pome run\` to record those trials again.`,
         );
+      }
+      if (discovery.totalSets === 0) {
+        if (discovery.staleVersionCount === 0) {
+          console.error(
+            `No finalized run sets under ${root} — hosted \`pome run\` records a verdict.json per trial; run one first (or point fix-prompt at your artifacts dir).`,
+          );
+        }
         process.exitCode = 5;
         return;
       }

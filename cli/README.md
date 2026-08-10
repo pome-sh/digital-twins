@@ -85,9 +85,13 @@ Three rules CI must honor:
   with nothing in those two fields alone saying so. Read `state` in the
   `verdict.json` a hosted `pome run` writes to
   `<artifacts-dir>/<task-slug>/<session-id>/verdict.json`: `"pass"`, `"fail"`,
-  or `"incomplete"` — the same word the terminal prints beside the score. The
-  `evaluated` / `not_evaluated` / `pre_satisfied` / `total` counts alongside
-  `score` show what fraction of criteria that number is actually over.
+  or `"incomplete"` — the same word the terminal prints beside the score, and
+  the field to gate on. The `evaluated` / `not_evaluated` / `pre_satisfied` /
+  `total` counts alongside it say how much of the task `score` covers:
+  **`score` is a percentage over `evaluated` alone**, so `not_evaluated > 0`
+  means `score` is silent about part of the run, and `evaluated: 0` means it
+  scored nothing at all (the cloud sends `0` there for want of a denominator
+  — "nothing was scored", not "nothing was correct").
 - **Trial groups map as a whole.** `pome run -n k` (k>1) collapses the whole
   group to one code: `0` = at least one trial completed and every completed
   trial passed; `1` = at least one completed trial failed its threshold **or was

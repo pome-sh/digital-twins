@@ -19,11 +19,22 @@ packaging restructure: bump `version` here and in `package.json`, and merging to
   `not_evaluated` / `pre_satisfied` / `total` counts, computed by one shared
   helper (`evaluationCounts` in `evalResultView.ts`) so the artifact and the
   terminal's "N of M criteria not evaluated" line can't drift apart.
-  `VERDICT_ARTIFACT_VERSION` bumps 1 → 2 with the new fields required; a v1
-  file on disk is refused (no dual-format reader) but `pome fix-prompt`
-  discovery now names that skip explicitly instead of reporting it exactly
-  like an empty `runs/`. `cli/README.md`'s exit-code contract now points CI
-  at `state` instead of "read the verdict word printed beside the score".
+  `cli/README.md`'s exit-code contract now points CI at `state` instead of
+  "read the verdict word printed beside the score". `state` is the CLI's
+  word, and the two run shapes where the dashboard words the same run
+  differently are named in `VerdictArtifact`'s own doc comment (an
+  all-pre-satisfied run, filed as F-1399; and a task whose `pass_threshold`
+  is not 100) rather than left for a reader to find as a mismatch.
+- `verdict.json` is at artifact version 2, and a file at any other version is
+  a NAMED skip rather than a silent one (F-1195). The new fields are
+  required, so a version-1 file is refused outright — there is no
+  dual-format reader — but `pome fix-prompt` now reports every skipped file
+  and its version instead of reporting a `runs/` full of them exactly like an
+  empty one, including when readable trials sit beside them (that case used
+  to build a prompt from part of a run set and say nothing about the rest).
+  The read path's pre-F-933 `scenario_path` tolerance is gone with it: every
+  file spelling the path that way is version 1, so the version check refuses
+  it first and the normalize step could no longer fire.
 
 ## 0.23.1
 

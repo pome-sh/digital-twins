@@ -178,6 +178,70 @@ describe("pome fix-prompt command (FDRS-644)", () => {
     expect(stderr.join("\n")).toContain("No finalized run sets");
   });
 
+  // F-1195 — a verdict.json this CLI can't read must never render as an
+  // absence. Both halves are pinned: the root that holds ONLY stale files
+  // must not read like an empty `runs/`, and the root that holds stale files
+  // BESIDE readable ones must say so even though it has a prompt to print.
+  describe("a verdict.json at another artifact version is a named skip (F-1195)", () => {
+    async function writeStaleTrial(root: string, sid: string): Promise<void> {
+      const runDir = join(root, "runs", "scn", sid);
+      await mkdir(runDir, { recursive: true });
+      const {
+        state: _s,
+        evaluated: _e,
+        not_evaluated: _n,
+        pre_satisfied: _p,
+        total: _t,
+        ...v1
+      } = verdict({ session_id: sid });
+      await writeFile(
+        join(runDir, "verdict.json"),
+        JSON.stringify({ ...v1, version: 1 }),
+        "utf8",
+      );
+      await writeFile(join(runDir, "events.jsonl"), EVENT, "utf8");
+    }
+
+    it("a root holding only stale trials names the version, not 'no runs'", async () => {
+      const dir = await mkdtemp(join(tmpdir(), "fixcmd-stale-only-"));
+      await writeStaleTrial(dir, "ses_v1");
+      process.chdir(dir);
+
+      await run();
+      expect(process.exitCode).toBe(5);
+      const err = stderr.join("\n");
+      expect(err).toContain("1 verdict.json file(s)");
+      expect(err).toContain(`artifact version ${VERDICT_ARTIFACT_VERSION}`);
+      // The distinct-state requirement: this must NOT be the message a truly
+      // empty runs/ gets.
+      expect(err).not.toContain("No finalized run sets");
+    });
+
+    it("a root holding stale trials beside readable ones still names the skip AND prints the prompt", async () => {
+      const dir = await mkdtemp(join(tmpdir(), "fixcmd-stale-mixed-"));
+      await writeStaleTrial(dir, "ses_v1");
+      await writeTrial(dir, "ses_2", {
+        passed: false,
+        state: "fail",
+        score: 50,
+        criteria_results: [
+          {
+            criterion: { type: "model", text: "Severity is set correctly" },
+            passed: false,
+            skipped: false,
+            reason: "under-rated",
+          },
+        ],
+      });
+      process.chdir(dir);
+
+      await run();
+      expect(process.exitCode ?? 0).toBe(0);
+      expect(stdout.join("\n")).toContain("## Grouped failure signatures");
+      expect(stderr.join("\n")).toContain("1 verdict.json file(s)");
+    });
+  });
+
   it("a trial run dir targets that trial's set", async () => {
     const dir = await mkdtemp(join(tmpdir(), "fixcmd-trial-"));
     await writeTrial(dir, "ses_1", {
