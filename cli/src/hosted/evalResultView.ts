@@ -220,6 +220,39 @@ function criteriaWord(n: number): string {
   return n === 1 ? "criterion" : "criteria";
 }
 
+// F-1195 — the completeness arithmetic, factored out of `runScoreLine` so
+// `verdict.json` (runTaskHosted.ts) can carry the SAME counts the terminal
+// line already prints instead of a second, hand-rolled computation. Before
+// this existed, `verdict.json` wrote `score: 100, pass_threshold: 100,
+// passed: false` with no denominator anywhere in the file — a CI script that
+// trusted `score >= pass_threshold` read `true` on a run where a third of the
+// criteria never ran, because nothing in the artifact said so.
+export interface EvaluationCounts {
+  /** passed + failed — the satisfaction denominator (`score.total_required`). */
+  evaluated: number;
+  /** skipped + errored − preSatisfied — abstentions that actually block
+   *  `can_pass`. Zero on a fully-evaluated OR fully-pre-satisfied run. */
+  notEvaluated: number;
+  /** Excluded from the denominator because the seed already satisfied them
+   *  (`PRE_SATISFIED_REASON`) — not an abstention, so not counted in
+   *  `notEvaluated`. */
+  preSatisfied: number;
+  /** evaluated + notEvaluated + preSatisfied — every criterion the run
+   *  considered, so `score` (over `evaluated`) is legible as "N of total". */
+  total: number;
+}
+
+export function evaluationCounts(score: Score): EvaluationCounts {
+  const evaluated = score.total_required;
+  const notEvaluated = score.skipped + score.errored - score.preSatisfied;
+  return {
+    evaluated,
+    notEvaluated,
+    preSatisfied: score.preSatisfied,
+    total: evaluated + notEvaluated + score.preSatisfied,
+  };
+}
+
 export function scoreCountsSummary(score: Score): string {
   return `${score.passed ?? 0} passed, ${score.failed ?? 0} failed, ${score.skipped ?? 0} skipped, ${score.errored ?? 0} errored`;
 }
@@ -240,9 +273,7 @@ export function runScoreLine(
     // instead of folded into "not evaluated", the way the dashboard's
     // `verdictLine` does (run-status.ts:173-199): a pre-satisfied criterion
     // reached a verdict (the grader wasn't gapped), it just tested nothing.
-    const allExcluded = score.skipped + score.errored;
-    const unreached = allExcluded - score.preSatisfied;
-    const total = score.total_required + allExcluded;
+    const { notEvaluated: unreached, total } = evaluationCounts(score);
     // The all-excluded run: nothing passed, nothing failed, and every
     // criterion that left the denominator left it because the seed already
     // satisfied it. `unreached` is 0, so the sentence below would read "0 of 2

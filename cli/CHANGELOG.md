@@ -4,6 +4,38 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.2
+
+### Patch Changes
+
+- `verdict.json` now names the run's third state and carries the counts
+  `score` is computed over (F-1195). Before this, a hosted run whose criteria
+  couldn't all be graded wrote `score: 100, pass_threshold: 100, passed:
+  false` with no denominator and no field naming the third state anywhere in
+  the artifact — a CI script trusting `score >= pass_threshold` read `true`
+  on a run where a third of the criteria never ran. `verdict.json` now
+  carries `state` (`"pass"` / `"fail"` / `"incomplete"`, the same word
+  `scoreStatus` gives the terminal and the dashboard) plus `evaluated` /
+  `not_evaluated` / `pre_satisfied` / `total` counts, computed by one shared
+  helper (`evaluationCounts` in `evalResultView.ts`) so the artifact and the
+  terminal's "N of M criteria not evaluated" line can't drift apart.
+  `cli/README.md`'s exit-code contract now points CI at `state` instead of
+  "read the verdict word printed beside the score". `state` is the CLI's
+  word, and the two run shapes where the dashboard words the same run
+  differently are named in `VerdictArtifact`'s own doc comment (an
+  all-pre-satisfied run, filed as F-1399; and a task whose `pass_threshold`
+  is not 100) rather than left for a reader to find as a mismatch.
+- `verdict.json` is at artifact version 2, and a file at any other version is
+  a NAMED skip rather than a silent one (F-1195). The new fields are
+  required, so a version-1 file is refused outright — there is no
+  dual-format reader — but `pome fix-prompt` now reports every skipped file
+  and its version instead of reporting a `runs/` full of them exactly like an
+  empty one, including when readable trials sit beside them (that case used
+  to build a prompt from part of a run set and say nothing about the rest).
+  The read path's pre-F-933 `scenario_path` tolerance is gone with it: every
+  file spelling the path that way is version 1, so the version check refuses
+  it first and the normalize step could no longer fire.
+
 ## 0.23.1
 
 ### Patch Changes

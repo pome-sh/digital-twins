@@ -32,6 +32,7 @@ import type { CriterionDefWire } from "../hosted/client.js";
 import type { RecorderEvent as LegacyGithubRecorderEvent } from "@pome-sh/wire";
 import type { Task } from "../task/taskSchema.js";
 import {
+  evaluationCounts,
   scoreStatus,
   type Score,
   type ScoreStatus,
@@ -674,6 +675,13 @@ export async function runTaskHosted(
     //     effort: a disk failure degrades to "fix-prompt won't see this
     //     trial", never fails a finalized run.
     try {
+      // F-1195 — `counts` is the SAME arithmetic `runScoreLine` prints beside
+      // the terminal's verdict word, so the artifact's "N of total" can never
+      // drift from what the terminal already said. `state` is the `verdict`
+      // local computed above (`scoreStatus`), not a second derivation — the
+      // one place F-1392 shipped a bug was two call sites disagreeing on this
+      // exact word.
+      const counts = evaluationCounts(score);
       await writeVerdictArtifact(artifacts.runDir, {
         version: VERDICT_ARTIFACT_VERSION,
         source: "cloud-finalize",
@@ -686,7 +694,12 @@ export async function runTaskHosted(
         judge_model: score.judge_model,
         score: finalized.score,
         pass_threshold: scenario.config.passThreshold,
+        state: verdict,
         passed: exitCode === 0,
+        evaluated: counts.evaluated,
+        not_evaluated: counts.notEvaluated,
+        pre_satisfied: counts.preSatisfied,
+        total: counts.total,
         criteria_results: score.results,
         duration_ms: durationMs,
         finalized_at: new Date().toISOString(),

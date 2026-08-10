@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { serve, type ServerType } from "@hono/node-server";
 import { Hono } from "hono";
 import { sign as signJwt } from "hono/jwt";
+import { readVerdictArtifact } from "../../src/hosted/evalResultCache.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CLI_ENTRY = resolve(__dirname, "../../src/cli/main.ts");
@@ -282,6 +283,25 @@ describe("pome run --hosted (e2e via spawn)", () => {
     expect(stderr).toContain("1 of 1 criteria not evaluated");
     expect(stderr).not.toContain("cannot pass");
     expect(stderr).toContain("cloud score: 100/100");
+
+    // F-1195 — the bug this test guards: `verdict.json` used to write
+    // `score: 100, pass_threshold: 100, passed: false` with no denominator
+    // and no name for the third state, so a CI script trusting
+    // `score >= pass_threshold` read `true` on this exact run. Assert the
+    // artifact directly: `state` must name it `incomplete` (never `pass`,
+    // even though score >= pass_threshold), and the counts must show the one
+    // criterion was never evaluated.
+    const v = await readVerdictArtifact(join(tmp, "runs", "scn", "ses_e2e"));
+    expect(v).not.toBeNull();
+    expect(v?.verdict.score).toBe(100);
+    expect(v?.verdict.pass_threshold).toBe(100);
+    expect(v?.verdict.state).toBe("incomplete");
+    expect(v?.verdict.state).not.toBe("pass");
+    expect(v?.verdict.passed).toBe(false);
+    expect(v?.verdict.evaluated).toBe(0);
+    expect(v?.verdict.not_evaluated).toBe(1);
+    expect(v?.verdict.pre_satisfied).toBe(0);
+    expect(v?.verdict.total).toBe(1);
   }, 90_000);
 
   // F-1392 — the sibling of the INCOMPLETE test above. pome-cloud's F-1296
@@ -364,6 +384,21 @@ describe("pome run --hosted (e2e via spawn)", () => {
     expect(stderr).toMatch(/PASS/);
     expect(stderr).not.toMatch(/INCOMPLETE/);
     expect(stderr).not.toContain("score: incomplete —");
+
+    // F-1195 — this is the row the dashboard and the CLI have to agree on
+    // (`cross-surface-agreement.test.ts`'s "seed-excluded criterion beside
+    // three passes"). `verdict.json` must record the same `pass` the
+    // terminal just printed, and the counts must show the pre-satisfied
+    // criterion excluded from the denominator without being folded into
+    // `not_evaluated` (it reached a verdict — the seed already satisfied it).
+    const v = await readVerdictArtifact(join(tmp, "runs", "scn", "ses_e2e"));
+    expect(v).not.toBeNull();
+    expect(v?.verdict.state).toBe("pass");
+    expect(v?.verdict.passed).toBe(true);
+    expect(v?.verdict.evaluated).toBe(1);
+    expect(v?.verdict.not_evaluated).toBe(0);
+    expect(v?.verdict.pre_satisfied).toBe(1);
+    expect(v?.verdict.total).toBe(2);
   }, 90_000);
 
   // F-768 (M1 "Turn-usage into the main ledger") — the whole point of the

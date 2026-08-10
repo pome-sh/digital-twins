@@ -271,9 +271,26 @@ describe("pome run -n k end-to-end against a stub cloud (FDRS-636)", () => {
       session_id: "ses_1",
       passed: true,
       score: 100,
+      // F-1195 — a full pass: the one criterion evaluated, nothing left out.
+      state: "pass",
+      evaluated: 1,
+      not_evaluated: 0,
+      pre_satisfied: 0,
+      total: 1,
     });
     expect(v3?.verdict.passed).toBe(false);
     expect(v3?.verdict.criteria_results[0]?.reason).toBe("under-rated");
+    // F-1195 — a genuine fail (the criterion ran and was judged unsatisfied,
+    // not skipped): `state` names it `fail`, distinct from `incomplete`, and
+    // the denominator shows the criterion WAS evaluated.
+    expect(v3?.verdict).toMatchObject({
+      state: "fail",
+      score: 58,
+      evaluated: 1,
+      not_evaluated: 0,
+      pre_satisfied: 0,
+      total: 1,
+    });
     expect(await readVerdictArtifact(join(tmp, "runs", "scn", "ses_2"))).toBeNull();
 
     // FDRS-644 — the fix & green handoff renders (a completed trial failed):

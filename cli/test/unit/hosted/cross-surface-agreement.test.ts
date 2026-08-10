@@ -22,9 +22,28 @@
 // The one row where the two surfaces still differ is in the table too, marked
 // `divergence`, with the reason. A known divergence with a test on it is a
 // fact; the same divergence with no test on it is the F-1392 defect again.
+//
+// F-1195 — there is now a THIRD surface answering the same question: the
+// `state` field of the `verdict.json` a hosted run writes, which is what CI
+// reads instead of scraping stderr. It answers with the CLI's word by
+// construction (`runTaskHosted.ts` passes the one `verdict` local it already
+// computed into the artifact; `test/e2e/runTaskHosted.test.ts` pins that end
+// to end). What this file adds is the VOCABULARY claim — that the artifact
+// spells the answer in the dashboard's three words and no others — and the
+// artifact's side of the known divergence, so `verdict.json` is never found
+// to have quietly picked a side of F-1399 that nothing wrote down.
 
+import { mkdir, mkdtemp, readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { CriterionResult } from "../../../src/contract/index.js";
+import {
+  readVerdictArtifact,
+  VERDICT_ARTIFACT_VERSION,
+  writeVerdictArtifact,
+  type VerdictArtifact,
+} from "../../../src/hosted/evalResultCache.js";
 import { PRE_SATISFIED_REASON, scoreStatus } from "../../../src/hosted/evalResultView.js";
 import { scoreFromFinalizeResponse } from "../../../src/hosted/uploadAndFinalize.js";
 
@@ -203,6 +222,85 @@ describe("CLI and dashboard answer `what state is this run in?` the same way (F-
       );
     });
   }
+
+  // ── The third surface: verdict.json's `state` (F-1195) ───────────────────
+  //
+  // `runTaskHosted.ts` writes `state: verdict` — the same local that produced
+  // the terminal's word — so agreement between the artifact and the terminal
+  // is structural, and the e2e tests prove the wiring. The risk this block
+  // covers is the OTHER one: that the artifact spells the answer in a
+  // vocabulary of its own, which would be the F-1392 defect reappearing in a
+  // new file.
+  describe("verdict.json spells the state in the same three words (F-1195)", () => {
+    async function roundtripState(state: string): Promise<string | undefined> {
+      const dir = join(await mkdtemp(join(tmpdir(), "xsurface-")), "scn", "ses_1");
+      await mkdir(dir, { recursive: true });
+      await writeVerdictArtifact(dir, {
+        version: VERDICT_ARTIFACT_VERSION,
+        source: "cloud-finalize",
+        task_name: "scn",
+        task_path: "tasks/scn.md",
+        group_id: null,
+        session_id: "ses_1",
+        cloud_run_id: "run_x",
+        cloud_dashboard_url: "https://app.pome.sh/runs/run_x",
+        judge_model: null,
+        score: 100,
+        pass_threshold: 100,
+        state: state as VerdictArtifact["state"],
+        passed: state === "pass",
+        evaluated: 1,
+        not_evaluated: 0,
+        pre_satisfied: 0,
+        total: 1,
+        criteria_results: [passing("a")],
+        duration_ms: 1,
+        finalized_at: "2026-08-10T00:00:00.000Z",
+      });
+      return (await readVerdictArtifact(dir))?.verdict.state;
+    }
+
+    // The dashboard's `RunStatus` is these three plus `in_progress`
+    // (run-status.ts) — a state no finalized artifact can be in, and one the
+    // artifact must therefore refuse rather than store.
+    const dashboardWords: DashboardStatus[] = ["pass", "fail", "incomplete"];
+
+    for (const word of dashboardWords) {
+      it(`accepts the dashboard's "${word}" verbatim`, async () => {
+        expect(await roundtripState(word)).toBe(word);
+      });
+    }
+
+    for (const notAWord of ["in_progress", "INCOMPLETE", "passed", "unevaluated", ""]) {
+      it(`refuses "${notAWord}" — a fourth word is a fourth vocabulary`, async () => {
+        expect(await roundtripState(notAWord)).toBeUndefined();
+      });
+    }
+
+    it("records the CLI's word on the F-1399 divergence, and the divergence is stated in the artifact's own doc", async () => {
+      const row = table.find((r) => r.divergence)!;
+      const cliWord = cliRunStatus(row.results, row.satisfaction);
+      // The all-pre-satisfied run: the artifact says `incomplete` (the CLI's
+      // A5 guard) while the dashboard renders Failed. Both refuse to pass it,
+      // so `passed` — the only bit CI can act on — agrees. The artifact does
+      // not get to pick this side silently: `VerdictArtifact.state`'s doc
+      // comment names F-1399 and this row.
+      expect(cliWord).toBe("incomplete");
+      expect(dashboardRunStatus(row.results, row.satisfaction)).toBe("fail");
+      expect(await roundtripState(cliWord)).toBe("incomplete");
+
+      // And the claim in this test's name is checked, not asserted: the field
+      // a CI reader meets first is `VerdictArtifact.state`, so the divergence
+      // has to be legible from there. Delete the mention and this goes red
+      // rather than the artifact quietly going back to implying agreement it
+      // does not have.
+      const artifactSource = await readFile(
+        new URL("../../../src/hosted/evalResultCache.ts", import.meta.url),
+        "utf8",
+      );
+      expect(artifactSource).toContain("F-1399");
+    });
+  });
 
   it("has exactly one known divergence, and it is the empty-denominator row", () => {
     // A guard on the guard: adding a `divergence` to a row is how this file

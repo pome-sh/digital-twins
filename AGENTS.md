@@ -36,8 +36,13 @@ live at **https://docs.pome.sh**.
   them. F-933 renamed the two artifact keys that had no such contract:
   `runs/latest.json` now writes `task` (was `scenario`) and
   `runs/<task>/<session>/verdict.json` writes `task_path` (was
-  `scenario_path`); the verdict READ path still accepts `scenario_path` so
-  `pome fix-prompt` can read trials recorded by `@pome-sh/cli` <= 0.8.x.
+  `scenario_path`). F-1195 retired the verdict READ path's `scenario_path`
+  tolerance: `verdict.json` is at artifact version 2, every file spelling it
+  the old way is version 1, and the version check refuses those before the
+  spelling could matter — so the normalize step was a dual-format reader that
+  could no longer fire. Such a file is still RECOGNIZED as one of ours and
+  `pome fix-prompt` names the skip (`staleVersionCount`) rather than dropping
+  it silently.
 - **The CLI (`cli/`) IS a root workspace member** — `workspaces: ["packages/*",
   "cli"]`, one `package-lock.json`, one `npm ci`. Use `npm run -w @pome-sh/cli
   ...` from the root. The former `cli/package-lock.json` and
