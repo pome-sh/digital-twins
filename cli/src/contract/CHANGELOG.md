@@ -12,6 +12,27 @@ published to npm — the package was `private: true` throughout — so a version
 workspace marker, not an installable artifact.
 
 
+## 0.14.2 — 2026-08-10
+
+`agentResponseSchema.framework` becomes nullable (F-1393, tracking pome-cloud
+F-1213).
+
+- pome-cloud dropped `agents.framework`'s `NOT NULL DEFAULT 'claude-agent-sdk'`
+  and now emits `framework: row.framework ?? null` on **every** `POST /v1/agents`
+  response, so `null` is the wire spelling of "this agent never declared a
+  framework". The schema was `z.string().optional()` and rejected it outright:
+  a CLI at 0.14.1 or earlier against an F-1213 cloud fails `parseOkAgent` with
+  "POST /v1/agents returned an unexpected shape" for exactly those agents.
+  Widened to `z.string().nullable().optional()`.
+- The three answers stay three and must not be collapsed: a string is a declared
+  value, `null` is "the cloud says nothing was ever declared", and absent is
+  "this cloud predates the field" (pre-F-820). `.optional()` is retained for the
+  last of those only.
+- Request side is unchanged — `createAgentRequestSchema.framework` stays
+  `z.string().min(1).optional()`. The cloud deliberately 422s a non-string
+  rather than normalizing it to unset, so the CLI must keep omitting the key
+  rather than sending `null`.
+
 ## 0.14.1 — 2026-08-04
 
 Dependency-only patch (#302): `zod` `^4.1.13` → `^4.4.3` and dev `@types/node`.

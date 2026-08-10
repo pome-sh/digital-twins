@@ -256,11 +256,11 @@ export function createProgram() {
           typeof existing.raw.agent === "object" && existing.raw.agent !== null
             ? (existing.raw.agent as Record<string, unknown>)
             : {};
-        const scaffoldedAgent = { ...priorAgent };
-        if (framework) scaffoldedAgent.framework = framework;
+        const nextAgent = { ...priorAgent };
+        if (framework) nextAgent.framework = framework;
         await writeManifest(existing.path, existing.format, {
           ...existing.raw,
-          agent: scaffoldedAgent,
+          agent: nextAgent,
           command,
         });
       }

@@ -21,7 +21,24 @@ packaging restructure: bump `version` here and in `package.json`, and merging to
   now reports an undeclared framework as `null` rather than a guessed default.
   The CLI's own `AgentResponse.framework` schema is updated to accept that
   `null` (previously only a bare string or absent), matching pome-cloud's
-  now-nullable wire contract.
+  now-nullable wire contract. Widening it is load-bearing, not cosmetic: the
+  old bare-string schema `safeParse`-rejected a literal `framework: null`, so
+  against a live F-1213 cloud every `pome register agent` for an agent with no
+  declared framework would have failed with "POST /v1/agents returned an
+  unexpected shape", and every `pome run` would have degraded to "running
+  unattributed".
+
+- `pome init --sdk claude` now writes `agent.framework: "claude-agent-sdk"`
+  instead of `"claude"` (F-1393). It was writing the `--sdk` FLAG name — a CLI
+  selector — into the manifest as if it were a framework label, so the CLI
+  contradicted itself one command later: `pome register agent` printed
+  `Unknown agent.framework "claude". (Recorded as-is.)` about a manifest the
+  CLI had just written, and the dashboard badged the run `claude` where every
+  bundled Claude Agent SDK example reads `claude-agent-sdk`. The scaffold's
+  label is now typed against `KNOWN_FRAMEWORKS` in `cli/src/cli/frameworks.ts`,
+  the CLI's own vocabulary, so a future `--sdk` cannot reintroduce a parallel
+  copy without failing typecheck. Plain `pome init` (no `--sdk`) still writes
+  no `agent.framework` at all — nothing was declared, so nothing is stated.
 
 ## 0.23.3
 

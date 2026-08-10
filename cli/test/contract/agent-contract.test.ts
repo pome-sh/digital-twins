@@ -99,6 +99,45 @@ describe("agentResponseSchema — resolver fields (F-818)", () => {
     expect(parsed.description).toBeNull();
     expect(parsed.created).toBe(false);
   });
+
+  // F-1393 / pome-cloud F-1213 — the control plane's `agents.framework` column
+  // lost its NOT NULL DEFAULT 'claude-agent-sdk', and `toResponse` now emits
+  // `framework: row.framework ?? null` on EVERY response. Before this widening
+  // the schema was a bare `z.string().optional()`, so a literal `null` failed
+  // `safeParse` and `parseOkAgent` threw "POST /v1/agents returned an
+  // unexpected shape" — i.e. every `pome register agent` for an agent that
+  // never declared a framework would have hard-failed against a live F-1213
+  // cloud, and every `pome run` would have degraded to "running unattributed".
+  it("accepts framework: null — the F-1213 shape for 'never declared'", () => {
+    const parsed = agentResponseSchema.parse({
+      ...base,
+      framework: null,
+      description: null,
+      transport: null,
+      clone_scope: null,
+      created: false,
+      resolved_via: "slug",
+    });
+    expect(parsed.framework).toBeNull();
+  });
+
+  // The three cloud answers stay three (D3): a declared value, `null` = the
+  // cloud says nothing was ever declared, and absent = the cloud did not
+  // answer at all (pre-F-820). Collapsing null into undefined here would put
+  // the milestone's exact bug back, one layer down.
+  it("keeps null (never declared) distinct from absent (cloud did not answer)", () => {
+    expect(agentResponseSchema.parse({ ...base, framework: null }).framework).toBeNull();
+    expect(agentResponseSchema.parse(base).framework).toBeUndefined();
+  });
+
+  // pome-cloud 422s a non-string framework on the REQUEST side rather than
+  // normalizing it to unset ("could not read it" is not "nothing declared").
+  // The response side is the mirror of that: a non-string never parses as
+  // absent here either.
+  it("rejects a non-string framework rather than reading it as absent", () => {
+    expect(agentResponseSchema.safeParse({ ...base, framework: 42 }).success).toBe(false);
+    expect(createAgentRequestSchema.safeParse({ name: "A", framework: 42 }).success).toBe(false);
+  });
 });
 
 describe("agentResponseSchema — slug-rename hint fields (F-861)", () => {
