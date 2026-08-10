@@ -129,7 +129,71 @@ async function readLiveWire(source) {
   if (!res.ok) {
     throw new Error(`${source.twin}: ${source.endpoint} answered HTTP ${res.status}: ${text.slice(0, 200)}`);
   }
-  return { rawText: text };
+  // The framing is a DECLARED assumption that is then CHECKED, never a derived
+  // value copied into the golden. `configuration` is copied verbatim into
+  // meta.json and `--check --offline` re-derives meta from the committed
+  // raw.json with no substrate to observe, so a field filled in from the live
+  // response would make the offline gate disagree with the online capture.
+  // Declaring it keeps the gate deterministic AND makes a vendor that silently
+  // switches framing a loud failure rather than a silent re-shape.
+  const observed = isEventStream(text) ? "text/event-stream" : "application/json";
+  const declared = source.configuration.responseFraming ?? "application/json";
+  if (observed !== declared) {
+    throw new Error(
+      `${source.twin}: the source table declares responseFraming "${declared}" but ${source.endpoint} ` +
+        `answered "${observed}". Either the vendor changed its transport framing or the declaration is wrong; ` +
+        `both change what this capture means, so it stops here.`
+    );
+  }
+  return { rawText: unwrapEventStream(text) };
+}
+
+const isEventStream = (text) => /^(event|data|id|retry):/m.test(text.trimStart().split("\n", 1)[0] ?? "");
+
+/**
+ * MCP's Streamable HTTP transport lets a server answer a POST with EITHER a JSON
+ * body or an SSE stream, and the two are both correct. Measured 2026-08-09:
+ * gmail, slack and stripe answer `application/json`; **linear answers SSE**
+ * (`event: message` / `data: {…}`), so `JSON.parse` on the wire bytes throws and
+ * the twin's capture fails with "the substrate did not answer JSON" — a message
+ * that reads like a broken endpoint or a bad token rather than a framing the
+ * reader never handled.
+ *
+ * The `data:` payload is unwrapped and stored as `raw.json`, and this is the one
+ * place the golden is not byte-verbatim from the wire. That is deliberate and it
+ * is declared: `raw.json` must be a `tools/list` envelope, because
+ * `parseMcpToolTable` on the pome-cloud side parses it and hashes it, and a
+ * golden nothing can read is not a golden. The framing is recorded in the
+ * capture's `configuration.responseFraming` instead, so the fact is kept rather
+ * than lost.
+ *
+ * Per RFC 8895/the SSE spec a single event's `data:` may span several lines, and
+ * a stream may carry several events. The first event that parses to a JSON-RPC
+ * object carrying `result` or `error` wins — a heartbeat or a `ping` before the
+ * real message must not be mistaken for the answer.
+ */
+export function unwrapEventStream(text) {
+  if (!isEventStream(text)) return text;
+  const events = text.split(/\r?\n\r?\n/);
+  for (const event of events) {
+    const data = event
+      .split(/\r?\n/)
+      .filter((line) => line.startsWith("data:"))
+      .map((line) => line.slice(5).replace(/^ /, ""))
+      .join("\n");
+    if (!data) continue;
+    let parsed;
+    try {
+      parsed = JSON.parse(data);
+    } catch {
+      continue;
+    }
+    if (parsed && typeof parsed === "object" && ("result" in parsed || "error" in parsed)) return data;
+  }
+  throw new Error(
+    "the endpoint answered text/event-stream but no event carried a JSON-RPC result or error. " +
+      `First 200 bytes: ${text.slice(0, 200)}`
+  );
 }
 
 function requireBinary(bin, versionArgs, why) {

@@ -1,0 +1,47 @@
+{
+  "twin": "stripe",
+  "substrate": "live-wire-oauth",
+  "endpoint": "https://mcp.stripe.com",
+  "method": "tools/list",
+  "protocol": "JSON-RPC 2.0 over HTTP",
+  "protocolVersion": "2025-06-18",
+  "captureDate": "2026-08-10",
+  "rawFileSha256": "457cd581207b30acee5c86f267a28a839a6a9d24b41121af6fb7d8233f8fd739",
+  "liveToolCount": 11,
+  "liveToolOrder": [
+    "stripe_implementation_planner",
+    "send_stripe_mcp_feedback",
+    "search_stripe_documentation",
+    "get_stripe_account_info",
+    "create_refund",
+    "stripe_api_search",
+    "stripe_api_details",
+    "stripe_api_read",
+    "stripe_api_write",
+    "list_available_accounts_or_orgs",
+    "manage_stripe_accounts"
+  ],
+  "configuration": {
+    "auth": "bearer",
+    "grantedScopes": "mcp",
+    "responseFraming": "application/json",
+    "deploymentSelector": "the authorising Stripe account, in TEST MODE. Captured 2026-08-10. Stripe's OAuth consent screen — not the `scope` request parameter — is where the permission set is chosen: the request carries scope=mcp and Stripe then asks the operator to pick None/Read/Write per resource group.",
+    "consentScreenPermissions": "All permissions = Write, test mode",
+    "whyNotAFreshAccount": "Preview and allowlisted tool groups are granted PER ACCOUNT — docs.stripe.com/mcp gates a Treasury group behind a separate access request — so a clean throwaway account returns a SHORTER listing than a customer sees. Measured: a brand-new test account's consent screen offered only two permission groups (Accounts, Analytics). This is the one twin where capturing from our own account is the correct answer rather than a compromise.",
+    "matchesExaminee": "11 tools. F-1326 refuted the oss-package premise for this vendor by reading @stripe/mcp@0.3.3: it declares no tools and forwards to this endpoint, and its cli.js dropped --tools with 'Tool permissions are now controlled by your Restricted API Key'. So the surface is per-credential and the grant above is part of what this golden means.",
+    "requestHeaders": {
+      "content-type": "application/json",
+      "accept": "application/json, text/event-stream"
+    },
+    "requestBody": {
+      "method": "tools/list",
+      "jsonrpc": "2.0",
+      "id": 1
+    }
+  },
+  "canonicalFileSha256": "a21e41ebb20b7a43da06d1ef81e224c3df1bbe467232e77f8db0e294b275e3e0",
+  "files": {
+    "raw": "stripe.raw.json",
+    "canonical": "stripe.canonical.json"
+  }
+}

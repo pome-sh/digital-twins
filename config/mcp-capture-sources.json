@@ -31,7 +31,11 @@
           "content-type": "application/json",
           "accept": "application/json, text/event-stream"
         },
-        "requestBody": { "method": "tools/list", "jsonrpc": "2.0", "id": 1 },
+        "requestBody": {
+          "method": "tools/list",
+          "jsonrpc": "2.0",
+          "id": 1
+        },
         "matchesExaminee": "an examinee pointing an MCP client at this URL gets this listing; there is no configuration axis on which the two could differ",
         "completeness": "exact"
       }
@@ -61,68 +65,99 @@
         "insiders": false,
         "featureFlags": [],
         "scopeFiltering": "none — docs/scope-filtering.md filters tools by a classic PAT's OAuth scopes; with no readable scopes the server logs `continuing without scope filtering` and serves the unfiltered toolset, which is what an examinee with full scopes gets",
-        "serverArgs": ["stdio", "--toolsets=default"],
-        "serverEnv": { "GITHUB_PERSONAL_ACCESS_TOKEN": "f1326-unauthenticated-capture" },
+        "serverArgs": [
+          "stdio",
+          "--toolsets=default"
+        ],
+        "serverEnv": {
+          "GITHUB_PERSONAL_ACCESS_TOKEN": "f1326-unauthenticated-capture"
+        },
         "serverEnvNote": "the token is deliberately not a credential; it only gets the server past its startup check. Verified: a valid-shaped ghp_ placeholder and this string produce a byte-identical tools/list.",
         "completeness": "subset-of-remote",
-        "knownRemoteOnlyToolsNotInCapture": ["create_pull_request_with_copilot"],
+        "knownRemoteOnlyToolsNotInCapture": [
+          "create_pull_request_with_copilot"
+        ],
         "knownRemoteOnlyToolsEvidence": "README.md 'Additional Tools in Remote GitHub MCP Server' at the pinned commit lists create_pull_request_with_copilot under the Copilot toolset, which is Default:true, so the remote `default` surface is this capture plus that one tool. The other two remote-only groups (copilot_spaces, github_support_docs_search) are non-default toolsets and are correctly absent. A consumer of this golden must treat a github tool in that list as not-compared rather than as a gap.",
         "unguardedDirection": "The asymmetry is on the record deliberately: there is no field, and no mechanism, for the OPPOSITE error — a tool in this capture that the remote deployment does not serve. `subset-of-remote` is an assumption about the remote's `default` composition matching the local one, sourced from the vendor's docs rather than from the remote itself, and only a credentialed read could confirm it. If the two ever diverge in that direction this golden over-reports and nothing here catches it. Whoever gains a credential for this endpoint should check that first."
       }
     },
     "stripe": {
-      "substrate": "not-captured",
-      "capture": false,
+      "substrate": "live-wire-oauth",
+      "capture": true,
       "endpoint": "https://mcp.stripe.com",
-      "reason": "@stripe/mcp ships no tool table, and the live surface is per-credential — there is nothing deployment-invariant to freeze.",
-      "evidence": [
-        "@stripe/mcp@0.3.3 (latest on npm) ships 3 files / 182 lines in dist/. dist/index.js is a stdio<->HTTP proxy that forwards every message to https://mcp.stripe.com; `grep -c inputSchema dist/*.js` is 0. The package declares no tools.",
-        "dist/cli.js removed the --tools flag with the message 'Tool permissions are now controlled by your Restricted API Key (RAK)', so the served surface is a function of the caller's key, not of the deployment.",
-        "docs.stripe.com/mcp lists a Treasury tool group in Public preview behind a separate access request, so even two fully-scoped keys need not see the same listing.",
-        "Unauthenticated POST tools/list to https://mcp.stripe.com returns 401 {\"error\":\"Unauthorized. See https://docs.stripe.com/mcp for usage instructions.\"} (re-probed 2026-08-06)."
-      ],
-      "revisitWhen": "a credentialed capture lane exists and can record WHICH restricted key's permissions produced the listing"
+      "method": "tools/list",
+      "protocol": "JSON-RPC 2.0 over HTTP",
+      "protocolVersion": "2025-06-18",
+      "authTokenEnv": "POME_STRIPE_MCP_TOKEN",
+      "configuration": {
+        "auth": "bearer",
+        "grantedScopes": "mcp",
+        "responseFraming": "application/json",
+        "deploymentSelector": "the authorising Stripe account, in TEST MODE. Captured 2026-08-10. Stripe's OAuth consent screen — not the `scope` request parameter — is where the permission set is chosen: the request carries scope=mcp and Stripe then asks the operator to pick None/Read/Write per resource group.",
+        "consentScreenPermissions": "All permissions = Write, test mode",
+        "whyNotAFreshAccount": "Preview and allowlisted tool groups are granted PER ACCOUNT — docs.stripe.com/mcp gates a Treasury group behind a separate access request — so a clean throwaway account returns a SHORTER listing than a customer sees. Measured: a brand-new test account's consent screen offered only two permission groups (Accounts, Analytics). This is the one twin where capturing from our own account is the correct answer rather than a compromise.",
+        "matchesExaminee": "11 tools. F-1326 refuted the oss-package premise for this vendor by reading @stripe/mcp@0.3.3: it declares no tools and forwards to this endpoint, and its cli.js dropped --tools with 'Tool permissions are now controlled by your Restricted API Key'. So the surface is per-credential and the grant above is part of what this golden means.",
+        "requestHeaders": {
+          "content-type": "application/json",
+          "accept": "application/json, text/event-stream"
+        },
+        "requestBody": {
+          "method": "tools/list",
+          "jsonrpc": "2.0",
+          "id": 1
+        }
+      }
     },
     "slack": {
       "substrate": "live-wire-oauth",
-      "capture": false,
-      "deferredTo": "F-1329",
+      "capture": true,
       "endpoint": "https://mcp.slack.com/mcp",
       "method": "tools/list",
       "protocol": "JSON-RPC 2.0 over HTTP",
       "protocolVersion": "2025-06-18",
-      "protocolVersionNote": "DECLARED, NOT OBSERVED. `loadSources` requires this field on every capturable source, so without it F-1329 flips `capture` to true and the producer throws `must declare protocolVersion` BEFORE it opens a socket — an error naming a schema field, read by whoever has just finished an OAuth flow. It is provenance only: `requestBody` is a bare tools/list with no `initialize`, so nothing is negotiated (gmail's row is the same shape). It cannot be observed first either — an unauthenticated `initialize` also returns 401 missing_token (probed 2026-08-09). F-1329's first credentialed capture must send `initialize` once and correct this value if the endpoint answers a different revision.",
       "authTokenEnv": "POME_SLACK_MCP_TOKEN",
-      "reason": "OAuth-gated: unauthenticated tools/list returns 401 missing_token (re-probed 2026-08-06). Same reader as gmail's; F-1329 sets POME_SLACK_MCP_TOKEN and flips `capture` to true.",
       "configuration": {
         "auth": "bearer",
-        "deploymentSelector": "unknown until a credentialed capture confirms whether the listing is scoped to the installing workspace",
+        "grantedScopes": "channels:history,groups:history,im:history,mpim:history,channels:read,emoji:read,files:read,canvases:read,groups:read,im:read,lists:read,mpim:read,reactions:read,users:read,users:read.email,channels:write,chat:write,files:write,canvases:write,groups:write,im:write,lists:write,mpim:write,reactions:write,search:read.public,search:read.private,search:read.mpim,search:read.im,search:read.files,search:read.users",
+        "responseFraming": "application/json",
+        "deploymentSelector": "the installing Slack workspace. Captured 2026-08-10 from an INTERNAL Slack app installed to the pome twin sandbox workspace, under a user token (xoxp) carrying every scope mcp.slack.com advertises in its protected-resource metadata (all 30).",
+        "whyNotReadOnly": "Slack's MCP page lists its required scopes PER TOOL, and four of them are writes (chat:write, channels:write, reactions:write, canvases:write). A read-only grant would plausibly return a listing missing the vendor's write tools, and the lane would then report twin-slack's write tools as mcp-tool-twin-only — a CRITICAL asserting the twin invented a capability that really exists. The golden must describe what an examinee's agent sees. This deliberately overrides F-1329's original 'all three are read-scoped' criterion; the capture issues one tools/list and invokes no tool, and the grant was revoked immediately after.",
+        "matchesExaminee": "19 tools, which is exactly the count Slack's own MCP documentation states the server exposes.",
         "requestHeaders": {
           "content-type": "application/json",
           "accept": "application/json, text/event-stream"
         },
-        "requestBody": { "method": "tools/list", "jsonrpc": "2.0", "id": 1 }
+        "requestBody": {
+          "method": "tools/list",
+          "jsonrpc": "2.0",
+          "id": 1
+        }
       }
     },
     "linear": {
       "substrate": "live-wire-oauth",
-      "capture": false,
-      "deferredTo": "F-1329",
+      "capture": true,
       "endpoint": "https://mcp.linear.app/mcp",
       "method": "tools/list",
       "protocol": "JSON-RPC 2.0 over HTTP",
       "protocolVersion": "2025-06-18",
-      "protocolVersionNote": "DECLARED, NOT OBSERVED — see the slack row for the full argument. Unauthenticated `initialize` returns 401 invalid_token (probed 2026-08-09), so F-1329's first credentialed capture must confirm this value.",
       "authTokenEnv": "POME_LINEAR_MCP_TOKEN",
-      "reason": "OAuth-gated: unauthenticated tools/list returns 401 invalid_token (re-probed 2026-08-06). Same reader as gmail's; F-1329 sets POME_LINEAR_MCP_TOKEN and flips `capture` to true.",
       "configuration": {
         "auth": "bearer",
-        "deploymentSelector": "unknown until a credentialed capture confirms whether the listing is scoped to the authorising workspace",
+        "grantedScopes": "read",
+        "responseFraming": "text/event-stream",
+        "deploymentSelector": "the authorising Linear workspace. Captured 2026-08-10 from a throwaway workspace under an OAuth grant limited to the `read` scope, which is the narrowest scope mcp.linear.app offers (scopes_supported: read, write, openid, email).",
+        "responseFramingNote": "linear is the only one of the five that answers the tools/list POST as SSE rather than application/json. raw.json holds the unwrapped `data:` payload, because the consumer parses and hashes it; the framing is recorded here so the fact is kept rather than lost.",
+        "matchesExaminee": "an examinee pointing an MCP client at this URL with a `read` grant gets this listing. Whether a `write` grant would add tools is UNMEASURED — see the F-1329 note in SECRETS.md.",
         "requestHeaders": {
           "content-type": "application/json",
           "accept": "application/json, text/event-stream"
         },
-        "requestBody": { "method": "tools/list", "jsonrpc": "2.0", "id": 1 }
+        "requestBody": {
+          "method": "tools/list",
+          "jsonrpc": "2.0",
+          "id": 1
+        }
       }
     }
   }

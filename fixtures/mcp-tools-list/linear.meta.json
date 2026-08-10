@@ -1,0 +1,71 @@
+{
+  "twin": "linear",
+  "substrate": "live-wire-oauth",
+  "endpoint": "https://mcp.linear.app/mcp",
+  "method": "tools/list",
+  "protocol": "JSON-RPC 2.0 over HTTP",
+  "protocolVersion": "2025-06-18",
+  "captureDate": "2026-08-10",
+  "rawFileSha256": "4faeb58927244414442b2e7fc51131e8de69ca62528cbcf4c87958d12195d2c4",
+  "liveToolCount": 36,
+  "liveToolOrder": [
+    "get_attachment",
+    "list_agent_skills",
+    "get_agent_skill",
+    "list_comments",
+    "list_cycles",
+    "get_document",
+    "list_documents",
+    "extract_images",
+    "get_issue",
+    "list_issues",
+    "list_issue_statuses",
+    "get_issue_status",
+    "list_issue_labels",
+    "list_projects",
+    "get_project",
+    "list_project_labels",
+    "list_release_pipelines",
+    "list_releases",
+    "get_release",
+    "list_release_notes",
+    "get_release_note",
+    "get_diff",
+    "list_diffs",
+    "get_diff_threads",
+    "list_milestones",
+    "get_milestone",
+    "list_teams",
+    "get_team",
+    "list_users",
+    "get_user",
+    "get_workspace",
+    "search_documentation",
+    "list_initiatives",
+    "get_initiative",
+    "list_initiative_labels",
+    "get_status_updates"
+  ],
+  "configuration": {
+    "auth": "bearer",
+    "grantedScopes": "read",
+    "responseFraming": "text/event-stream",
+    "deploymentSelector": "the authorising Linear workspace. Captured 2026-08-10 from a throwaway workspace under an OAuth grant limited to the `read` scope, which is the narrowest scope mcp.linear.app offers (scopes_supported: read, write, openid, email).",
+    "responseFramingNote": "linear is the only one of the five that answers the tools/list POST as SSE rather than application/json. raw.json holds the unwrapped `data:` payload, because the consumer parses and hashes it; the framing is recorded here so the fact is kept rather than lost.",
+    "matchesExaminee": "an examinee pointing an MCP client at this URL with a `read` grant gets this listing. Whether a `write` grant would add tools is UNMEASURED — see the F-1329 note in SECRETS.md.",
+    "requestHeaders": {
+      "content-type": "application/json",
+      "accept": "application/json, text/event-stream"
+    },
+    "requestBody": {
+      "method": "tools/list",
+      "jsonrpc": "2.0",
+      "id": 1
+    }
+  },
+  "canonicalFileSha256": "3ec346aa470742820380495fe75896892d5c87cced313f032443cea96b1facdc",
+  "files": {
+    "raw": "linear.raw.json",
+    "canonical": "linear.canonical.json"
+  }
+}
