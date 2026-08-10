@@ -4,6 +4,33 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.1
+
+### Patch Changes
+
+- `pome run --hosted` no longer exits 1 on a run the dashboard renders PASS
+  (F-1392). pome-cloud's F-1296 excludes a criterion the seed already
+  satisfied from the abstention count before deciding a run is incomplete;
+  the CLI counted it like any other unresolved criterion, so a task whose
+  seed already satisfied one check (and nothing else was left ungraded)
+  printed `INCOMPLETE` and failed CI. `scoreFromFinalizeResponse` now
+  exempts a `skipped` result stamped `already_true_in_seed`
+  (`isPreSatisfied`/`PRE_SATISFIED_REASON` in `evalResultView.ts`) from
+  `can_pass`. Any other skipped reason, and every errored result, still makes
+  a run incomplete. `runScoreLine` now names a pre-satisfied criterion apart
+  from genuine abstentions instead of folding it into "not evaluated", and an
+  all-excluded run reads `nothing was at risk (N criteria already true in the
+  seed)` rather than the self-contradicting `0 of N criteria not evaluated`.
+  `pome fix-prompt` likewise stops filing a seed-excluded criterion under
+  "not uniformly evaluated", which sent the reader's coding agent hunting for
+  a grader gap that did not exist.
+- The CLI and the dashboard are now walked over one table of wire fixtures
+  (`cli/test/unit/hosted/cross-surface-agreement.test.ts`) so their agreement
+  on run state is checked rather than assumed, including the single shape
+  where they still differ: a run whose criteria are ALL seed-excluded has no
+  denominator, so the CLI calls it `incomplete` and the dashboard renders
+  FAILED at 0/100 (F-1399). Neither passes it and both exit non-zero.
+
 ## 0.23.0
 
 ### Minor Changes

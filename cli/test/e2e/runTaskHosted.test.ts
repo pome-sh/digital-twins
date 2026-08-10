@@ -284,6 +284,88 @@ describe("pome run --hosted (e2e via spawn)", () => {
     expect(stderr).toContain("cloud score: 100/100");
   }, 90_000);
 
+  // F-1392 — the sibling of the INCOMPLETE test above. pome-cloud's F-1296
+  // excludes a criterion the seed already satisfied from the dashboard's
+  // abstention denominator (`isRunIncomplete` in
+  // apps/dashboard/src/lib/run-status.ts). Before this fix, the CLI counted
+  // this `skipped` result like any other abstention and printed INCOMPLETE /
+  // exit 1 on a run the dashboard renders PASS.
+  it("prints PASS and exits 0 when the only skipped criterion is pre-satisfied (already_true_in_seed)", async () => {
+    // The wire shape exactly as pome-cloud serializes it: no `outcome` field
+    // (`criterionResultSchema` has none on either side, and the CLI's
+    // `finalizeResponseSchema` strips unknown keys), so the exemption has to
+    // work off `skipped` + `reason` — which is the whole point.
+    finalizeResponseOverrides = {
+      criteria_results: [
+        {
+          criterion: { type: "code", text: "No unsupported endpoint was called" },
+          passed: true,
+          skipped: false,
+          reason: "matched",
+        },
+        {
+          criterion: { type: "code", text: "github.no-new-issues" },
+          passed: false,
+          skipped: true,
+          reason: "already_true_in_seed",
+        },
+      ],
+    };
+    const taskPath = join(tmp, "scn.md");
+    await writeFile(
+      taskPath,
+      [
+        "# Trivial",
+        "",
+        "## Prompt",
+        "Pretend prompt.",
+        "",
+        "## Success Criteria",
+        "- [code] No unsupported endpoint was called",
+        "- [code] github.no-new-issues",
+        "",
+        "## Config",
+        "```yaml",
+        "twins: [github]",
+        "timeout: 30",
+        "passThreshold: 100",
+        "```",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const child = spawn(
+      process.execPath,
+      [
+        "--import",
+        TSX_LOADER,
+        CLI_ENTRY,
+        "run",
+        taskPath,
+        "--api-url",
+        `http://127.0.0.1:${port}`,
+        "--agent",
+        "true",
+        "--artifacts-dir",
+        join(tmp, "runs"),
+      ],
+      {
+        cwd: tmp,
+        env: { ...process.env, POME_API_KEY: "pme_e2e_test" },
+      },
+    );
+
+    let stderr = "";
+    child.stderr.on("data", (d) => (stderr += d.toString()));
+    const code = await new Promise<number>((res) => child.on("close", res));
+
+    expect(code, `stderr was:\n${stderr}`).toBe(0);
+    expect(stderr).toMatch(/PASS/);
+    expect(stderr).not.toMatch(/INCOMPLETE/);
+    expect(stderr).not.toContain("score: incomplete —");
+  }, 90_000);
+
   // F-768 (M1 "Turn-usage into the main ledger") — the whole point of the
   // LlmTurnEvent contract is that per-turn LLM usage, and specifically the
   // cache-read/cache-creation token counts, reaches cloud. On the HOSTED lane

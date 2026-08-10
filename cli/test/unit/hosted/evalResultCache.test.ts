@@ -184,6 +184,42 @@ describe("verdict artifact (FDRS-644)", () => {
     expect(latestFailedRunSet(sets)?.groupId).toBe("grp_b");
   });
 
+  // F-1392 — `anyFailed` reads `!t.verdict.passed`, so a group holding a
+  // trial whose only non-passing criterion was pre-satisfied must NOT trip
+  // `anyFailed`, or it gets misrouted to `pome fix-prompt` as an agent
+  // defect. This is resolved upstream in `scoreFromFinalizeResponse` (the
+  // trial's `passed` is written correctly at verdict.json write time); this
+  // test pins the group-level behavior against the artifact directly rather
+  // than re-deriving it.
+  it("a group holding a pre-satisfied-only trial (passed: true) is NOT anyFailed", async () => {
+    const trials = [
+      {
+        runDir: "p1",
+        verdict: verdict({
+          group_id: "grp_p",
+          session_id: "p1",
+          passed: true,
+          criteria_results: [
+            {
+              criterion: { type: "code", text: "github.no-new-issues" },
+              passed: false,
+              skipped: true,
+              reason: "already_true_in_seed",
+            },
+          ],
+          finalized_at: "2026-08-10T00:00:00Z",
+        }),
+      },
+      {
+        runDir: "p2",
+        verdict: verdict({ group_id: "grp_p", session_id: "p2", finalized_at: "2026-08-10T00:01:00Z" }),
+      },
+    ];
+    const sets = groupRunSets(trials);
+    expect(sets).toHaveLength(1);
+    expect(sets[0]!.anyFailed).toBe(false);
+  });
+
   it("discoverRunSet(root): latest failed set; all-green roots return set=null with totalSets>0", async () => {
     const tmp = await mkdtemp(join(tmpdir(), "verdict-root-"));
     await writeTrial(tmp, "scn", "g1", { group_id: "grp_g", finalized_at: "2026-07-06T05:00:00Z" });

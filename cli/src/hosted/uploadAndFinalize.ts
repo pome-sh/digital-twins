@@ -11,7 +11,7 @@ import { gzipSync } from "node:zlib";
 import type { HostedClient } from "./client.js";
 import type { FinalizeResponse, PerTwinStateKeys } from "../types/shared.js";
 import type { Score } from "./evalResultView.js";
-import { outcomeOf } from "./evalResultView.js";
+import { isPreSatisfied, outcomeOf } from "./evalResultView.js";
 import { redactSecrets } from "../recorder/redaction.js";
 
 /** The narrow client surface the upload orchestration needs. `pome eval`
@@ -317,6 +317,23 @@ export async function uploadRunBlobs(
  * locally only when /finalize returns per-criterion results. Older cloud
  * builds omit `criteria_results`; for those, preserve the cloud score as
  * renderable instead of inventing an empty local A5 verdict.
+ *
+ * F-1392 — `can_pass` exempts a `skipped` result stamped
+ * `PRE_SATISFIED_REASON` (`already_true_in_seed`): the seed already satisfied
+ * that criterion, so it is not an abstention and a run holding one can still
+ * pass. Every OTHER skipped reason, and every `errored`, still blocks
+ * `can_pass` — this is the same exemption pome-cloud's `isRunIncomplete`
+ * applies over the same `criteria_results` (F-1296), narrowed to nothing
+ * else.
+ *
+ * `errored` is a DISPLAY-MODEL state with no wire producer today: it is
+ * reachable only through `CriterionResult.outcome`, which neither this repo's
+ * `criterionResultSchema` nor pome-cloud's carries, so `finalizeResponseSchema`
+ * strips it off every real /finalize response and `outcomeOf` falls back to
+ * passed/skipped. The term stays in the arithmetic because a cloud that starts
+ * emitting it must not thereby acquire a pass — but no wire fixture can
+ * exercise it, and a test that fabricates one is testing the display model, not
+ * this function (`incompleteVerdict.test.ts` does exactly that, and says so).
  */
 export function scoreFromFinalizeResponse(finalized: FinalizeResponse): Score {
   const hasCriteriaResults = finalized.criteria_results !== undefined;
@@ -325,17 +342,26 @@ export function scoreFromFinalizeResponse(finalized: FinalizeResponse): Score {
   const failed = results.filter((r) => outcomeOf(r) === "failed").length;
   const errored = results.filter((r) => outcomeOf(r) === "errored").length;
   const skipped = results.filter((r) => outcomeOf(r) === "skipped").length;
+  const preSatisfied = results.filter(
+    (r) => outcomeOf(r) === "skipped" && isPreSatisfied(r),
+  ).length;
   const totalRequired = passed + failed;
+  // The abstentions that actually block a pass: every skipped result MINUS
+  // the ones the seed already satisfied, plus every errored result (never
+  // exempted — F-1392's "Traps": a pre-satisfied result is a wire-observed
+  // fact for `skipped`, not for `errored`).
+  const unresolvedAbstentions = skipped - preSatisfied + errored;
   return {
     satisfaction: finalized.score,
     passed,
     failed,
     skipped,
     errored,
+    preSatisfied,
     total_required: totalRequired,
     evaluated: hasCriteriaResults ? totalRequired > 0 : true,
     can_pass: hasCriteriaResults
-      ? totalRequired > 0 && skipped === 0 && errored === 0
+      ? totalRequired > 0 && unresolvedAbstentions === 0
       : true,
     results,
     judge_model: finalized.judge_model ?? null,
