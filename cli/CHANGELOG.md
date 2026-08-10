@@ -4,6 +4,25 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.4
+
+### Patch Changes
+
+- `pome register agent` no longer echoes the control plane's `agent.framework`
+  back into `pome.json` (F-1393). It previously wrote `agent.framework ??
+  existingAgent.framework` into the manifest on every register, so a manifest
+  that never declared a framework picked up whatever the control plane had on
+  file for it — historically a NOT-NULL column defaulted to
+  `"claude-agent-sdk"` (pome-cloud F-1213), which is how `minimal-viktor`, a
+  Vercel AI SDK agent, got mislabeled as Claude Agent SDK on every registration.
+  `agent.framework` is now left untouched by register: the manifest is the
+  author's declaration, not the cloud's echo, and a manifest that omits it
+  keeps omitting it — including through the round trip against a cloud that
+  now reports an undeclared framework as `null` rather than a guessed default.
+  The CLI's own `AgentResponse.framework` schema is updated to accept that
+  `null` (previously only a bare string or absent), matching pome-cloud's
+  now-nullable wire contract.
+
 ## 0.23.3
 
 ### Patch Changes

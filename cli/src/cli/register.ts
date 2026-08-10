@@ -167,16 +167,18 @@ async function createAndPersistAgent(input: {
   const agent = await postAgentResolver(input.creds, body, input.seams);
 
   // Write the manifest from the response — slug + display name are canonical;
-  // description/version/framework fall back to the manifest when the cloud
-  // returns nothing (older control plane).
+  // description/version fall back to the manifest when the cloud returns
+  // nothing (older control plane). `framework` is NOT echoed back at all
+  // (F-1393): it is the author's declaration, never the cloud's — including
+  // when the cloud has nothing stored (F-1213: null, not a guessed default).
+  // `nextAgent` already carries whatever the manifest declared (or omitted)
+  // via the initial spread of `existingAgent` above; leave it untouched.
   const nextAgent: Record<string, unknown> = { ...existingAgent, slug: agent.slug };
   nextAgent.name = agent.display_name;
   const description = agent.description ?? existingAgent.description;
   if (typeof description === "string") nextAgent.description = description;
   const version = agent.version ?? existingAgent.version;
   if (typeof version === "string") nextAgent.version = version;
-  const framework = agent.framework ?? existingAgent.framework;
-  if (typeof framework === "string") nextAgent.framework = framework;
 
   const nextRaw: Record<string, unknown> = {
     ...input.manifestRead.raw,

@@ -111,6 +111,10 @@ describe("runRegisterAgent", () => {
     });
     expect("agentId" in manifest).toBe(false);
     expect(JSON.stringify(manifest)).not.toContain("agt_");
+    // F-1393: the manifest declared framework: "langgraph"; AGENT_OK's response
+    // doesn't even carry a framework field, and it must not matter either way —
+    // the declared value survives untouched.
+    expect((manifest.agent as Record<string, unknown>).framework).toBe("langgraph");
   });
 
   it("writes .pome/link.json (team-gated) and appends .pome/ to .gitignore", async () => {
@@ -279,6 +283,100 @@ describe("runRegisterAgent", () => {
 
     // Deep-links the agent by its server-canonical slug, not a generic root.
     expect(errors.join("\n")).toContain("Dashboard: https://app.example.com/agents/triage-bot");
+  });
+});
+
+// F-1393 — `agent.framework` is the author's declaration, never the cloud's
+// echo. Before this fix, `register.ts` wrote `agent.framework ?? existingAgent
+// .framework` back into pome.json, so a manifest that never declared a
+// framework picked up whatever the control plane had on file for it —
+// historically a NOT-NULL column defaulted to "claude-agent-sdk" (F-1213).
+// These pin the round trip in both directions, and separately pin that a
+// cloud-returned framework — a real value OR the F-1213 `null` shape — is
+// never written into a manifest that omitted the field.
+describe("register: agent.framework is never echoed from the cloud (F-1393)", () => {
+  it("a manifest that omits agent.framework still omits it after register, even when the cloud returns none either (AGENT_OK)", async () => {
+    await writeManifest({ agent: { slug: "triage-bot" } });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(response(AGENT_OK));
+
+    await runRegisterAgent({
+      apiBaseUrl: "https://api.example.com",
+      dashboardBaseUrl: "https://app.example.com",
+      name: "Triage Bot",
+      force: false,
+    });
+
+    const agent = readManifestFile().agent as Record<string, unknown>;
+    expect("framework" in agent).toBe(false);
+  });
+
+  it("THE BUG: a manifest that omits agent.framework still omits it after register, even when the cloud echoes back a real value it never asked for", async () => {
+    // Reproduces the pre-fix control plane: a NOT-NULL `framework` column
+    // defaulted to "claude-agent-sdk" and echoed it on every response,
+    // including for an agent whose manifest never declared one.
+    await writeManifest({ agent: { slug: "minimal-viktor" } });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      response({ ...AGENT_OK, slug: "minimal-viktor", framework: "claude-agent-sdk" }),
+    );
+
+    await runRegisterAgent({
+      apiBaseUrl: "https://api.example.com",
+      dashboardBaseUrl: "https://app.example.com",
+      name: "Minimal Viktor",
+      force: false,
+    });
+
+    const agent = readManifestFile().agent as Record<string, unknown>;
+    expect("framework" in agent).toBe(false);
+  });
+
+  it("a manifest that omits agent.framework still omits it after register when the cloud reports it as null (F-1213 shape)", async () => {
+    await writeManifest({ agent: { slug: "triage-bot" } });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(response({ ...AGENT_OK, framework: null }));
+
+    await runRegisterAgent({
+      apiBaseUrl: "https://api.example.com",
+      dashboardBaseUrl: "https://app.example.com",
+      name: "Triage Bot",
+      force: false,
+    });
+
+    const agent = readManifestFile().agent as Record<string, unknown>;
+    expect("framework" in agent).toBe(false);
+  });
+
+  it("a manifest that declares framework: \"langgraph\" keeps exactly that after register, whatever the cloud's response says (real value)", async () => {
+    await writeManifest({ agent: { slug: "minimal-viktor-langgraph", framework: "langgraph" } });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      response({ ...AGENT_OK, slug: "minimal-viktor-langgraph", framework: "claude-agent-sdk" }),
+    );
+
+    await runRegisterAgent({
+      apiBaseUrl: "https://api.example.com",
+      dashboardBaseUrl: "https://app.example.com",
+      name: "Minimal Viktor Langgraph",
+      force: false,
+    });
+
+    const agent = readManifestFile().agent as Record<string, unknown>;
+    expect(agent.framework).toBe("langgraph");
+  });
+
+  it("a manifest that declares framework: \"langgraph\" keeps exactly that after register when the cloud reports it as null", async () => {
+    await writeManifest({ agent: { slug: "minimal-viktor-langgraph", framework: "langgraph" } });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      response({ ...AGENT_OK, slug: "minimal-viktor-langgraph", framework: null }),
+    );
+
+    await runRegisterAgent({
+      apiBaseUrl: "https://api.example.com",
+      dashboardBaseUrl: "https://app.example.com",
+      name: "Minimal Viktor Langgraph",
+      force: false,
+    });
+
+    const agent = readManifestFile().agent as Record<string, unknown>;
+    expect(agent.framework).toBe("langgraph");
   });
 });
 

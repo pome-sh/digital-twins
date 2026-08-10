@@ -329,9 +329,10 @@ export const agentResponseSchema = z.object({
   display_name: z.string(),
   judge_model: z.string(),
   // Manifest identity (F-818): registered agent.framework / agent.description /
-  // agent.version, nullable where the server has nothing stored. Optional for
-  // the pre-F-820 cloud, which omits them.
-  framework: z.string().optional(),
+  // agent.version, nullable where the server has nothing stored (F-1213:
+  // unset, never a guessed default). Optional for the pre-F-820 cloud, which
+  // omits them.
+  framework: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
   version: z.string().nullable().optional(),
   // F-818 resolver semantics: true when POST /v1/agents auto-registered a new
