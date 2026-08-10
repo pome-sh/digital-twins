@@ -288,8 +288,11 @@ export async function scanVerdictArtifacts(
 // outcome that asserts an agent defect. "incomplete" = no trial failed, but
 // at least one trial's grading never finished — a grader/seed gap, not
 // evidence the agent did anything wrong; "fail" wins when a set has both,
-// since a real failure is signal worth naming over a sibling's gap. "pass" =
-// every trial's state is "pass".
+// since a real failure is signal worth naming over a sibling's gap.
+// "pass" = EVERY trial's state is exactly "pass", tested that way round on
+// purpose: "pass" is the one outcome claiming a verified result, so it is
+// never the fallthrough. An unrecognized state reads "incomplete", not green
+// (`isVerdictArtifact` already refuses such a file — second line of defense).
 export type RunSetOutcome = "fail" | "incomplete" | "pass";
 
 export interface RunSet {
@@ -334,14 +337,14 @@ export function groupRunSets(trials: TrialVerdict[]): RunSet[] {
     );
     const last = bucket[bucket.length - 1]!;
     const hasFailed = bucket.some((t) => t.verdict.state === "fail");
-    const hasIncomplete = bucket.some((t) => t.verdict.state === "incomplete");
+    const allPassed = bucket.every((t) => t.verdict.state === "pass");
     sets.push({
       groupId: bucket[0]!.verdict.group_id,
       taskName: bucket[0]!.verdict.task_name,
       taskPath: bucket[0]!.verdict.task_path,
       trials: bucket,
       latestFinalizedAt: last.verdict.finalized_at,
-      outcome: hasFailed ? "fail" : hasIncomplete ? "incomplete" : "pass",
+      outcome: hasFailed ? "fail" : allPassed ? "pass" : "incomplete",
     });
   }
   sets.sort((a, b) => a.latestFinalizedAt.localeCompare(b.latestFinalizedAt));

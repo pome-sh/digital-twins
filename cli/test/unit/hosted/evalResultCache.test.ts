@@ -358,6 +358,27 @@ describe("verdict artifact (FDRS-644)", () => {
     expect(latestIncompleteRunSet(sets)).toBeNull();
   });
 
+  // F-1404 — "pass" is the one outcome that asserts a verified result, so it
+  // must never be what an unrecognized `state` falls through to. The read path
+  // already refuses such a file (`isVerdictArtifact` checks `state` against
+  // the three words), so this pins the SECOND line of defense: a `state` this
+  // build does not know reads "incomplete", the claim that checks least — an
+  // ungraded run must not become an invisible one.
+  it("groupRunSets never reports an unrecognized state as a pass", () => {
+    const sets = groupRunSets([
+      {
+        runDir: "x1",
+        verdict: verdict({
+          group_id: "grp_x",
+          session_id: "x1",
+          state: "who-knows" as never,
+        }),
+      },
+    ]);
+    expect(sets[0]!.outcome).toBe("incomplete");
+    expect(latestFailedRunSet(sets)).toBeNull();
+  });
+
   it("discoverRunSet(root): latest failed set; all-green roots return set=null with totalSets>0", async () => {
     const tmp = await mkdtemp(join(tmpdir(), "verdict-root-"));
     await writeTrial(tmp, "scn", "g1", { group_id: "grp_g", finalized_at: "2026-07-06T05:00:00Z" });

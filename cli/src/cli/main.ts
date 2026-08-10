@@ -19,7 +19,7 @@ import {
 import { runTask } from "../runner/runTask.js";
 import { runTaskHosted } from "../runner/runTaskHosted.js";
 import { effectiveTrialCount, parseTrialsFlag } from "../runner/trialCount.js";
-import { runScoreLine, scoreStatus } from "../hosted/evalResultView.js";
+import { outcomeOf, runScoreLine, scoreStatus } from "../hosted/evalResultView.js";
 import { HostedUsageError, exitCodeFor } from "../hosted/errors.js";
 import { resolveCredentials, clearLocalCredentials } from "./credentials.js";
 import { loginWithClerk } from "./login.js";
@@ -1230,21 +1230,49 @@ export function createProgram() {
         return;
       }
       if (!discovery.set) {
-        // F-1404 — a root whose only non-passing run set is INCOMPLETE (a
-        // criterion was never graded) is neither "all passed" nor a failure
-        // to hand to a coding agent: routing it as a fix-prompt would assert
-        // an agent defect nothing here established, and "all passed" would
-        // be false about it. `incompleteSet` is only ever populated when no
-        // set actually failed (see `discoverRunSet`), so this branch and the
-        // routing decision above read the same computation and cannot
-        // disagree.
-        if (discovery.incompleteSet) {
-          const incompleteTrials = discovery.incompleteSet.trials.filter(
+        // F-1404 — a root whose only non-passing run set is INCOMPLETE (the
+        // grader never reached some criterion) is neither "all passed" nor a
+        // failure to hand to a coding agent: routing it would assert an agent
+        // defect nothing here established, and "all passed" would be false
+        // about it. `incompleteSet` is only ever populated when no set failed
+        // (see `discoverRunSet`), so this branch and the routing decision
+        // above read the one computation and cannot disagree.
+        //
+        // What this message may NOT say is "just a grading gap" unread: a
+        // trial's `state` is `incomplete` for ANY ungraded criterion
+        // (`scoreStatus`'s A5 guard outranks everything else), so such a set
+        // can still hold criteria that WERE graded and did fail. Claiming
+        // "not an agent defect" over those would be this ticket's own defect
+        // pointed the other way — understating instead of overstating. Count
+        // them and say which case this is.
+        const incomplete = discovery.incompleteSet;
+        if (incomplete) {
+          const ungradedTrials = incomplete.trials.filter(
             (t) => t.verdict.state === "incomplete",
           ).length;
-          console.error(
-            `Not routed to fix-prompt: the latest run set under ${root} is INCOMPLETE, not failed — ${incompleteTrials} of ${discovery.incompleteSet.trials.length} trial(s) have criteria that were never graded. That is a grader/seed gap, not an agent defect, so fix-prompt will not hand it to your coding agent. Re-run \`pome run\` for this task so those criteria are actually evaluated, then run fix-prompt again.`,
+          const gradedFailures = incomplete.trials.reduce(
+            (n, t) =>
+              n +
+              t.verdict.criteria_results.filter((r) => outcomeOf(r) === "failed")
+                .length,
+            0,
           );
+          const which = `task ${incomplete.taskName}${incomplete.groupId ? ` · group ${incomplete.groupId}` : ""}`;
+          // "the most recent NON-PASSING set", never "the latest run set":
+          // a newer set may have passed — `latestIncompleteRunSet` scans for
+          // an outcome, not for the newest set.
+          console.error(
+            `Not routed to fix-prompt: no run set under ${root} failed outright. The most recent non-passing one (${which}) is INCOMPLETE — ${ungradedTrials} of ${incomplete.trials.length} trial(s) have criteria the grader never graded.`,
+          );
+          if (gradedFailures > 0) {
+            console.error(
+              `${gradedFailures} criterion result(s) in that set WERE graded and did fail, so this is not only a grading gap — but no trial in it was graded end to end, and a fix prompt built from a partial grading would claim more than was checked. Re-run \`pome run ${incomplete.taskPath}\` to grade the rest, or point fix-prompt straight at one trial (\`pome fix-prompt ${incomplete.trials[0]!.runDir}\`) to build one from the partial grading anyway.`,
+            );
+          } else {
+            console.error(
+              `Nothing in that set was graded and failed, so it is a grader/seed gap, not an agent defect, and fix-prompt will not hand it to your coding agent. Re-run \`pome run ${incomplete.taskPath}\` to grade those criteria; if they come back ungraded, the gap is in the task's checks or its seed, not in your prompt.`,
+            );
+          }
           process.exitCode = 1;
           return;
         }

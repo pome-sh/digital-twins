@@ -219,6 +219,65 @@ describe("pome fix-prompt command (FDRS-644)", () => {
     // Non-zero: there is something worth acting on, even though it isn't a
     // fix-prompt-worthy failure.
     expect(process.exitCode).toBe(1);
+    // Names WHICH set, and does not call it "the latest run set" — the
+    // newest set may have passed; this one is the newest NON-PASSING one.
+    expect(err).toContain("most recent non-passing");
+    expect(err).toContain("task scn");
+  });
+
+  // F-1404 — the understating twin of the original defect. A trial's `state`
+  // is "incomplete" for ANY ungraded criterion (`scoreStatus`'s A5 guard), so
+  // an incomplete set can still hold criteria the judge DID grade and DID
+  // fail. Telling the user "a grading gap, not an agent defect" over those
+  // would state more than was checked in the opposite direction — and would
+  // silently bin real judge reasons.
+  it("an incomplete set holding GRADED failures says so instead of calling it only a grading gap", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "fixcmd-incomplete-failed-"));
+    await writeTrial(dir, "ses_1", {
+      passed: false,
+      state: "incomplete",
+      score: 0,
+      evaluated: 2,
+      not_evaluated: 1,
+      total: 3,
+      criteria_results: [
+        {
+          criterion: { type: "model", text: "Severity is set correctly" },
+          passed: false,
+          skipped: false,
+          reason: "under-rated",
+        },
+        {
+          criterion: { type: "model", text: "An assignee is set" },
+          passed: false,
+          skipped: false,
+          reason: "never set",
+        },
+        {
+          criterion: { type: "model", text: "Exactly one comment" },
+          passed: false,
+          skipped: true,
+          reason: "tool_not_recorded",
+        },
+      ],
+    });
+    process.chdir(dir);
+
+    await run();
+    const err = stderr.join("\n");
+    // Still not routed (no trial was graded end to end), still exit 1, still
+    // never "all passed".
+    expect(stdout.join("\n")).toBe("");
+    expect(process.exitCode).toBe(1);
+    expect(err).not.toContain("all passed");
+    // But it must NOT absolve the agent: two criteria were graded and failed.
+    expect(err).not.toContain("not an agent defect");
+    expect(err).toContain("2 criterion result(s)");
+    expect(err).toContain("WERE graded and did fail");
+    // And it names the escape hatch that DOES build a prompt from what was
+    // graded — the trial-dir form, which targets its set whatever the outcome.
+    expect(err).toContain("pome fix-prompt");
+    expect(err).toContain(join("runs", "scn", "ses_1"));
   });
 
   it("an empty root is a usage error naming what to do", async () => {

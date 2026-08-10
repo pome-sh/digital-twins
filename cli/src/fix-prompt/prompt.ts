@@ -157,6 +157,34 @@ function failedResults(verdict: VerdictArtifact): CriterionResult[] {
   return verdict.criteria_results.filter((r) => outcomeOf(r) === "failed");
 }
 
+/** F-1404 — a trial whose grading FINISHED: the only kind whose pass/fail
+ *  this prompt may count. A trial's `state` is `"incomplete"` whenever the
+ *  grader never reached some criterion (`scoreStatus`'s A5 guard), and such a
+ *  trial is neither a pass nor a failure — it belongs in no numerator and no
+ *  denominator here. Read off `state`, the same field `groupRunSets` routes
+ *  on, so the routing decision and this prompt cannot disagree about which
+ *  trials were graded.
+ *
+ *  This is why the partition below is NOT `verdict.passed`: `passed` is false
+ *  for a graded failure and for an ungraded trial alike, which listed an
+ *  ungraded trial under "Other failing trials" and counted it as a non-pass
+ *  in a fraction labelled "completed trials". Both stated more than the
+ *  artifact checked. */
+function isGraded(t: TrialFixInput): boolean {
+  return t.verdict.state !== "incomplete";
+}
+
+/** Criteria the grader never reached in this trial — neither graded pass nor
+ *  graded failure, and not a seed exclusion (which IS a verdict). */
+function ungradedCount(verdict: VerdictArtifact): number {
+  return verdict.criteria_results.filter(
+    (r) =>
+      !isPreSatisfied(r) &&
+      outcomeOf(r) !== "passed" &&
+      outcomeOf(r) !== "failed",
+  ).length;
+}
+
 /** Judge reasons and criterion text are DATA rendered into prompt prose —
  *  flatten to one line so a crafted (or just verbose) string can never open
  *  a new markdown heading/section inside the prompt structure. */
@@ -189,10 +217,19 @@ function renderGroupedSignatures(trials: TrialFixInput[]): string {
   // under, and "the seed already satisfied it" is a different note from "the
   // grader never reached it".
   const outcomesSeen = new Map<string, Set<string>>();
+  // F-1404 — per-criterion denominator: how many trials actually GRADED this
+  // criterion (reached a pass or a fail on it). The old denominator was
+  // `trials.length`, which counted trials that never graded the criterion at
+  // all — and once a set may hold an INCOMPLETE trial, a criterion can be
+  // failed in more trials than that count admits, printing "failed in 2 of 1".
+  const gradedFor = new Map<string, number>();
   for (const trial of trials) {
     for (const result of trial.verdict.criteria_results) {
       const key = result.criterion.text;
       const outcome = isPreSatisfied(result) ? "excluded" : outcomeOf(result);
+      if (outcome === "passed" || outcome === "failed") {
+        gradedFor.set(key, (gradedFor.get(key) ?? 0) + 1);
+      }
       if (outcome === "failed") {
         const entry = byCriterion.get(key) ?? {
           marker: criterionMarker(result.criterion),
@@ -217,14 +254,14 @@ function renderGroupedSignatures(trials: TrialFixInput[]): string {
     else notUniformlyEvaluated.push(key);
   }
 
-  const completed = trials.length;
   const blocks = [...byCriterion.entries()]
     .sort((a, b) => b[1].hits.length - a[1].hits.length)
     .map(([text, { marker, hits }], idx) => {
       const lines = hits.map(
         (h) => `   - ${h.label}: ${flattenLine(h.reason)}`,
       );
-      return `${idx + 1}. ${marker} ${flattenLine(text)} — failed in ${hits.length} of ${completed} completed trials\n${lines.join("\n")}`;
+      const graded = gradedFor.get(text) ?? hits.length;
+      return `${idx + 1}. ${marker} ${flattenLine(text)} — failed in ${hits.length} of ${graded} trials that graded it\n${lines.join("\n")}`;
     });
   if (
     blocks.length === 0 &&
@@ -261,11 +298,15 @@ function renderGroupedSignatures(trials: TrialFixInput[]): string {
 }
 
 /** The failing trial with the most failed criteria — the representative
- *  whose full trace anchors the prompt. */
+ *  whose full trace anchors the prompt.
+ *
+ *  F-1404 — `state === "fail"`, not `!passed`: an INCOMPLETE trial is not a
+ *  failing one, and anchoring the prompt's one trace on it under the heading
+ *  "the most-failing trial" asserted a failure the grading never reached. */
 export function representativeFailingTrial(
   trials: TrialFixInput[],
 ): TrialFixInput | null {
-  const failing = trials.filter((t) => !t.verdict.passed);
+  const failing = trials.filter((t) => t.verdict.state === "fail");
   if (failing.length === 0) return null;
   return failing.reduce((worst, t) =>
     failedResults(t.verdict).length > failedResults(worst.verdict).length
@@ -275,11 +316,15 @@ export function representativeFailingTrial(
 }
 
 export function buildGroupFixUserPrompt(ctx: GroupFixPromptContext): string {
-  const completed = ctx.trials.length;
-  const passed = ctx.trials.filter((t) => t.verdict.passed).length;
+  // F-1404 — every fraction below is over GRADED trials only. An INCOMPLETE
+  // trial gets its own named section instead of being counted as a non-pass
+  // in a denominator labelled "completed".
+  const incomplete = ctx.trials.filter((t) => !isGraded(t));
+  const completed = ctx.trials.length - incomplete.length;
+  const passed = ctx.trials.filter((t) => t.verdict.state === "pass").length;
   const representative = representativeFailingTrial(ctx.trials);
   const otherFailing = ctx.trials.filter(
-    (t) => !t.verdict.passed && t !== representative,
+    (t) => t.verdict.state === "fail" && t !== representative,
   );
 
   const signatures = redactSecrets(
@@ -299,11 +344,24 @@ export function buildGroupFixUserPrompt(ctx: GroupFixPromptContext): string {
     ? (redactSecrets(ctx.task.prompt) as string)
     : `(task file not found at ${ctx.trials[0]?.verdict.task_path ?? "?"} — criteria above come from the cloud verdicts)`;
 
+  // "0 of 0 completed trials passed" would be a fraction over an empty
+  // denominator — the A5 sin this milestone exists to remove. Name the state
+  // instead. (Reachable: `pome fix-prompt <trial-dir>` deliberately targets
+  // the trial the user pointed at whatever its outcome.)
+  const tally =
+    completed === 0
+      ? "no trial in this set was graded end to end"
+      : `${passed} of ${completed} completed trials passed`;
+  const gapNote =
+    incomplete.length > 0
+      ? ` · ${incomplete.length} INCOMPLETE (counted in nothing below — see the last section)`
+      : "";
+
   const sections: string[] = [];
   sections.push(`## Run set (cloud-judged)
 task ${redactSecrets(ctx.taskName) as string} · ${
     ctx.groupId ? `group ${ctx.groupId}` : "single run"
-  } · ${passed} of ${completed} completed trials passed`);
+  } · ${tally}${gapNote}`);
 
   sections.push(`## Grouped failure signatures (from the cloud judge)
 ${escapeTagContent(signatures)}`);
@@ -332,6 +390,24 @@ ${escapeTagContent(trace)}
       return `- ${t.label} — failed: ${failed || "(see verdict)"} — trace at ${join(t.runDir, "events.jsonl")}`;
     });
     sections.push(`## Other failing trials (traces on disk)
+${escapeTagContent(redactSecrets(lines.join("\n")) as string)}`);
+  }
+
+  // F-1404 — the gap, named, as the LAST thing the reading agent sees before
+  // it starts work. The prompt is allowed to be built over a set holding an
+  // ungraded trial (a genuine failure alongside it, or a trial dir the user
+  // pointed at directly); it is not allowed to let that trial read as
+  // evidence. Nothing above counts these, and this says so.
+  if (incomplete.length > 0) {
+    const lines = incomplete.map(
+      (t) =>
+        `- ${t.label} — ${ungradedCount(t.verdict)} criterion(s) never graded — trace at ${join(t.runDir, "events.jsonl")}`,
+    );
+    sections.push(`## Trials the grader never finished (INCOMPLETE)
+The grader never reached every criterion in these trials, so they are neither
+passes nor failures and are counted in no fraction above. Do NOT treat them as
+evidence for or against any fix: a criterion that never ran is a grader or seed
+gap, not something the agent did wrong.
 ${escapeTagContent(redactSecrets(lines.join("\n")) as string)}`);
   }
 
