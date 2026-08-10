@@ -310,24 +310,28 @@ describe("F-1421 — a seeded element is a whole GitHub object, not a stub", () 
   it("serves the seeded review comment anchored to the file the seed named", async () => {
     const { body } = await get(appFor(WORLD_A), "/repos/acme/api/pulls/3/comments");
     expect(body).toHaveLength(1);
-    // This LIST route serves a leaner element than the twin's own review-comment
-    // object — no `line`, `side`, `commit_id`, `pull_request_url` — while
-    // `POST /pulls/:n/comments` on the same row serves all of them
-    // (`pullRequestReviewCommentJson`). That predates this change and is left
-    // alone by it: widening a served shape is a wire change with its own
-    // fidelity accounting, and this ticket's subject is the modelling gap that
-    // made the array empty. Asserted as it is rather than as it should be.
+    // F-1422 closed the gap this assertion used to record: the LIST served six
+    // columns of a row whose `line`, `side` and `commit_id` the CREATE on the
+    // same route already served. Both verbs now go through
+    // `pullRequestReviewCommentJson`, so the anchor the seed planted is
+    // readable from the surface the fidelity lane measures — asserted here on
+    // the seeded element, and as the shared-shape property itself in
+    // `review-comment-list-shape.test.ts`.
     expect(body[0]).toMatchObject({
       body: WORLD_A.reviewCommentBody,
       path: "src/feature.ts",
-      user: { login: "bob" }
+      user: { login: "bob" },
+      line: 1,
+      side: "RIGHT",
+      pull_request_url: "https://api.github.com/repos/acme/api/pulls/3"
     });
   });
 
   // The two below are what pin `path` and `line`: the seed goes through the
   // domain's own write path, so a review comment the API could not have made is
-  // a seed that FAILS rather than a row only the seeder can produce. They are
-  // also how `line` is asserted at all — the list route above does not serve it.
+  // a seed that FAILS rather than a row only the seeder can produce. That guard
+  // is what makes the served `line` above a fact about the diff rather than a
+  // free integer.
   it("refuses a seeded review comment on a file the pull request does not change", async () => {
     const bad = world(WORLD_A);
     // `README.md` is on both branches unchanged, so it is not in the PR's diff.

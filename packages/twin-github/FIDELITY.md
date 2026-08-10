@@ -4,7 +4,7 @@
 universal clone. This page documents exactly which surfaces are faithful to
 GitHub today, at what tier, and how fidelity is verified.
 
-Last verified: 2026-08-08.
+Last verified: 2026-08-10.
 
 ## What "fidelity" means here
 
@@ -80,7 +80,7 @@ in the package README. Changing any of those is a breaking change for
 | `get_tag` | SQLite tags | hot | semantic | `mcp-contract.test.ts`, `m5-hot-gaps.test.ts` | MCP-only (no REST route; git-plumbing REST stays cold per F-729); returns the lightweight tag object, not the annotated-tag git object. |
 | `issue_read` | SQLite issues, issue comments, issue labels | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts` | GitHub's consolidated reader (F-1376). Methods `get`, `get_comments`, `get_labels`; `get_sub_issues` and `get_parent` answer 501 — sub-issues are not modeled. |
 | `issue_write` | SQLite issues, labels, assignees | hot | semantic | `mcp-contract.test.ts`, `mcp-error-semantics.test.ts` | GitHub's consolidated writer (F-1376). Methods `create` and `update`. Milestones, issue types and `state_reason` are not implemented. |
-| `pull_request_read` | SQLite pull requests, PR files, commits, reviews, comments, check runs | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts` | GitHub's consolidated reader (F-1376). `get_diff` and `get_files` return simplified placeholder patches; `get_comments` and `get_review_comments` answer from one comment thread, which this twin does not split. |
+| `pull_request_read` | SQLite pull requests, PR files, commits, reviews, comments, check runs | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts` | GitHub's consolidated reader (F-1376). `get_diff` and `get_files` return simplified placeholder patches; `get_comments` answers from the review-comment table rather than the PR's conversation, which the twin DOES split (divergence 22). |
 | `pull_request_review_write` | SQLite PR reviews | hot | semantic | `mcp-contract.test.ts`, `state-export.test.ts` | GitHub's consolidated review writer (F-1376). Only `create` with an explicit `event`; pending reviews and review threads are not modeled, so the other four methods answer 501. |
 | `list_repository_collaborators` | SQLite collaborators | hot | semantic | `mcp-contract.test.ts` | Permission filtering is not implemented. |
 
@@ -337,19 +337,40 @@ upstream so a divergence that upstream "heals" becomes a tier-upgrade signal.
     seeded sandbox's smaller label set and different collaborator set, not a serializer
     bug. On these L1 read surfaces the item-count difference is an accepted divergence
     (INFO), not drift.
-21. **The review-comment LIST serves a leaner object than the review-comment CREATE
-    (open gap, not accepted).** `GET /repos/:o/:r/pulls/:n/comments` builds its
-    elements inline — `{id, path, body, user, created_at, updated_at}` — while
-    `POST` to the same route serves the same row through
-    `pullRequestReviewCommentJson`, which adds `line`, `side`, `commit_id`,
-    `original_*`, `in_reply_to_id`, `pull_request_url`, `html_url`, `diff_hunk`
-    and the rest. One row, two shapes, one route family. This is NOT an accepted
-    INFO divergence like the omission bullets above: the twin already has the
-    faithful serializer and the list simply does not call it. It went unmeasured
-    because the surface answered `[]` on every seed anyone could write until
-    F-1421 made a review comment seedable — the first real element on this
-    surface is what makes the gap visible. Fixing it widens a served shape, so it
-    is owed its own change and its own fidelity accounting.
+21. **Review-comment objects omit `author_association`, `reactions` and
+    `subject_type`.** The twin's review-comment object serves the anchor
+    (`path`, `line`, `side`, `commit_id`, `position` and their `original_*`
+    twins), the identity (`id`, `node_id`, `user`, `in_reply_to_id`), the prose
+    (`body`) and the timestamps, and omits the leaves that belong to features it
+    does not model: `author_association` (no org-membership model — bullets 8 and
+    11 omit the same leaf on issues and pull requests), `reactions` (no reaction
+    model) and `subject_type` (no file-level comments; every twin review comment
+    is a line comment). `_links` is omitted under the categorical hypermedia
+    exemption, and `body_text` / `body_html` are gated behind media types the
+    twin does not serve, so neither is on this list. On the L1 read surface
+    `GET /repos/:o/:r/pulls/:n/comments` these upstream-only omissions are
+    accepted (INFO), not drift.
+
+    **`line`, `side`, `commit_id` and `pull_request_url` are served, not omitted
+    (F-1422).** They had been dropped by the LIST route alone: it built its
+    elements inline out of six columns while `POST` to the same route served the
+    same row through `pullRequestReviewCommentJson`. One row, two shapes, and the
+    read side — the measured one — was the lean one. That went unmeasured rather
+    than unnoticed: the surface answered `[]` on every seed anyone could write
+    until F-1421 made a review comment seedable, and a shape-diff compares no
+    elements when either side is empty. Both verbs now serve the one serializer,
+    which is asserted as that property — the LIST element and the CREATE response
+    are the same object for the same comment — in
+    `test/review-comment-list-shape.test.ts`, rather than as a field checklist
+    that goes stale the next time the serializer grows a leaf.
+
+    **`diff_hunk` and `position` are served as placeholders, not measurements.**
+    `diff_hunk` is `""` and `position` mirrors the row's `line` rather than
+    counting lines from the `@@` header, because the twin's patches are
+    placeholders (bullet 2). Both are string-vs-string and number-vs-number
+    against upstream, so the shape diff masks them; an agent that parses a
+    review comment's hunk text or resolves `position` against a real diff will
+    diverge, exactly as on the diff surfaces bullet 2 names.
 22. **`pull_request_read`'s `get_comments` answers from the wrong table (open gap,
     not accepted).** GitHub distinguishes the issue-level `get_comments` from the
     diff-level `get_review_comments`; the twin answers BOTH from
@@ -359,9 +380,12 @@ upstream so a divergence that upstream "heals" becomes a tier-upgrade signal.
     conversation has its own table (`issue_comments`, keyed on the PR's number),
     `exportState` keeps the three comment surfaces apart, and the REST routes
     already serve them separately. So `get_comments` returns inline review
-    comments to a caller asking for the timeline. Same visibility story as bullet
-    21 — F-1421 makes both surfaces seedable, so the two now have different
-    contents to tell apart.
+    comments to a caller asking for the timeline — and since F-1422 it returns
+    them in the full review-comment shape, so the answer is now recognizably the
+    wrong OBJECT rather than a lean one that could pass for a timeline comment.
+    Discovered the same way as the LIST shape in bullet 21 — F-1421 makes both
+    surfaces seedable, so the two now have different contents to tell apart —
+    but MCP-only, so no fidelity-watch lane measures it.
 
 ## How fidelity is verified
 
