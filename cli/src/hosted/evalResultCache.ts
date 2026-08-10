@@ -80,17 +80,21 @@ export interface VerdictArtifact {
    *  It is the word the TERMINAL prints, always — one local, one derivation.
    *  It is the word the DASHBOARD renders (`deriveRunStatus`, pome-cloud
    *  `apps/dashboard/src/lib/run-status.ts`) on the same three words and on
-   *  every shape `cross-surface-agreement.test.ts` walks EXCEPT two, named
+   *  every shape `cross-surface-agreement.test.ts` walks EXCEPT one, named
    *  here rather than left for a reader to discover from a mismatch:
-   *    - a run whose criteria were ALL pre-satisfied: `incomplete` here (no
-   *      denominator, so no verified pass — the A5 guard), `fail` on the
-   *      dashboard, which exempts every abstention and then reads a
-   *      satisfaction of 0 off an empty denominator. Neither passes it and
-   *      both exit non-zero; filed as F-1399 against pome-cloud.
    *    - a task whose `pass_threshold` is not 100: the dashboard's pass bar
    *      is a hard `satisfaction_score === 100` and it has no field to learn
    *      the task's threshold from. `pass_threshold` is in this artifact
-   *      beside `state` precisely so a reader can see which bar was used. */
+   *      beside `state` precisely so a reader can see which bar was used.
+   *
+   *  F-1399 closed the other one: a run whose criteria were ALL pre-satisfied
+   *  used to read `incomplete` here (no denominator, so no verified pass —
+   *  the A5 guard) against `fail` on the dashboard, which exempted every
+   *  abstention and then read a satisfaction of 0 off an empty denominator.
+   *  Neither passed it and both exited non-zero, so no CI caller could act on
+   *  the difference — but pome-cloud's shared `isIncompleteTally` (`@pome-
+   *  cloud/contract`) now adds an `evaluated === 0` clause, so the dashboard
+   *  reads `incomplete` here too. */
   state: ScoreStatus;
   passed: boolean;
   /** F-1195 — `EvaluationCounts` from `evalResultView.ts`, so `score` is
