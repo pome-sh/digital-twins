@@ -13,7 +13,26 @@
     "`configuration` is mandatory on every capturable source and is copied verbatim into",
     "meta.json. A capture with no declared configuration FAILS rather than defaulting: an",
     "unstated assumption about which deployment was read is the F-1179 failure — a lane",
-    "reporting divergence that is not real is worse than one honestly reporting not-compared."
+    "reporting divergence that is not real is worse than one honestly reporting not-compared.",
+    "",
+    "`configuration.completeness` is mandatory for the same reason and names the relation",
+    "between what this capture READ and what an examinee's own client REACHES:",
+    "  exact              the two are the same set — either no axis of the configuration can",
+    "                     move the listing, or every axis that could was closed and is written",
+    "                     down here.",
+    "  subset-of-remote   the capture may be MISSING tools the examinee reaches. Every tool in",
+    "                     the golden is served upstream; the reverse is NOT claimed.",
+    "  credential-scoped  the served listing is a function of the caller's own credential, so",
+    "                     neither containment holds for an arbitrary examinee: the golden is",
+    "                     exact for the declared grant and for nothing else.",
+    "",
+    "This field is not bookkeeping — it is the premise a consumer needs before it may call a",
+    "tool the twin serves and the golden lacks a DIVERGENCE. That inference is sound against",
+    "`exact`; against `subset-of-remote` it is sound only where the delta is ENUMERATED with",
+    "evidence, which is what github's `knownRemoteOnlyToolsNotInCapture` is for; against",
+    "`credential-scoped` it is not sound at all. F-1394 is the cost of leaving it unstated:",
+    "linear's golden was captured under a read-only grant and declared nothing, and the lane",
+    "reported six write tools mcp.linear.app really serves as tools twin-linear had invented."
   ],
   "goldenDir": "fixtures/mcp-tools-list",
   "twins": {
@@ -97,6 +116,9 @@
         "consentScreenPermissions": "All permissions = Write, test mode",
         "whyNotAFreshAccount": "Preview and allowlisted tool groups are granted PER ACCOUNT — docs.stripe.com/mcp gates a Treasury group behind a separate access request — so a clean throwaway account returns a SHORTER listing than a customer sees. Measured: a brand-new test account's consent screen offered only two permission groups (Accounts, Analytics). This is the one twin where capturing from our own account is the correct answer rather than a compromise.",
         "matchesExaminee": "11 tools. F-1326 refuted the oss-package premise for this vendor by reading @stripe/mcp@0.3.3: it declares no tools and forwards to this endpoint, and its cli.js dropped --tools with 'Tool permissions are now controlled by your Restricted API Key'. So the surface is per-credential and the grant above is part of what this golden means.",
+        "completeness": "credential-scoped",
+        "completenessBasis": "the fact `whyNotAFreshAccount` records, restated as a containment claim: mcp.stripe.com decides its listing from the caller's credential, so there is no account-independent surface for this golden to be exact against. It was measured in both directions rather than argued — a brand-new test account's consent screen offered two permission groups where this account's offered every one, and docs.stripe.com/mcp gates a Treasury group behind an access request this account has not made.",
+        "unguardedDirection": "BOTH, which is stricter than the github row's one. An examinee whose account carries an allowlisted or preview group reaches tools this capture does not list; an examinee whose Restricted API Key is narrower than this grant reaches fewer. So a tool twin-stripe serves that is absent here is NOT evidence the vendor lacks it, and a consumer must read that comparison as not-compared rather than as a twin-only divergence. Closing this needs a second capture from a differently-provisioned account, which is a decision about accounts and not a bug in this table.",
         "requestHeaders": {
           "content-type": "application/json",
           "accept": "application/json, text/event-stream"
@@ -123,6 +145,9 @@
         "deploymentSelector": "the installing Slack workspace. Captured 2026-08-10 from an INTERNAL Slack app installed to the pome twin sandbox workspace, under a user token (xoxp) carrying every scope mcp.slack.com advertises in its protected-resource metadata (all 30).",
         "whyNotReadOnly": "Slack's MCP page lists its required scopes PER TOOL, and four of them are writes (chat:write, channels:write, reactions:write, canvases:write). A read-only grant would plausibly return a listing missing the vendor's write tools, and the lane would then report twin-slack's write tools as mcp-tool-twin-only — a CRITICAL asserting the twin invented a capability that really exists. The golden must describe what an examinee's agent sees. This deliberately overrides F-1329's original 'all three are read-scoped' criterion; the capture issues one tools/list and invokes no tool, and the grant was revoked immediately after.",
         "matchesExaminee": "19 tools, which is exactly the count Slack's own MCP documentation states the server exposes.",
+        "completeness": "exact",
+        "completenessBasis": "the axis that moves an OAuth-gated listing is the grant, and this one is maximal: the token carries every one of the 30 scopes mcp.slack.com advertises in its own protected-resource metadata, so no per-tool scope requirement can withhold a tool from it (`whyNotReadOnly` has the reasoning). The result is then corroborated against a source outside the capture — 19 tools, the count Slack's own MCP documentation publishes.",
+        "unguardedDirection": "the installing WORKSPACE. This is an internal app on the pome twin sandbox, and nothing here reads a second workspace, so a listing that varied by plan or by Enterprise Grid would be invisible from this golden. Slack documents no such variation and the count matches its documentation, which is why the class is `exact` rather than `subset-of-remote` — but the axis is unmeasured, and it is written down rather than assumed shut.",
         "requestHeaders": {
           "content-type": "application/json",
           "accept": "application/json, text/event-stream"
@@ -144,11 +169,14 @@
       "authTokenEnv": "POME_LINEAR_MCP_TOKEN",
       "configuration": {
         "auth": "bearer",
-        "grantedScopes": "read",
+        "grantedScopes": "read write",
         "responseFraming": "text/event-stream",
-        "deploymentSelector": "the authorising Linear workspace. Captured 2026-08-10 from a throwaway workspace under an OAuth grant limited to the `read` scope, which is the narrowest scope mcp.linear.app offers (scopes_supported: read, write, openid, email).",
+        "deploymentSelector": "the authorising Linear workspace. Captured 2026-08-10 from a throwaway workspace under an OAuth grant carrying BOTH scopes mcp.linear.app grants a tool surface for (scopes_supported: read, write, openid, email — the other two are OIDC identity claims and gate no tool). The grant was minted, used for exactly one tools/list, and revoked.",
         "responseFramingNote": "linear is the only one of the five that answers the tools/list POST as SSE rather than application/json. raw.json holds the unwrapped `data:` payload, because the consumer parses and hashes it; the framing is recorded here so the fact is kept rather than lost.",
-        "matchesExaminee": "an examinee pointing an MCP client at this URL with a `read` grant gets this listing. Whether a `write` grant would add tools is UNMEASURED — see the F-1329 note in SECRETS.md.",
+        "matchesExaminee": "58 tools, and an examinee pointing an MCP client at this URL under a read+write grant gets exactly them. THE SCOPE SET IS NOT INVARIANT HERE, AND THIS IS THE MEASUREMENT RATHER THAN AN ARGUMENT (F-1394): the same endpoint, captured the same day, answered 36 tools under `read` and 58 under `read write`. The 22 the write scope adds are every write Linear has and nothing else — prepare_attachment_upload, create_attachment_from_upload, create_attachment, delete_attachment, save_comment, delete_comment, save_document, save_issue, create_issue_label, save_project, save_release, save_release_note, save_diff_comment, resolve_diff_thread, delete_diff_comment, submit_diff_review, merge_diff, save_milestone, save_initiative, create_initiative_label, save_status_update, delete_status_update. Nothing was REMOVED: the read listing is a strict subset, so a narrower grant can only ever under-report. A later capture may therefore never be read-only.",
+        "completeness": "exact",
+        "completenessBasis": "the axis that moves an OAuth-gated listing is the grant, and this one is now maximal: `read` and `write` are the only scopes mcp.linear.app gates tools behind, and holding both was measured to return 22 more tools than holding `read` alone, with none withheld. The count is corroborated from outside the capture — a live Linear MCP connector on a separate credential exposes the same 58 names.",
+        "unguardedDirection": "the authorising WORKSPACE. This is a throwaway workspace, and nothing here reads a second one, so a listing that varied by Linear plan tier would be invisible from this golden. The reason that is judged shut rather than merely unmeasured is Linear's own grant model: the OAuth surface offers `read`/`write` and no plan-scoped or preview scope, which is the same argument SECRETS.md makes for capturing this twin from a throwaway at all — and it is the opposite of stripe, where preview tool groups ARE granted per account and the class is `credential-scoped` because of it.",
         "requestHeaders": {
           "content-type": "application/json",
           "accept": "application/json, text/event-stream"

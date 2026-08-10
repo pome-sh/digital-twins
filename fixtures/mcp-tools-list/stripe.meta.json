@@ -29,6 +29,9 @@
     "consentScreenPermissions": "All permissions = Write, test mode",
     "whyNotAFreshAccount": "Preview and allowlisted tool groups are granted PER ACCOUNT — docs.stripe.com/mcp gates a Treasury group behind a separate access request — so a clean throwaway account returns a SHORTER listing than a customer sees. Measured: a brand-new test account's consent screen offered only two permission groups (Accounts, Analytics). This is the one twin where capturing from our own account is the correct answer rather than a compromise.",
     "matchesExaminee": "11 tools. F-1326 refuted the oss-package premise for this vendor by reading @stripe/mcp@0.3.3: it declares no tools and forwards to this endpoint, and its cli.js dropped --tools with 'Tool permissions are now controlled by your Restricted API Key'. So the surface is per-credential and the grant above is part of what this golden means.",
+    "completeness": "credential-scoped",
+    "completenessBasis": "the fact `whyNotAFreshAccount` records, restated as a containment claim: mcp.stripe.com decides its listing from the caller's credential, so there is no account-independent surface for this golden to be exact against. It was measured in both directions rather than argued — a brand-new test account's consent screen offered two permission groups where this account's offered every one, and docs.stripe.com/mcp gates a Treasury group behind an access request this account has not made.",
+    "unguardedDirection": "BOTH, which is stricter than the github row's one. An examinee whose account carries an allowlisted or preview group reaches tools this capture does not list; an examinee whose Restricted API Key is narrower than this grant reaches fewer. So a tool twin-stripe serves that is absent here is NOT evidence the vendor lacks it, and a consumer must read that comparison as not-compared rather than as a twin-only divergence. Closing this needs a second capture from a differently-provisioned account, which is a decision about accounts and not a bug in this table.",
     "requestHeaders": {
       "content-type": "application/json",
       "accept": "application/json, text/event-stream"
@@ -39,7 +42,7 @@
       "id": 1
     }
   },
-  "canonicalFileSha256": "a21e41ebb20b7a43da06d1ef81e224c3df1bbe467232e77f8db0e294b275e3e0",
+  "canonicalFileSha256": "4369bf0c8e00426f4565997480bf9011aac8ebf97ac56c7938f50722e79f5a5d",
   "files": {
     "raw": "stripe.raw.json",
     "canonical": "stripe.canonical.json"

@@ -44,7 +44,7 @@
 // `configuration` and the question is closed for good.
 //
 // Usage:
-//   node scripts/mint-mcp-capture-token.mjs linear
+//   node scripts/mint-mcp-capture-token.mjs linear --scopes "read,write"
 //   node scripts/mint-mcp-capture-token.mjs stripe
 //   node scripts/mint-mcp-capture-token.mjs slack --client-id … --client-secret … --scopes "a,b,c"
 //
@@ -74,7 +74,17 @@ const VENDORS = {
     register: "https://mcp.linear.app/register",
     resource: "https://mcp.linear.app/mcp",
     port: 16735,
-    defaultScopes: "read",
+    // WAS `"read"`, AND THAT DEFAULT COST A GOLDEN (F-1394). This file's header
+    // argues there is no safe default because the scopes decide what the
+    // LISTING contains — and then this line quietly supplied one. F-1329 ran
+    // `mint-mcp-capture-token.mjs linear` with no `--scopes`, got a read-only
+    // grant, and froze a golden of 36 tools without a single write in it; the
+    // fidelity lane then reported six write tools twin-linear serves as tools
+    // it had invented, against an endpoint that serves all six. Linear is the
+    // one vendor here with a real choice to make (`scopes_supported: read,
+    // write, openid, email`), so it is the one that must not have it made for
+    // it. Same treatment as slack, for the same reason.
+    defaultScopes: null, // must be stated: see the header on what scopes decide
   },
   stripe: {
     envVar: "POME_STRIPE_MCP_TOKEN",

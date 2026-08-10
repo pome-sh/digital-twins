@@ -40,6 +40,27 @@
 //                      and compare. No network, no toolchain: this is the
 //                      shape CI runs, and it is what catches a hand-edited
 //                      golden or a hand-typed sha.
+//   --offline          the same re-derivation, WRITTEN. See below.
+//
+// ── WHY --offline HAS A WRITE MODE (F-1394) ────────────────────────────────
+//
+// `configuration` is prose about a capture, and it is copied verbatim into
+// meta.json and canonical.json — so a sentence added to the source table moves
+// two golden files. Three of the five sources sit behind ONE-SHOT OAuth grants
+// that are minted, used once, and revoked (SECRETS.md is explicit that storing
+// one would be a defect). Without this mode, correcting a sentence about
+// slack's golden would mean minting a fresh Slack grant and re-reading the
+// vendor — so in practice it would mean editing the two goldens BY HAND, which
+// is the one thing `--check` exists to catch.
+//
+// It cannot forge a capture, and the two reasons are structural rather than
+// promised. raw.json is this mode's INPUT: every derived field — the tool
+// names, the count, both shas — still comes from the bytes the vendor sent, so
+// the mode can restate what a capture meant and can never restate what it
+// FOUND. And `captureDate` is carried from the committed meta.json, exactly as
+// `--check` carries it, so a re-derivation cannot make an old reading look like
+// a fresh one. F-1328's staleness alarm is downstream of that date; a mode that
+// stamped today would reset the alarm without contacting anybody.
 import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -323,6 +344,30 @@ export function adapterFor(substrate) {
   return adapter;
 }
 
+/**
+ * The vocabulary of `configuration.completeness` — the relation between the
+ * listing this producer CAPTURED and the listing an examinee's own client
+ * reaches. The source table's `$comment` defines each class; this array is what
+ * makes declaring one non-optional.
+ *
+ * A GOLDEN THAT STATES NO CLASS STILL MAKES A CLAIM — it just makes it silently,
+ * and the consumer supplies the missing half. pome-cloud's promotion-gate
+ * criterion 9 refuses a twin for serving a tool the golden does not declare, and
+ * its own reasoning turns on this field: it is sound against `exact`, and against
+ * `subset-of-remote` only because github's golden ENUMERATES its delta from the
+ * remote with written evidence. F-1394 is what an undeclared class costs.
+ * linear's golden was captured under a read-only grant, said nothing about
+ * completeness, and the gate reported six write tools that mcp.linear.app really
+ * serves — `save_issue`, `save_comment`, `delete_comment`, `create_issue_label`,
+ * `save_project`, `save_document` — as tools twin-linear had invented. Fabricated
+ * findings are the one thing that lane must never produce.
+ *
+ * So it is required at LOAD, beside `configuration` itself and for the same
+ * reason: an unstated assumption about what a capture covers fails here rather
+ * than defaulting to the flattering answer.
+ */
+export const COMPLETENESS_CLASSES = Object.freeze(["exact", "subset-of-remote", "credential-scoped"]);
+
 // ── the declared source table ───────────────────────────────────────────────
 
 export function loadSources({ repoRoot = REPO_ROOT, sourcesPath, table } = {}) {
@@ -347,6 +392,14 @@ export function loadSources({ repoRoot = REPO_ROOT, sourcesPath, table } = {}) {
           `${twin}: a capturable source must declare the \`configuration\` it assumed. ` +
             `A capture with no recorded configuration is an unstated assumption about which ` +
             `deployment was read — it fails here rather than defaulting.`
+        );
+      }
+      if (!COMPLETENESS_CLASSES.includes(config.completeness)) {
+        throw new Error(
+          `${twin}: a capturable source must declare \`configuration.completeness\` as one of ` +
+            `${COMPLETENESS_CLASSES.join(", ")} (got ${JSON.stringify(config.completeness)}). ` +
+            `A consumer that reports a tool as twin-only is asserting the vendor does not serve it, ` +
+            `which this golden can only support if it says what it covers — see F-1394.`
         );
       }
       for (const field of ["endpoint", "method", "protocol", "protocolVersion"]) {
@@ -526,7 +579,7 @@ export async function runCapture(options = {}) {
 
     let rawText;
     try {
-      if (check && offline) {
+      if (offline) {
         if (!existsSync(paths.raw)) throw new Error(`missing committed golden ${paths.raw}`);
         rawText = readFileSync(paths.raw, "utf8");
       } else {
@@ -539,9 +592,11 @@ export async function runCapture(options = {}) {
     }
 
     let captureDate = today;
-    if (check) {
+    if (check || offline) {
       // The date is a fact about the COMMITTED capture, so `--check` must not
-      // red merely because the calendar moved.
+      // red merely because the calendar moved — and an `--offline` re-derivation,
+      // which reads the same committed bytes and contacts nobody, must not move
+      // it either. `today` belongs to a run that actually read the substrate.
       //
       // KNOWN AND UNAVOIDABLE: this makes captureDate self-referential. The
       // gate reads the date out of the committed meta.json and feeds it back
@@ -563,7 +618,10 @@ export async function runCapture(options = {}) {
         continue;
       }
       if (!committed.captureDate) {
-        problems.push(`${twin}: committed meta.json has no captureDate`);
+        problems.push(
+          `${twin}: committed meta.json has no captureDate, and neither --check nor --offline reads a ` +
+            `substrate that could date this golden. Re-capture it from the substrate instead.`
+        );
         continue;
       }
       captureDate = committed.captureDate;
@@ -612,8 +670,15 @@ export async function runCapture(options = {}) {
       // that was always capturable.
       const retired = existsSync(paths.status);
       rmSync(paths.status, { force: true });
+      const toolCount = JSON.parse(golden.meta).liveToolCount;
       log(
-        `${twin}: ${source.substrate} — wrote ${JSON.parse(golden.meta).liveToolCount} tools` +
+        `${twin}: ${source.substrate} — ` +
+          // An --offline run says what it did NOT do, because the two modes
+          // write the same three files and only one of them contacted a vendor.
+          (offline
+            ? `re-derived ${toolCount} tools from the committed ${twin}.raw.json — nothing was read from ` +
+              `${source.endpoint}, and captureDate stays ${captureDate}`
+            : `wrote ${toolCount} tools`) +
           (retired ? ` (and retired ${twin}.status.json — commit the deletion)` : "")
       );
     }
