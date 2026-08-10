@@ -4,6 +4,42 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.4
+
+### Patch Changes
+
+- `pome register agent` no longer echoes the control plane's `agent.framework`
+  back into `pome.json` (F-1393). It previously wrote `agent.framework ??
+  existingAgent.framework` into the manifest on every register, so a manifest
+  that never declared a framework picked up whatever the control plane had on
+  file for it — historically a NOT-NULL column defaulted to
+  `"claude-agent-sdk"` (pome-cloud F-1213), which is how `minimal-viktor`, a
+  Vercel AI SDK agent, got mislabeled as Claude Agent SDK on every registration.
+  `agent.framework` is now left untouched by register: the manifest is the
+  author's declaration, not the cloud's echo, and a manifest that omits it
+  keeps omitting it — including through the round trip against a cloud that
+  now reports an undeclared framework as `null` rather than a guessed default.
+  The CLI's own `AgentResponse.framework` schema is updated to accept that
+  `null` (previously only a bare string or absent), matching pome-cloud's
+  now-nullable wire contract. Widening it is load-bearing, not cosmetic: the
+  old bare-string schema `safeParse`-rejected a literal `framework: null`, so
+  against a live F-1213 cloud every `pome register agent` for an agent with no
+  declared framework would have failed with "POST /v1/agents returned an
+  unexpected shape", and every `pome run` would have degraded to "running
+  unattributed".
+
+- `pome init --sdk claude` now writes `agent.framework: "claude-agent-sdk"`
+  instead of `"claude"` (F-1393). It was writing the `--sdk` FLAG name — a CLI
+  selector — into the manifest as if it were a framework label, so the CLI
+  contradicted itself one command later: `pome register agent` printed
+  `Unknown agent.framework "claude". (Recorded as-is.)` about a manifest the
+  CLI had just written, and the dashboard badged the run `claude` where every
+  bundled Claude Agent SDK example reads `claude-agent-sdk`. The scaffold's
+  label is now typed against `KNOWN_FRAMEWORKS` in `cli/src/cli/frameworks.ts`,
+  the CLI's own vocabulary, so a future `--sdk` cannot reintroduce a parallel
+  copy without failing typecheck. Plain `pome init` (no `--sdk`) still writes
+  no `agent.framework` at all — nothing was declared, so nothing is stated.
+
 ## 0.23.3
 
 ### Patch Changes

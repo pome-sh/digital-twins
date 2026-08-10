@@ -21,6 +21,13 @@ export const KNOWN_FRAMEWORKS = [
   "semantic-kernel",
 ] as const;
 
+/** A framework label the CLI itself recognizes. Anything a Pome surface WRITES
+ *  into a manifest must be one of these (F-1393): the open enum tolerates an
+ *  author's own value, but a label the CLI mints and then warns about on the
+ *  next command is the CLI disagreeing with itself. Authoring a value outside
+ *  this union is a typecheck error, not a runtime surprise. */
+export type KnownFramework = (typeof KNOWN_FRAMEWORKS)[number];
+
 const MAX_SUGGEST_DISTANCE = 2;
 
 export interface FrameworkSuggestion {

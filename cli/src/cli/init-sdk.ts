@@ -10,11 +10,21 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
+import type { KnownFramework } from "./frameworks.js";
+
 export const SUPPORTED_SDKS = ["claude", "claude-managed"] as const;
 export type SupportedSdk = (typeof SUPPORTED_SDKS)[number];
 
 export interface ScaffoldResult {
-  agentSdkValue: string;
+  /** The `agent.framework` label `pome init --sdk` writes into the manifest.
+   *  Typed to `KnownFramework`, not `string` (F-1393): the `--sdk` FLAG name is
+   *  a CLI selector (`claude`), not a framework label, and writing the flag
+   *  name straight through produced a manifest that `pome register agent`'s own
+   *  `warnUnknownFramework` then rejected as unknown on the very next command,
+   *  and a dashboard SDK badge reading `claude` where every bundled example
+   *  reads `claude-agent-sdk`. The vocabulary in `frameworks.ts` is the
+   *  authority; this derives from it instead of keeping a parallel copy. */
+  agentSdkValue: KnownFramework;
   agentCommand: string;
   exampleAgentRelativePath: string;
   postInstallHint: string;
@@ -132,7 +142,7 @@ async function writeClaudeSdkScaffold(): Promise<ScaffoldResult> {
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, CLAUDE_SDK_AGENT_SOURCE, "utf8");
   return {
-    agentSdkValue: "claude",
+    agentSdkValue: "claude-agent-sdk",
     agentCommand: `npx tsx ${CLAUDE_SDK_AGENT_RELATIVE}`,
     exampleAgentRelativePath: CLAUDE_SDK_AGENT_RELATIVE,
     postInstallHint:

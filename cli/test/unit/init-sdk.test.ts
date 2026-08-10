@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { suggestFramework } from "../../src/cli/frameworks.js";
 import { createProgram } from "../../src/cli/main.js";
 
 const originalCwd = process.cwd();
@@ -42,10 +43,34 @@ describe("pome init --sdk", () => {
     const cfg = JSON.parse(readFileSync("pome.json", "utf8")) as {
       agent: { framework?: string }; command?: string;
     };
-    expect(cfg.agent.framework).toBe("claude");
+    // F-1393: the value written is the FRAMEWORK label, not the `--sdk` flag
+    // name. `claude` (the flag) is not a framework the CLI knows; writing it
+    // through made `pome register agent` warn "Unknown agent.framework" about
+    // a manifest the CLI itself had just written, and badged the run `claude`
+    // where every bundled Claude Agent SDK example reads `claude-agent-sdk`.
+    expect(cfg.agent.framework).toBe("claude-agent-sdk");
     expect(cfg.command).toBe(
       "npx tsx examples/agents/claude-sdk-agent.ts",
     );
+  });
+
+  // F-1393 (D3, "no surface states more than it checked") — the scaffold must
+  // derive its framework label from `frameworks.ts`, the CLI's own vocabulary,
+  // rather than keeping a parallel copy that drifts. This fails the moment a
+  // new `--sdk` writes a label `warnUnknownFramework` would then complain
+  // about, which is the exact self-contradiction that shipped as `claude`.
+  it("writes a framework label the CLI's own did-you-mean recognizes", async () => {
+    const projectDir = await mkdtemp(join(tmpdir(), "pome-init-sdk-known-"));
+    tempDirs.push(projectDir);
+    process.chdir(projectDir);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await createProgram().parseAsync(["node", "pome", "init", "--sdk", "claude"]);
+
+    const cfg = JSON.parse(readFileSync("pome.json", "utf8")) as {
+      agent: { framework?: string };
+    };
+    expect(suggestFramework(cfg.agent.framework!)).toEqual({ known: true });
   });
 
   it("rejects unknown --sdk values with a clear error and non-zero exit", async () => {
@@ -109,7 +134,9 @@ describe("pome init --sdk", () => {
     const cfg = JSON.parse(readFileSync("pome.json", "utf8")) as {
       agent: { framework?: string }; command?: string;
     };
-    expect(cfg.agent.framework).toBeUndefined();
+    // F-1393: "never declared" must stay declarable — plain `pome init` has no
+    // framework to state, so the key is ABSENT, not present-and-guessed.
+    expect("framework" in cfg.agent).toBe(false);
     expect(cfg.command).toBe(
       "node examples/agents/scripted-triage-agent.ts",
     );
@@ -134,7 +161,7 @@ describe("pome init --sdk", () => {
     const cfg = JSON.parse(readFileSync("pome.json", "utf8")) as {
       agent: { framework?: string }; command?: string;
     };
-    expect(cfg.agent.framework).toBe("claude");
+    expect(cfg.agent.framework).toBe("claude-agent-sdk");
     expect(cfg.command).toBe(
       "npx tsx examples/agents/claude-sdk-agent.ts",
     );
