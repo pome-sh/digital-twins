@@ -1,5 +1,31 @@
 # @pome-sh/checks
 
+## 0.1.4
+
+Carries twin-github's widened seed schema to the grader (F-1421). One thing
+moves in `dist/`: `@pome-sh/checks/github`'s re-exported `seedSchema` — and with
+it `parseSeed` — now accepts five entity types it used to strip silently.
+
+- `repositories[].milestones[]`, `repositories[].tags[]`,
+  `repositories[].releases[]`
+- `repositories[].issues[].comments[]` and
+  `repositories[].pull_requests[].comments[]`
+- `repositories[].pull_requests[].review_comments[]`
+
+Every one is optional with a `[]` default, so a seed that parsed before parses
+to the same value now. This is a widening, not a tightening: nothing a consumer
+already sends can start failing.
+
+Why it is owed a release rather than left to the twin: this package's job is to
+carry the twins' seed schemas to a consumer that has no twin, and a consumer
+validating a seed against 0.1.3 would strip exactly the keys twin-github 0.10.2
+now honors — reporting a seed as accepted and a world as seeded while five
+entities were dropped on the way. The two halves have to move together or the
+copy on the grader's side becomes the one that decides what a seed may say.
+
+No check declaration, template, polarity or vacuity sentinel changed, so no
+existing criterion's verdict moves.
+
 ## 0.1.3
 
 No change to the published surface — `dist/` is byte-identical to 0.1.2, so no

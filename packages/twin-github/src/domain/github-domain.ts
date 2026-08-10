@@ -116,6 +116,23 @@ export class GitHubDomain {
         for (const label of repoSeed.labels ?? []) {
           this.createLabel(repo, label.name, label.color ?? "ededed", label.description ?? "");
         }
+        // F-1421 — milestones sit beside labels: repository-level, and in
+        // existence before any issue points at one.
+        for (const milestone of repoSeed.milestones ?? []) {
+          const created = this.createMilestone({
+            owner: repo.owner,
+            repo: repo.name,
+            title: milestone.title,
+            description: milestone.description ?? "",
+            due_on: milestone.due_on,
+            state: milestone.state ?? "open"
+          });
+          if (milestone.number && milestone.number !== created.number) {
+            // A single UPDATE, unlike the issue renumber below: nothing in the
+            // schema references a milestone by number.
+            this.db.prepare("UPDATE milestones SET number = ? WHERE repo_id = ? AND number = ?").run(milestone.number, repo.id, created.number);
+          }
+        }
         this.createBranchInternal(repo, repo.default_branch, null);
         const files = repoSeed.files?.filter((file) => (file.branch ?? repo.default_branch) === repo.default_branch) ?? [];
         this.commitFiles(repo, repo.default_branch, "Initial seed commit", files, "pome-agent");
@@ -139,6 +156,11 @@ export class GitHubDomain {
             this.bumpEntityCounter(repo.id, to);
           }
           if (issue.state === "closed") this.updateIssue({ owner: repo.owner, repo: repo.name, issue_number: issue.number ?? created.number, state: "closed" });
+          // F-1421 — after the renumber, so a comment lands on the number the
+          // seed asked for rather than the one `createIssue` handed out.
+          for (const comment of issue.comments ?? []) {
+            this.seedComment(repo, issue.number ?? created.number, comment);
+          }
         }
         for (const pull of repoSeed.pull_requests ?? []) {
           const createdPr = this.createPullRequest({ owner: repo.owner, repo: repo.name, title: pull.title, body: pull.body ?? "", head: pull.head, base: pull.base ?? repo.default_branch, actor: pull.author });
@@ -183,6 +205,61 @@ export class GitHubDomain {
               });
             }
           }
+          // F-1421 — the PR's conversation timeline. The shared per-repo
+          // `entity_counter` is what lets one table hold both: within a repo a
+          // number names an issue or a pull request, never both, so `prNumber`
+          // selects this PR's comments and no issue's.
+          for (const comment of pull.comments ?? []) {
+            this.seedComment(repo, prNumber, comment);
+          }
+          // F-1421 — inline review comments, through the write path rather than
+          // a raw INSERT: it is what checks that `path` names a file this PR
+          // changes, that `line` exists in that file, and that the resolved
+          // commit is one of the PR's. A seeded comment that skipped those
+          // would be a row `POST /pulls/:n/comments` could not have produced.
+          for (const comment of pull.review_comments ?? []) {
+            const author = comment.author ?? "pome-agent";
+            this.upsertUser(author, "User", author);
+            this.createPullRequestReviewComment(
+              {
+                owner: repo.owner,
+                repo: repo.name,
+                pull_number: prNumber,
+                body: comment.body,
+                path: comment.path,
+                line: comment.line ?? 1,
+                side: comment.side ?? "RIGHT"
+              },
+              { actor: author }
+            );
+          }
+        }
+        // F-1421 — tags and releases last: both name a commit, so every branch
+        // and commit the seed can point them at exists by now. Tags first, so a
+        // release naming a seeded tag reuses it instead of minting a second.
+        for (const tag of repoSeed.tags ?? []) {
+          if (this.db.prepare("SELECT 1 FROM tags WHERE repo_id = ? AND name = ?").get(repo.id, tag.name)) {
+            conflict(`Seed declares tag ${tag.name} twice in ${repo.full_name}`);
+          }
+          const sha = this.resolveRefToSha(repo, tag.target ?? repo.default_branch);
+          this.db.prepare("INSERT INTO tags (repo_id, name, commit_sha, created_at) VALUES (?, ?, ?, ?)").run(repo.id, tag.name, sha, nowIso());
+        }
+        for (const release of repoSeed.releases ?? []) {
+          const author = release.author ?? "pome-agent";
+          this.upsertUser(author, "User", author);
+          this.createRelease(
+            {
+              owner: repo.owner,
+              repo: repo.name,
+              tag_name: release.tag_name,
+              target_commitish: release.target_commitish,
+              name: release.name,
+              body: release.body ?? "",
+              draft: release.draft ?? false,
+              prerelease: release.prerelease ?? false
+            },
+            { actor: author }
+          );
         }
       }
       this.audit("seed", null, { repositories: parsedSeed.repositories.length });
@@ -192,6 +269,31 @@ export class GitHubDomain {
       before: { repositories: before },
       after: { repositories: this.summarizeRepositories() }
     });
+  }
+
+  /**
+   * F-1421 — plant one conversation comment on an issue or a pull request.
+   *
+   * A direct INSERT, for the same reason the seeded reviews above bypass
+   * `createPullRequestReview`: `addIssueComment` stamps `user_login =
+   * "pome-agent"` unconditionally, and a seeded world where the agent under
+   * test wrote every comment it is being asked to read has nothing to read.
+   * The one check the write path does that matters here is kept — the comment
+   * must hang off an issue or a pull request that exists (F-1151).
+   */
+  seedComment(repo: RepoRow, number: number, comment: { body: string; author?: string }) {
+    this.requireCommentTarget(repo.id, number);
+    const author = comment.author ?? "pome-agent";
+    this.upsertUser(author, "User", author);
+    const now = nowIso();
+    this.db.prepare("INSERT INTO issue_comments (repo_id, issue_number, body, user_login, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)").run(
+      repo.id,
+      number,
+      comment.body,
+      author,
+      now,
+      now
+    );
   }
 
 

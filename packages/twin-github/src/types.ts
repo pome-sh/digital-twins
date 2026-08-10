@@ -32,6 +32,24 @@ export type SeedRepository = {
   collaborators?: string[];
   labels?: Array<{ name: string; color?: string; description?: string }>;
   files?: Array<{ path: string; content: string; branch?: string }>;
+  // F-1421 — the five entities the twin serves but the seed used to strip.
+  milestones?: Array<{
+    number?: number;
+    title: string;
+    description?: string;
+    state?: "open" | "closed";
+    due_on?: string;
+  }>;
+  tags?: Array<{ name: string; target?: string }>;
+  releases?: Array<{
+    tag_name: string;
+    name?: string;
+    body?: string;
+    target_commitish?: string;
+    draft?: boolean;
+    prerelease?: boolean;
+    author?: string;
+  }>;
   issues?: Array<{
     number?: number;
     title: string;
@@ -39,6 +57,7 @@ export type SeedRepository = {
     state?: "open" | "closed";
     labels?: string[];
     assignees?: string[];
+    comments?: SeedComment[];
   }>;
   pull_requests?: Array<{
     number?: number;
@@ -58,7 +77,24 @@ export type SeedRepository = {
       state?: "error" | "failure" | "pending" | "success";
       description?: string;
     }>;
+    comments?: SeedComment[];
+    review_comments?: Array<{
+      body: string;
+      path: string;
+      line?: number;
+      side?: "LEFT" | "RIGHT";
+      author?: string;
+    }>;
   }>;
+};
+
+/**
+ * A conversation comment on an issue OR a pull request — one shape, because
+ * they are one table and one route on GitHub too (F-1151).
+ */
+export type SeedComment = {
+  body: string;
+  author?: string;
 };
 
 export type RepoRow = {
