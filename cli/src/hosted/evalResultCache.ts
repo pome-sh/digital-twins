@@ -282,20 +282,14 @@ export async function scanVerdictArtifacts(
   return (await scanVerdictArtifactsDetailed(artifactsRoot)).trials;
 }
 
-// F-1404 — the three-way verdict a run SET can carry, named the same as
-// `ScoreStatus` (the per-trial word) because it is built from that word:
-//   "fail"       — at least one trial genuinely failed (state === "fail"):
-//                  it was graded and did not satisfy a criterion. This is
-//                  the ONLY outcome that asserts an agent defect.
-//   "incomplete" — no trial failed, but at least one trial's grading never
-//                  finished (state === "incomplete"). Nothing here says the
-//                  agent did anything wrong — a criterion was never
-//                  evaluated, which is a grader/seed gap, not evidence of a
-//                  bug in the run. "fail" wins over "incomplete" when a set
-//                  has both: a trial that DID fail is real signal, and
-//                  naming it takes priority over naming the gap in a
-//                  sibling trial.
-//   "pass"       — every trial's state is "pass".
+// F-1404 — the three-way verdict a run SET can carry, named like
+// `ScoreStatus` (the per-trial word) because it is built from it: "fail" =
+// at least one trial genuinely failed (graded, unsatisfied) — the only
+// outcome that asserts an agent defect. "incomplete" = no trial failed, but
+// at least one trial's grading never finished — a grader/seed gap, not
+// evidence the agent did anything wrong; "fail" wins when a set has both,
+// since a real failure is signal worth naming over a sibling's gap. "pass" =
+// every trial's state is "pass".
 export type RunSetOutcome = "fail" | "incomplete" | "pass";
 
 export interface RunSet {
@@ -309,11 +303,10 @@ export interface RunSet {
   latestFinalizedAt: string;
   /** F-1404 — derived from the on-disk `state` (see `RunSetOutcome`), never
    *  from `passed` alone: `passed` is false for BOTH a genuine failure and a
-   *  trial the grader never finished, so a predicate built on it can't tell
-   *  "the agent has a defect" from "something was never graded" apart. This
-   *  is the ONE computation both the routing decision (`latestFailedRunSet`
-   *  / `latestIncompleteRunSet`) and the message shown to the user read, so
-   *  they cannot disagree about what a set is. */
+   *  trial the grader never finished, so it can't tell "agent defect" from
+   *  "never graded" apart. The ONE computation both the routing decision
+   *  (`latestFailedRunSet` / `latestIncompleteRunSet`) and the message shown
+   *  to the user read, so they cannot disagree. */
   outcome: RunSetOutcome;
 }
 
@@ -324,8 +317,7 @@ export interface RunSet {
  *  (F-1392's finding: `!passed` is true for both a genuine failure and an
  *  incomplete trial, so a set holding only incomplete trials used to trip
  *  the old `anyFailed` and get handed to `pome fix-prompt` as an agent
- *  defect — routing a grader gap as if it were proof the agent misbehaved).
- *  `evalResultCache.test.ts` pins all three outcomes directly against the
+ *  defect). `evalResultCache.test.ts` pins all three outcomes against the
  *  written artifact. */
 export function groupRunSets(trials: TrialVerdict[]): RunSet[] {
   const byKey = new Map<string, TrialVerdict[]>();
@@ -387,11 +379,10 @@ export interface RunSetDiscovery {
    *  agent. */
   set: RunSet | null;
   /** F-1404 — `kind: "root"` only, and only populated when `set` is null:
-   *  the newest run set whose outcome is `"incomplete"` (no trial failed,
-   *  but at least one was never graded). Distinct from `set` so a caller
-   *  can never conflate "route this to fix-prompt" with "tell the user
-   *  something was never graded" — the two must be named separately, or the
-   *  routing decision and the message it prints can end up disagreeing. */
+   *  the newest run set whose outcome is `"incomplete"`. Kept distinct from
+   *  `set` so a caller can never conflate "route this to fix-prompt" with
+   *  "something was never graded" — the routing decision and the message it
+   *  prints must never disagree. */
   incompleteSet: RunSet | null;
   /** Total finalized run sets seen — lets the caller distinguish "no runs
    *  at all" from "runs exist but none failed". */
