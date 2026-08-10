@@ -19,6 +19,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  COMPLETENESS_CLASSES,
   REQUIRED_META_FIELDS,
   adapterFor,
   deriveGolden,
@@ -488,6 +489,132 @@ function sandboxWithDeferredTwin() {
   const recheck = await runCapture({ repoRoot: dir, check: true, offline: true, ...SILENT });
   assert(recheck === 0, "what write mode produced is what --check accepts");
   rmSync(dir, { recursive: true, force: true });
+}
+
+// ── --offline WRITES the re-derivation, and cannot forge a capture (F-1394) ──
+//
+// The mode exists because `configuration` is prose about a capture that is
+// copied into two derived files, and three of the five sources sit behind
+// one-shot OAuth grants — so without it, a corrected sentence about slack's
+// golden means either minting a fresh Slack grant or hand-editing the goldens.
+//
+// What has to stay true is that it re-states what a capture MEANT and never
+// what it FOUND. Both halves get a red of their own below: the derived fields
+// still come from the committed raw bytes, and `captureDate` does not move.
+{
+  const dir = sandbox();
+  const sources = loadSources({ repoRoot: dir });
+  const twin = Object.keys(sources.twins).find((id) => sources.twins[id].capture);
+  const cfgPath = join(dir, "config/mcp-capture-sources.json");
+  const paths = goldenPaths({ repoRoot: dir, sources, twin });
+  const rawBefore = readFileSync(paths.raw, "utf8");
+  const committedDate = JSON.parse(readFileSync(paths.meta, "utf8")).captureDate;
+
+  const table = JSON.parse(readFileSync(cfgPath, "utf8"));
+  table.twins[twin].configuration.matchesExaminee = "re-stated by an offline re-derivation, not by a capture";
+  writeFileSync(cfgPath, `${JSON.stringify(table, null, 2)}\n`);
+
+  // The edit alone reds the gate — the whole reason the mode has to exist.
+  const stale = await runCapture({ repoRoot: dir, sourcesPath: cfgPath, check: true, offline: true, ...SILENT });
+  assert(stale !== 0, "--check reds while the source table's configuration and the goldens disagree");
+
+  const code = await runCapture({
+    repoRoot: dir,
+    sourcesPath: cfgPath,
+    // A date that is nothing like the committed one, so carrying it is visible.
+    today: "2099-12-31",
+    offline: true,
+    ...SILENT,
+  });
+  assert(code === 0, "--offline write mode re-derives every golden with no substrate");
+
+  const meta = JSON.parse(readFileSync(paths.meta, "utf8"));
+  assert(
+    meta.captureDate === committedDate,
+    `--offline write mode carries the committed captureDate (${committedDate}), never today's`
+  );
+  assert(readFileSync(paths.raw, "utf8") === rawBefore, "--offline write mode left raw.json byte-identical");
+  assert(meta.rawFileSha256 === sha256(rawBefore), "--offline write mode re-hashed the committed bytes");
+  assert(
+    meta.configuration.matchesExaminee === "re-stated by an offline re-derivation, not by a capture",
+    "--offline write mode carried the edited configuration into meta.json"
+  );
+
+  const recheck = await runCapture({ repoRoot: dir, sourcesPath: cfgPath, check: true, offline: true, ...SILENT });
+  assert(recheck === 0, "what --offline write mode produced is what --check --offline accepts");
+  rmSync(dir, { recursive: true, force: true });
+}
+
+// ── --offline has nothing to re-derive FROM, and says so rather than inventing ──
+{
+  const dir = sandbox();
+  const sources = loadSources({ repoRoot: dir });
+  const twin = Object.keys(sources.twins).find((id) => sources.twins[id].capture);
+  const paths = goldenPaths({ repoRoot: dir, sources, twin });
+
+  rmSync(paths.raw);
+  const code = await runCapture({ repoRoot: dir, twins: [twin], offline: true, ...SILENT });
+  assert(code !== 0, "--offline write mode reds when there is no committed raw.json to re-derive from");
+  assert(!existsSync(paths.raw), "--offline write mode did not invent a raw.json");
+  rmSync(dir, { recursive: true, force: true });
+}
+{
+  // An undated golden cannot be re-derived either: `today` belongs to a run
+  // that read a substrate, and stamping it here would reset F-1328's staleness
+  // clock without anybody having contacted the vendor.
+  const dir = sandbox();
+  const sources = loadSources({ repoRoot: dir });
+  const twin = Object.keys(sources.twins).find((id) => sources.twins[id].capture);
+  const paths = goldenPaths({ repoRoot: dir, sources, twin });
+  const meta = JSON.parse(readFileSync(paths.meta, "utf8"));
+  delete meta.captureDate;
+  writeFileSync(paths.meta, `${JSON.stringify(meta, null, 2)}\n`);
+
+  const code = await runCapture({ repoRoot: dir, twins: [twin], today: "2099-12-31", offline: true, ...SILENT });
+  assert(code !== 0, "--offline write mode reds on a golden whose meta.json carries no captureDate");
+  assert(
+    !JSON.parse(readFileSync(paths.meta, "utf8")).captureDate,
+    "--offline write mode did not date an undated golden from the calendar"
+  );
+  rmSync(dir, { recursive: true, force: true });
+}
+
+// ── every capturable source states what its capture COVERS (F-1394) ─────────
+//
+// The field is required at load, beside `configuration` itself. linear's golden
+// was captured under a read-only grant, declared no completeness class, and
+// pome-cloud's promotion-gate went on to report six write tools that
+// mcp.linear.app really serves as tools the twin had invented — the fabricated
+// finding that lane must never produce.
+{
+  const sources = loadSources({ repoRoot: ROOT });
+  for (const [id, source] of Object.entries(sources.twins)) {
+    if (!source.capture) continue;
+    assert(
+      COMPLETENESS_CLASSES.includes(source.configuration.completeness),
+      `${id}: the committed source table declares a completeness class (got ${JSON.stringify(
+        source.configuration.completeness
+      )})`
+    );
+  }
+
+  const table = JSON.parse(readFileSync(join(ROOT, "config/mcp-capture-sources.json"), "utf8"));
+  const capturable = Object.keys(table.twins).find((id) => table.twins[id].capture);
+  for (const [label, value] of [
+    ["absent", undefined],
+    ["an unknown class", "probably-fine"],
+    // The flattering default a missing field would otherwise mean.
+    ["the empty string", ""],
+  ]) {
+    const mutated = structuredClone(table);
+    if (value === undefined) delete mutated.twins[capturable].configuration.completeness;
+    else mutated.twins[capturable].configuration.completeness = value;
+    assertThrows(
+      () => loadSources({ table: mutated }),
+      "completeness",
+      `loadSources refuses a capturable source whose completeness is ${label}`
+    );
+  }
 }
 
 // ── a substrate read that comes back malformed fails loudly ─────────────────
