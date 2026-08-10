@@ -1230,6 +1230,24 @@ export function createProgram() {
         return;
       }
       if (!discovery.set) {
+        // F-1404 — a root whose only non-passing run set is INCOMPLETE (a
+        // criterion was never graded) is neither "all passed" nor a failure
+        // to hand to a coding agent: routing it as a fix-prompt would assert
+        // an agent defect nothing here established, and "all passed" would
+        // be false about it. `incompleteSet` is only ever populated when no
+        // set actually failed (see `discoverRunSet`), so this branch and the
+        // routing decision above read the same computation and cannot
+        // disagree.
+        if (discovery.incompleteSet) {
+          const incompleteTrials = discovery.incompleteSet.trials.filter(
+            (t) => t.verdict.state === "incomplete",
+          ).length;
+          console.error(
+            `Not routed to fix-prompt: the latest run set under ${root} is INCOMPLETE, not failed — ${incompleteTrials} of ${discovery.incompleteSet.trials.length} trial(s) have criteria that were never graded. That is a grader/seed gap, not an agent defect, so fix-prompt will not hand it to your coding agent. Re-run \`pome run\` for this task so those criteria are actually evaluated, then run fix-prompt again.`,
+          );
+          process.exitCode = 1;
+          return;
+        }
         console.error(
           `Nothing to fix: the latest run sets under ${root} all passed.`,
         );

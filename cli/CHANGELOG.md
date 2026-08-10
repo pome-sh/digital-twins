@@ -4,6 +4,29 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.5
+
+### Patch Changes
+
+- `pome fix-prompt` no longer routes an INCOMPLETE trial to your coding agent
+  as an agent defect (F-1404). A run set's `outcome` (`groupRunSets` in
+  `evalResultCache.ts`) was computed from `!verdict.passed`, which is false
+  for a genuine failure and for a trial the grader never finished alike — so
+  a `runs/` whose only non-passing trials were incomplete got picked by
+  `latestFailedRunSet` and handed to `pome fix-prompt` as if the agent had a
+  defect, when nothing had established that: a criterion just never got
+  graded. `outcome` now reads the on-disk `state` (`"fail"` / `"incomplete"`
+  / `"pass"`, from F-1195's verdict.json field) instead, so it can tell the
+  two apart.
+
+  A root whose only non-passing run set is incomplete now gets a third,
+  distinct message instead of either the old misroute or a false "the latest
+  run sets under runs all passed": it names the gap as incomplete, says it is
+  a grading gap rather than an agent defect, and tells you to re-run the
+  task. Pointing `fix-prompt` straight at a trial directory is unchanged — it
+  still targets that trial's whole set regardless of outcome, since the user
+  pointed at it directly.
+
 ## 0.23.4
 
 ### Patch Changes
