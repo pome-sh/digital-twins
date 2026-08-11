@@ -1,5 +1,28 @@
 # @pome-sh/twin-github — CHANGELOG
 
+## 0.10.6 — 2026-08-11
+
+Two route inputs GitHub does not declare come out of `route-inputs.ts` (F-1389).
+
+- `owner` off the `POST /user/repos` body. That surface creates a repository for
+  the AUTHENTICATED USER, which is its whole meaning, and
+  `repos/create-for-authenticated-user` declares 23 body properties without it.
+  `routes.ts` passed the body straight to `domain.createRepository`, so the one
+  surface defined not to take an owner could be made to create a repository
+  under an arbitrary one. It stays declared on `POST /orgs/:org/repos`, where
+  the handler overwrites it from the path and nothing observable differs.
+- `encoding` off `PUT /repos/:owner/:repo/contents/*`. GitHub declares `content`
+  as base64 and takes no `encoding` parameter.
+
+Both are now undeclared, so github's measured `ignore` disposition (F-1372)
+discards them instead of the handler acting on them. Neither is a 4xx: real
+GitHub answers 200 to a parameter it does not know.
+
+⚠️ `encoding`'s BEHAVIOURAL half is recorded, not fixed — the twin still treats
+`content` as plain text where GitHub treats it as base64. New FIDELITY.md
+divergence 24 says so, with the measurement that deferred it: 47 call sites send
+`content` and zero send base64, and the MCP door still declares `encoding`.
+
 
 ## 0.10.5 — 2026-08-11
 

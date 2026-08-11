@@ -196,7 +196,15 @@ export const GITHUB_ROUTES = {
       content: z.string(),
       branch: z.string().optional(),
       sha: z.string().optional(),
-      encoding: z.enum(["utf-8", "base64"]).optional(),
+      // F-1389 (GH-DECL-IN-005) — no `encoding`. GitHub declares `content` as
+      // "the new file content, using Base64 encoding" and takes no `encoding`
+      // parameter: base64 is the only encoding this surface has. Undeclared
+      // now, so github's measured disposition (`ignore`) discards it.
+      //
+      // ⚠️ This closes the DECLARED drift, not the behavioural one. The twin
+      // still treats `content` as plain text rather than base64 — recorded as
+      // divergence 24, and unified across both doors in the follow-up ticket
+      // that owns the 47-call-site migration.
     },
   }),
   listCommits: declareInputs({

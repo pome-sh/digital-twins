@@ -1,6 +1,18 @@
 # @pome-sh/twin-slack — CHANGELOG
 
 
+## 0.4.1 — 2026-08-11
+
+`files.upload` takes `channels` only (F-1389).
+
+Slack documents `channels` — plural, comma-separated — and has never documented
+a singular `channel`; the vendored `slack_web_openapi_v2` snapshot agrees,
+declaring `channels` and eight other real arguments, so it is not thin here. The
+twin declared both and the domain fell back `args.channels ?? args.channel`, so
+an upload addressed `channel=C123` landed in that channel here and in no channel
+at all on Slack. The declaration and the domain fallback are both gone; slack's
+measured `ignore` disposition discards `channel` if sent.
+
 ## 0.4.0 — 2026-08-10
 
 **Breaking.** It serves the tools Slack declares. Every tool name and almost

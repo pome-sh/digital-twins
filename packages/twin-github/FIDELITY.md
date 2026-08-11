@@ -453,6 +453,30 @@ upstream so a divergence that upstream "heals" becomes a tier-upgrade signal.
     until F-1430 was an empty `check_runs` array diffed against the twin's empty
     one, which published green while binding no key, no leaf type and no element.
 
+24. **`PUT /contents/*` treats `content` as plain text; GitHub treats it as
+    base64.** GitHub declares `content` as "the new file content, using Base64
+    encoding" — base64 is the only encoding the surface has. This twin writes
+    `content` through verbatim unless an `encoding: "base64"` flag asks it not
+    to, so the same request writes readable text here and base64-decoded garbage
+    on GitHub. An agent cannot see the difference until it reads the file back
+    from the real API.
+
+    The *declared* half of this is fixed: F-1389 removed `encoding` from
+    `route-inputs.ts`, so the twin no longer advertises a parameter GitHub does
+    not have, and github's `ignore` disposition discards it if sent. What
+    remains is the behaviour, and it is recorded rather than fixed in that PR
+    for a measured reason: **47 call sites send `content`, and zero of them send
+    base64** — the default seed, `config/twin-endpoint-probes.json`, and the
+    whole twin-github suite among them. Flipping the decode is a result-moving
+    change for every existing task, so it carries its own migration.
+
+    It is also wider than this route. The MCP door — `create_or_update_file` and
+    `push_files` — still declares `encoding` in its tool schema, and that is the
+    door an examinee actually calls; a REST-only decode would migrate all 47
+    sites while leaving the reachable path unchanged. So the fix is one change
+    across both doors, with the fixture regeneration and saved-task audit that
+    implies, tracked separately.
+
 ## How fidelity is verified
 
 Three independent checks back the tier classifications above. Each is a

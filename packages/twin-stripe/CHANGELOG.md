@@ -1,6 +1,20 @@
 # @pome-sh/twin-stripe — CHANGELOG
 
 
+## 0.4.7 — 2026-08-11
+
+`GET /v1/customers/:id/payment_methods` no longer accepts `created` (F-1389).
+
+The route shared the twin's `LIST_QUERY`, which carries `created`.
+`GetCustomersCustomerPaymentMethods` declares `allow_redisplay, ending_before,
+expand, limit, starting_after, type` and no `created`, and Stripe's measured
+disposition is `refuse` — it publishes `parameter_unknown`. So a request Stripe
+rejects outright used to succeed here, and an exam scored a call the real API
+declined. The route's query is now spelled out rather than spread from
+`LIST_QUERY`, so a future edit to that shared shape cannot put `created` back by
+inheritance. This twin REFUSES undeclared inputs, so the parameter is now a 400
+naming it — which is the point, not a side effect.
+
 ## 0.4.6 — 2026-08-06
 
 Its MCP tool table is now derived from `fixtures/mcp-tools-list.raw.json`
