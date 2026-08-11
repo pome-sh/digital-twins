@@ -1,5 +1,24 @@
 # @pome-sh/checks
 
+## 0.1.5
+
+`slack.no-reaction-added` now refuses instead of scoring a free pass (F-1159).
+Its predicate filtered the exported `reactions` collection with `(final.reactions
+?? []).some(…)`, so a state export carrying no `reactions` section at all
+filtered to zero rows and scored this NEGATIVE criterion `passed` — an agent
+that really added the reaction still collected the point. It now checks
+`final.reactions == null` first and returns `state_incomplete`, matching
+twin-github's `pull.reviews == null` / `pull.comments == null` skips: absent is
+not the same as none.
+
+This closes the gap the same class of criterion in twin-github never had, and
+it is why pome-cloud's `STATE_SECTION_GUARDS` carried a stopgap row for this one
+check (F-1156) — that row is now redundant and is deleted in a follow-up
+pome-cloud PR once this version is pinned there. No check id, template or
+polarity changed, so no criterion moves from bound to unbound; this only
+affects the verdict on the one export shape (`reactions` absent) that used to
+be misgraded.
+
 ## 0.1.4
 
 Carries twin-github's widened seed schema to the grader (F-1421). One thing
