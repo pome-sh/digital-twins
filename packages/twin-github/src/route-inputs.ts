@@ -90,6 +90,22 @@ const commentBody = { body: z.string().min(1) };
 
 export const GITHUB_ROUTES = {
   // ----- search -----
+  //
+  // GH-DECL-IN-001 / GH-DECL-IN-002 (F-1389) — all five take `q` and nothing but
+  // `q`. GitHub's search API has ONE scoping input and encodes every filter as a
+  // qualifier inside it (`repo:octocat/hello-world`, `state:open`); its OpenAPI
+  // declares `q, sort, order, per_page, page`. `/search/code`,
+  // `/search/commits` and `/search/issues` used to declare `owner` / `repo`
+  // (and `state`) alongside and scope by them, so the same request was scoped
+  // here and unscoped on GitHub.
+  //
+  // They are undeclared rather than refused, per github's measured `ignore`
+  // ruling — a request still sending them gets the answer it would have got
+  // without them, which is what real GitHub does. The scoping moved into `q`:
+  // `domain/search.ts` parses `repo:` / `user:` / `org:` / `state:` out of it.
+  // Both halves had to land together — deleting the parameters alone would have
+  // left `q=idempotency repo:acme/api` still answering zero, which is the
+  // mirror defect and the worse one.
   searchRepositories: declareInputs({
     method: "GET",
     path: "/search/repositories",
@@ -98,23 +114,12 @@ export const GITHUB_ROUTES = {
   searchCode: declareInputs({
     method: "GET",
     path: "/search/code",
-    query: {
-      q: z.string().optional(),
-      owner: z.string().optional(),
-      repo: z.string().optional(),
-      ...pageQuery,
-    },
+    query: { q: z.string().optional(), ...pageQuery },
   }),
   searchIssues: declareInputs({
     method: "GET",
     path: "/search/issues",
-    query: {
-      q: z.string().optional(),
-      owner: z.string().optional(),
-      repo: z.string().optional(),
-      state: stateFilter,
-      ...pageQuery,
-    },
+    query: { q: z.string().optional(), ...pageQuery },
   }),
   searchUsers: declareInputs({
     method: "GET",
@@ -124,12 +129,7 @@ export const GITHUB_ROUTES = {
   searchCommits: declareInputs({
     method: "GET",
     path: "/search/commits",
-    query: {
-      q: z.string().optional(),
-      owner: z.string().optional(),
-      repo: z.string().optional(),
-      ...pageQuery,
-    },
+    query: { q: z.string().optional(), ...pageQuery },
   }),
 
   // ----- repositories -----

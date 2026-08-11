@@ -50,14 +50,14 @@ in the package README. Changing any of those is a breaking change for
 | `search_repositories` | SQLite repositories | hot | semantic | `mcp-contract.test.ts`, `fixture-endpoints.test.ts` | Search query support is intentionally smaller than GitHub search syntax. |
 | `create_repository` | SQLite repositories, branches, commits, files | hot | semantic | `mcp-contract.test.ts`, `concurrency.test.ts` | Creates a deterministic README and main branch. |
 | `fork_repository` | SQLite repository/file/commit copy | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts` | Fork permissions and network metadata are simplified. |
-| `search_code` | SQLite default-branch files | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts`, `performance.test.ts` | Query syntax is substring based; search is scoped to the default branch. |
+| `search_code` | SQLite default-branch files | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts`, `performance.test.ts`, `search-query-qualifiers.test.ts` | Free text is substring based and scoped to the default branch; `repo:`/`user:`/`org:` are parsed, other qualifiers are not (divergence #1). |
 | `search_users` | SQLite users | hot | semantic | `mcp-contract.test.ts` | Organization/user scoring is simplified. |
 | `get_file_contents` | SQLite files/directories | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts`, `fixture-endpoints.test.ts` | Symlinks, submodules, and media/raw modes are not implemented. |
 | `list_commits` | SQLite commit graph | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts`, `fixture-endpoints.test.ts` | Commit listing follows the selected branch ancestry only. |
 | `create_or_update_file` | SQLite files/commits | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts` | Requires `sha` for updates to preserve optimistic locking. |
 | `create_branch` | SQLite branches/files | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts`, `concurrency.test.ts` | Branch protection is not modeled. |
 | `push_files` | SQLite files/commits | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts` | Multi-file pushes are one local commit; Git object APIs are simplified. |
-| `search_issues` | SQLite issues | hot | semantic | `mcp-contract.test.ts`, `performance.test.ts`, `fixture-endpoints.test.ts` | Query syntax is substring based. |
+| `search_issues` | SQLite issues | hot | semantic | `mcp-contract.test.ts`, `performance.test.ts`, `fixture-endpoints.test.ts`, `search-query-qualifiers.test.ts` | Free text is substring based; `repo:`/`user:`/`org:`/`state:` are parsed, other qualifiers are not (divergence #1). No `state=open` default, deliberately (F-1427). |
 | `list_issues` | SQLite issues | hot | semantic | `mcp-contract.test.ts`, `performance.test.ts`, `fixture-endpoints.test.ts`, `list-state-default.test.ts` | Only state, labels, assignee, and pagination filters are supported. An absent `state` means `open`, as on real GitHub (F-1427). |
 | `add_issue_comment` | SQLite issue comments | hot | semantic | `mcp-contract.test.ts`, `state-export.test.ts` | Comment edit/delete APIs are not implemented. |
 | `create_issue` | SQLite issues | hot | semantic | `mcp-contract.test.ts` | Issue templates and milestones are not modeled. |
@@ -75,7 +75,7 @@ in the package README. Changing any of those is a breaking change for
 | `list_releases` | SQLite releases | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts` | Newest-first; includes drafts and prereleases. |
 | `get_latest_release` | SQLite releases | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts` | Skips drafts and prereleases; 404 if none. |
 | `get_me` | SQLite users + JWT actor | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts` | Returns the JWT-claimed `login` (default `pome-agent`). |
-| `search_commits` | SQLite commit graph (default branches) | hot | semantic | `mcp-contract.test.ts`, `m5-hot-gaps.test.ts` | Substring match over commit message/author on default-branch ancestry; GitHub search qualifiers are not parsed. |
+| `search_commits` | SQLite commit graph (default branches) | hot | semantic | `mcp-contract.test.ts`, `m5-hot-gaps.test.ts`, `search-query-qualifiers.test.ts` | Substring match over commit message/author on default-branch ancestry; `repo:`/`user:`/`org:` are parsed, other qualifiers are not (divergence #1). |
 | `get_release_by_tag` | SQLite releases | hot | semantic | `mcp-contract.test.ts`, `m5-hot-gaps.test.ts` | 404 for unknown tag. |
 | `get_tag` | SQLite tags | hot | semantic | `mcp-contract.test.ts`, `m5-hot-gaps.test.ts` | MCP-only (no REST route; git-plumbing REST stays cold per F-729); returns the lightweight tag object, not the annotated-tag git object. |
 | `issue_read` | SQLite issues, issue comments, issue labels | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts` | GitHub's consolidated reader (F-1376). Methods `get`, `get_comments`, `get_labels`; `get_sub_issues` and `get_parent` answer 501 — sub-issues are not modeled. |
@@ -137,13 +137,21 @@ issue, as `[].state` constant-mismatch and `[].closed_at` type-changed against
 real GitHub, both CRITICAL.
 
 `GET /search/issues` is deliberately NOT part of this. GitHub's search API has no
-`state` default — `is:open` is a query qualifier, not a default — so the twin's
-search keeps filtering only on an explicit `state`. Imposing the list default
+`state` default — state is a query qualifier, not a default — so the twin's
+search keeps filtering only on an explicit state. Imposing the list default
 there would be a new divergence in the other direction, and a worse one: the
 twin's search is substring matching over the seeded world, so a query whose only
 match is closed would answer `[]`, replacing a value mismatch with an
 empty-array one. Any residual `state` / `closed_at` finding on `/search/issues`
 is a property of that surface's upstream comparison, not of this default.
+
+Where that explicit state is SPELLED moved in 0.10.6 (F-1389): it is a `q`
+qualifier, `?q=idempotency state:closed`, not a `?state=` query parameter.
+GitHub's search API declares `q, sort, order, per_page, page` and encodes every
+filter inside `q`, so `?state=` came off this route's declaration and is now
+discarded like any other input GitHub does not declare — it is ignored, not
+refused. The absence of a default is unchanged; only the spelling of the filter
+moved.
 
 Seeding the closed side of these surfaces works now, too: `seedSchema` had
 accepted `pull_requests[].state` for as long as the field existed while
@@ -196,10 +204,21 @@ the Twin Fidelity Watch's `known-divergences/github.yaml` (maintained in
 pome-cloud); a lint keeps the two 1:1. The fidelity watchdog reverse-tests each one against
 upstream so a divergence that upstream "heals" becomes a tier-upgrade signal.
 
-1. **Search query syntax is substring-based.** `search_repositories`,
-   `search_code`, and `search_issues` use substring matching scoped to the
-   default branch — GitHub's search qualifiers (`in:`, `language:`, `path:`,
-   boolean operators) are not parsed.
+1. **Search query syntax is substring-based.** The free text left in `q` is
+   matched as one case-insensitive substring, scoped to the default branch —
+   not as GitHub's ranked, tokenised, boolean-aware index. Four SCOPE
+   qualifiers are lifted out of `q` and honoured on `/search/code`,
+   `/search/commits` and `/search/issues` (F-1389): `repo:owner/name`,
+   `user:login`, `org:login`, and `state:open|closed` on `/search/issues` only,
+   several of them OR-ing together the way GitHub's do. Everything else GitHub
+   has — `in:`, `language:`, `path:`, `is:`, `label:`, `author:`, the boolean
+   operators — is **not parsed**, and an unparsed qualifier stays in the
+   free-text term rather than being dropped, so it narrows the answer to nothing
+   instead of silently widening it past what GitHub would return. Three further
+   simplifications, each deliberate: `user:` and `org:` both resolve to the
+   repository's owner login with no account-type check; `search_repositories`
+   and `search_users` parse no qualifiers at all and still match the whole `q`;
+   and quoted qualifier values (`repo:"a/b"`) are not unquoted.
 2. **PR diffs and patches are simplified placeholders.** `get_pull_request_diff`
    and `get_pull_request_files` return a unified-diff-shaped envelope whose
    `patch` bodies are placeholders, not byte-accurate GitHub patches.
@@ -567,8 +586,8 @@ the declaration with, and
 [`scripts/lint-route-input-declarations.mjs`](../../scripts/lint-route-input-declarations.mjs)
 fails the build if any module a route registrar reaches reads one imperatively.
 
-**This twin declares 295 inputs across 65 published surfaces**
-(157 path, 56 query, 82 body), 182 of them required. Each carries its name, location,
+**This twin declares 286 inputs across 65 published surfaces**
+(157 path, 49 query, 80 body), 182 of them required. Each carries its name, location,
 requiredness and best-effort type, all *derived from the schemas that validate* —
 requiredness by asking the validator whether the input may be absent, and type by
 way of JSON Schema. Nothing here is hand-written, so nothing here can drift from
@@ -608,6 +627,33 @@ the exam recorded a failure the agent did not commit.
 
 Nothing above this heading changes. The handler still sees only what the
 declaration names — `parse()` returns declared names and nothing else in either
-disposition — and the 295 published inputs are byte-identical, so what this
+disposition — and the 286 published inputs are byte-identical, so what this
 twin is short of GitHub's real surface is still the declared-fidelity lane's
 finding to report. The disposition decides only what the CALLER is told.
+
+### Nine inputs GitHub does not declare, removed (F-1389)
+
+The declared lane compares in both directions, and the direction that had gone
+unmeasured was ours: inputs this twin ACCEPTED that GitHub's OpenAPI does not
+declare. Nine came off in 0.10.6, taking the published surface from 295 to 286.
+
+- **`owner` on the `POST /user/repos` body.** That surface creates a repository
+  for the authenticated user, which is its whole meaning, and
+  `repos/create-for-authenticated-user` declares 23 body properties without it.
+  It stays declared on `POST /orgs/:org/repos`, where the handler overwrites it
+  from the path and nothing observable differs.
+- **`encoding` on `PUT /repos/:owner/:repo/contents/*`.** GitHub declares
+  `content` as base64 and takes no encoding switch. The BEHAVIOURAL half of that
+  finding is deferred and recorded as divergence 24, not fixed here.
+- **`owner`, `repo` and `state` on `/search/code`, `/search/commits` and
+  `/search/issues`** — seven inputs across three routes. GitHub's search API
+  takes one scoping input, `q`, and encodes every filter as a qualifier inside
+  it; its OpenAPI declares `q, sort, order, per_page, page`. The scoping moved
+  into `q` in the same change rather than simply disappearing — see divergence 1
+  for which qualifiers are parsed and which are not, and
+  `test/search-query-qualifiers.test.ts` for the behaviour.
+
+All nine are now undeclared, which under the `ignore` ruling above means
+discarded rather than refused: a request still sending one gets the answer it
+would have got without it, the way real GitHub answers. None of the three
+surfaces 4xx's.

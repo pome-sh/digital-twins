@@ -30,11 +30,20 @@
 //
 // `GET /search/issues` is the deliberate exception and is asserted as one.
 // GitHub's search API has no `state=open` default — a search returns what the
-// query asks for — so `searchIssues` keeps filtering only on an explicit
-// `state`. That is not an oversight the next reader should "fix": the twin's
-// search is substring-based over the seeded world, so imposing an open default
-// would answer `[]` for any query whose only match is closed, turning a
-// value mismatch into an empty-array divergence in the other direction.
+// query asks for — so `searchIssues` keeps filtering only on an explicit state.
+// That is not an oversight the next reader should "fix": the twin's search is
+// substring-based over the seeded world, so imposing an open default would
+// answer `[]` for any query whose only match is closed, turning a value
+// mismatch into an empty-array divergence in the other direction.
+//
+// Where that explicit state is SPELLED moved in F-1389: `state` is a `q`
+// qualifier (`q=idempotency state:closed`), not a query parameter. GitHub's
+// search API declares `q, sort, order, per_page, page` and encodes every filter
+// inside `q`, so `?state=` came off the declaration and is now discarded like
+// any other input GitHub does not declare. Both spellings are asserted below —
+// the qualifier because it is the one that filters, and the parameter because
+// "ignored" is a claim about what the twin SERVES, not only about what it
+// declares. `search-query-qualifiers.test.ts` covers the rest of that move.
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createGitHubCloneApp } from "../src/twin.js";
@@ -184,9 +193,20 @@ describe("list surfaces default `state` to open, the way real GitHub does (F-142
       expect(await searchNumbers("/search/issues?q=idempotency")).toEqual([CLOSED_ISSUE]);
     });
 
-    it("still honours an explicit `state`", async () => {
-      expect(await searchNumbers("/search/issues?q=idempotency&state=closed")).toEqual([CLOSED_ISSUE]);
-      expect(await searchNumbers("/search/issues?q=idempotency&state=open")).toEqual([]);
+    it("still honours an explicit state, now spelled as a `q` qualifier (F-1389)", async () => {
+      expect(await searchNumbers("/search/issues?q=idempotency state:closed")).toEqual([CLOSED_ISSUE]);
+      expect(await searchNumbers("/search/issues?q=idempotency state:open")).toEqual([]);
+    });
+
+    it("ignores `?state=`, which GitHub's search API does not declare (F-1389)", async () => {
+      // The parameter is gone from the declaration, and github's measured
+      // undeclared disposition is `ignore` — so this is not a 4xx, it is the
+      // same answer as without it. Asserted against `state=open`, the value
+      // that USED to change the answer: a twin still scoping by the parameter
+      // would answer `[]` here and fail loudly.
+      const unfiltered = await searchNumbers("/search/issues?q=idempotency");
+      expect(await searchNumbers("/search/issues?q=idempotency&state=open")).toEqual(unfiltered);
+      expect(await searchNumbers("/search/issues?q=idempotency&state=closed")).toEqual(unfiltered);
     });
   });
 });

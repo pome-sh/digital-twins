@@ -2,7 +2,48 @@
 
 ## 0.10.6 — 2026-08-11
 
-Two route inputs GitHub does not declare come out of `route-inputs.ts` (F-1389).
+Nine route inputs GitHub does not declare come out of `route-inputs.ts`, and
+the search routes learn the `q` qualifiers GitHub puts them in instead (F-1389).
+The published input surface goes 295 → 286.
+
+**`GET /search/code`, `/search/commits` and `/search/issues` take `q` and
+nothing but `q`.** GitHub's search API has ONE scoping input and encodes every
+filter as a qualifier inside it (`repo:octocat/hello-world`, `state:open`); its
+OpenAPI declares `q, sort, order, per_page, page`. This twin also took `?owner=`,
+`?repo=` and `?state=` — seven inputs across the three routes — and scoped by
+them, so the same request was scoped here and unscoped on GitHub.
+
+Both halves of that had to move together, because the second one is worse than
+the first. `q` was matched as ONE case-insensitive substring, so an agent writing
+the request GitHub actually documents:
+
+```
+GET /search/issues?q=idempotency repo:acme/api
+```
+
+got **zero results** — no issue's title or body contains that literal string.
+The surface did not merely let a wrong scoping habit pass; it punished the
+correct one, and deleting the three parameters alone would have left that
+standing. So `domain/search.ts` now lifts four qualifiers out of `q` —
+`repo:owner/name`, `user:login`, `org:login`, and `state:open|closed` on
+`/search/issues` — scopes by them, ORs several together the way GitHub does,
+and matches whatever free text is left as the substring term. The parser sits in
+the domain, so the MCP tools get it too.
+
+A qualifier this twin does not parse (`in:`, `language:`, `path:`, `is:`, a
+typo) stays in the free-text term rather than being dropped: dropping it would
+answer a BROADER set than GitHub for a request GitHub narrows, and breadth is
+the direction that scores a call the real API would not have served. Same for a
+recognised qualifier carrying a value the surface cannot honour — `repo:api`
+with no owner, `state:merged`. FIDELITY.md divergence 1 lists what is and is not
+parsed; `test/search-query-qualifiers.test.ts` pins it.
+
+⚠️ **`?state=` on `/search/issues` no longer filters.** It is ignored, not
+refused. A caller who relied on it gets the unfiltered answer — spell it
+`q=… state:closed` instead. Nothing changed about the absence of a `state=open`
+DEFAULT on that route (F-1427); only the spelling of the explicit filter moved.
+
+Two more, unrelated to search:
 
 - `owner` off the `POST /user/repos` body. That surface creates a repository for
   the AUTHENTICATED USER, which is its whole meaning, and
@@ -14,14 +55,20 @@ Two route inputs GitHub does not declare come out of `route-inputs.ts` (F-1389).
 - `encoding` off `PUT /repos/:owner/:repo/contents/*`. GitHub declares `content`
   as base64 and takes no `encoding` parameter.
 
-Both are now undeclared, so github's measured `ignore` disposition (F-1372)
-discards them instead of the handler acting on them. Neither is a 4xx: real
-GitHub answers 200 to a parameter it does not know.
+All nine are now undeclared, so github's measured `ignore` disposition (F-1372)
+discards them instead of the handler acting on them. None is a 4xx: real GitHub
+answers 200 to a parameter it does not know.
 
 ⚠️ `encoding`'s BEHAVIOURAL half is recorded, not fixed — the twin still treats
 `content` as plain text where GitHub treats it as base64. New FIDELITY.md
 divergence 24 says so, with the measurement that deferred it: 47 call sites send
 `content` and zero send base64, and the MCP door still declares `encoding`.
+
+The MCP door keeps `owner` / `repo` on `search_code` and `search_commits` and
+`state` on `search_issues`. Those are a separate published surface with their
+own frozen tool fixture, and they are left alone here on the same line the
+`encoding` amendment drew — the qualifier parser reaches both doors, so an MCP
+caller writing `repo:acme/api` inside `query` is served correctly either way.
 
 
 ## 0.10.5 — 2026-08-11

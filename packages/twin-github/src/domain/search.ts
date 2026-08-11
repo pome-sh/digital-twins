@@ -65,6 +65,99 @@ import type { GitHubDomain } from "./github-domain.js";
 import type { FileChange, MutatingOptions, PageOptions, StateDeltaCallback } from "./types.js";
 
 
+/**
+ * F-1389 — GitHub's search API takes ONE scoping input, `q`, and encodes every
+ * filter as a qualifier inside it. Its OpenAPI declares `q, sort, order,
+ * per_page, page` and nothing else.
+ *
+ * This twin used to take `?owner=`, `?repo=` and `?state=` alongside `q` and
+ * scope by them, which is two failures rather than one. The named one is that
+ * an agent taught to scope a search that way passes the exam and fails in
+ * production. The MIRROR is worse and is what makes this a parser rather than a
+ * deletion: the free-text match ran against the WHOLE `q` string, so an agent
+ * writing the request GitHub actually documents — `q=idempotency repo:acme/api`
+ * — got zero results, because no issue's title or body contains that literal
+ * string. The surface did not merely let a wrong habit pass; it punished the
+ * correct one, and dropping the three parameters alone would have left that
+ * standing.
+ *
+ * Four qualifiers are lifted out. Everything else GitHub has — `in:`,
+ * `language:`, `path:`, `is:`, the boolean operators — stays in the free-text
+ * term (FIDELITY.md divergence 1).
+ */
+const QUALIFIER = /(^|\s)(repo|user|org|state):(\S+)/gi;
+
+interface ParsedSearchQuery {
+  /** What is left of `q` once the qualifiers are lifted out, lowercased. */
+  readonly text: string;
+  /** `user:` / `org:` values — repository owner logins, lowercased. */
+  readonly owners: readonly string[];
+  /** `repo:` values — repository FULL names (`owner/name`), lowercased. */
+  readonly fullNames: readonly string[];
+  /** `state:`, on the surfaces that have one. */
+  readonly state?: "open" | "closed";
+}
+
+/**
+ * `q` split into the scope it names and the text it searches for.
+ *
+ * An unrecognised qualifier is left in the term rather than dropped, and so is
+ * a recognised one carrying a value the surface cannot honour (`repo:api` with
+ * no owner, `state:merged`). Both choices point the same way: a qualifier this
+ * twin discarded would answer a BROADER set than GitHub for a request GitHub
+ * narrows, and breadth is the direction that scores a call the real API would
+ * not have served. Narrowing is the safe failure.
+ *
+ * `state` is a qualifier only where the surface has one — `/search/issues`.
+ * Lifting `state:` out of a code search would filter by nothing and widen the
+ * answer for the same reason.
+ */
+function parseSearchQuery(raw: string, options: { state?: boolean } = {}): ParsedSearchQuery {
+  const owners: string[] = [];
+  const fullNames: string[] = [];
+  let state: "open" | "closed" | undefined;
+  const text = raw.replace(QUALIFIER, (whole, lead: string, key: string, rawValue: string) => {
+    const value = rawValue.toLowerCase();
+    switch (key.toLowerCase()) {
+      case "repo":
+        // GitHub's `repo:` names a repository in full. A bare name is not a
+        // scope it would honour, so it is not one here either.
+        if (!value.includes("/")) return whole;
+        fullNames.push(value);
+        return lead;
+      case "user":
+      case "org":
+        // Both resolve to the repository's owner login, with no account-type
+        // check — GitHub documents `org:` for organizations and `user:` for
+        // accounts, and this twin does not tell them apart. Refusing
+        // `user:<an org>` would answer `[]` to a request real GitHub serves,
+        // which is this ticket's own failure pointed the other way.
+        owners.push(value);
+        return lead;
+      case "state":
+        if (!options.state || (value !== "open" && value !== "closed")) return whole;
+        state = value;
+        return lead;
+      default:
+        return whole;
+    }
+  });
+  return { text: text.replace(/\s+/g, " ").trim().toLowerCase(), owners, fullNames, state };
+}
+
+/**
+ * Whether a repository is in `q`'s scope. Several scope qualifiers OR together,
+ * the way GitHub's do — `repo:a/b user:c` is everything in `a/b` plus
+ * everything `c` owns, not the empty intersection.
+ */
+function inScope(parsed: ParsedSearchQuery, owner: string, fullName: string): boolean {
+  if (parsed.owners.length === 0 && parsed.fullNames.length === 0) return true;
+  return (
+    parsed.fullNames.includes(fullName.toLowerCase()) || parsed.owners.includes(owner.toLowerCase())
+  );
+}
+
+
 export function searchRepositories(domain: GitHubDomain, input: { query?: string; q?: string } & PageOptions) {
   const query = (input.query ?? input.q ?? "").toLowerCase();
   const repos = (domain.db.prepare("SELECT * FROM repositories ORDER BY full_name ASC").all() as RepoRow[]).filter(
@@ -83,8 +176,16 @@ export function searchUsers(domain: GitHubDomain, input: { query?: string; q?: s
 }
 
 
+/**
+ * `owner` / `repo` survive on the DOMAIN signature after F-1389 took them off
+ * the REST declaration, because the MCP door still declares them on
+ * `search_code` and `search_commits`. That door is a separate published surface
+ * with its own frozen tool fixture, and it is out of this ticket's scope on the
+ * same line the `encoding` amendment drew — the qualifier parser below reaches
+ * both doors, so the behaviour half is fixed for MCP callers regardless.
+ */
 export function searchCode(domain: GitHubDomain, input: { query?: string; q?: string; owner?: string; repo?: string } & PageOptions) {
-  const query = (input.query ?? input.q ?? "").toLowerCase();
+  const parsed = parseSearchQuery(input.query ?? input.q ?? "");
   let rows = domain.db
     .prepare(
       "SELECT files.*, repositories.owner, repositories.name, repositories.full_name, repositories.description, repositories.private, repositories.default_branch, repositories.fork, repositories.parent_full_name, repositories.entity_counter, repositories.created_at, repositories.updated_at FROM files INNER JOIN repositories ON files.repo_id = repositories.id WHERE files.branch = repositories.default_branch ORDER BY repositories.full_name, files.path"
@@ -92,7 +193,8 @@ export function searchCode(domain: GitHubDomain, input: { query?: string; q?: st
     .all() as Array<FileRow & RepoRow>;
   if (input.owner) rows = rows.filter((row) => row.owner === input.owner);
   if (input.repo) rows = rows.filter((row) => row.name === input.repo);
-  rows = rows.filter((row) => !query || row.path.toLowerCase().includes(query) || row.content.toLowerCase().includes(query));
+  rows = rows.filter((row) => inScope(parsed, row.owner, row.full_name));
+  rows = rows.filter((row) => !parsed.text || row.path.toLowerCase().includes(parsed.text) || row.content.toLowerCase().includes(parsed.text));
   return {
     total_count: rows.length,
     incomplete_results: false,
@@ -110,16 +212,17 @@ export function searchCode(domain: GitHubDomain, input: { query?: string; q?: st
 
 
 export function searchCommits(domain: GitHubDomain, input: { query?: string; q?: string; owner?: string; repo?: string } & PageOptions) {
-  const query = (input.query ?? input.q ?? "").toLowerCase();
+  const parsed = parseSearchQuery(input.query ?? input.q ?? "");
   let repos = domain.db.prepare("SELECT * FROM repositories ORDER BY full_name ASC").all() as RepoRow[];
   if (input.owner) repos = repos.filter((repo) => repo.owner === input.owner);
   if (input.repo) repos = repos.filter((repo) => repo.name === input.repo);
+  repos = repos.filter((repo) => inScope(parsed, repo.owner, repo.full_name));
   const matches: Array<{ commit: CommitRow; repo: RepoRow }> = [];
   for (const repo of repos) {
     const branch = domain.db.prepare("SELECT * FROM branches WHERE repo_id = ? AND name = ?").get(repo.id, repo.default_branch) as BranchRow | undefined;
     if (!branch?.head_sha) continue;
     for (const commit of domain.commitAncestry(repo.id, branch.head_sha)) {
-      if (!query || commit.message.toLowerCase().includes(query) || commit.author_login.toLowerCase().includes(query)) matches.push({ commit, repo });
+      if (!parsed.text || commit.message.toLowerCase().includes(parsed.text) || commit.author_login.toLowerCase().includes(parsed.text)) matches.push({ commit, repo });
     }
   }
   return {
@@ -131,23 +234,30 @@ export function searchCommits(domain: GitHubDomain, input: { query?: string; q?:
 
 
 export function searchIssues(domain: GitHubDomain, input: { query?: string; q?: string; owner?: string; repo?: string; state?: "open" | "closed" | "all" } & PageOptions) {
-  const query = (input.query ?? input.q ?? "").toLowerCase();
+  const parsed = parseSearchQuery(input.query ?? input.q ?? "", { state: true });
   const rows = domain.db
     .prepare(
       "SELECT issues.*, repositories.owner, repositories.name, repositories.full_name, repositories.description, repositories.private, repositories.default_branch, repositories.fork, repositories.parent_full_name, repositories.entity_counter, repositories.created_at AS repo_created_at, repositories.updated_at AS repo_updated_at FROM issues INNER JOIN repositories ON issues.repo_id = repositories.id ORDER BY issues.updated_at DESC"
     )
     .all() as Array<IssueRow & { owner: string; name: string; full_name: string; description: string; private: 0 | 1; default_branch: string; fork: 0 | 1; parent_full_name: string | null; entity_counter: number; repo_created_at: string; repo_updated_at: string }>;
-  let filtered = rows.filter((issue) => !query || issue.title.toLowerCase().includes(query) || issue.body.toLowerCase().includes(query) || issue.full_name.toLowerCase().includes(query));
+  let filtered = rows.filter((issue) => !parsed.text || issue.title.toLowerCase().includes(parsed.text) || issue.body.toLowerCase().includes(parsed.text) || issue.full_name.toLowerCase().includes(parsed.text));
+  filtered = filtered.filter((issue) => inScope(parsed, issue.owner, issue.full_name));
   if (input.owner) filtered = filtered.filter((issue) => issue.owner === input.owner);
   if (input.repo) filtered = filtered.filter((issue) => issue.name === input.repo);
   // NO `state=open` default here, deliberately (F-1427). The three repo LIST
   // surfaces gained one because real GitHub defaults them; GitHub's SEARCH API
-  // does not — a search returns what the query asks for, and `is:open` is a
+  // does not — a search returns what the query asks for, and `state:open` is a
   // query qualifier, not a default. Adding one to match the lists would be a new
   // divergence in the other direction, and a worse one: this search is substring
   // matching over the seeded world, so any query whose only match is closed would
   // answer `[]` — an empty-array divergence in place of a value one.
-  if (input.state && input.state !== "all") filtered = filtered.filter((issue) => issue.state === input.state);
+  //
+  // `state:` in `q` is GitHub's own spelling and wins over `input.state`, which
+  // only an MCP caller can still set (F-1389 took `?state=` off the REST
+  // declaration). A request naming both has already contradicted itself; the
+  // qualifier is the half GitHub would have read.
+  const state = parsed.state ?? (input.state === "all" ? undefined : input.state);
+  if (state) filtered = filtered.filter((issue) => issue.state === state);
   return {
     total_count: filtered.length,
     incomplete_results: false,
