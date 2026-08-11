@@ -13,6 +13,18 @@
  * that shouldn't happen; the prefix match didn't know it. A test path is now
  * dropped before the match, EXCEPT under `examples/`, `assets/` and `tasks/`,
  * which the CLI's `files` array really does publish verbatim.
+ *
+ * F-1455 (reproduced by PR #366 / F-1453) found the same shape of bug one
+ * prefix over: `packages/twin-` is also a plain string prefix, so it matched
+ * a twin's own top-level `examples/` even though those files ship in no
+ * tarball — not because of `files` (twin-github and twin-slack's `files`
+ * DOES name `dist`, and their examples compile into `dist/examples/`), but
+ * because every twin-* package is `private: true` and release.yml publishes
+ * only cli, adapter-claude-sdk, checks and wire. The `examples/` carve-back
+ * above does not apply here — that one exists because `cli/examples` really
+ * does ship — so this needed a second, separately anchored exemption, one
+ * scoped to a single path segment so a twin's `src/examples/` (which DOES
+ * compile into that twin's `dist`) stays caught.
  */
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -135,6 +147,42 @@ console.log("check-version-bump-required.mjs");
     versions: { "cli/package.json": "0.9.0" },
   });
   check("a BEHIND version still fails", r.status === 1 && r.out.includes("BEHIND"), r.out);
+}
+
+{
+  // F-1455 (PR #366 / F-1453): `packages/twin-` is a plain prefix, so it
+  // over-matched a twin's own top-level examples/ — files that ship in no
+  // tarball because every twin-* package is `private: true` and release.yml
+  // publishes only cli, adapter-claude-sdk, checks and wire.
+  const r = run({
+    changes: { "packages/twin-stripe/examples/buyer-agent/package-lock.json": "{}\n" },
+  });
+  check("a change confined to a twin's examples/ needs no bump", r.status === 0, r.out);
+}
+
+{
+  // Anchoring check: a twin's src/ is very much publish-relevant (it's what
+  // tsup inlines into the CLI's tarball), so the new exemption must not have
+  // widened to cover it.
+  const r = run({
+    changes: { "packages/twin-stripe/src/index.ts": "export const a = 1;\n" },
+  });
+  check(
+    "a twin's src/ change with no bump still fails",
+    r.status === 1 && r.out.includes("@pome-sh/cli"),
+    r.out,
+  );
+}
+
+{
+  // Anchoring check, single path segment: `[^/]+` must not loosen to `.+`.
+  // packages/twin-stripe/src/examples/handler.ts compiles into that twin's
+  // own dist/ same as any other src/ module — a real publish-relevant file
+  // that a looser regex would wrongly exempt.
+  const r = run({
+    changes: { "packages/twin-stripe/src/examples/handler.ts": "export const a = 1;\n" },
+  });
+  check("a twin's src/examples/ change with no bump still fails", r.status === 1, r.out);
 }
 
 if (failures > 0) {
