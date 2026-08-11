@@ -16,10 +16,6 @@ import { describe, expect, it } from "vitest";
 import {
   VERDICT_ARTIFACT_VERSION,
   discoverRunSet,
-  groupRunSets,
-  latestFailedRunSet,
-  latestIncompleteRunSet,
-  loadTrialEvents,
   readVerdictArtifact,
   readVerdictArtifactDetailed,
   scanVerdictArtifacts,
@@ -27,6 +23,11 @@ import {
   writeVerdictArtifact,
   type VerdictArtifact,
 } from "../../../src/hosted/evalResultCache.js";
+import {
+  groupRunSets,
+  latestFailedRunSet,
+  latestIncompleteRunSet,
+} from "../../../src/hosted/runSets.js";
 
 function verdict(over: Partial<VerdictArtifact>): VerdictArtifact {
   return {
@@ -447,29 +448,6 @@ describe("verdict artifact (FDRS-644)", () => {
     expect(d.kind).toBe("trial-dir");
     expect(d.set?.groupId).toBe("grp_t");
     expect(d.set?.trials.map((t) => t.verdict.session_id)).toEqual(["t1", "t2"]);
-  });
-
-  it("loadTrialEvents skips corrupt rows and tolerates a missing file", async () => {
-    const tmp = await mkdtemp(join(tmpdir(), "verdict-events-"));
-    await writeFile(
-      join(tmp, "events.jsonl"),
-      '{"kind":"twin_http","path":"/a"}\nnot json\n\n{"kind":"twin_http","path":"/b"}\n',
-      "utf8",
-    );
-    const events = await loadTrialEvents(tmp);
-    expect(events).toHaveLength(2);
-    expect(await loadTrialEvents(join(tmp, "missing"))).toEqual([]);
-  });
-
-  it("loadTrialEvents drops valid-JSON non-object rows (null, numbers, strings)", async () => {
-    const tmp = await mkdtemp(join(tmpdir(), "verdict-events2-"));
-    await writeFile(
-      join(tmp, "events.jsonl"),
-      'null\n3\n"x"\n{"kind":"twin_http","path":"/a"}\n',
-      "utf8",
-    );
-    const events = await loadTrialEvents(tmp);
-    expect(events).toHaveLength(1);
   });
 
   // F-1195 — a v1 artifact is RECOGNIZABLE (it has every field a verdict.json

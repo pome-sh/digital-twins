@@ -72,9 +72,9 @@ import {
 } from "../fix-prompt/index.js";
 import {
   discoverRunSet,
-  loadTrialEvents,
   VERDICT_ARTIFACT_VERSION,
 } from "../hosted/evalResultCache.js";
+import { loadTrialEvents } from "../hosted/trialEvents.js";
 import type { Task } from "../task/taskSchema.js";
 import { parseTaskFile } from "../task/parseTask.js";
 import type { RecorderEvent } from "../types/shared.js";
