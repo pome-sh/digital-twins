@@ -291,6 +291,17 @@ export const criterionDefSchema = z.object({
   // attributes to. Absent = the session's primary twin (twins[0]). Additive —
   // single-twin tasks omit it and score against the sole twin as before.
   twin: z.string().min(1).optional(),
+  // F-1296 (pome-cloud) / F-1299 — forwards the markdown `always-scored`
+  // keyword so the cloud's seed-exclusion rule
+  // (docs/grading/seed-exclusion.md, pome-cloud) knows this [code] criterion
+  // must be graded even when the seed already satisfies it. snake_case to
+  // match the finalize wire body verbatim: this schema is the WRITER's
+  // shape — `cli/src/hosted/client.ts`'s `finalize` posts `body.criteria =
+  // input.criteria` with no per-field rename, so the key sent here IS the key
+  // pome-cloud's route reads. Absent = false; a criterion with no keyword
+  // must serialize byte-identically to every one built before this field
+  // existed.
+  always_scored: z.boolean().optional(),
 });
 export type CriterionDef = z.infer<typeof criterionDefSchema>;
 // Writer-side shape of the finalize wire during the F-778 compat window: a

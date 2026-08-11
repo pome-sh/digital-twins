@@ -12,6 +12,33 @@ published to npm — the package was `private: true` throughout — so a version
 workspace marker, not an installable artifact.
 
 
+## 0.14.3 — 2026-08-11
+
+`criterionDefSchema` gains `always_scored` on the finalize wire (F-1299,
+tracking pome-cloud F-1296).
+
+- pome-cloud's `POST /v1/sessions/:id/finalize` reads
+  `criteria[].always_scored` and transforms it to the engine's `alwaysScored`
+  (`apps/control-plane/src/routes/finalize.ts`), which is what exempts a
+  `[code]` criterion from the seed-exclusion rule
+  (`docs/grading/seed-exclusion.md`, pome-cloud). The CLI parses the
+  `always-scored` marker keyword out of task markdown and is the only writer
+  that can put it on the wire — the cloud never re-parses the source.
+- **Writer-side only.** This schema describes the body
+  `cli/src/hosted/client.ts`'s `finalize` posts; nothing in this repo parses a
+  finalize *request*. `.optional()` is therefore the whole relaxation needed:
+  a criterion with no keyword omits the key and serializes byte-identically to
+  every criterion built before this field existed. There is no
+  `always_scored: false` spelling.
+- **Safe against an older cloud.** The route's `criterionDefSchema` is a
+  non-strict `z.object`, so a control plane that predates F-1296 strips the key
+  rather than rejecting the body: a new CLI × old cloud finalizes unchanged and
+  simply does not get the exemption.
+- snake_case here and camelCase on the parsed `Criterion`
+  (`taskCriterionSchema.alwaysScored`, `cli/src/task/taskSchema.ts`) is
+  deliberate — the wire is snake_case throughout, and the transform between the
+  two spellings lives in pome-cloud's route.
+
 ## 0.14.2 — 2026-08-10
 
 `agentResponseSchema.framework` becomes nullable (F-1393, tracking pome-cloud

@@ -586,6 +586,112 @@ twins: ["github", "slack"]
   });
 });
 
+// F-1296 (pome-cloud) / F-1299 — the `always-scored` marker keyword. The
+// hosted mirror (`apps/mcp/src/task/parseTask.ts`) has accepted this grammar
+// since F-1296; this CLI's copy did not, so a task written with the keyword
+// parsed hosted and lost the criterion here — the older regex did not match
+// the line and `parseCriteria` skipped it as unrecognised prose, same as any
+// other line it does not understand. See docs/grading/seed-exclusion.md
+// (pome-cloud) for what the keyword is FOR: exempting a criterion from the
+// seed-exclusion rule so an inverse task ("refusing to act is the exam") does
+// not lose its whole state half.
+describe("criterion marker grammar — always-scored (F-1296/F-1299)", () => {
+  const single = (criteria: string) => `# Markers
+
+## Prompt
+Do the thing.
+
+## Success Criteria
+${criteria}
+
+## Config
+\`\`\`yaml
+twins: ["slack"]
+\`\`\`
+`;
+  const multi = (criteria: string) => `# Markers
+
+## Prompt
+Do a github+slack task.
+
+## Success Criteria
+${criteria}
+
+## Config
+\`\`\`yaml
+twins: ["github", "slack"]
+\`\`\`
+`;
+
+  it("parses `[code:slack always-scored]` and carries alwaysScored: true with its twin tag", () => {
+    const task = parseTask(
+      single('- [code:slack always-scored] No message was posted to the "general" channel'),
+    );
+    expect(task.criteria).toEqual([
+      {
+        type: "code",
+        text: 'No message was posted to the "general" channel',
+        twin: "slack",
+        alwaysScored: true,
+      },
+    ]);
+  });
+
+  it("parses a bare `[code always-scored]` (no twin tag) in a single-twin task", () => {
+    const task = parseTask(single("- [code always-scored] Nothing was posted"));
+    expect(task.criteria).toEqual([
+      { type: "code", text: "Nothing was posted", alwaysScored: true },
+    ]);
+  });
+
+  it("leaves alwaysScored ABSENT — not `false` — on an unannotated criterion", () => {
+    const task = parseTask(single("- [code] Something deterministic"));
+    expect(task.criteria).toHaveLength(1);
+    const criterion = task.criteria[0]!;
+    expect(Object.hasOwn(criterion, "alwaysScored")).toBe(false);
+    // Byte-identical to the pre-F-1299 shape: exactly {type, text}.
+    expect(criterion).toEqual({ type: "code", text: "Something deterministic" });
+  });
+
+  it("rejects `[model always-scored]` — the keyword only means anything to the deterministic scorer", () => {
+    expect(() =>
+      parseTask(single("- [model always-scored] The summary reads well")),
+    ).toThrow(/always-scored.*only applies to \[code\] criteria/i);
+  });
+
+  it("rejects a tagged `[model:slack always-scored]` the same way", () => {
+    expect(() =>
+      parseTask(multi("- [model:slack always-scored] The reply is polite")),
+    ).toThrow(/only applies to \[code\] criteria/i);
+  });
+
+  it("still honours the twin-tag rules alongside always-scored (single-twin mismatch)", () => {
+    expect(() =>
+      parseTask(single("- [code:github always-scored] Issue #1 is labeled")),
+    ).toThrow(/single-twin task runs "slack"/i);
+  });
+
+  it("still requires a twin tag on a bare always-scored [code] in a multi-twin task", () => {
+    expect(() =>
+      parseTask(multi("- [code always-scored] Something deterministic")),
+    ).toThrow(/needs a twin tag \(\[code:<twin>\]\)/);
+  });
+
+  // A malformed near-miss must still error rather than being silently dropped
+  // as prose — the exact defect class LEGACY_CRITERION_LINE_RE exists to catch
+  // for [D]/[P]. Pins that adding the always-scored group to CRITERION_LINE_RE
+  // (and the match-index shift it required in parseCriteria) did not make the
+  // retired-marker guard unreachable for a file that ALSO carries a valid
+  // always-scored criterion.
+  it("does not let a retired [D] marker slip through as silently-skipped prose beside a valid always-scored criterion", () => {
+    expect(() =>
+      parseTask(
+        single("- [D] Issue #1 is labeled\n- [code always-scored] Something else"),
+      ),
+    ).toThrow(/\[D\]→\[code\]/);
+  });
+});
+
 // F-1134 — the tolerant reader `pome checks add` and `pome checks lint` use to
 // audit a file they did not necessarily finish writing. Separate from
 // `parseTask` on purpose: an in-progress task file may carry zero criteria and
@@ -620,6 +726,29 @@ twins: ${twins}
     );
     expect(found).toEqual([
       { marker: "[code:slack]", twin: "slack", text: "A message was posted" },
+    ]);
+  });
+
+  // F-1299 regression: CRITERION_LINE_RE gained a capture group for
+  // always-scored, shifting every group after it. readCodeCriteria reads the
+  // SAME regex by index (match[2] tag, match[3]/[4] text) — a stale index
+  // here would silently corrupt `text` (e.g. report " always-scored" or the
+  // wrong slice) instead of failing loudly, which is exactly the silent-drop
+  // defect class this file exists to catch, one level down.
+  it("reads the criterion's text correctly when the marker carries always-scored", () => {
+    const found = readCodeCriteria(
+      file("- [code:slack always-scored] A message was posted", "[github, slack]"),
+    );
+    expect(found).toEqual([
+      { marker: "[code:slack always-scored]", twin: "slack", text: "A message was posted" },
+    ]);
+  });
+
+  it("reads a bare always-scored criterion's text correctly too", () => {
+    expect(
+      readCodeCriteria(file("- [code always-scored] No new labels were created")),
+    ).toEqual([
+      { marker: "[code always-scored]", twin: "github", text: "No new labels were created" },
     ]);
   });
 

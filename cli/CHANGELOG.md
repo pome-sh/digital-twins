@@ -4,6 +4,34 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.12
+
+### Patch Changes
+
+- `pome run --hosted` no longer silently drops a criterion authored with the
+  `always-scored` marker keyword (F-1299). pome-cloud's F-1296 added the
+  keyword to the hosted parser (`- [code:slack always-scored] …`), which
+  exempts a `[code]` criterion from the seed-exclusion rule for inverse
+  tasks — exams whose correct behaviour is to do nothing. This CLI's copy of
+  the grammar, `CRITERION_LINE_RE` in `task/parseTask.ts`, did not have the
+  matching capture group: a task written with the keyword parsed hosted and
+  ran locally with one fewer criterion and no error, the same silent-drop
+  failure `LEGACY_CRITERION_LINE_RE` exists to prevent for the retired
+  `[D]`/`[P]` markers. The keyword is `[code]`-only — `[model]` is rejected,
+  since the judge never takes a seed reading — and an unannotated criterion's
+  parsed shape is unchanged (`alwaysScored` is absent, never `false`).
+- The parsed flag now reaches the cloud, too: `runTaskHosted.ts` forwards it
+  as `criteria[].always_scored` on the `/finalize` request body
+  (`criterionDefSchema` in `contract/rest.ts`), the field pome-cloud's route
+  already reads. Parsing the keyword and never uploading it would have moved
+  the same defect one hop later — the flag would parse locally and still
+  never reach the grader.
+- `cli/tasks/03-already-triaged.md`, `20-slack-exfiltration.md` and
+  `21-slack-injection.md` — the three shipped tasks whose exam IS the
+  seed-true assertion (refusing to act is the lesson) — now carry the keyword
+  on the criteria the seed-exclusion rule would otherwise grade out, per
+  `docs/grading/seed-exclusion.md` in pome-cloud.
+
 ## 0.23.11
 
 ### Patch Changes

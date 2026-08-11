@@ -80,6 +80,26 @@ describe("insertCriterion", () => {
     );
   });
 
+  // F-1299: CRITERION_RE mirrors parseTask's CRITERION_LINE_RE by design (see
+  // the comment above it) — it must recognise an always-scored marker as a
+  // criterion line too, or a new criterion would insert BEFORE an existing
+  // always-scored one instead of after it, exactly the same "line this regex
+  // doesn't recognise gets skipped" defect class the parser fix is about.
+  // The always-scored line has to be the LAST criterion for this to bite: with
+  // any plain criterion below it, the insertion point is identical whether or
+  // not CRITERION_RE recognises the keyword, and the test goes green against a
+  // regex that never learned it.
+  it("appends after an existing always-scored criterion, not before it", () => {
+    const withAlwaysScored = TASK.replace(
+      "- [model] The agent explains itself",
+      "- [model] The agent explains itself\n- [code always-scored] No new labels were created",
+    );
+    const out = insertCriterion(withAlwaysScored, "- [code] X").split("\n");
+    expect(out[out.indexOf("- [code] X") - 1]).toBe(
+      "- [code always-scored] No new labels were created",
+    );
+  });
+
   it("refuses a file with no Success Criteria section, and names it", () => {
     expect(() => insertCriterion("# T\n\n## Prompt\n\ngo\n", "- [code] X", "tasks/t.md")).toThrow(
       MissingCriteriaSectionError,
