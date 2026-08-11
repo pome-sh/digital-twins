@@ -3,6 +3,7 @@ import { z } from "zod";
 import { defineTwin, type TwinDefinition } from "@pome-sh/sdk";
 import { createApp, type RecorderStore } from "@pome-sh/sdk/server";
 import { Hono, type Context } from "hono";
+import { HonoRequest } from "hono/request";
 import { resolveLinearCredential } from "./auth-credential.js";
 import { LinearDomain } from "./domain/index.js";
 import { openLinearTwinDatabase } from "./db.js";
@@ -140,6 +141,8 @@ export function withPublicOAuth(app: Hono, db: LinearTwinDatabase): Hono {
  *   * It NEVER reports a malformed request. A body that will not decode, or a
  *     declared input that fails its schema, is handed on to the recorded
  *     handler, which answers it through the twin's own error envelope.
+ *
+ * And it reads the request through a CLONE — see `persistedQueryAnswer`.
  */
 function withPersistedQueryGate(app: Hono): Hono {
   const root = new Hono();
@@ -157,11 +160,27 @@ function withPersistedQueryGate(app: Hono): Hono {
   return root;
 }
 
-/** The gate's verdict for one request, or `null` to let it through. */
+/**
+ * The gate's verdict for one request, or `null` to let it through.
+ *
+ * **Read through a clone, and that is load-bearing.** The engine's recorder
+ * captures an event's `request_body` with `c.req.raw.clone().json()`, and
+ * `clone()` throws once the body stream has been disturbed — it records `null`
+ * rather than a 500, so a middleware that drains the body first blanks the tape
+ * on every recorded request and no assertion anywhere goes red. This gate runs
+ * ahead of the recorder by construction, so it hands the DECLARATION a
+ * `HonoRequest` over a clone and never touches the original stream. The
+ * recorder's own clone still succeeds, and the handler behind it parses the
+ * request as it always did.
+ *
+ * The declaration is still the only thing that reads a value by name: the clone
+ * changes which Request is parsed, not what is allowed to be read off it.
+ */
 async function persistedQueryAnswer(c: Context): Promise<PersistedQueryAnswer> {
   try {
+    const peek = new HonoRequest(c.req.raw.clone());
     if (c.req.method === "GET") {
-      const { query } = await LINEAR_ROUTES.graphqlGet.parse(c.req);
+      const { query } = await LINEAR_ROUTES.graphqlGet.parse(peek);
       return checkPersistedQuery({
         query: query.query,
         extensions: query.extensions,
@@ -169,7 +188,7 @@ async function persistedQueryAnswer(c: Context): Promise<PersistedQueryAnswer> {
       });
     }
     if (c.req.method === "POST") {
-      const { body } = await LINEAR_ROUTES.graphqlPost.parse(c.req);
+      const { body } = await LINEAR_ROUTES.graphqlPost.parse(peek);
       return checkPersistedQuery({
         query: body.query,
         extensions: body.extensions,
@@ -179,9 +198,9 @@ async function persistedQueryAnswer(c: Context): Promise<PersistedQueryAnswer> {
     // Any other verb falls to the engine's 501 catch-all, which is its answer.
     return null;
   } catch {
-    // Not the gate's business — see the note above. `parse()` is called again
-    // by the handler behind this middleware, off hono's cached body, and the
-    // failure is reported there through the twin's error envelope.
+    // Not the gate's business — see the note above. The handler behind this
+    // middleware parses the real request and reports the failure through the
+    // twin's error envelope.
     return null;
   }
 }

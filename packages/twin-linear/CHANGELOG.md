@@ -40,6 +40,17 @@ auth check would show an agent with a stale token a 401 where Linear shows a
 deliberately-bad token, and drives every row of the table over the real HTTP
 wire.
 
+**The gate reads a CLONE of the request, and that is load-bearing.** The
+engine's recorder captures an event's `request_body` with its own
+`c.req.raw.clone().json()`, and `clone()` throws once the body stream has been
+disturbed — recording `null` rather than failing. A gate that drained the body
+ahead of the recorder therefore blanked the tape on every recorded `/graphql`
+request with nothing anywhere going red. The first draft of this change did
+exactly that. The declaration is still the only thing that reads a value by
+name; the clone decides which `Request` it parses, not what may be read off it,
+and `test/route-input-declarations.test.ts` now asserts the tape carries the
+body.
+
 Declared inputs: 120 → **122**. The observed behaviour, and the two things this
 does not model (no persisted-query store, no Apollo CSRF prevention), are
 recorded in `FIDELITY.md`; the full transcript is in

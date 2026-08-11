@@ -280,6 +280,26 @@ const MIDDLEWARE_EXEMPTIONS = [
       "`parseFormOrJson`, the engine's `bodyReader` hook — not a route input: the form branch of " +
       "the decoder for `/admin/seed` and the legacy `/mcp/call`.",
   },
+  // ── twin-linear: the pre-auth `extensions` gate reads a CLONE ─────────────
+  //
+  // The one entry here that grants a clone rather than a named read, and the
+  // reason is the mirror image of twin-stripe's first entry above: that one
+  // drains the body BEFORE the declaration parses so the recorder's
+  // `request_body` is not blank, this one refuses to drain it at all for the
+  // same reason.
+  {
+    file: "packages/twin-linear/src/twin.ts",
+    expression: `const peek = new HonoRequest(c.req.raw.clone())`,
+    reason:
+      "recorder plumbing, not a route input: F-1385's `extensions` gate answers ahead of " +
+      "`bearerAuth`, so it runs before the recorder — and the recorder captures `request_body` " +
+      "with its own `c.req.raw.clone().json()`, which throws once the stream is disturbed and " +
+      "records null instead. Parsing the original would blank the tape on every recorded " +
+      "/graphql request with nothing going red. The clone is handed straight to " +
+      "`LINEAR_ROUTES.graphql*.parse()`, so the DECLARATION is still the only thing reading a " +
+      "value by name — this grants which Request is parsed, not what may be read off it. " +
+      "`test/route-input-declarations.test.ts` asserts the tape still carries the body.",
+  },
 ];
 
 // ─── Discover the twins and their route registrars ───────────────────────────

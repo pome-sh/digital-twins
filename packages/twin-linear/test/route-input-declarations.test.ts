@@ -14,9 +14,11 @@ import { createHash } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { sign } from "hono/jwt";
 import { diffRegisteredRoutes, type UndeclaredDisposition } from "@pome-sh/sdk/route-inputs";
+import { createRecorderStore } from "@pome-sh/sdk/server";
 import {
   DEFAULT_LINEAR_EMAIL,
   DEFAULT_LINEAR_SID,
+  DEFAULT_LINEAR_TOKEN,
   createLinearTwinApp,
 } from "../src/index.js";
 import { linearGraphqlArgumentSurfaces } from "../src/graphql/argument-surface.js";
@@ -481,6 +483,32 @@ describe("`extensions` — the persisted-query envelope member (F-1385)", () => 
     });
     expect(satisfied.status).toBe(200);
     expect((satisfied.body as { errors?: unknown }).errors).toBeUndefined();
+  });
+
+  it("leaves the recorder's `request_body` capture intact", async () => {
+    // The regression this gate introduced on its first draft, and the reason it
+    // parses a clone. The recorder captures `request_body` with its own
+    // `c.req.raw.clone().json()`; `clone()` throws once the body stream is
+    // disturbed, and the engine records `null` rather than a 500. So a gate
+    // that drained the body ahead of it blanked the tape on EVERY recorded
+    // /graphql request — while all 190 other assertions in this package stayed
+    // green, because none of them reads the tape.
+    process.env.TWIN_AUTH_SECRET = SECRET;
+    const recorder = createRecorderStore();
+    const recorded = createLinearTwinApp({ recorder, runId: "extensions-tape" });
+    const query = "{ viewer { id email } }";
+    const response = await recorded.request("/graphql", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${DEFAULT_LINEAR_TOKEN}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ query }),
+    });
+
+    expect(response.status).toBe(200);
+    const bodies = recorder.events().map((event) => event.request_body);
+    expect(bodies, "the gate drained the body the recorder needed").toContainEqual({ query });
   });
 
   it("hands anything it cannot parse to the ordinary recorded path", async () => {
