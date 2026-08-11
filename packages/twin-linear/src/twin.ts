@@ -142,7 +142,7 @@ export function withPublicOAuth(app: Hono, db: LinearTwinDatabase): Hono {
  *     declared input that fails its schema, is handed on to the recorded
  *     handler, which answers it through the twin's own error envelope.
  *
- * And it reads the request through a CLONE — see `persistedQueryAnswer`.
+ * And it reads a POST body through a CLONE — see `persistedQueryAnswer`.
  */
 function withPersistedQueryGate(app: Hono): Hono {
   const root = new Hono();
