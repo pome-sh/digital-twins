@@ -494,6 +494,10 @@ export class GitHubDomain {
     return pulls.getPullRequestComments(this, input);
   }
 
+  getPullRequestConversation(input: { owner: string; repo: string; pull_number: number } & PageOptions) {
+    return pulls.getPullRequestConversation(this, input);
+  }
+
   getPullRequestStatus(input: { owner: string; repo: string; pull_number: number }) {
     return pulls.getPullRequestStatus(this, input);
   }

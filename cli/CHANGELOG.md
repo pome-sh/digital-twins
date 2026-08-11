@@ -4,6 +4,22 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.13
+
+### Patch Changes
+
+- The GitHub twin's `pull_request_read` tool now answers `get_comments` from the
+  pull request's conversation rather than from its inline review comments
+  (F-1423); `get_review_comments` is unchanged. Both methods used to read
+  `pull_request_review_comments`, behind a comment claiming the twin did not
+  model the split — it has since F-1151, which gave a PR's conversation its own
+  storage keyed on the PR's number, the way GitHub models a pull request as an
+  issue. **This moves results**: an agent under `pome twin start github` that
+  asks a PR for its discussion gets the discussion from 0.23.13 on, where it
+  previously got diff-anchored comments in the review-comment shape. A task that
+  seeded `review_comments[]` and read them back through `get_comments` needs to
+  seed `comments[]` instead. REST is unchanged and no CLI source changed.
+
 ## 0.23.12
 
 ### Patch Changes
