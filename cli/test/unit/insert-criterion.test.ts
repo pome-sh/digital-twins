@@ -85,13 +85,19 @@ describe("insertCriterion", () => {
   // criterion line too, or a new criterion would insert BEFORE an existing
   // always-scored one instead of after it, exactly the same "line this regex
   // doesn't recognise gets skipped" defect class the parser fix is about.
+  // The always-scored line has to be the LAST criterion for this to bite: with
+  // any plain criterion below it, the insertion point is identical whether or
+  // not CRITERION_RE recognises the keyword, and the test goes green against a
+  // regex that never learned it.
   it("appends after an existing always-scored criterion, not before it", () => {
     const withAlwaysScored = TASK.replace(
-      "- [code] Issue #1 is still assigned to `alice`",
-      "- [code always-scored] Issue #1 is still assigned to `alice`",
+      "- [model] The agent explains itself",
+      "- [model] The agent explains itself\n- [code always-scored] No new labels were created",
     );
     const out = insertCriterion(withAlwaysScored, "- [code] X").split("\n");
-    expect(out[out.indexOf("- [code] X") - 1]).toBe("- [model] The agent explains itself");
+    expect(out[out.indexOf("- [code] X") - 1]).toBe(
+      "- [code always-scored] No new labels were created",
+    );
   });
 
   it("refuses a file with no Success Criteria section, and names it", () => {

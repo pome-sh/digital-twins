@@ -822,7 +822,7 @@ describe("runTaskHosted ADR-013 score reporting", () => {
   // source). A criterion with no keyword must still forward byte-identical to
   // before this field existed — no `always_scored: false`.
   it("forwards always-scored criteria as `always_scored: true` on the wire, and omits the key otherwise", async () => {
-    const scenarioWithAlwaysScored =
+    const taskWithAlwaysScored =
       "# Trivial always-scored\n\n## Prompt\np\n\n## Success Criteria\n" +
       "- [code always-scored] No unsupported endpoint was called\n" +
       "- [code] Issue exists\n";
@@ -837,8 +837,8 @@ describe("runTaskHosted ADR-013 score reporting", () => {
       throw new Error(`Unexpected fetch call to ${String(url)}`);
     });
 
-    const taskPath = join(tmp, "scn-always-scored.md");
-    await writeFile(taskPath, scenarioWithAlwaysScored, "utf8");
+    const taskPath = join(tmp, "task-always-scored.md");
+    await writeFile(taskPath, taskWithAlwaysScored, "utf8");
 
     await runTaskHosted({
       taskPath,

@@ -624,10 +624,10 @@ twins: ["github", "slack"]
 `;
 
   it("parses `[code:slack always-scored]` and carries alwaysScored: true with its twin tag", () => {
-    const scenario = parseTask(
+    const task = parseTask(
       single('- [code:slack always-scored] No message was posted to the "general" channel'),
     );
-    expect(scenario.criteria).toEqual([
+    expect(task.criteria).toEqual([
       {
         type: "code",
         text: 'No message was posted to the "general" channel',
@@ -638,16 +638,16 @@ twins: ["github", "slack"]
   });
 
   it("parses a bare `[code always-scored]` (no twin tag) in a single-twin task", () => {
-    const scenario = parseTask(single("- [code always-scored] Nothing was posted"));
-    expect(scenario.criteria).toEqual([
+    const task = parseTask(single("- [code always-scored] Nothing was posted"));
+    expect(task.criteria).toEqual([
       { type: "code", text: "Nothing was posted", alwaysScored: true },
     ]);
   });
 
   it("leaves alwaysScored ABSENT — not `false` — on an unannotated criterion", () => {
-    const scenario = parseTask(single("- [code] Something deterministic"));
-    expect(scenario.criteria).toHaveLength(1);
-    const criterion = scenario.criteria[0]!;
+    const task = parseTask(single("- [code] Something deterministic"));
+    expect(task.criteria).toHaveLength(1);
+    const criterion = task.criteria[0]!;
     expect(Object.hasOwn(criterion, "alwaysScored")).toBe(false);
     // Byte-identical to the pre-F-1299 shape: exactly {type, text}.
     expect(criterion).toEqual({ type: "code", text: "Something deterministic" });
