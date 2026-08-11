@@ -111,4 +111,64 @@ describe("state export", () => {
     expect(state.workspace.id).toBe("T_CUSTOM");
     expect(state.channels[0]!.id).toBe("C_HELP");
   });
+
+  // F-1159 — the premise the reactions guard rests on, made falsifiable.
+  //
+  // `slack.no-reaction-added` refuses (`state_incomplete`) when the export
+  // carries no `reactions` key, because absent is not the same as none. That is
+  // only SAFE while a zero-reaction workspace still emits `reactions: []`: the
+  // day this export starts omitting empty collections, every one of those
+  // criteria stops being graded and silently leaves the denominator on runs
+  // where the agent behaved perfectly — a false SKIP replacing a false pass,
+  // just as quiet and rather harder to notice.
+  //
+  // `exportState()` runs `SELECT * FROM reactions` unconditionally today, so the
+  // guard's trigger is unreachable on a whole export.
+  //
+  // `fidelity-contract.test.ts` already asserts the KEY survives, but it asks
+  // the domain method directly and only that the property exists. Two gaps this
+  // closes: the value must be `[]` rather than any present-but-falsy stand-in,
+  // and the question is asked of `/_pome/state` — the surface pome-cloud
+  // actually reads — so the SDK's state pipeline sits inside the assertion
+  // instead of beside it.
+  it("a zero-reaction workspace exports `reactions: []`, never an absent key (F-1159)", async () => {
+    const a = build();
+    const token = await signTestToken();
+    const state = (await (
+      await a.app.request(`/s/${TEST_SID}/_pome/state`, withAuth(token, {}))
+    ).json()) as Record<string, unknown>;
+
+    expect(Object.hasOwn(state, "reactions")).toBe(true);
+    expect(state.reactions).toEqual([]);
+
+    // The same promise one level down, and the reason the nested
+    // `channel.messages ?? []` in `check-messages.ts` is a real-zero default
+    // rather than an unguarded absence: a channel row always carries its
+    // `messages` array, empty or not.
+    const channels = state.channels as Array<Record<string, unknown>>;
+    expect(channels.length).toBeGreaterThan(0);
+    for (const channel of channels) {
+      expect(Object.hasOwn(channel, "messages"), `channel ${String(channel.id)}`).toBe(true);
+      expect(Array.isArray(channel.messages)).toBe(true);
+    }
+  });
+
+  it("a workspace that HAS a reaction still exports the same key, populated", async () => {
+    const a = build();
+    const token = await signTestToken();
+    const posted = a.domain.chatPostMessage(
+      { channel: "C_GENERAL", text: "please approve" },
+      { login: "pome-agent" },
+    ) as { ts: string };
+    a.domain.reactionsAdd(
+      { channel: "C_GENERAL", timestamp: posted.ts, name: "white_check_mark" },
+      { login: "bob" },
+    );
+    const state = (await (
+      await a.app.request(`/s/${TEST_SID}/_pome/state`, withAuth(token, {}))
+    ).json()) as { reactions: Array<{ name: string }> };
+    // The populated arm exists so the empty-arm assertion above cannot be
+    // satisfied by an export that emits `[]` for everything.
+    expect(state.reactions.map((row) => row.name)).toContain("white_check_mark");
+  });
 });

@@ -426,24 +426,37 @@ describe("declared state citations", () => {
 // declares its subject now, so the row below reads `declared_subject` and the
 // engine skips the criterion at the door.
 //
-// ⚠️ THAT IS NOT THE ONLY WAY `slack.no-reaction-added` PASSES VACUOUSLY, and
-// declaring its subject did not close the other one. F-1159: its predicate reads
-// `(final.reactions ?? []).some(…)`, so an export carrying NO `reactions`
-// collection filters to zero rows and scores the same negative criterion
-// `passed` — an agent that did react collects the point. Same direction of
-// failure, different cause: this ledger's question is "what if the VALUE was
-// masked", F-1159's is "what if the SECTION is absent". This probe only ever
-// replaces strings and never deletes a collection, so it is structurally unable
-// to see it and a green row above is not evidence about it.
+// THAT WAS NOT THE ONLY WAY `slack.no-reaction-added` PASSED VACUOUSLY, and
+// declaring its subject did not close the other one on its own. F-1157's
+// predicate read `(final.reactions ?? []).some(…)`, so an export carrying NO
+// `reactions` collection filtered to zero rows and scored the same negative
+// criterion `passed` — an agent that did react collected the point. Same
+// direction of failure, different cause: this ledger's question is "what if
+// the VALUE was masked", F-1159's was "what if the SECTION is absent". This
+// probe only ever replaces strings and never deletes a collection, so it is
+// structurally unable to see that class and a green row above was never
+// evidence about it.
 //
-// It is guarded in the consuming engine's `STATE_SECTION_GUARDS` today, which is
-// the wrong repo for a guard whose state lives here — that is F-1159's whole
-// point, and moving it costs a twins release plus a cloud pin bump, so it stays
-// its own ticket. Its neighbours in twin-github already have the shape this one
-// wants: `pull.reviews == null`, `pull.comments == null` and `pull.merged ==
-// null` each skip with "absent is not the same as none" written beside them.
-// `packages/twin-slack/src/check-messages.ts` is the only place across all five
-// twins' declarations that reaches for `?? []` on a top-level section.
+// F-1159 closed it, directly in `check-messages.ts`'s `evaluate`, the way its
+// neighbours in twin-github already do: `pull.reviews == null`, `pull.comments
+// == null` and `pull.merged == null` each skip with "absent is not the same as
+// none" written beside them. `noReactionAdded` now returns `STATE_INCOMPLETE`
+// (this file's own name for the same idiom, already used by
+// `noMessageContaining` for the `channels` section) when `final.reactions ==
+// null`, before the join runs — see `check-messages.test.ts` for the executable
+// proof. It used to be guarded at arm's length in the consuming engine's
+// `STATE_SECTION_GUARDS`, which could drift from the state it inspects silently
+// because that state lives here; that row is now redundant.
+//
+// Deleting it is NOT the whole of the follow-up, and assuming it is buys a red
+// pipeline in the other repo. `declared-pin.test.ts` keeps a negative control —
+// `names the shipped reader when the table is empty` — that asserts the
+// arrival-direction detector still NAMES `slack.no-reaction-added:reactions`
+// when handed an empty guard table. This release is precisely what stops it
+// naming anything, so that arm goes red on the pin bump alone, before the row
+// is touched, and it needs a synthetic reader of its own. The two edits are
+// spelled out in `packages/checks/CHANGELOG.md` under 0.1.5, which is the file
+// whoever does the bump will actually read.
 //
 // The `abstains` rows are `resolveChannel`'s `missSkip`, which is what a
 // channel-name slot has always done with a miss, and the reason slack's other

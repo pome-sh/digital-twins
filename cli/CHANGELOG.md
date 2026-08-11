@@ -4,6 +4,18 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.10
+
+### Patch Changes
+
+- Carries twin-slack's reactions guard (F-1159) into the bundled twin.
+  `slack.no-reaction-added` now refuses (`state_incomplete`) instead of scoring
+  a free pass when a state export carries no `reactions` section at all — its
+  `(final.reactions ?? []).some(…)` used to filter that absence to zero rows and
+  pass the criterion, the same way an unresolved-field trap already closed on
+  twin-github's `pull.reviews`/`pull.comments`. No route, tool or check id
+  changed under `pome twin start slack`.
+
 ## 0.23.9
 
 ### Patch Changes

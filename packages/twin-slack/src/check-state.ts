@@ -66,6 +66,26 @@ export interface SlackCheckStateChannel {
   is_im?: number | boolean | null;
   is_mpim?: number | boolean | null;
   members?: string[] | null;
+  // NULLABLE IN THE TYPE, UNCONDITIONAL IN THE EXPORT — and that gap is why the
+  // predicates that read this one may default it with `?? []` while the
+  // TOP-LEVEL `reactions` may not (F-1159).
+  //
+  // `exportState()` builds every channel row as
+  // `{ ...channel, members, messages: SELECT * FROM messages WHERE channel_id = ? }`
+  // (`domain/slack-domain.ts:243`), so a channel that arrived at all arrived with
+  // its `messages` array — empty when nobody posted. `?? []` on this field is
+  // therefore a REAL-ZERO default and not the absent-section trap: there is no
+  // export shape where it substitutes for evidence nobody gathered. The `| null`
+  // is here for hand-written fixtures and for the file-wide rule that every
+  // export field is optional, not because a whole export can drop it.
+  //
+  // That is a claim about the exporter, so it is pinned as one:
+  // `fidelity-contract.test.ts` asserts an exported channel row carries this
+  // field, and `state-export.test.ts` asserts it of EVERY row over the live
+  // `_pome/state` surface. If the export ever becomes conditional, four `?? []`
+  // sites across `check-messages.ts` and `check-secrets.ts` — two of them
+  // NEGATIVE criteria — start reading absence as a clean bill, and those tests
+  // go red first.
   messages?: SlackCheckStateMessage[] | null;
 }
 
