@@ -425,6 +425,21 @@ upstream so a divergence that upstream "heals" becomes a tier-upgrade signal.
     surfaces seedable, so the two now have different contents to tell apart —
     but MCP-only, so no fidelity-watch lane measures it.
 
+23. **`check-runs` has no reachable upstream — `Checks` is not grantable to a
+    fine-grained PAT.** GitHub gates
+    `GET /repos/{owner}/{repo}/commits/{ref}/check-runs` on the `Checks`
+    permission, which it offers to a GitHub App and **not** to a fine-grained
+    personal access token, so the fidelity capture answers HTTP 403 at every
+    scope its credential can hold (measured 2026-08-11, on the first credentialed
+    live dispatch). Note what this bullet does and does not claim: the twin's
+    answer has never been compared to GitHub's, so this is not an observed
+    difference — the surface is UNMEASURABLE under the credential model the
+    watchdog is permitted to use. It is registered in pome-cloud with a written
+    `verification_opt_out` so the promotion gate reads it as waived-with-a-reason
+    rather than never-checked, and it holds no committed golden: the one it held
+    until F-1430 was an empty `check_runs` array diffed against the twin's empty
+    one, which published green while binding no key, no leaf type and no element.
+
 ## How fidelity is verified
 
 Three independent checks back the tier classifications above. Each is a

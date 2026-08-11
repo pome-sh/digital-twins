@@ -321,6 +321,16 @@ _Shape-anchoring divergences (compile-time anchor to `@slack/web-api`):_
     `@slack/web-api`'s `ChatScheduledMessagesListResponse` item, so it is held out of
     the anchored `base` and spread back.
 
+22. **`users.list` member count reflects the seeded world, not the live sandbox
+    workspace.** The twin serves the users its seed declares;
+    `pome-twin-sandbox.slack.com` holds whoever is installed in it, and it gained
+    a bot user on 2026-08-10 when a second Slack app was installed. The L1
+    upstream oracle fires `array-length-changed` on any exact count mismatch, so
+    those two numbers can only ever agree by coincidence — and they did, until
+    the 2026-08-11 re-baseline removed the coincidence. The COUNT is accepted in
+    pome-cloud's registry and the per-member SHAPE is still compared; the same
+    reasoning already covers `conversations.members`. F-1434.
+
 ## Shape anchoring (compile-time, `@slack/web-api@7.16.0`)
 
 The serializers are pinned to Slack's official response types at compile time
