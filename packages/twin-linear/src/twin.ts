@@ -163,24 +163,28 @@ function withPersistedQueryGate(app: Hono): Hono {
 /**
  * The gate's verdict for one request, or `null` to let it through.
  *
- * **Read through a clone, and that is load-bearing.** The engine's recorder
- * captures an event's `request_body` with `c.req.raw.clone().json()`, and
- * `clone()` throws once the body stream has been disturbed — it records `null`
- * rather than a 500, so a middleware that drains the body first blanks the tape
- * on every recorded request and no assertion anywhere goes red. This gate runs
- * ahead of the recorder by construction, so it hands the DECLARATION a
- * `HonoRequest` over a clone and never touches the original stream. The
- * recorder's own clone still succeeds, and the handler behind it parses the
- * request as it always did.
+ * **The POST body is read through a clone, and that is load-bearing.** The
+ * engine's recorder captures an event's `request_body` with
+ * `c.req.raw.clone().json()`, and `clone()` throws once the body stream has
+ * been disturbed — it records `null` rather than a 500, so a middleware that
+ * drains the body first blanks the tape on every recorded request and no
+ * assertion anywhere goes red. This gate runs ahead of the recorder by
+ * construction, so it hands the DECLARATION a `HonoRequest` over a clone and
+ * never touches the original stream. The recorder's own clone still succeeds,
+ * and the handler behind it parses the request as it always did.
  *
  * The declaration is still the only thing that reads a value by name: the clone
  * changes which Request is parsed, not what is allowed to be read off it.
+ *
+ * The GET surface declares no body (`bodyEncoding` defaults to `"none"`), so
+ * its parse cannot touch the stream and needs no clone — and cloning anyway
+ * would leave an unread tee branch buffering the request for as long as the
+ * original is alive.
  */
 async function persistedQueryAnswer(c: Context): Promise<PersistedQueryAnswer> {
   try {
-    const peek = new HonoRequest(c.req.raw.clone());
     if (c.req.method === "GET") {
-      const { query } = await LINEAR_ROUTES.graphqlGet.parse(peek);
+      const { query } = await LINEAR_ROUTES.graphqlGet.parse(c.req);
       return checkPersistedQuery({
         query: query.query,
         extensions: query.extensions,
@@ -188,6 +192,7 @@ async function persistedQueryAnswer(c: Context): Promise<PersistedQueryAnswer> {
       });
     }
     if (c.req.method === "POST") {
+      const peek = new HonoRequest(c.req.raw.clone());
       const { body } = await LINEAR_ROUTES.graphqlPost.parse(peek);
       return checkPersistedQuery({
         query: body.query,
