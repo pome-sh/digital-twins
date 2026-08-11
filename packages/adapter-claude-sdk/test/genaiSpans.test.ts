@@ -341,6 +341,45 @@ describe("withGenAiSpans → gen_ai.usage.output_tokens is the message_delta tru
     event: { type: "message_delta", delta: { stop_reason: stopReason }, usage: { output_tokens: outputTokens } },
   });
 
+  // The two numbers the main agent's turn reports in the sub-agent tapes
+  // below: its `message_delta` truth, and its ~5x-low `message_start`
+  // snapshot. Named so the sub-agent assertions can say "none of the main
+  // turn's numbers" without re-spelling literals the fixtures own.
+  const MAIN_DELTA = 517;
+  const MAIN_SNAPSHOT = 8;
+
+  /**
+   * A sub-agent span must carry the SUB-AGENT's own output count.
+   *
+   * Deliberately does not assert what that count IS. It is the 4-token
+   * `message_start` snapshot today — that is F-1014's defect — and becomes the
+   * real total once F-1014 reads `system/task_notification`; asserting either
+   * would pin a value an open ticket is going to change (F-1375).
+   *
+   * What is asserted is that the span carries a real count and that no
+   * main-turn number leaked into it. The finiteness check is load-bearing
+   * rather than ceremony: `outputTokensOf` yields NaN for a span that carries
+   * no `gen_ai.usage.output_tokens` attribute at all, and NaN satisfies every
+   * `not.toBe` silently, so without it a regression that drops sub-agent usage
+   * entirely leaves this whole file green (verified by mutation).
+   *
+   * Caveat for whoever takes F-1014: this holds under the ticket's approach 1
+   * (derive the split, keep `gen_ai.usage.output_tokens`), which the ticket
+   * says to try first. Approaches 2 and 3 deliberately stop putting a
+   * sub-agent output count on a `gen_ai` span at all — leaving `gen_ai.usage.*`
+   * unset, or not emitting these spans. Those change the span's SHAPE, not
+   * just this value, so they should rewrite this test rather than find it
+   * already permissive: a test still claiming these spans carry sub-agent
+   * output tokens would be wrong, not merely outdated.
+   */
+  function expectSubagentOwnCount(span: ExportedSpan): void {
+    const tokens = outputTokensOf(span);
+    expect(Number.isFinite(tokens)).toBe(true);
+    expect(tokens).toBeGreaterThan(0);
+    expect(tokens).not.toBe(MAIN_DELTA);
+    expect(tokens).not.toBe(MAIN_SNAPSHOT);
+  }
+
   it("prefers the message_delta count over the snapshot on the assistant message", async () => {
     await drive([
       streamStart("msg_A"),
@@ -402,11 +441,24 @@ describe("withGenAiSpans → gen_ai.usage.output_tokens is the message_delta tru
   // usage, so the exactness invariant holds over MAIN-AGENT turns. Live
   // two-subagent run: main deltas 517 + 7 == result 524, with the subagent turns'
   // 4 + 4 sitting outside that total on both sides.
+  //
+  // F-1014: that "4" snapshot is the defect this ticket tracks — a real
+  // sub-agent turn doing ~22k tokens of work reports 4, because the SDK never
+  // emits a `message_delta` for it and nothing yet reads the real total from
+  // `system/task_notification`. Asserting `4` here as the expected span value
+  // would pin that defect a second time (F-1375), so this test does NOT
+  // assert what the sub-agent spans' token count equals. It asserts every
+  // property of that count which survives F-1014 — see
+  // `expectSubagentOwnCount`: a real, positive number carrying none of the
+  // main turn's numbers, which is the regression this test guards against
+  // ("must not leak onto it," above) and stays true whatever the corrected
+  // sub-agent number turns out to be (`system/task_notification`'s
+  // `total_tokens`, or `total - input`, per the ticket's ordered approach).
   it("keeps the snapshot on a subagent turn and does not leak the main delta onto it", async () => {
     await drive([
       streamStart("msg_main"),
-      { type: "assistant", message: { id: "msg_main", model: "claude-opus-4-8", usage: { input_tokens: 2, output_tokens: 8 } } },
-      streamDelta(517, "tool_use"),
+      { type: "assistant", message: { id: "msg_main", model: "claude-opus-4-8", usage: { input_tokens: 2, output_tokens: MAIN_SNAPSHOT } } },
+      streamDelta(MAIN_DELTA, "tool_use"),
       // Subagent turns: assistant messages only, no stream events of their own.
       {
         type: "assistant",
@@ -422,7 +474,13 @@ describe("withGenAiSpans → gen_ai.usage.output_tokens is the message_delta tru
     ]);
 
     const spans = collectSpans();
-    expect(spans.map(outputTokensOf)).toEqual([517, 4, 4]);
+    expect(spans.length).toBe(3);
+    // Main-agent turn: unaffected by F-1014, still the exact message_delta count.
+    expect(outputTokensOf(spans[0]!)).toBe(MAIN_DELTA);
+    // Sub-agent turns keep their own count with nothing from the main turn in
+    // it — see `expectSubagentOwnCount` for why the count itself is not pinned.
+    expectSubagentOwnCount(spans[1]!);
+    expectSubagentOwnCount(spans[2]!);
   });
 
   // The lanes keep ONE `pending` turn, not one per stream, so a subagent's
@@ -445,9 +503,9 @@ describe("withGenAiSpans → gen_ai.usage.output_tokens is the message_delta tru
 
     await drive([
       streamStart("msg_main1"),
-      { type: "assistant", message: { id: "msg_main1", model: "claude-opus-4-8", usage: { input_tokens: 2, output_tokens: 8 } } },
-      { type: "assistant", message: { id: "msg_main1", model: "claude-opus-4-8", usage: { input_tokens: 2, output_tokens: 8 } } },
-      streamDelta(517, "tool_use"),
+      { type: "assistant", message: { id: "msg_main1", model: "claude-opus-4-8", usage: { input_tokens: 2, output_tokens: MAIN_SNAPSHOT } } },
+      { type: "assistant", message: { id: "msg_main1", model: "claude-opus-4-8", usage: { input_tokens: 2, output_tokens: MAIN_SNAPSHOT } } },
+      streamDelta(MAIN_DELTA, "tool_use"),
       messageStop(),
       sub("msg_sub_a", "toolu_alpha"),
       sub("msg_sub_b", "toolu_beta"),
@@ -460,9 +518,21 @@ describe("withGenAiSpans → gen_ai.usage.output_tokens is the message_delta tru
     ]);
 
     const spans = collectSpans();
-    expect(spans.map(outputTokensOf)).toEqual([517, 4, 4, 7]);
-    // Main-agent turns alone reproduce SDKResultMessage.usage.output_tokens.
-    expect(517 + 7).toBe(524);
+    expect(spans.length).toBe(4);
+    // Main-agent turns, in stream order, survive the interleaved sub-agent
+    // turns untouched.
+    expect(outputTokensOf(spans[0]!)).toBe(MAIN_DELTA);
+    expect(outputTokensOf(spans[3]!)).toBe(7);
+    // spans[1] and spans[2] are the interleaved sub-agent turns — see
+    // `expectSubagentOwnCount` for why their count is not pinned (that number,
+    // currently a 4-token snapshot, is F-1014's defect) and what is checked
+    // instead.
+    expectSubagentOwnCount(spans[1]!);
+    expectSubagentOwnCount(spans[2]!);
+    // Main-agent turns ALONE reproduce SDKResultMessage.usage.output_tokens —
+    // read off the exported spans, so the interleaved sub-agent turns
+    // provably neither joined this total nor stole from it.
+    expect(outputTokensOf(spans[0]!) + outputTokensOf(spans[3]!)).toBe(524);
   });
 
   // The span window is measured from the previously yielded message. Injected

@@ -21,11 +21,32 @@ if (!baseSha) {
   throw new Error("usage: check-version-bump-required.mjs <base-sha>");
 }
 
+/**
+ * A test file cannot change one byte of any tarball this gate guards: no
+ * package's `files` array names a test directory, tsup builds from `src/`, and
+ * no `src/` module imports out of one. Demanding a version bump for a
+ * test-only PR therefore demands a release that republishes an identical
+ * artifact — which is what RELEASING.md already says should not happen ("If
+ * your change doesn't warrant a release (docs, tests, CI-only), it shouldn't
+ * be touching a publish-relevant path in the first place"), and is the same
+ * pointless-bump noise the `@pome-sh/checks` entry below argues a gate must
+ * not generate if it wants to keep being read.
+ *
+ * `examples/`, `assets/` and `tasks/` are carved back IN because the CLI's
+ * `files` array publishes them verbatim — a file named `*.test.ts` inside one
+ * of those really does ship, so it must still demand a bump.
+ */
+function isUnpublishableTestPath(file) {
+  if (/(^|\/)(examples|assets|tasks)\//.test(file)) return false;
+  return /(^|\/)tests?\//.test(file) || /\.test\.[cm]?[jt]sx?$/.test(file);
+}
+
 const changedFiles = execFileSync("git", ["diff", "--name-only", baseSha, "HEAD"], {
   encoding: "utf8",
 })
   .split("\n")
-  .filter(Boolean);
+  .filter(Boolean)
+  .filter((file) => !isUnpublishableTestPath(file));
 
 function versionAt(ref, manifestPath) {
   try {
