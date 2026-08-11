@@ -42,7 +42,11 @@ live at **https://docs.pome.sh**.
   spelling could matter — so the normalize step was a dual-format reader that
   could no longer fire. Such a file is still RECOGNIZED as one of ours and
   `pome fix-prompt` names the skip (`staleVersionCount`) rather than dropping
-  it silently.
+  it silently. F-1411 gives the same treatment to a verdict.json that EXISTS
+  at the current version but is truncated, hand-edited, or otherwise damaged
+  — a different fact (nothing wrote this file correctly, vs. an older CLI
+  that did) — counted and path-named separately as `unreadableCount` /
+  `unreadablePaths`, never folded into `staleVersionCount`.
 - **The CLI (`cli/`) IS a root workspace member** — `workspaces: ["packages/*",
   "cli"]`, one `package-lock.json`, one `npm ci`. Use `npm run -w @pome-sh/cli
   ...` from the root. The former `cli/package-lock.json` and

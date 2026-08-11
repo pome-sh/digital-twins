@@ -352,6 +352,78 @@ describe("pome fix-prompt command (FDRS-644)", () => {
     });
   });
 
+  // F-1411 — a verdict.json that EXISTS but is damaged (truncated,
+  // hand-edited, or an unexpected `state`) is a different fact from a
+  // stale-version file (an older CLI wrote that one correctly) and gets its
+  // own line, naming the path — never folded into the stale-version count,
+  // "no finalized run sets", or silently dropped.
+  describe("a corrupt current-version verdict.json is a named skip that points at the path (F-1411)", () => {
+    async function writeCorruptTrial(root: string, sid: string): Promise<string> {
+      const runDir = join(root, "runs", "scn", sid);
+      await mkdir(runDir, { recursive: true });
+      await writeFile(
+        join(runDir, "verdict.json"),
+        JSON.stringify(verdict({ session_id: sid, state: "bogus" as never })),
+        "utf8",
+      );
+      return runDir;
+    }
+
+    it("a root holding only a corrupt trial names the path, not 'no runs', and not the stale-version wording", async () => {
+      const dir = await mkdtemp(join(tmpdir(), "fixcmd-unreadable-only-"));
+      const runDir = await writeCorruptTrial(dir, "ses_bad");
+      process.chdir(dir);
+
+      await run();
+      expect(process.exitCode).toBe(5);
+      const err = stderr.join("\n");
+      expect(err).toContain("1 verdict.json file(s)");
+      expect(err).toContain("could not be read");
+      expect(err).toContain(runDir);
+      expect(err).not.toContain("No finalized run sets");
+      expect(err).not.toContain("artifact version");
+    });
+
+    it("a root holding a corrupt trial beside a readable failed one still names the corrupt path AND prints the prompt", async () => {
+      const dir = await mkdtemp(join(tmpdir(), "fixcmd-unreadable-mixed-"));
+      const runDir = await writeCorruptTrial(dir, "ses_bad");
+      await writeTrial(dir, "ses_2", {
+        passed: false,
+        state: "fail",
+        score: 50,
+        criteria_results: [
+          {
+            criterion: { type: "model", text: "Severity is set correctly" },
+            passed: false,
+            skipped: false,
+            reason: "under-rated",
+          },
+        ],
+      });
+      process.chdir(dir);
+
+      await run();
+      expect(process.exitCode ?? 0).toBe(0);
+      expect(stdout.join("\n")).toContain("## Grouped failure signatures");
+      const err = stderr.join("\n");
+      expect(err).toContain("1 verdict.json file(s)");
+      expect(err).toContain("could not be read");
+      expect(err).toContain(runDir);
+    });
+
+    it("a trial dir pointed straight at a corrupt verdict.json names it as unreadable, not as an empty root", async () => {
+      const dir = await mkdtemp(join(tmpdir(), "fixcmd-unreadable-trialdir-"));
+      const runDir = await writeCorruptTrial(dir, "ses_bad");
+
+      await run(runDir);
+      expect(process.exitCode).toBe(5);
+      const err = stderr.join("\n");
+      expect(err).toContain("1 verdict.json file(s)");
+      expect(err).toContain("could not be read");
+      expect(err).toContain(runDir);
+    });
+  });
+
   it("a trial run dir targets that trial's set", async () => {
     const dir = await mkdtemp(join(tmpdir(), "fixcmd-trial-"));
     await writeTrial(dir, "ses_1", {

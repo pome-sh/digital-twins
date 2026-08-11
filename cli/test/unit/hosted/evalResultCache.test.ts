@@ -600,4 +600,142 @@ describe("verdict artifact (FDRS-644)", () => {
       expect(discovery.staleVersionCount).toBe(1);
     });
   });
+
+  // F-1411 — a v2 verdict.json that is truncated, hand-edited into an
+  // unexpected `state`, or valid JSON that isn't a verdict artifact at all
+  // used to read as `{status: "unreadable"}` and vanish from every count:
+  // not `totalSets`, not `staleVersionCount`. Unlike a stale-version file
+  // (a REAL trial an older CLI wrote correctly), this is a file nothing wrote
+  // correctly — a different fact, so it gets its own count and its own named
+  // paths, never folded into either existing one.
+  describe("a corrupt current-version verdict.json is a named, counted 'unreadable' skip (F-1411)", () => {
+    it("a truncated verdict.json reads as unreadable", async () => {
+      const tmp = await mkdtemp(join(tmpdir(), "verdict-truncated-"));
+      const dir = join(tmp, "scn", "ses_truncated");
+      await mkdir(dir, { recursive: true });
+      await writeFile(join(dir, "verdict.json"), '{"version": 2, "source":', "utf8");
+      expect(await readVerdictArtifactDetailed(dir)).toEqual({ status: "unreadable" });
+    });
+
+    it("a v2 verdict.json with an unexpected `state` value reads as unreadable, not stale-version", async () => {
+      const tmp = await mkdtemp(join(tmpdir(), "verdict-badstate-"));
+      const dir = join(tmp, "scn", "ses_badstate");
+      await mkdir(dir, { recursive: true });
+      await writeFile(
+        join(dir, "verdict.json"),
+        JSON.stringify(verdict({ session_id: "ses_badstate", state: "bogus" as never })),
+        "utf8",
+      );
+      expect(await readVerdictArtifactDetailed(dir)).toEqual({ status: "unreadable" });
+    });
+
+    it("valid JSON that isn't a verdict artifact at all reads as unreadable", async () => {
+      const tmp = await mkdtemp(join(tmpdir(), "verdict-notartifact-"));
+      const dir = join(tmp, "scn", "ses_notartifact");
+      await mkdir(dir, { recursive: true });
+      await writeFile(join(dir, "verdict.json"), JSON.stringify({ hello: "world", count: 3 }), "utf8");
+      expect(await readVerdictArtifactDetailed(dir)).toEqual({ status: "unreadable" });
+    });
+
+    it("scanVerdictArtifactsDetailed separates unreadable dirs from readable trials AND from stale-version dirs, without flagging a run dir that has no verdict.json at all", async () => {
+      const tmp = await mkdtemp(join(tmpdir(), "verdict-unreadable-scan-"));
+      await writeTrial(tmp, "scn", "ses_ok", {});
+      const staleDir = join(tmp, "scn", "ses_v1");
+      await mkdir(staleDir, { recursive: true });
+      await writeFile(join(staleDir, "verdict.json"), JSON.stringify(v1OnDiskArtifact("ses_v1")), "utf8");
+      const truncatedDir = join(tmp, "scn", "ses_truncated");
+      await mkdir(truncatedDir, { recursive: true });
+      await writeFile(join(truncatedDir, "verdict.json"), '{"version": 2, "source":', "utf8");
+      const badStateDir = join(tmp, "scn", "ses_badstate");
+      await mkdir(badStateDir, { recursive: true });
+      await writeFile(
+        join(badStateDir, "verdict.json"),
+        JSON.stringify(verdict({ session_id: "ses_badstate", state: "bogus" as never })),
+        "utf8",
+      );
+      const notArtifactDir = join(tmp, "scn", "ses_notartifact");
+      await mkdir(notArtifactDir, { recursive: true });
+      await writeFile(join(notArtifactDir, "verdict.json"), JSON.stringify({ hello: "world" }), "utf8");
+      // A run dir that never got a verdict.json at all (e.g. an in-progress
+      // or crashed run) is neither stale nor unreadable — it is simply not
+      // finalized yet, and must stay silently skipped as before.
+      await mkdir(join(tmp, "scn", "ses_never_finalized"), { recursive: true });
+
+      const { trials, staleVersionDirs, unreadableDirs } = await scanVerdictArtifactsDetailed(tmp);
+      expect(trials.map((t) => t.verdict.session_id)).toEqual(["ses_ok"]);
+      expect(staleVersionDirs).toEqual([staleDir]);
+      expect(unreadableDirs.slice().sort()).toEqual(
+        [truncatedDir, badStateDir, notArtifactDir].sort(),
+      );
+    });
+
+    // F-1195's own lesson, replayed for `unreadable`: the count must survive
+    // to the caller even when a real, readable run set exists beside it — a
+    // "only report it when there's nothing else" guard is exactly the silent
+    // drop this milestone exists to remove.
+    it("discoverRunSet(root) reports unreadableCount and names the path even when another run set parsed fine", async () => {
+      const tmp = await mkdtemp(join(tmpdir(), "verdict-unreadable-mixed-"));
+      await writeTrial(tmp, "scn", "ses_fail", {
+        group_id: "grp_mixed",
+        passed: false,
+        state: "fail",
+      });
+      const corruptDir = join(tmp, "scn", "ses_badstate");
+      await mkdir(corruptDir, { recursive: true });
+      await writeFile(
+        join(corruptDir, "verdict.json"),
+        JSON.stringify(verdict({ session_id: "ses_badstate", state: "bogus" as never })),
+        "utf8",
+      );
+
+      const discovery = await discoverRunSet(tmp);
+      expect(discovery.totalSets).toBe(1);
+      expect(discovery.set?.trials.map((t) => t.verdict.session_id)).toEqual(["ses_fail"]);
+      expect(discovery.unreadableCount).toBe(1);
+      expect(discovery.unreadablePaths).toEqual([corruptDir]);
+      // Never folded into the stale-version count — different fact.
+      expect(discovery.staleVersionCount).toBe(0);
+    });
+
+    it("discoverRunSet(root) with ONLY a corrupt file reports unreadableCount, distinct from an empty runs/ and from stale-version", async () => {
+      const tmp = await mkdtemp(join(tmpdir(), "verdict-unreadable-only-"));
+      const corruptDir = join(tmp, "scn", "ses_truncated");
+      await mkdir(corruptDir, { recursive: true });
+      await writeFile(join(corruptDir, "verdict.json"), '{"version": 2, "source":', "utf8");
+
+      const discovery = await discoverRunSet(tmp);
+      expect(discovery.kind).toBe("root");
+      expect(discovery.totalSets).toBe(0);
+      expect(discovery.set).toBeNull();
+      expect(discovery.unreadableCount).toBe(1);
+      expect(discovery.unreadablePaths).toEqual([corruptDir]);
+      expect(discovery.staleVersionCount).toBe(0);
+
+      // A truly empty runs/ still reports unreadableCount: 0 — "nothing here"
+      // and "something here is damaged" stay distinguishable.
+      const empty = await mkdtemp(join(tmpdir(), "verdict-unreadable-empty-"));
+      const emptyDiscovery = await discoverRunSet(empty);
+      expect(emptyDiscovery.totalSets).toBe(0);
+      expect(emptyDiscovery.unreadableCount).toBe(0);
+    });
+
+    it("discoverRunSet(trial dir) pointed straight at a corrupt verdict.json names the skip as unreadable", async () => {
+      const tmp = await mkdtemp(join(tmpdir(), "verdict-unreadable-trialdir-"));
+      const corruptDir = join(tmp, "scn", "ses_badstate");
+      await mkdir(corruptDir, { recursive: true });
+      await writeFile(
+        join(corruptDir, "verdict.json"),
+        JSON.stringify(verdict({ session_id: "ses_badstate", state: "bogus" as never })),
+        "utf8",
+      );
+
+      const discovery = await discoverRunSet(corruptDir);
+      expect(discovery.kind).toBe("trial-dir");
+      expect(discovery.set).toBeNull();
+      expect(discovery.totalSets).toBe(0);
+      expect(discovery.unreadableCount).toBe(1);
+      expect(discovery.unreadablePaths).toEqual([corruptDir]);
+      expect(discovery.staleVersionCount).toBe(0);
+    });
+  });
 });

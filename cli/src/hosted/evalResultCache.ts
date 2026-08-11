@@ -247,10 +247,18 @@ export async function readVerdictArtifact(
 /** F-1195 — the detailed scan behind `scanVerdictArtifacts`: also collects
  *  the dirs whose verdict.json was recognizable but a prior artifact version,
  *  so `discoverRunSet` can name that skip instead of it looking identical to
- *  "no run happened here". */
+ *  "no run happened here".
+ *
+ *  F-1411 — likewise for `unreadableDirs`: a verdict.json that EXISTS but is
+ *  truncated, hand-edited, or otherwise damaged. Kept out of `staleVersionDirs`
+ *  on purpose — a prior-version file and a corrupt one are different facts
+ *  (upgrade vs. damage) and want different fixes. A run dir with no
+ *  verdict.json at all (no run finished there yet) is neither: `existsSync`
+ *  below is what tells "never written" apart from "written, then damaged". */
 export interface VerdictScanResult {
   trials: TrialVerdict[];
   staleVersionDirs: string[];
+  unreadableDirs: string[];
 }
 
 export async function scanVerdictArtifactsDetailed(
@@ -258,11 +266,12 @@ export async function scanVerdictArtifactsDetailed(
 ): Promise<VerdictScanResult> {
   const trials: TrialVerdict[] = [];
   const staleVersionDirs: string[] = [];
+  const unreadableDirs: string[] = [];
   let slugs: string[];
   try {
     slugs = await readdir(artifactsRoot);
   } catch {
-    return { trials, staleVersionDirs };
+    return { trials, staleVersionDirs, unreadableDirs };
   }
   for (const slug of slugs) {
     const slugDir = join(artifactsRoot, slug);
@@ -277,9 +286,12 @@ export async function scanVerdictArtifactsDetailed(
       const result = await readVerdictArtifactDetailed(runDir);
       if (result.status === "ok") trials.push(result.trial);
       else if (result.status === "stale-version") staleVersionDirs.push(runDir);
+      else if (result.status === "unreadable" && existsSync(join(runDir, VERDICT_FILENAME))) {
+        unreadableDirs.push(runDir);
+      }
     }
   }
-  return { trials, staleVersionDirs };
+  return { trials, staleVersionDirs, unreadableDirs };
 }
 
 /** Scan an artifacts root for finalized trials — exactly the two-level
@@ -316,6 +328,18 @@ export interface RunSetDiscovery {
    *  happened here" — a v1 file dropped silently is the exact shape this
    *  milestone exists to remove. */
   staleVersionCount: number;
+  /** F-1411 — verdict.json files that EXIST under the scanned root (or, for
+   *  `kind: "trial-dir"`, at the target itself) but could not be read: a
+   *  truncated file, one hand-edited into an unexpected `state`, or valid
+   *  JSON that isn't a verdict artifact at all. Never folded into
+   *  `staleVersionCount` (an older CLI wrote that file; nothing wrote this
+   *  one correctly) or `totalSets` — a damaged current-version file is not a
+   *  usable run set. Reported even when other sets under the same root
+   *  parsed fine, same lesson as `staleVersionCount`. */
+  unreadableCount: number;
+  /** The paths behind `unreadableCount`, so the caller can name them instead
+   *  of only counting them. */
+  unreadablePaths: string[];
 }
 
 /**
@@ -340,6 +364,29 @@ export async function discoverRunSet(target: string): Promise<RunSetDiscovery> {
       incompleteSet: null,
       totalSets: 0,
       staleVersionCount: 1,
+      unreadableCount: 0,
+      unreadablePaths: [],
+    };
+  }
+  // F-1411 — same reasoning as the stale-version branch above, for a target
+  // whose verdict.json exists but is damaged: name it as a trial-dir skip
+  // rather than falling through to the "root" branch, which would scan
+  // `target` itself (two levels too shallow) and find nothing. The
+  // `existsSync` check is what tells this apart from a target that is
+  // actually an artifacts root (which has no verdict.json of its own either,
+  // and must fall through).
+  if (
+    anchorResult.status === "unreadable" &&
+    existsSync(join(target, VERDICT_FILENAME))
+  ) {
+    return {
+      kind: "trial-dir",
+      set: null,
+      incompleteSet: null,
+      totalSets: 0,
+      staleVersionCount: 0,
+      unreadableCount: 1,
+      unreadablePaths: [target],
     };
   }
   if (anchorResult.status === "ok") {
@@ -347,7 +394,8 @@ export async function discoverRunSet(target: string): Promise<RunSetDiscovery> {
     // Trial dir → its set. Layout is <root>/<slug>/<runId>, so the root is
     // two levels up; a moved/isolated dir degrades to a set of one.
     const root = join(target, "..", "..");
-    const { trials, staleVersionDirs } = await scanVerdictArtifactsDetailed(root);
+    const { trials, staleVersionDirs, unreadableDirs } =
+      await scanVerdictArtifactsDetailed(root);
     const sets = groupRunSets(trials);
     const own =
       sets.find(
@@ -364,6 +412,8 @@ export async function discoverRunSet(target: string): Promise<RunSetDiscovery> {
       incompleteSet: null,
       totalSets: Math.max(sets.length, 1),
       staleVersionCount: staleVersionDirs.length,
+      unreadableCount: unreadableDirs.length,
+      unreadablePaths: unreadableDirs,
     };
   }
 
@@ -374,9 +424,12 @@ export async function discoverRunSet(target: string): Promise<RunSetDiscovery> {
       incompleteSet: null,
       totalSets: 0,
       staleVersionCount: 0,
+      unreadableCount: 0,
+      unreadablePaths: [],
     };
   }
-  const { trials, staleVersionDirs } = await scanVerdictArtifactsDetailed(target);
+  const { trials, staleVersionDirs, unreadableDirs } =
+    await scanVerdictArtifactsDetailed(target);
   const sets = groupRunSets(trials);
   const failedSet = latestFailedRunSet(sets);
   return {
@@ -385,5 +438,7 @@ export async function discoverRunSet(target: string): Promise<RunSetDiscovery> {
     incompleteSet: failedSet ? null : latestIncompleteRunSet(sets),
     totalSets: sets.length,
     staleVersionCount: staleVersionDirs.length,
+    unreadableCount: unreadableDirs.length,
+    unreadablePaths: unreadableDirs,
   };
 }

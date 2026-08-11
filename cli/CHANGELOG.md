@@ -4,6 +4,31 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.11
+
+### Patch Changes
+
+- `pome fix-prompt` names a corrupt current-version `verdict.json` instead of
+  dropping it silently (F-1411). A v2 artifact that is truncated, hand-edited,
+  or carries an unexpected `state` read as `{status: "unreadable"}` and
+  vanished from every count `RunSetDiscovery` exposes — not `totalSets`, not
+  `staleVersionCount` — so a `runs/` holding one readable trial beside a
+  damaged one built a prompt from a fraction of the run set and said nothing
+  about the rest, the same silent drop F-1195 closed for a prior-version
+  file. `RunSetDiscovery` now carries `unreadableCount` and the paths behind
+  it (`unreadablePaths`), and fix-prompt discovery prints a distinct line
+  naming them — capped at 5, "N more omitted" beyond that — every time it
+  happens, not only when nothing else was found. Kept separate from
+  `staleVersionCount` on purpose: a file an older CLI wrote correctly and a
+  file nothing wrote correctly are different facts and want different fixes.
+  A run dir with no verdict.json at all (a run still in progress) is neither,
+  and stays silently skipped as before.
+- `evalResultCache.ts` split `loadTrialEvents` into `hosted/trialEvents.ts`
+  and the run-set grouping (`RunSet`, `groupRunSets`,
+  `latestFailedRunSet`/`latestIncompleteRunSet`) into `hosted/runSets.ts`, to
+  stay under the file-size gate after the above. No behavior change; callers
+  now import from the new paths.
+
 ## 0.23.10
 
 ### Patch Changes
