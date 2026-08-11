@@ -142,15 +142,22 @@ export const GITHUB_ROUTES = {
     method: "POST",
     path: "/user/repos",
     bodyEncoding: "json",
-    body: { ...repositoryBody, owner: z.string().min(1).optional() },
+    // F-1389 (GH-DECL-IN-003) — no `owner`. This surface creates a repository
+    // for the AUTHENTICATED USER, which is its whole meaning;
+    // `repos/create-for-authenticated-user` declares 23 body properties and
+    // `owner` is not one. `routes.ts` passed the body straight to
+    // `domain.createRepository`, so the one surface defined not to take an
+    // owner could be made to create a repository under an arbitrary one.
+    // Undeclared now, so `parse()` never hands it to the handler, and github's
+    // measured disposition (`ignore`) discards it rather than 422-ing a request
+    // real GitHub accepts and ignores.
+    body: { ...repositoryBody },
   }),
-  // `owner` is declared in BOTH locations, because the twin accepts it in both.
-  //
-  // The handler spreads the body schema and then overwrites `owner` with the
-  // path value, so the body copy is read and discarded. Declaring only the path
-  // one would turn that into a 422 for a request the twin has always accepted —
-  // a divergence this ticket invented rather than found. The declaration records
-  // what is true: two locations, one of which the handler ignores.
+  // `owner` stays declared on the ORG surface, and the contrast is the whole
+  // argument: there the handler overwrites it with the path value, so the body
+  // copy is read and discarded and nothing observable differs. That one is
+  // registered `accepted` (GH-DECL-IN-004); the `/user/repos` one above was
+  // registered `open-defect` because there the body copy reached the domain.
   createOrgRepository: declareInputs({
     method: "POST",
     path: "/orgs/:owner/repos",

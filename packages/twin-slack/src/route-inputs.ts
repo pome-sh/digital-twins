@@ -375,8 +375,14 @@ export const SLACK_WRITES = {
   }),
 
   filesUpload: slackWrite("/files.upload", {
+    // F-1389 (SLACK-DECL-IN-003) — `channels` (plural, comma-separated) only.
+    // Slack has never documented a singular `channel` here, and the vendored
+    // `slack_web_openapi_v2` snapshot agrees: it declares `channels` and eight
+    // other real arguments, so it is not thin on this method. An upload
+    // addressed `channel=C123` landed in that channel here and in no channel at
+    // all on Slack. Undeclared now, so slack's measured disposition (`ignore`)
+    // discards it instead of the handler forwarding it to `domain.filesUpload`.
     channels: absentIfEmpty(),
-    channel: absentIfEmpty(),
     filename: absentIfEmpty(),
     title: absentIfEmpty(),
     filetype: absentIfEmpty(),

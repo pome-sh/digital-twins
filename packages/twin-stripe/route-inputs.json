@@ -7,7 +7,7 @@
     "packages/twin-stripe/src/route-inputs.ts"
   ],
   "surface_count": 38,
-  "input_count": 128,
+  "input_count": 127,
   "surfaces": [
     {
       "method": "DELETE",
@@ -188,12 +188,6 @@
           "location": "path",
           "required": true,
           "type": "string"
-        },
-        {
-          "name": "created",
-          "location": "query",
-          "required": false,
-          "type": "object|string"
         },
         {
           "name": "ending_before",

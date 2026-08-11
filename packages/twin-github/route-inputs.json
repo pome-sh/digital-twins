@@ -7,7 +7,7 @@
     "packages/twin-github/src/route-inputs.ts"
   ],
   "surface_count": 65,
-  "input_count": 295,
+  "input_count": 294,
   "surfaces": [
     {
       "method": "DELETE",
@@ -2064,12 +2064,6 @@
           "name": "name",
           "location": "body",
           "required": true,
-          "type": "string"
-        },
-        {
-          "name": "owner",
-          "location": "body",
-          "required": false,
           "type": "string"
         },
         {

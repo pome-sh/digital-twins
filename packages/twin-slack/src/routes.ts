@@ -361,7 +361,6 @@ export function registerSlackRoutes(app: Hono, { domain, recorder }: RouteContex
     domain.filesUpload(
       {
         channels: args.channels,
-        channel: args.channel,
         filename: args.filename,
         title: args.title,
         filetype: args.filetype,

@@ -285,11 +285,27 @@ export const STRIPE_ROUTES = {
     body: CUSTOMER_FIELDS_BODY,
   }),
 
+  // F-1389 (ST-DECL-IN-001) — NOT `LIST_QUERY`. This is the one list surface
+  // that does not take `created`: `GetCustomersCustomerPaymentMethods` declares
+  // `allow_redisplay, ending_before, expand, limit, starting_after, type` and
+  // nothing else, and Stripe's measured disposition is `refuse` — it publishes
+  // `parameter_unknown`. Sharing `LIST_QUERY` here meant a request Stripe
+  // rejects outright succeeded, so an exam scored a call the real API declined.
+  // Leaving it undeclared is what makes the twin refuse it too: the declaration
+  // IS the validator, and this twin's declarer is `refuse`. That is why this
+  // one is spelled out rather than fixed by spreading a narrower shared shape —
+  // the point is the absence, and a future `LIST_QUERY` edit must not put
+  // `created` back by inheritance.
   listCustomerPaymentMethods: declareInputs({
     method: "GET",
     path: "/v1/customers/:id/payment_methods",
     pathParams: ID_PATH,
-    query: { ...LIST_QUERY, type: z.string().optional() },
+    query: {
+      limit: LIST_QUERY.limit,
+      starting_after: LIST_QUERY.starting_after,
+      ending_before: LIST_QUERY.ending_before,
+      type: z.string().optional(),
+    },
   }),
 
   retrieveCustomer: declareInputs({
