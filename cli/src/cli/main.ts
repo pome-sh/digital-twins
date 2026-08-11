@@ -72,9 +72,9 @@ import {
 } from "../fix-prompt/index.js";
 import {
   discoverRunSet,
-  loadTrialEvents,
   VERDICT_ARTIFACT_VERSION,
 } from "../hosted/evalResultCache.js";
+import { loadTrialEvents } from "../hosted/trialEvents.js";
 import type { Task } from "../task/taskSchema.js";
 import { parseTaskFile } from "../task/parseTask.js";
 import type { RecorderEvent } from "../types/shared.js";
@@ -94,6 +94,10 @@ const DEFAULT_AGENT_FILE = "examples/agents/scripted-triage-agent.ts";
 // with no error pointing at the real cause.
 const DEFAULT_AGENT_COMMAND = `node ${DEFAULT_AGENT_FILE}`;
 const MANIFEST_SCHEMA_URL = "https://pome.sh/schemas/v1/pome.json";
+// F-1411 — cap on how many unreadable verdict.json paths `fix-prompt`
+// discovery names individually, same "kept first N" convention as
+// `fix-prompt/prompt.ts`'s MAX_EVENTS trim.
+const MAX_UNREADABLE_PATHS_SHOWN = 5;
 
 // Injected by tsup (`define: { PKG_VERSION }`) so the bundled CLI never has to
 // locate its own package.json at runtime. Undeclared under `tsx src/cli/main.ts`,
@@ -1220,8 +1224,26 @@ export function createProgram() {
           `${discovery.staleVersionCount} verdict.json file(s) under ${root} are not artifact version ${VERDICT_ARTIFACT_VERSION} (the only version this CLI reads) and were skipped — re-run \`pome run\` to record those trials again.`,
         );
       }
+      // F-1411 — a verdict.json that EXISTS but is truncated, hand-edited, or
+      // otherwise damaged is a different fact from a prior-version file (an
+      // older CLI wrote that one correctly) and gets its own line, naming the
+      // path(s) — a count alone would tell the user something was skipped but
+      // not which trial to go look at. Reported every time it happens, same
+      // as stale-version above, never only when nothing else was found.
+      if (discovery.unreadableCount > 0) {
+        console.error(
+          `${discovery.unreadableCount} verdict.json file(s) under ${root} could not be read (truncated, hand-edited, or not a verdict artifact) and were skipped:`,
+        );
+        for (const path of discovery.unreadablePaths.slice(0, MAX_UNREADABLE_PATHS_SHOWN)) {
+          console.error(`  - ${path}`);
+        }
+        const omitted = discovery.unreadablePaths.length - MAX_UNREADABLE_PATHS_SHOWN;
+        if (omitted > 0) {
+          console.error(`  (${omitted} more omitted — kept first ${MAX_UNREADABLE_PATHS_SHOWN})`);
+        }
+      }
       if (discovery.totalSets === 0) {
-        if (discovery.staleVersionCount === 0) {
+        if (discovery.staleVersionCount === 0 && discovery.unreadableCount === 0) {
           console.error(
             `No finalized run sets under ${root} — hosted \`pome run\` records a verdict.json per trial; run one first (or point fix-prompt at your artifacts dir).`,
           );

@@ -26,6 +26,12 @@ import { readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { CriterionResult } from "../types/shared.js";
 import type { ScoreStatus } from "./evalResultView.js";
+import {
+  groupRunSets,
+  latestFailedRunSet,
+  latestIncompleteRunSet,
+  type RunSet,
+} from "./runSets.js";
 
 // F-1195 — bumped 1 → 2: the artifact gained `state` (the run's three-state
 // verdict, by name) and the `evaluated`/`not_evaluated`/`pre_satisfied`/
@@ -241,10 +247,25 @@ export async function readVerdictArtifact(
 /** F-1195 — the detailed scan behind `scanVerdictArtifacts`: also collects
  *  the dirs whose verdict.json was recognizable but a prior artifact version,
  *  so `discoverRunSet` can name that skip instead of it looking identical to
- *  "no run happened here". */
+ *  "no run happened here".
+ *
+ *  F-1411 — likewise for `unreadableDirs`: a verdict.json that EXISTS but is
+ *  truncated, hand-edited, or otherwise damaged. Kept out of `staleVersionDirs`
+ *  on purpose — a prior-version file and a corrupt one are different facts
+ *  (upgrade vs. damage) and want different fixes. A run dir with no
+ *  verdict.json at all (no run finished there yet) is neither: `existsSync`
+ *  below is what tells "never written" apart from "written, then damaged".
+ *
+ *  `unreadableDirs` is SORTED, unlike the other two: it is the only one whose
+ *  order reaches a user, via the path list `pome fix-prompt` prints and trims
+ *  to the first few. `readdir` promises no order — APFS hands back names
+ *  sorted, ext4 hands back hash order — so without this the WHICH of "kept
+ *  first 5" would differ between a dev's machine and CI, and a test pinning
+ *  the trim would pass locally and flake on Linux. */
 export interface VerdictScanResult {
   trials: TrialVerdict[];
   staleVersionDirs: string[];
+  unreadableDirs: string[];
 }
 
 export async function scanVerdictArtifactsDetailed(
@@ -252,11 +273,12 @@ export async function scanVerdictArtifactsDetailed(
 ): Promise<VerdictScanResult> {
   const trials: TrialVerdict[] = [];
   const staleVersionDirs: string[] = [];
+  const unreadableDirs: string[] = [];
   let slugs: string[];
   try {
     slugs = await readdir(artifactsRoot);
   } catch {
-    return { trials, staleVersionDirs };
+    return { trials, staleVersionDirs, unreadableDirs };
   }
   for (const slug of slugs) {
     const slugDir = join(artifactsRoot, slug);
@@ -271,9 +293,13 @@ export async function scanVerdictArtifactsDetailed(
       const result = await readVerdictArtifactDetailed(runDir);
       if (result.status === "ok") trials.push(result.trial);
       else if (result.status === "stale-version") staleVersionDirs.push(runDir);
+      else if (result.status === "unreadable" && existsSync(join(runDir, VERDICT_FILENAME))) {
+        unreadableDirs.push(runDir);
+      }
     }
   }
-  return { trials, staleVersionDirs };
+  unreadableDirs.sort();
+  return { trials, staleVersionDirs, unreadableDirs };
 }
 
 /** Scan an artifacts root for finalized trials — exactly the two-level
@@ -284,96 +310,6 @@ export async function scanVerdictArtifacts(
   artifactsRoot: string,
 ): Promise<TrialVerdict[]> {
   return (await scanVerdictArtifactsDetailed(artifactsRoot)).trials;
-}
-
-// F-1404 — the three-way verdict a run SET can carry, named like
-// `ScoreStatus` (the per-trial word) because it is built from it: "fail" =
-// at least one trial genuinely failed (graded, unsatisfied) — the only
-// outcome that asserts an agent defect. "incomplete" = no trial failed, but
-// at least one trial's grading never finished — a grader/seed gap, not
-// evidence the agent did anything wrong; "fail" wins when a set has both,
-// since a real failure is signal worth naming over a sibling's gap.
-// "pass" = EVERY trial's state is exactly "pass", tested that way round on
-// purpose: "pass" is the one outcome claiming a verified result, so it is
-// never the fallthrough. An unrecognized state reads "incomplete", not green
-// (`isVerdictArtifact` already refuses such a file — second line of defense).
-export type RunSetOutcome = "fail" | "incomplete" | "pass";
-
-export interface RunSet {
-  /** null = a single run that never had a group. */
-  groupId: string | null;
-  taskName: string;
-  /** The task path recorded at run time (first trial's). */
-  taskPath: string;
-  /** Trials sorted by finalized_at ascending. */
-  trials: TrialVerdict[];
-  latestFinalizedAt: string;
-  /** F-1404 — derived from the on-disk `state` (see `RunSetOutcome`), never
-   *  from `passed` alone: `passed` is false for BOTH a genuine failure and a
-   *  trial the grader never finished, so it can't tell "agent defect" from
-   *  "never graded" apart. The ONE computation both the routing decision
-   *  (`latestFailedRunSet` / `latestIncompleteRunSet`) and the message shown
-   *  to the user read, so they cannot disagree. */
-  outcome: RunSetOutcome;
-}
-
-/** Group trials into run sets: trials sharing a group_id form one set; a
- *  null group_id is its own single-run set.
- *
- *  F-1404 — `outcome` reads the on-disk `state` (F-1195), not `!passed`
- *  (F-1392's finding: `!passed` is true for both a genuine failure and an
- *  incomplete trial, so a set holding only incomplete trials used to trip
- *  the old `anyFailed` and get handed to `pome fix-prompt` as an agent
- *  defect). `evalResultCache.test.ts` pins all three outcomes against the
- *  written artifact. */
-export function groupRunSets(trials: TrialVerdict[]): RunSet[] {
-  const byKey = new Map<string, TrialVerdict[]>();
-  for (const trial of trials) {
-    const key = trial.verdict.group_id ?? `solo:${trial.verdict.session_id}`;
-    const bucket = byKey.get(key);
-    if (bucket) bucket.push(trial);
-    else byKey.set(key, [trial]);
-  }
-  const sets: RunSet[] = [];
-  for (const bucket of byKey.values()) {
-    bucket.sort((a, b) =>
-      a.verdict.finalized_at.localeCompare(b.verdict.finalized_at),
-    );
-    const last = bucket[bucket.length - 1]!;
-    const hasFailed = bucket.some((t) => t.verdict.state === "fail");
-    const allPassed = bucket.every((t) => t.verdict.state === "pass");
-    sets.push({
-      groupId: bucket[0]!.verdict.group_id,
-      taskName: bucket[0]!.verdict.task_name,
-      taskPath: bucket[0]!.verdict.task_path,
-      trials: bucket,
-      latestFinalizedAt: last.verdict.finalized_at,
-      outcome: hasFailed ? "fail" : allPassed ? "pass" : "incomplete",
-    });
-  }
-  sets.sort((a, b) => a.latestFinalizedAt.localeCompare(b.latestFinalizedAt));
-  return sets;
-}
-
-/** The newest run set with at least one genuinely FAILED (graded, not
- *  satisfied) trial — the only outcome `pome fix-prompt` may hand to a
- *  coding agent as an agent defect. */
-export function latestFailedRunSet(sets: RunSet[]): RunSet | null {
-  for (let i = sets.length - 1; i >= 0; i -= 1) {
-    if (sets[i]!.outcome === "fail") return sets[i]!;
-  }
-  return null;
-}
-
-/** F-1404 — the newest run set whose worst outcome is INCOMPLETE: no trial
- *  failed, but at least one trial's grading never finished. Callers use this
- *  to name the gap distinctly from both "fix this" (a fail set exists) and
- *  "nothing to fix" (every set passed) — never silently folded into either. */
-export function latestIncompleteRunSet(sets: RunSet[]): RunSet | null {
-  for (let i = sets.length - 1; i >= 0; i -= 1) {
-    if (sets[i]!.outcome === "incomplete") return sets[i]!;
-  }
-  return null;
 }
 
 export interface RunSetDiscovery {
@@ -400,6 +336,20 @@ export interface RunSetDiscovery {
    *  happened here" — a v1 file dropped silently is the exact shape this
    *  milestone exists to remove. */
   staleVersionCount: number;
+  /** F-1411 — verdict.json files that EXIST under the scanned root (or, for
+   *  `kind: "trial-dir"`, at the target itself) but could not be read: a
+   *  truncated file, one hand-edited into an unexpected `state`, or valid
+   *  JSON that isn't a verdict artifact at all. Never folded into
+   *  `staleVersionCount` (an older CLI wrote that file; nothing wrote this
+   *  one correctly) or `totalSets` — a damaged current-version file is not a
+   *  usable run set. Reported even when other sets under the same root
+   *  parsed fine, same lesson as `staleVersionCount`. */
+  unreadableCount: number;
+  /** The paths behind `unreadableCount`, so the caller can name them instead
+   *  of only counting them. Sorted (see `scanVerdictArtifactsDetailed`) —
+   *  callers trim this list for display, so which ones survive the trim must
+   *  not depend on the filesystem's `readdir` order. */
+  unreadablePaths: string[];
 }
 
 /**
@@ -424,6 +374,29 @@ export async function discoverRunSet(target: string): Promise<RunSetDiscovery> {
       incompleteSet: null,
       totalSets: 0,
       staleVersionCount: 1,
+      unreadableCount: 0,
+      unreadablePaths: [],
+    };
+  }
+  // F-1411 — same reasoning as the stale-version branch above, for a target
+  // whose verdict.json exists but is damaged: name it as a trial-dir skip
+  // rather than falling through to the "root" branch, which would scan
+  // `target` itself (two levels too shallow) and find nothing. The
+  // `existsSync` check is what tells this apart from a target that is
+  // actually an artifacts root (which has no verdict.json of its own either,
+  // and must fall through).
+  if (
+    anchorResult.status === "unreadable" &&
+    existsSync(join(target, VERDICT_FILENAME))
+  ) {
+    return {
+      kind: "trial-dir",
+      set: null,
+      incompleteSet: null,
+      totalSets: 0,
+      staleVersionCount: 0,
+      unreadableCount: 1,
+      unreadablePaths: [target],
     };
   }
   if (anchorResult.status === "ok") {
@@ -431,7 +404,8 @@ export async function discoverRunSet(target: string): Promise<RunSetDiscovery> {
     // Trial dir → its set. Layout is <root>/<slug>/<runId>, so the root is
     // two levels up; a moved/isolated dir degrades to a set of one.
     const root = join(target, "..", "..");
-    const { trials, staleVersionDirs } = await scanVerdictArtifactsDetailed(root);
+    const { trials, staleVersionDirs, unreadableDirs } =
+      await scanVerdictArtifactsDetailed(root);
     const sets = groupRunSets(trials);
     const own =
       sets.find(
@@ -448,6 +422,8 @@ export async function discoverRunSet(target: string): Promise<RunSetDiscovery> {
       incompleteSet: null,
       totalSets: Math.max(sets.length, 1),
       staleVersionCount: staleVersionDirs.length,
+      unreadableCount: unreadableDirs.length,
+      unreadablePaths: unreadableDirs,
     };
   }
 
@@ -458,9 +434,12 @@ export async function discoverRunSet(target: string): Promise<RunSetDiscovery> {
       incompleteSet: null,
       totalSets: 0,
       staleVersionCount: 0,
+      unreadableCount: 0,
+      unreadablePaths: [],
     };
   }
-  const { trials, staleVersionDirs } = await scanVerdictArtifactsDetailed(target);
+  const { trials, staleVersionDirs, unreadableDirs } =
+    await scanVerdictArtifactsDetailed(target);
   const sets = groupRunSets(trials);
   const failedSet = latestFailedRunSet(sets);
   return {
@@ -469,30 +448,7 @@ export async function discoverRunSet(target: string): Promise<RunSetDiscovery> {
     incompleteSet: failedSet ? null : latestIncompleteRunSet(sets),
     totalSets: sets.length,
     staleVersionCount: staleVersionDirs.length,
+    unreadableCount: unreadableDirs.length,
+    unreadablePaths: unreadableDirs,
   };
-}
-
-/** Load a trial's captured events.jsonl (raw trace) for prompt assembly.
- *  Missing/corrupt lines are skipped — the prompt degrades, never throws. */
-export async function loadTrialEvents(runDir: string): Promise<unknown[]> {
-  let raw: string;
-  try {
-    raw = await readFile(join(runDir, "events.jsonl"), "utf8");
-  } catch {
-    return [];
-  }
-  const events: unknown[] = [];
-  for (const line of raw.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    try {
-      const parsed: unknown = JSON.parse(trimmed);
-      // Valid JSON but not an event object (`null`, `3`, `"x"`) is corrupt
-      // for our purposes — renderEvent dereferences fields on it.
-      if (typeof parsed === "object" && parsed !== null) events.push(parsed);
-    } catch {
-      // skip corrupt row
-    }
-  }
-  return events;
 }

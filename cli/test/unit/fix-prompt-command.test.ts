@@ -14,9 +14,9 @@
 // see "an incomplete-only root ..." below. `groupRunSets`'s `outcome` is the
 // one computation both the routing decision and this wording read.
 
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createProgram } from "../../src/cli/main.js";
 import {
@@ -349,6 +349,127 @@ describe("pome fix-prompt command (FDRS-644)", () => {
       expect(process.exitCode ?? 0).toBe(0);
       expect(stdout.join("\n")).toContain("## Grouped failure signatures");
       expect(stderr.join("\n")).toContain("1 verdict.json file(s)");
+    });
+  });
+
+  // F-1411 — a verdict.json that EXISTS but is damaged (truncated,
+  // hand-edited, or an unexpected `state`) is a different fact from a
+  // stale-version file (an older CLI wrote that one correctly) and gets its
+  // own line, naming the path — never folded into the stale-version count,
+  // "no finalized run sets", or silently dropped.
+  describe("a corrupt current-version verdict.json is a named skip that points at the path (F-1411)", () => {
+    async function writeCorruptTrial(root: string, sid: string): Promise<string> {
+      const runDir = join(root, "runs", "scn", sid);
+      await mkdir(runDir, { recursive: true });
+      await writeFile(
+        join(runDir, "verdict.json"),
+        JSON.stringify(verdict({ session_id: sid, state: "bogus" as never })),
+        "utf8",
+      );
+      return runDir;
+    }
+
+    it("a root holding only a corrupt trial names the path, not 'no runs', and not the stale-version wording", async () => {
+      const dir = await mkdtemp(join(tmpdir(), "fixcmd-unreadable-only-"));
+      const runDir = await writeCorruptTrial(dir, "ses_bad");
+      process.chdir(dir);
+
+      await run();
+      expect(process.exitCode).toBe(5);
+      const err = stderr.join("\n");
+      expect(err).toContain("1 verdict.json file(s)");
+      expect(err).toContain("could not be read");
+      expect(err).toContain(runDir);
+      expect(err).not.toContain("No finalized run sets");
+      expect(err).not.toContain("artifact version");
+    });
+
+    it("a root holding a corrupt trial beside a readable failed one still names the corrupt path AND prints the prompt", async () => {
+      const dir = await mkdtemp(join(tmpdir(), "fixcmd-unreadable-mixed-"));
+      const runDir = await writeCorruptTrial(dir, "ses_bad");
+      await writeTrial(dir, "ses_2", {
+        passed: false,
+        state: "fail",
+        score: 50,
+        criteria_results: [
+          {
+            criterion: { type: "model", text: "Severity is set correctly" },
+            passed: false,
+            skipped: false,
+            reason: "under-rated",
+          },
+        ],
+      });
+      process.chdir(dir);
+
+      await run();
+      expect(process.exitCode ?? 0).toBe(0);
+      expect(stdout.join("\n")).toContain("## Grouped failure signatures");
+      const err = stderr.join("\n");
+      expect(err).toContain("1 verdict.json file(s)");
+      expect(err).toContain("could not be read");
+      expect(err).toContain(runDir);
+    });
+
+    // The trim is the one part of this output with arithmetic in it, and it
+    // only fires past five paths — untested, an off-by-one (or a tail line
+    // that never prints) is invisible to CI. Five is the last count that
+    // prints every path; six is the first that omits one.
+    it("names every path up to five, and trims with a count past that", async () => {
+      const five = await mkdtemp(join(tmpdir(), "fixcmd-unreadable-five-"));
+      const fiveDirs: string[] = [];
+      for (let i = 1; i <= 5; i += 1) {
+        fiveDirs.push(await writeCorruptTrial(five, `ses_bad_${i}`));
+      }
+      process.chdir(five);
+      await run();
+      const fiveErr = stderr.join("\n");
+      expect(fiveErr).toContain("5 verdict.json file(s)");
+      for (const d of fiveDirs) expect(fiveErr).toContain(d);
+      expect(fiveErr).not.toContain("more omitted");
+
+      stderr = [];
+      const six = await mkdtemp(join(tmpdir(), "fixcmd-unreadable-six-"));
+      const sixDirs: string[] = [];
+      for (let i = 1; i <= 6; i += 1) {
+        sixDirs.push(await writeCorruptTrial(six, `ses_bad_${i}`));
+      }
+      process.chdir(six);
+      await run();
+      const sixErr = stderr.join("\n");
+      expect(sixErr).toContain("6 verdict.json file(s)");
+      expect(sixErr).toContain("(1 more omitted — kept first 5)");
+      // WHICH five survive the trim is pinned, not just how many: the scan
+      // sorts `unreadablePaths` so this holds on ext4 (hash-ordered readdir)
+      // as well as APFS. Asserting only the count would let that sort rot.
+      const listed = sixErr
+        .split("\n")
+        .filter((l) => l.startsWith("  - "))
+        .map((l) => l.slice(4));
+      // Compared against the REALPATH of the tmp root: discovery resolves the
+      // root against `process.cwd()`, which on macOS reports
+      // /private/var/... for a /var/... tmpdir. The `toContain` assertions
+      // elsewhere in this describe survive that by substring luck; an
+      // order-sensitive equality cannot.
+      const sixRoot = await realpath(six);
+      expect(listed).toEqual(
+        sixDirs
+          .map((d) => join(sixRoot, relative(six, d)))
+          .sort()
+          .slice(0, 5),
+      );
+    });
+
+    it("a trial dir pointed straight at a corrupt verdict.json names it as unreadable, not as an empty root", async () => {
+      const dir = await mkdtemp(join(tmpdir(), "fixcmd-unreadable-trialdir-"));
+      const runDir = await writeCorruptTrial(dir, "ses_bad");
+
+      await run(runDir);
+      expect(process.exitCode).toBe(5);
+      const err = stderr.join("\n");
+      expect(err).toContain("1 verdict.json file(s)");
+      expect(err).toContain("could not be read");
+      expect(err).toContain(runDir);
     });
   });
 
