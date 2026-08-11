@@ -446,8 +446,17 @@ describe("declared state citations", () => {
 // null`, before the join runs — see `check-messages.test.ts` for the executable
 // proof. It used to be guarded at arm's length in the consuming engine's
 // `STATE_SECTION_GUARDS`, which could drift from the state it inspects silently
-// because that state lives here; that row is now redundant and pome-cloud
-// deletes it once this fix is published and pinned.
+// because that state lives here; that row is now redundant.
+//
+// Deleting it is NOT the whole of the follow-up, and assuming it is buys a red
+// pipeline in the other repo. `declared-pin.test.ts` keeps a negative control —
+// `names the shipped reader when the table is empty` — that asserts the
+// arrival-direction detector still NAMES `slack.no-reaction-added:reactions`
+// when handed an empty guard table. This release is precisely what stops it
+// naming anything, so that arm goes red on the pin bump alone, before the row
+// is touched, and it needs a synthetic reader of its own. The two edits are
+// spelled out in `packages/checks/CHANGELOG.md` under 0.1.5, which is the file
+// whoever does the bump will actually read.
 //
 // The `abstains` rows are `resolveChannel`'s `missSkip`, which is what a
 // channel-name slot has always done with a miss, and the reason slack's other
