@@ -100,6 +100,15 @@ jobs:
       # F-778 — the legacy D/P criterion markers are retired; fail on any
       # reintroduction outside the parser's own legacy-detection code.
       - run: node scripts/lint-legacy-criterion-markers.mjs
+      # F-1299 — the criterion grammar quoted in the pome-author-task skill
+      # reference must be the one cli/src/task/parseTask.ts runs. That doc is a
+      # byte-identical mirror of pome-cloud's canonical copy, which pome-cloud
+      # gates; nothing gated the mirror, and it published a grammar that dropped
+      # `always-scored` criteria as prose for the whole of F-1296. It lives in
+      # THIS block, not the heavy one, because a PR that only edits `skills/`
+      # is classified docs-only and would skip the gate that catches it.
+      - run: node scripts/lint-task-format-doc.mjs
+      - run: node scripts/lint-task-format-doc.test.mjs
       # F-1306 — "each twin is a lazily-loaded chunk" was a comment in
       # registry.ts and a 0.21.0 headline, and it was false for github, gmail and
       # linear for six releases: five modules on the CLI's startup path imported
