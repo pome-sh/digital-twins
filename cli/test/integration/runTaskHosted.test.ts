@@ -937,8 +937,18 @@ describe("runTaskHosted single-twin old-cloud (no per_twin) env parity", () => {
     expect(agentEnv.ghm).toBe(`${twinUrl}/mcp`);
     expect(agentEnv.ghr).toBe(twinUrl);
     expect(agentEnv.base).toBe(twinUrl);
-    // Provider github token flows through (origin/main parity).
-    expect(agentEnv.ght).toBe("ght_provider");
+    // F-1211: `POME_GITHUB_TOKEN` is currently
+    // `provider_credentials.github.token ?? agent_token` — here the PAT
+    // `"ght_provider"`, which the twin proxy 404s on because it verifies
+    // bearers only against `agent_token`. Asserting that exact value pinned
+    // the defect (F-1375: a test that pins a known defect is the defect with
+    // a second lock on it), so the value is not asserted; F-1211 owns the
+    // fix, after which this becomes `agentEnv.auth` unconditionally, matching
+    // the stripe/slack/gmail bearers. What is true on BOTH sides of that fix
+    // is that the agent is handed one of the two bearers this session
+    // actually carries — never a third, empty or absent one.
+    expect(agentEnv.ght).toBeTruthy();
+    expect([agentEnv.auth, "ght_provider"]).toContain(agentEnv.ght);
     // Stripe vars injected UNCONDITIONALLY even on a github-only run.
     expect(agentEnv.sb).toBe(twinUrl);
     expect(agentEnv.sk).toBe(agentEnv.auth);

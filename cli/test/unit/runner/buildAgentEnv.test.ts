@@ -8,9 +8,11 @@ import { rawBodyHadPerTwin } from "../../../src/hosted/client.js";
 
 // Regression: single-twin runs against an OLD cloud (no `per_twin` in the wire
 // body) must stay BYTE-IDENTICAL to origin/main's hosted env, with ONE
-// deliberate exception: POME_GITHUB_TOKEN (see the F-1211 comment at its
-// assertions below — that key is a known defect, not a byte-identity
-// property, so this file does not pin its value). The schema synthesizes a
+// deliberate exception: the VALUE of POME_GITHUB_TOKEN (see the F-1211
+// comment at its assertions below — that value is a known defect, not a
+// byte-identity property, so this file does not pin it; the key's presence
+// and its slot in the insertion order are still asserted). The schema
+// synthesizes a
 // `per_twin` entry whose `mcp_url` host-rewrites api.pome.sh→mcp.pome.sh with
 // NO `/mcp` suffix; the fan-out must NOT trust that synthesized value and
 // must fall back to `${twin_url}/mcp`, exactly as main did. It must also keep
@@ -67,13 +69,24 @@ function originMainEnv(session: CreateSessionResponse): Record<string, string> {
   };
 }
 
-/** Drop `POME_GITHUB_TOKEN` from an env object while preserving the order of
- *  the remaining keys, so the byte-identity checks below can compare
- *  everything ELSE against `originMainEnv()` without re-asserting F-1211's
- *  defective value. */
+/** Drop `POME_GITHUB_TOKEN` so the value-level byte-identity checks below can
+ *  compare every OTHER key against `originMainEnv()` without re-asserting
+ *  F-1211's defective value. Key ORDER is checked separately, over the full
+ *  env — see `expectedKeyOrder`. */
 function withoutGithubToken(env: Record<string, string>): Record<string, string> {
   const { POME_GITHUB_TOKEN: _omitted, ...rest } = env;
   return rest;
+}
+
+/** `originMainEnv()`'s key order with `POME_GITHUB_TOKEN` put back in main's
+ *  slot for it — directly after `POME_GITHUB_MCP_URL`. The fixture omits the
+ *  key because its VALUE is F-1211's defect; its POSITION is ordinary
+ *  byte-identity coverage that F-1211 will not move, so the key-order check
+ *  keeps asserting it. */
+function expectedKeyOrder(expected: Record<string, string>): string[] {
+  return Object.keys(expected).flatMap((key) =>
+    key === "POME_GITHUB_MCP_URL" ? [key, "POME_GITHUB_TOKEN"] : [key],
+  );
 }
 
 function oldCloudBody(extra: Record<string, unknown> = {}): Record<string, unknown> {
@@ -132,7 +145,10 @@ describe("buildAgentEnv — single-twin old-cloud byte-identity", () => {
     const envWithoutGithubToken = withoutGithubToken(env);
     expect(envWithoutGithubToken).toEqual(expected);
     // Insertion order matters for byte-identity of any serialized env dump.
-    expect(Object.keys(envWithoutGithubToken)).toEqual(Object.keys(expected));
+    // POME_GITHUB_TOKEN's VALUE is F-1211's defect, but its SLOT in main's
+    // literal is not — the fix changes what the key holds, never where it
+    // sits — so the key-order check still covers the full env including it.
+    expect(Object.keys(env)).toEqual(expectedKeyOrder(expected));
     // Stripe vars injected unconditionally even for a github-only session.
     expect(env.POME_STRIPE_API_BASE).toBe(TWIN_URL);
     expect(env.POME_STRIPE_API_KEY).toBe(AGENT_TOKEN);
@@ -145,15 +161,21 @@ describe("buildAgentEnv — single-twin old-cloud byte-identity", () => {
     // (`GITHUB_PROVIDER_TOKEN`) as part of the "byte-identity acceptance
     // bar" above — that was pinning the defect, not protecting a real
     // property, so the assertion was deleted rather than flipped (F-1211
-    // owns the fix, not this ticket). When F-1211 lands, `buildAgentEnv`
-    // will set POME_GITHUB_TOKEN to `session.agent_token` unconditionally,
-    // matching stripe/slack/gmail elsewhere in this file — at which point
-    // this value will differ from `GITHUB_PROVIDER_TOKEN`. The only
-    // invariant that holds true both before AND after that fix, and so is
-    // safe to assert here, is that the key exists and carries some bearer
-    // string:
+    // owns the fix, not this ticket). F-1211 offers two fixes and has not
+    // picked one: set POME_GITHUB_TOKEN to `session.agent_token`
+    // unconditionally, matching how `buildAgentEnv`'s per-twin overlay
+    // already derives the stripe, slack and gmail bearers — or teach the
+    // proxy to accept the github provider credential, leaving this value the
+    // PAT. So there is no single "correct" value to flip this to yet.
+    //
+    // What holds under BOTH of those fixes — and so is what gets asserted —
+    // is that the key is present and carries one of the two bearers this
+    // session actually contains. That is deliberately stronger than a
+    // `typeof === "string"` check: it still reds if the key is dropped, and
+    // it ALSO reds if the value becomes a third bearer that is neither the
+    // PAT nor the JWT, which is the realistic way this line breaks.
     expect(typeof env.POME_GITHUB_TOKEN).toBe("string");
-    expect(env.POME_GITHUB_TOKEN.length).toBeGreaterThan(0);
+    expect([GITHUB_PROVIDER_TOKEN, AGENT_TOKEN]).toContain(env.POME_GITHUB_TOKEN);
   });
 
   it("empty per_twin ({}): FULL env is byte-identical to the omitted-per_twin case", () => {

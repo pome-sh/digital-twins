@@ -54,6 +54,7 @@ jobs:
       # the PR's actual base (a push to main has already merged).
       - if: github.event_name == 'pull_request'
         run: node scripts/ci/check-version-bump-required.mjs "${{ github.event.pull_request.base.sha }}"
+      - run: node scripts/ci/check-version-bump-required.test.mjs
       # F-949 — @pome-sh/wire publishes to GitHub Packages, and the two ways that
       # silently stops working are both readable straight from its package.json:
       # `private: true` makes `npm publish -w` skip the workspace and EXIT 0 (a
