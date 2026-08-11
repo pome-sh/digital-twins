@@ -98,7 +98,13 @@ export function createIssue(domain: GitHubDomain, input: { owner: string; repo: 
 export function listIssues(domain: GitHubDomain, input: { owner: string; repo: string; state?: "open" | "closed" | "all"; labels?: string; assignee?: string } & PageOptions) {
   const repo = domain.requireRepo(input.owner, input.repo);
   let rows = domain.listIssuesRows(repo.id);
-  if (input.state && input.state !== "all") rows = rows.filter((issue) => issue.state === input.state);
+  // Real GitHub defaults this route to `state=open` (F-1427). The filter used to
+  // apply only when `state` was PRESENT, so a caller who sent none — the common
+  // case — got closed issues too. Invisible while every seeded issue was open;
+  // the moment pome-cloud's fidelity seed closed one it showed up as `[].state`
+  // constant-mismatch and `[].closed_at` type-changed against real GitHub.
+  const state = input.state ?? "open";
+  if (state !== "all") rows = rows.filter((issue) => issue.state === state);
   if (input.labels) {
     const wanted = input.labels.split(",").map((label) => label.trim()).filter(Boolean);
     rows = rows.filter((issue) => {
@@ -312,7 +318,13 @@ export function deleteIssueComment(domain: GitHubDomain, input: { owner: string;
 export function listMilestones(domain: GitHubDomain, input: { owner: string; repo: string; state?: "open" | "closed" | "all" } & PageOptions) {
   const repo = domain.requireRepo(input.owner, input.repo);
   let rows = domain.db.prepare("SELECT * FROM milestones WHERE repo_id = ? ORDER BY number ASC").all(repo.id) as MilestoneRow[];
-  if (input.state && input.state !== "all") rows = rows.filter((milestone) => milestone.state === input.state);
+  // `state=open` by default, as on real GitHub (F-1427). pome-cloud's upstream
+  // seeder had already met this one and worked around it in the SEED rather than
+  // the twin — its milestone is kept open on purpose, commented "GitHub defaults
+  // that list to `state=open` — a closed milestone would leave the golden empty
+  // again". That workaround is what kept the twin's own missing default hidden.
+  const state = input.state ?? "open";
+  if (state !== "all") rows = rows.filter((milestone) => milestone.state === state);
   return paginate(rows, input.page, input.per_page ?? input.perPage).map((milestone) => milestoneJson(milestone, repo));
 }
 

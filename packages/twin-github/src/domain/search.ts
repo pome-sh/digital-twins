@@ -140,6 +140,13 @@ export function searchIssues(domain: GitHubDomain, input: { query?: string; q?: 
   let filtered = rows.filter((issue) => !query || issue.title.toLowerCase().includes(query) || issue.body.toLowerCase().includes(query) || issue.full_name.toLowerCase().includes(query));
   if (input.owner) filtered = filtered.filter((issue) => issue.owner === input.owner);
   if (input.repo) filtered = filtered.filter((issue) => issue.name === input.repo);
+  // NO `state=open` default here, deliberately (F-1427). The three repo LIST
+  // surfaces gained one because real GitHub defaults them; GitHub's SEARCH API
+  // does not — a search returns what the query asks for, and `is:open` is a
+  // query qualifier, not a default. Adding one to match the lists would be a new
+  // divergence in the other direction, and a worse one: this search is substring
+  // matching over the seeded world, so any query whose only match is closed would
+  // answer `[]` — an empty-array divergence in place of a value one.
   if (input.state && input.state !== "all") filtered = filtered.filter((issue) => issue.state === input.state);
   return {
     total_count: filtered.length,

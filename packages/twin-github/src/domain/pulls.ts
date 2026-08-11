@@ -113,7 +113,12 @@ export function listPullRequests(domain: GitHubDomain, input: { owner: string; r
   const repo = domain.requireRepo(input.owner, input.repo);
   const all = domain.listPullRequestRows(repo.id);
   let rows = all;
-  if (input.state && input.state !== "all") rows = rows.filter((pr) => pr.state === input.state);
+  // `state=open` by default, as on real GitHub (F-1427). Same missing default
+  // the issue list had, hidden the same way: every seeded pull request was open,
+  // so "all" and "open" named one set. `all` below is deliberately the UNFILTERED
+  // rows — see the note on the stack read.
+  const state = input.state ?? "open";
+  if (state !== "all") rows = rows.filter((pr) => pr.state === state);
   // `all`, not `rows`: a PR's stack is a fact about the whole repo, so the state
   // filter and the page must not change it. Reading it once here is also what
   // keeps serializing a page of N from re-reading the table N times (F-1178).
