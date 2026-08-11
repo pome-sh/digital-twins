@@ -4,7 +4,7 @@
 universal clone. This page documents exactly which surfaces are faithful to
 GitHub today, at what tier, and how fidelity is verified.
 
-Last verified: 2026-08-10.
+Last verified: 2026-08-11.
 
 ## What "fidelity" means here
 
@@ -58,11 +58,11 @@ in the package README. Changing any of those is a breaking change for
 | `create_branch` | SQLite branches/files | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts`, `concurrency.test.ts` | Branch protection is not modeled. |
 | `push_files` | SQLite files/commits | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts` | Multi-file pushes are one local commit; Git object APIs are simplified. |
 | `search_issues` | SQLite issues | hot | semantic | `mcp-contract.test.ts`, `performance.test.ts`, `fixture-endpoints.test.ts` | Query syntax is substring based. |
-| `list_issues` | SQLite issues | hot | semantic | `mcp-contract.test.ts`, `performance.test.ts`, `fixture-endpoints.test.ts` | Only state, labels, assignee, and pagination filters are supported. |
+| `list_issues` | SQLite issues | hot | semantic | `mcp-contract.test.ts`, `performance.test.ts`, `fixture-endpoints.test.ts`, `list-state-default.test.ts` | Only state, labels, assignee, and pagination filters are supported. An absent `state` means `open`, as on real GitHub (F-1427). |
 | `add_issue_comment` | SQLite issue comments | hot | semantic | `mcp-contract.test.ts`, `state-export.test.ts` | Comment edit/delete APIs are not implemented. |
 | `create_issue` | SQLite issues | hot | semantic | `mcp-contract.test.ts` | Issue templates and milestones are not modeled. |
 | `create_pull_request_review` | SQLite PR reviews | hot | semantic | `mcp-contract.test.ts`, `state-export.test.ts` | Inline review comments are not created by this tool. |
-| `list_pull_requests` | SQLite pull requests | hot | semantic | `mcp-contract.test.ts`, `v2-hot-paths-rest.test.ts` | Sorting and advanced filters are simplified. `stack` is derived from the base chain (divergence #11). |
+| `list_pull_requests` | SQLite pull requests | hot | semantic | `mcp-contract.test.ts`, `v2-hot-paths-rest.test.ts`, `list-state-default.test.ts` | Sorting and advanced filters are simplified. `stack` is derived from the base chain (divergence #11). An absent `state` means `open`, as on real GitHub (F-1427). |
 | `merge_pull_request` | SQLite merge mutation | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts` | Merge methods are simplified to one deterministic local merge. |
 | `update_pull_request_branch` | SQLite merge of base into head | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts`, `m5-hot-gaps.test.ts` | Merge commit carries a single parent; conflicting paths resolve head-wins (no 422 merge-conflict); 202-shaped no-op instead of GitHub's 422 when base has no new commits or when its changes are already contained on head (merge commits are only created when files change); no async update job. |
 | `create_pull_request` | SQLite pull requests/files | hot | semantic | `mcp-contract.test.ts`, `concurrency.test.ts` | Cross-repo forks are supported only when the fork exists in the clone. |
@@ -112,6 +112,44 @@ Twin-only fields are namespaced under `_twin.*`, matching `twin-slack` and
 
 If you hit this envelope and the route is one your agent needs, that's a
 fidelity gap worth filing — open an issue or a PR adding the route.
+
+### An absent `state` means `open` on the three list routes (F-1427)
+
+`GET /repos/:o/:r/issues`, `GET /repos/:o/:r/pulls` and
+`GET /repos/:o/:r/milestones` each default `state` to `open`, the way real
+GitHub documents them. `state=all` returns every item and an explicit
+`state=closed` returns the closed ones; both are unchanged.
+
+**This is a change to what the twin SERVES, not only to what it documents.**
+Until 0.10.4 the filter applied only when `state` was present, so a caller who
+sent none got closed items too — a task whose agent lists issues and counts them
+gets a different answer from 0.10.4 on. That answer is the one real GitHub gives,
+but it is a moved result, not a silent correction.
+
+It stayed invisible for one reason on all three surfaces: every seeded issue,
+pull request and milestone was open, so `all` and `open` named the same set and
+no fixture could tell them apart. pome-cloud's upstream seeder had already met
+the milestone half and worked around it in the SEED — its milestone is kept open
+on purpose, commented "GitHub defaults that list to `state=open` — a closed
+milestone would leave the golden empty again" — which is what kept the twin's own
+missing default hidden. The issue half surfaced the moment that seed closed an
+issue, as `[].state` constant-mismatch and `[].closed_at` type-changed against
+real GitHub, both CRITICAL.
+
+`GET /search/issues` is deliberately NOT part of this. GitHub's search API has no
+`state` default — `is:open` is a query qualifier, not a default — so the twin's
+search keeps filtering only on an explicit `state`. Imposing the list default
+there would be a new divergence in the other direction, and a worse one: the
+twin's search is substring matching over the seeded world, so a query whose only
+match is closed would answer `[]`, replacing a value mismatch with an
+empty-array one. Any residual `state` / `closed_at` finding on `/search/issues`
+is a property of that surface's upstream comparison, not of this default.
+
+Seeding the closed side of these surfaces works now, too: `seedSchema` had
+accepted `pull_requests[].state` for as long as the field existed while
+`createPullRequest` hardcoded `'open'` in its INSERT, so a seed asking for a
+closed pull request got an open one and `GET /pulls?state=closed` could not be
+made non-empty by any seed. It is applied from 0.10.4.
 
 ## Tier-mismatch ledger
 

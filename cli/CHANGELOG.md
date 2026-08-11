@@ -4,6 +4,22 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.9
+
+### Patch Changes
+
+- Carries twin-github 0.10.4 (F-1427) into the bundled twin.
+  `GET /repos/:o/:r/issues`, `GET /repos/:o/:r/pulls` and
+  `GET /repos/:o/:r/milestones` now default `state` to `open`, the way real
+  GitHub documents them; they previously returned closed items too whenever the
+  caller sent no `state`. **This moves results**: an agent that lists issues
+  under `pome twin start github` and counts them gets a different answer than it
+  did on 0.23.8 — the answer real GitHub gives, but a different one.
+  `state=all` and `state=closed` are unchanged, and `GET /search/issues` is
+  deliberately excluded (GitHub's search API has no such default). A seed asking
+  for a closed pull request also gets one now; the field was accepted and
+  silently dropped before. No CLI source changed.
+
 ## 0.23.8
 
 ### Patch Changes

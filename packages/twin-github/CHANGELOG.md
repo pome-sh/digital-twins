@@ -1,6 +1,65 @@
 # @pome-sh/twin-github — CHANGELOG
 
 
+## 0.10.4 — 2026-08-11
+
+An absent `state` means `open` on the three list routes, the way real GitHub
+documents them (F-1427).
+
+`GET /repos/:o/:r/issues`, `GET /repos/:o/:r/pulls` and
+`GET /repos/:o/:r/milestones` each filtered only when `state` was PRESENT:
+
+```js
+if (input.state && input.state !== "all") rows = rows.filter(...)
+```
+
+so a caller who sent none — the common case, and the one real GitHub answers with
+open items only — got everything, closed included.
+
+⚠️ **This changes what the twin SERVES.** A task whose agent lists issues and
+counts them gets a different answer from 0.10.4 on. That answer is the one real
+GitHub gives, but it is a moved result, not a silent correction. `state=all`
+returns everything and an explicit `state=closed` returns the closed items; both
+are unchanged.
+
+It stayed invisible for one reason on all three surfaces: every seeded issue,
+pull request and milestone was open, so `all` and `open` named the same set and
+no fixture could tell them apart. pome-cloud's upstream seeder had already met
+the milestone half and worked around it in the SEED rather than the twin — its
+milestone is kept open on purpose, commented "GitHub defaults that list to
+`state=open` — a closed milestone would leave the golden empty again". The issue
+half surfaced the moment pome-cloud's fidelity seed closed an issue, as
+`[].state` constant-mismatch and `[].closed_at` type-changed against real GitHub,
+both CRITICAL on a `semantic`-tier read surface.
+
+`GET /search/issues` is deliberately excluded and now says so in the code.
+GitHub's search API has no `state` default — `is:open` is a query qualifier, not
+a default — so the twin's search keeps filtering only on an explicit `state`.
+Imposing the list default there would be a new divergence in the other direction,
+and a worse one: the twin's search is substring matching over the seeded world,
+so a query whose only match is closed would answer `[]`, replacing a value
+mismatch with an empty-array one.
+
+Seeding the closed side of these surfaces works now, too. `seedSchema` had
+accepted `pull_requests[].state` for as long as the field existed, but nothing
+ever applied it — `createPullRequest` hardcodes `'open'` in its INSERT — so a
+seed asking for a closed pull request got an open one and
+`GET /pulls?state=closed` could not be made non-empty by any seed. That is the
+same shape of invisibility F-1421 fixed for the five entities the seed could not
+express at all, and it is why the pull-request half of this fix was untestable
+until now. The seed applies it last, after every child is seeded: the review and
+update-branch write paths refuse a non-open pull request, so closing first would
+make a seeded child fail against the state the seed itself asked for.
+
+`test/list-state-default.test.ts` seeds one open and one closed of each kind and
+compares SETS of numbers, never counts — a count matches for the wrong reason as
+easily as the right one, since two items is what `state=all` returns AND what an
+open default would return from a world with two open items. The absent case is
+asserted equal to the explicit `open` case and, separately, NOT equal to the
+`all` case, so a future change that reverts the default fails on the assertion
+that names the cause.
+
+
 ## 0.10.3 — 2026-08-10
 
 `GET /repos/:o/:r/pulls/:n/comments` serves the review-comment object, not six

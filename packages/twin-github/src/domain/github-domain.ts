@@ -233,6 +233,20 @@ export class GitHubDomain {
               { actor: author }
             );
           }
+          // F-1427 — LAST, after every child is seeded. `seedSchema` has taken
+          // `pull_requests[].state` since the field was added, but nothing ever
+          // applied it: `createPullRequest` hardcodes `'open'` in its INSERT, so
+          // a seed asking for a closed PR got an open one and
+          // `GET /pulls?state=closed` could not be made non-empty by any seed —
+          // the same shape of invisibility F-1421 fixed for the five entities
+          // the seed could not express at all. Ordering is the reason this sits
+          // here rather than beside `createPullRequest`: the review and
+          // update-branch write paths refuse a non-open PR, so closing first
+          // would make a seeded child fail against the state the seed itself
+          // asked for.
+          if (pull.state === "closed") {
+            this.updatePullRequest({ owner: repo.owner, repo: repo.name, pull_number: prNumber, state: "closed" });
+          }
         }
         // F-1421 — tags and releases last: both name a commit, so every branch
         // and commit the seed can point them at exists by now. Tags first, so a
