@@ -815,6 +815,54 @@ describe("runTaskHosted ADR-013 score reporting", () => {
     ]);
   });
 
+  // F-1299: the parser fix is pointless if the flag never reaches the wire —
+  // the cloud's seed-exclusion escape hatch (docs/grading/seed-exclusion.md,
+  // pome-cloud) reads `criteria[].always_scored` off THIS request body, not
+  // off the task markdown (the CLI parses it locally and never re-uploads the
+  // source). A criterion with no keyword must still forward byte-identical to
+  // before this field existed — no `always_scored: false`.
+  it("forwards always-scored criteria as `always_scored: true` on the wire, and omits the key otherwise", async () => {
+    const scenarioWithAlwaysScored =
+      "# Trivial always-scored\n\n## Prompt\np\n\n## Success Criteria\n" +
+      "- [code always-scored] No unsupported endpoint was called\n" +
+      "- [code] Issue exists\n";
+
+    const { client, getFinalizeInput } = makeStubClient({
+      requestEventsUploadUrlImpl: async () => {
+        throw new HostedOrchError("no route");
+      },
+    });
+
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+      throw new Error(`Unexpected fetch call to ${String(url)}`);
+    });
+
+    const taskPath = join(tmp, "scn-always-scored.md");
+    await writeFile(taskPath, scenarioWithAlwaysScored, "utf8");
+
+    await runTaskHosted({
+      taskPath,
+      agentCommand: `node -e ${JSON.stringify("console.log('done')")}`,
+      artifactsDir: join(tmp, "runs"),
+      hosted: { baseUrl: "http://no-cloud.invalid", apiKey: "pme_test" },
+      client,
+    });
+
+    const sent = getFinalizeInput() as {
+      criteria: { id: string; text: string; kind: string; always_scored?: boolean }[];
+    };
+    expect(sent.criteria).toEqual([
+      {
+        id: "crit_0",
+        text: "No unsupported endpoint was called",
+        kind: "code",
+        always_scored: true,
+      },
+      { id: "crit_1", text: "Issue exists", kind: "code" },
+    ]);
+    expect(Object.hasOwn(sent.criteria[1]!, "always_scored")).toBe(false);
+  });
+
   it("FAIL when cloud returns satisfaction < passThreshold", async () => {
     const { client } = makeStubClient({
       requestEventsUploadUrlImpl: async () => {

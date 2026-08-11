@@ -10,9 +10,14 @@
 
 const HEADING_RE = /^##\s+Success Criteria\s*$/;
 const NEXT_HEADING_RE = /^##\s+/;
-// Mirrors CRITERION_LINE_RE in ./parseTask.ts. Used ONLY to find where the last
-// existing criterion sits — never to validate one; that is the parser's job.
-const CRITERION_RE = /^[-*]\s+\[(?:code|model)(?::[a-z][a-z0-9_-]*)?\]\s+.+$/;
+// Mirrors CRITERION_LINE_RE in ./parseTask.ts, including the F-1299
+// always-scored keyword — a criterion this regex does not recognise as one
+// gets skipped when scanning for the last existing criterion (below), so an
+// always-scored line that fell through here would let a new criterion insert
+// BEFORE it instead of after. Used ONLY to find where the last existing
+// criterion sits — never to validate one; that is the parser's job.
+const CRITERION_RE =
+  /^[-*]\s+\[(?:code|model)(?::[a-z][a-z0-9_-]*)?(?:\s+always-scored)?\]\s+.+$/;
 
 export class MissingCriteriaSectionError extends Error {
   constructor(path: string) {

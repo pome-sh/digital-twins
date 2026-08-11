@@ -596,11 +596,17 @@ export async function runTaskHosted(
     // Multi-twin (M3): carry the per-criterion twin attribution so the cloud
     // judge checks each criterion against its twin's state. Absent = the
     // primary twin (single-twin scenarios omit it entirely).
+    // F-1299: also carry the parsed `always-scored` flag — the cloud's
+    // seed-exclusion escape hatch reads it off THIS request body
+    // (criteria[].always_scored), not off re-parsed markdown, so a flag the
+    // parser reads but this map drops would repeat the exact silent-loss
+    // defect the parser fix exists to close, one hop later.
     const criteriaDefs: CriterionDefWire[] = scenario.criteria.map((c, idx) => ({
       id: `crit_${idx}`,
       text: c.text,
       kind: c.type,
       ...(c.twin ? { twin: c.twin } : {}),
+      ...(c.alwaysScored ? { always_scored: true } : {}),
     }));
     const stopReason = agentResult.timedOut
       ? "agent_timeout"

@@ -14,6 +14,29 @@ import { z } from "zod";
 
 export { criterionSchema };
 
+// F-1296 (pome-cloud) / F-1299 (this repo) — the published contract's
+// criterion, plus the one thing this parser has to say about it that the
+// contract does not carry yet.
+//
+// `alwaysScored` marks a criterion that must be graded even when the SEED
+// already satisfies it — the inverse-task escape hatch for pome-cloud's
+// seed-exclusion rule (see `apps/control-plane/src/services/evaluators/
+// deterministic/pre-satisfied.ts` and `docs/grading/seed-exclusion.md`,
+// pome-cloud). Authored as a marker keyword, `- [code:slack always-scored] …`,
+// and read by `parseCriteria`.
+//
+// EXTENDED HERE rather than on `criterionSchema` itself, mirroring the choice
+// the hosted mirror already made (`apps/mcp/src/task/taskSchema.ts`,
+// pome-cloud): `criterionSchema` (`../contract/run.ts`) is the published wire
+// contract shared with `CriterionResult` / verdict artifacts / every other
+// consumer of a parsed Criterion, and a flag only the deterministic scorer
+// reads does not need to widen every one of those. Extending keeps the field
+// alive across this module's own `.parse()` without touching the wire shape
+// everything else consumes.
+export const taskCriterionSchema = criterionSchema.extend({
+  alwaysScored: z.boolean().optional(),
+});
+
 // F-1302 — which population a task belongs to. See `taskClassSchema` in
 // ../contract/task.ts for what the three values mean and why the field is
 // optional here but mandatory for the tasks THIS repo ships.
@@ -115,7 +138,7 @@ export const taskSchema = z.object({
   setup: z.string().default(""),
   prompt: z.string().min(1),
   expectedBehavior: z.string().default(""),
-  criteria: z.array(criterionSchema).min(1),
+  criteria: z.array(taskCriterionSchema).min(1),
   config: taskConfigSchema,
   // Flat single-twin seed OR the multi-twin per-twin envelope. Flat is tried
   // first so single-twin seeds match their strict arms; the envelope only
@@ -123,7 +146,7 @@ export const taskSchema = z.object({
   seedState: z.union([seedStateSchema, seedEnvelopeSchema])
 });
 
-export type Criterion = z.infer<typeof criterionSchema>;
+export type Criterion = z.infer<typeof taskCriterionSchema>;
 export type TaskConfig = z.infer<typeof taskConfigSchema>;
 export type GithubSeedState = z.infer<typeof githubSeedStateSchema>;
 export type StripeSeedState = z.infer<typeof stripeSeedStateSchema>;

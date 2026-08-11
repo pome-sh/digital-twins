@@ -22,7 +22,7 @@ import {
 } from "@pome-sh/twin-linear/seed";
 import { parseGitHubSeedState } from "./githubSeedCompat.js";
 import {
-  criterionSchema,
+  taskCriterionSchema,
   taskConfigSchema,
   taskSchema,
   slackSeedStateSchema,
@@ -100,10 +100,14 @@ export function readCodeCriteria(markdown: string): CodeCriterion[] {
     const match = rawLine.trim().match(CRITERION_LINE_RE);
     if (!match || match[1] !== "code") continue;
     const tag = match[2];
+    // F-1299: group 3 is the always-scored keyword, text moved to group 4.
+    // Reconstructing the marker WITH the keyword keeps the echoed line
+    // findable by search, same reason the twin tag is reconstructed into it.
+    const alwaysScored = match[3] !== undefined;
     found.push({
-      marker: `[code${tag ? `:${tag}` : ""}]`,
+      marker: `[code${tag ? `:${tag}` : ""}${alwaysScored ? " always-scored" : ""}]`,
       twin: tag ?? primary,
-      text: match[3]!.trim(),
+      text: match[4]!.trim(),
     });
   }
   return found;
@@ -315,7 +319,21 @@ function splitSections(markdown: string) {
 // `[a-z][a-z0-9_-]*`. The marker spells the canonical criterion kind directly.
 // The tag lands on `criterion.twin`; a bare marker leaves it undefined
 // (attributes to the session's primary twin, `twins[0]`).
-const CRITERION_LINE_RE = /^[-*]\s+\[(code|model)(?::([a-z][a-z0-9_-]*))?\]\s+(.+)$/;
+//
+// F-1296 (pome-cloud) / F-1299 added a third, optional part: the keyword
+// `always-scored`, after the kind and any tag — `- [code:slack always-scored]
+// No message was posted to …`. It marks a criterion graded even when the seed
+// already satisfies it (see `taskCriterionSchema.alwaysScored` in
+// `./taskSchema.ts`), and it lives IN THE MARKER because that is the only part
+// of the line an author can annotate without changing the graded sentence.
+//
+// Must stay byte-for-byte identical to the hosted mirror's
+// (`apps/mcp/src/task/parseTask.ts`, pome-cloud): a task written with the
+// keyword used to parse hosted and silently lose the criterion here, because
+// the older CLI-side regex did not match the line and `parseCriteria` skipped
+// it as unrecognised prose — the exact defect F-1299 closes.
+const CRITERION_LINE_RE =
+  /^[-*]\s+\[(code|model)(?::([a-z][a-z0-9_-]*))?(\s+always-scored)?\]\s+(.+)$/;
 // The retired pre-F-778 marker spelling, matched ONLY to fail loudly. Without
 // this guard a legacy `[D]`/`[P]` line would fall through the silent
 // skip-non-criterion path below and the scenario would "pass" with fewer
@@ -341,9 +359,19 @@ function parseCriteria(input: string, twins: string[]): Criterion[] {
     if (!match) continue;
     const kind = match[1]!; // "code" | "model"
     const tag = match[2]; // twin tag or undefined
-    const text = match[3]!.trim();
+    const alwaysScored = match[3] !== undefined; // F-1296/F-1299 `always-scored` keyword
+    const text = match[4]!.trim();
     // Reconstruct the human-facing marker for error messages.
-    const marker = `[${kind}${tag ? `:${tag}` : ""}]`;
+    const marker = `[${kind}${tag ? `:${tag}` : ""}${alwaysScored ? " always-scored" : ""}]`;
+
+    // `always-scored` only means anything to the deterministic scorer: the
+    // judge never takes a seed reading, so a [model] criterion has nothing to
+    // exclude and nothing to honour the flag.
+    if (alwaysScored && kind !== "code") {
+      throw new Error(
+        `Criterion "${marker} ${text}" is marked always-scored, which only applies to [code] criteria — a [model] criterion is judged from the run, never against the seed.`,
+      );
+    }
 
     if (tag !== undefined) {
       if (!multiTwin) {
@@ -369,13 +397,16 @@ function parseCriteria(input: string, twins: string[]): Criterion[] {
     }
 
     // The marker spells the canonical kind; `criterionSchema` keeps accepting
-    // the legacy `D`/`P` enum values only for 0.3.0-era persisted artifacts
-    // (the published contract's tolerant reader), never from markdown.
-    // The optional `twin` rides through untouched.
+    // the legacy `D`/`P` values only for 0.3.0-era artifacts, never markdown.
+    // `twin` and `alwaysScored` ride through untouched, both ABSENT (never
+    // `false`) when the line carries no tag / no keyword.
     criteria.push(
-      criterionSchema.parse(
-        tag !== undefined ? { type: kind, text, twin: tag } : { type: kind, text },
-      ),
+      taskCriterionSchema.parse({
+        type: kind,
+        text,
+        ...(tag !== undefined ? { twin: tag } : {}),
+        ...(alwaysScored ? { alwaysScored: true } : {}),
+      }),
     );
   }
 
