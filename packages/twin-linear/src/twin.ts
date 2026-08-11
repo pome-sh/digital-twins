@@ -141,7 +141,7 @@ export function withPublicOAuth(app: Hono, db: LinearTwinDatabase): Hono {
  *     declared input that fails its schema, is handed on to the recorded
  *     handler, which answers it through the twin's own error envelope.
  */
-export function withPersistedQueryGate(app: Hono): Hono {
+function withPersistedQueryGate(app: Hono): Hono {
   const root = new Hono();
   // Both declarations carry the same path, and the engine answers it at the
   // root and under `/s/:sid` (`mountSessionAtRoot`), so the gate covers both.

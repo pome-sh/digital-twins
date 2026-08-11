@@ -454,6 +454,35 @@ describe("`extensions` — the persisted-query envelope member (F-1385)", () => 
     expect(satisfied.body).toEqual(control.body);
   });
 
+  it("answers the same at `/s/:sid/graphql`, which is the other mount of one router", async () => {
+    // `mountSessionAtRoot` serves the session app at BOTH paths, so a gate
+    // mounted at one of them leaves the other on the old behaviour — a hole
+    // that every assertion above would miss, since they all use the root mount.
+    const url = `/s/${DEFAULT_LINEAR_SID}/graphql`;
+    const send = async (envelope: Record<string, unknown>) => {
+      const response = await app.request(url, {
+        method: "POST",
+        headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json" },
+        body: JSON.stringify(envelope),
+      });
+      return { status: response.status, body: await response.json() };
+    };
+
+    const mismatched = await send({
+      query: APQ_QUERY,
+      extensions: persistedQuery({ version: 1, sha256Hash: WRONG_HASH }),
+    });
+    expect(mismatched.status).toBe(400);
+    expect(mismatched.body).toEqual(INTERNAL_SERVER_ERROR);
+
+    const satisfied = await send({
+      query: APQ_QUERY,
+      extensions: persistedQuery({ version: 1, sha256Hash: APQ_HASH }),
+    });
+    expect(satisfied.status).toBe(200);
+    expect((satisfied.body as { errors?: unknown }).errors).toBeUndefined();
+  });
+
   it("hands anything it cannot parse to the ordinary recorded path", async () => {
     // The gate runs outside the recorder and outside the twin's error
     // envelope, so it must never be the thing that answers a malformed
