@@ -41,12 +41,40 @@ function isUnpublishableTestPath(file) {
   return /(^|\/)tests?\//.test(file) || /\.test\.[cm]?[jt]sx?$/.test(file);
 }
 
+/**
+ * A twin's own top-level examples/ ships in no tarball — but not because of
+ * its `files` array. Some twins' `files` DO name it: twin-github and
+ * twin-slack's tsconfig.build.json compile `examples/**\/*.ts` into
+ * `dist/examples/*.js` (rootDir "."), and `files: ["dist", ...]` names
+ * `dist`. The actual load-bearing fact is `private: true` — release.yml
+ * (F-1308, F-949) publishes only cli, adapter-claude-sdk, checks and wire,
+ * and no twin is any of those. Nothing in this repo currently asserts a
+ * twin stays private, so if one were ever unprivated this exemption would
+ * need re-checking; today it holds for all five. The CLI's own `files`
+ * entry "examples" is cli/examples (cli/tsconfig.json's `include`), a
+ * different directory, not a twin's.
+ *
+ * `[^/]+` is deliberately one path segment, so only a twin's TOP-LEVEL
+ * examples/ is exempt — `packages/twin-stripe/src/examples/handler.ts`
+ * does not match, because that file compiles into the twin's `dist` same as
+ * any other `src/` module and is publish-relevant if the CLI bundle imports
+ * it.
+ *
+ * F-1455, reproduced by PR #366 (F-1453): a PR touching only
+ * packages/twin-stripe/examples/buyer-agent/ was told to bump @pome-sh/cli
+ * for a republish that would be byte-identical.
+ */
+function isTwinExamplePath(file) {
+  return /^packages\/twin-[^/]+\/examples\//.test(file);
+}
+
 const changedFiles = execFileSync("git", ["diff", "--name-only", baseSha, "HEAD"], {
   encoding: "utf8",
 })
   .split("\n")
   .filter(Boolean)
-  .filter((file) => !isUnpublishableTestPath(file));
+  .filter((file) => !isUnpublishableTestPath(file))
+  .filter((file) => !isTwinExamplePath(file));
 
 function versionAt(ref, manifestPath) {
   try {
