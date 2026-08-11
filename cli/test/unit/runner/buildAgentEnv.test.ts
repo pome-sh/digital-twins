@@ -7,12 +7,15 @@ import { buildAgentEnv } from "../../../src/runner/runTaskHosted.js";
 import { rawBodyHadPerTwin } from "../../../src/hosted/client.js";
 
 // Regression: single-twin runs against an OLD cloud (no `per_twin` in the wire
-// body) must stay BYTE-IDENTICAL to origin/main's hosted env. The schema
-// synthesizes a `per_twin` entry whose `mcp_url` host-rewrites
-// api.pome.sh→mcp.pome.sh with NO `/mcp` suffix; the fan-out must NOT trust
-// that synthesized value and must fall back to `${twin_url}/mcp`, exactly as
-// main did. It must also keep injecting the github + stripe vars unconditionally
-// (main set them on every hosted run regardless of twin).
+// body) must stay BYTE-IDENTICAL to origin/main's hosted env, with ONE
+// deliberate exception: POME_GITHUB_TOKEN (see the F-1211 comment at its
+// assertions below — that key is a known defect, not a byte-identity
+// property, so this file does not pin its value). The schema synthesizes a
+// `per_twin` entry whose `mcp_url` host-rewrites api.pome.sh→mcp.pome.sh with
+// NO `/mcp` suffix; the fan-out must NOT trust that synthesized value and
+// must fall back to `${twin_url}/mcp`, exactly as main did. It must also keep
+// injecting the github + stripe vars unconditionally (main set them on every
+// hosted run regardless of twin).
 
 const AGENT_TOKEN = "edt_fake.jwt.token";
 const GITHUB_PROVIDER_TOKEN = "ght_provider_x";
@@ -32,8 +35,17 @@ const ENV_SCAFFOLD = {
 } as const;
 
 /** Reproduce the env origin/main produced for a single-twin github session —
- *  the acceptance bar for byte-identity. Mirrors main's env object literal
- *  (keys AND insertion order) exactly. */
+ *  the acceptance bar for byte-identity over every key EXCEPT
+ *  `POME_GITHUB_TOKEN`. Mirrors main's env object literal (keys AND insertion
+ *  order) exactly for everything else.
+ *
+ *  `POME_GITHUB_TOKEN` is deliberately omitted here: main computes it as
+ *  `session.provider_credentials.github?.token ?? session.agent_token`, which
+ *  is F-1211 — the twin proxy verifies bearers only against `agent_token`, so
+ *  that provider-credential PAT 404s against every real hosted twin. Pinning
+ *  it as part of a "byte-identity" fixture would assert the bug is the
+ *  correct behaviour; see the F-1211 comment at this fixture's call sites for
+ *  what is actually asserted about that key instead. */
 function originMainEnv(session: CreateSessionResponse): Record<string, string> {
   const { agentId, runId } = ENV_SCAFFOLD;
   return {
@@ -46,8 +58,6 @@ function originMainEnv(session: CreateSessionResponse): Record<string, string> {
     POME_TWIN_BASE_URL: session.twin_url,
     POME_GITHUB_REST_URL: session.twin_url,
     POME_GITHUB_MCP_URL: `${session.twin_url}/mcp`,
-    POME_GITHUB_TOKEN:
-      session.provider_credentials.github?.token ?? session.agent_token,
     POME_STRIPE_API_BASE: session.twin_url,
     POME_STRIPE_API_KEY: session.agent_token,
     POME_AUTH_TOKEN: session.agent_token,
@@ -55,6 +65,15 @@ function originMainEnv(session: CreateSessionResponse): Record<string, string> {
     POME_ARTIFACTS_DIR: `runs/scn/${runId}`,
     POME_ADAPTER_SIGNALS_PATH: ENV_SCAFFOLD.signalsPath,
   };
+}
+
+/** Drop `POME_GITHUB_TOKEN` from an env object while preserving the order of
+ *  the remaining keys, so the byte-identity checks below can compare
+ *  everything ELSE against `originMainEnv()` without re-asserting F-1211's
+ *  defective value. */
+function withoutGithubToken(env: Record<string, string>): Record<string, string> {
+  const { POME_GITHUB_TOKEN: _omitted, ...rest } = env;
+  return rest;
 }
 
 function oldCloudBody(extra: Record<string, unknown> = {}): Record<string, unknown> {
@@ -110,12 +129,31 @@ describe("buildAgentEnv — single-twin old-cloud byte-identity", () => {
     });
 
     const expected = originMainEnv(session);
-    expect(env).toEqual(expected);
+    const envWithoutGithubToken = withoutGithubToken(env);
+    expect(envWithoutGithubToken).toEqual(expected);
     // Insertion order matters for byte-identity of any serialized env dump.
-    expect(Object.keys(env)).toEqual(Object.keys(expected));
+    expect(Object.keys(envWithoutGithubToken)).toEqual(Object.keys(expected));
     // Stripe vars injected unconditionally even for a github-only session.
     expect(env.POME_STRIPE_API_BASE).toBe(TWIN_URL);
     expect(env.POME_STRIPE_API_KEY).toBe(AGENT_TOKEN);
+
+    // F-1211: main computes POME_GITHUB_TOKEN as
+    // `session.provider_credentials.github?.token ?? session.agent_token`,
+    // which is the exact expression that hands the twin proxy a
+    // provider-credential PAT it 404s on (the proxy verifies bearers only
+    // against `agent_token`). This test used to assert that PAT
+    // (`GITHUB_PROVIDER_TOKEN`) as part of the "byte-identity acceptance
+    // bar" above — that was pinning the defect, not protecting a real
+    // property, so the assertion was deleted rather than flipped (F-1211
+    // owns the fix, not this ticket). When F-1211 lands, `buildAgentEnv`
+    // will set POME_GITHUB_TOKEN to `session.agent_token` unconditionally,
+    // matching stripe/slack/gmail elsewhere in this file — at which point
+    // this value will differ from `GITHUB_PROVIDER_TOKEN`. The only
+    // invariant that holds true both before AND after that fix, and so is
+    // safe to assert here, is that the key exists and carries some bearer
+    // string:
+    expect(typeof env.POME_GITHUB_TOKEN).toBe("string");
+    expect(env.POME_GITHUB_TOKEN.length).toBeGreaterThan(0);
   });
 
   it("empty per_twin ({}): FULL env is byte-identical to the omitted-per_twin case", () => {
@@ -140,8 +178,12 @@ describe("buildAgentEnv — single-twin old-cloud byte-identity", () => {
       ...ENV_SCAFFOLD,
     });
 
+    // Both sides come from the SAME buildAgentEnv code path (including
+    // whatever POME_GITHUB_TOKEN it currently computes, F-1211 included) —
+    // this is a self-consistency check between two actual outputs, not a
+    // comparison against a fixed "correct" value, so it is not a defect pin.
     expect(envEmpty).toEqual(envOmitted);
-    expect(envEmpty).toEqual(originMainEnv(sessionEmpty));
+    expect(withoutGithubToken(envEmpty)).toEqual(originMainEnv(sessionEmpty));
   });
 
   it("new cloud with real per_twin: trusts mcp_url + applies ensureMcpSuffix", () => {

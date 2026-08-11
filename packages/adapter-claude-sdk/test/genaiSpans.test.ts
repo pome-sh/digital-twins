@@ -402,6 +402,18 @@ describe("withGenAiSpans → gen_ai.usage.output_tokens is the message_delta tru
   // usage, so the exactness invariant holds over MAIN-AGENT turns. Live
   // two-subagent run: main deltas 517 + 7 == result 524, with the subagent turns'
   // 4 + 4 sitting outside that total on both sides.
+  //
+  // F-1014: that "4" snapshot is the defect this ticket tracks — a real
+  // sub-agent turn doing ~22k tokens of work reports 4, because the SDK never
+  // emits a `message_delta` for it and nothing yet reads the real total from
+  // `system/task_notification`. Asserting `4` here as the expected span value
+  // would pin that defect a second time (F-1375), so this test does NOT
+  // assert what the sub-agent spans' token count equals — only that they are
+  // NOT the main turn's delta (517), which is the actual regression this test
+  // guards against ("must not leak onto it," above) and will remain true
+  // after F-1014 lands, whatever the corrected sub-agent number turns out to
+  // be (`system/task_notification`'s `total_tokens`, or `total - input`, per
+  // the ticket's ordered approach).
   it("keeps the snapshot on a subagent turn and does not leak the main delta onto it", async () => {
     await drive([
       streamStart("msg_main"),
@@ -422,7 +434,13 @@ describe("withGenAiSpans → gen_ai.usage.output_tokens is the message_delta tru
     ]);
 
     const spans = collectSpans();
-    expect(spans.map(outputTokensOf)).toEqual([517, 4, 4]);
+    expect(spans.length).toBe(3);
+    // Main-agent turn: unaffected by F-1014, still the exact message_delta count.
+    expect(outputTokensOf(spans[0]!)).toBe(517);
+    // Sub-agent turns must carry their OWN number, not the main turn's delta —
+    // see the F-1014 comment above for why that number itself is not asserted.
+    expect(outputTokensOf(spans[1]!)).not.toBe(outputTokensOf(spans[0]!));
+    expect(outputTokensOf(spans[2]!)).not.toBe(outputTokensOf(spans[0]!));
   });
 
   // The lanes keep ONE `pending` turn, not one per stream, so a subagent's
@@ -460,7 +478,19 @@ describe("withGenAiSpans → gen_ai.usage.output_tokens is the message_delta tru
     ]);
 
     const spans = collectSpans();
-    expect(spans.map(outputTokensOf)).toEqual([517, 4, 4, 7]);
+    expect(spans.length).toBe(4);
+    // Main-agent turns, in stream order, survive the interleaved sub-agent
+    // turns untouched.
+    expect(outputTokensOf(spans[0]!)).toBe(517);
+    expect(outputTokensOf(spans[3]!)).toBe(7);
+    // spans[1] and spans[2] are the interleaved sub-agent turns — see the
+    // F-1014 comment on the previous test for why their token count is not
+    // asserted here (that number, currently a 4-token snapshot, is F-1014's
+    // defect, not a byte we should pin). The invariant that matters — the
+    // interleaving does not corrupt the main turn's boundary — is what
+    // spans[0]/spans[3] above and the total below prove.
+    expect(outputTokensOf(spans[1]!)).not.toBe(outputTokensOf(spans[0]!));
+    expect(outputTokensOf(spans[2]!)).not.toBe(outputTokensOf(spans[0]!));
     // Main-agent turns alone reproduce SDKResultMessage.usage.output_tokens.
     expect(517 + 7).toBe(524);
   });
