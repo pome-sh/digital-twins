@@ -10,12 +10,15 @@
 // does not name the way F-1372 measured Linear handling one, and that the
 // argument projection is the schema rather than a second description of it.
 
+import { createHash } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { sign } from "hono/jwt";
 import { diffRegisteredRoutes, type UndeclaredDisposition } from "@pome-sh/sdk/route-inputs";
+import { createRecorderStore } from "@pome-sh/sdk/server";
 import {
   DEFAULT_LINEAR_EMAIL,
   DEFAULT_LINEAR_SID,
+  DEFAULT_LINEAR_TOKEN,
   createLinearTwinApp,
 } from "../src/index.js";
 import { linearGraphqlArgumentSurfaces } from "../src/graphql/argument-surface.js";
@@ -158,20 +161,370 @@ describe("route input declarations", () => {
 
   it("declares the GraphQL envelope, which is transport and not an operation argument", () => {
     // The distinction matters for the published artifact: `query` /
-    // `variables` / `operationName` are inputs of the HTTP surface, while an
-    // issue's `title` is an argument of a root field. Conflating them would
-    // report `undeclaredByVendor` on three names Linear's GraphQL schema has no
-    // reason to declare.
+    // `variables` / `operationName` / `extensions` are inputs of the HTTP
+    // surface, while an issue's `title` is an argument of a root field.
+    // Conflating them would report `undeclaredByVendor` on four names Linear's
+    // GraphQL schema has no reason to declare.
     expect(LINEAR_ROUTES.graphqlGet.inputs.map((input) => `${input.location}:${input.name}`)).toEqual([
+      "query:extensions",
       "query:operationName",
       "query:query",
       "query:variables",
     ]);
     expect(LINEAR_ROUTES.graphqlPost.inputs.map((input) => `${input.location}:${input.name}`)).toEqual([
+      "body:extensions",
       "body:operationName",
       "body:query",
       "body:variables",
     ]);
+  });
+});
+
+// ─── F-1385 — `extensions`, the fourth envelope member ───────────────────────
+//
+// Re-measured against real `https://api.linear.app/graphql` on 2026-08-11. The
+// ticket's reading — that Linear's 400 is "automatic persisted queries simply
+// switched off" — is FALSIFIED by that measurement: Linear runs APQ in
+// verify-only mode, and the 400 is the hash check failing. The full transcript
+// is in `docs/undeclared-route-inputs.md`; this suite is the same table driven
+// over the real HTTP wire, which is the third of F-1385's Done-whens.
+//
+// Every case below is answered BEFORE authentication, which is why each one is
+// also run with a deliberately-bad bearer token further down. That ordering is
+// the fix, not a detail: reject after the auth check and an agent sending an
+// APQ payload with a stale token sees 401 here and 400 at Linear — the same
+// divergence in a harder-to-see form.
+
+/** A query, and the hash an Apollo client computes for it. */
+const APQ_QUERY = "{__typename}";
+const APQ_HASH = createHash("sha256").update(APQ_QUERY).digest("hex");
+const WRONG_HASH = "abc";
+
+/** A token that is syntactically a bearer and resolves to no session. */
+const BAD_TOKEN = "lin_api_deliberately_not_a_real_token";
+
+function persistedQuery(descriptor: unknown): Record<string, unknown> {
+  return { persistedQuery: descriptor };
+}
+
+/** Linear's answer to an APQ descriptor it cannot satisfy. */
+const INTERNAL_SERVER_ERROR = {
+  errors: [
+    {
+      message: "Internal server error",
+      extensions: {
+        http: { status: 400, headers: {} },
+        code: "INTERNAL_SERVER_ERROR",
+        type: "internal error",
+        userError: false,
+      },
+    },
+  ],
+};
+
+/** Linear's answer to an `extensions` value that is not a usable object. */
+function badRequest(message: string) {
+  return {
+    errors: [
+      {
+        message,
+        extensions: {
+          http: { status: 400, headers: {} },
+          code: "BAD_REQUEST",
+          type: "internal error",
+          userError: false,
+        },
+      },
+    ],
+  };
+}
+
+/** APQ's lookup miss — HTTP 200, the error inside the envelope. */
+const PERSISTED_QUERY_NOT_FOUND = {
+  errors: [
+    {
+      message: "PersistedQueryNotFound",
+      extensions: {
+        http: { status: 200, headers: {} },
+        code: "PERSISTED_QUERY_NOT_FOUND",
+        type: "graphql error",
+        userError: true,
+      },
+    },
+  ],
+};
+
+async function post(
+  envelope: Record<string, unknown>,
+  token: string = jwt
+): Promise<{ status: number; body: unknown }> {
+  const response = await app.request("/graphql", {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify(envelope),
+  });
+  return { status: response.status, body: await response.json() };
+}
+
+async function get(
+  params: Record<string, string>,
+  token: string = jwt
+): Promise<{ status: number; body: unknown }> {
+  const response = await app.request(`/graphql?${new URLSearchParams(params).toString()}`, {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  return { status: response.status, body: await response.json() };
+}
+
+describe("`extensions` — the persisted-query envelope member (F-1385)", () => {
+  it("declares it on both `/graphql` surfaces, so the declared lane can compare it", () => {
+    // The C case of the measurement is why this is DECLARED rather than left to
+    // the twin's `ignore` disposition: an unknown envelope key (`bogusKey`)
+    // answers exactly as the bare request does, while `extensions` has its own
+    // observable contract. Only the second kind belongs in `route-inputs.ts`.
+    for (const declaration of [LINEAR_ROUTES.graphqlGet, LINEAR_ROUTES.graphqlPost]) {
+      expect(declaration.names, `${declaration.surface} does not declare 'extensions'`).toContain(
+        "extensions"
+      );
+      const declared = declaration.inputs.find((input) => input.name === "extensions");
+      expect(declared?.required, `${declaration.surface} makes 'extensions' required`).toBe(false);
+    }
+  });
+
+  it("serves the request when `extensions` carries no persisted query", async () => {
+    // Measured: `{}`, `{foo:1}`, `null` and `persistedQuery: null` each left
+    // Linear's answer exactly where the bare request's was. `extensions` is not
+    // a key Linear rejects; `persistedQuery` is the key it acts on.
+    for (const extensions of [undefined, null, {}, { foo: 1 }, persistedQuery(null)]) {
+      const { status, body } = await post({ query: APQ_QUERY, extensions });
+      expect(status, `extensions ${JSON.stringify(extensions)} was not served`).toBe(200);
+      expect((body as { errors?: unknown }).errors).toBeUndefined();
+    }
+  });
+
+  it("serves the request when the persisted-query hash matches the query", async () => {
+    // The case the ticket's ruling would have got wrong. An Apollo client with
+    // APQ enabled retries a cache miss with the query AND its hash; Linear
+    // verifies the pair and goes on to serve it. Answering 400 here would
+    // score an agent for a failure it did not commit.
+    const { status, body } = await post({
+      query: APQ_QUERY,
+      extensions: persistedQuery({ version: 1, sha256Hash: APQ_HASH }),
+    });
+    expect(status).toBe(200);
+    expect((body as { errors?: unknown }).errors).toBeUndefined();
+  });
+
+  it("answers 400 `INTERNAL_SERVER_ERROR` for a descriptor it cannot satisfy", async () => {
+    // Each of these was measured returning this exact envelope. The shape reads
+    // like an unhandled path rather than a designed contract — `userError:
+    // false` on what is plainly a client mistake — which is why it is recorded
+    // as an OBSERVED behaviour in FIDELITY.md rather than asserted as intent.
+    const unsatisfiable: Array<[string, unknown]> = [
+      ["hash does not match the query", persistedQuery({ version: 1, sha256Hash: WRONG_HASH })],
+      ["hash matches but in the wrong case", persistedQuery({ version: 1, sha256Hash: APQ_HASH.toUpperCase() })],
+      ["unsupported protocol version", persistedQuery({ version: 2, sha256Hash: APQ_HASH })],
+      ["no version", persistedQuery({ sha256Hash: APQ_HASH })],
+      ["no hash", persistedQuery({ version: 1 })],
+      ["descriptor is not an object", persistedQuery("str")],
+      ["descriptor is a number", persistedQuery(7)],
+      ["descriptor is empty", persistedQuery({})],
+    ];
+    for (const [why, extensions] of unsatisfiable) {
+      const { status, body } = await post({ query: APQ_QUERY, extensions });
+      expect(status, `${why}: wrong status`).toBe(400);
+      expect(body, `${why}: wrong envelope`).toEqual(INTERNAL_SERVER_ERROR);
+    }
+  });
+
+  it("answers 200 `PersistedQueryNotFound` when the hash arrives without a query", async () => {
+    // APQ's lookup miss, and the reason modelling this needs no store: Linear
+    // never registers the pair either. Sending the query WITH its correct hash
+    // (the test above) does not make a later hash-only request resolve.
+    const { status, body } = await post({
+      extensions: persistedQuery({ version: 1, sha256Hash: APQ_HASH }),
+    });
+    expect(status).toBe(200);
+    expect(body).toEqual(PERSISTED_QUERY_NOT_FOUND);
+  });
+
+  it("answers 400 `BAD_REQUEST` for an `extensions` that is not an object", async () => {
+    for (const extensions of [42, [], true]) {
+      const { status, body } = await post({ query: APQ_QUERY, extensions });
+      expect(status, `extensions ${JSON.stringify(extensions)}: wrong status`).toBe(400);
+      expect(body).toEqual(badRequest("`extensions` in a POST body must be an object if provided."));
+    }
+  });
+
+  it("names the recursively-JSON-encoded string separately, as Linear does", async () => {
+    // A distinct message from the one above: the client double-encoded, which
+    // is a different mistake from sending a number, and Linear says so.
+    const { status, body } = await post({
+      query: APQ_QUERY,
+      extensions: JSON.stringify(persistedQuery({ version: 1, sha256Hash: APQ_HASH })),
+    });
+    expect(status).toBe(400);
+    expect(body).toEqual(
+      badRequest(
+        "`extensions` in a POST body should be provided as an object, not a recursively JSON-encoded string."
+      )
+    );
+  });
+
+  it("applies the same rules to the GET surface, where `extensions` is JSON in the query string", async () => {
+    const satisfied = await get({
+      query: APQ_QUERY,
+      extensions: JSON.stringify(persistedQuery({ version: 1, sha256Hash: APQ_HASH })),
+    });
+    expect(satisfied.status).toBe(200);
+    expect((satisfied.body as { errors?: unknown }).errors).toBeUndefined();
+
+    const mismatched = await get({
+      query: APQ_QUERY,
+      extensions: JSON.stringify(persistedQuery({ version: 1, sha256Hash: WRONG_HASH })),
+    });
+    expect(mismatched.status).toBe(400);
+    expect(mismatched.body).toEqual(INTERNAL_SERVER_ERROR);
+
+    const miss = await get({
+      extensions: JSON.stringify(persistedQuery({ version: 1, sha256Hash: APQ_HASH })),
+    });
+    expect(miss.status).toBe(200);
+    expect(miss.body).toEqual(PERSISTED_QUERY_NOT_FOUND);
+  });
+
+  it("names undecodable JSON in the query string as its own failure", async () => {
+    const { status, body } = await get({ query: APQ_QUERY, extensions: "not-json" });
+    expect(status).toBe(400);
+    expect(body).toEqual(badRequest("The extensions search parameter contains invalid JSON."));
+  });
+
+  it("refuses query-string JSON that decodes to something other than an object", async () => {
+    // The measured asymmetry between the two surfaces, and the reason the
+    // decode is not shared between them: `null` is IGNORED as a POST body's
+    // `extensions` and REFUSED as a query string's. Deriving one surface's
+    // behaviour from the other would have got this backwards.
+    for (const encoded of ["42", "[]", "null", '"str"']) {
+      const { status, body } = await get({ query: APQ_QUERY, extensions: encoded });
+      expect(status, `extensions=${encoded}: wrong status`).toBe(400);
+      expect(body, `extensions=${encoded}: wrong envelope`).toEqual(
+        badRequest("The extensions search parameter should contain a JSON-encoded object.")
+      );
+    }
+  });
+
+  it("answers every one of them BEFORE the authentication check", async () => {
+    // The ordering pin, with a deliberately-bad token. Without it the next
+    // refactor can quietly move the rejection behind `bearerAuth` and every
+    // assertion above still passes — they all carry a good token.
+    //
+    // The control is the point of comparison: the SAME bad token, the same
+    // query, no `extensions`, answers 401. So a difference here is the envelope
+    // member being read ahead of the credential, not the credential being
+    // accepted.
+    const control = await post({ query: APQ_QUERY }, BAD_TOKEN);
+    expect(control.status, "the bad token was accepted — this test proves nothing").toBe(401);
+
+    const mismatched = await post(
+      { query: APQ_QUERY, extensions: persistedQuery({ version: 1, sha256Hash: WRONG_HASH }) },
+      BAD_TOKEN
+    );
+    expect(mismatched.status).toBe(400);
+    expect(mismatched.body).toEqual(INTERNAL_SERVER_ERROR);
+
+    const miss = await post(
+      { extensions: persistedQuery({ version: 1, sha256Hash: APQ_HASH }) },
+      BAD_TOKEN
+    );
+    expect(miss.status).toBe(200);
+    expect(miss.body).toEqual(PERSISTED_QUERY_NOT_FOUND);
+
+    const encoded = await post({ query: APQ_QUERY, extensions: 42 }, BAD_TOKEN);
+    expect(encoded.status).toBe(400);
+    expect(encoded.body).toEqual(
+      badRequest("`extensions` in a POST body must be an object if provided.")
+    );
+
+    // And the other half of the ordering claim, which a "reject `extensions`
+    // outright" fix would fail: a descriptor Linear IS satisfied by falls
+    // through to the auth check and answers 401, exactly like the control.
+    const satisfied = await post(
+      { query: APQ_QUERY, extensions: persistedQuery({ version: 1, sha256Hash: APQ_HASH }) },
+      BAD_TOKEN
+    );
+    expect(satisfied.status).toBe(401);
+    expect(satisfied.body).toEqual(control.body);
+  });
+
+  it("answers the same at `/s/:sid/graphql`, which is the other mount of one router", async () => {
+    // `mountSessionAtRoot` serves the session app at BOTH paths, so a gate
+    // mounted at one of them leaves the other on the old behaviour — a hole
+    // that every assertion above would miss, since they all use the root mount.
+    const url = `/s/${DEFAULT_LINEAR_SID}/graphql`;
+    const send = async (envelope: Record<string, unknown>) => {
+      const response = await app.request(url, {
+        method: "POST",
+        headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json" },
+        body: JSON.stringify(envelope),
+      });
+      return { status: response.status, body: await response.json() };
+    };
+
+    const mismatched = await send({
+      query: APQ_QUERY,
+      extensions: persistedQuery({ version: 1, sha256Hash: WRONG_HASH }),
+    });
+    expect(mismatched.status).toBe(400);
+    expect(mismatched.body).toEqual(INTERNAL_SERVER_ERROR);
+
+    const satisfied = await send({
+      query: APQ_QUERY,
+      extensions: persistedQuery({ version: 1, sha256Hash: APQ_HASH }),
+    });
+    expect(satisfied.status).toBe(200);
+    expect((satisfied.body as { errors?: unknown }).errors).toBeUndefined();
+  });
+
+  it("leaves the recorder's `request_body` capture intact", async () => {
+    // The regression this gate introduced on its first draft, and the reason it
+    // parses a clone. The recorder captures `request_body` with its own
+    // `c.req.raw.clone().json()`; `clone()` throws once the body stream is
+    // disturbed, and the engine records `null` rather than a 500. So a gate
+    // that drained the body ahead of it blanked the tape on EVERY recorded
+    // /graphql request — while all 190 other assertions in this package stayed
+    // green, because none of them reads the tape.
+    process.env.TWIN_AUTH_SECRET = SECRET;
+    const recorder = createRecorderStore();
+    const recorded = createLinearTwinApp({ recorder, runId: "extensions-tape" });
+    const query = "{ viewer { id email } }";
+    const response = await recorded.request("/graphql", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${DEFAULT_LINEAR_TOKEN}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ query }),
+    });
+
+    expect(response.status).toBe(200);
+    const bodies = recorder.events().map((event) => event.request_body);
+    expect(bodies, "the gate drained the body the recorder needed").toContainEqual({ query });
+  });
+
+  it("hands anything it cannot parse to the ordinary recorded path", async () => {
+    // The gate runs outside the recorder and outside the twin's error
+    // envelope, so it must never be the thing that answers a malformed
+    // request: a body that is not JSON at all is the declaration's business,
+    // and it still reaches the handler that reports it.
+    const response = await app.request("/graphql", {
+      method: "POST",
+      headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json" },
+      body: "}{",
+    });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      errors: [{ message: "GraphQL query is required" }],
+    });
   });
 });
 

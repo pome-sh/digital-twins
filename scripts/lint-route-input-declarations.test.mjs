@@ -126,6 +126,22 @@ const EXEMPT_FIXTURES = {
     `  return body;`,
     `}`,
   ].join("\n"),
+  // twin-linear's pre-auth `extensions` gate — the one exemption that grants a
+  // CLONE rather than a named read, so that the recorder's own
+  // `raw.clone().json()` still has an undisturbed stream to read.
+  "packages/twin-linear/src/twin.ts": [
+    `import type { Hono } from "hono";`,
+    `import { HonoRequest } from "hono/request";`,
+    `export const gate = async (c) => {`,
+    `  const peek = new HonoRequest(c.req.raw.clone());`,
+    `  return await ROUTES.graphqlPost.parse(peek);`,
+    `};`,
+    `export const mount = (app: Hono) => app;`,
+  ].join("\n"),
+  "packages/twin-linear/package.json": JSON.stringify({
+    name: "@pome-sh/twin-linear",
+    exports: { ".": { types: "./dist/src/index.d.ts", default: "./dist/src/index.js" } },
+  }),
 };
 
 const SDK_FILES = {
@@ -206,7 +222,9 @@ const BASE = { ...SDK_FILES, ...EXEMPT_FIXTURES, ...cleanTwin("github"), ...clea
   check("case 1: a declaration-driven tree passes", status === 0, output.trim());
   check(
     "case 1: the pass names how many modules it walked, so zero coverage is visible",
-    /OK — \d+ module\(s\) reachable from \d+ route registrar\(s\) across 4 twins/.test(output),
+    // The twin count tracks EXEMPT_FIXTURES, which has to carry every twin the
+    // real exemption list names — five since F-1385 added twin-linear's.
+    /OK — \d+ module\(s\) reachable from \d+ route registrar\(s\) across 5 twins/.test(output),
     output.trim()
   );
 }

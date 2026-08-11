@@ -4,6 +4,28 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.15
+
+### Patch Changes
+
+- The Linear twin declares `extensions` on both `/graphql` surfaces and answers
+  it the way Linear does, before authentication (F-1385). GraphQL-over-HTTP's
+  fourth envelope member is what Apollo clients send for automatic persisted
+  queries; the twin declared it nowhere, so since F-1372 flipped that twin to
+  `ignore` it was discarded and the query served, where real Linear answers on
+  it. Re-measuring on 2026-08-11 corrected the ticket's premise: Linear is not
+  "APQ switched off" but APQ in **verify-only** mode, checking that `sha256Hash`
+  is the SHA-256 of the `query` it arrived with. So a matching hash is served,
+  a mismatched hash (or a `version` other than 1, or no hash) answers 400
+  `INTERNAL_SERVER_ERROR`, a hash with no query answers 200
+  `PersistedQueryNotFound`, and an `extensions` that is not a usable object
+  answers 400 `BAD_REQUEST` in that surface's own wording. Neither side
+  registers anything, so there is no persisted-query store — only a hash to
+  verify. The rejection sits ahead of the twin's auth check because Linear's
+  does: rejecting after it would show an agent with a stale token a 401 where
+  Linear shows a 400, which is the same divergence in a harder-to-see form. The
+  twin's declared input count goes 120 → 122. No CLI source changed.
+
 ## 0.23.14
 
 ### Patch Changes

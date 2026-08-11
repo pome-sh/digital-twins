@@ -36,10 +36,13 @@ import { routeInputDeclarer, type RouteInputDeclaration } from "@pome-sh/sdk/rou
  *
  * The other two are `/graphql`, measured the same day: an unknown top-level
  * envelope key, and an unknown query-string key, each left Linear's answer
- * exactly as it was. See `docs/undeclared-route-inputs.md`, which also records
- * the one thing this does NOT cover — `extensions`, a GraphQL-over-HTTP
- * envelope member this twin declares nowhere and Linear rejects for its own
- * reasons.
+ * exactly as it was.
+ *
+ * F-1385 settled the one case that ruling did NOT cover. `extensions` is not an
+ * unknown key Linear happens to reject — it is a key Linear specifically
+ * parses, so it is DECLARED below and answered by
+ * `./graphql/persisted-query.ts` rather than left to this disposition. The
+ * transcript behind both is `docs/undeclared-route-inputs.md`.
  */
 const declareInputs = routeInputDeclarer("ignore");
 
@@ -51,6 +54,24 @@ const declareInputs = routeInputDeclarer("ignore");
  */
 const VARIABLES_STRING = z.string().optional();
 const VARIABLES_OBJECT = z.union([z.record(z.string(), z.unknown()), z.string()]).optional();
+
+/**
+ * `extensions`, the envelope's fourth member — Apollo's automatic persisted
+ * queries ride in it (F-1385).
+ *
+ * Deliberately permissive rather than shaped, on BOTH surfaces. Linear answers
+ * a differently-worded 400 for each way an `extensions` value can be wrong — a
+ * non-object, a recursively JSON-encoded string, query-string JSON that will
+ * not decode — and it answers them itself, ahead of authentication. A zod
+ * schema tight enough to reject those here would substitute the twin's
+ * `BAD_USER_INPUT` envelope for the vendor's own message on every one of them,
+ * which is a divergence manufactured by our type rule rather than measured.
+ * So the declaration NAMES the input and `./graphql/persisted-query.ts`
+ * answers it; the derived type is `null` because the wire really does accept
+ * any JSON value here.
+ */
+const EXTENSIONS_STRING = z.string().optional();
+const EXTENSIONS_ANY = z.unknown().optional();
 
 /** PKCE + the authorization-request parameters, shared by authorize and its callback. */
 const AUTHORIZE_PARAMS = {
@@ -71,6 +92,7 @@ export const LINEAR_ROUTES = {
       query: z.string().optional(),
       variables: VARIABLES_STRING,
       operationName: z.string().optional(),
+      extensions: EXTENSIONS_STRING,
     },
   }),
 
@@ -82,6 +104,7 @@ export const LINEAR_ROUTES = {
       query: z.string().optional(),
       variables: VARIABLES_OBJECT,
       operationName: z.string().optional(),
+      extensions: EXTENSIONS_ANY,
     },
   }),
 

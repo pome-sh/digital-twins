@@ -1,6 +1,62 @@
 # @pome-sh/twin-linear — CHANGELOG
 
 
+## 0.4.1 — 2026-08-11
+
+**`extensions` is declared on both `/graphql` surfaces, and answered before
+authentication** (F-1385). GraphQL-over-HTTP's fourth envelope member is what
+Apollo clients send for automatic persisted queries. The twin declared it
+nowhere, so since F-1372 flipped this twin to `ignore` it was discarded and the
+query served — where real Linear answers on it.
+
+**The ticket's premise was wrong, and re-measuring is what caught it.** F-1385
+was filed reading Linear's 400 as "persisted queries are switched off". Measured
+against `https://api.linear.app/graphql` on 2026-08-11, Linear runs APQ in
+**verify-only** mode: it checks that `sha256Hash` is the SHA-256 of the `query`
+it arrived with, and the 400 is that check failing. Send the correct hash and
+the request is served. Had the twin rejected every `extensions` payload — the
+literal shape of the fix as filed — an Apollo client with APQ enabled would have
+failed the exam and worked in production, which is the failure class this whole
+batch exists to remove.
+
+Nothing is registered, by either side: a hash-only request answers
+`PersistedQueryNotFound` even straight after the same hash arrived with its
+query. So there is no persisted-query store here, only a hash to verify.
+
+| Request | Answer |
+| --- | --- |
+| `extensions` absent, or carrying no `persistedQuery` | served |
+| `persistedQuery` whose `sha256Hash` matches `query` | served |
+| a hash that does not match, `version` ≠ 1, or no hash | 400 `INTERNAL_SERVER_ERROR` |
+| `persistedQuery` with no `query` | 200 `PersistedQueryNotFound` |
+| `extensions` that is not a usable object | 400 `BAD_REQUEST`, worded per surface |
+
+**Answered ahead of `bearerAuth`**, on a router wrapped around the engine's
+session app the way the OAuth endpoints already are. Linear answers all of the
+above with no credential at all, while the same request without `extensions` has
+to reach the auth check to earn its 401 — so a twin that rejected after its own
+auth check would show an agent with a stale token a 401 where Linear shows a
+400. `test/route-input-declarations.test.ts` pins the ordering with a
+deliberately-bad token, and drives every row of the table over the real HTTP
+wire.
+
+**The gate reads a CLONE of the request, and that is load-bearing.** The
+engine's recorder captures an event's `request_body` with its own
+`c.req.raw.clone().json()`, and `clone()` throws once the body stream has been
+disturbed — recording `null` rather than failing. A gate that drained the body
+ahead of the recorder therefore blanked the tape on every recorded `/graphql`
+request with nothing anywhere going red. The first draft of this change did
+exactly that. The declaration is still the only thing that reads a value by
+name; the clone decides which `Request` it parses, not what may be read off it,
+and `test/route-input-declarations.test.ts` now asserts the tape carries the
+body.
+
+Declared inputs: 120 → **122**. The observed behaviour, and the two things this
+does not model (no persisted-query store, no Apollo CSRF prevention), are
+recorded in `FIDELITY.md`; the full transcript is in
+`docs/undeclared-route-inputs.md`.
+
+
 ## 0.4.0 — 2026-08-09
 
 The agent-session **mutation inputs** are Linear's now, and so is the model they
