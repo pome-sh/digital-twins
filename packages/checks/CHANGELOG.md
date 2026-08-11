@@ -1,5 +1,46 @@
 # @pome-sh/checks
 
+## 0.1.5
+
+`slack.no-reaction-added` now refuses instead of scoring a free pass (F-1159).
+Its predicate filtered the exported `reactions` collection with `(final.reactions
+?? []).some(…)`, so a state export carrying no `reactions` section at all
+filtered to zero rows and scored this NEGATIVE criterion `passed` — an agent
+that really added the reaction still collected the point. It now checks
+`final.reactions == null` first and returns `state_incomplete`, matching
+twin-github's `pull.reviews == null` / `pull.comments == null` skips: absent is
+not the same as none.
+
+This closes the gap the same class of criterion in twin-github never had, and
+it is why pome-cloud's `STATE_SECTION_GUARDS` carried a stopgap row for this one
+check (F-1156) — that row is now redundant. No check id, template or polarity
+changed, so no criterion moves from bound to unbound; this only affects the
+verdict on the one export shape (`reactions` absent) that used to be misgraded,
+and on that shape the cloud already returned `state_incomplete` via the stopgap.
+The grade a real run receives does not move.
+
+**What pome-cloud must do, and it is TWO edits, not one.** Pinning `0.1.5`
+turns `declared-pin.test.ts` red on its own, before anybody touches the guard
+table, so a follow-up that only deletes the row will not go green:
+
+1. Delete the `slack.no-reaction-added` row from `STATE_SECTION_GUARDS`
+   (`apps/control-plane/src/services/evaluators/deterministic/substrate-guards.ts`).
+   The arm that asserts every vacuous reader has a row —
+   `findVacuousStateSectionReaders(allDeclared(), STATE_SECTION_GUARDS)` — stays
+   `[]` with the row present or absent, because the twin now refuses on its own.
+2. Re-point the NEGATIVE CONTROL beside it, `names the shipped reader when the
+   table is empty`. It asserts
+   `findVacuousStateSectionReaders(allDeclared(), [])` equals
+   `["slack.no-reaction-added:reactions"]` — the detector's only firing case in
+   the shipped vocabulary, and this release is what removes it. Measured against
+   the built `0.1.5` declarations it now returns `[]`. Give that arm a synthetic
+   declaration that still reads absence as a pass, the way the three arms below
+   it already build one inline, so the detector keeps a firing case nobody has
+   to ship a defect to preserve.
+
+Both `apps/control-plane` and `apps/mcp` pin this package exactly and must move
+together, or `save_task` accepts criteria the grader cannot bind.
+
 ## 0.1.4
 
 Carries twin-github's widened seed schema to the grader (F-1421). One thing

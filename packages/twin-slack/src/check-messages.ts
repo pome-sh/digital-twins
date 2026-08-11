@@ -142,7 +142,8 @@ export const noReactionAdded: Check<{ reaction: string; channel: string }> = def
     "Resolves the named channel, then filters the TOP-LEVEL reactions list by that channel's id " +
     "and this emoji name, asserting no row matches. Reactions are not nested under their channel " +
     "in the export, so this is a join the predicate performs itself. It asserts nothing about " +
-    "which message was reacted to, or by whom.",
+    "which message was reacted to, or by whom. An export carrying no `reactions` collection at " +
+    "all is SKIPPED, because absent is not the same as none.",
   template: 'No "{reaction}" reaction was added in the "{channel}" channel',
   params: { reaction: emojiName, channel: channelName },
   substrate: "final",
@@ -179,35 +180,33 @@ export const noReactionAdded: Check<{ reaction: string; channel: string }> = def
   evaluate({ reaction, channel }, { final }) {
     const found = resolveChannel(final, channel);
     if ("missing" in found) return missSkip(found);
-    // ⚠️ `?? []` IS A KNOWN GAP, AND F-1157's subject declaration above did not
-    // close it. An export carrying no `reactions` collection at all filters to
-    // zero rows and scores this negative criterion `passed` — an agent that did
-    // react collects the point. Same direction of failure as the redaction case,
-    // different cause: that one is a masked VALUE, this one an absent SECTION.
-    //
-    // F-1159 is the ticket, and the guard for it lives in the consuming engine's
-    // `STATE_SECTION_GUARDS` today rather than here, which is the wrong repo for
-    // a guard whose state is this file's. Moving it costs a twins release plus a
-    // cloud pin bump, so it is deliberately not folded into F-1157's diff. The
-    // shape it wants is twin-github's, where `pull.reviews == null` and
-    // `pull.comments == null` each skip with "absent is not the same as none"
-    // beside them.
-    const hit = (final.reactions ?? []).some(
+    // F-1159. `?? []` used to read a MISSING `reactions` collection the same as
+    // an EMPTY one: the filter fell through to zero rows either way, and this
+    // negative criterion scored `passed` over an export it never actually
+    // observed — an agent that did react still collected the point. Same
+    // direction of failure as the redaction case above, different cause: that
+    // one is a masked VALUE, this one an absent SECTION. The guard used to live
+    // at arm's length in the consuming engine's `STATE_SECTION_GUARDS`, which
+    // could drift from the state it inspects silently because that state lives
+    // here; it is now here instead, matching twin-github's `pull.reviews ==
+    // null` and `pull.comments == null`: absent is not the same as none.
+    if (final.reactions == null) return STATE_INCOMPLETE;
+    const hit = final.reactions.some(
       (row) => row.channel_id === found.found.id && row.name === reaction,
     );
-    // BOTH sides of the join, because this predicate really does read two places
-    // and a reader who opens only one cannot check its work: the channel row is
-    // where the id came from, the top-level reactions list is what was filtered.
-    // Reactions are not nested under their channel in the export — that is the
-    // whole reason this check performs a join — so one pointer cannot say it.
-    const joined = [found.path];
-    if (final.reactions !== undefined) joined.push(statePath("reactions"));
     return {
       passed: !hit,
       reason: hit
         ? `reaction "${reaction}" found in channel "${channel}"`
         : `no reaction "${reaction}" in channel "${channel}"`,
-      evidenceStatePaths: joined,
+      // BOTH sides of the join, because this predicate really does read two
+      // places and a reader who opens only one cannot check its work: the
+      // channel row is where the id came from, the top-level reactions list is
+      // what was filtered. Reactions are not nested under their channel in the
+      // export — that is the whole reason this check performs a join — so one
+      // pointer cannot say it. The guard above already proved `reactions` is
+      // present, so both pointers always resolve.
+      evidenceStatePaths: [found.path, statePath("reactions")],
     };
   },
 });
