@@ -366,6 +366,28 @@ not exposed at the root mount — those remain at `/s/:sid/_pome/*` and
     the shape tier carries no billing-cycle arithmetic, so no period is
     fabricated. Cancellation is an immediate status flip with no proration.
 
+17. **`/v1/payment_intents` row count is the empty seeded world against a live
+    test account.** The twin serves `data: []`; the live Stripe TEST account has
+    held payment intents since 2026-08-10. `array-length-changed` fires on the
+    exact count, so the two sides can only agree by coincidence — and they did
+    until the 2026-08-11 re-baseline, when both were empty and the comparison
+    bound nothing at all. The count is accepted in pome-cloud's registry; the
+    per-object shape is still compared, so a wrong `object`, a wrong `status` or
+    a changed leaf type still drifts. F-1434.
+
+18. **`/v1/charges` row count is the empty seeded world against a live test
+    account.** Same class as bullet 17 on the charges list. The PII redaction
+    pass masks free-text leaves by VALUE only — it never changes a key set, an
+    array length or a leaf type — so accepting the count here does not compound
+    with it. F-1434.
+
+19. **`/v1/balance_transactions` row count is the empty seeded world against a
+    live test account.** Same class as bullet 17, and the clearest illustration
+    of why seeding the upstream to match the twin is not a maintainable answer:
+    balance transactions are minted by Stripe as a side effect of charge
+    activity rather than created directly, so this surface would drift again on
+    an account emptied today. F-1434.
+
 > Pagination is **not** a divergence: `GET /v1/payment_intents` (and the
 > other list surfaces) use real cursor pagination keyed on `(created, id)`
 > via `starting_after` / `ending_before`, matching Stripe's cursor model.

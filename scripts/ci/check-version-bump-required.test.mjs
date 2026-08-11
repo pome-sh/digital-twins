@@ -161,6 +161,36 @@ console.log("check-version-bump-required.mjs");
 }
 
 {
+  // Same over-match as F-1455, one directory over: a twin's own top-level
+  // markdown ships in no tarball (every twin-* is `private: true`), and tsup
+  // cannot inline a markdown file into the CLI's bundle either way. Demanding a
+  // bump here demands a byte-identical republish, and RELEASING.md's "don't
+  // touch a publish-relevant path" has no answer — a twin's FIDELITY.md has
+  // nowhere else to live.
+  const r = run({
+    changes: { "packages/twin-github/FIDELITY.md": "## Known divergences\n\n1. **A.** b\n" },
+  });
+  check("a change confined to a twin's top-level docs needs no bump", r.status === 0, r.out);
+}
+
+{
+  // Anchoring check, single path segment: `[^/]+\/[^/]+\.md` must not loosen.
+  // Nothing under a twin's src/ is exempt, markdown or otherwise — the point of
+  // the exemption is "documentation at the package root", not "any .md".
+  const r = run({
+    changes: {
+      "packages/twin-github/FIDELITY.md": "# doc\n",
+      "packages/twin-github/src/index.ts": "export const a = 1;\n",
+    },
+  });
+  check(
+    "a doc change RIDING ALONG with a src change still demands a bump",
+    r.status === 1 && r.out.includes("@pome-sh/cli"),
+    r.out,
+  );
+}
+
+{
   // Anchoring check: a twin's src/ is very much publish-relevant (it's what
   // tsup inlines into the CLI's tarball), so the new exemption must not have
   // widened to cover it.
