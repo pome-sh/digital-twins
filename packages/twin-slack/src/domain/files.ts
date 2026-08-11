@@ -36,13 +36,19 @@ import { clampLimit, filetypeMimetype } from "./helpers.js";
 // ───────────────────────────────────────────────────────────────────────────
 
 export function filesUpload(domain: SlackDomain, 
-  args: { channels?: string; channel?: string; filename?: string; title?: string; filetype?: string; content?: string; initial_comment?: string; thread_ts?: string },
+  args: { channels?: string; filename?: string; title?: string; filetype?: string; content?: string; initial_comment?: string; thread_ts?: string },
   actor: Actor,
   onDelta: DeltaHook = NOOP
 ): Record<string, unknown> {
   const workspace = domain.requireWorkspace();
   const acting = domain.resolveActorUser(actor);
-  const channelsRaw = args.channels ?? args.channel ?? "";
+  // F-1389 (SLACK-DECL-IN-003) — `channels` only. The singular `channel`
+  // fallback that stood here is what made an upload addressed `channel=C123`
+  // land in that channel on the twin and in no channel at all on Slack, which
+  // documents no singular form on this method. Dropping the fallback as well as
+  // the declaration matters: leaving it would keep the wrong behaviour reachable
+  // from any caller that reaches the domain without going through `parse()`.
+  const channelsRaw = args.channels ?? "";
   const channelIds = channelsRaw
     .split(",")
     .map((s) => s.trim())

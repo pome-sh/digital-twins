@@ -65,9 +65,9 @@ Last verified: 2026-08-08
 | `POST /repos/:owner/:repo/releases` | warm | semantic | Auto-creates tag from `target_commitish` if missing. |
 | `GET /user` | hot | semantic | Returns JWT-claimed `login`. |
 | `GET /search/repositories` | hot | semantic | Searches clone state. Result-set counts reflect the local seed, not GitHub's global index (divergence #18). |
-| `GET /search/code` | hot | semantic | Searches clone state (divergence #18). |
-| `GET /search/commits` | hot | semantic | Searches clone state; added by F-735 (divergence #18). |
-| `GET /search/issues` | hot | semantic | Searches clone state (divergence #18). |
+| `GET /search/code` | hot | semantic | Searches clone state (divergence #18). Takes `q` only; `repo:`/`user:`/`org:` are parsed out of it, other qualifiers are not (divergence #1, F-1389). |
+| `GET /search/commits` | hot | semantic | Searches clone state; added by F-735 (divergence #18). Takes `q` only; `repo:`/`user:`/`org:` are parsed out of it (divergence #1, F-1389). |
+| `GET /search/issues` | hot | semantic | Searches clone state (divergence #18). Takes `q` only; `repo:`/`user:`/`org:`/`state:` are parsed out of it and `?state=` is ignored (divergence #1, F-1389). No `state=open` default (F-1427). |
 | `GET /search/users` | hot | semantic | Searches clone state; `type` is not modelled (divergence #15, #18). |
 | `POST /mcp/call` and `POST /mcp/tools/:name` | unclassified | semantic | MCP tools mutate the same state as REST routes. Engine introspection — outside the rubric's inventory scope; rows retained until the post-F-440 surface-count reconcile. |
 | `GET /repos/:owner/:repo/actions/*` | cold | unsupported | Named cold (F-729): loud 501, test-backed (`m5-hot-gaps.test.ts`); top post-M5 promotion candidate. |

@@ -4,6 +4,38 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.14
+
+### Patch Changes
+
+- Eleven route inputs the twins accepted but their vendors do not declare are
+  gone from the twins' published input surface (F-1389). The GitHub twin no
+  longer declares `owner` on `POST /user/repos` (that surface creates a
+  repository for the authenticated user, and the body copy reached the domain),
+  `encoding` on `PUT /contents/*`, or `owner`/`repo`/`state` on `/search/code`,
+  `/search/commits` and `/search/issues`; the Slack twin no longer declares a
+  singular `channel` on `files.upload` (Slack takes `channels`, plural), and its
+  domain no longer falls back to it; the Stripe twin no longer accepts `created`
+  on `GET /v1/customers/:id/payment_methods`. **Only the Stripe one changes what
+  a caller is told** — that twin refuses undeclared inputs, matching Stripe,
+  which publishes `parameter_unknown` for exactly this parameter, so a request
+  the real API declines is now declined here too. GitHub and Slack ignore
+  undeclared inputs, so the rest are discarded rather than refused, as on the
+  real vendors. No CLI source changed.
+- The GitHub twin's three search routes now parse GitHub's scope qualifiers out
+  of `q` — `repo:owner/name`, `user:`, `org:`, and `state:` on `/search/issues`
+  (F-1389). This ships with the removal above rather than after it, because the
+  removal alone would have left the surface punishing correct requests: `q` was
+  matched as one substring, so `q=idempotency repo:acme/api` — the request
+  GitHub documents — answered ZERO, and dropping `?owner=`/`?repo=` without
+  teaching the twin the qualifier spelling would have left an agent with no way
+  to scope a search at all. Qualifiers this twin does not parse stay in the
+  free-text term rather than being dropped, so an unrecognised one narrows the
+  answer instead of widening it past what GitHub would return. ⚠️ `?state=` on
+  `/search/issues` is now ignored rather than filtering; the qualifier
+  `q=… state:closed` is the spelling that works. See the twin's FIDELITY.md
+  divergence 1 for exactly which qualifiers are parsed. No CLI source changed.
+
 ## 0.23.13
 
 ### Patch Changes

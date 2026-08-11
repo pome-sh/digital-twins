@@ -90,6 +90,22 @@ const commentBody = { body: z.string().min(1) };
 
 export const GITHUB_ROUTES = {
   // ----- search -----
+  //
+  // GH-DECL-IN-001 / GH-DECL-IN-002 (F-1389) — all five take `q` and nothing but
+  // `q`. GitHub's search API has ONE scoping input and encodes every filter as a
+  // qualifier inside it (`repo:octocat/hello-world`, `state:open`); its OpenAPI
+  // declares `q, sort, order, per_page, page`. `/search/code`,
+  // `/search/commits` and `/search/issues` used to declare `owner` / `repo`
+  // (and `state`) alongside and scope by them, so the same request was scoped
+  // here and unscoped on GitHub.
+  //
+  // They are undeclared rather than refused, per github's measured `ignore`
+  // ruling — a request still sending them gets the answer it would have got
+  // without them, which is what real GitHub does. The scoping moved into `q`:
+  // `domain/search.ts` parses `repo:` / `user:` / `org:` / `state:` out of it.
+  // Both halves had to land together — deleting the parameters alone would have
+  // left `q=idempotency repo:acme/api` still answering zero, which is the
+  // mirror defect and the worse one.
   searchRepositories: declareInputs({
     method: "GET",
     path: "/search/repositories",
@@ -98,23 +114,12 @@ export const GITHUB_ROUTES = {
   searchCode: declareInputs({
     method: "GET",
     path: "/search/code",
-    query: {
-      q: z.string().optional(),
-      owner: z.string().optional(),
-      repo: z.string().optional(),
-      ...pageQuery,
-    },
+    query: { q: z.string().optional(), ...pageQuery },
   }),
   searchIssues: declareInputs({
     method: "GET",
     path: "/search/issues",
-    query: {
-      q: z.string().optional(),
-      owner: z.string().optional(),
-      repo: z.string().optional(),
-      state: stateFilter,
-      ...pageQuery,
-    },
+    query: { q: z.string().optional(), ...pageQuery },
   }),
   searchUsers: declareInputs({
     method: "GET",
@@ -124,12 +129,7 @@ export const GITHUB_ROUTES = {
   searchCommits: declareInputs({
     method: "GET",
     path: "/search/commits",
-    query: {
-      q: z.string().optional(),
-      owner: z.string().optional(),
-      repo: z.string().optional(),
-      ...pageQuery,
-    },
+    query: { q: z.string().optional(), ...pageQuery },
   }),
 
   // ----- repositories -----
@@ -142,15 +142,22 @@ export const GITHUB_ROUTES = {
     method: "POST",
     path: "/user/repos",
     bodyEncoding: "json",
-    body: { ...repositoryBody, owner: z.string().min(1).optional() },
+    // F-1389 (GH-DECL-IN-003) — no `owner`. This surface creates a repository
+    // for the AUTHENTICATED USER, which is its whole meaning;
+    // `repos/create-for-authenticated-user` declares 23 body properties and
+    // `owner` is not one. `routes.ts` passed the body straight to
+    // `domain.createRepository`, so the one surface defined not to take an
+    // owner could be made to create a repository under an arbitrary one.
+    // Undeclared now, so `parse()` never hands it to the handler, and github's
+    // measured disposition (`ignore`) discards it rather than 422-ing a request
+    // real GitHub accepts and ignores.
+    body: { ...repositoryBody },
   }),
-  // `owner` is declared in BOTH locations, because the twin accepts it in both.
-  //
-  // The handler spreads the body schema and then overwrites `owner` with the
-  // path value, so the body copy is read and discarded. Declaring only the path
-  // one would turn that into a 422 for a request the twin has always accepted —
-  // a divergence this ticket invented rather than found. The declaration records
-  // what is true: two locations, one of which the handler ignores.
+  // `owner` stays declared on the ORG surface, and the contrast is the whole
+  // argument: there the handler overwrites it with the path value, so the body
+  // copy is read and discarded and nothing observable differs. That one is
+  // registered `accepted` (GH-DECL-IN-004); the `/user/repos` one above was
+  // registered `open-defect` because there the body copy reached the domain.
   createOrgRepository: declareInputs({
     method: "POST",
     path: "/orgs/:owner/repos",
@@ -189,7 +196,15 @@ export const GITHUB_ROUTES = {
       content: z.string(),
       branch: z.string().optional(),
       sha: z.string().optional(),
-      encoding: z.enum(["utf-8", "base64"]).optional(),
+      // F-1389 (GH-DECL-IN-005) — no `encoding`. GitHub declares `content` as
+      // "the new file content, using Base64 encoding" and takes no `encoding`
+      // parameter: base64 is the only encoding this surface has. Undeclared
+      // now, so github's measured disposition (`ignore`) discards it.
+      //
+      // ⚠️ This closes the DECLARED drift, not the behavioural one. The twin
+      // still treats `content` as plain text rather than base64 — recorded as
+      // divergence 24, and unified across both doors in the follow-up ticket
+      // that owns the 47-call-site migration.
     },
   }),
   listCommits: declareInputs({

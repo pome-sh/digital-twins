@@ -7,7 +7,7 @@
     "packages/twin-github/src/route-inputs.ts"
   ],
   "surface_count": 65,
-  "input_count": 295,
+  "input_count": 286,
   "surfaces": [
     {
       "method": "DELETE",
@@ -1046,12 +1046,6 @@
       "surface": "GET /search/code",
       "inputs": [
         {
-          "name": "owner",
-          "location": "query",
-          "required": false,
-          "type": "string"
-        },
-        {
           "name": "page",
           "location": "query",
           "required": false,
@@ -1065,12 +1059,6 @@
         },
         {
           "name": "q",
-          "location": "query",
-          "required": false,
-          "type": "string"
-        },
-        {
-          "name": "repo",
           "location": "query",
           "required": false,
           "type": "string"
@@ -1083,12 +1071,6 @@
       "surface": "GET /search/commits",
       "inputs": [
         {
-          "name": "owner",
-          "location": "query",
-          "required": false,
-          "type": "string"
-        },
-        {
           "name": "page",
           "location": "query",
           "required": false,
@@ -1102,12 +1084,6 @@
         },
         {
           "name": "q",
-          "location": "query",
-          "required": false,
-          "type": "string"
-        },
-        {
-          "name": "repo",
           "location": "query",
           "required": false,
           "type": "string"
@@ -1120,12 +1096,6 @@
       "surface": "GET /search/issues",
       "inputs": [
         {
-          "name": "owner",
-          "location": "query",
-          "required": false,
-          "type": "string"
-        },
-        {
           "name": "page",
           "location": "query",
           "required": false,
@@ -1139,18 +1109,6 @@
         },
         {
           "name": "q",
-          "location": "query",
-          "required": false,
-          "type": "string"
-        },
-        {
-          "name": "repo",
-          "location": "query",
-          "required": false,
-          "type": "string"
-        },
-        {
-          "name": "state",
           "location": "query",
           "required": false,
           "type": "string"
@@ -2067,12 +2025,6 @@
           "type": "string"
         },
         {
-          "name": "owner",
-          "location": "body",
-          "required": false,
-          "type": "string"
-        },
-        {
           "name": "private",
           "location": "body",
           "required": false,
@@ -2144,12 +2096,6 @@
           "name": "content",
           "location": "body",
           "required": true,
-          "type": "string"
-        },
-        {
-          "name": "encoding",
-          "location": "body",
-          "required": false,
           "type": "string"
         },
         {
