@@ -253,23 +253,14 @@ in the JSON body, and an unknown key in the query string, each left Linear's
 answer byte for byte where it was — it went on to fail on authentication, which
 is what it does for the bare request too.
 
-**One thing this does not settle.** GraphQL-over-HTTP has a fourth envelope
-member, `extensions`, which Apollo clients send for persisted queries. This
-twin declares it nowhere, and real Linear does not ignore it — it answers 400
-`INTERNAL_SERVER_ERROR`, before authentication, apparently because persisted
-queries are not enabled:
-
-```
-$ curl -X POST -H 'content-type: application/json' \
-    -d '{"query":"{__typename}","extensions":{"persistedQuery":{"version":1,"sha256Hash":"abc"}}}' \
-    https://api.linear.app/graphql
-{"errors":[{"message":"Internal server error","extensions":{"http":{"status":400,…}}}]}
-```
-
-That is a DECLARATION gap, not a disposition question — the twin does not model
-`extensions` at all — and under `ignore` the twin now serves such a request
-where Linear rejects it. It is the declared-fidelity lane's finding to report,
-and worth a ticket of its own.
+**One thing this did not settle — `extensions` (settled by F-1385).**
+GraphQL-over-HTTP has a fourth envelope member, `extensions`, which Apollo
+clients send for persisted queries. F-1372 left it out, and F-1385 measured it
+properly. It turned out not to be a disposition question at all: `extensions`
+is a key Linear *specifically parses*, not one it happens to reject, so it is
+DECLARED on both `/graphql` surfaces and answered by
+[`packages/twin-linear/src/graphql/persisted-query.ts`](../packages/twin-linear/src/graphql/persisted-query.ts).
+The transcript is [below](#extensions--linears-persisted-query-contract-f-1385).
 
 ## How a disposition is changed
 
@@ -290,3 +281,96 @@ things now make that reconciliation compulsory rather than remembered.
 
 So a flip is: measure the vendor, add the transcript here, change the one
 `routeInputDeclarer()` line, change the one `RULED` line. Anything less is red.
+
+## `extensions` — Linear's persisted-query contract (F-1385)
+
+Measured against `https://api.linear.app/graphql` on **2026-08-11**, with no
+credentials: every line below is answered before authentication.
+
+**The reading F-1385 was filed with is wrong, and this is the correction.** The
+ticket took the 400 for "automatic persisted queries are switched off" — an
+unhandled path rather than a contract. It is neither. Linear runs APQ in
+**verify-only** mode: it checks that `sha256Hash` is the SHA-256 of the `query`
+sent with it, and the 400 is that check failing.
+
+```
+$ Q='{__typename}'; H=$(printf '%s' "$Q" | shasum -a 256 | cut -d' ' -f1)
+
+# the control — no extensions at all
+{"query":"{__typename}"}                                            -> 401 AUTHENTICATION_ERROR
+
+# the hash does not match the query
+{"query":"…","extensions":{"persistedQuery":{"version":1,"sha256Hash":"abc"}}}
+                                                                    -> 400 INTERNAL_SERVER_ERROR
+
+# the hash DOES match the query — served like any other request
+{"query":"…","extensions":{"persistedQuery":{"version":1,"sha256Hash":"$H"}}}
+                                                                    -> 401 AUTHENTICATION_ERROR
+
+# the hash with no query: APQ's lookup miss, HTTP 200
+{"extensions":{"persistedQuery":{"version":1,"sha256Hash":"$H"}}}    -> 200 PERSISTED_QUERY_NOT_FOUND
+
+# an unknown envelope key, for comparison — ignored, per this twin's ruling
+{"query":"…","bogusKey":{"a":1}}                                    -> 401 AUTHENTICATION_ERROR
+```
+
+**Nothing is ever registered.** The hash-only request answers
+`PersistedQueryNotFound` even immediately after the same hash arrived with its
+query. That is why the twin needs no persisted-query store to match this
+behaviour, and why "implement persisted queries" was the wrong shape for the
+fix: upstream has no store to mirror, only a hash to verify.
+
+**Why it is DECLARED and not left to the `ignore` disposition.** `bogusKey`
+behaves identically to the control — that is the `ignore` disposition this page
+measured. `extensions` does not: it is parsed, and each way of getting it wrong
+earns its own worded answer. An input with its own observable contract belongs
+in `route-inputs.ts` where the declared lane can compare it; an input governed
+by a generic disposition does not.
+
+### The whole table, both surfaces
+
+`persistedQuery` rules are shared. The two surfaces differ only in how
+`extensions` is decoded — and they genuinely differ, which is why the twin does
+not derive one from the other:
+
+| `extensions` in a **POST body** | Answer |
+| --- | --- |
+| absent, or `null` | served — on to the auth check |
+| `42` / `[]` / `true` | 400 `BAD_REQUEST` — "\`extensions\` in a POST body must be an object if provided." |
+| a JSON-encoded string | 400 `BAD_REQUEST` — "\`extensions\` in a POST body should be provided as an object, not a recursively JSON-encoded string." |
+| an object | → the `persistedQuery` rules below |
+
+| `extensions` in the **GET query string** | Answer |
+| --- | --- |
+| absent | served |
+| not valid JSON | 400 `BAD_REQUEST` — `The extensions search parameter contains invalid JSON.` |
+| valid JSON that is not an object — including `null`, `"str"`, `42`, `[]` | 400 `BAD_REQUEST` — `The extensions search parameter should contain a JSON-encoded object.` |
+| an object | → the `persistedQuery` rules below |
+
+Note the asymmetry: `null` is **ignored** in a body and **refused** in a query
+string.
+
+| `extensions.persistedQuery` | Answer |
+| --- | --- |
+| absent, or `null` | served |
+| not an object (`"str"`, `7`) | 400 `INTERNAL_SERVER_ERROR` |
+| `version` ≠ 1, or absent — even with a correct hash | 400 `INTERNAL_SERVER_ERROR` |
+| no `sha256Hash`, or `{}` | 400 `INTERNAL_SERVER_ERROR` |
+| valid v1 descriptor, **no `query`** | 200 `PERSISTED_QUERY_NOT_FOUND` |
+| hash ≠ SHA-256 of `query` — including the right hash in the wrong case | 400 `INTERNAL_SERVER_ERROR` |
+| hash = SHA-256 of `query` | served |
+
+### Two things this deliberately leaves alone
+
+- **`INTERNAL_SERVER_ERROR` for a client mistake still looks unintentional.**
+  `userError: false` on a bad hash is not what a designed contract reads like,
+  and Apollo's own vocabulary has `PERSISTED_QUERY_ID_INVALID` for it. The twin
+  mirrors what was measured and says so in
+  [`packages/twin-linear/FIDELITY.md`](../packages/twin-linear/FIDELITY.md); a
+  re-measure that answers differently is a signal to re-decide, not drift to
+  suppress.
+- **Real Linear blocks a bare `GET /graphql` as CSRF**, answering 400 unless
+  the request carries `x-apollo-operation-name` or `apollo-require-preflight`.
+  Every measurement above therefore sent that header. The twin models no CSRF
+  prevention at all — a separate, pre-existing gap on a different axis from
+  route inputs, recorded here rather than widened into this change.

@@ -8,13 +8,19 @@
     "packages/twin-linear/src/graphql/argument-surface.ts"
   ],
   "surface_count": 45,
-  "input_count": 120,
+  "input_count": 122,
   "surfaces": [
     {
       "method": "GET",
       "path": "/graphql",
       "surface": "GET /graphql",
       "inputs": [
+        {
+          "name": "extensions",
+          "location": "query",
+          "required": false,
+          "type": "string"
+        },
         {
           "name": "operationName",
           "location": "query",
@@ -95,6 +101,12 @@
       "path": "/graphql",
       "surface": "POST /graphql",
       "inputs": [
+        {
+          "name": "extensions",
+          "location": "body",
+          "required": false,
+          "type": null
+        },
         {
           "name": "operationName",
           "location": "body",
