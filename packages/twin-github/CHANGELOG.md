@@ -1,6 +1,56 @@
 # @pome-sh/twin-github — CHANGELOG
 
 
+## 0.10.5 — 2026-08-11
+
+`pull_request_read`'s `get_comments` reads the PR's conversation instead of its
+inline review comments (F-1423).
+
+The dispatch answered BOTH comment methods from `pull_request_review_comments`:
+
+```js
+// GitHub distinguishes issue-level `get_comments` from diff-level
+// `get_review_comments`; this twin stores one comment thread per PR and
+// answers both from it rather than inventing a split it does not model.
+case "get_comments":
+case "get_review_comments":
+  return domain.getPullRequestComments(pull);
+```
+
+The justification was false by the time it was read. F-1151 gave a PR's
+conversation its own storage — `issue_comments`, keyed on the PR's own number,
+because GitHub models a pull request as an issue — and F-1421 gave the seed both
+vocabularies as separate fields (`pull_requests[].comments[]` and
+`pull_requests[].review_comments[]`). The twin models the split; only this
+dispatch did not. `get_comments` now reads `issue_comments` and
+`get_review_comments` keeps the review-comment table.
+
+The conversation is read through a new `getPullRequestConversation`, not by
+calling the ISSUE endpoints' `listIssueComments` with the pull number. Those
+read the same rows through the same serializer, but they resolve the target
+with `requireCommentTarget`, which accepts an issue OR a pull request — correct
+for the endpoints it serves, and wrong on this tool, where every other method
+answers 404 for a number that is not a pull request. Reusing it would have
+fixed the table and quietly widened one method of `pull_request_read` to answer
+for issues as well.
+
+⚠️ **This changes what the twin SERVES.** An examinee calling
+`pull_request_read(method: "get_comments")` gets the PR's discussion from 0.10.5
+on, where it previously got inline diff comments — and, since 0.10.3 (F-1422),
+got them in the full review-comment shape, so the answer was recognizably the
+wrong OBJECT rather than a lean one that could pass for a timeline comment. A
+task that seeded review comments and read them back through `get_comments` will
+now see `[]` unless it also seeds `comments[]`. The REST routes are unchanged;
+this was always MCP-only, which is why no fidelity lane measured it — the L1 MCP
+lane compares tool names and input schemas, not response bodies.
+
+`test/pull-request-read-comment-methods.test.ts` seeds one comment of each kind
+on one PR and pins each method to the body its own table holds, asserts the two
+answers are disjoint, and pins `pull_request_read(get_comments)` equal to
+`issue_read(get_comments)` on the same number — the two tool names for the one
+GitHub endpoint, which is what stops the dispatches drifting apart again.
+
+
 ## 0.10.4 — 2026-08-11
 
 An absent `state` means `open` on the three list routes, the way real GitHub

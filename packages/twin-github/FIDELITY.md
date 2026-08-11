@@ -80,7 +80,7 @@ in the package README. Changing any of those is a breaking change for
 | `get_tag` | SQLite tags | hot | semantic | `mcp-contract.test.ts`, `m5-hot-gaps.test.ts` | MCP-only (no REST route; git-plumbing REST stays cold per F-729); returns the lightweight tag object, not the annotated-tag git object. |
 | `issue_read` | SQLite issues, issue comments, issue labels | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts` | GitHub's consolidated reader (F-1376). Methods `get`, `get_comments`, `get_labels`; `get_sub_issues` and `get_parent` answer 501 — sub-issues are not modeled. |
 | `issue_write` | SQLite issues, labels, assignees | hot | semantic | `mcp-contract.test.ts`, `mcp-error-semantics.test.ts` | GitHub's consolidated writer (F-1376). Methods `create` and `update`. Milestones, issue types and `state_reason` are not implemented. |
-| `pull_request_read` | SQLite pull requests, PR files, commits, reviews, comments, check runs | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts` | GitHub's consolidated reader (F-1376). `get_diff` and `get_files` return simplified placeholder patches; `get_comments` answers from the review-comment table rather than the PR's conversation, which the twin DOES split (divergence 22). |
+| `pull_request_read` | SQLite pull requests, PR files, commits, reviews, comments, check runs | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts` | GitHub's consolidated reader (F-1376). `get_diff` and `get_files` return simplified placeholder patches; `get_comments` serves the PR's conversation timeline and `get_review_comments` its inline diff comments, from the two tables GitHub splits them across (F-1423). |
 | `pull_request_review_write` | SQLite PR reviews | hot | semantic | `mcp-contract.test.ts`, `state-export.test.ts` | GitHub's consolidated review writer (F-1376). Only `create` with an explicit `event`; pending reviews and review threads are not modeled, so the other four methods answer 501. |
 | `list_repository_collaborators` | SQLite collaborators | hot | semantic | `mcp-contract.test.ts` | Permission filtering is not implemented. |
 
@@ -409,21 +409,34 @@ upstream so a divergence that upstream "heals" becomes a tier-upgrade signal.
     against upstream, so the shape diff masks them; an agent that parses a
     review comment's hunk text or resolves `position` against a real diff will
     diverge, exactly as on the diff surfaces bullet 2 names.
+
 22. **`pull_request_read`'s `get_comments` answers from the wrong table (open gap,
-    not accepted).** GitHub distinguishes the issue-level `get_comments` from the
-    diff-level `get_review_comments`; the twin answers BOTH from
-    `pull_request_review_comments`, on a comment that says it "stores one comment
+    not accepted).** ⚠️ **FIXED in 0.10.5 (F-1423) — this bullet is awaiting
+    retirement, not describing current behaviour.** `get_comments` now reads the
+    pull request's conversation (`issue_comments`, keyed on the PR's own number)
+    and `get_review_comments` keeps `pull_request_review_comments`; the two are
+    pinned apart by `test/pull-request-read-comment-methods.test.ts`.
+
+    It is still here because pome-cloud's `lint-known-divergences.ts` binds this
+    bullet 1:1 to an entry in its `known-divergences/github.yaml`, matching on the
+    bold title above, and runs on every pome-cloud PR against **main, unpinned**
+    (F-1430, PR #369). Deleting the bullet without deleting that entry in the same
+    window orphans it and reds every open pome-cloud PR — so the two retire
+    together, in the coordinated change that owns the pome-cloud half, and the
+    title is left byte-identical so the match keeps holding until then. The stale
+    thing this ticket was really about — a code comment asserting a split the twin
+    did model — is gone from `tools.ts`.
+
+    What it recorded, for the reader who finds it before it goes: GitHub
+    distinguishes the issue-level `get_comments` from the diff-level
+    `get_review_comments`; the twin answered BOTH from
+    `pull_request_review_comments`, on a comment saying it "stores one comment
     thread per PR and answers both from it rather than inventing a split it does
-    not model". That was true when it was written and F-1151 made it false: a PR's
-    conversation has its own table (`issue_comments`, keyed on the PR's number),
-    `exportState` keeps the three comment surfaces apart, and the REST routes
-    already serve them separately. So `get_comments` returns inline review
-    comments to a caller asking for the timeline — and since F-1422 it returns
-    them in the full review-comment shape, so the answer is now recognizably the
-    wrong OBJECT rather than a lean one that could pass for a timeline comment.
-    Discovered the same way as the LIST shape in bullet 21 — F-1421 makes both
-    surfaces seedable, so the two now have different contents to tell apart —
-    but MCP-only, so no fidelity-watch lane measures it.
+    not model". That was true when written and F-1151 made it false — a PR's
+    conversation has its own table, `exportState` keeps the three comment surfaces
+    apart, and the REST routes already served them separately. Discovered the same
+    way as the LIST shape in bullet 21, but MCP-only, so no fidelity-watch lane
+    measured it.
 
 23. **`check-runs` has no reachable upstream — `Checks` is not grantable to a
     fine-grained PAT.** GitHub gates

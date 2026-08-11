@@ -189,6 +189,30 @@ export function getPullRequestComments(domain: GitHubDomain, input: { owner: str
 }
 
 
+// F-1423 — the PR's CONVERSATION timeline, the other half of the pair above.
+// It reads `issue_comments` keyed on the PR's own number, because GitHub models
+// a pull request as an issue and puts both entities' conversations in one table
+// and behind one route (F-1151).
+//
+// This is deliberately not `issues.listIssueComments` called with the pull
+// number, even though that reads the same rows through the same serializer.
+// That function resolves its target with `requireCommentTarget`, which accepts
+// an issue OR a pull request — correct for the ISSUE endpoints it serves, and
+// wrong here, because every other method on `pull_request_read` answers 404 for
+// a number that is not a pull request. Reaching the shared table must not
+// quietly make one method on that tool answer for issues too. So the guard is
+// `requirePullRequest`, like every sibling in this file, and `target` is
+// `"pull_request"` as a fact rather than a lookup.
+export function getPullRequestConversation(domain: GitHubDomain, input: { owner: string; repo: string; pull_number: number } & PageOptions) {
+  const repo = domain.requireRepo(input.owner, input.repo);
+  domain.requirePullRequest(repo.id, input.pull_number);
+  const rows = domain.listIssueCommentRows(repo.id, input.pull_number);
+  return paginate(rows, input.page, input.per_page ?? input.perPage).map((comment) =>
+    issueCommentJson(comment, repo, "pull_request")
+  );
+}
+
+
 export function getPullRequestStatus(domain: GitHubDomain, input: { owner: string; repo: string; pull_number: number }) {
   const repo = domain.requireRepo(input.owner, input.repo);
   const pr = domain.requirePullRequest(repo.id, input.pull_number);

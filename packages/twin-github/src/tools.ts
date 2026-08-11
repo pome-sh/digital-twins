@@ -414,10 +414,17 @@ export function executeTool(
           return domain.getPullRequestCommits(pull);
         case "get_reviews":
           return domain.getPullRequestReviews(pull);
-        // GitHub distinguishes issue-level `get_comments` from diff-level
-        // `get_review_comments`; this twin stores one comment thread per PR and
-        // answers both from it rather than inventing a split it does not model.
+        // GitHub distinguishes the issue-level `get_comments` from the
+        // diff-level `get_review_comments`, and so does this twin: a PR's
+        // CONVERSATION lives in `issue_comments`, keyed on the PR's own number
+        // because GitHub models a pull request as an issue (F-1151), while the
+        // comments anchored to a file and line live in
+        // `pull_request_review_comments`. Both halves of the justification that
+        // stood here — one thread per PR, a split the twin does not model —
+        // stopped being true at F-1151, and F-1421 then gave the seed both
+        // vocabularies as separate fields (F-1423).
         case "get_comments":
+          return domain.getPullRequestConversation(pull);
         case "get_review_comments":
           return domain.getPullRequestComments(pull);
         case "get_check_runs": {
