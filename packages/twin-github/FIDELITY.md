@@ -204,6 +204,16 @@ the Twin Fidelity Watch's `known-divergences/github.yaml` (maintained in
 pome-cloud); a lint keeps the two 1:1. The fidelity watchdog reverse-tests each one against
 upstream so a divergence that upstream "heals" becomes a tier-upgrade signal.
 
+**These numbers are stable identifiers, not positions.** A retired divergence
+leaves its number behind rather than renumbering the ones after it — code
+comments, CHANGELOG entries and tickets cite divergences by number ("recorded as
+divergence 24"), and renumbering would silently repoint every one of them, including
+entries in an append-only changelog that cannot be corrected without falsifying
+the record. So a gap in this list means a divergence was retired, and the first
+one is 22: `pull_request_read`'s `get_comments` answered from the review-comment
+table until F-1423 gave the conversation its own read in 0.10.5. The lint matches
+on each bullet's bold title and never on its number, so gaps cost it nothing.
+
 1. **Search query syntax is substring-based.** The free text left in `q` is
    matched as one case-insensitive substring, scoped to the default branch —
    not as GitHub's ranked, tokenised, boolean-aware index. Four SCOPE
@@ -428,34 +438,6 @@ upstream so a divergence that upstream "heals" becomes a tier-upgrade signal.
     against upstream, so the shape diff masks them; an agent that parses a
     review comment's hunk text or resolves `position` against a real diff will
     diverge, exactly as on the diff surfaces bullet 2 names.
-
-22. **`pull_request_read`'s `get_comments` answers from the wrong table (open gap,
-    not accepted).** ⚠️ **FIXED in 0.10.5 (F-1423) — this bullet is awaiting
-    retirement, not describing current behaviour.** `get_comments` now reads the
-    pull request's conversation (`issue_comments`, keyed on the PR's own number)
-    and `get_review_comments` keeps `pull_request_review_comments`; the two are
-    pinned apart by `test/pull-request-read-comment-methods.test.ts`.
-
-    It is still here because pome-cloud's `lint-known-divergences.ts` binds this
-    bullet 1:1 to an entry in its `known-divergences/github.yaml`, matching on the
-    bold title above, and runs on every pome-cloud PR against **main, unpinned**
-    (F-1430, PR #369). Deleting the bullet without deleting that entry in the same
-    window orphans it and reds every open pome-cloud PR — so the two retire
-    together, in the coordinated change that owns the pome-cloud half, and the
-    title is left byte-identical so the match keeps holding until then. The stale
-    thing this ticket was really about — a code comment asserting a split the twin
-    did model — is gone from `tools.ts`.
-
-    What it recorded, for the reader who finds it before it goes: GitHub
-    distinguishes the issue-level `get_comments` from the diff-level
-    `get_review_comments`; the twin answered BOTH from
-    `pull_request_review_comments`, on a comment saying it "stores one comment
-    thread per PR and answers both from it rather than inventing a split it does
-    not model". That was true when written and F-1151 made it false — a PR's
-    conversation has its own table, `exportState` keeps the three comment surfaces
-    apart, and the REST routes already served them separately. Discovered the same
-    way as the LIST shape in bullet 21, but MCP-only, so no fidelity-watch lane
-    measured it.
 
 23. **`check-runs` has no reachable upstream — `Checks` is not grantable to a
     fine-grained PAT.** GitHub gates
