@@ -609,32 +609,59 @@ describe("verdict artifact (FDRS-644)", () => {
   // correctly — a different fact, so it gets its own count and its own named
   // paths, never folded into either existing one.
   describe("a corrupt current-version verdict.json is a named, counted 'unreadable' skip (F-1411)", () => {
-    it("a truncated verdict.json reads as unreadable", async () => {
-      const tmp = await mkdtemp(join(tmpdir(), "verdict-truncated-"));
-      const dir = join(tmp, "scn", "ses_truncated");
+    // Each of the three damage shapes the ticket names is asserted TWICE, and
+    // the second assertion is the one that matters: `readVerdictArtifactDetailed`
+    // already returned `unreadable` for all three before this change, so a test
+    // that stops there passes against the unfixed code and pins nothing (the
+    // exact shape F-1375 exists to remove). The read status is stated as the
+    // premise; `discoverRunSet` counting and NAMING the dir is the claim.
+    async function discoverOne(prefix: string, sid: string, body: string) {
+      const tmp = await mkdtemp(join(tmpdir(), prefix));
+      const dir = join(tmp, "scn", sid);
       await mkdir(dir, { recursive: true });
-      await writeFile(join(dir, "verdict.json"), '{"version": 2, "source":', "utf8");
-      expect(await readVerdictArtifactDetailed(dir)).toEqual({ status: "unreadable" });
-    });
+      await writeFile(join(dir, "verdict.json"), body, "utf8");
+      return { dir, discovery: await discoverRunSet(tmp) };
+    }
 
-    it("a v2 verdict.json with an unexpected `state` value reads as unreadable, not stale-version", async () => {
-      const tmp = await mkdtemp(join(tmpdir(), "verdict-badstate-"));
-      const dir = join(tmp, "scn", "ses_badstate");
-      await mkdir(dir, { recursive: true });
-      await writeFile(
-        join(dir, "verdict.json"),
-        JSON.stringify(verdict({ session_id: "ses_badstate", state: "bogus" as never })),
-        "utf8",
+    it("a truncated verdict.json is counted and named, not dropped", async () => {
+      const { dir, discovery } = await discoverOne(
+        "verdict-truncated-",
+        "ses_truncated",
+        '{"version": 2, "source":',
       );
       expect(await readVerdictArtifactDetailed(dir)).toEqual({ status: "unreadable" });
+      expect(discovery.unreadableCount).toBe(1);
+      expect(discovery.unreadablePaths).toEqual([dir]);
+      expect(discovery.staleVersionCount).toBe(0);
+      expect(discovery.totalSets).toBe(0);
     });
 
-    it("valid JSON that isn't a verdict artifact at all reads as unreadable", async () => {
-      const tmp = await mkdtemp(join(tmpdir(), "verdict-notartifact-"));
-      const dir = join(tmp, "scn", "ses_notartifact");
-      await mkdir(dir, { recursive: true });
-      await writeFile(join(dir, "verdict.json"), JSON.stringify({ hello: "world", count: 3 }), "utf8");
+    it("a v2 verdict.json with an unexpected `state` value is counted as unreadable, not as stale-version", async () => {
+      const { dir, discovery } = await discoverOne(
+        "verdict-badstate-",
+        "ses_badstate",
+        JSON.stringify(verdict({ session_id: "ses_badstate", state: "bogus" as never })),
+      );
       expect(await readVerdictArtifactDetailed(dir)).toEqual({ status: "unreadable" });
+      expect(discovery.unreadableCount).toBe(1);
+      expect(discovery.unreadablePaths).toEqual([dir]);
+      // The file CLAIMS the current version, so the stale-version count must
+      // stay at zero: "an older CLI wrote this correctly" would be false.
+      expect(discovery.staleVersionCount).toBe(0);
+      expect(discovery.totalSets).toBe(0);
+    });
+
+    it("valid JSON that isn't a verdict artifact at all is counted and named", async () => {
+      const { dir, discovery } = await discoverOne(
+        "verdict-notartifact-",
+        "ses_notartifact",
+        JSON.stringify({ hello: "world", count: 3 }),
+      );
+      expect(await readVerdictArtifactDetailed(dir)).toEqual({ status: "unreadable" });
+      expect(discovery.unreadableCount).toBe(1);
+      expect(discovery.unreadablePaths).toEqual([dir]);
+      expect(discovery.staleVersionCount).toBe(0);
+      expect(discovery.totalSets).toBe(0);
     });
 
     it("scanVerdictArtifactsDetailed separates unreadable dirs from readable trials AND from stale-version dirs, without flagging a run dir that has no verdict.json at all", async () => {
@@ -664,9 +691,13 @@ describe("verdict artifact (FDRS-644)", () => {
       const { trials, staleVersionDirs, unreadableDirs } = await scanVerdictArtifactsDetailed(tmp);
       expect(trials.map((t) => t.verdict.session_id)).toEqual(["ses_ok"]);
       expect(staleVersionDirs).toEqual([staleDir]);
-      expect(unreadableDirs.slice().sort()).toEqual(
-        [truncatedDir, badStateDir, notArtifactDir].sort(),
-      );
+      // Asserted in SORTED order, not "sort both sides and compare": the
+      // scan sorts on purpose so the trimmed path list fix-prompt prints is
+      // the same on APFS (readdir hands back names sorted) and ext4 (hash
+      // order). Sorting the actual before comparing would hide a regression
+      // there and let the display test flake on Linux only.
+      expect(unreadableDirs).toEqual([badStateDir, notArtifactDir, truncatedDir]);
+      expect(unreadableDirs).toEqual([...unreadableDirs].sort());
     });
 
     // F-1195's own lesson, replayed for `unreadable`: the count must survive

@@ -9,14 +9,16 @@ packaging restructure: bump `version` here and in `package.json`, and merging to
 ### Patch Changes
 
 - `pome fix-prompt` names a corrupt current-version `verdict.json` instead of
-  dropping it silently (F-1411). A v2 artifact that is truncated, hand-edited,
-  or carries an unexpected `state` read as `{status: "unreadable"}` and
+  dropping it silently (F-1411). A verdict.json that is truncated,
+  hand-edited into an unexpected `state`, or valid JSON that is not one of
+  our artifacts at all read as `{status: "unreadable"}` and
   vanished from every count `RunSetDiscovery` exposes — not `totalSets`, not
   `staleVersionCount` — so a `runs/` holding one readable trial beside a
   damaged one built a prompt from a fraction of the run set and said nothing
   about the rest, the same silent drop F-1195 closed for a prior-version
   file. `RunSetDiscovery` now carries `unreadableCount` and the paths behind
-  it (`unreadablePaths`), and fix-prompt discovery prints a distinct line
+  it (`unreadablePaths`, sorted so the trimmed list does not depend on
+  `readdir` order), and fix-prompt discovery prints a distinct line
   naming them — capped at 5, "N more omitted" beyond that — every time it
   happens, not only when nothing else was found. Kept separate from
   `staleVersionCount` on purpose: a file an older CLI wrote correctly and a

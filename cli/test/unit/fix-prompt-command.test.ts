@@ -14,9 +14,9 @@
 // see "an incomplete-only root ..." below. `groupRunSets`'s `outcome` is the
 // one computation both the routing decision and this wording read.
 
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createProgram } from "../../src/cli/main.js";
 import {
@@ -409,6 +409,55 @@ describe("pome fix-prompt command (FDRS-644)", () => {
       expect(err).toContain("1 verdict.json file(s)");
       expect(err).toContain("could not be read");
       expect(err).toContain(runDir);
+    });
+
+    // The trim is the one part of this output with arithmetic in it, and it
+    // only fires past five paths — untested, an off-by-one (or a tail line
+    // that never prints) is invisible to CI. Five is the last count that
+    // prints every path; six is the first that omits one.
+    it("names every path up to five, and trims with a count past that", async () => {
+      const five = await mkdtemp(join(tmpdir(), "fixcmd-unreadable-five-"));
+      const fiveDirs: string[] = [];
+      for (let i = 1; i <= 5; i += 1) {
+        fiveDirs.push(await writeCorruptTrial(five, `ses_bad_${i}`));
+      }
+      process.chdir(five);
+      await run();
+      const fiveErr = stderr.join("\n");
+      expect(fiveErr).toContain("5 verdict.json file(s)");
+      for (const d of fiveDirs) expect(fiveErr).toContain(d);
+      expect(fiveErr).not.toContain("more omitted");
+
+      stderr = [];
+      const six = await mkdtemp(join(tmpdir(), "fixcmd-unreadable-six-"));
+      const sixDirs: string[] = [];
+      for (let i = 1; i <= 6; i += 1) {
+        sixDirs.push(await writeCorruptTrial(six, `ses_bad_${i}`));
+      }
+      process.chdir(six);
+      await run();
+      const sixErr = stderr.join("\n");
+      expect(sixErr).toContain("6 verdict.json file(s)");
+      expect(sixErr).toContain("(1 more omitted — kept first 5)");
+      // WHICH five survive the trim is pinned, not just how many: the scan
+      // sorts `unreadablePaths` so this holds on ext4 (hash-ordered readdir)
+      // as well as APFS. Asserting only the count would let that sort rot.
+      const listed = sixErr
+        .split("\n")
+        .filter((l) => l.startsWith("  - "))
+        .map((l) => l.slice(4));
+      // Compared against the REALPATH of the tmp root: discovery resolves the
+      // root against `process.cwd()`, which on macOS reports
+      // /private/var/... for a /var/... tmpdir. The `toContain` assertions
+      // elsewhere in this describe survive that by substring luck; an
+      // order-sensitive equality cannot.
+      const sixRoot = await realpath(six);
+      expect(listed).toEqual(
+        sixDirs
+          .map((d) => join(sixRoot, relative(six, d)))
+          .sort()
+          .slice(0, 5),
+      );
     });
 
     it("a trial dir pointed straight at a corrupt verdict.json names it as unreadable, not as an empty root", async () => {

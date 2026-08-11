@@ -254,7 +254,14 @@ export async function readVerdictArtifact(
  *  on purpose — a prior-version file and a corrupt one are different facts
  *  (upgrade vs. damage) and want different fixes. A run dir with no
  *  verdict.json at all (no run finished there yet) is neither: `existsSync`
- *  below is what tells "never written" apart from "written, then damaged". */
+ *  below is what tells "never written" apart from "written, then damaged".
+ *
+ *  `unreadableDirs` is SORTED, unlike the other two: it is the only one whose
+ *  order reaches a user, via the path list `pome fix-prompt` prints and trims
+ *  to the first few. `readdir` promises no order — APFS hands back names
+ *  sorted, ext4 hands back hash order — so without this the WHICH of "kept
+ *  first 5" would differ between a dev's machine and CI, and a test pinning
+ *  the trim would pass locally and flake on Linux. */
 export interface VerdictScanResult {
   trials: TrialVerdict[];
   staleVersionDirs: string[];
@@ -291,6 +298,7 @@ export async function scanVerdictArtifactsDetailed(
       }
     }
   }
+  unreadableDirs.sort();
   return { trials, staleVersionDirs, unreadableDirs };
 }
 
@@ -338,7 +346,9 @@ export interface RunSetDiscovery {
    *  parsed fine, same lesson as `staleVersionCount`. */
   unreadableCount: number;
   /** The paths behind `unreadableCount`, so the caller can name them instead
-   *  of only counting them. */
+   *  of only counting them. Sorted (see `scanVerdictArtifactsDetailed`) —
+   *  callers trim this list for display, so which ones survive the trim must
+   *  not depend on the filesystem's `readdir` order. */
   unreadablePaths: string[];
 }
 
