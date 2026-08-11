@@ -68,13 +68,42 @@ function isTwinExamplePath(file) {
   return /^packages\/twin-[^/]+\/examples\//.test(file);
 }
 
+/**
+ * A twin's own TOP-LEVEL markdown ships in no tarball either, for exactly the
+ * reason above: every `packages/twin-*` package is `private: true`, and
+ * release.yml publishes only cli, adapter-claude-sdk, checks and wire. Their
+ * `files` arrays do name `README.md` / `FIDELITY.md` / `LIMITS.md`, and that is
+ * as inert as the `dist/examples` case — a `files` array on a package nothing
+ * publishes describes a tarball nobody builds. The CLI's tarball inlines twin
+ * SOURCE through tsup, and tsup cannot inline a markdown file.
+ *
+ * Same shape of over-match as F-1455, one directory over: `packages/twin-` is a
+ * plain prefix, so documentation that cannot change one byte of any published
+ * artifact was demanding a `@pome-sh/cli` bump — i.e. a republish that would be
+ * byte-identical. RELEASING.md's advice ("if your change doesn't warrant a
+ * release it shouldn't be touching a publish-relevant path") has no answer here:
+ * a twin's FIDELITY.md has nowhere else to live.
+ *
+ * Found on the docs-only PR that added the FIDELITY.md bullets pome-cloud's
+ * `lint-known-divergences.ts` binds its registry entries to 1:1.
+ *
+ * `[^/]+\/[^/]+\.md` is two single path segments on purpose: this exempts
+ * `packages/twin-github/FIDELITY.md` and NOT `packages/twin-github/src/x.md`
+ * or any nested docs directory, so it cannot widen to cover something the
+ * bundler might actually read.
+ */
+function isTwinTopLevelDocPath(file) {
+  return /^packages\/twin-[^/]+\/[^/]+\.md$/.test(file);
+}
+
 const changedFiles = execFileSync("git", ["diff", "--name-only", baseSha, "HEAD"], {
   encoding: "utf8",
 })
   .split("\n")
   .filter(Boolean)
   .filter((file) => !isUnpublishableTestPath(file))
-  .filter((file) => !isTwinExamplePath(file));
+  .filter((file) => !isTwinExamplePath(file))
+  .filter((file) => !isTwinTopLevelDocPath(file));
 
 function versionAt(ref, manifestPath) {
   try {
