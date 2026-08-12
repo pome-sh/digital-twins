@@ -62,18 +62,33 @@ jobs:
           tmp="$(mktemp -d)"
           trap 'rm -rf "$tmp"' EXIT
           # This step puts the REQUIRED check (`typecheck-test`) behind a
-          # third-party CDN fetch, so the retry budget is load-bearing, not
-          # decoration. The GitHub release CDN served sustained 503s during this
-          # PR's own review — run 31618873218 (gitleaks), a twin-image syft
-          # install, and run 31619759943 where a 3-attempt/7-second budget
-          # exhausted itself and red this very step on a good commit.
-          # `--retry-delay 0` selects curl's exponential backoff (1s, 2s, 4s …)
-          # instead of a flat wait, so this rides out a minute-long blip;
-          # --retry-max-time bounds the worst case so a real outage fails fast
-          # rather than burning a runner. Deliberately NOT cached: a cache hit
-          # would skip the sha256 verification below, which is the whole point
-          # of fetching a pinned binary rather than trusting an Action.
-          curl -sSfL --retry 6 --retry-delay 0 --retry-max-time 120 --retry-connrefused "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}" -o "$tmp/$archive"
+          # third-party CDN fetch, so the backoff is load-bearing, not
+          # decoration. The GitHub release CDN was degraded throughout this
+          # PR's review and took out three separate pinned installs on its own
+          # runs: 31618873218 (gitleaks, 503), a twin-image syft install (503),
+          # and 31619759943 (this step, 503).
+          #
+          # The retry is an explicit loop rather than curl's --retry flags,
+          # because those were measured doing two different things: locally
+          # `--retry-delay 0` backed off 1s/2s/4s as documented, while on the
+          # runner the same flags burned five attempts in 0.8s against a
+          # `curl: (56) Connection died` (run 31620014945) — a retry budget
+          # that looks handled and is not is worse than none. A loop with a
+          # literal `sleep` cannot be version-dependent.
+          #
+          # Deliberately NOT cached, though that would make an outage a
+          # cold-cache-only problem: a cache hit skips the sha256 verification
+          # below, which is the whole reason for fetching a pinned binary
+          # instead of trusting a third-party Action.
+          url="https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}"
+          for attempt in 1 2 3 4 5; do
+            if curl -sSfL --connect-timeout 10 --max-time 120 "$url" -o "$tmp/$archive"; then break; fi
+            if [ "$attempt" -eq 5 ]; then
+              echo "actionlint download failed after 5 attempts: $url" >&2
+              exit 1
+            fi
+            sleep "$(( attempt * 5 ))"
+          done
           printf '%s  %s\n' "$ACTIONLINT_SHA256" "$tmp/$archive" | sha256sum -c -
           tar -xzf "$tmp/$archive" -C "$tmp" actionlint
           mkdir -p "$HOME/.local/bin"
