@@ -39,12 +39,12 @@
   "transcription": {
     "readFrom": "twin-stripe's own tools/list, booted on defaultSeed() and driven through Hono's app.request, read immediately before this table became fixture-driven (F-1325). Re-projected on 2026-08-12 for F-1484: every tool's inputSchema was rewritten from stripeToolInputSchema() of its zod schema — a no-op for 25 of the 26, and create_refund.reason's enum for the one. Names, descriptions and ordering are unchanged, and test/mcp-tool-fixture.test.ts boots the twin and asserts it serves exactly these bytes.",
     "contentOrigin": "packages/twin-stripe/src/tools.ts — a hand-written TypeScript array of 26 tools. Each inputSchema is z.toJSONSchema() of that tool's zod schema, frozen here verbatim including the $schema key it emits.",
-    "comparedToUpstream": "never, and not comparable today. @stripe/mcp is a stdio-to-HTTP proxy that declares no tools of its own and the served listing is a function of the caller's Restricted API Key, so F-1326 recorded stripe as not-captured (fixtures/mcp-tools-list/stripe.status.json) rather than inventing a deployment-invariant table."
+    "comparedToUpstream": "compared, and credential-scoped. F-1326 recorded stripe as not-captured because @stripe/mcp is a stdio-to-HTTP proxy that declares no tools of its own and the served listing is a function of the caller's Restricted API Key; that stopped being the whole story on 2026-08-10, when a golden was captured live off https://mcp.stripe.com (fixtures/mcp-tools-list/stripe.meta.json — live-wire-oauth, 11 tools). F-1469 read this table against it: of the 36 union names exactly 1 is shared (create_refund), twin_only=25, upstream_only=10. One of 36 is the honest measurement rather than a failed comparison — the endpoint decides its listing from the caller's credential, so that golden declares completeness credential-scoped and unguarded in BOTH directions. So a name this twin serves that the golden lacks is never evidence the vendor lacks it: read the 25 as not-compared, never as twin-only divergence and never as full coverage. The one compared name is load-bearing — F-1484 narrowed create_refund.reason to the enum that golden carries."
   },
   "notes": [
     "Seeded from the code table rather than from upstream on purpose. F-1325 is name-neutral by construction: every byte this twin serves is identical before and after it."
   ],
-  "canonicalFileSha256": "6a294341065eb90138f26654ad00bf7b0b3750ee6c2f12df82a38fb91df7854f",
+  "canonicalFileSha256": "49c8d40fc29e99be704d81362e3c7b87d72cac58c35686ed3aae8dc166db3fd0",
   "files": {
     "raw": "mcp-tools-list.raw.json",
     "canonical": "mcp-tools-list.canonical.json"
