@@ -68,7 +68,11 @@ const SCOPE = "@pome-sh/";
 // pair silently stops covering its subject the moment root grows a glob or the
 // CLI moves directory — which it has done twice (#237, #239). An empty result
 // throws rather than reporting a pass over nothing.
-export function findPinViolations(repoRoot) {
+// Shared with `scripts/check-example-pins-published.mjs` (F-1483): that gate
+// needs the same sibling-name → workspace-version map to know which
+// `examples/*` pins have a sibling to compare against, and duplicating this
+// walk would let the two derivations disagree about what a "sibling" is.
+export function loadWorkspaceMembers(repoRoot) {
   const root = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8"));
   const relativePaths = (root.workspaces ?? []).flatMap((pattern) =>
     globSync(join(pattern, "package.json"), { cwd: repoRoot }),
@@ -78,10 +82,14 @@ export function findPinViolations(repoRoot) {
       `no workspace manifests found under ${repoRoot} for workspaces ${JSON.stringify(root.workspaces)}`,
     );
   }
-  const members = relativePaths.map((relativePath) => ({
+  return relativePaths.map((relativePath) => ({
     manifest: JSON.parse(readFileSync(join(repoRoot, relativePath), "utf8")),
     label: dirname(relativePath),
   }));
+}
+
+export function findPinViolations(repoRoot) {
+  const members = loadWorkspaceMembers(repoRoot);
   const manifests = new Map(members.map((member) => [member.manifest.name, member]));
 
   const violations = [];

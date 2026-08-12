@@ -21,9 +21,11 @@
 // fixture with its own root manifest, so the gate is proven to fire on the shape
 // rather than trusted to, but no fixture can prove it is aimed at the real tree.
 //
-// The failure class itself is NOT fully closed, and this suite cannot close it:
-// see `scripts/typecheck-examples.mjs`'s header for the `examples/support-triage`
-// seam, which is the same shape through a pin that is published on purpose.
+// The failure class through `examples/*`'s deliberately-published pins is a
+// different rule (needs the registry, tolerates a pin equal to a version that
+// simply has not published yet) and is NOT this suite's subject — see
+// `scripts/check-example-pins-published.mjs` (F-1483) and its own regression
+// suite, wired from `scripts/typecheck-examples.mjs`.
 
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
