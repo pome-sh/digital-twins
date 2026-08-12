@@ -12,12 +12,17 @@
 //
 // twin-slack's equivalent asserts empty, because F-1330 moved its validators
 // onto Slack's argument surface in the same change that adopted the fixture.
-// This one cannot yet, and the reason is not effort. Closing most of these
-// TIGHTENS what the twin accepts — `query` becomes required on the five search
-// tools, `branch` on the file writers, `list_issues.state` loses its lowercase
-// spelling — and every one of those breaks a task that passes today. Tightening
-// is what ships with a corpus heat reading and its migrations (F-1330's
-// discipline), not with a fixture swap.
+// This one does not, and the reason is not effort: closing an entry here usually
+// TIGHTENS what the twin accepts, and a tightening breaks every task written
+// against the twin as it is. It ships with a corpus heat reading and its
+// migrations (F-1330's discipline), not with a fixture swap.
+//
+// That reading ran, and the three tightenings it cleared are gone from this list
+// rather than sitting in it: `query` required on the five search tools and
+// `branch` on the two file writers (zero callers measured across the corpus, the
+// bundled examples, 17 hosted saved tasks and 50 hosted runs), and
+// `list_issues.state` on GitHub's casing (one caller, migrated in the same
+// change). What remains is what still has heat, or still wants a ruling.
 //
 // So the gap is PINNED rather than tolerated. Adding a validator argument
 // GitHub does not declare, or dropping one it does, fails this test until a
@@ -28,11 +33,15 @@
 //
 // THE RESIDUE IS THE WORKLIST. Three shapes, and they are not equally urgent:
 //
-//   FALSE PASS — the twin accepts what GitHub refuses. `requires []` against
-//     GitHub's `[query]` on all five search tools; `create_or_update_file` and
-//     `delete_file` not requiring `branch`. An examinee that omits the argument
-//     is graded as succeeding here and would fail against GitHub. Worst class
-//     for a grading instrument, and first in line.
+//   FALSE PASS — the twin accepts what GitHub refuses. One left:
+//     `create_pull_request` takes a call with no `base`. An examinee that omits
+//     the argument is graded as succeeding here and would fail against GitHub.
+//     Worst class for a grading instrument, and first in line.
+//
+//     The other four went in F-1468's tightening, once the heat read found them
+//     free: `query` on the five search tools and `branch` on the two file
+//     writers had zero callers anywhere, and `list_issues.state` had exactly one
+//     (examples/triage-agent), migrated in the same change.
 //   ALIAS — the twin validates a snake_case spelling GitHub does not declare
 //     (`per_page`, `pull_number`, `q`, `expected_head_sha`) ALONGSIDE the
 //     camelCase one. Breaks nobody today and is invisible to an examinee
@@ -42,35 +51,35 @@
 //     an examinee that passes it is graded on a call the twin did not make.
 import { describe, expect, it } from "vitest";
 import { toolSchemaConformance } from "../src/tool-schema-conformance.js";
+import { toolArgumentSchemas } from "../src/tools.js";
 
 /** Every known disagreement between GitHub's declared arguments and this twin's
  * validators, sorted. Sorted so the diff of an addition is one line. */
 const KNOWN_RESIDUE: string[] = [
     "'add_issue_comment' does not model GitHub's parameter 'comment_id'",
     "'add_issue_comment' does not model GitHub's parameter 'reaction'",
-    "'add_issue_comment' requires [body,owner,repo] and GitHub requires [issue_number,owner,repo]",
+    "'add_issue_comment' requires 'body', which GitHub does not",
     "'add_issue_comment' validates 'issueNumber', which GitHub's inputSchema does not declare",
     "'add_reply_to_pull_request_comment' does not model GitHub's parameter 'reaction'",
-    "'add_reply_to_pull_request_comment' requires [body,owner,repo] and GitHub requires [commentId,owner,repo]",
+    "'add_reply_to_pull_request_comment' requires 'body', which GitHub does not",
     "'add_reply_to_pull_request_comment' validates 'comment_id', which GitHub's inputSchema does not declare",
     "'add_reply_to_pull_request_comment' validates 'pull_number', which GitHub's inputSchema does not declare",
     "'create_branch' validates 'sha', which GitHub's inputSchema does not declare",
-    "'create_or_update_file' requires [content,message,owner,path,repo] and GitHub requires [branch,content,message,owner,path,repo]",
     "'create_or_update_file' validates 'encoding', which GitHub's inputSchema does not declare",
+    "'create_pull_request' accepts a call with no 'base', and GitHub requires it",
     "'create_pull_request' does not model GitHub's parameter 'draft'",
     "'create_pull_request' does not model GitHub's parameter 'maintainer_can_modify'",
     "'create_pull_request' does not model GitHub's parameter 'reviewers'",
-    "'create_pull_request' requires [head,owner,repo,title] and GitHub requires [base,head,owner,repo,title]",
     "'create_repository' does not model GitHub's parameter 'autoInit'",
     "'create_repository' does not model GitHub's parameter 'organization'",
     "'create_repository' validates 'owner', which GitHub's inputSchema does not declare",
-    "'delete_file' requires [message,owner,path,repo,sha] and GitHub requires [branch,message,owner,path,repo]",
+    "'delete_file' requires 'sha', which GitHub does not",
     "'delete_file' validates 'sha', which GitHub's inputSchema does not declare",
     "'get_commit' does not model GitHub's parameter 'detail'",
     "'get_commit' does not model GitHub's parameter 'page'",
     "'get_commit' does not model GitHub's parameter 'perPage'",
     "'get_commit' does not model GitHub's parameter 'sha'",
-    "'get_commit' requires [owner,ref,repo] and GitHub requires [owner,repo,sha]",
+    "'get_commit' requires 'ref', which GitHub does not",
     "'get_commit' validates 'ref', which GitHub's inputSchema does not declare",
     "'get_file_contents' does not model GitHub's parameter 'fields'",
     "'get_file_contents' does not model GitHub's parameter 'sha'",
@@ -105,23 +114,19 @@ const KNOWN_RESIDUE: string[] = [
     "'list_releases' validates 'per_page', which GitHub's inputSchema does not declare",
     "'list_tags' validates 'per_page', which GitHub's inputSchema does not declare",
     "'merge_pull_request' does not model GitHub's parameter 'merge_method'",
-    "'merge_pull_request' requires [owner,repo] and GitHub requires [owner,pullNumber,repo]",
     "'merge_pull_request' validates 'pull_number', which GitHub's inputSchema does not declare",
     "'pull_request_read' does not model GitHub's parameter 'after'",
     "'pull_request_review_write' does not model GitHub's parameter 'commitID'",
     "'pull_request_review_write' does not model GitHub's parameter 'threadId'",
-    "'push_files' requires [files,message,owner,repo] and GitHub requires [branch,files,message,owner,repo]",
     "'search_code' does not model GitHub's parameter 'fields'",
     "'search_code' does not model GitHub's parameter 'order'",
     "'search_code' does not model GitHub's parameter 'sort'",
-    "'search_code' requires [] and GitHub requires [query]",
     "'search_code' validates 'owner', which GitHub's inputSchema does not declare",
     "'search_code' validates 'per_page', which GitHub's inputSchema does not declare",
     "'search_code' validates 'q', which GitHub's inputSchema does not declare",
     "'search_code' validates 'repo', which GitHub's inputSchema does not declare",
     "'search_commits' does not model GitHub's parameter 'order'",
     "'search_commits' does not model GitHub's parameter 'sort'",
-    "'search_commits' requires [] and GitHub requires [query]",
     "'search_commits' validates 'owner', which GitHub's inputSchema does not declare",
     "'search_commits' validates 'per_page', which GitHub's inputSchema does not declare",
     "'search_commits' validates 'q', which GitHub's inputSchema does not declare",
@@ -131,28 +136,23 @@ const KNOWN_RESIDUE: string[] = [
     "'search_issues' does not model GitHub's parameter 'owner'",
     "'search_issues' does not model GitHub's parameter 'repo'",
     "'search_issues' does not model GitHub's parameter 'sort'",
-    "'search_issues' requires [] and GitHub requires [query]",
     "'search_issues' validates 'per_page', which GitHub's inputSchema does not declare",
     "'search_issues' validates 'q', which GitHub's inputSchema does not declare",
     "'search_issues' validates 'state', which GitHub's inputSchema does not declare",
     "'search_repositories' does not model GitHub's parameter 'minimal_output'",
     "'search_repositories' does not model GitHub's parameter 'order'",
     "'search_repositories' does not model GitHub's parameter 'sort'",
-    "'search_repositories' requires [] and GitHub requires [query]",
     "'search_repositories' validates 'per_page', which GitHub's inputSchema does not declare",
     "'search_repositories' validates 'q', which GitHub's inputSchema does not declare",
     "'search_users' does not model GitHub's parameter 'order'",
     "'search_users' does not model GitHub's parameter 'sort'",
-    "'search_users' requires [] and GitHub requires [query]",
     "'search_users' validates 'per_page', which GitHub's inputSchema does not declare",
     "'search_users' validates 'q', which GitHub's inputSchema does not declare",
     "'update_pull_request' does not model GitHub's parameter 'draft'",
     "'update_pull_request' does not model GitHub's parameter 'maintainer_can_modify'",
     "'update_pull_request' does not model GitHub's parameter 'reviewers'",
-    "'update_pull_request' requires [owner,repo] and GitHub requires [owner,pullNumber,repo]",
     "'update_pull_request' validates 'pull_number', which GitHub's inputSchema does not declare",
     "'update_pull_request_branch' does not model GitHub's parameter 'expectedHeadSha'",
-    "'update_pull_request_branch' requires [owner,repo] and GitHub requires [owner,pullNumber,repo]",
     "'update_pull_request_branch' validates 'expected_head_sha', which GitHub's inputSchema does not declare",
     "'update_pull_request_branch' validates 'pull_number', which GitHub's inputSchema does not declare",
 ];
@@ -169,6 +169,24 @@ describe("MCP argument surface vs GitHub's declared one (F-1468)", () => {
   // itself) would not. These two are cheap and they fix the denominator.
   it("compares a non-trivial number of tools, so the residue is not a vacuum", () => {
     expect(KNOWN_RESIDUE.length).toBeGreaterThan(50);
+  });
+
+  // ⚠️ REQUIRED MEANS PRESENT, NOT TRUTHY. F-1468's first cut wrote the search
+  // tools' refine as `value.query ?? value.q`, which rejects `q: ""` — and
+  // GitHub declares `query` as a plain string with no `minLength`, so an empty
+  // one is a call the vendor accepts. Requiring an argument is not licence to
+  // narrow its domain: that would have swapped a false PASS for a false FAILURE,
+  // the very trade this ticket exists to avoid. The CLI's own smoke app caught
+  // it (`search_repositories` with `{ q: "" }`), which is luck, so it is pinned
+  // here where it is the subject.
+  it("an EMPTY query satisfies the requirement, because GitHub declares no minimum", () => {
+    for (const name of ["search_repositories", "search_code", "search_users", "search_issues", "search_commits"]) {
+      const schema = toolArgumentSchemas.find((t) => t.name === name)!.schema;
+      expect(schema.safeParse({ query: "" }).success, `${name} query:""`).toBe(true);
+      expect(schema.safeParse({ q: "" }).success, `${name} q:""`).toBe(true);
+      // …and absent is still absent.
+      expect(schema.safeParse({}).success, `${name} {}`).toBe(false);
+    }
   });
 
   it("names no tool the twin does not serve", () => {

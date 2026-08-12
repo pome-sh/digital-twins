@@ -56,6 +56,44 @@ function normalizePullNumber<T extends { pull_number?: number; pullNumber?: numb
   return { ...input, pull_number: input.pull_number ?? input.pullNumber! };
 }
 
+/**
+ * GitHub's MCP `list_issues` takes `state` as `OPEN`/`CLOSED`; its REST
+ * `GET /issues` takes `open`/`closed`. Both are real, and this twin serves both
+ * doors onto ONE domain function whose stored state is lowercase — so the
+ * uppercase spelling has to be folded down HERE, at the MCP boundary, and
+ * nowhere else.
+ *
+ * ⚠️ WHY NOT IN `listIssues`. The REST route reaches the same function and F-1427
+ * established its `state=open` default there; teaching the domain to accept both
+ * casings would make the REST route accept `OPEN` too, which real GitHub does
+ * not, and would replace a divergence with a wider one.
+ *
+ * ⚠️ WHY THIS IS NOT COSMETIC. The filter is `issue.state === state` against
+ * lowercase rows. An unfolded `OPEN` matches NOTHING and returns `[]` — a
+ * silent empty result, not an error, which reads to an examinee as "this repo
+ * has no open issues". `mcp-state-enum.test.ts` is the teeth: it seeds open
+ * issues and demands `state: "OPEN"` return them.
+ *
+ * ── THE DEFAULT SPLITS THE SAME WAY, AND FOR THE SAME REASON ───────────────
+ *
+ * GitHub's two doors disagree about the ABSENT case too, and the tightening
+ * above is what made that unavoidable rather than what caused it: its MCP enum
+ * is `["OPEN","CLOSED"]` with no `all` member, so once the twin follows that
+ * declaration there is no spelling left for "both". GitHub's own description of
+ * the argument answers what that means — *"by default both open and closed
+ * issues are returned when not provided"* — while its REST `GET /issues`
+ * defaults to `open`, which is F-1427's ruling and stays exactly as it is.
+ *
+ * So absent maps to `all` HERE and nowhere else. Without it the MCP tool would
+ * have no way to reach a closed issue except by asking for closed ones, and an
+ * examinee told "list the issues" would be handed a filtered world it never
+ * asked for — a wrong answer the twin would then grade as complete.
+ */
+function normalizeIssueState<T extends { state?: string }>(input: T) {
+  if (input.state === undefined) return { ...input, state: "all" };
+  return { ...input, state: input.state.toLowerCase() };
+}
+
 function normalizeCommentId<T extends { comment_id?: number; commentId?: number }>(input: T) {
   return { ...input, comment_id: input.comment_id ?? input.commentId! };
 }
@@ -70,7 +108,7 @@ function normalizeCommentId<T extends { comment_id?: number; commentId?: number 
 export const toolArgumentSchemas = [
   {
     name: "search_repositories",
-    schema: z.object({ query: z.string().optional(), q: z.string().optional(), ...pageShape })
+    schema: z.object({ query: z.string().optional(), q: z.string().optional(), ...pageShape }).refine((value) => value.query !== undefined || value.q !== undefined, "query is required")
   },
   {
     name: "create_repository",
@@ -82,11 +120,11 @@ export const toolArgumentSchemas = [
   },
   {
     name: "search_code",
-    schema: z.object({ query: z.string().optional(), q: z.string().optional(), owner: z.string().optional(), repo: z.string().optional(), ...pageShape })
+    schema: z.object({ query: z.string().optional(), q: z.string().optional(), owner: z.string().optional(), repo: z.string().optional(), ...pageShape }).refine((value) => value.query !== undefined || value.q !== undefined, "query is required")
   },
   {
     name: "search_users",
-    schema: z.object({ query: z.string().optional(), q: z.string().optional(), ...pageShape })
+    schema: z.object({ query: z.string().optional(), q: z.string().optional(), ...pageShape }).refine((value) => value.query !== undefined || value.q !== undefined, "query is required")
   },
   {
     name: "get_file_contents",
@@ -98,7 +136,7 @@ export const toolArgumentSchemas = [
   },
   {
     name: "create_or_update_file",
-    schema: z.object({ ...ownerRepo, path: z.string().min(1), message: z.string().min(1), content: z.string(), branch: z.string().optional(), sha: z.string().optional(), encoding: z.enum(["utf-8", "base64"]).optional() })
+    schema: z.object({ ...ownerRepo, path: z.string().min(1), message: z.string().min(1), content: z.string(), branch: z.string().min(1), sha: z.string().optional(), encoding: z.enum(["utf-8", "base64"]).optional() })
   },
   {
     name: "create_branch",
@@ -144,11 +182,11 @@ export const toolArgumentSchemas = [
   },
   {
     name: "search_issues",
-    schema: z.object({ query: z.string().optional(), q: z.string().optional(), state: z.enum(["open", "closed", "all"]).optional(), ...pageShape })
+    schema: z.object({ query: z.string().optional(), q: z.string().optional(), state: z.enum(["open", "closed", "all"]).optional(), ...pageShape }).refine((value) => value.query !== undefined || value.q !== undefined, "query is required")
   },
   {
     name: "list_issues",
-    schema: z.object({ ...ownerRepo, state: z.enum(["open", "closed", "all"]).optional(), labels: z.string().optional(), assignee: z.string().optional(), ...pageShape })
+    schema: z.object({ ...ownerRepo, state: z.enum(["OPEN", "CLOSED"]).optional(), labels: z.string().optional(), assignee: z.string().optional(), ...pageShape })
   },
   {
     name: "add_issue_comment",
@@ -234,7 +272,7 @@ export const toolArgumentSchemas = [
   },
   {
     name: "delete_file",
-    schema: z.object({ ...ownerRepo, path: z.string().min(1), message: z.string().min(1), sha: z.string().min(1), branch: z.string().optional() })
+    schema: z.object({ ...ownerRepo, path: z.string().min(1), message: z.string().min(1), sha: z.string().min(1), branch: z.string().min(1) })
   },
   // Cluster B — commits & diffs
   {
@@ -276,7 +314,7 @@ export const toolArgumentSchemas = [
   // M5 hot gaps (F-735)
   {
     name: "search_commits",
-    schema: z.object({ query: z.string().optional(), q: z.string().optional(), owner: z.string().optional(), repo: z.string().optional(), ...pageShape })
+    schema: z.object({ query: z.string().optional(), q: z.string().optional(), owner: z.string().optional(), repo: z.string().optional(), ...pageShape }).refine((value) => value.query !== undefined || value.q !== undefined, "query is required")
   },
   {
     name: "get_release_by_tag",
@@ -392,7 +430,7 @@ export function executeTool(
     case "search_issues":
       return domain.searchIssues(parsed);
     case "list_issues":
-      return domain.listIssues(parsed);
+      return domain.listIssues(normalizeIssueState(parsed));
     case "add_issue_comment":
       return domain.addIssueComment(normalizeIssueNumber(parsed), onDelta);
     case "create_issue":

@@ -35,16 +35,21 @@
 //
 // twin-slack's conformance is empty: F-1330 moved its validators onto Slack's
 // argument surface in the same change that adopted the fixture. twin-github's
-// is NOT, on purpose. Closing its residue means TIGHTENING what the twin
-// accepts — `list_issues` state to `["OPEN","CLOSED"]`, `query` to required on
-// the search tools — and a tightening is a breaking change for every task
-// written against the twin as it is. Those go with a corpus heat reading and
-// their migrations, not with a fixture swap.
+// is NOT, and the reason is that closing an entry here usually TIGHTENS what the
+// twin accepts, which breaks every task written against it as it is. Those go
+// with a corpus heat reading and their migrations.
 //
-// So the residue is PINNED, exactly, by `test/mcp-contract.test.ts`. A new gap
-// fails; the known ones are visible in a list somebody has to edit. That is the
-// same discipline as pome-cloud's `EXPECTED_OPT_OUTS` and for the same reason:
-// a count or an allowance would let the next one arrive unread.
+// That reading ran (F-1468): three tightenings were measured against the corpus,
+// the bundled examples, the hosted saved tasks and the hosted runs, and the ones
+// with zero heat landed — `query` required on the five search tools, `branch`
+// required on the two file writers, `list_issues.state` on GitHub's
+// `["OPEN","CLOSED"]` with its one call site migrated. The residue below is what
+// is LEFT, and it is still the worklist rather than a backlog of oversights.
+//
+// So the residue is PINNED, exactly, by `test/mcp-argument-surface.test.ts`. A
+// new gap fails; the known ones are visible in a list somebody has to edit. That
+// is the same discipline as pome-cloud's `EXPECTED_OPT_OUTS` and for the same
+// reason: a count or an allowance would let the next one arrive unread.
 import { z } from "zod";
 import { githubToolFixture, toolArgumentSchemas } from "./tools.js";
 
@@ -89,10 +94,35 @@ export function toolSchemaConformance(): string[] {
       }
     }
 
-    const upstreamRequired = [...(upstream.required ?? [])].sort().join(",");
-    const ourRequired = [...(projected.required ?? [])].sort().join(",");
-    if (upstreamRequired !== ourRequired) {
-      problems.push(`'${tool.name}' requires [${ourRequired}] and GitHub requires [${upstreamRequired}]`);
+    // ── REQUIRED-NESS IS PROBED, NOT PROJECTED ──────────────────────────────
+    //
+    // This compared `projected.required` against `upstream.required` until
+    // F-1468's tightening, and that comparison could not see the answer. Four of
+    // the five search tools take a query under either of two spellings
+    // (`query`/`q`), so requiring one is a `.refine()` on the object — and a
+    // refine does not appear in `z.toJSONSchema()`'s `required` array at all.
+    // The projection went on reporting `requires []` for a validator that
+    // refuses an empty call, which is a residue entry that LIES: the next reader
+    // "fixes" something already fixed, and the pinned list stops meaning what it
+    // says.
+    //
+    // So ask the validator instead. For each key GitHub requires, omit exactly
+    // that one from an otherwise-complete probe and see whether the twin
+    // refuses. The alias case answers correctly because omitting `query` leaves
+    // `q` absent too — the probe only ever supplies keys GitHub named.
+    const complete = knownKeyProbe(upstream);
+    for (const key of upstream.required ?? []) {
+      const { [key]: _omitted, ...missingOne } = complete;
+      if (schema.safeParse(missingOne).success) {
+        problems.push(`'${tool.name}' accepts a call with no '${key}', and GitHub requires it`);
+      }
+    }
+    // And the other direction: a key the twin demands that GitHub does not, which
+    // makes the twin refuse a call the vendor answers.
+    for (const key of projected.required ?? []) {
+      if (!(upstream.required ?? []).includes(key)) {
+        problems.push(`'${tool.name}' requires '${key}', which GitHub does not`);
+      }
     }
 
     // `z.object()` is STRIP mode: it advertises `additionalProperties: false`
