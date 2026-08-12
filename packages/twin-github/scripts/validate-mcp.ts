@@ -12,12 +12,10 @@
 //   3. Calls the same tool via the legacy `/mcp/call` REST shim and diffs
 //      the recorder events to prove field-shape parity.
 //
-// Writes the entire validation output to
-// `scripts/validate-mcp.output.txt` for PR-description copy-paste.
+// Prints the entire validation output to stdout (captured by CI); it used to
+// also write a committed `scripts/validate-mcp.output.txt` snapshot, which
+// could silently disagree with a re-run of this same script and did (F-1354).
 
-import { writeFileSync } from "node:fs";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
 import { sign } from "hono/jwt";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -28,14 +26,10 @@ import { githubToolFixture } from "../src/tools.js";
 import type { RecorderEvent } from "@pome-sh/wire";
 import type { GitHubStateSeed } from "../src/types.js";
 
-const OUTPUT_PATH = join(dirname(fileURLToPath(import.meta.url)), "validate-mcp.output.txt");
 const SID = "validate-mcp-session";
 const SECRET = "validate-mcp-secret-32-chars-long-enough";
 
-const log: string[] = [];
 function record(line: string) {
-  log.push(line);
-  // Mirror to stdout so a developer running this directly sees progress.
   console.log(line);
 }
 
@@ -157,15 +151,17 @@ async function main() {
     if (missing.length || extra.length) {
       throw new Error(`tool name mismatch: missing=${JSON.stringify(missing)} extra=${JSON.stringify(extra)}`);
     }
-    record("All 65 tool names match the tool-table fixture ✓");
+    record(`All ${gotNames.length} tool names match the tool-table fixture ✓`);
     record("Full tool list (from the wire):");
     record(pretty(listResult.tools));
 
     // ── tools/call (strict read against the seeded PR) ─────────────────
-    section("tools/call get_pull_request (strict read against seeded fixture)");
+    // `get_pull_request` was consolidated into `pull_request_read` (F-1376),
+    // replacing the seven `get_pull_request*` tools GitHub no longer declares.
+    section("tools/call pull_request_read (strict read against seeded fixture)");
     const callResult = await client.callTool({
-      name: "get_pull_request",
-      arguments: { owner: "acme", repo: "api", pull_number: 1 }
+      name: "pull_request_read",
+      arguments: { method: "get", owner: "acme", repo: "api", pullNumber: 1 }
     });
     record("Raw callTool() result:");
     record(pretty(callResult));
@@ -187,7 +183,10 @@ async function main() {
     const legacyResp = await fetch(`${baseUrl}/s/${SID}/mcp/call`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
-      body: JSON.stringify({ tool: "get_pull_request", arguments: { owner: "acme", repo: "api", pull_number: 1 } })
+      body: JSON.stringify({
+        tool: "pull_request_read",
+        arguments: { method: "get", owner: "acme", repo: "api", pullNumber: 1 }
+      })
     });
     if (!legacyResp.ok) throw new Error(`legacy /mcp/call failed: ${legacyResp.status} ${await legacyResp.text()}`);
 
@@ -264,14 +263,9 @@ function diffEvents(a: RecorderEvent, b: RecorderEvent) {
 
 main()
   .then(() => {
-    writeFileSync(OUTPUT_PATH, log.join("\n") + "\n", "utf8");
-    console.log(`\nWrote ${OUTPUT_PATH}`);
     process.exit(0);
   })
   .catch((err) => {
-    log.push("");
-    log.push(`FAILED: ${err instanceof Error ? err.stack ?? err.message : String(err)}`);
-    writeFileSync(OUTPUT_PATH, log.join("\n") + "\n", "utf8");
     console.error(err);
     process.exit(1);
   });

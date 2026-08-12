@@ -93,8 +93,10 @@ bearer-auth contract is unchanged — the JWT `sid` claim (or
 Every `tools/call` reaching `/s/:sid/mcp` produces one recorder event whose
 `request_body` is `{ tool, arguments }` and whose `response_body` is the raw
 domain return — identical to what `POST /s/:sid/mcp/call` records. The
-only intentional difference is `path`. Run `npm run validate:mcp` to
-regenerate the side-by-side diff in `scripts/validate-mcp.output.txt`.
+only intentional difference is `path` (`request_headers` also differs, but
+that's a fact about the two callers — the MCP SDK client vs a plain-fetch
+legacy shim — not about the twin). Run `npm run validate:mcp` to print the
+side-by-side diff; the same command runs in CI's heavy suite.
 
 ## Runtime contract (for snapshot consumers)
 
@@ -271,7 +273,7 @@ npm run typecheck
 npm test
 npm run smoke
 npm run fidelity:parity
-npm run validate:mcp # rewrites scripts/validate-mcp.output.txt
+npm run validate:mcp # prints the wire-protocol / legacy-shim parity diff
 npm run review:harness
 npm run agent:claude
 ```
