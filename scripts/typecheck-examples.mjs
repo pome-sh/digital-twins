@@ -21,7 +21,7 @@
 // adapter source next to it, and nothing compares the two. It has drifted twice
 // already (#308 off 0.2.5, then 0.3.1 against a workspace 0.3.3, which also
 // dragged the retired `@pome-sh/shared-types` back into the example's install
-// graph as 0.3.1's declared runtime dep). That is the F-1231 seam, moved:
+// graph as 0.3.1's declared runtime dep). This gap is F-1231's, unclosed:
 // `check-workspace-pins-match-workspace.mjs` cannot own it, because "resolve to
 // the workspace" is the wrong rule for a deliberately-published pin, and the
 // right rule ("re-pin once the workspace version publishes, skip while it has

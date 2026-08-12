@@ -165,11 +165,12 @@ jobs:
       # 0.9.0 for months, and adapter-claude-sdk pinned shared-types one minor
       # back. CI was green throughout — everything it ran genuinely passed,
       # against the wrong sdk.
-      # F-1231 — the scan covers `cli/package.json` too. Its exact pins (and the
-      # `cli-ci.yml` tarball rewrite that hid their drift) were deleted by #237
-      # and #239; nothing stopped a PR reintroducing one, because this walk only
-      # ever read `packages/*`. `examples/*` are deliberately NOT in scope —
-      # they install from the registry by design; see the script's header.
+      # F-1231 — the scan's subject is the root `workspaces` field, so it covers
+      # `cli/package.json` too. The CLI's exact pins (and the `cli-ci.yml`
+      # tarball rewrite that hid their drift) were deleted by #237 and #239;
+      # nothing stopped a PR reintroducing one, because this walk held its own
+      # `packages/*` list. `examples/*` are deliberately NOT in scope — they
+      # install from the registry by design; see the script's header.
       # Dependency-free, so it runs here before `npm ci`.
       - run: node scripts/check-workspace-pins-match-workspace.mjs
       - run: node scripts/check-workspace-pins-match-workspace.test.mjs
