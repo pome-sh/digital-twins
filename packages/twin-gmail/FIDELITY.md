@@ -47,6 +47,84 @@ _(empty)_
 - Do not fake success for watch/stop, resumable upload, or filter `action.forward`.
 - Gate 1 expands the MCP launch set from 10 → 13 to match the live Developer Preview `tools/list`.
 
+## Known divergences from real Gmail
+
+These are the places where the twin's answer differs from what real Gmail
+answered. Each bullet has a structured entry in the Twin Fidelity Watch's
+`known-divergences/gmail.yaml` (maintained in pome-cloud); a lint keeps the two
+1:1.
+
+**These numbers are stable identifiers, not positions**, on the same convention
+twin-github's list uses: a retired divergence leaves its number behind rather
+than renumbering the ones after it, so a gap here means a retirement. The lint
+matches on each bullet's bold title and never on its number.
+
+Unlike the other four twins' lists, every bullet below was **measured, not read
+off the twin's source**. The upstream half is a real human-attended capture
+against a throwaway Gmail mailbox on 2026-08-11 (F-1377), committed as
+`sandboxes/gmail/fixtures/upstream-golden.json` in pome-cloud; the twin half is
+the twin's own answer to the same 14 L1 read surfaces. So
+`verified_against_upstream_at` carries a real date on all seven rather than the
+honest `null` the unmeasured registries carry.
+
+**All seven are registered pending triage (F-1463), which is a disposition and
+not a verdict.** Registration is what stops an unregistered divergence reporting
+as new drift every day; it does not say the twin is right. Which of these get a
+real twin fix — bullets 1 and 2 are the substantial candidates, since an agent
+that walks `payload.parts` for an HTML body or reads `Received` / `DKIM-Signature`
+to make a decision sees a structurally different object here than in Gmail — is a
+later ruling on F-1463. Each fix deletes its entry and its bullet together.
+
+1. **Message payloads are single-part where Gmail returns `payload.parts`.** A
+   delivered Gmail message is `multipart/alternative` with a `text/plain` and a
+   `text/html` part under `payload.parts`; the twin emits one `text/plain`
+   payload and no `parts` key at all. Measured on the seeded welcome message,
+   on both messages of a thread, and on a draft. An agent that reaches for the
+   HTML alternative finds nothing to reach into.
+
+2. **The twin synthesizes a fixed eight-header set, so its header count is
+   wrong in both directions.** The twin always emits the same eight
+   (`From`, `To`, `Date`, `Message-ID`, `Subject`, `MIME-Version`,
+   `Content-Type`, `Content-Transfer-Encoding`). A message Gmail actually
+   delivered carries **26** — the transport and authentication record the twin
+   models none of: `Received` ×3, `Received-SPF`, `Authentication-Results`,
+   `ARC-Seal` / `ARC-Message-Signature` / `ARC-Authentication-Results` ×2,
+   `DKIM-Signature`, `X-Google-DKIM-Signature`, `Return-Path`, `Delivered-To`,
+   the `X-Gm-*` family. An unsent draft carries **7**, where the twin still
+   emits its eight (`Content-Transfer-Encoding` is the extra). The divergence
+   is one fact — a uniform synthesized set — with two opposite consequences.
+
+3. **`messages.list` does not count drafts.** The mailbox holds one unsent
+   draft. Gmail's `users.messages.list` returns 5 message ids; the twin returns
+   4, omitting the draft's. An agent that lists a mailbox and expects to see its
+   own unsent drafts sees a shorter list here than in Gmail.
+
+4. **`threads.list` does not count a draft's thread.** The same fact one level
+   up: Gmail returns 4 threads, the twin 3.
+
+5. **The label set omits Gmail's `CHAT` system label.** Gmail returns 16 labels
+   to the twin's 15. The system-label gap is exactly one — `CHAT`, which Gmail
+   still returns on every mailbox and the twin does not model. The remaining
+   difference is identity, not modelling: the user labels are Gmail-minted
+   opaque ids (`Label_8665618256210763520`) upstream and the twin's own readable
+   ids (`Label_build`) here, which is inherent to a seeded twin and not
+   something a fix would change.
+
+6. **A thread message's `labelIds` carries the twin's own labels and its own
+   read state.** On the captured thread, Gmail's first message is
+   `["Label_8665618256210763520", "INBOX"]` (2) and the twin's is
+   `["INBOX", "Label_build", "UNREAD"]` (3). Two differences sit behind the one
+   count: the label id (see bullet 5) and `UNREAD`, which the twin sets on a
+   seeded inbox message where the captured mailbox's had been read. Seed state,
+   not a serializer gap.
+
+7. **`sendAs` entries omit `replyToAddress`.** Gmail returns `replyToAddress` on
+   every send-as entry — present and empty (`""`) when no reply-to is
+   configured, which is the case on the captured mailbox. The twin omits the key
+   entirely, on both `settings/sendAs` and `settings/sendAs/{sendAsEmail}`. The
+   twin's own `verificationStatus` and `treatAsAlias`, which Gmail did not
+   return, are the twin-adds direction and are informational, not drift.
+
 ## Declared input surface (F-1179)
 
 Fidelity is not only about what a surface *answers*; it is also about what it
