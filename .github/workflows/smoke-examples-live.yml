@@ -48,8 +48,12 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           set -euo pipefail
-          if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
-            echo "::error::ANTHROPIC_API_KEY is required for the credentialed smoke leg (F-1486) — provision it as a repo Actions secret. Without it every example would exit at its first model call exactly like the uncredentialed PR leg, which is the gap this workflow exists to close."
+          # An unset secret arrives as the empty string, and a secret whose
+          # stored value is a stray space or newline arrives blank-but-not-empty
+          # (the F-1187/F-1184 blank-in-Infisical shape) — strip whitespace so
+          # both are named here rather than reaching the model as a bad key.
+          if [[ -z "$(printf '%s' "${ANTHROPIC_API_KEY:-}" | tr -d '[:space:]')" ]]; then
+            echo "::error::ANTHROPIC_API_KEY is absent or blank (whitespace-only counts as blank) and is required for the credentialed smoke leg (F-1486) — provision it as a repo Actions secret. Without it every example would exit at its first model call exactly like the uncredentialed PR leg, which is the gap this workflow exists to close."
             exit 1
           fi
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -104,16 +108,33 @@ jobs:
           # POME_AUTH_TOKEN (cli/src/twin/twinStart.ts). All three were
           # started with the same TWIN_AUTH_SECRET, so any one printed
           # POME_AUTH_TOKEN verifies against every twin — take github's.
+          #
+          # `echo "VAR=$(grep ...)"` is NOT safe here: a command substitution
+          # that fails does not trip `set -e`, so a renamed or dropped wiring
+          # line would write `VAR=` and hand every example blank wiring. Only
+          # ANTHROPIC_API_KEY/POME_AUTH_TOKEN are re-checked by the script's own
+          # missingLiveEnv(), so a blank *_MCP_URL would surface as a confusing
+          # per-example crash instead of a named setup failure. Fail closed.
+          grab() {
+            local var="$1" log="$2" val
+            val="$(grep -oP "^${var}=\K.*" "$log" || true)"
+            if [[ -z "${val// /}" ]]; then
+              echo "::error::${var} was not printed by ${log} — the twin booted but that wiring line is absent (renamed or dropped in cli/src/twin/twinStart.ts?). Refusing to run the credentialed leg with blank twin wiring, which would red every example for the wrong reason."
+              cat "$log" || true
+              return 1
+            fi
+            printf '%s=%s\n' "$var" "$val"
+          }
           {
-            echo "POME_GITHUB_REST_URL=$(grep -oP '^POME_GITHUB_REST_URL=\K.*' github-twin.log)"
-            echo "POME_GITHUB_MCP_URL=$(grep -oP '^POME_GITHUB_MCP_URL=\K.*' github-twin.log)"
+            grab POME_GITHUB_REST_URL github-twin.log
+            grab POME_GITHUB_MCP_URL github-twin.log
             echo "POME_TWIN_BASE_URL=http://127.0.0.1:3333"
-            echo "POME_AUTH_TOKEN=$(grep -oP '^POME_AUTH_TOKEN=\K.*' github-twin.log)"
-            echo "POME_SLACK_REST_URL=$(grep -oP '^POME_SLACK_REST_URL=\K.*' slack-twin.log)"
-            echo "POME_SLACK_MCP_URL=$(grep -oP '^POME_SLACK_MCP_URL=\K.*' slack-twin.log)"
-            echo "POME_GMAIL_REST_URL=$(grep -oP '^POME_GMAIL_REST_URL=\K.*' gmail-twin.log)"
-            echo "POME_GMAIL_MCP_URL=$(grep -oP '^POME_GMAIL_MCP_URL=\K.*' gmail-twin.log)"
-            echo "POME_GMAIL_TOKEN=$(grep -oP '^POME_GMAIL_TOKEN=\K.*' gmail-twin.log)"
+            grab POME_AUTH_TOKEN github-twin.log
+            grab POME_SLACK_REST_URL slack-twin.log
+            grab POME_SLACK_MCP_URL slack-twin.log
+            grab POME_GMAIL_REST_URL gmail-twin.log
+            grab POME_GMAIL_MCP_URL gmail-twin.log
+            grab POME_GMAIL_TOKEN gmail-twin.log
           } >> "$GITHUB_ENV"
       - name: smoke:examples (LIVE — real twins, real model key)
         env:
