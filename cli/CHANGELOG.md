@@ -4,6 +4,16 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.25
+
+### Patch Changes
+
+- **No CLI change.** Version-only bump, for the same reason 0.23.18 and 0.21.7
+  were: F-1476 brought `cli/`'s own scripts inside the wired-scripts
+  denominator, which touches `cli/package.json` — a publish-relevant path — so
+  `release.yml` needs a version diff even though no shipped code changed.
+  0.23.24 was taken by F-1460 (#388) while this branch was in review.
+
 ## 0.23.18
 
 ### Patch Changes
