@@ -289,7 +289,12 @@ jobs:
           # examples/pr-summary-review shipped a `comment_on_pull_request` the
           # GitHub twin answered `404 Issue not found` for, on every subject,
           # for as long as they existed. Boot each example's declared twins on
-          # its own task seed and invoke every registered tool once — no model.
+          # EVERY seed the example ships and invoke every registered tool once
+          # per seed — no model. F-1163: this used to probe only the one seed
+          # each manifest entry hand-named (7 of 20 shipped seeds), and the
+          # probe arguments are read off each seed itself (owner, repo, first
+          # PR/issue number) rather than hand-written, so a new seed is
+          # covered with no edit here or in config/example-tool-probes.json.
           npm run probe:examples
           node scripts/probe-example-tools.test.mjs
           # F-1305 — the gate above probes what seven bundled EXAMPLES expose,

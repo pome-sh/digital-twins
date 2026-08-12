@@ -64,10 +64,14 @@ try {
   process.exit(1);
 }
 
-// Both tool shapes the bundled examples use: the Claude Agent SDK's `tool()`
+// Three tool shapes the bundled examples use: the Claude Agent SDK's `tool()`
 // returns `{name, description, inputSchema, handler}` objects that callers
-// collect into an ARRAY, while the Vercel AI SDK and LangGraph keep a RECORD of
-// name -> `{execute}`.
+// collect into an ARRAY; the Vercel AI SDK keeps a RECORD of name -> `{execute}`;
+// and LangChain's `tool()` (`examples/minimal-viktor-langgraph`) returns a
+// `StructuredTool` instance invoked through its `.invoke()` method, also kept
+// in a name -> tool RECORD. `.invoke` has to be bound to the tool instance —
+// destructuring it the way `handler`/`execute` are read here would call it
+// with no `this` and it would throw on every probe.
 const table = new Map(Array.isArray(tools) ? tools.map((tool) => [tool.name, tool]) : Object.entries(tools));
 emit({ kind: "tools", names: [...table.keys()] });
 
@@ -77,9 +81,9 @@ for (const probe of spec.probes) {
   const tool = table.get(probe.tool);
   if (!tool) continue; // the parent reports this as `unknown-tool`.
   current = { tool: probe.tool, calls: [], threw: null };
-  const invoke = tool.handler ?? tool.execute;
+  const invoke = tool.handler ?? tool.execute ?? (typeof tool.invoke === "function" ? tool.invoke.bind(tool) : undefined);
   if (typeof invoke !== "function") {
-    current.threw = `tool "${probe.tool}" exposes neither handler() nor execute()`;
+    current.threw = `tool "${probe.tool}" exposes neither handler(), execute(), nor invoke()`;
   } else {
     try {
       await invoke(probe.args, {});
