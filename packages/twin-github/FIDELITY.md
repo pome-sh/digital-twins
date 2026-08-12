@@ -538,6 +538,38 @@ on each bullet's bold title and never on its number, so gaps cost it nothing.
     Pinned by `test/contents-base64.test.ts`, which asserts the mangling rather
     than the round trip, so the day the storage changes the test says so.
 
+30. **A missing required body field says `Validation Failed` where GitHub names
+    the field.** Real GitHub answers a required body field the caller did not
+    send with `422 Invalid request.\n\n"<field>" wasn't supplied.` and **no
+    `errors` array`**. Measured live 2026-08-12 on four unrelated surfaces —
+    `PUT /contents/*` and `DELETE /contents/*` (`sha`), `POST /issues` (`title`),
+    `POST /pulls` (`head`) — so it is GitHub's general answer, not one route's
+    quirk. This twin instead answers the generic `Validation Failed` plus a
+    structured `errors` array, because the refusal comes from the route
+    declaration's zod schema and is projected by `githubErrorEnvelope`'s zod
+    branch in `src/twin.ts`, which sees an issue list and not a field name.
+
+    **F-1491 closed exactly two of these and no more.** `PUT /contents/*` with
+    no `sha` on an existing path is raised by the DOMAIN rather than by zod — the
+    declaration correctly makes `sha` optional, since GitHub only requires it on
+    an update — so that one call site could adopt GitHub's message directly, and
+    it has (`missingRequestField` in `src/errors.ts`). `DELETE /contents/*` with
+    no `sha` at all still shows the generic shape, because its declaration
+    requires `sha` and zod refuses before the domain is reached, which is exactly
+    the divergence this entry records.
+
+    Recorded rather than fixed because closing it means changing the zod branch
+    for **every** required field on **every** route at once — a global envelope
+    change with its own blast radius, not a line in a per-route ticket. The
+    already-exists family is a different matter and needs no change: GitHub does
+    send `Validation Failed` with an `errors` array there (measured on
+    `POST /labels` and on `POST /pulls` with `head == base`), which is what this
+    twin already emits.
+
+    Pinned by `test/contents-sha-semantics.test.ts`, whose last test asserts the
+    unfixed shape on `POST /issues` deliberately — when the global change lands,
+    that test fails, and failing is the signal.
+
 ## How fidelity is verified
 
 Three independent checks back the tier classifications above. Each is a
@@ -740,3 +772,41 @@ never asks. The error is 422 with GitHub's message, **no `errors` array** (unlik
 this twin's `validationFailed`) and the operation-specific `documentation_url`.
 `test/contents-base64.test.ts` holds all of it, including two tests whose only
 job is to fail if the doors are ever unified.
+
+### Optimistic locking on the contents door: 409, not 422 (F-1491)
+
+Unlike `content`, the `sha` rule is the **same on both doors**, so it lives in the
+domain (`src/domain/git.ts`) where both reach it. Measured live 2026-08-12 against
+two throwaway private repos, both deleted:
+
+| request | GitHub answers |
+|---|---|
+| existing path, no `sha` | 422 `Invalid request.\n\n"sha" wasn't supplied.` |
+| existing path, `sha: "deadbeef"` | **409** `<path> does not match deadbeef` |
+| existing path, 40-hex `sha` that exists nowhere | **409**, same message shape |
+| existing path, the real `sha` of a **different** blob | **409**, same message shape |
+| path that does **not** exist, any `sha` | **201** — `sha` is ignored entirely |
+| existing path, correct `sha` | 200, not 201 |
+| `branch` that does not exist + wrong `sha` | 404 — the branch is checked first |
+
+Three findings worth keeping. **GitHub does not distinguish a malformed `sha`
+from a stale one** — all three wrong-sha flavours get one answer, so a twin that
+422'd the unparseable ones and 409'd the stale ones would be inventing a
+distinction. **A wrong `sha` on a path that does not exist is not an error at
+all**: GitHub creates the file and never looks at the sha, so validating it there
+would refuse writes GitHub accepts. And **the message names the full path**
+(`dir/sub/file.txt does not match …`), not the basename.
+
+Neither body carries an `errors` array, and both carry the operation-specific
+`documentation_url` — `#create-or-update-file-contents` for `PUT`,
+`#delete-a-file` for `DELETE`. Those two urls are stamped at the throw site,
+which is sound *here* and does not generalise: a `sha` conflict can only be
+raised by the contents operations, so the throw site knows the operation. Most of
+this twin's errors do not have that property, which is why the generic
+`https://docs.github.com/rest` is still what everything else emits.
+
+GitHub's own published OpenAPI description declares the 409 independently —
+`PUT /repos/{owner}/{repo}/contents/{path}` lists `409: Conflict` against
+`basic-error`, which has no `errors` array — so the wire measurement and the
+vendor's schema agree. `test/contents-sha-semantics.test.ts` pins all of it,
+whole-envelope, on both doors.
