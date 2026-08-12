@@ -23,7 +23,10 @@ export function buildTools(config) {
 
   return {
     list_open_issues: {
-      execute: ({ owner, repo }) => twin("list_issues", { owner, repo, state: "open" }),
+      // `OPEN`, not `open` (F-1468): GitHub's MCP `list_issues` declares
+      // `["OPEN","CLOSED"]` and the twin follows it. Its REST `GET /issues` is
+      // the door that takes lowercase.
+      execute: ({ owner, repo }) => twin("list_issues", { owner, repo, state: "OPEN" }),
     },
     comment_on_issue: {
       execute: ({ owner, repo, issue_number, body }) =>
