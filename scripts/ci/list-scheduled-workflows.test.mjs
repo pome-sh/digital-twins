@@ -120,6 +120,43 @@ withScratchRoot(
     for (const expected of ["quoted-on.yml", "flow-on.yml", "deep-indent.yml"]) {
       assert(found.includes(expected), `${expected} must count as scheduled, got ${found}`);
     }
+    // The half this fixture used to leave untested, and the reason it mattered:
+    // asserting only the `on: schedule:` read said nothing about the SET
+    // EQUALITY main() enforces between the two reads. The `cron:` read was
+    // anchored at line start, so it missed `schedule: [{cron: …}]` — meaning
+    // two of the three shapes this very fixture proves are parsed would have
+    // FAILED main()'s cross-check. A correctly-alarmed workflow red the guard.
+    const cron = findCronWorkflows(root);
+    for (const expected of ["quoted-on.yml", "flow-on.yml", "deep-indent.yml"]) {
+      assert(cron.includes(expected), `${expected} must also be seen by the cron: read, or main()'s set-equality reds a correct workflow; got ${cron}`);
+    }
+    assert(
+      found.length === cron.length,
+      `the two reads must agree exactly on these shapes, got ${found} vs ${cron}`,
+    );
+  },
+);
+
+// A flow mapping that SPANS lines (`on: {` with the keys below it) is read by
+// neither rule, so a cron inside one is invisible to both — and two blind reads
+// agree, so the set-equality cross-check has nothing to disagree about and the
+// alarm-coverage check reports a clean pass on an unalarmed cron. actionlint
+// accepts the shape as valid workflow YAML, so nothing else catches it either.
+// An unsupported shape must be LOUD, never indistinguishable from an absent
+// trigger.
+withScratchRoot(
+  {
+    "multiline-flow-on.yml": 'name: x\non: {\n  schedule: [{cron: "0 3 * * *"}]\n}\njobs: {}\n',
+  },
+  (root) => {
+    let threw = false;
+    try {
+      findScheduledWorkflows(root);
+    } catch (err) {
+      threw = true;
+      assert(/block form/.test(err.message), `expected the error to name the remedy, got ${err.message}`);
+    }
+    assert(threw, "a multi-line flow on: mapping must throw, not silently report zero scheduled workflows");
   },
 );
 
