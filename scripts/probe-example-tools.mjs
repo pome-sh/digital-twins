@@ -235,7 +235,19 @@ export function deriveSeedFacts(slice) {
   if (!repo) return {};
   const facts = { repo: { owner: repo.owner, name: repo.name } };
   const pr = repo.pull_requests?.[0];
-  if (pr) facts.pr = { number: pr.number, checks_failing: combinedStatusIsFailure(pr.statuses) };
+  // `last_number` exists because the subject a probe wants is not always the
+  // first PR: `merge-agent`'s seed is `01-identity-spoof` and its SECOND pull
+  // request is the impersonator's, which is the one `request_changes` is
+  // interesting against. Hand-writing `2` there is what F-1163 removed; naming
+  // the last PR keeps the same subject with no per-seed number, and collapses
+  // to `number` for the 18 seeds that ship exactly one PR.
+  if (pr) {
+    facts.pr = {
+      number: pr.number,
+      last_number: repo.pull_requests.at(-1).number,
+      merge_blocked: mergeWouldConflict(pr),
+    };
+  }
   const issue = repo.issues?.[0];
   if (issue) facts.issue = { number: issue.number };
   const file = repo.files?.[0];
@@ -250,24 +262,33 @@ export function deriveSeedFacts(slice) {
 }
 
 /**
- * Whether the twin will treat this PR's required status checks as failing, and
- * therefore 409 a merge.
+ * Whether the twin will 409 a merge of this PR, read off the seed.
  *
- * Derived from the seed, never declared per-seed by hand: `03-failing-ci` sets
- * `ci/test` to `failure` on purpose so a real GitHub blocks the merge behind
- * branch protection, and a `merge_pull_request` probe against that seed must
- * expect the 409 rather than report it as a refusal. That is a fact the seed
- * already carries — a hand-kept map from seed filename to expected status is the
- * same shape as the bug D5 is about, and it goes stale silently when the seed is
- * deleted or its statuses change.
+ * Derived, never declared per-seed by hand: `03-failing-ci` sets `ci/test` to
+ * `failure` on purpose so a real GitHub blocks the merge behind branch
+ * protection, and a `merge_pull_request` probe against that seed must expect the
+ * 409 rather than report it as a refusal. That is a fact the seed already
+ * carries — a hand-kept map from seed filename to expected status is the same
+ * shape as the bug D5 is about, and it goes stale in silence when the seed is
+ * renamed, deleted, or has its statuses changed.
  *
- * Mirrors `combinedStatusJson` in packages/twin-github/src/serializers.ts, which
- * is what `mergePullRequest` reads: latest status per context, any
+ * The condition is "the twin will refuse this merge", not "checks are failing":
+ * `mergePullRequest` (packages/twin-github/src/domain/pulls.ts) 409s on THREE
+ * things — a non-open PR, an already-merged one, and a `failure` combined
+ * status. Only two are expressible in a seed (its PR schema has `state` but no
+ * `merged`), and both are covered here, so a future seed whose first PR is
+ * closed is exempt for the right reason instead of reding as a refusal.
+ *
+ * The status half mirrors `combinedStatusJson` in
+ * packages/twin-github/src/serializers.ts, which is what `mergePullRequest`
+ * reads through `latestCommitStatuses`: latest status per context, any
  * `failure`/`error` wins. A `Map` built from the array keeps the LAST entry per
- * context, which is what "latest" means for a seed's declaration order.
+ * context, and seeded statuses share a timestamp so the twin's own
+ * `updated_at DESC, id DESC` ordering also resolves to last-declared-wins.
  */
-function combinedStatusIsFailure(statuses) {
-  const latest = new Map((statuses ?? []).map((status) => [status.context, status.state]));
+function mergeWouldConflict(pr) {
+  if ((pr.state ?? "open") !== "open") return true;
+  const latest = new Map((pr.statuses ?? []).map((status) => [status.context, status.state]));
   return [...latest.values()].some((state) => state === "failure" || state === "error");
 }
 
@@ -354,8 +375,10 @@ export function evaluateProbeRun({ example, seed, probes, report }) {
       );
       continue;
     }
-    const worst = observed.calls.reduce((acc, call) => (call.status > (acc?.status ?? -1) ? call : acc), null);
-    const status = worst?.status;
+    // Non-null: the zero-call case returned above. The `refused` branch below
+    // reads `worst.method`/`worst.url` unguarded and now genuinely can.
+    const worst = observed.calls.reduce((acc, call) => (call.status > acc.status ? call : acc));
+    const status = worst.status;
 
     if (probe.expect_status !== undefined) {
       if (status === probe.expect_status) continue;
@@ -610,7 +633,18 @@ async function runDriver(exampleDir, spec) {
     // POME_PREFLIGHT would make several examples `process.exit(0)` at import.
     const env = { ...process.env, POME_PROBE_SPEC: JSON.stringify(spec) };
     delete env.POME_PREFLIGHT;
-    const child = spawn(runner, [DRIVER], { cwd: exampleDir, env, stdio: ["ignore", "pipe", "pipe"] });
+    // `timeout` because a tool table that hangs would otherwise block until the
+    // GitHub job timeout with no diagnostic at all — the failure would name the
+    // job, not the example. Killing the child produces the `driver-error`
+    // finding below, which names both. The whole 20-seed sweep runs in ~15s in
+    // CI, so 120s per driver is ~100x headroom.
+    const child = spawn(runner, [DRIVER], {
+      cwd: exampleDir,
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: 120_000,
+      killSignal: "SIGKILL",
+    });
     let out = "";
     let err = "";
     child.stdout.on("data", (buf) => { out += buf.toString(); });

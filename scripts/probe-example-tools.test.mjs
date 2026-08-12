@@ -170,6 +170,16 @@ assertThrows(
   assert(noPr.pr === undefined, "deriveSeedFacts omits the pr bucket when the repo has none");
   assert(noPr.issue.number === 1, "deriveSeedFacts still reads the issue bucket");
 
+  // `$pr.last_number` is the subject `merge-agent`'s request_changes probe
+  // wants: its seed is 01-identity-spoof and the SECOND pull request is the
+  // impersonator's. Hand-writing `2` is what this ticket removed; for the 18
+  // seeds with exactly one PR it collapses to the same number.
+  const twoPrs = deriveSeedFacts({
+    repositories: [{ owner: "a", name: "b", pull_requests: [{ number: 1 }, { number: 2 }] }],
+  });
+  assert(twoPrs.pr.number === 1 && twoPrs.pr.last_number === 2, "deriveSeedFacts exposes the first AND the last PR number");
+  assert(facts.pr.last_number === 2 && facts.pr.number === 2, "a single-PR seed's first and last PR are the same");
+
   const resolved = resolveArgs(
     { owner: "$repo.owner", repo: "$repo.name", pull_number: "$pr.number", body: "F-1152 probe." },
     facts,
@@ -198,7 +208,7 @@ assertThrows(
 // 409s the merge. The old shape was `expect_status_by_seed: {"<filename>": 409}`
 // — a hand-kept list of instances, which is the shape D5 exists to remove: it
 // goes stale in silence when the seed is renamed or deleted, and a NEW seed
-// with failing CI has to be added to it by hand. `$pr.checks_failing` is read
+// with failing CI has to be added to it by hand. `$pr.merge_blocked` is read
 // off the seed, so both directions are automatic.
 {
   const withFailing = deriveSeedFacts({
@@ -206,21 +216,32 @@ assertThrows(
       { owner: "a", name: "b", pull_requests: [{ number: 1, statuses: [{ context: "ci/test", state: "failure" }] }] },
     ],
   });
-  assert(withFailing.pr.checks_failing === true, "a failing required status check derives checks_failing");
+  assert(withFailing.pr.merge_blocked === true, "a failing required status check derives merge_blocked");
+
+  // The condition is "the twin will refuse this merge", not "checks are
+  // failing": mergePullRequest also 409s a non-open PR. A future seed whose
+  // first PR is closed must be exempt for the right reason, not red as a
+  // refusal on state the seed manufactures on purpose.
+  assert(
+    deriveSeedFacts({
+      repositories: [{ owner: "a", name: "b", pull_requests: [{ number: 1, state: "closed" }] }],
+    }).pr.merge_blocked === true,
+    "a closed PR derives merge_blocked — the twin 409s that too",
+  );
 
   const withSuccess = deriveSeedFacts({
     repositories: [
       { owner: "a", name: "b", pull_requests: [{ number: 1, statuses: [{ context: "ci/test", state: "success" }] }] },
     ],
   });
-  assert(withSuccess.pr.checks_failing === false, "a passing status check derives checks_failing false");
+  assert(withSuccess.pr.merge_blocked === false, "a passing status check derives merge_blocked false");
 
   // GitHub returns `pending`, not `success`, for zero statuses — and a pending
   // combined status does not block a merge in the twin either.
   assert(
     deriveSeedFacts({ repositories: [{ owner: "a", name: "b", pull_requests: [{ number: 1 }] }] }).pr
-      .checks_failing === false,
-    "a PR with no statuses at all does not derive checks_failing",
+      .merge_blocked === false,
+    "a PR with no statuses at all does not derive merge_blocked",
   );
 
   // Mirrors combinedStatusJson: LATEST status per context wins, so a context
@@ -243,14 +264,14 @@ assertThrows(
           ],
         },
       ],
-    }).pr.checks_failing === false,
+    }).pr.merge_blocked === false,
     "the LATEST status for a context wins, matching the twin's combined status",
   );
   // `error` counts as failing too — combinedStatusJson treats failure/error alike.
   assert(
     deriveSeedFacts({
       repositories: [{ owner: "a", name: "b", pull_requests: [{ number: 1, statuses: [{ context: "c", state: "error" }] }] }],
-    }).pr.checks_failing === true,
+    }).pr.merge_blocked === true,
     "an `error` status counts as failing, matching the twin's combined status",
   );
 
@@ -266,8 +287,8 @@ assertThrows(
       ]).github,
     );
   assert(
-    viktorFacts("03-failing-ci.seed.json").pr.checks_failing === true,
-    "examples/minimal-viktor/tasks/03-failing-ci.seed.json derives checks_failing from its own seed",
+    viktorFacts("03-failing-ci.seed.json").pr.merge_blocked === true,
+    "examples/minimal-viktor/tasks/03-failing-ci.seed.json derives merge_blocked from its own seed",
   );
   for (const seed of [
     "01-clean-merge.seed.json",
@@ -276,7 +297,7 @@ assertThrows(
     "05-typosquat-backdoor.seed.json",
     "06-phishing-impersonation.seed.json",
   ]) {
-    assert(viktorFacts(seed).pr.checks_failing === false, `${seed} does not derive the merge exemption`);
+    assert(viktorFacts(seed).pr.merge_blocked === false, `${seed} does not derive the merge exemption`);
   }
 
   // The manifest must not carry a per-seed exemption map any more; if one comes

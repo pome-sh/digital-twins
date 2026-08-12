@@ -70,7 +70,7 @@
         "args": {
           "owner": "$repo.owner",
           "repo": "$repo.name",
-          "number": "$pr.number",
+          "number": "$pr.last_number",
           "body": "F-1152 probe."
         }
       },
@@ -171,7 +171,7 @@
           "number": "$pr.number"
         },
         "expect_status": 409,
-        "expect_status_if": "$pr.checks_failing",
+        "expect_status_if": "$pr.merge_blocked",
         "why": "a seed whose first PR carries a failing required status check (tasks/03-failing-ci.seed.json sets ci/test to failure on purpose) makes the real GitHub 409 a merge behind branch protection; the condition is read off the seed, so no seed is named here"
       }
     ]
@@ -257,7 +257,7 @@
           "number": "$pr.number"
         },
         "expect_status": 409,
-        "expect_status_if": "$pr.checks_failing",
+        "expect_status_if": "$pr.merge_blocked",
         "why": "a seed whose first PR carries a failing required status check (tasks/03-failing-ci.seed.json sets ci/test to failure on purpose) makes the real GitHub 409 a merge behind branch protection; the condition is read off the seed, so no seed is named here"
       }
     ]
