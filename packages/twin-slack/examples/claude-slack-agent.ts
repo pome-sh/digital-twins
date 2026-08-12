@@ -1,3 +1,5 @@
+// pome:unwired-ok(agent:claude): interactive demo. Needs ANTHROPIC_API_KEY and a live model, so it cannot produce a deterministic verdict; `probe:examples` is what checks this example's tools are answered.
+
 // SPDX-License-Identifier: Apache-2.0
 //
 // Minimal Slack-twin agent example.

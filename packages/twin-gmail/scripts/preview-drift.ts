@@ -7,6 +7,8 @@
  * Usage: npm run preview:drift -w @pome-sh/twin-gmail
  * Exit 0 when identical; exit 1 when drift is detected.
  *
+ * pome:unwired-ok(preview:drift): standalone human-run diff tool for debugging a suspected drift outside vitest. The exact assertion here — served tools/list equals the frozen canonical fixture — is already made by test/mcp-tool-fixture.test.ts, which runs under `npm test` in ci.yml, so wiring this would add a second source of one verdict, not a new one.
+ *
  * Not wired into CI (F-1472 audit): the exact assertion here — served
  * tools/list equals the frozen canonical fixture — is already made by
  * `test/mcp-tool-fixture.test.ts`'s "serves exactly the fixture's listing

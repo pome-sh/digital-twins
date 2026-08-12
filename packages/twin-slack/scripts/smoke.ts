@@ -43,7 +43,7 @@ function assert(condition: unknown, message: string) {
   }
 }
 
-// Derived from the fixture, not hardcoded: F-1330 moved this 8 -> 18 while
+// Derived from the fixture, not hardcoded: F-1330 moved this 11 -> 18 while
 // this file, invoked by nothing, went on asserting the old count and two
 // pre-F-1330 response shapes (F-1472).
 const expectedTools = slackToolFixture.tools.length;

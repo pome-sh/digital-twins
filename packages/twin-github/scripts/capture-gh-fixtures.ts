@@ -1,3 +1,5 @@
+// pome:unwired-ok(capture:fixtures): write mode against real github.com via `gh api`. Needs GitHub CLI auth CI does not have, and re-capturing a fixture is a deliberate human-reviewed act, never a cron.
+
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
