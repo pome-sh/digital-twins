@@ -49,9 +49,33 @@
 // Dependency-free, so it runs in ci.yml's always-on block before `npm ci`.
 //
 // Usage: node scripts/check-packages-scripts-wired.mjs
+//
+// F-1476 — `cli/` extension. F-1472 scoped this gate to `packages/*`; `cli/`
+// is a root workspace member too (AGENTS.md) and had the identical shape:
+// `gate:no-eval`, `gate:no-native`, `gate:recorder-overhead` and `test:e2e`
+// declared, only `check:manifest-schema` reached. Same total partition, same
+// three-way split (lifecycle / wired / marker), same marker syntax — no
+// second mechanism, no exemption list, just a second package.json to read.
+//
+// `cli/` also has raw executable files under `cli/scripts/*` that are not
+// declared as ANY npm script — `cli/scripts/make-unwired-fixture.mjs` is
+// exactly that: broken on `main` (a stale exact-text replacement throws
+// before doing anything), reached by nothing, and invisible to a denominator
+// built only from npm SCRIPT NAMES. So `cli/`'s denominator is the union of
+// (a) `cli/package.json`'s own non-lifecycle scripts, audited exactly like
+// `packages/*`, and (b) every file under `cli/scripts/**` that is neither the
+// invoked file of a declared `cli/package.json` script NOR imported by a
+// sibling file in `cli/scripts/**` — an imported file is a library module,
+// covered by whatever imports it, and if THAT importer is itself dead, IT is
+// what shows up here, which is the more actionable diagnosis. A file in (b)
+// has no script name for the `npm run <name> -w <pkg>` regex to find, so
+// being reached means being one of (a)'s invoked files (already excluded) —
+// anything left is wired via its own `pome:unwired-ok(<relpath>): <reason>`
+// marker or it fails, the same marker mechanism as everywhere else in this
+// file, keyed by the file's path instead of a script name.
 
 import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = process.cwd();
@@ -88,6 +112,13 @@ const LIFECYCLE_SCRIPTS = new Set([
   "prepare",
   "prepublishOnly",
   "postinstall",
+  // `pome` is cli/package.json's own equivalent of npm's `start` — it runs
+  // the BUILT tarball entry point (`node dist/src/cli/main.js`) with no
+  // assertion, the identical reasoning `dev`/`start` get above. Scoped into
+  // this shared set rather than a per-package list because that residual
+  // ("a check smuggled in under an exempt name is skipped") is already
+  // accepted for the other nine, and this repo has exactly one `cli/`.
+  "pome",
 ]);
 
 /**
@@ -141,12 +172,46 @@ export function findCheckScripts(root) {
     for (const [scriptName, command] of Object.entries(pkg.scripts ?? {})) {
       if (LIFECYCLE_SCRIPTS.has(scriptName)) continue;
       found.push({
+        pkgKind: "packages",
         pkgDir: entry.name,
         pkgName: pkg.name ?? entry.name,
         scriptName,
         command: String(command),
       });
     }
+  }
+  return found;
+}
+
+/**
+ * F-1476 — the same enumeration as `findCheckScripts`, for `cli/`'s own
+ * `package.json` instead of every `packages/*` member. `cli/` is a single
+ * root workspace member (AGENTS.md), not a directory of them, so this reads
+ * one file rather than looping a directory. Returns `[]` if `cli/package.json`
+ * is absent — real for this repo's own `cli/` never happens (it is a
+ * committed root workspace member), and the "wrong cwd" failure mode this
+ * gate must never silently pass on is already caught by `findCheckScripts`'s
+ * hard throw on a missing `packages/` dir, which runs from the same root.
+ */
+export function findCliPackageScripts(root) {
+  const pkgJsonPath = join(root, "cli", "package.json");
+  if (!existsSync(pkgJsonPath)) return [];
+  let pkg;
+  try {
+    pkg = JSON.parse(readFileSync(pkgJsonPath, "utf8"));
+  } catch {
+    return []; // not this gate's problem — package.json validity is checked elsewhere
+  }
+  const found = [];
+  for (const [scriptName, command] of Object.entries(pkg.scripts ?? {})) {
+    if (LIFECYCLE_SCRIPTS.has(scriptName)) continue;
+    found.push({
+      pkgKind: "cli",
+      pkgDir: "cli",
+      pkgName: pkg.name ?? "cli",
+      scriptName,
+      command: String(command),
+    });
   }
   return found;
 }
@@ -203,14 +268,7 @@ export function isWired(entry, corpus) {
 export function findExemptionReason(entry, root) {
   const scriptPath = invokedFile(entry, root);
   if (!scriptPath) return null;
-  let content;
-  try {
-    content = readFileSync(scriptPath, "utf8");
-  } catch {
-    return null;
-  }
-  const marker = content.match(exemptionMarkerFor(entry.scriptName));
-  return marker ? marker[1].trim() : null;
+  return readMarkerFromFile(scriptPath, entry.scriptName);
 }
 
 const SELF_EXCLUDED = new Set([
@@ -285,14 +343,130 @@ function readCorpus(root) {
 export function invokedFile(entry, root) {
   const fileMatch = entry.command.match(/([\w./-]+\.(?:ts|mjs|js|sh))/);
   if (!fileMatch) return null;
-  const pkgRoot = resolve(root, "packages", entry.pkgDir);
+  // F-1476 — `cli/` is a single workspace member at `cli/`, not one of many
+  // under `packages/<name>`, so it resolves against a different base.
+  const pkgRoot = entry.pkgKind === "cli" ? resolve(root, "cli") : resolve(root, "packages", entry.pkgDir);
   const scriptPath = resolve(pkgRoot, fileMatch[1]);
   if (scriptPath !== pkgRoot && !scriptPath.startsWith(`${pkgRoot}/`)) return null;
   return existsSync(scriptPath) ? scriptPath : null;
 }
 
+/**
+ * Reads the `pome:unwired-ok(<name>): <reason>` marker straight out of a
+ * file's own bytes, shared by both the script-command path
+ * (`findExemptionReason`, below) and the raw-file path (F-1476's
+ * `cli/scripts/**` entries, which have no command to derive a file from —
+ * the file IS the entry).
+ */
+function readMarkerFromFile(filePath, name) {
+  let content;
+  try {
+    content = readFileSync(filePath, "utf8");
+  } catch {
+    return null;
+  }
+  const marker = content.match(exemptionMarkerFor(name));
+  return marker ? marker[1].trim() : null;
+}
+
+const SCRIPT_FILE_RE = /\.(?:mjs|js|cjs|ts|tsx|sh)$/;
+const TEST_FILE_RE = /\.test\.[mc]?[jt]sx?$/;
+const RELATIVE_IMPORT_RE = /\bfrom\s*["'](\.[^"']+)["']|\brequire\(\s*["'](\.[^"']+)["']\s*\)/g;
+
+function listScriptFilesRecursive(dir) {
+  const out = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name === "node_modules") continue;
+    const abs = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      out.push(...listScriptFilesRecursive(abs));
+    } else if (SCRIPT_FILE_RE.test(entry.name) && !TEST_FILE_RE.test(entry.name)) {
+      out.push(abs);
+    }
+  }
+  return out;
+}
+
+/** Resolve a relative import specifier against the extensionless-.ts-behind-.js
+ * convention this codebase's scripts use (`import ... from "./overhead-stats.js"`
+ * resolving to the committed `overhead-stats.ts`). */
+function resolveRelativeImport(fromFile, specifier) {
+  const base = resolve(dirname(fromFile), specifier);
+  const candidates = [
+    base,
+    base.replace(/\.(?:js|mjs|cjs)$/, ".ts"),
+    base.replace(/\.(?:js|mjs|cjs)$/, ".tsx"),
+  ];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
+/**
+ * F-1476 — every file under `cli/scripts/**` that is neither the invoked
+ * file of a declared `cli/package.json` script (any of them, including
+ * LIFECYCLE ones — `prepublishOnly` reaching `assert-publishable.mjs` counts
+ * as reached) nor imported by a sibling file in the same tree. What is left
+ * is a candidate entry point exactly like `make-unwired-fixture.mjs`: no
+ * script name names it, so it cannot be "wired" the way a package.json
+ * script can — it can only carry its own exemption marker or fail.
+ */
+export function findCliOrphanFileEntries(root) {
+  const scriptsDir = join(root, "cli", "scripts");
+  if (!existsSync(scriptsDir)) return [];
+  const files = listScriptFilesRecursive(scriptsDir);
+
+  const invokedByScript = new Set();
+  const pkgJsonPath = join(root, "cli", "package.json");
+  if (existsSync(pkgJsonPath)) {
+    try {
+      const pkg = JSON.parse(readFileSync(pkgJsonPath, "utf8"));
+      for (const [scriptName, command] of Object.entries(pkg.scripts ?? {})) {
+        const filePath = invokedFile({ pkgKind: "cli", pkgDir: "cli", scriptName, command: String(command) }, root);
+        if (filePath) invokedByScript.add(filePath);
+      }
+    } catch {
+      // not this gate's problem — package.json validity is checked elsewhere
+    }
+  }
+
+  const importedBySibling = new Set();
+  for (const file of files) {
+    const text = readFileSync(file, "utf8");
+    RELATIVE_IMPORT_RE.lastIndex = 0;
+    let match;
+    while ((match = RELATIVE_IMPORT_RE.exec(text)) !== null) {
+      const specifier = match[1] ?? match[2];
+      const resolved = resolveRelativeImport(file, specifier);
+      if (resolved) importedBySibling.add(resolved);
+    }
+  }
+
+  const cliRoot = join(root, "cli");
+  const entries = [];
+  for (const file of files) {
+    if (invokedByScript.has(file)) continue;
+    if (importedBySibling.has(file)) continue;
+    entries.push({
+      isFileEntry: true,
+      pkgKind: "cli",
+      pkgDir: "cli",
+      pkgName: "@pome-sh/cli",
+      scriptName: relative(cliRoot, file).replaceAll("\\", "/"),
+      filePath: file,
+    });
+  }
+  return entries;
+}
+
 export function run(root) {
-  const entries = findCheckScripts(root);
+  // F-1476 — cli/'s own non-lifecycle scripts join packages/*'s in ONE array,
+  // so the derived write/--check coverage below (same `pkgDir`, same command
+  // shape) applies to cli/'s `emit:manifest-schema`/`check:manifest-schema`
+  // pair with no new code — it is the identical shape three packages/* pairs
+  // already use.
+  const entries = [...findCheckScripts(root), ...findCliPackageScripts(root)];
   const corpus = readCorpus(root);
 
   // A write mode whose WIRED sibling runs the same command PLUS more is
@@ -349,7 +523,21 @@ export function run(root) {
     }
     failures.push(entry);
   }
-  return { total: entries.length, failures, exemptions };
+
+  // F-1476 — cli/scripts/** files nothing declares as a script at all
+  // (make-unwired-fixture.mjs's shape). No script name exists for these, so
+  // the only way to clear one is the marker, read straight from the file.
+  const fileEntries = findCliOrphanFileEntries(root);
+  for (const entry of fileEntries) {
+    const reason = readMarkerFromFile(entry.filePath, entry.scriptName);
+    if (reason) {
+      exemptions.push({ entry, reason });
+    } else {
+      failures.push(entry);
+    }
+  }
+
+  return { total: entries.length + fileEntries.length, failures, exemptions };
 }
 
 // Never `import.meta.main` (Node 24.2+; `undefined` on an earlier permitted
@@ -369,8 +557,17 @@ if (isMain) {
   if (failures.length > 0) {
     console.error(`${failures.length} package check script(s) are invoked by nothing:`);
     for (const entry of failures) {
+      if (entry.isFileEntry) {
+        console.error(
+          `  - cli/${entry.scriptName} — not the invoked file of any cli/package.json ` +
+            `script, not imported by any sibling file under cli/scripts/**, and it carries ` +
+            `no \`pome:unwired-ok(${entry.scriptName}): <reason>\` marker.`,
+        );
+        continue;
+      }
+      const manifestPath = entry.pkgKind === "cli" ? "cli/package.json" : `packages/${entry.pkgDir}/package.json`;
       console.error(
-        `  - ${entry.pkgName} "${entry.scriptName}" (packages/${entry.pkgDir}/package.json: ` +
+        `  - ${entry.pkgName} "${entry.scriptName}" (${manifestPath}: ` +
           `"${entry.command}") — no workflow or root aggregate reaches it via ` +
           `\`npm run ${entry.scriptName} ... -w ${entry.pkgName}\`, and its script file carries ` +
           `no \`pome:unwired-ok(${entry.scriptName}): <reason>\` marker.`,
@@ -379,7 +576,7 @@ if (isMain) {
     process.exit(1);
   }
   console.log(
-    `check-packages-scripts-wired: OK — ${total} non-lifecycle script(s) across packages/*, ` +
-      `${exemptions.length} exempt, all wired or exempted.`,
+    `check-packages-scripts-wired: OK — ${total} non-lifecycle script(s)/entry point(s) across ` +
+      `packages/* and cli/, ${exemptions.length} exempt, all wired or exempted.`,
   );
 }

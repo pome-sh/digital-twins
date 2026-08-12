@@ -87,26 +87,28 @@ jobs:
       - name: Build CLI
         run: npm run build
       - name: Run agent-trace overhead gate (PR/FAQ #1)
-        working-directory: cli
         env:
-          # Wired by `cli/scripts/overhead-gate.ts`. Budget is FDRS-405's 5ms;
-          # N and the escalation pair count are F-728's recalibration for
+          # Wired by `cli/scripts/overhead-gate.ts` (`gate:agent-trace-overhead`
+          # in cli/package.json — F-1476 named it so check-packages-scripts-
+          # wired.mjs's cli/ audit can see it wired, same `npm run <name> -w
+          # <pkg>` shape as everywhere else in this file). Budget is FDRS-405's
+          # 5ms; N and the escalation pair count are F-728's recalibration for
           # shared-runner noise. Overrideable for local triage runs.
           OVERHEAD_BENCH_N: '1000'
           OVERHEAD_BENCH_PAIRS: '3'
           OVERHEAD_BENCH_BUDGET_MS: '5'
-        run: npx tsx scripts/overhead-gate.ts
+        run: npm run gate:agent-trace-overhead -w @pome-sh/cli
       - name: Run durable recorder overhead gate (F-722)
-        working-directory: cli
         env:
           RECORDER_OVERHEAD_N: '200'
           RECORDER_OVERHEAD_BUDGET_MS: '1'
-        run: npx tsx scripts/recorder-overhead-gate.ts
+        run: npm run gate:recorder-overhead -w @pome-sh/cli
       - name: Run CAS-adapter acceptance gate (PR/FAQ #2)
-        working-directory: cli
         env:
+          # F-1476 named this `gate:cas-adapter-acceptance` for the same reason
+          # as gate:agent-trace-overhead above.
           CAS_ACCEPTANCE_ARTIFACT_OUT: ${{ github.workspace }}/cas-adapter-trace
-        run: npx tsx scripts/cas-adapter-acceptance.ts
+        run: npm run gate:cas-adapter-acceptance -w @pome-sh/cli
       - name: Upload CAS-adapter trace
         # Always upload, even on failure — the trace is the most useful
         # artifact for debugging a gate regression.

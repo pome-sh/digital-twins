@@ -352,6 +352,144 @@ for (const [label, line] of [
   );
 }
 
+// Cases 25+ (F-1476): the cli/ extension. cli/ is a single workspace member
+// at `cli/`, not a directory of many under `packages/*`, so it needs its own
+// coverage — same mechanisms, different base path.
+
+// Case 25: a cli/package.json script wired the standard way passes, exactly
+// like a packages/* one.
+check(
+  "wired cli/package.json check passes",
+  {
+    "packages/dummy/package.json": pkgJson("@pome-sh/dummy", {}),
+    "cli/package.json": pkgJson("@pome-sh/cli", { "gate:foo": "node scripts/foo.mjs" }),
+    "cli/scripts/foo.mjs": "console.log('ok');\n",
+    ".github/workflows/ci.yml": "run: npm run gate:foo -w @pome-sh/cli\n",
+  },
+  { expect: "green" }
+);
+
+// Case 26 (the ticket's own "do"): an unreferenced cli/ check reds by name —
+// the exact break-on-purpose the PR verifies by hand against the real repo.
+check(
+  "unwired cli/package.json check reds, naming it",
+  {
+    "packages/dummy/package.json": pkgJson("@pome-sh/dummy", {}),
+    "cli/package.json": pkgJson("@pome-sh/cli", { "gate:foo": "node scripts/foo.mjs" }),
+    "cli/scripts/foo.mjs": "console.log('ok');\n",
+  },
+  { expect: "red", contains: '@pome-sh/cli "gate:foo"' }
+);
+
+// Case 27: cli/'s own exemption marker, read from the file the command
+// invokes — same syntax as packages/*.
+check(
+  "unwired cli/package.json script with a marker passes",
+  {
+    "packages/dummy/package.json": pkgJson("@pome-sh/dummy", {}),
+    "cli/package.json": pkgJson("@pome-sh/cli", { "gate:foo": "node scripts/foo.mjs" }),
+    "cli/scripts/foo.mjs": "// pome:unwired-ok(gate:foo): manual dev tool\nconsole.log('ok');\n",
+  },
+  { expect: "green", contains: "manual dev tool" }
+);
+
+// Case 28: `pome` (cli/'s own equivalent of npm's `start` — runs the built
+// tarball, asserts nothing) must not be flagged, the same reasoning as `dev`/
+// `start` in the shared lifecycle set.
+check(
+  "cli/package.json's 'pome' runtime alias is not flagged",
+  {
+    "packages/dummy/package.json": pkgJson("@pome-sh/dummy", {}),
+    "cli/package.json": pkgJson("@pome-sh/cli", { pome: "node dist/src/cli/main.js" }),
+  },
+  { expect: "green" }
+);
+
+// Case 29 (F-1476's motivating find): a raw cli/scripts/ file declared by NO
+// package.json script at all — make-unwired-fixture.mjs's exact shape — has
+// no script name for the npm-run regex to find, so it reds by its own path.
+check(
+  "an orphan cli/scripts/ file invoked by no script and imported by nothing reds by path",
+  {
+    "packages/dummy/package.json": pkgJson("@pome-sh/dummy", {}),
+    "cli/package.json": pkgJson("@pome-sh/cli", { build: "tsup" }),
+    "cli/scripts/orphan.mjs": "console.log('nothing calls this');\n",
+  },
+  { expect: "red", contains: "cli/scripts/orphan.mjs" }
+);
+
+// Case 30: the same orphan file, marked with its own reason, passes — keyed
+// by its relative path rather than a script name, since it has none.
+check(
+  "an orphan cli/scripts/ file with a pome:unwired-ok(<path>) marker passes",
+  {
+    "packages/dummy/package.json": pkgJson("@pome-sh/dummy", {}),
+    "cli/package.json": pkgJson("@pome-sh/cli", { build: "tsup" }),
+    "cli/scripts/orphan.mjs":
+      "// pome:unwired-ok(scripts/orphan.mjs): spawned via a resolved path, not a literal invocation\nconsole.log('ok');\n",
+  },
+  { expect: "green", contains: "spawned via a resolved path" }
+);
+
+// Case 31: a file that IS the invoked file of a declared cli/package.json
+// script — including a LIFECYCLE one, e.g. prepublishOnly — is covered by
+// that script's own status and must not also be flagged as an orphan.
+check(
+  "a file invoked by a lifecycle script (prepublishOnly) is not treated as an orphan",
+  {
+    "packages/dummy/package.json": pkgJson("@pome-sh/dummy", {}),
+    "cli/package.json": pkgJson("@pome-sh/cli", { prepublishOnly: "node scripts/assert.mjs" }),
+    "cli/scripts/assert.mjs": "console.log('ok');\n",
+  },
+  { expect: "green" }
+);
+
+// Case 32: a file imported by a sibling script is a library module, covered
+// by whatever imports it — it must not be flagged as its own orphan entry.
+// If the importer itself were dead, THAT file is what should show up, which
+// case 29 above already proves.
+check(
+  "a cli/scripts/ file imported by a sibling is not its own orphan entry",
+  {
+    "packages/dummy/package.json": pkgJson("@pome-sh/dummy", {}),
+    "cli/package.json": pkgJson("@pome-sh/cli", { "gate:foo": "tsx scripts/foo.ts" }),
+    ".github/workflows/ci.yml": "run: npm run gate:foo -w @pome-sh/cli\n",
+    "cli/scripts/foo.ts": 'import { helper } from "./lib.js";\nhelper();\n',
+    "cli/scripts/lib.ts": "export function helper() {}\n",
+  },
+  { expect: "green" }
+);
+
+// Case 33: cli/'s own write/--check pair is covered by the SAME derivation
+// packages/* pairs use (case 16) — no new code, just entries sharing one
+// pkgDir in one combined array.
+check(
+  "cli/'s own write mode is covered by its wired --check sibling",
+  {
+    "packages/dummy/package.json": pkgJson("@pome-sh/dummy", {}),
+    "cli/package.json": pkgJson("@pome-sh/cli", {
+      "emit:foo": "node scripts/foo.mjs",
+      "check:foo": "node scripts/foo.mjs --check",
+    }),
+    "cli/scripts/foo.mjs": "console.log('ok');\n",
+    ".github/workflows/ci.yml": "run: npm run check:foo -w @pome-sh/cli\n",
+  },
+  { expect: "green", contains: "wired sibling runs with --check" }
+);
+
+// Case 34: no cli/ directory at all (every case above but this one) must not
+// throw or otherwise misbehave — packages/*-only repos (and this suite's own
+// fixtures for cases 1-24) stay green with zero cli/ entries.
+check(
+  "a repo with no cli/ directory is unaffected",
+  {
+    "packages/alpha/package.json": pkgJson("@pome-sh/alpha", { "check:foo": "node scripts/foo.mjs" }),
+    "packages/alpha/scripts/foo.mjs": "console.log('ok');\n",
+    ".github/workflows/ci.yml": "run: npm run check:foo -w @pome-sh/alpha\n",
+  },
+  { expect: "green" }
+);
+
 if (failures > 0) {
   console.error(`\n${failures} case(s) failed.`);
   process.exit(1);
