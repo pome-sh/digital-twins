@@ -52,6 +52,21 @@
 // (module evaluated, startup guards cleared, an outbound call opened) and never
 // for what it does not (that the work was correct — `probe:examples` and the
 // scenario suites are the gates for that).
+//
+// F-1486: the REACHED-OUTBOUND leg above is the only thing any environment
+// ever proves, because CI has no credentials and 0 of 8 examples are ever
+// "still running at the settle" here. `SMOKE_EXAMPLES_LIVE=1` switches this
+// same gate — same classifier, same discovery, same output-tail printing —
+// into the mode a credentialed nightly runs: it stops overlaying SMOKE_ENV's
+// dead loopback ports and invalid keys, so whatever real twin wiring and
+// model key the caller already put in `process.env` (booting real local
+// twins via `pome twin start`, a real `ANTHROPIC_API_KEY`) flows straight
+// through to each example. In this mode a hard credential check runs BEFORE
+// anything launches — an absent credential must never degrade into a second
+// REACHED-OUTBOUND run that reports success, which would prove nothing while
+// looking like a nightly that does — and a floor after the run asserts at
+// least one example was alive at the settle for real, naming what it
+// expected when it was not.
 import { spawn } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -115,12 +130,51 @@ function matchBenignFailure(output) {
   return null;
 }
 
+// The kickoff instruction. This is NOT a fake credential and NOT dead wiring:
+// it is the only thing that gives a launched example anything to do, and four
+// of the eight (`gmail-retry-notify`, `merge-agent`, `minimal-viktor`,
+// `minimal-viktor-langgraph`) call `requiredEnv("POME_TASK")` and throw at
+// startup without it. It therefore applies on BOTH legs, and keeping it out of
+// SMOKE_DEAD_WIRING below is load-bearing: F-1486's first cut overlaid nothing
+// at all in LIVE mode, so those four died on `Error: POME_TASK is required`
+// and the gate classified them FAIL with "returned without evidence it did any
+// real work" — i.e. the credentialed nightly would have redded 4 of 8 on its
+// very first run, for an unset env var that has nothing to do with the
+// property this leg exists to prove, which is exactly the kind of
+// non-diagnosable red that trains a reader to ignore the alarm.
+const SMOKE_TASK = "Smoke run: triage/summarize the open items in acme/api.";
+
+// F-1486 — settings the credentialed leg supplies only when the caller has NOT.
+// Neither is a credential and neither is dead wiring: together they are what
+// decides whether a launched example has anything to do and whether it can
+// reach a model with the ONE secret this leg asks a human to provision. Both
+// gaps were found by running the leg's exact env shape; each one alone reds the
+// nightly on its first run, for a reason unrelated to the property it proves.
+const SMOKE_LIVE_DEFAULTS = {
+  POME_TASK: SMOKE_TASK,
+  // `minimal-viktor` defaults to `VIKTOR_MODEL=alibaba/qwen-3-32b`, which its
+  // `resolveModel()` can reach ONLY through the AI Gateway: with no
+  // AI_GATEWAY_API_KEY it throws `VIKTOR_MODEL=alibaba/qwen-3-32b needs
+  // AI_GATEWAY_API_KEY` before any outbound call — a non-benign exit 1, so FAIL,
+  // so a red leg. The PR leg papers over this with a fake AI_GATEWAY_API_KEY in
+  // SMOKE_DEAD_WIRING; the credentialed leg must not, because a fake gateway key
+  // would route all eight examples into a gateway that rejects them and the real
+  // ANTHROPIC_API_KEY would never be exercised at all — a "credentialed" leg
+  // whose credential is unreachable. Pinning the anthropic/* slug that
+  // merge-agent and gmail-retry-notify ALREADY default to keeps the whole leg on
+  // one provisioned secret. `VIKTOR_MODEL` is also minimal-viktor-langgraph's
+  // documented fallback (LANGGRAPH_MODEL ?? VIKTOR_MODEL ?? claude-sonnet-5) and
+  // its resolveModel() takes `anthropic/*` too, so both land on
+  // ANTHROPIC_API_KEY rather than one silently needing a second key.
+  VIKTOR_MODEL: "anthropic/claude-opus-4-8",
+};
+
 // Env that gets every example past its startup guards and into async work so
 // the launch-above-class code path is actually exercised. Values are
 // intentionally non-functional (no live twin, invalid keys): we want the module
-// to LOAD, not to complete a real run.
-const SMOKE_ENV = {
-  POME_TASK: "Smoke run: triage/summarize the open items in acme/api.",
+// to LOAD, not to complete a real run. Overlaid on the PR (uncredentialed) leg
+// ONLY — see launchEnv().
+const SMOKE_DEAD_WIRING = {
   // Nothing is listening here; fetches fail fast, but only AFTER module load.
   POME_TWIN_BASE_URL: "http://127.0.0.1:59321",
   POME_GITHUB_REST_URL: "http://127.0.0.1:59321",
@@ -145,6 +199,113 @@ const SMOKE_ENV = {
   // when this is set, so resolveModel() returns without a per-provider key.
   AI_GATEWAY_API_KEY: "smoke-invalid",
 };
+
+// The env one example is launched with. Exported and pure so the regression
+// suite can assert the LIVE leg still hands every example a task (the defect
+// above) without booting anything.
+export function launchEnv(baseEnv, live) {
+  // LIVE: the caller (the credentialed workflow) has already put real twin
+  // wiring and a real model key in the env; overlaying SMOKE_DEAD_WIRING here
+  // would put every example straight back on the loopback port this whole leg
+  // exists to get off of. SMOKE_LIVE_DEFAULTS fill only what the caller left
+  // unset — a caller-supplied value always wins, and a BLANK one counts as
+  // unset so `requiredEnv`'s own trim-check never receives "".
+  // PR leg: unchanged from before F-1486 — the overlay wins unconditionally,
+  // including the fake AI_GATEWAY_API_KEY that makes alibaba/* resolve there.
+  const env = live
+    ? { ...baseEnv }
+    : { ...baseEnv, ...SMOKE_DEAD_WIRING, POME_TASK: SMOKE_TASK };
+  if (live) {
+    for (const [name, value] of Object.entries(SMOKE_LIVE_DEFAULTS)) {
+      if (!env[name]?.trim()) env[name] = value;
+    }
+  }
+  delete env.POME_PREFLIGHT; // ensure the real launch path, not the early return
+  return env;
+}
+
+// F-1486 — the credentialed leg switch. Read once at module load (same as
+// SETTLE_MS/TDZ_SIGNATURE above) so both smokeOne() and main() agree on it
+// for the life of one process; the regression suite drives the exported pure
+// functions below directly rather than re-triggering this env read.
+//
+// Strict, and a non-"1" value is an ERROR rather than "not live": a flag typo'd
+// to `true`/`yes`/`TRUE`/`1 ` would otherwise make LIVE false and silently run
+// the PR leg instead — SMOKE_DEAD_WIRING overlaid, no credential check, no
+// floor, REACHED-OUTBOUND x 8, exit 0. A green nightly that proves nothing is
+// this ticket's own subject, and it must not be one character away.
+export function resolveLiveFlag(value) {
+  if (value === undefined || value === "") return { live: false, error: null };
+  if (value === "1") return { live: true, error: null };
+  return {
+    live: false,
+    error:
+      `SMOKE_EXAMPLES_LIVE is set to ${JSON.stringify(value)}, which is not the recognised ` +
+      `value "1" (unset or "" means the uncredentialed PR leg). Refusing to run: treating an ` +
+      `unrecognised value as "not live" would silently run the PR leg — dead loopback ports, no ` +
+      `credential check, no alive-at-settle floor — and report success, which is the exact ` +
+      `"proves nothing but looks like it does" failure this leg exists to prevent (F-1486).`,
+  };
+}
+
+export const LIVE = resolveLiveFlag(process.env.SMOKE_EXAMPLES_LIVE).live;
+
+// The credentials a credentialed run cannot proceed without. `ANTHROPIC_API_KEY`
+// is required unconditionally rather than accepting `AI_GATEWAY_API_KEY` as an
+// alternative: `minimal-viktor-langgraph` constructs its `ChatAnthropic` model
+// from `ANTHROPIC_API_KEY` directly and never consults the gateway key (see
+// examples/minimal-viktor-langgraph/src/index.ts), so a leg that accepted the
+// gateway key alone would still strand that example at "no evidence of real
+// work" while reporting the OTHER seven's gateway-routed calls as proof the
+// leg is credentialed. `POME_AUTH_TOKEN` is the one twin-side signal every
+// wired example reads (see AGENTS.md's smoke:examples row); its presence is
+// what distinguishes "real local twins were booted for this run" from
+// SMOKE_ENV's dead loopback ports, without hand-enumerating which of the
+// three twin REST/MCP URL pairs a given example needs.
+export const LIVE_REQUIRED_ENV = ["ANTHROPIC_API_KEY", "POME_AUTH_TOKEN"];
+
+// Named, not silent: a credentialed leg missing a secret must fail loudly
+// before anything launches, never fall through into a second uncredentialed
+// REACHED-OUTBOUND run that reports success — that would be a nightly
+// proving nothing while looking like it proves something, this ticket's own
+// subject.
+// `!env[name]` alone is not enough. GitHub Actions substitutes an unset secret
+// as the EMPTY STRING rather than leaving the var absent (falsy, so caught), but
+// a secret whose stored value is blank-but-not-empty — a stray space or newline
+// pasted into the secret box, the shape F-1187/F-1184 found blank in Infisical —
+// is TRUTHY and would sail through, leaving the leg to launch every example with
+// a whitespace API key and report the resulting per-example crashes as "the
+// example is broken" instead of "the credential is blank". Trim, so present-but-
+// blank is named as absent.
+export function missingLiveEnv(env = process.env) {
+  return LIVE_REQUIRED_ENV.filter((name) => !env[name]?.trim());
+}
+
+// The floor F-1486 asks for: on the credentialed leg, at least one example
+// must be alive at the settle — zero-alive is the exact fact no environment
+// currently asserts. Deliberately >= 1, not a hardcoded count of examples or
+// a fraction of `total`: a literal tied to `total` is the milestone's own
+// "two floors that compared quantities which moved together" shape — either
+// number drifts in lockstep as examples are added or removed, so the
+// cross-check never disagrees with itself. The floor here is independent of
+// `total` on purpose.
+export function assertAliveFloor({ live, okCount, total }) {
+  if (!live) return { ok: true, message: null };
+  if (okCount < 1) {
+    return {
+      ok: false,
+      message:
+        `credentialed smoke leg: 0 of ${total} example(s) were alive at the settle (expected ` +
+        `>= 1 — this is the exact assertion no uncredentialed environment can make). Every ` +
+        `example either crashed or exited before reaching real async work despite real twin ` +
+        `and model credentials; check the per-example verdicts above for why.`,
+    };
+  }
+  return {
+    ok: true,
+    message: `${okCount} of ${total} example(s) alive at the settle (floor: >= 1, met).`,
+  };
+}
 
 export function discoverExamples(dir = examplesDir) {
   const found = [];
@@ -172,7 +333,7 @@ export function discoverExamples(dir = examplesDir) {
 // positively proves (the process evaluated its module, cleared its startup
 // guards, and got far enough to open an outbound twin/model call) and printed
 // distinctly from "ok", which is the strictly stronger evidence.
-export function classifyLaunch({ output, stillRunningAtSettle, exitCode, signal }) {
+export function classifyLaunch({ output, stillRunningAtSettle, exitCode, signal, live = LIVE }) {
   if (TDZ_SIGNATURE.test(output)) {
     return { status: "fail", reason: "TDZ crash on launch" };
   }
@@ -200,6 +361,27 @@ export function classifyLaunch({ output, stillRunningAtSettle, exitCode, signal 
         `so the process exits non-zero`,
     };
   }
+  // F-1486 — the third possibility exists ONLY on the credentialed leg, and the
+  // reader has to be told about it or the first real nightly red is a mystery.
+  // OK is "still alive at the settle", so with real twins and a real key a
+  // GENUINELY CORRECT example that answers fast — the twin's default seed does
+  // not contain what SMOKE_TASK asks about, the model correctly says "nothing
+  // found", the process exits 0 in under 5s — lands HERE, on a FAIL whose text
+  // otherwise insists the example is broken. Distinguishing "exited 0 having
+  // produced work output" from "exited 0 having done nothing" needs a work
+  // marker no example emits in a common form across three frameworks, so it is
+  // not a cheap fix; naming the possibility in the message is, and it makes the
+  // first red diagnosable instead of training the reader to ignore the alarm.
+  const liveFastExit =
+    live && exitCode === 0
+      ? ` NOTE (credentialed leg): a third possibility applies here and NOWHERE ELSE — with real ` +
+        `twins and a real model key, an example that is CORRECT but FAST can exit 0 inside the ` +
+        `${SETTLE_MS}ms settle (e.g. the twin's seed genuinely contains nothing matching the task, ` +
+        `so the model answers "nothing found" and returns), and OK is defined as "still alive at ` +
+        `the settle", so a correct fast run is indistinguishable from a do-nothing one by timing ` +
+        `alone. Read the tail above BEFORE assuming breakage: if it shows a real answer, the fix ` +
+        `is a seed that matches the task or a work-output signal, not this example.`
+      : "";
   return {
     status: "fail",
     reason:
@@ -208,7 +390,8 @@ export function classifyLaunch({ output, stillRunningAtSettle, exitCode, signal 
       `(the likely case: a wrong parse, an early return, or a swallowed error read as an empty ` +
       `result), or it failed on a genuinely benign outbound error this gate does not recognize ` +
       `yet — if the tail above shows one, add it to BENIGN_FAILURE_SIGNATURES in ` +
-      `scripts/smoke-examples.mjs naming the class, and add a case to smoke-examples.test.mjs`,
+      `scripts/smoke-examples.mjs naming the class, and add a case to smoke-examples.test.mjs.` +
+      liveFastExit,
   };
 }
 
@@ -226,8 +409,7 @@ function smokeOne(name) {
       return;
     }
 
-    const env = { ...process.env, ...SMOKE_ENV };
-    delete env.POME_PREFLIGHT; // ensure the real launch path, not the early return
+    const env = launchEnv(process.env, LIVE);
 
     const child = spawn(tsx, ["src/index.ts"], { cwd, env, stdio: ["ignore", "pipe", "pipe"] });
     let output = "";
@@ -280,6 +462,30 @@ if (invokedDirectly) {
 }
 
 async function main() {
+  // F-1486 — fail closed, before anything launches. A credentialed leg
+  // missing a secret must never silently become a second uncredentialed
+  // REACHED-OUTBOUND run that reports success; it must red, naming exactly
+  // what is absent.
+  // A flag set to an unrecognised value must not quietly mean "PR leg".
+  const flag = resolveLiveFlag(process.env.SMOKE_EXAMPLES_LIVE);
+  if (flag.error) {
+    console.error(flag.error);
+    process.exit(1);
+  }
+
+  if (LIVE) {
+    const missing = missingLiveEnv();
+    if (missing.length > 0) {
+      console.error(
+        `SMOKE_EXAMPLES_LIVE=1 but missing required credential(s): ${missing.join(", ")}. ` +
+          `This is the credentialed leg (F-1486) — it must not fall back to SMOKE_ENV's dead ` +
+          `loopback ports and invalid keys, which would report REACHED-OUTBOUND and pass while ` +
+          `proving nothing. Provision the missing secret(s)/twin wiring before retrying.`,
+      );
+      process.exit(1);
+    }
+  }
+
   const examples = discoverExamples();
   // Vacuous green: a runner examining zero examples must fail loudly, not
   // print "All 0 examples launched clean."
@@ -288,10 +494,14 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`Launch-smoking ${examples.length} example(s): ${examples.join(", ")}`);
+  console.log(
+    `Launch-smoking ${examples.length} example(s)${LIVE ? " (LIVE — real twin + model credentials)" : ""}: ` +
+      examples.join(", "),
+  );
 
   const failures = [];
   const reached = [];
+  const oks = [];
   for (const name of examples) {
     process.stdout.write(`\n=== examples/${name} === `);
     const result = await smokeOne(name);
@@ -299,6 +509,7 @@ async function main() {
     if (result.status === "ok") {
       console.log(`OK (${result.reason})`);
       if (tail) console.log(tail);
+      oks.push({ name, reason: result.reason });
     } else if (result.status === "reached") {
       console.log(`REACHED-OUTBOUND (${result.reason})`);
       if (tail) console.log(tail);
@@ -314,23 +525,30 @@ async function main() {
   if (reached.length > 0) {
     console.log(
       `\n${reached.length} of ${examples.length} example(s) got as far as an outbound twin/model ` +
-        `call and failed THERE, which is the furthest this environment can take them ` +
-        `(SMOKE_ENV has no live twin and no valid model key). Verified: module evaluated, ` +
+        `call and failed THERE, which is the furthest this environment can take them` +
+        `${LIVE ? "" : " (SMOKE_ENV has no live twin and no valid model key)"}. Verified: module evaluated, ` +
         `startup guards passed, async work reached. NOT verified: that the work is correct. ` +
         reached.map((r) => `${r.name} (${r.reason})`).join("; "),
     );
   }
 
-  if (failures.length > 0) {
-    console.error(
-      `\nExamples that crash on launch or return with no evidence of real work: ` +
-        failures.map((f) => `${f.name} (${f.reason})`).join("; "),
-    );
+  const floor = assertAliveFloor({ live: LIVE, okCount: oks.length, total: examples.length });
+
+  if (failures.length > 0 || !floor.ok) {
+    if (failures.length > 0) {
+      console.error(
+        `\nExamples that crash on launch or return with no evidence of real work: ` +
+          failures.map((f) => `${f.name} (${f.reason})`).join("; "),
+      );
+    }
+    if (!floor.ok) console.error(`\n${floor.message}`);
     process.exit(1);
   }
+
+  if (LIVE) console.log(`\n${floor.message}`);
   console.log(
     `\nAll ${examples.length} examples reached real work: ` +
-      `${examples.length - reached.length} still running at the settle, ` +
+      `${oks.length} still running at the settle, ` +
       `${reached.length} failed at an outbound call.`,
   );
 }

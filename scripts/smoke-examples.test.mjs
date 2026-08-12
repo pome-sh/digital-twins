@@ -21,7 +21,16 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { SETTLE_MS, classifyLaunch, discoverExamples } from "./smoke-examples.mjs";
+import {
+  SETTLE_MS,
+  classifyLaunch,
+  discoverExamples,
+  assertAliveFloor,
+  missingLiveEnv,
+  resolveLiveFlag,
+  launchEnv,
+  LIVE_REQUIRED_ENV,
+} from "./smoke-examples.mjs";
 
 let failures = 0;
 function check(name, got, want) {
@@ -202,6 +211,211 @@ function check(name, got, want) {
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+}
+
+// ── F-1486: the credentialed leg's floor — zero alive is a hard failure ────
+{
+  const zero = assertAliveFloor({ live: true, okCount: 0, total: 8 });
+  check("zero alive on the live leg fails the floor", zero.ok, false);
+  assert.match(zero.message, /0 of 8/);
+  assert.match(zero.message, />= 1/);
+
+  const one = assertAliveFloor({ live: true, okCount: 1, total: 8 });
+  check(">= 1 alive on the live leg meets the floor", one.ok, true);
+
+  const many = assertAliveFloor({ live: true, okCount: 8, total: 8 });
+  check("every example alive still meets the floor", many.ok, true);
+
+  // The floor must never apply to the uncredentialed (PR) leg — that leg's
+  // permanent steady state is 0 alive, and this floor is not the mechanism
+  // that would make it red for that.
+  const notLive = assertAliveFloor({ live: false, okCount: 0, total: 8 });
+  check("the floor is a no-op when not on the live leg", notLive.ok, true);
+  check("a no-op floor carries no message", notLive.message, null);
+}
+
+// ── F-1486: an absent credential on the live leg must be named, not silent ─
+{
+  check(
+    "every required var is reported missing from an empty env",
+    missingLiveEnv({}).sort(),
+    [...LIVE_REQUIRED_ENV].sort(),
+  );
+  check(
+    "a fully-populated env reports nothing missing",
+    missingLiveEnv({ ANTHROPIC_API_KEY: "sk-ant-real", POME_AUTH_TOKEN: "real-jwt" }),
+    [],
+  );
+  check(
+    "a partially-populated env names only what is absent",
+    missingLiveEnv({ ANTHROPIC_API_KEY: "sk-ant-real" }),
+    ["POME_AUTH_TOKEN"],
+  );
+  // GitHub Actions substitutes an UNSET secret as the empty string, so the
+  // empty case is the one that actually happens in production, not a curiosity.
+  check(
+    "an empty-string secret is named as absent, not accepted",
+    missingLiveEnv({ ANTHROPIC_API_KEY: "", POME_AUTH_TOKEN: "" }).sort(),
+    [...LIVE_REQUIRED_ENV].sort(),
+  );
+  // Truthy but blank — a space or newline pasted into the secret box
+  // (F-1187/F-1184's blank-in-Infisical shape). Untrimmed, this sails through
+  // and the leg launches every example with a whitespace API key.
+  check(
+    "a whitespace-only secret is named as absent, not accepted",
+    missingLiveEnv({ ANTHROPIC_API_KEY: "   ", POME_AUTH_TOKEN: "\t\n " }).sort(),
+    [...LIVE_REQUIRED_ENV].sort(),
+  );
+  check(
+    "one real secret + one whitespace-only secret names only the blank one",
+    missingLiveEnv({ ANTHROPIC_API_KEY: "sk-ant-real", POME_AUTH_TOKEN: " " }),
+    ["POME_AUTH_TOKEN"],
+  );
+}
+
+// ── F-1486: an unrecognised SMOKE_EXAMPLES_LIVE must ERROR, never mean "PR leg"
+// A flag typo'd to `true` silently reverts to the uncredentialed leg: dead
+// loopback ports, no credential check, no floor, exit 0. That is a green
+// nightly proving nothing — this ticket's own subject, one character away.
+{
+  check("unset means the PR leg, with no error", resolveLiveFlag(undefined), {
+    live: false,
+    error: null,
+  });
+  check('"" means the PR leg, with no error', resolveLiveFlag(""), { live: false, error: null });
+  check('"1" is the live leg', resolveLiveFlag("1").live, true);
+  check('"1" carries no error', resolveLiveFlag("1").error, null);
+  for (const bogus of ["true", "TRUE", "yes", "on", "0", "1 ", " 1", "2", "live"]) {
+    const r = resolveLiveFlag(bogus);
+    check(`${JSON.stringify(bogus)} is not the live leg`, r.live, false);
+    assert.ok(
+      r.error && r.error.includes(JSON.stringify(bogus)),
+      `${JSON.stringify(bogus)} must produce an error naming the value it saw, got ${r.error}`,
+    );
+  }
+}
+
+// ── F-1486: the LIVE leg must still hand every example a task ───────────────
+// Four of the eight `requiredEnv("POME_TASK")`. The first cut of the live leg
+// overlaid nothing at all, so those four died on `Error: POME_TASK is required`
+// and were classified FAIL ("returned without evidence it did any real work") —
+// the nightly would have redded 4 of 8 on its first run for an unset env var.
+{
+  const realWiring = {
+    ANTHROPIC_API_KEY: "sk-ant-real",
+    POME_AUTH_TOKEN: "real-jwt",
+    POME_GITHUB_MCP_URL: "http://127.0.0.1:3333/s/standalone/mcp",
+    POME_PREFLIGHT: "1",
+  };
+
+  const live = launchEnv(realWiring, true);
+  assert.ok(live.POME_TASK?.trim(), "the LIVE leg must supply a non-blank POME_TASK");
+  // minimal-viktor's default alibaba/* slug is reachable ONLY via the AI
+  // Gateway; on the credentialed leg (no fake gateway key) it throws before any
+  // outbound call. The leg must pin a slug the ONE provisioned secret can serve.
+  assert.match(
+    live.VIKTOR_MODEL ?? "",
+    /^anthropic\//,
+    "the LIVE leg must pin an anthropic/* model slug so ANTHROPIC_API_KEY alone suffices",
+  );
+  check(
+    "the LIVE leg does not fake an AI_GATEWAY_API_KEY",
+    live.AI_GATEWAY_API_KEY === undefined,
+    true,
+  );
+  check(
+    "a caller-supplied VIKTOR_MODEL wins on the LIVE leg",
+    launchEnv({ ...realWiring, VIKTOR_MODEL: "openai/gpt-5" }, true).VIKTOR_MODEL,
+    "openai/gpt-5",
+  );
+  check(
+    "the LIVE leg leaves real twin wiring untouched",
+    live.POME_GITHUB_MCP_URL,
+    "http://127.0.0.1:3333/s/standalone/mcp",
+  );
+  // Compared to a boolean, never passed as a value: check() prints `got` on
+  // failure, and handing it anything read off a *_API_KEY property is
+  // clear-text logging of sensitive information (js/clear-text-logging), which
+  // CodeQL flags high even when the value is this file's own fake literal.
+  check("the LIVE leg keeps the real model key", live.ANTHROPIC_API_KEY === "sk-ant-real", true);
+  check("the LIVE leg never re-enables POME_PREFLIGHT", live.POME_PREFLIGHT, undefined);
+  // The whole point of the leg: no dead loopback port may be overlaid.
+  for (const [k, v] of Object.entries(live)) {
+    assert.ok(
+      !String(v).includes("59321"),
+      `LIVE leg leaked the dead loopback port into ${k}=${v}`,
+    );
+  }
+  check(
+    "a caller-supplied POME_TASK wins on the LIVE leg",
+    launchEnv({ ...realWiring, POME_TASK: "real task" }, true).POME_TASK,
+    "real task",
+  );
+  assert.ok(
+    launchEnv({ ...realWiring, POME_TASK: "  " }, true).POME_TASK.trim(),
+    "a blank caller POME_TASK must not reach requiredEnv() as blank",
+  );
+
+  // The PR leg is unchanged: the dead wiring overlay still wins outright.
+  const pr = launchEnv(realWiring, false);
+  check("the PR leg still overlays the dead loopback port", pr.POME_GITHUB_MCP_URL, "http://127.0.0.1:59321/s/smoke/mcp");
+  check(
+    "the PR leg still overlays the invalid model key",
+    pr.ANTHROPIC_API_KEY === "sk-ant-smoke-invalid",
+    true,
+  );
+  // The PR leg's fake gateway key is what lets alibaba/* resolve and then fail
+  // at the outbound call (REACHED-OUTBOUND). Removing it would red that leg.
+  check(
+    "the PR leg still overlays the fake gateway key",
+    pr.AI_GATEWAY_API_KEY === "smoke-invalid",
+    true,
+  );
+  check("the PR leg does not pin a model slug", pr.VIKTOR_MODEL, undefined);
+  assert.ok(pr.POME_TASK?.trim(), "the PR leg must supply a non-blank POME_TASK");
+  check("the PR leg never re-enables POME_PREFLIGHT", pr.POME_PREFLIGHT, undefined);
+}
+
+// ── F-1486: the fast-correct-completion edge must be named in the failure ───
+// OK is "still alive at the settle", so on the credentialed leg a correct-but-
+// fast example exits 0 inside the settle and lands on FAIL. The verdict is
+// acceptable; a message insisting the example is broken is not, because the
+// first real nightly red would be undiagnosable.
+{
+  const liveFast = classifyLaunch({
+    output: "Triaged 0 open items in acme/api — nothing to do.",
+    stillRunningAtSettle: false,
+    exitCode: 0,
+    live: true,
+  });
+  check("a fast exit-0 on the live leg is still a FAIL", liveFast.status, "fail");
+  assert.match(liveFast.reason, /credentialed leg/);
+  assert.match(liveFast.reason, /CORRECT but FAST/);
+
+  // Off the live leg the note must NOT appear — the PR leg's exit-0 examples
+  // really are do-nothing exits, and F-1478's message is the right one there.
+  const prFast = classifyLaunch({
+    output: "Triaged 0 open items in acme/api — nothing to do.",
+    stillRunningAtSettle: false,
+    exitCode: 0,
+    live: false,
+  });
+  check("a fast exit-0 off the live leg is still a FAIL", prFast.status, "fail");
+  assert.ok(
+    !prFast.reason.includes("credentialed leg"),
+    "the PR leg's failure message must not carry the live-only note",
+  );
+  // A non-zero exit is a crash on either leg; the fast-completion note would be
+  // misleading there, so it must not appear.
+  assert.ok(
+    !classifyLaunch({
+      output: "unrecognized boom",
+      stillRunningAtSettle: false,
+      exitCode: 1,
+      live: true,
+    }).reason.includes("credentialed leg"),
+    "a non-zero exit must not be excused as a fast correct completion",
+  );
 }
 
 if (failures > 0) {
