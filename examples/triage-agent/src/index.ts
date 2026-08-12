@@ -234,7 +234,14 @@ export function buildTwinTools(config: { mcpUrl: string; token: string }) {
     "List open issues in a repository on the GitHub twin. Returns the array as JSON text.",
     ownerRepo,
     async ({ owner, repo }) => {
-      const issues = await twin.call("list_issues", { owner, repo, state: "open" });
+      // `OPEN`, not `open` (F-1468). GitHub's MCP `list_issues` declares
+      // `state` as `["OPEN","CLOSED"]` — its REST `GET /issues` is the one that
+      // takes lowercase, and the two are genuinely different spellings on the
+      // same vendor. The twin accepted lowercase until the validator was
+      // tightened onto GitHub's declaration; this call site is the one place in
+      // the bundled examples that was relying on that, found by the F-1468
+      // corpus heat read.
+      const issues = await twin.call("list_issues", { owner, repo, state: "OPEN" });
       return { content: [{ type: "text", text: JSON.stringify(issues, null, 2) }] };
     }
   );

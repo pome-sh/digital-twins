@@ -73,7 +73,10 @@ describe("MCP tool contract", () => {
     await call(app, "search_users", { query: "alice" });
     await call(app, "get_file_contents", { owner: "acme", repo: "api", path: "README.md" });
     await call(app, "list_commits", { owner: "acme", repo: "api" });
-    await call(app, "create_or_update_file", { owner: "acme", repo: "api", path: "contract.txt", message: "Add contract", content: "ok\n" });
+    // `branch` is required since F-1468 — GitHub declares it required on this
+    // tool and the twin took it as optional, which let an examinee write to a
+    // default branch it never named.
+    await call(app, "create_or_update_file", { owner: "acme", repo: "api", branch: "main", path: "contract.txt", message: "Add contract", content: "ok\n" });
     await call(app, "create_branch", { owner: "acme", repo: "api", branch: "contract" });
     await call(app, "push_files", { owner: "acme", repo: "api", branch: "contract", message: "Change", files: [{ path: "contract.txt", content: "changed\n" }] });
     // issue_read / issue_write — every method this twin answers.
@@ -83,7 +86,10 @@ describe("MCP tool contract", () => {
     await call(app, "issue_write", { method: "update", owner: "acme", repo: "api", issue_number: 1, state: "open" });
     await call(app, "issue_write", { method: "create", owner: "acme", repo: "api", title: "Consolidated issue" });
     await call(app, "search_issues", { query: "500" });
-    await call(app, "list_issues", { owner: "acme", repo: "api", state: "all" });
+    // GitHub's MCP enum is ["OPEN","CLOSED"] with no `all` member, and its own
+    // description says both are returned when the argument is absent — so
+    // "everything" is spelled by omission here, not by a value (F-1468).
+    await call(app, "list_issues", { owner: "acme", repo: "api" });
     await call(app, "add_issue_comment", { owner: "acme", repo: "api", issue_number: 1, body: "contract comment" });
     await call(app, "create_issue", { owner: "acme", repo: "api", title: "Contract issue" });
     await call(app, "list_repository_collaborators", { owner: "acme", repo: "api" });
