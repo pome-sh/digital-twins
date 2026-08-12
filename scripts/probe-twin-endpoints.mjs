@@ -48,7 +48,7 @@
 // No model, no API key, no network: every twin boots in-process against
 // `:memory:` SQLite on its own default seed and is driven through `app.request`.
 
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -413,6 +413,13 @@ export async function runGate(opts = {}) {
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   const ids = Object.keys(manifest).sort();
 
+  // A manifest declaring zero twins would otherwise fall straight through the
+  // loop below to "0 findings, exit 0" — the exact "probed nothing but exited
+  // 0" shape this gate exists to prevent, just moved one file over (F-1481).
+  if (ids.length === 0) {
+    throw new Error(`${manifestPath} declares zero twins — refusing to report a pass having probed nothing`);
+  }
+
   console.log(`Probing declared endpoints for ${ids.length} twin(s): ${ids.join(", ")}`);
   const findings = [];
   for (const id of ids) {
@@ -422,16 +429,48 @@ export async function runGate(opts = {}) {
     findings.push(...found);
   }
 
+  // Reported BEFORE the zero-probe floor below: a manifest whose twins declare
+  // no probes produces an `unprobed-endpoint` finding per declared tool, and
+  // those name the endpoints. Throwing first would replace that whole list with
+  // a bare stack trace — the louder failure would be the less informative one.
   if (findings.length > 0) {
     console.error(`\n${formatFindings(findings)}`);
     console.error(`Twins with declared-endpoint findings: ${[...new Set(findings.map((f) => f.twin))].join(", ")}`);
     return 1;
   }
+
+  // Only reachable on the pass path, which is the point: it is the floor under
+  // "exit 0", not a second way to red. A manifest with twins but no probes at
+  // all reds through the findings above; this catches the case where nothing
+  // red AND nothing was probed.
   const probeCount = ids.reduce((sum, id) => sum + (manifest[id]?.probes?.length ?? 0), 0);
+  if (probeCount === 0) {
+    throw new Error(
+      `${manifestPath} declares ${ids.length} twin(s) but zero probes in total — refusing to report a pass having probed nothing`
+    );
+  }
+
   console.log(`\nEvery endpoint all ${ids.length} twins declare was called and answered (${probeCount} probes).`);
   return 0;
 }
 
-if (import.meta.main) {
+// Realpath'd on both sides, never bare `import.meta.main`: that property
+// landed in Node 24.2, root `engines` allows `>=24`, and on 24.0.0/24.0.1/
+// 24.0.2/24.1.0 it is `undefined` — the guard is false, `runGate()` never
+// runs, and the script exits 0 having probed nothing (F-1481). Node resolves
+// symlinks before deriving `import.meta.url`, so realpathing only one side
+// misses through a symlinked checkout (a worktree, or macOS's symlinked
+// `/tmp`) in the same silent shape — the mistake F-1353's first fix made and
+// F-1481 revisits. A guard miss while invoked AS this file throws rather than
+// exits 0.
+const SELF = realpathSync(fileURLToPath(import.meta.url));
+const ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";
+const invokedDirectly = ENTRY === SELF;
+
+if (!invokedDirectly && ENTRY.endsWith("probe-twin-endpoints.mjs")) {
+  throw new Error(`probe-twin-endpoints.mjs entry guard did not fire for ${ENTRY} (expected ${SELF})`);
+}
+
+if (invokedDirectly) {
   process.exit(await runGate());
 }

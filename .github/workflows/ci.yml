@@ -288,6 +288,19 @@ jobs:
           set -euo pipefail
           npm ci
           npm run lint:dead-code
+          # F-1481 — a bare `import.meta.main` entry guard is undefined on Node
+          # 24.0.0/24.0.1/24.0.2/24.1.0 (it landed in 24.2), root `engines`
+          # allows `>=24`, and a guard built on it exits 0 having run nothing.
+          # scripts/probe-twin-endpoints.mjs and SIX bundled examples shipped
+          # exactly that shape; this PARSES every source file under scripts/,
+          # contract/, cli/src/, cli/scripts/, packages/ and examples/ (never a
+          # hand-kept list) so the next one reds instead of going quiet. Every
+          # one of those roots is in the heavy-suite scope regex above, so this
+          # is not path-filtered away from any diff that could trip it. Needs
+          # only node_modules (the typescript parser), not a build, so it runs
+          # here rather than after `npm run build`.
+          npm run lint:import-meta-main
+          node scripts/lint-no-bare-import-meta-main.test.mjs
           # F-705 — zero native deps is an invariant: no gyp-marked package in the
           # production closure (prebuilt installers like esbuild/fsevents pass).
           npm run gate:no-native

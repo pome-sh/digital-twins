@@ -1,0 +1,326 @@
+#!/usr/bin/env node
+// SPDX-License-Identifier: Apache-2.0
+//
+// Regression coverage for scripts/lint-no-bare-import-meta-main.mjs (F-1481).
+
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { discoverSourceFiles, findBareImportMetaMain, parseErrorsIn, scanRepo } from "./lint-no-bare-import-meta-main.mjs";
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+
+let failures = 0;
+function assert(cond, msg) {
+  if (cond) return;
+  failures += 1;
+  console.error(`FAIL  ${msg}`);
+}
+
+/** Every root the gate must cover, and one real file under each. */
+const REQUIRED_ROOTS = ["scripts", "contract", "cli/src", "cli/scripts", "packages", "examples"];
+
+// ── findBareImportMetaMain: every real shape must red ───────────────────────
+// Formatting cannot hide it: a line break, parens, optional chaining, negation,
+// computed access, or a destructure straight off `import.meta` (with or without
+// a rename) all have to be caught — exactly the forms a naive regex misses.
+const REAL_SHAPES = {
+  "bare member access": "if (import.meta.main) { run(); }",
+  "wrapped in parens": "if ((import.meta.main)) { run(); }",
+  "split across lines": "if (\n  import.meta\n    .main\n) { run(); }",
+  "negated": "if (!import.meta.main) { skip(); }",
+  "optional chaining": "if (import.meta?.main) { run(); }",
+  "computed access, string key": 'if (import.meta["main"]) { run(); }',
+  "computed access, template key": "if (import.meta[`main`]) { run(); }",
+  "inside a ternary": "const mode = import.meta.main ? 'cli' : 'lib';",
+  "inside an && chain": "if (ready && import.meta.main && !dryRun) { run(); }",
+  "coerced": "const isEntry = Boolean(import.meta.main);",
+  "destructured, no rename": "const { main } = import.meta;\nif (main) run();",
+  "destructured with rename": "const { main: isMain } = import.meta;\nif (isMain) run();",
+  "destructured, computed key": 'const { ["main"]: m } = import.meta;\nif (m) run();',
+  // `...rest` hands the whole object over, so `rest.main` is reachable and the
+  // guard is just as broken — the shape must not slip through as "no `main`".
+  "destructured via rest": "const { ...rest } = import.meta;\nif (rest.main) run();",
+  "assignment-expression destructure": "let main;\n({ main } = import.meta);",
+  "assignment-expression spread": "let rest;\n({ ...rest } = import.meta);",
+};
+for (const [label, source] of Object.entries(REAL_SHAPES)) {
+  const hits = findBareImportMetaMain(source);
+  assert(hits.length > 0, `a real import.meta.main reference is caught: ${label} (source: ${JSON.stringify(source)})`);
+}
+
+// The live instances F-1481's first cut could not see were `.ts`, so the parser
+// must read TypeScript syntax — not merely "not crash" on it. A JS-only parser
+// fails on the type annotations here and would report the file as unparseable
+// (or as clean), which is the silent skip this gate exists to prevent.
+{
+  const tsSource = [
+    "interface Wiring { readonly url: string }",
+    "function boot(w: Wiring): Promise<void> { return fetch(w.url).then(() => {}); }",
+    "const cfg = { url: process.env.U as string } satisfies Wiring;",
+    "if (import.meta.main) { await boot(cfg); }",
+  ].join("\n");
+  assert(parseErrorsIn(tsSource, "x.ts").length === 0, "a real .ts file parses cleanly (type syntax and all)");
+  const hits = findBareImportMetaMain(tsSource, "x.ts");
+  assert(hits.length === 1 && hits[0].line === 4, `a bare guard in a .ts file is caught, with its line (got ${JSON.stringify(hits)})`);
+}
+
+// ── the false positives a grep would produce, which parsing must not ────────
+const FALSE_POSITIVES = {
+  "line comment": "// import.meta.main\nconsole.log('ok');",
+  "block comment": "/* uses import.meta.main historically */\nconsole.log('ok');",
+  "string literal": "const s = 'import.meta.main';\nconsole.log(s);",
+  "template literal": "const s = `guard is import.meta.main`;\nconsole.log(s);",
+  // cli/scripts/make-unwired-fixture.mjs builds source text out of lines
+  // exactly like this. It is data, not a guard, and must stay green.
+  "string array a generator emits": 'const lines = ["if (import.meta.main) {", "  await main();", "}"];',
+  "unrelated .main property": "const config = { main: true };\nif (config.main) run();",
+  "import.meta without .main": "const url = import.meta.url;\nconsole.log(url);",
+  "import.meta.resolve": "if (import.meta.resolve) run();",
+  "concatenated key (documented non-goal)": 'if (import.meta["ma" + "in"]) { run(); }',
+};
+for (const [label, source] of Object.entries(FALSE_POSITIVES)) {
+  const hits = findBareImportMetaMain(source);
+  assert(hits.length === 0, `not a real reference, must not red: ${label} (got ${JSON.stringify(hits)})`);
+}
+
+// A file mixing a real reference with a comment/string mention of the same text
+// must still be caught by the real one.
+{
+  const mixed = "// import.meta.main is banned here\nif (import.meta.main) { run(); }\nconst s = 'import.meta.main';";
+  const hits = findBareImportMetaMain(mixed);
+  assert(hits.length === 1, `a real reference is caught even alongside comment/string mentions (got ${hits.length})`);
+}
+
+// ── discoverSourceFiles: a directory walk, not a hand-kept list ─────────────
+{
+  const dir = mkdtempSync(join(tmpdir(), "f1481-discover-"));
+  try {
+    mkdirSync(join(dir, "scripts", "nested"), { recursive: true });
+    mkdirSync(join(dir, "scripts", "node_modules", "pkg"), { recursive: true });
+    mkdirSync(join(dir, "scripts", "dist"), { recursive: true });
+    writeFileSync(join(dir, "scripts", "a.mjs"), "export const a = 1;\n");
+    writeFileSync(join(dir, "scripts", "nested", "b.js"), "export const b = 1;\n");
+    writeFileSync(join(dir, "scripts", "nested", "c.ts"), "export const c: number = 1;\n");
+    writeFileSync(join(dir, "scripts", "ignore.json"), "{}\n");
+    writeFileSync(join(dir, "scripts", "node_modules", "pkg", "d.js"), "module.exports = 1;\n");
+    writeFileSync(join(dir, "scripts", "dist", "e.js"), "export const e = 1;\n");
+    const files = discoverSourceFiles(dir, ["scripts"]).get("scripts");
+    assert(files.length === 3, `discovery walks nested dirs, filters by extension, prunes node_modules/dist (got ${files.length}: ${files.join(", ")})`);
+    assert(files.some((f) => f.endsWith("nested/b.js")), "discovery finds a file nested two levels down");
+    assert(files.some((f) => f.endsWith("nested/c.ts")), "discovery includes .ts — the extension the live instances used");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+// `isDirectory()`/`isFile()` on a dirent are both FALSE for a symlink, so a
+// walk keyed off the dirent alone silently skips a symlinked script — a skip
+// that reads as a pass. This is the shape the gate itself is about.
+{
+  const dir = mkdtempSync(join(tmpdir(), "f1481-symlink-"));
+  try {
+    mkdirSync(join(dir, "scripts"), { recursive: true });
+    mkdirSync(join(dir, "elsewhere"), { recursive: true });
+    writeFileSync(join(dir, "elsewhere", "linked.mjs"), "if (import.meta.main) { run(); }\n");
+    symlinkSync(join(dir, "elsewhere", "linked.mjs"), join(dir, "scripts", "linked.mjs"));
+    symlinkSync(join(dir, "elsewhere"), join(dir, "scripts", "linkeddir"));
+    const files = discoverSourceFiles(dir, ["scripts"]).get("scripts");
+    assert(files.length === 2, `a symlinked file AND a symlinked directory are both scanned (got ${files.length})`);
+    const { findings } = scanRepo(dir, ["scripts"]);
+    assert(findings.length === 2, `a bare guard behind a symlink still reds (got ${JSON.stringify(findings)})`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+// ── the scan roots cannot silently narrow ──────────────────────────────────
+// F-1481's own history is the argument for this assertion: F-1353 fixed
+// `contract/run.mjs`, the same bug survived ten lines away under `scripts/`,
+// and this gate's first cut then covered only those two roots while six live
+// instances sat in `examples/*/src/*.ts`. A root dropping out of the walk must
+// red here rather than quietly stop being covered.
+{
+  const byRoot = discoverSourceFiles(ROOT);
+  for (const root of REQUIRED_ROOTS) {
+    const files = byRoot.get(root);
+    assert(Array.isArray(files) && files.length > 0, `the walk covers ${root}/ (got ${files ? files.length : "no entry"} files)`);
+  }
+  const all = [...byRoot.values()].flat();
+  assert(
+    all.some((f) => /examples\/[^/]+\/src\/index\.ts$/.test(f)),
+    "a bundled example's entry module is in scope — the six live F-1481 instances were exactly these files"
+  );
+  assert(all.some((f) => f.includes("/cli/src/")), "cli/src is in scope");
+  assert(!all.some((f) => f.includes("node_modules")), "the walk never descends into node_modules");
+}
+
+// Independent second derivation of the same file set, using `find` rather than
+// the gate's own walk. If discovery silently stopped recursing (or started
+// skipping an extension or a root) this comparison — not a hardcoded count — is
+// what reds, so the floor moves with the tree. `-L` follows symlinks, matching
+// the walk's statSync, so the two share no blind spot.
+{
+  const viaDiscovery = [...discoverSourceFiles(ROOT).values()].flat().sort();
+  const findArgs = ["-L", ...REQUIRED_ROOTS];
+  for (const pruned of ["node_modules", "dist", "build", ".git", "coverage", ".turbo", ".next"]) {
+    findArgs.push("-name", pruned, "-prune", "-o");
+  }
+  findArgs.push("-type", "f", "(");
+  const exts = [".mjs", ".js", ".cjs", ".ts", ".mts", ".cts", ".tsx"];
+  exts.forEach((ext, i) => {
+    if (i > 0) findArgs.push("-o");
+    findArgs.push("-name", `*${ext}`);
+  });
+  findArgs.push(")", "-print");
+  const viaFind = execFileSync("find", findArgs, { cwd: ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 })
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map((p) => join(ROOT, p))
+    .sort();
+  const onlyWalk = viaDiscovery.filter((f) => !viaFind.includes(f));
+  const onlyFind = viaFind.filter((f) => !viaDiscovery.includes(f));
+  assert(
+    onlyWalk.length === 0 && onlyFind.length === 0,
+    `discoverSourceFiles agrees with an independently-derived file list ` +
+      `(walk-only: ${JSON.stringify(onlyWalk.slice(0, 5))}, find-only: ${JSON.stringify(onlyFind.slice(0, 5))})`
+  );
+}
+
+// ── scanRepo: an empty root is a hard failure, PER ROOT ────────────────────
+// An aggregate floor is satisfied by `scripts/` alone, so relocating any other
+// root would leave it unscanned while the gate still printed a pass.
+{
+  const dir = mkdtempSync(join(tmpdir(), "f1481-empty-"));
+  try {
+    mkdirSync(join(dir, "scripts"), { recursive: true });
+    writeFileSync(join(dir, "scripts", "a.mjs"), "export const a = 1;\n");
+    let threw = false;
+    try {
+      scanRepo(dir, ["scripts", "contract"]);
+    } catch (err) {
+      threw = true;
+      assert(/zero files/.test(err.message) && /contract/.test(err.message), `the empty-root error names the missing root (got: ${err.message})`);
+    }
+    assert(threw, "a root that exists in the config but not on disk throws rather than reporting a pass");
+
+    // And the aggregate case: nothing anywhere.
+    let threwAll = false;
+    try {
+      scanRepo(mkdtempSync(join(tmpdir(), "f1481-void-")), ["scripts"]);
+    } catch {
+      threwAll = true;
+    }
+    assert(threwAll, "pointing the scan at a tree with no roots at all throws");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+// ── an unparseable file is its own category, not a fake guard ──────────────
+// typescript RECOVERS from syntax errors rather than throwing, so without an
+// explicit diagnostics read an unreadable file scans "clean" — a skip that
+// reads as a pass. It must also not be reported as a broken entry guard, which
+// sends the reader looking for a guard that does not exist.
+{
+  const dir = mkdtempSync(join(tmpdir(), "f1481-unparseable-"));
+  try {
+    mkdirSync(join(dir, "scripts"), { recursive: true });
+    writeFileSync(join(dir, "scripts", "broken-syntax.mjs"), "function ( { this is not javascript\n");
+    const { findings, unparseable } = scanRepo(dir, ["scripts"]);
+    assert(unparseable.length === 1 && unparseable[0].file === "scripts/broken-syntax.mjs", `a syntax error is reported as unparseable, naming the file (got ${JSON.stringify(unparseable)})`);
+    assert(findings.length === 0, "a syntax error is NOT reported as a bare import.meta.main finding");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+// ── scanRepo: break-on-purpose against a scratch fixture ───────────────────
+// The ticket's own break-on-purpose case, as an assertion: add a bare guard to
+// a scratch file, and the scan must red naming that exact file — while a
+// sibling that only MENTIONS the string must not.
+{
+  const dir = mkdtempSync(join(tmpdir(), "f1481-scratch-"));
+  try {
+    mkdirSync(join(dir, "scripts"), { recursive: true });
+    writeFileSync(join(dir, "scripts", "broken.mjs"), "// a scratch file that should never ship\nif (import.meta.main) { console.log('ran'); }\n");
+    writeFileSync(join(dir, "scripts", "clean.mjs"), "// mentions import.meta.main only in prose, and in a string: 'import.meta.main'\nconsole.log('fine');\n");
+    // The `.ts` half of the same break, since that is where the live ones were.
+    writeFileSync(join(dir, "scripts", "broken.ts"), "const n: number = 1;\nif (import.meta.main) { console.log(n); }\n");
+    const { filesScanned, findings } = scanRepo(dir, ["scripts"]);
+    assert(filesScanned === 3, `all three scratch files are scanned (got ${filesScanned})`);
+    const named = findings.map((f) => f.file).sort();
+    assert(
+      findings.length === 2 && named[0] === "scripts/broken.mjs" && named[1] === "scripts/broken.ts",
+      `the scan reds exactly the files with a real bare guard, naming them (got: ${JSON.stringify(findings)})`
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+// ── the shipped repo is clean ────────────────────────────────────────────
+// The regression that matters most: what would have caught
+// scripts/probe-twin-endpoints.mjs and the six examples shipping a bare guard.
+{
+  const { filesScanned, findings, unparseable } = scanRepo(ROOT);
+  assert(filesScanned > 0, "the real scan covers at least one file");
+  assert(findings.length === 0, `no bare import.meta.main anywhere in scope (got: ${JSON.stringify(findings)})`);
+  assert(unparseable.length === 0, `every file in scope actually parses (got: ${JSON.stringify(unparseable)})`);
+}
+
+// ── the gate is actually wired into CI, in a step that can fail ────────────
+// Asserting `ci.includes("npm run lint:import-meta-main")` is satisfied by a
+// COMMENTED-OUT line, by the command sitting in a job that never runs, and by
+// `set -euo pipefail` appearing anywhere else in the file (it appears in the
+// scope step at the top). Locate the gate's OWN step and assert on that.
+{
+  const ci = readFileSync(join(ROOT, ".github/workflows/ci.yml"), "utf8");
+  const COMMANDS = ["npm run lint:import-meta-main", "node scripts/lint-no-bare-import-meta-main.test.mjs"];
+
+  // Steps start at a `      - ` list item within a job's `steps:`.
+  const steps = ci.split(/\n(?=      - )/);
+  for (const command of COMMANDS) {
+    const owning = steps.filter((step) =>
+      step.split("\n").some((line) => {
+        const code = line.trim();
+        return !code.startsWith("#") && code.includes(command);
+      })
+    );
+    assert(owning.length === 1, `exactly one uncommented CI step runs \`${command}\` (got ${owning.length})`);
+    if (owning.length !== 1) continue;
+    const step = owning[0];
+    assert(/set -euo pipefail/.test(step), `the step running \`${command}\` sets a failing shell mode`);
+    assert(!/continue-on-error/.test(step), `the step running \`${command}\` has no continue-on-error`);
+    assert(!/\bif:\s*false\b/.test(step), `the step running \`${command}\` is not disabled`);
+  }
+
+  // It lives behind the heavy gate (it needs `npm ci` for the parser), so the
+  // scope regex MUST classify a diff to any scanned root as heavy — otherwise
+  // the gate is path-filtered away from the very changes that could trip it.
+  const scopeRegex = ci.match(/'\^\((?<alts>[^']+)\)'/)?.groups?.alts ?? "";
+  for (const root of REQUIRED_ROOTS) {
+    const top = `${root.split("/")[0]}/`;
+    assert(scopeRegex.includes(top), `the heavy-suite scope regex selects on ${top}, a root this gate scans (regex: ${scopeRegex})`);
+  }
+
+  const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
+  assert(
+    pkg.scripts["lint:import-meta-main"] === "node scripts/lint-no-bare-import-meta-main.mjs",
+    "package.json declares lint:import-meta-main"
+  );
+  assert(
+    typeof pkg.devDependencies?.typescript === "string",
+    "the parser this gate imports is a declared root devDependency, not a hoisting accident"
+  );
+}
+
+if (failures > 0) {
+  console.error(`\n${failures} assertion(s) failed.`);
+  process.exit(1);
+}
+console.log("lint-no-bare-import-meta-main: all assertions passed.");
