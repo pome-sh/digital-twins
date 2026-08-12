@@ -4,9 +4,9 @@
 // contract + the five twins, then run the black-box suite with plain `node`.
 
 import { spawnSync } from "node:child_process";
-import { readdirSync } from "node:fs";
+import { readdirSync, realpathSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const CONTRACT_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -40,11 +40,24 @@ function run(cmd, args) {
 // `>=24`, so on 24.0/24.1 it is `undefined`, this guard is false, and
 // `npm run test:contract` exits 0 having built nothing and asserted nothing —
 // the exact "a check that never ran reads like one that passed" failure
-// F-1353 exists to remove, promoted from one file to the whole suite. Same
+// F-1353 exists to remove, promoted from one file to the whole suite. The
 // argv/import.meta.url comparison the repo's other entry guards use, pinned
-// for the same reason in scripts/capture-mcp-tools-list.test.mjs.
-const invokedDirectly =
-  process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;
+// for the same reason in scripts/capture-mcp-tools-list.test.mjs — but
+// realpath'd on BOTH sides: node resolves symlinks before deriving
+// `import.meta.url`, so a bare `path.resolve` of argv[1] misses through a
+// symlinked checkout (`node /tmp/link/contract/run.mjs`) and skips silently in
+// the same shape. Then, because any guard that can be wrong here is worth a
+// crash rather than an exit 0: if we were invoked as this file and did NOT
+// match, say so loudly instead of running nothing.
+const SELF = realpathSync(fileURLToPath(import.meta.url));
+const ENTRY = process.argv[1] ? realpathSync(path.resolve(process.argv[1])) : "";
+const invokedDirectly = ENTRY === SELF;
+
+if (!invokedDirectly && path.basename(ENTRY) === path.basename(SELF)) {
+  throw new Error(
+    `contract/run.mjs entry guard did not fire for ${ENTRY} (expected ${SELF}) — refusing to exit 0 having run nothing`
+  );
+}
 
 if (invokedDirectly) {
   // Wire first: every twin's runtime import chain reaches it, and the suite spawns
@@ -58,8 +71,14 @@ if (invokedDirectly) {
   if (status === 0) status = run("npm", ["run", "build", "-w", "@pome-sh/twin-stripe"]);
   if (status === 0) status = run("npm", ["run", "build", "-w", "@pome-sh/twin-gmail"]);
   if (status === 0) status = run("npm", ["run", "build", "-w", "@pome-sh/twin-linear"]);
-  if (status === 0)
-    status = run("node", ["--test", ...discoverTestFiles().map((f) => path.relative(REPO_ROOT, f))]);
+  if (status === 0) {
+    const files = discoverTestFiles().map((f) => path.relative(REPO_ROOT, f));
+    // Bare `node --test` with no paths recursively searches cwd — here the repo
+    // root — so an empty discovery would silently turn "run the contract suite"
+    // into "run every test in the monorepo". Say what actually happened.
+    if (files.length === 0) throw new Error(`no *.test.mjs files discovered under ${CONTRACT_DIR}`);
+    status = run("node", ["--test", ...files]);
+  }
 
   process.exit(status);
 }

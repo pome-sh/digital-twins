@@ -79,15 +79,20 @@ const CONTRACT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(CONTRACT_DIR, "..");
 
 test("every contract/*.test.mjs file is run by the runner or by a named ci.yml step", () => {
-  // Comment lines dropped: ci.yml's F-1353 note NAMES cli-start.test.mjs in
-  // prose, and a comment mentioning a file is not a step that runs it. Then
+  // Only lines where the COMMAND starts with `node --test` count: a comment
+  // naming the file is not a step that runs it (ci.yml's own F-1353 note names
+  // cli-start.test.mjs in prose), and neither is a `name:` or an `echo`. Then
   // whole-token matching, not a RegExp built from a filename — a path is not a
   // pattern, and `foo.test.mjs` as a regex also matches `fooXtest.mjs`.
+  // Residual, accepted: an `if:` that disables the step is invisible to a
+  // line scan. Disabling a step is a visible act in a diff; falling off a list
+  // is not, and that is what this gate is for.
   const invokedByWorkflow = new Set(
     readFileSync(path.join(REPO_ROOT, ".github/workflows/ci.yml"), "utf8")
       .split("\n")
-      .filter((line) => !/^\s*#/.test(line) && line.includes("node --test"))
-      .flatMap((line) => line.trim().split(/\s+/))
+      .map((line) => line.trim().replace(/^-\s*/, "").replace(/^run:\s*/, ""))
+      .filter((cmd) => cmd.startsWith("node --test "))
+      .flatMap((cmd) => cmd.split(/\s+/))
   );
   const discovered = new Set(discoverTestFiles().map((f) => path.basename(f)));
   const uncovered = readdirSync(CONTRACT_DIR)
