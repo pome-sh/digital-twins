@@ -8,7 +8,7 @@
 > The rest of this file is the engineering reference: HTTP/MCP surface, seed
 > shape, and the runtime contract pome-cloud's sandbox images depend on.
 
-`@pome-sh/twin-github` is a local, stateful GitHub twin for agent testing. It exposes GitHub-shaped REST routes plus a 65-tool MCP-style API backed by the same SQLite domain services.
+`@pome-sh/twin-github` is a local, stateful GitHub twin for agent testing. It exposes GitHub-shaped REST routes plus a 36-tool MCP-style API backed by the same SQLite domain services.
 
 ## Quickstart
 
@@ -59,7 +59,7 @@ The default seed creates:
 - **Real MCP (JSON-RPC, Streamable HTTP, stateless):** `POST /s/:sid/mcp`
   — speaks the protocol the `@modelcontextprotocol/sdk` `Client` +
   `StreamableHTTPClientTransport` expect (`initialize`, `tools/list`,
-  `tools/call`, `ping`, `notifications/*`). 65 tools exposed via
+  `tools/call`, `ping`, `notifications/*`). 36 tools exposed via
   `tools/list` with camelCase `inputSchema`.
 - Legacy custom MCP routes (compat surface for already-deployed agents):
   - `GET  /s/:sid/mcp/tools` — returns `{ tools: [{ name, description, input_schema }, ...] }`

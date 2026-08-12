@@ -6,8 +6,11 @@
 // the existing test fixture mints), connects an `@modelcontextprotocol/sdk`
 // `Client` over `StreamableHTTPClientTransport` with a Bearer header, and:
 //
-//   1. Verifies tools/list returns the 65-tool catalog through real
-//      JSON-RPC framing (i.e. through the wire, not from internal state).
+//   1. Verifies tools/list returns the catalog `githubToolFixture` derives from
+//      the captured upstream listing — count and names, both directions —
+//      through real JSON-RPC framing (i.e. through the wire, not from internal
+//      state). The size is never written down here: it moved 65 → 36 (F-1376)
+//      while a hardcoded `65` in this file went on claiming otherwise.
 //   2. Verifies a strict-read tools/call against a seeded PR.
 //   3. Calls the same tool via the legacy `/mcp/call` REST shim and diffs
 //      the recorder events to prove field-shape parity.
