@@ -16,11 +16,25 @@ export class TwinError extends Error {
   }
 }
 
+/**
+ * Build GitHub's error body: `{message, documentation_url, status, errors?}`.
+ *
+ * `status` is rendered as a **STRING**, which looks like a bug and is not.
+ * Measured live against `api.github.com` on 2026-08-12 (F-1490): **59 of 59**
+ * error responses across 400 / 401 / 403 / 404 / 409 / 422 sent it quoted, with
+ * no exceptions and no absences, and GitHub's own published OpenAPI description
+ * declares it that way too — `basic-error` has `status: {type: string}`. Two
+ * independent sources, so the twin quotes it as well.
+ *
+ * ⚠️ The `status` here is the BODY LEAF, not the HTTP status. `twin.ts`'s
+ * `githubErrorEnvelope` returns `{status, body}` and the outer one stays a
+ * number, because that is what the engine writes to the status line.
+ */
 export function githubError(message: string, status: number, errors?: unknown[], documentationUrl?: string) {
   return {
     message,
     documentation_url: documentationUrl ?? "https://docs.github.com/rest",
-    status,
+    status: String(status),
     ...(errors ? { errors } : {})
   };
 }

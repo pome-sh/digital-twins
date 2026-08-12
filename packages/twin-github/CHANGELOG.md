@@ -1,5 +1,54 @@
 # @pome-sh/twin-github — CHANGELOG
 
+## 0.10.10 — 2026-08-12
+
+`status` in the error envelope is a **string**, the way real GitHub sends it, and
+the two envelope gaps that cannot be fixed here are registered (F-1490).
+
+**⚠️ Wire change on every 4xx/5xx this twin emits.** `githubError` now renders
+`status: "422"` where it rendered `status: 422`. An examinee that type-checks the
+field, or a grader comparing envelopes leaf by leaf, saw a difference on every
+single error before this. Measured live against `api.github.com` on 2026-08-12:
+**59 of 59** error responses across 400 / 401 / 403 / 404 / 409 / 422 sent it
+quoted — zero exceptions, zero absences — and GitHub's own published OpenAPI
+description declares it independently (`basic-error` has
+`status: {type: string}`). The ticket asked for exactly this re-measurement
+because a quoted numeric is odd enough to distrust from one surface; it held on
+every class.
+
+The HTTP status stays a number. Only the body leaf is a string, and a test
+asserts the two are deliberately different types, because stringifying the wrong
+one would break every response.
+
+**Teeth on the helper, not on a route**, since `githubError` builds the body for
+every envelope that flows through `githubErrorEnvelope` — TwinError, the zod
+branch, the unknown-tool branch, the JSON-parse branch and the 500 fallback. The
+new `test/error-envelope-status.test.ts` asserts the helper directly *and* on the
+wire across every error class the twin can be provoked into, so it cannot pass by
+agreeing with itself.
+
+**Two things measured and deliberately NOT fixed, now registered as divergences
+31 and 32** rather than left invisible:
+
+- **The 401/403 envelopes** carry `documentation_url: ""` and **no `status` leaf
+  at all**, where GitHub sends the generic-but-real url and `"401"`. Three of the
+  four envelope-building sites never reach `githubError`, and two of those live in
+  **`@pome-sh/sdk`** — shared by all five twins, so fixing them there moves slack,
+  stripe, gmail and linear too and needs its own cross-twin measurement.
+- **`documentation_url` is generic** where GitHub names the operation (45 of 59).
+  The SDK hook is `(err) => {status, body}`: it cannot see the entry point, and
+  `notFound()` in `requireRepo` is reachable from ~40 routes and ~30 tools, so the
+  url depends on which door was knocked on rather than where the throw happened.
+
+Divergence 32 records the **boundary** as well as the rule, because "operation
+everywhere" would be a new divergence in the other direction: GitHub is generic
+on every 401 (8/8), on unrouted paths (4/4), and on `GET /users/:username` (2/2,
+a one-off — `/users/:u/repos`, `/orgs/:o` and `/gists/:id` are all specific).
+
+Three test files migrated off the numeric literal: `contents-base64.test.ts` and
+`contents-sha-semantics.test.ts` (whose whole-envelope assertions carried nine of
+them), plus a stray backtick in F-1491's own divergence-30 prose.
+
 ## 0.10.9 — 2026-08-12
 
 A wrong `sha` on the contents door is a **409**, not a 422, and a missing one
