@@ -158,19 +158,30 @@ jobs:
       # (packages/sdk/src): every statement catch must throw, return an
       # error/sentinel, or reject. Dependency-free, runs before `npm ci`.
       - run: node scripts/no-catch-and-continue.mjs
-      # F-1135 — cli/package.json's @pome-sh/* pins must equal packages/*'s
-      # versions. CI tests the workspace build (the tarball rewrite) while users
-      # install the published tarball, where those deps are bundleDependencies
-      # and the pin is frozen at publish time. F-1132 shipped a CLI that refused
-      # every `pome checks add` for github while cli-ci was green.
-      # F-1126 — the same argument one directory over. npm only SYMLINKS a
-      # sibling when the declared pin matches its version; otherwise it installs
-      # a real nested copy from the registry, and that package is built and
-      # tested against the PUBLISHED artifact instead of this tree. twin-slack
-      # pinned sdk 0.5.1 against a workspace on 0.9.0 for months, and
-      # adapter-claude-sdk pinned shared-types one minor back. CI was green
-      # throughout — everything it ran genuinely passed, against the wrong sdk.
+      # F-1126 — npm only SYMLINKS a sibling when the declared pin matches its
+      # version; otherwise it installs a real nested copy from the registry,
+      # and that package is built and tested against the PUBLISHED artifact
+      # instead of this tree. twin-slack pinned sdk 0.5.1 against a workspace on
+      # 0.9.0 for months, and adapter-claude-sdk pinned shared-types one minor
+      # back. CI was green throughout — everything it ran genuinely passed,
+      # against the wrong sdk.
+      # F-1135 named the same argument for `cli/`, back when `cli/package.json`
+      # pinned exact `@pome-sh/*` versions and `cli-ci.yml` rewrote them to
+      # local tarballs (`use-local-pome-tarballs.mjs`) so the workspace tree got
+      # tested while `cli-release.yml` alone typechecked the real, PUBLISHED
+      # pins — the seam F-1231 investigated after a 2026-08-03 push to `main`
+      # broke on a `@pome-sh/shared-types` symbol the pin hadn't caught up to
+      # yet. `a3c9441` ("replace two release systems with one", #239) deleted
+      # all of that the following day: every internal `@pome-sh/*` dep in
+      # `cli/package.json`, like every one in `packages/*`, became a
+      # workspace-resolved `"*"`, which npm always symlinks — so there is no
+      # longer a pin for `cli/`'s build to lag behind, published or not. What
+      # F-1135's half of this gate protected against — an exact pin drifting —
+      # can still recur through `cli/package.json` alone if a future PR
+      # reintroduces one, and nothing was scanning `cli/` for that until F-1231
+      # extended this same walk to include it.
       - run: node scripts/check-workspace-pins-match-workspace.mjs
+      - run: node scripts/check-workspace-pins-match-workspace.test.mjs
       - run: bash scripts/lint-no-cloud-imports.sh
       - run: bash scripts/lint-no-cloud-imports.test.sh
       - run: node scripts/ci/wait-for-workflow.test.mjs

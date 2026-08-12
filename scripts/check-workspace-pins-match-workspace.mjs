@@ -24,8 +24,17 @@
 // an export would have been tested against the wrong artifact in silence.
 //
 // This is the sibling of `check-cli-pins-match-workspace.mjs` (F-1135), which
-// makes the same argument for `cli/`. The CLI half existed; the packages half
-// did not, which is why the drift lived in packages.
+// made the same argument for `cli/`. That file, `cli-ci.yml`, `cli-release.yml`
+// and `scripts/use-local-pome-tarballs.mjs` are all gone as of `a3c9441`
+// ("replace two release systems with one", #239): the CLI joined the root
+// workspace and every internal `@pome-sh/*` dep in `cli/package.json` became a
+// workspace-resolved `"*"`, precisely because an exact pin there had drifted
+// (`shared-types@0.12.0` against a local `0.12.2`, two zod schema identities
+// at one runtime — the same shape F-1126 above catches in `packages/`). `cli/`
+// itself is not a sibling anything else pins against, so it was never in this
+// script's `packages/` scan — but nothing stopped `cli/package.json` from
+// reintroducing the exact pin #239 deleted. This scan now covers it too, so
+// that regression is caught here rather than rediscovered the hard way again.
 //
 // THE RULE — a pin must be `"*"` / `workspace:*` (always a workspace link) OR an
 // exact semver that EQUALS the sibling's workspace version. Stated the useful
@@ -49,8 +58,22 @@ export function findPinViolations(repoRoot) {
     manifests.set(manifest.name, { manifest, dir: entry });
   }
 
+  // `cli/` is a consumer of these siblings but never one itself — nothing in
+  // this workspace pins a `@pome-sh/*` dep against the CLI's own version — so
+  // it is scanned for violations without being added to `manifests`.
+  const consumers = [...manifests.entries()].map(([name, { manifest, dir }]) => ({
+    name,
+    manifest,
+    label: `packages/${dir}`,
+  }));
+  const cliManifestPath = join(repoRoot, "cli", "package.json");
+  if (existsSync(cliManifestPath)) {
+    const cliManifest = JSON.parse(readFileSync(cliManifestPath, "utf8"));
+    consumers.push({ name: cliManifest.name, manifest: cliManifest, label: "cli" });
+  }
+
   const violations = [];
-  for (const [name, { manifest, dir }] of manifests) {
+  for (const { manifest, label } of consumers) {
     for (const field of ["dependencies", "devDependencies", "peerDependencies"]) {
       for (const [dep, pin] of Object.entries(manifest[field] ?? {})) {
         if (!dep.startsWith(SCOPE)) continue;
@@ -66,13 +89,13 @@ export function findPinViolations(repoRoot) {
         if (pin === "*" || pin === "workspace:*") continue;
         if (!EXACT_VERSION.test(pin)) {
           violations.push(
-            `packages/${dir} (${name}): ${field}.${dep} is "${pin}" — @pome-sh/* pins must be exact semver, "*", or "workspace:*"`,
+            `${label} (${manifest.name}): ${field}.${dep} is "${pin}" — @pome-sh/* pins must be exact semver, "*", or "workspace:*"`,
           );
           continue;
         }
         if (pin !== sibling.manifest.version) {
           violations.push(
-            `packages/${dir} (${name}): ${field}.${dep} pins ${pin} but packages/${sibling.dir} ` +
+            `${label} (${manifest.name}): ${field}.${dep} pins ${pin} but packages/${sibling.dir} ` +
               `is ${sibling.manifest.version}. npm will install the PUBLISHED ${pin} as a nested ` +
               `copy, so this package is built and tested against the registry rather than this tree.`,
           );
@@ -93,10 +116,13 @@ if (invokedDirectly) {
     console.error("❌ workspace pin parity FAILED:\n");
     for (const violation of violations) console.error(`  ${violation}`);
     console.error(
-      "\nSet each pin to the sibling's version in packages/. A mismatched pin does not fail\n" +
-        "loudly — it silently swaps the workspace tree for a published tarball.",
+      "\nSet each pin to \"*\" (or the sibling's exact version in packages/). A mismatched or\n" +
+        "unnecessary exact pin does not fail loudly — it silently swaps the workspace tree for\n" +
+        "a published tarball.",
     );
     process.exit(1);
   }
-  console.log("✅ workspace pin parity OK: every @pome-sh/* pin matches its sibling in packages/.");
+  console.log(
+    "✅ workspace pin parity OK: every @pome-sh/* pin in packages/ and cli/ matches its sibling.",
+  );
 }
