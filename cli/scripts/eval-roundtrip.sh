@@ -9,6 +9,8 @@
 # dev/staging cloud, with your own credentials, before undrafting a PR that
 # touches the meta.json / upload-url contract (see the PR body checklist).
 #
+# pome:unwired-ok(scripts/eval-roundtrip.sh): manual, env-driven round-trip check against a REAL pome-cloud deployment — needs live POME_API_URL/POME_API_KEY credentials CI does not have (D12/F-689, F-1476).
+#
 # What it does:
 #   1. Records a fresh local trace with the bundled starter scenario + the
 #      scripted example agent (`pome run --local`) — capture-only, no

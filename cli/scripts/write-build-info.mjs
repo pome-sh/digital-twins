@@ -11,6 +11,8 @@
 // `<packageRoot>/assets/**` and ship as-is via cli/package.json `files`, so
 // there is nothing left to copy: see src/cli/assets.ts for why a bundled CLI
 // cannot resolve an asset relative to its importing module.
+//
+// pome:unwired-ok(scripts/write-build-info.mjs): invoked by cli/tsup.config.ts's build hook (execFileSync), not by any npm script name — it writes build metadata and asserts nothing, so it is not itself a check (F-1476).
 
 import { execSync } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";

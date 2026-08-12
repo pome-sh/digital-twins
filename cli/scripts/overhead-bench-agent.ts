@@ -7,6 +7,8 @@
 // otherwise — emitting one `OVERHEAD_BENCH_SAMPLE_MS=<n>` line per iteration
 // to stdout. The orchestrator (`cli/scripts/overhead-gate.ts`) reads
 // `stdout.txt` from each run's artifact directory and computes the p99 delta.
+//
+// pome:unwired-ok(scripts/overhead-bench-agent.ts): spawned by overhead-gate.ts (wired as `gate:agent-trace-overhead`) via a resolved path (OVERHEAD_BENCH_AGENT env default), not a literal `tsx <path>` invocation — it is the workload agent under test, asserts nothing itself, and the orchestrator's own p99 budget check is the gate (F-1476).
 
 import { createConnection } from "node:net";
 import { performance } from "node:perf_hooks";

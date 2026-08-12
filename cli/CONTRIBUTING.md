@@ -27,8 +27,7 @@ npm run pome -- --help           # built dist/ output
 
 ```bash
 npm run typecheck    # tsc --noEmit
-npm test             # vitest unit tests
-npm run test:e2e     # end-to-end tests
+npm test             # vitest unit tests — includes test/e2e/**, no separate script
 npm run build        # full publishable build
 ```
 
@@ -66,9 +65,9 @@ back from the cloud, whether via a hosted `pome run` or an upload through
 
 This boundary is enforced mechanically, repo-wide, by
 [`scripts/no-eval-in-oss.mjs`](../scripts/no-eval-in-oss.mjs) (`npm run
-gate:no-eval` from the repo root; `cd cli && npm run gate:no-eval` also
-works). The gate denies three things across `cli/src/**`, `cli/scripts/**`,
-and `packages/**`:
+gate:no-eval` from the repo root). The gate denies three things across
+`cli/src/**`, `cli/scripts/**`, and `packages/**` in one pass — there is no
+separate `cli/`-local copy to run. The gate denies:
 
 1. **Known deleted paths reappearing** — `src/evaluator/`, `src/matrix/`,
    `src/score/`, `packages/correlator/`, and the retired local-scoring CLI

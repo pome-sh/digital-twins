@@ -74,8 +74,8 @@ const FALSE_POSITIVES = {
   "block comment": "/* uses import.meta.main historically */\nconsole.log('ok');",
   "string literal": "const s = 'import.meta.main';\nconsole.log(s);",
   "template literal": "const s = `guard is import.meta.main`;\nconsole.log(s);",
-  // cli/scripts/make-unwired-fixture.mjs builds source text out of lines
-  // exactly like this. It is data, not a guard, and must stay green.
+  // A generator that builds source text out of lines exactly like this emits
+  // data, not a guard, and must stay green.
   "string array a generator emits": 'const lines = ["if (import.meta.main) {", "  await main();", "}"];',
   "unrelated .main property": "const config = { main: true };\nif (config.main) run();",
   "import.meta without .main": "const url = import.meta.url;\nconsole.log(url);",
