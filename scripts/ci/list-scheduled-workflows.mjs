@@ -120,8 +120,15 @@ export function findBrokenLocalUses(root) {
   return broken.sort();
 }
 
-/** Every workflow file as `[name, comment-stripped lines]`. */
-function workflowLines(root) {
+/**
+ * Every workflow file as `[name, comment-stripped lines]`. Exported so
+ * scripts/ci/assert-schedule-alarm-coverage.mjs (F-1471) reads the exact same
+ * file list and comment-stripping rule rather than re-implementing it — two
+ * readers of ".github/workflows/*.yml with comments stripped" drifting apart
+ * is the same shape of bug this file's `cron:`/`schedule:` cross-check exists
+ * to catch.
+ */
+export function workflowLines(root) {
   const dir = join(root, ".github", WORKFLOWS_DIR);
   if (!existsSync(dir)) {
     throw new Error(`no .github/workflows directory at ${dir}`);

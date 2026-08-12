@@ -43,6 +43,32 @@ jobs:
             echo "heavy=false" >> "$GITHUB_OUTPUT"
             echo "Skipping heavy suite (docs/chore-only PR); required check stays green."
           fi
+      # F-1471 — a malformed workflow file reached main unchecked: nothing in
+      # this repo parsed `.github/workflows/*.yml` for YAML-shape or
+      # embedded-shell mistakes before this line, which is exactly the gap
+      # that let a wired-but-broken alarm ship and look correct in review.
+      # actionlint also runs shellcheck over every embedded `run:` block when
+      # shellcheck is on PATH (pre-installed on ubuntu-latest), so a broken
+      # inline script is caught the same way. Binary fetched and checksummed
+      # rather than installed from a registry, same pattern as secret-scan.yml's
+      # gitleaks install.
+      - name: Install actionlint
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          set -euo pipefail
+          archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          curl -sSfL "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}" -o "$tmp/$archive"
+          printf '%s  %s\n' "$ACTIONLINT_SHA256" "$tmp/$archive" | sha256sum -c -
+          tar -xzf "$tmp/$archive" -C "$tmp" actionlint
+          mkdir -p "$HOME/.local/bin"
+          install "$tmp/actionlint" "$HOME/.local/bin/actionlint"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: actionlint (workflow syntax + embedded shell)
+        run: actionlint -color
       # Cheap, dependency-free gates — always on so docs PRs still catch
       # copy-marker / barrel / cloud-import / policy fixture regressions.
       - run: node scripts/check-copy-markers.mjs
@@ -126,6 +152,17 @@ jobs:
       - run: node scripts/ci/list-scheduled-workflows.mjs
       - run: node scripts/ci/list-scheduled-workflows.test.mjs
       - run: bash scripts/ci/file-schedule-alarm.test.sh
+      # F-1471 — the guard that keeps the above true as a PROPERTY, not a fact
+      # about the three workflows scheduled today. Reads
+      # list-scheduled-workflows.mjs's own derivation (never re-parses the
+      # tree by its own rules) and asserts every scheduled workflow reaches a
+      # job that calls schedule-alarm.yml with outcome: failure, unneutralised
+      # by continue-on-error: true or a dead if:, plus that the title/label
+      # pair — typed twice per alarm, once on the failure leg and once on
+      # recovery — agrees between the two calls. A mismatched pair means the
+      # alarm files under one key and looks itself up under another.
+      - run: node scripts/ci/assert-schedule-alarm-coverage.mjs
+      - run: node scripts/ci/assert-schedule-alarm-coverage.test.mjs
       # F-1226 — the plugin manifest is what makes the `skills` installer render
       # one select-all row instead of six unticked checkboxes. It has to live in
       # the always-on block: adding a skill touches only `skills/`, which the
