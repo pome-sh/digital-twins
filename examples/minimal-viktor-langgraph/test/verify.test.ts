@@ -54,6 +54,17 @@ describe("parseRepo", () => {
       /owner\/repo/,
     );
   });
+
+  // F-1478: the smoke gate's SMOKE_ENV task ("Smoke run: triage/summarize the
+  // open items in acme/api.") contains two slug-shaped substrings —
+  // "triage/summarize" reads first, but "acme/api" is the one introduced by
+  // "in " and is the actual target.
+  it("prefers the slug introduced by 'in' over an earlier slug-shaped phrase", () => {
+    expect(parseRepo("Smoke run: triage/summarize the open items in acme/api.")).toEqual({
+      owner: "acme",
+      repo: "api",
+    });
+  });
 });
 
 describe("checkSlack", () => {

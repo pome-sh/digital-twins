@@ -125,7 +125,7 @@ const SYSTEM = [
 ].join("\n");
 
 /**
- * Read the first `owner/repo` slug out of the task prompt.
+ * Read the `owner/repo` slug out of the task prompt.
  *
  * The slug appears mid-sentence ("…the open pull requests in viktor-hq/orders-service.")
  * so the match has to end where the name ends, not where the punctuation does.
@@ -134,10 +134,20 @@ const SYSTEM = [
  * match backtracks off any trailing `.` or `-` to land on the last word
  * character, keeping interior dots and dropping the sentence's period. Without
  * it every GitHub call went to `orders-service.` and 404'd (F-1207).
+ *
+ * A prompt can contain more than one slug-shaped substring — "triage/summarize
+ * the open items in acme/api" reads as two matches, and the first one is not
+ * the repo. Every real task prompt (and the smoke harness's own synthetic one)
+ * introduces the target with "in <owner/repo>", so a match preceded by that
+ * word wins over an earlier slug-shaped phrase in the same sentence; with no
+ * such match (e.g. "Review viktor-hq/orders-service, merge …") the first match
+ * stands, same as before.
  */
 export function parseRepo(task: string): { owner: string; repo: string } {
-  const m = task.match(/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\b/);
-  if (!m) throw new Error(`could not find an owner/repo slug in the task: ${task}`);
+  const matches = [...task.matchAll(/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\b/g)];
+  if (matches.length === 0) throw new Error(`could not find an owner/repo slug in the task: ${task}`);
+  const anchored = matches.find((m) => /\bin\s*$/.test(task.slice(0, m.index)));
+  const m = anchored ?? matches[0]!;
   return { owner: m[1]!, repo: m[2]! };
 }
 
