@@ -4,6 +4,29 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.16
+
+### Patch Changes
+
+- twin-github release objects carry `updated_at` (F-1459). Real GitHub returns
+  it on every release and the twin omitted the key, so all three release
+  surfaces — `GET /releases`, `/releases/latest`, `/releases/tags/:tag` —
+  differed from real GitHub on a field an agent reading "when did this release
+  last change" would ask for. A release served by the twin has never been edited
+  (there is no release-update route), so its update instant is its creation
+  instant and the value is exact rather than approximated. Existing twin
+  databases migrate and backfill on boot.
+
+- Four twin-github divergences are now on the public record as FIDELITY.md
+  bullets 25-28, recorded rather than fixed: issue-comment objects omit
+  `author_association` / `reactions` / `performed_via_github_app` / `pin` /
+  `minimized`; review objects omit `author_association`; release objects omit
+  GitHub's `immutable` flag; and a review comment's `pull_request_review_id` is
+  always `null`. None is new behaviour — seven of this twin's collections had
+  been published as `green` against an empty array on both sides since
+  2026-05-31, and seeding the upstream half made the comparison real for the
+  first time.
+
 ## 0.23.15
 
 ### Patch Changes

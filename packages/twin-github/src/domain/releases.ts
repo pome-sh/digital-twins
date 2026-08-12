@@ -135,7 +135,7 @@ export function createRelease(domain: GitHubDomain,
     const draft = input.draft ? 1 : 0;
     const prerelease = input.prerelease ? 1 : 0;
     const now = nowIso();
-    const result = domain.db.prepare("INSERT INTO releases (repo_id, tag_name, target_commitish, name, body, draft, prerelease, author_login, created_at, published_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
+    const result = domain.db.prepare("INSERT INTO releases (repo_id, tag_name, target_commitish, name, body, draft, prerelease, author_login, created_at, updated_at, published_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
       repo.id,
       input.tag_name,
       target,
@@ -144,6 +144,11 @@ export function createRelease(domain: GitHubDomain,
       draft,
       prerelease,
       options.actor ?? "pome-agent",
+      now,
+      // F-1459 — `updated_at` on creation IS `created_at`. There is no release
+      // update route on this twin, so nothing can ever move it apart; when one
+      // is added it must set this column, which is why it is a real column and
+      // not `created_at` aliased in the serializer.
       now,
       draft ? null : now
     );
