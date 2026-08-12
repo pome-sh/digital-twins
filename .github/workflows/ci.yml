@@ -61,13 +61,19 @@ jobs:
           archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
           tmp="$(mktemp -d)"
           trap 'rm -rf "$tmp"' EXIT
-          # --retry because the release CDN returns transient 503s: one did
-          # exactly that to secret-scan.yml's identical gitleaks fetch on this
-          # PR's own run 31618873218. This step gates `typecheck-test`, the
-          # required check, so a CDN hiccup would red an otherwise-good PR and
-          # teach people to re-run rather than read. curl retries 5xx (and
-          # connection failures) on its own; the sha256 below is unaffected.
-          curl -sSfL --retry 3 --retry-delay 2 --retry-connrefused "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}" -o "$tmp/$archive"
+          # This step puts the REQUIRED check (`typecheck-test`) behind a
+          # third-party CDN fetch, so the retry budget is load-bearing, not
+          # decoration. The GitHub release CDN served sustained 503s during this
+          # PR's own review — run 31618873218 (gitleaks), a twin-image syft
+          # install, and run 31619759943 where a 3-attempt/7-second budget
+          # exhausted itself and red this very step on a good commit.
+          # `--retry-delay 0` selects curl's exponential backoff (1s, 2s, 4s …)
+          # instead of a flat wait, so this rides out a minute-long blip;
+          # --retry-max-time bounds the worst case so a real outage fails fast
+          # rather than burning a runner. Deliberately NOT cached: a cache hit
+          # would skip the sha256 verification below, which is the whole point
+          # of fetching a pinned binary rather than trusting an Action.
+          curl -sSfL --retry 6 --retry-delay 0 --retry-max-time 120 --retry-connrefused "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}" -o "$tmp/$archive"
           printf '%s  %s\n' "$ACTIONLINT_SHA256" "$tmp/$archive" | sha256sum -c -
           tar -xzf "$tmp/$archive" -C "$tmp" actionlint
           mkdir -p "$HOME/.local/bin"
