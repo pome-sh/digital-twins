@@ -30,6 +30,7 @@ import {
   sha256,
   unwrapEventStream,
 } from "./capture-mcp-tools-list.mjs";
+import { findEntryGuardRealpathGaps } from "./lint-no-bare-import-meta-main.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -140,9 +141,25 @@ function sandboxWithDeferredTwin() {
   // checks asserting one property in different places is the shape D5 warns
   // about, and the repo-wide one covers strictly more (every file, not just
   // this producer) with no hand-kept list of which files to watch.
+  //
+  // Asserted by PARSING, via the same classifier the repo-wide gate uses,
+  // rather than by a regex over the source text. The regex this replaces
+  // required argv0 to appear before `import.meta.url` within 120 characters,
+  // which is a fact about source ORDER, not about the guard: F-1488 rewrote
+  // this guard into the sanctioned realpath-both-sides form with the
+  // `import.meta.url` const first and the regex failed on a guard that had
+  // just been made STRICTER. The classifier is order-independent, and it
+  // asserts the stronger property besides — one entry-guard relation, in the
+  // sanctioned shape (both sides realpath'd, no basename compare), so a
+  // rewrite into some other broken shape still reds here.
+  const producerGuard = findEntryGuardRealpathGaps(producerText, "capture-mcp-tools-list.mjs");
   assert(
-    /process\.argv\[1\][\s\S]{0,120}import\.meta\.url/.test(producerText),
-    "the CLI entry guard compares process.argv[1] against import.meta.url"
+    producerGuard.relations === 1,
+    `this producer has exactly one process.argv[1]-vs-import.meta.url entry guard (found ${producerGuard.relations})`
+  );
+  assert(
+    producerGuard.gaps.length === 0,
+    `this producer's entry guard realpaths both sides (got ${JSON.stringify(producerGuard.gaps)})`
   );
 }
 

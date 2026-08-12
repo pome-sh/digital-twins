@@ -76,6 +76,11 @@ const SCAN_ROOTS = ["scripts", "contract", "cli/src", "cli/scripts", "packages",
 // ~740 and parses third-party CJS, which reds spuriously.
 const PRUNED_DIRS = new Set(["node_modules", "dist", "build", ".git", "coverage", ".turbo", ".next"]);
 
+// The floor on how many entry-guard comparisons the F-1488 half must CLASSIFY
+// before its "no gaps" verdict means anything. See the runner at the bottom of
+// this file. 12 is F-1488's own instance count, against 27 actually present.
+const MIN_ENTRY_GUARD_RELATIONS = 12;
+
 /**
  * Every source file under SCAN_ROOTS, sorted, found by recursively walking the
  * directory tree rather than by any hand-kept list. A root that does not exist
@@ -586,20 +591,32 @@ if (invokedDirectly) {
   // The floor on the F-1488 half, and the counterpart to the per-root
   // file-count floor inside scanRepo. An empty `guardGaps` is ambiguous on its
   // own: it means "every entry guard realpaths both sides" OR "the walk
-  // recognized no entry guard at all", and only the first is a pass. This repo
-  // ships one guard per runnable script, so zero classified relations across
-  // ~750 files means the classifier went blind — a `typescript` upgrade
-  // changing an AST shape, argv0 read some new way, or the guards refactored
-  // behind a helper — and the D5 failure mode is reporting the class closed at
-  // exactly that moment.
-  if (guardRelations === 0) {
+  // recognized no entry guard at all", and only the first is a pass. The
+  // classifier going blind — a `typescript` upgrade changing an AST shape,
+  // argv0 read some new way, the guards refactored behind a helper — is
+  // exactly the moment D5's failure mode reports the class closed.
+  //
+  // PROPORTIONAL, not `> 0`. Only ONE guard in this repo compares argv0 and
+  // `import.meta.url` inline; the other 26 are found through the
+  // single-assignment alias deref, so a regression that broke only the deref
+  // would leave the count at 1 and a `> 0` floor would still print a pass —
+  // the same vacuous pass one step down. The bound is the F-1488 instance
+  // count (12) against 27 actual, so it reds on a classifier regression
+  // without reding on someone legitimately deleting a script.
+  if (guardRelations < MIN_ENTRY_GUARD_RELATIONS) {
     console.error(
-      `\nThe entry-guard check classified ZERO argv[1]-vs-import.meta.url relations across ${filesScanned} ` +
-        "file(s). Every runnable script in this repo has such a guard, so this is the checker being blind, " +
-        "not the repo being clean — refusing to report a pass (F-1488)."
+      `\nThe entry-guard check classified only ${guardRelations} argv[1]-vs-import.meta.url relation(s) across ` +
+        `${filesScanned} file(s), below the floor of ${MIN_ENTRY_GUARD_RELATIONS}. Every runnable script in this ` +
+        "repo has such a guard, so this is the checker having gone (partly) blind, not the repo being clean — " +
+        "refusing to report a pass (F-1488). If scripts were genuinely removed, lower the floor deliberately."
     );
   }
-  if (findings.length > 0 || unparseable.length > 0 || guardGaps.length > 0 || guardRelations === 0) {
+  if (
+    findings.length > 0 ||
+    unparseable.length > 0 ||
+    guardGaps.length > 0 ||
+    guardRelations < MIN_ENTRY_GUARD_RELATIONS
+  ) {
     process.exit(1);
   }
   console.log(
