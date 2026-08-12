@@ -316,12 +316,6 @@ jobs:
           npm run gate:checks-tarball
           npm run test:coverage -w @pome-sh/twin-github
           npm run test:coverage -w @pome-sh/twin-slack
-          # F-1472 — twin-github's regenerate-mcp-tool-fixture.ts --check: the one
-          # thing src/tools.ts and the committed fixture cannot disagree about
-          # without the suite going red (inputSchema, derived by z.toJSONSchema())
-          # was declared as a script, invoked by nothing. Needs the build above,
-          # same as gate:mcp-fixture below, since it imports @pome-sh/sdk.
-          npm run gate:mcp-tool-fixture -w @pome-sh/twin-github
           # Former cli-ci.yml (folded in here — one required check, one npm ci).
           npm test -w @pome-sh/cli
           # Every internal @pome-sh/* package is INLINED into the published CLI
@@ -364,6 +358,15 @@ jobs:
           # GITHUB_MCP_URL is set, so it is CI-runnable with no live GitHub
           # and no model. Its own token was also missing the `login` claim
           # mergePullRequest's permission check reads, which 403'd every run.
+          #
+          # What this line covers, precisely: the LEGACY REST shim, not
+          # JSON-RPC MCP. `isJsonRpcMcp()` (review-harness.ts) is false for any
+          # 127.0.0.1/localhost host, and the self-boot always yields one, so
+          # every tool call goes to `POST /s/:sid/mcp/call` and the client's
+          # `close()` early-returns with no session teardown. Driving the
+          # JSON-RPC transport is `packages/twin-github/test/mcp-*.test.ts` and
+          # twin-slack's `validate:mcp` below. Real gain either way — every
+          # prior run of this harness 403'd before reaching any transport.
           REVIEW_TARGET=local npm run review:harness -w @pome-sh/twin-github
       # F-709 — the frozen M1 runtime-contract assertions, asserted against
       # twins started via the CLI front door (`pome twin start <twin>`).

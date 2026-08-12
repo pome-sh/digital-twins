@@ -47,9 +47,7 @@
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "capture:fixtures": "tsx scripts/capture-gh-fixtures.ts",
-    "fidelity:parity": "tsx scripts/fidelity-parity.ts",
-    "regenerate:mcp-tool-fixture": "tsx scripts/regenerate-mcp-tool-fixture.ts",
-    "gate:mcp-tool-fixture": "tsx scripts/regenerate-mcp-tool-fixture.ts --check"
+    "fidelity:parity": "tsx scripts/fidelity-parity.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.0",

@@ -8,7 +8,6 @@ import { openSlackTwinDatabase } from "../src/db.js";
 import { SlackDomain } from "../src/domain/index.js";
 import { createRecorderStore } from "@pome-sh/sdk/server";
 import { defaultSeedState } from "../src/seed.js";
-import { slackToolFixture } from "../src/tools.js";
 
 process.env.TWIN_AUTH_SECRET = process.env.TWIN_AUTH_SECRET ?? "smoke-secret-32-chars-minimum-length";
 process.env.SLACK_DETERMINISTIC_TS = "1";
@@ -43,10 +42,17 @@ function assert(condition: unknown, message: string) {
   }
 }
 
-// Derived from the fixture, not hardcoded: F-1330 moved this 11 -> 18 while
-// this file, invoked by nothing, went on asserting the old count and two
-// pre-F-1330 response shapes (F-1472).
-const expectedTools = slackToolFixture.tools.length;
+// No tool COUNT is asserted here, deliberately. `deriveMcpToolTable` joins the
+// fixture to the implementations 1:1 and throws both ways at module load, and
+// healthz / `/mcp/tools` / `tools/list` all report that one derived table — so
+// `served.length === slackToolFixture.tools.length` cannot fail; the twin would
+// not construct. The hardcoded `11` this file carried until F-1472 was a real
+// bug, but replacing it with a derived literal replaced it with an assertion
+// that asserts nothing, which is this milestone's own subject in a passing
+// costume. The count IS checked, by `gate:mcp-fixture` and
+// `test/mcp-tool-fixture.test.ts`, both wired. What is worth asserting over the
+// wire is that each transport answered with a NON-EMPTY list at all — an error
+// body would otherwise satisfy the `every()` below vacuously.
 
 // 1. Root healthz (no auth).
 {
@@ -54,7 +60,7 @@ const expectedTools = slackToolFixture.tools.length;
   const body = (await res.json()) as Record<string, unknown>;
   assert(res.status === 200, "GET /healthz returns 200");
   assert(body.twin === "slack", "healthz reports twin=slack");
-  assert(body.tools === expectedTools, `healthz reports ${expectedTools} tools (got ${body.tools})`);
+  assert(typeof body.tools === "number" && body.tools > 0, `healthz reports a non-zero tool count (got ${body.tools})`);
 }
 
 // 2. auth.test
@@ -150,7 +156,7 @@ let threadParentTs = "";
   const { status, body } = await call("/mcp/tools");
   assert(status === 200, "GET /mcp/tools 200");
   const tools = (body as { tools: Array<{ name: string }> }).tools;
-  assert(tools.length === expectedTools, `${expectedTools} tools listed (got ${tools.length})`);
+  assert(tools.length > 0, `GET /mcp/tools lists at least one tool (got ${tools.length})`);
   assert(tools.every((t) => t.name.startsWith("slack_")), "all tools prefixed slack_");
 }
 
@@ -165,7 +171,7 @@ let threadParentTs = "";
   });
   const body = (await res.json()) as { result: { tools: Array<{ name: string }> } };
   assert(res.status === 200, "MCP tools/list 200");
-  assert(body.result.tools.length === expectedTools, `MCP lists ${expectedTools} tools`);
+  assert(body.result.tools.length > 0, `MCP tools/list returns at least one tool (got ${body.result.tools.length})`);
 }
 
 // 11. MCP tools/call

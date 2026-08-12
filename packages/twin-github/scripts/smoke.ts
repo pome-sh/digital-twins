@@ -1,7 +1,6 @@
 import { serve } from "@hono/node-server";
 import { sign } from "hono/jwt";
 import { createGitHubCloneApp } from "../src/twin.js";
-import { githubToolFixture } from "../src/tools.js";
 
 const port = 43333;
 const sid = "smoke-session";
@@ -22,11 +21,13 @@ try {
   if (!health.ok) throw new Error(`healthz failed: ${health.status}`);
 
   const tools = await fetch(`${sessionBase}/mcp/tools`, { headers: authHeader }).then((response) => response.json()) as { tools: unknown[] };
-  // Derived from the fixture, not hardcoded: it moved 65 -> 36 under F-1376
-  // while this line went on claiming 65, silently, because nothing ran this
-  // script (F-1472). A hardcoded count is the bug wearing a new number.
-  const expectedTools = githubToolFixture.tools.length;
-  if (tools.tools.length !== expectedTools) throw new Error(`expected ${expectedTools} tools, got ${tools.tools.length}`);
+  // No COUNT is asserted, deliberately — see twin-slack/scripts/smoke.ts for
+  // the reasoning. `deriveMcpToolTable` throws on any fixture/implementation
+  // asymmetry at module load, so comparing the served length to the fixture's
+  // cannot fail; the hardcoded `65` was a real bug and a derived literal is an
+  // assertion that asserts nothing. `gate:mcp-fixture` and
+  // `test/mcp-tool-fixture.test.ts` are what check the count, both wired.
+  if (tools.tools.length === 0) throw new Error("GET /mcp/tools listed no tools");
 
   const issue = await fetch(`${sessionBase}/repos/acme/api/issues`, {
     method: "POST",
