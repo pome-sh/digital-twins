@@ -6,11 +6,24 @@
 // Agent SDK `tool()` typing regression sat latent until F-866. This gate
 // typechecks every example that declares a `typecheck` script.
 //
-// The three Claude-Agent-SDK examples consume `@pome-sh/adapter-claude-sdk`
-// through a local `file:` link, so the adapter's `dist/` must be current before
-// they can resolve its types. The gate rebuilds the adapter first (a fast
-// incremental tsc) so it always reflects the adapter source in the working
-// tree — a prior root `npm ci`/`npm install` must have populated node_modules.
+// Three of the four Claude-Agent-SDK examples consume
+// `@pome-sh/adapter-claude-sdk` through a local `file:` link, so the adapter's
+// `dist/` must be current before they can resolve its types. The gate rebuilds
+// the adapter first (a fast incremental tsc) so it always reflects the adapter
+// source in the working tree — a prior root `npm ci`/`npm install` must have
+// populated node_modules.
+//
+// `examples/support-triage` is the fourth and the exception: it pins the
+// PUBLISHED adapter by exact version (#308), because its README documents it as
+// standalone-fetchable via `npx degit`, which copies that subtree and nothing
+// above it, so a `file:` path out of the tree breaks its `npm install`. So this
+// gate typechecks that example against the registry artifact, NOT against the
+// adapter source next to it, and nothing compares the two — the pin is 0.3.1
+// against a workspace 0.3.3 as of this comment. That is the F-1231 seam, moved:
+// `check-workspace-pins-match-workspace.mjs` cannot own it, because "resolve to
+// the workspace" is the wrong rule for a deliberately-published pin, and the
+// right rule ("re-pin once the workspace version publishes, skip while it has
+// not") needs the registry and so cannot live in that offline gate.
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";

@@ -8,8 +8,8 @@
 // against a `@pome-sh/shared-types` version behind what `packages/` (and its
 // own source) actually used — a pin that had drifted out from under it. That
 // specific architecture (`cli-ci.yml`, `use-local-pome-tarballs.mjs`, an exact
-// registry pin in `cli/package.json`) was deleted by `a3c9441` ("replace two
-// release systems with one", #239) the day AFTER the ticket was filed: every
+// registry pin in `cli/package.json`) was deleted across `6369379` (#237) and
+// `a3c9441` (#239) the day AFTER the ticket was filed: every
 // internal `@pome-sh/*` dep, cli's included, became a workspace-resolved `"*"`,
 // which npm always symlinks — so the specific "stale pin passes CI, breaks on
 // publish" shape this gate is named for cannot recur through `cli/` today. What
@@ -110,6 +110,43 @@ expectGate(
   fixture(
     { wire: { name: "@pome-sh/wire", version: "0.14.0" } },
     { name: "@pome-sh/cli", version: "0.23.19", devDependencies: { "@pome-sh/wire": "0.13.4" } },
+  ),
+  "red",
+);
+
+// 4b. Every other way a pin can be reintroduced is caught by the same rule, in
+// every install field. A caret/tilde/range, a `file:`/`link:` path, a `npm:`
+// alias, a dist-tag and a git/tarball URL are all "not exact semver" — none of
+// them guarantees npm produces a symlink — and `optionalDependencies` resolves
+// like `dependencies`, so it is scanned too.
+for (const pin of [
+  "^0.14.0",
+  "~0.14.0",
+  ">=0.13.0",
+  "file:../packages/wire",
+  "link:../packages/wire",
+  "npm:@pome-sh/wire@0.13.4",
+  "latest",
+  "0.14.0-rc.1",
+]) {
+  expectGate(
+    `4b. cli pin "${pin}" reds — only "*" or an exact match guarantees a symlink`,
+    fixture(
+      { wire: { name: "@pome-sh/wire", version: "0.14.0" } },
+      { name: "@pome-sh/cli", version: "0.23.19", devDependencies: { "@pome-sh/wire": pin } },
+    ),
+    "red",
+  );
+}
+expectGate(
+  "4c. a stale pin in optionalDependencies reds like one in dependencies",
+  fixture(
+    { wire: { name: "@pome-sh/wire", version: "0.14.0" } },
+    {
+      name: "@pome-sh/cli",
+      version: "0.23.19",
+      optionalDependencies: { "@pome-sh/wire": "0.13.4" },
+    },
   ),
   "red",
 );

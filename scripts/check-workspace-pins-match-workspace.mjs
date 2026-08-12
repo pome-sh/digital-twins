@@ -24,17 +24,24 @@
 // an export would have been tested against the wrong artifact in silence.
 //
 // This is the sibling of `check-cli-pins-match-workspace.mjs` (F-1135), which
-// made the same argument for `cli/`. That file, `cli-ci.yml`, `cli-release.yml`
-// and `scripts/use-local-pome-tarballs.mjs` are all gone as of `a3c9441`
-// ("replace two release systems with one", #239): the CLI joined the root
-// workspace and every internal `@pome-sh/*` dep in `cli/package.json` became a
-// workspace-resolved `"*"`, precisely because an exact pin there had drifted
-// (`shared-types@0.12.0` against a local `0.12.2`, two zod schema identities
-// at one runtime — the same shape F-1126 above catches in `packages/`). `cli/`
-// itself is not a sibling anything else pins against, so it was never in this
-// script's `packages/` scan — but nothing stopped `cli/package.json` from
-// reintroducing the exact pin #239 deleted. This scan now covers it too, so
-// that regression is caught here rather than rediscovered the hard way again.
+// made the same argument for `cli/`. That file and
+// `scripts/use-local-pome-tarballs.mjs` went in `6369379` (#237), and
+// `cli-ci.yml` / `cli-release.yml` in `a3c9441` (#239) — one restructure over
+// two PRs the same day. The CLI joined the root workspace and every internal
+// `@pome-sh/*` dep in `cli/package.json` became a workspace-resolved `"*"`,
+// precisely because an exact pin there had drifted (`shared-types@0.12.0`
+// against a local `0.12.2`, two zod schema identities at one runtime — the same
+// shape F-1126 above catches in `packages/`). `cli/` itself is not a sibling
+// anything else pins against, so it was never in this script's `packages/`
+// scan — but nothing stopped `cli/package.json` from reintroducing the exact pin
+// that restructure deleted. This scan now covers it too, so that regression is
+// caught here rather than rediscovered the hard way again.
+//
+// NOT in scope: `examples/*`. Those are standalone npm packages with their own
+// lockfiles that install from the REGISTRY on purpose (`examples/support-triage`
+// is `npx degit`-fetchable as a standalone subtree, so it cannot use a `file:`
+// link out of its own directory), so "must resolve to the workspace" is the
+// wrong rule for them and applying it here would red a deliberate pin.
 //
 // THE RULE — a pin must be `"*"` / `workspace:*` (always a workspace link) OR an
 // exact semver that EQUALS the sibling's workspace version. Stated the useful
@@ -61,20 +68,30 @@ export function findPinViolations(repoRoot) {
   // `cli/` is a consumer of these siblings but never one itself — nothing in
   // this workspace pins a `@pome-sh/*` dep against the CLI's own version — so
   // it is scanned for violations without being added to `manifests`.
-  const consumers = [...manifests.entries()].map(([name, { manifest, dir }]) => ({
-    name,
+  const consumers = [...manifests.values()].map(({ manifest, dir }) => ({
     manifest,
     label: `packages/${dir}`,
   }));
   const cliManifestPath = join(repoRoot, "cli", "package.json");
   if (existsSync(cliManifestPath)) {
-    const cliManifest = JSON.parse(readFileSync(cliManifestPath, "utf8"));
-    consumers.push({ name: cliManifest.name, manifest: cliManifest, label: "cli" });
+    consumers.push({
+      manifest: JSON.parse(readFileSync(cliManifestPath, "utf8")),
+      label: "cli",
+    });
   }
 
   const violations = [];
   for (const { manifest, label } of consumers) {
-    for (const field of ["dependencies", "devDependencies", "peerDependencies"]) {
+    // `optionalDependencies` is a real install field, not a comment: npm
+    // resolves it exactly like `dependencies` and only tolerates a FAILED
+    // install, so a stale exact pin there installs a nested registry copy just
+    // as silently as one in `dependencies`.
+    for (const field of [
+      "dependencies",
+      "devDependencies",
+      "peerDependencies",
+      "optionalDependencies",
+    ]) {
       for (const [dep, pin] of Object.entries(manifest[field] ?? {})) {
         if (!dep.startsWith(SCOPE)) continue;
         const sibling = manifests.get(dep);
