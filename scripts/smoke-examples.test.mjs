@@ -320,8 +320,8 @@ function check(name, got, want) {
   );
   check(
     "the LIVE leg does not fake an AI_GATEWAY_API_KEY",
-    live.AI_GATEWAY_API_KEY,
-    undefined,
+    live.AI_GATEWAY_API_KEY === undefined,
+    true,
   );
   check(
     "a caller-supplied VIKTOR_MODEL wins on the LIVE leg",
@@ -333,7 +333,11 @@ function check(name, got, want) {
     live.POME_GITHUB_MCP_URL,
     "http://127.0.0.1:3333/s/standalone/mcp",
   );
-  check("the LIVE leg keeps the real model key", live.ANTHROPIC_API_KEY, "sk-ant-real");
+  // Compared to a boolean, never passed as a value: check() prints `got` on
+  // failure, and handing it anything read off a *_API_KEY property is
+  // clear-text logging of sensitive information (js/clear-text-logging), which
+  // CodeQL flags high even when the value is this file's own fake literal.
+  check("the LIVE leg keeps the real model key", live.ANTHROPIC_API_KEY === "sk-ant-real", true);
   check("the LIVE leg never re-enables POME_PREFLIGHT", live.POME_PREFLIGHT, undefined);
   // The whole point of the leg: no dead loopback port may be overlaid.
   for (const [k, v] of Object.entries(live)) {
@@ -355,10 +359,18 @@ function check(name, got, want) {
   // The PR leg is unchanged: the dead wiring overlay still wins outright.
   const pr = launchEnv(realWiring, false);
   check("the PR leg still overlays the dead loopback port", pr.POME_GITHUB_MCP_URL, "http://127.0.0.1:59321/s/smoke/mcp");
-  check("the PR leg still overlays the invalid model key", pr.ANTHROPIC_API_KEY, "sk-ant-smoke-invalid");
+  check(
+    "the PR leg still overlays the invalid model key",
+    pr.ANTHROPIC_API_KEY === "sk-ant-smoke-invalid",
+    true,
+  );
   // The PR leg's fake gateway key is what lets alibaba/* resolve and then fail
   // at the outbound call (REACHED-OUTBOUND). Removing it would red that leg.
-  check("the PR leg still overlays the fake gateway key", pr.AI_GATEWAY_API_KEY, "smoke-invalid");
+  check(
+    "the PR leg still overlays the fake gateway key",
+    pr.AI_GATEWAY_API_KEY === "smoke-invalid",
+    true,
+  );
   check("the PR leg does not pin a model slug", pr.VIKTOR_MODEL, undefined);
   assert.ok(pr.POME_TASK?.trim(), "the PR leg must supply a non-blank POME_TASK");
   check("the PR leg never re-enables POME_PREFLIGHT", pr.POME_PREFLIGHT, undefined);
