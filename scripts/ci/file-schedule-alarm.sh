@@ -20,7 +20,16 @@
 #   TITLE="..." LABEL="..." DETAIL="..." RUN_URL="..." \
 #   GH_TOKEN=... GITHUB_REPOSITORY=owner/repo \
 #     bash scripts/ci/file-schedule-alarm.sh
-set -u
+#
+# Every `gh` call this script NEEDS is unguarded, and the script exits non-zero
+# if one fails. That is the opposite of release-alarm.yml's in-job alerting
+# steps, which are `continue-on-error: true` so that alerting cannot masquerade
+# as a release failure — there, alerting is a side errand of a job whose real
+# subject is the release. Here it is the entire purpose of a SEPARATE job, so
+# swallowing a 403 (a caller that forgot `issues: write`, an org token policy,
+# a rate limit) would reproduce this ticket's own defect inside the alarm: a
+# green check standing in for a signal that reached nobody.
+set -euo pipefail
 
 outcome="${OUTCOME:?OUTCOME (failure|success) required}"
 title="${TITLE:?TITLE required}"
@@ -36,13 +45,26 @@ failure | success) ;;
   ;;
 esac
 
+# `gh issue create --label X` FAILS OUTRIGHT if X does not exist in the repo,
+# and none of the `schedule-alarm:*` labels existed on pome-sh/digital-twins
+# when this shipped — so without this line the first real failure would have
+# filed nothing. Create-on-demand rather than a one-off manual `gh label
+# create` per alarm, so a new alarm needs no out-of-band repo setup step that
+# is remembered right up until it isn't. `|| true` because the call also fails
+# when the label ALREADY exists, which is the steady state and not an error;
+# the labelled `gh issue create` below is what actually asserts the label is
+# usable, and it is unguarded.
 gh label create "$label" \
   --color B60205 \
   --description "a scheduled workflow's own alarm, filed by schedule-alarm.yml" \
   --repo "$repo" >/dev/null 2>&1 || true
 
+# Unguarded on purpose. With no match this prints an empty string and exits 0
+# (gh renders a null scalar as ""), so "no open issue" is already distinct from
+# "the lookup failed" — and swallowing the latter would read as "no open issue"
+# and file a duplicate on every run. The label is guaranteed to exist by here.
 existing="$(gh issue list --repo "$repo" --state open --label "$label" \
-  --json number --jq '.[0].number' 2>/dev/null || true)"
+  --json number --jq '.[0].number')"
 
 if [ "$outcome" = "success" ]; then
   if [ -z "$existing" ]; then
@@ -53,8 +75,8 @@ if [ "$outcome" = "success" ]; then
   {
     printf 'Green again. Closed by schedule-alarm: %s\n' "$run_url"
   } >"$body"
-  gh issue comment "$existing" --repo "$repo" --body-file "$body" || true
-  gh issue close "$existing" --repo "$repo" || true
+  gh issue comment "$existing" --repo "$repo" --body-file "$body"
+  gh issue close "$existing" --repo "$repo"
   exit 0
 fi
 
@@ -69,9 +91,14 @@ body="$(mktemp)"
 
 if [ -n "$existing" ]; then
   { printf 'Still failing on the latest run.\n\n'; cat "$body"; } >"${body}.c"
-  gh issue comment "$existing" --repo "$repo" --body-file "${body}.c" || true
+  gh issue comment "$existing" --repo "$repo" --body-file "${body}.c"
 else
+  # Deliberately NO un-labelled fallback. An issue filed without "$label" is
+  # invisible to the `gh issue list --label` lookup above, so every subsequent
+  # failure would open ANOTHER new issue and no recovery could ever close any
+  # of them — the "new issue per run" behaviour this file exists to avoid,
+  # arrived at silently. If the label cannot be applied, failing here is the
+  # honest outcome.
   gh issue create --repo "$repo" --title "$title" \
-    --body-file "$body" --label "$label" ||
-    gh issue create --repo "$repo" --title "$title" --body-file "$body" || true
+    --body-file "$body" --label "$label"
 fi

@@ -72,7 +72,7 @@ on:
         required: true
         type: string
       outcome:
-        description: "'failure' files/updates the tracking issue; 'success' closes it. Anything else is a no-op."
+        description: "'failure' files/updates the tracking issue; 'success' closes it. Any other value is a hard error, never a no-op."
         required: true
         type: string
       detail:
@@ -85,8 +85,14 @@ permissions:
   contents: read
 
 jobs:
+  # Deliberately NO `if:` on the outcome value. An `if: inputs.outcome ==
+  # 'failure' || == 'success'` would look like input validation and act as the
+  # opposite: a caller that passes `Failure`, or an expression that resolves to
+  # '', would SKIP this job, render a green skipped check, and leave that alarm
+  # dead with no signal anywhere. Letting the job run means
+  # file-schedule-alarm.sh's own `exit 1` on an unrecognised OUTCOME is
+  # reachable and reds the run.
   alarm:
-    if: inputs.outcome == 'failure' || inputs.outcome == 'success'
     name: file or close the tracking issue
     runs-on: ubuntu-latest
     timeout-minutes: 5
