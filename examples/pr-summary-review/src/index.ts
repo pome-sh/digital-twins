@@ -32,6 +32,9 @@
  */
 
 import { execFileSync } from "node:child_process";
+import { realpathSync } from "node:fs";
+import { resolve as resolvePath } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk";
 import { flushPomeTelemetry, query, tool, withPome } from "@pome-sh/adapter-claude-sdk";
@@ -429,7 +432,7 @@ function trimSlash(url: string): string {
 }
 
 // Only run the agent when executed directly (`npx tsx src/index.ts`). Guarding
-// on `import.meta.main` keeps the module importable without kicking off a full
+// the launch keeps the module importable without kicking off a full
 // agent run — and keeps the `withPome()` fetch-hook out of import-time side
 // effects.
 //
@@ -439,7 +442,16 @@ function trimSlash(url: string): string {
 // from above the class definition throws `Cannot access 'TwinMcpClient' before
 // initialization`. Hoisted `function` declarations are unaffected, which is why
 // the POME_PREFLIGHT path (an early return) masked this.
-if (import.meta.main) {
+// NOT `import.meta.main`: that landed in Node 24.2 and this package's `engines`
+// allows `>=24`, so on 24.0/24.1 it is `undefined`, this guard is false, and
+// `npm start` prints nothing and exits 0 having run no agent at all (F-1481).
+// Realpath'd on BOTH sides because node resolves symlinks before deriving
+// `import.meta.url`, so a bare `resolve` of argv[1] misses through a symlinked
+// checkout (a worktree, macOS's `/tmp`) in the same silent shape.
+const SELF = realpathSync(fileURLToPath(import.meta.url));
+const ENTRY = process.argv[1] ? realpathSync(resolvePath(process.argv[1])) : "";
+
+if (ENTRY === SELF) {
   withPome();
   await main();
 }

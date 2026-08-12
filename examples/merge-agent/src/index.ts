@@ -31,6 +31,10 @@
  * POME_PREFLIGHT=1 → print "preflight ok" and exit, touching no network/model.
  */
 
+import { realpathSync } from "node:fs";
+import { resolve as resolvePath } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { generateText, stepCountIs, tool } from "ai";
 import { z } from "zod";
 
@@ -172,9 +176,19 @@ function requiredEnv(name: string): string {
 
 // This block MUST stay at the bottom of the module (F-900): a launch above the
 // declarations it uses dies in the temporal dead zone, and `tsc` cannot see it.
-// Guarding on `import.meta.main` also keeps the module importable, which is what
-// lets F-1152's gate probe `buildTools` without running the agent.
-if (import.meta.main) {
+// Guarding the launch (rather than calling `main()` at top level) also keeps the
+// module importable, which is what lets F-1152's gate probe `buildTools`
+// without running the agent.
+// NOT `import.meta.main`: that landed in Node 24.2 and this package's `engines`
+// allows `>=24`, so on 24.0/24.1 it is `undefined`, this guard is false, and
+// `npm start` prints nothing and exits 0 having run no agent at all (F-1481).
+// Realpath'd on BOTH sides because node resolves symlinks before deriving
+// `import.meta.url`, so a bare `resolve` of argv[1] misses through a symlinked
+// checkout (a worktree, macOS's `/tmp`) in the same silent shape.
+const SELF = realpathSync(fileURLToPath(import.meta.url));
+const ENTRY = process.argv[1] ? realpathSync(resolvePath(process.argv[1])) : "";
+
+if (ENTRY === SELF) {
   if (process.env.POME_PREFLIGHT === "1") {
     console.log("preflight ok");
   } else {
