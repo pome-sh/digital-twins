@@ -18,7 +18,7 @@ import type {
   RepoRow,
   TagRow,
 } from "../types.js";
-import { conflict, notFound, validationFailed } from "../errors.js";
+import { conflict, missingRequestField, notFound, validationFailed } from "../errors.js";
 import { fileSha, linesChanged, makeSha, nowIso, paginate, stableNumericId, treeSha } from "../util.js";
 import {
   authenticatedUserJson,
@@ -96,6 +96,39 @@ export function listCommits(domain: GitHubDomain, input: { owner: string; repo: 
 }
 
 
+// F-1491 — the contents door's optimistic locking, and the two documentation
+// urls it answers with.
+//
+// These urls are stamped HERE, on four call sites, rather than left to the
+// generic `https://docs.github.com/rest` that `githubError` defaults to, for a
+// reason that does not generalise: a `sha` conflict can only be raised BY the
+// contents operations, so the throw site knows which operation the caller asked
+// for. Most of this twin's errors do not have that property — `notFound()` in
+// `requireRepo` is reachable from ~40 routes and ~30 tools — which is why the
+// twin's generic url is still a live divergence with its own ticket. Do not read
+// these four as a pattern to spread by hand.
+const CONTENTS_PUT_DOC = "https://docs.github.com/rest/repos/contents#create-or-update-file-contents";
+const CONTENTS_DELETE_DOC = "https://docs.github.com/rest/repos/contents#delete-a-file";
+
+/**
+ * GitHub's answer to a `sha` that does not match the blob being replaced: a
+ * **409**, not the 422 this twin used to send, and a message naming the path
+ * and the sha the caller sent.
+ *
+ * Measured live 2026-08-12 against a throwaway private repo. THREE flavours of
+ * wrong — `deadbeef` (not a sha), a well-formed 40-hex sha that exists nowhere,
+ * and the real sha of a DIFFERENT blob — all got the same 409, so GitHub draws
+ * no line between "malformed" and "stale". The path is the full path, not the
+ * basename (`dir/sub/file.txt does not match deadbeef`), and the body carries no
+ * `errors` array.
+ *
+ * `sha` is echoed back exactly as sent, unnormalised, because that is what
+ * GitHub echoes — it is reporting the caller's own input to them.
+ */
+function shaConflict(path: string, sha: string, documentationUrl: string): never {
+  conflict(`${path} does not match ${sha}`, documentationUrl);
+}
+
 // F-1460 — `content` arrives DECODED, from both doors. The REST route decodes
 // base64 before it gets here (`rest-content.ts`); the MCP tools pass their plain
 // text straight through, because that is what GitHub's MCP server accepts. No
@@ -110,8 +143,13 @@ export function createOrUpdateFile(domain: GitHubDomain, input: { owner: string;
     const path = normalizePath(input.path);
     const existing = domain.getFile(repo.id, branch, path);
     before = existing ? fileState(existing, repo) : null;
-    if (existing && !input.sha) validationFailed("sha", "missing", path);
-    if (existing && input.sha !== existing.sha) validationFailed("sha", "invalid", input.sha);
+    // `sha` is only consulted when the path already exists — measured: GitHub
+    // ignores it entirely on a create and answers 201, so a twin that validated
+    // it there would refuse writes GitHub accepts.
+    if (existing) {
+      if (!input.sha) missingRequestField("sha", CONTENTS_PUT_DOC);
+      if (input.sha !== existing.sha) shaConflict(path, input.sha, CONTENTS_PUT_DOC);
+    }
     const commit = domain.commitFiles(repo, branch, input.message, [{ path, content: input.content }], options.actor ?? "pome-agent");
     const file = domain.getFile(repo.id, branch, path)!;
     afterFile = file;
@@ -234,8 +272,15 @@ export function deleteFile(domain: GitHubDomain,
     const path = normalizePath(input.path);
     const existing = domain.getFile(repo.id, branch, path);
     if (!existing) notFound("Not Found");
-    if (!input.sha) validationFailed("sha", "missing", path);
-    if (input.sha !== existing.sha) validationFailed("sha", "invalid", input.sha);
+    // Defensive, and unreachable from either declared door: `DELETE /contents/*`
+    // declares `sha` as required (`z.string().min(1)`) and so does the
+    // `delete_file` tool, so zod refuses an absent one before the domain is
+    // reached — which is why the OBSERVABLE missing-sha shape on this route is
+    // still the generic `Validation Failed` recorded as divergence 30. Only a
+    // direct domain caller passing `""` lands here. It answers GitHub's message
+    // anyway, so the two paths cannot drift apart.
+    if (!input.sha) missingRequestField("sha", CONTENTS_DELETE_DOC);
+    if (input.sha !== existing.sha) shaConflict(path, input.sha, CONTENTS_DELETE_DOC);
     before = fileState(existing, repo);
     return domain.commitFiles(repo, branch, input.message, [{ path, content: "", delete: true }], options.actor ?? "pome-agent");
   });

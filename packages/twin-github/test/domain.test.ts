@@ -64,7 +64,11 @@ describe("GitHubDomain edge cases", () => {
         message: "Unsafe stale update",
         content: "lost update\n"
       })
-    ).toThrow("Validation Failed");
+      // F-1491 — GitHub's own two answers, which are DIFFERENT from each other:
+      // omitting `sha` is a 422 naming the field, sending a wrong one is a 409
+      // naming the path. Before F-1491 both said "Validation Failed", so this
+      // test could not tell the two failure modes apart.
+    ).toThrow('"sha" wasn\'t supplied.');
     expect(() =>
       domain.createOrUpdateFile({
         owner: "acme",
@@ -74,7 +78,7 @@ describe("GitHubDomain edge cases", () => {
         content: "lost update\n",
         sha: "wrong"
       })
-    ).toThrow("Validation Failed");
+    ).toThrow("README.md does not match wrong");
 
     const updated = domain.createOrUpdateFile({
       owner: "acme",
