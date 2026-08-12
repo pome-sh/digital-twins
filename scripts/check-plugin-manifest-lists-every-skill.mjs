@@ -18,6 +18,7 @@
 // and the install still succeeds.
 //
 // Ordering is not checked. Presence is.
+import { realpathSync } from "node:fs";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -84,8 +85,22 @@ export async function check(repoRoot) {
   return { onDisk, declared, problems };
 }
 
-// Run as a script, not when imported by the regression test.
-if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
+// Run as a script, not when imported by the regression test. Realpath'd on
+// both sides — a bare `resolve()` of argv[1] (with no realpath) misses
+// through a symlinked checkout (a worktree, or macOS's symlinked `/tmp`) in
+// the same silent shape F-1488 found in nine sibling gates, and a guard miss
+// while invoked as this file throws rather than exits 0.
+const SELF = realpathSync(fileURLToPath(import.meta.url));
+const ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";
+const invokedDirectly = ENTRY === SELF;
+
+if (!invokedDirectly && ENTRY.endsWith("check-plugin-manifest-lists-every-skill.mjs")) {
+  throw new Error(
+    `check-plugin-manifest-lists-every-skill.mjs entry guard did not fire for ${ENTRY} (expected ${SELF})`
+  );
+}
+
+if (invokedDirectly) {
   const { onDisk, problems } = await check(root);
   if (problems.length > 0) {
     throw new Error(`Plugin-manifest gate failed. ${problems.join("\n\n")}`);

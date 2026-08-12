@@ -106,7 +106,7 @@
 // and the gate favors a rule a reviewer can verify by eye over a full parser.
 
 import { readdir, readFile, stat } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -549,9 +549,18 @@ function stripCommentsAndLiterals(src) {
   return out.join("");
 }
 
-// Run as a script (not when imported by the test).
-const invokedDirectly =
-  process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// Run as a script (not when imported by the test). Realpath'd on both
+// sides — node resolves symlinks before deriving `import.meta.url`, so a
+// bare `resolve()` of argv[1] misses through a symlinked checkout (a
+// worktree, or macOS's symlinked `/tmp`) in the same silent shape (F-1488),
+// and a guard miss while invoked as this file throws rather than exits 0.
+const SELF = realpathSync(fileURLToPath(import.meta.url));
+const ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";
+const invokedDirectly = ENTRY === SELF;
+
+if (!invokedDirectly && ENTRY.endsWith("no-catch-and-continue.mjs")) {
+  throw new Error(`no-catch-and-continue.mjs entry guard did not fire for ${ENTRY} (expected ${SELF})`);
+}
 
 if (invokedDirectly) {
   const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");

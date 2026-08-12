@@ -12,7 +12,7 @@
 // production install (`npm ci --omit=dev`) or a published artifact.
 // Run against a root whose `npm ci` has already populated node_modules —
 // marker inspection needs the unpacked package on disk.
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, realpathSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -91,9 +91,18 @@ function hasPackagedNodeBinary(pkgDir) {
   return false;
 }
 
-// Run as a script (not when imported by the test).
-const invokedDirectly =
-  process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// Run as a script (not when imported by the test). Realpath'd on both
+// sides — node resolves symlinks before deriving `import.meta.url`, so a
+// bare `resolve()` of argv[1] misses through a symlinked checkout (a
+// worktree, or macOS's symlinked `/tmp`) in the same silent shape (F-1488),
+// and a guard miss while invoked as this file throws rather than exits 0.
+const SELF = realpathSync(fileURLToPath(import.meta.url));
+const ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";
+const invokedDirectly = ENTRY === SELF;
+
+if (!invokedDirectly && ENTRY.endsWith("no-native-modules.mjs")) {
+  throw new Error(`no-native-modules.mjs entry guard did not fire for ${ENTRY} (expected ${SELF})`);
+}
 
 if (invokedDirectly) {
   const rootArgIdx = process.argv.indexOf("--root");

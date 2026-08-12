@@ -23,8 +23,9 @@
 // Deliberately narrow. It does not check the doc's prose, its worked examples,
 // or the rest of the mirror; a gate over the whole file would be a cross-repo
 // diff wearing a disguise. It pins the claim that went stale.
-import { readFileSync } from "node:fs";
-import { basename, join } from "node:path";
+import { readFileSync, realpathSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const DOC_PATH = "skills/pome-author-task/references/task-format.md";
 const PARSER_PATH = "cli/src/task/parseTask.ts";
@@ -80,4 +81,18 @@ function main() {
   console.log(`task-format-doc gate passed — the skill reference quotes ${docGrammar}`);
 }
 
-if (process.argv[1] && import.meta.url.endsWith(basename(process.argv[1]))) main();
+// Never a basename compare — `import.meta.url.endsWith(basename(process.argv[1]))`
+// is satisfied by any file of that name anywhere on disk, weaker even than
+// an unresolved full-path compare. Realpath'd on both sides instead — node
+// resolves symlinks before deriving `import.meta.url`, so a bare compare
+// misses through a symlinked checkout (F-1488) — and a guard miss while
+// invoked as this file throws rather than exits 0.
+const SELF = realpathSync(fileURLToPath(import.meta.url));
+const ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";
+const invokedDirectly = ENTRY === SELF;
+
+if (!invokedDirectly && ENTRY.endsWith("lint-task-format-doc.mjs")) {
+  throw new Error(`lint-task-format-doc.mjs entry guard did not fire for ${ENTRY} (expected ${SELF})`);
+}
+
+if (invokedDirectly) main();

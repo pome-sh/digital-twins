@@ -48,7 +48,7 @@
 // gate (allowlist discipline over broad heuristics), not an oversight.
 
 import { readdir, readFile, stat } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -208,9 +208,21 @@ async function scanFileImports(file, root, violations) {
   }
 }
 
-// Run as a script (not when imported by the test).
-const invokedDirectly =
-  process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// Run as a script (not when imported by the test). Realpath'd on both
+// sides — node resolves symlinks before deriving `import.meta.url`, so a
+// bare `resolve()` of argv[1] misses through a symlinked checkout (a
+// worktree, or macOS's symlinked `/tmp`) in the same silent shape F-1488
+// found in ten CI gates: the guard falls false and this file exits 0 having
+// checked nothing, for the gate that exists specifically to keep evaluation
+// out of the OSS repo. A guard miss while invoked as this file throws rather
+// than exits 0.
+const SELF = realpathSync(fileURLToPath(import.meta.url));
+const ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";
+const invokedDirectly = ENTRY === SELF;
+
+if (!invokedDirectly && ENTRY.endsWith("no-eval-in-oss.mjs")) {
+  throw new Error(`no-eval-in-oss.mjs entry guard did not fire for ${ENTRY} (expected ${SELF})`);
+}
 
 if (invokedDirectly) {
   const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");

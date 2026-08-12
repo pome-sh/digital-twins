@@ -4,6 +4,24 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.26
+
+### Patch Changes
+
+- **No CLI behavior change.** Version-only bump: F-1488 fixed
+  `packages/wire/scripts/emit-trace-contract.mjs`'s entry guard (realpath both
+  sides of the `process.argv[1]` vs. `import.meta.url` compare, so it still
+  fires through a symlinked checkout), which is publish-relevant for the CLI
+  under the version-bump gate's `packages/wire/` prefix because tsup inlines
+  wire's compiled output into the CLI tarball. Nothing tsup inlines actually
+  changed — the script itself is dev tooling that ships in no tarball — so the
+  CLI artifact is byte-identical apart from its version.
+
+  0.23.26 rather than 0.23.25: #392 (F-1476) took that version first while
+  this branch was in review, and rebasing onto it left both sides declaring
+  0.23.25, which the version-bump gate reads as unbumped — same shape as
+  0.23.17/0.23.18 below.
+
 ## 0.23.25
 
 ### Patch Changes

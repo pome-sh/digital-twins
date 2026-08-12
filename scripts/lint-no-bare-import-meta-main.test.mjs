@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Regression coverage for scripts/lint-no-bare-import-meta-main.mjs (F-1481).
+// Regression coverage for scripts/lint-no-bare-import-meta-main.mjs
+// (F-1481, extended by F-1488 for the realpath-both-sides entry-guard shape).
 
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
@@ -9,7 +10,13 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { discoverSourceFiles, findBareImportMetaMain, parseErrorsIn, scanRepo } from "./lint-no-bare-import-meta-main.mjs";
+import {
+  discoverSourceFiles,
+  findBareImportMetaMain,
+  findEntryGuardRealpathGaps,
+  parseErrorsIn,
+  scanRepo,
+} from "./lint-no-bare-import-meta-main.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -93,6 +100,136 @@ for (const [label, source] of Object.entries(FALSE_POSITIVES)) {
   const mixed = "// import.meta.main is banned here\nif (import.meta.main) { run(); }\nconst s = 'import.meta.main';";
   const hits = findBareImportMetaMain(mixed);
   assert(hits.length === 1, `a real reference is caught even alongside comment/string mentions (got ${hits.length})`);
+}
+
+// ── findEntryGuardRealpathGaps: the F-1488 shapes, each its own verdict ─────
+// The sanctioned replacement for bare `import.meta.main` — comparing
+// `process.argv[1]` against `import.meta.url` — has its own silent-skip shape
+// when either side is not realpath'd. Node resolves symlinks before deriving
+// `import.meta.url`, so an unresolved argv0 disagrees through a symlinked
+// checkout and the guard falls false. Every shape a live instance shipped
+// must red, tagged with which shape it is; the sanctioned form must not.
+const GUARD_GAP_CASES = {
+  "bare compare, no resolve at all": {
+    source: "if (fileURLToPath(import.meta.url) === process.argv[1]) { main(); }",
+    kind: "no-realpath",
+  },
+  "resolve()-only, neither side realpath'd": {
+    source: "if (resolve(process.argv[1]) === fileURLToPath(import.meta.url)) { main(); }",
+    kind: "no-realpath",
+  },
+  "resolve() on both sides, neither realpath'd": {
+    source: "if (resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) { main(); }",
+    kind: "no-realpath",
+  },
+  "pathToFileURL(...).href, meta on the left": {
+    source: 'if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) { main(); }',
+    kind: "no-realpath",
+  },
+  "pathToFileURL(...).href, argv on the left": {
+    source: "if (pathToFileURL(resolve(process.argv[1])).href === import.meta.url) { main(); }",
+    kind: "no-realpath",
+  },
+  "one-sided realpath, argv side only": {
+    source: "if (realpathSync(resolve(process.argv[1])) === fileURLToPath(import.meta.url)) { main(); }",
+    kind: "one-sided-realpath",
+  },
+  "one-sided realpath, meta side only": {
+    source: "if (resolve(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) { main(); }",
+    kind: "one-sided-realpath",
+  },
+  "basename compare via endsWith, meta object": {
+    source: "if (import.meta.url.endsWith(basename(process.argv[1]))) main();",
+    kind: "basename-comparison",
+  },
+  "basename compare via endsWith, argv object (reversed)": {
+    source: "if (process.argv[1].endsWith(basename(import.meta.url))) main();",
+    kind: "basename-comparison",
+  },
+  // The shape that matters most, because it is the shape every FIXED instance
+  // in this repo uses: argv0 and import.meta.url reach the comparison through
+  // SELF/ENTRY consts. A checker that only searches the comparison's own
+  // operands sees `ENTRY === SELF`, classifies no relation, and reports the
+  // whole repo clean while seeing none of its guards — the vacuous pass this
+  // milestone keeps re-shipping. Reverting the realpath on either side of the
+  // sanctioned form must red.
+  "alias-routed, neither side realpath'd (the sanctioned shape with realpath removed)": {
+    source:
+      'const SELF = fileURLToPath(import.meta.url);\nconst ENTRY = process.argv[1] ? resolve(process.argv[1]) : "";\nif (ENTRY === SELF) main();',
+    kind: "no-realpath",
+  },
+  "alias-routed, argv side realpath'd only": {
+    source:
+      'const SELF = fileURLToPath(import.meta.url);\nconst ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";\nif (ENTRY === SELF) main();',
+    kind: "one-sided-realpath",
+  },
+  "alias-routed, meta side realpath'd only": {
+    source:
+      'const SELF = realpathSync(fileURLToPath(import.meta.url));\nconst ENTRY = process.argv[1] ? resolve(process.argv[1]) : "";\nif (ENTRY === SELF) main();',
+    kind: "one-sided-realpath",
+  },
+  "alias-routed via plain consts, no ternary": {
+    source: "const E = resolve(process.argv[1]);\nconst S = fileURLToPath(import.meta.url);\nif (E === S) main();",
+    kind: "no-realpath",
+  },
+  // Spellings of the same two reads. A gate asserting a PROPERTY has to cover
+  // the spellings of that property, not only the ones that happened to ship.
+  "process.argv.at(1) instead of [1]": {
+    source: "if (resolve(process.argv.at(1)) === fileURLToPath(import.meta.url)) main();",
+    kind: "no-realpath",
+  },
+  "import.meta.filename instead of .url": {
+    source: "if (resolve(process.argv[1]) === import.meta.filename) main();",
+    kind: "no-realpath",
+  },
+};
+for (const [label, { source, kind }] of Object.entries(GUARD_GAP_CASES)) {
+  const { gaps } = findEntryGuardRealpathGaps(source, "x.mjs");
+  assert(
+    gaps.length === 1 && gaps[0].kind === kind,
+    `entry-guard gap caught with the right verdict: ${label} (got ${JSON.stringify(gaps)})`
+  );
+}
+
+// The sanctioned form — both sides realpath'd, no basename() anywhere — is
+// NOT a finding, whether the leaves sit directly in the comparison or behind
+// the SELF/ENTRY intermediate consts every fixed instance in this repo uses.
+//
+// The `fs.realpathSync` / `realpathSync.native` / `await realpath` rows are
+// false-RED coverage, not padding: they are all the same act as the bare
+// identifier, and a gate that reds three correct spellings out of four is a
+// gate that gets deleted rather than obeyed.
+const GUARD_GAP_CLEAN_CASES = {
+  "both sides realpath'd, direct": "if (realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url))) { main(); }",
+  "both sides realpath'd, reversed operand order": "if (realpathSync(fileURLToPath(import.meta.url)) === realpathSync(resolve(process.argv[1]))) { main(); }",
+  "via SELF/ENTRY intermediate consts (the pattern this repo's fixed instances use)":
+    'const SELF = realpathSync(fileURLToPath(import.meta.url));\nconst ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";\nif (ENTRY === SELF) main();',
+  "namespaced fs.realpathSync on both sides":
+    "if (fs.realpathSync(resolve(process.argv[1])) === fs.realpathSync(fileURLToPath(import.meta.url))) main();",
+  "realpathSync.native on both sides":
+    "if (realpathSync.native(resolve(process.argv[1])) === realpathSync.native(fileURLToPath(import.meta.url))) main();",
+  "awaited realpath from fs/promises on both sides":
+    "if ((await realpath(resolve(process.argv[1]))) === (await realpath(fileURLToPath(import.meta.url)))) main();",
+  "resolve() wrapped OUTSIDE realpathSync on both sides":
+    "if (resolve(realpathSync(process.argv[1])) === resolve(realpathSync(fileURLToPath(import.meta.url)))) main();",
+  "no entry guard at all": "const url = import.meta.url;\nconsole.log(url, process.argv[1]);",
+};
+for (const [label, source] of Object.entries(GUARD_GAP_CLEAN_CASES)) {
+  const { gaps } = findEntryGuardRealpathGaps(source, "x.mjs");
+  assert(gaps.length === 0, `the sanctioned form is not a finding: ${label} (got ${JSON.stringify(gaps)})`);
+}
+
+// `relations` counts what the walk CLASSIFIED, sanctioned guards included. It
+// exists so an empty `gaps` can be told apart from a blind checker: those two
+// read identically in a CI log, and only one of them is a pass.
+{
+  const clean = findEntryGuardRealpathGaps(
+    'const SELF = realpathSync(fileURLToPath(import.meta.url));\nconst ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";\nif (ENTRY === SELF) main();',
+    "x.mjs"
+  );
+  assert(clean.relations === 1 && clean.gaps.length === 0, `a sanctioned guard is COUNTED, not just un-flagged (got ${JSON.stringify(clean)})`);
+  const none = findEntryGuardRealpathGaps("console.log('nothing to see');", "x.mjs");
+  assert(none.relations === 0 && none.gaps.length === 0, "a file with no entry guard classifies no relation");
 }
 
 // ── discoverSourceFiles: a directory walk, not a hand-kept list ─────────────
@@ -263,14 +400,85 @@ for (const [label, source] of Object.entries(FALSE_POSITIVES)) {
   }
 }
 
+// ── scanRepo: F-1488 break-on-purpose, one scratch file per shape ─────────
+// The ticket's own break-on-purpose matrix: a one-sided-realpath guard, a
+// no-realpath guard, and a basename guard added to a scratch script each red
+// naming that exact file; a correct both-sides-realpath'd guard next to them
+// does not.
+{
+  const dir = mkdtempSync(join(tmpdir(), "f1488-guard-scratch-"));
+  try {
+    mkdirSync(join(dir, "scripts"), { recursive: true });
+    writeFileSync(
+      join(dir, "scripts", "one-sided.mjs"),
+      'import { realpathSync } from "node:fs";\nimport { resolve } from "node:path";\nimport { fileURLToPath } from "node:url";\nif (realpathSync(resolve(process.argv[1])) === fileURLToPath(import.meta.url)) { console.log("ran"); }\n'
+    );
+    writeFileSync(
+      join(dir, "scripts", "no-realpath.mjs"),
+      'import { resolve } from "node:path";\nimport { fileURLToPath } from "node:url";\nif (resolve(process.argv[1]) === fileURLToPath(import.meta.url)) { console.log("ran"); }\n'
+    );
+    writeFileSync(
+      join(dir, "scripts", "basename.mjs"),
+      'import { basename } from "node:path";\nif (import.meta.url.endsWith(basename(process.argv[1]))) console.log("ran");\n'
+    );
+    writeFileSync(
+      join(dir, "scripts", "correct.mjs"),
+      'import { realpathSync } from "node:fs";\nimport { resolve } from "node:path";\nimport { fileURLToPath } from "node:url";\nconst SELF = realpathSync(fileURLToPath(import.meta.url));\nconst ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";\nif (ENTRY === SELF) console.log("ran");\n'
+    );
+    // The regression for the blind spot itself: the sanctioned SELF/ENTRY
+    // shape with its realpath removed. This is what a future author writes
+    // when they copy a fixed sibling and drop a call, and it is the shape the
+    // gate saw nothing at all in before.
+    writeFileSync(
+      join(dir, "scripts", "alias-broken.mjs"),
+      'import { resolve } from "node:path";\nimport { fileURLToPath } from "node:url";\nconst SELF = fileURLToPath(import.meta.url);\nconst ENTRY = process.argv[1] ? resolve(process.argv[1]) : "";\nif (ENTRY === SELF) console.log("ran");\n'
+    );
+    const { filesScanned, guardGaps, guardRelations } = scanRepo(dir, ["scripts"]);
+    assert(filesScanned === 5, `all five scratch files are scanned (got ${filesScanned})`);
+    const byFile = new Map(guardGaps.map((g) => [g.file, g.kind]));
+    assert(
+      guardGaps.length === 4 && !byFile.has("scripts/correct.mjs"),
+      `only the four broken files red, the correct one does not (got: ${JSON.stringify(guardGaps)})`
+    );
+    assert(byFile.get("scripts/one-sided.mjs") === "one-sided-realpath", "one-sided-realpath is named and classified");
+    assert(byFile.get("scripts/no-realpath.mjs") === "no-realpath", "no-realpath is named and classified");
+    assert(byFile.get("scripts/basename.mjs") === "basename-comparison", "a basename compare is named and classified");
+    assert(byFile.get("scripts/alias-broken.mjs") === "no-realpath", "an alias-routed broken guard is named and classified");
+    // The correct file's guard is COUNTED even though it is not a finding —
+    // five files, five guards, so the relation floor sees all of them.
+    assert(guardRelations === 5, `every guard is classified, sanctioned ones included (got ${guardRelations})`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 // ── the shipped repo is clean ────────────────────────────────────────────
 // The regression that matters most: what would have caught
-// scripts/probe-twin-endpoints.mjs and the six examples shipping a bare guard.
+// scripts/probe-twin-endpoints.mjs and the six examples shipping a bare
+// guard (F-1481), and the ten entry-guard-realpath instances plus the two
+// basename ones (F-1488).
 {
-  const { filesScanned, findings, unparseable } = scanRepo(ROOT);
+  const { filesScanned, findings, unparseable, guardGaps, guardRelations } = scanRepo(ROOT);
   assert(filesScanned > 0, "the real scan covers at least one file");
   assert(findings.length === 0, `no bare import.meta.main anywhere in scope (got: ${JSON.stringify(findings)})`);
   assert(unparseable.length === 0, `every file in scope actually parses (got: ${JSON.stringify(unparseable)})`);
+  assert(
+    guardGaps.length === 0,
+    `no un-realpath'd or basename entry guard anywhere in scope (got: ${JSON.stringify(guardGaps)})`
+  );
+  // The floor on the assertion above, and the whole reason `guardRelations`
+  // exists. `guardGaps.length === 0` over the real repo is satisfied both by
+  // "every guard realpaths both sides" and by "the classifier recognized no
+  // guard at all", and the second is how two floors in this milestone shipped
+  // dead. The repo has one guard per runnable script; the twelve F-1488 fixed
+  // ones alone put the count above 12, so a bound well under the real number
+  // reds on a classifier going blind without reding on someone deleting a
+  // script.
+  assert(
+    guardRelations >= 12,
+    `the classifier actually SEES the repo's entry guards (got ${guardRelations} classified relations; ` +
+      "zero or a handful means it went blind, not that the repo is clean)"
+  );
 }
 
 // ── the gate is actually wired into CI, in a step that can fail ────────────
