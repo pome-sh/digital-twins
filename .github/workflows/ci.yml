@@ -102,6 +102,17 @@ jobs:
       # that blinds the alarm.
       - run: node scripts/ci/release-alarm.mjs --targets
       - run: node scripts/ci/release-alarm.test.mjs
+      # F-1230 — every workflow with a `schedule:` trigger must reach a
+      # failure alarm (schedule-alarm.yml). The set of scheduled workflows is
+      # DERIVED from `.github/workflows/*.yml`, never a hand-kept list, and
+      # asserts a non-zero floor for the same reason release-alarm's
+      # `--targets` does: a walk that finds zero scheduled workflows here,
+      # when this repo has carried at least three since before this line
+      # existed, is a parser regression passing forever, not a true fact.
+      # Network-free, so it belongs in this block.
+      - run: node scripts/ci/list-scheduled-workflows.mjs
+      - run: node scripts/ci/list-scheduled-workflows.test.mjs
+      - run: bash scripts/ci/file-schedule-alarm.test.sh
       # F-1226 — the plugin manifest is what makes the `skills` installer render
       # one select-all row instead of six unticked checkboxes. It has to live in
       # the always-on block: adding a skill touches only `skills/`, which the
