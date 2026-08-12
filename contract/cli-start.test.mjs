@@ -7,9 +7,12 @@
 // @pome-sh/* dependencies, so this suite is the proof that the front door
 // serves the identical control plane + admin surface CONTRACT.md freezes.
 //
-// Prerequisite: a built CLI (`cd cli && npm ci && npm run build`) — chained
-// by cli-ci.yml, NOT by the root `test:contract` script (the CLI is not a
-// root workspace). Run locally with `node --test contract/cli-start.test.mjs`.
+// Prerequisite: a built CLI (`cd cli && npm ci && npm run build`, or the root
+// `npm run build`) — NOT chained by the root `test:contract` script
+// (contract/run.mjs only builds its own five packages: wire, sdk, twin-*).
+// ci.yml's heavy job runs this file as its own step, after the earlier
+// root-wide `npm run build` already built cli/ (F-1353). Run locally with
+// `node --test contract/cli-start.test.mjs`.
 //
 // bootGuardCase is deliberately absent: `pome twin start` binds loopback
 // only, so the F-708 non-loopback self-generation guard lives with the

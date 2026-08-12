@@ -301,6 +301,15 @@ jobs:
       # bundled CLI is self-contained (it owns cli/src/contract and inlines
       # @pome-sh/wire), so unlike the packaged twins it resolves nothing from a
       # sibling workspace at runtime.
+      # F-1353 — this is also why contract/run.mjs's discovery excludes this
+      # file by name instead of running it: run.mjs only builds wire/sdk/
+      # twin-* (its own five packages), never cli/, so `npm run test:contract`
+      # alone can't produce this file's prerequisite (cli/dist/src/cli/main.js
+      # — see the header comment in contract/cli-start.test.mjs). Here it only
+      # works because the heavy job's earlier `npm run build` (above) already
+      # built every workspace including cli/ — folding this file into run.mjs
+      # would mean giving run.mjs a redundant, heavier cli build step just to
+      # keep local `npm run test:contract` runnable standalone.
       - name: Contract suite vs pome twin start
         if: steps.scope.outputs.heavy == 'true'
         run: node --test contract/cli-start.test.mjs
