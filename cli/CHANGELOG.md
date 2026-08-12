@@ -4,6 +4,15 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.26
+
+### Patch Changes
+
+- **No CLI behavior change.** Version-only bump: this was 0.23.25 until #392
+  (F-1476) took that version first. Rebasing onto it left both sides
+  declaring 0.23.25, which the version-bump gate reads as unbumped — same
+  shape as 0.23.17/0.23.18 below.
+
 ## 0.23.25
 
 ### Patch Changes
