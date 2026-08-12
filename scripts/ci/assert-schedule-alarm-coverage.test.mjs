@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Regression coverage for scripts/ci/assert-schedule-alarm-coverage.mjs
-// (F-1471). Builds scratch `.github/workflows` trees so every assertion is
-// about the PARSER, not about which alarms this repo happens to carry today.
+// (F-1471, and F-1493's effective-permissions check). Builds scratch
+// `.github/workflows` trees so every assertion is about the PARSER, not
+// about which alarms this repo happens to carry today.
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -14,6 +15,7 @@ import {
   findAlarmNeedsGaps,
   findSharedAlarmKeys,
   findUnclosableAlarms,
+  findAlarmPermissionGaps,
 } from "./assert-schedule-alarm-coverage.mjs";
 
 function assert(cond, msg) {
@@ -457,6 +459,116 @@ withScratchRoot(
   },
 );
 
+// ── F-1493: a calling job whose permissions map omits issues: write must
+// gap, naming both the workflow and the job — the shape ci.yml's own
+// acceptance test injects and reverts against the real tree.
+withScratchRoot(
+  {
+    "no-issues.yml": `name: no-issues\non:\n  schedule:\n    - cron: '0 0 * * *'\njobs:\n  main:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n  schedule-alarm:\n    needs: main\n    if: failure()\n    permissions:\n      contents: read\n    uses: ./.github/workflows/schedule-alarm.yml\n    with:\n      title: "no-issues is failing"\n      label: "schedule-alarm:no-issues"\n      outcome: failure\n`,
+  },
+  (root) => {
+    const gaps = findAlarmPermissionGaps(findScheduleAlarmCalls(root));
+    assert(
+      gaps.length === 1 && gaps[0].file === "no-issues.yml" && gaps[0].job === "schedule-alarm",
+      `expected no-issues.yml:schedule-alarm named, got ${JSON.stringify(gaps)}`,
+    );
+  },
+);
+
+// ── permissions: read-all (job-level shorthand) grants no write scopes at
+// all, so it must gap the same as an explicit map missing issues: write.
+withScratchRoot(
+  {
+    "read-all.yml": `name: read-all\non:\n  schedule:\n    - cron: '0 0 * * *'\njobs:\n  main:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n  schedule-alarm:\n    needs: main\n    if: failure()\n    permissions: read-all\n    uses: ./.github/workflows/schedule-alarm.yml\n    with:\n      title: "read-all is failing"\n      label: "schedule-alarm:read-all"\n      outcome: failure\n`,
+  },
+  (root) => {
+    const gaps = findAlarmPermissionGaps(findScheduleAlarmCalls(root));
+    assert(gaps.length === 1, `read-all must gap, got ${JSON.stringify(gaps)}`);
+  },
+);
+
+// ── permissions: {} — an explicit empty mapping grants nothing, which is a
+// distinct fact from "unset" (see the absent-at-both fixture below) but the
+// same failure from this check's point of view: no issues: write either way.
+withScratchRoot(
+  {
+    "empty-map.yml": `name: empty-map\non:\n  schedule:\n    - cron: '0 0 * * *'\njobs:\n  main:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n  schedule-alarm:\n    needs: main\n    if: failure()\n    permissions: {}\n    uses: ./.github/workflows/schedule-alarm.yml\n    with:\n      title: "empty-map is failing"\n      label: "schedule-alarm:empty-map"\n      outcome: failure\n`,
+  },
+  (root) => {
+    const gaps = findAlarmPermissionGaps(findScheduleAlarmCalls(root));
+    assert(gaps.length === 1, `permissions: {} must gap, got ${JSON.stringify(gaps)}`);
+  },
+);
+
+// ── permissions: absent at BOTH the job and the workflow level — the
+// effective grant is the repo default, which this script cannot read from
+// the filesystem. Reported as a hard failure naming the workflow and job,
+// never a silent pass: an unstated grant is exactly the silent-degradation
+// shape this milestone exists to catch.
+withScratchRoot(
+  {
+    "absent-both.yml": `name: absent-both\non:\n  schedule:\n    - cron: '0 0 * * *'\njobs:\n  main:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n  schedule-alarm:\n    needs: main\n    if: failure()\n    uses: ./.github/workflows/schedule-alarm.yml\n    with:\n      title: "absent-both is failing"\n      label: "schedule-alarm:absent-both"\n      outcome: failure\n`,
+  },
+  (root) => {
+    const gaps = findAlarmPermissionGaps(findScheduleAlarmCalls(root));
+    assert(
+      gaps.length === 1 && gaps[0].reason.includes("unstated repo default"),
+      `permissions absent at both levels must gap naming the unstated default, got ${JSON.stringify(gaps)}`,
+    );
+  },
+);
+
+// ── Positive: job-level permissions map WITH issues: write passes, even
+// though this fixture also HAS a workflow-level permissions block, proving
+// the job-level block is read first rather than merged with it.
+withScratchRoot(
+  {
+    "job-level-ok.yml": `name: job-level-ok\npermissions:\n  contents: read\non:\n  schedule:\n    - cron: '0 0 * * *'\njobs:\n  main:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n  schedule-alarm:\n    needs: main\n    if: failure()\n    permissions:\n      contents: read\n      issues: write\n    uses: ./.github/workflows/schedule-alarm.yml\n    with:\n      title: "job-level-ok is failing"\n      label: "schedule-alarm:job-level-ok"\n      outcome: failure\n`,
+  },
+  (root) => {
+    const gaps = findAlarmPermissionGaps(findScheduleAlarmCalls(root));
+    assert(gaps.length === 0, `job-level issues: write must satisfy the requirement, got ${JSON.stringify(gaps)}`);
+  },
+);
+
+// ── Positive: workflow-level permissions map WITH issues: write, and the
+// calling job carries no permissions: block of its own — the fallback.
+withScratchRoot(
+  {
+    "workflow-level-ok.yml": `name: workflow-level-ok\npermissions:\n  contents: read\n  issues: write\non:\n  schedule:\n    - cron: '0 0 * * *'\njobs:\n  main:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n  schedule-alarm:\n    needs: main\n    if: failure()\n    uses: ./.github/workflows/schedule-alarm.yml\n    with:\n      title: "workflow-level-ok is failing"\n      label: "schedule-alarm:workflow-level-ok"\n      outcome: failure\n`,
+  },
+  (root) => {
+    const gaps = findAlarmPermissionGaps(findScheduleAlarmCalls(root));
+    assert(gaps.length === 0, `workflow-level fallback with issues: write must satisfy the requirement, got ${JSON.stringify(gaps)}`);
+  },
+);
+
+// ── Positive: write-all (job-level shorthand) satisfies the requirement.
+withScratchRoot(
+  {
+    "write-all.yml": `name: write-all\non:\n  schedule:\n    - cron: '0 0 * * *'\njobs:\n  main:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n  schedule-alarm:\n    needs: main\n    if: failure()\n    permissions: write-all\n    uses: ./.github/workflows/schedule-alarm.yml\n    with:\n      title: "write-all is failing"\n      label: "schedule-alarm:write-all"\n      outcome: failure\n`,
+  },
+  (root) => {
+    const gaps = findAlarmPermissionGaps(findScheduleAlarmCalls(root));
+    assert(gaps.length === 0, `write-all must satisfy the requirement, got ${JSON.stringify(gaps)}`);
+  },
+);
+
+// ── A job-level permissions: block REPLACES the workflow-level one rather
+// than merging with it (the GitHub Actions rule this check must mirror): the
+// workflow grants issues: write, but the job's own block omits it, so the
+// job-level block wins and the call must gap rather than falling back to the
+// permissive workflow-level one.
+withScratchRoot(
+  {
+    "job-replaces-workflow.yml": `name: job-replaces-workflow\npermissions:\n  contents: read\n  issues: write\non:\n  schedule:\n    - cron: '0 0 * * *'\njobs:\n  main:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n  schedule-alarm:\n    needs: main\n    if: failure()\n    permissions:\n      contents: read\n    uses: ./.github/workflows/schedule-alarm.yml\n    with:\n      title: "job-replaces-workflow is failing"\n      label: "schedule-alarm:job-replaces-workflow"\n      outcome: failure\n`,
+  },
+  (root) => {
+    const gaps = findAlarmPermissionGaps(findScheduleAlarmCalls(root));
+    assert(gaps.length === 1, `a job-level block must REPLACE, not merge with, a permissive workflow-level block, got ${JSON.stringify(gaps)}`);
+  },
+);
+
 // ── Against the real tree: main's three scheduled workflows all pass today.
 {
   const root = fileURLToPath(new URL("../..", import.meta.url));
@@ -466,6 +578,7 @@ withScratchRoot(
   assert(findMissingAlarmInputs(calls).length === 0, "real tree must have no missing alarm inputs");
   assert(findTitleLabelMismatches(calls).length === 0, "real tree must have no title/label mismatch");
   assert(findAlarmNeedsGaps(root).length === 0, `real tree's alarms must need every job in their own workflow, got ${JSON.stringify(findAlarmNeedsGaps(root))}`);
+  assert(findAlarmPermissionGaps(calls).length === 0, `real tree's calling jobs must all resolve issues: write, got ${JSON.stringify(findAlarmPermissionGaps(calls))}`);
   // Not a vacuous pass: the real tree genuinely has calls to examine.
   assert(calls.length >= 3, `real tree must have alarm calls to examine, got ${calls.length}`);
 }
