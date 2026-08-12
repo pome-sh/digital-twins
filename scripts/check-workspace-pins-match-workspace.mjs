@@ -53,7 +53,7 @@
 // tightening the gate onto the prose rule would delete the version-comparison
 // branch below entirely. That is F-1126's contract to change, not F-1231's.
 
-import { globSync, readFileSync } from "node:fs";
+import { globSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -144,8 +144,20 @@ export function findPinViolations(repoRoot) {
   return violations;
 }
 
-const invokedDirectly =
-  process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url;
+// Realpath'd on both sides — node resolves symlinks before deriving
+// `import.meta.url`, so a bare `pathToFileURL(resolve(...))` of argv[1]
+// misses through a symlinked checkout (a worktree, or macOS's symlinked
+// `/tmp`) in the same silent shape (F-1488), and a guard miss while invoked
+// as this file throws rather than exits 0.
+const SELF = realpathSync(fileURLToPath(import.meta.url));
+const ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";
+const invokedDirectly = ENTRY === SELF;
+
+if (!invokedDirectly && ENTRY.endsWith("check-workspace-pins-match-workspace.mjs")) {
+  throw new Error(
+    `check-workspace-pins-match-workspace.mjs entry guard did not fire for ${ENTRY} (expected ${SELF})`
+  );
+}
 
 if (invokedDirectly) {
   const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");

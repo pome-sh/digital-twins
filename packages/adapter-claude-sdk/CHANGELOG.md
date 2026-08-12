@@ -1,5 +1,15 @@
 # @pome-sh/adapter-claude-sdk — CHANGELOG
 
+## 0.3.4 — 2026-08-12
+
+No user-visible change. Version-only bump: F-1488 fixed
+`packages/wire/scripts/emit-trace-contract.mjs`'s entry guard (realpath both
+sides of the `process.argv[1]` vs. `import.meta.url` compare) —
+publish-relevant for this package under the `packages/wire/` prefix, because
+tsup inlines wire's compiled output into the bundle. The changed file is dev
+tooling that ships in no tarball; wire's published source is unchanged, so
+this tarball is byte-identical in content.
+
 ## 0.3.3 — 2026-08-06
 
 No user-visible change. Version-only bump: F-949 made `@pome-sh/wire` an

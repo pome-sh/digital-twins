@@ -80,7 +80,7 @@
 //   Writes alarm= / reason= / report= to $GITHUB_OUTPUT. Exits 1 when alarming.
 
 import { execFileSync, spawnSync } from "node:child_process";
-import { appendFileSync, existsSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -375,4 +375,17 @@ export function main(argv = process.argv.slice(2)) {
   console.log("\n✅ Every version main declares is on its registry, and the release path is alive.");
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) main();
+// Realpath'd on both sides — node resolves symlinks before deriving
+// `import.meta.url`, so a bare `pathToFileURL()` of argv[1] (with no
+// realpath) misses through a symlinked checkout (a worktree, or macOS's
+// symlinked `/tmp`) in the same silent shape (F-1488), and a guard miss
+// while invoked as this file throws rather than exits 0.
+const SELF = realpathSync(fileURLToPath(import.meta.url));
+const ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";
+const invokedDirectly = ENTRY === SELF;
+
+if (!invokedDirectly && ENTRY.endsWith("release-alarm.mjs")) {
+  throw new Error(`release-alarm.mjs entry guard did not fire for ${ENTRY} (expected ${SELF})`);
+}
+
+if (invokedDirectly) main();

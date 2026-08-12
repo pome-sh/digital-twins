@@ -49,8 +49,9 @@
 // with files carrying no criteria. They stay out because their directory is
 // neither a corpus root nor under a `tasks/`.
 
-import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
-import { basename, join, relative } from "node:path";
+import { readFileSync, readdirSync, statSync, existsSync, realpathSync } from "node:fs";
+import { basename, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const root = process.cwd();
 
@@ -180,4 +181,18 @@ function main() {
 }
 
 // Importable by the regression suite beside it without running the walk.
-if (process.argv[1] && import.meta.url.endsWith(basename(process.argv[1]))) main();
+// Never a basename compare — `import.meta.url.endsWith(basename(process.argv[1]))`
+// is satisfied by any file of that name anywhere on disk, weaker even than
+// an unresolved full-path compare. Realpath'd on both sides instead — node
+// resolves symlinks before deriving `import.meta.url`, so a bare compare
+// misses through a symlinked checkout (F-1488) — and a guard miss while
+// invoked as this file throws rather than exits 0.
+const SELF = realpathSync(fileURLToPath(import.meta.url));
+const ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";
+const invokedDirectly = ENTRY === SELF;
+
+if (!invokedDirectly && ENTRY.endsWith("lint-task-class.mjs")) {
+  throw new Error(`lint-task-class.mjs entry guard did not fire for ${ENTRY} (expected ${SELF})`);
+}
+
+if (invokedDirectly) main();

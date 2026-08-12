@@ -31,7 +31,7 @@
 // short list — a silently-empty kind list would restore exactly the vacuous
 // gate this replaces.
 
-import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
 import { registerHooks } from "node:module";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -294,7 +294,20 @@ async function main() {
   console.log(relative(packageRoot, outPath));
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+// Realpath'd on both sides — node resolves symlinks before deriving
+// `import.meta.url`, so a bare `pathToFileURL()` of argv[1] (with no
+// realpath) misses through a symlinked checkout (a worktree, or macOS's
+// symlinked `/tmp`) in the same silent shape (F-1488), and a guard miss
+// while invoked as this file throws rather than exits 0.
+const SELF = realpathSync(fileURLToPath(import.meta.url));
+const ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";
+const invokedDirectly = ENTRY === SELF;
+
+if (!invokedDirectly && ENTRY.endsWith("emit-trace-contract.mjs")) {
+  throw new Error(`emit-trace-contract.mjs entry guard did not fire for ${ENTRY} (expected ${SELF})`);
+}
+
+if (invokedDirectly) {
   main().catch((error) => {
     console.error(error.message);
     process.exitCode = 1;

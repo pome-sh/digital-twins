@@ -4,6 +4,19 @@ SPDX-License-Identifier: Apache-2.0
 
 # @pome-sh/wire — CHANGELOG
 
+## 0.2.2 — 2026-08-12
+
+No schema, type, export or behaviour change. F-1488 fixed
+`scripts/emit-trace-contract.mjs`'s entry guard: it compared
+`process.argv[1]` against `import.meta.url` with no `realpathSync` on either
+side, so the guard fell false and the script exited 0 having emitted nothing
+when reached through a symlinked checkout (a `git worktree`, or macOS's
+symlinked `/tmp`). Both sides are realpath'd now, and a guard miss while
+invoked as this file throws rather than exits 0. The script is dev tooling
+that ships in no tarball, but it lives under `packages/wire/`, which is
+publish-relevant for wire itself, the CLI and the adapter — bumped per the
+same policy as 0.2.1's own packaging-only bump.
+
 Wire had no changelog before 0.2.1 because it had never been published. Earlier
 versions exist only as bytes inlined into `@pome-sh/cli` and
 `@pome-sh/adapter-claude-sdk`; their history is in those packages' changelogs.

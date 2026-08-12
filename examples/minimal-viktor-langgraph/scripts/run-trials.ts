@@ -18,6 +18,8 @@
  * stays (with a case per scenario) so `--verify` and the fixture tests can still
  * assert the Slack half against a live sandbox by slug.
  */
+import { realpathSync } from "node:fs";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
@@ -166,6 +168,19 @@ async function main() {
 }
 
 // Only run main() when executed directly (vitest imports checkSlack).
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+// Realpath'd on both sides — a bare `fileURLToPath(import.meta.url) ===
+// process.argv[1]` compare has no resolve() at all, so it also misses on an
+// unnormalized relative argv0 as well as through a symlinked checkout
+// (F-1488), and a guard miss while invoked as this file throws rather than
+// exits 0.
+const SELF = realpathSync(fileURLToPath(import.meta.url));
+const ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";
+const invokedDirectly = ENTRY === SELF;
+
+if (!invokedDirectly && ENTRY.endsWith("run-trials.ts")) {
+  throw new Error(`run-trials.ts entry guard did not fire for ${ENTRY} (expected ${SELF})`);
+}
+
+if (invokedDirectly) {
   await main();
 }

@@ -63,7 +63,7 @@
 // stamped today would reset the alarm without contacting anybody.
 import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -723,8 +723,18 @@ function parseArgv(argv) {
 // exists to prevent. The two scripts in this repo that do read that flag both
 // run after setup-node@24 in the heavy block, so they have a floor this one
 // does not. A test asserts the flag stays out of here.
-const invokedDirectly =
-  process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url;
+// Realpath'd on both sides — node resolves symlinks before deriving
+// `import.meta.url`, so a bare `pathToFileURL(resolve(...))` of argv[1]
+// misses through a symlinked checkout (a worktree, or macOS's symlinked
+// `/tmp`) in the same silent shape (F-1488), and a guard miss while invoked
+// as this file throws rather than exits 0.
+const SELF = realpathSync(fileURLToPath(import.meta.url));
+const ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";
+const invokedDirectly = ENTRY === SELF;
+
+if (!invokedDirectly && ENTRY.endsWith("capture-mcp-tools-list.mjs")) {
+  throw new Error(`capture-mcp-tools-list.mjs entry guard did not fire for ${ENTRY} (expected ${SELF})`);
+}
 
 if (invokedDirectly) {
   process.exit(await runCapture(parseArgv(process.argv.slice(2))));
