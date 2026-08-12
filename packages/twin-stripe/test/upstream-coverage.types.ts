@@ -18,7 +18,9 @@
 //
 // EDITING ANY `_Allow` UNION IS A CONSCIOUS FIDELITY DECISION — each entry is a
 // field the twin is on record as choosing not to emit.
-import type { AssertNoUncovered } from "../src/upstream-types.js";
+import type Stripe from "stripe";
+import type { AssertNoUncovered, AssertSameMembers } from "../src/upstream-types.js";
+import { STRIPE_REFUND_REASONS } from "../src/upstream-types.js";
 import type {
   Balance,
   BalanceTransaction,
@@ -82,6 +84,19 @@ type Balance_Allow =
   | "refund_and_dispute_prefunding";
 const _cov_balanceJson: AssertNoUncovered<Balance, ReturnType<typeof balanceJson>, Balance_Allow> = true;
 
+// F-1484 — the one INPUT anchor. Unlike the lines above it has no `_Allow`
+// union, and that is the point: an accepted-value set has no legitimate
+// "deliberately not accepted" member. A twin that refuses a value Stripe takes
+// fails a call the vendor answers; one that takes a value Stripe refuses is the
+// false pass this closed. Both are errors, so both sides are exact.
+//
+// ⚠️ `RefundCreateParams.Reason`, NOT `Refund.Reason` — the response union adds
+// `expired_uncaptured_charge`, which Stripe generates and refuses on input.
+const _cov_refundCreateReasons: AssertSameMembers<
+  (typeof STRIPE_REFUND_REASONS)[number],
+  Stripe.RefundCreateParams.Reason
+> = true;
+
 // Reference the consts so noUnusedLocals (if enabled) stays quiet; zero runtime cost.
 void [
   _cov_paymentIntentJson,
@@ -90,4 +105,5 @@ void [
   _cov_balanceTransactionJson,
   _cov_eventJson,
   _cov_balanceJson,
+  _cov_refundCreateReasons,
 ];

@@ -23,6 +23,7 @@ import {
   routeInputDeclarer,
   type RouteInputDeclaration,
 } from "@pome-sh/sdk/route-inputs";
+import { STRIPE_REFUND_REASONS } from "./upstream-types.js";
 
 /**
  * F-1372 — Stripe refuses a parameter it does not know, so the strict default
@@ -106,11 +107,19 @@ const CONFIRM_PAYMENT_INTENT_BODY = { payment_method: z.string().optional() } as
  * integer here: `12.5` has to reach the domain, which answers it with Stripe's
  * own `parameter_invalid_integer`. Narrowing it in the declaration would swap
  * that for the generic `parameter_invalid`.
+ *
+ * `reason` is the opposite call, and F-1484 is why. Stripe's `PostRefunds`
+ * declares it as a CLOSED set — `["duplicate","fraudulent",
+ * "requested_by_customer"]`, the same three its MCP `create_refund` declares —
+ * so a free string here is a request real Stripe answers 400 and this twin
+ * answered 200. `.nullish()` is kept deliberately: the tightening narrows the
+ * VALUE, not the arity. Stripe does not require the field, and every refund the
+ * corpus actually makes omits it.
  */
 const CREATE_REFUND_BODY = {
   charge: z.string().optional(),
   amount: z.coerce.number().optional(),
-  reason: z.string().nullish(),
+  reason: z.enum(STRIPE_REFUND_REASONS).nullish(),
 } as const;
 
 /** Every customer field is optional, like real Stripe's. */
