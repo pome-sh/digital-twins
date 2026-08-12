@@ -87,18 +87,26 @@ for (const name of examples) {
 
 if (failures.length > 0) {
   console.error(`\nExamples failing typecheck: ${failures.join(", ")}`);
-  process.exit(1);
+} else {
+  console.log(`\nAll ${examples.length} examples typechecked clean.`);
 }
-console.log(`\nAll ${examples.length} examples typechecked clean.`);
 
-// F-1483 — now that every example is `npm ci`'d (so the registry is known to
-// be reachable), confirm each bundled example's exact `@pome-sh/*` pin still
-// equals the sibling workspace version wherever that version is published.
+// F-1483 — confirm each bundled example's exact `@pome-sh/*` pin still equals
+// the sibling workspace version wherever that version is published.
+//
+// Deliberately NOT behind the typecheck exit above. It used to be, and that
+// made an unrelated tsc error in ANY example (say `examples/merge-agent`) hide a
+// real published-pin drift until someone fixed the typecheck and CI came round
+// again — a check that silently stops running behind another check's failure is
+// this milestone's whole subject. It reads manifests and calls the registry, so
+// it needs none of the installs above to have succeeded.
 console.log("\n=== examples/* pin↔registry parity ===");
-if (!reportExamplePinParity(repoRoot)) {
+const parityOk = reportExamplePinParity(repoRoot);
+if (!parityOk) {
   console.error(
-    "\nA pin drifted from a workspace version that is already published, or the registry could not " +
-      "be read for a reason other than 'unpublished'. See above.",
+    "\nA pin drifted from a workspace version that is already published, a pin has no single version " +
+      "to watch at all, or the registry could not be read for a reason other than 'unpublished'. See above.",
   );
-  process.exit(1);
 }
+
+if (failures.length > 0 || !parityOk) process.exit(1);

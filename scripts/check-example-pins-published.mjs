@@ -34,11 +34,31 @@
 // exiting non-zero with `E404` in its stderr means "not found", anything else
 // means "ask again", and only the former may stand in for "unpublished".
 //
-// Only EXACT semver pins are this gate's subject. A `@pome-sh/*` dep with no
-// workspace sibling, or pinned `"*"`/`file:`/a range, is out of scope the same
-// way `check-workspace-pins-match-workspace.mjs` documents for `examples/*` as
-// a whole — those forms cannot silently swap in a stale published artifact the
-// way an exact pin can, so there is nothing here for this gate to compare.
+// Only EXACT semver pins can be COMPARED against the registry. But "cannot be
+// compared" must never mean "silently uncounted" — that is the D5 failure shape
+// this gate exists to close, and the first draft of it had exactly that hole:
+// discovery `continue`d past every non-exact pin, so re-pinning
+// `examples/support-triage` to `^0.3.3` made its watch evaporate while the
+// report still printed a clean pass. (It only reddened at all because
+// support-triage happens to own the sole exact pin in the tree, so the
+// zero-eligible-pins floor caught it by arithmetic accident; add one more
+// exact pin anywhere under `examples/*` and the range pin goes silent.)
+//
+// So every `@pome-sh/*` dep that HAS a workspace sibling is classified, and all
+// three classes are reported:
+//   - `exact`       — an exact semver: this gate's subject, checked against the
+//                     registry below.
+//   - `linked`      — `file:`/`link:`: resolves from the source next to it and
+//                     cannot reach a registry at all, so it cannot swap in a
+//                     stale published artifact. Out of scope on purpose, but
+//                     COUNTED and named, so the report never claims a
+//                     denominator it does not have.
+//   - `unwatchable` — anything else (a caret/tilde/range, `"*"`, a dist-tag,
+//                     `npm:`): resolves FROM the registry, so it carries the
+//                     very risk this gate watches for, yet has no single
+//                     version to compare. That is a VIOLATION, not a skip.
+//                     A pin nobody can check must not read as a pin nobody
+//                     needs to check.
 //
 // Discovery, not a list: every `examples/*/package.json`, walked fresh each
 // run, is the corpus — so a new example shipping its own published pin is
@@ -50,23 +70,35 @@ import { join } from "node:path";
 
 import { loadWorkspaceMembers } from "./check-workspace-pins-match-workspace.mjs";
 
-const EXACT_VERSION = /^\d+\.\d+\.\d+$/;
+// Prerelease/build metadata included: `0.4.0-rc.1` is an exact, registry-
+// resolvable version, and rejecting it would drop the first rc into
+// `unwatchable` with advice ("re-pin to 0.4.0-rc.1") that names the value it
+// already has — an unfixable red.
+const EXACT_VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+// `../foo` with no protocol is a directory dep to npm exactly as `file:../foo`
+// is; classing it `unwatchable` would red a legitimate local link while telling
+// the author it "resolves from the registry", which is false.
+const WORKSPACE_LINK = /^(?:file:|link:|\.{1,2}[\\/])/;
 const SCOPE = "@pome-sh/";
 const INSTALL_FIELDS = ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"];
 
 /**
- * Every `@pome-sh/*` pin under `examples/*` that names an exact semver AND has
- * a same-named sibling among the root workspace members — the population this
- * gate's rule applies to. Discovered fresh each run, never a hand-kept list of
- * examples or packages.
+ * Every `@pome-sh/*` dep under `examples/*` that has a same-named sibling among
+ * the root workspace members, classified into `exact` / `linked` /
+ * `unwatchable` (see this file's header for why all three are reported and none
+ * is dropped). One walk, so the three classes cannot disagree about what a
+ * sibling is. Discovered fresh each run, never a hand-kept list of examples or
+ * packages.
  */
-export function discoverExampleRegistryPins(repoRoot) {
+export function discoverExampleSiblingDeps(repoRoot) {
   const examplesDir = join(repoRoot, "examples");
   const siblingsByName = new Map(
     loadWorkspaceMembers(repoRoot).map((member) => [member.manifest.name, member]),
   );
 
-  const pins = [];
+  const exact = [];
+  const linked = [];
+  const unwatchable = [];
   for (const name of readdirSync(examplesDir).sort()) {
     const pkgPath = join(examplesDir, name, "package.json");
     if (!existsSync(pkgPath)) continue;
@@ -76,12 +108,14 @@ export function discoverExampleRegistryPins(repoRoot) {
         if (!dep.startsWith(SCOPE)) continue;
         const sibling = siblingsByName.get(dep);
         if (!sibling) continue; // no workspace sibling to compare a published pin against
-        if (!EXACT_VERSION.test(pin)) continue; // "*"/file:/range — not this gate's subject
-        pins.push({ example: name, field, dep, pin, workspaceVersion: sibling.manifest.version });
+        const record = { example: name, field, dep, pin, workspaceVersion: sibling.manifest.version };
+        if (EXACT_VERSION.test(pin)) exact.push(record);
+        else if (WORKSPACE_LINK.test(pin)) linked.push(record);
+        else unwatchable.push(record);
       }
     }
   }
-  return pins;
+  return { exact, linked, unwatchable };
 }
 
 /**
@@ -91,19 +125,44 @@ export function discoverExampleRegistryPins(repoRoot) {
  * network, rate-limit, 5xx) — the same three-way split
  * `scripts/ci/decide-publish.sh` draws, because only an E404 may stand in for
  * "not published yet".
+ *
+ * The `timeout` is load-bearing, not decoration: without it a registry that
+ * accepts the connection and then stalls hangs this call indefinitely (npm's
+ * own `fetch-timeout` defaults to five minutes PER attempt, times its retries),
+ * so a degraded registry stalls the whole heavy job instead of answering. A
+ * killed call has no `E404` in its stderr, so it lands in `error` — the
+ * conservative side, and the same side a 401 or a 5xx lands on.
+ *
+ * Retried, because "any non-E404 answer is a hard failure" puts the REQUIRED
+ * `typecheck-test` check behind a third-party registry: one transient 5xx or
+ * ECONNRESET would red it. `ci.yml`'s own actionlint install carries a
+ * five-attempt loop for exactly this reason, with a comment recording three
+ * 503s during this PR's review. An `E404` returns immediately — it is a real
+ * answer, not a failure to get one — so retrying never delays the ordinary
+ * unpublished path.
  */
-export function defaultNpmView(name, version) {
-  try {
-    execFileSync("npm", ["view", `${name}@${version}`, "version"], {
-      stdio: ["ignore", "pipe", "pipe"],
-      encoding: "utf8",
-    });
-    return { status: "published" };
-  } catch (err) {
-    const stderr = String(err.stderr ?? err.message ?? "");
-    if (/\bE404\b/.test(stderr)) return { status: "unpublished" };
-    return { status: "error", detail: stderr.trim() || String(err) };
+export function defaultNpmView(name, version, { attempts = 3, delayMs = 2000 } = {}) {
+  let lastDetail = "";
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      execFileSync("npm", ["view", `${name}@${version}`, "version"], {
+        stdio: ["ignore", "pipe", "pipe"],
+        encoding: "utf8",
+        timeout: 60_000,
+      });
+      return { status: "published" };
+    } catch (err) {
+      const stderr = String(err.stderr ?? err.message ?? "");
+      if (/\bE404\b/.test(stderr)) return { status: "unpublished" };
+      lastDetail = stderr.trim() || String(err);
+      // Synchronous backoff: this whole gate is sync (`execFileSync`), so there
+      // is no event loop to await on.
+      if (attempt < attempts && delayMs > 0) {
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, delayMs * attempt);
+      }
+    }
   }
+  return { status: "error", detail: lastDetail, attempts };
 }
 
 /**
@@ -145,15 +204,24 @@ export function checkExamplePinsPublished(pins, npmView = defaultNpmView) {
  * into its own exit code.
  */
 export function reportExamplePinParity(repoRoot, npmView = defaultNpmView) {
-  const pins = discoverExampleRegistryPins(repoRoot);
-  if (pins.length === 0) {
+  const { exact, linked, unwatchable } = discoverExampleSiblingDeps(repoRoot);
+  // The floor counts EXACT pins only. Counting `linked` here would have let a
+  // tree whose examples are all `file:` links report a green pass having made
+  // zero registry calls — and converting `examples/support-triage` to a `file:`
+  // link is a plausible edit (three other examples already are one), so that
+  // would delete this gate's only watch silently, which is the whole shape it
+  // exists to catch. `unwatchable` reds on its own below, so it does not need
+  // to satisfy a floor either.
+  if (exact.length === 0) {
     throw new Error(
-      "check-example-pins-published found zero @pome-sh/* exact-version pins under examples/* — " +
-        "refusing to report a pass having checked nothing (was support-triage's pin moved to a range or a file: link?)",
+      "check-example-pins-published found zero exact-version @pome-sh/* pins with a workspace sibling under " +
+        `examples/* (${linked.length} file:/link: link(s), ${unwatchable.length} unwatchable) — refusing to ` +
+        "report a pass having made no registry call at all. examples/support-triage must keep an exact pin: " +
+        "its README offers `npx degit` of that subtree alone, which cannot resolve a link out of the tree.",
     );
   }
 
-  const { checked, violations, skips, errors } = checkExamplePinsPublished(pins, npmView);
+  const { checked, violations, skips, errors } = checkExamplePinsPublished(exact, npmView);
 
   if (errors.length > 0) {
     console.error(`\n❌ registry lookup FAILED for ${errors.length} pin(s) (not a skip — a real error):\n`);
@@ -172,6 +240,22 @@ export function reportExamplePinParity(repoRoot, npmView = defaultNpmView) {
     }
   }
 
+  if (unwatchable.length > 0) {
+    console.error(
+      `\n❌ ${unwatchable.length} @pome-sh/* dep(s) under examples/* resolve from the registry but have no ` +
+        `single version to check — an unwatched pin, not an exempt one:\n`,
+    );
+    for (const u of unwatchable) {
+      console.error(
+        `  examples/${u.example} (${u.field}.${u.dep}): "${u.pin}" is neither an exact version nor a ` +
+          `file:/link: workspace link. Pin it to the workspace version (${u.workspaceVersion}) so it can be ` +
+          `watched. A file: link is the alternative ONLY for an example that is not offered for standalone ` +
+          `fetch — examples/support-triage is (its README documents \`npx degit\` of that subtree alone), so a ` +
+          `link out of the tree breaks its \`npm install\` and empties this gate at the same time.`,
+      );
+    }
+  }
+
   if (skips.length > 0) {
     console.log(`\n⚠️  skipped ${skips.length} pin(s) — sibling workspace version not yet published:`);
     for (const s of skips) {
@@ -179,11 +263,12 @@ export function reportExamplePinParity(repoRoot, npmView = defaultNpmView) {
     }
   }
 
-  const ok = violations.length === 0 && errors.length === 0;
+  const ok = violations.length === 0 && errors.length === 0 && unwatchable.length === 0;
   const passed = checked - violations.length - skips.length - errors.length;
   console.log(
     `\nexample pin↔registry parity: ${passed} matched, ${skips.length} skipped (unpublished), ` +
-      `${violations.length} drifted, ${errors.length} errored (of ${checked} checked).`,
+      `${violations.length} drifted, ${errors.length} errored (of ${checked} exact pin(s) checked); ` +
+      `${linked.length} file:/link: workspace link(s) out of scope, ${unwatchable.length} unwatchable.`,
   );
   return ok;
 }
