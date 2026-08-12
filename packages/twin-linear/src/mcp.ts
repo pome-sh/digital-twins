@@ -540,6 +540,16 @@ const boundImplementations = Object.fromEntries(
   ])
 ) as Record<string, McpToolImplementation<LinearDomain>>;
 
+/**
+ * The tool names this twin has a handler for, independent of any fixture.
+ *
+ * Exported for `scripts/adopt-upstream-mcp-fixture.ts` (F-1470), which has to
+ * check a projection against the implementations BEFORE writing it — the 1:1
+ * assertion `deriveMcpToolTable` makes below runs on the file the script already
+ * wrote, so a mismatch there is a broken build where here it is a refusal.
+ */
+export const LINEAR_IMPLEMENTED_TOOL_NAMES: readonly string[] = Object.keys(implementations);
+
 export const linearTools: ToolSpec<LinearDomain>[] = deriveMcpToolTable(
   linearToolFixture,
   boundImplementations,

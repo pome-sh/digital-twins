@@ -11,6 +11,7 @@ import {
   openLinearTwinDatabase,
 } from "../src/index.js";
 import { testSeed } from "./_helpers.js";
+import { payload } from "./_mcpPayload.js";
 
 const secret = "linear-mcp-test-secret-32-characters!";
 const sid = DEFAULT_LINEAR_SID;
@@ -82,7 +83,6 @@ async function call(
     id: number;
     result: {
       content: Array<{ type: string; text: string }>;
-      structuredContent?: Record<string, unknown>;
       isError: boolean;
     };
   };
@@ -108,7 +108,7 @@ describe("Linear MCP frozen contract", () => {
       description: "via MCP",
     });
     expect(created.result.isError).toBe(false);
-    const issue = created.result.structuredContent as {
+    const issue = payload(created) as {
       id: string;
       identifier: string;
       title: string;
@@ -121,7 +121,7 @@ describe("Linear MCP frozen contract", () => {
       title: "MCP updated",
     });
     expect(updated.result.isError).toBe(false);
-    expect(updated.result.structuredContent).toMatchObject({ title: "MCP updated" });
+    expect(payload(updated)).toMatchObject({ title: "MCP updated" });
   });
 
   it("records state_mutation=false for no-op save_issue with the same title", async () => {
@@ -131,7 +131,7 @@ describe("Linear MCP frozen contract", () => {
       title: "No-op title",
       team: "ENG",
     });
-    const issueId = (created.result.structuredContent as { id: string }).id;
+    const issueId = (payload(created) as { id: string }).id;
     await call(app, 2, "save_issue", { id: issueId, title: "No-op title" });
     const updateEvents = recorder.events().filter((event) => {
       const body = event.request_body as { tool?: string } | null;
@@ -147,8 +147,8 @@ describe("Linear MCP frozen contract", () => {
     const { app } = fixture();
     const listed = await call(app, 1, "list_issues", { team: "ENG", limit: 250 });
     expect(listed.result.isError).toBe(false);
-    expect(listed.result.structuredContent).toHaveProperty("issues");
-    expect(listed.result.structuredContent).not.toHaveProperty("cursor");
+    expect(payload(listed)).toHaveProperty("issues");
+    expect(payload(listed)).not.toHaveProperty("cursor");
   });
 
   it("supports estimate, parentId, threaded comments, delete_comment, and documents", async () => {
@@ -159,33 +159,33 @@ describe("Linear MCP frozen contract", () => {
       estimate: 5,
     });
     expect(parent.result.isError).toBe(false);
-    const parentId = (parent.result.structuredContent as { id: string }).id;
+    const parentId = (payload(parent) as { id: string }).id;
 
     const child = await call(app, 2, "save_issue", {
       title: "Child task",
       team: "ENG",
       parentId,
-      blockedBy: [(parent.result.structuredContent as { identifier: string }).identifier],
+      blockedBy: [(payload(parent) as { identifier: string }).identifier],
     });
     expect(child.result.isError).toBe(false);
-    expect(child.result.structuredContent).toMatchObject({
+    expect(payload(child)).toMatchObject({
       parentId,
-      relations: { blockedBy: [(parent.result.structuredContent as { identifier: string }).identifier] },
+      relations: { blockedBy: [(payload(parent) as { identifier: string }).identifier] },
     });
 
     const root = await call(app, 3, "save_comment", {
       issueId: parentId,
       body: "Root triage note",
     });
-    const rootId = (root.result.structuredContent as { id: string }).id;
+    const rootId = (payload(root) as { id: string }).id;
     const reply = await call(app, 4, "save_comment", {
       parentId: rootId,
       body: "Threaded reply",
     });
     expect(reply.result.isError).toBe(false);
-    expect(reply.result.structuredContent).toMatchObject({ parentId: rootId, issueId: parentId });
+    expect(payload(reply)).toMatchObject({ parentId: rootId, issueId: parentId });
 
-    const replyId = (reply.result.structuredContent as { id: string }).id;
+    const replyId = (payload(reply) as { id: string }).id;
     const deleted = await call(app, 5, "delete_comment", { id: replyId });
     expect(deleted.result.isError).toBe(false);
 
@@ -195,8 +195,8 @@ describe("Linear MCP frozen contract", () => {
       team: "ENG",
     });
     expect(doc.result.isError).toBe(false);
-    const docId = (doc.result.structuredContent as { id: string }).id;
+    const docId = (payload(doc) as { id: string }).id;
     const got = await call(app, 7, "get_document", { id: docId });
-    expect(got.result.structuredContent).toMatchObject({ title: "Triage runbook", content: "# Steps" });
+    expect(payload(got)).toMatchObject({ title: "Triage runbook", content: "# Steps" });
   });
 });
