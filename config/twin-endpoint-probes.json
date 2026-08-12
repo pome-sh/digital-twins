@@ -109,11 +109,11 @@
         }
       },
       {
+        "_comment": "No `state` (F-1468). This read `state: \"all\"`, and GitHub's MCP enum is [\"OPEN\",\"CLOSED\"] with no `all` member — its own description says both are returned when the argument is absent, so omission is how `all` is spelled on this door. The REST route still takes `all`, and `list_pull_requests` below still declares it, because GitHub declares it there.",
         "tool": "list_issues",
         "args": {
           "owner": "acme",
-          "repo": "api",
-          "state": "all"
+          "repo": "api"
         }
       },
       {
