@@ -52,9 +52,14 @@ jobs:
   # job sees that failure in the same run `assert` failed in — see
   # schedule-alarm.yml for why an embedded failure() job, not a second
   # separately-cron'd file, is the right shape here.
+  # Gated on the events that actually run the live drift check, rather than on
+  # `!= 'pull_request'`. Those are the same two events today, but stating the
+  # positive set means adding a `push:` trigger here later cannot silently
+  # start filing (or, worse, CLOSING) this alarm from a run that skipped the
+  # token-dependent step — see secret-scan.yml, where that shape is real.
   schedule-alarm:
     needs: assert
-    if: failure() && github.event_name != 'pull_request'
+    if: failure() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     permissions:
       contents: read
       issues: write
@@ -70,7 +75,7 @@ jobs:
   # scheduled run lands.
   schedule-alarm-recovery:
     needs: assert
-    if: success() && github.event_name != 'pull_request'
+    if: success() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     permissions:
       contents: read
       issues: write
