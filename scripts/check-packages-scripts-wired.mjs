@@ -69,11 +69,13 @@
 // sibling file in `cli/scripts/**` — an imported file is a library module,
 // covered by whatever imports it, and if THAT importer is itself dead, IT is
 // what shows up here, which is the more actionable diagnosis. A file in (b)
-// has no script name for the `npm run <name> -w <pkg>` regex to find, so
-// being reached means being one of (a)'s invoked files (already excluded) —
-// anything left is wired via its own `pome:unwired-ok(<relpath>): <reason>`
-// marker or it fails, the same marker mechanism as everywhere else in this
-// file, keyed by the file's path instead of a script name.
+// has no script name for the `npm run <name> -w <pkg>` regex to find, so the
+// only coverage it can have is being one of (a)'s invoked files (already
+// excluded) or being imported by a sibling — anything left is wired via its
+// own `pome:unwired-ok(<relpath>): <reason>` marker or it fails, the same
+// marker mechanism as everywhere else in this file, keyed by the file's path
+// instead of a script name. Note what that does NOT say: a file invoked
+// DIRECTLY by a workflow step is not covered either, see the next paragraph.
 //
 // ONE CALLING CONVENTION, AND IT IS A FALSE RED, NOT A BLIND SPOT. `isWired`
 // recognises `npm run <name> ... -w <pkg>` and nothing else. A workflow that
@@ -378,7 +380,14 @@ function readCorpus(root) {
  * script means.
  */
 export function invokedFile(entry, root) {
-  const fileMatch = entry.command.match(/([\w./-]+\.(?:ts|mjs|js|sh))/);
+  // Whole-token, never a substring. Unanchored, `[\w./-]+\.(?:ts|mjs|js|sh)`
+  // matches `tsconfig.js` INSIDE the literal `tsconfig.json`, so
+  // `tsx --tsconfig tsconfig.json scripts/x.ts` resolved to a config file
+  // instead of the script. Under F-1472 that only cost a missed exemption
+  // marker; under F-1476 it also keeps the real script out of
+  // `invokedByScript`, so the file reds as an orphan with a diagnosis
+  // pointing at the wrong file entirely.
+  const fileMatch = entry.command.match(/(?:^|\s)([\w./-]+\.(?:ts|mts|cts|tsx|mjs|cjs|js|sh))(?=\s|$)/);
   if (!fileMatch) return null;
   // F-1476 — `cli/` is a single workspace member at `cli/`, not one of many
   // under `packages/<name>`, so it resolves against a different base.
@@ -406,9 +415,19 @@ function readMarkerFromFile(filePath, name) {
   return marker ? marker[1].trim() : null;
 }
 
-const SCRIPT_FILE_RE = /\.(?:mjs|js|cjs|ts|tsx|sh)$/;
+// `.mts`/`.cts` included deliberately: `lint-no-bare-import-meta-main.mjs`
+// next door scans them, and a file this pattern misses is invisible to the
+// denominator — the exact class the file-level pass exists to close, so the
+// two extension sets must not disagree.
+const SCRIPT_FILE_RE = /\.(?:mjs|js|cjs|ts|mts|cts|tsx|sh)$/;
 const TEST_FILE_RE = /\.test\.[mc]?[jt]sx?$/;
-const RELATIVE_IMPORT_RE = /\bfrom\s*["'](\.[^"']+)["']|\brequire\(\s*["'](\.[^"']+)["']\s*\)/g;
+// All four specifier forms, not just `from "…"`: a side-effect `import "./x"`,
+// a dynamic `await import("./x")` and `require("./x")` each make the target a
+// live library module just as much as a named import does, and treating one as
+// an orphan is a FALSE red whose suggested remedy (add an unwired-ok marker)
+// would be a lie recorded in the file.
+const RELATIVE_IMPORT_RE =
+  /\bfrom\s*["'](\.[^"']+)["']|\b(?:require|import)\(\s*["'](\.[^"']+)["']\s*\)|\bimport\s+["'](\.[^"']+)["']/g;
 
 function listScriptFilesRecursive(dir) {
   const out = [];
@@ -433,6 +452,18 @@ function resolveRelativeImport(fromFile, specifier) {
     base,
     base.replace(/\.(?:js|mjs|cjs)$/, ".ts"),
     base.replace(/\.(?:js|mjs|cjs)$/, ".tsx"),
+    base.replace(/\.(?:js|mjs|cjs)$/, ".mts"),
+    base.replace(/\.(?:js|mjs|cjs)$/, ".cts"),
+    // Extensionless and directory/index specifiers. Without these a live
+    // `from "./overhead-stats"` or `from "./lib"` leaves its target looking
+    // like a dead entry point — a false red, and the marker it would prompt
+    // for would be a false statement in the file.
+    ...(/\.[a-z]+$/.test(base)
+      ? []
+      : [".ts", ".tsx", ".mts", ".cts", ".mjs", ".cjs", ".js"].flatMap((ext) => [
+          `${base}${ext}`,
+          join(base, `index${ext}`),
+        ])),
   ];
   for (const candidate of candidates) {
     if (existsSync(candidate)) return candidate;
@@ -481,7 +512,7 @@ export function findCliOrphanFileEntries(root) {
     RELATIVE_IMPORT_RE.lastIndex = 0;
     let match;
     while ((match = RELATIVE_IMPORT_RE.exec(text)) !== null) {
-      const specifier = match[1] ?? match[2];
+      const specifier = match[1] ?? match[2] ?? match[3];
       const resolved = resolveRelativeImport(file, specifier);
       if (resolved) importedBySibling.add(resolved);
     }
@@ -558,6 +589,12 @@ export function run(root) {
         // both declare `fixture:mcp = tsx scripts/adopt-upstream-mcp-fixture.ts`
         // — two DIFFERENT files with one command string — so unwiring gmail's
         // `gate:mcp-fixture` left gmail's write half certified by slack's file.
+        // `pkgKind` too, not `pkgDir` alone: `cli/` entries carry
+        // `pkgDir: "cli"`, so a future `packages/cli` member would collide with
+        // it and each one's wired `--check` half would certify the OTHER's
+        // write half — the same cross-package certification hole the
+        // twin-gmail/twin-slack `fixture:mcp` case put this guard here for.
+        w.pkgKind === entry.pkgKind &&
         w.pkgDir === entry.pkgDir &&
         // Exactly `--check`, not "any extra argv". The claim being made is that
         // the verdict mode runs everything the write mode does and then
