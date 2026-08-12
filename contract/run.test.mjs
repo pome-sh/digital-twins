@@ -79,16 +79,20 @@ const CONTRACT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(CONTRACT_DIR, "..");
 
 test("every contract/*.test.mjs file is run by the runner or by a named ci.yml step", () => {
-  // Comments stripped: ci.yml's F-1353 note NAMES cli-start.test.mjs in prose,
-  // and a comment mentioning a file is not a step that runs it.
-  const workflow = readFileSync(path.join(REPO_ROOT, ".github/workflows/ci.yml"), "utf8")
-    .split("\n")
-    .filter((line) => !/^\s*#/.test(line))
-    .join("\n");
+  // Comment lines dropped: ci.yml's F-1353 note NAMES cli-start.test.mjs in
+  // prose, and a comment mentioning a file is not a step that runs it. Then
+  // whole-token matching, not a RegExp built from a filename — a path is not a
+  // pattern, and `foo.test.mjs` as a regex also matches `fooXtest.mjs`.
+  const invokedByWorkflow = new Set(
+    readFileSync(path.join(REPO_ROOT, ".github/workflows/ci.yml"), "utf8")
+      .split("\n")
+      .filter((line) => !/^\s*#/.test(line) && line.includes("node --test"))
+      .flatMap((line) => line.trim().split(/\s+/))
+  );
   const discovered = new Set(discoverTestFiles().map((f) => path.basename(f)));
   const uncovered = readdirSync(CONTRACT_DIR)
     .filter((f) => f.endsWith(".test.mjs") && !discovered.has(f))
-    .filter((f) => !new RegExp(`node --test .*contract/${f.replace(/\./g, "\\.")}\\b`).test(workflow));
+    .filter((f) => !invokedByWorkflow.has(`contract/${f}`));
   assert.deepEqual(
     uncovered,
     [],
