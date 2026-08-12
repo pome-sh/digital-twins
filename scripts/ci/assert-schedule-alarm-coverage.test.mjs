@@ -165,17 +165,44 @@ withScratchRoot(
   },
 );
 
-// ── Break-on-purpose: a step-level if: (deeper than the job's own keys)
-// must not be mistaken for the job-level if: that gates the alarm call.
+// ── Break-on-purpose: a step-level if: false (deeper than the job's own
+// keys) must not be mistaken for the job-level if: that actually gates the
+// alarm call. This is one of the three shapes that defeated a grep-based
+// version of this exact check during F-1230's own review — a flat regex over
+// lines would see the nearer "if: false" and misread a healthy job-level
+// if: failure() as neutralised.
 withScratchRoot(
   {
-    "step-level-if.yml": `name: step-level-if\non:\n  schedule:\n    - cron: '0 0 * * *'\njobs:\n  main:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n  schedule-alarm:\n    needs: main\n    if: failure()\n    uses: ./.github/workflows/schedule-alarm.yml\n    with:\n      title: "step-level is failing"\n      label: "schedule-alarm:step-level"\n      outcome: failure\n`,
+    "step-level-if.yml": [
+      "name: step-level-if",
+      "on:",
+      "  schedule:",
+      "    - cron: '0 0 * * *'",
+      "jobs:",
+      "  main:",
+      "    runs-on: ubuntu-latest",
+      "    steps:",
+      "      - run: echo hi",
+      "  schedule-alarm:",
+      "    needs: main",
+      "    if: failure()",
+      "    uses: ./.github/workflows/schedule-alarm.yml",
+      "    with:",
+      '      title: "step-level is failing"',
+      '      label: "schedule-alarm:step-level"',
+      "      outcome: failure",
+      "    steps:",
+      "      - name: a step nested deeper than the job's own keys",
+      "        if: false",
+      "",
+    ].join("\n"),
   },
   (root) => {
     const calls = findScheduleAlarmCalls(root);
-    assert(calls.length === 1 && calls[0].ifExpr.startsWith("failure()"), `expected the job-level if to be captured, got ${JSON.stringify(calls)}`);
+    assert(calls.length === 1, `expected exactly one call, got ${JSON.stringify(calls)}`);
+    assert(calls[0].ifExpr === "failure()", `expected the job-level if: to win over the deeper step-level if: false, got ${calls[0].ifExpr}`);
     const missing = findMissingAlarmCoverage(root, calls);
-    assert(missing.length === 0, `well-formed job-level if must count, got ${missing}`);
+    assert(missing.length === 0, `a healthy job-level if: must not be neutralised by an unrelated step's if: false, got ${missing}`);
   },
 );
 
