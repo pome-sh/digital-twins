@@ -89,9 +89,8 @@ being unreliable. Pass the v1 run's `group_id` as the v2 run's
 ## Lesson: the agent that could not look before it leapt
 
 This is the curriculum's **lesson #1**, and the graded baseline lives in
-[`local/`](./local/) — the same agent as a Claude Agent SDK process on your
-machine. The one line under test is `DENY_ISSUE_LOOKUP` in
-[`local/src/index.ts`](./local/src/index.ts).
+[`src/index.ts`](./src/index.ts) — the same agent as a Claude Agent SDK process
+on your machine. The one line under test is `DENY_ISSUE_LOOKUP`, right there.
 
 > **Two runtimes, one story, two different flaws.** The `agents/*.yaml` pair
 > above tells this story on Anthropic's Managed Agents platform through a
@@ -172,7 +171,7 @@ diagnosis fast: a `search_issues` tool span that returns a refusal, followed by
 
 ### The fix
 
-One line in [`local/src/index.ts`](./local/src/index.ts):
+One line in [`src/index.ts`](./src/index.ts):
 
 ```diff
 -const DENY_ISSUE_LOOKUP = true;
@@ -226,13 +225,121 @@ because this example is the one that defines the standard.
 
 ## Local examinee
 
-[`local/`](./local/) is the same agent as a minimal **Claude Agent SDK process
-on your machine** — no managed-agent platform needed. The coach spawns it as a
-subprocess after `run_task` (per-twin MCP URLs + bearer arrive via env), it
-works the task over MCP, and exits when done. It imports `query` from
-`@pome-sh/adapter-claude-sdk` rather than the raw SDK — a drop-in that also
-emits gen_ai OTLP spans, so the report carries model, per-turn tokens and
-latency. See [`local/README.md`](./local/README.md).
+[`src/index.ts`](./src/index.ts) is the same agent as a minimal **Claude Agent
+SDK process on your machine** — no managed-agent platform needed. The coach
+spawns it as a subprocess after `run_task` (per-twin MCP URLs + bearer arrive
+via env), it works the task over MCP, and exits when done.
+
+> **⚠️ The baseline below does not fail. Measured, twice.**
+> `DENY_ISSUE_LOOKUP = true` is **green**, on `claude-opus-5`, n=5 each, hosted:
+>
+> | configuration | pass rate |
+> |---|---|
+> | as shipped 2026-08-04, open sandbox | 25 · 100 · 100 · 100 · 100 — **4/5** |
+> | sandbox closed (`tools: []`), denial unchanged | 100 × 5 — **5/5** |
+> | no denial at all, closed sandbox (the control) | 100 × 5 — **5/5** |
+>
+> **No trial filed a duplicate** — the behaviour the whole lesson is built
+> around. Run ids and the routes the agent used are in
+> [`VERIFICATION.md`](./VERIFICATION.md); the re-cut is
+> [F-1292](https://linear.app/pome-sh/issue/F-1292). Treat this example as a
+> working local examinee with a **known-green** placeholder defect, not as a
+> lesson, until that ticket closes.
+
+### Telemetry
+
+`query` is imported from `@pome-sh/adapter-claude-sdk`, not from
+`@anthropic-ai/claude-agent-sdk`. It is a drop-in — the message stream is
+byte-for-byte what the SDK yields — and it emits gen_ai OTLP spans (model,
+per-turn input/output tokens, latency) whenever a runner injects
+`POME_OTEL_EXPORTER_OTLP_ENDPOINT`, which both `pome run` and the coach do. With
+no endpoint set it is inert, so a standalone run is unaffected.
+
+Using the adapter rather than hand-rolling the exporter is deliberate: per-turn
+token accounting has two non-obvious traps the adapter already fixed — one API
+turn arrives as several `assistant` messages that each repeat the same `usage`
+object (naive counting over-reported one run's input by 79%), and the true
+per-turn `output_tokens` only arrives on a `message_delta` stream event, not on
+the assistant message. An example that re-implemented this would be teaching the
+bug.
+
+### How the coach launches it
+
+This example is built to be spawned as a **local subprocess** by the coach
+(the agent driving the Pome control MCP at `mcp.pome.sh`):
+
+1. **Fetch just this folder** onto the builder's machine:
+
+   ```bash
+   npx degit pome-sh/digital-twins/examples/support-triage support-triage-local
+   cd support-triage-local && npm install
+   ```
+
+2. **Mint the run** — `run_task(task_id, agent_id, agent_version="v1")` seeds
+   live twin sandboxes and returns `examinee_task` (the kickoff prompt) and
+   `examinee_launch` (per-twin MCP URLs + the session bearer). Declare the
+   version: after you swap in the fix below, the re-run declares `"v2"`, and
+   that is what keeps the failing run and the fixed one from being read as one
+   agent tried twice.
+
+3. **Spawn with the env contract** — map the spec onto the env and start the
+   process:
+
+   | env var | from `run_task` |
+   | --- | --- |
+   | `POME_GITHUB_MCP_URL` | `examinee_launch` — the GitHub twin's per-session MCP URL |
+   | `POME_SLACK_MCP_URL` | `examinee_launch` — the Slack twin's per-session MCP URL |
+   | `POME_AUTH_TOKEN` | `agent_token` — the session bearer for **both** twins. **Sensitive**: env-inject only, never write it to disk |
+   | `POME_TASK` | `examinee_task.prompt` (optional — the bundled kickoff prompt is the fallback) |
+
+   ```bash
+   POME_GITHUB_MCP_URL=… POME_SLACK_MCP_URL=… POME_AUTH_TOKEN=… POME_TASK=… npm run start
+   ```
+
+4. **Finalize on exit** — the process exits when the agent is done; the coach
+   calls `finalize_run(session_id, agent_token)` the instant it does, while the
+   twin session is still live, then narrates `get_report`.
+
+The same env contract is what the Pome CLI injects, so the local loop also
+works without the coach, from this directory:
+
+```bash
+pome run tasks/duplicate-issue.md --agent "npm run start"
+```
+
+### Zero-key Claude auth
+
+The Agent SDK needs Claude auth, nothing else:
+
+- a **stored `claude` login** on this machine (subscription — no env var at
+  all), or
+- `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`), or
+- `ANTHROPIC_API_KEY` as the BYOK fallback.
+
+The twin side is zero-key by construction: the only credential is the
+per-session bearer the runner injects as `POME_AUTH_TOKEN`.
+
+### The closed sandbox
+
+`options.tools: []` gives the model **no SDK built-in at all** — no `Bash`,
+`Read`, `Glob`, `Grep`, `Write`, `Edit`, `WebSearch` or `WebFetch`. Only the two
+twins' MCP tools reach it, because those come from `mcpServers` rather than from
+the built-in set (verified from the SDK's `init` message: 100 tools, all
+`mcp__*`).
+
+This is an **allowlist**, deliberately, rather than more names in
+`disallowedTools`. Until 2026-08-05 every built-in was live, and one measured
+trial in five used `Bash` to `cat` this examinee's own source and identify the
+fixture — with `tasks/duplicate-issue.md`, which carries all four grading
+criteria and the complete seed state, one directory away. An examinee that can
+read its own criteria is not sitting an exam.
+
+Note that `allowedTools` would **not** have closed it: it only auto-approves and
+does not restrict. Measured — `allowedTools` naming a single MCP tool left 152
+tools live, `Bash` and `Read` among them.
+
+`npm run typecheck` type-checks; `npm test` runs the env-contract and
+tool-policy tests.
 
 ## Layout
 
@@ -241,10 +348,16 @@ pome.json                       committed manifest: agent.slug + framework + tas
 agents/support-triage-v1.yaml   managed-agent baseline (prompt flaw, pattern 2)
 agents/support-triage-v2.yaml   managed-agent fix; one line different
 tasks/duplicate-issue.md        the task (inline ## Seed State)
-local/                          the graded examinee — the pattern-1 baseline lives here
-local/test/tool-policy.test.ts  the lesson pinned as a property (both branches)
+src/index.ts                    the graded examinee — the pattern-1 baseline lives here
+test/tool-policy.test.ts        the lesson pinned as a property (both branches)
+test/env.test.ts                unit test for the launch env contract
 VERIFICATION.md                 measured results, and what each measurement was of
 ```
+
+Two runtimes, one layout: `agents/*.yaml` is the managed-agent pair (Anthropic's
+platform runs it directly from the YAML); `src/` plus `package.json` is the
+local examinee, a standalone Node package you `npm install` and `npm start` in
+this same directory — no nested subfolder, no separate lockfile boundary.
 
 ## Notes
 

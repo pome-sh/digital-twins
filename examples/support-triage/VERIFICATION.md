@@ -7,7 +7,7 @@ This example now carries **two** failing baselines, on two runtimes:
 | Baseline | Where | Flaw | Curriculum pattern | Measured below |
 |---|---|---|---|---|
 | Managed-agent v1/v2 prompt pair | `agents/*.yaml` | charter line telling the agent not to search | 2 (policy constant) | **yes** |
-| Local examinee | `local/src/index.ts` — `DENY_ISSUE_LOOKUP` | tool policy denies every issue read path | 1 (config defect) | **no — pending** |
+| Local examinee | `src/index.ts` — `DENY_ISSUE_LOOKUP` | tool policy denies every issue read path | 1 (config defect) | **no — pending** |
 
 **Everything below measures the first one.** The local examinee's pattern-1
 baseline is the one the curriculum grades, and it has **no stamp yet**.
@@ -188,7 +188,7 @@ which `docs/curriculum/failure-classes.md` §3 bans by name.
 
 ```bash
 pome run tasks/duplicate-issue.md -n 5          # red   (DENY_ISSUE_LOOKUP = true)
-# flip the constant in local/src/index.ts, then
+# flip the constant in src/index.ts, then
 pome run tasks/duplicate-issue.md -n 5          # green
 ```
 
@@ -225,7 +225,7 @@ model capability routes around a tool that was never exposed."*
 denied tool; it makes the denial irrelevant. It used `update_issue` — a write —
 as an existence oracle, and it used the SDK's shell to read the fixture out of
 the source tree. Neither is a "new read path to an issue" of the kind this
-section anticipated, and `local/test/tool-policy.test.ts` pins a list that was
+section anticipated, and `test/tool-policy.test.ts` pins a list that was
 never the binding constraint.
 
 So the duty is the opposite of what was written: a tool-denial baseline carries
@@ -300,7 +300,7 @@ shell cost the agent nothing it needed. Two trials also *tried* the denied
 `list_issues`, failed, and routed around it in the same turn.
 
 **Conclusion, and it is the answer to F-1292's second "done when".** Closing the
-sandbox is necessary — an examinee that can `cat ../tasks/duplicate-issue.md` is
+sandbox is necessary — an examinee that can `cat tasks/duplicate-issue.md` is
 reading its own criteria and seed — but it is not the fix. Completing the
 denial is not the fix either: this measurement found two more paths after the
 first three, in one sitting, without trying hard. The GitHub twin's read surface
@@ -311,8 +311,8 @@ a tool-policy denial.**
 ### What was fixed here, and what was left open
 
 Fixed in this commit: the sandbox (`tools: []`, an allowlist rather than another
-name in a deny-list), and the claims in `local/src/index.ts` and
-`local/README.md` that the 2026-08-04 run refuted.
+name in a deny-list), and the claims in `src/index.ts` and
+`README.md` that the 2026-08-04 run refuted.
 
 Left open, deliberately, for the F-1292 design decision: the baseline defect
 itself. Nothing here is stamped `verified red`, and the shipped
