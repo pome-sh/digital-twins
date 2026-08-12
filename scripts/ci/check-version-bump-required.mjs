@@ -96,6 +96,41 @@ function isTwinTopLevelDocPath(file) {
   return /^packages\/twin-[^/]+\/[^/]+\.md$/.test(file);
 }
 
+/**
+ * A twin's own top-level `scripts/` is dev/CI tooling, run via tsx on the `.ts`
+ * source. It ships in no tarball, and — as with the two carve-outs above — the
+ * load-bearing fact is `private: true`: release.yml (F-1308, F-949) publishes
+ * only cli, adapter-claude-sdk, checks and wire, and no twin is any of those.
+ * That is deliberately the ONLY reason claimed here, because the tempting
+ * second one is false for four of the five twins: only
+ * `packages/twin-github/tsconfig.build.json` names `scripts` in its `exclude`,
+ * and `packages/twin-slack/dist/scripts/` and `packages/twin-stripe/dist/scripts/`
+ * really do exist inside the `dist` those packages' `files` arrays name. A
+ * `files` array on a package nothing publishes describes a tarball nobody
+ * builds. If a twin were ever unprivated, this exemption needs re-checking.
+ *
+ * The CLI's tarball is the other artifact that could carry these bytes, and does
+ * not: tsup inlines twin source reached from each twin's package `exports`,
+ * which resolve into `src/` only, and nothing under `cli/src/` or any twin's own
+ * `src/` imports a twin script — so tsup never sees these files.
+ *
+ * Third instance of the F-1455 over-match, one directory over from the
+ * `examples/` and top-level-`.md` carve-outs above: `packages/twin-` is a plain
+ * prefix, so editing a validator that CI runs was demanding an `@pome-sh/cli`
+ * bump — a republish that would be byte-identical. Found on F-1354, which had
+ * to touch `packages/twin-github/scripts/validate-mcp.ts` to wire that script
+ * into CI at all, and RELEASING.md's "if your change doesn't warrant a release
+ * it shouldn't be touching a publish-relevant path" has no answer: a twin's own
+ * validator has nowhere else to live.
+ *
+ * `[^/]+` is deliberately one path segment and `scripts` is anchored directly
+ * under the twin root, so `packages/twin-stripe/src/scripts/x.ts` — which
+ * compiles into that twin's dist like any other `src/` module — is NOT exempt.
+ */
+function isTwinScriptPath(file) {
+  return /^packages\/twin-[^/]+\/scripts\//.test(file);
+}
+
 const changedFiles = execFileSync("git", ["diff", "--name-only", baseSha, "HEAD"], {
   encoding: "utf8",
 })
@@ -103,7 +138,8 @@ const changedFiles = execFileSync("git", ["diff", "--name-only", baseSha, "HEAD"
   .filter(Boolean)
   .filter((file) => !isUnpublishableTestPath(file))
   .filter((file) => !isTwinExamplePath(file))
-  .filter((file) => !isTwinTopLevelDocPath(file));
+  .filter((file) => !isTwinTopLevelDocPath(file))
+  .filter((file) => !isTwinScriptPath(file));
 
 function versionAt(ref, manifestPath) {
   try {

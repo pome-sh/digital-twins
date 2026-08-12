@@ -215,6 +215,61 @@ console.log("check-version-bump-required.mjs");
   check("a twin's src/examples/ change with no bump still fails", r.status === 1, r.out);
 }
 
+{
+  // F-1354: third instance of the F-1455 over-match. A twin's own top-level
+  // scripts/ is dev/CI tooling excluded from its build (`tsconfig.build.json`)
+  // and unreachable from the twin's `exports`, so tsup never inlines it into
+  // the CLI's tarball — demanding a bump here demands a byte-identical
+  // republish, on the very PR whose job is to wire such a script into CI.
+  const r = run({
+    changes: { "packages/twin-github/scripts/validate-mcp.ts": "// tooling\n" },
+  });
+  check("a change confined to a twin's scripts/ needs no bump", r.status === 0, r.out);
+}
+
+{
+  // Anchoring check: `scripts` is exempt only DIRECTLY under the twin root.
+  // packages/twin-stripe/src/scripts/x.ts compiles into that twin's dist like
+  // any other src/ module, so a looser regex would wrongly exempt it.
+  const r = run({
+    changes: { "packages/twin-stripe/src/scripts/gen.ts": "export const a = 1;\n" },
+  });
+  check(
+    "a twin's src/scripts/ change with no bump still fails",
+    r.status === 1 && r.out.includes("@pome-sh/cli"),
+    r.out,
+  );
+}
+
+{
+  // Anchoring check: cli/scripts/ is NOT a twin script. The CLI's own tooling
+  // sits under a prefix the exemption must not reach.
+  const r = run({
+    changes: { "cli/scripts/copy-prompts.mjs": "// tooling\n" },
+  });
+  check(
+    "a cli/scripts/ change with no bump still fails",
+    r.status === 1 && r.out.includes("@pome-sh/cli"),
+    r.out,
+  );
+}
+
+{
+  // Ride-along, same shape as the docs case: an exempt script change alongside
+  // a real src/ change must still demand the bump.
+  const r = run({
+    changes: {
+      "packages/twin-github/scripts/validate-mcp.ts": "// tooling\n",
+      "packages/twin-github/src/index.ts": "export const a = 1;\n",
+    },
+  });
+  check(
+    "a script change RIDING ALONG with a src change still demands a bump",
+    r.status === 1 && r.out.includes("@pome-sh/cli"),
+    r.out,
+  );
+}
+
 if (failures > 0) {
   console.error(`\n${failures} check(s) failed`);
   process.exit(1);
