@@ -76,10 +76,88 @@ describe("linear MCP tool fixture", () => {
     expect(sha256(read(meta.files.canonical))).toBe(meta.canonicalFileSha256);
   });
 
-  it("declares a substrate that admits nobody read this from Linear", () => {
-    expect(meta.substrate).toBe("twin-authored-from-vendor-docs");
-    expect(meta.transcription?.comparedToUpstream).toMatch(/never/);
-    expect(meta.transcription?.contentOrigin).toMatch(/documentation/);
+  it("declares a substrate that names the capture it projects, and proves it by digest", () => {
+    // Was `twin-authored-from-vendor-docs` until F-1480, and that test asserted
+    // the admission — `comparedToUpstream: never`, `contentOrigin: documentation`.
+    // The word had to move with the rows: a reader who saw `vendor-docs` over
+    // Linear's own descriptions would go looking for an authoring problem behind
+    // a file that no longer has one.
+    expect(meta.substrate).toBe("upstream-capture-projection");
+    expect(meta.transcription).toBeUndefined();
+    expect(meta.liveToolCount).toBe(22);
+
+    // The digest is the claim. `rawFileSha256` proves this file has not been
+    // hand-edited since it was derived; only `projection.sourceRawFileSha256`
+    // proves WHAT it was derived from, and re-pointing the producer at a stale
+    // or hand-edited golden would re-hash clean without it.
+    const upstreamRaw = read(join("..", "..", "..", "fixtures", "mcp-tools-list", "linear.raw.json"));
+    expect(meta.projection?.sourceRawFileSha256).toBe(sha256(upstreamRaw));
+    expect(meta.projection?.sourceFixture).toBe("fixtures/mcp-tools-list/linear.raw.json");
+    expect(meta.projection?.sourceSubstrate).toBe("live-wire-oauth");
+
+    // No `sourceCommit` here, and its absence is a fact rather than an omission:
+    // github's golden is built from OSS source and pins the commit it was built
+    // at, while Linear's is a live HTTP capture of a server nobody outside Linear
+    // can build. The capture DATE is the whole provenance available, so the two
+    // files must at least agree on it.
+    const upstreamMeta = JSON.parse(
+      read(join("..", "..", "..", "fixtures", "mcp-tools-list", "linear.meta.json")),
+    ) as { captureDate: string; source?: unknown };
+    expect(upstreamMeta.source).toBeUndefined();
+    expect(meta.projection?.sourceCaptureDate).toBe(upstreamMeta.captureDate);
+    expect(meta.captureDate).toBe(upstreamMeta.captureDate);
+  });
+
+  // The residue, named on the file rather than only in the producer. Thirty-six
+  // tools Linear declares and this twin does not model, and a reason for each,
+  // because a name with no reason is a suppression.
+  it("enumerates every row the capture has and this twin does not, with a reason", () => {
+    const dropped = meta.projection?.dropped ?? {};
+    expect(Object.keys(dropped)).toHaveLength(36);
+    for (const [name, reason] of Object.entries(dropped)) {
+      expect(reason.length, name).toBeGreaterThan(40);
+      expect(reason, name).toMatch(/out of modeled scope/);
+    }
+
+    // EMPTY, and that is the strong form of the projection rather than an
+    // oversight: every row this twin serves is the capture's. twin-github needs a
+    // `carried` door because two of its tools are feature-flag-gated upstream and
+    // its flags-off capture cannot see them; nothing here is gated, so a non-empty
+    // carried set would mean a row we preferred rather than one Linear serves —
+    // exactly what F-1470 refused permanently.
+    expect(meta.projection?.carried).toEqual({});
+  });
+
+  it("is a STRICT SUBSET of the capture, so the two files stay byte-different", () => {
+    // Pure subtraction is the property the producer is allowed to have and the
+    // one that makes `upstream-capture-projection` an honest word. If the twin
+    // ever advertised a name the capture does not carry, this fails here rather
+    // than in pome-cloud's lane a day later.
+    const upstream = JSON.parse(
+      read(join("..", "..", "..", "fixtures", "mcp-tools-list", "linear.raw.json")),
+    ) as { result: { tools: Array<{ name: string }> } };
+    const upstreamNames = upstream.result.tools.map((tool) => tool.name);
+    const served = [...linearToolFixture.toolNames];
+
+    expect(upstreamNames).toHaveLength(58);
+    expect(served.filter((name) => !upstreamNames.includes(name))).toEqual([]);
+    expect(served.length).toBeLessThan(upstreamNames.length);
+    // ORDER is the capture's too — a projection that re-sorted would be editing.
+    expect(served).toEqual(upstreamNames.filter((name) => served.includes(name)));
+  });
+
+  it("advertises Linear's schemas, not a projection of the twin's own validators", () => {
+    // The defect this fixture existed to make invisible: every inputSchema used
+    // to be ours, so the MCP lane compared the twin against itself and every one
+    // of the 22 compared tools diverged. Linear declares no `outputSchema` on any
+    // tool, so a row carrying one is this twin having authored a schema again.
+    const tools = JSON.parse(read(meta.files.raw)) as {
+      result: { tools: Array<{ name: string; outputSchema?: unknown; description?: string }> };
+    };
+    expect(tools.result.tools.filter((tool) => tool.outputSchema !== undefined)).toEqual([]);
+    for (const tool of tools.result.tools) {
+      expect(tool.description, tool.name).toBeTruthy();
+    }
   });
 
   it("serves exactly the fixture's listing over tools/list", async () => {

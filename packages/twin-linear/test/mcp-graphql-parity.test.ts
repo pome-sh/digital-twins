@@ -9,6 +9,7 @@ import {
   openLinearTwinDatabase,
 } from "../src/index.js";
 import { testSeed } from "./_helpers.js";
+import { payload } from "./_mcpPayload.js";
 
 const secret = "linear-parity-test-secret-32chars!!";
 const sid = DEFAULT_LINEAR_SID;
@@ -59,7 +60,7 @@ async function mcpCall(
     }),
   });
   return (await response.json()) as {
-    result: { isError: boolean; structuredContent?: Record<string, unknown> };
+    result: { isError: boolean; content: Array<{ type: string; text: string }> };
   };
 }
 
@@ -87,7 +88,7 @@ describe("MCP / GraphQL parity", () => {
       team: "ENG",
     });
     expect(created.result.isError).toBe(false);
-    const issue = created.result.structuredContent as { id: string; identifier: string };
+    const issue = payload(created) as { id: string; identifier: string };
 
     const fetched = await gql(
       app,
@@ -116,7 +117,7 @@ describe("MCP / GraphQL parity", () => {
 
     const fetched = await mcpCall(app, 1, "get_issue", { id: issue.identifier });
     expect(fetched.result.isError).toBe(false);
-    expect(fetched.result.structuredContent).toMatchObject({
+    expect(payload(fetched)).toMatchObject({
       id: issue.id,
       identifier: issue.identifier,
       title: "Parity GQL→MCP",

@@ -1,25 +1,25 @@
 {
   "meta": {
     "twin": "linear",
-    "substrate": "twin-authored-from-vendor-docs",
-    "endpoint": "in-process://twin-linear/s/:sid/mcp",
+    "substrate": "upstream-capture-projection",
+    "endpoint": "https://mcp.linear.app/mcp",
     "method": "tools/list",
-    "protocol": "JSON-RPC 2.0 over Streamable HTTP",
+    "protocol": "JSON-RPC 2.0 over HTTP",
     "protocolVersion": "2025-06-18",
-    "captureDate": "2026-08-06",
-    "rawFileSha256": "f764e11486c25738b1952b6e83e4919fcb84c3c36cd36ef801b326fb40ed111d",
+    "captureDate": "2026-08-10",
+    "rawFileSha256": "9bd5195130a072b1b60d11d567b035bb34e77e099b41e55dca2faa920f3109c4",
     "liveToolCount": 22,
     "liveToolOrder": [
-      "list_issues",
-      "get_issue",
-      "save_issue",
       "list_comments",
       "save_comment",
       "delete_comment",
-      "list_teams",
-      "get_team",
-      "list_users",
-      "get_user",
+      "list_cycles",
+      "get_document",
+      "list_documents",
+      "save_document",
+      "get_issue",
+      "list_issues",
+      "save_issue",
       "list_issue_statuses",
       "get_issue_status",
       "list_issue_labels",
@@ -27,23 +27,84 @@
       "list_projects",
       "get_project",
       "save_project",
-      "list_cycles",
-      "search_documentation",
-      "list_documents",
-      "get_document",
-      "save_document"
+      "list_teams",
+      "get_team",
+      "list_users",
+      "get_user",
+      "search_documentation"
     ],
-    "transcription": {
-      "readFrom": "twin-linear's own tools/list, booted on defaultSeedState() and driven through Hono's app.request, read immediately before this table became fixture-driven (F-1325)",
-      "contentOrigin": "the tool NAMES come from Linear's published MCP launch documentation; the inputSchemas are twin-owned Gate-1 fixtures, as this fixture's own notes have always admitted. The pre-F-1325 provenance read `source: documented_official_linear_mcp_launch_set`, which reads like a capture. It was never one.",
-      "comparedToUpstream": "never. https://mcp.linear.app/mcp is OAuth-gated, so F-1326 recorded the upstream golden as deferred (fixtures/mcp-tools-list/linear.status.json). Re-sourcing this table needs that token and belongs to F-1329, not here."
+    "configuration": {
+      "auth": "bearer",
+      "grantedScopes": "read write",
+      "responseFraming": "text/event-stream",
+      "deploymentSelector": "the authorising Linear workspace. Captured 2026-08-10 from a throwaway workspace under an OAuth grant carrying BOTH scopes mcp.linear.app grants a tool surface for (scopes_supported: read, write, openid, email — the other two are OIDC identity claims and gate no tool). The grant was minted, used for exactly one tools/list, and revoked.",
+      "responseFramingNote": "linear is the only one of the five that answers the tools/list POST as SSE rather than application/json. raw.json holds the unwrapped `data:` payload, because the consumer parses and hashes it; the framing is recorded here so the fact is kept rather than lost.",
+      "matchesExaminee": "58 tools, and an examinee pointing an MCP client at this URL under a read+write grant gets exactly them. THE SCOPE SET IS NOT INVARIANT HERE, AND THIS IS THE MEASUREMENT RATHER THAN AN ARGUMENT (F-1394): the same endpoint, captured the same day, answered 36 tools under `read` and 58 under `read write`. The 22 the write scope adds are every write Linear has and nothing else — prepare_attachment_upload, create_attachment_from_upload, create_attachment, delete_attachment, save_comment, delete_comment, save_document, save_issue, create_issue_label, save_project, save_release, save_release_note, save_diff_comment, resolve_diff_thread, delete_diff_comment, submit_diff_review, merge_diff, save_milestone, save_initiative, create_initiative_label, save_status_update, delete_status_update. Nothing was REMOVED: the read listing is a strict subset, so a narrower grant can only ever under-report. A later capture may therefore never be read-only.",
+      "completeness": "exact",
+      "completenessBasis": "the axis that moves an OAuth-gated listing is the grant, and this one is now maximal: `read` and `write` are the only scopes mcp.linear.app gates tools behind, and holding both was measured to return 22 more tools than holding `read` alone, with none withheld. The count is corroborated from outside the capture — a live Linear MCP connector on a separate credential exposes the same 58 names.",
+      "unguardedDirection": "the authorising WORKSPACE. This is a throwaway workspace, and nothing here reads a second one, so a listing that varied by Linear plan tier would be invisible from this golden. The reason that is judged shut rather than merely unmeasured is Linear's own grant model: the OAuth surface offers `read`/`write` and no plan-scoped or preview scope, which is the same argument SECRETS.md makes for capturing this twin from a throwaway at all — and it is the opposite of stripe, where preview tool groups ARE granted per account and the class is `credential-scoped` because of it.",
+      "requestHeaders": {
+        "content-type": "application/json",
+        "accept": "application/json, text/event-stream"
+      },
+      "requestBody": {
+        "method": "tools/list",
+        "jsonrpc": "2.0",
+        "id": 1
+      }
+    },
+    "projection": {
+      "sourceFixture": "fixtures/mcp-tools-list/linear.raw.json",
+      "sourceRawFileSha256": "c737b527fec275abf693f3718db22875bdae0e9c4f207884af6790b0b4e6465a",
+      "sourceCaptureDate": "2026-08-10",
+      "sourceSubstrate": "live-wire-oauth",
+      "producer": "packages/twin-linear/scripts/adopt-upstream-mcp-fixture.ts — re-derive and diff with `npm run gate:mcp-fixture -w @pome-sh/twin-linear`",
+      "dropped": {
+        "get_attachment": "out of modeled scope: the twin models no attachments. There is no upload endpoint, no blob store and no file identity behind an issue, so every one of these reads or writes an object that does not exist here.",
+        "create_attachment": "out of modeled scope: the twin models no attachments. There is no upload endpoint, no blob store and no file identity behind an issue, so every one of these reads or writes an object that does not exist here.",
+        "create_attachment_from_upload": "out of modeled scope: the twin models no attachments. There is no upload endpoint, no blob store and no file identity behind an issue, so every one of these reads or writes an object that does not exist here.",
+        "prepare_attachment_upload": "out of modeled scope: the twin models no attachments. There is no upload endpoint, no blob store and no file identity behind an issue, so every one of these reads or writes an object that does not exist here.",
+        "delete_attachment": "out of modeled scope: the twin models no attachments. There is no upload endpoint, no blob store and no file identity behind an issue, so every one of these reads or writes an object that does not exist here.",
+        "extract_images": "out of modeled scope: the twin models no attachments. There is no upload endpoint, no blob store and no file identity behind an issue, so every one of these reads or writes an object that does not exist here.",
+        "list_agent_skills": "out of modeled scope: Linear's agent-skill registry is a feature of Linear's own agent platform, not of the issue tracker this twin models.",
+        "get_agent_skill": "out of modeled scope: Linear's agent-skill registry is a feature of Linear's own agent platform, not of the issue tracker this twin models.",
+        "list_release_pipelines": "out of modeled scope: the twin models no releases, release pipelines or release notes. Nothing in its schema associates an issue with a shipped version.",
+        "list_releases": "out of modeled scope: the twin models no releases, release pipelines or release notes. Nothing in its schema associates an issue with a shipped version.",
+        "get_release": "out of modeled scope: the twin models no releases, release pipelines or release notes. Nothing in its schema associates an issue with a shipped version.",
+        "save_release": "out of modeled scope: the twin models no releases, release pipelines or release notes. Nothing in its schema associates an issue with a shipped version.",
+        "list_release_notes": "out of modeled scope: the twin models no releases, release pipelines or release notes. Nothing in its schema associates an issue with a shipped version.",
+        "get_release_note": "out of modeled scope: the twin models no releases, release pipelines or release notes. Nothing in its schema associates an issue with a shipped version.",
+        "save_release_note": "out of modeled scope: the twin models no releases, release pipelines or release notes. Nothing in its schema associates an issue with a shipped version.",
+        "get_diff": "out of modeled scope: Linear's code-review surface. The twin models no diffs, no review threads and no merge, and an examinee reviewing code in Linear is exercising a capability that lives in twin-github here.",
+        "list_diffs": "out of modeled scope: Linear's code-review surface. The twin models no diffs, no review threads and no merge, and an examinee reviewing code in Linear is exercising a capability that lives in twin-github here.",
+        "get_diff_threads": "out of modeled scope: Linear's code-review surface. The twin models no diffs, no review threads and no merge, and an examinee reviewing code in Linear is exercising a capability that lives in twin-github here.",
+        "save_diff_comment": "out of modeled scope: Linear's code-review surface. The twin models no diffs, no review threads and no merge, and an examinee reviewing code in Linear is exercising a capability that lives in twin-github here.",
+        "resolve_diff_thread": "out of modeled scope: Linear's code-review surface. The twin models no diffs, no review threads and no merge, and an examinee reviewing code in Linear is exercising a capability that lives in twin-github here.",
+        "delete_diff_comment": "out of modeled scope: Linear's code-review surface. The twin models no diffs, no review threads and no merge, and an examinee reviewing code in Linear is exercising a capability that lives in twin-github here.",
+        "submit_diff_review": "out of modeled scope: Linear's code-review surface. The twin models no diffs, no review threads and no merge, and an examinee reviewing code in Linear is exercising a capability that lives in twin-github here.",
+        "merge_diff": "out of modeled scope: Linear's code-review surface. The twin models no diffs, no review threads and no merge, and an examinee reviewing code in Linear is exercising a capability that lives in twin-github here.",
+        "list_milestones": "out of modeled scope: project milestones are not modeled. The twin's projects carry issues and no milestone layer between them.",
+        "get_milestone": "out of modeled scope: project milestones are not modeled. The twin's projects carry issues and no milestone layer between them.",
+        "save_milestone": "out of modeled scope: project milestones are not modeled. The twin's projects carry issues and no milestone layer between them.",
+        "list_initiatives": "out of modeled scope: initiatives are the layer ABOVE projects, and the twin's hierarchy stops at project. Modelling one member means adding that layer and everything that hangs off it.",
+        "get_initiative": "out of modeled scope: initiatives are the layer ABOVE projects, and the twin's hierarchy stops at project. Modelling one member means adding that layer and everything that hangs off it.",
+        "save_initiative": "out of modeled scope: initiatives are the layer ABOVE projects, and the twin's hierarchy stops at project. Modelling one member means adding that layer and everything that hangs off it.",
+        "list_initiative_labels": "out of modeled scope: initiatives are the layer ABOVE projects, and the twin's hierarchy stops at project. Modelling one member means adding that layer and everything that hangs off it.",
+        "create_initiative_label": "out of modeled scope: initiatives are the layer ABOVE projects, and the twin's hierarchy stops at project. Modelling one member means adding that layer and everything that hangs off it.",
+        "get_status_updates": "out of modeled scope: project and initiative status updates are not modeled — the twin has no periodic-update object attached to either.",
+        "save_status_update": "out of modeled scope: project and initiative status updates are not modeled — the twin has no periodic-update object attached to either.",
+        "delete_status_update": "out of modeled scope: project and initiative status updates are not modeled — the twin has no periodic-update object attached to either.",
+        "get_workspace": "out of modeled scope: the twin serves ONE implicit workspace and has no workspace object to read. This is also why the initiative and status-update families above have nothing to hang from.",
+        "list_project_labels": "out of modeled scope: labels on PROJECTS are a separate taxonomy from labels on issues, which the twin does model (`list_issue_labels`, `create_issue_label`). Adding it is a second label namespace, not a second endpoint on the first."
+      },
+      "carried": {}
     },
     "notes": [
-      "Gate-1 Wave 4 expands Gate 0's 18-tool freeze: delete_comment plus documents list/get/save; save_issue estimate/parentId/relations; save_comment parentId.",
-      "Documents, initiatives and milestones beyond this minimal set stay named gaps.",
-      "GraphQL keeps issueCreate/issueUpdate for SDK parity; MCP follows the documented listing.",
-      "This listing carries the generic outputSchema the twin serves on every tool. The pre-F-1325 canonical omitted it, so the committed oracle described less than the wire did.",
-      "Seeded from the served table rather than from upstream on purpose. F-1325 is name-neutral by construction: every byte this twin serves is identical before and after it."
+      "These rows are Linear's, not this twin's. Until F-1480 the fixture was `twin-authored-from-vendor-docs`: the tool NAMES came from Linear's published documentation and every description and inputSchema was ours. It is the same shape F-1468 retired on twin-github, one step further from the vendor — github at least transcribed a table it served, this one was authored from prose — and it is the EASIER of the two to fix, because these 22 names are a STRICT SUBSET of the golden's 58 (`twin_only` is 0, measured), so the producer can only ever SUBTRACT.",
+      "The 22 are the captured surface's 58 minus 36 this twin does not model. Every dropped name gives its reason in `projection.dropped`, grouped by CAPABILITY rather than by tool: each family is one absence, and modelling any member means building the thing all of them read from. The producer enforces the list — a dropped name the capture does not carry fails, because a typo there suppresses nothing while the real divergence goes on failing elsewhere. `projection.carried` is EMPTY, which is the strong form: every row this twin serves is the capture's. twin-github needs a carried door because two of its tools are feature-flag-gated upstream; nothing here is.",
+      "What this file does NOT say is what the twin ACCEPTS. These are Linear's advertised schemas; the twin's own validators are what admit or refuse an examinee's call, and the two can disagree. Reading this fixture as a statement about behaviour is the mistake it exists to make visible.",
+      "Linear declares no `outputSchema` on any of its 58 tools, so since F-1480 neither does this twin, and `tools/call` carries its payload as JSON text in `content[0]` rather than in `result.structuredContent` — MCP only permits the structured field for a tool that declares an output schema. The generic outputSchema the pre-F-1480 fixture put on every row is where that field came from; it was ours, not Linear's. test/_mcpPayload.ts is the reader, and it re-asserts the absence at every call site.",
+      "`configuration` is the SOURCE capture's, carried through verbatim — its `completeness: exact` and its `matchesExaminee: 58 tools` describe the golden this was projected from, not what this twin serves. GraphQL keeps issueCreate/issueUpdate for SDK parity; the MCP surface follows Linear's captured listing."
     ],
     "derivedFrom": "mcp-tools-list.raw.json",
     "derivation": "result.tools verbatim, listing order preserved; only whitespace differs from the raw file"
@@ -53,192 +114,124 @@
   "result": {
     "tools": [
       {
-        "name": "list_issues",
-        "description": "List issues in the Linear workspace. For my issues, use \"me\" as the assignee.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "team": {
-              "type": "string",
-              "description": "Team key or id"
-            },
-            "assignee": {
-              "type": "string",
-              "description": "User email, id, or \"me\""
-            },
-            "state": {
-              "type": "string",
-              "description": "Workflow state name or id"
-            },
-            "limit": {
-              "type": "number",
-              "description": "Max results (default 50, max 250)"
-            },
-            "cursor": {
-              "type": "string",
-              "description": "Pagination cursor"
-            },
-            "query": {
-              "type": "string",
-              "description": "Title/description search"
-            }
-          },
-          "additionalProperties": false
-        },
-        "outputSchema": {
-          "type": "object",
-          "additionalProperties": true
-        }
-      },
-      {
-        "name": "get_issue",
-        "description": "Retrieve detailed information about an issue by ID or identifier (e.g. ENG-1).",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "id": {
-              "type": "string",
-              "description": "Issue id or identifier"
-            }
-          },
-          "required": [
-            "id"
-          ],
-          "additionalProperties": false
-        },
-        "outputSchema": {
-          "type": "object",
-          "additionalProperties": true
-        }
-      },
-      {
-        "name": "save_issue",
-        "description": "Create or update a Linear issue. Omit id to create (title and team required); provide id for a partial update. Relation arrays (blocks/blockedBy/relatedTo) are append-only.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "id": {
-              "type": "string",
-              "description": "Issue id or identifier (update)"
-            },
-            "title": {
-              "type": "string"
-            },
-            "team": {
-              "type": "string"
-            },
-            "description": {
-              "type": "string"
-            },
-            "assignee": {
-              "type": "string"
-            },
-            "state": {
-              "type": "string"
-            },
-            "priority": {
-              "type": "number"
-            },
-            "estimate": {
-              "type": [
-                "number",
-                "null"
-              ],
-              "description": "Estimate points; null clears on update"
-            },
-            "labels": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "project": {
-              "type": "string"
-            },
-            "cycle": {
-              "type": "string"
-            },
-            "parentId": {
-              "type": [
-                "string",
-                "null"
-              ],
-              "description": "Parent issue id/identifier; null removes"
-            },
-            "blocks": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "Append-only blocked issues"
-            },
-            "blockedBy": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "Append-only blockers"
-            },
-            "relatedTo": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "Append-only related issues"
-            }
-          },
-          "additionalProperties": false
-        },
-        "outputSchema": {
-          "type": "object",
-          "additionalProperties": true
-        }
-      },
-      {
         "name": "list_comments",
-        "description": "List comments for a specific Linear issue.",
+        "description": "List comments on a Linear issue, project, initiative, document, project milestone, or project/initiative status update. Provide exactly one of `issueId`, `projectId`, `initiativeId`, `documentId`, `milestoneId`, or `statusUpdateId`. For issues, projects, and initiatives this returns both top-level discussion threads and inline description comments. Inline (anchored) comments carry a non-null `quotedText` set to the snippet of description text they reference.",
         "inputSchema": {
           "type": "object",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
           "properties": {
-            "issueId": {
-              "type": "string"
-            },
             "limit": {
-              "type": "number"
+              "default": 50,
+              "description": "Max results (default 50, max 250)",
+              "type": "number",
+              "maximum": 250
             },
             "cursor": {
+              "description": "Next page cursor",
               "type": "string"
+            },
+            "orderBy": {
+              "default": "updatedAt",
+              "description": "Sort: createdAt | updatedAt",
+              "type": "string",
+              "enum": [
+                "createdAt",
+                "updatedAt"
+              ]
+            },
+            "issueId": {
+              "description": "Issue ID or identifier (e.g., LIN-123) (provide exactly one parent)",
+              "type": "string"
+            },
+            "projectId": {
+              "description": "Project name, ID, identifier (e.g., PROJ-123), or slug (provide exactly one parent)",
+              "type": "string"
+            },
+            "initiativeId": {
+              "description": "Initiative name, ID, identifier (e.g., INIT-123), or slug (provide exactly one parent)",
+              "type": "string"
+            },
+            "documentId": {
+              "description": "Document ID or slug (provide exactly one parent)",
+              "type": "string"
+            },
+            "milestoneId": {
+              "description": "Milestone UUID (provide exactly one parent). Resolve milestone names via `list_milestones` first.",
+              "type": "string"
+            },
+            "statusUpdateId": {
+              "description": "Status update UUID (provide exactly one parent). Resolve status updates via `get_status_updates` first.",
+              "type": "string"
+            },
+            "statusUpdateType": {
+              "description": "Type of status update named by `statusUpdateId`, as returned by `get_status_updates`. Only valid together with `statusUpdateId`; omit to check both project and initiative status updates.",
+              "type": "string",
+              "enum": [
+                "project",
+                "initiative"
+              ]
             }
           },
-          "required": [
-            "issueId"
-          ],
           "additionalProperties": false
         },
-        "outputSchema": {
-          "type": "object",
-          "additionalProperties": true
+        "title": "List comments",
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
         }
       },
       {
         "name": "save_comment",
-        "description": "Create or update a comment on a Linear issue. Provide id to edit. To reply in a thread, pass parentId (issueId optional when replying).",
+        "description": "Create or update a comment on a Linear issue, project, initiative, document, project milestone, or project/initiative status update. If `id` is provided, updates the existing comment; otherwise creates a new one. To start a new thread, pass `body` and exactly one of `issueId`, `projectId`, `initiativeId`, `documentId`, `milestoneId`, or `statusUpdateId` — comments on issues/projects/initiatives become top-level discussion threads; comments on documents/milestones become description comments. A status update holds a single thread, so a comment on an update that already has one is added to it as a reply. To reply to an existing thread, pass `parentId` and `body`; the reply inherits the parent's thread type, so no entity reference is needed. Parent reference fields are ignored when `id` or `parentId` is provided (`statusUpdateType` is rejected instead).",
         "inputSchema": {
           "type": "object",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
           "properties": {
             "id": {
-              "type": "string",
-              "description": "Comment id (edit)"
+              "description": "Comment ID. If provided, updates the existing comment",
+              "type": "string"
             },
             "issueId": {
+              "description": "Issue ID or identifier (e.g., LIN-123) (provide exactly one parent)",
               "type": "string"
+            },
+            "projectId": {
+              "description": "Project name, ID, identifier (e.g., PROJ-123), or slug (provide exactly one parent)",
+              "type": "string"
+            },
+            "initiativeId": {
+              "description": "Initiative name, ID, identifier (e.g., INIT-123), or slug (provide exactly one parent)",
+              "type": "string"
+            },
+            "documentId": {
+              "description": "Document ID or slug (provide exactly one parent)",
+              "type": "string"
+            },
+            "milestoneId": {
+              "description": "Milestone UUID (provide exactly one parent). Resolve milestone names via `list_milestones` first.",
+              "type": "string"
+            },
+            "statusUpdateId": {
+              "description": "Status update UUID (provide exactly one parent). Resolve status updates via `get_status_updates` first.",
+              "type": "string"
+            },
+            "statusUpdateType": {
+              "description": "Type of status update named by `statusUpdateId`, as returned by `get_status_updates`. Only valid together with `statusUpdateId`; omit to check both project and initiative status updates.",
+              "type": "string",
+              "enum": [
+                "project",
+                "initiative"
+              ]
             },
             "parentId": {
-              "type": "string",
-              "description": "Parent comment id for threaded replies"
+              "description": "Parent comment ID (for replies, only when creating)",
+              "type": "string"
             },
             "body": {
-              "type": "string"
+              "type": "string",
+              "description": "Content as Markdown. Do not escape the string — use literal newlines and special characters, not escape sequences. To mention a user, use @displayName (e.g., @johndoe)"
             }
           },
           "required": [
@@ -246,16 +239,20 @@
           ],
           "additionalProperties": false
         },
-        "outputSchema": {
-          "type": "object",
-          "additionalProperties": true
+        "title": "Save comment",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "idempotentHint": false,
+          "openWorldHint": false
         }
       },
       {
         "name": "delete_comment",
-        "description": "Delete a Linear comment by id.",
+        "description": "Delete a Linear comment. Inline description comments (those with non-null `quotedText`) anchor a mark in the editor, so their root cannot be deleted — delete the replies individually or resolve the thread instead.",
         "inputSchema": {
           "type": "object",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
           "properties": {
             "id": {
               "type": "string",
@@ -267,274 +264,33 @@
           ],
           "additionalProperties": false
         },
-        "outputSchema": {
-          "type": "object",
-          "additionalProperties": true
-        }
-      },
-      {
-        "name": "list_teams",
-        "description": "List teams in the user's Linear workspace.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "limit": {
-              "type": "number"
-            },
-            "cursor": {
-              "type": "string"
-            }
-          },
-          "additionalProperties": false
-        },
-        "outputSchema": {
-          "type": "object",
-          "additionalProperties": true
-        }
-      },
-      {
-        "name": "get_team",
-        "description": "Retrieve details of a specific Linear team.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "query": {
-              "type": "string",
-              "description": "Team id, key, or name"
-            }
-          },
-          "required": [
-            "query"
-          ],
-          "additionalProperties": false
-        },
-        "outputSchema": {
-          "type": "object",
-          "additionalProperties": true
-        }
-      },
-      {
-        "name": "list_users",
-        "description": "Retrieve users in the Linear workspace.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "limit": {
-              "type": "number"
-            },
-            "cursor": {
-              "type": "string"
-            }
-          },
-          "additionalProperties": false
-        },
-        "outputSchema": {
-          "type": "object",
-          "additionalProperties": true
-        }
-      },
-      {
-        "name": "get_user",
-        "description": "Retrieve details of a specific Linear user.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "query": {
-              "type": "string",
-              "description": "User id, email, or name"
-            }
-          },
-          "required": [
-            "query"
-          ],
-          "additionalProperties": false
-        },
-        "outputSchema": {
-          "type": "object",
-          "additionalProperties": true
-        }
-      },
-      {
-        "name": "list_issue_statuses",
-        "description": "List available issue statuses in a Linear team.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "team": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "team"
-          ],
-          "additionalProperties": false
-        },
-        "outputSchema": {
-          "type": "object",
-          "additionalProperties": true
-        }
-      },
-      {
-        "name": "get_issue_status",
-        "description": "Retrieve detailed information about an issue status by name or ID.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "id": {
-              "type": "string"
-            },
-            "name": {
-              "type": "string"
-            },
-            "team": {
-              "type": "string"
-            }
-          },
-          "additionalProperties": false
-        },
-        "outputSchema": {
-          "type": "object",
-          "additionalProperties": true
-        }
-      },
-      {
-        "name": "list_issue_labels",
-        "description": "List available issue labels in a Linear workspace or team.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "team": {
-              "type": "string"
-            },
-            "limit": {
-              "type": "number"
-            },
-            "cursor": {
-              "type": "string"
-            }
-          },
-          "additionalProperties": false
-        },
-        "outputSchema": {
-          "type": "object",
-          "additionalProperties": true
-        }
-      },
-      {
-        "name": "create_issue_label",
-        "description": "Create a new Linear issue label.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "name": {
-              "type": "string"
-            },
-            "color": {
-              "type": "string"
-            },
-            "description": {
-              "type": "string"
-            },
-            "team": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "name"
-          ],
-          "additionalProperties": false
-        },
-        "outputSchema": {
-          "type": "object",
-          "additionalProperties": true
-        }
-      },
-      {
-        "name": "list_projects",
-        "description": "List projects in the user's Linear workspace.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "team": {
-              "type": "string"
-            },
-            "limit": {
-              "type": "number"
-            },
-            "cursor": {
-              "type": "string"
-            }
-          },
-          "additionalProperties": false
-        },
-        "outputSchema": {
-          "type": "object",
-          "additionalProperties": true
-        }
-      },
-      {
-        "name": "get_project",
-        "description": "Retrieve details of a specific Linear project.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "query": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "query"
-          ],
-          "additionalProperties": false
-        },
-        "outputSchema": {
-          "type": "object",
-          "additionalProperties": true
-        }
-      },
-      {
-        "name": "save_project",
-        "description": "Create or update a Linear project. Omit id to create (name required); provide id for a partial update.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "id": {
-              "type": "string"
-            },
-            "name": {
-              "type": "string"
-            },
-            "team": {
-              "type": "string"
-            },
-            "description": {
-              "type": "string"
-            },
-            "state": {
-              "type": "string"
-            }
-          },
-          "additionalProperties": false
-        },
-        "outputSchema": {
-          "type": "object",
-          "additionalProperties": true
+        "title": "Delete comment",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "idempotentHint": false,
+          "openWorldHint": false
         }
       },
       {
         "name": "list_cycles",
-        "description": "Retrieve cycles for a specific Linear team.",
+        "description": "Retrieve cycles for a specific Linear team",
         "inputSchema": {
           "type": "object",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
           "properties": {
             "teamId": {
-              "type": "string"
+              "type": "string",
+              "description": "Team ID"
             },
-            "limit": {
-              "type": "number"
-            },
-            "cursor": {
-              "type": "string"
+            "type": {
+              "description": "Filter: current, previous, next, or all",
+              "type": "string",
+              "enum": [
+                "current",
+                "previous",
+                "next"
+              ]
             }
           },
           "required": [
@@ -542,65 +298,20 @@
           ],
           "additionalProperties": false
         },
-        "outputSchema": {
-          "type": "object",
-          "additionalProperties": true
-        }
-      },
-      {
-        "name": "search_documentation",
-        "description": "Search Linear's documentation to learn about features and usage.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "query": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "query"
-          ],
-          "additionalProperties": false
-        },
-        "outputSchema": {
-          "type": "object",
-          "additionalProperties": true
-        }
-      },
-      {
-        "name": "list_documents",
-        "description": "List documents in the user's Linear workspace.",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "projectId": {
-              "type": "string"
-            },
-            "teamId": {
-              "type": "string"
-            },
-            "query": {
-              "type": "string"
-            },
-            "limit": {
-              "type": "number"
-            },
-            "cursor": {
-              "type": "string"
-            }
-          },
-          "additionalProperties": false
-        },
-        "outputSchema": {
-          "type": "object",
-          "additionalProperties": true
+        "title": "List cycles",
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
         }
       },
       {
         "name": "get_document",
-        "description": "Retrieve a Linear document by ID or slug.",
+        "description": "Retrieve a Linear document by ID or slug",
         "inputSchema": {
           "type": "object",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
           "properties": {
             "id": {
               "type": "string",
@@ -612,50 +323,1698 @@
           ],
           "additionalProperties": false
         },
-        "outputSchema": {
+        "title": "Get document",
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "list_documents",
+        "description": "List documents in the user's Linear workspace",
+        "inputSchema": {
           "type": "object",
-          "additionalProperties": true
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "limit": {
+              "default": 50,
+              "description": "Max results (default 50, max 250)",
+              "type": "number",
+              "maximum": 250
+            },
+            "cursor": {
+              "description": "Next page cursor",
+              "type": "string"
+            },
+            "orderBy": {
+              "default": "updatedAt",
+              "description": "Sort: createdAt | updatedAt",
+              "type": "string",
+              "enum": [
+                "createdAt",
+                "updatedAt"
+              ]
+            },
+            "query": {
+              "description": "Search query",
+              "type": "string"
+            },
+            "projectId": {
+              "description": "Filter by project ID",
+              "type": "string"
+            },
+            "initiativeId": {
+              "description": "Filter by initiative ID",
+              "type": "string"
+            },
+            "teamId": {
+              "description": "Filter by team ID",
+              "type": "string"
+            },
+            "creatorId": {
+              "description": "Filter by creator ID",
+              "type": "string"
+            },
+            "createdAt": {
+              "description": "Created after: ISO-8601 date/duration (e.g., -P1D)",
+              "type": "string"
+            },
+            "updatedAt": {
+              "description": "Updated after: ISO-8601 date/duration (e.g., -P1D)",
+              "type": "string"
+            },
+            "includeArchived": {
+              "default": false,
+              "description": "Include archived items",
+              "type": "boolean"
+            },
+            "fields": {
+              "description": "Fields to include in each result. `id` is always included. Omit or pass an empty array for the default response.",
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "id",
+                  "title",
+                  "content",
+                  "url",
+                  "createdAt",
+                  "updatedAt",
+                  "archivedAt",
+                  "creator",
+                  "updatedBy",
+                  "project",
+                  "initiative",
+                  "team",
+                  "issue"
+                ]
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "title": "List documents",
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
         }
       },
       {
         "name": "save_document",
-        "description": "Create or update a Linear document. Omit id to create (title + exactly one parent required); provide id for a partial update.",
+        "description": "Create or update a Linear document. If `id` is provided, updates the existing document; otherwise creates a new one. When creating, `title` is required and exactly one parent (`project`, `issue`, `initiative`, `cycle`, or `team`) must be specified. On update, passing a parent reparents the document. To change parts of the content without resending all of it, pass `patch` instead of `content`.",
         "inputSchema": {
           "type": "object",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
           "properties": {
             "id": {
+              "description": "Document ID or slug to update. Omit to create a new document.",
               "type": "string"
             },
             "title": {
+              "description": "Document title (required when creating)",
               "type": "string"
             },
             "content": {
+              "description": "Content as Markdown. Do not escape the string — use literal newlines and special characters, not escape sequences. To mention a user, use @displayName (e.g., @johndoe)",
               "type": "string"
+            },
+            "patch": {
+              "description": "Partial edits applied to the current content, in order and atomically (one failing operation aborts the whole save). Every anchor string must match the current content exactly once. Only valid on update, in place of the full content/description field",
+              "minItems": 1,
+              "maxItems": 50,
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "replace"
+                      },
+                      "old_string": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Exact text to replace. Must match the current content exactly once"
+                      },
+                      "new_string": {
+                        "type": "string",
+                        "description": "Replacement text. Empty string deletes the match"
+                      },
+                      "replace_all": {
+                        "description": "Replace every occurrence instead of requiring a unique match",
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "old_string",
+                      "new_string"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "insert_before"
+                      },
+                      "anchor": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Exact text to insert before. Must match the current content exactly once"
+                      },
+                      "text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Text to insert directly before the anchor. Include separators (e.g. \"\\n\\n\")"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "anchor",
+                      "text"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "insert_after"
+                      },
+                      "anchor": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Exact text to insert after. Must match the current content exactly once"
+                      },
+                      "text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Text to insert directly after the anchor. Include separators (e.g. \"\\n\\n\")"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "anchor",
+                      "text"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "prepend"
+                      },
+                      "text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Text to insert at the very start of the content"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "text"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "append"
+                      },
+                      "text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Text to insert at the very end of the content"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "text"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "replace_range"
+                      },
+                      "from": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Exact text where the range starts (inclusive). Must match exactly once"
+                      },
+                      "to": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Exact text where the range ends (exclusive, stays in place). Must match exactly once after `from`"
+                      },
+                      "new_string": {
+                        "type": "string",
+                        "description": "Text replacing the range. Empty string deletes it"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "from",
+                      "to",
+                      "new_string"
+                    ]
+                  }
+                ]
+              }
             },
             "project": {
-              "type": "string"
-            },
-            "team": {
+              "description": "Project name, ID, identifier (e.g., PROJ-123), or slug",
               "type": "string"
             },
             "issue": {
+              "description": "Issue ID or identifier (e.g., LIN-123)",
+              "type": "string"
+            },
+            "initiative": {
+              "description": "Initiative name, ID, identifier (e.g., INIT-123), or slug",
               "type": "string"
             },
             "cycle": {
+              "description": "Cycle name, number, or ID. When passing a name or number, also pass `team` to disambiguate.",
+              "type": "string"
+            },
+            "team": {
+              "description": "Team name or ID. Attaches the document to the team, unless `cycle` is also passed, in which case it disambiguates the cycle.",
               "type": "string"
             },
             "icon": {
+              "description": "Icon name or emoji code (e.g. \"Rocket\" or \":eagle:\"), not a raw Unicode emoji",
               "type": "string"
             },
             "color": {
+              "description": "Hex color",
               "type": "string"
             }
           },
           "additionalProperties": false
         },
-        "outputSchema": {
+        "title": "Save document",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "idempotentHint": false,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "get_issue",
+        "description": "Retrieve detailed information about an issue by ID, including attachments, git branch name, and active Triage Intelligence suggestions when the issue is in triage",
+        "inputSchema": {
           "type": "object",
-          "additionalProperties": true
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Issue ID or identifier (e.g., LIN-123)"
+            },
+            "includeRelations": {
+              "default": false,
+              "description": "Include blocking/related/duplicate relations",
+              "type": "boolean"
+            },
+            "includeCustomerNeeds": {
+              "default": false,
+              "description": "Include associated customer needs",
+              "type": "boolean"
+            },
+            "includeReleases": {
+              "default": false,
+              "description": "Include associated releases",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false
+        },
+        "title": "Get issue",
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "list_issues",
+        "description": "List issues in the user's Linear workspace, including active Triage Intelligence suggestions for issues in triage. For my issues, use \"me\" as the assignee. Use \"null\" for no assignee.",
+        "inputSchema": {
+          "type": "object",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "limit": {
+              "default": 50,
+              "description": "Max results (default 50, max 250)",
+              "type": "number",
+              "maximum": 250
+            },
+            "cursor": {
+              "description": "Next page cursor",
+              "type": "string"
+            },
+            "orderBy": {
+              "default": "updatedAt",
+              "description": "Sort: createdAt | updatedAt",
+              "type": "string",
+              "enum": [
+                "createdAt",
+                "updatedAt"
+              ]
+            },
+            "query": {
+              "description": "Search issue title or description",
+              "type": "string"
+            },
+            "team": {
+              "description": "Team name or ID",
+              "type": "string"
+            },
+            "state": {
+              "description": "State type, name, or ID",
+              "type": "string"
+            },
+            "cycle": {
+              "description": "Cycle name, number, or ID",
+              "type": "string"
+            },
+            "label": {
+              "description": "Label name or ID",
+              "type": "string"
+            },
+            "assignee": {
+              "description": "User ID, name, email, or \"me\"",
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "delegate": {
+              "description": "Agent name or ID. When the user asks to delegate to \"Linear\" or \"the Linear agent\", this refers to the \"Linear\" app user specifically",
+              "type": "string"
+            },
+            "project": {
+              "description": "Project name, ID, identifier (e.g., PROJ-123), or slug",
+              "type": "string"
+            },
+            "release": {
+              "description": "Release ID or slug",
+              "type": "string"
+            },
+            "priority": {
+              "description": "0=None, 1=Urgent, 2=High, 3=Medium, 4=Low",
+              "type": "number"
+            },
+            "parentId": {
+              "description": "Parent issue ID or identifier (e.g., LIN-123)",
+              "type": "string"
+            },
+            "fields": {
+              "description": "Fields to include in each result. `id` is always included. Omit or pass an empty array for the default response.",
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "id",
+                  "title",
+                  "description",
+                  "projectMilestone",
+                  "priority",
+                  "estimate",
+                  "url",
+                  "gitBranchName",
+                  "createdAt",
+                  "updatedAt",
+                  "archivedAt",
+                  "completedAt",
+                  "startedAt",
+                  "canceledAt",
+                  "dueDate",
+                  "slaStartedAt",
+                  "slaMediumRiskAt",
+                  "slaHighRiskAt",
+                  "slaBreachesAt",
+                  "slaType",
+                  "status",
+                  "statusType",
+                  "labels",
+                  "triageIntel",
+                  "createdBy",
+                  "createdById",
+                  "assignee",
+                  "assigneeId",
+                  "delegate",
+                  "delegateId",
+                  "project",
+                  "projectId",
+                  "parentId",
+                  "team",
+                  "teamId",
+                  "cycleId"
+                ]
+              }
+            },
+            "createdAt": {
+              "description": "Created after: ISO-8601 date/duration (e.g., -P1D)",
+              "type": "string"
+            },
+            "updatedAt": {
+              "description": "Updated after: ISO-8601 date/duration (e.g., -P1D)",
+              "type": "string"
+            },
+            "includeArchived": {
+              "default": true,
+              "description": "Include archived items",
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "title": "List issues",
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "save_issue",
+        "description": "Create or update a Linear issue. If `id` is provided, updates the existing issue; otherwise creates a new one. When creating, `title` and `team` are required. Note: use `assignee` (not `assigneeId`) to set the assignee — it accepts a user ID, name, email, or \"me\".",
+        "inputSchema": {
+          "type": "object",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "id": {
+              "description": "Only for updating an existing issue. Pass the issue ID or identifier (e.g., LIN-123). Do NOT pass this parameter when creating a new issue.",
+              "type": "string"
+            },
+            "title": {
+              "description": "Issue title (required when creating)",
+              "type": "string"
+            },
+            "description": {
+              "description": "Content as Markdown. Do not escape the string — use literal newlines and special characters, not escape sequences. To mention a user, use @displayName (e.g., @johndoe)",
+              "type": "string"
+            },
+            "patch": {
+              "description": "Partial edits applied to the current content, in order and atomically (one failing operation aborts the whole save). Every anchor string must match the current content exactly once. Only valid on update, in place of the full content/description field",
+              "minItems": 1,
+              "maxItems": 50,
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "replace"
+                      },
+                      "old_string": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Exact text to replace. Must match the current content exactly once"
+                      },
+                      "new_string": {
+                        "type": "string",
+                        "description": "Replacement text. Empty string deletes the match"
+                      },
+                      "replace_all": {
+                        "description": "Replace every occurrence instead of requiring a unique match",
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "old_string",
+                      "new_string"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "insert_before"
+                      },
+                      "anchor": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Exact text to insert before. Must match the current content exactly once"
+                      },
+                      "text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Text to insert directly before the anchor. Include separators (e.g. \"\\n\\n\")"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "anchor",
+                      "text"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "insert_after"
+                      },
+                      "anchor": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Exact text to insert after. Must match the current content exactly once"
+                      },
+                      "text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Text to insert directly after the anchor. Include separators (e.g. \"\\n\\n\")"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "anchor",
+                      "text"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "prepend"
+                      },
+                      "text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Text to insert at the very start of the content"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "text"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "append"
+                      },
+                      "text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Text to insert at the very end of the content"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "text"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "replace_range"
+                      },
+                      "from": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Exact text where the range starts (inclusive). Must match exactly once"
+                      },
+                      "to": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Exact text where the range ends (exclusive, stays in place). Must match exactly once after `from`"
+                      },
+                      "new_string": {
+                        "type": "string",
+                        "description": "Text replacing the range. Empty string deletes it"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "from",
+                      "to",
+                      "new_string"
+                    ]
+                  }
+                ]
+              }
+            },
+            "team": {
+              "description": "Team name or ID (required when creating)",
+              "type": "string"
+            },
+            "cycle": {
+              "description": "Cycle name, number, or ID. Null to remove",
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "milestone": {
+              "description": "Milestone name or ID",
+              "type": "string"
+            },
+            "priority": {
+              "description": "0=None, 1=Urgent, 2=High, 3=Medium, 4=Low",
+              "type": "number"
+            },
+            "project": {
+              "description": "Project name, ID, identifier (e.g., PROJ-123), or slug. Null to remove",
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "state": {
+              "description": "State type, name, or ID",
+              "type": "string"
+            },
+            "assignee": {
+              "description": "User ID, name, email, or \"me\". Null to remove",
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "delegate": {
+              "description": "Agent name or ID. When the user asks to delegate to \"Linear\" or \"the Linear agent\", this refers to the \"Linear\" app user specifically. Null to remove",
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "labels": {
+              "description": "Label names or IDs as a JSON array of strings (e.g. [\"Bug\", \"Urgent\"]). Replaces the full label set; existing labels not included are removed. Omit to leave labels unchanged",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "dueDate": {
+              "description": "Due date (ISO format). On update, pass null to remove the due date",
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "slaBreachesAt": {
+              "description": "ISO-8601 timestamp when the SLA will breach. On update, pass null to remove the SLA",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "slaType": {
+              "description": "SLA day counting type: \"all\" or \"onlyBusinessDays\". Only use with slaBreachesAt; null means unset",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "all",
+                    "onlyBusinessDays"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "parentId": {
+              "description": "Parent issue ID or identifier (e.g., LIN-123). Null to remove",
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "estimate": {
+              "description": "Issue estimate value. On create, pass null or omit for no estimate. On update, pass null to clear the estimate; omitting leaves it unchanged. 0 is a real estimate only on teams that allow zero estimates.",
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "links": {
+              "description": "Link attachments to add [{url, title}]. Append-only; existing links are never removed",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "url",
+                  "title"
+                ]
+              }
+            },
+            "setReleases": {
+              "description": "Replace all releases on the issue with these. Cannot be combined with addReleases/removeReleases",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "addReleases": {
+              "description": "Release IDs or slugs to add. Append-only; existing releases are never removed",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "removeReleases": {
+              "description": "Release IDs or slugs to remove. Only valid when updating an existing issue",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "blocks": {
+              "description": "Issue IDs/identifiers this blocks. Append-only; existing relations are never removed",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "blockedBy": {
+              "description": "Issue IDs/identifiers blocking this. Append-only; existing relations are never removed",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "relatedTo": {
+              "description": "Related issue IDs/identifiers. Append-only; existing relations are never removed",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "duplicateOf": {
+              "description": "Duplicate of issue ID/identifier. Null to remove",
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "removeBlocks": {
+              "description": "Issue IDs/identifiers to stop blocking",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "removeBlockedBy": {
+              "description": "Issue IDs/identifiers to remove as blockers of this issue",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "removeRelatedTo": {
+              "description": "Related issue IDs/identifiers to remove",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "title": "Save issue",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "idempotentHint": false,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "list_issue_statuses",
+        "description": "List available issue statuses in a Linear team",
+        "inputSchema": {
+          "type": "object",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "team": {
+              "type": "string",
+              "description": "Team name or ID"
+            }
+          },
+          "required": [
+            "team"
+          ],
+          "additionalProperties": false
+        },
+        "title": "List issue statuses",
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "get_issue_status",
+        "description": "Retrieve detailed information about an issue status in Linear by name or ID",
+        "inputSchema": {
+          "type": "object",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Status ID"
+            },
+            "name": {
+              "type": "string",
+              "description": "Status name"
+            },
+            "team": {
+              "type": "string",
+              "description": "Team name or ID"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "team"
+          ],
+          "additionalProperties": false
+        },
+        "title": "Get issue status",
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "list_issue_labels",
+        "description": "List available issue labels in a Linear workspace or team",
+        "inputSchema": {
+          "type": "object",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "limit": {
+              "default": 50,
+              "description": "Max results (default 50, max 250)",
+              "type": "number",
+              "maximum": 250
+            },
+            "cursor": {
+              "description": "Next page cursor",
+              "type": "string"
+            },
+            "orderBy": {
+              "default": "updatedAt",
+              "description": "Sort: createdAt | updatedAt",
+              "type": "string",
+              "enum": [
+                "createdAt",
+                "updatedAt"
+              ]
+            },
+            "name": {
+              "description": "Filter by name",
+              "type": "string"
+            },
+            "team": {
+              "description": "Team name or ID",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "title": "List issue labels",
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "create_issue_label",
+        "description": "Create a new Linear issue label",
+        "inputSchema": {
+          "type": "object",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Label name"
+            },
+            "description": {
+              "description": "Label description",
+              "type": "string"
+            },
+            "color": {
+              "description": "Hex color code",
+              "type": "string"
+            },
+            "teamId": {
+              "description": "Team UUID (omit for workspace label)",
+              "type": "string"
+            },
+            "parent": {
+              "description": "Parent label group name",
+              "type": "string"
+            },
+            "isGroup": {
+              "default": false,
+              "description": "Is label group (not directly applicable)",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "additionalProperties": false
+        },
+        "title": "Create issue label",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "idempotentHint": false,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "list_projects",
+        "description": "List projects in the user's Linear workspace",
+        "inputSchema": {
+          "type": "object",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "limit": {
+              "default": 50,
+              "description": "Max results (default 50, max 50)",
+              "type": "number",
+              "maximum": 50
+            },
+            "cursor": {
+              "description": "Next page cursor",
+              "type": "string"
+            },
+            "orderBy": {
+              "default": "updatedAt",
+              "description": "Sort: createdAt | updatedAt",
+              "type": "string",
+              "enum": [
+                "createdAt",
+                "updatedAt"
+              ]
+            },
+            "query": {
+              "description": "Search project name",
+              "type": "string"
+            },
+            "state": {
+              "description": "State type, name, or ID",
+              "type": "string"
+            },
+            "initiative": {
+              "description": "Initiative name, ID, identifier (e.g., INIT-123), or slug",
+              "type": "string"
+            },
+            "team": {
+              "description": "Team name or ID",
+              "type": "string"
+            },
+            "member": {
+              "description": "User ID, name, email, or \"me\"",
+              "type": "string"
+            },
+            "label": {
+              "description": "Label name or ID",
+              "type": "string"
+            },
+            "createdAt": {
+              "description": "Created after: ISO-8601 date/duration (e.g., -P1D)",
+              "type": "string"
+            },
+            "updatedAt": {
+              "description": "Updated after: ISO-8601 date/duration (e.g., -P1D)",
+              "type": "string"
+            },
+            "includeMilestones": {
+              "default": false,
+              "description": "Include milestones",
+              "type": "boolean"
+            },
+            "includeMembers": {
+              "default": false,
+              "description": "Include project members",
+              "type": "boolean"
+            },
+            "includeArchived": {
+              "default": false,
+              "description": "Include archived items",
+              "type": "boolean"
+            },
+            "fields": {
+              "description": "Fields to include in each result. `id` is always included. Omit or pass an empty array for the default response.",
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "id",
+                  "name",
+                  "summary",
+                  "description",
+                  "url",
+                  "trashed",
+                  "createdAt",
+                  "updatedAt",
+                  "startedAt",
+                  "completedAt",
+                  "canceledAt",
+                  "startDate",
+                  "startDateResolution",
+                  "targetDate",
+                  "targetDateResolution",
+                  "priority",
+                  "labels",
+                  "initiatives",
+                  "lead",
+                  "status",
+                  "teams",
+                  "members",
+                  "milestones"
+                ]
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "title": "List projects",
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "get_project",
+        "description": "Retrieve details of a specific project in Linear",
+        "inputSchema": {
+          "type": "object",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Project name, ID, identifier (e.g., PROJ-123), or slug"
+            },
+            "includeMilestones": {
+              "default": false,
+              "description": "Include milestones",
+              "type": "boolean"
+            },
+            "includeMembers": {
+              "default": false,
+              "description": "Include project members",
+              "type": "boolean"
+            },
+            "includeResources": {
+              "default": false,
+              "description": "Include resources (documents, links, attachments)",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "additionalProperties": false
+        },
+        "title": "Get project",
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "save_project",
+        "description": "Create or update a Linear project. If `id` is provided, updates the existing project; otherwise creates a new one. When creating, `name` and at least one team (via `addTeams` or `setTeams`) are required. To change parts of the description without resending all of it, pass `patch` instead of `description`.",
+        "inputSchema": {
+          "type": "object",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "id": {
+              "description": "Project name, ID, identifier (e.g., PROJ-123), or slug. If provided, updates the existing project",
+              "type": "string"
+            },
+            "name": {
+              "description": "Project name (required when creating)",
+              "type": "string"
+            },
+            "icon": {
+              "description": "Icon name or emoji code (e.g. \"Rocket\" or \":eagle:\"), not a raw Unicode emoji",
+              "type": "string"
+            },
+            "color": {
+              "description": "Hex color",
+              "type": "string"
+            },
+            "summary": {
+              "description": "Short summary (max 255 chars)",
+              "type": "string"
+            },
+            "description": {
+              "description": "Content as Markdown. Do not escape the string — use literal newlines and special characters, not escape sequences. To mention a user, use @displayName (e.g., @johndoe)",
+              "type": "string"
+            },
+            "patch": {
+              "description": "Partial edits applied to the current content, in order and atomically (one failing operation aborts the whole save). Every anchor string must match the current content exactly once. Only valid on update, in place of the full content/description field",
+              "minItems": 1,
+              "maxItems": 50,
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "replace"
+                      },
+                      "old_string": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Exact text to replace. Must match the current content exactly once"
+                      },
+                      "new_string": {
+                        "type": "string",
+                        "description": "Replacement text. Empty string deletes the match"
+                      },
+                      "replace_all": {
+                        "description": "Replace every occurrence instead of requiring a unique match",
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "old_string",
+                      "new_string"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "insert_before"
+                      },
+                      "anchor": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Exact text to insert before. Must match the current content exactly once"
+                      },
+                      "text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Text to insert directly before the anchor. Include separators (e.g. \"\\n\\n\")"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "anchor",
+                      "text"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "insert_after"
+                      },
+                      "anchor": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Exact text to insert after. Must match the current content exactly once"
+                      },
+                      "text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Text to insert directly after the anchor. Include separators (e.g. \"\\n\\n\")"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "anchor",
+                      "text"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "prepend"
+                      },
+                      "text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Text to insert at the very start of the content"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "text"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "append"
+                      },
+                      "text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Text to insert at the very end of the content"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "text"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "replace_range"
+                      },
+                      "from": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Exact text where the range starts (inclusive). Must match exactly once"
+                      },
+                      "to": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Exact text where the range ends (exclusive, stays in place). Must match exactly once after `from`"
+                      },
+                      "new_string": {
+                        "type": "string",
+                        "description": "Text replacing the range. Empty string deletes it"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "from",
+                      "to",
+                      "new_string"
+                    ]
+                  }
+                ]
+              }
+            },
+            "state": {
+              "description": "Project state",
+              "type": "string"
+            },
+            "startDate": {
+              "description": "Start date (ISO format). Pair with startDateResolution to indicate precision (e.g. month, quarter)",
+              "type": "string"
+            },
+            "startDateResolution": {
+              "description": "Start date resolution",
+              "type": "string",
+              "enum": [
+                "halfYear",
+                "month",
+                "quarter",
+                "year"
+              ]
+            },
+            "targetDate": {
+              "description": "Target date (ISO format). Pair with targetDateResolution to indicate precision (e.g. month, quarter)",
+              "type": "string"
+            },
+            "targetDateResolution": {
+              "description": "Target date resolution",
+              "type": "string",
+              "enum": [
+                "halfYear",
+                "month",
+                "quarter",
+                "year"
+              ]
+            },
+            "priority": {
+              "description": "0=None, 1=Urgent, 2=High, 3=Medium, 4=Low",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4
+            },
+            "addTeams": {
+              "description": "Team name or ID to add",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "removeTeams": {
+              "description": "Team name or ID to remove",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "setTeams": {
+              "description": "Replace all teams with these. Cannot combine with addTeams/removeTeams",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "labels": {
+              "description": "Label names or IDs as a JSON array of strings (e.g. [\"Bug\", \"Urgent\"]). Replaces the full label set; existing labels not included are removed. Omit to leave labels unchanged",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "lead": {
+              "description": "User ID, name, email, or \"me\". Null to remove",
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "addInitiatives": {
+              "description": "Initiatives to add. Initiative name, ID, identifier (e.g., INIT-123), or slug",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "removeInitiatives": {
+              "description": "Initiatives to remove. Initiative name, ID, identifier (e.g., INIT-123), or slug",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "setInitiatives": {
+              "description": "Replace all initiatives with these. Initiative name, ID, identifier (e.g., INIT-123), or slug. Cannot combine with addInitiatives/removeInitiatives",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "links": {
+              "description": "External resource links to add [{url, title}]. Append-only; existing links are never removed",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "url",
+                  "title"
+                ]
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "title": "Save project",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "idempotentHint": false,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "list_teams",
+        "description": "List teams in the user's Linear workspace",
+        "inputSchema": {
+          "type": "object",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "limit": {
+              "default": 50,
+              "description": "Max results (default 50, max 250)",
+              "type": "number",
+              "maximum": 250
+            },
+            "cursor": {
+              "description": "Next page cursor",
+              "type": "string"
+            },
+            "orderBy": {
+              "default": "updatedAt",
+              "description": "Sort: createdAt | updatedAt",
+              "type": "string",
+              "enum": [
+                "createdAt",
+                "updatedAt"
+              ]
+            },
+            "query": {
+              "description": "Search query",
+              "type": "string"
+            },
+            "includeArchived": {
+              "default": false,
+              "description": "Include archived items",
+              "type": "boolean"
+            },
+            "createdAt": {
+              "description": "Created after: ISO-8601 date/duration (e.g., -P1D)",
+              "type": "string"
+            },
+            "updatedAt": {
+              "description": "Updated after: ISO-8601 date/duration (e.g., -P1D)",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "title": "List teams",
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "get_team",
+        "description": "Retrieve details of a specific Linear team",
+        "inputSchema": {
+          "type": "object",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Team UUID, key, or name"
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "additionalProperties": false
+        },
+        "title": "Get team",
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "list_users",
+        "description": "Retrieve users in the Linear workspace",
+        "inputSchema": {
+          "type": "object",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "limit": {
+              "default": 50,
+              "description": "Max results (default 50, max 250)",
+              "type": "number",
+              "maximum": 250
+            },
+            "cursor": {
+              "description": "Next page cursor",
+              "type": "string"
+            },
+            "orderBy": {
+              "default": "updatedAt",
+              "description": "Sort: createdAt | updatedAt",
+              "type": "string",
+              "enum": [
+                "createdAt",
+                "updatedAt"
+              ]
+            },
+            "query": {
+              "description": "Filter by name or email",
+              "type": "string"
+            },
+            "team": {
+              "description": "Team name or ID",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "title": "List users",
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "get_user",
+        "description": "Retrieve details of a specific Linear user",
+        "inputSchema": {
+          "type": "object",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "User ID, name, email, or \"me\""
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "additionalProperties": false
+        },
+        "title": "Get user",
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        }
+      },
+      {
+        "name": "search_documentation",
+        "description": "Search Linear's documentation to learn about features and usage",
+        "inputSchema": {
+          "type": "object",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Search query"
+            },
+            "page": {
+              "default": 0,
+              "description": "Page number",
+              "type": "number"
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "additionalProperties": false
+        },
+        "title": "Search documentation",
+        "annotations": {
+          "readOnlyHint": true,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
         }
       }
     ]

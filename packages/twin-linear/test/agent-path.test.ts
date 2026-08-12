@@ -8,6 +8,7 @@ import {
   openLinearTwinDatabase,
 } from "../src/index.js";
 import { testSeed } from "./_helpers.js";
+import { payload } from "./_mcpPayload.js";
 
 const SID = DEFAULT_LINEAR_SID;
 const SECRET = "linear-agent-path-test-secret-32!";
@@ -58,8 +59,7 @@ async function mcp(
   return (await response.json()) as {
     result: {
       isError: boolean;
-      structuredContent?: Record<string, unknown>;
-      content: Array<{ text: string }>;
+      content: Array<{ type: string; text: string }>;
     };
   };
 }
@@ -70,7 +70,7 @@ describe("Linear agent-path MCP triage", () => {
 
     const listed = await mcp(app, 1, "list_issues", { team: "ENG", limit: 20 });
     expect(listed.result.isError).toBe(false);
-    const issues = listed.result.structuredContent?.issues as Array<{
+    const issues = payload(listed).issues as Array<{
       id: string;
       identifier: string;
       title: string;
@@ -85,7 +85,7 @@ describe("Linear agent-path MCP triage", () => {
       title: backlog.title,
     });
     expect(updated.result.isError).toBe(false);
-    expect(updated.result.structuredContent).toMatchObject({
+    expect(payload(updated)).toMatchObject({
       id: backlog.id,
       state: { name: "In Progress" },
     });
@@ -95,7 +95,7 @@ describe("Linear agent-path MCP triage", () => {
       body: "Agent triage: moving into progress.",
     });
     expect(commented.result.isError).toBe(false);
-    expect(commented.result.structuredContent).toMatchObject({
+    expect(payload(commented)).toMatchObject({
       issueId: backlog.id,
       body: "Agent triage: moving into progress.",
     });
