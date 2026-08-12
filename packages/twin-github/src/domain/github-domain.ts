@@ -390,11 +390,11 @@ export class GitHubDomain {
     return git.listCommits(this, input);
   }
 
-  createOrUpdateFile(input: { owner: string; repo: string; path: string; message: string; content: string; branch?: string; sha?: string; encoding?: string }, options: MutatingOptions = {}, onDelta?: StateDeltaCallback) {
+  createOrUpdateFile(input: { owner: string; repo: string; path: string; message: string; content: string; branch?: string; sha?: string }, options: MutatingOptions = {}, onDelta?: StateDeltaCallback) {
     return git.createOrUpdateFile(this, input, options, onDelta);
   }
 
-  pushFiles(input: { owner: string; repo: string; branch?: string; message: string; files: Array<{ path: string; content: string; encoding?: string }> }, options: MutatingOptions = {}, onDelta?: StateDeltaCallback) {
+  pushFiles(input: { owner: string; repo: string; branch?: string; message: string; files: Array<{ path: string; content: string }> }, options: MutatingOptions = {}, onDelta?: StateDeltaCallback) {
     return git.pushFiles(this, input, options, onDelta);
   }
 

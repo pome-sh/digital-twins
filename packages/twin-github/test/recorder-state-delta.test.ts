@@ -19,6 +19,9 @@ afterAll(() => {
 
 const base = `/s/${TEST_SID}`;
 
+/** F-1460 — `PUT /contents/*` takes base64, the way GitHub's does. */
+const b64 = (text: string) => Buffer.from(text, "utf8").toString("base64");
+
 function setupApp() {
   const recorder = createRecorderStore();
   const app = createGitHubCloneApp({ recorder, runId: "run_state_delta_test" });
@@ -90,7 +93,7 @@ describe("recorder state_delta — mutation endpoints", () => {
     await app.request(`${base}/repos/acme/api/contents/x.md`, withAuth(token, {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ message: "add x", content: "hello", branch: "feature/x" })
+      body: JSON.stringify({ message: "add x", content: b64("hello"), branch: "feature/x" })
     }));
     const prResp = await app.request(`${base}/repos/acme/api/pulls`, withAuth(token, {
       method: "POST",

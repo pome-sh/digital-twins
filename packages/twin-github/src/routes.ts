@@ -30,6 +30,7 @@ import {
 import type { StateDelta } from "@pome-sh/wire";
 import type { GitHubDomain } from "./domain/index.js";
 import { TwinError, validationFailed } from "./errors.js";
+import { decodeRestContent } from "./rest-content.js";
 import { GITHUB_ROUTES } from "./route-inputs.js";
 import { TAPE_ASSERTABLE_TOOLS } from "./tools.js";
 
@@ -109,8 +110,13 @@ export function registerGitHubRoutes(session: Hono, { domain, recorder }: RouteC
     ok(domain.getFileContents({ ...path, ref: query.ref }))
   );
   route(GITHUB_ROUTES.createOrUpdateFile, ({ path, body }, c) => {
+    // F-1460 — base64 in, on THIS door only. The MCP tools reach the same
+    // `domain.createOrUpdateFile` with plain text, which is what GitHub's own
+    // MCP server sends it; see `rest-content.ts` for why the decode lives here
+    // and not one level down.
+    const content = decodeRestContent(body.content).toString("utf8");
     const { value, delta } = captureDelta((onDelta) =>
-      domain.createOrUpdateFile({ ...path, ...body }, { actor: sessionLogin(c) }, onDelta)
+      domain.createOrUpdateFile({ ...path, ...body, content }, { actor: sessionLogin(c) }, onDelta)
     );
     // GitHub returns 201 Created when the file did not previously exist and 200
     // OK when an existing file is updated (FDRS-596). The domain reports a

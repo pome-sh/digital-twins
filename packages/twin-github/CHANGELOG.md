@@ -1,5 +1,51 @@
 # @pome-sh/twin-github — CHANGELOG
 
+## 0.10.8 — 2026-08-12
+
+`PUT /contents/*` takes base64, the MCP write tools keep taking plain text, and
+divergence 24 is retired (F-1460).
+
+**The REST route base64-decodes `content` and refuses what GitHub refuses.**
+F-1389 removed the `encoding` switch from the declaration and left the behaviour
+alone; this closes it. Invalid base64 now gets real GitHub's answer, measured
+live against the API on 2026-08-12 rather than assumed: HTTP 422,
+`content is not valid Base64`, **no `errors` array**, and the operation-specific
+`documentation_url`. What GitHub validates is STRUCTURE — the base64 alphabet and
+a padded length, whitespace tolerated anywhere — not meaning: `test` is well
+formed, so GitHub takes it and writes three junk bytes, and so does this twin.
+`abcde` is not, and both refuse it.
+
+**The MCP door was already right, and the ticket that opened this was wrong
+about it.** F-1460 was written to make `create_or_update_file` and `push_files`
+decode base64 too, on the reasoning that the reachable door must not be left
+behind. The measurement says the opposite: GitHub's own MCP server takes
+`content` as PLAIN TEXT and base64-encodes it itself before calling the REST
+route, and its tool schema tells the model so outright — *"Do not base64-encode
+it; this server does that before calling the REST API."* `push_files` hands
+`content` to a Git tree entry, which takes plain UTF-8 as well. So the doors are
+asymmetric because GitHub's are, the decode lives at the REST boundary
+(`src/rest-content.ts`) and never in the domain that serves both, and
+`test/contents-base64.test.ts` carries two tests whose only job is to fail if a
+later change "unifies" them.
+
+**The migration was 13 call sites, not 47.** The 47 in the ticket counted every
+mention of `content`; split by door it is 13 REST calls (all inside this
+package's own suite, all migrated here), 22 MCP calls that are correct as they
+stand, and 36 direct domain calls that sit below both doors. The default seed
+needed nothing either — it commits through `commitFiles` and never touches the
+decode path. **Zero shipped tasks under `cli/tasks/` write file content**, so no
+saved task's expected output moves.
+
+**`encoding` is gone from the MCP validators too.** It survived F-1389 because
+the served tool table is a capture and the zod validators are a different object;
+`mcp-argument-surface`'s known-residue entry for it is retired with it.
+
+**Divergence 24 retired; 29 recorded in its place.** Accepting base64 makes a
+limitation reachable that nothing could express before: `files.content` is a TEXT
+column, so bytes that are not valid UTF-8 come back as replacement characters.
+Recorded rather than fixed — closing it means changing the storage convention for
+every surface that reads file content back out.
+
 ## 0.10.7 — 2026-08-12
 
 `updated_at` appears on release objects, and four divergences the first real
