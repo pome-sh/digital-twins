@@ -61,7 +61,13 @@ jobs:
           archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
           tmp="$(mktemp -d)"
           trap 'rm -rf "$tmp"' EXIT
-          curl -sSfL "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}" -o "$tmp/$archive"
+          # --retry because the release CDN returns transient 503s: one did
+          # exactly that to secret-scan.yml's identical gitleaks fetch on this
+          # PR's own run 31618873218. This step gates `typecheck-test`, the
+          # required check, so a CDN hiccup would red an otherwise-good PR and
+          # teach people to re-run rather than read. curl retries 5xx (and
+          # connection failures) on its own; the sha256 below is unaffected.
+          curl -sSfL --retry 3 --retry-delay 2 --retry-connrefused "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}" -o "$tmp/$archive"
           printf '%s  %s\n' "$ACTIONLINT_SHA256" "$tmp/$archive" | sha256sum -c -
           tar -xzf "$tmp/$archive" -C "$tmp" actionlint
           mkdir -p "$HOME/.local/bin"
