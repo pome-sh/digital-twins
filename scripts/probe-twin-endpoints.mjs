@@ -429,22 +429,27 @@ export async function runGate(opts = {}) {
     findings.push(...found);
   }
 
+  // Reported BEFORE the zero-probe floor below: a manifest whose twins declare
+  // no probes produces an `unprobed-endpoint` finding per declared tool, and
+  // those name the endpoints. Throwing first would replace that whole list with
+  // a bare stack trace — the louder failure would be the less informative one.
+  if (findings.length > 0) {
+    console.error(`\n${formatFindings(findings)}`);
+    console.error(`Twins with declared-endpoint findings: ${[...new Set(findings.map((f) => f.twin))].join(", ")}`);
+    return 1;
+  }
+
+  // Only reachable on the pass path, which is the point: it is the floor under
+  // "exit 0", not a second way to red. A manifest with twins but no probes at
+  // all reds through the findings above; this catches the case where nothing
+  // red AND nothing was probed.
   const probeCount = ids.reduce((sum, id) => sum + (manifest[id]?.probes?.length ?? 0), 0);
-  // Every declared tool with zero probes already reds as `unprobed-endpoint`
-  // (see evaluateTwinProbeRun), so this only fires if a twin were ever booted
-  // with no declared tools at all — belt-and-suspenders against the same
-  // "exit 0 having probed nothing" shape from the other direction.
   if (probeCount === 0) {
     throw new Error(
       `${manifestPath} declares ${ids.length} twin(s) but zero probes in total — refusing to report a pass having probed nothing`
     );
   }
 
-  if (findings.length > 0) {
-    console.error(`\n${formatFindings(findings)}`);
-    console.error(`Twins with declared-endpoint findings: ${[...new Set(findings.map((f) => f.twin))].join(", ")}`);
-    return 1;
-  }
   console.log(`\nEvery endpoint all ${ids.length} twins declare was called and answered (${probeCount} probes).`);
   return 0;
 }
