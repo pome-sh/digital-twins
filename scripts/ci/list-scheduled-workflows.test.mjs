@@ -5,7 +5,12 @@
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { findScheduledWorkflows } from "./list-scheduled-workflows.mjs";
+import { fileURLToPath } from "node:url";
+import {
+  findScheduledWorkflows,
+  findCronWorkflows,
+  findBrokenLocalUses,
+} from "./list-scheduled-workflows.mjs";
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg);
@@ -97,8 +102,70 @@ withScratchRoot({ "none.yml": "name: x\non:\n  push:\n    branches: [main]\njobs
 // secret-scan.yml and release-alarm.yml on a schedule today. A regression
 // here would mean the real-tree floor assertion (this same non-zero-count
 // logic, run by main()) is not actually watching anything.
+// The three YAML shapes the first revision of the parser silently missed. Each
+// is a scheduled workflow that would have gone uncovered, invisibly, because
+// the only floor was "at least one workflow is scheduled" — which the three
+// real ones satisfy forever.
+withScratchRoot(
+  {
+    // `on` is YAML 1.1 truthy, so yamllint's standard workaround is to quote it.
+    "quoted-on.yml": "name: x\n\"on\":\n  schedule:\n    - cron: '0 0 * * *'\njobs: {}\n",
+    // Flow form entirely on the `on:` line.
+    "flow-on.yml": "name: x\non: {schedule: [{cron: '0 0 * * *'}]}\njobs: {}\n",
+    // Four-space indent under `on:`, and an inline value on `schedule:`.
+    "deep-indent.yml": "name: x\non:\n    schedule: [{cron: '0 0 * * *'}]\njobs: {}\n",
+  },
+  (root) => {
+    const found = findScheduledWorkflows(root);
+    for (const expected of ["quoted-on.yml", "flow-on.yml", "deep-indent.yml"]) {
+      assert(found.includes(expected), `${expected} must count as scheduled, got ${found}`);
+    }
+  },
+);
+
+// The cross-check floor: the `cron:` read and the `on: schedule:` read are two
+// independent rules over the same fact, so a parser that stops matching one
+// workflow shows up as a set difference rather than as a still-non-zero count.
+withScratchRoot(
+  {
+    "scheduled.yml": "name: x\non:\n  schedule:\n    - cron: '0 0 * * *'\njobs: {}\n",
+    "plain.yml": "name: y\non:\n  push:\n    branches: [main]\njobs: {}\n",
+    // `cron:` only in prose must not count on the cron side either.
+    "prose.yml": "name: z\n# nightly cron: not a trigger\non:\n  push:\njobs: {}\n",
+  },
+  (root) => {
+    const cron = findCronWorkflows(root);
+    assert(
+      cron.length === 1 && cron[0] === "scheduled.yml",
+      `cron read must find exactly scheduled.yml, got ${cron}`,
+    );
+    assert(
+      JSON.stringify(cron) === JSON.stringify(findScheduledWorkflows(root)),
+      "the two reads must agree on this fixture",
+    );
+  },
+);
+
+// A wired-but-BROKEN alarm: the job is present, the `uses:` path is a typo, and
+// GitHub would refuse to run the workflow. Nothing else in CI catches this —
+// actionlint is not wired in, and the reusable call is never exercised on a PR.
+withScratchRoot(
+  {
+    "caller.yml":
+      "name: x\non:\n  schedule:\n    - cron: '0 0 * * *'\njobs:\n  a:\n    uses: ./.github/workflows/typo.yml\n  b:\n    uses: ./.github/workflows/real.yml\n",
+    "real.yml": "name: r\non:\n  workflow_call:\njobs: {}\n",
+  },
+  (root) => {
+    const broken = findBrokenLocalUses(root);
+    assert(
+      broken.length === 1 && broken[0].includes("typo.yml"),
+      `only the typo'd uses: must be reported, got ${JSON.stringify(broken)}`,
+    );
+  },
+);
+
 {
-  const real = findScheduledWorkflows(new URL("../..", import.meta.url).pathname);
+  const real = findScheduledWorkflows(fileURLToPath(new URL("../..", import.meta.url)));
   for (const expected of ["repo-policy.yml", "secret-scan.yml", "release-alarm.yml"]) {
     assert(real.includes(expected), `expected ${expected} in the real tree's scheduled set, got ${real}`);
   }

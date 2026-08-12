@@ -102,14 +102,23 @@ jobs:
       # that blinds the alarm.
       - run: node scripts/ci/release-alarm.mjs --targets
       - run: node scripts/ci/release-alarm.test.mjs
-      # F-1230 — every workflow with a `schedule:` trigger must reach a
-      # failure alarm (schedule-alarm.yml). The set of scheduled workflows is
-      # DERIVED from `.github/workflows/*.yml`, never a hand-kept list, and
-      # asserts a non-zero floor for the same reason release-alarm's
-      # `--targets` does: a walk that finds zero scheduled workflows here,
-      # when this repo has carried at least three since before this line
-      # existed, is a parser regression passing forever, not a true fact.
-      # Network-free, so it belongs in this block.
+      # F-1230 — the DERIVATION behind the schedule-alarm coverage property,
+      # plus the two things that can make that derivation lie. The set of
+      # scheduled workflows is read out of `.github/workflows/*.yml`, never a
+      # hand-kept list. What this step asserts today, precisely:
+      #   - at least one workflow is scheduled (release-alarm's `--targets`
+      #     dead-guard, same reasoning: an alarm covering zero workflows passes
+      #     forever), AND
+      #   - the `on: schedule:` read and the independent `cron:` read agree
+      #     exactly — the floor above cannot move on its own, since the three
+      #     workflows scheduled today satisfy it no matter what the parser
+      #     stops recognising, so a set difference is the part that can, AND
+      #   - no workflow calls a local `uses: ./.github/workflows/…` that is not
+      #     there, which is a workflow GitHub refuses to run and therefore an
+      #     alarm that is present in review and dead in production.
+      # It does NOT yet assert that every scheduled workflow reaches the alarm
+      # — that property is F-1471, and it reads this derivation rather than
+      # re-parsing the tree by its own rules. Network-free, so it belongs here.
       - run: node scripts/ci/list-scheduled-workflows.mjs
       - run: node scripts/ci/list-scheduled-workflows.test.mjs
       - run: bash scripts/ci/file-schedule-alarm.test.sh
