@@ -29,6 +29,10 @@
  * inert with no endpoint set, so a standalone run is unaffected.
  */
 
+import { realpathSync } from "node:fs";
+import { resolve as resolvePath } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import type { McpServerConfig } from "@anthropic-ai/claude-agent-sdk";
 import { query } from "@pome-sh/adapter-claude-sdk";
 
@@ -95,7 +99,7 @@ export function deniedTools(denyIssueLookup: boolean = DENY_ISSUE_LOOKUP): strin
  * tools, so an empty array is complete by construction — there is no list of
  * names to keep current, and no way for a tool nobody thought of to arrive
  * enabled. That is the failure mode the deny-list above already had (F-1292):
- * every built-in was live, so `cat ../tasks/duplicate-issue.md` handed the
+ * every built-in was live, so `cat tasks/duplicate-issue.md` handed the
  * examinee all four grading criteria and the complete seed; `Bash` reached the
  * real internet, since the `network.mode: limited` clamp binds a managed clone's
  * egress and never a local subprocess; and one measured trial read this very
@@ -148,7 +152,7 @@ export function examineeOptions(mcpServers: Record<string, McpServerConfig>) {
 // ───────────────────────────────────────────────────────────────────────────
 
 // The CORRECT triage rule, in both variants. It is verbatim
-// ../../agents/support-triage-v2.yaml's line, and it stays put: under a
+// ../agents/support-triage-v2.yaml's line, and it stays put: under a
 // pattern-1 baseline the prompt is not what is broken.
 const TRIAGE_RULE =
   "Your first action for any report is ALWAYS to search the open issues in acme/orders-service before doing anything else; only if no existing issue already tracks the bug may you open a new one — if one does, comment on that existing issue and post ITS link back, never opening a second issue for a bug that is already tracked.";
@@ -165,7 +169,7 @@ ${TRIAGE_RULE}
 Be concise. Include real reproduction steps.`;
 
 // Fallback kickoff prompt when the launcher doesn't inject POME_TASK. Matches
-// the `## Prompt` of ../../tasks/duplicate-issue.md (the task itself —
+// the `## Prompt` of ../tasks/duplicate-issue.md (the task itself —
 // seed, criteria, config — stays in that file; this is only the kickoff line).
 const DEFAULT_TASK = `A customer bug report came in on the #support Slack channel. Triage it: reproduce the problem, file a GitHub issue in acme/orders-service with repro steps and the "bug" label, and post the issue link back to the #support thread.`;
 
@@ -205,7 +209,7 @@ export function resolveTwinWiring(env: NodeJS.ProcessEnv = process.env): TwinWir
         "  • coach flow — `run_task` returns an `examinee_launch` spec; map its\n" +
         "    per-twin MCP URLs to POME_GITHUB_MCP_URL / POME_SLACK_MCP_URL and\n" +
         "    its agent_token to POME_AUTH_TOKEN, then spawn `npm run start`.\n" +
-        "  • CLI flow — `pome run ../tasks/duplicate-issue.md --agent \"npm run start\"`\n" +
+        "  • CLI flow — `pome run tasks/duplicate-issue.md --agent \"npm run start\"`\n" +
         "    injects all of them automatically."
     );
   }
@@ -217,10 +221,24 @@ export function resolveTwinWiring(env: NodeJS.ProcessEnv = process.env): TwinWir
   };
 }
 
-// Only run the agent when executed directly (`npm run start`). Guarding on
-// `import.meta.main` keeps the module importable — e.g. by the env unit test —
-// without kicking off a full agent run on import.
-if (import.meta.main) {
+// Only run the agent when executed directly (`npm start`), so the module stays
+// importable — e.g. by the env unit test — without kicking off a full agent run.
+//
+// NOT `import.meta.main`: that landed in Node 24.2 and this package's `engines`
+// allows `>=24`, so on 24.0/24.1 it is `undefined`, this guard is false, and
+// `npm start` prints nothing and exits 0 having run no agent at all. That is
+// worse than a crash here: `scripts/smoke-examples.mjs` — the gate that covers
+// this example — only fails on a TDZ ReferenceError, so it reads a do-nothing
+// exit 0 as a healthy launch and reports OK. The argv/`import.meta.url`
+// comparison the repo's other entry guards use (`contract/run.mjs`,
+// `scripts/check-packages-scripts-wired.mjs`), realpath'd on BOTH sides because
+// node resolves symlinks before deriving `import.meta.url`, so a bare
+// `path.resolve` of argv[1] misses through a symlinked checkout in the same
+// silent shape.
+const SELF = realpathSync(fileURLToPath(import.meta.url));
+const ENTRY = process.argv[1] ? realpathSync(resolvePath(process.argv[1])) : "";
+
+if (ENTRY === SELF) {
   await main();
 }
 

@@ -48,6 +48,13 @@ const SMOKE_ENV = {
   POME_GITHUB_REST_URL: "http://127.0.0.1:59321",
   POME_GITHUB_MCP_URL: "http://127.0.0.1:59321/s/smoke/mcp",
   POME_SLACK_REST_URL: "http://127.0.0.1:59321",
+  // support-triage resolves BOTH twins' MCP URLs in resolveTwinWiring() before it
+  // touches anything else, and throws naming every missing var. Without this the
+  // example this gate was extended to cover (F-1290) died in env resolution and
+  // the gate still printed OK — it proved the module evaluates and nothing more,
+  // never reaching examineeOptions() or query(), which is where a launch-above-
+  // declaration TDZ of the F-900 shape would actually fire.
+  POME_SLACK_MCP_URL: "http://127.0.0.1:59321/s/smoke/mcp",
   POME_GMAIL_REST_URL: "http://127.0.0.1:59321",
   // triage-agent / pr-summary-* accept a pre-minted bearer token verbatim, so
   // resolveAuthToken() returns immediately and reaches `new TwinMcpClient(...)`
