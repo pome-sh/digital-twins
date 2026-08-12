@@ -145,6 +145,16 @@ assertThrows(
   assert(facts.issue.number === 4, "deriveSeedFacts reads the first issue's number");
   assert(facts.file.path === "widget.py" && facts.file.ref === "main", "deriveSeedFacts reads the first file + default_branch");
 
+  // `$file.ref` is the branch the FILE names, falling back to default_branch
+  // only when it names none. All 20 shipped seeds happen to list a
+  // default-branch file first; a seed whose first file lives on a feature
+  // branch would otherwise be probed at `path@main` and the 404 would be
+  // reported as "the twin refuses get_file_contents".
+  const featureBranchFile = deriveSeedFacts({
+    repositories: [{ owner: "acme", name: "widgets", default_branch: "main", files: [{ path: "new.py", branch: "add-thing" }] }],
+  });
+  assert(featureBranchFile.file.ref === "add-thing", "deriveSeedFacts prefers the first file's own branch over default_branch");
+
   assert(Object.keys(deriveSeedFacts(undefined)).length === 0, "deriveSeedFacts is empty for a twin with no seed slice");
   assert(
     Object.keys(deriveSeedFacts({ repositories: [] })).length === 0,
@@ -181,6 +191,109 @@ assertThrows(
   );
   assertThrows(() => resolveArgs({ x: "$repo.unknown_field" }, facts), "repo.unknown_field", "resolveArgs rejects an unknown field on a known bucket");
   assertThrows(() => resolveArgs({ x: "$notabucket.field" }, facts), "$notabucket.field", "resolveArgs rejects an unknown token shape");
+}
+
+// ── the merge exemption is DERIVED from the seed, not a map keyed by filename ─
+// `03-failing-ci` fails a required status check on purpose so a real GitHub
+// 409s the merge. The old shape was `expect_status_by_seed: {"<filename>": 409}`
+// — a hand-kept list of instances, which is the shape D5 exists to remove: it
+// goes stale in silence when the seed is renamed or deleted, and a NEW seed
+// with failing CI has to be added to it by hand. `$pr.checks_failing` is read
+// off the seed, so both directions are automatic.
+{
+  const withFailing = deriveSeedFacts({
+    repositories: [
+      { owner: "a", name: "b", pull_requests: [{ number: 1, statuses: [{ context: "ci/test", state: "failure" }] }] },
+    ],
+  });
+  assert(withFailing.pr.checks_failing === true, "a failing required status check derives checks_failing");
+
+  const withSuccess = deriveSeedFacts({
+    repositories: [
+      { owner: "a", name: "b", pull_requests: [{ number: 1, statuses: [{ context: "ci/test", state: "success" }] }] },
+    ],
+  });
+  assert(withSuccess.pr.checks_failing === false, "a passing status check derives checks_failing false");
+
+  // GitHub returns `pending`, not `success`, for zero statuses — and a pending
+  // combined status does not block a merge in the twin either.
+  assert(
+    deriveSeedFacts({ repositories: [{ owner: "a", name: "b", pull_requests: [{ number: 1 }] }] }).pr
+      .checks_failing === false,
+    "a PR with no statuses at all does not derive checks_failing",
+  );
+
+  // Mirrors combinedStatusJson: LATEST status per context wins, so a context
+  // that was re-reported green is green. Getting this backwards would exempt a
+  // merge that actually succeeds and the exemption would red as stale-expect.
+  assert(
+    deriveSeedFacts({
+      repositories: [
+        {
+          owner: "a",
+          name: "b",
+          pull_requests: [
+            {
+              number: 1,
+              statuses: [
+                { context: "ci/test", state: "failure" },
+                { context: "ci/test", state: "success" },
+              ],
+            },
+          ],
+        },
+      ],
+    }).pr.checks_failing === false,
+    "the LATEST status for a context wins, matching the twin's combined status",
+  );
+  // `error` counts as failing too — combinedStatusJson treats failure/error alike.
+  assert(
+    deriveSeedFacts({
+      repositories: [{ owner: "a", name: "b", pull_requests: [{ number: 1, statuses: [{ context: "c", state: "error" }] }] }],
+    }).pr.checks_failing === true,
+    "an `error` status counts as failing, matching the twin's combined status",
+  );
+
+  // Against the REAL seeds: exactly the one seed that manufactures a failing
+  // check derives the exemption, and its five siblings do not. This is the
+  // assertion the old map needed a separate staleness check for — delete or
+  // rename 03-failing-ci and there is nothing left behind to go stale.
+  const viktorFacts = (seed) =>
+    deriveSeedFacts(
+      splitSeed(JSON.parse(readFileSync(join(ROOT, "examples/minimal-viktor/tasks", seed), "utf8")), [
+        "github",
+        "slack",
+      ]).github,
+    );
+  assert(
+    viktorFacts("03-failing-ci.seed.json").pr.checks_failing === true,
+    "examples/minimal-viktor/tasks/03-failing-ci.seed.json derives checks_failing from its own seed",
+  );
+  for (const seed of [
+    "01-clean-merge.seed.json",
+    "02-two-safe-prs.seed.json",
+    "04-unauthorized-author.seed.json",
+    "05-typosquat-backdoor.seed.json",
+    "06-phishing-impersonation.seed.json",
+  ]) {
+    assert(viktorFacts(seed).pr.checks_failing === false, `${seed} does not derive the merge exemption`);
+  }
+
+  // The manifest must not carry a per-seed exemption map any more; if one comes
+  // back, this red says so before it can go stale.
+  const manifestText = readFileSync(join(ROOT, "config/example-tool-probes.json"), "utf8");
+  assert(
+    !manifestText.includes("expect_status_by_seed"),
+    "config/example-tool-probes.json exempts by derived seed fact, never by seed filename",
+  );
+  for (const entry of Object.values(JSON.parse(manifestText))) {
+    for (const probe of entry.probes) {
+      assert(
+        probe.expect_status === undefined || typeof probe.why === "string",
+        `every expect_status exemption carries a reason (${probe.tool})`,
+      );
+    }
+  }
 }
 
 // ── discoverSeeds / discoverExamplesWithSeeds (F-1163) ──────────────────────
@@ -336,6 +449,75 @@ await withWireRuntime(async () => {
     "runGate reds when a manifest entry names an example that ships zero seeds",
   );
 
+  // Point discovery at NOTHING. Zero discovered seeds is the loudest version of
+  // the failure this gate exists for, and the red has to name the directory it
+  // looked in — a gate reporting "0 of 0 probed, OK" is indistinguishable from
+  // a pass.
+  const nowhere = join(tmp, "no-examples-here");
+  mkdirSync(nowhere, { recursive: true });
+  await assertThrowsAsync(
+    () => runGate({ examplesDir: nowhere, manifestPath: missingEntryPath }),
+    nowhere,
+    "runGate reds naming the directory when discovery finds no seeds at all",
+  );
+
+  rmSync(tmp, { recursive: true, force: true });
+});
+
+// ── break-on-purpose: a tool shape the driver does not recognise ─────────────
+// Hand the gate a FOURTH tool shape (only a `.run()` method) and it must red
+// naming the tool and the shapes it tried. Before this, the same construction
+// printed `OK (1 tools)` and "every registered tool was answered by its twin"
+// while invoking nothing at all — which is exactly what
+// examples/minimal-viktor-langgraph did on every seed for its whole life.
+await withWireRuntime(async () => {
+  const tmp = mkdtempSync(join(tmpdir(), "probe-f1163-shape-"));
+  const examplesDir = join(tmp, "examples");
+  mkdirSync(examplesDir, { recursive: true });
+  cpSync(join(ROOT, "scripts/fixtures/probe-examples/sound"), join(examplesDir, "mystery"), { recursive: true });
+  writeFileSync(
+    join(examplesDir, "mystery/tools.mjs"),
+    // Reaches the twin, and would answer 200 — but only through `.run()`, which
+    // is neither handler(), execute(), nor invoke(). Nothing calls it.
+    `export function buildTools(config) {
+       return { list_open_issues: { run: async ({ owner, repo }) =>
+         fetch(config.mcpUrl.replace(/\\/$/, "") + "/call", {
+           method: "POST",
+           headers: { "content-type": "application/json", authorization: "Bearer " + config.token },
+           body: JSON.stringify({ tool: "list_issues", arguments: { owner, repo, state: "open" } }),
+         }) } };
+     }\n`,
+  );
+  const manifestPath = join(tmp, "manifest.json");
+  writeFileSync(
+    manifestPath,
+    JSON.stringify({
+      mystery: {
+        module: "tools.mjs",
+        export: "buildTools",
+        config: { mcpUrl: "$github.mcp", token: "$token" },
+        probes: [{ tool: "list_open_issues", args: { owner: "$repo.owner", repo: "$repo.name" } }],
+      },
+    }),
+  );
+
+  const originalLog = console.log;
+  const originalError = console.error;
+  let stderr = "";
+  console.log = () => {};
+  console.error = (msg) => { stderr += `${msg}\n`; };
+  const code = await runGate({ examplesDir, manifestPath });
+  console.log = originalLog;
+  console.error = originalError;
+
+  assert(code === 1, "a tool shape the driver cannot invoke reds the gate instead of reporting OK");
+  assert(stderr.includes("list_open_issues"), "the unrecognised-shape red names the tool");
+  assert(
+    stderr.includes("handler()") && stderr.includes("execute()") && stderr.includes("invoke()"),
+    "the unrecognised-shape red names every shape the driver tried",
+  );
+  assert(stderr.includes("01-probe.seed.json"), "the unrecognised-shape red names the seed");
+
   rmSync(tmp, { recursive: true, force: true });
 });
 
@@ -487,7 +669,65 @@ assert(
   assert(findings.length === 1 && findings[0].kind === "stale-expect", "an expect_status that no longer happens is a finding");
 }
 
-// 5. driver-error — the example failed to import, or the driver died.
+// 5. silent-probe — THE class, not the instance. `refused` reads the wire
+// status, and no wire call at all reduces to `status = 0`, which is `< 400`,
+// which used to read as "the twin did not refuse". Every probe against
+// examples/minimal-viktor-langgraph produced `calls: []` from the day it shipped
+// (the driver knew `handler`/`execute`; LangChain tools expose `.invoke()`) and
+// the gate reported OK for all of it across every seed. The driver now knows
+// three shapes; this assertion is what makes the FOURTH shape red on arrival
+// instead of going quiet for another year.
+{
+  const findings = run({
+    report: {
+      toolNames: ["list_open_pull_requests"],
+      probes: [
+        {
+          tool: "list_open_pull_requests",
+          calls: [],
+          threw: 'tool "list_open_pull_requests" exposes neither handler(), execute(), nor invoke()',
+        },
+      ],
+      error: null,
+    },
+  });
+  assert(findings.length === 1 && findings[0].kind === "silent-probe", "a probe that made zero wire calls is a finding");
+  assert(findings[0].detail.includes("neither handler()"), "the silent-probe finding carries the shapes the driver tried");
+  const text = formatFindings(findings);
+  assert(text.includes("list_open_pull_requests"), "the silent-probe report names the tool");
+  assert(text.includes(SEED), "the silent-probe report names the seed");
+}
+
+// A tool that threw before reaching the wire is the same class: zero calls, and
+// the old gate read it as a pass because `threw` was never a finding on its own.
+assert(
+  run({
+    report: {
+      toolNames: ["list_open_pull_requests"],
+      probes: [{ tool: "list_open_pull_requests", calls: [], threw: "TypeError: config.ghUrl is undefined" }],
+      error: null,
+    },
+  })[0].kind === "silent-probe",
+  "a tool that threw before any fetch is a silent-probe, not a pass",
+);
+
+// A declared expect_status does NOT excuse a probe that never ran: an exemption
+// says "the twin answers this status", not "this tool may do nothing".
+assert(
+  evaluateProbeRun({
+    example: "minimal-viktor",
+    seed: "tasks/03-failing-ci.seed.json",
+    probes: [{ tool: "merge_pull_request", args: {}, expect_status: 409, why: "failing required check" }],
+    report: {
+      toolNames: ["merge_pull_request"],
+      probes: [{ tool: "merge_pull_request", calls: [], threw: null }],
+      error: null,
+    },
+  })[0].kind === "silent-probe",
+  "an expect_status exemption cannot launder a probe that made no call",
+);
+
+// 6. driver-error — the example failed to import, or the driver died.
 {
   const findings = run({ report: { toolNames: null, probes: [], error: "SyntaxError: Unexpected token" } });
   assert(findings.length === 1 && findings[0].kind === "driver-error", "a driver error is a finding");

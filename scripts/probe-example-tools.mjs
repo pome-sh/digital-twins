@@ -235,12 +235,40 @@ export function deriveSeedFacts(slice) {
   if (!repo) return {};
   const facts = { repo: { owner: repo.owner, name: repo.name } };
   const pr = repo.pull_requests?.[0];
-  if (pr) facts.pr = { number: pr.number };
+  if (pr) facts.pr = { number: pr.number, checks_failing: combinedStatusIsFailure(pr.statuses) };
   const issue = repo.issues?.[0];
   if (issue) facts.issue = { number: issue.number };
   const file = repo.files?.[0];
-  if (file) facts.file = { path: file.path, ref: repo.default_branch };
+  // `file.branch` when the seed names one, NOT `default_branch` unconditionally:
+  // a seed whose first file exists only on a feature branch would otherwise be
+  // probed at `path@main`, and the resulting 404 would read as "the twin refuses
+  // get_file_contents" when the truth is the gate asked for the wrong ref. All
+  // 20 seeds today happen to list a default-branch file first, which is exactly
+  // why nothing would have caught the 21st that does not.
+  if (file) facts.file = { path: file.path, ref: file.branch ?? repo.default_branch };
   return facts;
+}
+
+/**
+ * Whether the twin will treat this PR's required status checks as failing, and
+ * therefore 409 a merge.
+ *
+ * Derived from the seed, never declared per-seed by hand: `03-failing-ci` sets
+ * `ci/test` to `failure` on purpose so a real GitHub blocks the merge behind
+ * branch protection, and a `merge_pull_request` probe against that seed must
+ * expect the 409 rather than report it as a refusal. That is a fact the seed
+ * already carries — a hand-kept map from seed filename to expected status is the
+ * same shape as the bug D5 is about, and it goes stale silently when the seed is
+ * deleted or its statuses change.
+ *
+ * Mirrors `combinedStatusJson` in packages/twin-github/src/serializers.ts, which
+ * is what `mergePullRequest` reads: latest status per context, any
+ * `failure`/`error` wins. A `Map` built from the array keeps the LAST entry per
+ * context, which is what "latest" means for a seed's declaration order.
+ */
+function combinedStatusIsFailure(statuses) {
+  const latest = new Map((statuses ?? []).map((status) => [status.context, status.state]));
+  return [...latest.values()].some((state) => state === "failure" || state === "error");
 }
 
 /**
@@ -262,7 +290,7 @@ export function resolveArgs(argsTemplate, facts) {
 }
 
 function resolveFactToken(token, facts) {
-  const match = /^\$(repo|pr|issue|file)\.([a-z]+)$/.exec(token);
+  const match = /^\$(repo|pr|issue|file)\.([a-z_]+)$/.exec(token);
   if (!match) throw new Error(`unresolvable probe token ${token}`);
   const [, group, field] = match;
   const bucket = facts[group];
@@ -273,13 +301,23 @@ function resolveFactToken(token, facts) {
 }
 
 /**
- * The five ways this gate goes red. Ordered most-actionable first so a wall of
+ * The six ways this gate goes red. Ordered most-actionable first so a wall of
  * unprobed-tool findings never buries a real refusal.
  *
  * `refused` reads the WIRE status, never the handler's return value: the
  * AI-SDK and LangGraph examples' `gh()` / `twinFetch()` deliberately swallow a
  * 4xx and hand the model `{ok:false,status}` so one bad call cannot abort the
  * run, so `threw` is silent on exactly the failure this gate exists to catch.
+ *
+ * `silent-probe` is the class the LangGraph shape gap belonged to, guarded here
+ * rather than fixed one framework at a time. Reading only the wire status has a
+ * floor the original gate had no assertion for: NO wire call at all reduces to
+ * `status = 0`, which is `< 400`, which reads as "the twin did not refuse". Every
+ * probe against `examples/minimal-viktor-langgraph` produced `calls: []` from the
+ * day it shipped, because the driver recognised `handler`/`execute` and LangChain
+ * tools expose `.invoke()` — and the gate reported OK for all of it. Adding a
+ * third shape to the driver fixes that instance; asserting that every probe
+ * actually reached a twin is what makes the FOURTH shape red on the day it lands.
  */
 export function evaluateProbeRun({ example, seed, probes, report }) {
   const findings = [];
@@ -307,8 +345,17 @@ export function evaluateProbeRun({ example, seed, probes, report }) {
       at("driver-error", probe.tool, "the driver reported no result for this probe");
       continue;
     }
+    if (observed.calls.length === 0) {
+      at(
+        "silent-probe",
+        probe.tool,
+        "the tool was invoked but made zero HTTP calls to any twin, so this probe asserted nothing" +
+          (observed.threw ? ` — the driver reported: ${observed.threw}` : ""),
+      );
+      continue;
+    }
     const worst = observed.calls.reduce((acc, call) => (call.status > (acc?.status ?? -1) ? call : acc), null);
-    const status = worst?.status ?? 0;
+    const status = worst?.status;
 
     if (probe.expect_status !== undefined) {
       if (status === probe.expect_status) continue;
@@ -366,6 +413,7 @@ export function annotateFromTape(findings, events) {
 
 const HEADLINE = {
   refused: "the twin refused this tool's call",
+  "silent-probe": "the probe never reached a twin, so it asserted nothing",
   "unprobed-tool": "no probe covers this registered tool",
   "unknown-tool": "probe names a tool the example does not register",
   "stale-expect": "expect_status exemption no longer applies",
@@ -389,6 +437,10 @@ export function formatFindings(findings) {
         lines.push(`    args: ${JSON.stringify(detail.args)}`);
       } else {
         lines.push(`    ${finding.detail}`);
+        // Every finding names its seed, not just `refused`. An example ships up
+        // to six seeds and a `silent-probe` or `stale-expect` on one of them is
+        // unactionable without knowing which.
+        if (finding.seed) lines.push(`    seed: ${finding.seed}`);
       }
     }
     lines.push("");
@@ -451,13 +503,21 @@ export async function probeExample(name, entry, opts) {
       // encodes — `03-failing-ci` sets a failing required status check
       // specifically so a real GitHub 409's the merge, mirroring branch
       // protection. That is fidelity, not a defect, but it is fidelity ONE
-      // seed manufactures on purpose: a flat `expect_status` (checked against
-      // every seed the example ships) would misreport every OTHER seed's
-      // successful merge as a stale exemption. `expect_status_by_seed` scopes
-      // the exemption to the seed that earns it; a seed absent from the map
-      // gets the ordinary refusal check.
-      const bySeed = probe.expect_status_by_seed?.[entry.seed];
-      if (bySeed !== undefined) resolved.expect_status = bySeed;
+      // seed manufactures on purpose: a flat `expect_status` checked against
+      // every seed the example ships would misreport every OTHER seed's
+      // successful merge as a stale exemption.
+      //
+      // `expect_status_if` names the SEED FACT that earns the exemption rather
+      // than the seed filename, so the condition travels with the seed. A map
+      // keyed by filename goes stale in silence — rename or delete the seed and
+      // the entry simply stops matching — and a new seed with failing CI would
+      // have to be added to it by hand. This way both are automatic: any seed
+      // whose first PR has a failing required check expects the 409, any seed
+      // whose does not gets the ordinary refusal check, and if the twin ever
+      // stops 409ing behind a failing check the exemption reds as `stale-expect`.
+      if (probe.expect_status_if !== undefined && resolveFactToken(probe.expect_status_if, facts) !== true) {
+        delete resolved.expect_status;
+      }
       return resolved;
     } catch (err) {
       throw new Error(`examples/${name} (${entry.seed}), tool ${probe.tool}: ${err.message}`);
@@ -588,7 +648,7 @@ export async function runGate(opts = {}) {
   const missingSeeds = names.filter((name) => !withSeeds.includes(name));
   if (missingFromManifest.length > 0 || missingSeeds.length > 0) {
     throw new Error(
-      "config/example-tool-probes.json and examples/*/tasks/*.seed.json disagree on which examples ship seeds — " +
+      `${manifestPath} and ${examplesDir}/*/tasks/*.seed.json disagree on which examples ship seeds — ` +
         `[${missingFromManifest.join(", ")}] ship seeds with no manifest entry; ` +
         `[${missingSeeds.join(", ")}] have a manifest entry but ship no seed`,
     );
