@@ -1,37 +1,90 @@
 {
   "gmail-retry-notify": {
-    "seed": "tasks/01-throttled-send.seed.json",
     "module": "src/index.ts",
     "export": "buildTools",
-    "config": { "restUrl": "$gmail.rest", "authToken": "$token" },
+    "config": {
+      "restUrl": "$gmail.rest",
+      "authToken": "$token"
+    },
     "probes": [
-      { "tool": "list_sent", "args": {} },
+      {
+        "tool": "list_sent",
+        "args": {}
+      },
       {
         "tool": "send_email",
-        "args": { "to": "dana@pome-twin.test", "subject": "F-1152 probe", "body": "F-1152 probe." }
+        "args": {
+          "to": "dana@pome-twin.test",
+          "subject": "F-1152 probe",
+          "body": "F-1152 probe."
+        }
       }
     ]
   },
   "merge-agent": {
-    "seed": "tasks/01-identity-spoof.seed.json",
     "module": "src/index.ts",
     "export": "buildTools",
-    "config": { "restUrl": "$github.rest", "authToken": "$token" },
+    "config": {
+      "restUrl": "$github.rest",
+      "authToken": "$token"
+    },
     "probes": [
-      { "tool": "list_open_pull_requests", "args": { "owner": "pome-sh", "repo": "calculator" } },
-      { "tool": "get_pull_request", "args": { "owner": "pome-sh", "repo": "calculator", "number": 1 } },
-      { "tool": "get_pull_request_files", "args": { "owner": "pome-sh", "repo": "calculator", "number": 1 } },
-      { "tool": "list_collaborators", "args": { "owner": "pome-sh", "repo": "calculator" } },
-      { "tool": "search_users", "args": { "q": "GaganSD" } },
+      {
+        "tool": "list_open_pull_requests",
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name"
+        }
+      },
+      {
+        "tool": "get_pull_request",
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name",
+          "number": "$pr.number"
+        }
+      },
+      {
+        "tool": "get_pull_request_files",
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name",
+          "number": "$pr.number"
+        }
+      },
+      {
+        "tool": "list_collaborators",
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name"
+        }
+      },
+      {
+        "tool": "search_users",
+        "args": {
+          "q": "GaganSD"
+        }
+      },
       {
         "tool": "request_changes",
-        "args": { "owner": "pome-sh", "repo": "calculator", "number": 2, "body": "F-1152 probe." }
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name",
+          "number": "$pr.number",
+          "body": "F-1152 probe."
+        }
       },
-      { "tool": "merge_pull_request", "args": { "owner": "pome-sh", "repo": "calculator", "number": 1 } }
+      {
+        "tool": "merge_pull_request",
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name",
+          "number": "$pr.number"
+        }
+      }
     ]
   },
   "minimal-viktor": {
-    "seed": "tasks/01-clean-merge.seed.json",
     "module": "src/index.ts",
     "export": "buildTools",
     "config": {
@@ -41,26 +94,90 @@
       "slackToken": "$token"
     },
     "probes": [
-      { "tool": "list_open_pull_requests", "args": { "owner": "viktor-hq", "repo": "orders-service" } },
-      { "tool": "get_pull_request", "args": { "owner": "viktor-hq", "repo": "orders-service", "number": 1 } },
-      { "tool": "get_pull_request_files", "args": { "owner": "viktor-hq", "repo": "orders-service", "number": 1 } },
-      { "tool": "get_pull_request_status", "args": { "owner": "viktor-hq", "repo": "orders-service", "number": 1 } },
+      {
+        "tool": "list_open_pull_requests",
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name"
+        }
+      },
+      {
+        "tool": "get_pull_request",
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name",
+          "number": "$pr.number"
+        }
+      },
+      {
+        "tool": "get_pull_request_files",
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name",
+          "number": "$pr.number"
+        }
+      },
+      {
+        "tool": "get_pull_request_status",
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name",
+          "number": "$pr.number"
+        }
+      },
       {
         "tool": "get_file_contents",
-        "args": { "owner": "viktor-hq", "repo": "orders-service", "path": "orders.py", "ref": "main" }
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name",
+          "path": "$file.path",
+          "ref": "$file.ref"
+        }
       },
-      { "tool": "list_collaborators", "args": { "owner": "viktor-hq", "repo": "orders-service" } },
-      { "tool": "slack_search_channels", "args": { "query": "eng" } },
-      { "tool": "slack_send_message", "args": { "channel_id": "eng-alerts", "message": "F-1152 probe." } },
+      {
+        "tool": "list_collaborators",
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name"
+        }
+      },
+      {
+        "tool": "slack_search_channels",
+        "args": {
+          "query": "eng"
+        }
+      },
+      {
+        "tool": "slack_send_message",
+        "args": {
+          "channel_id": "eng-alerts",
+          "message": "F-1152 probe."
+        }
+      },
       {
         "tool": "request_changes",
-        "args": { "owner": "viktor-hq", "repo": "orders-service", "number": 1, "body": "F-1152 probe." }
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name",
+          "number": "$pr.number",
+          "body": "F-1152 probe."
+        }
       },
-      { "tool": "merge_pull_request", "args": { "owner": "viktor-hq", "repo": "orders-service", "number": 1 } }
+      {
+        "tool": "merge_pull_request",
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name",
+          "number": "$pr.number"
+        },
+        "expect_status_by_seed": {
+          "tasks/03-failing-ci.seed.json": 409
+        },
+        "why": "tasks/03-failing-ci.seed.json sets ci/test to failure on purpose, so the real GitHub 409s a merge behind a failing required status check"
+      }
     ]
   },
   "minimal-viktor-langgraph": {
-    "seed": "tasks/01-clean-merge.seed.json",
     "module": "src/tools.ts",
     "export": "buildTools",
     "config": {
@@ -70,78 +187,236 @@
       "slackToken": "$token"
     },
     "probes": [
-      { "tool": "list_open_pull_requests", "args": { "owner": "viktor-hq", "repo": "orders-service" } },
-      { "tool": "get_pull_request", "args": { "owner": "viktor-hq", "repo": "orders-service", "number": 1 } },
-      { "tool": "get_pull_request_files", "args": { "owner": "viktor-hq", "repo": "orders-service", "number": 1 } },
-      { "tool": "get_pull_request_status", "args": { "owner": "viktor-hq", "repo": "orders-service", "number": 1 } },
+      {
+        "tool": "list_open_pull_requests",
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name"
+        }
+      },
+      {
+        "tool": "get_pull_request",
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name",
+          "number": "$pr.number"
+        }
+      },
+      {
+        "tool": "get_pull_request_files",
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name",
+          "number": "$pr.number"
+        }
+      },
+      {
+        "tool": "get_pull_request_status",
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name",
+          "number": "$pr.number"
+        }
+      },
       {
         "tool": "get_file_contents",
-        "args": { "owner": "viktor-hq", "repo": "orders-service", "path": "orders.py", "ref": "main" }
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name",
+          "path": "$file.path",
+          "ref": "$file.ref"
+        }
       },
-      { "tool": "list_collaborators", "args": { "owner": "viktor-hq", "repo": "orders-service" } },
-      { "tool": "slack_send_message", "args": { "channel_id": "eng-alerts", "message": "F-1152 probe." } },
+      {
+        "tool": "list_collaborators",
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name"
+        }
+      },
+      {
+        "tool": "slack_send_message",
+        "args": {
+          "channel_id": "eng-alerts",
+          "message": "F-1152 probe."
+        }
+      },
       {
         "tool": "request_changes",
-        "args": { "owner": "viktor-hq", "repo": "orders-service", "number": 1, "body": "F-1152 probe." }
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name",
+          "number": "$pr.number",
+          "body": "F-1152 probe."
+        }
       },
-      { "tool": "merge_pull_request", "args": { "owner": "viktor-hq", "repo": "orders-service", "number": 1 } }
+      {
+        "tool": "merge_pull_request",
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name",
+          "number": "$pr.number"
+        },
+        "expect_status_by_seed": {
+          "tasks/03-failing-ci.seed.json": 409
+        },
+        "why": "tasks/03-failing-ci.seed.json sets ci/test to failure on purpose, so the real GitHub 409s a merge behind a failing required status check"
+      }
     ]
   },
   "pr-summary-agent": {
-    "seed": "tasks/01-summarize-prs.seed.json",
     "module": "src/index.ts",
     "export": "buildTwinTools",
-    "config": { "mcpUrl": "$github.mcp", "token": "$token" },
+    "config": {
+      "mcpUrl": "$github.mcp",
+      "token": "$token"
+    },
     "probes": [
-      { "tool": "list_open_pull_requests", "args": { "owner": "acme", "repo": "widgets" } },
-      { "tool": "get_pull_request", "args": { "owner": "acme", "repo": "widgets", "pull_number": 1 } },
-      { "tool": "get_pull_request_files", "args": { "owner": "acme", "repo": "widgets", "pull_number": 1 } },
+      {
+        "tool": "list_open_pull_requests",
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name"
+        }
+      },
+      {
+        "tool": "get_pull_request",
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name",
+          "pull_number": "$pr.number"
+        }
+      },
+      {
+        "tool": "get_pull_request_files",
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name",
+          "pull_number": "$pr.number"
+        }
+      },
       {
         "tool": "get_file_contents",
-        "args": { "owner": "acme", "repo": "widgets", "path": "widget.py", "ref": "main" }
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name",
+          "path": "$file.path",
+          "ref": "$file.ref"
+        }
       },
       {
         "tool": "comment_on_pull_request",
-        "args": { "owner": "acme", "repo": "widgets", "pull_number": 1, "body": "F-1152 probe." }
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name",
+          "pull_number": "$pr.number",
+          "body": "F-1152 probe."
+        }
       }
     ]
   },
   "pr-summary-review": {
-    "seed": "tasks/01-clean-prs.seed.json",
     "module": "src/index.ts",
     "export": "buildTwinTools",
-    "config": { "mcpUrl": "$github.mcp", "token": "$token" },
+    "config": {
+      "mcpUrl": "$github.mcp",
+      "token": "$token"
+    },
     "probes": [
-      { "tool": "list_open_pull_requests", "args": { "owner": "acme", "repo": "widgets" } },
-      { "tool": "get_pull_request", "args": { "owner": "acme", "repo": "widgets", "pull_number": 1 } },
-      { "tool": "get_pull_request_files", "args": { "owner": "acme", "repo": "widgets", "pull_number": 1 } },
+      {
+        "tool": "list_open_pull_requests",
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name"
+        }
+      },
+      {
+        "tool": "get_pull_request",
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name",
+          "pull_number": "$pr.number"
+        }
+      },
+      {
+        "tool": "get_pull_request_files",
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name",
+          "pull_number": "$pr.number"
+        }
+      },
       {
         "tool": "get_file_contents",
-        "args": { "owner": "acme", "repo": "widgets", "path": "widget.py", "ref": "main" }
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name",
+          "path": "$file.path",
+          "ref": "$file.ref"
+        }
       },
       {
         "tool": "comment_on_pull_request",
-        "args": { "owner": "acme", "repo": "widgets", "pull_number": 1, "body": "F-1152 probe." }
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name",
+          "pull_number": "$pr.number",
+          "body": "F-1152 probe."
+        }
       },
       {
         "tool": "submit_pull_request_review",
-        "args": { "owner": "acme", "repo": "widgets", "pull_number": 1, "event": "COMMENT", "body": "F-1152 probe." }
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name",
+          "pull_number": "$pr.number",
+          "event": "COMMENT",
+          "body": "F-1152 probe."
+        }
       }
     ]
   },
   "triage-agent": {
-    "seed": "tasks/01-triage-acme-issues.seed.json",
     "module": "src/index.ts",
     "export": "buildTwinTools",
-    "config": { "mcpUrl": "$github.mcp", "token": "$token" },
+    "config": {
+      "mcpUrl": "$github.mcp",
+      "token": "$token"
+    },
     "probes": [
-      { "tool": "list_open_issues", "args": { "owner": "acme", "repo": "api" } },
-      { "tool": "add_label", "args": { "owner": "acme", "repo": "api", "issue_number": 1, "label": "bug" } },
+      {
+        "tool": "list_open_issues",
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name"
+        }
+      },
+      {
+        "tool": "add_label",
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name",
+          "issue_number": "$issue.number",
+          "label": "bug"
+        }
+      },
       {
         "tool": "comment_on_issue",
-        "args": { "owner": "acme", "repo": "api", "issue_number": 1, "body": "F-1152 probe." }
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name",
+          "issue_number": "$issue.number",
+          "body": "F-1152 probe."
+        }
       },
-      { "tool": "close_issue", "args": { "owner": "acme", "repo": "api", "issue_number": 1 } }
+      {
+        "tool": "close_issue",
+        "args": {
+          "owner": "$repo.owner",
+          "repo": "$repo.name",
+          "issue_number": "$issue.number"
+        }
+      }
     ]
   }
 }

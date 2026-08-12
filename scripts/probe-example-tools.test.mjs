@@ -11,17 +11,23 @@
  * are written from that incident.
  */
 import { spawn } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
   annotateFromTape,
+  deriveSeedFacts,
+  discoverExamplesWithSeeds,
+  discoverSeeds,
   evaluateProbeRun,
   formatFindings,
   freePort,
   PROBE_SECRET,
+  resolveArgs,
   resolveConfig,
+  runGate,
   splitSeed,
   withWireRuntime,
 } from "./probe-example-tools.mjs";
@@ -114,6 +120,233 @@ assertThrows(
     "$github.graphql",
     "resolveConfig rejects an unknown surface on a booted twin",
   );
+}
+
+// ── deriveSeedFacts / resolveArgs (F-1163) ──────────────────────────────────
+// The load-bearing half of the ticket: probe arguments come off the seed
+// itself, never a hand-written literal, so a sixth viktor seed needs no new
+// fixture and a repo with no PR/issue/file simply yields no bucket for it.
+{
+  const slice = {
+    repositories: [
+      {
+        owner: "acme",
+        name: "widgets",
+        default_branch: "main",
+        files: [{ path: "widget.py", branch: "main", content: "x" }],
+        issues: [{ number: 4, title: "an issue" }],
+        pull_requests: [{ number: 2, title: "a pr" }],
+      },
+    ],
+  };
+  const facts = deriveSeedFacts(slice);
+  assert(facts.repo.owner === "acme" && facts.repo.name === "widgets", "deriveSeedFacts reads the first repo");
+  assert(facts.pr.number === 2, "deriveSeedFacts reads the first PR's number");
+  assert(facts.issue.number === 4, "deriveSeedFacts reads the first issue's number");
+  assert(facts.file.path === "widget.py" && facts.file.ref === "main", "deriveSeedFacts reads the first file + default_branch");
+
+  assert(Object.keys(deriveSeedFacts(undefined)).length === 0, "deriveSeedFacts is empty for a twin with no seed slice");
+  assert(
+    Object.keys(deriveSeedFacts({ repositories: [] })).length === 0,
+    "deriveSeedFacts is empty when the slice has no repositories",
+  );
+
+  // triage-agent's seeds carry issues but no pull_requests — deriveSeedFacts
+  // must not invent a `pr` bucket, or a probe template asking for `$pr.number`
+  // would silently resolve to `undefined` instead of failing loudly.
+  const noPr = deriveSeedFacts({
+    repositories: [{ owner: "acme", name: "api", issues: [{ number: 1 }], pull_requests: [] }],
+  });
+  assert(noPr.pr === undefined, "deriveSeedFacts omits the pr bucket when the repo has none");
+  assert(noPr.issue.number === 1, "deriveSeedFacts still reads the issue bucket");
+
+  const resolved = resolveArgs(
+    { owner: "$repo.owner", repo: "$repo.name", pull_number: "$pr.number", body: "F-1152 probe." },
+    facts,
+  );
+  assert(
+    resolved.owner === "acme" && resolved.repo === "widgets" && resolved.pull_number === 2,
+    "resolveArgs fills $repo.* and $pr.number from the derived facts",
+  );
+  assert(resolved.body === "F-1152 probe.", "resolveArgs passes a non-$ literal through unchanged");
+
+  assert(
+    resolveArgs({ issue_number: "$issue.number" }, noPr).issue_number === 1,
+    "resolveArgs resolves $issue.number when the seed has an issue",
+  );
+  assertThrows(
+    () => resolveArgs({ pull_number: "$pr.number" }, noPr),
+    "pr.number",
+    "resolveArgs rejects $pr.number against a seed with no pull_requests",
+  );
+  assertThrows(() => resolveArgs({ x: "$repo.unknown_field" }, facts), "repo.unknown_field", "resolveArgs rejects an unknown field on a known bucket");
+  assertThrows(() => resolveArgs({ x: "$notabucket.field" }, facts), "$notabucket.field", "resolveArgs rejects an unknown token shape");
+}
+
+// ── discoverSeeds / discoverExamplesWithSeeds (F-1163) ──────────────────────
+// Discovery, not a hand-kept list — a new .seed.json under an example's
+// tasks/ is covered with no edit anywhere in this repo.
+{
+  const viktorSeeds = discoverSeeds(join(ROOT, "examples/minimal-viktor"));
+  assert(viktorSeeds.length === 6, `discoverSeeds finds all 6 minimal-viktor seeds (got ${viktorSeeds.length})`);
+  assert(viktorSeeds[0] === "tasks/01-clean-merge.seed.json", "discoverSeeds returns seed-relative paths, sorted");
+  assert(viktorSeeds.every((seed) => seed.endsWith(".seed.json")), "discoverSeeds only returns *.seed.json");
+
+  const reviewSeeds = discoverSeeds(join(ROOT, "examples/pr-summary-review"));
+  assert(reviewSeeds.length === 3, `discoverSeeds finds all 3 pr-summary-review seeds (got ${reviewSeeds.length})`);
+
+  const withSeeds = discoverExamplesWithSeeds(join(ROOT, "examples"));
+  for (const name of [
+    "gmail-retry-notify",
+    "merge-agent",
+    "minimal-viktor",
+    "minimal-viktor-langgraph",
+    "pr-summary-agent",
+    "pr-summary-review",
+    "triage-agent",
+  ]) {
+    assert(withSeeds.includes(name), `discoverExamplesWithSeeds includes examples/${name}`);
+  }
+  // support-triage's tasks are markdown prompts, not JSON seeds — a different
+  // format this gate does not cover. It is correctly absent by construction
+  // (zero *.seed.json under its tasks/), never a hand exclusion naming it.
+  assert(!withSeeds.includes("support-triage"), "discoverExamplesWithSeeds excludes an example that ships no seed.json");
+
+  // An example directory whose tasks/ exists but is empty is a loud failure,
+  // never a quiet zero-probe pass.
+  const emptyDir = mkdtempSync(join(tmpdir(), "probe-f1163-empty-"));
+  mkdirSync(join(emptyDir, "tasks"), { recursive: true });
+  assertThrows(() => discoverSeeds(emptyDir), "no *.seed.json", "discoverSeeds refuses an example with an empty tasks/");
+  rmSync(emptyDir, { recursive: true, force: true });
+}
+
+// ── the "Do:" acceptance test from the ticket, plus break-on-purpose ────────
+// "add a seed to an example. Expect: it is probed with no hand edit." — run
+// for real, against a throwaway copy of the `sound` fixture, with templated
+// probe args so a second seed with a DIFFERENT issue number only stays green
+// if its args were actually re-derived rather than reused from the first seed.
+await withWireRuntime(async () => {
+  const tmp = mkdtempSync(join(tmpdir(), "probe-f1163-dowith-"));
+  const examplesDir = join(tmp, "examples");
+  mkdirSync(examplesDir, { recursive: true });
+  cpSync(join(ROOT, "scripts/fixtures/probe-examples/sound"), join(examplesDir, "sound"), { recursive: true });
+  const manifestPath = join(tmp, "manifest.json");
+  const manifest = {
+    sound: {
+      module: "tools.mjs",
+      export: "buildTools",
+      config: { mcpUrl: "$github.mcp", token: "$token" },
+      probes: [
+        { tool: "list_open_issues", args: { owner: "$repo.owner", repo: "$repo.name" } },
+        {
+          tool: "comment_on_issue",
+          args: { owner: "$repo.owner", repo: "$repo.name", issue_number: "$issue.number", body: "probe" },
+        },
+      ],
+    },
+  };
+  writeFileSync(manifestPath, JSON.stringify(manifest));
+
+  assert(discoverSeeds(join(examplesDir, "sound")).length === 1, "the fixture starts with exactly one seed");
+  assert((await runGate({ examplesDir, manifestPath })) === 0, "the gate is green with one seed, args resolved from it");
+
+  // Add a seed with issue #7 — not #1, the first fixture seed's number — so a
+  // gate that reused the FIRST seed's derived args (rather than re-deriving
+  // per seed) would 404 `comment_on_issue` against an issue that isn't there.
+  writeFileSync(
+    join(examplesDir, "sound/tasks/02-second.seed.json"),
+    JSON.stringify({
+      users: [{ login: "pome-agent", type: "User", name: "Pome Agent" }],
+      repositories: [
+        {
+          owner: "acme",
+          name: "widgets",
+          default_branch: "main",
+          collaborators: ["pome-agent"],
+          files: [{ path: "README.md", branch: "main", content: "# widgets\n" }],
+          issues: [{ number: 7, title: "the second seed's own issue", body: "b", state: "open" }],
+          pull_requests: [],
+        },
+      ],
+    }),
+  );
+
+  const withNewSeed = discoverSeeds(join(examplesDir, "sound"));
+  assert(withNewSeed.length === 2, "discoverSeeds picks up the new seed with no hand edit");
+  assert(
+    (await runGate({ examplesDir, manifestPath })) === 0,
+    "the gate stays green after adding a seed — its args were re-derived from ITS OWN issue #7, not reused from seed 1's #1",
+  );
+
+  // Break-on-purpose: point the manifest's `comment_on_issue` probe at a
+  // FIXED issue number no seed here carries. Both seeds' derived facts get
+  // overridden by the literal, so both calls 404 and the gate must red,
+  // naming the tool and BOTH seeds — not silently pass either one.
+  manifest.sound.probes[1].args.issue_number = 999;
+  writeFileSync(manifestPath, JSON.stringify(manifest));
+  const originalLog = console.log;
+  const originalError = console.error;
+  let stderr = "";
+  console.log = () => {};
+  console.error = (msg) => { stderr += `${msg}\n`; };
+  const broken = await runGate({ examplesDir, manifestPath });
+  console.log = originalLog;
+  console.error = originalError;
+  assert(broken === 1, "a probe argument that no longer matches its seed reds the gate");
+  assert(stderr.includes("comment_on_issue"), "the red names the broken tool");
+  assert(stderr.includes("01-probe.seed.json"), "the red names the first seed");
+  assert(stderr.includes("02-second.seed.json"), "the red names the second seed too — not just the first one found");
+
+  rmSync(tmp, { recursive: true, force: true });
+});
+
+// ── totality: manifest keys and on-disk seeds must name the same examples ───
+await withWireRuntime(async () => {
+  const tmp = mkdtempSync(join(tmpdir(), "probe-f1163-totality-"));
+  const examplesDir = join(tmp, "examples");
+  mkdirSync(examplesDir, { recursive: true });
+  cpSync(join(ROOT, "scripts/fixtures/probe-examples/sound"), join(examplesDir, "sound"), { recursive: true });
+  cpSync(join(ROOT, "scripts/fixtures/probe-examples/refused"), join(examplesDir, "refused"), { recursive: true });
+  const soundEntry = {
+    module: "tools.mjs",
+    export: "buildTools",
+    config: { mcpUrl: "$github.mcp", token: "$token" },
+    probes: [{ tool: "list_open_issues", args: { owner: "$repo.owner", repo: "$repo.name" } }],
+  };
+
+  // A directory that ships seeds but has no manifest entry: "refused" exists
+  // on disk with a seed but the manifest only names "sound".
+  const missingEntryPath = join(tmp, "missing-entry.json");
+  writeFileSync(missingEntryPath, JSON.stringify({ sound: soundEntry }));
+  await assertThrowsAsync(
+    () => runGate({ examplesDir, manifestPath: missingEntryPath }),
+    "refused",
+    "runGate reds when an example ships seeds with no manifest entry",
+  );
+
+  // A manifest entry naming an example whose tasks/ ships no seed at all.
+  const emptyExampleDir = join(examplesDir, "empty-example");
+  mkdirSync(join(emptyExampleDir, "tasks"), { recursive: true });
+  writeFileSync(join(emptyExampleDir, "pome.json"), JSON.stringify({ agent: { slug: "empty" }, twins: ["github"] }));
+  const extraEntryPath = join(tmp, "extra-entry.json");
+  writeFileSync(extraEntryPath, JSON.stringify({ sound: soundEntry, refused: soundEntry, "empty-example": soundEntry }));
+  await assertThrowsAsync(
+    () => runGate({ examplesDir, manifestPath: extraEntryPath }),
+    "empty-example",
+    "runGate reds when a manifest entry names an example that ships zero seeds",
+  );
+
+  rmSync(tmp, { recursive: true, force: true });
+});
+
+async function assertThrowsAsync(fn, match, msg) {
+  try {
+    await fn();
+  } catch (err) {
+    assert(String(err.message).includes(match), `${msg} (message was: ${err.message})`);
+    return;
+  }
+  assert(false, `${msg} (did not throw)`);
 }
 
 // ── evaluateProbeRun: the five ways the gate goes red ───────────────────────

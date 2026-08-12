@@ -22,9 +22,9 @@
 // registers once with fixture arguments and fail if the twin refused.
 
 import { execFileSync, spawn } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { createServer } from "node:net";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -159,6 +159,117 @@ function resolveToken(token, ctx) {
     );
   }
   return booted[surface];
+}
+
+/**
+ * Every `.seed.json` an example ships, sorted for a stable probe order.
+ *
+ * F-1163: `probe:examples` used to probe only the one seed each manifest entry
+ * hand-named. `pr-summary-review` ships 3, both viktor examples ship 6 — 13 of
+ * 20 seeds across the bundled examples were never probed at all, and a new
+ * seed landed uncovered by construction, since nothing read the directory.
+ * Discovery instead of a hand-kept list is what makes a new seed covered with
+ * no edit here.
+ *
+ * A `tasks/` directory with zero seeds is a loud failure, not an empty probe
+ * set: an example whose manifest entry exists but whose seeds all got deleted
+ * (or renamed) must not read as "probed nothing, still green."
+ */
+export function discoverSeeds(exampleDir) {
+  const tasksDir = join(exampleDir, "tasks");
+  const seeds = existsSync(tasksDir)
+    ? readdirSync(tasksDir)
+        .filter((name) => name.endsWith(".seed.json"))
+        .sort()
+        .map((name) => join("tasks", name))
+    : [];
+  if (seeds.length === 0) {
+    throw new Error(`${exampleDir} declares no *.seed.json under tasks/ — nothing to probe`);
+  }
+  return seeds;
+}
+
+/**
+ * Every top-level example directory that ships at least one `.seed.json`.
+ *
+ * This is the OTHER half of the totality the manifest owes: discovery covers
+ * a new seed inside an already-listed example, but a brand-new example
+ * directory with its own seeds and no manifest entry would still be silently
+ * skipped by `runGate`'s `Object.keys(manifest)` loop. Comparing this set
+ * against the manifest's keys in `runGate` is what makes that omission red
+ * instead of quiet — `examples/support-triage` ships no `.seed.json` at all
+ * (its tasks are markdown prompts, a different format this gate does not
+ * cover) and is correctly absent from both sides by construction, with no
+ * exclusion list naming it.
+ */
+export function discoverExamplesWithSeeds(examplesDir) {
+  return readdirSync(examplesDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .filter((name) => existsSync(join(examplesDir, name, "tasks")))
+    .filter((name) =>
+      readdirSync(join(examplesDir, name, "tasks")).some((file) => file.endsWith(".seed.json")),
+    )
+    .sort();
+}
+
+/**
+ * The first repo, PR number and issue number a seed carries, for `resolveArgs`
+ * to fill probe argument templates with.
+ *
+ * F-1163: hand-writing six near-identical probe arg sets per viktor example
+ * (one per seed) is the defect the ticket names, not a workaround for it — a
+ * seventh seed would land with no probe arguments and nothing would say so.
+ * Reading the subject straight off the seed means a new seed is covered by
+ * construction. Only what the seed actually declares is exposed: a seed with
+ * no PR (`triage-agent`) yields no `pr` bucket, and a probe template that
+ * still asks for `$pr.number` fails loudly in `resolveFactToken` rather than
+ * silently probing `undefined`.
+ *
+ * `slice` is the twin's OWN half of the seed (already run through
+ * `splitSeed`), never the raw envelope — a multi-twin example's slack half has
+ * no `repositories` key to read this off of.
+ */
+export function deriveSeedFacts(slice) {
+  const repo = slice?.repositories?.[0];
+  if (!repo) return {};
+  const facts = { repo: { owner: repo.owner, name: repo.name } };
+  const pr = repo.pull_requests?.[0];
+  if (pr) facts.pr = { number: pr.number };
+  const issue = repo.issues?.[0];
+  if (issue) facts.issue = { number: issue.number };
+  const file = repo.files?.[0];
+  if (file) facts.file = { path: file.path, ref: repo.default_branch };
+  return facts;
+}
+
+/**
+ * Fill a probe's `args` template with facts read off its own seed.
+ *
+ * Mirrors `resolveConfig` below, but over seed-derived facts (`$repo.owner`,
+ * `$pr.number`, `$issue.number`, `$file.path`, `$file.ref`) instead of booted
+ * twin URLs. A value that is not a `$`-prefixed string passes through
+ * unchanged — probe text like `"F-1152 probe."` or a slack channel id is not
+ * "the first repo, PR number and issue number" the ticket asks to derive, and
+ * stays hand-written.
+ */
+export function resolveArgs(argsTemplate, facts) {
+  const out = {};
+  for (const [key, value] of Object.entries(argsTemplate ?? {})) {
+    out[key] = typeof value === "string" && value.startsWith("$") ? resolveFactToken(value, facts) : value;
+  }
+  return out;
+}
+
+function resolveFactToken(token, facts) {
+  const match = /^\$(repo|pr|issue|file)\.([a-z]+)$/.exec(token);
+  if (!match) throw new Error(`unresolvable probe token ${token}`);
+  const [, group, field] = match;
+  const bucket = facts[group];
+  if (!bucket || bucket[field] === undefined) {
+    throw new Error(`unresolvable probe token ${token}: this seed has no ${group}.${field}`);
+  }
+  return bucket[field];
 }
 
 /**
@@ -332,6 +443,26 @@ export async function probeExample(name, entry, opts) {
   const manifest = JSON.parse(readFileSync(join(exampleDir, "pome.json"), "utf8"));
   const twinIds = manifest.twins ?? ["github"];
   const slices = splitSeed(JSON.parse(readFileSync(join(exampleDir, entry.seed), "utf8")), twinIds);
+  const facts = deriveSeedFacts(slices.github);
+  const probes = entry.probes.map((probe) => {
+    try {
+      const resolved = { ...probe, args: resolveArgs(probe.args, facts) };
+      // Some seeds deliberately break a tool for a REASON the seed itself
+      // encodes — `03-failing-ci` sets a failing required status check
+      // specifically so a real GitHub 409's the merge, mirroring branch
+      // protection. That is fidelity, not a defect, but it is fidelity ONE
+      // seed manufactures on purpose: a flat `expect_status` (checked against
+      // every seed the example ships) would misreport every OTHER seed's
+      // successful merge as a stale exemption. `expect_status_by_seed` scopes
+      // the exemption to the seed that earns it; a seed absent from the map
+      // gets the ordinary refusal check.
+      const bySeed = probe.expect_status_by_seed?.[entry.seed];
+      if (bySeed !== undefined) resolved.expect_status = bySeed;
+      return resolved;
+    } catch (err) {
+      throw new Error(`examples/${name} (${entry.seed}), tool ${probe.tool}: ${err.message}`);
+    }
+  });
 
   process.env.TWIN_AUTH_SECRET = PROBE_SECRET;
   const { serve, createRecorderStore } = await import("@pome-sh/sdk/server");
@@ -375,11 +506,11 @@ export async function probeExample(name, entry, opts) {
       module: resolve(exampleDir, entry.module),
       export: entry.export,
       config: resolveConfig(entry.config, { twins: urls, token }),
-      probes: entry.probes,
+      probes,
     });
     const tape = twinIds.flatMap((id) => stores[id].events().map((event) => ({ ...event, twin: id })));
     return annotateFromTape(
-      evaluateProbeRun({ example: name, seed: entry.seed, probes: entry.probes, report }),
+      evaluateProbeRun({ example: name, seed: entry.seed, probes, report }),
       tape,
     );
   } finally {
@@ -446,13 +577,55 @@ export async function runGate(opts = {}) {
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   const names = Object.keys(manifest).sort();
 
-  console.log(`Probing twin tools for ${names.length} example(s): ${names.join(", ")}`);
+  // F-1163's other half of totality: discovery inside an example covers a new
+  // seed, but a whole new example directory with seeds and no manifest entry
+  // (or a manifest entry for a directory that ships none) would still be
+  // silently skipped by the `Object.keys(manifest)` loop below. Assert the two
+  // sets are the SAME set, named both ways, rather than letting either side
+  // win by default.
+  const withSeeds = discoverExamplesWithSeeds(examplesDir);
+  const missingFromManifest = withSeeds.filter((name) => !names.includes(name));
+  const missingSeeds = names.filter((name) => !withSeeds.includes(name));
+  if (missingFromManifest.length > 0 || missingSeeds.length > 0) {
+    throw new Error(
+      "config/example-tool-probes.json and examples/*/tasks/*.seed.json disagree on which examples ship seeds — " +
+        `[${missingFromManifest.join(", ")}] ship seeds with no manifest entry; ` +
+        `[${missingSeeds.join(", ")}] have a manifest entry but ship no seed`,
+    );
+  }
+
+  // Seeds per example, discovered — never a hand-kept count. This is the
+  // denominator the "20 of 20" claim below has to actually earn: it is
+  // computed independently of the probe loop, so a loop that quietly skipped
+  // a seed would be caught by the tally at the end, not just assumed correct
+  // because it's the same variable.
+  const seedsByExample = new Map(names.map((name) => [name, discoverSeeds(join(examplesDir, name))]));
+  const totalSeeds = [...seedsByExample.values()].reduce((sum, seeds) => sum + seeds.length, 0);
+  if (totalSeeds === 0) {
+    throw new Error("discovered zero seeds across every bundled example — refusing to report a pass on nothing");
+  }
+
+  console.log(
+    `Probing ${totalSeeds} seed(s) across ${names.length} example(s): ${names.join(", ")}`,
+  );
   const findings = [];
+  let probedSeeds = 0;
   for (const name of names) {
-    process.stdout.write(`\n=== examples/${name} === `);
-    const found = await probeExample(name, manifest[name], { repoRoot, examplesDir });
-    console.log(found.length === 0 ? `OK (${manifest[name].probes.length} tools)` : `${found.length} finding(s)`);
-    findings.push(...found);
+    const seeds = seedsByExample.get(name);
+    for (const seed of seeds) {
+      process.stdout.write(`\n=== examples/${name} (${seed}) === `);
+      const found = await probeExample(name, { ...manifest[name], seed }, { repoRoot, examplesDir });
+      console.log(found.length === 0 ? `OK (${manifest[name].probes.length} tools)` : `${found.length} finding(s)`);
+      findings.push(...found);
+      probedSeeds += 1;
+    }
+  }
+
+  // A gate that ran fewer probes than the seeds it discovered would exit 0
+  // having done less than it claimed — the F-1478 shape, guarded here rather
+  // than trusted from the loop above.
+  if (probedSeeds !== totalSeeds) {
+    throw new Error(`probed ${probedSeeds} seed(s) but discovered ${totalSeeds} — the gate skipped some silently`);
   }
 
   if (findings.length > 0) {
@@ -462,11 +635,27 @@ export async function runGate(opts = {}) {
     );
     return 1;
   }
-  const probeCount = names.reduce((sum, name) => sum + manifest[name].probes.length, 0);
-  console.log(`\nAll ${probeCount} registered tools across ${names.length} example(s) were answered by their twins.`);
+  console.log(
+    `\n${probedSeeds} of ${totalSeeds} seed(s) across ${names.length} example(s) were probed; ` +
+      "every registered tool was answered by its twin on every seed.",
+  );
   return 0;
 }
 
-if (import.meta.main) {
+// NOT `import.meta.main`: it landed in Node 24.2, root `engines` allows
+// `>=24`, and on 24.0/24.1 it is `undefined` — this guard would be false and
+// `npm run probe:examples` would exit 0 having probed nothing. Both sides
+// realpath'd, matching contract/run.mjs: node resolves symlinks before
+// deriving `import.meta.url`, so a bare argv[1] misses through a symlinked
+// checkout in the same silent shape.
+const SELF = realpathSync(fileURLToPath(import.meta.url));
+const ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";
+const invokedDirectly = ENTRY === SELF;
+
+if (!invokedDirectly && basename(ENTRY) === basename(SELF)) {
+  throw new Error(`probe-example-tools.mjs entry guard did not fire for ${ENTRY} (expected ${SELF})`);
+}
+
+if (invokedDirectly) {
   process.exit(await withWireRuntime(() => runGate()));
 }
