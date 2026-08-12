@@ -36,6 +36,7 @@
     "emit:route-inputs": "node scripts/emit-route-inputs.mjs",
     "gate:route-inputs": "node scripts/emit-route-inputs.mjs --check",
     "lint:dead-code": "knip --no-config-hints",
+    "lint:import-meta-main": "node scripts/lint-no-bare-import-meta-main.mjs",
     "gate:bundled-deps": "node scripts/check-bundled-runtime-deps.mjs",
     "gate:wire-tarball": "node scripts/ci/check-wire-tarball.mjs",
     "gate:wire-manifest": "node scripts/ci/check-wire-tarball.mjs --manifest-only",
@@ -47,6 +48,7 @@
     "npm": ">=11.5.1"
   },
   "devDependencies": {
+    "acorn": "^8.18.0",
     "knip": "^6.31.0"
   },
   "overrides": {
