@@ -46,3 +46,36 @@ jobs:
             exit 1
           fi
           bash scripts/ci/assert-repo-policy.sh
+
+  # F-1230 — repo-policy.yml's weekly cron has been firing and failing since
+  # it shipped (REPO_POLICY_TOKEN has never existed) with nobody told. This
+  # job sees that failure in the same run `assert` failed in — see
+  # schedule-alarm.yml for why an embedded failure() job, not a second
+  # separately-cron'd file, is the right shape here.
+  schedule-alarm:
+    needs: assert
+    if: failure() && github.event_name != 'pull_request'
+    permissions:
+      contents: read
+      issues: write
+    uses: ./.github/workflows/schedule-alarm.yml
+    with:
+      title: "the repo-policy weekly cron is failing"
+      label: "schedule-alarm:repo-policy"
+      outcome: failure
+      detail: "repo-policy.yml's scheduled run failed. Common cause: REPO_POLICY_TOKEN is not set (see F-1212) — but any regression in scripts/ci/assert-repo-policy.sh lands here too, so check the run log for the actual assertion that broke."
+
+  # The other direction: a recovered run closes the tracking issue rather
+  # than leaving it open once REPO_POLICY_TOKEN is set and the first green
+  # scheduled run lands.
+  schedule-alarm-recovery:
+    needs: assert
+    if: success() && github.event_name != 'pull_request'
+    permissions:
+      contents: read
+      issues: write
+    uses: ./.github/workflows/schedule-alarm.yml
+    with:
+      title: "the repo-policy weekly cron is failing"
+      label: "schedule-alarm:repo-policy"
+      outcome: success
