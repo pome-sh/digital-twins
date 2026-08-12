@@ -147,8 +147,12 @@ describe("list_issues.state — GitHub's spelling, and the fold behind it", () =
     const enumOf = (tool: string) =>
       golden.result.tools.find((t) => t.name === tool)?.inputSchema.properties?.state?.enum;
 
+    // THREE spellings on one vendor, not two. `issue_write` was found by the
+    // parity harness during F-1468's own migration, which is the argument for
+    // reading the capture rather than generalising from two data points.
     expect(enumOf("list_issues")).toEqual(["OPEN", "CLOSED"]);
     expect(enumOf("list_pull_requests")).toEqual(["open", "closed", "all"]);
+    expect(enumOf("issue_write")).toEqual(["open", "closed"]);
 
     // And the twin follows each one, which is the point: `list_pull_requests`
     // was deliberately NOT tightened by F-1468, because it was already right.
@@ -161,5 +165,8 @@ describe("list_issues.state — GitHub's spelling, and the fold behind it", () =
     const pulls = schemaOf("list_pull_requests");
     expect(pulls.safeParse({ owner: "o", repo: "r", state: "open" }).success).toBe(true);
     expect(pulls.safeParse({ owner: "o", repo: "r", state: "OPEN" }).success).toBe(false);
+    const write = schemaOf("issue_write");
+    expect(write.safeParse({ method: "update", owner: "o", repo: "r", issue_number: 1, state: "open" }).success).toBe(true);
+    expect(write.safeParse({ method: "update", owner: "o", repo: "r", issue_number: 1, state: "OPEN" }).success).toBe(false);
   });
 });

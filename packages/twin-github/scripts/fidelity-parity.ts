@@ -33,18 +33,20 @@ const steps: ParityStep[] = [
   // Repositories + branches + files
   { tool: "create_repository", arguments: { owner: "qa", name: "parity" } },
   { tool: "fork_repository", arguments: { ...repo, organization: "forks" } },
-  { tool: "create_or_update_file", arguments: { ...repo, path: "parity.txt", message: "Add parity", content: "ok\n" } },
+  // `branch` is required since F-1468 — GitHub declares it required and the
+  // twin took it as optional, which let a write land on a branch nobody named.
+  { tool: "create_or_update_file", arguments: { ...repo, branch: "main", path: "parity.txt", message: "Add parity", content: "ok\n" } },
   { tool: "create_branch", arguments: { ...repo, branch: "parity" } },
   { tool: "push_files", arguments: { ...repo, branch: "parity", message: "Change parity", files: [{ path: "parity.txt", content: "changed\n" }] } },
   // Advance main past the branch point so update_pull_request_branch has work
   {
     tool: "create_or_update_file",
-    arguments: { ...repo, path: "delete-me.txt", message: "Add delete-me", content: "bye\n" },
+    arguments: { ...repo, branch: "main", path: "delete-me.txt", message: "Add delete-me", content: "bye\n" },
     capture: (body, state) => {
       state.deleteMeSha = (body as { content?: { sha?: string } }).content?.sha;
     },
   },
-  { tool: "delete_file", arguments: (state) => ({ ...repo, path: "delete-me.txt", message: "Remove delete-me", sha: state.deleteMeSha }) },
+  { tool: "delete_file", arguments: (state) => ({ ...repo, branch: "main", path: "delete-me.txt", message: "Remove delete-me", sha: state.deleteMeSha }) },
   { tool: "get_commit", arguments: { ...repo, ref: "main" } },
   // Issues — GitHub's consolidated pair, every method this twin answers
   { tool: "issue_read", arguments: { method: "get", ...repo, issue_number: 1 } },
@@ -53,7 +55,13 @@ const steps: ParityStep[] = [
   { tool: "issue_write", arguments: { method: "update", ...repo, issue_number: 1, state: "open" } },
   { tool: "issue_write", arguments: { method: "create", ...repo, title: "Parity issue via issue_write" } },
   { tool: "search_issues", arguments: { query: "500" } },
-  { tool: "list_issues", arguments: { ...repo, state: "all" } },
+  // No `state` (F-1468). GitHub's MCP enum here is ["OPEN","CLOSED"] with no
+  // `all`, and its description says both are returned when the argument is
+  // absent — so omission is how "all" is spelled on this door. Note the NEXT
+  // line up: `issue_write.state` is lowercase ["open","closed"], because that is
+  // what GitHub declares THERE. Three spellings on one vendor; the twin follows
+  // each, and mcp-state-enum.test.ts pins the difference against the capture.
+  { tool: "list_issues", arguments: { ...repo } },
   { tool: "add_issue_comment", arguments: { ...repo, issue_number: 1, body: "Parity comment" } },
   { tool: "create_issue", arguments: { ...repo, title: "Parity issue" } },
   // Collaborators + identity
