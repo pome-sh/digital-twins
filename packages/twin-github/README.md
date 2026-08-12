@@ -8,7 +8,7 @@
 > The rest of this file is the engineering reference: HTTP/MCP surface, seed
 > shape, and the runtime contract pome-cloud's sandbox images depend on.
 
-`@pome-sh/twin-github` is a local, stateful GitHub twin for agent testing. It exposes GitHub-shaped REST routes plus a 65-tool MCP-style API backed by the same SQLite domain services.
+`@pome-sh/twin-github` is a local, stateful GitHub twin for agent testing. It exposes GitHub-shaped REST routes plus a 36-tool MCP-style API backed by the same SQLite domain services.
 
 ## Quickstart
 
@@ -59,7 +59,7 @@ The default seed creates:
 - **Real MCP (JSON-RPC, Streamable HTTP, stateless):** `POST /s/:sid/mcp`
   — speaks the protocol the `@modelcontextprotocol/sdk` `Client` +
   `StreamableHTTPClientTransport` expect (`initialize`, `tools/list`,
-  `tools/call`, `ping`, `notifications/*`). 65 tools exposed via
+  `tools/call`, `ping`, `notifications/*`). 36 tools exposed via
   `tools/list` with camelCase `inputSchema`.
 - Legacy custom MCP routes (compat surface for already-deployed agents):
   - `GET  /s/:sid/mcp/tools` — returns `{ tools: [{ name, description, input_schema }, ...] }`
@@ -93,8 +93,10 @@ bearer-auth contract is unchanged — the JWT `sid` claim (or
 Every `tools/call` reaching `/s/:sid/mcp` produces one recorder event whose
 `request_body` is `{ tool, arguments }` and whose `response_body` is the raw
 domain return — identical to what `POST /s/:sid/mcp/call` records. The
-only intentional difference is `path`. Run `npm run validate:mcp` to
-regenerate the side-by-side diff in `scripts/validate-mcp.output.txt`.
+only intentional difference is `path` (`request_headers` also differs, but
+that's a fact about the two callers — the MCP SDK client vs a plain-fetch
+legacy shim — not about the twin). Run `npm run validate:mcp` to print the
+side-by-side diff; the same command runs in CI's heavy suite.
 
 ## Runtime contract (for snapshot consumers)
 
@@ -271,7 +273,7 @@ npm run typecheck
 npm test
 npm run smoke
 npm run fidelity:parity
-npm run validate:mcp # rewrites scripts/validate-mcp.output.txt
+npm run validate:mcp # prints the wire-protocol / legacy-shim parity diff
 npm run review:harness
 npm run agent:claude
 ```

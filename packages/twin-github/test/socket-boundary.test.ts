@@ -10,7 +10,8 @@
 // parallel; never a fixed port) and characterizes the wire contract:
 //
 //   * real @modelcontextprotocol/sdk Client over StreamableHTTPClientTransport
-//     (promoted from scripts/validate-mcp.ts, which stays as a manual script),
+//     (promoted from scripts/validate-mcp.ts, which since F-1354 is no longer
+//     manual — it runs in ci.yml's heavy suite as `validate:mcp`),
 //   * the 202/405 status contract for MCP notifications and GET/DELETE,
 //   * JSON-RPC error framing (-32700) for malformed bytes,
 //   * the loud-501 unsupported-route envelope,
