@@ -1,7 +1,7 @@
 {
   "name": "@pome-sh/twin-github",
   "version": "0.10.7",
-  "description": "Deterministic GitHub-shaped twin for agent testing — REST + MCP, SQLite-backed state.",
+  "description": "Deterministic GitHub-shaped twin for agent testing \u2014 REST + MCP, SQLite-backed state.",
   "private": true,
   "type": "module",
   "main": "./dist/src/index.js",
@@ -37,6 +37,8 @@
     "seed": "tsx scripts/seed.ts",
     "smoke": "tsx scripts/smoke.ts",
     "validate:mcp": "tsx scripts/validate-mcp.ts",
+    "fixture:mcp": "tsx scripts/adopt-upstream-mcp-fixture.ts",
+    "gate:mcp-fixture": "tsx scripts/adopt-upstream-mcp-fixture.ts --check",
     "agent:claude": "tsx examples/claude-github-agent.ts",
     "review:harness": "tsx scripts/review-harness.ts",
     "start": "node dist/src/server.js",

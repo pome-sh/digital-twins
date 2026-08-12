@@ -18,49 +18,52 @@ afterAll(() => {
 const base = `/s/${TEST_SID}`;
 
 describe("MCP tool contract", () => {
-  it("lists and executes all 36 GitHub twin tools", async () => {
+  it("lists and executes all 36 GitHub twin tools, in the capture's order", async () => {
     const app = createGitHubCloneApp();
+    // ORDER IS THE CAPTURE'S SINCE F-1468, not this twin's. The fixture is a
+    // projection of GitHub's `default` listing, so the sequence is whatever
+    // github-mcp-server registers — pinned here because a served listing whose
+    // order silently reshuffles is a diff nobody can read.
     expect([...githubToolFixture.toolNames]).toEqual([
-      "search_repositories",
-      "create_repository",
-      "fork_repository",
-      "search_code",
-      "search_users",
-      "get_file_contents",
-      "list_commits",
-      "create_or_update_file",
-      "create_branch",
-      "push_files",
-      // GitHub's consolidated issue pair (F-1376)
-      "issue_read",
-      "issue_write",
-      "search_issues",
-      "list_issues",
       "add_issue_comment",
-      "create_issue",
-      "list_repository_collaborators",
-      // GitHub's consolidated pull-request pair (F-1376)
-      "pull_request_read",
-      "pull_request_review_write",
-      "create_pull_request_review",
-      "list_pull_requests",
-      "merge_pull_request",
-      "update_pull_request_branch",
-      "create_pull_request",
-      // v2 hot paths (FDRS-300)
-      "list_branches",
-      "delete_file",
-      "get_commit",
-      "update_pull_request",
       "add_reply_to_pull_request_comment",
-      "list_tags",
-      "list_releases",
+      "create_branch",
+      "create_or_update_file",
+      "create_pull_request",
+      "create_repository",
+      "delete_file",
+      "fork_repository",
+      "get_commit",
+      "get_file_contents",
       "get_latest_release",
       "get_me",
-      // M5 hot gaps (F-735)
-      "search_commits",
       "get_release_by_tag",
-      "get_tag"
+      "get_tag",
+      "issue_read",
+      "issue_write",
+      "list_branches",
+      "list_commits",
+      "list_issues",
+      "list_pull_requests",
+      "list_releases",
+      "list_repository_collaborators",
+      "list_tags",
+      "merge_pull_request",
+      "pull_request_read",
+      "pull_request_review_write",
+      "push_files",
+      "search_code",
+      "search_commits",
+      "search_issues",
+      "search_repositories",
+      "search_users",
+      "update_pull_request",
+      "update_pull_request_branch",
+      // The two rows the capture cannot carry, appended by the producer:
+      // GitHub gates these behind the `issues_granular` / `pull_requests_granular`
+      // feature flags and the golden is captured with none set (GITHUB-MCP-001/002).
+      "create_issue",
+      "create_pull_request_review",
     ]);
 
     await call(app, "search_repositories", { query: "acme" });

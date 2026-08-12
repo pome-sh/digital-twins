@@ -1,3 +1,10 @@
+// file-size: one fixture contract — the substrate vocabulary, the provenance
+// schema that enforces it, and the loader that turns a validated fixture into a
+// tool table. Splitting it would put the vocabulary in one file and the rules
+// that give each value its cost in another, which is the fork this module's own
+// `substrate-vocabulary.test.ts` exists because of: `substrate` is already
+// validated in three places across two repos, and only two of them are
+// import-checked against each other.
 // SPDX-License-Identifier: Apache-2.0
 //
 // F-1325 — every twin derives its MCP tool table from a fixture.
@@ -40,24 +47,45 @@ import type { ToolCallContext, ToolSpec } from "./index.js";
  * field name in two languages with no import between them is exactly how a
  * vocabulary silently forks.
  *
- * The last two are additions this side needs, and the producer has no use for.
- * They describe a table nobody read from upstream at all, and exist so that
- * fact has to be stated instead of implied:
+ * The last three are additions this side needs, and the producer has no use for.
+ * The first two describe a table nobody read from upstream at all, and exist so
+ * that fact has to be stated instead of implied:
  *
  * - `twin-code-transcription` — the fixture is a transcription of the listing
  *   the twin's own code already served. It says nothing about the vendor.
  * - `twin-authored-from-vendor-docs` — the tool NAMES come from the vendor's
  *   published documentation; the schemas are the twin's own.
  *
- * A twin on either of the last two has never been compared to its upstream.
+ * A twin on either of those has never been compared to its upstream.
  * `transcription.comparedToUpstream` has to say so.
+ *
+ * - `upstream-capture-projection` — MOST of the rows are an upstream capture's,
+ *   copied through byte for byte, and the exceptions are named. It is not a
+ *   producer value because no capture produces it, and it is not twin-owned
+ *   because its content was read from the vendor; it is the honest word for a
+ *   fixture that is a capture's bytes plus a declared, reasoned residue.
+ *
+ *   twin-slack and twin-gmail do NOT need it: their producers can only SUBTRACT,
+ *   so every surviving row is the capture's and the capture's own substrate
+ *   (`live-wire-oauth` / `live-wire-unauth`) stays exactly true. twin-github
+ *   cannot reach that shape. Two of the tools it serves — `create_issue` and
+ *   `create_pull_request_review` — are ones GitHub registers behind feature
+ *   flags (`issues_granular`, `pull_requests_granular`), and the golden is
+ *   captured with no flags set ON PURPOSE, because that is the surface an
+ *   examinee pointed at `api.githubcopilot.com/mcp/` actually gets. So those two
+ *   rows can never come from the capture, and claiming `oss-source` over the
+ *   whole file would be an overclaim on exactly the two rows a reader most needs
+ *   to know about. `projection.carried` names them, with a reason each.
  *
  * The same value can legitimately differ between the two trees for one twin,
  * because they describe different subjects: `fixtures/mcp-tools-list/github.*`
  * is `oss-source` (what GitHub serves) while
  * `packages/twin-github/fixtures/mcp-tools-list.*` is
- * `twin-code-transcription` (what the twin serves). That is not drift. Which
- * subject a file describes is fixed by where it lives.
+ * `upstream-capture-projection` (what the twin serves, and where those rows came
+ * from). That is not drift. Which subject a file describes is fixed by where it
+ * lives — which is also why the projection has to name its source by DIGEST
+ * rather than by path: two files in two directories describing the same vendor
+ * is the arrangement in which "these are the same bytes" stops being obvious.
  */
 export const mcpFixtureSubstrateSchema = z.enum([
   "live-wire-unauth",
@@ -66,6 +94,7 @@ export const mcpFixtureSubstrateSchema = z.enum([
   "not-captured",
   "twin-code-transcription",
   "twin-authored-from-vendor-docs",
+  "upstream-capture-projection",
 ]);
 export type McpFixtureSubstrate = z.infer<typeof mcpFixtureSubstrateSchema>;
 
@@ -84,6 +113,9 @@ const TWIN_OWNED_SUBSTRATES = new Set<McpFixtureSubstrate>([
 
 /** Substrates that pin a public source tree, and must say which commit. */
 const OSS_SUBSTRATES = new Set<McpFixtureSubstrate>(["oss-source"]);
+
+/** Substrates whose rows are an upstream capture's, minus/plus a declared residue. */
+const PROJECTION_SUBSTRATES = new Set<McpFixtureSubstrate>(["upstream-capture-projection"]);
 
 const sha256Hex = z.string().regex(/^[0-9a-f]{64}$/, "must be a lowercase hex sha256");
 
@@ -139,10 +171,72 @@ export const mcpToolFixtureMetaSchema = z
         comparedToUpstream: z.string().min(1),
       })
       .optional(),
+    /**
+     * Mandatory on `upstream-capture-projection`, rejected everywhere else: WHICH
+     * capture these rows came from, and every row that is not that capture's.
+     *
+     * The sha is the load-bearing field. `rawFileSha256` above proves this file
+     * has not been hand-edited since it was derived; it says nothing about what
+     * it was derived FROM, and "these are GitHub's bytes" is the whole claim a
+     * projection makes. With the source digest on the file, a reader — or the
+     * `--check` producer — can prove the claim instead of taking the substrate
+     * word for it. Without it, re-pointing the projection at a stale or
+     * hand-edited golden would re-hash clean.
+     *
+     * `dropped` and `carried` are records rather than lists so a name cannot be
+     * added without a reason, the same rule `verification_opt_out` and the
+     * MCP-lane registry are built on: the value IS the justification.
+     */
+    projection: z
+      .strictObject({
+        /** Repo-relative path of the upstream golden the rows were copied from. */
+        sourceFixture: z.string().min(1),
+        /** That golden's own `rawFileSha256`. Re-checked by the producer on every run. */
+        sourceRawFileSha256: sha256Hex,
+        sourceCaptureDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "must be an ISO date (YYYY-MM-DD)"),
+        sourceSubstrate: mcpFixtureSubstrateSchema,
+        /** The commit an `oss-source` golden was built from, when it pins one. */
+        sourceCommit: z.string().min(1).optional(),
+        /** The script that wrote this file, and the command that re-derives it. */
+        producer: z.string().min(1),
+        /** Tools the capture carries that this twin does not serve — name → reason. */
+        dropped: z.record(z.string(), z.string().min(1)),
+        /** Rows that are NOT the capture's — name → reason. Empty on a pure subtraction. */
+        carried: z.record(z.string(), z.string().min(1)),
+      })
+      .optional(),
     notes: z.array(z.string()).optional(),
     files: z.strictObject({ raw: z.string().min(1), canonical: z.string().min(1) }),
   })
   .superRefine((meta, ctx) => {
+    if (PROJECTION_SUBSTRATES.has(meta.substrate) && !meta.projection) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["projection"],
+        message:
+          `substrate '${meta.substrate}' claims these rows are an upstream capture's, so the fixture ` +
+          `must name that capture, carry its digest, and list every row that is NOT its. A projection ` +
+          `that does not say what it projected from is a substrate word doing the work of evidence.`,
+      });
+    }
+    if (meta.projection && !PROJECTION_SUBSTRATES.has(meta.substrate)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["projection"],
+        message: `substrate '${meta.substrate}' does not project an upstream capture, so \`projection\` is a claim nothing here made.`,
+      });
+    }
+    if (PROJECTION_SUBSTRATES.has(meta.substrate) && !meta.configuration) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["configuration"],
+        message:
+          `substrate '${meta.substrate}' inherits its rows from a capture, so it inherits that ` +
+          `capture's configuration question too — GitHub serves 44 tools at /mcp/ and 85 at ` +
+          `/mcp/x/all, and a projection that does not say which it descends from is as unarguable ` +
+          `as a capture that does not.`,
+      });
+    }
     if (UPSTREAM_SUBSTRATES.has(meta.substrate) && !meta.configuration) {
       ctx.addIssue({
         code: "custom",

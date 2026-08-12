@@ -44,10 +44,46 @@ describe("substrate vocabulary", () => {
   it("declares no substrate the producer has never heard of unless it is twin-owned", () => {
     const producerValues = new Set(producer.KNOWN_SUBSTRATES);
     const extra = mcpFixtureSubstrateSchema.options.filter((value) => !producerValues.has(value));
-    // Additions are legal, but only the twin-owned ones. A value that is
-    // neither in the producer nor twin-owned is a phantom: nothing produces it
-    // and nothing else in the repo can read it.
-    expect(extra.sort()).toEqual(["twin-authored-from-vendor-docs", "twin-code-transcription"]);
+    // Additions are legal, but each one has to be a thing this side can produce
+    // and something else in the repo can read. A value that is neither is a
+    // phantom. Two describe a table nobody read from upstream; the third
+    // (F-1468) describes one that IS an upstream capture's rows, minus and plus
+    // a residue the meta has to enumerate — which is why it is not twin-owned
+    // and still not a producer value: no capture produces a projection of
+    // itself, and `mcpToolFixtureMetaSchema` refuses it without the evidence.
+    expect(extra.sort()).toEqual([
+      "twin-authored-from-vendor-docs",
+      "twin-code-transcription",
+      "upstream-capture-projection",
+    ]);
+  });
+
+  // F-1468. The substrate word is a claim; these are the two rules that make it
+  // cost something to say. Asserted against the real twin-github meta rather
+  // than a fixture, because the file that ships is the one that has to hold.
+  it("refuses an upstream-capture-projection that does not name what it projected from", () => {
+    const projected = JSON.parse(
+      readFileSync(new URL("packages/twin-github/fixtures/mcp-tools-list.meta.json", repoRoot), "utf8")
+    ) as Record<string, unknown>;
+    expect(mcpToolFixtureMetaSchema.safeParse(projected).success).toBe(true);
+    const { projection: _dropped, ...unevidenced } = projected;
+    expect(mcpToolFixtureMetaSchema.safeParse(unevidenced).success).toBe(false);
+  });
+
+  it("refuses a `projection` block on a substrate that projects nothing", () => {
+    const projected = JSON.parse(
+      readFileSync(new URL("packages/twin-github/fixtures/mcp-tools-list.meta.json", repoRoot), "utf8")
+    ) as Record<string, unknown>;
+    const parsed = mcpToolFixtureMetaSchema.safeParse({
+      ...projected,
+      substrate: "twin-code-transcription",
+      transcription: {
+        readFrom: "this twin",
+        contentOrigin: "this twin's code",
+        comparedToUpstream: "never",
+      },
+    });
+    expect(parsed.success).toBe(false);
   });
 
   // The point of sharing the vocabulary is that a golden the producer wrote can

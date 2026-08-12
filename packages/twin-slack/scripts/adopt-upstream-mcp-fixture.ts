@@ -5,12 +5,19 @@
 //
 // ── WHY THIS EXISTS ──────────────────────────────────────────────────────────
 //
-// twin-github's equivalent script derives its fixture from `src/tools.ts`,
-// because that twin's table is its own. This one runs the other way: the table
-// is SLACK'S, captured live over OAuth by F-1329, and the twin's job is to
-// serve it. So the code is what has to follow, and the only thing this script
-// is allowed to do to the vendor's bytes is DROP a tool the heat ruling says
-// this twin does not expose.
+// The table is SLACK'S, captured live over OAuth by F-1329, and the twin's job
+// is to serve it. So the code is what has to follow, and the only thing this
+// script is allowed to do to the vendor's bytes is DROP a tool the heat ruling
+// says this twin does not expose.
+//
+// (This comment used to open by contrasting twin-github, "which derives its
+// fixture from `src/tools.ts`, because that twin's table is its own". F-1468
+// retired that: twin-github projects GitHub's capture now, through
+// `packages/twin-github/scripts/adopt-upstream-mcp-fixture.ts`. The one
+// remaining difference is that its producer can also ADD — two tools GitHub
+// gates behind `X-MCP-Features` flags cannot appear in a flags-off golden — so
+// this script's subtract-only property is the stricter of the two and stays
+// worth stating.)
 //
 // It cannot rename, cannot re-describe, cannot re-shape an inputSchema, and
 // cannot add a tool the capture does not carry. That is the whole point:
