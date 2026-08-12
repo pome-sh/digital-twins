@@ -121,6 +121,34 @@ export function findBrokenLocalUses(root) {
 }
 
 /**
+ * Strip a trailing YAML comment from one raw line.
+ *
+ * A blanket `raw.replace(/#.*$/, "")` is wrong in the direction that matters:
+ * YAML only starts a comment at a `#` that is at the start of the line or
+ * preceded by whitespace, and never inside a quoted scalar. A blanket strip
+ * silently TRUNCATES values — `label: "schedule-alarm:x#1"` and
+ * `label: "schedule-alarm:x#2"` both reduce to `"schedule-alarm:x`, so the
+ * F-1471 title/label bijection compares two mangled values, finds them equal,
+ * and reports green on exactly the typo it exists to catch. Failing to strip a
+ * real comment is the safer error, so an unterminated quote leaves the rest of
+ * the line intact rather than guessing.
+ */
+function stripComment(raw) {
+  let quote = null;
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (quote !== null) {
+      if (ch === quote) quote = null;
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+    } else if (ch === "#" && (i === 0 || /\s/.test(raw[i - 1]))) {
+      return raw.slice(0, i);
+    }
+  }
+  return raw;
+}
+
+/**
  * Every workflow file as `[name, comment-stripped lines]`. Exported so
  * scripts/ci/assert-schedule-alarm-coverage.mjs (F-1471) reads the exact same
  * file list and comment-stripping rule rather than re-implementing it — two
@@ -141,8 +169,9 @@ export function workflowLines(root) {
       readFileSync(join(dir, file), "utf8")
         .split("\n")
         // Strip comments before matching: a workflow's own prose can contain
-        // the literal strings "schedule:" and "cron:" — these files do.
-        .map((raw) => raw.replace(/#.*$/, "")),
+        // the literal strings "schedule:" and "cron:" — these files do. Also
+        // tolerate CRLF checkouts, so a `\r` never lands inside a parsed value.
+        .map((raw) => stripComment(raw.replace(/\r$/, ""))),
     ]);
 }
 

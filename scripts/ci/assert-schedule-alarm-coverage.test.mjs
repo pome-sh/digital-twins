@@ -11,6 +11,7 @@ import {
   findMissingAlarmCoverage,
   findMissingAlarmInputs,
   findTitleLabelMismatches,
+  findAlarmNeedsGaps,
 } from "./assert-schedule-alarm-coverage.mjs";
 
 function assert(cond, msg) {
@@ -275,6 +276,103 @@ withScratchRoot(
   },
 );
 
+// ── The bijection's OTHER direction. The fixture above is "same title, two
+// labels"; this is "same label, two titles". A one-directional check would
+// pass this, and it is the direction that actually breaks the mechanism the
+// other way round: the failure leg files an issue titled one thing under a
+// label whose recovery leg believes it is titled another, so whichever call
+// creates the issue decides a title its sibling's prose contradicts.
+withScratchRoot(
+  {
+    "same-label.yml": `name: same-label\non:\n  schedule:\n    - cron: '0 0 * * *'\njobs:\n  main:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n  schedule-alarm:\n    needs: main\n    if: failure()\n    uses: ./.github/workflows/schedule-alarm.yml\n    with:\n      title: "same-label is failing"\n      label: "schedule-alarm:same-label"\n      outcome: failure\n  schedule-alarm-recovery:\n    needs: main\n    if: success()\n    uses: ./.github/workflows/schedule-alarm.yml\n    with:\n      title: "same-label has recovered"\n      label: "schedule-alarm:same-label"\n      outcome: success\n`,
+  },
+  (root) => {
+    const calls = findScheduleAlarmCalls(root);
+    const mismatches = findTitleLabelMismatches(calls);
+    assert(mismatches.length === 2, `one label with two titles must flag both calls, got ${JSON.stringify(mismatches)}`);
+  },
+);
+
+// ── A `#` inside a title or label is NOT a YAML comment (a comment needs
+// start-of-line or preceding whitespace, and never starts inside a quoted
+// scalar). A blanket `#.*$` strip truncated both legs to the same mangled
+// prefix, so the bijection compared two equal wrecks and reported green on
+// precisely the typo it exists to catch. Issue refs like `#300` are all over
+// this repo's prose, so this is a reachable shape, not a hypothetical.
+withScratchRoot(
+  {
+    "hashed.yml": `name: hashed\non:\n  schedule:\n    - cron: '0 0 * * *'\njobs:\n  main:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n  schedule-alarm:\n    needs: main\n    if: failure()\n    uses: ./.github/workflows/schedule-alarm.yml\n    with:\n      title: "hashed is failing"\n      label: "schedule-alarm:hashed#1"\n      outcome: failure\n  schedule-alarm-recovery:\n    needs: main\n    if: success()\n    uses: ./.github/workflows/schedule-alarm.yml\n    with:\n      title: "hashed is failing"\n      label: "schedule-alarm:hashed#2"\n      outcome: success\n`,
+  },
+  (root) => {
+    const calls = findScheduleAlarmCalls(root);
+    assert(
+      calls[0].label === "schedule-alarm:hashed#1" && calls[1].label === "schedule-alarm:hashed#2",
+      `a # inside a quoted value must survive comment stripping, got ${JSON.stringify(calls.map((c) => c.label))}`,
+    );
+    assert(findTitleLabelMismatches(calls).length === 2, "two labels differing only after a # must still be a mismatch");
+  },
+);
+
+// ── A real trailing comment on the same line still goes, so a commented-out
+// key cannot be read as live state (the property the strip exists for).
+withScratchRoot(
+  {
+    "trailing.yml": `name: trailing\non:\n  schedule:\n    - cron: '0 0 * * *'\njobs:\n  main:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n  schedule-alarm:\n    needs: main\n    if: failure() # only on a real failure\n    uses: ./.github/workflows/schedule-alarm.yml # the shared alarm\n    with:\n      title: "trailing is failing"\n      label: "schedule-alarm:trailing"\n      outcome: failure\n`,
+  },
+  (root) => {
+    const calls = findScheduleAlarmCalls(root);
+    assert(calls.length === 1 && calls[0].ifExpr === "failure()", `trailing comments must be stripped, got ${JSON.stringify(calls)}`);
+    assert(findMissingAlarmCoverage(root, calls).length === 0, "a call with trailing comments is still covered");
+  },
+);
+
+// ── False red closed: flow-style `with: {…}`. GitHub accepts it, actionlint
+// accepts it, and an earlier revision of the parser required `with:` alone on
+// its line — so a CORRECTLY covered workflow was reported both uncovered and
+// missing its inputs. A guard that reds on right answers gets deleted.
+withScratchRoot(
+  {
+    "flow-with.yml": `name: flow-with\non:\n  schedule:\n    - cron: '0 0 * * *'\njobs:\n  main:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n  schedule-alarm:\n    needs: main\n    if: failure()\n    uses: ./.github/workflows/schedule-alarm.yml\n    with: {title: "flow is failing", label: "schedule-alarm:flow", outcome: failure}\n`,
+  },
+  (root) => {
+    const calls = findScheduleAlarmCalls(root);
+    assert(calls.length === 1 && calls[0].outcome === "failure", `flow-form with: must parse, got ${JSON.stringify(calls)}`);
+    assert(calls[0].title === "flow is failing" && calls[0].label === "schedule-alarm:flow", `flow-form title/label must parse, got ${JSON.stringify(calls[0])}`);
+    assert(findMissingAlarmCoverage(root, calls).length === 0, "a flow-form alarm call is covered, not missing");
+    assert(findMissingAlarmInputs(calls).length === 0, "a flow-form alarm call is not missing its inputs");
+  },
+);
+
+// ── Break-on-purpose: the alarm job needs only ONE of two work jobs.
+// `failure()` is scoped to the alarm job's own dependency graph, so the
+// sibling it does not depend on can fail while the alarm is simply SKIPPED and
+// files nothing — wired in the diff, dead in production.
+withScratchRoot(
+  {
+    "partial-needs.yml": `name: partial-needs\non:\n  schedule:\n    - cron: '0 0 * * *'\njobs:\n  trivial:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n  realwork:\n    runs-on: ubuntu-latest\n    steps:\n      - run: exit 1\n  schedule-alarm:\n    needs: trivial\n    if: failure()\n    uses: ./.github/workflows/schedule-alarm.yml\n    with:\n      title: "partial is failing"\n      label: "schedule-alarm:partial"\n      outcome: failure\n`,
+  },
+  (root) => {
+    const calls = findScheduleAlarmCalls(root);
+    assert(findMissingAlarmCoverage(root, calls).length === 0, "the call itself is well-formed; this fixture is about the needs graph");
+    const gaps = findAlarmNeedsGaps(root);
+    assert(gaps.length === 1 && gaps[0].unseen.includes("realwork"), `realwork must be named as invisible to the alarm, got ${JSON.stringify(gaps)}`);
+  },
+);
+
+// ── The same shape done RIGHT must stay green, in both spellings and through
+// a TRANSITIVE chain — requiring every work job to be listed DIRECTLY would
+// red correct work, which is how a guard gets disabled.
+withScratchRoot(
+  {
+    "flow-needs.yml": `name: flow-needs\non:\n  schedule:\n    - cron: '0 0 * * *'\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n  b:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n  schedule-alarm:\n    needs: [a, b]\n    if: failure()\n    uses: ./.github/workflows/schedule-alarm.yml\n    with:\n      title: "flow-needs is failing"\n      label: "schedule-alarm:flow-needs"\n      outcome: failure\n`,
+    "chained-needs.yml": `name: chained-needs\non:\n  schedule:\n    - cron: '0 0 * * *'\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n  b:\n    needs:\n      - a\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n  schedule-alarm:\n    needs: b\n    if: failure()\n    uses: ./.github/workflows/schedule-alarm.yml\n    with:\n      title: "chained is failing"\n      label: "schedule-alarm:chained"\n      outcome: failure\n`,
+  },
+  (root) => {
+    const gaps = findAlarmNeedsGaps(root);
+    assert(gaps.length === 0, `flow-form and transitive needs: must both count as covering, got ${JSON.stringify(gaps)}`);
+  },
+);
+
 // ── Against the real tree: main's three scheduled workflows all pass today.
 {
   const root = fileURLToPath(new URL("../..", import.meta.url));
@@ -283,6 +381,9 @@ withScratchRoot(
   assert(missing.length === 0, `real tree must have zero missing alarm coverage, got ${missing}`);
   assert(findMissingAlarmInputs(calls).length === 0, "real tree must have no missing alarm inputs");
   assert(findTitleLabelMismatches(calls).length === 0, "real tree must have no title/label mismatch");
+  assert(findAlarmNeedsGaps(root).length === 0, `real tree's alarms must need every job in their own workflow, got ${JSON.stringify(findAlarmNeedsGaps(root))}`);
+  // Not a vacuous pass: the real tree genuinely has calls to examine.
+  assert(calls.length >= 3, `real tree must have alarm calls to examine, got ${calls.length}`);
 }
 
 console.log("✅ assert-schedule-alarm-coverage.test.mjs passed");
