@@ -1,6 +1,7 @@
 import { serve } from "@hono/node-server";
 import { sign } from "hono/jwt";
 import { createGitHubCloneApp } from "../src/twin.js";
+import { githubToolFixture } from "../src/tools.js";
 
 const port = 43333;
 const sid = "smoke-session";
@@ -21,7 +22,11 @@ try {
   if (!health.ok) throw new Error(`healthz failed: ${health.status}`);
 
   const tools = await fetch(`${sessionBase}/mcp/tools`, { headers: authHeader }).then((response) => response.json()) as { tools: unknown[] };
-  if (tools.tools.length !== 65) throw new Error(`expected 65 tools, got ${tools.tools.length}`);
+  // Derived from the fixture, not hardcoded: it moved 65 -> 36 under F-1376
+  // while this line went on claiming 65, silently, because nothing ran this
+  // script (F-1472). A hardcoded count is the bug wearing a new number.
+  const expectedTools = githubToolFixture.tools.length;
+  if (tools.tools.length !== expectedTools) throw new Error(`expected ${expectedTools} tools, got ${tools.tools.length}`);
 
   const issue = await fetch(`${sessionBase}/repos/acme/api/issues`, {
     method: "POST",

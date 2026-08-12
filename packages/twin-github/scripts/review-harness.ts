@@ -123,22 +123,53 @@ class GitHubTwinClient {
 }
 
 const target = process.env.REVIEW_TARGET ?? "local";
-let mcpUrl = process.env.GITHUB_MCP_URL ?? process.env.POME_GITHUB_MCP_URL ?? "http://127.0.0.1:3333/mcp";
+const explicitUrl = process.env.GITHUB_MCP_URL ?? process.env.POME_GITHUB_MCP_URL;
+let mcpUrl = explicitUrl ?? "http://127.0.0.1:3333/mcp";
 let token = process.env.GITHUB_MCP_TOKEN;
 const runId = process.env.REVIEW_RUN_ID ?? `${Date.now()}`;
 const repoName = `review-fixture-${target}-${runId}`.replace(/[^a-zA-Z0-9._-]/g, "-").slice(0, 90);
 const branchName = "claude-agent-review";
 const filePath = "claude-agent.txt";
 
+// A server this process owns, closed at the end. Boots its own twin on an
+// ephemeral port when REVIEW_TARGET=local and nobody pointed GITHUB_MCP_URL
+// at an already-running one — this script used to assume a human had already
+// run `npm run dev` in another terminal (README's two-terminal flow still
+// works: an explicit GITHUB_MCP_URL skips the self-boot), which is exactly
+// why nothing ran it in CI (F-1472).
+let ownedServer: { close: () => void } | undefined;
+
 if (target === "local") {
   const sid = process.env.REVIEW_SID ?? `harness_${runId}`;
+  const secret = process.env.TWIN_AUTH_SECRET ?? "dev-only-insecure-secret";
+  if (!explicitUrl) {
+    const { serve } = await import("@hono/node-server");
+    const { createGitHubCloneApp } = await import("../src/twin.js");
+    process.env.TWIN_AUTH_SECRET = secret;
+    const app = createGitHubCloneApp();
+    const { server, port } = await new Promise<{ server: ReturnType<typeof serve>; port: number }>(
+      (resolve, reject) => {
+        const s = serve({ fetch: app.fetch, port: 0, hostname: "127.0.0.1" }, (info) => {
+          resolve({ server: s, port: info.port });
+        });
+        s.on("error", reject);
+      }
+    );
+    mcpUrl = `http://127.0.0.1:${port}/mcp`;
+    ownedServer = server;
+  }
   const url = new URL(mcpUrl);
   url.pathname = `/s/${sid}/mcp`;
   mcpUrl = url.toString().replace(/\/$/, "");
   const { sign } = await import("hono/jwt");
-  const secret = process.env.TWIN_AUTH_SECRET ?? "dev-only-insecure-secret";
   token = await sign(
-    { sid, team_id: "tm_review", exp: Math.floor(Date.now() / 1000) + 3600 },
+    // `login` matters, not just decoration: `create_repository`'s default
+    // owner ("pome-agent", domain/repos.ts) auto-adds "pome-agent" as a
+    // collaborator, and mergePullRequest's permission check reads the
+    // session's login to look that collaborator up — an unset login always
+    // 403s "must have push access", on the repo this run just created and
+    // owns. Never caught before because nothing ran this script (F-1472).
+    { sid, team_id: "tm_review", login: "pome-agent", exp: Math.floor(Date.now() / 1000) + 3600 },
     secret
   );
 }
@@ -157,6 +188,7 @@ report.tests.push(await concurrencyStress());
 
 const ok = report.tests.every((test) => test.ok);
 await client.close().catch(() => undefined);
+ownedServer?.close();
 console.log(JSON.stringify(report, null, 2));
 if (!ok) process.exit(1);
 

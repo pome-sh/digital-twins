@@ -6,6 +6,16 @@
  *
  * Usage: npm run preview:drift -w @pome-sh/twin-gmail
  * Exit 0 when identical; exit 1 when drift is detected.
+ *
+ * Not wired into CI (F-1472 audit): the exact assertion here — served
+ * tools/list equals the frozen canonical fixture — is already made by
+ * `test/mcp-tool-fixture.test.ts`'s "serves exactly the fixture's listing
+ * over tools/list" case, which DOES run under `npm test` in ci.yml. This file
+ * is a standalone, human-run diff tool for debugging a suspected drift
+ * outside vitest (no test-runner startup, plain stdout diff), not a second
+ * source of the same verdict. `preview:drift` also does not match the check
+ * vocabulary (`validate:*`/`check:*`/`lint:*`/`gate:*`/`test:*`/`assert:*`),
+ * so the repo-root wiring guard does not expect it to be reachable either.
  */
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
