@@ -18,8 +18,10 @@
 // standalone-fetchable via `npx degit`, which copies that subtree and nothing
 // above it, so a `file:` path out of the tree breaks its `npm install`. So this
 // gate typechecks that example against the registry artifact, NOT against the
-// adapter source next to it, and nothing compares the two — the pin is 0.3.1
-// against a workspace 0.3.3 as of this comment. That is the F-1231 seam, moved:
+// adapter source next to it, and nothing compares the two. It has drifted twice
+// already (#308 off 0.2.5, then 0.3.1 against a workspace 0.3.3, which also
+// dragged the retired `@pome-sh/shared-types` back into the example's install
+// graph as 0.3.1's declared runtime dep). That is the F-1231 seam, moved:
 // `check-workspace-pins-match-workspace.mjs` cannot own it, because "resolve to
 // the workspace" is the wrong rule for a deliberately-published pin, and the
 // right rule ("re-pin once the workspace version publishes, skip while it has
