@@ -128,6 +128,7 @@ CREATE TABLE IF NOT EXISTS releases (
   prerelease INTEGER NOT NULL DEFAULT 0,
   author_login TEXT NOT NULL DEFAULT 'pome-agent',
   created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT '',
   published_at TEXT,
   UNIQUE (repo_id, tag_name),
   FOREIGN KEY (repo_id) REFERENCES repositories(id) ON DELETE CASCADE
@@ -326,6 +327,11 @@ export function migrate(db: GitHubCloneDatabase) {
   ensureColumn(db, "pull_request_review_comments", "commit_sha", "TEXT");
   ensureColumn(db, "pull_request_review_comments", "in_reply_to_id", "INTEGER");
   ensureColumn(db, "collaborators", "invitation_state", "TEXT NOT NULL DEFAULT 'accepted'");
+  // F-1459 — real GitHub returns `updated_at` on every release and the twin
+  // omitted the key entirely. Defaulted to '' rather than NULL so an older
+  // database migrates without a rewrite; `hydrateDerivedColumns` backfills it
+  // from `created_at` for rows written before the column existed.
+  ensureColumn(db, "releases", "updated_at", "TEXT NOT NULL DEFAULT ''");
   ensureIssueNumberCascade(db);
   ensureCommentsAllowPullRequests(db);
   hydrateDerivedColumns(db);
@@ -450,5 +456,14 @@ UPDATE pull_requests
 SET
   head_sha = COALESCE(head_sha, (SELECT head_sha FROM branches WHERE branches.repo_id = pull_requests.head_repo_id AND branches.name = pull_requests.head_ref)),
   base_sha = COALESCE(base_sha, (SELECT head_sha FROM branches WHERE branches.repo_id = pull_requests.base_repo_id AND branches.name = pull_requests.base_ref));
+
+-- F-1459. \`updated_at\` arrived after \`releases\` existed, so a database written
+-- by an earlier build has it at the column default (''). A release this twin
+-- serves has never been edited — there is no release-update route — so its
+-- update instant IS its creation instant, and backfilling is exact rather than
+-- an approximation. Guarded on '' so a real value is never overwritten.
+UPDATE releases
+SET updated_at = created_at
+WHERE updated_at = '';
 `);
 }

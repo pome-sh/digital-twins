@@ -1,5 +1,43 @@
 # @pome-sh/twin-github — CHANGELOG
 
+## 0.10.7 — 2026-08-12
+
+`updated_at` appears on release objects, and four divergences the first real
+comparison of the seeded collections found get written down (F-1459).
+
+**Releases carry `updated_at`.** Real GitHub returns it on every release and this
+twin omitted the key entirely, so all three release surfaces —
+`GET /releases`, `/releases/latest`, `/releases/tags/:tag` — reported
+`field-removed` against the real-GitHub golden. A release here has never been
+edited (there is no release-update route on this twin), so its update instant is
+its creation instant and the honest value was already in hand; omitting it was a
+gap, not a modelling decision. `updated_at` is a real column rather than
+`created_at` aliased in the serializer, so that a release-update route added
+later has somewhere to write and cannot silently leave this field frozen.
+Databases written by an earlier build migrate through `ensureColumn` and are
+backfilled from `created_at`, which is exact rather than approximate for the
+same reason.
+
+**Four divergences recorded, not fixed** — bullets 25–28 in FIDELITY.md. None of
+these is new behaviour. Seven of this twin's collections published `green` from
+2026-05-31 while both sides of the comparison were empty arrays, which bound no
+key, no leaf type and no element; seeding the upstream half made the comparison
+real, and this is what it found.
+
+- **25** — issue-comment objects omit `author_association`, `reactions`,
+  `performed_via_github_app`, `pin` and `minimized`.
+- **26** — review objects omit `author_association`.
+- **27** — release objects omit GitHub's `immutable` flag. Unlike its neighbour
+  `updated_at` there is no honest value to emit: this twin does not model
+  immutable releases, and a hard-coded `false` would claim it had evaluated
+  something it cannot.
+- **28** — a review comment's `pull_request_review_id` is always `null`. The
+  faithful fix is for this twin to mint the implicit `COMMENTED` review GitHub
+  makes for a standalone review comment, but the fidelity harness already works
+  around the gap by declaring that review in its seed — so minting one here
+  would serve three reviews where GitHub serves two. Both moves have to land
+  together, across two repos, and that is its own change.
+
 ## 0.10.6 — 2026-08-11
 
 Nine route inputs GitHub does not declare come out of `route-inputs.ts`, and

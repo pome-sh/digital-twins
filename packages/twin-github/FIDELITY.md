@@ -478,6 +478,71 @@ on each bullet's bold title and never on its number, so gaps cost it nothing.
     across both doors, with the fixture regeneration and saved-task audit that
     implies, tracked separately.
 
+25. **Issue-comment objects omit moderation and social metadata.** The twin's
+    issue-comment object carries what an agent reads a comment for — id, body,
+    user, `created_at`/`updated_at`, the html and issue urls — and omits five
+    leaves real GitHub always returns: `author_association` and `reactions` (the
+    same social metadata divergence 9 records on the issue object and 21 on
+    review comments), `performed_via_github_app` (null unless a GitHub App wrote
+    the comment), and two moderation slots this twin has no model for at all —
+    `pin` and `minimized`, GitHub's pinned-comment and hidden-comment state,
+    both null on an ordinary comment. `pin` is the counterpart of the issue
+    object's `pinned_comment`, which divergence 9 already records; registering
+    one half of a pinned-comment model and not the other would have been the
+    odder choice.
+
+    First observed on 2026-08-11. Not new behaviour: `GET /issues/:n/comments`
+    published green from 2026-05-31 while both sides of the comparison were
+    empty arrays, which bound no key and no leaf type. Seeding the upstream half
+    made the comparison real and this is what it found.
+
+26. **Review objects omit `author_association`.** Real GitHub returns the
+    reviewer's relationship to the repository (`OWNER`, `COLLABORATOR`, `NONE`,
+    …) on every review; this twin does not model it. One leaf, and deliberately
+    not folded into divergence 21 — that one is about review *comments*, a
+    different object served by a different route, and one bullet naming two
+    claims is how a registration ends up covering something nobody verified.
+
+    What is **not** here is this surface's item count. `GET /pulls/:n/reviews`
+    did serve one review where GitHub served two, because posting a standalone
+    review comment makes GitHub wrap it in an empty-bodied `COMMENTED` review to
+    hang it off and this twin writes the comment without touching the review
+    table. That was fixed on the harness side by declaring the implicit review
+    in the fidelity seed, so a count divergence reappearing here is a
+    regression and must go red rather than land in a bullet widened to absorb
+    it.
+
+27. **Release objects omit GitHub's `immutable` flag.** Real GitHub returns
+    `immutable` on every release — the flag for its immutable-releases feature,
+    which pins a release's tag and assets against being moved or replaced after
+    publication. This twin does not model the feature, so it omits the key
+    rather than emitting a hard-coded `false`, which would claim it had
+    evaluated something it cannot.
+
+    Its neighbour `updated_at` was the same kind of omission and is **fixed**,
+    not recorded, in 0.10.7: a release does have an update instant, this twin
+    already knows the instant it was created, and there is no release-update
+    route here that could ever move the two apart — so the honest value was
+    available and omitting it was a gap rather than a modelling decision.
+
+28. **A review comment's `pull_request_review_id` is always `null`.** Real
+    GitHub returns the id of the review the comment hangs off — every review
+    comment belongs to one, because posting a standalone comment via
+    `POST /pulls/:n/comments` makes GitHub mint an empty-bodied `COMMENTED`
+    review for it. This twin writes `pull_request_review_comments` and never
+    touches the review table, so it has no review to point at and answers
+    `null`. Measured 2026-08-11: GitHub `4907749377`, twin `null`.
+
+    Recorded rather than fixed, and the reason is a collision rather than
+    difficulty. The faithful fix is for this twin to mint the implicit review
+    the way GitHub does — but the fidelity harness already works around the gap by
+    declaring that review explicitly in its seed, so a twin that also minted one
+    would serve **three** reviews where GitHub serves two, and
+    `GET /pulls/:n/reviews` would start failing on a count. Making both moves at
+    once is a coordinated two-repo change that also moves the result of every
+    task asserting on a review list, and it needs its own ticket rather than a
+    line in this one.
+
 ## How fidelity is verified
 
 Three independent checks back the tier classifications above. Each is a

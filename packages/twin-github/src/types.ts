@@ -261,6 +261,10 @@ export type ReleaseRow = {
   prerelease: 0 | 1;
   author_login: string;
   created_at: string;
+  /** F-1459 — GitHub's release `updated_at`. Equal to `created_at` on a release
+   * that has never been edited, which is every release this twin serves: it has
+   * no release-update route. */
+  updated_at: string;
   published_at: string | null;
 };
 

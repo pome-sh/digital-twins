@@ -591,6 +591,10 @@ export function releaseJson(release: ReleaseRow, repo: RepoRow) {
     prerelease: Boolean(release.prerelease),
     author: userJson(release.author_login),
     created_at: release.created_at,
+    // F-1459 — real GitHub returns this on every release; the twin used to omit
+    // the key, which read as `field-removed` on all three release surfaces.
+    // Falls back to `created_at` for a row written before the column existed.
+    updated_at: release.updated_at || release.created_at,
     published_at: release.published_at,
     html_url: `https://github.com/${repo.full_name}/releases/tag/${release.tag_name}`,
     url: `https://api.github.com/repos/${repo.full_name}/releases/${release.id}`,
