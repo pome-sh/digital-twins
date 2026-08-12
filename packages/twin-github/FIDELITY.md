@@ -541,7 +541,7 @@ on each bullet's bold title and never on its number, so gaps cost it nothing.
 30. **A missing required body field says `Validation Failed` where GitHub names
     the field.** Real GitHub answers a required body field the caller did not
     send with `422 Invalid request.\n\n"<field>" wasn't supplied.` and **no
-    `errors` array`**. Measured live 2026-08-12 on four unrelated surfaces —
+    `errors` array**. Measured live 2026-08-12 on four unrelated surfaces —
     `PUT /contents/*` and `DELETE /contents/*` (`sha`), `POST /issues` (`title`),
     `POST /pulls` (`head`) — so it is GitHub's general answer, not one route's
     quirk. This twin instead answers the generic `Validation Failed` plus a
@@ -569,6 +569,88 @@ on each bullet's bold title and never on its number, so gaps cost it nothing.
     Pinned by `test/contents-sha-semantics.test.ts`, whose last test asserts the
     unfixed shape on `POST /issues` deliberately — when the global change lands,
     that test fails, and failing is the signal.
+
+31. **The 401 and 403 envelopes carry an empty `documentation_url` and no
+    `status` leaf at all.** Real GitHub answers `401` with
+    `{message, documentation_url: "https://docs.github.com/rest", status: "401"}`
+    — the generic url, but a *real* one, and the `status` leaf present. Measured
+    live 2026-08-12 (F-1490): 8 of 8 401s across five route shapes (`/user`,
+    `/repos/:o/:r`, `/search/repositories`, `/users/:u`,
+    `/repos/:o/:r/contents/*`), with a bad token and with no `Authorization`
+    header at all. 403 is the same but with an operation-specific url (3 of 3).
+
+    This twin answers `{message, documentation_url: ""}` — empty string, and the
+    `status` leaf **missing entirely**. Three of the four envelope-building sites
+    in play never reach `githubError`, which is why F-1490's global `status` fix
+    does not cover them: the 401 bodies are written by hand in `src/twin.ts`
+    (`auth.unauthorized` / `auth.sidMismatch`), and the admin-gate 403 body comes
+    from **`@pome-sh/sdk`** (`admin-gate.ts`, defaulted in `auth.ts`).
+
+    **Registered rather than fixed because two of the three are not
+    twin-github's to change.** `packages/sdk` is shared by all five twins, so an
+    empty-url or missing-`status` fix there moves slack, stripe, gmail and linear
+    at the same time and needs its own ticket with its own cross-twin
+    measurement — twin-github's numbers say nothing about what Slack's 401 looks
+    like. Doing it inside a github envelope ticket would be the same
+    smuggling F-1490 was spawned to avoid.
+
+    One smaller difference in the same family, measured and not fixed here:
+    GitHub distinguishes a **bad** credential (`Bad credentials`) from a
+    **missing** one (`Requires authentication`); this twin says `Bad credentials`
+    for both.
+
+    Pinned by `test/error-envelope-status.test.ts`, which asserts the *absent*
+    `status` leaf and the empty url on purpose — so this reads as a gap rather
+    than as coverage, and closing it makes the test fail.
+
+32. **`documentation_url` is the generic `https://docs.github.com/rest` where
+    GitHub names the operation.** Measured live 2026-08-12 (F-1490): real GitHub
+    is operation-specific on **45 of 59** error responses —
+    `https://docs.github.com/rest/repos/contents#create-or-update-file-contents`,
+    `…/rest/branches/branches#get-a-branch`, `…/rest/commits/commits#list-commits`
+    and so on. This twin sends the generic url everywhere except the four
+    contents-door `sha` sites and the invalid-base64 site, which can name their
+    operation because a `sha` or base64 refusal can only be raised BY that
+    operation.
+
+    **The boundary matters as much as the rule, because "operation everywhere"
+    would be a NEW divergence in the opposite direction.** GitHub itself sends
+    the generic url on the remaining **14 of 59**, and the cases are crisp:
+
+    * **every 401 — 8 of 8**, on all five route shapes probed and with no
+      `Authorization` header at all. Authentication fails before dispatch, so
+      there is no operation to name.
+    * **unrouted paths — 4 of 4** (`/this-route-does-not-exist`, `/zzz-not-a-route`,
+      `/repos`, `DELETE /user`).
+    * **`GET /users/:username` — 2 of 2.** A genuine GitHub one-off, not a
+      pattern: `GET /users/:u/repos` *is* operation-specific, so is `GET /orgs/:o`,
+      and so is `GET /gists/:id`. Only the single-user read is generic.
+
+    So a faithful fix has to reproduce GitHub's genericness too. The twin is
+    already accidentally right on two of those three classes — its 401s and its
+    unrouted 501 catch-all do not name an operation either.
+
+    **Registered rather than fixed because the envelope builder structurally
+    cannot know the answer.** The SDK hook is `errorEnvelope?: (err: unknown) =>
+    {status, body}` — the error, and nothing else. That is not an oversight to
+    route around: `notFound()` raised inside `domain.requireRepo()` is reachable
+    from ~40 REST routes *and* ~30 MCP tools, and the right url depends on which
+    door was knocked on rather than on where the throw happened. Naming the
+    operation means putting a url on all **65 REST surfaces**
+    (`route-inputs.json`) **and 40 MCP tools**; the MCP door emits this same
+    envelope.
+
+    The data for it is not guesswork and that is worth recording: GitHub's
+    published OpenAPI description carries `externalDocs.url` per operation,
+    byte-identical to what was measured on the wire, and 63 of the 65 REST
+    surfaces map mechanically onto a GitHub operation. The two that do not —
+    `GET /pulls/:n/diff` and `GET /pulls/:n/status` — are twin-only routes GitHub
+    would answer generically anyway, so they are already right. What the fix
+    needs decided rather than guessed is the 40-tool mapping, where a tool like
+    `push_files` spans several REST operations.
+
+    Pinned by `test/error-envelope-status.test.ts`, which asserts the generic url
+    on a 404 deliberately.
 
 ## How fidelity is verified
 

@@ -162,7 +162,7 @@ describe("F-1460 — REST `PUT /contents/*` takes base64, the way GitHub does", 
       message: "content is not valid Base64",
       documentation_url:
         "https://docs.github.com/rest/repos/contents#create-or-update-file-contents",
-      status: 422
+      status: "422"
     });
 
     // Refused, not half-written.

@@ -32,14 +32,17 @@
 // Neither body carries an `errors` array. `DELETE` answers the same two shapes
 // against its own doc anchor (`#delete-a-file`).
 //
-// Two things in those bodies are DELIBERATELY still wrong here and belong to
-// F-1490, which is a global envelope question and has its own decision:
-// `status` is a number where GitHub sends a string, and every envelope this twin
-// builds outside the four sites below carries the generic
-// `https://docs.github.com/rest`. This file pins the operation-specific url
-// because the sha errors can only come FROM the contents operations, so the
-// throw site knows the operation — which is exactly the subset F-1490 cannot
-// generalise. Do not widen it here.
+// `status` is a quoted string in the assertions below because F-1490 closed
+// that half globally in `githubError` — 59 of 59 measured GitHub error responses
+// send it quoted, and GitHub's own `basic-error` schema types it `string`. The
+// numbers this file shipped with were the divergence, not the claim.
+//
+// The OTHER half of F-1490 is still open and deliberately not widened here:
+// every envelope this twin builds outside the four sites below carries the
+// generic `https://docs.github.com/rest` where GitHub names the operation
+// (divergence 32). This file pins the operation-specific url because a sha
+// conflict can only come FROM the contents operations, so the throw site knows
+// which one — exactly the subset F-1490 could not generalise.
 //
 // ── WHY THIS DID NOT GO IN `validationFailed` ─────────────────────────────
 //
@@ -118,7 +121,7 @@ describe("F-1491 — a wrong `sha` on the contents door is a 409, as GitHub answ
     // Whole-envelope equality, so an `errors` array coming back is a failure.
     expect(put).toEqual({
       status: 409,
-      body: { message: "probe.txt does not match deadbeef", documentation_url: PUT_DOC, status: 409 }
+      body: { message: "probe.txt does not match deadbeef", documentation_url: PUT_DOC, status: "409" }
     });
   });
 
@@ -136,7 +139,7 @@ describe("F-1491 — a wrong `sha` on the contents door is a 409, as GitHub answ
 
     expect(put).toEqual({
       status: 409,
-      body: { message: `probe.txt does not match ${ghost}`, documentation_url: PUT_DOC, status: 409 }
+      body: { message: `probe.txt does not match ${ghost}`, documentation_url: PUT_DOC, status: "409" }
     });
   });
 
@@ -154,7 +157,7 @@ describe("F-1491 — a wrong `sha` on the contents door is a 409, as GitHub answ
 
     expect(put).toEqual({
       status: 409,
-      body: { message: `probe.txt does not match ${otherSha}`, documentation_url: PUT_DOC, status: 409 }
+      body: { message: `probe.txt does not match ${otherSha}`, documentation_url: PUT_DOC, status: "409" }
     });
   });
 
@@ -171,7 +174,7 @@ describe("F-1491 — a wrong `sha` on the contents door is a 409, as GitHub answ
 
     expect(put).toEqual({
       status: 409,
-      body: { message: "dir/sub/file.txt does not match deadbeef", documentation_url: PUT_DOC, status: 409 }
+      body: { message: "dir/sub/file.txt does not match deadbeef", documentation_url: PUT_DOC, status: "409" }
     });
   });
 
@@ -187,7 +190,7 @@ describe("F-1491 — a wrong `sha` on the contents door is a 409, as GitHub answ
 
     expect(del).toEqual({
       status: 409,
-      body: { message: "dir/sub/file.txt does not match deadbeef", documentation_url: DELETE_DOC, status: 409 }
+      body: { message: "dir/sub/file.txt does not match deadbeef", documentation_url: DELETE_DOC, status: "409" }
     });
   });
 
@@ -224,7 +227,7 @@ describe("F-1491 — a wrong `sha` on the contents door is a 409, as GitHub answ
 
     expect(called).toEqual({
       status: 409,
-      body: { message: "probe.txt does not match deadbeef", documentation_url: PUT_DOC, status: 409 }
+      body: { message: "probe.txt does not match deadbeef", documentation_url: PUT_DOC, status: "409" }
     });
   });
 
@@ -243,7 +246,7 @@ describe("F-1491 — a wrong `sha` on the contents door is a 409, as GitHub answ
 
     expect(called).toEqual({
       status: 409,
-      body: { message: "probe.txt does not match deadbeef", documentation_url: DELETE_DOC, status: 409 }
+      body: { message: "probe.txt does not match deadbeef", documentation_url: DELETE_DOC, status: "409" }
     });
   });
 });
@@ -264,7 +267,7 @@ describe("F-1491 — a MISSING `sha` is still a 422, but GitHub's 422, not the g
       body: {
         message: 'Invalid request.\n\n"sha" wasn\'t supplied.',
         documentation_url: PUT_DOC,
-        status: 422
+        status: "422"
       }
     });
   });
@@ -286,7 +289,7 @@ describe("F-1491 — a MISSING `sha` is still a 422, but GitHub's 422, not the g
       body: {
         message: 'Invalid request.\n\n"sha" wasn\'t supplied.',
         documentation_url: PUT_DOC,
-        status: 422
+        status: "422"
       }
     });
   });
@@ -309,7 +312,7 @@ describe("F-1491 — a MISSING `sha` is still a 422, but GitHub's 422, not the g
       body: {
         message: 'Invalid request.\n\n"sha" wasn\'t supplied.',
         documentation_url: PUT_DOC,
-        status: 422
+        status: "422"
       }
     });
   });
