@@ -6,7 +6,7 @@
 import { spawnSync } from "node:child_process";
 import { readdirSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const CONTRACT_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -35,7 +35,18 @@ function run(cmd, args) {
 // Guarded so run.test.mjs can import discoverTestFiles() without re-triggering
 // the build + spawn pipeline below (that recursion is how a plain `import`
 // used to shell out to npm build and re-run `node --test` on itself).
-if (import.meta.main) {
+//
+// NOT `import.meta.main`: that landed in Node 24.2 and root `engines` allows
+// `>=24`, so on 24.0/24.1 it is `undefined`, this guard is false, and
+// `npm run test:contract` exits 0 having built nothing and asserted nothing —
+// the exact "a check that never ran reads like one that passed" failure
+// F-1353 exists to remove, promoted from one file to the whole suite. Same
+// argv/import.meta.url comparison the repo's other entry guards use, pinned
+// for the same reason in scripts/capture-mcp-tools-list.test.mjs.
+const invokedDirectly =
+  process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;
+
+if (invokedDirectly) {
   // Wire first: every twin's runtime import chain reaches it, and the suite spawns
   // the twins with plain `node`, so wire's dist/ must exist before anything boots.
   let status = run("npm", ["run", "build", "-w", "@pome-sh/wire"]);

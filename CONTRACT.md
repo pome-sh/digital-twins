@@ -143,4 +143,4 @@ Probed against the pre-engine builds (`3cd86eb`); the contract suite asserts eve
 npm run test:contract
 ```
 
-builds `@pome-sh/wire` + the sdk + all five first-party twins, then runs `node --test contract/contract.test.mjs`. The suite is dependency-free (node:test, global fetch, node:crypto) so the same file can be pointed at any built twin artifact — including a cloud-built snapshot (FDRS-714).
+builds `@pome-sh/wire` + the sdk + all five first-party twins, then runs `node --test` over every `contract/*.test.mjs` file it discovers — no file list to fall off (F-1353). The one exception is `contract/cli-start.test.mjs`, which needs a built `cli/` this runner does not build; ci.yml runs it as its own step. The suite is dependency-free (node:test, global fetch, node:crypto) so the same file can be pointed at any built twin artifact — including a cloud-built snapshot (FDRS-714).
