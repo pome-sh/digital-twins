@@ -891,6 +891,26 @@ await withWireRuntime(async () => {
   assert(text.includes("add_issue_comment"), "the end-to-end report names the twin action, read off the tape");
   assert(text.includes("Issue not found"), "the end-to-end report carries the twin's error text");
 
+  // Two probes for one tool is a manifest error, not a silent half-check:
+  // results are keyed by tool name, so the first probe's arguments would be
+  // judged against the second probe's result.
+  await assertThrowsAsync(
+    () =>
+      probeExample(
+        "sound",
+        {
+          ...base,
+          probes: [
+            { tool: "list_open_issues", args: { owner: "acme", repo: "widgets" } },
+            { tool: "list_open_issues", args: { owner: "acme", repo: "nope" } },
+          ],
+        },
+        opts,
+      ),
+    "more than one probe for tool",
+    "probeExample refuses two probes for the same tool",
+  );
+
   // The anti-drift clause, end to end: drop a probe and the gate still reds.
   const drifted = await probeExample(
     "sound",

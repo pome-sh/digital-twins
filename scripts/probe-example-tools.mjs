@@ -496,6 +496,19 @@ export async function probeExample(name, entry, opts) {
   const twinIds = manifest.twins ?? ["github"];
   const slices = splitSeed(JSON.parse(readFileSync(join(exampleDir, entry.seed), "utf8")), twinIds);
   const facts = deriveSeedFacts(slices.github);
+  // `evaluateProbeRun` keys the driver's results by tool name, so two probes for
+  // the same tool would both be judged against the LAST one's result and the
+  // first one's arguments would be silently unchecked — the same shape as the
+  // silence this gate exists to break. One probe per tool.
+  const duplicated = entry.probes
+    .map((probe) => probe.tool)
+    .filter((tool, index, all) => all.indexOf(tool) !== index);
+  if (duplicated.length > 0) {
+    throw new Error(
+      `examples/${name} declares more than one probe for tool(s) [${[...new Set(duplicated)].join(", ")}] — ` +
+        "results are keyed by tool name, so only the last would be judged",
+    );
+  }
   const probes = entry.probes.map((probe) => {
     try {
       const resolved = { ...probe, args: resolveArgs(probe.args, facts) };
