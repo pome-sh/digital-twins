@@ -23,6 +23,25 @@ export function sanitizeJsonString(raw: string, fallback: string): string {
   }
 }
 
+/**
+ * `blocks` / `attachments`, which real Slack takes as a JSON STRING *or* as a
+ * native ARRAY (F-1487). Stores the canonical JSON string either way.
+ *
+ * ⚠️ THE PARSE FOLLOWS THE TYPE, AND THAT IS NOT STYLISTIC. Running
+ * {@link sanitizeJsonString} unconditionally over an array is a category error,
+ * not a no-op: `JSON.parse` coerces its argument to a string first, so an array
+ * arrives as `"[object Object]"`, throws, and the FALLBACK is written. On
+ * `chat.postMessage` that silently drops the blocks; on `chat.update` it
+ * silently keeps the previous ones and reports `ok:true`. A silent partial
+ * success is strictly worse than the refusal it would replace.
+ */
+export function jsonStringOrArrayField(
+  value: string | Record<string, unknown>[],
+  fallback: string
+): string {
+  return typeof value === "string" ? sanitizeJsonString(value, fallback) : JSON.stringify(value);
+}
+
 export function normalizeReactionName(raw: string): string {
   return raw.trim().replace(/^:|:$/g, "");
 }
