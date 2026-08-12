@@ -443,11 +443,30 @@ const HEADLINE = {
   "driver-error": "the probe driver could not run this example",
 };
 
+/**
+ * Findings whose subject is the tool TABLE, not the seed.
+ *
+ * An example registers the same tools on every seed it ships, so one missing
+ * probe on `minimal-viktor` produces six identical `unprobed-tool` findings and
+ * another six on the langgraph twin. Collapsing them to one per example per tool
+ * is what keeps this function's own promise — "a wall of unprobed-tool findings
+ * never buries a real refusal" — true now that the gate runs 20 seeds instead of
+ * 7. Everything else (`refused`, `silent-probe`, `stale-expect`, `driver-error`)
+ * really can differ seed by seed and is printed once per seed on purpose.
+ */
+const SEED_INVARIANT = new Set(["unprobed-tool", "unknown-tool"]);
+
 export function formatFindings(findings) {
   const lines = [];
   for (const [example, group] of groupBy(findings, (finding) => finding.example)) {
     lines.push(`FAILED  examples/${example}`);
+    const shown = new Set();
     for (const finding of group) {
+      if (SEED_INVARIANT.has(finding.kind)) {
+        const key = `${finding.kind} ${finding.tool}`;
+        if (shown.has(key)) continue;
+        shown.add(key);
+      }
       lines.push(`  ${finding.tool ? `tool ${finding.tool}` : "example"} — ${HEADLINE[finding.kind]}`);
       if (finding.kind === "refused") {
         const detail = JSON.parse(finding.detail);
@@ -460,10 +479,12 @@ export function formatFindings(findings) {
         lines.push(`    args: ${JSON.stringify(detail.args)}`);
       } else {
         lines.push(`    ${finding.detail}`);
-        // Every finding names its seed, not just `refused`. An example ships up
-        // to six seeds and a `silent-probe` or `stale-expect` on one of them is
-        // unactionable without knowing which.
-        if (finding.seed) lines.push(`    seed: ${finding.seed}`);
+        // Every seed-specific finding names its seed, not just `refused`. An
+        // example ships up to six seeds and a `silent-probe` or `stale-expect`
+        // on one of them is unactionable without knowing which. The
+        // seed-invariant kinds deliberately print no seed — they hold for all
+        // of them, and naming one would read as "only that one".
+        if (finding.seed && !SEED_INVARIANT.has(finding.kind)) lines.push(`    seed: ${finding.seed}`);
       }
     }
     lines.push("");
@@ -505,6 +526,68 @@ export const TWIN_MODULES = {
 };
 
 /**
+ * The github facts a single seed yields, without booting anything.
+ *
+ * Shared by `probeExample` and `runGate`'s manifest checks so the second is not a
+ * near-copy of the first three lines of the first.
+ */
+function factsForSeed(exampleDir, seed, twinIds) {
+  return deriveSeedFacts(splitSeed(JSON.parse(readFileSync(join(exampleDir, seed), "utf8")), twinIds).github);
+}
+
+/**
+ * Manifest invariants that do not vary by seed, asserted once per example.
+ *
+ * These used to be tempting to put in `probeExample`, which runs 20 times and
+ * only after twins are booted; they belong beside `runGate`'s other totality
+ * checks, before anything boots.
+ *
+ *   1. ONE probe per tool. `evaluateProbeRun` keys the driver's results by tool
+ *      name, so two probes for the same tool would both be judged against the
+ *      LAST one's result and the first one's arguments would go unchecked — the
+ *      same silence this gate exists to break.
+ *   2. NO DEAD EXEMPTION. `expect_status_if` is the derived replacement for a map
+ *      keyed by seed filename, and it inherits one of the map's failure modes if
+ *      nothing checks it: delete the seed that earns the exemption (or flip its
+ *      `ci/test` back to success) and the condition is simply false everywhere,
+ *      leaving a 409 exemption that can never fire and that nothing reds. The
+ *      inverse — the twin stops refusing on a seed that IS blocked — is already
+ *      caught as `stale-expect`. This is the other direction, and it catches both
+ *      viktor copies of the exemption rather than the one a test happens to pin.
+ */
+export function assertManifestEntry(name, entry, exampleDir, seeds, twinIds) {
+  const duplicated = entry.probes
+    .map((probe) => probe.tool)
+    .filter((tool, index, all) => all.indexOf(tool) !== index);
+  if (duplicated.length > 0) {
+    throw new Error(
+      `examples/${name} declares more than one probe for tool(s) [${[...new Set(duplicated)].join(", ")}] — ` +
+        "results are keyed by tool name, so only the last would be judged",
+    );
+  }
+
+  const conditional = entry.probes.filter((probe) => probe.expect_status_if !== undefined);
+  if (conditional.length === 0) return;
+  const factsBySeed = seeds.map((seed) => [seed, factsForSeed(exampleDir, seed, twinIds)]);
+  for (const probe of conditional) {
+    const firesOn = factsBySeed.filter(([seed, facts]) => {
+      try {
+        return resolveFactToken(probe.expect_status_if, facts) === true;
+      } catch (err) {
+        throw new Error(`examples/${name} (${seed}), tool ${probe.tool}: ${err.message}`);
+      }
+    });
+    if (firesOn.length === 0) {
+      throw new Error(
+        `examples/${name}, tool ${probe.tool}: declares expect_status ${probe.expect_status} when ` +
+          `${probe.expect_status_if}, but no seed this example ships satisfies that condition ` +
+          `(checked ${seeds.length}: ${seeds.join(", ")}) — the exemption can never fire, drop it`,
+      );
+    }
+  }
+}
+
+/**
  * Boot every twin the example declares, run its probes, return findings.
  *
  * Twins run IN-PROCESS here (no model, no Docker, no network beyond loopback)
@@ -519,19 +602,6 @@ export async function probeExample(name, entry, opts) {
   const twinIds = manifest.twins ?? ["github"];
   const slices = splitSeed(JSON.parse(readFileSync(join(exampleDir, entry.seed), "utf8")), twinIds);
   const facts = deriveSeedFacts(slices.github);
-  // `evaluateProbeRun` keys the driver's results by tool name, so two probes for
-  // the same tool would both be judged against the LAST one's result and the
-  // first one's arguments would be silently unchecked — the same shape as the
-  // silence this gate exists to break. One probe per tool.
-  const duplicated = entry.probes
-    .map((probe) => probe.tool)
-    .filter((tool, index, all) => all.indexOf(tool) !== index);
-  if (duplicated.length > 0) {
-    throw new Error(
-      `examples/${name} declares more than one probe for tool(s) [${[...new Set(duplicated)].join(", ")}] — ` +
-        "results are keyed by tool name, so only the last would be judged",
-    );
-  }
   const probes = entry.probes.map((probe) => {
     try {
       const resolved = { ...probe, args: resolveArgs(probe.args, facts) };
@@ -712,6 +782,14 @@ export async function runGate(opts = {}) {
     throw new Error("discovered zero seeds across every bundled example — refusing to report a pass on nothing");
   }
 
+  // Manifest invariants, before anything boots: one probe per tool, and no
+  // exemption that no seed can satisfy.
+  for (const name of names) {
+    const exampleDir = join(examplesDir, name);
+    const twinIds = JSON.parse(readFileSync(join(exampleDir, "pome.json"), "utf8")).twins ?? ["github"];
+    assertManifestEntry(name, manifest[name], exampleDir, seedsByExample.get(name), twinIds);
+  }
+
   console.log(
     `Probing ${totalSeeds} seed(s) across ${names.length} example(s): ${names.join(", ")}`,
   );
@@ -728,9 +806,12 @@ export async function runGate(opts = {}) {
     }
   }
 
-  // A gate that ran fewer probes than the seeds it discovered would exit 0
-  // having done less than it claimed — the F-1478 shape, guarded here rather
-  // than trusted from the loop above.
+  // A tripwire for a FUTURE edit, not an independent tally: as written the loop
+  // above cannot skip a seed, and this is what reds if someone gives it a
+  // `continue` — a gate that exits 0 having done less than it claimed is the
+  // F-1478 shape. The real per-seed assertion is `silent-probe`, which is what
+  // makes the "every registered tool was answered" line below earned rather than
+  // restated from the manifest.
   if (probedSeeds !== totalSeeds) {
     throw new Error(`probed ${probedSeeds} seed(s) but discovered ${totalSeeds} — the gate skipped some silently`);
   }

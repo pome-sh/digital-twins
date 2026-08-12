@@ -20,6 +20,7 @@ import {
   annotateFromTape,
   deriveSeedFacts,
   discoverExamplesWithSeeds,
+  assertManifestEntry,
   discoverSeeds,
   evaluateProbeRun,
   formatFindings,
@@ -423,9 +424,16 @@ await withWireRuntime(async () => {
   let stderr = "";
   console.log = () => {};
   console.error = (msg) => { stderr += `${msg}\n`; };
-  const broken = await runGate({ examplesDir, manifestPath });
-  console.log = originalLog;
-  console.error = originalError;
+  let broken;
+  try {
+    broken = await runGate({ examplesDir, manifestPath });
+  } finally {
+    // try/finally, not bare restore: runGate can throw (a manifest invariant),
+    // and a throw here would leave the rest of the suite writing to a swallowed
+    // console — a silenced test run is the failure mode this file is about.
+    console.log = originalLog;
+    console.error = originalError;
+  }
   assert(broken === 1, "a probe argument that no longer matches its seed reds the gate");
   assert(stderr.includes("comment_on_issue"), "the red names the broken tool");
   assert(stderr.includes("01-probe.seed.json"), "the red names the first seed");
@@ -527,9 +535,16 @@ await withWireRuntime(async () => {
   let stderr = "";
   console.log = () => {};
   console.error = (msg) => { stderr += `${msg}\n`; };
-  const code = await runGate({ examplesDir, manifestPath });
-  console.log = originalLog;
-  console.error = originalError;
+  let code;
+  try {
+    code = await runGate({ examplesDir, manifestPath });
+  } finally {
+    // try/finally, not bare restore: runGate can throw (a manifest invariant),
+    // and a throw here would leave the rest of the suite writing to a swallowed
+    // console — a silenced test run is the failure mode this file is about.
+    console.log = originalLog;
+    console.error = originalError;
+  }
 
   assert(code === 1, "a tool shape the driver cannot invoke reds the gate instead of reporting OK");
   assert(stderr.includes("list_open_issues"), "the unrecognised-shape red names the tool");
@@ -912,26 +927,6 @@ await withWireRuntime(async () => {
   assert(text.includes("add_issue_comment"), "the end-to-end report names the twin action, read off the tape");
   assert(text.includes("Issue not found"), "the end-to-end report carries the twin's error text");
 
-  // Two probes for one tool is a manifest error, not a silent half-check:
-  // results are keyed by tool name, so the first probe's arguments would be
-  // judged against the second probe's result.
-  await assertThrowsAsync(
-    () =>
-      probeExample(
-        "sound",
-        {
-          ...base,
-          probes: [
-            { tool: "list_open_issues", args: { owner: "acme", repo: "widgets" } },
-            { tool: "list_open_issues", args: { owner: "acme", repo: "nope" } },
-          ],
-        },
-        opts,
-      ),
-    "more than one probe for tool",
-    "probeExample refuses two probes for the same tool",
-  );
-
   // The anti-drift clause, end to end: drop a probe and the gate still reds.
   const drifted = await probeExample(
     "sound",
@@ -943,6 +938,70 @@ await withWireRuntime(async () => {
     `a registered tool with no probe reds the gate end to end (got: ${JSON.stringify(drifted)})`,
   );
 });
+
+// ── manifest invariants, asserted before anything boots ─────────────────────
+{
+  const viktorDir = join(ROOT, "examples/minimal-viktor");
+  const viktorSeeds = discoverSeeds(viktorDir);
+
+  // Two probes for one tool is a manifest error, not a silent half-check:
+  // evaluateProbeRun keys results by tool name, so the first probe's arguments
+  // would be judged against the second probe's result and never checked.
+  assertThrows(
+    () =>
+      assertManifestEntry(
+        "minimal-viktor",
+        {
+          probes: [
+            { tool: "list_open_pull_requests", args: {} },
+            { tool: "list_open_pull_requests", args: {} },
+          ],
+        },
+        viktorDir,
+        viktorSeeds,
+        ["github", "slack"],
+      ),
+    "more than one probe for tool",
+    "two probes for the same tool is refused before anything boots",
+  );
+
+  // The real manifest satisfies both invariants on every example.
+  const realManifest = JSON.parse(readFileSync(join(ROOT, "config/example-tool-probes.json"), "utf8"));
+  for (const [name, entry] of Object.entries(realManifest)) {
+    const dir = join(ROOT, "examples", name);
+    const twinIds = JSON.parse(readFileSync(join(dir, "pome.json"), "utf8")).twins ?? ["github"];
+    assertManifestEntry(name, entry, dir, discoverSeeds(dir), twinIds);
+  }
+
+  // The other half of the exemption's staleness, and the one `stale-expect`
+  // cannot see: an `expect_status_if` no seed satisfies is a 409 exemption that
+  // can NEVER fire. That is what would be left behind by deleting
+  // 03-failing-ci or flipping its ci/test back to success — dead config the map
+  // shape would also have left, silently. It is checked for every example, so
+  // both viktor copies are covered rather than the one a test names.
+  assertThrows(
+    () =>
+      assertManifestEntry(
+        "minimal-viktor",
+        {
+          probes: [
+            {
+              tool: "merge_pull_request",
+              args: {},
+              expect_status: 409,
+              expect_status_if: "$pr.merge_blocked",
+            },
+          ],
+        },
+        viktorDir,
+        // Only the five seeds that do NOT block their own merge.
+        viktorSeeds.filter((seed) => !seed.includes("03-failing-ci")),
+        ["github", "slack"],
+      ),
+    "can never fire",
+    "an expect_status_if no remaining seed satisfies reds as a dead exemption",
+  );
+}
 
 // ── the gate is actually wired into CI ──────────────────────────────────────
 // A gate nothing runs is the failure mode this ticket exists to prevent.
