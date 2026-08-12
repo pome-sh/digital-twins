@@ -1,0 +1,115 @@
+name: schedule alarm
+
+# F-1230 — a scheduled workflow that fails tells nobody.
+#
+# `repo-policy.yml`'s weekly cron has failed every Monday since it shipped
+# with the precise, actionable error `REPO_POLICY_TOKEN is required for
+# schedule drift checks`, and it still took a human reading Actions run
+# history by hand to notice. This is the reusable workflow every
+# schedule-triggered workflow in this repo calls from a `failure()`-guarded
+# job: constant title, one long-lived tracking issue reused across
+# consecutive failures (never a new issue per run), one label per alarm so
+# unrelated alarms never collide on the same issue, and a body naming what
+# failed plus the run URL — the pattern check-release-staleness.yml proved
+# (#300) before it was deleted alongside the Changesets flow it watched
+# (a3c9441). Green is asserted as hard as red: recovery CLOSES the tracking
+# issue, the same stance scripts/ci/release-alarm.mjs takes for the release
+# path.
+#
+# ── Why a `failure()`-guarded call here is enough, and NOT a second
+#    separately-cron'd file like release-alarm.yml ──────────────────────────
+#
+# `release-alarm.yml` is a separate file on its OWN daily cron because
+# `release.yml` is PUSH-triggered and had no failure path at all: on
+# 2026-08-06 four consecutive runs failed and nothing fired, because a push
+# that triggers no run at all is invisible to an `if: failure()` step living
+# inside the workflow that never ran (F-1180). The watcher has to survive the
+# thing it watches.
+#
+# `repo-policy.yml` and `secret-scan.yml` are a different shape. Their
+# failure mode is observed and it is NOT "never triggers" — their weekly cron
+# has been firing reliably (that is precisely how repo-policy.yml's red runs
+# were noticed by hand every Monday); the gap is that a run FIRES, FAILS, and
+# nobody is told. A `failure()`-guarded job inside the same workflow file sees
+# that failure in the same run, for free, with the actual step-level error
+# text available in its own job env — which is exactly what the ticket asks
+# the alarm body to name. Embedding here is proportionate to the failure mode
+# that has actually been observed.
+#
+# The theoretical case release-alarm.yml's separateness DOES guard against —
+# GitHub disabling a repository's scheduled workflows after 60 days with no
+# commits — is a risk this repo already carries and has already accepted for
+# release-alarm.yml itself (see that file's own comment): a repo quiet enough
+# to lose its cron is a repo whose release path nobody is exercising either.
+# Embedding the alarm in repo-policy.yml/secret-scan.yml does not make that
+# pre-existing, accepted risk any worse. The other half of "never fires" — a
+# future edit that deletes or breaks a workflow's own `schedule:` block or its
+# alarm job — is a code-review-time regression, not a runtime outage, and is
+# F-1471's job: a static CI check over the workflow files themselves, which
+# gets feedback on the PR that causes it rather than waiting for a missed
+# cadence.
+#
+# `release-alarm.yml` is itself schedule-triggered and therefore inside D5's
+# own property, but its subject (does every version main declares reach its
+# registry) is unrelated to whether ITS OWN mechanism is intact — a checkout
+# failure, a broken regression suite, or a `release-alarm.mjs` throw before
+# it reaches a verdict is a different fact than "the release is not
+# delivering," and conflating the two would mean the mechanism's own outage
+# reports as a release problem. So release-alarm.yml calls this same reusable
+# workflow too, from a job gated on its `check` step never having been
+# reached at all (see the `meta-alarm` job there) — reusing this file rather
+# than inventing a second mechanism, per the same "no hand-maintained second
+# copy" reasoning as everything else in this milestone.
+on:
+  workflow_call:
+    inputs:
+      title:
+        description: Constant issue title for this alarm (one long-lived issue per title).
+        required: true
+        type: string
+      label:
+        description: One label per alarm, so unrelated alarms never share an issue.
+        required: true
+        type: string
+      outcome:
+        description: "'failure' files/updates the tracking issue; 'success' closes it. Any other value is a hard error, never a no-op."
+        required: true
+        type: string
+      detail:
+        description: What failed, in plain text. Only meaningful when outcome is 'failure'.
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  # Deliberately NO `if:` on the outcome value. An `if: inputs.outcome ==
+  # 'failure' || == 'success'` would look like input validation and act as the
+  # opposite: a caller that passes `Failure`, or an expression that resolves to
+  # '', would SKIP this job, render a green skipped check, and leave that alarm
+  # dead with no signal anywhere. Letting the job run means
+  # file-schedule-alarm.sh's own `exit 1` on an unrecognised OUTCOME is
+  # reachable and reds the run.
+  alarm:
+    name: file or close the tracking issue
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read # actions/checkout
+      issues: write # per-repo; the caller's job permissions must also grant this
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: File, update, or close the tracking issue
+        env:
+          OUTCOME: ${{ inputs.outcome }}
+          TITLE: ${{ inputs.title }}
+          LABEL: ${{ inputs.label }}
+          DETAIL: ${{ inputs.detail }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: bash scripts/ci/file-schedule-alarm.sh
