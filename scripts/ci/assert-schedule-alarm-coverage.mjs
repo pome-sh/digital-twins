@@ -96,11 +96,26 @@ function directChildLines(lines, start, end) {
   return out;
 }
 
-/** Strip a single layer of matching quotes and surrounding whitespace. */
+/**
+ * Strip a single layer of matching quotes, an explicit YAML tag (`!!str
+ * failure` is the same string as `failure`, and reading it as the literal
+ * `"!!str failure"` red a correctly covered workflow) and surrounding
+ * whitespace. A bare block-scalar indicator is NOT a value — `title: >-` with
+ * the text on following lines captured the literal `">-"`, which is truthy, so
+ * garbage passed the required-input check and then collided with every other
+ * workflow that did the same. Reported as absent instead.
+ */
 function unquote(value) {
-  const trimmed = value.trim();
-  const m = /^["'](.*)["']$/.exec(trimmed);
-  return m ? m[1] : trimmed;
+  const tagless = value.trim().replace(/^!!\w+\s+/, "");
+  if (/^[|>][-+]?$/.test(tagless)) return "";
+  const m = /^["'](.*)["']$/.exec(tagless);
+  return m ? m[1] : tagless;
+}
+
+/** `${{ false }}` is the same dead job as `if: false`; unwrap before testing. */
+function unwrapExpression(value) {
+  const m = /^\$\{\{(.*)\}\}$/.exec(value.trim());
+  return (m ? m[1] : value).trim();
 }
 
 /**
@@ -221,7 +236,7 @@ export function findScheduleAlarmCalls(root) {
 
 /** `false`, in any casing, with nothing else in the expression. */
 function isTriviallyFalse(ifExpr) {
-  return ifExpr !== null && /^false$/i.test(ifExpr.trim());
+  return ifExpr !== null && /^false$/i.test(unwrapExpression(ifExpr));
 }
 
 /**
@@ -236,7 +251,7 @@ function isTriviallyFalse(ifExpr) {
  * sibling) is not covering the failure path either.
  */
 function reachesFailureAlarm(call) {
-  if (call.continueOnError !== null && /^true$/i.test(call.continueOnError)) return false;
+  if (call.continueOnError !== null && /^true$/i.test(unwrapExpression(call.continueOnError))) return false;
   if (isTriviallyFalse(call.ifExpr)) return false;
   return call.outcome === "failure";
 }
@@ -324,6 +339,56 @@ export function findTitleLabelMismatches(calls) {
   return calls.filter((c) => badTitles.has(c.title) || badLabels.has(c.label));
 }
 
+/**
+ * Two DIFFERENT workflows using the same label (or the same title).
+ *
+ * The bijection above is satisfied by an identical pair copy-pasted into a
+ * second workflow — consistent, and wrong: `schedule-alarm.yml` documents the
+ * label as "one label per alarm, so unrelated alarms never share an issue", and
+ * `file-schedule-alarm.sh` looks the issue up by label alone. Sharing one means
+ * two workflows share one tracking issue, so B's recovery leg CLOSES the alarm
+ * A is still failing on. That is the alarm silencing itself — the exact fact
+ * this whole milestone exists to make impossible — while every other assertion
+ * here reports green.
+ */
+export function findSharedAlarmKeys(calls) {
+  const shared = [];
+  for (const key of ["label", "title"]) {
+    const files = new Map();
+    for (const c of calls) {
+      if (!c[key]) continue;
+      if (!files.has(c[key])) files.set(c[key], new Set());
+      files.get(c[key]).add(c.file);
+    }
+    for (const [value, fileSet] of files) {
+      if (fileSet.size > 1) shared.push({ key, value, files: [...fileSet].sort() });
+    }
+  }
+  return shared;
+}
+
+/**
+ * An alarm label that files but can never close.
+ *
+ * "Files or updates a tracking issue when its scheduled run fails, AND closes
+ * it on recovery" is one property, not two — a failure leg with no recovery
+ * sibling leaves its issue open forever after the first red, which is how an
+ * alarm stops being read. Derived per label from the calls themselves, so a new
+ * alarm cannot land half-wired.
+ */
+export function findUnclosableAlarms(calls) {
+  const outcomes = new Map();
+  for (const c of calls) {
+    if (!c.label) continue;
+    if (!outcomes.has(c.label)) outcomes.set(c.label, new Set());
+    outcomes.get(c.label).add(c.outcome);
+  }
+  return [...outcomes]
+    .filter(([, o]) => o.has("failure") && !o.has("success"))
+    .map(([label]) => label)
+    .sort();
+}
+
 export function main() {
   const root = resolve(HERE, "../..");
 
@@ -354,6 +419,8 @@ export function main() {
   const missingInputs = findMissingAlarmInputs(calls);
   const mismatches = findTitleLabelMismatches(calls);
   const needsGaps = findAlarmNeedsGaps(root);
+  const shared = findSharedAlarmKeys(calls);
+  const unclosable = findUnclosableAlarms(calls);
 
   const problems = [];
   if (missing.length > 0) {
@@ -385,6 +452,23 @@ export function main() {
         "scoped to the alarm job's own needs: graph, so a sibling failing " +
         "SKIPS the alarm and files nothing:\n  " +
         needsGaps.map((g) => `${g.file}:${g.job} does not (transitively) need ${g.unseen.join(", ")}`).join("\n  "),
+    );
+  }
+
+  if (shared.length > 0) {
+    problems.push(
+      "two different workflows share one alarm key, so they share one tracking " +
+        "issue — the second one's recovery leg CLOSES an alarm the first is " +
+        "still failing on:\n  " +
+        shared.map((s) => `${s.key}="${s.value}" used by ${s.files.join(" and ")}`).join("\n  "),
+    );
+  }
+  if (unclosable.length > 0) {
+    problems.push(
+      "alarm label(s) with a failure leg and no recovery leg — the issue is " +
+        "filed and then never closes, so it stays open past the fix and stops " +
+        "being read:\n  " +
+        unclosable.join("\n  "),
     );
   }
 

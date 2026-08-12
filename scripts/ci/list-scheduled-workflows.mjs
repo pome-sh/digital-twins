@@ -58,7 +58,25 @@ export function findScheduledWorkflows(root) {
           scheduled.push(file);
           break;
         }
-        inOnBlock = start[1].trim() === "";
+        const inline = start[1].trim();
+        // A flow mapping that SPANS lines (`on: {` then `schedule: …` below)
+        // is read by neither this walk nor findCronWorkflows, so a cron hidden
+        // inside one is invisible to both — which means the set-equality
+        // cross-check has nothing to disagree about and the alarm-coverage
+        // check reports a clean pass on an unalarmed cron. actionlint accepts
+        // the shape as valid, so nothing else would catch it either. Refuse
+        // loudly instead of parsing it wrong: an unsupported shape must never
+        // be indistinguishable from an absent trigger.
+        const opens = (inline.match(/[{[]/g) ?? []).length;
+        const closes = (inline.match(/[}\]]/g) ?? []).length;
+        if (opens !== closes) {
+          throw new Error(
+            `${file}: an \`on:\` flow mapping that spans more than one line is not parsed by ` +
+              "this derivation, so a `schedule:` trigger inside it would be invisible to it and " +
+              "to the alarm-coverage check (F-1471) alike. Rewrite it in block form.",
+          );
+        }
+        inOnBlock = inline === "";
         continue;
       }
       if (!inOnBlock || line.trim() === "") continue;
@@ -94,7 +112,14 @@ export function findScheduledWorkflows(root) {
 export function findCronWorkflows(root) {
   const cron = [];
   for (const [file, lines] of workflowLines(root)) {
-    if (lines.some((line) => /^\s*-?\s*cron:\s*\S/.test(line))) cron.push(file);
+    // `cron:` also appears inside a flow sequence — `schedule: [{cron: "…"}]`,
+    // the very shape findScheduledWorkflows() was taught to read in #384. An
+    // anchored `^\s*-?\s*cron:` missed it, so two of the three shapes that
+    // review fixed would fail this file's OWN set-equality cross-check: a
+    // correctly-alarmed workflow red the derivation. A guard that reds on right
+    // answers is a guard someone deletes. The delimiter class stays narrow (no
+    // quotes) so `"cron: …"` inside a shell string still does not count.
+    if (lines.some((line) => /(?:^|[\s,[{-])cron\s*:\s*\S/.test(line))) cron.push(file);
   }
   return cron.sort();
 }

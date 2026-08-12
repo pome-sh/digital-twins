@@ -12,6 +12,8 @@ import {
   findMissingAlarmInputs,
   findTitleLabelMismatches,
   findAlarmNeedsGaps,
+  findSharedAlarmKeys,
+  findUnclosableAlarms,
 } from "./assert-schedule-alarm-coverage.mjs";
 
 function assert(cond, msg) {
@@ -370,6 +372,88 @@ withScratchRoot(
   (root) => {
     const gaps = findAlarmNeedsGaps(root);
     assert(gaps.length === 0, `flow-form and transitive needs: must both count as covering, got ${JSON.stringify(gaps)}`);
+  },
+);
+
+// ── The neutralisers wrapped in an expression. `${{ false }}` is the same dead
+// job as `if: false`, and `${{ true }}` the same swallowed failure as
+// `continue-on-error: true` — and the expression form is exactly what someone
+// reaches for when silencing a noisy alarm, because it looks like configuration
+// rather than deletion.
+withScratchRoot(
+  {
+    "expr-false.yml": `name: expr-false\non:\n  schedule:\n    - cron: '0 0 * * *'\njobs:\n  main:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n  schedule-alarm:\n    needs: main\n    if: \${{ false }}\n    uses: ./.github/workflows/schedule-alarm.yml\n    with:\n      title: "expr-false is failing"\n      label: "schedule-alarm:expr-false"\n      outcome: failure\n`,
+    "expr-coe.yml": `name: expr-coe\non:\n  schedule:\n    - cron: '0 0 * * *'\njobs:\n  main:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n  schedule-alarm:\n    needs: main\n    if: failure()\n    continue-on-error: \${{ true }}\n    uses: ./.github/workflows/schedule-alarm.yml\n    with:\n      title: "expr-coe is failing"\n      label: "schedule-alarm:expr-coe"\n      outcome: failure\n`,
+  },
+  (root) => {
+    const missing = findMissingAlarmCoverage(root, findScheduleAlarmCalls(root));
+    assert(missing.includes("expr-false.yml"), `\${{ false }} must neutralise, got ${missing}`);
+    assert(missing.includes("expr-coe.yml"), `\${{ true }} continue-on-error must neutralise, got ${missing}`);
+  },
+);
+
+// ── `!!str failure` is the same string as `failure`; reading the tag as part
+// of the value red a correctly covered workflow. And a bare block-scalar
+// indicator is NOT a value: `title: >-` captured the literal ">-", which is
+// truthy, so garbage passed the required-input check and then collided with
+// every other workflow that did the same.
+withScratchRoot(
+  {
+    "tagged.yml": `name: tagged\non:\n  schedule:\n    - cron: '0 0 * * *'\njobs:\n  main:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n  schedule-alarm:\n    needs: main\n    if: failure()\n    uses: ./.github/workflows/schedule-alarm.yml\n    with:\n      title: "tagged is failing"\n      label: "schedule-alarm:tagged"\n      outcome: !!str failure\n`,
+  },
+  (root) => {
+    const calls = findScheduleAlarmCalls(root);
+    assert(calls[0].outcome === "failure", `an explicit YAML tag must not become part of the value, got ${JSON.stringify(calls[0].outcome)}`);
+    assert(findMissingAlarmCoverage(root, calls).length === 0, "a tagged outcome: failure is still covered");
+  },
+);
+withScratchRoot(
+  {
+    "block-title.yml": `name: block-title\non:\n  schedule:\n    - cron: '0 0 * * *'\njobs:\n  main:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n  schedule-alarm:\n    needs: main\n    if: failure()\n    uses: ./.github/workflows/schedule-alarm.yml\n    with:\n      title: >-\n        block scalar title\n      label: "schedule-alarm:block-title"\n      outcome: failure\n`,
+  },
+  (root) => {
+    const calls = findScheduleAlarmCalls(root);
+    assert(calls[0].title !== ">-", "a bare block-scalar indicator must not be accepted as the title");
+    assert(findMissingAlarmInputs(calls).length === 1, `an unreadable title must be reported MISSING, not accepted as ">-", got ${JSON.stringify(calls[0])}`);
+  },
+);
+
+// ── Break-on-purpose: an identical title AND label copy-pasted into a SECOND
+// workflow. The bijection is satisfied (the pair is consistent) and it is still
+// wrong: both workflows share one tracking issue, so B's recovery leg closes
+// the alarm A is still failing on — the alarm silencing itself.
+withScratchRoot(
+  {
+    "shared-a.yml": `name: shared-a\non:\n  schedule:\n    - cron: '0 0 * * *'\njobs:\n  main:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n${ALARM_JOB("the weekly cron is failing", "schedule-alarm:weekly")}`,
+    "shared-b.yml": `name: shared-b\non:\n  schedule:\n    - cron: '0 1 * * *'\njobs:\n  main:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n${ALARM_JOB("the weekly cron is failing", "schedule-alarm:weekly")}`,
+  },
+  (root) => {
+    const calls = findScheduleAlarmCalls(root);
+    assert(findTitleLabelMismatches(calls).length === 0, "the pair is internally consistent — that is the point of this fixture");
+    const shared = findSharedAlarmKeys(calls);
+    assert(shared.length === 2, `both the shared label and the shared title must be reported, got ${JSON.stringify(shared)}`);
+    assert(
+      shared.every((s) => s.files.join() === "shared-a.yml,shared-b.yml"),
+      `both offending files must be named, got ${JSON.stringify(shared)}`,
+    );
+  },
+);
+
+// ── Break-on-purpose: a failure leg with no recovery sibling. "Files when it
+// fails AND closes on recovery" is one property; an issue that never closes
+// stays open past the fix and stops being read.
+withScratchRoot(
+  {
+    "no-recovery.yml": `name: no-recovery\non:\n  schedule:\n    - cron: '0 0 * * *'\njobs:\n  main:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n  schedule-alarm:\n    needs: main\n    if: failure()\n    uses: ./.github/workflows/schedule-alarm.yml\n    with:\n      title: "no-recovery is failing"\n      label: "schedule-alarm:no-recovery"\n      outcome: failure\n`,
+  },
+  (root) => {
+    const calls = findScheduleAlarmCalls(root);
+    assert(findMissingAlarmCoverage(root, calls).length === 0, "the failure leg itself is well-formed; this fixture is about recovery");
+    const unclosable = findUnclosableAlarms(calls);
+    assert(
+      unclosable.length === 1 && unclosable[0] === "schedule-alarm:no-recovery",
+      `a failure leg with no recovery sibling must be named, got ${JSON.stringify(unclosable)}`,
+    );
   },
 );
 
