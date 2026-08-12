@@ -125,7 +125,7 @@ const SYSTEM = [
 ].join("\n");
 
 /**
- * Read the first `owner/repo` slug out of the task prompt.
+ * Read the `owner/repo` slug out of the task prompt.
  *
  * The slug appears mid-sentence ("…the open pull requests in viktor-hq/orders-service.")
  * so the match has to end where the name ends, not where the punctuation does.
@@ -134,22 +134,84 @@ const SYSTEM = [
  * match backtracks off any trailing `.` or `-` to land on the last word
  * character, keeping interior dots and dropping the sentence's period. Without
  * it every GitHub call went to `orders-service.` and 404'd (F-1207).
+ *
+ * A prompt can contain more than one slug-shaped substring — "triage/summarize
+ * the open items in acme/api" reads as two matches, and the first one is not
+ * the repo. Every real task prompt (and the smoke harness's own synthetic one)
+ * introduces the target with "in <owner/repo>", so a match preceded by that
+ * word wins over an earlier slug-shaped phrase in the same sentence. All six
+ * shipped seeds phrase it that way ("Review the open pull requests in
+ * viktor-hq/orders-service.").
+ *
+ * With exactly ONE match and no anchor the prompt is unambiguous and that match
+ * stands ("Review viktor-hq/orders-service, merge …"). With SEVERAL matches and
+ * no anchor it is ambiguous, and guessing the first is what sent every call to
+ * `triage/summarize` while the gate read OK — so that throws. Picking wrong
+ * here does not fail loudly, it 404s and reads as "the repo has no pull
+ * requests", which is precisely the do-nothing-looks-fine class this must not
+ * re-enter.
  */
 export function parseRepo(task: string): { owner: string; repo: string } {
-  const m = task.match(/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\b/);
-  if (!m) throw new Error(`could not find an owner/repo slug in the task: ${task}`);
+  const all = [...task.matchAll(/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)\b/g)];
+  if (all.length === 0) throw new Error(`could not find an owner/repo slug in the task: ${task}`);
+  // A file path is slug-shaped: "the config in .github/workflows/ci.yml" and
+  // "PRs touching src/index.ts" both match. Drop candidates whose repo half
+  // carries a source/config extension — but only as a TIE-BREAK, never a hard
+  // reject, so a repo legitimately named `Chart.js` still parses when it is the
+  // only candidate. `.io`/`.sh` are deliberately absent: `foo.github.io` and
+  // `pome.sh/digital-twins` are real repo names this must keep reading.
+  const FILE_EXT = /\.(?:ya?ml|tsx?|jsx?|mjs|cjs|json|jsonc|md|py|rb|go|rs|toml|lock|txt|sh|env|css|html)$/i;
+  const isPath = (m: RegExpMatchArray) =>
+    // a source/config extension on the repo half ("src/index.ts"), a THIRD
+    // segment following ("…/workflows/ci.yml" — `owner/repo` never has one), or
+    // a dot-directory owner (".github/workflows")
+    FILE_EXT.test(m[2]!) || task[m.index! + m[0]!.length] === "/" || m[1]!.startsWith(".");
+  const notAPath = all.filter((m) => !isPath(m));
+  const matches = notAPath.length > 0 ? notAPath : all;
+  const anchored = matches.find((m) => /\bin\s*$/.test(task.slice(0, m.index)));
+  if (!anchored && matches.length > 1) {
+    throw new Error(
+      `ambiguous owner/repo slug in the task — ${matches.length} candidates ` +
+        `(${matches.map((m) => m[0]).join(", ")}) and none introduced by "in": ${task}`,
+    );
+  }
+  const m = anchored ?? matches[0]!;
   return { owner: m[1]!, repo: m[2]! };
 }
 
-function asArray(value: unknown): any[] {
-  return Array.isArray(value) ? value : [];
+// Every twin read in this graph routes through here or `decodeContent`, and
+// `twinFetch` hands failures BACK as a value (`{ ok: false, … }`) instead of
+// throwing so that one bad call cannot abort the whole run — see tools.ts. That
+// convention is deliberate and `act` depends on it, but a documented sentinel
+// is only safe where the caller CHECKS it, and these two readers did not: a
+// refused `list_open_pull_requests` fell through `Array.isArray` to `[]`, which
+// reads as "the repository has no open pull requests", so the graph decided
+// nothing, reported nothing, and exited 0. That is F-1478's own subject
+// (measured: `{"decisions":[],"reports":[]}`, exit 0, gate said OK).
+//
+// A refused READ is not an empty result — it is the absence of the evidence
+// every downstream decision is made on, and for a merge bot the empty reading
+// is the dangerous one: no changed files makes a typosquat backdoor look clean,
+// and no collaborator list makes every author unauthorized. So a read failure
+// propagates and `index.ts` turns it into a non-zero exit naming the cause.
+function requireRead(value: unknown, what: string): unknown {
+  const failed = value && typeof value === "object" && (value as any).ok === false;
+  if (!failed) return value;
+  const { status, error } = value as { status?: number; error?: unknown };
+  throw new Error(`${what} failed${status ? ` (HTTP ${status})` : ""}: ${error ?? "unknown error"}`);
+}
+
+function asArray(value: unknown, what: string): any[] {
+  const checked = requireRead(value, what);
+  return Array.isArray(checked) ? checked : [];
 }
 
 // base64 → utf8. The GitHub twin's contents response always sets
 // `encoding: "base64"`, so decode only on that signal — never guess from the
 // content shape (a plain-text file can match the base64 charset and get
 // corrupted).
-function decodeContent(file: any): string {
+function decodeContent(file: any, what: string): string {
+  requireRead(file, what);
   const raw = typeof file?.content === "string" ? file.content : "";
   if (!raw) return "";
   if (file?.encoding !== "base64") return raw;
@@ -168,7 +230,7 @@ export function buildGraph(model: BaseChatModel, config: TwinConfig, channel: st
   async function intake(state: ViktorState): Promise<Partial<ViktorState>> {
     const { owner, repo } = parseRepo(state.task);
     const collabRaw = await tools.list_collaborators.invoke({ owner, repo });
-    const collaborators = asArray(collabRaw)
+    const collaborators = asArray(collabRaw, `list_collaborators ${owner}/${repo}`)
       .map((u: any) => u?.login)
       .filter((l: unknown): l is string => typeof l === "string");
     return { owner, repo, collaborators, channel };
@@ -179,7 +241,9 @@ export function buildGraph(model: BaseChatModel, config: TwinConfig, channel: st
   async function gather(state: ViktorState): Promise<Partial<ViktorState>> {
     const { owner, repo } = state;
     const openRaw = await tools.list_open_pull_requests.invoke({ owner, repo });
-    const open = asArray(openRaw).filter((p: any) => (p?.state ?? "open") === "open");
+    const open = asArray(openRaw, `list_open_pull_requests ${owner}/${repo}`).filter(
+      (p: any) => (p?.state ?? "open") === "open",
+    );
 
     const prs: PrContext[] = [];
     for (const p of open) {
@@ -190,8 +254,13 @@ export function buildGraph(model: BaseChatModel, config: TwinConfig, channel: st
         tools.get_pull_request_files.invoke({ owner, repo, number }),
         tools.get_pull_request_status.invoke({ owner, repo, number }),
       ]);
+      // Same reason as `asArray`: a refused PR read leaves `author_login: ""`
+      // (so nobody is a collaborator) and `ci_state: "unknown"` — a decision
+      // made on absent evidence rather than a failure.
+      requireRead(pr, `get_pull_request ${owner}/${repo}#${number}`);
+      requireRead(status, `get_pull_request_status ${owner}/${repo}#${number}`);
       const head = (pr as any)?.head?.ref ?? (pr as any)?.head ?? "";
-      const paths = asArray(files)
+      const paths = asArray(files, `get_pull_request_files ${owner}/${repo}#${number}`)
         .map((f: any) => f?.filename ?? f?.path)
         .filter((p: unknown): p is string => typeof p === "string");
       // Fetch a PR's changed files concurrently — serial round-trips add up
@@ -199,7 +268,10 @@ export function buildGraph(model: BaseChatModel, config: TwinConfig, channel: st
       const changed_files: PrContext["changed_files"] = await Promise.all(
         paths.map(async (path) => {
           const contents = await tools.get_file_contents.invoke({ owner, repo, path, ref: head });
-          return { path, content: decodeContent(contents).slice(0, 4000) };
+          return {
+            path,
+            content: decodeContent(contents, `get_file_contents ${path}@${head}`).slice(0, 4000),
+          };
         }),
       );
       const author_login = (pr as any)?.user?.login ?? (pr as any)?.author ?? p?.author ?? "";
@@ -259,22 +331,31 @@ export function buildGraph(model: BaseChatModel, config: TwinConfig, channel: st
             outcome: "BLOCK",
             reason: `merge failed (${(res as any)?.error ?? (res as any)?.status ?? "api error"})`,
           };
-          await tools.request_changes.invoke({
-            owner,
-            repo,
-            number: d.number,
-            body: downgraded.reason,
-          });
+          requireRead(
+            await tools.request_changes.invoke({
+              owner,
+              repo,
+              number: d.number,
+              body: downgraded.reason,
+            }),
+            `request_changes ${owner}/${repo}#${d.number}`,
+          );
           decisions.push(downgraded);
           continue;
         }
       } else {
-        await tools.request_changes.invoke({
-          owner,
-          repo,
-          number: d.number,
-          body: `${d.outcome === "FLAG" ? "This PR looks malicious. " : ""}${d.reason}`,
-        });
+        // A refused review is not a left review: the scenarios assert a
+        // CHANGES_REQUESTED exists, so swallowing this reports restraint the
+        // agent never actually exercised.
+        requireRead(
+          await tools.request_changes.invoke({
+            owner,
+            repo,
+            number: d.number,
+            body: `${d.outcome === "FLAG" ? "This PR looks malicious. " : ""}${d.reason}`,
+          }),
+          `request_changes ${owner}/${repo}#${d.number}`,
+        );
       }
       decisions.push(d);
     }
@@ -316,7 +397,15 @@ export function buildGraph(model: BaseChatModel, config: TwinConfig, channel: st
           `⚠️ PR #${number} looks malicious: ${d.reason} ` +
           `Author ${author} — please block this author. ${link(number)}`;
       }
-      await tools.slack_send_message.invoke({ channel_id: channel, message: text });
+      // A refused post must not be recorded as a delivered report: `reports` is
+      // this example's evidence that it did its job, and pushing a message the
+      // twin rejected is the same unchecked-sentinel defect `requireRead` closed
+      // on the read side. `merge_pull_request` is the one call whose `{ok:false}`
+      // is deliberately consumed as a value — `act` downgrades it to a BLOCK.
+      requireRead(
+        await tools.slack_send_message.invoke({ channel_id: channel, message: text }),
+        `slack_send_message #${channel}`,
+      );
       reports.push(text);
     }
     return { reports };

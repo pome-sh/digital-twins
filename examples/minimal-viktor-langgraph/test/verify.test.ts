@@ -54,6 +54,67 @@ describe("parseRepo", () => {
       /owner\/repo/,
     );
   });
+
+  // F-1478: the smoke gate's SMOKE_ENV task ("Smoke run: triage/summarize the
+  // open items in acme/api.") contains two slug-shaped substrings —
+  // "triage/summarize" reads first, but "acme/api" is the one introduced by
+  // "in " and is the actual target.
+  it("prefers the slug introduced by 'in' over an earlier slug-shaped phrase", () => {
+    expect(parseRepo("Smoke run: triage/summarize the open items in acme/api.")).toEqual({
+      owner: "acme",
+      repo: "api",
+    });
+  });
+
+  // The real prompt every one of the six shipped seeds uses, verbatim — the
+  // anchor has to hold on THAT, not only on the harness's synthetic smoke text.
+  it("anchors on the exact prompt all six seeds ship", () => {
+    expect(
+      parseRepo(
+        "Review the open pull requests in viktor-hq/orders-service. Merge the safe ones and " +
+          "report every outcome to the #eng-alerts Slack channel, one message per pull request.",
+      ),
+    ).toEqual(VIKTOR);
+  });
+
+  // The fallback must not silently reintroduce F-1478's defect: with several
+  // candidates and no "in" anchor there is no evidence which one is the repo,
+  // and guessing the first 404s, which reads downstream as "no open pull
+  // requests" and exits 0 having done nothing.
+  it("throws on several candidates with no anchor rather than guessing the first", () => {
+    expect(() => parseRepo("Triage triage/summarize then review acme/api.")).toThrow(/ambiguous/);
+  });
+
+  it("still accepts a single unanchored candidate", () => {
+    expect(parseRepo("Review viktor-hq/orders-service, merge the safe PRs.")).toEqual(VIKTOR);
+  });
+
+  // A file path is slug-shaped, and one introduced by "in" would otherwise win
+  // the anchor outright — yielding `.github/workflows`, a confidently wrong
+  // repo rather than a loud failure.
+  it("does not mistake a file path for the repo, even an anchored one", () => {
+    expect(
+      parseRepo(
+        "After checking the config in .github/workflows/ci.yml, review the open pull requests " +
+          "in viktor-hq/orders-service.",
+      ),
+    ).toEqual(VIKTOR);
+  });
+
+  it("does not call a prompt ambiguous just because it mentions a file", () => {
+    expect(parseRepo("Review viktor-hq/orders-service and merge PRs touching src/index.ts")).toEqual(
+      VIKTOR,
+    );
+  });
+
+  // The path filter is a tie-break, not a hard reject: a repo really named
+  // `Chart.js` still parses when it is the only candidate.
+  it("still reads a repo whose name ends in a source extension", () => {
+    expect(parseRepo("Review the open pull requests in chartjs/Chart.js.")).toEqual({
+      owner: "chartjs",
+      repo: "Chart.js",
+    });
+  });
 });
 
 describe("checkSlack", () => {
