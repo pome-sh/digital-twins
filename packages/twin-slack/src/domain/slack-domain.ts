@@ -421,7 +421,7 @@ export class SlackDomain {
     return users.usersProfileGet(this, args, actor);
   }
 
-  usersProfileSet(args: { user?: string; profile?: string; name?: string; value?: string }, actor: Actor, onDelta: DeltaHook = NOOP): Record<string, unknown> {
+  usersProfileSet(args: { user?: string; profile?: string | Record<string, unknown>; name?: string; value?: string }, actor: Actor, onDelta: DeltaHook = NOOP): Record<string, unknown> {
     return users.usersProfileSet(this, args, actor, onDelta);
   }
 

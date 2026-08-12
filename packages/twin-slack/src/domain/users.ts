@@ -84,7 +84,7 @@ export function usersProfileGet(domain: SlackDomain, args: { user?: string; incl
 }
 
 
-export function usersProfileSet(domain: SlackDomain, args: { user?: string; profile?: string; name?: string; value?: string }, actor: Actor, onDelta: DeltaHook = NOOP): Record<string, unknown> {
+export function usersProfileSet(domain: SlackDomain, args: { user?: string; profile?: string | Record<string, unknown>; name?: string; value?: string }, actor: Actor, onDelta: DeltaHook = NOOP): Record<string, unknown> {
   const target = args.user ? domain.resolveUser(args.user) : domain.resolveActorUser(actor);
   if (!target) slackError("user_not_found", 404);
   const acting = domain.resolveActorUser(actor);
@@ -93,7 +93,11 @@ export function usersProfileSet(domain: SlackDomain, args: { user?: string; prof
     const before = domain.db.prepare(`SELECT * FROM users WHERE id = ?`).get(target!.id) as UserRow;
     let profile = safeParseJson(before.profile_json);
     if (args.profile) {
-      const incoming = safeParseJson(args.profile);
+      // F-1462 — Slack takes `profile` as a JSON string OR as an object, so the
+      // parse only runs on the branch that needs it. `safeParseJson` over an
+      // object would be a category error, not a no-op: it would swallow the
+      // fields and write nothing, which is a silent partial success.
+      const incoming = typeof args.profile === "string" ? safeParseJson(args.profile) : args.profile;
       profile = { ...(profile as object), ...(incoming as object) };
     } else if (args.name) {
       profile = { ...(profile as object), [args.name]: args.value ?? "" };
