@@ -88,7 +88,9 @@ describe("v2 / cluster A — branches & files", () => {
     it("requires matching sha (optimistic locking)", () => {
       const domain = freshDomain();
       domain.createOrUpdateFile({ owner: "acme", repo: "api", path: "lock.md", message: "m", content: "x\n" });
-      expect(() => domain.deleteFile({ owner: "acme", repo: "api", path: "lock.md", message: "stale", sha: "WRONG" })).toThrow("Validation Failed");
+      // F-1491 — a stale sha is GitHub's 409 conflict, not a 422 validation
+      // failure, and the message names the path and the sha the caller sent.
+      expect(() => domain.deleteFile({ owner: "acme", repo: "api", path: "lock.md", message: "stale", sha: "WRONG" })).toThrow("lock.md does not match WRONG");
     });
 
     it("404s on missing file", () => {

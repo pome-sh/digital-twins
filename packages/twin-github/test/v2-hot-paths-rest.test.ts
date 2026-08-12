@@ -71,7 +71,8 @@ describe("REST / cluster A — branches & files", () => {
     expect(put.status).toBe(201);
     const sha = (put.body as { content: { sha: string } }).content.sha;
     const stale = await jsonReq(a, "DELETE", "/repos/acme/api/contents/del.txt", { message: "drop", sha: "WRONG" }, aliceToken);
-    expect(stale.status).toBe(422);
+    // F-1491 — measured: real GitHub answers a mismatched `sha` with 409, not 422.
+    expect(stale.status).toBe(409);
     const removed = await jsonReq(a, "DELETE", "/repos/acme/api/contents/del.txt", { message: "drop", sha }, aliceToken);
     expect(removed.status).toBe(200);
     const gone = await jsonReq(a, "GET", "/repos/acme/api/contents/del.txt");

@@ -1,5 +1,42 @@
 # @pome-sh/twin-github — CHANGELOG
 
+## 0.10.9 — 2026-08-12
+
+A wrong `sha` on the contents door is a **409**, not a 422, and a missing one
+names the field the way GitHub names it (F-1491).
+
+**The 409 was a hypothesis on the ticket and it measured true — three ways.**
+Probed live against two throwaway private repos on 2026-08-12: a `sha` that is
+not a sha (`deadbeef`), a well-formed 40-hex sha that exists nowhere, and the
+real sha of a *different* blob all get the same `409 <path> does not match <sha>`.
+GitHub draws no line between malformed and stale, so neither does this twin. The
+message names the full path (`dir/sub/file.txt does not match …`), not the
+basename, and the body carries **no `errors` array** — where this twin previously
+sent `422 Validation Failed` plus a structured one. `DELETE /contents/*` answers
+the same two shapes against its own doc anchor. GitHub's published OpenAPI
+description declares the same 409 against `basic-error`, independently of the
+wire measurement.
+
+**A missing `sha` stays 422 but stops being generic.** GitHub answers
+`Invalid request.\n\n"sha" wasn't supplied.`, with no `errors` array — measured on
+four unrelated surfaces (`PUT`/`DELETE /contents/*`, `POST /issues`,
+`POST /pulls`), so it is GitHub's general answer to any missing required body
+field. `PUT /contents/*` adopts it, because that refusal is raised by the domain.
+
+**Two things this deliberately did NOT change.** `DELETE /contents/*` with no
+`sha` at all still shows the generic `Validation Failed`, because its declaration
+requires `sha` and zod refuses before the domain is reached; migrating that means
+changing the zod branch for every required field on every route, which is a global
+envelope change and is now divergence 30. And the already-exists family keeps its
+`errors` array, which is right — GitHub sends one there, measured on `POST /labels`
+and on `POST /pulls` with `head == base`. The shared `validationFailed` helper is
+untouched on all 48 of its other call sites, with a test that says so.
+
+**Two cases the twin already had right, now guarded rather than incidental**: a
+`sha` sent for a path that does not exist is *ignored*, and the write succeeds
+with 201 — GitHub never looks at it, so validating there would refuse writes
+GitHub accepts; and a nonexistent `branch` is checked before the `sha`.
+
 ## 0.10.8 — 2026-08-12
 
 `PUT /contents/*` takes base64, the MCP write tools keep taking plain text, and
