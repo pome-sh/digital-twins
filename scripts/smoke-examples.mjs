@@ -13,13 +13,37 @@
 // `main()` runs past the point where a launch-above-class TDZ would fire — and
 // fails if the module crashes on load with a TDZ ReferenceError.
 //
-// We deliberately do NOT assert a clean exit: with no live twin and an invalid
-// model key the agent is *expected* to fail once it starts doing real work
-// (network / auth). That benign runtime failure is not a smoke failure. The one
-// thing that must never happen is the module failing to evaluate — which is
-// exactly the class-before-initialization TDZ this gate guards against.
+// F-1478: for as long as this gate existed, an exit *inside* SETTLE_MS was
+// unconditionally treated as OK, on the theory that a benign network/auth
+// failure (no live twin, no real model key in CI) is expected and must not be
+// a false red. That theory is right, but the implementation never checked it —
+// ANY exit before the settle read as success, so an example that returns
+// having done nothing at all (wrong parse, an early return, a swallowed
+// error — `minimal-viktor-langgraph` did all three at once) passed exactly
+// like a healthy launch. Measured in CI on pome-sh/digital-twins#382: 8 of 8
+// examples reported OK, seven exited 1, one exited 0, and zero were "still
+// running" at the settle — the one signal this gate computes that actually
+// means "reached real work" was thrown away every time.
+//
+// The fix asserts the property instead of trusting the exit path:
+//   - still alive at the settle → OK. The launch reached async work (a network
+//     call, a model call) and is still in it — a TDZ throws synchronously
+//     during module evaluation, well under this window, so surviving it is
+//     real evidence, not silence.
+//   - exits before the settle with the TDZ signature in its output → FAIL,
+//     unconditionally. This is F-900's actual subject and must never become a
+//     skip or a pass no matter what else changes here.
+//   - exits before the settle WITHOUT the TDZ signature → only a network/auth
+//     failure this gate's own SMOKE_ENV deliberately manufactures (dead twin
+//     endpoints, invalid model keys) excuses this. That is asserted by
+//     matching the output against BENIGN_FAILURE_SIGNATURE below — a property
+//     of the failure ("connection refused", "invalid api key" …), not a list
+//     of which examples are allowed to exit early. A match is a named, counted
+//     SKIP, never printed as OK. No match is a FAIL: the example returned
+//     before it could have done anything, and nothing in its own output says
+//     why.
 import { spawn } from "node:child_process";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -27,15 +51,41 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const examplesDir = join(repoRoot, "examples");
 
 // How long to let each example run before we conclude it survived module
-// evaluation. A launch-above-class TDZ throws synchronously while the module
-// body evaluates — well under a second — so a few seconds is plenty even with
-// tsx's cold-start transpile. A healthy example is still alive (doing real
-// work) or has already failed on network/auth by the time this elapses.
-const SETTLE_MS = 5000;
+// evaluation and reached real (async) work. A launch-above-class TDZ throws
+// synchronously while the module body evaluates — well under a second — so a
+// few seconds is plenty even with tsx's cold-start transpile.
+export const SETTLE_MS = 5000;
 
 // The V8 message for accessing a `let`/`const`/`class` binding in its temporal
 // dead zone. This is the exact crash F-900 fixed and F-866's tsc gate missed.
-const TDZ_SIGNATURE = /(?:Cannot access '[^']+' before initialization|before initialization)/;
+// A TDZ crash is a hard failure regardless of exit code or timing.
+export const TDZ_SIGNATURE = /(?:Cannot access '[^']+' before initialization|before initialization)/;
+
+// A benign, CI-expected reason an example can legitimately exit before the
+// settle: SMOKE_ENV points every twin URL at a dead loopback port and hands
+// out invalid model/API keys on purpose, so a healthy example that reaches
+// real work is EXPECTED to fail fast on a network refusal or an auth
+// rejection. Each entry names the class of failure it recognizes so a match
+// carries a reason, not just a verdict — this is a property of the failure
+// text, not a per-example allowlist, so it says nothing about which of the
+// eight examples produced it.
+const BENIGN_FAILURE_SIGNATURES = [
+  ["connection refused", /ECONNREFUSED/],
+  ["connection reset", /ECONNRESET/],
+  ["DNS resolution failed", /ENOTFOUND|getaddrinfo/],
+  ["host unreachable", /EHOSTUNREACH/],
+  ["network request failed", /fetch failed/i],
+  ["request timed out", /ETIMEDOUT|AbortError/],
+  ["AI Gateway rejected the invalid key", /AI Gateway/i],
+  ["model provider rejected the invalid key", /invalid api key|invalid x-api-key|authentication_error|unauthenticated request|unauthorized/i],
+];
+
+function matchBenignFailure(output) {
+  for (const [reason, re] of BENIGN_FAILURE_SIGNATURES) {
+    if (re.test(output)) return reason;
+  }
+  return null;
+}
 
 // Env that gets every example past its startup guards and into async work so
 // the launch-above-class code path is actually exercised. Values are
@@ -68,10 +118,10 @@ const SMOKE_ENV = {
   AI_GATEWAY_API_KEY: "smoke-invalid",
 };
 
-function discoverExamples() {
+export function discoverExamples(dir = examplesDir) {
   const found = [];
-  for (const name of readdirSync(examplesDir).sort()) {
-    const pkgPath = join(examplesDir, name, "package.json");
+  for (const name of readdirSync(dir).sort()) {
+    const pkgPath = join(dir, name, "package.json");
     if (!existsSync(pkgPath)) continue;
     const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
     // Every runnable example starts with `tsx src/index.ts`; only those can
@@ -81,12 +131,40 @@ function discoverExamples() {
   return found;
 }
 
+// The verdict for one launch, given what we observed. Pure and exported so the
+// regression suite can drive it directly with synthetic evidence instead of
+// spawning real processes. `status` is one of "ok" | "skip" | "fail" — never
+// anything a caller could mistake for a fourth state, and "skip" must never be
+// printed as "OK": it is health this gate could not confirm, named as such.
+export function classifyLaunch({ output, stillRunningAtSettle, exitCode, signal }) {
+  if (TDZ_SIGNATURE.test(output)) {
+    return { status: "fail", reason: "TDZ crash on launch" };
+  }
+  if (stillRunningAtSettle) {
+    return { status: "ok", reason: `still running after ${SETTLE_MS}ms` };
+  }
+  const how = signal ? `killed by ${signal}` : `exited code ${exitCode}`;
+  const benign = matchBenignFailure(output);
+  if (benign) {
+    return { status: "skip", reason: `${how} before settling — benign: ${benign}` };
+  }
+  return {
+    status: "fail",
+    reason: `${how} before settling (${SETTLE_MS}ms) with no TDZ and no recognized benign-failure signal — did it do any real work?`,
+  };
+}
+
 function smokeOne(name) {
   return new Promise((resolvePromise) => {
     const cwd = join(examplesDir, name);
     const tsx = join(cwd, "node_modules", ".bin", "tsx");
     if (!existsSync(tsx)) {
-      resolvePromise({ name, ok: false, reason: `tsx not installed (run \`npm ci\` in examples/${name})`, output: "" });
+      resolvePromise({
+        name,
+        status: "fail",
+        reason: `tsx not installed (run \`npm ci\` in examples/${name})`,
+        output: "",
+      });
       return;
     }
 
@@ -102,61 +180,95 @@ function smokeOne(name) {
     child.stderr.on("data", capture);
 
     let settled = false;
-    const finish = (result) => {
+    const finish = (verdict) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
       if (!child.killed) child.kill("SIGKILL");
-      resolvePromise(result);
+      resolvePromise({ name, output, ...verdict });
     };
 
-    // Survived long enough without a TDZ crash → the module evaluated fine.
     const timer = setTimeout(() => {
-      finish({ name, ok: !TDZ_SIGNATURE.test(output), reason: "still running", output });
+      finish(classifyLaunch({ output, stillRunningAtSettle: true }));
     }, SETTLE_MS);
 
     child.on("exit", (code, signal) => {
-      // A TDZ crash prints the ReferenceError and exits non-zero on launch.
-      const tdz = TDZ_SIGNATURE.test(output);
-      finish({
-        name,
-        ok: !tdz,
-        reason: tdz ? "TDZ crash on launch" : `exited ${signal ? `on ${signal}` : `code ${code}`} (no TDZ)`,
-        output,
-      });
+      finish(classifyLaunch({ output, stillRunningAtSettle: false, exitCode: code, signal }));
     });
 
     child.on("error", (err) => {
-      finish({ name, ok: false, reason: `failed to spawn: ${err.message}`, output });
+      finish({ status: "fail", reason: `failed to spawn: ${err.message}` });
     });
   });
 }
 
-const examples = discoverExamples();
-if (examples.length === 0) {
-  console.error("No runnable examples (with a `start` script) found.");
-  process.exit(1);
+// Guarded so the regression suite can `import { classifyLaunch, discoverExamples }`
+// without re-triggering a real launch of all eight examples. Realpath'd on
+// both sides (not `import.meta.main`: that landed in Node 24.2, root
+// `engines` allows `>=24`, and `undefined` there makes the guard false and
+// this file exit 0 having smoked nothing — same shape F-1353 fixed in
+// contract/run.mjs), and a guard miss while invoked as this file throws
+// rather than exits 0.
+const SELF = realpathSync(fileURLToPath(import.meta.url));
+const ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";
+const invokedDirectly = ENTRY === SELF;
+
+if (!invokedDirectly && ENTRY.endsWith("smoke-examples.mjs")) {
+  throw new Error(`smoke-examples.mjs entry guard did not fire for ${ENTRY} (expected ${SELF})`);
 }
 
-console.log(`Launch-smoking ${examples.length} example(s): ${examples.join(", ")}`);
+if (invokedDirectly) {
+  await main();
+}
 
-const failures = [];
-for (const name of examples) {
-  process.stdout.write(`\n=== examples/${name} === `);
-  const result = await smokeOne(name);
-  if (result.ok) {
-    console.log(`OK (${result.reason})`);
-  } else {
-    console.log(`FAILED (${result.reason})`);
-    // Show the tail so the TDZ ReferenceError is visible in CI logs.
-    const tail = result.output.trim().split("\n").slice(-12).join("\n");
-    if (tail) console.error(tail);
-    failures.push(name);
+async function main() {
+  const examples = discoverExamples();
+  // Vacuous green: a runner examining zero examples must fail loudly, not
+  // print "All 0 examples launched clean."
+  if (examples.length === 0) {
+    console.error("No runnable examples (with a `start` script) found.");
+    process.exit(1);
   }
-}
 
-if (failures.length > 0) {
-  console.error(`\nExamples that crash on launch: ${failures.join(", ")}`);
-  process.exit(1);
+  console.log(`Launch-smoking ${examples.length} example(s): ${examples.join(", ")}`);
+
+  const failures = [];
+  const skips = [];
+  for (const name of examples) {
+    process.stdout.write(`\n=== examples/${name} === `);
+    const result = await smokeOne(name);
+    const tail = result.output?.trim().split("\n").slice(-12).join("\n") ?? "";
+    if (result.status === "ok") {
+      console.log(`OK (${result.reason})`);
+      if (tail) console.log(tail);
+    } else if (result.status === "skip") {
+      console.log(`SKIPPED (${result.reason})`);
+      if (tail) console.log(tail);
+      skips.push({ name, reason: result.reason });
+    } else {
+      console.log(`FAILED (${result.reason})`);
+      // Show the tail so the crash (or the silent nothing) is visible in CI logs.
+      if (tail) console.error(tail);
+      failures.push({ name, reason: result.reason });
+    }
+  }
+
+  if (skips.length > 0) {
+    console.error(
+      `\n${skips.length} example(s) skipped (not verified — benign environment failure): ` +
+        skips.map((s) => `${s.name} (${s.reason})`).join("; "),
+    );
+  }
+
+  if (failures.length > 0) {
+    console.error(
+      `\nExamples that crash on launch or return with no evidence of real work: ` +
+        failures.map((f) => `${f.name} (${f.reason})`).join("; "),
+    );
+    process.exit(1);
+  }
+  console.log(
+    `\nAll ${examples.length} examples launched without a TDZ crash` +
+      (skips.length > 0 ? ` (${skips.length} skipped, unverified).` : "."),
+  );
 }
-console.log(`\nAll ${examples.length} examples launched without a TDZ crash.`);

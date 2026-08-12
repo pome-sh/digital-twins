@@ -60,6 +60,10 @@ jobs:
       # workflow/root-script text only, so it runs here before `npm ci`.
       - run: node scripts/check-packages-scripts-wired.mjs
       - run: node scripts/check-packages-scripts-wired.test.mjs
+      # F-1478 — locks the smoke:examples classifier (below, in the heavy
+      # block) so an exit inside SETTLE_MS can't quietly go back to reading as
+      # success. Pure-function tests, no npm ci needed, so it runs here too.
+      - run: node scripts/smoke-examples.test.mjs
       # release.yml only publishes on a version diff against npm — a PR that
       # changes a published package's source without bumping its version
       # merges clean and silently never reaches npm. Only meaningful against
