@@ -10,6 +10,12 @@
 // wrong-named or mistyped field becomes a COMPILE error. This is the
 // type-level guard rail — runtime behavior is unchanged.
 //
+// Since F-1484 the file also carries one INPUT anchor (`STRIPE_REFUND_REASONS`,
+// at the bottom). It is a runtime `const` rather than a type, because a
+// validator needs the values — but the `stripe` import above stays `import
+// type` and is still erased, so nothing here reaches the devDependency at run
+// time. The anchoring is done by a type-level assertion beside it.
+//
 // ANCHOR-LIBRARY-VERSION vs WIRE-VERSION (ST-DIV-012, deliberate decision):
 // the anchor pins `stripe@22.2.0` (apiVersion 2026-05-27.dahlia), which is
 // DECOUPLED from the wire apiVersion the twin serves (2026-03-04.preview). The
@@ -69,3 +75,35 @@ export type AssertNoUncovered<Upstream, Emitted, Allow extends PropertyKey> =
   Exclude<keyof Upstream, keyof Emitted | Allow> extends never
     ? true
     : { __UNCOVERED_UPSTREAM_FIELDS__: Exclude<keyof Upstream, keyof Emitted | Allow> };
+
+// F-1484 — the one INPUT anchor in this file, and the only value set the twin
+// closes against the vendor rather than accepting freely.
+//
+// Both doors that create a refund (`create_refund`'s MCP schema and
+// `POST /v1/refunds`'s declared body) validate against this array, so they
+// cannot drift apart into a twin that refuses a value over one and accepts it
+// over the other.
+//
+// ⚠️ IT IS `RefundCreateParams.Reason`, NOT `Refund.Reason`. The response union
+// carries a FOURTH member — `expired_uncaptured_charge` — that Stripe generates
+// internally and REFUSES on input. Anchoring to the object's own reason would
+// have re-opened the false pass this closed, one value narrower and just as
+// invisible: the twin would accept a create Stripe 400s, and the enum would
+// look vendor-derived while being wrong.
+export const STRIPE_REFUND_REASONS = ["duplicate", "fraudulent", "requested_by_customer"] as const;
+
+// Checked in BOTH directions, and it names the offender the way
+// `AssertNoUncovered` does: a `stripe` bump that adds an accepted reason leaves
+// it `__MISSING_FROM_TWIN__`, one that removes or renames a reason leaves it
+// `__NOT_ACCEPTED_UPSTREAM__`. Either way tsc fails the bump PR by name rather
+// than the fidelity lane finding it months later. Asserted `= true` in
+// test/upstream-coverage.types.ts, next to the serializer anchors.
+export type AssertSameMembers<Declared extends string, Upstream extends string> = [
+  Exclude<Upstream, Declared>,
+  Exclude<Declared, Upstream>,
+] extends [never, never]
+  ? true
+  : {
+      __MISSING_FROM_TWIN__: Exclude<Upstream, Declared>;
+      __NOT_ACCEPTED_UPSTREAM__: Exclude<Declared, Upstream>;
+    };

@@ -19,6 +19,10 @@ import metaListing from "../fixtures/mcp-tools-list.meta.json" with { type: "jso
 import rawListing from "../fixtures/mcp-tools-list.raw.json" with { type: "json" };
 import type { StripeDomain } from "./domain/index.js";
 import { TwinError } from "./errors.js";
+// Value import, and safe under bun for the same reason the note above cares:
+// `upstream-types.ts` imports `stripe` with `import type`, so it compiles to a
+// module with no imports at all.
+import { STRIPE_REFUND_REASONS } from "./upstream-types.js";
 
 /**
  * The tool table Stripe serves. Every name, description and input schema on
@@ -160,7 +164,10 @@ export const toolArgumentSchemas = [
     schema: z.object({
       charge: z.string().min(1),
       amount: z.coerce.number().int().positive().optional(),
-      reason: z.string().optional(),
+      // F-1484 — Stripe's closed set, not a free string. `.optional()` is kept:
+      // the vendor does not require the field, and narrowing the arity as well
+      // as the value would refuse every refund the corpus actually makes.
+      reason: z.enum(STRIPE_REFUND_REASONS).optional(),
     }),
   },
   {

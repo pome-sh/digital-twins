@@ -6,8 +6,8 @@
     "method": "tools/list",
     "protocol": "JSON-RPC 2.0 over Streamable HTTP",
     "protocolVersion": "2025-06-18",
-    "captureDate": "2026-08-06",
-    "rawFileSha256": "7bb87c5d6d99fea8dad1069a501f9801811e42c7cf81723b6b3d4e75aacc5bba",
+    "captureDate": "2026-08-12",
+    "rawFileSha256": "5ce7a3dcecd7a2093bb3986472461f713a48b5c14e82163151ca4b108e4fa520",
     "liveToolCount": 26,
     "liveToolOrder": [
       "create_payment_intent",
@@ -38,7 +38,7 @@
       "list_events"
     ],
     "transcription": {
-      "readFrom": "twin-stripe's own tools/list, booted on defaultSeed() and driven through Hono's app.request, read immediately before this table became fixture-driven (F-1325)",
+      "readFrom": "twin-stripe's own tools/list, booted on defaultSeed() and driven through Hono's app.request, read immediately before this table became fixture-driven (F-1325). Re-projected on 2026-08-12 for F-1484: every tool's inputSchema was rewritten from stripeToolInputSchema() of its zod schema — a no-op for 25 of the 26, and create_refund.reason's enum for the one. Names, descriptions and ordering are unchanged, and test/mcp-tool-fixture.test.ts boots the twin and asserts it serves exactly these bytes.",
       "contentOrigin": "packages/twin-stripe/src/tools.ts — a hand-written TypeScript array of 26 tools. Each inputSchema is z.toJSONSchema() of that tool's zod schema, frozen here verbatim including the $schema key it emits.",
       "comparedToUpstream": "never, and not comparable today. @stripe/mcp is a stdio-to-HTTP proxy that declares no tools of its own and the served listing is a function of the caller's Restricted API Key, so F-1326 recorded stripe as not-captured (fixtures/mcp-tools-list/stripe.status.json) rather than inventing a deployment-invariant table."
     },
@@ -411,7 +411,12 @@
               "maximum": 9007199254740991
             },
             "reason": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "duplicate",
+                "fraudulent",
+                "requested_by_customer"
+              ]
             }
           },
           "required": [
