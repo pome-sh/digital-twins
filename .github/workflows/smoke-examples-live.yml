@@ -1,0 +1,156 @@
+name: smoke-examples-live
+
+# F-1486 — the credentialed leg. `smoke:examples` (ci.yml, every PR) has two
+# verdicts: OK (still alive at the settle — the one that proves an example
+# actually runs) and REACHED-OUTBOUND (launched, wired its twin, reached a
+# network call, and failed THERE because CI has no credentials). Measured
+# across #386: 0 of 8 examples are ever OK in CI, while 4 of 8 are locally.
+# The strong verdict is verified nowhere that gates anything.
+#
+# This workflow runs the SAME gate (scripts/smoke-examples.mjs, same
+# classifier, same discovery) with real credentials so OK is achievable:
+#   - real local twins, booted for real via `pome twin start` (the same
+#     in-process boot path quickstart-smoke.yml already proves), not
+#     SMOKE_ENV's dead loopback ports;
+#   - a real ANTHROPIC_API_KEY repo secret, not an invalid placeholder.
+# `SMOKE_EXAMPLES_LIVE=1` tells the script to stop overlaying SMOKE_ENV and
+# to assert a floor after the run: at least one example must be alive at the
+# settle, or it hard-fails naming the gap — the exact assertion no
+# uncredentialed environment can make. The PR leg (ci.yml) is untouched:
+# REACHED-OUTBOUND on an uncredentialed runner stays a pass there.
+#
+# Absent credentials must fail loudly, never silently degrade into a second
+# REACHED-OUTBOUND run that reports success — the script's own
+# missingLiveEnv() check does that, but this workflow also fails fast before
+# spending any CI minutes booting twins, the same "named error before doing
+# the expensive thing" shape as repo-policy.yml's REPO_POLICY_TOKEN check.
+on:
+  schedule:
+    - cron: "37 6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: smoke-examples-live
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  smoke-live:
+    name: smoke:examples with real twin + model credentials
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Require ANTHROPIC_API_KEY before doing anything expensive
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
+            echo "::error::ANTHROPIC_API_KEY is required for the credentialed smoke leg (F-1486) — provision it as a repo Actions secret. Without it every example would exit at its first model call exactly like the uncredentialed PR leg, which is the gap this workflow exists to close."
+            exit 1
+          fi
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # Same build order quickstart-smoke.yml uses: wire before the adapter
+      # (tsup's noExternal resolves wire's exports at build time), then the
+      # adapter, then the whole workspace (which builds the CLI last).
+      - run: npm run build -w @pome-sh/wire
+      - run: npm run build -w @pome-sh/adapter-claude-sdk
+      - run: npm run build
+      - name: Install each example's own dependencies
+        run: |
+          set -euo pipefail
+          for dir in examples/*/; do
+            (cd "$dir" && npm ci)
+          done
+      # One secret shared by every twin this run boots (same TWIN_AUTH_SECRET
+      # flow quickstart-smoke.yml uses for github+gmail), so a single minted
+      # JWT verifies against all three — support-triage's own header names
+      # this explicitly ("the Authorization header for BOTH twins").
+      - name: Generate the shared twin auth secret
+        run: echo "TWIN_AUTH_SECRET=$(node -e 'console.log(require("crypto").randomBytes(32).toString("hex"))')" >> "$GITHUB_ENV"
+      - name: Start the GitHub twin
+        run: nohup node cli/dist/src/cli/main.js twin start github > github-twin.log 2>&1 &
+      - name: Start the Slack twin (github's default port, so it needs its own)
+        run: nohup node cli/dist/src/cli/main.js twin start slack --port 3334 > slack-twin.log 2>&1 &
+      - name: Start the Gmail twin
+        run: nohup node cli/dist/src/cli/main.js twin start gmail --port 3336 > gmail-twin.log 2>&1 &
+      - name: Wait for all three twins and capture their printed wiring
+        run: |
+          set -euo pipefail
+          wait_healthy() {
+            local port="$1" log="$2"
+            for _ in $(seq 1 60); do
+              if curl -fsS "http://127.0.0.1:${port}/healthz" >/dev/null 2>&1; then
+                return 0
+              fi
+              sleep 2
+            done
+            echo "::error::twin on port ${port} not healthy within 120s"
+            cat "$log" || true
+            return 1
+          }
+          wait_healthy 3333 github-twin.log
+          wait_healthy 3334 slack-twin.log
+          wait_healthy 3336 gmail-twin.log
+
+          # Every twin boot prints POME_<NAME>_REST_URL / _MCP_URL and
+          # POME_AUTH_TOKEN (cli/src/twin/twinStart.ts). All three were
+          # started with the same TWIN_AUTH_SECRET, so any one printed
+          # POME_AUTH_TOKEN verifies against every twin — take github's.
+          {
+            echo "POME_GITHUB_REST_URL=$(grep -oP '^POME_GITHUB_REST_URL=\K.*' github-twin.log)"
+            echo "POME_GITHUB_MCP_URL=$(grep -oP '^POME_GITHUB_MCP_URL=\K.*' github-twin.log)"
+            echo "POME_TWIN_BASE_URL=http://127.0.0.1:3333"
+            echo "POME_AUTH_TOKEN=$(grep -oP '^POME_AUTH_TOKEN=\K.*' github-twin.log)"
+            echo "POME_SLACK_REST_URL=$(grep -oP '^POME_SLACK_REST_URL=\K.*' slack-twin.log)"
+            echo "POME_SLACK_MCP_URL=$(grep -oP '^POME_SLACK_MCP_URL=\K.*' slack-twin.log)"
+            echo "POME_GMAIL_REST_URL=$(grep -oP '^POME_GMAIL_REST_URL=\K.*' gmail-twin.log)"
+            echo "POME_GMAIL_MCP_URL=$(grep -oP '^POME_GMAIL_MCP_URL=\K.*' gmail-twin.log)"
+            echo "POME_GMAIL_TOKEN=$(grep -oP '^POME_GMAIL_TOKEN=\K.*' gmail-twin.log)"
+          } >> "$GITHUB_ENV"
+      - name: smoke:examples (LIVE — real twins, real model key)
+        env:
+          SMOKE_EXAMPLES_LIVE: "1"
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: npm run smoke:examples
+      - name: Twin logs on failure
+        if: failure()
+        run: cat github-twin.log slack-twin.log gmail-twin.log 2>/dev/null || true
+
+  # F-1230's alarm requirement, F-1471's guard: a schedule:-triggered workflow
+  # must reach the reusable alarm from a failure()-guarded job in the same
+  # file, with a recovery sibling and a title/label pair unique across the
+  # tree. Gated on schedule/workflow_dispatch specifically (this workflow has
+  # no pull_request trigger at all, but stating the positive set matches the
+  # pattern repo-policy.yml/secret-scan.yml already established).
+  schedule-alarm:
+    needs: smoke-live
+    if: failure() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    permissions:
+      contents: read
+      issues: write
+    uses: ./.github/workflows/schedule-alarm.yml
+    with:
+      title: "the smoke-examples-live nightly is failing"
+      label: "schedule-alarm:smoke-examples-live"
+      outcome: failure
+      detail: "smoke-examples-live.yml's scheduled run failed. Common causes: ANTHROPIC_API_KEY is absent or invalid (the workflow's own upfront check should have caught an absent one — if this fired instead, the key itself was rejected), a twin failed to boot, or the >= 1-alive floor was not met (zero examples reached real work at the settle with real credentials). Check the run log for the actual verdict that broke."
+
+  schedule-alarm-recovery:
+    needs: smoke-live
+    if: success() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    permissions:
+      contents: read
+      issues: write
+    uses: ./.github/workflows/schedule-alarm.yml
+    with:
+      title: "the smoke-examples-live nightly is failing"
+      label: "schedule-alarm:smoke-examples-live"
+      outcome: success

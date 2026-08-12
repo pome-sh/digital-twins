@@ -21,7 +21,14 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { SETTLE_MS, classifyLaunch, discoverExamples } from "./smoke-examples.mjs";
+import {
+  SETTLE_MS,
+  classifyLaunch,
+  discoverExamples,
+  assertAliveFloor,
+  missingLiveEnv,
+  LIVE_REQUIRED_ENV,
+} from "./smoke-examples.mjs";
 
 let failures = 0;
 function check(name, got, want) {
@@ -202,6 +209,46 @@ function check(name, got, want) {
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+}
+
+// ── F-1486: the credentialed leg's floor — zero alive is a hard failure ────
+{
+  const zero = assertAliveFloor({ live: true, okCount: 0, total: 8 });
+  check("zero alive on the live leg fails the floor", zero.ok, false);
+  assert.match(zero.message, /0 of 8/);
+  assert.match(zero.message, />= 1/);
+
+  const one = assertAliveFloor({ live: true, okCount: 1, total: 8 });
+  check(">= 1 alive on the live leg meets the floor", one.ok, true);
+
+  const many = assertAliveFloor({ live: true, okCount: 8, total: 8 });
+  check("every example alive still meets the floor", many.ok, true);
+
+  // The floor must never apply to the uncredentialed (PR) leg — that leg's
+  // permanent steady state is 0 alive, and this floor is not the mechanism
+  // that would make it red for that.
+  const notLive = assertAliveFloor({ live: false, okCount: 0, total: 8 });
+  check("the floor is a no-op when not on the live leg", notLive.ok, true);
+  check("a no-op floor carries no message", notLive.message, null);
+}
+
+// ── F-1486: an absent credential on the live leg must be named, not silent ─
+{
+  check(
+    "every required var is reported missing from an empty env",
+    missingLiveEnv({}).sort(),
+    [...LIVE_REQUIRED_ENV].sort(),
+  );
+  check(
+    "a fully-populated env reports nothing missing",
+    missingLiveEnv({ ANTHROPIC_API_KEY: "sk-ant-real", POME_AUTH_TOKEN: "real-jwt" }),
+    [],
+  );
+  check(
+    "a partially-populated env names only what is absent",
+    missingLiveEnv({ ANTHROPIC_API_KEY: "sk-ant-real" }),
+    ["POME_AUTH_TOKEN"],
+  );
 }
 
 if (failures > 0) {
