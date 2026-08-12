@@ -29,6 +29,10 @@
  * inert with no endpoint set, so a standalone run is unaffected.
  */
 
+import { realpathSync } from "node:fs";
+import { resolve as resolvePath } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import type { McpServerConfig } from "@anthropic-ai/claude-agent-sdk";
 import { query } from "@pome-sh/adapter-claude-sdk";
 
@@ -217,10 +221,24 @@ export function resolveTwinWiring(env: NodeJS.ProcessEnv = process.env): TwinWir
   };
 }
 
-// Only run the agent when executed directly (`npm run start`). Guarding on
-// `import.meta.main` keeps the module importable — e.g. by the env unit test —
-// without kicking off a full agent run on import.
-if (import.meta.main) {
+// Only run the agent when executed directly (`npm start`), so the module stays
+// importable — e.g. by the env unit test — without kicking off a full agent run.
+//
+// NOT `import.meta.main`: that landed in Node 24.2 and this package's `engines`
+// allows `>=24`, so on 24.0/24.1 it is `undefined`, this guard is false, and
+// `npm start` prints nothing and exits 0 having run no agent at all. That is
+// worse than a crash here: `scripts/smoke-examples.mjs` — the gate that covers
+// this example — only fails on a TDZ ReferenceError, so it reads a do-nothing
+// exit 0 as a healthy launch and reports OK. The argv/`import.meta.url`
+// comparison the repo's other entry guards use (`contract/run.mjs`,
+// `scripts/check-packages-scripts-wired.mjs`), realpath'd on BOTH sides because
+// node resolves symlinks before deriving `import.meta.url`, so a bare
+// `path.resolve` of argv[1] misses through a symlinked checkout in the same
+// silent shape.
+const SELF = realpathSync(fileURLToPath(import.meta.url));
+const ENTRY = process.argv[1] ? realpathSync(resolvePath(process.argv[1])) : "";
+
+if (ENTRY === SELF) {
   await main();
 }
 

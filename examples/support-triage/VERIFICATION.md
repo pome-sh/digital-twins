@@ -167,8 +167,9 @@ Two independent routes, both of which the agent volunteered in its own output:
    (`update_issue` with no fields) because it was the only read path available."*
 2. **The exam is open-book.** `deniedTools()` names two web tools and three MCP
    tools. Every Claude Agent SDK built-in — `Bash`, `Read`, `Glob`, `Grep` — is
-   live, and the examinee's cwd is `local/`, one level below the task file with
-   its criteria and full seed, this file, and the README. Trial 5 ran
+   live, and the examinee's cwd — `local/` at the time of this run, the example
+   root since F-1290 flattened it — carries or sits one level below the task
+   file with its criteria and full seed, this file, and the README. Trial 5 ran
    `cat src/index.ts`, found the fixture, and reported: *"the deny-list …
    appears to be an intentional fixture rather than a misconfiguration …
    flipping it to `false` is the documented fix."*

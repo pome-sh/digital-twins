@@ -71,7 +71,7 @@ describe("deniedTools — the committed baseline defect", () => {
 
 // The closed sandbox, pinned separately from the lesson because it survives every
 // re-cut of the lesson: whatever the baseline defect turns out to be, an examinee
-// that can `cat ../tasks/duplicate-issue.md` is reading its own grading criteria
+// that can `cat tasks/duplicate-issue.md` is reading its own grading criteria
 // and its own seed. Measured 2026-08-04 (F-1292): with the built-ins live, one
 // trial in five read this examinee's source and named the fixture.
 describe("BUILT_IN_TOOLS — the closed sandbox", () => {

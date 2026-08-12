@@ -331,8 +331,11 @@ This is an **allowlist**, deliberately, rather than more names in
 `disallowedTools`. Until 2026-08-05 every built-in was live, and one measured
 trial in five used `Bash` to `cat` this examinee's own source and identify the
 fixture — with `tasks/duplicate-issue.md`, which carries all four grading
-criteria and the complete seed state, one directory away. An examinee that can
-read its own criteria is not sitting an exam.
+criteria and the complete seed state, in the examinee's own working directory
+since the flatten (it was one level up before). An examinee that can read its
+own criteria is not sitting an exam, and `tools: []` is now the *only* thing
+standing between it and the answer key — re-enable `Read` or `Bash` for a
+debugging session and the criteria are one unqualified filename away.
 
 Note that `allowedTools` would **not** have closed it: it only auto-approves and
 does not restrict. Measured — `allowedTools` naming a single MCP tool left 152
@@ -357,7 +360,9 @@ VERIFICATION.md                 measured results, and what each measurement was 
 Two runtimes, one layout: `agents/*.yaml` is the managed-agent pair (Anthropic's
 platform runs it directly from the YAML); `src/` plus `package.json` is the
 local examinee, a standalone Node package you `npm install` and `npm start` in
-this same directory — no nested subfolder, no separate lockfile boundary.
+this same directory — no nested subfolder. It keeps its **own lockfile** and is
+deliberately **not** a member of the root npm workspace, like every other
+example: install and run it from this directory, not from the repo root.
 
 ## Notes
 
