@@ -13,8 +13,8 @@
 // It PARSES rather than greps. A grep for the string "import.meta.main" also
 // matches it inside a comment or a string literal (this file's own header
 // above, scripts/capture-mcp-tools-list.test.mjs's assertion about a
-// producer's SOURCE TEXT, and cli/scripts/make-unwired-fixture.mjs, which
-// WRITES the string into a fixture) — those are not code and must not red.
+// producer's SOURCE TEXT, and any generator that WRITES the string into
+// source it emits) — those are not code and must not red.
 // Conversely the real thing can be spelled in ways a naive regex misses:
 // `import.meta?.main`, split across lines, wrapped in parens, negated
 // (`!import.meta.main`), read via computed access (`import.meta["main"]`), or

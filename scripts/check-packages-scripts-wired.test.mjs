@@ -490,6 +490,49 @@ check(
   { expect: "green" }
 );
 
+// Case 35: a COMMENTED-OUT sibling import must not certify the file it names
+// as a live library module. Commenting a line out is how a thing stops
+// happening, and the corpus scan already strips whole-line comments for
+// exactly this reason; the sibling-import derivation gets the same treatment,
+// or a dead file stays exempt on the strength of a dead import line.
+check(
+  "a commented-out sibling import does not exempt the file it names",
+  {
+    "packages/dummy/package.json": pkgJson("@pome-sh/dummy", {}),
+    "cli/package.json": pkgJson("@pome-sh/cli", { "gate:foo": "tsx scripts/foo.ts" }),
+    ".github/workflows/ci.yml": "run: npm run gate:foo -w @pome-sh/cli\n",
+    "cli/scripts/foo.ts": '// import { helper } from "./lib.js";\nconsole.log("ok");\n',
+    "cli/scripts/lib.ts": "export function helper() {}\n",
+  },
+  { expect: "red", contains: "cli/scripts/lib.ts" }
+);
+
+// Case 36: the cli/ FLOOR. A root manifest that declares `cli` a workspace
+// member while the cli/ half of the denominator is empty is a hard failure,
+// not a green pass — the same reasoning as findCheckScripts's throw on a
+// missing packages/ dir. Renaming cli/ or cli/scripts/ must red, never
+// silently drop eight entries out of coverage.
+check(
+  "cli declared a workspace but contributing zero entries is a hard failure",
+  {
+    "package.json": JSON.stringify({ name: "root", workspaces: ["packages/*", "cli"] }),
+    "packages/alpha/package.json": pkgJson("@pome-sh/alpha", {}),
+  },
+  { expect: "red", contains: "denominator is EMPTY" }
+);
+
+// Case 37: the floor is DERIVED from the root manifest, so a repo whose
+// workspaces do not name `cli` is not held to it (this is what keeps cases
+// 1-24, which write no root package.json at all, green).
+check(
+  "a root manifest that does not declare cli is not held to the cli floor",
+  {
+    "package.json": JSON.stringify({ name: "root", workspaces: ["packages/*"] }),
+    "packages/alpha/package.json": pkgJson("@pome-sh/alpha", {}),
+  },
+  { expect: "green" }
+);
+
 if (failures > 0) {
   console.error(`\n${failures} case(s) failed.`);
   process.exit(1);

@@ -58,9 +58,10 @@
 // second mechanism, no exemption list, just a second package.json to read.
 //
 // `cli/` also has raw executable files under `cli/scripts/*` that are not
-// declared as ANY npm script — `cli/scripts/make-unwired-fixture.mjs` is
-// exactly that: broken on `main` (a stale exact-text replacement throws
-// before doing anything), reached by nothing, and invisible to a denominator
+// declared as ANY npm script. The motivating instance was
+// `cli/scripts/make-unwired-fixture.mjs` (deleted by F-1476, so do not go
+// looking for it): broken on `main` — a stale exact-text replacement threw
+// before it did anything — reached by nothing, and invisible to a denominator
 // built only from npm SCRIPT NAMES. So `cli/`'s denominator is the union of
 // (a) `cli/package.json`'s own non-lifecycle scripts, audited exactly like
 // `packages/*`, and (b) every file under `cli/scripts/**` that is neither the
@@ -73,6 +74,22 @@
 // anything left is wired via its own `pome:unwired-ok(<relpath>): <reason>`
 // marker or it fails, the same marker mechanism as everywhere else in this
 // file, keyed by the file's path instead of a script name.
+//
+// ONE CALLING CONVENTION, AND IT IS A FALSE RED, NOT A BLIND SPOT. `isWired`
+// recognises `npm run <name> ... -w <pkg>` and nothing else. A workflow that
+// invokes a declared script's FILE directly — `run: npx tsx
+// scripts/overhead-gate.ts` — is a real, running check that this gate reds
+// anyway, by name, saying "no workflow reaches it". Verified by hand against
+// that exact shape. Three of `agent-trace-overhead-gate.yml`'s steps were
+// written that way and F-1476 converted all three to `npm run <name> -w
+// @pome-sh/cli` rather than teach the gate a second wiring shape, because one
+// detection mechanism is the whole reason the marker path can be trusted.
+// The cost is real and is accepted deliberately: the NEXT person who adds a
+// direct `tsx <path>` step gets a red whose diagnosis names the fix (declare
+// it as a script and call it the standard way), so the failure is loud and
+// self-correcting rather than silent. If that ever stops being the right
+// trade, the fix is to also scan the corpus for the script's resolved file
+// path — not to add an exemption list.
 
 import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
@@ -98,9 +115,10 @@ const ROOT = process.cwd();
  * exact name `dev` or `typecheck` would be skipped. It is a far smaller and
  * far less load-bearing list than the check-name PREFIX vocabulary it replaced
  * — nine exact names that already exist in every package, versus an open set of
- * every prefix someone might invent for a new check — but it is not zero, and
- * `packages/*` is the denominator, so `cli/`'s own `gate:*` scripts are out of
- * this gate's reach entirely (follow-up).
+ * every prefix someone might invent for a new check — but it is not zero. The
+ * set is shared by `packages/*` and `cli/` (F-1476 widened the denominator to
+ * both), so adding `pome` for `cli/`'s sake also exempts that exact name in a
+ * `packages/*` member; same accepted residual, one more name.
  */
 const LIFECYCLE_SCRIPTS = new Set([
   "build",
@@ -218,6 +236,25 @@ export function findCliPackageScripts(root) {
 
 function escapeRe(text) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Does the ROOT manifest declare `cli` a workspace member? This is what makes
+ * the cli/ floor in `run()` derived rather than hardcoded: the same source npm
+ * itself reads decides whether cli/ is expected to contribute entries, so a
+ * `packages/*`-only repo (and this suite's own cases 1-24, which write no root
+ * package.json) is not held to a floor it has no subject for.
+ */
+function declaresCliWorkspace(root) {
+  const rootPkgJson = join(root, "package.json");
+  if (!existsSync(rootPkgJson)) return false;
+  try {
+    const pkg = JSON.parse(readFileSync(rootPkgJson, "utf8"));
+    const workspaces = Array.isArray(pkg.workspaces) ? pkg.workspaces : (pkg.workspaces?.packages ?? []);
+    return workspaces.some((glob) => glob === "cli" || glob === "cli/" || glob === "./cli");
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -408,7 +445,7 @@ function resolveRelativeImport(fromFile, specifier) {
  * file of a declared `cli/package.json` script (any of them, including
  * LIFECYCLE ones — `prepublishOnly` reaching `assert-publishable.mjs` counts
  * as reached) nor imported by a sibling file in the same tree. What is left
- * is a candidate entry point exactly like `make-unwired-fixture.mjs`: no
+ * is a candidate entry point exactly like the deleted `make-unwired-fixture.mjs`: no
  * script name names it, so it cannot be "wired" the way a package.json
  * script can — it can only carry its own exemption marker or fail.
  */
@@ -433,7 +470,14 @@ export function findCliOrphanFileEntries(root) {
 
   const importedBySibling = new Set();
   for (const file of files) {
-    const text = readFileSync(file, "utf8");
+    // Same `stripCommentLines` the corpus gets, and for the same reason:
+    // commenting a line out is how a thing stops happening, and a plain text
+    // scan otherwise counts the dead line as proof it still does. Here the
+    // consequence is a file-level exemption — a commented-out
+    // `// import { x } from "./dead.js";` would certify `dead.js` as a live
+    // library module covered by its importer, which is exactly the
+    // no-verdict-reads-as-a-pass shape this gate exists to catch.
+    const text = stripCommentLines(readFileSync(file, "utf8"));
     RELATIVE_IMPORT_RE.lastIndex = 0;
     let match;
     while ((match = RELATIVE_IMPORT_RE.exec(text)) !== null) {
@@ -466,7 +510,26 @@ export function run(root) {
   // shape) applies to cli/'s `emit:manifest-schema`/`check:manifest-schema`
   // pair with no new code — it is the identical shape three packages/* pairs
   // already use.
-  const entries = [...findCheckScripts(root), ...findCliPackageScripts(root)];
+  const cliPackageScripts = findCliPackageScripts(root);
+  const fileEntries = findCliOrphanFileEntries(root);
+  // A FLOOR for the cli/ half, derived from the root manifest rather than
+  // assumed. `findCheckScripts` hard-throws on a missing `packages/` because a
+  // zero-entry scan exits 0 having asserted nothing; the cli/ half had no
+  // equivalent, so renaming `cli/` or `cli/scripts/` would have dropped eight
+  // entries and stayed green — coverage silently shrinking, which is the shape
+  // this milestone exists to kill and which `lint:import-meta-main` already
+  // makes a hard failure PER ROOT. Derived, not listed: if the root
+  // `workspaces` array names `cli`, the cli/ denominator must be non-empty. A
+  // repo whose workspaces do not name `cli` legitimately contributes nothing.
+  if (cliPackageScripts.length + fileEntries.length === 0 && declaresCliWorkspace(root)) {
+    throw new Error(
+      `root package.json declares "cli" a workspace member, but the cli/ half of this gate's ` +
+        `denominator is EMPTY — no non-lifecycle cli/package.json script and no cli/scripts/** ` +
+        `entry point. Either cli/ moved (update this gate) or its scripts vanished; a zero-entry ` +
+        `scan would exit 0 having asserted nothing about cli/.`,
+    );
+  }
+  const entries = [...findCheckScripts(root), ...cliPackageScripts];
   const corpus = readCorpus(root);
 
   // A write mode whose WIRED sibling runs the same command PLUS more is
@@ -525,9 +588,8 @@ export function run(root) {
   }
 
   // F-1476 — cli/scripts/** files nothing declares as a script at all
-  // (make-unwired-fixture.mjs's shape). No script name exists for these, so
+  // (the deleted make-unwired-fixture.mjs's shape). No script name exists for these, so
   // the only way to clear one is the marker, read straight from the file.
-  const fileEntries = findCliOrphanFileEntries(root);
   for (const entry of fileEntries) {
     const reason = readMarkerFromFile(entry.filePath, entry.scriptName);
     if (reason) {
