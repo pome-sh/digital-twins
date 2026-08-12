@@ -1867,7 +1867,7 @@
           "name": "profile",
           "location": "body",
           "required": false,
-          "type": "string"
+          "type": "object|string"
         },
         {
           "name": "token",

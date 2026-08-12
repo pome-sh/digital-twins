@@ -163,6 +163,29 @@ const zeroIfAbsent = (): z.ZodType<number> => integerInput().default(0);
 /** A value the handler forwards without inspecting (canvas document bodies). */
 const opaque = (): z.ZodType<unknown> => z.unknown().optional();
 
+/**
+ * `users.profile.set`'s `profile`, which real Slack takes in TWO shapes (F-1462).
+ *
+ * Slack documents the JSON-STRING form, which is what form encoding forces, and
+ * it also accepts a bare OBJECT when the request body is `application/json`.
+ * That second half is documented nowhere and this twin refused it until F-1462
+ * called `users.profile.set` on the sandbox workspace and measured all three
+ * combinations — form+string, json+string and json+object all answered `ok:true`,
+ * and the object's fields were APPLIED, not merely tolerated. An examinee that
+ * sent the natural JSON shape used to fail here and pass in production.
+ *
+ * ⚠️ IT IS A UNION, NOT A SWAP. Both forms are real; swapping which one is
+ * accepted would move the divergence rather than close it. And it is NOT
+ * `z.unknown()` — the accepted set widened by exactly one shape, so
+ * `profile: 12345` is still refused, which is what keeps the declaration a
+ * statement about Slack rather than a hole.
+ */
+const jsonStringOrObject = (): z.ZodType<string | Record<string, unknown> | undefined> =>
+  z
+    .union([z.string(), z.record(z.string(), z.unknown())])
+    .optional()
+    .transform((value) => (value ? value : undefined));
+
 // ─── Reads: mounted on GET and POST ──────────────────────────────────────────
 
 export const SLACK_READS = {
@@ -359,7 +382,7 @@ export const SLACK_WRITES = {
 
   usersProfileSet: slackWrite("/users.profile.set", {
     user: absentIfEmpty(),
-    profile: absentIfEmpty(),
+    profile: jsonStringOrObject(),
     name: absentIfEmpty(),
     value: absentIfEmpty(),
   }),

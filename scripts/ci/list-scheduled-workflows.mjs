@@ -58,7 +58,25 @@ export function findScheduledWorkflows(root) {
           scheduled.push(file);
           break;
         }
-        inOnBlock = start[1].trim() === "";
+        const inline = start[1].trim();
+        // A flow mapping that SPANS lines (`on: {` then `schedule: …` below)
+        // is read by neither this walk nor findCronWorkflows, so a cron hidden
+        // inside one is invisible to both — which means the set-equality
+        // cross-check has nothing to disagree about and the alarm-coverage
+        // check reports a clean pass on an unalarmed cron. actionlint accepts
+        // the shape as valid, so nothing else would catch it either. Refuse
+        // loudly instead of parsing it wrong: an unsupported shape must never
+        // be indistinguishable from an absent trigger.
+        const opens = (inline.match(/[{[]/g) ?? []).length;
+        const closes = (inline.match(/[}\]]/g) ?? []).length;
+        if (opens !== closes) {
+          throw new Error(
+            `${file}: an \`on:\` flow mapping that spans more than one line is not parsed by ` +
+              "this derivation, so a `schedule:` trigger inside it would be invisible to it and " +
+              "to the alarm-coverage check (F-1471) alike. Rewrite it in block form.",
+          );
+        }
+        inOnBlock = inline === "";
         continue;
       }
       if (!inOnBlock || line.trim() === "") continue;
@@ -94,7 +112,14 @@ export function findScheduledWorkflows(root) {
 export function findCronWorkflows(root) {
   const cron = [];
   for (const [file, lines] of workflowLines(root)) {
-    if (lines.some((line) => /^\s*-?\s*cron:\s*\S/.test(line))) cron.push(file);
+    // `cron:` also appears inside a flow sequence — `schedule: [{cron: "…"}]`,
+    // the very shape findScheduledWorkflows() was taught to read in #384. An
+    // anchored `^\s*-?\s*cron:` missed it, so two of the three shapes that
+    // review fixed would fail this file's OWN set-equality cross-check: a
+    // correctly-alarmed workflow red the derivation. A guard that reds on right
+    // answers is a guard someone deletes. The delimiter class stays narrow (no
+    // quotes) so `"cron: …"` inside a shell string still does not count.
+    if (lines.some((line) => /(?:^|[\s,[{-])cron\s*:\s*\S/.test(line))) cron.push(file);
   }
   return cron.sort();
 }
@@ -120,8 +145,43 @@ export function findBrokenLocalUses(root) {
   return broken.sort();
 }
 
-/** Every workflow file as `[name, comment-stripped lines]`. */
-function workflowLines(root) {
+/**
+ * Strip a trailing YAML comment from one raw line.
+ *
+ * A blanket `raw.replace(/#.*$/, "")` is wrong in the direction that matters:
+ * YAML only starts a comment at a `#` that is at the start of the line or
+ * preceded by whitespace, and never inside a quoted scalar. A blanket strip
+ * silently TRUNCATES values — `label: "schedule-alarm:x#1"` and
+ * `label: "schedule-alarm:x#2"` both reduce to `"schedule-alarm:x`, so the
+ * F-1471 title/label bijection compares two mangled values, finds them equal,
+ * and reports green on exactly the typo it exists to catch. Failing to strip a
+ * real comment is the safer error, so an unterminated quote leaves the rest of
+ * the line intact rather than guessing.
+ */
+function stripComment(raw) {
+  let quote = null;
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (quote !== null) {
+      if (ch === quote) quote = null;
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+    } else if (ch === "#" && (i === 0 || /\s/.test(raw[i - 1]))) {
+      return raw.slice(0, i);
+    }
+  }
+  return raw;
+}
+
+/**
+ * Every workflow file as `[name, comment-stripped lines]`. Exported so
+ * scripts/ci/assert-schedule-alarm-coverage.mjs (F-1471) reads the exact same
+ * file list and comment-stripping rule rather than re-implementing it — two
+ * readers of ".github/workflows/*.yml with comments stripped" drifting apart
+ * is the same shape of bug this file's `cron:`/`schedule:` cross-check exists
+ * to catch.
+ */
+export function workflowLines(root) {
   const dir = join(root, ".github", WORKFLOWS_DIR);
   if (!existsSync(dir)) {
     throw new Error(`no .github/workflows directory at ${dir}`);
@@ -134,8 +194,9 @@ function workflowLines(root) {
       readFileSync(join(dir, file), "utf8")
         .split("\n")
         // Strip comments before matching: a workflow's own prose can contain
-        // the literal strings "schedule:" and "cron:" — these files do.
-        .map((raw) => raw.replace(/#.*$/, "")),
+        // the literal strings "schedule:" and "cron:" — these files do. Also
+        // tolerate CRLF checkouts, so a `\r` never lands inside a parsed value.
+        .map((raw) => stripComment(raw.replace(/\r$/, ""))),
     ]);
 }
 

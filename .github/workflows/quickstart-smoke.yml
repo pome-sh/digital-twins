@@ -134,7 +134,7 @@ jobs:
       - name: Gmail quickstart boot and token alias
         run: |
           nohup node cli/dist/src/cli/main.js twin start gmail --port 3336 > gmail-twin.log 2>&1 &
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             if curl -fsS http://127.0.0.1:3336/healthz >/dev/null 2>&1; then
               grep -q '^POME_GMAIL_REST_URL=' gmail-twin.log
               grep -q '^POME_GMAIL_MCP_URL=' gmail-twin.log
