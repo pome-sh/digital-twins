@@ -18,18 +18,23 @@
 // standalone-fetchable via `npx degit`, which copies that subtree and nothing
 // above it, so a `file:` path out of the tree breaks its `npm install`. So this
 // gate typechecks that example against the registry artifact, NOT against the
-// adapter source next to it, and nothing compares the two. It has drifted twice
-// already (#308 off 0.2.5, then 0.3.1 against a workspace 0.3.3, which also
-// dragged the retired `@pome-sh/shared-types` back into the example's install
-// graph as 0.3.1's declared runtime dep). This gap is F-1231's, unclosed:
-// `check-workspace-pins-match-workspace.mjs` cannot own it, because "resolve to
-// the workspace" is the wrong rule for a deliberately-published pin, and the
-// right rule ("re-pin once the workspace version publishes, skip while it has
-// not") needs the registry and so cannot live in that offline gate.
+// adapter source next to it — and nothing compared the two until F-1483. It had
+// drifted twice already (#308 off 0.2.5, then 0.3.1 against a workspace 0.3.3,
+// which also dragged the retired `@pome-sh/shared-types` back into the
+// example's install graph as 0.3.1's declared runtime dep) before anything
+// watched it. `check-workspace-pins-match-workspace.mjs` cannot own that watch:
+// it runs OFFLINE before `npm ci`, and "resolve to the workspace" is the wrong
+// rule for a deliberately-published pin. The right rule — re-pin once the
+// workspace version publishes, skip while it has not — needs the registry, so
+// it runs here, in `check-example-pins-published.mjs`'s
+// `reportExamplePinParity()`, right where every example is already `npm ci`'d
+// against that same registry.
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { reportExamplePinParity } from "./check-example-pins-published.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const examplesDir = join(repoRoot, "examples");
@@ -82,6 +87,26 @@ for (const name of examples) {
 
 if (failures.length > 0) {
   console.error(`\nExamples failing typecheck: ${failures.join(", ")}`);
-  process.exit(1);
+} else {
+  console.log(`\nAll ${examples.length} examples typechecked clean.`);
 }
-console.log(`\nAll ${examples.length} examples typechecked clean.`);
+
+// F-1483 — confirm each bundled example's exact `@pome-sh/*` pin still equals
+// the sibling workspace version wherever that version is published.
+//
+// Deliberately NOT behind the typecheck exit above. It used to be, and that
+// made an unrelated tsc error in ANY example (say `examples/merge-agent`) hide a
+// real published-pin drift until someone fixed the typecheck and CI came round
+// again — a check that silently stops running behind another check's failure is
+// this milestone's whole subject. It reads manifests and calls the registry, so
+// it needs none of the installs above to have succeeded.
+console.log("\n=== examples/* pin↔registry parity ===");
+const parityOk = reportExamplePinParity(repoRoot);
+if (!parityOk) {
+  console.error(
+    "\nA pin drifted from a workspace version that is already published, a pin has no single version " +
+      "to watch at all, or the registry could not be read for a reason other than 'unpublished'. See above.",
+  );
+}
+
+if (failures.length > 0 || !parityOk) process.exit(1);

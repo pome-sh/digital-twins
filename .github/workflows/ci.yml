@@ -262,6 +262,13 @@ jobs:
       # Dependency-free, so it runs here before `npm ci`.
       - run: node scripts/check-workspace-pins-match-workspace.mjs
       - run: node scripts/check-workspace-pins-match-workspace.test.mjs
+      # F-1483 — the sibling of the gate above for `examples/*`'s deliberately
+      # published pins. The regression suite is pure functions with an
+      # injected registry answer (no network, no npm ci), so it runs here
+      # alongside its offline sibling; the live registry check itself runs in
+      # `typecheck-examples.mjs` in the heavy job below, where every example
+      # is already `npm ci`'d against the real registry.
+      - run: node scripts/check-example-pins-published.test.mjs
       - run: bash scripts/lint-no-cloud-imports.sh
       - run: bash scripts/lint-no-cloud-imports.test.sh
       - run: node scripts/ci/wait-for-workflow.test.mjs
