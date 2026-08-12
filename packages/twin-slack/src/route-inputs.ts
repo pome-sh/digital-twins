@@ -186,6 +186,40 @@ const jsonStringOrObject = (): z.ZodType<string | Record<string, unknown> | unde
     .optional()
     .transform((value) => (value ? value : undefined));
 
+/**
+ * `blocks` / `attachments` on the three chat writes, which real Slack takes in
+ * TWO shapes (F-1487) — the same question F-1462 asked of `profile`, asked
+ * again rather than inherited.
+ *
+ * Slack documents the JSON-STRING form, which is what form encoding forces, and
+ * it also accepts a native ARRAY when the body is `application/json`. That
+ * second half is documented nowhere and this twin refused it on all five
+ * declarations until F-1487 called every one of them on the sandbox workspace
+ * (2026-08-12) and measured all three combinations per field — form+string,
+ * json+string and json+array all answered `ok:true`, and each array's contents
+ * came back inside `message.blocks` / `message.attachments`, so they were
+ * APPLIED and not merely tolerated. An examinee that sent the natural JSON
+ * shape — which is what an SDK produces — used to fail here and pass in
+ * production.
+ *
+ * ⚠️ NOTHING HERE IS GENERALISED FROM F-1462. `profile` is an object on a
+ * profile method; these are arrays on three messaging methods with different
+ * validators behind them, and assuming they agree is the exact error F-1462 was
+ * opened to prevent. They were called separately and they happen to agree.
+ *
+ * ⚠️ IT IS A UNION, NOT A SWAP, and the element type is not `z.unknown()`. The
+ * string form is what the capture leg and every form-encoded SDK send, so
+ * accepting only the array would move the divergence rather than close it. And
+ * the accepted set widens by exactly ONE shape — an array of OBJECTS — so
+ * `blocks: 12345` and `blocks: [1,2,3]` are still refused, which is what keeps
+ * the declaration a statement about Slack rather than a hole.
+ */
+const jsonStringOrArray = (): z.ZodType<string | Record<string, unknown>[] | undefined> =>
+  z
+    .union([z.string(), z.array(z.record(z.string(), z.unknown()))])
+    .optional()
+    .transform((value) => (value ? value : undefined));
+
 // ─── Reads: mounted on GET and POST ──────────────────────────────────────────
 
 export const SLACK_READS = {
@@ -332,8 +366,8 @@ export const SLACK_WRITES = {
   chatPostMessage: slackWrite("/chat.postMessage", {
     channel: emptyIfAbsent(),
     text: absentIfEmpty(),
-    blocks: absentIfEmpty(),
-    attachments: absentIfEmpty(),
+    blocks: jsonStringOrArray(),
+    attachments: jsonStringOrArray(),
     thread_ts: absentIfEmpty(),
     reply_broadcast: falseIfAbsent(),
     icon_emoji: absentIfEmpty(),
@@ -346,8 +380,8 @@ export const SLACK_WRITES = {
     channel: emptyIfAbsent(),
     ts: emptyIfAbsent(),
     text: absentIfEmpty(),
-    blocks: absentIfEmpty(),
-    attachments: absentIfEmpty(),
+    blocks: jsonStringOrArray(),
+    attachments: jsonStringOrArray(),
   }),
 
   chatDelete: slackWrite("/chat.delete", {
@@ -360,7 +394,7 @@ export const SLACK_WRITES = {
     text: emptyIfAbsent(),
     post_at: zeroIfAbsent(),
     thread_ts: absentIfEmpty(),
-    blocks: absentIfEmpty(),
+    blocks: jsonStringOrArray(),
   }),
 
   chatDeleteScheduledMessage: slackWrite("/chat.deleteScheduledMessage", {

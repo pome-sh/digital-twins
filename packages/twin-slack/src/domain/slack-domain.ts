@@ -349,8 +349,8 @@ export class SlackDomain {
     args: {
       channel: string;
       text?: string;
-      blocks?: string;
-      attachments?: string;
+      blocks?: string | Record<string, unknown>[];
+      attachments?: string | Record<string, unknown>[];
       thread_ts?: string;
       reply_broadcast?: boolean;
       icon_emoji?: string;
@@ -370,7 +370,13 @@ export class SlackDomain {
   }
 
   chatUpdate(
-    args: { channel: string; ts: string; text?: string; blocks?: string; attachments?: string },
+    args: {
+      channel: string;
+      ts: string;
+      text?: string;
+      blocks?: string | Record<string, unknown>[];
+      attachments?: string | Record<string, unknown>[];
+    },
     actor: Actor,
     onDelta: DeltaHook = NOOP
   ): Record<string, unknown> {
@@ -382,7 +388,13 @@ export class SlackDomain {
   }
 
   chatScheduleMessage(
-    args: { channel: string; text: string; post_at: number; thread_ts?: string; blocks?: string },
+    args: {
+      channel: string;
+      text: string;
+      post_at: number;
+      thread_ts?: string;
+      blocks?: string | Record<string, unknown>[];
+    },
     actor: Actor,
     onDelta: DeltaHook = NOOP
   ): Record<string, unknown> {

@@ -29,7 +29,7 @@ import type {
 import { cursorDecode, cursorEncode, nowIso, nowUnix, padTsCounter, tsBaseSeconds } from "../util.js";
 import type { Actor, DeltaHook, SlackDomain } from "./slack-domain.js";
 import { NOOP } from "./slack-domain.js";
-import { sanitizeJsonString } from "./helpers.js";
+import { jsonStringOrArrayField } from "./helpers.js";
 
 // ───────────────────────────────────────────────────────────────────────────
 // Chat
@@ -39,8 +39,8 @@ export function chatPostMessage(domain: SlackDomain,
   args: {
     channel: string;
     text?: string;
-    blocks?: string;
-    attachments?: string;
+    blocks?: string | Record<string, unknown>[];
+    attachments?: string | Record<string, unknown>[];
     thread_ts?: string;
     reply_broadcast?: boolean;
     icon_emoji?: string;
@@ -73,8 +73,8 @@ export function chatPostMessage(domain: SlackDomain,
     if (!member) slackError("not_in_channel", 400);
   }
   const ts = domain.allocMessageTs(channel.id);
-  const blocks = args.blocks ? sanitizeJsonString(args.blocks, "[]") : "[]";
-  const attachments = args.attachments ? sanitizeJsonString(args.attachments, "[]") : "[]";
+  const blocks = args.blocks ? jsonStringOrArrayField(args.blocks, "[]") : "[]";
+  const attachments = args.attachments ? jsonStringOrArrayField(args.attachments, "[]") : "[]";
   const subtype = author.is_bot ? "bot_message" : null;
   // For bot authors: bot_id = the bot user's id; app_id = synthetic A_POME so
   // SDK consumers see a non-null app_id consistent with real Slack.
@@ -126,7 +126,13 @@ export function chatPostMessage(domain: SlackDomain,
 
 
 export function chatUpdate(domain: SlackDomain, 
-  args: { channel: string; ts: string; text?: string; blocks?: string; attachments?: string },
+  args: {
+    channel: string;
+    ts: string;
+    text?: string;
+    blocks?: string | Record<string, unknown>[];
+    attachments?: string | Record<string, unknown>[];
+  },
   actor: Actor,
   onDelta: DeltaHook = NOOP
 ): Record<string, unknown> {
@@ -144,9 +150,9 @@ export function chatUpdate(domain: SlackDomain,
   const out = domain.db.transaction(() => {
     const updatedTs = domain.allocMessageTs(channel.id);
     const newText = args.text ?? before!.text;
-    const newBlocks = args.blocks ? sanitizeJsonString(args.blocks, before!.blocks_json) : before!.blocks_json;
+    const newBlocks = args.blocks ? jsonStringOrArrayField(args.blocks, before!.blocks_json) : before!.blocks_json;
     const newAttachments = args.attachments
-      ? sanitizeJsonString(args.attachments, before!.attachments_json)
+      ? jsonStringOrArrayField(args.attachments, before!.attachments_json)
       : before!.attachments_json;
     domain.db
       .prepare(
@@ -195,7 +201,13 @@ export function chatDelete(domain: SlackDomain, args: { channel: string; ts: str
 
 
 export function chatScheduleMessage(domain: SlackDomain, 
-  args: { channel: string; text: string; post_at: number; thread_ts?: string; blocks?: string },
+  args: {
+    channel: string;
+    text: string;
+    post_at: number;
+    thread_ts?: string;
+    blocks?: string | Record<string, unknown>[];
+  },
   actor: Actor,
   onDelta: DeltaHook = NOOP
 ): Record<string, unknown> {
@@ -212,7 +224,7 @@ export function chatScheduleMessage(domain: SlackDomain,
         `INSERT INTO scheduled_messages (id, channel_id, user_id, text, thread_ts, post_at, date_created, blocks_json)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
       )
-      .run(id, channel.id, acting.id, args.text, args.thread_ts ?? null, args.post_at, now, args.blocks ? sanitizeJsonString(args.blocks, "[]") : "[]");
+      .run(id, channel.id, acting.id, args.text, args.thread_ts ?? null, args.post_at, now, args.blocks ? jsonStringOrArrayField(args.blocks, "[]") : "[]");
     const row = domain.requireScheduledMessage(id);
     onDelta({ before: null, after: row });
     return {
