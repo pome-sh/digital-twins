@@ -1,3 +1,5 @@
+// pome:unwired-ok(seed): dev utility that seeds a local DB for manual poking. Asserts nothing, and the seeded state CI relies on comes from src/seed.ts, which the suites drive directly.
+
 import { openGitHubCloneDatabase } from "../src/db.js";
 import { GitHubDomain } from "../src/domain/index.js";
 import { defaultSeedState } from "../src/seed.js";

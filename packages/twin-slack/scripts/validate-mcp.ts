@@ -12,11 +12,12 @@
 //   3. Calls the same tools via the legacy `/mcp/call` REST shim and diffs
 //      the recorder events to prove field-shape parity.
 //
-// Writes the entire validation output to `scripts/validate-mcp.output.txt`.
+// Prints the entire validation output to stdout (captured by CI); it used to
+// also write a committed `scripts/validate-mcp.output.txt` snapshot, which
+// could never reproduce byte-for-byte — it embeds the ephemeral port this run
+// bound to — so a CI job that wrote it would rewrite a tracked file mid-job
+// (F-1472, same fix as twin-github's F-1354).
 
-import { writeFileSync } from "node:fs";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
 import { sign } from "hono/jwt";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -29,16 +30,13 @@ import { defaultSeedState } from "../src/seed.js";
 import { slackToolFixture } from "../src/tools.js";
 import type { RecorderEvent } from "@pome-sh/wire";
 
-const OUTPUT_PATH = join(dirname(fileURLToPath(import.meta.url)), "validate-mcp.output.txt");
 const SID = "validate-mcp-session";
 const SECRET = "validate-mcp-secret-32-chars-long-enough";
 
 process.env.TWIN_AUTH_SECRET = SECRET;
 process.env.SLACK_DETERMINISTIC_TS = "1";
 
-const log: string[] = [];
 function record(line: string) {
-  log.push(line);
   console.log(line);
 }
 
@@ -127,10 +125,6 @@ async function main() {
 
   await client.close();
   server.close();
-
-  writeFileSync(OUTPUT_PATH, log.join("\n") + "\n");
-  record("");
-  record(`Output written to ${OUTPUT_PATH}`);
 }
 
 main().catch((err) => {

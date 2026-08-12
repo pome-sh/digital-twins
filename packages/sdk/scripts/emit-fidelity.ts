@@ -1,3 +1,5 @@
+// pome:unwired-ok(emit-fidelity): write-only generator (writes FIDELITY.md). No --check mode exists, so there is no verdict to run; the tables it writes are compared to the inventory by lintFidelityInventory under `npm test`.
+
 // SPDX-License-Identifier: Apache-2.0
 //
 // CLI for `npm run emit-fidelity -w @pome-sh/sdk -- --twin <package>`.

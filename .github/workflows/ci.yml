@@ -48,6 +48,18 @@ jobs:
       - run: node scripts/check-copy-markers.mjs
       - run: node scripts/lint-code-health.mjs
       - run: node scripts/check-first-party-twin-registration.mjs
+      # F-1472 — closes the class F-1354 found one instance of: a `packages/*`
+      # script that produces no verdict because nothing reaches it, and no
+      # verdict reads exactly like a pass. The partition is total: every
+      # `packages/*` script is a uniform lifecycle name, or wired as
+      # `npm run <script> ... -w <package>`, or carries a
+      # `pome:unwired-ok(<script>): <reason>` marker in the file it invokes.
+      # (It began as an allowlist of check-name PREFIXES, which could not see
+      # `smoke`, `review:harness` or `verify:cloud-token` — three real checks
+      # that had also never run.) Reads package.json scripts and
+      # workflow/root-script text only, so it runs here before `npm ci`.
+      - run: node scripts/check-packages-scripts-wired.mjs
+      - run: node scripts/check-packages-scripts-wired.test.mjs
       # release.yml only publishes on a version diff against npm — a PR that
       # changes a published package's source without bumping its version
       # merges clean and silently never reaches npm. Only meaningful against
@@ -292,15 +304,18 @@ jobs:
           # at. No model, no key, no socket.
           npm run probe:twins
           node scripts/probe-twin-endpoints.test.mjs
-          # twin-github runs with coverage thresholds (90% lines/funcs/statements)
-          # instead of a second plain `npm test` pass for that workspace.
-          npm test -w @pome-sh/wire -w @pome-sh/sdk -w @pome-sh/adapter-claude-sdk -w @pome-sh/twin-slack -w @pome-sh/twin-stripe -w @pome-sh/twin-gmail -w @pome-sh/twin-linear -w @pome-sh/checks
+          # twin-github and twin-slack each run with their own coverage
+          # thresholds instead of a second plain `npm test` pass for those
+          # workspaces (F-1472 — twin-slack's `test:coverage` declared vitest
+          # coverage thresholds that nothing ever ran to enforce).
+          npm test -w @pome-sh/wire -w @pome-sh/sdk -w @pome-sh/adapter-claude-sdk -w @pome-sh/twin-stripe -w @pome-sh/twin-gmail -w @pome-sh/twin-linear -w @pome-sh/checks
           # F-1308 — the tarball half of the @pome-sh/checks audit: the engine is
           # not inlined, zod stayed external (one schema identity), the DSL exists
           # exactly once across seven entries, and every `exports` subpath ships.
           # Needs the build above, which is why it is here and not in the cheap block.
           npm run gate:checks-tarball
           npm run test:coverage -w @pome-sh/twin-github
+          npm run test:coverage -w @pome-sh/twin-slack
           # Former cli-ci.yml (folded in here — one required check, one npm ci).
           npm test -w @pome-sh/cli
           # Every internal @pome-sh/* package is INLINED into the published CLI
@@ -315,6 +330,44 @@ jobs:
           npm run test:contract
           # F-730 — fidelity:parity across first-party twins.
           npm run fidelity:parity -w @pome-sh/twin-github -w @pome-sh/twin-slack -w @pome-sh/twin-stripe -w @pome-sh/twin-gmail -w @pome-sh/twin-linear
+          # F-1472 — each twin's own `smoke` script (own dist/src/server for
+          # twin-stripe, in-process for github/slack) was declared and invoked
+          # by nothing; twin-github's had a hardcoded tool count stale since
+          # F-1376 (65, moved to 36), and twin-slack's had three assertions
+          # stale since F-1330 (tool count, a discarded HTTP status, and a
+          # dropped `additionalProperties:false`) that this line would have
+          # caught the day either landed.
+          npm run smoke -w @pome-sh/twin-github
+          npm run smoke -w @pome-sh/twin-slack
+          npm run smoke -w @pome-sh/twin-stripe
+          # F-1354 — real-SDK wire-protocol validation for twin-slack's MCP
+          # endpoint, the same shape twin-github's validate:mcp is above. Its
+          # committed output artifact could never reproduce byte-for-byte (it
+          # embedded the ephemeral port each run bound to), so this script no
+          # longer writes one — same fix as F-1354, deleting rather than
+          # regenerating, because nothing read it.
+          npm run validate:mcp -w @pome-sh/twin-slack
+          # F-1472 — the xoxb-pome-<sid>-<sig> token shape pome-cloud's control
+          # plane signs, checked end-to-end against the twin's own auth
+          # middleware. Declared, invoked by nothing, until now.
+          npm run verify:cloud-token -w @pome-sh/twin-slack
+          # F-1472 — twin-github's behavior harness (PR flow, negative
+          # fidelity, concurrency race). Used to assume a human had already
+          # run `npm run dev` in another terminal; now self-boots on an
+          # ephemeral port when REVIEW_TARGET=local and no explicit
+          # GITHUB_MCP_URL is set, so it is CI-runnable with no live GitHub
+          # and no model. Its own token was also missing the `login` claim
+          # mergePullRequest's permission check reads, which 403'd every run.
+          #
+          # What this line covers, precisely: the LEGACY REST shim, not
+          # JSON-RPC MCP. `isJsonRpcMcp()` (review-harness.ts) is false for any
+          # 127.0.0.1/localhost host, and the self-boot always yields one, so
+          # every tool call goes to `POST /s/:sid/mcp/call` and the client's
+          # `close()` early-returns with no session teardown. Driving the
+          # JSON-RPC transport is `packages/twin-github/test/mcp-*.test.ts` and
+          # twin-slack's `validate:mcp` below. Real gain either way — every
+          # prior run of this harness 403'd before reaching any transport.
+          REVIEW_TARGET=local npm run review:harness -w @pome-sh/twin-github
       # F-709 — the frozen M1 runtime-contract assertions, asserted against
       # twins started via the CLI front door (`pome twin start <twin>`).
       # Separate step so a failure here is not buried in the block above. The

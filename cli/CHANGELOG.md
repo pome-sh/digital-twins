@@ -4,6 +4,20 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.18
+
+### Patch Changes
+
+- **No CLI change.** Version-only bump, for the same reason 0.21.7 was: F-1472
+  audited every `packages/*` npm script that constitutes a check, which touched
+  `packages/twin-github/package.json` — publish-relevant for the CLI under the
+  gate's plain `packages/twin-` prefix match. Here it genuinely is not: tsup
+  only inlines twin `src/`, and an npm `scripts` entry ships in no tarball.
+  Bumped anyway rather than adding an exception list to the gate, per 0.21.7.
+  This was 0.23.17 until F-1468 (#378) took that version first; rebasing onto it
+  left both sides declaring 0.23.17, which the version-bump gate reads as
+  unbumped.
+
 ## 0.23.16
 
 ### Patch Changes

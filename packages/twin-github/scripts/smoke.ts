@@ -21,7 +21,13 @@ try {
   if (!health.ok) throw new Error(`healthz failed: ${health.status}`);
 
   const tools = await fetch(`${sessionBase}/mcp/tools`, { headers: authHeader }).then((response) => response.json()) as { tools: unknown[] };
-  if (tools.tools.length !== 65) throw new Error(`expected 65 tools, got ${tools.tools.length}`);
+  // No COUNT is asserted, deliberately — see twin-slack/scripts/smoke.ts for
+  // the reasoning. `deriveMcpToolTable` throws on any fixture/implementation
+  // asymmetry at module load, so comparing the served length to the fixture's
+  // cannot fail; the hardcoded `65` was a real bug and a derived literal is an
+  // assertion that asserts nothing. `gate:mcp-fixture` and
+  // `test/mcp-tool-fixture.test.ts` are what check the count, both wired.
+  if (tools.tools.length === 0) throw new Error("GET /mcp/tools listed no tools");
 
   const issue = await fetch(`${sessionBase}/repos/acme/api/issues`, {
     method: "POST",

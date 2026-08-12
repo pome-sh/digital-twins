@@ -42,13 +42,25 @@ function assert(condition: unknown, message: string) {
   }
 }
 
+// No tool COUNT is asserted here, deliberately. `deriveMcpToolTable` joins the
+// fixture to the implementations 1:1 and throws both ways at module load, and
+// healthz / `/mcp/tools` / `tools/list` all report that one derived table — so
+// `served.length === slackToolFixture.tools.length` cannot fail; the twin would
+// not construct. The hardcoded `11` this file carried until F-1472 was a real
+// bug, but replacing it with a derived literal replaced it with an assertion
+// that asserts nothing, which is this milestone's own subject in a passing
+// costume. The count IS checked, by `gate:mcp-fixture` and
+// `test/mcp-tool-fixture.test.ts`, both wired. What is worth asserting over the
+// wire is that each transport answered with a NON-EMPTY list at all — an error
+// body would otherwise satisfy the `every()` below vacuously.
+
 // 1. Root healthz (no auth).
 {
   const res = await app.request("/healthz");
   const body = (await res.json()) as Record<string, unknown>;
   assert(res.status === 200, "GET /healthz returns 200");
   assert(body.twin === "slack", "healthz reports twin=slack");
-  assert(body.tools === 11, "healthz reports 11 tools");
+  assert(typeof body.tools === "number" && body.tools > 0, `healthz reports a non-zero tool count (got ${body.tools})`);
 }
 
 // 2. auth.test
@@ -103,10 +115,14 @@ let postedTs = "";
   assert((body as { ok: boolean }).ok === true, "reactions.add ok=true");
 }
 
-// 7. conversations.replies on a non-existent ts → thread_not_found
+// 7. conversations.replies on a non-existent ts → thread_not_found. Slack's
+// Web API answers every error 200 with ok:false (routes.ts's slackErrorEnvelope
+// discards TwinError's own internal 404 on purpose); this used to assert the
+// discarded status.
 {
   const { status, body } = await call("/conversations.replies?channel=C_GENERAL&ts=9999999999.999999");
-  assert(status === 404, "conversations.replies non-existent returns 404");
+  assert(status === 200, "conversations.replies non-existent returns 200 (Slack error envelope)");
+  assert((body as { ok: boolean }).ok === false, "ok=false");
   assert((body as { error: string }).error === "thread_not_found", "error=thread_not_found");
 }
 
@@ -140,21 +156,22 @@ let threadParentTs = "";
   const { status, body } = await call("/mcp/tools");
   assert(status === 200, "GET /mcp/tools 200");
   const tools = (body as { tools: Array<{ name: string }> }).tools;
-  assert(tools.length === 11, `11 tools listed (got ${tools.length})`);
+  assert(tools.length > 0, `GET /mcp/tools lists at least one tool (got ${tools.length})`);
   assert(tools.every((t) => t.name.startsWith("slack_")), "all tools prefixed slack_");
 }
 
-// 10. MCP JSON-RPC tools/list
+// 10. MCP JSON-RPC tools/list. F-1330 dropped `additionalProperties:false` from
+// the served schemas because Slack's own listing declares none — already
+// asserted by mcp-tool-fixture.test.ts / mcp-contract.test.ts / mcp-legacy.test.ts.
 {
   const res = await app.request(`/s/${SID}/mcp`, {
     method: "POST",
     headers: { "Authorization": `Bearer ${token}`, "content-type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
   });
-  const body = (await res.json()) as { result: { tools: Array<{ name: string; inputSchema: { additionalProperties: false } }> } };
+  const body = (await res.json()) as { result: { tools: Array<{ name: string }> } };
   assert(res.status === 200, "MCP tools/list 200");
-  assert(body.result.tools.length === 11, "MCP lists 11 tools");
-  assert(body.result.tools.every((t) => t.inputSchema?.additionalProperties === false), "all tools have additionalProperties:false");
+  assert(body.result.tools.length > 0, `MCP tools/list returns at least one tool (got ${body.result.tools.length})`);
 }
 
 // 11. MCP tools/call
