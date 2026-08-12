@@ -795,13 +795,13 @@
           "name": "attachments",
           "location": "body",
           "required": false,
-          "type": "string"
+          "type": "array|string"
         },
         {
           "name": "blocks",
           "location": "body",
           "required": false,
-          "type": "string"
+          "type": "array|string"
         },
         {
           "name": "channel",
@@ -862,7 +862,7 @@
           "name": "blocks",
           "location": "body",
           "required": false,
-          "type": "string"
+          "type": "array|string"
         },
         {
           "name": "channel",
@@ -905,13 +905,13 @@
           "name": "attachments",
           "location": "body",
           "required": false,
-          "type": "string"
+          "type": "array|string"
         },
         {
           "name": "blocks",
           "location": "body",
           "required": false,
-          "type": "string"
+          "type": "array|string"
         },
         {
           "name": "channel",

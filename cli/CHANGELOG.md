@@ -4,6 +4,20 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.27
+
+### Patch Changes
+
+- **twin-slack takes `blocks` and `attachments` as native arrays** (F-1487), on
+  `chat.postMessage`, `chat.update` and `chat.scheduleMessage` — the five
+  declarations that were `z.string()` and refused the natural JSON spelling with
+  `{ok:false,"error":"invalid_arguments"}` at HTTP 200. Real Slack was called on
+  all five (2026-08-12, `pome-twin-sandbox`) and answers `ok:true` to the array
+  and to the JSON string alike, applying either, so this is a union rather than a
+  swap: the form-encoded string form every Slack SDK sends is unchanged. The CLI
+  bundles the twins, so an agent driven through it now reaches the same accepted
+  set as production.
+
 ## 0.23.26
 
 ### Patch Changes
