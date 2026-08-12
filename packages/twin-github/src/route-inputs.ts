@@ -201,10 +201,11 @@ export const GITHUB_ROUTES = {
       // parameter: base64 is the only encoding this surface has. Undeclared
       // now, so github's measured disposition (`ignore`) discards it.
       //
-      // ⚠️ This closes the DECLARED drift, not the behavioural one. The twin
-      // still treats `content` as plain text rather than base64 — recorded as
-      // divergence 24, and unified across both doors in the follow-up ticket
-      // that owns the 47-call-site migration.
+      // F-1460 closed the behavioural half too: `routes.ts` base64-decodes this
+      // field via `rest-content.ts`, and invalid base64 gets GitHub's own 422.
+      // ⚠️ ON THIS DOOR ONLY — the MCP write tools take plain text, because
+      // GitHub's MCP server does. Divergence 24 is retired; see FIDELITY.md
+      // "The two doors take `content` differently" before touching either.
     },
   }),
   listCommits: declareInputs({

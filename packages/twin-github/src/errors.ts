@@ -3,16 +3,23 @@ export class TwinError extends Error {
   constructor(
     message: string,
     readonly status: number,
-    readonly errors?: unknown[]
+    readonly errors?: unknown[],
+    /**
+     * Overrides the generic `https://docs.github.com/rest` below. Real GitHub
+     * points at the SPECIFIC operation on some errors, and where this twin
+     * reproduces such an error verbatim it has to reproduce that too — the
+     * envelope is compared leaf by leaf, so a generic url is a diff (F-1460).
+     */
+    readonly documentationUrl?: string
   ) {
     super(message);
   }
 }
 
-export function githubError(message: string, status: number, errors?: unknown[]) {
+export function githubError(message: string, status: number, errors?: unknown[], documentationUrl?: string) {
   return {
     message,
-    documentation_url: "https://docs.github.com/rest",
+    documentation_url: documentationUrl ?? "https://docs.github.com/rest",
     status,
     ...(errors ? { errors } : {})
   };

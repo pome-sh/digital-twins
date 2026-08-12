@@ -88,7 +88,10 @@ function githubErrorEnvelope(err: unknown): { status: number; body: unknown } {
     };
   }
   if (err instanceof TwinError) {
-    return { status: err.status, body: githubError(err.message, err.status, err.errors) };
+    return {
+      status: err.status,
+      body: githubError(err.message, err.status, err.errors, err.documentationUrl),
+    };
   }
   const issues = zodIssues(err);
   if (issues) {

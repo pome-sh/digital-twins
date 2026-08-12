@@ -454,30 +454,6 @@ on each bullet's bold title and never on its number, so gaps cost it nothing.
     until F-1430 was an empty `check_runs` array diffed against the twin's empty
     one, which published green while binding no key, no leaf type and no element.
 
-24. **`PUT /contents/*` treats `content` as plain text; GitHub treats it as
-    base64.** GitHub declares `content` as "the new file content, using Base64
-    encoding" — base64 is the only encoding the surface has. This twin writes
-    `content` through verbatim unless an `encoding: "base64"` flag asks it not
-    to, so the same request writes readable text here and base64-decoded garbage
-    on GitHub. An agent cannot see the difference until it reads the file back
-    from the real API.
-
-    The *declared* half of this is fixed: F-1389 removed `encoding` from
-    `route-inputs.ts`, so the twin no longer advertises a parameter GitHub does
-    not have, and github's `ignore` disposition discards it if sent. What
-    remains is the behaviour, and it is recorded rather than fixed in that PR
-    for a measured reason: **47 call sites send `content`, and zero of them send
-    base64** — the default seed, `config/twin-endpoint-probes.json`, and the
-    whole twin-github suite among them. Flipping the decode is a result-moving
-    change for every existing task, so it carries its own migration.
-
-    It is also wider than this route. The MCP door — `create_or_update_file` and
-    `push_files` — still declares `encoding` in its tool schema, and that is the
-    door an examinee actually calls; a REST-only decode would migrate all 47
-    sites while leaving the reachable path unchanged. So the fix is one change
-    across both doors, with the fixture regeneration and saved-task audit that
-    implies, tracked separately.
-
 25. **Issue-comment objects omit moderation and social metadata.** The twin's
     issue-comment object carries what an agent reads a comment for — id, body,
     user, `created_at`/`updated_at`, the html and issue urls — and omits five
@@ -542,6 +518,25 @@ on each bullet's bold title and never on its number, so gaps cost it nothing.
     once is a coordinated two-repo change that also moves the result of every
     task asserting on a review list, and it needs its own ticket rather than a
     line in this one.
+
+29. **`PUT /contents/*` stores file content as TEXT, so bytes that are not UTF-8
+    come back mangled.** GitHub stores blobs; this twin stores a `TEXT` column,
+    and `util.ts`'s `encodeContent` re-encodes it as UTF-8 on the way out. Write
+    a PNG through the REST route and the bytes that are not valid UTF-8 come back
+    as `U+FFFD` replacement characters. The status code is right — GitHub accepts
+    it, and so does this twin — so the divergence is invisible until the file is
+    read back, the same shape the old divergence 24 had.
+
+    **It is new, and it is new because 24 was fixed.** Until F-1460 this route
+    took plain text, so no caller could express a non-UTF-8 byte at all and the
+    limitation was unreachable by construction. Accepting base64 is exactly what
+    makes it expressible. Recorded rather than fixed because the fix is a storage
+    convention change — `files.content`, `encodeContent`, `size`, and every
+    surface that reads file content back out, including diffs, search and blobs —
+    which is a wider change than the encoding contract this ticket owns.
+
+    Pinned by `test/contents-base64.test.ts`, which asserts the mangling rather
+    than the round trip, so the day the storage changes the test says so.
 
 ## How fidelity is verified
 
@@ -691,7 +686,8 @@ declare. Nine came off in 0.10.6, taking the published surface from 295 to 286.
   from the path and nothing observable differs.
 - **`encoding` on `PUT /repos/:owner/:repo/contents/*`.** GitHub declares
   `content` as base64 and takes no encoding switch. The BEHAVIOURAL half of that
-  finding is deferred and recorded as divergence 24, not fixed here.
+  finding was deferred and recorded as divergence 24; F-1460 closed it and
+  retired the divergence — see *The two doors take `content` differently* below.
 - **`owner`, `repo` and `state` on `/search/code`, `/search/commits` and
   `/search/issues`** — seven inputs across three routes. GitHub's search API
   takes one scoping input, `q`, and encodes every filter as a qualifier inside
@@ -704,3 +700,43 @@ All nine are now undeclared, which under the `ignore` ruling above means
 discarded rather than refused: a request still sending one gets the answer it
 would have got without it, the way real GitHub answers. None of the three
 surfaces 4xx's.
+
+### The two doors take `content` differently, and both are right (F-1460)
+
+**This is fidelity, not an inconsistency. Do not "unify" it.** Real GitHub's two
+write doors disagree with each other, so a faithful twin has to disagree with
+itself in the same place:
+
+| door | takes | measured |
+|---|---|---|
+| REST `PUT /repos/:owner/:repo/contents/*` | **base64** | live probe, 2026-08-12 |
+| MCP `create_or_update_file`, `push_files` | **plain text** | GitHub's captured tool schema + `github/github-mcp-server` source |
+
+GitHub's MCP server base64-encodes `content` **for you** before it calls the REST
+route above, and says so in the tool description a model actually reads: *"Do not
+base64-encode it; this server does that before calling the REST API."* Its
+`push_files` hands `content` to a Git tree entry, which takes plain UTF-8 too. So
+an examinee that base64-encodes before calling the MCP tool is double-encoding on
+real GitHub, and a twin that accepted it would be teaching the wrong lesson.
+
+The decode therefore lives at the REST boundary (`src/rest-content.ts`, called
+only from `routes.ts`) and **not** in the domain, which serves both doors off one
+`createOrUpdateFile`. Pushing it down one level is the tempting refactor and it
+is the bug: it would make the MCP door reject the plain text GitHub's MCP door
+requires, on the door an examinee actually calls.
+
+What GitHub validates on the REST door is STRUCTURE, not meaning — the base64
+alphabet and a padded length, whitespace tolerated anywhere. Measured:
+
+| sent | GitHub answers |
+|---|---|
+| `aGVsbG8gd29ybGQK` | 201, round-trips byte-identical |
+| `hello world\n`, `!!!@@@###$$$`, `abcde` | 422 `content is not valid Base64` |
+| `test` — good alphabet, good length | **201**, and three junk bytes are written |
+| base64 containing a newline | 201 |
+
+That last row is why the twin does not "reject content that isn't text": GitHub
+never asks. The error is 422 with GitHub's message, **no `errors` array** (unlike
+this twin's `validationFailed`) and the operation-specific `documentation_url`.
+`test/contents-base64.test.ts` holds all of it, including two tests whose only
+job is to fail if the doors are ever unified.

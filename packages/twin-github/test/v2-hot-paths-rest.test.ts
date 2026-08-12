@@ -21,6 +21,9 @@ afterAll(() => {
 
 const base = `/s/${TEST_SID}`;
 
+/** F-1460 — `PUT /contents/*` takes base64, the way GitHub's does. */
+const b64 = (text: string) => Buffer.from(text, "utf8").toString("base64");
+
 function app() {
   return createGitHubCloneApp();
 }
@@ -64,7 +67,7 @@ describe("REST / cluster A — branches & files", () => {
   it("DELETE /contents/:path requires sha and clears the file", async () => {
     const a = app();
     const aliceToken = await signTestToken({ login: "alice" });
-    const put = await jsonReq(a, "PUT", "/repos/acme/api/contents/del.txt", { message: "add", content: "x\n" }, aliceToken);
+    const put = await jsonReq(a, "PUT", "/repos/acme/api/contents/del.txt", { message: "add", content: b64("x\n") }, aliceToken);
     expect(put.status).toBe(201);
     const sha = (put.body as { content: { sha: string } }).content.sha;
     const stale = await jsonReq(a, "DELETE", "/repos/acme/api/contents/del.txt", { message: "drop", sha: "WRONG" }, aliceToken);
@@ -79,7 +82,7 @@ describe("REST / cluster A — branches & files", () => {
       author: { login: "alice" }
     });
 
-    const recreate = await jsonReq(a, "PUT", "/repos/acme/api/contents/del.txt", { message: "re-add", content: "y\n" }, aliceToken);
+    const recreate = await jsonReq(a, "PUT", "/repos/acme/api/contents/del.txt", { message: "re-add", content: b64("y\n") }, aliceToken);
     expect(recreate.status).toBe(201);
   });
 
@@ -104,17 +107,17 @@ describe("REST / cluster B — commits & diffs", () => {
 
   it("PUT /contents returns 201 on create and 200 on update (FDRS-596)", async () => {
     const a = app();
-    const create = await jsonReq(a, "PUT", "/repos/acme/api/contents/newfile.ts", { message: "add", content: "1\n" });
+    const create = await jsonReq(a, "PUT", "/repos/acme/api/contents/newfile.ts", { message: "add", content: b64("1\n") });
     expect(create.status).toBe(201);
     const sha = (create.body as { content: { sha: string } }).content.sha;
-    const update = await jsonReq(a, "PUT", "/repos/acme/api/contents/newfile.ts", { message: "update", content: "2\n", sha });
+    const update = await jsonReq(a, "PUT", "/repos/acme/api/contents/newfile.ts", { message: "update", content: b64("2\n"), sha });
     expect(update.status).toBe(200);
 
     const seeded = await jsonReq(a, "GET", "/repos/acme/api/contents/README.md");
     const seededSha = (seeded.body as { sha: string }).sha;
     const seededUpdate = await jsonReq(a, "PUT", "/repos/acme/api/contents/README.md", {
       message: "update seeded file",
-      content: "# Acme API\n\nUpdated.\n",
+      content: b64("# Acme API\n\nUpdated.\n"),
       sha: seededSha
     });
     expect(seededUpdate.status).toBe(200);
@@ -124,7 +127,7 @@ describe("REST / cluster B — commits & diffs", () => {
     const a = app();
     const before = await jsonReq(a, "GET", "/repos/acme/api/commits");
     const baseSha = (before.body as Array<{ sha: string }>)[0]!.sha;
-    await jsonReq(a, "PUT", "/repos/acme/api/contents/advance.txt", { message: "advance", content: "x\n" });
+    await jsonReq(a, "PUT", "/repos/acme/api/contents/advance.txt", { message: "advance", content: b64("x\n") });
     const response = await jsonReq(a, "GET", `/repos/acme/api/compare/${baseSha}...main`);
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({ status: "ahead", ahead_by: expect.any(Number) });
@@ -133,7 +136,7 @@ describe("REST / cluster B — commits & diffs", () => {
   it("GET /pulls/:n/diff returns the unified-diff envelope", async () => {
     const a = app();
     await jsonReq(a, "POST", "/repos/acme/api/git/refs", { ref: "refs/heads/diff-rest" });
-    await jsonReq(a, "PUT", "/repos/acme/api/contents/diff.ts", { message: "m", content: "x\n", branch: "diff-rest" });
+    await jsonReq(a, "PUT", "/repos/acme/api/contents/diff.ts", { message: "m", content: b64("x\n"), branch: "diff-rest" });
     const pr = await jsonReq(a, "POST", "/repos/acme/api/pulls", { title: "Diff REST", head: "diff-rest", base: "main" });
     const number = (pr.body as { number: number }).number;
     const response = await jsonReq(a, "GET", `/repos/acme/api/pulls/${number}/diff`);
@@ -153,7 +156,7 @@ describe("REST / cluster B — commits & diffs", () => {
 describe("REST / cluster C — pull requests deeper", () => {
   async function openPr(a: ReturnType<typeof createGitHubCloneApp>) {
     await jsonReq(a, "POST", "/repos/acme/api/git/refs", { ref: "refs/heads/cr-rest" });
-    await jsonReq(a, "PUT", "/repos/acme/api/contents/cr.ts", { message: "m", content: "1\n", branch: "cr-rest" });
+    await jsonReq(a, "PUT", "/repos/acme/api/contents/cr.ts", { message: "m", content: b64("1\n"), branch: "cr-rest" });
     const pr = await jsonReq(a, "POST", "/repos/acme/api/pulls", { title: "CR", head: "cr-rest", base: "main" });
     return (pr.body as { number: number }).number;
   }
@@ -215,7 +218,7 @@ describe("REST / cluster C — pull requests deeper", () => {
   // Puts one commit on `ref` so a PR opened from it has a diff.
   async function branchWithWork(a: ReturnType<typeof createGitHubCloneApp>, ref: string) {
     await jsonReq(a, "POST", "/repos/acme/api/git/refs", { ref: `refs/heads/${ref}` });
-    await jsonReq(a, "PUT", `/repos/acme/api/contents/${ref}.ts`, { message: "m", content: "1\n", branch: ref });
+    await jsonReq(a, "PUT", `/repos/acme/api/contents/${ref}.ts`, { message: "m", content: b64("1\n"), branch: ref });
   }
 
   async function openPull(a: ReturnType<typeof createGitHubCloneApp>, title: string, head: string, base: string) {

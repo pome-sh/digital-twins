@@ -22,6 +22,9 @@ afterAll(() => {
 
 const base = `/s/${TEST_SID}`;
 
+/** F-1460 — `PUT /contents/*` takes base64, the way GitHub's does. */
+const b64 = (text: string) => Buffer.from(text, "utf8").toString("base64");
+
 async function req(app: ReturnType<typeof createGitHubCloneApp>, method: string, path: string, body?: unknown) {
   const init: RequestInit = { method, headers: { "content-type": "application/json" } };
   if (body !== undefined) init.body = JSON.stringify(body);
@@ -35,7 +38,7 @@ describe("v1 REST coverage — existing surface end-to-end", () => {
   it("PR review/merge/update-branch via REST", async () => {
     const app = createGitHubCloneApp();
     await req(app, "POST", "/repos/acme/api/git/refs", { ref: "refs/heads/feat-cov" });
-    await req(app, "PUT", "/repos/acme/api/contents/feat.ts", { message: "m", content: "1\n", branch: "feat-cov" });
+    await req(app, "PUT", "/repos/acme/api/contents/feat.ts", { message: "m", content: b64("1\n"), branch: "feat-cov" });
     const pr = await req(app, "POST", "/repos/acme/api/pulls", { title: "Cov", head: "feat-cov", base: "main" });
     const n = (pr.body as { number: number }).number;
 
@@ -68,7 +71,7 @@ describe("v1 REST coverage — existing surface end-to-end", () => {
     const noLoginToken = await signTestToken({ login: null });
     const app = createGitHubCloneApp();
     await req(app, "POST", "/repos/acme/api/git/refs", { ref: "refs/heads/no-push" });
-    await req(app, "PUT", "/repos/acme/api/contents/np.ts", { message: "m", content: "1\n", branch: "no-push" });
+    await req(app, "PUT", "/repos/acme/api/contents/np.ts", { message: "m", content: b64("1\n"), branch: "no-push" });
     const pr = await req(app, "POST", "/repos/acme/api/pulls", { title: "NoPush", head: "no-push", base: "main" });
     const n = (pr.body as { number: number }).number;
     const response = await app.request(`${base}/repos/acme/api/pulls/${n}/merge`, withAuth(noLoginToken, {

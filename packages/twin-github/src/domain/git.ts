@@ -96,7 +96,11 @@ export function listCommits(domain: GitHubDomain, input: { owner: string; repo: 
 }
 
 
-export function createOrUpdateFile(domain: GitHubDomain, input: { owner: string; repo: string; path: string; message: string; content: string; branch?: string; sha?: string; encoding?: string }, options: MutatingOptions = {}, onDelta?: StateDeltaCallback) {
+// F-1460 — `content` arrives DECODED, from both doors. The REST route decodes
+// base64 before it gets here (`rest-content.ts`); the MCP tools pass their plain
+// text straight through, because that is what GitHub's MCP server accepts. No
+// `encoding` switch: GitHub declares one on neither door.
+export function createOrUpdateFile(domain: GitHubDomain, input: { owner: string; repo: string; path: string; message: string; content: string; branch?: string; sha?: string }, options: MutatingOptions = {}, onDelta?: StateDeltaCallback) {
   const repo = domain.requireRepo(input.owner, input.repo);
   const branch = input.branch ?? repo.default_branch;
   let before: Record<string, unknown> | null = null;
@@ -108,8 +112,7 @@ export function createOrUpdateFile(domain: GitHubDomain, input: { owner: string;
     before = existing ? fileState(existing, repo) : null;
     if (existing && !input.sha) validationFailed("sha", "missing", path);
     if (existing && input.sha !== existing.sha) validationFailed("sha", "invalid", input.sha);
-    const content = input.encoding === "base64" ? Buffer.from(input.content, "base64").toString("utf8") : input.content;
-    const commit = domain.commitFiles(repo, branch, input.message, [{ path, content }], options.actor ?? "pome-agent");
+    const commit = domain.commitFiles(repo, branch, input.message, [{ path, content: input.content }], options.actor ?? "pome-agent");
     const file = domain.getFile(repo.id, branch, path)!;
     afterFile = file;
     return { content: contentFileJson(file, repo), commit: commitJson(commit, repo) };
@@ -120,7 +123,7 @@ export function createOrUpdateFile(domain: GitHubDomain, input: { owner: string;
 }
 
 
-export function pushFiles(domain: GitHubDomain, input: { owner: string; repo: string; branch?: string; message: string; files: Array<{ path: string; content: string; encoding?: string }> }, options: MutatingOptions = {}, onDelta?: StateDeltaCallback) {
+export function pushFiles(domain: GitHubDomain, input: { owner: string; repo: string; branch?: string; message: string; files: Array<{ path: string; content: string }> }, options: MutatingOptions = {}, onDelta?: StateDeltaCallback) {
   const repo = domain.requireRepo(input.owner, input.repo);
   const branch = input.branch ?? repo.default_branch;
   domain.requireBranch(repo.id, branch);
@@ -130,7 +133,7 @@ export function pushFiles(domain: GitHubDomain, input: { owner: string; repo: st
     const path = normalizePath(file.path);
     if (paths.has(path)) validationFailed("files.path", "duplicate", path);
     paths.add(path);
-    return { path, content: file.encoding === "base64" ? Buffer.from(file.content, "base64").toString("utf8") : file.content };
+    return { path, content: file.content };
   });
   const beforeFiles = files.map((file) => {
     const existing = domain.getFile(repo.id, branch, file.path);

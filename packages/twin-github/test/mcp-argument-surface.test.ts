@@ -65,7 +65,6 @@ const KNOWN_RESIDUE: string[] = [
     "'add_reply_to_pull_request_comment' validates 'comment_id', which GitHub's inputSchema does not declare",
     "'add_reply_to_pull_request_comment' validates 'pull_number', which GitHub's inputSchema does not declare",
     "'create_branch' validates 'sha', which GitHub's inputSchema does not declare",
-    "'create_or_update_file' validates 'encoding', which GitHub's inputSchema does not declare",
     "'create_pull_request' accepts a call with no 'base', and GitHub requires it",
     "'create_pull_request' does not model GitHub's parameter 'draft'",
     "'create_pull_request' does not model GitHub's parameter 'maintainer_can_modify'",

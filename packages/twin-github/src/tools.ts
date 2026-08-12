@@ -136,7 +136,13 @@ export const toolArgumentSchemas = [
   },
   {
     name: "create_or_update_file",
-    schema: z.object({ ...ownerRepo, path: z.string().min(1), message: z.string().min(1), content: z.string(), branch: z.string().min(1), sha: z.string().optional(), encoding: z.enum(["utf-8", "base64"]).optional() })
+    // F-1460 — no `encoding`. GitHub's MCP server declares none and needs none:
+    // it takes `content` as PLAIN TEXT and base64-encodes it itself before
+    // calling the REST API, which its own tool description says outright. The
+    // switch survived F-1389 because that ticket removed it from the REST
+    // DECLARATION, and the served table (a capture) and these validators are two
+    // different objects. Undeclared now, so `ignore` discards it if sent.
+    schema: z.object({ ...ownerRepo, path: z.string().min(1), message: z.string().min(1), content: z.string(), branch: z.string().min(1), sha: z.string().optional() })
   },
   {
     name: "create_branch",
@@ -144,7 +150,9 @@ export const toolArgumentSchemas = [
   },
   {
     name: "push_files",
-    schema: z.object({ ...ownerRepo, branch: z.string().optional(), message: z.string().min(1), files: z.array(z.object({ path: z.string().min(1), content: z.string(), encoding: z.enum(["utf-8", "base64"]).optional() })).min(1) })
+    // Same as `create_or_update_file` above: GitHub's `push_files` hands each
+    // file's `content` straight to a Git tree entry, which takes plain UTF-8.
+    schema: z.object({ ...ownerRepo, branch: z.string().optional(), message: z.string().min(1), files: z.array(z.object({ path: z.string().min(1), content: z.string() })).min(1) })
   },
   // GitHub's consolidated issue pair (F-1376). `issue_read` and `issue_write`
   // replace the seven single-purpose tools this twin used to serve — `get_issue`,

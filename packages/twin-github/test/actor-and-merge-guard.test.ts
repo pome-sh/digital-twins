@@ -16,6 +16,9 @@ afterAll(() => {
 
 const base = `/s/${TEST_SID}`;
 
+/** F-1460 — `PUT /contents/*` takes base64, the way GitHub's does. */
+const b64 = (text: string) => Buffer.from(text, "utf8").toString("base64");
+
 async function seedBranchAndPR(app: ReturnType<typeof createGitHubCloneApp>, token: string, branch: string) {
   const refResp = await app.request(`${base}/repos/acme/api/git/refs`, withAuth(token, {
     method: "POST",
@@ -27,7 +30,7 @@ async function seedBranchAndPR(app: ReturnType<typeof createGitHubCloneApp>, tok
   const fileResp = await app.request(`${base}/repos/acme/api/contents/${branch}.md`, withAuth(token, {
     method: "PUT",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ message: "add note", content: "hi", branch })
+    body: JSON.stringify({ message: "add note", content: b64("hi"), branch })
   }));
   expect(fileResp.status).toBe(201);
 
