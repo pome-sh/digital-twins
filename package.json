@@ -48,8 +48,8 @@
     "npm": ">=11.5.1"
   },
   "devDependencies": {
-    "acorn": "^8.18.0",
-    "knip": "^6.31.0"
+    "knip": "^6.31.0",
+    "typescript": "^5.9.3"
   },
   "overrides": {
     "hono": "^4.13.0",
