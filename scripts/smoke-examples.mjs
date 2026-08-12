@@ -36,12 +36,22 @@
 //   - exits before the settle WITHOUT the TDZ signature → only a network/auth
 //     failure this gate's own SMOKE_ENV deliberately manufactures (dead twin
 //     endpoints, invalid model keys) excuses this. That is asserted by
-//     matching the output against BENIGN_FAILURE_SIGNATURE below — a property
+//     matching the output against BENIGN_FAILURE_SIGNATURES below — a property
 //     of the failure ("connection refused", "invalid api key" …), not a list
 //     of which examples are allowed to exit early. A match is a named, counted
-//     SKIP, never printed as OK. No match is a FAIL: the example returned
-//     before it could have done anything, and nothing in its own output says
-//     why.
+//     REACHED-OUTBOUND, printed distinctly from OK. No match is a FAIL: the
+//     example returned before it could have done anything, and nothing in its
+//     own output says why.
+//
+// Measured on this PR in real CI (the only environment that gates anything):
+// 7 of 8 examples are REACHED-OUTBOUND and ZERO are OK, because with no live
+// twin and no valid model key nothing survives 5s. That is why the outbound
+// failure is a PASS and not a skip — a "skip" that is the permanent steady
+// state means a gate that verifies nothing and reports green, which is exactly
+// the defect this ticket exists to remove. It is named for what it proves
+// (module evaluated, startup guards cleared, an outbound call opened) and never
+// for what it does not (that the work was correct — `probe:examples` and the
+// scenario suites are the gates for that).
 import { spawn } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -69,15 +79,33 @@ export const TDZ_SIGNATURE = /(?:Cannot access '[^']+' before initialization|bef
 // carries a reason, not just a verdict — this is a property of the failure
 // text, not a per-example allowlist, so it says nothing about which of the
 // eight examples produced it.
+//
+// Every pattern must be ERROR-SHAPED — an errno, an HTTP status, a library's
+// own error class — never ordinary prose an example could print on a healthy
+// path. `/unauthorized/i` was the sharp edge here: this example's own Slack
+// report for seed 04 reads "merge blocked: … not an authorized collaborator",
+// so a bare prose match let an example excuse itself with its own output.
 const BENIGN_FAILURE_SIGNATURES = [
   ["connection refused", /ECONNREFUSED/],
   ["connection reset", /ECONNRESET/],
-  ["DNS resolution failed", /ENOTFOUND|getaddrinfo/],
-  ["host unreachable", /EHOSTUNREACH/],
+  ["DNS resolution failed", /ENOTFOUND|EAI_AGAIN|getaddrinfo/],
+  ["host unreachable", /EHOSTUNREACH|ENETUNREACH/],
+  // undici's own message for a failed fetch. Error-shaped by construction —
+  // no example prints this phrase on a healthy path.
   ["network request failed", /fetch failed/i],
-  ["request timed out", /ETIMEDOUT|AbortError/],
-  ["AI Gateway rejected the invalid key", /AI Gateway/i],
-  ["model provider rejected the invalid key", /invalid api key|invalid x-api-key|authentication_error|unauthenticated request|unauthorized/i],
+  ["TLS/proxy terminated the connection", /ECONNABORTED|EPROTO|before secure TLS connection/],
+  ["request timed out", /ETIMEDOUT|ERR_SOCKET_CONNECTION_TIMEOUT|\bAbortError\b/],
+  [
+    "AI Gateway rejected the invalid key",
+    /Unauthenticated request to AI Gateway|unauthenticated-ai-gateway|wrapGatewayError|AI_LoadAPIKeyError/i,
+  ],
+  [
+    "model provider rejected the invalid key",
+    // Status codes are matched only in status-shaped context: a bare /\b401\b/
+    // also matches a stack frame's line number (`at f (file.js:401:5)`), which
+    // would hand a benign verdict to any crash with a 401-line stack.
+    /invalid[ _-]?api[ _-]?key|invalid x-api-key|authentication_error|permission_error|status (?:401|403)\b|HTTP 40[13]\b|\b40[13] (?:Unauthorized|Forbidden)\b/i,
+  ],
 ];
 
 function matchBenignFailure(output) {
@@ -133,9 +161,17 @@ export function discoverExamples(dir = examplesDir) {
 
 // The verdict for one launch, given what we observed. Pure and exported so the
 // regression suite can drive it directly with synthetic evidence instead of
-// spawning real processes. `status` is one of "ok" | "skip" | "fail" — never
-// anything a caller could mistake for a fourth state, and "skip" must never be
-// printed as "OK": it is health this gate could not confirm, named as such.
+// spawning real processes. `status` is one of "ok" | "reached" | "fail" —
+// never anything a caller could mistake for a fourth state.
+//
+// "reached" is a PASS, and deliberately not called a skip: measured on this PR
+// in real CI, 7 of 8 examples land here and ZERO land on "ok", because with no
+// live twin and no valid model key nothing can still be running at the settle.
+// A skip that is the permanent steady state is a gate that verifies nothing and
+// goes green — this milestone's own subject. So it is named for what it
+// positively proves (the process evaluated its module, cleared its startup
+// guards, and got far enough to open an outbound twin/model call) and printed
+// distinctly from "ok", which is the strictly stronger evidence.
 export function classifyLaunch({ output, stillRunningAtSettle, exitCode, signal }) {
   if (TDZ_SIGNATURE.test(output)) {
     return { status: "fail", reason: "TDZ crash on launch" };
@@ -144,13 +180,35 @@ export function classifyLaunch({ output, stillRunningAtSettle, exitCode, signal 
     return { status: "ok", reason: `still running after ${SETTLE_MS}ms` };
   }
   const how = signal ? `killed by ${signal}` : `exited code ${exitCode}`;
-  const benign = matchBenignFailure(output);
+  // A benign outbound failure only excuses an early exit that FAILED. An
+  // example that hits the dead twin, logs it, and exits 0 anyway has done
+  // nothing and reported success — F-1478's defect verbatim, just with a
+  // recognizable string in the output. `minimal-viktor-langgraph` reds today
+  // only because index.ts sets `exitCode = 1` on a graph failure; had it merely
+  // warned, matching the signature alone would have handed it a pass.
+  const benign = exitCode !== 0 || signal ? matchBenignFailure(output) : null;
   if (benign) {
-    return { status: "skip", reason: `${how} before settling — benign: ${benign}` };
+    return { status: "reached", reason: `${how} at an outbound call — ${benign}` };
+  }
+  if (exitCode === 0 && matchBenignFailure(output)) {
+    return {
+      status: "fail",
+      reason:
+        `exited code 0 before settling (${SETTLE_MS}ms) while its own output reports an outbound ` +
+        `failure (${matchBenignFailure(output)}) — it swallowed the error and exited clean, which ` +
+        `is the do-nothing-looks-healthy defect this gate exists to catch. Propagate the failure ` +
+        `so the process exits non-zero`,
+    };
   }
   return {
     status: "fail",
-    reason: `${how} before settling (${SETTLE_MS}ms) with no TDZ and no recognized benign-failure signal — did it do any real work?`,
+    reason:
+      `${how} before settling (${SETTLE_MS}ms) with no TDZ and no outbound-call failure in its ` +
+      `output — it returned without evidence it did any real work. Either the example is broken ` +
+      `(the likely case: a wrong parse, an early return, or a swallowed error read as an empty ` +
+      `result), or it failed on a genuinely benign outbound error this gate does not recognize ` +
+      `yet — if the tail above shows one, add it to BENIGN_FAILURE_SIGNATURES in ` +
+      `scripts/smoke-examples.mjs naming the class, and add a case to smoke-examples.test.mjs`,
   };
 }
 
@@ -233,7 +291,7 @@ async function main() {
   console.log(`Launch-smoking ${examples.length} example(s): ${examples.join(", ")}`);
 
   const failures = [];
-  const skips = [];
+  const reached = [];
   for (const name of examples) {
     process.stdout.write(`\n=== examples/${name} === `);
     const result = await smokeOne(name);
@@ -241,10 +299,10 @@ async function main() {
     if (result.status === "ok") {
       console.log(`OK (${result.reason})`);
       if (tail) console.log(tail);
-    } else if (result.status === "skip") {
-      console.log(`SKIPPED (${result.reason})`);
+    } else if (result.status === "reached") {
+      console.log(`REACHED-OUTBOUND (${result.reason})`);
       if (tail) console.log(tail);
-      skips.push({ name, reason: result.reason });
+      reached.push({ name, reason: result.reason });
     } else {
       console.log(`FAILED (${result.reason})`);
       // Show the tail so the crash (or the silent nothing) is visible in CI logs.
@@ -253,10 +311,13 @@ async function main() {
     }
   }
 
-  if (skips.length > 0) {
-    console.error(
-      `\n${skips.length} example(s) skipped (not verified — benign environment failure): ` +
-        skips.map((s) => `${s.name} (${s.reason})`).join("; "),
+  if (reached.length > 0) {
+    console.log(
+      `\n${reached.length} of ${examples.length} example(s) got as far as an outbound twin/model ` +
+        `call and failed THERE, which is the furthest this environment can take them ` +
+        `(SMOKE_ENV has no live twin and no valid model key). Verified: module evaluated, ` +
+        `startup guards passed, async work reached. NOT verified: that the work is correct. ` +
+        reached.map((r) => `${r.name} (${r.reason})`).join("; "),
     );
   }
 
@@ -268,7 +329,8 @@ async function main() {
     process.exit(1);
   }
   console.log(
-    `\nAll ${examples.length} examples launched without a TDZ crash` +
-      (skips.length > 0 ? ` (${skips.length} skipped, unverified).` : "."),
+    `\nAll ${examples.length} examples reached real work: ` +
+      `${examples.length - reached.length} still running at the settle, ` +
+      `${reached.length} failed at an outbound call.`,
   );
 }
