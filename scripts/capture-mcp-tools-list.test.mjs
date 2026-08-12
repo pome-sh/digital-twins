@@ -129,17 +129,17 @@ function sandboxWithDeferredTwin() {
     );
   }
 
-  // The CLI entry guard must not be `import.meta.main`. This gate runs in
-  // ci.yml's always-on block, ABOVE `actions/setup-node` (which is itself
-  // gated on the heavy suite), so it executes on the runner image's unpinned
-  // Node. `import.meta.main` landed in Node 24.2/22.16; on anything older it
-  // is `undefined` and the whole gate exits 0 having checked nothing. The
-  // argv/import.meta.url comparison the rest of this repo's always-on gates
-  // use has no such floor.
-  assert(
-    !producerText.includes("import.meta.main"),
-    "the CLI entry guard does not depend on import.meta.main (it would make this gate a no-op on old Node)"
-  );
+  // This producer's entry guard follows the sanctioned form (positive
+  // assertion: THIS file's guard really is process.argv[1] vs.
+  // import.meta.url, not just "not import.meta.main" — a guard rewritten into
+  // some other broken shape would still pass an absence check). The absence
+  // of a bare `import.meta.main` ANYWHERE under scripts/**/contract/** —
+  // including in this file — is asserted repo-wide by
+  // scripts/lint-no-bare-import-meta-main.mjs (F-1481), which subsumes what
+  // used to be a second, narrower copy of that same assertion here: two
+  // checks asserting one property in different places is the shape D5 warns
+  // about, and the repo-wide one covers strictly more (every file, not just
+  // this producer) with no hand-kept list of which files to watch.
   assert(
     /process\.argv\[1\][\s\S]{0,120}import\.meta\.url/.test(producerText),
     "the CLI entry guard compares process.argv[1] against import.meta.url"
