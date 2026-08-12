@@ -55,7 +55,7 @@
 
 import { globSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 const EXACT_VERSION = /^\d+\.\d+\.\d+$/;
 const SCOPE = "@pome-sh/";

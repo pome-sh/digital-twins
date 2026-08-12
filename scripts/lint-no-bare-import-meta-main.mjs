@@ -210,60 +210,168 @@ export function findBareImportMetaMain(source, fileName = "input.mjs") {
   });
 }
 
-/** `import.meta.url` itself — the property access the sanctioned entry-guard
- * form reads off `import.meta`, the counterpart to `namesMain`/`isImportMetaNode`
- * above but for `.url` instead of `.main`. */
+/** The self-path properties on `import.meta` — the counterpart to
+ * `namesMain`/`isImportMetaNode` above but for the entry guard's other operand.
+ * `filename` and `dirname` are in here alongside `url` because Node ships all
+ * three (they landed in 21.2), they are all derived AFTER symlink resolution,
+ * and a guard comparing an unresolved argv0 against `import.meta.filename` has
+ * exactly the F-1488 bug in a spelling the `url`-only check would call clean. */
+const IMPORT_META_SELF_PATH_PROPS = new Set(["url", "filename", "dirname"]);
 function isImportMetaUrlNode(node) {
   return (
     !!node &&
     ts.isPropertyAccessExpression(node) &&
     isImportMetaNode(node.expression) &&
-    node.name?.text === "url"
+    IMPORT_META_SELF_PATH_PROPS.has(node.name?.text)
   );
 }
 
-/** `process.argv[1]` — an element access on `process.argv` with the literal
- * index `1`. Every shipped guard reads argv0 this way; none used `.at(1)`. */
+/** argv0 — `process.argv[1]` or `process.argv.at(1)`. Every shipped guard used
+ * the element access; `.at(1)` is here because it is the same read in a
+ * spelling a future author reaches for without thinking, and a gate that
+ * asserts a PROPERTY has to cover the spellings of that property rather than
+ * the ones that happened to ship.
+ *
+ * Not covered: argv0 reached through destructuring (`const [, entry] = process.argv`).
+ * That needs binding resolution rather than a syntactic match; the zero-relation
+ * floor in the runner is what catches a repo whose guards all moved to a shape
+ * this predicate cannot see.
+ * ponytail: syntactic match; add binding resolution if a destructured guard ever ships. */
 function isProcessArgv1Node(node) {
-  if (!node || !ts.isElementAccessExpression(node)) return false;
-  const obj = node.expression;
-  if (!ts.isPropertyAccessExpression(obj)) return false;
-  if (!ts.isIdentifier(obj.expression) || obj.expression.text !== "process") return false;
-  if (obj.name.text !== "argv") return false;
-  const idx = node.argumentExpression;
-  return ts.isNumericLiteral(idx) && idx.text === "1";
-}
-
-/** The first descendant of `node` (inclusive) satisfying `pred`, depth-first,
- * or `null`. Bounded to the subtree passed in — this is what lets the caller
- * ask "does THIS SIDE of the comparison hold the argv0/meta-url leaf", not
- * "does this leaf appear anywhere in the file" (which a grep would ask). */
-function findLeaf(node, pred) {
-  if (pred(node)) return node;
-  let found = null;
-  ts.forEachChild(node, (child) => {
-    if (!found) found = findLeaf(child, pred);
-  });
-  return found;
-}
-
-/** Walking from `leaf` up through its parent chain, up to and including
- * `sideTop` (the top of the comparison operand this leaf belongs to), is
- * there a call to `calleeName` wrapping it? This is how a side is classified
- * as realpath'd (or not) without re-deriving the operand from scratch — the
- * parent chain IS the nesting `realpathSync(resolve(process.argv[1]))`
- * builds, and `node.parent` is populated because `createSourceFile` above is
- * called with `setParentNodes: true`. */
-function hasWrappingCall(leaf, sideTop, calleeName) {
-  let node = leaf;
-  while (node) {
-    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === calleeName) {
-      return true;
-    }
-    if (node === sideTop) return false;
-    node = node.parent;
+  if (!node) return false;
+  const isProcessArgv = (n) =>
+    ts.isPropertyAccessExpression(n) &&
+    ts.isIdentifier(n.expression) &&
+    n.expression.text === "process" &&
+    n.name.text === "argv";
+  const isOne = (n) => n && ts.isNumericLiteral(n) && n.text === "1";
+  if (ts.isElementAccessExpression(node)) {
+    return isProcessArgv(node.expression) && isOne(node.argumentExpression);
+  }
+  if (ts.isCallExpression(node)) {
+    const callee = node.expression;
+    return (
+      ts.isPropertyAccessExpression(callee) &&
+      callee.name.text === "at" &&
+      isProcessArgv(callee.expression) &&
+      node.arguments.length === 1 &&
+      isOne(node.arguments[0])
+    );
   }
   return false;
+}
+
+/** EVERY descendant of `node` (inclusive) satisfying `pred`, depth-first.
+ * Bounded to the subtree passed in — this is what lets the caller ask "does
+ * THIS SIDE of the comparison hold the argv0/meta-url leaf", not "does this
+ * leaf appear anywhere in the file" (which a grep would ask). All matches,
+ * not the first, because one side can legitimately read argv0 twice: the
+ * sanctioned form's own argv side is
+ * `process.argv[1] ? realpathSync(resolve(process.argv[1])) : ""`, whose
+ * FIRST occurrence depth-first is the unwrapped ternary condition. */
+function findLeaves(node, pred, out = []) {
+  if (pred(node)) out.push(node);
+  // The callback must return nothing: `ts.forEachChild` treats a truthy return
+  // as "found it" and stops iterating siblings, so returning the accumulator
+  // here would visit only the first child of every node.
+  ts.forEachChild(node, (child) => {
+    findLeaves(child, pred, out);
+  });
+  return out;
+}
+
+/** Does any identifier in `call`'s callee chain name one of `names`?
+ * Deliberately name-based rather than binding-based, so that `realpathSync(p)`,
+ * `fs.realpathSync(p)`, `realpathSync.native(p)` and `await realpath(p)` from
+ * `node:fs/promises` all read as the same act. They are — and a gate that
+ * accepted only the bare-identifier spelling would red three correct guards
+ * out of four, which is a false red on correct work and the fastest way to
+ * get a gate deleted. */
+function calleeNamesOneOf(call, names) {
+  let expr = call.expression;
+  for (;;) {
+    if (ts.isIdentifier(expr)) return names.has(expr.text);
+    if (ts.isPropertyAccessExpression(expr)) {
+      if (names.has(expr.name.text)) return true;
+      expr = expr.expression;
+      continue;
+    }
+    return false;
+  }
+}
+
+const REALPATH_CALLEES = new Set(["realpathSync", "realpath"]);
+const BASENAME_CALLEES = new Set(["basename"]);
+
+/** Walking from each of `leaves` up through its parent chain, up to and
+ * including `sideTop` (the top of the comparison operand the leaves belong
+ * to), is ANY of them wrapped in a call naming one of `names`? This is how a
+ * side is classified as realpath'd (or not) without re-deriving the operand
+ * from scratch — the parent chain IS the nesting
+ * `realpathSync(resolve(process.argv[1]))` builds, and `node.parent` is
+ * populated because `createSourceFile` above is called with
+ * `setParentNodes: true`.
+ *
+ * ANY rather than EVERY for the ternary reason in `findLeaves` above: the
+ * sanctioned form reads argv0 once unwrapped (as the ternary's own existence
+ * test) and once wrapped (as its value), and demanding every occurrence be
+ * wrapped would red it.
+ *
+ * Known ceiling: a side that realpaths inside a HELPER
+ * (`const real = (p) => realpathSync(p); real(process.argv[1])`) is not
+ * followed — that needs interprocedural analysis. It errs toward a false RED
+ * on correct work rather than a false green on broken work, which is the safe
+ * direction for a gate, and inlining the call is the fix.
+ * ponytail: name-based, one hop; add binding resolution if a helper form ever
+ * ships and the false red actually bites. */
+function anyWrappedIn(leaves, sideTop, names) {
+  for (const leaf of leaves) {
+    let node = leaf;
+    while (node) {
+      if (ts.isCallExpression(node) && calleeNamesOneOf(node, names)) return true;
+      if (node === sideTop) break;
+      node = node.parent;
+    }
+  }
+  return false;
+}
+
+/**
+ * Single-assignment aliases for argv0 / `import.meta.url`, as
+ * name -> initializer.
+ *
+ * Load-bearing, not a nicety. `const ENTRY = realpathSync(resolve(process.argv[1]))`
+ * followed by `if (ENTRY === SELF)` is the shape EVERY fixed entry guard in
+ * this repo uses, and it puts the leaf in a DECLARATION rather than in the
+ * comparison. A purely operand-local search therefore sees `ENTRY === SELF`,
+ * finds no argv0 and no `import.meta.url`, and classifies no relation at all
+ * — reporting "no un-realpath'd entry guard" over a repo in which it can see
+ * none of them. That is the vacuous pass this milestone keeps re-shipping, so
+ * the alias is followed one hop.
+ *
+ * A name declared more than once is dropped rather than guessed at: two
+ * initializers mean the gate cannot know which one reaches the comparison,
+ * and a wrong guess in either direction is worse than the relation floor
+ * below noticing the guard went unclassified.
+ */
+function collectArgvAndMetaAliases(sourceFile) {
+  const byName = new Map();
+  const walk = (node) => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
+      const init = node.initializer;
+      if (
+        findLeaves(init, isProcessArgv1Node).length > 0 ||
+        findLeaves(init, isImportMetaUrlNode).length > 0
+      ) {
+        const name = node.name.text;
+        byName.set(name, byName.has(name) ? null : init);
+      }
+    }
+    ts.forEachChild(node, walk);
+  };
+  ts.forEachChild(sourceFile, walk);
+  for (const [name, init] of byName) if (init === null) byName.delete(name);
+  return byName;
 }
 
 const EQUALITY_OPERATORS = new Set([
@@ -293,6 +401,14 @@ const EQUALITY_OPERATORS = new Set([
  *     `pathToFileURL(...).href`/`fileURLToPath(...)` compare with no
  *     `realpathSync` anywhere).
  *
+ * Returns `{ relations, gaps }`, not a bare array, and `relations` is the
+ * whole point of the pair: it counts every entry-guard-shaped relation the
+ * walk CLASSIFIED, sanctioned ones included. An empty `gaps` means either "no
+ * broken guard" or "the walk recognized nothing at all", and those two read
+ * identically in a CI log. `scanRepo` sums it and the runner hard-fails on
+ * zero, so an AST-shape change, a `typescript` upgrade, or a refactor into an
+ * unrecognized form reds instead of reporting the class closed.
+ *
  * @param {string} source
  * @param {string} [fileName] drives the script kind, as in `findBareImportMetaMain`.
  */
@@ -301,12 +417,18 @@ export function findEntryGuardRealpathGaps(source, fileName = "input.mjs") {
   const sourceFile = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, kind);
 
   const gaps = [];
+  let relations = 0;
+  const aliases = collectArgvAndMetaAliases(sourceFile);
+  /** One hop through a single-assignment alias, so `ENTRY === SELF` is read as
+   * the initializers those two names hold. */
+  const deref = (node) => (ts.isIdentifier(node) ? aliases.get(node.text) ?? node : node);
 
-  const report = (guardNode, argvSide, metaSide, argvLeaf, metaLeaf) => {
-    const argvRealpath = hasWrappingCall(argvLeaf, argvSide, "realpathSync");
-    const metaRealpath = hasWrappingCall(metaLeaf, metaSide, "realpathSync");
-    const argvBasename = hasWrappingCall(argvLeaf, argvSide, "basename");
-    const metaBasename = hasWrappingCall(metaLeaf, metaSide, "basename");
+  const report = (guardNode, argvSide, metaSide, argvLeaves, metaLeaves) => {
+    relations += 1;
+    const argvRealpath = anyWrappedIn(argvLeaves, argvSide, REALPATH_CALLEES);
+    const metaRealpath = anyWrappedIn(metaLeaves, metaSide, REALPATH_CALLEES);
+    const argvBasename = anyWrappedIn(argvLeaves, argvSide, BASENAME_CALLEES);
+    const metaBasename = anyWrappedIn(metaLeaves, metaSide, BASENAME_CALLEES);
     let gapKind;
     if (argvBasename || metaBasename) gapKind = "basename-comparison";
     else if (argvRealpath && metaRealpath) return; // sanctioned form — not a finding
@@ -321,34 +443,33 @@ export function findEntryGuardRealpathGaps(source, fileName = "input.mjs") {
     });
   };
 
+  /** Classify one relation between two operands, each already deref'd through
+   * its alias, in whichever order argv0 and `import.meta.url` appear. */
+  const relate = (guardNode, a, b) => {
+    const aArgv = findLeaves(a, isProcessArgv1Node);
+    const bMeta = findLeaves(b, isImportMetaUrlNode);
+    if (aArgv.length > 0 && bMeta.length > 0) return report(guardNode, a, b, aArgv, bMeta);
+    const aMeta = findLeaves(a, isImportMetaUrlNode);
+    const bArgv = findLeaves(b, isProcessArgv1Node);
+    if (aMeta.length > 0 && bArgv.length > 0) return report(guardNode, b, a, bArgv, aMeta);
+  };
+
   const visit = (node) => {
     if (ts.isBinaryExpression(node) && EQUALITY_OPERATORS.has(node.operatorToken.kind)) {
-      const leftArgv = findLeaf(node.left, isProcessArgv1Node);
-      const rightMeta = findLeaf(node.right, isImportMetaUrlNode);
-      const leftMeta = findLeaf(node.left, isImportMetaUrlNode);
-      const rightArgv = findLeaf(node.right, isProcessArgv1Node);
-      if (leftArgv && rightMeta) report(node, node.left, node.right, leftArgv, rightMeta);
-      else if (leftMeta && rightArgv) report(node, node.right, node.left, rightArgv, leftMeta);
+      relate(node, deref(node.left), deref(node.right));
     } else if (
       ts.isCallExpression(node) &&
       ts.isPropertyAccessExpression(node.expression) &&
       node.expression.name.text === "endsWith" &&
       node.arguments.length > 0
     ) {
-      const object = node.expression.expression;
-      const arg = node.arguments[0];
-      const objArgv = findLeaf(object, isProcessArgv1Node);
-      const objMeta = findLeaf(object, isImportMetaUrlNode);
-      const argArgv = findLeaf(arg, isProcessArgv1Node);
-      const argMeta = findLeaf(arg, isImportMetaUrlNode);
-      if (objArgv && argMeta) report(node, object, arg, objArgv, argMeta);
-      else if (objMeta && argArgv) report(node, arg, object, argArgv, objMeta);
+      relate(node, deref(node.expression.expression), deref(node.arguments[0]));
     }
     ts.forEachChild(node, visit);
   };
   ts.forEachChild(sourceFile, visit);
 
-  return gaps;
+  return { relations, gaps };
 }
 
 /** Syntax errors, reported as their own category rather than as fake guards. */
@@ -388,6 +509,7 @@ export function scanRepo(repoRoot = REPO_ROOT, roots = SCAN_ROOTS) {
   const unparseable = [];
   const guardGaps = [];
   let filesScanned = 0;
+  let guardRelations = 0;
   for (const files of byRoot.values()) {
     for (const file of files) {
       filesScanned += 1;
@@ -401,12 +523,14 @@ export function scanRepo(repoRoot = REPO_ROOT, roots = SCAN_ROOTS) {
       for (const hit of findBareImportMetaMain(source, file)) {
         findings.push({ file: relPath, line: hit.line, snippet: hit.snippet });
       }
-      for (const gap of findEntryGuardRealpathGaps(source, file)) {
+      const guards = findEntryGuardRealpathGaps(source, file);
+      guardRelations += guards.relations;
+      for (const gap of guards.gaps) {
         guardGaps.push({ file: relPath, line: gap.line, kind: gap.kind, snippet: gap.snippet });
       }
     }
   }
-  return { filesScanned, findings, unparseable, guardGaps };
+  return { filesScanned, findings, unparseable, guardGaps, guardRelations };
 }
 
 // Realpath'd on both sides, never bare `import.meta.main` — this file is one
@@ -423,7 +547,7 @@ if (!invokedDirectly && ENTRY.endsWith("lint-no-bare-import-meta-main.mjs")) {
 }
 
 if (invokedDirectly) {
-  const { filesScanned, findings, unparseable, guardGaps } = scanRepo();
+  const { filesScanned, findings, unparseable, guardGaps, guardRelations } = scanRepo();
   if (unparseable.length > 0) {
     console.error(`Could not parse ${unparseable.length} file(s), so they were NOT checked:\n`);
     for (const bad of unparseable) console.error(`  ${bad.file} — ${bad.errors.join("; ")}`);
@@ -459,9 +583,28 @@ if (invokedDirectly) {
         "(see contract/run.mjs or scripts/no-eval-in-oss.mjs)."
     );
   }
-  if (findings.length > 0 || unparseable.length > 0 || guardGaps.length > 0) process.exit(1);
+  // The floor on the F-1488 half, and the counterpart to the per-root
+  // file-count floor inside scanRepo. An empty `guardGaps` is ambiguous on its
+  // own: it means "every entry guard realpaths both sides" OR "the walk
+  // recognized no entry guard at all", and only the first is a pass. This repo
+  // ships one guard per runnable script, so zero classified relations across
+  // ~750 files means the classifier went blind — a `typescript` upgrade
+  // changing an AST shape, argv0 read some new way, or the guards refactored
+  // behind a helper — and the D5 failure mode is reporting the class closed at
+  // exactly that moment.
+  if (guardRelations === 0) {
+    console.error(
+      `\nThe entry-guard check classified ZERO argv[1]-vs-import.meta.url relations across ${filesScanned} ` +
+        "file(s). Every runnable script in this repo has such a guard, so this is the checker being blind, " +
+        "not the repo being clean — refusing to report a pass (F-1488)."
+    );
+  }
+  if (findings.length > 0 || unparseable.length > 0 || guardGaps.length > 0 || guardRelations === 0) {
+    process.exit(1);
+  }
   console.log(
-    `No bare \`import.meta.main\` and no un-realpath'd entry guard in ${filesScanned} file(s) under ${SCAN_ROOTS.join(", ")}.`
+    `No bare \`import.meta.main\` in ${filesScanned} file(s) under ${SCAN_ROOTS.join(", ")}, and all ` +
+      `${guardRelations} entry-guard comparison(s) realpath both sides.`
   );
   process.exit(0);
 }
