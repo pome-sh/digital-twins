@@ -75,11 +75,59 @@ describe("stripe MCP tool fixture", () => {
 
   it("declares a substrate that admits nobody read this from Stripe", () => {
     expect(meta.substrate).toBe("twin-code-transcription");
-    // F-1326 recorded stripe as not-captured: there is no upstream table to
-    // compare against, and the provenance says so rather than implying one.
-    expect(meta.transcription?.comparedToUpstream).toMatch(/never/);
-    expect(meta.transcription?.comparedToUpstream).toMatch(/Restricted API Key/);
     expect(meta.liveToolCount).toBe(26);
+  });
+
+  // F-1485 — these two assertions used to pin the sentence's claim that this
+  // table had NEVER been compared upstream and could not be. That was true when
+  // F-1326 wrote it and false from 2026-08-10, when the golden landed; the test
+  // kept a green check on the false version, which is the failure mode where a
+  // guard reads as coverage it is not. Pinning provenance prose survives the
+  // correction — it is why the drift was catchable at all — so both pins move
+  // to the corrected sentence rather than being deleted.
+  //
+  // `Restricted API Key` moves verbatim: the per-credential mechanism is still
+  // the reason the comparison is scoped, it just no longer implies "and so
+  // there is nothing to compare". `never` moves to the clause that is now the
+  // true one — a consumer may never read the unshared names as full coverage.
+  it("pins a provenance sentence that says what was actually compared", () => {
+    const compared = meta.transcription?.comparedToUpstream ?? "";
+
+    expect(compared).toMatch(/Restricted API Key/);
+    expect(compared).toMatch(/never as full coverage/);
+
+    // The correction, not just any sentence: it has to name the capture that
+    // made comparison possible, and must not re-open with F-1326's verdict.
+    expect(compared).toMatch(/https:\/\/mcp\.stripe\.com/);
+    expect(compared).toMatch(/2026-08-10/);
+    expect(compared).not.toMatch(/never, and not comparable/);
+    // The old sentence pointed at a status file the golden replaced.
+    expect(compared).not.toMatch(/stripe\.status\.json/);
+  });
+
+  // The numbers in that sentence are a measurement, so they are re-measured
+  // here rather than trusted. `refund-reason-enum.test.ts` reads Stripe's enum
+  // off the same committed capture for the same reason: a hand-restated number
+  // in prose is exactly the thing that goes stale without anyone noticing.
+  it("states the comparison the two committed tables actually produce", () => {
+    const golden = JSON.parse(
+      readFileSync(
+        join(import.meta.dirname, "..", "..", "..", "fixtures", "mcp-tools-list", "stripe.raw.json"),
+        "utf8"
+      )
+    ) as { result: { tools: Array<{ name: string }> } };
+
+    const upstream = new Set(golden.result.tools.map((tool) => tool.name));
+    const twin = new Set(stripeToolFixture.toolNames);
+    const shared = [...twin].filter((name) => upstream.has(name));
+    const union = new Set([...twin, ...upstream]);
+
+    expect(shared).toEqual(["create_refund"]);
+
+    const compared = meta.transcription?.comparedToUpstream ?? "";
+    expect(compared).toContain(`of the ${union.size} union names exactly 1 is shared`);
+    expect(compared).toContain(`twin_only=${twin.size - shared.length}`);
+    expect(compared).toContain(`upstream_only=${upstream.size - shared.length}`);
   });
 
   // F-1325 — the fixture carries the inputSchema the wire serves, and the zod
