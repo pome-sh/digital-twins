@@ -30,7 +30,6 @@ import {
   sha256,
   unwrapEventStream,
 } from "./capture-mcp-tools-list.mjs";
-import { findEntryGuardRealpathGaps } from "./lint-no-bare-import-meta-main.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -142,24 +141,27 @@ function sandboxWithDeferredTwin() {
   // about, and the repo-wide one covers strictly more (every file, not just
   // this producer) with no hand-kept list of which files to watch.
   //
-  // Asserted by PARSING, via the same classifier the repo-wide gate uses,
-  // rather than by a regex over the source text. The regex this replaces
-  // required argv0 to appear before `import.meta.url` within 120 characters,
-  // which is a fact about source ORDER, not about the guard: F-1488 rewrote
-  // this guard into the sanctioned realpath-both-sides form with the
-  // `import.meta.url` const first and the regex failed on a guard that had
-  // just been made STRICTER. The classifier is order-independent, and it
-  // asserts the stronger property besides — one entry-guard relation, in the
-  // sanctioned shape (both sides realpath'd, no basename compare), so a
-  // rewrite into some other broken shape still reds here.
-  const producerGuard = findEntryGuardRealpathGaps(producerText, "capture-mcp-tools-list.mjs");
+  // Two independent, ORDER-INDEPENDENT assertions, one per side. The single
+  // regex these replace was `/process\.argv\[1\][\s\S]{0,120}import\.meta\.url/`,
+  // which encodes source ORDER rather than the guard: F-1488 rewrote this guard
+  // into the sanctioned realpath-both-sides form, which declares the
+  // `import.meta.url` const first, and the old regex failed on a guard that had
+  // just been made strictly STRONGER.
+  //
+  // Deliberately still a text match and NOT the repo-wide gate's AST
+  // classifier, tempting as reusing it is: `findEntryGuardRealpathGaps` lives
+  // in `lint-no-bare-import-meta-main.mjs`, which imports `typescript`, and
+  // THIS test runs in ci.yml's CHEAP block, which has no `npm ci`. Importing it
+  // here crashes the job with ERR_MODULE_NOT_FOUND — a dependency-free test
+  // must stay dependency-free. The AST version of this property is asserted
+  // repo-wide in the heavy block, over this file among all the others.
   assert(
-    producerGuard.relations === 1,
-    `this producer has exactly one process.argv[1]-vs-import.meta.url entry guard (found ${producerGuard.relations})`
+    /realpathSync\(\s*fileURLToPath\(\s*import\.meta\.url\s*\)\s*\)/.test(producerText),
+    "the CLI entry guard realpaths its own side (realpathSync(fileURLToPath(import.meta.url)))"
   );
   assert(
-    producerGuard.gaps.length === 0,
-    `this producer's entry guard realpaths both sides (got ${JSON.stringify(producerGuard.gaps)})`
+    /realpathSync\(\s*resolve\(\s*process\.argv\[1\]\s*\)\s*\)/.test(producerText),
+    "the CLI entry guard realpaths the argv0 side (realpathSync(resolve(process.argv[1])))"
   );
 }
 
