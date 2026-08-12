@@ -97,20 +97,20 @@ replaceOnce(
   "the adapter import block",
 );
 
-// 3. The startup hook (and the import.meta.main comments that name pome).
+// 3. The startup hook — drop `withPome()` so the fixture is genuinely unwired.
+// The entry guard itself is COPIED THROUGH unchanged: it is the realpath
+// compare on both sides, never bare `import.meta.main` (F-1481), so the
+// generated fixture cannot be an agent that exits 0 having run nothing on Node
+// 24.0/24.1. Emitting the bare form here would reintroduce the defect in a file
+// this repo's gate never sees, because the fixture is written to a tmpdir.
 replaceOnce(
   [
-    "// Only run the agent when executed directly (`npx tsx src/index.ts`). Guarding",
-    "// on `import.meta.main` keeps the module importable — e.g. by the secret-path",
-    "// unit test — without kicking off a full agent run on import.",
-    "if (import.meta.main) {",
     "  // Install the pome fetch-hook only for a real run — keeps the module free of",
-    "  // import-time side effects (the secret-path unit test imports it).",
+    "  // import-time side effects (the auth-token unit test imports it).",
     "  withPome();",
     "  await main();",
-    "}",
   ].join("\n"),
-  ["if (import.meta.main) {", "  await main();", "}"].join("\n"),
+  "  await main();",
   "the withPome() startup block",
 );
 
