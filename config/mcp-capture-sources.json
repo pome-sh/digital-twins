@@ -68,7 +68,7 @@
       "protocolVersion": "2025-06-18",
       "source": {
         "repo": "https://github.com/github/github-mcp-server",
-        "commit": "e6e3a4e8414686d9763e5e4840e1e0d61db9a992",
+        "commit": "c2bc7dc068245fda0d9779cfde1e84b0f338e4fb",
         "package": "./cmd/github-mcp-server",
         "language": "go"
       },

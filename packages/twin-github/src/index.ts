@@ -11,5 +11,6 @@ export type {
 export { defaultSeedState, parseSeed, seedSchema } from "./seed.js";
 export type { ParsedGitHubStateSeed } from "./seed.js";
 export { executeTool, githubToolFixture, githubToolInputSchema, toolArgumentSchemas } from "./tools.js";
+export { toolSchemaConformance } from "./tool-schema-conformance.js";
 export type { GitHubCloneAppOptions } from "./twin.js";
 export type { GitHubCloneDatabase, GitHubStateSeed, RecorderEvent } from "./types.js";

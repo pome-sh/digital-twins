@@ -239,6 +239,15 @@ jobs:
           # stale for want of exactly this line: the sha in its meta.json was
           # green the whole time, because a stale file is internally consistent.
           npm run gate:mcp-fixture -w @pome-sh/twin-gmail
+          # F-1468 — the same gate for twin-github, whose fixture stopped being a
+          # transcription of its own `src/tools.ts` and became a projection of
+          # GitHub's capture. It is the one of the three that can also ADD: two
+          # tools GitHub gates behind `X-MCP-Features` flags cannot appear in a
+          # flags-off golden and are carried from the previous fixture, so this
+          # line is also what catches a carried row GitHub has since started
+          # declaring — at which point the row should be the capture's and the
+          # matching known-divergences/github.mcp.yaml entry should be retired.
+          npm run gate:mcp-fixture -w @pome-sh/twin-github
           # F-1354 — real-SDK wire-protocol validation for twin-github's MCP
           # endpoint: boots the twin in-process, drives tools/list and a
           # tools/call over an actual StreamableHTTPClientTransport, and diffs
