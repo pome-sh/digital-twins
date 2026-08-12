@@ -9,15 +9,8 @@
  *
  * pome:unwired-ok(preview:drift): standalone human-run diff tool for debugging a suspected drift outside vitest. The exact assertion here — served tools/list equals the frozen canonical fixture — is already made by test/mcp-tool-fixture.test.ts, which runs under `npm test` in ci.yml, so wiring this would add a second source of one verdict, not a new one.
  *
- * Not wired into CI (F-1472 audit): the exact assertion here — served
- * tools/list equals the frozen canonical fixture — is already made by
- * `test/mcp-tool-fixture.test.ts`'s "serves exactly the fixture's listing
- * over tools/list" case, which DOES run under `npm test` in ci.yml. This file
- * is a standalone, human-run diff tool for debugging a suspected drift
- * outside vitest (no test-runner startup, plain stdout diff), not a second
- * source of the same verdict. `preview:drift` also does not match the check
- * vocabulary (`validate:*`/`check:*`/`lint:*`/`gate:*`/`test:*`/`assert:*`),
- * so the repo-root wiring guard does not expect it to be reachable either.
+ * The marker above is what `scripts/check-packages-scripts-wired.mjs` reads —
+ * `preview:drift` IS inside that gate's reach, so deleting the marker reds CI.
  */
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";

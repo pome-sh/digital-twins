@@ -49,11 +49,15 @@ jobs:
       - run: node scripts/lint-code-health.mjs
       - run: node scripts/check-first-party-twin-registration.mjs
       # F-1472 — closes the class F-1354 found one instance of: a `packages/*`
-      # script named like a check (validate:*/check:*/lint:*/gate:*/test:*/
-      # assert:*) that no workflow or root aggregate reaches produces no
-      # verdict, and no verdict reads exactly like a pass. Reads package.json
-      # scripts and workflow/root-script text only, so it runs here before
-      # `npm ci`.
+      # script that produces no verdict because nothing reaches it, and no
+      # verdict reads exactly like a pass. The partition is total: every
+      # `packages/*` script is a uniform lifecycle name, or wired as
+      # `npm run <script> ... -w <package>`, or carries a
+      # `pome:unwired-ok(<script>): <reason>` marker in the file it invokes.
+      # (It began as an allowlist of check-name PREFIXES, which could not see
+      # `smoke`, `review:harness` or `verify:cloud-token` — three real checks
+      # that had also never run.) Reads package.json scripts and
+      # workflow/root-script text only, so it runs here before `npm ci`.
       - run: node scripts/check-packages-scripts-wired.mjs
       - run: node scripts/check-packages-scripts-wired.test.mjs
       # release.yml only publishes on a version diff against npm — a PR that

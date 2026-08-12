@@ -57,12 +57,26 @@ import { fileURLToPath } from "node:url";
 const ROOT = process.cwd();
 
 /**
- * npm's own lifecycle script names. Not a list of things exempt from being a
- * check — a list of names npm assigns meaning to, which every package has and
- * which the root wires uniformly (`--workspaces --if-present`, or an explicit
- * `-w` list). This set is closed by npm, not by us: it does not grow when
- * someone adds a check under a name nobody predicted, which is the failure the
- * old prefix vocabulary had.
+ * The uniform lifecycle scripts, matched by EXACT name. `test`, `start`,
+ * `prepare`, `prepack`, `prepublishOnly` and `postinstall` are npm's own;
+ * `build`, `dev` and `typecheck` are this repo's convention, not something npm
+ * defines, and it is worth saying so rather than claiming npm closes the set.
+ *
+ * What makes the list safe is not who owns the names but that each is reached
+ * WITHOUT the `-w <package>` shape below, uniformly across every workspace:
+ * root `test` and `typecheck` are `npm run <name> --workspaces --if-present`
+ * (package.json:12,15), root `build` is `scripts/build.mjs` over the whole
+ * workspace graph, `prepack`/`prepare`/`prepublishOnly`/`postinstall` are npm's
+ * own pack/publish/install hooks, and `dev`/`start` are runtime entry points
+ * that assert nothing.
+ *
+ * It is still a list, and that is the residual: a check smuggled in under the
+ * exact name `dev` or `typecheck` would be skipped. It is a far smaller and
+ * far less load-bearing list than the check-name PREFIX vocabulary it replaced
+ * — nine exact names that already exist in every package, versus an open set of
+ * every prefix someone might invent for a new check — but it is not zero, and
+ * `packages/*` is the denominator, so `cli/`'s own `gate:*` scripts are out of
+ * this gate's reach entirely (follow-up).
  */
 const LIFECYCLE_SCRIPTS = new Set([
   "build",
@@ -148,13 +162,29 @@ function escapeRe(text) {
  * repo uses (see ci.yml's `npm run validate:mcp -w @pome-sh/twin-github`).
  */
 export function isWired(entry, corpus) {
+  const script = escapeRe(entry.scriptName);
+  const pkg = escapeRe(entry.pkgName);
   // `(?![\w:.-])`, never `\b`: `-` and `:` are non-word characters, so `\b`
   // after `gate:mcp` matches inside `gate:mcp-fixture`. A package declaring
   // both would have had the longer script's real CI line certify the shorter
   // one as wired while nothing ran it — the F-1354 shape, produced by the gate
-  // meant to catch it.
+  // meant to catch it. Same guard on the package name, so `@pome-sh/twin-slack`
+  // is not wired by a line naming `@pome-sh/twin-slack-legacy`.
+  const nameEnd = "(?![\\w:.-])";
+  const pkgEnd = "(?![\\w:./@-])";
+  // `npm run` and `npm run-script` are the same command; the workspace can be
+  // `-w X` or `--workspace X` or `--workspace=X`, and can come BEFORE or AFTER
+  // the script name. Accepting only one of those six spellings meant a
+  // genuinely-wired check went red the first time someone reformatted the line
+  // — a false red with a diagnosis pointing at the wrong thing. ci.yml's
+  // 180-char five-workspace `fidelity:parity` line is the obvious candidate.
+  const ws = `(?:-w|--workspace)[=\\s]+${pkg}${pkgEnd}`;
+  // A `--` ends npm's own options: in `npm run x -- -w pkg` the `-w` is passed
+  // to the SCRIPT, npm selects no workspace, and the command runs in the root.
+  // That is not wiring, so the gap before the workspace must not contain `--`.
+  const gap = "(?:(?!--)[^\\n])*";
   const re = new RegExp(
-    `npm run ${escapeRe(entry.scriptName)}(?![\\w:.-])[^\\n]*-w\\s+${escapeRe(entry.pkgName)}(?![\\w:./@-])`,
+    `npm run(?:-script)? (?:${ws}${gap}${script}${nameEnd}|${script}${nameEnd}${gap}${ws})`,
   );
   return re.test(corpus);
 }
@@ -200,7 +230,7 @@ const SELF_EXCLUDED = new Set([
 function stripCommentLines(text) {
   return text
     .split("\n")
-    .filter((line) => !/^\s*(#|\/\/)/.test(line))
+    .filter((line) => !/^\s*(#|\/\/|\/\*|\*)/.test(line))
     .join("\n");
 }
 
@@ -283,9 +313,22 @@ export function run(root) {
   // wired WRITE mode regenerates the artifact and asserts nothing, so it must
   // never certify the `--check` verdict as covered. Sharing a file alone is
   // not enough; the argv is the difference between a verdict and a rewrite.
-  const wiredCommands = entries.filter((e) => isWired(e, corpus)).map((e) => e.command);
+  const wired = entries.filter((e) => isWired(e, corpus));
   const coveredByWiredSuperset = (entry) =>
-    wiredCommands.some((wired) => wired.startsWith(`${entry.command} `));
+    wired.some(
+      (w) =>
+        // Same package. `wiredCommands` was flat, and twin-gmail and twin-slack
+        // both declare `fixture:mcp = tsx scripts/adopt-upstream-mcp-fixture.ts`
+        // — two DIFFERENT files with one command string — so unwiring gmail's
+        // `gate:mcp-fixture` left gmail's write half certified by slack's file.
+        w.pkgDir === entry.pkgDir &&
+        // Exactly `--check`, not "any extra argv". The claim being made is that
+        // the verdict mode runs everything the write mode does and then
+        // asserts; `startsWith(cmd + " ")` also let a wired
+        // `dev:foo = node scripts/foo.mjs --watch` certify an unwired
+        // `check:foo`, which asserts nothing.
+        w.command === `${entry.command} --check`,
+    );
 
   const failures = [];
   const exemptions = [];
@@ -294,7 +337,7 @@ export function run(root) {
     if (coveredByWiredSuperset(entry)) {
       exemptions.push({
         entry,
-        reason: "write half of a command a wired sibling runs with more arguments (the --check verdict)",
+        reason: "write half of a command the same package's wired sibling runs with --check (the verdict half)",
         derived: true,
       });
       continue;

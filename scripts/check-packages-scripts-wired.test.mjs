@@ -265,8 +265,92 @@ check(
     "packages/alpha/scripts/adopt.mjs": "console.log('ok');\n",
     ".github/workflows/ci.yml": "        run: npm run gate:mcp-fixture -w @pome-sh/alpha\n",
   },
-  { expect: "green", contains: "a wired sibling runs with more arguments" }
+  { expect: "green", contains: "wired sibling runs with --check" }
 );
+
+// Case 17 (break-on-purpose): the superset rule must be SAME-PACKAGE.
+// twin-gmail and twin-slack both declare `fixture:mcp = tsx
+// scripts/adopt-upstream-mcp-fixture.ts` — one command string, two different
+// files — so a flat command list let gmail's write half be certified by
+// slack's file after gmail's own verdict line was deleted.
+check(
+  "another package's wired --check does not cover this package's write half",
+  {
+    "packages/alpha/package.json": pkgJson("@pome-sh/alpha", { "fixture:mcp": "node scripts/adopt.mjs" }),
+    "packages/alpha/scripts/adopt.mjs": "console.log('ok');\n",
+    "packages/beta/package.json": pkgJson("@pome-sh/beta", {
+      "fixture:mcp": "node scripts/adopt.mjs",
+      "gate:mcp-fixture": "node scripts/adopt.mjs --check",
+    }),
+    "packages/beta/scripts/adopt.mjs": "console.log('ok');\n",
+    ".github/workflows/ci.yml":
+      "        run: npm run gate:mcp-fixture -w @pome-sh/beta\n        run: npm run fixture:mcp -w @pome-sh/beta\n",
+  },
+  { expect: "red", contains: '@pome-sh/alpha "fixture:mcp"' }
+);
+
+// Case 18 (break-on-purpose): the extra argv must be `--check`, not just MORE.
+// `startsWith(cmd + " ")` let a wired watch-mode dev script certify a verdict.
+check(
+  "a wired sibling with --watch does not cover an unwired check",
+  {
+    "packages/alpha/package.json": pkgJson("@pome-sh/alpha", {
+      "check:foo": "node scripts/foo.mjs",
+      "dev:foo": "node scripts/foo.mjs --watch",
+    }),
+    "packages/alpha/scripts/foo.mjs": "console.log('ok');\n",
+    ".github/workflows/ci.yml": "        run: npm run dev:foo -w @pome-sh/alpha\n",
+  },
+  { expect: "red", contains: '@pome-sh/alpha "check:foo"' }
+);
+
+// Case 19 (break-on-purpose): a JSDoc line is not wiring. This repo's house
+// style puts `Usage: npm run <script> -w <package>` in a script header, so a
+// comment ABOUT running a check was counting as running it.
+check(
+  "a JSDoc ` *` line mentioning the command is NOT wiring",
+  {
+    "packages/alpha/package.json": pkgJson("@pome-sh/alpha", { "check:foo": "node scripts/foo.mjs" }),
+    "packages/alpha/scripts/foo.mjs": "console.log('ok');\n",
+    "scripts/other.mjs": "/**\n * Usage: npm run check:foo -w @pome-sh/alpha\n */\nexport const x = 1;\n",
+  },
+  { expect: "red", contains: '@pome-sh/alpha "check:foo"' }
+);
+
+// Case 20 (break-on-purpose): `--` ends npm's own options, so in
+// `npm run x -- -w pkg` the `-w` goes to the SCRIPT, npm selects no workspace,
+// and the command runs in the root. Not wiring.
+check(
+  "a workspace flag after `--` is not wiring — npm selects no workspace",
+  {
+    "packages/alpha/package.json": pkgJson("@pome-sh/alpha", { "check:foo": "node scripts/foo.mjs" }),
+    "packages/alpha/scripts/foo.mjs": "console.log('ok');\n",
+    ".github/workflows/ci.yml": "        run: npm run check:foo -- -w @pome-sh/alpha\n",
+  },
+  { expect: "red", contains: '@pome-sh/alpha "check:foo"' }
+);
+
+// Cases 21-24: the syntaxes npm really accepts must all read as wired. Only
+// one spelling was accepted before, so a genuinely-wired check went red the
+// first time someone reformatted its line — a false red pointing at the wrong
+// thing. ci.yml's 180-char five-workspace fidelity:parity line is the
+// candidate.
+for (const [label, line] of [
+  ["workspace before the script name", "        run: npm run -w @pome-sh/alpha check:foo\n"],
+  ["--workspace= form", "        run: npm run check:foo --workspace=@pome-sh/alpha\n"],
+  ["--workspace space form", "        run: npm run --workspace @pome-sh/alpha check:foo\n"],
+  ["npm run-script", "        run: npm run-script check:foo -w @pome-sh/alpha\n"],
+]) {
+  check(
+    `wired via ${label} counts as wired`,
+    {
+      "packages/alpha/package.json": pkgJson("@pome-sh/alpha", { "check:foo": "node scripts/foo.mjs" }),
+      "packages/alpha/scripts/foo.mjs": "console.log('ok');\n",
+      ".github/workflows/ci.yml": line,
+    },
+    { expect: "green" }
+  );
+}
 
 if (failures > 0) {
   console.error(`\n${failures} case(s) failed.`);
