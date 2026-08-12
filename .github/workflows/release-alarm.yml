@@ -113,12 +113,23 @@ jobs:
       issues: write # the tracking issue
       packages: read # @pome-sh/wire's GitHub Packages version, as plan-wire reads it
     # F-1230 — whether this job's OWN mechanism ever reached a verdict, for
-    # the meta-alarm job below. Empty when the `check` step never ran at all
-    # (skipped on a pull_request event, or never reached because checkout,
-    # setup-node, the regression suite, or the --targets dead-guard failed
-    # first) — as opposed to 'success' or 'failure', either of which means
-    # the mechanism worked and evaluated the release, whether or not it liked
-    # what it found.
+    # the meta-alarm job below. 'success' or 'failure' both mean the mechanism
+    # worked and evaluated the release, whether or not it liked what it found.
+    #
+    # ANY OTHER VALUE means it never got that far, and the meta-alarm keys off
+    # exactly that — "not one of the two verdicts" — rather than off empty.
+    # There are two distinct non-verdict values and an earlier revision of this
+    # file only handled the rarer one:
+    #   'skipped' — the step was reached but its condition was false. A step
+    #     carrying an explicit `if:` still gets an implicit `success()`, so a
+    #     failed checkout / setup-node / regression suite / --targets dead-guard
+    #     SKIPS `check` and records 'skipped'. This is the common case, and the
+    #     one the meta-alarm exists for.
+    #   '' — `steps.check` is absent from the context entirely, i.e. the job
+    #     died before the runner got to that step at all (a "Set up job"
+    #     failure, a runner fault).
+    # Note also that `check` is `continue-on-error: true`, so `outcome` (not
+    # `conclusion`) is the field that carries the real verdict.
     outputs:
       checked: ${{ steps.check.outcome }}
     steps:
@@ -286,17 +297,30 @@ jobs:
   # checkout/setup-node/the regression suite/the --targets dead-guard failing
   # BEFORE `check` ever ran, which means the mechanism itself is broken and
   # said nothing about the release either way. `outputs.checked` distinguishes
-  # them: non-empty means `check` ran (the mechanism worked, whatever it
-  # found); empty means it never got the chance. Gated off pull_request
-  # because `check` is deliberately skipped there and an empty `checked` on a
-  # PR run is expected, not a mechanism outage.
+  # them: it is 'success' or 'failure' exactly when `check` reached a verdict
+  # (the mechanism worked, whatever it found), and anything else — 'skipped'
+  # when a preceding step failed and took `check`'s implicit `success()` with
+  # it, '' when the job died before the step existed in the context at all —
+  # means it never got the chance. Testing for "not one of the two verdicts"
+  # rather than for `== ''` is deliberate: 'skipped' is the COMMON case and an
+  # `== ''` test would have made this job unfireable in precisely the
+  # situation it was written for. Gated off pull_request because `check` is
+  # deliberately skipped there and a non-verdict on a PR run is expected, not
+  # a mechanism outage.
+  #
+  # NOT covered by design, so as not to overstate this: `release-alarm.mjs`
+  # THROWING once `check` is running yields outcome 'failure', which is
+  # indistinguishable here from "the release is not delivering". That case is
+  # handled inside the job instead — the tracking-issue body prints
+  # `(no reason was produced)` when the checker died before a verdict.
   meta-alarm:
     needs: alarm
     if: >-
       always() &&
       github.event_name != 'pull_request' &&
       needs.alarm.result == 'failure' &&
-      needs.alarm.outputs.checked == ''
+      needs.alarm.outputs.checked != 'success' &&
+      needs.alarm.outputs.checked != 'failure'
     permissions:
       contents: read
       issues: write
@@ -307,13 +331,21 @@ jobs:
       outcome: failure
       detail: "release-alarm.yml failed before its own check step ever ran — checkout, setup-node, the regression suite (scripts/ci/release-alarm.test.mjs), or the --targets dead-guard broke, so this run said nothing about whether the release is actually delivering. See the run log for which step failed."
 
+  # The exact negation of `meta-alarm`'s gate, and deliberately NOT also
+  # requiring `needs.alarm.result == 'success'`. The fact this alarm tracks is
+  # "did the mechanism reach a verdict", which `checked` alone answers. Also
+  # requiring a green job would mean that once the mechanism broke and filed,
+  # a subsequent run that worked perfectly but found the release genuinely
+  # broken (verdict 'failure', so the job reds on purpose) closes nothing — and
+  # since a real release outage is exactly when release-alarm.yml is red for a
+  # stretch, the "mechanism is broken" issue would sit open, contradicted and
+  # unread, for the whole stretch.
   meta-alarm-recovery:
     needs: alarm
     if: >-
       always() &&
       github.event_name != 'pull_request' &&
-      needs.alarm.result == 'success' &&
-      needs.alarm.outputs.checked != ''
+      (needs.alarm.outputs.checked == 'success' || needs.alarm.outputs.checked == 'failure')
     permissions:
       contents: read
       issues: write
