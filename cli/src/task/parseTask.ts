@@ -1,3 +1,4 @@
+// file-size: the criterion marker grammar and the two guards that refuse a line reaching for it (retired markers, near-misses) belong with the parser that applies them — and pome-cloud's scripts/check-criterion-grammar.ts reads CRITERION_LINE_RE as its registered authority by THIS path and binding, so splitting the grammar out would move the authority the cross-repo gate is pinned to.
 // SPDX-License-Identifier: Apache-2.0
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
@@ -339,6 +340,47 @@ const CRITERION_LINE_RE =
 // skip-non-criterion path below and the scenario would "pass" with fewer
 // criteria than its author wrote.
 const LEGACY_CRITERION_LINE_RE = /^[-*]\s+\[([DP])(?::([a-z][a-z0-9_-]*))?\]\s+(.+)$/;
+// A line that REACHES for a criterion marker and misses (F-1444). The grammar
+// above is exact and `parseCriteria` skips anything it does not match as prose,
+// so `- [code always-scored ] …`, `- [code:slack always-scored extra] …` and
+// `- [code alwaysscored] …` each loaded the task with one fewer criterion and no
+// error at all. That is the same failure LEGACY_CRITERION_LINE_RE exists to
+// prevent for the retired markers: a line visibly trying to be a criterion is
+// worth an error, not a shrug.
+//
+// DELIBERATELY NARROW. It fires only on a bullet the grammar itself knows
+// (`-`/`*`) whose bracket names `code` or `model` AS A WORD, so ordinary
+// markdown stays prose: `- [ ] todo`, `- [x] done`, `- [note] …`, `- [checks] …`,
+// `- [codex] …` and `- [modeling] …` are all untouched, and so is any line with
+// no bullet. A greedier rule would turn plain markdown into a parse error — a
+// louder failure than the silent drop it replaces, and a far more disruptive one.
+//
+// Checked ONLY once CRITERION_LINE_RE has already refused the line, so by
+// construction it can never refuse a line the grammar accepts.
+//
+// NOT REGISTERED in pome-cloud's `scripts/check-criterion-grammar.ts`, and must
+// not be: that gate compares the accepted LANGUAGE of CRITERION_LINE_RE across
+// its five copies, and the accepted language is unchanged here. This sits beside
+// the grammar exactly the way LEGACY_CRITERION_LINE_RE already does.
+//
+// Must stay identical to the hosted parser's (`apps/mcp/src/task/parseTask.ts`,
+// pome-cloud), refusal message included. A guard in only one of the two repos
+// re-opens the cross-parser disagreement F-1299 closed with the sign flipped: a
+// typo would parse hosted and throw here.
+const NEAR_MISS_CRITERION_LINE_RE = /^[-*]\s*\[\s*(code|model)\b[^\]]*\]/;
+
+/** The one wording for a near-miss refusal, shared with the hosted parser word
+ *  for word. It quotes the line so an author can find it by searching the file,
+ *  and names the grammar it failed by reading CRITERION_LINE_RE itself — so the
+ *  message cannot drift from the rule it is reporting. */
+function nearMissCriterionMessage(line: string): string {
+  return (
+    `Criterion line "${line}" reaches for a [code]/[model] marker but does not match the ` +
+    `criterion grammar ${CRITERION_LINE_RE.source} — fix the marker (e.g. "[code]", ` +
+    `"[code:slack]", "[code:slack always-scored]"); a line this close to a criterion is ` +
+    `refused rather than silently dropped as prose.`
+  );
+}
 
 function parseCriteria(input: string, twins: string[]): Criterion[] {
   const multiTwin = twins.length > 1;
@@ -356,7 +398,14 @@ function parseCriteria(input: string, twins: string[]): Criterion[] {
       );
     }
     const match = line.match(CRITERION_LINE_RE);
-    if (!match) continue;
+    if (!match) {
+      // F-1444: a near-miss is refused here rather than skipped. Reached only
+      // after the grammar has said no, so an accepted line never lands here.
+      if (NEAR_MISS_CRITERION_LINE_RE.test(line)) {
+        throw new Error(nearMissCriterionMessage(line));
+      }
+      continue;
+    }
     const kind = match[1]!; // "code" | "model"
     const tag = match[2]; // twin tag or undefined
     const alwaysScored = match[3] !== undefined; // F-1296/F-1299 `always-scored` keyword
