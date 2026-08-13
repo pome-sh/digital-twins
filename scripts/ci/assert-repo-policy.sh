@@ -41,7 +41,7 @@
 #      asserting it below — see the PR for F-1212.
 set -euo pipefail
 
-REPO="${GITHUB_REPOSITORY:-pome-sh/pome-twins}"
+REPO="${GITHUB_REPOSITORY:-pome-sh/digital-twins}"
 BRANCH="${POLICY_BRANCH:-main}"
 TOKEN="${GITHUB_TOKEN:?GITHUB_TOKEN required (ordinary Actions token; no PAT needed)}"
 RULES_OUT="$(mktemp)"

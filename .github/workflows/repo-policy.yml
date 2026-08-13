@@ -2,10 +2,12 @@ name: repo-policy
 
 # F-696 — assert protected main policy (PR + review + required checks).
 # F-1212 — the live check now reads GET .../rules/branches/{branch}, which an
-# ordinary contents:read GITHUB_TOKEN can call; the legacy
-# GET .../protection + .../rulesets endpoints needed Administration:read
-# (GITHUB_TOKEN cannot hold that scope), so the live check depended on a PAT
-# (REPO_POLICY_TOKEN) that was never minted — the weekly cron was red since
+# ordinary contents:read GITHUB_TOKEN can call. The legacy pair it replaces
+# needed Administration:read, which GITHUB_TOKEN cannot hold: GET .../protection
+# is auth-gated outright (401 unauthenticated), and while GET .../rulesets/{id}
+# does answer 200 for any caller on a public repo, it ELIDES the bypass_actors
+# field for callers without that scope — so the old check depended on a PAT
+# (REPO_POLICY_TOKEN) that was never minted, and the weekly cron was red since
 # it shipped. No PAT anywhere now, so the live check also runs on
 # pull_request: drift is caught on every touching PR, not just weekly.
 # repo-policy is not in config/required-checks.json's required set, so this

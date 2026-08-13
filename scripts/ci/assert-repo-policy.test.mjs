@@ -71,7 +71,7 @@ function runAssert(rules) {
     env: {
       ...process.env,
       GITHUB_TOKEN: "test-token",
-      GITHUB_REPOSITORY: "pome-sh/pome-twins",
+      GITHUB_REPOSITORY: "pome-sh/digital-twins",
       RULES_JSON: rulesPath,
     },
   });
@@ -306,7 +306,7 @@ if (ffRules.length === 0) {
       env: {
         ...process.env,
         GITHUB_TOKEN: "test-token",
-        GITHUB_REPOSITORY: "pome-sh/pome-twins",
+        GITHUB_REPOSITORY: "pome-sh/digital-twins",
         RULES_JSON: rulesPath,
       },
     });
