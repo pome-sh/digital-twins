@@ -173,6 +173,14 @@ const implementations: Record<ToolName, ToolImplementation> = {
             input.view === "THREAD_VIEW_METADATA_ONLY" ? "metadata" : "minimal"
           )
         ),
+        // `threads` above is the PAGE; this is the whole match set, which is
+        // why the count is exact rather than an estimate. Google documents the
+        // field as a lower bound, so an exact count satisfies the contract —
+        // and the advertised type is int64-as-STRING, not a number (F-1417).
+        // Unconditional: it is the answer to "how many matched", and 0 matches
+        // is an answer. Emitting it only when non-zero would make an absent
+        // field mean two different things.
+        resultCountEstimate: String(threads.length),
         ...(page.nextPageToken ? { nextPageToken: page.nextPageToken } : {}),
       };
     },

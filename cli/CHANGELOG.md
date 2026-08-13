@@ -4,6 +4,27 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.31
+
+### Patch Changes
+
+- **twin-gmail's `search_threads` serves `resultCountEstimate`** (F-1417). The
+  tool's own `outputSchema` has always advertised the field as an
+  int64-as-string, and the handler never produced it. No lane could report that:
+  twin-gmail's `mcp_diff` compares the served table against the upstream golden
+  and since F-1400 those are the same bytes, so the field is identical on both
+  sides and the comparison is silent by construction; the MCP read leg's oracle
+  names only what the seed fixes, so an omitted field it never mentioned is not
+  a `field-removed`. It was found by walking every tool's advertised
+  `outputSchema` against a live call — the only one of the thirteen with an
+  advertised field the handlers never produce.
+
+  The count is the whole match set rather than the returned page, and exact
+  rather than estimated: the domain computes the full match list before it
+  paginates, and Google documents the field as a lower bound, so an exact count
+  satisfies the contract. Emitted unconditionally, including `"0"` — an absent
+  field must not mean both "no matches" and "this twin does not serve it".
+
 ## 0.23.27
 
 ### Patch Changes
