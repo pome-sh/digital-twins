@@ -45,7 +45,15 @@
 //   5. The plan-only arm exists, is PR-guarded, and does not push. That arm is the
 //      fallback's whole reason for being; if it disappears, the fallback should go
 //      with it rather than sit there reachable-in-principle.
-//   6. Floors: the file exists, and the push-step and mint-step counts are
+//   6. The checkout ref is per arm, and its non-PR branch is `main` — the moving
+//      TIP, not the event sha, because a second merge that landed while this run
+//      queued belongs in the same release. This one is here because the first live
+//      run of this workflow died on it: an unconditional `ref: main` checks out a
+//      tree WITHOUT the PR's own files, so the plan-only arm — whose entire job is
+//      to prove this PR's allocator still runs — failed with
+//      `Cannot find module …/allocate-release-versions.test.mjs` (PR #421).
+//      Asserted only while the file has a `pull_request:` trigger to serve.
+//   7. Floors: the file exists, and the push-step and mint-step counts are
 //      non-zero. A checker whose subject has gone empty passes forever.
 //
 // Comment stripping is `list-scheduled-workflows.mjs`'s, not a third copy: its
@@ -119,10 +127,22 @@ export function parseSteps(lines) {
       uses: value("uses"),
       guard: value("if"),
       continueOnError: value("continue-on-error"),
+      ref: value("ref"),
       pushes: /\bgit push\b/.test(text),
     };
   });
 }
+
+/**
+ * The non-pull_request branch of a checkout `ref:` must be `main` — the moving tip.
+ * Accepts the literal, and the per-arm expression whose fallback side is `'main'`.
+ * The PR side is deliberately left open (`github.ref` and `github.sha` are both
+ * the merge ref on that event); what matters is that it is not `main`, which is a
+ * tree without the PR's own files.
+ */
+const REF_IS_TIP_LITERAL = /^main$/;
+const REF_IS_TIP_PER_ARM =
+  /^\$\{\{\s*github\.event_name\s*==\s*'pull_request'\s*&&\s*[^|]+\|\|\s*'main'\s*\}\}$/;
 
 /** Absent or literally `false`. Anything else — including `${{ true }}` — is not. */
 function neutralised(step) {
@@ -262,7 +282,45 @@ export function checkAllocateTokenPath(root) {
     );
   }
 
-  // 5 — the plan-only arm the fallback exists for.
+  // 6 — the checkout ref, per arm. Ordered before the plan-only check below only
+  // because it needs the same `hasPrTrigger` fact.
+  const hasPrTrigger = lines.some((line) => /^\s{2}pull_request:\s*$/.test(line));
+  const checkouts = steps.filter((step) => step.uses?.startsWith("actions/checkout@"));
+  if (checkouts.length === 0) {
+    errors.push(`no \`actions/checkout\` step — the allocator cannot read a tree it has not checked out.`);
+  }
+  for (const step of checkouts) {
+    if (step.ref === null) {
+      errors.push(
+        `the checkout step has no \`ref:\`, so a push run would check out the event sha instead of ` +
+          `main's tip — a merge that landed while this run queued would be left out of the release it ` +
+          `belongs to.`,
+      );
+      continue;
+    }
+    if (REF_IS_TIP_LITERAL.test(step.ref)) {
+      if (hasPrTrigger) {
+        errors.push(
+          `the checkout \`ref: ${step.ref}\` is unconditional while this workflow still has a ` +
+            `\`pull_request:\` trigger. On that arm it checks out a tree WITHOUT the PR's own files, so ` +
+            `the plan-only arm proves nothing and reds on the first missing module — which is exactly ` +
+            `how this workflow's first live run died. Use ` +
+            `\`\${{ github.event_name == 'pull_request' && github.ref || 'main' }}\`.`,
+        );
+      }
+      continue;
+    }
+    if (!REF_IS_TIP_PER_ARM.test(step.ref)) {
+      errors.push(
+        `the checkout \`ref: ${step.ref}\` does not resolve to main's tip on a push. The number belongs ` +
+          `to the TIP, not to the event sha: a second merge that landed while this run queued is ` +
+          `already on main and belongs in the same release. Accepted forms: \`main\`, or ` +
+          `\`\${{ github.event_name == 'pull_request' && <merge ref> || 'main' }}\`.`,
+      );
+    }
+  }
+
+  // 7 — the plan-only arm the fallback exists for.
   const planOnly = steps.filter((step) => step.guard?.includes(PR_ONLY_GUARD) && !step.pushes);
   if (ambientOccurrences > 0 && planOnly.length === 0) {
     errors.push(
@@ -281,7 +339,8 @@ export function checkAllocateTokenPath(root) {
       `${WORKFLOW}: ${steps.length} step(s), ${mintSteps.length} mint step(s)` +
       `${mint?.id ? ` (id: ${mint.id})` : ""}, ${pushSteps.length} pushing step(s), ` +
       `${planOnly.length} plan-only step(s), ${ambientOccurrences} ambient-token mention(s), ` +
-      `${precondition ? "1" : "0"} credential precondition.`,
+      `${precondition ? "1" : "0"} credential precondition, ` +
+      `${checkouts.length} checkout(s) (ref: ${checkouts.map((step) => step.ref ?? "absent").join(", ")}).`,
   };
 }
 

@@ -271,6 +271,61 @@ console.log("the fallback itself");
   );
 }
 
+console.log("the checkout ref, per arm — the way the first live run actually died");
+{
+  // PR #421's first run: `ref: main` on a pull_request event checks out a tree
+  // WITHOUT the PR's files, so the arm that exists to prove this PR's allocator
+  // runs died with `Cannot find module …/allocate-release-versions.test.mjs`.
+  const unconditional = run((t) =>
+    t.replace(
+      "ref: ${{ github.event_name == 'pull_request' && github.ref || 'main' }}",
+      "ref: main",
+    ),
+  );
+  check(
+    "an unconditional `ref: main` reds while a pull_request trigger exists",
+    /unconditional while this workflow still has a/.test(names(unconditional)),
+    names(unconditional),
+  );
+
+  // The other direction: the push arm must read the moving TIP, not the sha the
+  // event fired on, or a merge that landed while the run queued is left out of the
+  // release it belongs to.
+  const eventSha = run((t) =>
+    t.replace(
+      "ref: ${{ github.event_name == 'pull_request' && github.ref || 'main' }}",
+      "ref: ${{ github.sha }}",
+    ),
+  );
+  check(
+    "pinning the checkout to the event sha reds, naming the tip",
+    /does not resolve to main's tip on a push/.test(names(eventSha)),
+    names(eventSha),
+  );
+
+  const missing = run((t) =>
+    t.replace(
+      "          ref: ${{ github.event_name == 'pull_request' && github.ref || 'main' }}\n",
+      "",
+    ),
+  );
+  check(
+    "no `ref:` at all reds",
+    /checkout step has no `ref:`/.test(names(missing)),
+    names(missing),
+  );
+
+  // And the per-arm form is accepted with either spelling of the merge ref, so the
+  // check does not red a correct file (a guard that reds right answers gets deleted).
+  const shaForm = run((t) =>
+    t.replace(
+      "ref: ${{ github.event_name == 'pull_request' && github.ref || 'main' }}",
+      "ref: ${{ github.event_name == 'pull_request' && github.sha || 'main' }}",
+    ),
+  );
+  check("`github.sha` on the PR side is accepted too", shaForm.errors.length === 0, names(shaForm));
+}
+
 console.log("the checker's own floors");
 {
   let threw = "";

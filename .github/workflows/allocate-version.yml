@@ -157,17 +157,26 @@ jobs:
       # fetch-depth: 0 is load-bearing. The allocator asks "when did this
       # package's version last move" and refuses to answer from a shallow clone,
       # because a truncated walk silently mis-scopes which packages are owed a
-      # release. `ref: main` (not the event sha) because the number belongs to
-      # the tip: if a second merge landed while this run queued, its entry is
-      # already on main and belongs in the same release.
+      # release.
+      #
+      # THE REF IS PER ARM, and getting it wrong is how the first run of this
+      # workflow failed. On a push, `main` (not the event sha) because the number
+      # belongs to the TIP: if a second merge landed while this run queued, its
+      # entry is already on main and belongs in the same release. On a
+      # pull_request, `github.ref` — the merge ref — because that arm's whole job
+      # is to prove THIS PR's allocator still runs, and a checkout of `main` does
+      # not contain the PR's files at all (which is exactly how PR #421's first
+      # run died: `Cannot find module …/allocate-release-versions.test.mjs`). The
+      # merge ref is also the better preview: it is what main will look like.
       #
       # `|| github.token` is for the pull_request arm ONLY, where the mint step is
       # skipped and its output is empty — a fork PR has no secrets at all. That
       # arm plans and never pushes, so the ambient token is the right credential
-      # there and the wrong one everywhere else.
+      # there and the wrong one everywhere else. That split is asserted
+      # structurally by scripts/ci/assert-allocate-token-path.mjs.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
+          ref: ${{ github.event_name == 'pull_request' && github.ref || 'main' }}
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token || github.token }}
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
