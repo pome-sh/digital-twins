@@ -121,14 +121,17 @@ npm test
 
 The package publishes the `pome` binary from `dist/src/cli/main.js`.
 
-### Versioning — every behavior change ships with a bump
+### Versioning — every behavior change ships with a release, and you do not write the number
 
-Bump `version` in `cli/package.json` and add the user-facing entry to
-`CHANGELOG.md` in the same PR. Merging to `main` is the release trigger:
+Add the user-facing entry to `CHANGELOG.md` under an `## Unreleased (patch)` (or
+`(minor)`) heading, above the newest released one, and leave `version` in
+`cli/package.json` alone — a PR that moves it fails CI. Merging to `main` is the
+release trigger: `.github/workflows/allocate-version.yml` allocates the number
+there, rewriting that heading and the manifest in one commit, and
 `.github/workflows/release.yml` compares the local version against npm and
-publishes when they differ. `pome --version` reports the bumped value from a
+publishes when they differ. `pome --version` reports the allocated value from a
 build-time constant, so a user can always tell whether their install carries a
-given fix.
+given fix. See [`RELEASING.md`](../RELEASING.md).
 
 ## License
 

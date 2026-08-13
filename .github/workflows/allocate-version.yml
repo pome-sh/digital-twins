@@ -1,0 +1,253 @@
+name: allocate version
+
+# F-1511 — the version number leaves the PR author's hands; this is the hand it
+# lands in. The reasoning, the rejected alternative and the one-time credential
+# setup are in RELEASING.md ("Why the number is not yours to write" and "The
+# credential: pome-ops-push, and the one-time setup around it"); the full ADR
+# lives in the private pome-cloud docs, where this repo's design records live.
+#
+# Every twins PR used to hand-write the shared version line, so every merge
+# invalidated every open PR that had pinned a consumed number — silently, while
+# still green, across workspaces and humans. Measured 2026-08-13: #402/#405 went
+# stale-green overnight, five renumber+force-push cycles in one batch night,
+# 0.23.35/.36 burned unpublished. `strict_required_status_checks_policy` on main
+# existed only to keep the version gate's verdict fresh against a moving base.
+#
+# This workflow reads `main`'s tip, allocates the numbers that tip has earned
+# (`scripts/ci/allocate-release-versions.mjs` decides), writes them into the
+# manifests and the CHANGELOG headings, and pushes ONE commit back to `main`.
+#
+# ── WHAT THIS DELIBERATELY DOES NOT DO ───────────────────────────────────────
+#
+# It does not publish, and `release.yml` is untouched by it. `release.yml` still
+# triggers on push to `main`, still compares each package's local manifest
+# against its registry, still hard-fails on behind-npm and still baselines a
+# never-seen package at 0.0.0. The bump commit is a push to `main`, so the
+# publish is that commit's own `release.yml` run. Two consequences worth stating:
+# the run on the HUMAN merge commit sees no version diff and publishes nothing
+# (correct — the number does not exist yet at that sha), and `release.yml`'s
+# `concurrency: release-${{ github.ref }}` with `cancel-in-progress: false` is
+# what serialises the publish half, as it already did.
+#
+# This is NOT a return to changesets or batch releases. Nothing waits for a
+# release PR, nothing batches, and #239's deletion of both stands: what moved is
+# WHO WRITES THE NUMBER, not when a release happens.
+#
+# ── WHY AN APP TOKEN AND NOT THE AMBIENT GITHUB_TOKEN ────────────────────────
+#
+# The push is made with an installation token minted from the org's
+# `pome-ops-push` GitHub App (app_id 4582446, org installation 153466692,
+# Contents: RW). Two independent reasons the ambient `GITHUB_TOKEN` cannot do it,
+# either one sufficient:
+#
+#   1. `main`'s live rules (ruleset "main founder-bypass" 18797095, the ones
+#      scripts/ci/assert-repo-policy.sh asserts) require a pull request, resolved
+#      threads, strict required status checks and non-fast-forward, and classic
+#      branch protection sits underneath them. A direct push needs an actor those
+#      rules let bypass — and `github-actions` can NEVER be one: the UI and the
+#      API both refuse it, and org policy disables deploy keys. An App
+#      installation CAN (`actor_type: Integration`), which is why this app exists.
+#   2. GitHub refuses to let a push made with the ambient `GITHUB_TOKEN` trigger
+#      workflows. That push would land the number and no `release.yml` run would
+#      ever see it — a release that silently never happens, which is the failure
+#      class this whole apparatus exists to remove. (`release-alarm.mjs`'s
+#      NEVER_RAN leg names exactly this trap, because F-1180 walked into it.) An
+#      App installation token is NOT event-suppressed: only `GITHUB_TOKEN` is.
+#
+# WHY AN APP AND NOT A FINE-GRAINED PAT, which is what this job was first written
+# against. A PAT expires — and its expiry day is a release-freeze day nobody
+# scheduled — and it binds the release path to one person's account. An App
+# private key does not expire and rotates in one click. `pome-ops-push` was built
+# 2026-08-13 for exactly this problem class in pome-cloud (PR #730:
+# fidelity-watch.yml, declared-diff.yml, SECRETS.md), and the pattern is proven in
+# production there: commit 6bbf202d pushed through pome-cloud's ACTIVE "main
+# founder-bypass" ruleset the same day.
+#
+# THE F-1212 LESSON, WHICH CUT AGAINST THE PAT VERSION OF THIS AND IS WHY THE APP
+# IS THE BETTER ANSWER: this repo just DELETED its only PAT dependency
+# (`REPO_POLICY_TOKEN`) because the PAT was never minted, so repo-policy.yml's
+# weekly cron was red from the day it shipped and its live check never ran once. A
+# credential nobody creates is a check nobody runs. The App removes the recurring
+# half of that risk (nothing to re-mint on a schedule); the fail-loud half stays
+# either way — a missing secret is a hard, named failure and never a fallback,
+# because falling back to `GITHUB_TOKEN` would push nothing (reason 1) or publish
+# nothing (reason 2), and both of those look like a quiet green.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  # Changing the allocator or the table it reads must prove the job wiring still
+  # works on the PR that changes it — a syntax-valid workflow whose steps are
+  # broken is the F-1471 class. The PR arm plans and never writes or pushes.
+  pull_request:
+    paths:
+      - "scripts/ci/allocate-release-versions.mjs"
+      - "scripts/ci/allocate-release-versions.test.mjs"
+      - "scripts/ci/changelog-entry.mjs"
+      - "scripts/ci/publish-relevance.mjs"
+      - ".github/workflows/allocate-version.yml"
+
+# One allocation at a time, and never cancelled mid-write: the number is a
+# side effect on `main`, so a cancelled run is a half-written release commit.
+# Serialising also means the retry loop below only ever races a human merge, not
+# another copy of itself.
+concurrency:
+  group: allocate-version-${{ github.ref }}
+  cancel-in-progress: false
+
+# The ambient token gets nothing. The push uses the `pome-ops-push` installation
+# token (see the header), so granting `contents: write` here would hand out a
+# capability nothing in this file uses — and could not do the job anyway.
+permissions:
+  contents: read
+
+jobs:
+  allocate:
+    name: write the version numbers this push earned
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # A cheap "don't even start" on the allocator's own commit — NOT the loop
+    # guard. The guard is structural and lives in the allocator: relevance is
+    # measured from the last commit that moved a package's version, and the bump
+    # commit is one, so its own diff is already inside the previous release. If
+    # this literal and BUMP_COMMIT_MARKER in the script ever drift apart, the job
+    # runs and finds nothing to do.
+    if: ${{ !contains(github.event.head_commit.message, '[release-bump]') }}
+    steps:
+      # Named before the mint step rather than left to it: the action's own
+      # failure on an empty input does not tell a reader which secret, on which
+      # repository, or what to do about it — and this is the message someone meets
+      # when releases have silently stopped.
+      - name: The pome-ops-push credentials must exist
+        if: github.event_name != 'pull_request'
+        env:
+          OPS_APP_ID: ${{ secrets.OPS_APP_ID }}
+          OPS_APP_PRIVATE_KEY: ${{ secrets.OPS_APP_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${OPS_APP_ID}" || -z "${OPS_APP_PRIVATE_KEY}" ]]; then
+            echo "::error::OPS_APP_ID / OPS_APP_PRIVATE_KEY are not both set, so no version can be allocated and nothing will publish."
+            echo "These are the org's pome-ops-push GitHub App (app_id 4582446). Three one-time steps,"
+            echo "in this order — RELEASING.md has the commands:"
+            echo "  1. App installation -> Repository access includes pome-sh/digital-twins (UI only)."
+            echo "  2. Generate a SECOND private key (pome-cloud holds the first, write-only), then"
+            echo "     gh secret set OPS_APP_ID / OPS_APP_PRIVATE_KEY on this repository."
+            echo "  3. Add the app to ruleset 18797095's bypass_actors as actor_type Integration."
+            echo "Step 3 answers 422 before step 1 is done. The ambient GITHUB_TOKEN cannot stand in:"
+            echo "it can never be a ruleset bypass actor, and a push made with it does not trigger release.yml."
+            exit 1
+          fi
+
+      # An installation token, not a PAT: nothing to re-mint before an expiry
+      # nobody scheduled, and no binding of the release path to one person's
+      # account. `app-id` (not `client-id`) matches pome-cloud's #730 call sites so
+      # both repos read the same way; v3.2.0 prints a deprecation warning for it,
+      # and migrating is a some-day for the two repos together, not a divergence to
+      # introduce here. No `owner`/`repositories` inputs: the default scopes the
+      # token to this repository through the org installation, which is exactly
+      # what the push needs.
+      - name: Mint a pome-ops-push installation token
+        id: app-token
+        if: github.event_name != 'pull_request'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.OPS_APP_ID }}
+          private-key: ${{ secrets.OPS_APP_PRIVATE_KEY }}
+
+      # fetch-depth: 0 is load-bearing. The allocator asks "when did this
+      # package's version last move" and refuses to answer from a shallow clone,
+      # because a truncated walk silently mis-scopes which packages are owed a
+      # release. `ref: main` (not the event sha) because the number belongs to
+      # the tip: if a second merge landed while this run queued, its entry is
+      # already on main and belongs in the same release.
+      #
+      # `|| github.token` is for the pull_request arm ONLY, where the mint step is
+      # skipped and its output is empty — a fork PR has no secrets at all. That
+      # arm plans and never pushes, so the ambient token is the right credential
+      # there and the wrong one everywhere else.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token || github.token }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      # Gate on the allocator's own tests before letting it write to main, the
+      # same ordering release-alarm.yml uses: a commit on main is not the place
+      # to discover the writer is broken.
+      - name: Regression-test the allocator
+        run: node scripts/ci/allocate-release-versions.test.mjs
+
+      - name: What would this push allocate?
+        if: github.event_name == 'pull_request'
+        run: node scripts/ci/allocate-release-versions.mjs
+
+      - name: Allocate, write, and push one commit to main
+        if: github.event_name != 'pull_request'
+        env:
+          PLAN: ${{ runner.temp }}/allocation.json
+          MESSAGE: ${{ runner.temp }}/allocation-message.txt
+          REGEN: ${{ runner.temp }}/allocation-regenerate.sh
+        run: |
+          set -euo pipefail
+          # The commit AUTHOR is cosmetic; what the ruleset bypass keys on is the
+          # PUSHER, which is the pome-ops-push installation whose token checkout
+          # stored above. Naming the workflow here means `git log` explains itself
+          # without anyone having to know that.
+          git config user.name "pome release bot"
+          git config user.email "release-bot@pome.sh"
+
+          # Three attempts, and each one RECOMPUTES rather than retrying a stale
+          # write: the allocator is a pure function of the tip, so re-planning
+          # after a rejected push is both correct and the only way to fold in the
+          # merge that beat us to it. `git reset --hard` discards the previous
+          # attempt's writes but not node_modules, which is untracked.
+          for attempt in 1 2 3; do
+            # Explicit destination refspec rather than a bare `git fetch origin
+            # main`: which remote-tracking ref that updates depends on the
+            # `remote.origin.fetch` refspec actions/checkout happened to
+            # configure, and resetting to a stale origin/main would re-plan
+            # against the tip we were trying to get away from.
+            git fetch --quiet --force origin main:refs/remotes/origin/main
+            git reset --quiet --hard refs/remotes/origin/main
+
+            node scripts/ci/allocate-release-versions.mjs \
+              --write --plan-out "${PLAN}" --message-out "${MESSAGE}" --regen-out "${REGEN}"
+
+            if git diff --quiet; then
+              echo "Nothing to allocate at $(git rev-parse --short HEAD) — no commit, no publish."
+              exit 0
+            fi
+
+            # Committed artifacts that embed a package's own version and are
+            # byte-compared by a required gate — today only wire's shipped
+            # trace-contract.json. The command comes from the table next to the
+            # artifact (scripts/ci/publish-relevance.mjs), so a second one needs
+            # no edit here; an empty file means no package in this plan has one,
+            # which is why `npm ci` is inside the guard.
+            if [[ -s "${REGEN}" ]]; then
+              echo "Regenerating version-embedding artifacts:"
+              cat "${REGEN}"
+              npm ci --no-audit --no-fund
+              bash "${REGEN}"
+            fi
+
+            # `-a` is safe and deliberate: this is a fresh checkout whose only
+            # writers are the allocator and the regeneration above.
+            git commit --quiet -a --file "${MESSAGE}"
+            if git push --quiet origin HEAD:main; then
+              echo "Allocated on main:"
+              cat "${MESSAGE}"
+              exit 0
+            fi
+            echo "::warning::push to main was rejected on attempt ${attempt}/3 — a merge landed first. Recomputing."
+          done
+
+          echo "::error::Could not land the version allocation after three attempts. Nothing published;"
+          echo "the pending CHANGELOG entries are still on main, so release-alarm.yml will report this"
+          echo "within a day (UNALLOCATED). Re-run this workflow once main is quiet."
+          exit 1

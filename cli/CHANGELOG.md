@@ -1,8 +1,27 @@
 # Changelog
 
 Entries are hand-written from 0.9.0 on. Changesets was retired with the
-packaging restructure: bump `version` here and in `package.json`, and merging to
-`main` publishes (see `.github/workflows/release.yml`).
+packaging restructure, and F-1511 took the NUMBER out of PRs: in a PR, add your
+entry under an `## Unreleased (patch)` (or `(minor)`) heading above the newest
+released one. `.github/workflows/allocate-version.yml` rewrites that heading to
+the version it allocates on `main` after the merge, in the same commit that moves
+`package.json`, and `.github/workflows/release.yml` publishes from there. Do not
+write a version number here or in `package.json` — see `RELEASING.md`. Released
+entries are insertions only: a correction is the next entry, naming the one it
+corrects.
+
+## Unreleased (patch)
+
+No user-visible change to the CLI itself. This release carries the corrected
+release instructions in the shipped `README.md` (and this file's preamble):
+F-1511 moved the version number out of PRs, so "bump `version` in
+`cli/package.json` and add the entry in the same PR" is no longer true — the
+entry is yours, the number is `allocate-version.yml`'s. `RELEASING.md` has the
+runbook.
+
+This is the first entry of this shape in the repo, and it is deliberately not
+special: the heading above says `patch` because a consumer has nothing to act on,
+and the pipeline turned it into a number on merge without anyone typing one.
 
 ## 0.23.46
 
