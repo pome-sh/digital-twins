@@ -17,6 +17,17 @@ export class TwinError extends Error {
 }
 
 /**
+ * What GitHub sends when it is not naming an operation, and what this twin
+ * sends when it does not know one.
+ *
+ * Not a fallback nobody meant: GitHub itself answers exactly this on 14 of 59
+ * measured errors — every 401, every unrouted path, and `GET /users/:username`
+ * (F-1490's transcript). `withOperationDocs` below only overwrites THIS value,
+ * so a url a throw site already knew (F-1460, F-1491) survives.
+ */
+export const GENERIC_DOCUMENTATION_URL = "https://docs.github.com/rest";
+
+/**
  * Build GitHub's error body: `{message, documentation_url, status, errors?}`.
  *
  * `status` is rendered as a **STRING**, which looks like a bug and is not.
@@ -33,10 +44,57 @@ export class TwinError extends Error {
 export function githubError(message: string, status: number, errors?: unknown[], documentationUrl?: string) {
   return {
     message,
-    documentation_url: documentationUrl ?? "https://docs.github.com/rest",
+    documentation_url: documentationUrl ?? GENERIC_DOCUMENTATION_URL,
     status: String(status),
     ...(errors ? { errors } : {})
   };
+}
+
+/**
+ * Attach the operation's `documentation_url` to an already-projected envelope
+ * (F-1498). The DOOR knows the operation; the error does not.
+ *
+ * Deliberately envelope-side rather than error-side on the REST leg: it has to
+ * reach the zod branch and the JSON-parse branch too, which raise no
+ * `TwinError` and have no field to carry a url in — and GitHub's 14 measured
+ * 422s were operation-specific like its 404s.
+ *
+ * Two things it will not do:
+ * - **overwrite a url the throw site already knew.** `domain/git.ts` stamps the
+ *   contents-door `sha` and base64 errors (F-1460, F-1491); those are the same
+ *   operation this would stamp, and re-stamping them would make the throw-site
+ *   constants dead code that looks live.
+ * - **name an operation on a 501.** The twin's own refusals — an unrouted path,
+ *   an MCP `method` it does not model — are not GitHub errors being proxied,
+ *   and the unrouted class is one of the three measured GENERIC ones.
+ */
+export function withOperationDocs(
+  envelope: { status: number; body: unknown },
+  documentationUrl: string
+): { status: number; body: unknown } {
+  if (envelope.status === 501) return envelope;
+  const body = envelope.body;
+  if (!body || typeof body !== "object") return envelope;
+  const current = (body as { documentation_url?: unknown }).documentation_url;
+  if (current !== GENERIC_DOCUMENTATION_URL) return envelope;
+  return { status: envelope.status, body: { ...body, documentation_url: documentationUrl } };
+}
+
+/**
+ * The same attachment, error-side, for the MCP door (F-1498).
+ *
+ * The MCP leg cannot use the envelope form: the SDK projects a tool error
+ * through the twin-wide `errorEnvelope` with no per-tool hook, and the operation
+ * is not even KNOWN until the arguments parse — `issue_read` stands for three
+ * different operations depending on `method`. So `executeTool` stamps the error
+ * it is about to rethrow, after the parse and around the dispatch.
+ *
+ * Same two refusals as above, for the same reasons.
+ */
+export function withDocumentationUrl(error: unknown, documentationUrl: string): unknown {
+  if (!(error instanceof TwinError)) return error;
+  if (error.documentationUrl !== undefined || error.status === 501) return error;
+  return new TwinError(error.message, error.status, error.errors, documentationUrl);
 }
 
 export function notFound(message = "Not Found"): never {

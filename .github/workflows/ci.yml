@@ -382,6 +382,18 @@ jobs:
           # declaring — at which point the row should be the capture's and the
           # matching known-divergences/github.mcp.yaml entry should be retired.
           npm run gate:mcp-fixture -w @pome-sh/twin-github
+          # F-1498 — twin-github's per-operation `documentation_url` slice of
+          # GitHub's published OpenAPI description. The 12.9 MB description is
+          # NOT committed, so this line is what proves the 24 KB that is: the
+          # artifact's REST keys must be exactly the surfaces the twin MOUNTS
+          # (66, not route-inputs.json's 65 — that artifact drops zero-input
+          # surfaces, which is how `GET /user` went missing from the mapping in
+          # the first place), its MCP keys exactly the 36 tools it serves, every
+          # mapped `method` one the tool's own zod schema accepts, and every url
+          # `…/rest/<category>/<subcategory>#<anchor>` from the committed
+          # x-github pair. Needs the build above: it imports the twin's route
+          # declarations, which resolve through @pome-sh/sdk's dist.
+          npm run gate:operation-docs -w @pome-sh/twin-github
           # F-1480 — the same gate for twin-linear, whose fixture stopped being
           # `twin-authored-from-vendor-docs` (the NAMES came from Linear's
           # published docs and every description and schema was ours) and became

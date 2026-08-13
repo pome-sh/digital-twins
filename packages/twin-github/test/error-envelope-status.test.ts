@@ -39,10 +39,15 @@
 // ⚠️ IT DOES NOT COVER EVERY ENVELOPE THE TWIN EMITS, and F-1490 measured
 // exactly which ones it misses: the 401 sites in `twin.ts`, the SDK's admin-gate
 // 403, and the 501 catch-all all build their bodies by hand and carry NO
-// `status` leaf at all. Those are registered as divergences 31 and 32 rather
-// than fixed here, because two of the three live in `@pome-sh/sdk` and are
-// shared by all five twins. The last test in this file pins that gap so it
-// cannot be mistaken for coverage.
+// `status` leaf at all. That is registered as divergence 31 rather than fixed
+// here, because two of the three live in `@pome-sh/sdk` and are shared by all
+// five twins. The last test in this file pins that gap so it cannot be mistaken
+// for coverage.
+//
+// The OTHER leaf F-1490 registered — `documentation_url` naming no operation,
+// divergence 32 — was closed by F-1498, and the two assertions that pinned it
+// generic moved rather than went away. Where they went, and why the new reading
+// is honest, is written on each of them below.
 
 import { describe, expect, it } from "vitest";
 import { createGitHubCloneApp } from "../src/twin.js";
@@ -84,6 +89,9 @@ describe("F-1490 — the envelope builder always renders `status` as a string", 
   });
 
   it("does not disturb the other three leaves", () => {
+    // The generic url is still the helper's default, and F-1498 did not change
+    // that: it is what GitHub sends where it names no operation, and what the
+    // twin sends where it knows none. The DOOR supplies the specific one.
     expect(githubError("Not Found", 404)).toEqual({
       message: "Not Found",
       documentation_url: "https://docs.github.com/rest",
@@ -114,9 +122,19 @@ describe("F-1490 — the envelope builder always renders `status` as a string", 
 describe("F-1490 — on the wire, across every error class the twin can be made to emit", () => {
   it("404 from a read", async () => {
     const app = createGitHubCloneApp();
+    // ⚠️ MOVED BY F-1498, and this is the whole envelope so it cannot move
+    // quietly: `documentation_url` was the generic `https://docs.github.com/rest`
+    // here, pinned deliberately as divergence 32's evidence. This route now
+    // names its own operation, which is what real GitHub answered on all 45
+    // routed, authenticated errors it was measured on. `status` — this file's
+    // subject — is untouched.
     expect(await rest(app, "GET", "/repos/acme/nope")).toEqual({
       status: 404,
-      body: { message: "Not Found", documentation_url: "https://docs.github.com/rest", status: "404" }
+      body: {
+        message: "Not Found",
+        documentation_url: "https://docs.github.com/rest/repos/repos#get-a-repository",
+        status: "404"
+      }
     });
   });
 
@@ -197,16 +215,30 @@ describe("F-1490 — the envelopes this fix does NOT reach, pinned as gaps", () 
     expect("status" in (got.body as object)).toBe(false);
   });
 
-  it("every reached envelope still carries the GENERIC documentation_url — divergence 32", async () => {
+  it("the 401 and the 501 catch-all still name NO operation — and must not (F-1498)", async () => {
     const app = createGitHubCloneApp();
 
-    // ⚠️ Also a gap. Real GitHub names the operation on 45 of the 59 measured
-    // errors. The twin cannot: `errorEnvelope` receives the error and nothing
-    // else, and `notFound()` in `requireRepo` is reachable from ~40 routes and
-    // ~30 tools, so the throw site does not know which door was knocked on.
-    // The contents-door sha errors are the exception (F-1491) precisely because
-    // they can only come from one operation.
-    const got = await rest(app, "GET", "/repos/acme/nope");
-    expect((got.body as { documentation_url: string }).documentation_url).toBe("https://docs.github.com/rest");
+    // ⚠️ RE-CUT BY F-1498, not deleted. This assertion used to read "every
+    // reached envelope still carries the GENERIC documentation_url" and stood
+    // for divergence 32's whole surface. That half is closed: a routed,
+    // authenticated error now names its operation (see
+    // `test/operation-documentation-url.test.ts`).
+    //
+    // What survives is the part of divergence 32 that was never a gap. GitHub
+    // itself answers generically on 14 of 59 measured errors, and two of those
+    // three classes are these — every 401 (8/8), because authentication fails
+    // before dispatch, and every unrouted path (4/4). The twin was accidentally
+    // right on both, so this pins them as REQUIREMENTS now rather than as an
+    // absence: a later change that stamped an operation here would be a new
+    // divergence pointing the other way.
+    const unauthorized = await app.request(`${base}/repos/acme/api`, {
+      headers: { authorization: "Bearer ghp_pome_not_a_real_token" }
+    });
+    expect(unauthorized.status).toBe(401);
+    expect(((await unauthorized.json()) as { documentation_url: string }).documentation_url).toBe("");
+
+    const unrouted = await rest(app, "GET", "/repos/acme/api/actions/runs");
+    expect(unrouted.status).toBe(501);
+    expect(JSON.stringify(unrouted.body)).not.toContain("docs.github.com");
   });
 });

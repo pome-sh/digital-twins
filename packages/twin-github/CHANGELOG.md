@@ -1,5 +1,61 @@
 # @pome-sh/twin-github — CHANGELOG
 
+## 0.10.11 — 2026-08-13
+
+`documentation_url` names the operation the caller asked for, on both doors
+(F-1498), and stays generic exactly where real GitHub stays generic.
+
+**⚠️ Wire change on nearly every error this twin emits.** A routed,
+authenticated error used to answer the generic `https://docs.github.com/rest`;
+it now answers the url real GitHub answers for that operation — `GET
+/repos/:o/:r` gives `…/rest/repos/repos#get-a-repository`, `POST
+/repos/:o/:r/issues` gives `…/rest/issues/issues#create-an-issue`. Measured live
+2026-08-12 (F-1490's transcript): GitHub is operation-specific on **45 of 59**
+error responses, so a grader comparing envelopes leaf by leaf saw a difference on
+nearly every error before this.
+
+**The urls are vendored, not typed.** `fixtures/operation-docs.raw.json` is 63
+operations sliced out of GitHub's published OpenAPI description
+(`github/rest-api-description@dd98388`, OpenAPI 3.0.3, `info.version` 1.1.4, 808
+paths, 12.9 MB) by `scripts/vendor-operation-docs.ts`: operation id →
+`externalDocs.url`, plus the `x-github.category`/`subcategory` pair that
+reproduces the anchor and the vendor's own method and path. The description
+itself is NOT committed — it is pinned by commit and SHA-256 in the producer, so
+adopting newer bytes is a deliberate two-constant edit. `npm run
+gate:operation-docs -w @pome-sh/twin-github` re-checks the artifact offline and
+is wired into CI; hand it the description and it re-derives every url and
+byte-diffs.
+
+**Attached at the door, not at the throw site.** `routes.ts`'s `route()` helper
+installs a per-call `errorEnvelope` keyed on each declaration's own `surface`
+string, and `executeTool` stamps the error it rethrows using the tool name plus
+the `method` it just parsed. `notFound()` inside `domain.requireRepo()` is
+reachable from ~40 routes and ~30 tools, so the throw site cannot know the
+answer; the two urls `src/domain/git.ts` does stamp (F-1460, F-1491) still win,
+because the attachment only overwrites the generic default.
+
+**64 of the 66 REST surfaces and 33 of the 36 MCP tools name an operation.** The
+remainder is decided, not skipped, and each carries its reason on
+`fixtures/operation-docs.meta.json`: two twin-only routes (`/pulls/:n/diff`,
+`/pulls/:n/status`) GitHub has no operation for, and three MCP tools
+(`push_files`, `create_branch`, `get_tag`) that fan out over several upstream
+legs where the url depends on which leg failed. Divergence 32 narrows to those
+three; its count of the tool table is corrected from 40 to 36.
+
+**The genericness is a requirement on three classes and stays.** GitHub sends
+the generic url on the other **14 of 59** — every 401 (auth fails before
+dispatch), every unrouted path, and `GET /users/:username`. The twin was
+accidentally right on the first two, and they are now pinned as requirements
+rather than absences, because "name the operation everywhere" would have been a
+new divergence pointing the other way.
+
+**`GET /user` was missing from the ticket's own mapping table**, which was keyed
+on `route-inputs.json` — and `buildRouteInputArtifact` drops surfaces with zero
+declared inputs, which that route has. It is a mounted route. The new gate keys
+on `GITHUB_ROUTE_INPUTS` (66 declarations) instead, so the blind spot cannot
+recur, and the route answers `users/get-authenticated` — the same operation the
+`get_me` tool was already decided to stand for.
+
 ## 0.10.10 — 2026-08-12
 
 `status` in the error envelope is a **string**, the way real GitHub sends it, and

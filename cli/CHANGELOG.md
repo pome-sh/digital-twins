@@ -4,6 +4,86 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.40
+
+### Patch Changes
+
+- **twin-github's `documentation_url` names the operation the caller asked for**
+  (F-1498), on both the REST and the MCP door. It answered the generic
+  `https://docs.github.com/rest` on essentially every error; real GitHub is
+  operation-specific on 45 of 59 measured responses, so a grader comparing
+  envelopes leaf by leaf saw a difference on nearly every error. 64 of the 66
+  REST surfaces and 33 of the 36 MCP tools now carry the vendor's own url.
+
+  The urls are vendored rather than typed: `fixtures/operation-docs.raw.json` is
+  63 operations sliced out of GitHub's published OpenAPI description
+  (`github/rest-api-description@dd98388`, `info.version` 1.1.4) — operation id →
+  `externalDocs.url` plus the `x-github` category/subcategory pair that
+  reproduces the anchor. The 12.9 MB description is not committed; the producer
+  pins it by commit and SHA-256, and `gate:operation-docs` re-checks the slice
+  offline in CI.
+
+  The three classes GitHub answers GENERICALLY are unchanged and now pinned as
+  requirements: every 401, every unrouted path, and `GET /users/:username`.
+  Naming an operation there would be a new divergence pointing the other way.
+  The residue is three MCP tools — `push_files`, `create_branch`, `get_tag` —
+  each a multi-leg upstream call where the url depends on which leg failed;
+  their reasons ship on the artifact's meta.
+
+- 0.23.39 rather than 0.23.32: #403, #406, #407, #408, #409 and #410 took 0.23.31
+  through 0.23.34 and 0.23.37/0.23.38 while this branch was in review, and
+  0.23.35/0.23.36 are spoken for by siblings in the same batch.
+
+- **The CLI stops restating the seed-exclusion reason string, and its
+  cross-surface agreement test stops transcribing pome-cloud's completeness
+  predicate** (F-1416). No user-visible behaviour changes: every word the CLI
+  prints, and every field of `verdict.json`, is byte-identical.
+
+  `cli/test/unit/hosted/cross-surface-agreement.test.ts` exists to catch one
+  defect — the CLI and the pome-cloud dashboard stating different things about
+  the same run (F-1392 shipped exactly that, until a human noticed two screens
+  disagreeing). To do it, the file carried a hand-written copy of pome-cloud's
+  `isIncompleteTally` as an oracle. That copy went stale twice, and both times
+  it went stale GREEN: it kept passing while asserting something false about
+  the other repo. A parallel copy across a repo boundary is the same defect the
+  test was written to catch, with the longest possible feedback loop, sitting
+  inside the test itself.
+
+  The predicate now lives in `@pome-sh/wire@0.2.3`'s new
+  `run-completeness` subpath — the package this repo publishes and pome-cloud
+  consumes — so both sides import one implementation. `evalResultView.ts`
+  re-exports `PRE_SATISFIED_REASON` from there instead of declaring its own
+  copy of `"already_true_in_seed"`, and the test calls the real function. A
+  change to the predicate is now a type error or a red test on whichever side
+  has not moved; it can no longer be a silent pass on both.
+
+- **One hardened path for every release-CDN fetch in CI** (F-1489). No change to
+  the published CLI's behaviour; this is release-pipeline hardening.
+  `anchore/sbom-action` fetched the `syft` binary from the anchore release CDN
+  with no retry, and a 503 there killed the `stripe` twin-image job twice on
+  2026-08-12 — noise on a PR, but on `main` the cosign sign/attest steps do run,
+  so the same 503 fails an image publish. The repo already had the fix in two
+  hand-copied variants (ci.yml's actionlint install, secret-scan.yml's gitleaks
+  install) and missing entirely from a third install.
+
+  All three now go through `scripts/ci/fetch-pinned-release.sh`: five attempts
+  with a literal backoff (not curl's `--retry` flags, which were measured
+  burning five attempts in 0.8s on a runner), an UNCONDITIONAL sha256 check, and
+  an exhaustion message naming the CDN host instead of `exit code 1`. The two
+  fetches that arrive through an ACTION rather than a `curl` — syft via
+  `anchore/sbom-action`, cosign via `sigstore/cosign-installer` — are repeated
+  steps instead: two `continue-on-error` attempts and a fatal third, so a
+  transient 5xx cannot stop a publish on the first try while a genuinely dead
+  CDN still refuses to ship an unsigned, unattested image.
+
+  `scripts/ci/assert-hardened-cdn-fetches.mjs` keeps that true as a property.
+  It derives the set of things to judge from `.github/workflows/**` rather than
+  a hand-kept list, so a sixth install reds the PR that adds it, and it refuses
+  to report a pass over an empty derivation. It also pins the hazard
+  twin-image.yml carries a paragraph defending: every copy of a repeated action
+  step must carry byte-identical `with:` inputs, so the three cosign installs
+  cannot drift off `cosign-release: 'v2.6.4'`.
+
 ## 0.23.39
 
 ### Patch Changes
@@ -57,6 +137,7 @@ packaging restructure: bump `version` here and in `package.json`, and merging to
   twin-image.yml carries a paragraph defending: every copy of a repeated action
   step must carry byte-identical `with:` inputs, so the three cosign installs
   cannot drift off `cosign-release: 'v2.6.4'`.
+
 
 ## 0.23.38
 

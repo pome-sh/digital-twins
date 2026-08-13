@@ -1,0 +1,640 @@
+{
+  "operations": {
+    "checks/create": {
+      "method": "POST",
+      "path": "/repos/{owner}/{repo}/check-runs",
+      "category": "checks",
+      "subcategory": "runs",
+      "url": "https://docs.github.com/rest/checks/runs#create-a-check-run"
+    },
+    "checks/list-for-ref": {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/commits/{ref}/check-runs",
+      "category": "checks",
+      "subcategory": "runs",
+      "url": "https://docs.github.com/rest/checks/runs#list-check-runs-for-a-git-reference"
+    },
+    "git/create-ref": {
+      "method": "POST",
+      "path": "/repos/{owner}/{repo}/git/refs",
+      "category": "git",
+      "subcategory": "refs",
+      "url": "https://docs.github.com/rest/git/refs#create-a-reference"
+    },
+    "git/delete-ref": {
+      "method": "DELETE",
+      "path": "/repos/{owner}/{repo}/git/refs/{ref}",
+      "category": "git",
+      "subcategory": "refs",
+      "url": "https://docs.github.com/rest/git/refs#delete-a-reference"
+    },
+    "issues/add-assignees": {
+      "method": "POST",
+      "path": "/repos/{owner}/{repo}/issues/{issue_number}/assignees",
+      "category": "issues",
+      "subcategory": "assignees",
+      "url": "https://docs.github.com/rest/issues/assignees#add-assignees-to-an-issue"
+    },
+    "issues/add-labels": {
+      "method": "POST",
+      "path": "/repos/{owner}/{repo}/issues/{issue_number}/labels",
+      "category": "issues",
+      "subcategory": "labels",
+      "url": "https://docs.github.com/rest/issues/labels#add-labels-to-an-issue"
+    },
+    "issues/create": {
+      "method": "POST",
+      "path": "/repos/{owner}/{repo}/issues",
+      "category": "issues",
+      "subcategory": "issues",
+      "url": "https://docs.github.com/rest/issues/issues#create-an-issue"
+    },
+    "issues/create-comment": {
+      "method": "POST",
+      "path": "/repos/{owner}/{repo}/issues/{issue_number}/comments",
+      "category": "issues",
+      "subcategory": "comments",
+      "url": "https://docs.github.com/rest/issues/comments#create-an-issue-comment"
+    },
+    "issues/create-label": {
+      "method": "POST",
+      "path": "/repos/{owner}/{repo}/labels",
+      "category": "issues",
+      "subcategory": "labels",
+      "url": "https://docs.github.com/rest/issues/labels#create-a-label"
+    },
+    "issues/create-milestone": {
+      "method": "POST",
+      "path": "/repos/{owner}/{repo}/milestones",
+      "category": "issues",
+      "subcategory": "milestones",
+      "url": "https://docs.github.com/rest/issues/milestones#create-a-milestone"
+    },
+    "issues/delete-comment": {
+      "method": "DELETE",
+      "path": "/repos/{owner}/{repo}/issues/comments/{comment_id}",
+      "category": "issues",
+      "subcategory": "comments",
+      "url": "https://docs.github.com/rest/issues/comments#delete-an-issue-comment"
+    },
+    "issues/delete-milestone": {
+      "method": "DELETE",
+      "path": "/repos/{owner}/{repo}/milestones/{milestone_number}",
+      "category": "issues",
+      "subcategory": "milestones",
+      "url": "https://docs.github.com/rest/issues/milestones#delete-a-milestone"
+    },
+    "issues/get": {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/issues/{issue_number}",
+      "category": "issues",
+      "subcategory": "issues",
+      "url": "https://docs.github.com/rest/issues/issues#get-an-issue"
+    },
+    "issues/list-comments": {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/issues/{issue_number}/comments",
+      "category": "issues",
+      "subcategory": "comments",
+      "url": "https://docs.github.com/rest/issues/comments#list-issue-comments"
+    },
+    "issues/list-for-repo": {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/issues",
+      "category": "issues",
+      "subcategory": "issues",
+      "url": "https://docs.github.com/rest/issues/issues#list-repository-issues"
+    },
+    "issues/list-labels-for-repo": {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/labels",
+      "category": "issues",
+      "subcategory": "labels",
+      "url": "https://docs.github.com/rest/issues/labels#list-labels-for-a-repository"
+    },
+    "issues/list-labels-on-issue": {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/issues/{issue_number}/labels",
+      "category": "issues",
+      "subcategory": "labels",
+      "url": "https://docs.github.com/rest/issues/labels#list-labels-for-an-issue"
+    },
+    "issues/list-milestones": {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/milestones",
+      "category": "issues",
+      "subcategory": "milestones",
+      "url": "https://docs.github.com/rest/issues/milestones#list-milestones"
+    },
+    "issues/remove-label": {
+      "method": "DELETE",
+      "path": "/repos/{owner}/{repo}/issues/{issue_number}/labels/{name}",
+      "category": "issues",
+      "subcategory": "labels",
+      "url": "https://docs.github.com/rest/issues/labels#remove-a-label-from-an-issue"
+    },
+    "issues/update": {
+      "method": "PATCH",
+      "path": "/repos/{owner}/{repo}/issues/{issue_number}",
+      "category": "issues",
+      "subcategory": "issues",
+      "url": "https://docs.github.com/rest/issues/issues#update-an-issue"
+    },
+    "issues/update-comment": {
+      "method": "PATCH",
+      "path": "/repos/{owner}/{repo}/issues/comments/{comment_id}",
+      "category": "issues",
+      "subcategory": "comments",
+      "url": "https://docs.github.com/rest/issues/comments#update-an-issue-comment"
+    },
+    "issues/update-milestone": {
+      "method": "PATCH",
+      "path": "/repos/{owner}/{repo}/milestones/{milestone_number}",
+      "category": "issues",
+      "subcategory": "milestones",
+      "url": "https://docs.github.com/rest/issues/milestones#update-a-milestone"
+    },
+    "pulls/create": {
+      "method": "POST",
+      "path": "/repos/{owner}/{repo}/pulls",
+      "category": "pulls",
+      "subcategory": "pulls",
+      "url": "https://docs.github.com/rest/pulls/pulls#create-a-pull-request"
+    },
+    "pulls/create-reply-for-review-comment": {
+      "method": "POST",
+      "path": "/repos/{owner}/{repo}/pulls/{pull_number}/comments/{comment_id}/replies",
+      "category": "pulls",
+      "subcategory": "comments",
+      "url": "https://docs.github.com/rest/pulls/comments#create-a-reply-for-a-review-comment"
+    },
+    "pulls/create-review": {
+      "method": "POST",
+      "path": "/repos/{owner}/{repo}/pulls/{pull_number}/reviews",
+      "category": "pulls",
+      "subcategory": "reviews",
+      "url": "https://docs.github.com/rest/pulls/reviews#create-a-review-for-a-pull-request"
+    },
+    "pulls/create-review-comment": {
+      "method": "POST",
+      "path": "/repos/{owner}/{repo}/pulls/{pull_number}/comments",
+      "category": "pulls",
+      "subcategory": "comments",
+      "url": "https://docs.github.com/rest/pulls/comments#create-a-review-comment-for-a-pull-request"
+    },
+    "pulls/get": {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/pulls/{pull_number}",
+      "category": "pulls",
+      "subcategory": "pulls",
+      "url": "https://docs.github.com/rest/pulls/pulls#get-a-pull-request"
+    },
+    "pulls/list": {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/pulls",
+      "category": "pulls",
+      "subcategory": "pulls",
+      "url": "https://docs.github.com/rest/pulls/pulls#list-pull-requests"
+    },
+    "pulls/list-commits": {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/pulls/{pull_number}/commits",
+      "category": "pulls",
+      "subcategory": "pulls",
+      "url": "https://docs.github.com/rest/pulls/pulls#list-commits-on-a-pull-request"
+    },
+    "pulls/list-files": {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/pulls/{pull_number}/files",
+      "category": "pulls",
+      "subcategory": "pulls",
+      "url": "https://docs.github.com/rest/pulls/pulls#list-pull-requests-files"
+    },
+    "pulls/list-review-comments": {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/pulls/{pull_number}/comments",
+      "category": "pulls",
+      "subcategory": "comments",
+      "url": "https://docs.github.com/rest/pulls/comments#list-review-comments-on-a-pull-request"
+    },
+    "pulls/list-reviews": {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/pulls/{pull_number}/reviews",
+      "category": "pulls",
+      "subcategory": "reviews",
+      "url": "https://docs.github.com/rest/pulls/reviews#list-reviews-for-a-pull-request"
+    },
+    "pulls/merge": {
+      "method": "PUT",
+      "path": "/repos/{owner}/{repo}/pulls/{pull_number}/merge",
+      "category": "pulls",
+      "subcategory": "pulls",
+      "url": "https://docs.github.com/rest/pulls/pulls#merge-a-pull-request"
+    },
+    "pulls/update": {
+      "method": "PATCH",
+      "path": "/repos/{owner}/{repo}/pulls/{pull_number}",
+      "category": "pulls",
+      "subcategory": "pulls",
+      "url": "https://docs.github.com/rest/pulls/pulls#update-a-pull-request"
+    },
+    "pulls/update-branch": {
+      "method": "PUT",
+      "path": "/repos/{owner}/{repo}/pulls/{pull_number}/update-branch",
+      "category": "pulls",
+      "subcategory": "pulls",
+      "url": "https://docs.github.com/rest/pulls/pulls#update-a-pull-request-branch"
+    },
+    "repos/add-collaborator": {
+      "method": "PUT",
+      "path": "/repos/{owner}/{repo}/collaborators/{username}",
+      "category": "collaborators",
+      "subcategory": "collaborators",
+      "url": "https://docs.github.com/rest/collaborators/collaborators#add-a-repository-collaborator"
+    },
+    "repos/check-collaborator": {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/collaborators/{username}",
+      "category": "collaborators",
+      "subcategory": "collaborators",
+      "url": "https://docs.github.com/rest/collaborators/collaborators#check-if-a-user-is-a-repository-collaborator"
+    },
+    "repos/compare-commits": {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/compare/{basehead}",
+      "category": "commits",
+      "subcategory": "commits",
+      "url": "https://docs.github.com/rest/commits/commits#compare-two-commits"
+    },
+    "repos/create-commit-status": {
+      "method": "POST",
+      "path": "/repos/{owner}/{repo}/statuses/{sha}",
+      "category": "commits",
+      "subcategory": "statuses",
+      "url": "https://docs.github.com/rest/commits/statuses#create-a-commit-status"
+    },
+    "repos/create-for-authenticated-user": {
+      "method": "POST",
+      "path": "/user/repos",
+      "category": "repos",
+      "subcategory": "repos",
+      "url": "https://docs.github.com/rest/repos/repos#create-a-repository-for-the-authenticated-user"
+    },
+    "repos/create-fork": {
+      "method": "POST",
+      "path": "/repos/{owner}/{repo}/forks",
+      "category": "repos",
+      "subcategory": "forks",
+      "url": "https://docs.github.com/rest/repos/forks#create-a-fork"
+    },
+    "repos/create-in-org": {
+      "method": "POST",
+      "path": "/orgs/{org}/repos",
+      "category": "repos",
+      "subcategory": "repos",
+      "url": "https://docs.github.com/rest/repos/repos#create-an-organization-repository"
+    },
+    "repos/create-or-update-file-contents": {
+      "method": "PUT",
+      "path": "/repos/{owner}/{repo}/contents/{path}",
+      "category": "repos",
+      "subcategory": "contents",
+      "url": "https://docs.github.com/rest/repos/contents#create-or-update-file-contents"
+    },
+    "repos/create-release": {
+      "method": "POST",
+      "path": "/repos/{owner}/{repo}/releases",
+      "category": "releases",
+      "subcategory": "releases",
+      "url": "https://docs.github.com/rest/releases/releases#create-a-release"
+    },
+    "repos/delete-file": {
+      "method": "DELETE",
+      "path": "/repos/{owner}/{repo}/contents/{path}",
+      "category": "repos",
+      "subcategory": "contents",
+      "url": "https://docs.github.com/rest/repos/contents#delete-a-file"
+    },
+    "repos/get": {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}",
+      "category": "repos",
+      "subcategory": "repos",
+      "url": "https://docs.github.com/rest/repos/repos#get-a-repository"
+    },
+    "repos/get-branch": {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/branches/{branch}",
+      "category": "branches",
+      "subcategory": "branches",
+      "url": "https://docs.github.com/rest/branches/branches#get-a-branch"
+    },
+    "repos/get-combined-status-for-ref": {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/commits/{ref}/status",
+      "category": "commits",
+      "subcategory": "statuses",
+      "url": "https://docs.github.com/rest/commits/statuses#get-the-combined-status-for-a-specific-reference"
+    },
+    "repos/get-commit": {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/commits/{ref}",
+      "category": "commits",
+      "subcategory": "commits",
+      "url": "https://docs.github.com/rest/commits/commits#get-a-commit"
+    },
+    "repos/get-content": {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/contents/{path}",
+      "category": "repos",
+      "subcategory": "contents",
+      "url": "https://docs.github.com/rest/repos/contents#get-repository-content"
+    },
+    "repos/get-latest-release": {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/releases/latest",
+      "category": "releases",
+      "subcategory": "releases",
+      "url": "https://docs.github.com/rest/releases/releases#get-the-latest-release"
+    },
+    "repos/get-release-by-tag": {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/releases/tags/{tag}",
+      "category": "releases",
+      "subcategory": "releases",
+      "url": "https://docs.github.com/rest/releases/releases#get-a-release-by-tag-name"
+    },
+    "repos/list-branches": {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/branches",
+      "category": "branches",
+      "subcategory": "branches",
+      "url": "https://docs.github.com/rest/branches/branches#list-branches"
+    },
+    "repos/list-collaborators": {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/collaborators",
+      "category": "collaborators",
+      "subcategory": "collaborators",
+      "url": "https://docs.github.com/rest/collaborators/collaborators#list-repository-collaborators"
+    },
+    "repos/list-commits": {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/commits",
+      "category": "commits",
+      "subcategory": "commits",
+      "url": "https://docs.github.com/rest/commits/commits#list-commits"
+    },
+    "repos/list-releases": {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/releases",
+      "category": "releases",
+      "subcategory": "releases",
+      "url": "https://docs.github.com/rest/releases/releases#list-releases"
+    },
+    "repos/list-tags": {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/tags",
+      "category": "repos",
+      "subcategory": "repos",
+      "url": "https://docs.github.com/rest/repos/repos#list-repository-tags"
+    },
+    "search/code": {
+      "method": "GET",
+      "path": "/search/code",
+      "category": "search",
+      "subcategory": "search",
+      "url": "https://docs.github.com/rest/search/search#search-code"
+    },
+    "search/commits": {
+      "method": "GET",
+      "path": "/search/commits",
+      "category": "search",
+      "subcategory": "search",
+      "url": "https://docs.github.com/rest/search/search#search-commits"
+    },
+    "search/issues-and-pull-requests": {
+      "method": "GET",
+      "path": "/search/issues",
+      "category": "search",
+      "subcategory": "search",
+      "url": "https://docs.github.com/rest/search/search#search-issues-and-pull-requests"
+    },
+    "search/repos": {
+      "method": "GET",
+      "path": "/search/repositories",
+      "category": "search",
+      "subcategory": "search",
+      "url": "https://docs.github.com/rest/search/search#search-repositories"
+    },
+    "search/users": {
+      "method": "GET",
+      "path": "/search/users",
+      "category": "search",
+      "subcategory": "search",
+      "url": "https://docs.github.com/rest/search/search#search-users"
+    },
+    "users/get-authenticated": {
+      "method": "GET",
+      "path": "/user",
+      "category": "users",
+      "subcategory": "users",
+      "url": "https://docs.github.com/rest/users/users#get-the-authenticated-user"
+    }
+  },
+  "rest": {
+    "DELETE /repos/:owner/:repo/contents/*": "repos/delete-file",
+    "DELETE /repos/:owner/:repo/git/refs/heads/*": "git/delete-ref",
+    "DELETE /repos/:owner/:repo/issues/:number/labels/:name": "issues/remove-label",
+    "DELETE /repos/:owner/:repo/issues/comments/:comment_id": "issues/delete-comment",
+    "DELETE /repos/:owner/:repo/milestones/:number": "issues/delete-milestone",
+    "GET /repos/:owner/:repo": "repos/get",
+    "GET /repos/:owner/:repo/branches": "repos/list-branches",
+    "GET /repos/:owner/:repo/branches/*": "repos/get-branch",
+    "GET /repos/:owner/:repo/collaborators": "repos/list-collaborators",
+    "GET /repos/:owner/:repo/collaborators/:username": "repos/check-collaborator",
+    "GET /repos/:owner/:repo/commits": "repos/list-commits",
+    "GET /repos/:owner/:repo/commits/:ref": "repos/get-commit",
+    "GET /repos/:owner/:repo/commits/:ref/check-runs": "checks/list-for-ref",
+    "GET /repos/:owner/:repo/commits/:ref/status": "repos/get-combined-status-for-ref",
+    "GET /repos/:owner/:repo/compare/:basehead{.+}": "repos/compare-commits",
+    "GET /repos/:owner/:repo/contents": "repos/get-content",
+    "GET /repos/:owner/:repo/contents/*": "repos/get-content",
+    "GET /repos/:owner/:repo/issues": "issues/list-for-repo",
+    "GET /repos/:owner/:repo/issues/:number": "issues/get",
+    "GET /repos/:owner/:repo/issues/:number/comments": "issues/list-comments",
+    "GET /repos/:owner/:repo/issues/:number/labels": "issues/list-labels-on-issue",
+    "GET /repos/:owner/:repo/labels": "issues/list-labels-for-repo",
+    "GET /repos/:owner/:repo/milestones": "issues/list-milestones",
+    "GET /repos/:owner/:repo/pulls": "pulls/list",
+    "GET /repos/:owner/:repo/pulls/:number": "pulls/get",
+    "GET /repos/:owner/:repo/pulls/:number/comments": "pulls/list-review-comments",
+    "GET /repos/:owner/:repo/pulls/:number/commits": "pulls/list-commits",
+    "GET /repos/:owner/:repo/pulls/:number/diff": null,
+    "GET /repos/:owner/:repo/pulls/:number/files": "pulls/list-files",
+    "GET /repos/:owner/:repo/pulls/:number/reviews": "pulls/list-reviews",
+    "GET /repos/:owner/:repo/pulls/:number/status": null,
+    "GET /repos/:owner/:repo/releases": "repos/list-releases",
+    "GET /repos/:owner/:repo/releases/latest": "repos/get-latest-release",
+    "GET /repos/:owner/:repo/releases/tags/*": "repos/get-release-by-tag",
+    "GET /repos/:owner/:repo/tags": "repos/list-tags",
+    "GET /search/code": "search/code",
+    "GET /search/commits": "search/commits",
+    "GET /search/issues": "search/issues-and-pull-requests",
+    "GET /search/repositories": "search/repos",
+    "GET /search/users": "search/users",
+    "GET /user": "users/get-authenticated",
+    "PATCH /repos/:owner/:repo/issues/:number": "issues/update",
+    "PATCH /repos/:owner/:repo/issues/comments/:comment_id": "issues/update-comment",
+    "PATCH /repos/:owner/:repo/milestones/:number": "issues/update-milestone",
+    "PATCH /repos/:owner/:repo/pulls/:number": "pulls/update",
+    "POST /orgs/:owner/repos": "repos/create-in-org",
+    "POST /repos/:owner/:repo/check-runs": "checks/create",
+    "POST /repos/:owner/:repo/forks": "repos/create-fork",
+    "POST /repos/:owner/:repo/git/refs": "git/create-ref",
+    "POST /repos/:owner/:repo/issues": "issues/create",
+    "POST /repos/:owner/:repo/issues/:number/assignees": "issues/add-assignees",
+    "POST /repos/:owner/:repo/issues/:number/comments": "issues/create-comment",
+    "POST /repos/:owner/:repo/issues/:number/labels": "issues/add-labels",
+    "POST /repos/:owner/:repo/labels": "issues/create-label",
+    "POST /repos/:owner/:repo/milestones": "issues/create-milestone",
+    "POST /repos/:owner/:repo/pulls": "pulls/create",
+    "POST /repos/:owner/:repo/pulls/:number/comments": "pulls/create-review-comment",
+    "POST /repos/:owner/:repo/pulls/:number/comments/:comment_id/replies": "pulls/create-reply-for-review-comment",
+    "POST /repos/:owner/:repo/pulls/:number/reviews": "pulls/create-review",
+    "POST /repos/:owner/:repo/releases": "repos/create-release",
+    "POST /repos/:owner/:repo/statuses/:sha": "repos/create-commit-status",
+    "POST /user/repos": "repos/create-for-authenticated-user",
+    "PUT /repos/:owner/:repo/collaborators/:username": "repos/add-collaborator",
+    "PUT /repos/:owner/:repo/contents/*": "repos/create-or-update-file-contents",
+    "PUT /repos/:owner/:repo/pulls/:number/merge": "pulls/merge",
+    "PUT /repos/:owner/:repo/pulls/:number/update-branch": "pulls/update-branch"
+  },
+  "mcp": {
+    "add_issue_comment": {
+      "operationId": "issues/create-comment"
+    },
+    "add_reply_to_pull_request_comment": {
+      "operationId": "pulls/create-reply-for-review-comment"
+    },
+    "create_branch": null,
+    "create_issue": {
+      "operationId": "issues/create"
+    },
+    "create_or_update_file": {
+      "operationId": "repos/create-or-update-file-contents"
+    },
+    "create_pull_request": {
+      "operationId": "pulls/create"
+    },
+    "create_pull_request_review": {
+      "operationId": "pulls/create-review"
+    },
+    "create_repository": {
+      "byArgument": {
+        "argument": "owner",
+        "present": "repos/create-in-org",
+        "absent": "repos/create-for-authenticated-user"
+      }
+    },
+    "delete_file": {
+      "operationId": "repos/delete-file"
+    },
+    "fork_repository": {
+      "operationId": "repos/create-fork"
+    },
+    "get_commit": {
+      "operationId": "repos/get-commit"
+    },
+    "get_file_contents": {
+      "operationId": "repos/get-content"
+    },
+    "get_latest_release": {
+      "operationId": "repos/get-latest-release"
+    },
+    "get_me": {
+      "operationId": "users/get-authenticated"
+    },
+    "get_release_by_tag": {
+      "operationId": "repos/get-release-by-tag"
+    },
+    "get_tag": null,
+    "issue_read": {
+      "byMethod": {
+        "get": "issues/get",
+        "get_comments": "issues/list-comments",
+        "get_labels": "issues/list-labels-on-issue"
+      }
+    },
+    "issue_write": {
+      "byMethod": {
+        "create": "issues/create",
+        "update": "issues/update"
+      }
+    },
+    "list_branches": {
+      "operationId": "repos/list-branches"
+    },
+    "list_commits": {
+      "operationId": "repos/list-commits"
+    },
+    "list_issues": {
+      "operationId": "issues/list-for-repo"
+    },
+    "list_pull_requests": {
+      "operationId": "pulls/list"
+    },
+    "list_releases": {
+      "operationId": "repos/list-releases"
+    },
+    "list_repository_collaborators": {
+      "operationId": "repos/list-collaborators"
+    },
+    "list_tags": {
+      "operationId": "repos/list-tags"
+    },
+    "merge_pull_request": {
+      "operationId": "pulls/merge"
+    },
+    "pull_request_read": {
+      "byMethod": {
+        "get": "pulls/get",
+        "get_diff": "pulls/get",
+        "get_status": "repos/get-combined-status-for-ref",
+        "get_files": "pulls/list-files",
+        "get_commits": "pulls/list-commits",
+        "get_reviews": "pulls/list-reviews",
+        "get_comments": "issues/list-comments",
+        "get_review_comments": "pulls/list-review-comments",
+        "get_check_runs": "checks/list-for-ref"
+      }
+    },
+    "pull_request_review_write": {
+      "byMethod": {
+        "create": "pulls/create-review"
+      }
+    },
+    "push_files": null,
+    "search_code": {
+      "operationId": "search/code"
+    },
+    "search_commits": {
+      "operationId": "search/commits"
+    },
+    "search_issues": {
+      "operationId": "search/issues-and-pull-requests"
+    },
+    "search_repositories": {
+      "operationId": "search/repos"
+    },
+    "search_users": {
+      "operationId": "search/users"
+    },
+    "update_pull_request": {
+      "operationId": "pulls/update"
+    },
+    "update_pull_request_branch": {
+      "operationId": "pulls/update-branch"
+    }
+  }
+}
