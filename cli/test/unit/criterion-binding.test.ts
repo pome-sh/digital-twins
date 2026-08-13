@@ -174,4 +174,40 @@ describe("auditCodeCriteria", () => {
     expect(findings).toHaveLength(1);
     expect(findings[0]!.binding.kind).not.toBe("bound");
   });
+
+  // F-1338, from the authoring side. Until this bound, every tape sentence an
+  // author could write was a prohibition — so a task could be fully bound, fully
+  // green, and cleared by an agent that did nothing at all.
+  it("binds a `was called` criterion for an action the recorder stamps", () => {
+    const audit = auditCodeCriteria(file("- [code] `create_commit_status` was called"));
+    expect(audit.findings).toEqual([]);
+    expect(audit.bound).toBe(1);
+  });
+
+  // The same narrowing, in the direction that fails a CORRECT agent rather than
+  // passing a wrong one. `add_issue_comment`'s REST route is unstamped, so this
+  // sentence would answer "never called" over a run that commented by REST.
+  // One set gates both polarities (F-1342), which is why this stays unbound for
+  // exactly the reason the `was never called` case above does.
+  it("leaves `was called` unbound for an action the recorder does not stamp", () => {
+    const { findings } = auditCodeCriteria(file("- [code] `add_issue_comment` was called"));
+    expect(findings).toHaveLength(1);
+    expect(findings[0]!.binding.kind).not.toBe("bound");
+  });
+
+  // Neither sentence may be read as the other. They differ by one word, they
+  // grade opposite verdicts, and the binder resolves by pattern — so a criterion
+  // that bound to its own negation would invert a task's score in silence. The
+  // `bound` count above cannot see that; only the check id can.
+  it("resolves the two `{tool}` sentences to OPPOSITE checks", () => {
+    const bind = (text: string) => bindCriterion({ marker: "[code]", twin: "github", text });
+    expect(bind("`create_check_run` was called")).toEqual({
+      kind: "bound",
+      checkId: "github.tool-was-called",
+    });
+    expect(bind("`create_check_run` was never called")).toEqual({
+      kind: "bound",
+      checkId: "github.tool-never-called",
+    });
+  });
 });

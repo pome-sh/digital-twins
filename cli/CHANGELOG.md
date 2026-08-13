@@ -20,6 +20,35 @@ denominator, the no-skip set, and only then the aggregate. Consumer-visible
 delta is the new `gate:golden` manifest script; behaviour of `pome` itself is
 unchanged.
 
+## 0.23.48 — 2026-08-13
+
+### Minor Changes
+
+- **The bundled github vocabulary gains its first positive tape assertion**
+  (F-1338): `` `create_commit_status` was called `` and
+  `` `create_check_run` was called `` now bind. `pome checks github` lists the
+  new sentence, and the offline binder resolves it to `github.tool-was-called` —
+  where before, every tape sentence an author could write locally was a
+  prohibition, so a task could be fully bound, fully green, and cleared by an
+  agent that did nothing at all.
+
+  `pome checks add --check github.tool-was-called` **refuses to write until the
+  cloud pins `@pome-sh/checks` 0.2.0**, by design and not as a defect: the
+  digest handshake in `checks-add.ts` reports `this CLI has it, the cloud does
+  not` and declines, because a sentence written here would not be graded there.
+  Reading (`pome checks github`) and auditing an existing file are unaffected —
+  only the write door waits for the pin.
+
+  The slot is the same closed set its `was never called` sibling uses,
+  `TAPE_ASSERTABLE_TOOLS`, so `` `add_issue_comment` was called `` stays
+  UNBOUND — that action's REST route is unstamped, and the sentence would
+  answer "never called" over a run that commented by REST. One set gates both
+  polarities; both widen together when a route is stamped (F-1342).
+
+  0.23.42 rather than 0.23.31: #403 and then eight more merged while this branch
+  was in review, so it has been rebased twice and re-bumped each time — same
+  version race as 0.23.17/0.23.18 and 0.23.26 below.
+
 ## 0.23.47 — 2026-08-13
 
 No user-visible change to the CLI itself. This release carries the corrected

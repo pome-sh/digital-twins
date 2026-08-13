@@ -40,6 +40,7 @@ const SCRIPT = join(ROOT, "scripts/ci/allocate-release-versions.mjs");
 const DATE = "2026-08-14";
 const CLI = PUBLISHED_PACKAGES.find((pkg) => pkg.name === "@pome-sh/cli");
 const WIRE = PUBLISHED_PACKAGES.find((pkg) => pkg.name === "@pome-sh/wire");
+const ADAPTER = PUBLISHED_PACKAGES.find((pkg) => pkg.name === "@pome-sh/adapter-claude-sdk");
 
 let failures = 0;
 function check(label, condition, detail = "") {
@@ -82,6 +83,29 @@ function repo() {
   return dir;
 }
 
+/**
+ * F-1520 — `repo()` has no root `package.json`/`examples/`, so `planExample
+ * Repins` is a no-op against it (proven in "the repin path is a no-op" below).
+ * This adds the shape it needs: a root `workspaces` field naming
+ * `ADAPTER.manifest`'s directory, and `examples/support-triage` pinning the
+ * adapter the same way the real tree does.
+ */
+function withExamples(dir, { adapterPin }) {
+  write(dir, "package.json", JSON.stringify({ name: "root", private: true, workspaces: ["packages/*", "cli"] }));
+  write(
+    dir,
+    "examples/support-triage/package.json",
+    JSON.stringify({
+      name: "support-triage-example",
+      dependencies: { "@pome-sh/adapter-claude-sdk": adapterPin },
+    }),
+  );
+}
+
+/** A `npmView` stub: only the named version of the named package is published. */
+const onlyPublished = (name, version) => (n, v) =>
+  n === name && v === version ? { status: "published" } : { status: "unpublished" };
+
 function commit(dir, files, message = "a merge") {
   for (const [path, contents] of Object.entries(files)) write(dir, path, contents);
   git(dir, "add", "-A");
@@ -95,7 +119,7 @@ function pend(dir, pkg, { level = "patch", body = "- something a consumer must k
   write(dir, pkg.changelog, `${text.slice(0, at)}## Unreleased (${level})\n\n${body}\n\n${text.slice(at)}`);
 }
 
-const plan = (dir) => planAllocations({ root: dir, date: DATE });
+const plan = (dir, npmView) => planAllocations({ root: dir, date: DATE, npmView });
 const named = (result, name) => result.allocations.find((a) => a.name === name);
 
 /** Apply a plan and commit it the way allocate-version.yml does. */
@@ -444,6 +468,144 @@ console.log("the script's own surface");
   } finally {
     rmSync(dir, { recursive: true, force: true });
     rmSync(out, { recursive: true, force: true });
+  }
+}
+
+console.log("F-1520 — the repin path is a no-op without examples/");
+{
+  const dir = repo();
+  try {
+    // repo() never creates a root package.json or examples/, exactly like
+    // every OTHER fixture above — proving that stays true is what keeps this
+    // whole suite honest about the new code path touching nothing by default.
+    check("no repins are planned", plan(dir).repins.length === 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+console.log("F-1520 — a broken example can never block a version allocation");
+{
+  const dir = repo();
+  try {
+    // The whole reason the repin call is wrapped: this runs on EVERY push to
+    // main, so a throw anywhere in the example walk would stop every package's
+    // release over one example directory. A manifest that is not valid JSON is
+    // the cheapest reachable vector (discoverExampleSiblingDeps JSON.parses it
+    // unguarded); the guard is around the call, so it covers the others too.
+    withExamples(dir, { adapterPin: "0.9.0" });
+    write(dir, "examples/broken/package.json", "{ this is not json");
+    pend(dir, CLI, { body: "- a fix consumers need" });
+    git(dir, "add", "-A");
+    git(dir, "commit", "-qm", "a merge (#912)");
+
+    const result = plan(dir, onlyPublished("@pome-sh/adapter-claude-sdk", "1.0.0"));
+    check("the CLI still gets its version", named(result, "@pome-sh/cli")?.to === "1.0.1", JSON.stringify(result.allocations));
+    check("the repin is dropped, not fatal", result.repins.length === 0, JSON.stringify(result.repins));
+    check(
+      "and the failure is announced as a ::warning:: note rather than swallowed",
+      result.notes.some((n) => n.includes("example re-pin planning failed")),
+      JSON.stringify(result.notes),
+    );
+    land(dir, result);
+    check("the release still lands", JSON.parse(read(dir, CLI.manifest)).version === "1.0.1");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+console.log("F-1520 — a drifted pin against an already-published sibling is repinned");
+{
+  const dir = repo();
+  try {
+    withExamples(dir, { adapterPin: "0.9.0" }); // ADAPTER is seeded at 1.0.0 by repo()
+    git(dir, "add", "-A");
+    git(dir, "commit", "-qm", "add examples");
+
+    const npmView = onlyPublished("@pome-sh/adapter-claude-sdk", "1.0.0");
+    const result = plan(dir, npmView);
+    check("nothing is owed a NEW version", result.allocations.length === 0, JSON.stringify(result.allocations));
+    check("exactly one repin is planned", result.repins.length === 1, JSON.stringify(result.repins));
+    const repin = result.repins[0];
+    check("it names the example, the dep, and both versions", repin.example === "support-triage" && repin.from === "0.9.0" && repin.to === "1.0.0", JSON.stringify(repin));
+    const rewritten = JSON.parse(repin.writes[0].contents);
+    check("the manifest write carries the new pin", rewritten.dependencies["@pome-sh/adapter-claude-sdk"] === "1.0.0", repin.writes[0].contents);
+    check("a lockfile-regen command is named for that example", repin.regenerate[0].includes("examples/support-triage"), JSON.stringify(repin.regenerate));
+    check(
+      "a repin-only commit gets its own message, not an empty one",
+      result.message.startsWith("chore: re-pin 1 example dep(s)") && result.message.includes("examples/support-triage @pome-sh/adapter-claude-sdk 0.9.0 → 1.0.0"),
+      result.message,
+    );
+
+    land(dir, result);
+    check("the example manifest is actually rewritten on disk", JSON.parse(read(dir, "examples/support-triage/package.json")).dependencies["@pome-sh/adapter-claude-sdk"] === "1.0.0");
+    check("running again with the same npmView is a clean no-op", plan(dir, npmView).repins.length === 0 && plan(dir, npmView).allocations.length === 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+console.log("F-1520 — the version THIS run allocates is never repinned to in the same run");
+{
+  const dir = repo();
+  try {
+    // The adapter's OWN version is being bumped 1.0.0 -> 1.0.1 in this run
+    // (via a pending entry); support-triage still pins the OLD 1.0.0. Nothing
+    // has published 1.0.1 yet — that is release.yml's job, on this run's own
+    // future push — so repinning to it now would set a pin `npm install
+    // --package-lock-only` cannot resolve.
+    withExamples(dir, { adapterPin: "1.0.0" });
+    pend(dir, ADAPTER, { body: "- the adapter learned a thing" });
+    git(dir, "add", "-A");
+    git(dir, "commit", "-qm", "adapter change + examples (#111)");
+
+    const npmViewOnlyOld = onlyPublished("@pome-sh/adapter-claude-sdk", "1.0.0"); // 1.0.1 is NOT published
+    const result = plan(dir, npmViewOnlyOld);
+    check("the adapter is allocated 1.0.1", named(result, "@pome-sh/adapter-claude-sdk")?.to === "1.0.1", JSON.stringify(result.allocations));
+    check(
+      "but nothing is repinned to the still-unpublished 1.0.1 — the pin already matches the published 1.0.0",
+      result.repins.length === 0,
+      JSON.stringify(result.repins),
+    );
+
+    land(dir, result);
+    check("the manifest still pins 1.0.0 after landing — nothing broke npm ci", JSON.parse(read(dir, "examples/support-triage/package.json")).dependencies["@pome-sh/adapter-claude-sdk"] === "1.0.0");
+
+    // The NEXT run, once 1.0.1 is (now) published, closes the gap fully
+    // automatically — no human PR, just one push later.
+    const npmViewNowNew = onlyPublished("@pome-sh/adapter-claude-sdk", "1.0.1");
+    const next = plan(dir, npmViewNowNew);
+    check("the next run repins to the now-published 1.0.1", next.repins.length === 1 && next.repins[0].to === "1.0.1", JSON.stringify(next.repins));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+console.log("F-1520 — replays the two real incidents (adapter 0.3.4 and 0.3.6, both 2026-08-13)");
+for (const { from, to } of [
+  { from: "0.3.3", to: "0.3.4" }, // #395
+  { from: "0.3.5", to: "0.3.6" }, // #425
+]) {
+  const dir = repo();
+  try {
+    write(dir, ADAPTER.manifest, `{\n  "name": "${ADAPTER.name}",\n  "version": "${to}"\n}\n`); // already released
+    withExamples(dir, { adapterPin: from }); // support-triage never got the memo
+    git(dir, "add", "-A");
+    git(dir, "commit", "-qm", `release: ${ADAPTER.name} ${to} [release-bump]`);
+
+    const result = plan(dir, onlyPublished(ADAPTER.name, to));
+    check(
+      `${from} -> ${to}: exactly the pin #${from === "0.3.3" ? "395" : "425"} fixed by hand`,
+      result.repins.length === 1 &&
+        result.repins[0].from === from &&
+        result.repins[0].to === to &&
+        JSON.parse(result.repins[0].writes[0].contents).dependencies[ADAPTER.name] === to,
+      JSON.stringify(result.repins),
+    );
+    land(dir, result);
+    check(`${from} -> ${to}: lands cleanly and is a no-op afterwards`, plan(dir, onlyPublished(ADAPTER.name, to)).repins.length === 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 }
 

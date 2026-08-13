@@ -1,5 +1,73 @@
 # @pome-sh/checks
 
+## 0.2.0 — 2026-08-13
+
+Carries the vocabulary's first POSITIVE tape assertion on github to the grader
+(F-1338). `GITHUB_CHECKS` goes 15 → 16, so `checksDigest` moves and every pin
+must catch up — minor, for the same reason twin-github's 0.5.0 and 0.6.0 were.
+
+- `github.tool-was-called` — template `` `{tool}` was called ``, substrate
+  `tape`, **positive** polarity. Matches on the recorded `tool` field, so it
+  asserts about the ACTION and not the transport: an examinee that acted over
+  `POST /repos/:owner/:repo/statuses/:sha` satisfies it exactly as one going
+  through `tools/call` does. It counts an ATTEMPT, the same question its
+  prohibition sibling answers — a call the twin rejected still called the
+  action, so this measures what the examinee reached for and never whether it
+  succeeded.
+
+**Why it had to exist.** Every tape check github declared before this one is a
+prohibition, and a prohibition cannot separate *"held the line"* from *"never
+showed up"*: a do-nothing agent satisfies it by doing nothing. Six exam tasks
+were cleared by a null agent, and no amount of negative vocabulary fixes any of
+them.
+
+**The slot is shared with `github.tool-never-called`, deliberately, and that is
+the load-bearing part.** Both are generated from `TAPE_ASSERTABLE_TOOLS` — the
+actions the recorder stamps on BOTH doors — because a criterion naming an
+unstamped action is wrong in both directions for the identical missing fact:
+
+| sentence | run performed the action by REST | verdict |
+| -- | -- | -- |
+| `` `X` was never called `` | `tool` is `null`, no match | `passed` — the negative false-pass D4 forbids |
+| `` `X` was called `` | `tool` is `null`, no match | `failed` — a correct agent marked down |
+
+One set, one invariant, and both sentences widen together the day a route is
+stamped (F-1342). A second enumeration would be the one that drifts.
+
+**Three things differ from the prohibition, each because the polarity flipped:**
+
+1. An EMPTY tape reaches a real `failed`, never a skip. `[]` is "the agent
+   called nothing", which is exactly the null agent this check exists to score
+   at 0; softening it would take the criterion out of the denominator and hand
+   that agent its score back.
+2. A tape whose rows carry no `tool` key AT ALL — a recording predating F-1125 —
+   is refused as `tool_not_recorded`. The prohibition can read that absence as
+   "not a match" and stay safe; reading it the same way here fails a correct
+   agent for the age of its tape.
+3. Citations move to the PASS branch. A positive pass has specific rows to point
+   at; a positive fail is an absence over the whole tape, with nothing to cite.
+
+No existing check id, template, polarity or predicate changed, so no criterion
+that binds today moves to a different check or a different verdict.
+
+**What pome-cloud must do.** Pin `0.2.0` on **both** `apps/control-plane` and
+`apps/mcp` — they pin this package exactly and must move together, or
+`save_task` accepts criteria the grader cannot bind. Expect
+`CORPUS_SHAPE_BASELINE` to move only once a task actually writes the new
+sentence; this release adds vocabulary and edits no criterion.
+
+**And one thing to CHECK rather than inherit, because its failure is silent.**
+`github.tool-was-called` distinguishes `tool: null` ("this surface declares no
+action" — a real world, and the null agent's) from `tool` ABSENT ("this
+recording predates F-1125" — a skip). The twin writes `null` explicitly on every
+unstamped surface, but `twinHttpEventSchema` types the field
+`.nullable().optional()`, so a tape mapper or jsonb round-trip that DROPS
+null-valued keys would make every read-only run look like a legacy recording —
+and this check would `skipped` the null agent instead of failing it, which is
+the one outcome it exists to prevent. A skip does not announce itself the way a
+wrong verdict does. Confirm a persisted tape row for an unstamped call still
+carries `"tool": null` when the pin lands.
+
 ## 0.1.8
 
 **Grading-vocabulary change: twin-github's seed gained

@@ -59,7 +59,7 @@ import {
   pullRequestStateCheck,
 } from "./check-pulls.js";
 import { commitStatus, fileExists, noNewIssues, noNewLabels } from "./check-repos.js";
-import { noUnsupportedEndpoint, toolNeverCalled } from "./check-tape.js";
+import { noUnsupportedEndpoint, toolNeverCalled, toolWasCalled } from "./check-tape.js";
 
 export type { Check } from "./check-kind.js";
 export type {
@@ -101,4 +101,10 @@ export const GITHUB_CHECKS = [
   // that assert about the RUN rather than the world it left behind.
   noUnsupportedEndpoint,
   toolNeverCalled,
+  // F-1338. Adjacent to its prohibition for the reason the two repo-scoped
+  // deltas sit together above: an author reaching for one usually wants to see
+  // the other, and these two are the same predicate read in opposite
+  // directions off one closed set of actions. It is appended rather than
+  // slotted in front so the existing listing order does not move.
+  toolWasCalled,
 ] as const;

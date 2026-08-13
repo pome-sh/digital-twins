@@ -341,6 +341,30 @@ Note that `allowedTools` would **not** have closed it: it only auto-approves and
 does not restrict. Measured — `allowedTools` naming a single MCP tool left 152
 tools live, `Bash` and `Read` among them.
 
+### The other door: `settingSources: []`
+
+`tools` is only half of it, and the half that is easy to mistake for the whole.
+It governs the SDK's **built-in** set. `options.settingSources` governs
+**filesystem settings** — user (`~/.claude/settings.json`), project
+(`.claude/settings.json`) and local (`.claude/settings.local.json`) — and those
+carry the **Claude Code plugin MCP servers configured on whoever's machine this
+runs on**. Omit the option and the SDK loads all three ("matches CLI defaults");
+`[]` is its documented isolation mode.
+
+Measured 2026-08-05, on a `claude-haiku-4-5` trial of this very task with
+`tools: []` **already set**: the examinee called
+`mcp__plugin_slack_slack__slack_search_channels`, `…__slack_search_public` and
+`…__slack_list_channel_members`. It searched the *developer's real Slack
+workspace*, made zero twin calls, and would have scored as *the agent failed to
+triage* — a verdict about the wrong workspace entirely. With `settingSources: []`
+the same trial called only `mcp__github__*` / `mcp__slack__*`, searched issues
+first, commented on #1, posted the link, and scored 75.
+
+This is the one exam surface that changes depending on **who runs it**, which is
+why it is not left to intention: `scripts/check-example-sdk-isolation.mjs` in
+this repo's CI fails any bundled Claude-Agent-SDK example whose `query()`
+options omit either door (F-1295).
+
 `npm run typecheck` type-checks; `npm test` runs the env-contract and
 tool-policy tests.
 

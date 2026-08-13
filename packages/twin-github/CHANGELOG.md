@@ -1,5 +1,51 @@
 # @pome-sh/twin-github — CHANGELOG
 
+## 0.11.0 — 2026-08-13
+
+`` `create_commit_status` was called `` and `` `create_check_run` was called ``
+are declared here now (F-1338) — the vocabulary's first POSITIVE tape assertion
+on this twin. Minor for the same reason 0.5.0 and 0.6.0 were: the exported tuple
+changes shape, so `checksDigest` moves and every pin must catch up.
+
+**Why a positive one had to come first.** Every tape check this twin declared
+before it is a prohibition — `no-unsupported-endpoint`, `tool-never-called` —
+and a prohibition cannot separate *"held the line"* from *"never showed up"*. A
+do-nothing agent satisfies one by doing nothing, which is how six exam tasks
+came to be cleared by a null agent.
+
+- `github.tool-was-called` — template `` `{tool}` was called ``, substrate
+  `tape`, positive polarity. Matches on the recorded `tool` field, so it asserts
+  about the ACTION and not the transport, and it counts an ATTEMPT exactly as
+  its prohibition sibling does: a call the twin rejected still called the
+  action. A task that needs the OUTCOME must assert the outcome on state.
+- `GITHUB_CHECKS` goes from fifteen entries to sixteen. Appended after
+  `tool-never-called` rather than slotted in front, so the existing listing order
+  does not move.
+- No route, tool, seed, wire shape or existing predicate changed. Nothing about
+  the twin's HTTP or MCP behaviour moves in this release.
+
+**`TAPE_ASSERTABLE_TOOLS` is unchanged, and the new check shares its slot type
+rather than opening a second one.** That is the settlement F-1338 owed F-1342: a
+criterion naming an action whose REST route is unstamped is wrong in BOTH
+directions for one missing fact. `` `X` was never called `` over a run that did
+X by REST reads `passed` — the negative false-pass D4 forbids. `` `X` was
+called `` over the same run reads `failed` — a correct agent marked down. Same
+`null` stamp, same cause, so one set gates both and both widen together when
+F-1342 stamps a route. `test/tool-stamping.test.ts` keeps that set honest with a
+both-doors probe per member, and it is unchanged here.
+
+**Three things flip with the polarity**, each written onto the declaration:
+
+1. An EMPTY tape FAILS. `[]` is "the agent called nothing" — the null agent this
+   check exists to score at 0 — so it must reach a real verdict, never a skip.
+2. A tape carrying no `tool` key on any row (a recording predating F-1125) is
+   refused as `tool_not_recorded`, the shape
+   `stripe.x402-retry-includes-payment` uses for `headers_not_recorded`. `null`
+   ("this surface declares no action") and `undefined` ("this recording predates
+   the field") stay different worlds.
+3. Citations move to the pass branch: a positive pass has rows to point at, a
+   positive fail is an absence with none.
+
 ## 0.10.11 — 2026-08-13
 
 `documentation_url` names the operation the caller asked for, on both doors
