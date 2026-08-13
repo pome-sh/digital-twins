@@ -133,6 +133,18 @@ export function discoverExampleSiblingDeps(repoRoot) {
  * killed call has no `E404` in its stderr, so it lands in `error` — the
  * conservative side, and the same side a 401 or a 5xx lands on.
  *
+ * `--prefer-online` forces npm's staleness check instead of accepting a cached
+ * packument, and it is load-bearing on the write side (F-1520): both the workflow
+ * that calls this and the one that publishes restore npm's HTTP cache via
+ * `setup-node`'s `cache: npm`, keyed on the root lockfile — which a release
+ * commit changes, so the run immediately BEFORE a publish takes the miss and
+ * saves a fresh cache whose adapter packument predates that publish. The
+ * dispatched re-pin run then restores it, and inside the packument's max-age
+ * `npm view <pkg>@<just-published>` answers E404 — indistinguishable, by design,
+ * from "never published", so `planExampleRepins` skips the pin it exists to fix
+ * and no later run retries. A read that is allowed to answer from cache cannot
+ * prove a version is absent.
+ *
  * Retried, because "any non-E404 answer is a hard failure" puts the REQUIRED
  * `typecheck-test` check behind a third-party registry: one transient 5xx or
  * ECONNRESET would red it. `ci.yml`'s own actionlint install carries a
@@ -145,7 +157,7 @@ export function defaultNpmView(name, version, { attempts = 3, delayMs = 2000 } =
   let lastDetail = "";
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
-      execFileSync("npm", ["view", `${name}@${version}`, "version"], {
+      execFileSync("npm", ["view", `${name}@${version}`, "version", "--prefer-online"], {
         stdio: ["ignore", "pipe", "pipe"],
         encoding: "utf8",
         timeout: 60_000,
@@ -301,7 +313,13 @@ export function planExampleRepins(repoRoot, npmView = writeSideNpmView) {
       // would need dev toolchains (tsx, vitest) this job has no other use for.
       // The path is QUOTED: `v.example` is a directory name off `readdirSync`,
       // and this string is `bash`ed by a job holding a write-capable App token.
-      regenerate: [`(cd "examples/${v.example}" && npm install --package-lock-only --no-audit --no-fund)`],
+      // `--prefer-online` for the same reason the view above carries it: this
+      // resolves the version that was published minutes ago, and a cached
+      // packument that predates it makes the install fail on a version the
+      // registry really does serve.
+      regenerate: [
+        `(cd "examples/${v.example}" && npm install --package-lock-only --no-audit --no-fund --prefer-online)`,
+      ],
     });
   }
   return repins;

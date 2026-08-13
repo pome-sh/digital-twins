@@ -287,7 +287,7 @@ asserted in `scripts/ci/decide-publish.test.mjs`:
   indistinguishable from "never published" — so a read that beat propagation
   would make the dispatched run a no-op with no later run to retry it (the next
   PR's own required `typecheck-test` reds on the same drift). So the publish job
-  polls `npm view <pkg>@<version> --prefer-online` until the registry serves what
+  polls `npm view <pkg>@<version> --prefer-online` (as does the dispatched run's own read, and its lockfile regen — a cached packument cannot prove a version is absent, and both workflows restore npm's HTTP cache) until the registry serves what
   it just published — eighteen attempts over roughly three minutes, sized for the
   CDN's packument cache and exiting on the first attempt in the ordinary case —
   before this job runs at all. If that times

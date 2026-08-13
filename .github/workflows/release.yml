@@ -303,6 +303,16 @@ jobs:
       # seconds. A timeout reds a publish that already succeeded, which is the
       # loud half of the choice — the alternative is a green run whose dispatch
       # achieves nothing.
+      #
+      # A TIMEOUT ALSO SUPPRESSES THE DISPATCH, and that coupling is deliberate
+      # rather than unnoticed: this is a step of `publish`, so its failure makes
+      # `needs.publish.result` 'failure' and the dispatch job below then fires
+      # only if `publish-wire` published. Decoupling it — plumbing a matrix
+      # output so the dispatch fires regardless — buys a dispatched run that
+      # would very likely no-op for the same reason this step timed out, in
+      # exchange for a job graph nobody can read. A registry that will not serve
+      # a version three minutes after accepting it is abnormal, worth a red, and
+      # the recovery is the single command this step prints.
       - name: The registry serves what we just published
         if: matrix.enabled == 'true'
         env:
@@ -311,10 +321,19 @@ jobs:
           set -euo pipefail
           # Asked of npm by workspace NAME, which is all the matrix carries —
           # decide-publish.sh is handed a manifest path, and duplicating that
-          # table here is a second place for it to drift. `--json` because the
-          # human format prints `<name> <version>` and depends on npm's
-          # formatting; the shape below is stable and fails loudly if it changes.
-          version="$(npm pkg get version -w "${PKG}" --json | node -p 'JSON.parse(require("node:fs").readFileSync(0,"utf8"))[process.env.PKG].version')"
+          # table here is a second place for it to drift.
+          #
+          # BOTH JSON SHAPES ARE ACCEPTED, and that is not defensive padding:
+          # `npm pkg get version -w <name> --json` answers
+          # `{"<name>": "0.3.6"}` on the npm@11.5.1 this job pins two steps up
+          # (for the OIDC provenance crash) and `{"<name>": {"version": "0.3.6"}}`
+          # on npm 12. Reading only the nested shape yields `undefined`, and
+          # `npm view <pkg>@undefined` then 404s for the full budget below and
+          # reds a publish that succeeded — on every release, from a step whose
+          # whole job is to stop a silent no-op. The version is asserted to look
+          # like one rather than interpolated blind, so an npm that answers a
+          # third shape fails HERE, naming what it said.
+          version="$(npm pkg get version -w "${PKG}" --json | node -p 'const v=JSON.parse(require("node:fs").readFileSync(0,"utf8"))[process.env.PKG];const n=typeof v==="string"?v:v?.version;if(!/^\d+\.\d+\.\d+/.test(n??""))throw new Error("npm pkg get returned no version for "+process.env.PKG+": "+JSON.stringify(v));n')"
           for attempt in $(seq 1 18); do
             if npm view "${PKG}@${version}" version --prefer-online --registry https://registry.npmjs.org >/dev/null 2>&1; then
               echo "registry.npmjs.org serves ${PKG}@${version} (attempt ${attempt}/18)."
@@ -474,11 +493,19 @@ jobs:
   #
   # allocate-version.yml's `concurrency: allocate-version-${{ github.ref }}`
   # covers a `repository_dispatch` the same as a `push`: GitHub sets `ref` to the
-  # default branch on that event, so both resolve to `refs/heads/main`, a
-  # dispatch queues behind (never cancels, and is never raced by) any allocation
-  # already in flight on `main`, and the allocator recomputes from the tip when
-  # it starts — the same behaviour this file already relies on for two merges
-  # landing close together.
+  # default branch on that event, so both resolve to the same
+  # `allocate-version-refs/heads/main` group and a dispatch queues behind any
+  # allocation already in flight on `main` rather than racing it.
+  #
+  # It does NOT mean nothing is ever cancelled, and the honest version matters
+  # more than the reassuring one: GitHub keeps only the NEWEST pending run per
+  # group, so a dispatch arriving while a run is in progress and another is
+  # already pending displaces that pending run — and is itself displaceable by a
+  # later merge. What makes that safe is not the queue, it is that the allocator
+  # is a pure function of `main`'s tip: whichever run does start re-derives both
+  # the allocations and the re-pins from the tip, so a displaced run's work is
+  # not lost, it is recomputed. A future reader who instead relies on "nothing is
+  # cancelled" will mis-reason about exactly this.
   dispatch-allocate-version:
     name: dispatch allocate-version.yml after a publish
     needs: [publish, publish-wire]

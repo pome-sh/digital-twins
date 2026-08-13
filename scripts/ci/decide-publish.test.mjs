@@ -329,6 +329,43 @@ console.log("\nrelease.yml wiring");
     /npm view "\$\{PKG\}@\$\{version\}"[^\n]*--prefer-online/.test(publish),
     publish,
   );
+
+  // …and the version it waits for is READ CORRECTLY, which a grep cannot tell
+  // you. `npm pkg get version -w <name> --json` answers `{"<name>": "0.3.6"}` on
+  // the npm@11.5.1 that job pins and `{"<name>": {"version": "0.3.6"}}` on npm
+  // 12, so an expression written against one shape yields `undefined` on the
+  // other — `npm view <pkg>@undefined` then 404s for the whole budget and reds
+  // every publish. So the expression is pulled out of the workflow and RUN here
+  // against both shapes, rather than asserted to exist.
+  const extractor = publish.match(/node -p '(const v=JSON\.parse[^']*)'/)?.[1];
+  check("the version extractor is findable in the wait step", Boolean(extractor), publish);
+  if (extractor) {
+    const evaluate = (input) =>
+      spawnSync(process.execPath, ["-p", extractor], {
+        input,
+        encoding: "utf8",
+        env: { ...process.env, PKG: "@pome-sh/thing" },
+      });
+    for (const [label, input] of [
+      ["npm 11.5.1's flat shape", '{"@pome-sh/thing":"0.9.9"}'],
+      ["npm 12's nested shape", '{"@pome-sh/thing":{"version":"0.9.9"}}'],
+    ]) {
+      const r = evaluate(input);
+      check(
+        `the version extractor reads ${label}`,
+        r.status === 0 && r.stdout.trim() === "0.9.9",
+        `status=${r.status} stdout=${JSON.stringify(r.stdout)} stderr=${r.stderr?.split("\n")[0]}`,
+      );
+    }
+    // A third shape must fail HERE and name what npm said, never interpolate
+    // `undefined` into the registry query and blame the registry for the 404.
+    const r = evaluate('{"@pome-sh/thing":{"nope":true}}');
+    check(
+      "the version extractor throws on a shape it does not recognise, rather than yielding undefined",
+      r.status !== 0 && /no version for @pome-sh\/thing/.test(r.stderr ?? ""),
+      `status=${r.status} stderr=${(r.stderr ?? "").split("\n").slice(0, 3).join(" | ")}`,
+    );
+  }
 }
 
 if (failures > 0) {
