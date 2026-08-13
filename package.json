@@ -42,7 +42,9 @@
     "gate:wire-tarball": "node scripts/ci/check-wire-tarball.mjs",
     "gate:wire-manifest": "node scripts/ci/check-wire-tarball.mjs --manifest-only",
     "gate:checks-tarball": "node scripts/ci/check-checks-tarball.mjs",
-    "gate:checks-manifest": "node scripts/ci/check-checks-tarball.mjs --manifest-only"
+    "gate:checks-manifest": "node scripts/ci/check-checks-tarball.mjs --manifest-only",
+    "gate:sandbox-domains-tarball": "node scripts/ci/check-sandbox-domains-tarball.mjs",
+    "gate:sandbox-domains-manifest": "node scripts/ci/check-sandbox-domains-tarball.mjs --manifest-only"
   },
   "engines": {
     "node": ">=24",

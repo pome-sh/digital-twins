@@ -1,7 +1,7 @@
 {
-  "name": "@pome-sh/checks",
-  "version": "0.2.0",
-  "description": "Pome's grading vocabulary — the check declarations, seed schemas and default seeds of all five digital twins, plus the check DSL they are written in. Declarations only: no twin server, no database, no routes, no tools.",
+  "name": "@pome-sh/sandbox-domains",
+  "version": "0.0.0",
+  "description": "Pome's twin domain layer — the in-process runtime a bound check reads: each digital twin's domain object, its SQLite opener, its seed parser and its declared check vocabulary. Runtime, not server: no Hono app, no routes, no MCP tool table.",
   "private": false,
   "type": "module",
   "main": "./dist/index.js",
@@ -10,10 +10,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    },
-    "./dsl": {
-      "types": "./dist/dsl.d.ts",
-      "default": "./dist/dsl.js"
     },
     "./github": {
       "types": "./dist/github.d.ts",
@@ -35,6 +31,10 @@
       "types": "./dist/stripe.d.ts",
       "default": "./dist/stripe.js"
     },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
@@ -50,9 +50,9 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/pome-sh/digital-twins.git",
-    "directory": "packages/checks"
+    "directory": "packages/sandbox-domains"
   },
-  "homepage": "https://github.com/pome-sh/digital-twins/tree/main/packages/checks",
+  "homepage": "https://github.com/pome-sh/digital-twins/tree/main/packages/sandbox-domains",
   "bugs": {
     "url": "https://github.com/pome-sh/digital-twins/issues"
   },
@@ -63,13 +63,18 @@
     "evaluation",
     "grading",
     "digital-twin",
-    "checks"
+    "runtime"
   ],
   "scripts": {
-    "build": "tsup && node ../../scripts/bundle-declarations.mjs .",
+    "build": "tsup && node ../../scripts/bundle-declarations.mjs . --external hono --external @octokit/openapi-types --external stripe",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@octokit/openapi-types": "^28.0.0",
+    "hono": "^4.13.0",
+    "stripe": "22.3.2"
   },
   "peerDependencies": {
     "zod": "^4.4.3"

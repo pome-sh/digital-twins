@@ -1,10 +1,28 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Makes the emitted declarations SELF-CONTAINED. Sequenced AFTER tsup by this
-// package's `build` script — deliberately not tsup's `onSuccess`, which fires
-// when the JS build finishes while the declaration build is still running in a
-// separate worker, so it would rewrite files that are then overwritten.
+// Makes the emitted declarations SELF-CONTAINED. Sequenced AFTER tsup by the
+// consuming package's `build` script — deliberately not tsup's `onSuccess`,
+// which fires when the JS build finishes while the declaration build is still
+// running in a separate worker, so it would rewrite files that are then
+// overwritten.
+//
+// ── Shared by every bundling package, on purpose ─────────────────────────────
+//
+// Usage: `node ../../scripts/bundle-declarations.mjs <package-root>` — the
+// argument is resolved against the process cwd, which is the package directory
+// when npm runs a workspace's `build`, so `.` is what every caller passes.
+//
+// It lived at `packages/checks/scripts/` while `@pome-sh/checks` was the only
+// bundling package with re-export-only sources. `@pome-sh/sandbox-domains`
+// (F-1526) is the second, and the algorithm below is entirely
+// package-agnostic — it reads the caller's `dist/` and resolves specifiers
+// through the OWNING package's `exports` map. Copying ~300 lines into a second
+// package would be the F-1135 shape `scripts/ci/publish-relevance.mjs` argues
+// against in its own header: one copy goes stale while both still look like
+// they are doing the job, and here the stale one ships broken `.d.ts` to a
+// cross-repo consumer. Both packages' entries in `publish-relevance.mjs` name
+// this path, so editing it is publish-relevant for both.
 //
 // ── The bug this exists to fix ───────────────────────────────────────────────
 //
@@ -45,20 +63,57 @@
 // vendoring its types would reintroduce the two-identities problem
 // (`scripts/ci/check-checks-tarball.mjs` asserts it stays external).
 //
+// A caller may name FURTHER externals with `--external <specifier>`, repeatable.
+// `@pome-sh/sandbox-domains` passes `hono`, which is a declared runtime dependency
+// of that package and therefore resolvable for its consumers — vendoring hono's
+// types there would ship a second copy of `Context`/`Hono` that is not the one
+// the consumer's own hono provides. `@pome-sh/checks` passes none, which is why
+// its build is unchanged by this file moving: with no `--external`, a hono
+// specifier still fails the closure assertion below exactly as before.
+//
 // This is a build step over generated output, not a second copy of anything
 // checked in: `dist/` is gitignored and regenerated from the twins on every
 // build, so it cannot drift from them.
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, posix, relative, resolve } from "node:path";
 
-const PACKAGE_ROOT = resolve(import.meta.dirname, "..");
+const argv = process.argv.slice(2);
+const extraExternals = new Set();
+const positional = [];
+for (let i = 0; i < argv.length; i += 1) {
+  if (argv[i] === "--external") {
+    const value = argv[i + 1];
+    if (!value) throw new Error("--external needs a specifier");
+    extraExternals.add(value);
+    i += 1;
+  } else positional.push(argv[i]);
+}
+if (positional.length !== 1) {
+  throw new Error(
+    "usage: bundle-declarations.mjs <package-root> [--external <specifier>]…\n" +
+      "  <package-root> is resolved against the cwd; a workspace `build` script passes `.`.",
+  );
+}
+
+const PACKAGE_ROOT = resolve(process.cwd(), positional[0]);
 const PACKAGES_ROOT = resolve(PACKAGE_ROOT, "..");
 const DIST = join(PACKAGE_ROOT, "dist");
 const VENDOR_DIRECTORY = join(DIST, "_types");
 const SCOPE = "@pome-sh/";
 
-/** Bare specifiers that must STAY bare. zod is a peer; node: builtins are builtins. */
-const KEEP_EXTERNAL = (specifier) => specifier === "zod" || specifier.startsWith("node:");
+if (!existsSync(DIST)) {
+  throw new Error(`${DIST} does not exist — run tsup before this script.`);
+}
+
+/**
+ * Bare specifiers that must STAY bare. zod is a peer; node: builtins are
+ * builtins; `--external` adds the caller's own declared runtime dependencies.
+ */
+const KEEP_EXTERNAL = (specifier) =>
+  specifier === "zod" ||
+  specifier.startsWith("node:") ||
+  extraExternals.has(specifier) ||
+  [...extraExternals].some((external) => specifier.startsWith(`${external}/`));
 
 /**
  * Every specifier form that can appear in a `.d.ts`: `from "x"`, bare
@@ -146,7 +201,7 @@ function resolveDeclaration(specifier) {
   if (!target) {
     throw new Error(
       `${specifier} names no \`types\` target in ${packageName}'s exports map. ` +
-        `Add one, or stop re-exporting it from @pome-sh/checks.`,
+        `Add one, or stop re-exporting it from ${relative(PACKAGES_ROOT, PACKAGE_ROOT)}.`,
     );
   }
   const file = resolve(directory, target);
@@ -279,8 +334,9 @@ const walk = (directory) => {
           const found = [`${base}.d.ts`, join(base, "index.d.ts")].some((c) => existsSync(c));
           if (!found) leaked.push(`${relative(DIST, path)} -> ${specifier} (not shipped)`);
         } else if (!KEEP_EXTERNAL(specifier)) {
-          // `hono`, `@pome-sh/sdk`, a DOM lib type — none is a dependency of this
-          // package, so none can resolve for a consumer.
+          // `@pome-sh/sdk`, a DOM lib type, or a bare `hono` in a package that
+          // did not declare it via `--external` — none is resolvable for that
+          // package's consumers, so none may reach a shipped `.d.ts`.
           leaked.push(`${relative(DIST, path)} -> ${specifier} (not an allowed external)`);
         }
       }

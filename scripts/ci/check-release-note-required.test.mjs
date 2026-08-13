@@ -45,7 +45,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { PUBLISHED_PACKAGES } from "./publish-relevance.mjs";
+import { isPublishIrrelevantPath, PUBLISHED_PACKAGES } from "./publish-relevance.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const SCRIPT = join(ROOT, "scripts/ci/check-release-note-required.mjs");
@@ -437,6 +437,56 @@ console.log("the gate's own surface");
     "appending below the newest released entry is a rewrite, and refused",
     r.status === 1 && r.out.includes("byte-identical"),
     r.out,
+  );
+}
+
+{
+  // Every carve-out in publish-relevance.mjs justifies itself with "the package
+  // this path belongs to publishes nothing", so none of them may ever exempt a
+  // path inside a package that DOES publish — that would drop a file which
+  // really reaches a consumer's tarball out of the relevance table, silently.
+  //
+  // Written as a property over `PUBLISHED_PACKAGES` rather than against any one
+  // package, because the way it breaks is a NAME. F-1526's package was called
+  // `twin-domains` first, which put a published `README.md` (in its `files`) under
+  // the `packages/twin-*` top-level-markdown carve-out; renaming it to
+  // `sandbox-domains` is what actually fixed that, and the fix is invisible in
+  // the carve-outs themselves. This is the assertion that notices if a future
+  // package name — or a rename of the twins, which is coming — walks back into
+  // one of these prefixes.
+  const exemptedPublished = PUBLISHED_PACKAGES.flatMap((pkg) => {
+    const directory = dirname(pkg.manifest);
+    return [`${directory}/README.md`, `${directory}/examples/demo/index.ts`, `${directory}/scripts/validate.ts`]
+      .filter((path) => isPublishIrrelevantPath(path) !== null)
+      .map((path) => `${pkg.name}: ${path} — ${isPublishIrrelevantPath(path)}`);
+  });
+  check(
+    "no carve-out exempts a path inside a package that publishes",
+    exemptedPublished.length === 0,
+    exemptedPublished.join("\n      "),
+  );
+
+  // …and the carve-outs still apply to the five PRIVATE twins, or the rule was
+  // widened into uselessness rather than kept honest.
+  check(
+    "the private twins keep their carve-outs",
+    isPublishIrrelevantPath("packages/twin-github/FIDELITY.md") !== null &&
+      isPublishIrrelevantPath("packages/twin-stripe/examples/buyer-agent/index.ts") !== null &&
+      isPublishIrrelevantPath("packages/twin-github/scripts/validate-mcp.ts") !== null,
+  );
+
+  // The shared declaration bundler moved to scripts/ (F-1526) so sandbox-domains
+  // could use it instead of copying ~300 lines. Both packages' `.d.ts` are
+  // unresolvable for a consumer if it regresses, so it must stay publish-relevant
+  // for both — the move must not have quietly dropped it out of the table.
+  const bundlerConsumers = PUBLISHED_PACKAGES.filter((pkg) =>
+    (pkg.pathPatterns ?? []).some((pattern) => pattern.test("scripts/bundle-declarations.mjs")),
+  ).map((pkg) => pkg.name);
+  check(
+    "the shared declaration bundler is publish-relevant for both bundling packages",
+    bundlerConsumers.includes("@pome-sh/checks") &&
+      bundlerConsumers.includes("@pome-sh/sandbox-domains"),
+    `named by: ${bundlerConsumers.join(", ") || "(nobody)"}`,
   );
 }
 

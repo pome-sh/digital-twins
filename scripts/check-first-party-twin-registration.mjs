@@ -63,6 +63,18 @@ compare(
   "packages/checks/src/index.ts CHECKS_TWIN_NAMES",
   quotedArray("packages/checks/src/index.ts", "CHECKS_TWIN_NAMES"),
 );
+// F-1526 — `@pome-sh/sandbox-domains` carries the other half to the same
+// consumer: the in-process domain runtime `lib/twin-state.ts` boots. Same seam,
+// same failure shape as the line above and one step worse — a sixth twin missing
+// here compiles, and its criteria do not merely fail to bind, they bind against
+// a vocabulary whose runtime pome-cloud cannot construct at all. Both arrays are
+// checked because the two packages are the two legs of `checks-package-drift`: a
+// twin present in one and absent from the other is precisely the drift that gate
+// exists to catch, caught here a repository earlier.
+compare(
+  "packages/sandbox-domains/src/index.ts SANDBOX_DOMAIN_NAMES",
+  quotedArray("packages/sandbox-domains/src/index.ts", "SANDBOX_DOMAIN_NAMES"),
+);
 
 const contractNames = [
   ...read("contract/helpers.mjs").matchAll(/\{\s*name:\s*"([a-z][a-z0-9-]*)",\s*pkg:\s*"packages\/twin-/g),

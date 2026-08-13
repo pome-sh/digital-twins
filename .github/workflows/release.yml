@@ -1,5 +1,5 @@
 name: release
-# The single release pipeline for the four published packages, replacing
+# The single release pipeline for the five published packages, replacing
 # cli-release.yml (Changesets + a manual "publish the @pome-sh/* batch first"
 # gate that produced 16 batch releases in 14 days, 4 of them consecutive
 # failures) and sdk-publish.yml.
@@ -21,6 +21,18 @@ name: release
 # the check declarations and could no longer receive a correction. Publishing the
 # declaration layer on its own restores that path without reversing the
 # privatisation that fixed the two-zod-identities bug (F-942).
+#
+# @pome-sh/sandbox-domains (F-1526) is the matrix entry that finished that job, and
+# the reason it took a second package is worth stating once here. F-1308 gave the
+# DECLARATIONS a publish path and left the RUNTIME behind: pome-cloud boots the
+# twin domain layer in-process, and `checks-package-drift.test.ts` demands the
+# two declare an identical binding surface. When F-1338 widened the vocabulary,
+# the vocabulary leg could publish and the runtime leg had no lane at all — so
+# the gate went red with no legal move available, on purpose and by design.
+# Bundling the domain layer the same way (tsup `noExternal`, zod as a peer)
+# puts both legs on THIS lane, cut from the same commit by the same allocator
+# run, so a widening is now two pins moving in one pome-cloud PR. The twins and
+# the sdk stay `private: true`; nothing about F-942 or F-1308 is reversed.
 #
 # @pome-sh/wire (F-949) publishes to BOTH registries now, independently, from
 # the SAME version line. It originally shipped to GitHub Packages only, for
@@ -88,6 +100,7 @@ jobs:
       cli: ${{ steps.diff.outputs.cli }}
       adapter: ${{ steps.diff.outputs.adapter }}
       checks: ${{ steps.diff.outputs.checks }}
+      sandboxDomains: ${{ steps.diff.outputs.sandboxDomains }}
       wireNpm: ${{ steps.diff.outputs.wireNpm }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -106,6 +119,12 @@ jobs:
           scripts/ci/decide-publish.sh "@pome-sh/cli" "cli/package.json" "cli"
           scripts/ci/decide-publish.sh "@pome-sh/adapter-claude-sdk" "packages/adapter-claude-sdk/package.json" "adapter"
           scripts/ci/decide-publish.sh "@pome-sh/checks" "packages/checks/package.json" "checks"
+          # @pome-sh/sandbox-domains — the grading RUNTIME, the other leg of
+          # pome-cloud's drift gate (F-1526). Decided on the same lane and in
+          # the same step as @pome-sh/checks on purpose: the two are compared
+          # against each other in the consumer, so a release that moves one and
+          # not the other is exactly the failure this entry exists to prevent.
+          scripts/ci/decide-publish.sh "@pome-sh/sandbox-domains" "packages/sandbox-domains/package.json" "sandboxDomains"
           # wire's npmjs decision — independent of, and output-named distinctly
           # from, plan-wire's `wire` output below (that one reads GitHub
           # Packages). Same manifest, same version line, two registries decided
@@ -150,7 +169,7 @@ jobs:
   publish:
     name: publish ${{ matrix.package }}
     needs: plan
-    if: needs.plan.outputs.cli == 'true' || needs.plan.outputs.adapter == 'true' || needs.plan.outputs.checks == 'true' || needs.plan.outputs.wireNpm == 'true'
+    if: needs.plan.outputs.cli == 'true' || needs.plan.outputs.adapter == 'true' || needs.plan.outputs.checks == 'true' || needs.plan.outputs.sandboxDomains == 'true' || needs.plan.outputs.wireNpm == 'true'
     runs-on: ubuntu-latest
     strategy:
       # Never cancel a sibling mid-publish: a half-published set is worse than
@@ -170,6 +189,22 @@ jobs:
           # need an .npmrc change it cannot make without breaking @pome-sh/cli.
           - package: "@pome-sh/checks"
             enabled: ${{ needs.plan.outputs.checks }}
+          # @pome-sh/sandbox-domains — the grading RUNTIME (F-1526), and the
+          # package that made the drift gate's red a fixable condition rather
+          # than a wall. @pome-sh/checks carries the check DECLARATIONS to
+          # pome-cloud; this carries the in-process domain layer those
+          # declarations read, so `checks-package-drift.test.ts` finally has two
+          # legs that can both move. Both are cut from the same `main` commit by
+          # the same allocator run, which is what makes their binding surfaces
+          # agree by construction.
+          #
+          # It runs `gate:sandbox-domains-tarball` where checks runs
+          # `gate:checks-tarball`, and the two audits are NOT interchangeable —
+          # three of their assertions are deliberately inverted (this one
+          # REQUIRES the `node:sqlite` bytes the checks audit treats as an engine
+          # leak). See the header of scripts/ci/check-sandbox-domains-tarball.mjs.
+          - package: "@pome-sh/sandbox-domains"
+            enabled: ${{ needs.plan.outputs.sandboxDomains }}
           # @pome-sh/wire — the odd one out twice over (F-949). It is on this
           # npmjs lane ADDITIONALLY to (not instead of) its separate GitHub
           # Packages jobs further down in this file: pome-cloud's migration off
@@ -238,6 +273,16 @@ jobs:
       - name: Audit the @pome-sh/checks tarball
         if: matrix.enabled == 'true' && matrix.package == '@pome-sh/checks'
         run: npm run gate:checks-tarball
+      # @pome-sh/sandbox-domains inlines the same six `private: true` workspace
+      # packages, so the same leaked-dependency 404 applies — but the rest of
+      # this audit is the INVERSE of the one above: it requires the `node:sqlite`
+      # driver to be present (a runtime bundle without one has openers that
+      # cannot open), requires every bare specifier in the shipped bytes to be a
+      # declared dependency and every declared dependency to be imported, and
+      # asserts F-1526's export spec against the packed modules.
+      - name: Audit the @pome-sh/sandbox-domains tarball
+        if: matrix.enabled == 'true' && matrix.package == '@pome-sh/sandbox-domains'
+        run: npm run gate:sandbox-domains-tarball
       - name: Guard against hard-link tarball (E415)
         if: matrix.enabled == 'true'
         run: |

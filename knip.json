@@ -88,6 +88,28 @@
         "test/**/*.ts"
       ]
     },
+    "packages/sandbox-domains": {
+      "entry": [
+        "src/index.ts",
+        "src/github.ts",
+        "src/gmail.ts",
+        "src/linear.ts",
+        "src/slack.ts",
+        "src/stripe.ts",
+        "src/server.ts",
+        "tsup.config.ts",
+        "test/**/*.test.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "test/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@octokit/openapi-types",
+        "hono",
+        "stripe"
+      ]
+    },
     "cli": {
       "entry": [
         "src/cli/main.ts",
