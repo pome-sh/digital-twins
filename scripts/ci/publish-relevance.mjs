@@ -48,10 +48,13 @@ function isUnpublishableTestPath(file) {
  * twin-slack's tsconfig.build.json compile `examples/**\/*.ts` into
  * `dist/examples/*.js` (rootDir "."), and `files: ["dist", ...]` names
  * `dist`. The actual load-bearing fact is `private: true` — release.yml
- * (F-1308, F-949) publishes only cli, adapter-claude-sdk, checks and wire, and
- * no twin is any of those. Nothing in this repo currently asserts a twin stays
- * private, so if one were ever unprivated this exemption would need
- * re-checking; today it holds for all five. The CLI's own `files` entry
+ * (F-1308, F-949, F-1526) publishes cli, adapter-claude-sdk, checks, wire and
+ * sandbox-domains, and no twin is any of those. Nothing in this repo currently
+ * asserts a twin stays private, so if one were ever unprivated this exemption
+ * would need re-checking; today it holds for all five. `@pome-sh/sandbox-domains`
+ * also bundles twin SOURCE, which does not change this either: tsup reaches
+ * `src/` through each twin's `exports` map and can inline neither a markdown
+ * file nor an `examples/` tree nobody imports. The CLI's own `files` entry
  * "examples" is cli/examples (cli/tsconfig.json's `include`), a different
  * directory, not a twin's.
  *
@@ -71,12 +74,13 @@ function isTwinExamplePath(file) {
 
 /**
  * A twin's own TOP-LEVEL markdown ships in no tarball either, for exactly the
- * reason above: every `packages/twin-*` package is `private: true`, and
- * release.yml publishes only cli, adapter-claude-sdk, checks and wire. Their
- * `files` arrays do name `README.md` / `FIDELITY.md` / `LIMITS.md`, and that is
- * as inert as the `dist/examples` case — a `files` array on a package nothing
- * publishes describes a tarball nobody builds. The CLI's tarball inlines twin
- * SOURCE through tsup, and tsup cannot inline a markdown file.
+ * reason above: every twin under `packages/twin-*` is `private: true`, and none
+ * of them is one of the five release.yml publishes. Their `files` arrays do name
+ * `README.md` / `FIDELITY.md` / `LIMITS.md`, and that is as inert as the
+ * `dist/examples` case — a `files` array on a package nothing publishes
+ * describes a tarball nobody builds. The CLI's and `@pome-sh/sandbox-domains`'
+ * tarballs inline twin SOURCE through tsup, and tsup cannot inline a markdown
+ * file.
  *
  * Same shape of over-match as F-1455, one directory over: `packages/twin-` is a
  * plain prefix, so documentation that cannot change one byte of any published
@@ -100,9 +104,9 @@ function isTwinTopLevelDocPath(file) {
 /**
  * A twin's own top-level `scripts/` is dev/CI tooling, run via tsx on the `.ts`
  * source. It ships in no tarball, and — as with the two carve-outs above — the
- * load-bearing fact is `private: true`: release.yml (F-1308, F-949) publishes
- * only cli, adapter-claude-sdk, checks and wire, and no twin is any of those.
- * That is deliberately the ONLY reason claimed here, because the tempting
+ * load-bearing fact is `private: true`: release.yml (F-1308, F-949, F-1526)
+ * publishes cli, adapter-claude-sdk, checks, wire and sandbox-domains, and no twin
+ * is any of those. That is deliberately the ONLY reason claimed here, because the tempting
  * second one is false for four of the five twins: only
  * `packages/twin-github/tsconfig.build.json` names `scripts` in its `exclude`,
  * and `packages/twin-slack/dist/scripts/` and `packages/twin-stripe/dist/scripts/`
@@ -110,10 +114,11 @@ function isTwinTopLevelDocPath(file) {
  * `files` array on a package nothing publishes describes a tarball nobody
  * builds. If a twin were ever unprivated, this exemption needs re-checking.
  *
- * The CLI's tarball is the other artifact that could carry these bytes, and does
- * not: tsup inlines twin source reached from each twin's package `exports`,
- * which resolve into `src/` only, and nothing under `cli/src/` or any twin's own
- * `src/` imports a twin script — so tsup never sees these files.
+ * The CLI's and `@pome-sh/sandbox-domains`' tarballs are the other artifacts that
+ * could carry these bytes, and do not: tsup inlines twin source reached from
+ * each twin's package `exports`, which resolve into `src/` only, and nothing
+ * under `cli/src/`, `packages/sandbox-domains/src/` or any twin's own `src/`
+ * imports a twin script — so tsup never sees these files.
  *
  * Third instance of the F-1455 over-match, one directory over from the
  * `examples/` and top-level-`.md` carve-outs above: `packages/twin-` is a plain
@@ -179,7 +184,7 @@ export function isPublishIrrelevantPath(file) {
 }
 
 /**
- * The four packages `release.yml` can publish, and what changes each one's
+ * The five packages `release.yml` can publish, and what changes each one's
  * bytes. `changelog` is where that package's release note lives, and
  * `versionedArtifacts` names committed files that embed the package's own
  * version and are byte-compared by a CI gate, so the allocator cannot move a
@@ -232,7 +237,44 @@ export const PUBLISHED_PACKAGES = [
     pathPatterns: [
       /^packages\/twin-[a-z]+\/src\/(checks|check-[a-z-]+|seed|tape-assertable-tools)\.ts$/,
       /^packages\/sdk\/src\/(checks|check-state-path|check-discrimination|check-redaction|failure-injection)\.ts$/,
+      // The declaration bundler moved out of this package (F-1526) so
+      // @pome-sh/sandbox-domains could share it instead of copying ~300 lines. It
+      // is still what makes this tarball's `.d.ts` resolvable for a consumer,
+      // so it is still publish-relevant here — the move must not quietly drop
+      // it out of the table.
+      /^scripts\/bundle-declarations\.mjs$/,
     ],
+  },
+  {
+    // The twin domain layer — the in-process runtime pome-cloud's
+    // `lib/twin-state.ts` boots and a bound check reads (F-1526).
+    //
+    // `@pome-sh/checks` ships the DECLARATIONS, this ships what they read. The
+    // two are the two legs of pome-cloud's `checks-package-drift.test.ts`, and
+    // the reason they are separate entries on one lane is that both must be cut
+    // from the SAME `main` commit: publishing a widened vocabulary whose runtime
+    // could not follow is precisely the wall F-1524 recorded.
+    //
+    // Its paths are WHOLE directories where the checks entry above names files,
+    // and the difference is not an oversight. A twin's routes, tools and domain
+    // change no byte of the vocabulary tarball — but they are exactly what this
+    // one bundles, so a domain-behaviour change that did not republish this
+    // package is the silent non-release this table exists to prevent. The
+    // deliberate overlap with the checks entry (and with the CLI's) is the wire
+    // precedent one file up: one edit, several artifacts, several releases.
+    name: "@pome-sh/sandbox-domains",
+    manifest: "packages/sandbox-domains/package.json",
+    changelog: "packages/sandbox-domains/CHANGELOG.md",
+    registry: "npm",
+    pathPrefixes: [
+      "packages/sandbox-domains/",
+      "packages/twin-",
+      // `./server` re-exports `toTwinHttpEventRow`, and every twin domain
+      // reaches the sdk's db layer — the whole sdk is inlined here, exactly as
+      // it is into the CLI.
+      "packages/sdk/",
+    ],
+    pathPatterns: [/^scripts\/bundle-declarations\.mjs$/],
   },
   {
     // Published to BOTH registries from one version line (F-949): npmjs for

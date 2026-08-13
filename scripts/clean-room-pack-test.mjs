@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Clean-room release gate for the two packages published to npm. (`@pome-sh/wire`
+// Clean-room release gate for the four npmjs-published packages. (`@pome-sh/wire`
 // is also published, but to GitHub Packages for cross-repo consumers, and is
 // audited separately by scripts/ci/check-wire-tarball.mjs — F-949. What matters
 // HERE is the assertion below that neither npm tarball declares an `@pome-sh/*`
@@ -40,6 +40,15 @@
 //   - a real consumer file TYPECHECKS against the shipped `dist/index.d.ts`.
 //     Runtime-import-only would pass even if dts bundling dropped or
 //     mis-resolved the bundled wire types: only the consumer's tsc breaks.
+//
+// `@pome-sh/checks` and `@pome-sh/sandbox-domains` get their own sections at the
+// bottom — the two packages whose only consumer is in another repository, and
+// the two where a runtime import proves the least. checks needs the consumer
+// COMPILE (its whole job is re-exported declarations); sandbox-domains needs the
+// consumer CONSTRUCTION (its openers must actually open a database), and its
+// install deliberately names nothing but the tarball, its zod peer and
+// typescript, so anything else it needs has to arrive through its own
+// `dependencies`.
 //
 // Usage: node scripts/clean-room-pack-test.mjs [--keep]
 
@@ -539,5 +548,187 @@ try {
 }
 console.log("  ✓ consumer file typechecks against the shipped declarations (skipLibCheck off)");
 
+// ── @pome-sh/sandbox-domains ───────────────────────────────────────────────────
+//
+// The grading RUNTIME (F-1526), and the one published package where "the import
+// resolves" is genuinely not enough: pome-cloud does not just read these
+// exports, it CONSTRUCTS them — opens a SQLite database, builds a domain over
+// it, and parses a seed through it. A tarball whose `open*Database` resolves and
+// then cannot open anything satisfies every name-shaped assertion and fails on
+// the grader, which is why the runtime check below boots rather than imports.
+//
+// `skipLibCheck` stays OFF for the same reason as checks above, and it reaches
+// further here: this package's declarations legitimately name three EXTERNAL
+// packages (`hono`, `@octokit/openapi-types`, `stripe`) that its manifest must
+// therefore declare. Installing the tarball alone — with no workspace, and
+// without hand-installing those — is what proves the manifest actually carries
+// them. It is the assertion that would have caught `graphql` being declared for
+// a package tsup had inlined, and `@hono/node-server` being declared for one
+// nothing imported.
+console.log("\n@pome-sh/sandbox-domains — clean-room pack test");
+const domainsRoom = makeRoom("sandbox-domains");
+const domainsTarball = pack("@pome-sh/sandbox-domains", join(domainsRoom, "tarballs"));
+assertNoHardLinks(domainsTarball);
+assertNoStrayTarballArtifacts(domainsTarball, "@pome-sh/sandbox-domains");
+
+const domainsInstall = join(domainsRoom, "install");
+mkdirSync(domainsInstall, { recursive: true });
+writeFileSync(
+  join(domainsInstall, "package.json"),
+  JSON.stringify({ name: "sandbox-domains-room", private: true, type: "module" }, null, 2),
+);
+const domainsZodRange = JSON.parse(
+  readFileSync(join(ROOT, "packages", "sandbox-domains", "package.json"), "utf8"),
+).peerDependencies.zod;
+// Only the tarball, its zod PEER and typescript are named here. Everything else
+// the package needs has to arrive through its own `dependencies`, which is the
+// point of the exercise.
+// `@types/node` is here and is NOT a hole in the exercise. This package opens
+// SQLite databases through `node:sqlite`, and its shipped declarations reach
+// `hono`'s and `stripe`'s own `.d.ts`, which require `@types/node` and the DOM
+// lib themselves (neither declares `@types/node`; both assume a Node consumer,
+// which is standard for a server library). A consumer of a package like this is
+// a Node server — pome-cloud's control-plane — so requiring those is honest.
+// What is NOT installed is anything that would let this package's own missing
+// `dependencies` pass unnoticed: `hono`, `@octokit/openapi-types` and `stripe`
+// must all still arrive through the tarball's own manifest.
+run(
+  "npm",
+  [
+    "install",
+    domainsTarball,
+    `zod@${domainsZodRange}`,
+    "typescript",
+    "@types/node",
+    "--no-audit",
+    "--no-fund",
+    "--ignore-scripts",
+  ],
+  { cwd: domainsInstall },
+);
+assertManifestPure(
+  join(domainsInstall, "node_modules", "@pome-sh", "sandbox-domains", "package.json"),
+  "@pome-sh/sandbox-domains",
+);
+
+writeFileSync(
+  join(domainsInstall, "runtime-check.mjs"),
+  [
+    'import { SANDBOX_DOMAINS, SANDBOX_DOMAIN_NAMES, toTwinHttpEventRow } from "@pome-sh/sandbox-domains";',
+    'import { GitHubDomain, openGitHubCloneDatabase, parseSeed, defaultSeedState, GITHUB_CHECKS } from "@pome-sh/sandbox-domains/github";',
+    'import { StripeDomain, openTwinStripeDatabase, applySeed } from "@pome-sh/sandbox-domains/stripe";',
+    'import { toTwinHttpEventRow as viaServer } from "@pome-sh/sandbox-domains/server";',
+    'if (SANDBOX_DOMAIN_NAMES.length !== 5) throw new Error("SANDBOX_DOMAIN_NAMES does not cover five twins");',
+    'if (Object.keys(SANDBOX_DOMAINS).length !== 5) throw new Error("SANDBOX_DOMAINS does not cover five twins");',
+    "// One copy across entries, or the barrel and a subpath hand out different",
+    "// objects for the same primitive (the splitting: true invariant).",
+    'if (viaServer !== toTwinHttpEventRow) throw new Error("toTwinHttpEventRow differs between ./server and the barrel");',
+    'if (SANDBOX_DOMAINS.github.Domain !== GitHubDomain) throw new Error("barrel and subpath disagree on GitHubDomain");',
+    "// The part a name-shaped check cannot reach: node:sqlite actually opens,",
+    "// and a domain constructs over the handle it returns.",
+    'const db = openGitHubCloneDatabase(":memory:");',
+    'if (!(new GitHubDomain(db) instanceof GitHubDomain)) throw new Error("GitHubDomain did not construct");',
+    "parseSeed(defaultSeedState());",
+    'if (GITHUB_CHECKS.length === 0) throw new Error("GITHUB_CHECKS is empty");',
+    'if (typeof applySeed !== "function") throw new Error("stripe applySeed missing");',
+    'const sdb = openTwinStripeDatabase(":memory:");',
+    'if (!(new StripeDomain(sdb) instanceof StripeDomain)) throw new Error("StripeDomain did not construct");',
+    'const row = toTwinHttpEventRow({ request_id: "req_1" });',
+    'if (row.kind !== "TwinHttpEvent" || row.event_id !== "req_1") throw new Error("toTwinHttpEventRow did not wrap the row");',
+    'console.log("sandbox-domains runtime import, database open and domain construction OK");',
+  ].join("\n"),
+);
+run(process.execPath, [join(domainsInstall, "runtime-check.mjs")], { cwd: domainsInstall });
+console.log("  ✓ runtime import, one-copy identity, real SQLite open + domain construction");
+
+writeFileSync(
+  join(domainsInstall, "consumer.ts"),
+  `import {
+  SANDBOX_DOMAINS,
+  SANDBOX_DOMAIN_NAMES,
+  type SandboxDomainName,
+  toTwinHttpEventRow,
+} from "@pome-sh/sandbox-domains";
+import {
+  GitHubDomain,
+  openGitHubCloneDatabase,
+  parseSeed,
+  defaultSeedState,
+  GITHUB_CHECKS,
+} from "@pome-sh/sandbox-domains/github";
+import { StripeDomain, openTwinStripeDatabase, applySeed, type TwinStripeDatabase } from "@pome-sh/sandbox-domains/stripe";
+import { GmailDomain, openGmailTwinDatabase } from "@pome-sh/sandbox-domains/gmail";
+import { LinearDomain, openLinearTwinDatabase } from "@pome-sh/sandbox-domains/linear";
+import { SlackDomain, openSlackTwinDatabase } from "@pome-sh/sandbox-domains/slack";
+
+const names: readonly SandboxDomainName[] = SANDBOX_DOMAIN_NAMES;
+const github = new GitHubDomain(openGitHubCloneDatabase(":memory:"));
+const stripeDb: TwinStripeDatabase = openTwinStripeDatabase(":memory:");
+const stripe = new StripeDomain(stripeDb);
+const gmail = new GmailDomain(openGmailTwinDatabase(":memory:"));
+const linear = new LinearDomain(openLinearTwinDatabase(":memory:"));
+const slack = new SlackDomain(openSlackTwinDatabase(":memory:"));
+const parsed = parseSeed(defaultSeedState());
+const row = toTwinHttpEventRow({ request_id: "req_1" } as never);
+const kind: "TwinHttpEvent" = row.kind;
+
+export function main(): void {
+  void [
+    names, SANDBOX_DOMAINS, github, stripe, gmail, linear, slack, parsed, kind,
+    GITHUB_CHECKS, applySeed,
+  ];
+}
+`,
+);
+writeFileSync(
+  join(domainsInstall, "tsconfig.json"),
+  JSON.stringify(
+    {
+      compilerOptions: {
+        target: "ES2022",
+        // DOM and `@types/node` ARE allowed here, and that is the one place this
+        // room deliberately differs from the checks room above. The reason there
+        // ("a declarations package has no business requiring either") does not
+        // transfer: this package is a RUNTIME. Its declarations reach hono's and
+        // stripe's own `.d.ts`, which name `File`, `Request`, `ReadableStream`
+        // and `NodeJS.*` — third-party types that need those libs and are not
+        // this repo's to fix.
+        //
+        // `skipLibCheck` stays OFF, which is what keeps the assertion worth
+        // making: the tarball installs INTO node_modules, so turning it on would
+        // skip this package's own declarations too and degrade the whole section
+        // to "does the import resolve" — which the runtime check already covers.
+        // The cost is that a genuine type regression shipped by hono or stripe
+        // reds this gate; renovate keeps both current and the rest of the repo's
+        // typecheck already carries the same exposure.
+        lib: ["ES2022", "DOM"],
+        types: ["node"],
+        module: "NodeNext",
+        moduleResolution: "NodeNext",
+        strict: true,
+        noEmit: true,
+        skipLibCheck: false,
+      },
+      files: ["consumer.ts"],
+    },
+    null,
+    2,
+  ),
+);
+try {
+  run(join(domainsInstall, "node_modules", ".bin", "tsc"), ["-p", "tsconfig.json"], {
+    cwd: domainsInstall,
+  });
+} catch (err) {
+  fail(
+    "@pome-sh/sandbox-domains: a consumer file failed to typecheck against the shipped declarations.\n" +
+      "Either the declaration bundler left a bare @pome-sh/* specifier (the failure `noExternal`\n" +
+      "does not cover), or the shipped `.d.ts` names an external — hono, @octokit/openapi-types,\n" +
+      "stripe — that the package's own `dependencies` do not carry.\n" +
+      `${err.stdout ?? ""}${err.stderr ?? ""}`,
+  );
+}
+console.log("  ✓ consumer file typechecks against the shipped declarations (skipLibCheck off)");
+
 cleanup();
-console.log("\n✅ clean-room pack test passed for all three published packages.");
+console.log("\n✅ clean-room pack test passed for all four published packages.");

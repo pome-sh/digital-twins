@@ -125,25 +125,57 @@ Two properties are load-bearing and gated by
   job is to hand out declarations. `@pome-sh/sdk/failure-injection` is the narrow
   subpath that exists so it doesn't.
 
-`applySeed` and `loadSeedFromEnv` are deliberately not re-exported: they write
-SQLite rows and read `process.env`. The twin *runtime* channel is GHCR and stays
-GHCR; only the *vocabulary* travels by npm.
+`applySeed` and `loadSeedFromEnv` are deliberately not re-exported here: they
+write SQLite rows and read `process.env`. The *standalone twin server*'s channel
+is GHCR and stays GHCR; what travels by npm is the vocabulary and — since
+F-1526 — the domain layer beside it.
+
+## `@pome-sh/sandbox-domains` — the runtime the vocabulary describes
+
+[`sandbox-domains/`](./sandbox-domains/) is the other half of the same argument, and
+it exists because half was not enough. pome-cloud does not only *read* the
+declarations above, it boots the twin domain layer in-process to evaluate them
+against real state, and `checks-package-drift.test.ts` demands the two agree on
+an identical binding surface per twin, with no allowlist.
+
+F-1308 gave the declarations a lane and left the runtime frozen at its last
+pre-privatisation publish. So when the vocabulary widened (F-1338), the
+vocabulary leg could move and the runtime leg structurally could not: the gate
+went red with no legal move available, which is the wall F-1524 recorded. Same
+build shape as checks — tsup, `noExternal`, `splitting: true`, zod as a peer,
+zero `@pome-sh/*` runtime dependencies — so both publish from the same commit on
+the same allocator run and agree by construction.
+
+It carries per twin the `{Twin}Domain` class, the `open*Database` opener,
+`parseSeed` (and stripe's `applySeed` — the write side belongs in a runtime),
+and the twin's own `*_CHECKS`, plus a `./server` entry whose single
+`toTwinHttpEventRow` export retires the last frozen `@pome-sh/sdk` pin.
+
+Its tarball gate
+([`scripts/ci/check-sandbox-domains-tarball.mjs`](../scripts/ci/check-sandbox-domains-tarball.mjs))
+is deliberately the INVERSE of the checks gate on the two properties above: it
+*requires* the `node:sqlite` bytes (exactly once — a runtime bundle whose
+openers cannot open is a second declarations package), and treats `hono` as a
+declared external rather than an engine leak. zod stays a peer in both, for the
+same reason in both.
 
 ## Private vs. published
 
-Three packages in this repo are published to **npm**: two for end users
-(`@pome-sh/cli`, `@pome-sh/adapter-claude-sdk`) and one for the cloud grader
-(`@pome-sh/checks`). One (`@pome-sh/wire`) is published to **GitHub Packages**
-for internal cross-repo consumers. Everything else under `packages/` is
-`private: true` and reaches users only as bytes inlined into one of those
-tarballs — there is no `npm install` for it, ever.
+Four packages in this repo are published to **npm**: two for end users
+(`@pome-sh/cli`, `@pome-sh/adapter-claude-sdk`) and two for the cloud grader
+(`@pome-sh/checks`, `@pome-sh/sandbox-domains`). One (`@pome-sh/wire`) is published
+to **GitHub Packages** for internal cross-repo consumers as well as npm.
+Everything else under `packages/` is `private: true` and reaches users only as
+bytes inlined into one of those tarballs — there is no `npm install` for it,
+ever.
 
 | Directory | Workspace name | Role | Published? |
 | --- | --- | --- | --- |
 | [`checks/`](./checks/) | `@pome-sh/checks` | Grading vocabulary — the five twins' check declarations, seed schemas and default seeds, plus the check DSL | **Yes** — npm, for pome-cloud (F-1308) |
-| [`sdk/`](./sdk/) | `@pome-sh/sdk` | Twin engine — HTTP mount, auth, recorder, MCP dispatch, SQLite | No — bundled into `@pome-sh/cli` |
+| [`sandbox-domains/`](./sandbox-domains/) | `@pome-sh/sandbox-domains` | Grading runtime — the five twins' domain objects, SQLite openers and seed parsers, plus the tape-row wrapper | **Yes** — npm, for pome-cloud (F-1526) |
+| [`sdk/`](./sdk/) | `@pome-sh/sdk` | Twin engine — HTTP mount, auth, recorder, MCP dispatch, SQLite | No — bundled into `@pome-sh/cli` and `@pome-sh/sandbox-domains` |
 | [`wire/`](./wire/) | `@pome-sh/wire` | Trace surface — recorder-events, redaction, OTel schemas | **Both** — bundled into `@pome-sh/cli` and `@pome-sh/adapter-claude-sdk`, *and* published to GitHub Packages (`npm.pkg.github.com`) for pome-cloud (F-949) |
-| [`twin-github/`](./twin-github/), `twin-stripe/`, `twin-slack/`, `twin-gmail/`, `twin-linear/` | `@pome-sh/twin-*` | The five digital twins | No — bundled into `@pome-sh/cli`; also published as signed GHCR container images for pome-cloud |
+| [`twin-github/`](./twin-github/), `twin-stripe/`, `twin-slack/`, `twin-gmail/`, `twin-linear/` | `@pome-sh/twin-*` | The five digital twins | No — bundled into `@pome-sh/cli`, `@pome-sh/checks` (declarations) and `@pome-sh/sandbox-domains` (domain layer); also published as signed GHCR container images for pome-cloud |
 | [`adapter-claude-sdk/`](./adapter-claude-sdk/) | `@pome-sh/adapter-claude-sdk` | Claude Agent SDK adapter for user agent code | **Yes** — npm |
 
 "Bundled" means tsup's `noExternal: [/^@pome-sh\//]` inlines the internal
@@ -166,5 +198,5 @@ identities bug that dissolved `@pome-sh/shared-types` in the first place. See
 [`RELEASING.md`](../RELEASING.md) for the publish model and the one-time
 package-visibility step.
 
-For how the three published packages version and release, see
+For how the five published packages version and release, see
 [`RELEASING.md`](../RELEASING.md) at the repo root.

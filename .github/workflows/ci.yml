@@ -173,6 +173,20 @@ jobs:
       # half (engine bytes, zod identity, one copy of the DSL) needs `dist` and
       # runs in release.yml's publish job.
       - run: node scripts/ci/check-checks-tarball.mjs --manifest-only
+      # F-1526 — @pome-sh/sandbox-domains inlines the same six packages and carries
+      # the grading RUNTIME to the same consumer, so it has the same two
+      # readable-from-the-manifest failure modes. It adds one the vocabulary
+      # package cannot have: its `dependencies` are load-bearing in BOTH
+      # directions (declaring a package is what makes tsup leave it external),
+      # and the upstream type anchors it must declare are generated against the
+      # twins' own versions. All of that is manifest-readable and runs pre-merge;
+      # the tarball half (SQLite present exactly once, every import declared,
+      # the export spec) needs `dist` and runs in release.yml's publish job.
+      - run: node scripts/ci/check-sandbox-domains-tarball.mjs --manifest-only
+      # Regression suite for that gate — it is asserted by BREAKING the manifest
+      # nine ways, because a gate only ever run against a green tree is one that
+      # could have been `process.exit(0)`.
+      - run: node scripts/ci/check-sandbox-domains-tarball.test.mjs
       # Regression suite for the shared publish-decision logic. Asserts a 401
       # from GitHub Packages is never read as "unpublished" (which would bypass
       # the never-publish-behind-latest floor check) and that the npmjs and
@@ -513,12 +527,20 @@ jobs:
           # thresholds instead of a second plain `npm test` pass for those
           # workspaces (F-1472 — twin-slack's `test:coverage` declared vitest
           # coverage thresholds that nothing ever ran to enforce).
-          npm test -w @pome-sh/wire -w @pome-sh/sdk -w @pome-sh/adapter-claude-sdk -w @pome-sh/twin-stripe -w @pome-sh/twin-gmail -w @pome-sh/twin-linear -w @pome-sh/checks
+          npm test -w @pome-sh/wire -w @pome-sh/sdk -w @pome-sh/adapter-claude-sdk -w @pome-sh/twin-stripe -w @pome-sh/twin-gmail -w @pome-sh/twin-linear -w @pome-sh/checks -w @pome-sh/sandbox-domains
           # F-1308 — the tarball half of the @pome-sh/checks audit: the engine is
           # not inlined, zod stayed external (one schema identity), the DSL exists
           # exactly once across seven entries, and every `exports` subpath ships.
           # Needs the build above, which is why it is here and not in the cheap block.
           npm run gate:checks-tarball
+          # F-1526 — the tarball half of the @pome-sh/sandbox-domains audit, and
+          # deliberately the INVERSE of the line above on three points: the
+          # SQLite driver must be present (exactly once), hono is a declared
+          # external rather than a forbidden engine byte, and every bare
+          # specifier in the shipped JS and `.d.ts` must be a declared
+          # dependency. Plus F-1526's export spec, read off the packed modules —
+          # the table pome-cloud's `lib/twin-state.ts` imports.
+          npm run gate:sandbox-domains-tarball
           npm run test:coverage -w @pome-sh/twin-github
           npm run test:coverage -w @pome-sh/twin-slack
           # Former cli-ci.yml (folded in here — one required check, one npm ci).

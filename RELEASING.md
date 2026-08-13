@@ -295,14 +295,15 @@ asserted in `scripts/ci/decide-publish.test.mjs`:
   the recovery is `gh workflow run allocate-version.yml --ref main` by hand once
   the version is visible.
 
-## The four packages version independently
+## The five packages version independently
 
-`@pome-sh/cli`, `@pome-sh/adapter-claude-sdk`, `@pome-sh/checks` and
-`@pome-sh/wire` are on their own version lines (D11) and are diff-gated
-separately in the same workflow run — the CLI bundles the internal packages, the
-adapter bundles `@pome-sh/wire`, `@pome-sh/checks` bundles the twins' declaration
-layer, and none depends on another's published version. There is no lockstep to
-enforce and no sync-versions script.
+`@pome-sh/cli`, `@pome-sh/adapter-claude-sdk`, `@pome-sh/checks`,
+`@pome-sh/sandbox-domains` and `@pome-sh/wire` are on their own version lines (D11)
+and are diff-gated separately in the same workflow run — the CLI bundles the
+internal packages, the adapter bundles `@pome-sh/wire`, `@pome-sh/checks`
+bundles the twins' declaration layer, `@pome-sh/sandbox-domains` bundles their
+domain runtime, and none depends on another's published version. There is no
+lockstep to enforce and no sync-versions script.
 
 Independent version *lines* is not the same as independent *releases*, and the
 one coupling worth knowing up front: because wire's compiled output is inlined
@@ -310,7 +311,20 @@ into both npm tarballs, a change under `packages/wire/` is publish-relevant for
 all three, so all three get a number. Anything else — a CLI-only change, an
 adapter-only change — releases only its own package. See "Before you merge".
 
-All four packages are pre-1.0, so npm's `^0.x` caret semantics apply
+`@pome-sh/checks` and `@pome-sh/sandbox-domains` have a second coupling, and it is
+the reason the fifth package exists (F-1526). They are the two legs of
+pome-cloud's `checks-package-drift.test.ts`: one carries the check
+DECLARATIONS, the other the domain RUNTIME those declarations read, and the gate
+demands they declare an identical binding surface per twin with no allowlist.
+A twin declaration file moves both, so both get a number **from the same
+allocator run on the same `main` commit** — which is what makes their surfaces
+agree by construction rather than by anyone remembering to publish two things.
+Before this package existed the vocabulary could publish and the runtime could
+not, so a widening (F-1338) turned the gate red with no legal move available.
+That is the wall F-1524 recorded, and closing a widening is now two pins moving
+in one pome-cloud PR.
+
+All five packages are pre-1.0, so npm's `^0.x` caret semantics apply
 (`^0.N.x` never crosses into `0.N+1`) — **minor plays the major role**:
 
 - **Minor (`0.N+1.0`)** — anything a consumer must act on: a breaking change
@@ -466,6 +480,81 @@ export blocks), so
 compares `CHECKS_TWIN_NAMES` against `config/first-party-twins.json`, and
 `packages/checks/test/surface.test.ts` asserts every twin's vocabulary is
 non-empty and every default seed parses under its own schema.
+
+## `@pome-sh/sandbox-domains` — the runtime half, and its inverted tarball gate
+
+`@pome-sh/checks` ships the twins' check DECLARATIONS; `@pome-sh/sandbox-domains`
+(F-1526) ships the domain RUNTIME those declarations read — per twin, the
+`{Twin}Domain` class, the `open*Database` opener, `parseSeed`/`applySeed`, and
+the twin's own `*_CHECKS` tuple — plus a `./server` entry re-exporting
+`toTwinHttpEventRow`. Same build shape as checks (tsup, `noExternal` on
+`@pome-sh/*`, `splitting: true`, zod as a peer), same lane, same allocator.
+
+**Version it like a runtime, not like a vocabulary.** A removed or renamed
+export, a changed domain-method signature or an `engines` floor bump is a
+**minor**; an added export, a bug fix inside an unchanged surface, or a
+dependency bump is a **patch**. Its publish-relevant paths are the WHOLE of
+`packages/twin-*/` and `packages/sdk/` — deliberately wider than the checks
+entry's named declaration files, because a twin's routes, tools and domain
+change no byte of the vocabulary tarball and are exactly what this one bundles.
+So most twin PRs owe this package an entry and the CLI one; only a *declaration*
+file also owes `@pome-sh/checks`.
+
+**`npm run gate:sandbox-domains-tarball` is not `gate:checks-tarball` with a
+different path.** Three assertions are deliberately inverted, and reading one
+gate as a copy of the other will get them backwards:
+
+| | `@pome-sh/checks` | `@pome-sh/sandbox-domains` |
+| -- | -- | -- |
+| `node:sqlite` in the bundle | **fatal** — an engine leak into a declarations package | **required, exactly once** — without it every opener is a function that cannot open |
+| `hono` | **fatal** | a declared, external, ordinary dependency |
+| the once-only primitive | `defineCheck` + the vacuity sentinels | the sdk's SQLite layer |
+
+Two assertions it adds that checks does not need, both because its
+`dependencies` are load-bearing in *both* directions: every bare specifier in
+the shipped bytes (JS **and** `.d.ts`) must be a declared dependency, and every
+declared dependency must actually be imported. Those are one knob, not two —
+`noExternal` only forces `@pome-sh/*` inlining, so tsup decides every other
+third-party package by whether the manifest declares it. Declared ⇒ left
+external ⇒ must stay declared (`hono`). Undeclared ⇒ inlined ⇒ must **not** be
+declared (`graphql`, which twin-linear reaches through its package root). So the
+fix for a red here is never "declare it and move on": decide which side of the
+knob the package belongs on first.
+
+`@octokit/openapi-types` and `stripe` are declared because they reach the
+shipped `.d.ts` — they are the twins' upstream shape anchors and appear in
+`GitHubDomain`'s and `StripeDomain`'s method signatures. Their specs must equal
+the twins' own, since the declarations were generated against those versions;
+the gate asserts that too. A consumer of this package typechecks as a Node
+server (`@types/node` + the DOM lib), which is what `stripe`'s and `hono`'s own
+declarations require and what the clean-room room installs.
+
+### One-time manual bootstrap for `@pome-sh/sandbox-domains`
+
+Same npm limitation as wire's npmjs target below, and the same two steps — a
+Trusted Publisher cannot be configured for a package that has never been
+published, because the settings live on a package page that does not exist yet.
+So the first `release.yml` run that tries to publish this package **will fail**,
+and that is npm's documented bootstrap, not a bug in the workflow. Once:
+
+1. Let the merge to `main` allocate the first number (`0.0.0` in the manifest +
+   an `## Unreleased (minor)` entry ⇒ the allocator writes `0.1.0`). **Do not
+   hand-write it** — the same rule as every other release, and it is why the
+   manifest ships at `0.0.0`: `decide-publish.sh` baselines a never-published
+   package at `0.0.0` too, so a manifest still sitting there cannot publish by
+   accident.
+2. From that exact `main` tip, publish out of band: `npm publish -w
+   @pome-sh/sandbox-domains --access public`, authenticated with `npm login` as
+   someone with publish rights on the `@pome-sh` org.
+3. On npmjs.com, under the now-existing package's *Settings → Trusted
+   Publisher*, add this repository (`pome-sh/digital-twins`), the workflow file
+   (`.github/workflows/release.yml`) and the `publish` job — the same way
+   `@pome-sh/cli`, `@pome-sh/adapter-claude-sdk`, `@pome-sh/checks` and
+   `@pome-sh/wire` are already configured.
+
+Configure it against the **existing workflow name**. Trusted Publishing matches
+on the live `owner/repo` and workflow path, not on a stable id, so renaming
+either silently breaks publishing until every package's config is re-pointed.
 
 ## Before you merge
 

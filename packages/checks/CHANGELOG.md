@@ -1,5 +1,23 @@
 # @pome-sh/checks
 
+## Unreleased (patch)
+
+No change to the vocabulary: every check id, template, polarity and seed schema
+is identical, so `checksDigest` does not move and no pin has to catch up.
+
+Build tooling only. The declaration bundler that makes this package's shipped
+`.d.ts` self-contained moved from `packages/checks/scripts/` to
+`scripts/bundle-declarations.mjs`, so the new `@pome-sh/sandbox-domains` (F-1526)
+can share it rather than carry a second copy of a ~300-line algorithm that was
+already package-agnostic. It takes the package root as an argument now, plus an
+optional `--external`; this package passes no externals, which is exactly its
+previous behaviour, so its output is unchanged and `zod` and `node:*` remain the
+only bare specifiers its declarations may name.
+
+It stays publish-relevant for this package — a regression in it ships broken
+declarations to pome-cloud, and that is true no matter which directory it lives
+in.
+
 ## 0.2.0 — 2026-08-13
 
 Carries the vocabulary's first POSITIVE tape assertion on github to the grader

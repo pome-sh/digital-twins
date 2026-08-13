@@ -109,6 +109,31 @@ const ALLOCATE_WORKFLOW = "allocate-version.yml";
  * so targets are keyed on name+registry rather than name.
  */
 export function parseTargets(root) {
+  const targets = readTargets(root);
+  for (const t of targets) {
+    if (!existsSync(join(root, t.manifest))) {
+      throw new Error(`${RELEASE_WORKFLOW} points ${t.name} at ${t.manifest}, which does not exist`);
+    }
+  }
+  return targets;
+}
+
+/**
+ * The parse half of `parseTargets`, without the "every manifest exists" leg.
+ *
+ * Split out for callers that need to know WHICH manifests a workflow names
+ * before those manifests exist — the test suite's historical fixtures build a
+ * scratch tree from the real release.yml and have to create them. Folding that
+ * need into `parseTargets` would mean weakening the existence check, and that
+ * check is the whole reason the alarm cannot silently watch a package whose
+ * manifest was moved or renamed.
+ *
+ * The empty-targets guard stays HERE rather than in `parseTargets`, because it
+ * is a property of the parser rather than of the tree: an alarm watching zero
+ * packages passes forever, and a fixture builder that silently created nothing
+ * would be the same failure one layer down.
+ */
+export function readTargets(root) {
   const file = join(root, ".github/workflows", RELEASE_WORKFLOW);
   if (!existsSync(file)) throw new Error(`${RELEASE_WORKFLOW} not found at ${file}`);
   const yaml = readFileSync(file, "utf8");
@@ -124,11 +149,6 @@ export function parseTargets(root) {
         `stopped using it or this parser has drifted — an alarm watching zero ` +
         `packages passes forever, so this is a hard failure, not an empty run.`,
     );
-  }
-  for (const t of targets) {
-    if (!existsSync(join(root, t.manifest))) {
-      throw new Error(`${RELEASE_WORKFLOW} points ${t.name} at ${t.manifest}, which does not exist`);
-    }
   }
   return targets;
 }

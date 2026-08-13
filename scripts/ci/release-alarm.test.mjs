@@ -22,7 +22,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { PUBLISHED_PACKAGES } from "./publish-relevance.mjs";
-import { check, compareVersions, parseTargets } from "./release-alarm.mjs";
+import { check, compareVersions, parseTargets, readTargets } from "./release-alarm.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const SCRIPT = join(ROOT, "scripts/ci/release-alarm.mjs");
@@ -382,6 +382,19 @@ console.log("2026-08-06, replayed");
       mkdirSync(join(dir, dirname(manifest)), { recursive: true });
       writeFileSync(join(dir, manifest), JSON.stringify({ version }));
     }
+    // Backfill any target the YAML names that the caller did not — `parseTargets`
+    // hard-fails on a manifest that does not exist, so a hand-written map has to
+    // be re-edited every time release.yml gains a package. It was, once: F-1526's
+    // fifth target broke the replay below, which passes the REAL release.yml
+    // against a four-entry map. The versions are what each replay is about, so
+    // callers still name those; the rest only need to exist, and matching
+    // `fixture()`'s self-updating shape is what stops a sixth package breaking a
+    // 2026-08-06 replay it has nothing to do with.
+    for (const t of readTargets(dir)) {
+      if (versions[t.manifest] !== undefined) continue;
+      mkdirSync(join(dir, dirname(t.manifest)), { recursive: true });
+      writeFileSync(join(dir, t.manifest), JSON.stringify({ name: t.name, version: "1.0.0" }));
+    }
     // Today's CHANGELOGs even in a historical fixture: the allocation leg's
     // subject is the tree the alarm is checked out in, and the replay below is
     // about the registry and the run list, not about F-1511's contract.
@@ -481,6 +494,13 @@ console.log("2026-08-06, replayed");
           }),
     // cli 0.21.9 published at 10:42; checks 0.1.0 and wire 0.2.1 had never been
     // published (13:04 and 13:03, by the manual dispatch); adapter was on 0.3.1.
+    //
+    // Anything this replay does not name is a package that did not exist on
+    // 2026-08-06 and is answered in sync with the version `historical` backfilled
+    // — the same `?? { version: "1.0.0" }` fallback `registryStub` uses. Without
+    // it the fifth target (F-1526) reads `undefined` and this replay reds over a
+    // package it is not about, which is the trap the fixture backfill above
+    // exists to close on the other side.
     readVersion: (name, registry) =>
       registry
         ? { version: "0.2.1" }
@@ -489,7 +509,7 @@ console.log("2026-08-06, replayed");
             "@pome-sh/adapter-claude-sdk": { version: "0.3.1" },
             "@pome-sh/checks": { version: "0.0.0", unpublished: true },
             "@pome-sh/wire": { version: "0.0.0", unpublished: true },
-          }[name],
+          }[name] ?? { version: "1.0.0" },
     graceMinutes: 30, // the cron would have been the next morning; 12:00 is 32 min after
   });
   const unpublished = late.alarms.filter((a) => a.startsWith("UNPUBLISHED"));
