@@ -692,6 +692,153 @@ twins: ["github", "slack"]
   });
 });
 
+// F-1444 — a line that reaches for the criterion grammar and MISSES.
+//
+// F-1299 made both parsers accept `always-scored`; neither noticed a line that
+// tried to use it and mistyped it. `parseCriteria` skips every line the marker
+// regex refuses, so each of the three lines below loaded the task with one fewer
+// criterion and no error — the task ran, scored out of a smaller denominator,
+// and read as a clean bill. Same failure class the retired-marker guard already
+// covers for [D]/[P], which is why the fix has the same shape: a SEPARATE regex
+// beside CRITERION_LINE_RE, which is untouched (it is the registered authority
+// pome-cloud's scripts/check-criterion-grammar.ts compares across five copies).
+//
+// The over-correction is the thing to watch. A near-miss rule that fires on
+// "bullet, then bracket" turns ordinary markdown — task lists, prose asides —
+// into a parse error, which is louder than the silent drop but far more
+// disruptive. The prose cases below are as load-bearing as the throwing ones.
+describe("near-miss criterion lines are refused, not dropped as prose (F-1444)", () => {
+  const single = (criteria: string) => `# Markers
+
+## Prompt
+Do the thing.
+
+## Success Criteria
+${criteria}
+
+## Config
+\`\`\`yaml
+twins: ["slack"]
+\`\`\`
+`;
+  // A valid criterion rides alongside, so a test that fails fails because the
+  // near-miss was tolerated — not because `taskSchema` refused an empty list.
+  const withKeeper = (line: string) => single(`${line}\n- [code] The keeper criterion`);
+  const KEEPER = { type: "code", text: "The keeper criterion" };
+
+  const NEAR_MISSES: ReadonlyArray<[string, string]> = [
+    ["- [code always-scored ] X", "a stray space before the closing bracket"],
+    ["- [code:slack always-scored extra] X", "an extra word inside the marker"],
+    ["- [code alwaysscored] X", "the keyword misspelled"],
+  ];
+
+  for (const [line, why] of NEAR_MISSES) {
+    it(`refuses \`${line}\` — ${why}`, () => {
+      expect(() => parseTask(withKeeper(line))).toThrow(
+        /reaches for a \[code\]\/\[model\] marker but does not match the criterion grammar/,
+      );
+    });
+
+    it(`quotes \`${line}\` back and names the grammar it failed`, () => {
+      // The whole point of the error is that the author can find the line. A
+      // message that only said "a criterion is malformed" would leave them
+      // diffing a criteria section by eye.
+      expect(() => parseTask(withKeeper(line))).toThrow(
+        new RegExp(line.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+      );
+      expect(() => parseTask(withKeeper(line))).toThrow(/always-scored/);
+    });
+  }
+
+  // The message is pinned WHOLE, because it is shared with the hosted parser
+  // (`apps/mcp/src/task/parseTask.ts`, pome-cloud) word for word. Wording that
+  // drifts is the cross-parser disagreement F-1299 closed, in a new costume:
+  // the same typo would be described two different ways depending on where the
+  // task was parsed.
+  it("refuses with the exact wording the hosted parser uses", () => {
+    expect(() => parseTask(withKeeper("- [code alwaysscored] X"))).toThrow(
+      'Criterion line "- [code alwaysscored] X" reaches for a [code]/[model] marker but does ' +
+        "not match the criterion grammar " +
+        "^[-*]\\s+\\[(code|model)(?::([a-z][a-z0-9_-]*))?(\\s+always-scored)?\\]\\s+(.+)$" +
+        ' — fix the marker (e.g. "[code]", "[code:slack]", "[code:slack always-scored]"); a ' +
+        "line this close to a criterion is refused rather than silently dropped as prose.",
+    );
+  });
+
+  it("refuses a near-miss [model] marker the same way", () => {
+    expect(() => parseTask(withKeeper("- [model alwaysscored] X"))).toThrow(
+      /reaches for a \[code\]\/\[model\] marker/,
+    );
+  });
+
+  // ── The over-correction guard ──────────────────────────────────────────────
+  //
+  // Each of these opens `- [` inside the criteria section and must stay prose.
+  const STILL_PROSE: ReadonlyArray<[string, string]> = [
+    ["- [note] X", "names neither kind — the Done-when case"],
+    ["- [ ] an unchecked markdown task", "a markdown task list item"],
+    ["- [x] a checked markdown task", "a checked markdown task list item"],
+    ["- [checks] X", "an unknown marker"],
+    ["- [codex] X", "`code` must not match a longer word"],
+    ["- [modeling] the data", "`model` must not match a longer word"],
+    ["- just prose, not a criterion", "a bullet with no bracket at all"],
+    ["Prose mentioning [code] with no bullet", "no bullet"],
+  ];
+
+  for (const [line, why] of STILL_PROSE) {
+    it(`still treats \`${line}\` as prose — ${why}`, () => {
+      const task = parseTask(withKeeper(line));
+      expect(task.criteria).toEqual([KEEPER]);
+    });
+  }
+
+  // The guard runs only after CRITERION_LINE_RE has refused the line, so no
+  // accepted form can reach it. Measured rather than argued: every spelling the
+  // grammar accepts still parses to a criterion.
+  it("refuses nothing the criterion grammar accepts", () => {
+    const accepted = [
+      "- [code] x",
+      "* [code] x",
+      "- [code:slack] x",
+      "- [code always-scored] x",
+      "- [code:slack always-scored] x",
+      "- [code  always-scored] x",
+      "- [code:slack]  x",
+      "- [model] x",
+      "- [model:slack] x",
+      '- [code:slack] No message containing "[code]" appears in any public channel',
+    ];
+    for (const line of accepted) {
+      expect(() => parseTask(single(line)), line).not.toThrow();
+      expect(parseTask(single(line)).criteria, line).toHaveLength(1);
+    }
+  });
+
+  // `readCodeCriteria` is the TOLERANT reader `pome checks add` / `checks lint`
+  // use on a file that is mid-edit. It warns, it does not gate, and turning it
+  // into a crash is how a warning surface stops being used — the same reason it
+  // skips a retired [D] marker instead of throwing.
+  it("leaves the tolerant reader tolerant — a near-miss is skipped there, not thrown", () => {
+    const file = `# Audit
+
+## Success Criteria
+
+- [code alwaysscored] X
+- [code] Issue #1 exists in \`acme/api\`
+
+## Config
+
+\`\`\`yaml
+twins: [github]
+\`\`\`
+`;
+    expect(() => readCodeCriteria(file)).not.toThrow();
+    expect(readCodeCriteria(file)).toEqual([
+      { marker: "[code]", twin: "github", text: "Issue #1 exists in `acme/api`" },
+    ]);
+  });
+});
+
 // F-1134 — the tolerant reader `pome checks add` and `pome checks lint` use to
 // audit a file they did not necessarily finish writing. Separate from
 // `parseTask` on purpose: an in-progress task file may carry zero criteria and

@@ -4,6 +4,44 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.37
+
+### Patch Changes
+
+- **A line that reaches for the `always-scored` keyword and misses is now
+  refused, not dropped as prose** (F-1444). F-1299 closed the disagreement
+  between this parser and the hosted one on the keyword itself — both accept it.
+  Neither noticed a line that tried to use it and mistyped it. `parseCriteria`
+  skips every line `CRITERION_LINE_RE` does not match, so `- [code
+  always-scored ] X` (a stray space before the bracket), `- [code:slack
+  always-scored extra] X` (an extra word inside the marker) and `- [code
+  alwaysscored] X` (the keyword misspelled) each loaded the task with ONE FEWER
+  criterion and no error at all. The task then ran, scored out of a smaller
+  denominator, and read as a clean bill — the same silent-drop failure
+  `LEGACY_CRITERION_LINE_RE` already refuses for the retired marker spellings.
+
+  A separate `NEAR_MISS_CRITERION_LINE_RE` now catches those lines and throws,
+  quoting the line so the author can find it by searching the file and naming
+  the grammar it failed. `CRITERION_LINE_RE` itself is untouched and stays
+  byte-identical to the hosted parser's: it is the registered authority
+  pome-cloud's `scripts/check-criterion-grammar.ts` compares across five copies,
+  and the accepted language has not moved.
+
+  Deliberately narrow, because the over-correction is worse than the defect. It
+  fires only on a bullet the grammar itself knows (`-`/`*`) whose bracket names
+  `code` or `model` AS A WORD, so ordinary markdown stays prose: `- [ ] todo`,
+  `- [x] done`, `- [note] …`, `- [checks] …`, `- [codex] …`, `- [modeling] …`
+  and any line without a bullet are all untouched. It is also checked only after
+  the grammar has already refused the line, so no accepted form can reach it.
+  The tolerant reader behind `pome checks add` / `pome checks lint` still skips a
+  near-miss rather than throwing — turning a warning surface into a crash on a
+  file that is mid-edit is how that surface stops being used.
+
+  The hosted parser (`apps/mcp/src/task/parseTask.ts`, pome-cloud) takes the
+  same guard and the same message, word for word, in the same change. A guard in
+  only one of the two repos would re-open the disagreement F-1299 closed with
+  the sign flipped: a typo would parse hosted and throw here.
+
 ## 0.23.34
 
 ### Patch Changes
