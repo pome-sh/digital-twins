@@ -156,14 +156,22 @@ async function main() {
     }
   } catch (err) {
     // F-1518: the Claude Agent SDK's message iterator can REJECT — not just
-    // yield an error `result` message — when the underlying `claude` CLI
-    // subprocess exits non-zero after already reporting an error result (an
-    // invalid API key is one way). Uncaught, that throws out of this `for
-    // await` with no handler above it, crashing the process from what
-    // `smoke-examples.mjs` sees as an indistinguishable uncaught rejection —
-    // identical text to the graceful path below, but never captured by it.
-    // Route it through the same exitCode=1 path so both shapes converge.
-    console.error(`\nagent errored: ${err instanceof Error ? err.message : String(err)}`);
+    // yield an error `result` message — when the underlying `claude` CLI exits
+    // non-zero (an invalid API key is one way; the SDK calls
+    // `inputStream.error()` on the stream being iterated). Uncaught, that threw
+    // out of this `for await` and killed the process with a raw Node stack
+    // instead of this example's own reporting, so route it through the same
+    // exitCode=1 path the graceful branch uses.
+    //
+    // Log the error OBJECT, never just `err.message`: Node prints name + stack
+    // + `[cause]`, and scripts/smoke-examples.mjs classifies this output by
+    // matching signatures that can live OUTSIDE the message — `AbortError` and
+    // `AI_LoadAPIKeyError` are error NAMES, and undici reports
+    // `ECONNREFUSED`/`ENOTFOUND` only on `err.cause`. Logging the message alone
+    // would show the classifier strictly less than the uncaught rejection did,
+    // turning a benign outbound abort into "no evidence it did any real work" —
+    // trading one nondeterministic red for another.
+    console.error("\nagent errored:", err);
     exitCode = 1;
   } finally {
     thinking.stop();

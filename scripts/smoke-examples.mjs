@@ -458,11 +458,32 @@ function smokeOne(name) {
       resolvePromise({ name, output, ...verdict });
     };
 
+    // Classify on 'close', not 'exit'. Node only guarantees the piped stdio
+    // streams are drained on 'close'; 'exit' can fire with the child's final
+    // write still unread, and the whole verdict is a regex over `output` — so
+    // an example whose only BENIGN_FAILURE_SIGNATURES match sits in its last
+    // stderr line (`agent errored: … ECONNREFUSED`, written immediately before
+    // `process.exit(1)`) can be read as "no outbound-call failure in its
+    // output" and FAIL on one run and REACHED-OUTBOUND on the next, from the
+    // same commit. 'exit' still records HOW it exited, because 'close' carries
+    // the same code/signal but a lingering grandchild holding the pipe open can
+    // delay it past SETTLE_MS — and a child that has already exited must be
+    // classified on its exit code, never as "still running at the settle",
+    // which would turn a fast exit into a false OK.
+    let exited = null;
     const timer = setTimeout(() => {
-      finish(classifyLaunch({ output, stillRunningAtSettle: true }));
+      finish(
+        exited
+          ? classifyLaunch({ output, stillRunningAtSettle: false, ...exited })
+          : classifyLaunch({ output, stillRunningAtSettle: true }),
+      );
     }, SETTLE_MS);
 
     child.on("exit", (code, signal) => {
+      exited = { exitCode: code, signal };
+    });
+
+    child.on("close", (code, signal) => {
       finish(classifyLaunch({ output, stillRunningAtSettle: false, exitCode: code, signal }));
     });
 
@@ -532,11 +553,6 @@ async function main() {
   const failures = [];
   const reached = [];
   const oks = [];
-  // F-1518 — every name pushed here got an actual verdict below. Compared
-  // against `examples` after the loop so a name that never makes it into any
-  // bucket (this array, or oks/reached/failures) is named, not silently
-  // dropped from the "N of M" total.
-  const reportedNames = [];
   for (const name of examples) {
     process.stdout.write(`\n=== examples/${name} === `);
     let result;
@@ -544,16 +560,14 @@ async function main() {
       result = await smokeOne(name);
     } catch (err) {
       // smokeOne() is designed to always resolve — the SETTLE_MS timer, the
-      // child 'exit' handler, and the child 'error' handler each
+      // child 'close' handler, and the child 'error' handler each
       // independently produce a verdict — but this loop must not itself
-      // become the next silent-drop bug. A rejection here is left OUT of
-      // reportedNames on purpose: assertReportedCount() below names it as
-      // missing rather than this catch inventing a verdict for work that
-      // never actually ran.
+      // become the next silent-drop bug. This catch deliberately does NOT
+      // invent a verdict for work that never ran: the name lands in no bucket,
+      // so assertReportedCount() below names it as missing.
       console.log(`did not report a verdict (runner threw: ${err instanceof Error ? err.message : String(err)})`);
       continue;
     }
-    reportedNames.push(name);
     const tail = result.output?.trim().split("\n").slice(-12).join("\n") ?? "";
     if (result.status === "ok") {
       console.log(`OK (${result.reason})`);
@@ -571,7 +585,17 @@ async function main() {
     }
   }
 
-  const reportedCount = assertReportedCount(examples, reportedNames);
+  // F-1518 — the reported set is DERIVED from the three verdict buckets, never
+  // tracked alongside them. A separate `reportedNames.push(name)` next to the
+  // `await` would mark a name reported before the ok/reached/fail dispatch had
+  // put it anywhere, so the next silent-drop bug — a `continue` added inside
+  // the dispatch, or a fourth `status` no branch matches — would still net
+  // `ok: true` and still shrink the "N of M" total unannounced. Reading the
+  // buckets makes the assertion check the thing the summary actually counts.
+  const reportedCount = assertReportedCount(
+    examples,
+    [...oks, ...reached, ...failures].map((r) => r.name),
+  );
 
   if (reached.length > 0) {
     console.log(
