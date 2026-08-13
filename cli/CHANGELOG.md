@@ -10,6 +10,16 @@ write a version number here or in `package.json` — see `RELEASING.md`. Release
 entries are insertions only: a correction is the next entry, naming the one it
 corrects.
 
+## Unreleased (patch)
+
+**A golden-scenario gate ships in the test surface (`gate:golden`).** Two fixture
+runs whose verdicts are known by construction — one correct agent, one wrong —
+drive `examples/support-triage`'s task through the real evaluator path over
+seeded github + slack twins, pinning the per-criterion breakdown, the
+denominator, the no-skip set, and only then the aggregate. Consumer-visible
+delta is the new `gate:golden` manifest script; behaviour of `pome` itself is
+unchanged.
+
 ## 0.23.47 — 2026-08-13
 
 No user-visible change to the CLI itself. This release carries the corrected
