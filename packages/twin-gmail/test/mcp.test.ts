@@ -717,6 +717,74 @@ describe("the adopted listing's claims are behaviours", () => {
     });
   });
 
+  it("answers every field the search_threads root advertises, resultCountEstimate included", async () => {
+    // Read out of the fixture rather than named here (F-1400's pattern): if
+    // Google adds a fourth root field, this reds instead of the twin quietly
+    // never serving it. Naming `resultCountEstimate` in the assertion would
+    // close exactly one gap and leave the class open.
+    expect(advertisedFields("search_threads")).toContain("resultCountEstimate");
+
+    // Two threads, because this file's `seed()` has exactly one: with a single
+    // match, pageSize 1 returns the whole result set and `nextPageToken` can
+    // never appear, so the root could not show its full advertised shape.
+    const base = seed();
+    const app = createGmailTwinApp({
+      seed: {
+        ...base,
+        primaryMailbox: {
+          ...base.primaryMailbox,
+          messages: [
+            ...base.primaryMailbox.messages,
+            {
+              ...base.primaryMailbox.messages[0]!,
+              id: "msg_seed_2",
+              threadId: "thread_seed_2",
+              subject: "Second seed message",
+              messageId: "seed2@example.com",
+              date: "2026-07-19T13:00:00.000Z",
+            },
+          ],
+        },
+      },
+    });
+
+    // pageSize 1 against a multi-thread mailbox so `nextPageToken` is present
+    // too — otherwise the root can never show its full advertised set and the
+    // comparison below would be asserting a shape the tool cannot produce.
+    const page = await call(app, 1, "search_threads", { query: "", pageSize: 1 });
+    expect(page.result.isError).toBe(false);
+    expect(Object.keys(page.result.structuredContent ?? {}).sort()).toEqual(
+      advertisedFields("search_threads")
+    );
+
+    // int64-as-string, as the outputSchema declares — a number here would
+    // satisfy "present" while diverging from the advertised type.
+    const estimate = (page.result.structuredContent as { resultCountEstimate?: unknown })
+      .resultCountEstimate;
+    expect(typeof estimate).toBe("string");
+
+    // The WHOLE match set, not the page. This is the assertion with teeth:
+    // returning `page.items.length` would also be a string and also be present,
+    // and would be wrong by exactly the amount that matters.
+    const all = await call(app, 2, "search_threads", { query: "" });
+    const total = (all.result.structuredContent as { threads: unknown[] }).threads.length;
+    expect((page.result.structuredContent as { threads: unknown[] }).threads.length).toBe(1);
+    expect(estimate).toBe(String(total));
+    expect(total).toBeGreaterThan(1);
+  });
+
+  it("reports a zero match count rather than omitting the field", async () => {
+    // 0 is an answer to "how many matched". If the field were emitted only when
+    // non-zero, an absent field would mean both "no matches" and "this twin
+    // does not serve it" — which is the gap F-1417 closed.
+    const app = createGmailTwinApp({ seed: fullyPopulatedSeed() });
+    const none = await call(app, 1, "search_threads", { query: "is:unread from:nobody@example.invalid" });
+    expect(none.result.isError).toBe(false);
+    const body = none.result.structuredContent as { threads: unknown[]; resultCountEstimate?: unknown };
+    expect(body.threads).toEqual([]);
+    expect(body.resultCountEstimate).toBe("0");
+  });
+
   it("takes no page arguments on list_labels, because the listing declares none", async () => {
     const app = createGmailTwinApp({ seed: fullyPopulatedSeed() });
 

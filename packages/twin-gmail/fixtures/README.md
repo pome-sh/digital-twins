@@ -54,17 +54,6 @@ it can ever report is capture staleness. Whether the twin behaves like the tools
 by pome-cloud's read leg and write round trip
 ([F-1397](https://linear.app/pome-sh/issue/F-1397)).
 
-#### One advertised field is still unserved, and it is named rather than missing
-
-`search_threads` declares `resultCountEstimate` (int64-as-string, "treated as a lower bound") and
-this twin never returns it. That is **not** part of F-1400's adoption: the 2026-07-20 capture declared
-it too, so it is a gap this twin has always had and no comparison between the two captures reports.
-It is cheap to close — the domain knows the exact match count before it paginates — and deliberately
-left out of the change that moved the capture, so the adoption's behavioural surface is only the
-three claims that actually moved. Every other field either of the two schemas declares is served
-whenever the data exists; `nextPageToken` only when there is another page, and `color` / `htmlBody` /
-`attachments` only when the record carries one.
-
 ### Provenance notes
 
 - `tools/list` was captured live without OAuth on **2026-08-10** against `https://gmailmcp.googleapis.com/mcp/v1`; `initialize` on 2026-07-20 against the same endpoint (protocolVersion `2025-03-26`, unchanged).
