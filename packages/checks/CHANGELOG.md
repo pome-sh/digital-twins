@@ -1,6 +1,6 @@
 # @pome-sh/checks
 
-## Unreleased (patch)
+## 0.2.1 — 2026-08-13
 
 No change to the vocabulary: every check id, template, polarity and seed schema
 is identical, so `checksDigest` does not move and no pin has to catch up.

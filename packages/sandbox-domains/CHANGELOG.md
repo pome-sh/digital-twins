@@ -1,6 +1,6 @@
 # @pome-sh/sandbox-domains
 
-## Unreleased (minor)
+## 0.1.0 — 2026-08-13
 
 First release. The **domain layer** — the in-process runtime a bound check
 reads — published as one self-contained bundle (F-1526).
