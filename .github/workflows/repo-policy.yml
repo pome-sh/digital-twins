@@ -1,10 +1,15 @@
 name: repo-policy
 
 # F-696 — assert protected main policy (PR + review + required checks).
-# Live GET .../protection needs Administration:read, which GITHUB_TOKEN cannot
-# hold (invalid workflow permission scope). Unit tests always run; live drift
-# checks use repo secret REPO_POLICY_TOKEN (fine-grained PAT, Administration:
-# Read-only). On PRs without that secret, only the offline validator runs.
+# F-1212 — the live check now reads GET .../rules/branches/{branch}, which an
+# ordinary contents:read GITHUB_TOKEN can call; the legacy
+# GET .../protection + .../rulesets endpoints needed Administration:read
+# (GITHUB_TOKEN cannot hold that scope), so the live check depended on a PAT
+# (REPO_POLICY_TOKEN) that was never minted — the weekly cron was red since
+# it shipped. No PAT anywhere now, so the live check also runs on
+# pull_request: drift is caught on every touching PR, not just weekly.
+# repo-policy is not in config/required-checks.json's required set, so this
+# cannot deadlock a merge.
 on:
   schedule:
     - cron: "41 5 * * 1"
@@ -32,31 +37,22 @@ jobs:
       - name: Regression-test policy validator
         run: node scripts/ci/assert-repo-policy.test.mjs
       - name: Assert live branch protection
-        # Never expose the Administration:read PAT to code from a PR branch.
-        # Schedule/dispatch runs use the workflow and script from default branch.
-        if: github.event_name != 'pull_request'
         env:
-          GITHUB_TOKEN: ${{ secrets.REPO_POLICY_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          EVENT_NAME: ${{ github.event_name }}
-        run: |
-          set -euo pipefail
-          if [[ -z "${GITHUB_TOKEN:-}" ]]; then
-            echo "::error::REPO_POLICY_TOKEN is required for ${EVENT_NAME} drift checks (GITHUB_TOKEN cannot read branch protection)."
-            exit 1
-          fi
-          bash scripts/ci/assert-repo-policy.sh
+        run: bash scripts/ci/assert-repo-policy.sh
 
-  # F-1230 — repo-policy.yml's weekly cron has been firing and failing since
-  # it shipped (REPO_POLICY_TOKEN has never existed) with nobody told. This
+  # F-1230 — repo-policy.yml's weekly cron was firing and failing since it
+  # shipped (REPO_POLICY_TOKEN never existed, F-1212) with nobody told. This
   # job sees that failure in the same run `assert` failed in — see
   # schedule-alarm.yml for why an embedded failure() job, not a second
   # separately-cron'd file, is the right shape here.
   # Gated on the events that actually run the live drift check, rather than on
-  # `!= 'pull_request'`. Those are the same two events today, but stating the
-  # positive set means adding a `push:` trigger here later cannot silently
-  # start filing (or, worse, CLOSING) this alarm from a run that skipped the
-  # token-dependent step — see secret-scan.yml, where that shape is real.
+  # `!= 'pull_request'`. F-1212 dropped the PAT and now runs the live check on
+  # every event, but stating the positive set here still means a future event
+  # (e.g. `push:`) cannot silently start filing (or, worse, CLOSING) this
+  # alarm before someone decides it should — see secret-scan.yml, where that
+  # shape is real.
   schedule-alarm:
     needs: assert
     if: failure() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
@@ -68,11 +64,9 @@ jobs:
       title: "the repo-policy weekly cron is failing"
       label: "schedule-alarm:repo-policy"
       outcome: failure
-      detail: "repo-policy.yml's scheduled run failed. Common cause: REPO_POLICY_TOKEN is not set (see F-1212) — but any regression in scripts/ci/assert-repo-policy.sh lands here too, so check the run log for the actual assertion that broke."
+      detail: "repo-policy.yml's scheduled run failed. F-1212 removed the REPO_POLICY_TOKEN dependency, so check the run log for the actual assertion in scripts/ci/assert-repo-policy.sh that broke."
 
-  # The other direction: a recovered run closes the tracking issue rather
-  # than leaving it open once REPO_POLICY_TOKEN is set and the first green
-  # scheduled run lands.
+  # The other direction: a recovered run closes the tracking issue.
   schedule-alarm-recovery:
     needs: assert
     if: success() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
