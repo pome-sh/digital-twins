@@ -1,6 +1,6 @@
 # @pome-sh/checks
 
-## 0.2.0
+## Unreleased (minor)
 
 Carries the vocabulary's first POSITIVE tape assertion on github to the grader
 (F-1338). `GITHUB_CHECKS` goes 15 → 16, so `checksDigest` moves and every pin
