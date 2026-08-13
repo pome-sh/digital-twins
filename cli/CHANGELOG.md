@@ -4,6 +4,31 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.41
+
+### Patch Changes
+
+- **`gmail.message-has-label`'s discriminating worlds now mint a label id that
+  differs from the label's display name.** The CLI bundles the twins, so it
+  carries their declarations; this is the fixture half of the section-read sweep
+  added to `@pome-sh/checks@0.1.7`.
+
+  The pair used to build its user label as `userLabel(label, label)` — an
+  `id === name` shape only a SYSTEM label has. With it, `labelIdsFor`'s
+  bare-display-name fallback answered the label join unaided, so deleting the
+  whole `labels` collection from the passing world changed nothing and the
+  verdict stayed `passed`: a section the verdict demonstrably reads, proven
+  unread by the only world that speaks for it. That is invisible to pome-cloud's
+  `findVacuousStateSectionReaders`, which can only make a candidate of a section
+  the two worlds DISAGREE about.
+
+  Nothing in any `evaluate` changed, so no criterion moves and no verdict moves.
+  `discriminatingWorlds` is not part of the binding surface either —
+  `checksDigest` deliberately does not hash it, so this skews no pin. It is a
+  fixture the twins' own probes run. `labelIdsFor`'s comment also stops
+  under-counting its callers: there are three, not two, and the third answers
+  `false` rather than refusing.
+
 ## 0.23.40
 
 ### Patch Changes
