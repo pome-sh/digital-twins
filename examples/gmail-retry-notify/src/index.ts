@@ -117,6 +117,12 @@ async function main() {
   const modelSlug = (process.env.GMAIL_AGENT_MODEL ?? "anthropic/claude-opus-4-8").trim();
   const maxSteps = Number(process.env.GMAIL_AGENT_MAX_STEPS ?? 30);
 
+  // F-1519 — positive-evidence marker `scripts/smoke-examples.mjs` classifies
+  // REACHED-OUTBOUND on, printed immediately before this example's first
+  // outbound call (the Gmail twin's profile lookup, ahead of the model call).
+  // This example has no @pome-sh dependency to emit it for free, so it is a
+  // literal print, gated so real users never see it.
+  if (process.env.POME_SMOKE_MARK_OUTBOUND === "1") console.error("POME_SMOKE_REACHED_OUTBOUND");
   const profile = await createGmailClient({ restUrl, authToken })(`/gmail/v1/users/me/profile`);
   const sender =
     profile && typeof profile === "object" && "emailAddress" in profile
