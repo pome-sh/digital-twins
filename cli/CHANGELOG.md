@@ -4,6 +4,30 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.46
+
+### Patch Changes
+
+- **Divergence 19 names the two commit-count surfaces it was actually measured on,
+  and the number it was measured at.** The bullet listed `/commits`,
+  `/commits/:ref` and `/compare/:basehead`, but `GET /repos/:o/:r/pulls/:n/commits`
+  reports the same seeded-history count difference and was missing — so the prose
+  described less than the registry entry it binds to, which is how a registry
+  starts understating what it covers.
+
+  Measured against the real `pome-sh/twin-fixtures-sandbox` on 2026-08-13, after
+  the sandbox was seeded with the `renamed_from` move: **twin 1 vs upstream 4** on
+  `compare.commits` and on `/pulls/:n/commits`. The bullet now carries that number
+  and the reason it is four rather than the two or three a reader derives from
+  "one twin commit vs a PUT plus a DELETE" — the real repo also carries the
+  branch-convergence merge that gives the move a source to consume (F-1510).
+  Without that sentence the next reader re-derives three, finds four, and
+  concludes the golden went stale.
+
+  Behaviour-free: `FIDELITY.md` only. The twin serialises its own seeded commits
+  faithfully either way; what changed is that the accepted set is now written down
+  where it is read.
+
 ## 0.23.43
 
 ### Patch Changes
