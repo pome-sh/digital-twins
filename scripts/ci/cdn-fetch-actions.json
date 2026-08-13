@@ -1,0 +1,112 @@
+{
+  "_readme": [
+    "F-1489 — the classification half of scripts/ci/assert-hardened-cdn-fetches.mjs.",
+    "",
+    "WHAT IS DERIVED, AND WHAT IS NOT. The gate derives the SET OF ACTIONS TO JUDGE",
+    "from `.github/workflows/**` — never from this file — so a new `uses:` step is",
+    "discovered the moment it lands. What cannot be derived from this repo is",
+    "whether a given third-party action downloads an executable over the network:",
+    "that fact lives in the action's own implementation, on someone else's default",
+    "branch. `actions/checkout` does not; `sigstore/cosign-installer` exists to.",
+    "Guessing from the action's NAME is exactly the heuristic that silently misses",
+    "(nothing in the string `anchore/sbom-action` says 'fetches syft from a release",
+    "CDN'). So the residual is made explicit instead: every action the workflows",
+    "reference must have a row here, the gate reds on any that does not, and each",
+    "row records the evidence the verdict was read from.",
+    "",
+    "Rows are keyed on `owner/repo`, NOT on the pinned sha. A routine sha bump",
+    "keeps the classification; a MAJOR rewrite of an action under the same name",
+    "could in principle invalidate a row, and nothing here would notice. That is",
+    "the one thing this file cannot see, stated rather than hidden. `evidence`",
+    "names the ref each verdict was read at so a re-audit is a diff, not a re-read.",
+    "",
+    "FIELDS",
+    "  fetchesFromCdn  Does running this action pull an executable over the network",
+    "                  from outside this repo (release CDN, container registry)?",
+    "  hardening       not-needed      | fetchesFromCdn must be false.",
+    "                  repeat-attempts | every occurrence must be a repeated-attempt",
+    "                                    group (see the gate's header for the shape).",
+    "                  step-is-the-check | deliberately NOT retried; requires",
+    "                                    `residual`.",
+    "  why             Required, non-empty. What was read, and what it said.",
+    "  residual        Required iff hardening is `step-is-the-check`. What is still",
+    "                  exposed, and what would close it."
+  ],
+  "_classifiedOn": "2026-08-13",
+  "actions": {
+    "actions/checkout": {
+      "fetchesFromCdn": false,
+      "hardening": "not-needed",
+      "why": "A JavaScript action that talks to the GitHub API and git for the repository being built. It installs no tool. A failure here is a GitHub outage, which no amount of retrying inside GitHub Actions routes around.",
+      "evidence": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 (v7.0.1), action.yml `runs: using: node24`."
+    },
+    "actions/setup-node": {
+      "fetchesFromCdn": false,
+      "hardening": "not-needed",
+      "why": "Resolves `node-version: 24` from the runner's own tool cache, where GitHub-hosted ubuntu images already ship it; a cache miss falls back to actions/node-versions via @actions/tool-cache, whose downloader retries internally. Neither is a third-party release CDN, and no binary here is pinned by sha in this repo, so the hardened-fetch path has nothing to verify.",
+      "evidence": "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 (v7.0.0) and @a0853c24544627f65ddf259abe73b1d18a591444 (v6.4.0); every call site in this repo passes `node-version: 24`."
+    },
+    "actions/upload-artifact": {
+      "fetchesFromCdn": false,
+      "hardening": "not-needed",
+      "why": "Uploads to the GitHub Actions artifact service. Installs nothing.",
+      "evidence": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a (v7.0.1)."
+    },
+    "actions/dependency-review-action": {
+      "fetchesFromCdn": false,
+      "hardening": "not-needed",
+      "why": "Calls GitHub's dependency-review API for the PR. Installs nothing.",
+      "evidence": "actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 (v5.0.0)."
+    },
+    "docker/login-action": {
+      "fetchesFromCdn": false,
+      "hardening": "not-needed",
+      "why": "Writes a registry credential into the local docker config. Installs nothing.",
+      "evidence": "docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 (v4.4.0)."
+    },
+    "docker/metadata-action": {
+      "fetchesFromCdn": false,
+      "hardening": "not-needed",
+      "why": "Computes tag and label strings from the event payload. Pure JS, no network fetch of any executable.",
+      "evidence": "docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 (v6.2.0)."
+    },
+    "docker/setup-buildx-action": {
+      "fetchesFromCdn": false,
+      "hardening": "not-needed",
+      "why": "Its src/main.ts downloads buildx from GitHub Releases only when `Util.isValidRef(version)` (build from source), or when `!(await toolkit.buildx.isAvailable()) || version` — i.e. when a `version:` input is set, or when the runner has no buildx. This repo's single call site sets no `version:`, and GitHub-hosted ubuntu runners ship buildx, so that branch is not taken. NOTE THE CONDITION: adding a `version:` input to that step turns this row false without touching this file, and nothing here would notice.",
+      "evidence": "docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c (v4.2.0), src/main.ts lines 46-70."
+    },
+    "docker/build-push-action": {
+      "fetchesFromCdn": false,
+      "hardening": "not-needed",
+      "why": "Drives the buildx binary that setup-buildx-action already put in place. Pulls base images from the registries the Dockerfile names, which is the build itself, not a tool install.",
+      "evidence": "docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a (v7.3.0)."
+    },
+    "anchore/sbom-action": {
+      "fetchesFromCdn": true,
+      "hardening": "repeat-attempts",
+      "why": "Downloads the syft binary from the anchore release CDN (github.com/anchore/syft/releases) on every run, with no retry of its own. THIS IS F-1489's SUBJECT: a 503 there killed the stripe twin-image job twice on 2026-08-12 (PRs #390, #391) with `[error] received HTTP status=503 ... [error] unable to find tag=''`. On a PR that is noise; on main the cosign sign/attest steps below it do run, so the same 503 fails an image publish. Retrying the whole step is sound here because the step has no verdict of its own — SBOM generation either produces the file or fails for an infrastructure reason.",
+      "evidence": "anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 (v0.24.0), action.yml `syft-version` input; observed run output quoted in F-1489."
+    },
+    "sigstore/cosign-installer": {
+      "fetchesFromCdn": true,
+      "hardening": "repeat-attempts",
+      "why": "Its entire purpose is to download the pinned cosign binary from the sigstore release CDN, so it is the same exposure as syft one step later on the same publish path. Retrying is free: the step installs a tool and asserts nothing. The `cosign-release` input is load-bearing and MUST stay `v2.6.4` in every copy (see twin-image.yml's comment: cosign v3 `attest --type spdx` rejects the anchore SBOM predicate) — which is why the gate requires every attempt in a repeated group to carry byte-identical `with:` inputs.",
+      "evidence": "sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 (v4.1.2)."
+    },
+    "aquasecurity/trivy-action": {
+      "fetchesFromCdn": true,
+      "hardening": "step-is-the-check",
+      "why": "Composite action whose first step is `aquasecurity/setup-trivy`, which downloads the Trivy binary from its release CDN — so the exposure is real. It is deliberately NOT wrapped in a repeated-attempt group, because in this repo the step runs with `exit-code: '1'` on HIGH/CRITICAL: its failure means EITHER the install broke OR Trivy found a fixable vulnerability. A repeated-attempt group retries the whole step, so attempts 1 and 2 would swallow a real CVE finding under `continue-on-error`, and the `::warning::` would report a flaky download on a run that actually found a vulnerability. Turning a finding into a retry is a worse property than the one F-1489 fixes.",
+      "residual": "A trivy install that 5xxes still reds twin-image, and on main still stops a publish, with no retry. Closing it means splitting the install from the scan — `skip-setup-trivy: true` on the trivy-action step plus an explicit `aquasecurity/setup-trivy` step in a repeated-attempt group — which adds a third-party pin and rewires the scanner on the publish path. Out of scope for F-1489, which is about the SBOM/sign leg; file it against twin-image.yml when the trivy CDN actually costs a run.",
+      "evidence": "aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 (v0.36.0), action.yaml lines 120-133."
+    },
+    "trufflesecurity/trufflehog": {
+      "fetchesFromCdn": true,
+      "hardening": "step-is-the-check",
+      "why": "Named in F-1489's sweep list, and swept: at the pinned ref it is a composite action that `docker run`s ghcr.io/trufflesecurity/trufflehog (and apt-get installs jq if missing). That is a container-registry pull, not a release-CDN binary fetch, so the sha256-pinned-fetch path has nothing to pin. It is also, like trivy, a step that IS the check — its failure normally means a verified secret was found, and retrying it twice under `continue-on-error` would swallow exactly that.",
+      "residual": "A GHCR outage still reds secret-scan (a required context) with no retry. The fix, if it ever costs a run, is a `docker pull` of the pinned image in a repeated-attempt group BEFORE the scan step, leaving the scan itself un-retried — not wrapping the scan.",
+      "evidence": "trufflesecurity/trufflehog@27b0417c16317ca9a472a9a8092acce143b49c55 (v3.95.9), action.yml `runs: using: composite`, `image` input defaulting to ghcr.io/trufflesecurity/trufflehog."
+    }
+  }
+}
