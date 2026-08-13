@@ -4,7 +4,7 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
-## 0.23.46
+## 0.23.44
 
 ### Patch Changes
 
