@@ -397,8 +397,16 @@ on each bullet's bold title and never on its number, so gaps cost it nothing.
     The commits-collection length, per-commit `parents` count (seeded commits are roots,
     0 vs 1), and per-commit `files` changed-set count differ because the seeded sandbox's
     git history is not a byte-for-byte mirror of the real repo's commit DAG. On the
-    `GET /repos/:o/:r/commits`, `.../commits/:ref`, `.../compare/:basehead` read surfaces
-    these length differences are accepted (INFO), not drift.
+    `GET /repos/:o/:r/commits`, `.../commits/:ref`, `.../compare/:basehead`,
+    `.../pulls/:n/commits` read surfaces these length differences are accepted (INFO),
+    not drift. Measured against the real sandbox on 2026-08-13: **twin 1 vs upstream 4**
+    on the compare surface's `commits` leaf and on `/pulls/:n/commits`. Four, not the
+    two-commit figure a reader derives from "the twin spends one commit where the
+    Contents API spends a PUT plus a DELETE": the real repo also carries the
+    branch-convergence merge that gives a `renamed_from` move a source to consume
+    (F-1510), and the seeder issues that merge rather than rewriting history through the
+    Git Data API, so the golden and the seeder agree on one commit shape. A count of two
+    or three here means the seeder changed, not that the golden went stale.
 20. **`/labels` and `/collaborators` list counts reflect the seeded sandbox content.**
     The `/labels` (2 vs 10) and `/collaborators` (3 vs 2) collection counts reflect the
     seeded sandbox's smaller label set and different collaborator set, not a serializer
