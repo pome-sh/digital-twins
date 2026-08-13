@@ -34,13 +34,19 @@
 //     true fact about the tree — inherited from list-scheduled-workflows.mjs)
 //   - a job calling schedule-alarm.yml whose EFFECTIVE permissions (its own
 //     job-level `permissions:` if present, else the workflow-level block,
-//     else the unreadable repo default) do not grant `issues: write` — the
-//     alarm exists, runs, and dies with a 403 at `gh issue create`, which is
-//     the exact "fired, failed, told nobody" outcome F-1230 exists to
-//     prevent. Permissions for a reusable workflow CALL come from the
-//     calling job's own grant (GitHub Actions rule), so the calling job —
-//     not schedule-alarm.yml's own `permissions:` block — is what must be
-//     resolved.
+//     else the unreadable repo default) do not grant every scope
+//     schedule-alarm.yml's OWN filing job requests — the alarm exists, runs,
+//     and either dies with a 403 at `gh issue create` or is refused by
+//     GitHub before it starts, which is the exact "fired, failed, told
+//     nobody" outcome F-1230 exists to prevent.
+//   - schedule-alarm.yml's own filing job not resolving `issues: write`. The
+//     caller's grant is a CEILING, not the effective set: a reusable
+//     workflow's own `permissions:` can only narrow what the caller handed
+//     it, so deleting `issues: write` from the callee 403s every alarm in
+//     the tree while every caller stays compliant. The required scope set is
+//     therefore DERIVED from the callee and floored with an absolute
+//     `issues: write` on the callee itself — a pure derivation would let
+//     that deletion lower the bar for everyone and pass.
 
 import { realpathSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
@@ -59,6 +65,13 @@ import {
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REUSABLE_ALARM_FILE = "schedule-alarm.yml";
+// The script that actually does the filing. The job that runs it is the one
+// whose permissions decide whether an alarm can file, so the required scope
+// set is read off THAT job rather than typed here a second time.
+const ALARM_FILER_SCRIPT = "file-schedule-alarm.sh";
+// GitHub's three access levels, ordered: a `write` grant satisfies a `read`
+// requirement, and an omitted scope is `none`.
+const LEVEL = { none: 0, read: 1, write: 2 };
 
 /**
  * The [start, end) line-index range of the block nested under the key at
@@ -141,10 +154,23 @@ function unwrapExpression(value) {
 function parsePermissionsValue(lines, keyIdx, inline) {
   if (inline !== "") {
     if (inline.startsWith("{")) {
+      // A flow mapping that SPANS lines is refused, not parsed: stripping a
+      // closing brace that is not there yielded an EMPTY grant, so a workflow
+      // that really does grant `issues: write` red with "resolved permissions
+      // do not grant issues: write" — a guard reddening on a right answer, on
+      // a shape GitHub and actionlint both accept. Same stance
+      // list-scheduled-workflows.mjs takes for a multi-line `on:` mapping: an
+      // unsupported shape must never be indistinguishable from a parsed one.
+      if (!inline.endsWith("}")) {
+        throw new Error(
+          `unsupported permissions: shape — a flow mapping that spans lines (${lines[keyIdx].trim()}). ` +
+            "Refusing to read it as an empty grant; write it in block form.",
+        );
+      }
       const inner = inline.replace(/^\{/, "").replace(/\}$/, "").trim();
       const entries = new Map();
       if (inner !== "") {
-        for (const m of inner.matchAll(/([\w-]+)\s*:\s*("[^"]*"|'[^']*'|[^,}]+)/g)) {
+        for (const m of inner.matchAll(/["']?([\w-]+)["']?\s*:\s*("[^"]*"|'[^']*'|[^,}]+)/g)) {
           entries.set(unquote(m[1]), unquote(m[2]));
         }
       }
@@ -155,23 +181,32 @@ function parsePermissionsValue(lines, keyIdx, inline) {
   const [s, e] = blockRange(lines, keyIdx);
   const entries = new Map();
   for (const idx of directChildLines(lines, s, e)) {
-    const m = /^\s*([\w-]+):\s*(.+)$/.exec(lines[idx]);
+    // Quoted keys accepted for the same reason `["']jobs["']` is below: this
+    // repo's yamllint truthy workaround produces them, and reading
+    // `"issues": write` as absent reds a workflow that grants the scope.
+    const m = /^\s*["']?([\w-]+)["']?:\s*(.+)$/.exec(lines[idx]);
     if (m) entries.set(unquote(m[1]), unquote(m[2]));
   }
   return { kind: "map", entries };
 }
 
 /**
- * Does a resolved `permissions:` value grant `issues: write`? `write-all`
- * does; `read-all` and an empty (or issues-less, or issues-not-write)
- * mapping do not. `null` (nothing to resolve — see findAlarmPermissionGaps
- * below) is handled by the caller, not here, because "absent" and "present
- * but insufficient" are different failures this check reports differently.
+ * Does a resolved `permissions:` value grant at least `level` on `scope`?
+ * `write-all` grants everything, `read-all` grants every read, a mapping
+ * grants what it lists (and `write` satisfies a `read` requirement, the way
+ * GitHub's own levels nest). `null` (nothing to resolve — see
+ * findAlarmPermissionGaps below) is handled by the caller, not here, because
+ * "absent" and "present but insufficient" are different failures this check
+ * reports differently.
  */
-function grantsIssuesWrite(perm) {
+function grantsScope(perm, scope, level) {
   if (!perm) return false;
-  if (perm.kind === "scalar") return /^write-all$/i.test(perm.value);
-  return (perm.entries.get("issues") ?? "").toLowerCase() === "write";
+  if (perm.kind === "scalar") {
+    if (/^write-all$/i.test(perm.value)) return true;
+    return /^read-all$/i.test(perm.value) && LEVEL[level] <= LEVEL.read;
+  }
+  const granted = LEVEL[(perm.entries.get(scope) ?? "none").toLowerCase()] ?? 0;
+  return granted >= (LEVEL[level] ?? 0);
 }
 
 /**
@@ -180,10 +215,10 @@ function grantsIssuesWrite(perm) {
  * different fact) — or `null` if the file has none.
  */
 function parseWorkflowPermissions(lines) {
-  const idx = lines.findIndex((l) => /^permissions:\s*(.*)$/.test(l));
+  const KEY = /^["']?permissions["']?:\s*(.*)$/;
+  const idx = lines.findIndex((l) => KEY.test(l));
   if (idx === -1) return null;
-  const m = /^permissions:\s*(.*)$/.exec(lines[idx]);
-  return parsePermissionsValue(lines, idx, m[1].trim());
+  return parsePermissionsValue(lines, idx, KEY.exec(lines[idx])[1].trim());
 }
 
 /**
@@ -238,7 +273,7 @@ function parseJobs(lines) {
       let m;
       if ((m = /^\s*uses:\s*["']?([^"'\s]+)["']?\s*$/.exec(line))) {
         usesTarget = m[1];
-      } else if ((m = /^\s*permissions:\s*(.*)$/.exec(line))) {
+      } else if ((m = /^\s*["']?permissions["']?:\s*(.*)$/.exec(line))) {
         permissions = parsePermissionsValue(lines, kIdx, m[1].trim());
       } else if ((m = /^\s*if:\s*(.*)$/.exec(line))) {
         const inline = m[1].trim();
@@ -281,7 +316,12 @@ function parseJobs(lines) {
       }
     }
 
-    jobs.push({ job: jobId, usesTarget, ifExpr, continueOnError, needs, title, label, outcome, permissions });
+    // Does this job actually run the filing script? Only meaningful inside
+    // schedule-alarm.yml itself, where it identifies the job whose permissions
+    // decide whether ANY alarm in the tree can file.
+    const runsFiler = lines.slice(jobStart, jobEnd).some((l) => l.includes(ALARM_FILER_SCRIPT));
+
+    jobs.push({ job: jobId, usesTarget, ifExpr, continueOnError, needs, title, label, outcome, permissions, runsFiler });
   }
   return jobs;
 }
@@ -308,11 +348,14 @@ export function findScheduleAlarmCalls(root) {
 
 /**
  * Every call to schedule-alarm.yml whose EFFECTIVE permissions do not grant
- * `issues: write` — the alarm's own `gh issue create`/`gh issue edit`/`gh
- * issue close` (file-schedule-alarm.sh) 403s without it, and permissions for
- * a reusable workflow CALL come from the CALLING job's own grant, never from
- * schedule-alarm.yml's own `permissions:` block (a GitHub Actions rule, not
- * a guess). "Effective" is resolved exactly the way GitHub resolves it: a
+ * every scope the alarm's own filing job requests — `gh issue create`/`gh
+ * issue edit`/`gh issue close` (file-schedule-alarm.sh) 403s without
+ * `issues: write`, and `actions/checkout` cannot run without `contents:
+ * read`. The CALLING job's grant is what GitHub uses as the ceiling for a
+ * reusable workflow call; the required set itself is derived from the callee
+ * (see alarmRequiredScopes below), because the callee can only NARROW that
+ * ceiling and so is the other half of the same property.
+ * "Effective" is resolved exactly the way GitHub resolves it: a
  * job-level `permissions:` block REPLACES the workflow-level one rather than
  * merging with it, so a job-level block missing `issues: write` is checked
  * as-is — the workflow-level grant next to it is not consulted as a
@@ -329,7 +372,8 @@ export function findScheduleAlarmCalls(root) {
  * passing one" stance list-scheduled-workflows.mjs takes for a multi-line
  * `on:` mapping.
  */
-export function findAlarmPermissionGaps(calls) {
+export function findAlarmPermissionGaps(root, calls) {
+  const required = alarmRequiredScopes(root);
   const gaps = [];
   for (const call of calls) {
     const effective = call.permissions ?? call.workflowPermissions ?? null;
@@ -337,11 +381,65 @@ export function findAlarmPermissionGaps(calls) {
       gaps.push({ file: call.file, job: call.job, reason: "absent at both job and workflow level — the effective grant is an unstated repo default" });
       continue;
     }
-    if (!grantsIssuesWrite(effective)) {
-      gaps.push({ file: call.file, job: call.job, reason: "resolved permissions do not include issues: write" });
+    const short = [...required].filter(([scope, level]) => !grantsScope(effective, scope, level));
+    if (short.length > 0) {
+      gaps.push({
+        file: call.file,
+        job: call.job,
+        reason: `resolved permissions do not grant ${short.map(([s, l]) => `${s}: ${l}`).join(", ")}`,
+      });
     }
   }
   return gaps;
+}
+
+/**
+ * The scopes a caller must grant, READ OFF schedule-alarm.yml's own filing job
+ * rather than typed here.
+ *
+ * The caller's grant is a CEILING, not the effective set. A reusable
+ * workflow's own `permissions:` can only NARROW what the caller handed it, and
+ * a callee requesting a scope the caller withheld is refused by GitHub before
+ * the job starts. So two things are wrong with checking `issues: write` on
+ * callers alone: deleting `issues: write` from schedule-alarm.yml's `alarm`
+ * job 403s every alarm in the tree while every caller stays compliant, and a
+ * caller that grants ONLY `issues: write` — the exact minimal edit this
+ * check's own error message invites — withholds the `contents: read` that
+ * job's `actions/checkout` needs.
+ *
+ * Derivation alone would be self-defeating (deleting `issues: write` from the
+ * callee would simply lower the bar for everyone and pass), so the callee is
+ * ALSO held to an absolute `issues: write` floor here. `write-all` on the
+ * callee is refused rather than expanded: there is no scope list to hand
+ * callers, and a check that cannot enumerate its own requirement must not
+ * report a pass.
+ */
+export function alarmRequiredScopes(root) {
+  const entry = [...workflowLines(root)].find(([file]) => file === REUSABLE_ALARM_FILE);
+  if (!entry) throw new Error(`${REUSABLE_ALARM_FILE} not found under .github/workflows — the reusable alarm every caller resolves against is gone`);
+  const [, lines] = entry;
+  const workflowPermissions = parseWorkflowPermissions(lines);
+  const filers = parseJobs(lines).filter((j) => j.runsFiler);
+  if (filers.length === 0) {
+    throw new Error(`no job in ${REUSABLE_ALARM_FILE} runs ${ALARM_FILER_SCRIPT} — the alarm files nothing, and there is no job whose permissions callers could be held to`);
+  }
+  const scopes = new Map();
+  for (const job of filers) {
+    const effective = job.permissions ?? workflowPermissions ?? null;
+    if (effective === null) {
+      throw new Error(`${REUSABLE_ALARM_FILE}:${job.job} runs ${ALARM_FILER_SCRIPT} with no permissions: block at either level — the effective grant is an unstated repo default`);
+    }
+    if (effective.kind === "scalar") {
+      throw new Error(`${REUSABLE_ALARM_FILE}:${job.job} uses the shorthand permissions: ${effective.value} — the scope set callers must grant cannot be enumerated from it; write it as a map`);
+    }
+    if (!grantsScope(effective, "issues", "write")) {
+      throw new Error(`${REUSABLE_ALARM_FILE}:${job.job} runs ${ALARM_FILER_SCRIPT} but its own resolved permissions do not grant issues: write — every alarm in the tree 403s at gh issue create no matter what its caller grants`);
+    }
+    for (const [scope, level] of effective.entries) {
+      if ((LEVEL[level.toLowerCase()] ?? 0) > (LEVEL[(scopes.get(scope) ?? "none").toLowerCase()] ?? 0)) scopes.set(scope, level);
+    }
+  }
+  return scopes;
 }
 
 /** `false`, in any casing, with nothing else in the expression. */
@@ -531,10 +629,16 @@ export function main() {
   const needsGaps = findAlarmNeedsGaps(root);
   const shared = findSharedAlarmKeys(calls);
   const unclosable = findUnclosableAlarms(calls);
-  const permissionGaps = findAlarmPermissionGaps(calls);
-  // The denominator a silently-dropped-out workflow would otherwise hide in:
-  // distinct files among the calls this check actually resolved permissions
-  // for, printed in the summary line below whether the run passes or not.
+  const requiredScopes = alarmRequiredScopes(root);
+  const permissionGaps = findAlarmPermissionGaps(root, calls);
+  // Distinct files among the calls whose permissions were actually resolved.
+  // This is NOT an independent denominator — it is derived from `calls`, so a
+  // parser regression drops a file from numerator and denominator together.
+  // What holds the floor is findMissingAlarmCoverage above: every scheduled
+  // workflow must appear in `calls` with a live failure leg, so this count
+  // cannot fall below `covered.length` without that check reddening first.
+  // No separate assertion on it: it is implied by the coverage check, and an
+  // early throw here would MASK the coverage error it is downstream of.
   const permissionsResolvedFor = new Set(calls.map((c) => c.file)).size;
 
   const problems = [];
@@ -589,9 +693,11 @@ export function main() {
   if (permissionGaps.length > 0) {
     problems.push(
       "calling job(s) whose EFFECTIVE permissions (job-level if present, else " +
-        "workflow-level, else the unreadable repo default) do not grant " +
-        "issues: write — the alarm exists, runs, and 403s at gh issue " +
-        "create/close, which nobody reads as anything but a green check:\n  " +
+        "workflow-level, else the unreadable repo default) do not grant every " +
+        `scope ${REUSABLE_ALARM_FILE}'s own filing job requests — the alarm ` +
+        "exists, runs, and either 403s at gh issue create/close or is refused " +
+        "by GitHub before it starts, which nobody reads as anything but a " +
+        "green check:\n  " +
         permissionGaps.map((g) => `${g.file}:${g.job} — ${g.reason}`).join("\n  "),
     );
   }
@@ -601,7 +707,7 @@ export function main() {
   }
 
   console.log(
-    `schedule-alarm coverage OK: ${covered.length} scheduled workflow(s) all reach the alarm's failure leg, which needs every job in its own workflow; no title/label disagreement; permissions resolved for ${permissionsResolvedFor} calling workflow(s), all granting issues: write.`,
+    `schedule-alarm coverage OK: ${covered.length} scheduled workflow(s) all reach the alarm's failure leg, which needs every job in its own workflow; no title/label disagreement; permissions resolved for ${permissionsResolvedFor} calling workflow(s), all granting the ${requiredScopes.size} scope(s) ${REUSABLE_ALARM_FILE}'s own filing job requests (${[...requiredScopes].map(([s, l]) => `${s}: ${l}`).join(", ")}).`,
   );
 }
 

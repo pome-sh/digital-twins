@@ -174,14 +174,20 @@ jobs:
       - run: node scripts/ci/list-scheduled-workflows.test.mjs
       - run: bash scripts/ci/file-schedule-alarm.test.sh
       # F-1471 — the guard that keeps the above true as a PROPERTY, not a fact
-      # about the three workflows scheduled today. Reads
+      # about the four workflows scheduled today. Reads
       # list-scheduled-workflows.mjs's own derivation (never re-parses the
       # tree by its own rules) and asserts every scheduled workflow reaches a
       # job that calls schedule-alarm.yml with outcome: failure, unneutralised
       # by continue-on-error: true or a dead if:, plus that the title/label
       # pair — typed twice per alarm, once on the failure leg and once on
       # recovery — agrees between the two calls. A mismatched pair means the
-      # alarm files under one key and looks itself up under another.
+      # alarm files under one key and looks itself up under another. F-1493 adds
+      # the permission half, in both directions: every calling job must grant
+      # every scope schedule-alarm.yml's own filing job requests (a caller's
+      # grant is a CEILING, so an unstated or narrower one 403s at `gh issue
+      # create` or has the call refused outright), and that filing job must
+      # itself resolve `issues: write` — losing it there kills every alarm in
+      # the tree while leaving every caller compliant.
       - run: node scripts/ci/assert-schedule-alarm-coverage.mjs
       - run: node scripts/ci/assert-schedule-alarm-coverage.test.mjs
       # F-1489 — every binary `.github/workflows/**` pulls off a release CDN
