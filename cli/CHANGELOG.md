@@ -10,7 +10,7 @@ write a version number here or in `package.json` — see `RELEASING.md`. Release
 entries are insertions only: a correction is the next entry, naming the one it
 corrects.
 
-## Unreleased (patch)
+## 0.23.49 — 2026-08-13
 
 **A golden-scenario gate ships in the test surface (`gate:golden`).** Two fixture
 runs whose verdicts are known by construction — one correct agent, one wrong —
