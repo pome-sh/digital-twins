@@ -1,5 +1,32 @@
 # @pome-sh/checks
 
+## 0.1.8
+
+**Grading-vocabulary change: twin-github's seed gained
+`repositories[].files[].renamed_from`.** No check declaration moves, no criterion
+moves and `checksDigest` is unaffected — this package's other half is the seed
+schemas, and this is one of them.
+
+`renamed_from` names the path a file was MOVED from on `branch`, and it is the
+only way a seed can take a path away from a branch. A seeded branch is created
+from the default branch and inherits every path, and a plain `files[]` entry can
+add or overwrite but never remove — so `status: "renamed"`, which
+`PullRequestFileRow` has always declared, was reachable from no seed at all, and
+`GET /pulls/:n/files` could not be made to serve GitHub's `previous_filename` by
+any world. Registering that as an allowance would have been accepting a gap in
+the twin's core file model.
+
+`content` is refused alongside `renamed_from` and read from the source path
+instead. That is not ergonomics: the branch diff detects a move by pairing
+identical blobs, so a seed naming both a source and different content would be
+asking for a rename the diff would report as an add plus a remove — the same
+unreachability one level up. A seed that sets `renamed_from` with no `branch`, or
+whose source is not a file on the branch, or whose source is its own destination,
+is refused with a message naming the field.
+
+Every seed valid before this is valid now: `content` became optional in the
+object and required by refine wherever `renamed_from` is absent.
+
 ## 0.1.7
 
 A section a check's verdict reads is now measured HERE, where the worlds are

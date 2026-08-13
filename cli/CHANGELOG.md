@@ -4,6 +4,40 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.42
+
+### Patch Changes
+
+- **`GET /repos/:o/:r/pulls/:n/files` now serves `previous_filename` on a
+  renamed file, and the twin's branch diff detects the rename that makes it
+  reachable.** The CLI bundles the twins, so this is the bundled twin-github
+  half of the same change published as `@pome-sh/checks@0.1.8`.
+
+  GitHub's `diff-entry` carries `previous_filename` and sends it exactly when
+  `status: "renamed"`. `PullRequestFileRow` had declared `"renamed"` since it was
+  written and nothing could produce it: `calculatePullFiles` diffs the two
+  branches' file tables path by path, so a moved file read as one `removed` entry
+  plus one `added` entry with the whole file counted as a rewrite. An examinee
+  that renamed a file and read its own pull request's diff back saw a shape real
+  GitHub does not serve — and, because nothing in GitHub's REST API is a
+  "rename", that is how every agent moves a file.
+
+  The diff now pairs a path that left the base with a path that arrived on the
+  head when the two hold the same blob, and reports one `renamed` entry carrying
+  the pre-rename path and zero additions, zero deletions. Exact moves only, which
+  is git's `--find-renames` at 100% similarity: a move that also edits the file
+  still reports as an add plus a remove, because picking a similarity threshold
+  GitHub's declared schema does not expose would be inventing vendor behaviour
+  rather than reproducing it. The commit and compare surfaces are unchanged —
+  they read `file_versions`, whose status column has no `renamed` member.
+
+  The seed gained `repositories[].files[].renamed_from`, the only way it can take
+  a path AWAY from a branch: a seeded branch is created from the default branch
+  and inherits every path, and a plain entry can add or overwrite but never
+  remove, so before this the field was unreachable from any seed rather than
+  merely unemitted. `content` is refused alongside `renamed_from` and carried
+  over from the source instead, which makes a seeded move exact by construction.
+
 ## 0.23.41
 
 ### Patch Changes
