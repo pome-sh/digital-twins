@@ -248,15 +248,40 @@ jobs:
             # `-a` is safe and deliberate: this is a fresh checkout whose only
             # writers are the allocator and the regeneration above.
             git commit --quiet -a --file "${MESSAGE}"
-            if git push --quiet origin HEAD:main; then
+
+            push_err="${RUNNER_TEMP}/push-attempt-${attempt}.err"
+            if git push --quiet origin HEAD:main 2>"${push_err}"; then
               echo "Allocated on main:"
               cat "${MESSAGE}"
               exit 0
             fi
-            echo "::warning::push to main was rejected on attempt ${attempt}/3 — a merge landed first. Recomputing."
+            cat "${push_err}" >&2
+
+            # A REFUSAL IS NOT A RACE, and this branch exists because the first
+            # live run of this workflow spent all three attempts pretending it
+            # was one. `main` answered `GH013 … 3 of 3 required status checks are
+            # expected` — classic branch protection still carried a duplicate
+            # required-checks rule, which no App can bypass and `enforce_admins`
+            # applies to everyone — and the loop reported "a merge landed first"
+            # three times before giving up. Retrying cannot fix a rule; the only
+            # useful thing to do is stop and name the layer that refused.
+            if grep -qE 'GH013|GH006|rule violations|protected branch|refusing to allow' "${push_err}"; then
+              echo "::error::main REFUSED this push on a RULE, not a race (attempt ${attempt}/3). Retrying cannot help, so this run stops here."
+              echo "Nothing was published and nothing was lost: the pending CHANGELOG entries are still on"
+              echo "main, and release-alarm.yml reports this as UNALLOCATED within a day."
+              echo "Every layer guarding main must let the pome-ops-push app (app_id 4582446) through:"
+              echo "  - ruleset 18797095 'main founder-bypass' — needs the app in bypass_actors as actor_type Integration;"
+              echo "  - CLASSIC branch protection — CANNOT be bypassed by an app at all, so it must carry no"
+              echo "    required_status_checks rule (deleted 2026-08-13; a re-added one breaks this workflow again)."
+              echo "See RELEASING.md, 'The credential: pome-ops-push, and the one-time setup around it'."
+              exit 1
+            fi
+
+            echo "::warning::push to main was rejected on attempt ${attempt}/3 (non-fast-forward — a merge landed first). Recomputing from the new tip."
           done
 
-          echo "::error::Could not land the version allocation after three attempts. Nothing published;"
-          echo "the pending CHANGELOG entries are still on main, so release-alarm.yml will report this"
-          echo "within a day (UNALLOCATED). Re-run this workflow once main is quiet."
+          echo "::error::Could not land the version allocation after three attempts, each losing a race to a"
+          echo "new merge. Nothing published; the pending CHANGELOG entries are still on main, so"
+          echo "release-alarm.yml will report this within a day (UNALLOCATED). Re-run this workflow once"
+          echo "main is quiet."
           exit 1
