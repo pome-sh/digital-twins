@@ -47,9 +47,37 @@
 // opposite case: `./server` deliberately re-exports `toTwinHttpEventRow` from
 // `@pome-sh/sdk/server` (the only subpath that exports it), and each twin's
 // domain arrives through its package root, which is also where `defineTwin()`
-// runs at module scope. So hono and `@hono/node-server` are real, declared,
-// EXTERNAL dependencies — not inlined, not forbidden. The tarball gate asserts
-// the final dependency set either way rather than either of us assuming it.
+// runs at module scope. So hono is a real, declared, EXTERNAL dependency — not
+// inlined, not forbidden. The tarball gate asserts the final dependency set
+// either way rather than either of us assuming it: `@hono/node-server` was
+// declared here too until that gate reported nothing imports it, and `graphql`
+// was declared until it reported tsup had inlined it.
+//
+// ── Why knip.json has to ignore three of them ────────────────────────────────
+//
+// `hono`, `@octokit/openapi-types` and `stripe` are reachable only through the
+// BUNDLE, never from `src/` — every file under `src/` is `export … from
+// "@pome-sh/twin-*"` lines, and it is the inlined twin code that imports hono
+// and the inlined twin DECLARATIONS that name the two upstream shape anchors
+// (`GitHubDomain.pullRequestStack()`, `StripeDomain`'s `PaymentIntent[…]`
+// fields). knip reads the source graph, so it cannot see any of that — and its
+// verdict was ORDER-DEPENDENT before `knip.json` named them: green on a tree
+// where `packages/twin-*/dist` happened to be built and knip could follow into
+// it, red on CI, where `lint:dead-code` runs straight after `npm ci` with no
+// `dist` anywhere.
+//
+// The assertions that really hold these three are on the ARTIFACT and are
+// stronger than a source scan: `scripts/ci/check-sandbox-domains-tarball.mjs`
+// requires every bare specifier in the shipped JS and `.d.ts` to be a declared
+// dependency AND every declared dependency to be imported, and the
+// sandbox-domains room in `scripts/clean-room-pack-test.mjs` installs the
+// tarball with nothing beside it but zod, typescript and `@types/node`, then
+// typechecks a consumer with `skipLibCheck` OFF. Dropping one of these there is
+// a red; dropping it from knip's view is silence.
+//
+// `zod` is deliberately NOT in that ignore list: `test/surface.test.ts` imports
+// it to assert the peer identity (F-942) from the consumer's side, so it is
+// genuinely used and knip is right to want to see it.
 //
 // ── splitting: true is load-bearing, not a size tweak ────────────────────────
 //

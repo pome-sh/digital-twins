@@ -103,6 +103,11 @@
       "project": [
         "src/**/*.ts",
         "test/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "@octokit/openapi-types",
+        "hono",
+        "stripe"
       ]
     },
     "cli": {

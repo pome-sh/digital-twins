@@ -17,6 +17,7 @@
 // `@pome-sh/checks` serves, because both are cut from the same `main` commit.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import * as z from "zod";
 
 import * as barrel from "../src/index.js";
 import * as github from "../src/github.js";
@@ -169,5 +170,34 @@ describe("the vocabulary is shared with @pome-sh/checks, not copied", () => {
     expect(github.GITHUB_CHECKS).toBe(twinGithub.GITHUB_CHECKS);
     const twinStripe = await import("@pome-sh/twin-stripe/checks");
     expect(stripe.STRIPE_CHECKS).toBe(twinStripe.STRIPE_CHECKS);
+  });
+});
+
+// The property the `zod` PEER dependency exists to guarantee, asserted from the
+// consumer's side of it.
+//
+// This file imports zod itself, exactly as pome-cloud does, and the schemas the
+// package hands back must be values of THAT zod — not of a second copy bundled
+// inside the tarball. Two zod copies is the F-942 bug: `instanceof` starts
+// failing and `.parse()` results stop being interchangeable, and nothing at
+// runtime announces it, which is why it needs an assertion rather than a
+// convention. `check-sandbox-domains-tarball.mjs` covers the other half (zod is
+// never inlined into the shipped bytes); this covers the half a tarball scan
+// cannot see, which is that the objects are the same IDENTITY at run time.
+describe("zod is the consumer's, not a bundled copy", () => {
+  it("hands back schemas the importing module's own zod recognises", () => {
+    expect(github.seedSchema).toBeInstanceOf(z.ZodType);
+    expect(slack.seedSchema).toBeInstanceOf(z.ZodType);
+    expect(stripe.seedSchema).toBeInstanceOf(z.ZodType);
+    expect(gmail.gmailSeedSchema).toBeInstanceOf(z.ZodType);
+    expect(linear.linearSeedSchema).toBeInstanceOf(z.ZodType);
+  });
+
+  it("round-trips a seed this test's zod parsed", () => {
+    // The shape pome-cloud actually performs: parse with the package's schema,
+    // hand the result back to the package. A second zod identity survives the
+    // first call and fails here.
+    const parsed = github.seedSchema.parse(github.defaultSeedState());
+    expect(github.parseSeed(parsed)).toBeTruthy();
   });
 });
