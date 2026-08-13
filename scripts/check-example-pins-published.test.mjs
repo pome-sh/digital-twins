@@ -8,13 +8,14 @@
 // `check-workspace-pins-match-workspace.test.mjs` builds one, since both
 // gates read the same root `workspaces` shape.
 
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
   checkExamplePinsPublished,
   discoverExampleSiblingDeps,
+  planExampleRepins,
   reportExamplePinParity,
 } from "./check-example-pins-published.mjs";
 
@@ -322,6 +323,202 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
         else fail("9g. an E404 short-circuits the retry budget", `${JSON.stringify(result)} after ${tries} try/tries`);
       },
     );
+  }
+}
+
+// F-1520 — planExampleRepins is the write-side of this same gate: a pin that
+// this file's own `violations` classifier already calls drifted-against-a-
+// published-sibling is exactly the set safe to rewrite automatically.
+{
+  const published = (name, version) => (n, v) =>
+    n === name && v === version ? { status: "published" } : { status: "unpublished" };
+
+  // 11. A genuinely drifted, published pin produces a repin: the manifest
+  // text is rewritten (old pin -> new pin, nothing else touched) and a
+  // lockfile-regeneration command names the right example directory.
+  {
+    const root = fixture({ workspaceVersion: "0.3.6", examplePin: "0.3.5" });
+    const repins = planExampleRepins(root, published("@pome-sh/adapter-claude-sdk", "0.3.6"));
+    const manifestAfter = JSON.parse(readFileSync(join(root, "examples/support-triage/package.json"), "utf8"));
+    if (
+      repins.length === 1 &&
+      repins[0].example === "support-triage" &&
+      repins[0].from === "0.3.5" &&
+      repins[0].to === "0.3.6" &&
+      manifestAfter.dependencies["@pome-sh/adapter-claude-sdk"] === "0.3.5" && // on disk: repins only PLANS writes
+      repins[0].writes[0].path === "examples/support-triage/package.json" &&
+      JSON.parse(repins[0].writes[0].contents).dependencies["@pome-sh/adapter-claude-sdk"] === "0.3.6" &&
+      repins[0].regenerate.length === 1 &&
+      repins[0].regenerate[0].includes('cd "examples/support-triage"') && // quoted: this string is bash'ed in CI
+
+      repins[0].regenerate[0].includes("npm install --package-lock-only")
+    ) {
+      pass("11. a drifted, published pin plans a manifest rewrite and a lockfile regen command");
+    } else {
+      fail("11. a drifted, published pin plans a manifest rewrite and a lockfile regen command", JSON.stringify({ repins, manifestAfter }));
+    }
+  }
+
+  // 12. The exact incident shape: the sibling is NOT yet published (this run's
+  // own bump, or a `release.yml` publish still in flight) — must not repin.
+  // Repinning here would set a pin to a version `npm install
+  // --package-lock-only` cannot resolve, breaking `npm ci` outright.
+  {
+    const root = fixture({ workspaceVersion: "0.3.7", examplePin: "0.3.6" });
+    const repins = planExampleRepins(root, () => ({ status: "unpublished" }));
+    if (repins.length === 0) pass("12. an unpublished sibling produces no repin, ever");
+    else fail("12. an unpublished sibling produces no repin, ever", JSON.stringify(repins));
+  }
+
+  // 13. Already matching: no-op, no write planned — idempotence.
+  {
+    const root = fixture({ workspaceVersion: "0.3.6", examplePin: "0.3.6" });
+    const repins = planExampleRepins(root, published("@pome-sh/adapter-claude-sdk", "0.3.6"));
+    if (repins.length === 0) pass("13. a pin that already matches the published sibling is a no-op");
+    else fail("13. a pin that already matches the published sibling is a no-op", JSON.stringify(repins));
+  }
+
+  // 14. A registry error (not E404) must not be read as "go ahead and repin".
+  {
+    const root = fixture({ workspaceVersion: "0.3.6", examplePin: "0.3.5" });
+    const repins = planExampleRepins(root, () => ({ status: "error", detail: "ECONNRESET" }));
+    if (repins.length === 0) pass("14. a registry error produces no repin (never treated as published)");
+    else fail("14. a registry error produces no repin (never treated as published)", JSON.stringify(repins));
+  }
+
+  // 15. Replays the real incidents (#395: adapter 0.3.4, #425: adapter 0.3.6)
+  // — the exact state right after each release, before the human PR.
+  for (const { was, published: newVersion } of [
+    { was: "0.3.3", published: "0.3.4" },
+    { was: "0.3.5", published: "0.3.6" },
+  ]) {
+    const root = fixture({ workspaceVersion: newVersion, examplePin: was });
+    const repins = planExampleRepins(root, published("@pome-sh/adapter-claude-sdk", newVersion));
+    const rewritten = JSON.parse(repins[0]?.writes[0]?.contents ?? "{}");
+    if (repins.length === 1 && rewritten.dependencies?.["@pome-sh/adapter-claude-sdk"] === newVersion) {
+      pass(`15. replays the ${was} -> ${newVersion} incident exactly as the human PR did`);
+    } else {
+      fail(`15. replays the ${was} -> ${newVersion} incident exactly as the human PR did`, JSON.stringify(repins));
+    }
+  }
+
+  // 16b. TWO drifted pins in ONE example. `applyAllocations` writes a plan's
+  // entries in order and last write wins per path, so the LAST entry for a
+  // manifest must already carry every earlier substitution — otherwise the
+  // first repin is silently dropped while the commit message still claims it,
+  // and the read-side gate keeps reddening on a drift the commit says it fixed.
+  {
+    const root = mkdtempSync(join(tmpdir(), "example-pins-two-"));
+    writeFileSync(join(root, "package.json"), JSON.stringify({ name: "root", workspaces: ["packages/*"] }));
+    for (const [dir, name, version] of [
+      ["adapter-claude-sdk", "@pome-sh/adapter-claude-sdk", "0.3.6"],
+      ["checks", "@pome-sh/checks", "1.2.0"],
+    ]) {
+      mkdirSync(join(root, "packages", dir), { recursive: true });
+      writeFileSync(join(root, "packages", dir, "package.json"), JSON.stringify({ name, version }));
+    }
+    mkdirSync(join(root, "examples", "support-triage"), { recursive: true });
+    writeFileSync(
+      join(root, "examples", "support-triage", "package.json"),
+      JSON.stringify({
+        name: "support-triage-example",
+        dependencies: { "@pome-sh/adapter-claude-sdk": "0.3.5", "@pome-sh/checks": "1.1.0" },
+      }),
+    );
+    const repins = planExampleRepins(root, () => ({ status: "published" }));
+    // Whichever entry lands last for that path is what ends up on disk.
+    const lastForPath = repins.filter((r) => r.writes[0].path === "examples/support-triage/package.json").at(-1);
+    const onDisk = JSON.parse(lastForPath?.writes[0].contents ?? "{}");
+    if (
+      repins.length === 2 &&
+      onDisk.dependencies["@pome-sh/adapter-claude-sdk"] === "0.3.6" &&
+      onDisk.dependencies["@pome-sh/checks"] === "1.2.0"
+    ) {
+      pass("16b. two drifted pins in one example both survive the last-write-wins apply");
+    } else {
+      fail("16b. two drifted pins in one example both survive the last-write-wins apply", JSON.stringify({ repins, onDisk }));
+    }
+  }
+
+  // 16c. An ambiguous manifest — the same `"<dep>": "<pin>"` bytes repeated in
+  // an `overrides` block, which npm accepts and this gate does not read as a
+  // second install field. `planExampleRepins` runs inside `planAllocations` on
+  // EVERY push to main, so throwing here would stop every package's release
+  // over one example manifest. It must skip that pin and keep going, leaving
+  // the read-side gate to red on it.
+  {
+    const root = mkdtempSync(join(tmpdir(), "example-pins-ambig-"));
+    writeFileSync(join(root, "package.json"), JSON.stringify({ name: "root", workspaces: ["packages/*"] }));
+    mkdirSync(join(root, "packages", "adapter-claude-sdk"), { recursive: true });
+    writeFileSync(
+      join(root, "packages", "adapter-claude-sdk", "package.json"),
+      JSON.stringify({ name: "@pome-sh/adapter-claude-sdk", version: "0.3.6" }),
+    );
+    mkdirSync(join(root, "examples", "support-triage"), { recursive: true });
+    writeFileSync(
+      join(root, "examples", "support-triage", "package.json"),
+      JSON.stringify({
+        name: "support-triage-example",
+        dependencies: { "@pome-sh/adapter-claude-sdk": "0.3.5" },
+        overrides: { "@pome-sh/adapter-claude-sdk": "0.3.5" },
+      }),
+    );
+    let threw = null;
+    let repins = null;
+    try {
+      repins = planExampleRepins(root, () => ({ status: "published" }));
+    } catch (e) {
+      threw = e;
+    }
+    // The gate itself must still call it drift — skipping the WRITE must never
+    // skip the READ.
+    const { violations } = checkExamplePinsPublished(discoverExampleSiblingDeps(root).exact, () => ({
+      status: "published",
+    }));
+    if (threw === null && repins?.length === 0 && violations.length === 1) {
+      pass("16c. an ambiguous pin is skipped, not thrown on, and still reds the read-side gate");
+    } else {
+      fail("16c. an ambiguous pin is skipped, not thrown on, and still reds the read-side gate", String(threw ?? JSON.stringify({ repins, violations })));
+    }
+  }
+
+  // 16d. …and one ambiguous pin must not cost a DIFFERENT example its repin.
+  {
+    const root = fixture({
+      workspaceVersion: "0.3.6",
+      examplePin: "0.3.5",
+      extraExamples: {
+        "ambiguous-example": {
+          name: "ambiguous-example",
+          dependencies: { "@pome-sh/adapter-claude-sdk": "0.3.4" },
+          overrides: { "@pome-sh/adapter-claude-sdk": "0.3.4" },
+        },
+      },
+    });
+    const repins = planExampleRepins(root, () => ({ status: "published" }));
+    if (repins.length === 1 && repins[0].example === "support-triage" && repins[0].to === "0.3.6") {
+      pass("16d. an ambiguous example does not block a clean one in the same run");
+    } else {
+      fail("16d. an ambiguous example does not block a clean one in the same run", JSON.stringify(repins));
+    }
+  }
+
+  // 16. No `package.json` at the repo root (a throwaway fixture, like
+  // allocate-release-versions.test.mjs's) — must return empty, not throw.
+  {
+    const root = mkdtempSync(join(tmpdir(), "no-root-manifest-"));
+    let threw = null;
+    let repins = null;
+    try {
+      repins = planExampleRepins(root, published("x", "1.0.0"));
+    } catch (e) {
+      threw = e;
+    }
+    if (threw === null && Array.isArray(repins) && repins.length === 0) {
+      pass("16. a root with no package.json/examples returns no repins rather than throwing");
+    } else {
+      fail("16. a root with no package.json/examples returns no repins rather than throwing", String(threw));
+    }
   }
 }
 
