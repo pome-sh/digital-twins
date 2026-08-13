@@ -20,6 +20,7 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   SETTLE_MS,
@@ -135,6 +136,33 @@ function check(name, got, want) {
   }
 }
 
+// ── F-1519 the other direction: the marker is printed at the outbound call
+// SITE, so a crash between that line and the syscall prints it first. Both of
+// these were MEASURED on this branch (the adapter seam with an unresolvable
+// `claude` binary; `gmail-retry-notify` with a malformed twin URL) and both
+// FAILED under the old text classifier, so the marker alone must not convert
+// them into passes — that is F-1478's defect through the back door.
+{
+  for (const [label, output] of [
+    [
+      "the `claude` binary never resolved",
+      `${OUTBOUND_MARKER}\nError: Claude Code native binary not found at /nonexistent/claude. Please ensure Claude Code is installed`,
+    ],
+    [
+      "the twin URL never parsed",
+      `${OUTBOUND_MARKER}\nTypeError: Failed to parse URL\n  code: 'ERR_INVALID_URL',\n  input: 'ht!tp://[bad/gmail/v1/users/me/profile'`,
+    ],
+    [
+      "a module never resolved",
+      `${OUTBOUND_MARKER}\nError [ERR_MODULE_NOT_FOUND]: Cannot find package 'ai'`,
+    ],
+  ]) {
+    const v = classifyLaunch({ output, stillRunningAtSettle: false, exitCode: 1 });
+    check(`marker + a pre-outbound crash is a fail, not reached (${label})`, v.status, "fail");
+    assert.match(v.reason, /reached its outbound call SITE/);
+  }
+}
+
 // ── F-1519: both of the SDK's racing error shapes give the SAME verdict once
 // the marker is present. This is the exact nondeterminism the ticket names:
 // `@anthropic-ai/claude-agent-sdk@0.3.221`'s query() picks between
@@ -191,6 +219,16 @@ function check(name, got, want) {
       exitCode: 1,
     });
     check(`real CI output for ${name} (with marker) classifies as reached`, v.status, "reached");
+    // The status alone is decided by the marker, so asserting only that would
+    // pass with BENIGN_FAILURE_SIGNATURES emptied — a vacuous version of the
+    // claim in this block's header. The REASON is what the signature list
+    // still owns, so assert a class was actually recognized: a pattern
+    // tightened past what CI prints reds here, cheaply, naming the example.
+    assert.match(
+      v.reason,
+      /an outbound call failed \(.+\)/,
+      `${name}: no BENIGN_FAILURE_SIGNATURES entry recognized this real CI output`,
+    );
   }
 }
 
@@ -553,7 +591,7 @@ function check(name, got, want) {
       join(dir, "via-adapter", "package.json"),
       JSON.stringify({
         scripts: { start: "tsx src/index.ts" },
-        dependencies: { "@pome-sh/adapter-claude-sdk": "*" },
+        dependencies: { "@pome-sh/adapter-claude-sdk": "file:../../packages/adapter-claude-sdk" },
       }),
     );
     writeFileSync(join(dir, "via-adapter", "src", "index.ts"), "import { query } from '@pome-sh/adapter-claude-sdk';\n");
@@ -579,6 +617,33 @@ function check(name, got, want) {
     );
     writeFileSync(join(dir, "forgot-it", "src", "index.ts"), "console.log('does real work, prints nothing marker-shaped');\n");
 
+    // NOT covered: it DEPENDS on the adapter, but from the REGISTRY — a
+    // published tarball cut before the marker existed prints nothing, which is
+    // `examples/support-triage`'s real shape (measured: zero occurrences of the
+    // marker in its installed dist). A dependency-name-only check called this
+    // covered while every run FAILED it.
+    mkdirSync(join(dir, "registry-pinned", "src"), { recursive: true });
+    writeFileSync(
+      join(dir, "registry-pinned", "package.json"),
+      JSON.stringify({
+        scripts: { start: "tsx src/index.ts" },
+        dependencies: { "@pome-sh/adapter-claude-sdk": "0.3.5" },
+      }),
+    );
+    writeFileSync(join(dir, "registry-pinned", "src", "index.ts"), "import { query } from '@pome-sh/adapter-claude-sdk';\n");
+
+    // NOT covered: the literal appears, but only as a MENTION in a comment —
+    // coverage requires an emitting `console.error(...)` call.
+    mkdirSync(join(dir, "mentions-it", "src"), { recursive: true });
+    writeFileSync(
+      join(dir, "mentions-it", "package.json"),
+      JSON.stringify({ scripts: { start: "tsx src/index.ts" } }),
+    );
+    writeFileSync(
+      join(dir, "mentions-it", "src", "index.ts"),
+      `// the smoke gate looks for ${OUTBOUND_MARKER} here.\nconsole.log("no emission");\n`,
+    );
+
     const clean = assertEveryExampleEmitsMarker(dir, ["via-adapter", "via-literal"]);
     check("an example covered by the shared seam or its own literal passes", clean.ok, true);
     check("a clean pass carries no message", clean.message, null);
@@ -590,6 +655,14 @@ function check(name, got, want) {
     // Only the example actually missing it is named.
     assert.ok(!withGap.message.includes("via-adapter"), "a covered example must not be named as missing");
     assert.ok(!withGap.message.includes("via-literal"), "a covered example must not be named as missing");
+
+    const registryPin = assertEveryExampleEmitsMarker(dir, ["registry-pinned"]);
+    check("a REGISTRY-pinned adapter dependency does not buy coverage", registryPin.ok, false);
+    assert.match(registryPin.message, /registry-pinned/);
+
+    const mention = assertEveryExampleEmitsMarker(dir, ["mentions-it"]);
+    check("the marker mentioned in a comment does not buy coverage", mention.ok, false);
+    assert.match(mention.message, /mentions-it/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -605,7 +678,10 @@ function check(name, got, want) {
 }
 
 function examplesDirForRepo() {
-  return new URL("../examples", import.meta.url).pathname;
+  // fileURLToPath, not `.pathname`: the latter stays percent-encoded, so a
+  // checkout under a path with a space reds this on ENOENT for a reason that
+  // has nothing to do with the property being asserted.
+  return fileURLToPath(new URL("../examples", import.meta.url));
 }
 
 if (failures > 0) {

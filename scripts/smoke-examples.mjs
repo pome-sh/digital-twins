@@ -103,6 +103,17 @@
 // ninth example that forgets it reds here by name instead of silently
 // reporting FAIL forever with nothing pointing at why.
 //
+// What the marker does NOT prove: that a socket was written. It is printed at
+// the outbound call SITE, so anything that throws between that line and the
+// syscall prints it first. Two such classes were measured (the SDK failing to
+// resolve the `claude` binary; a malformed twin URL) and both used to FAIL, so
+// `PRE_OUTBOUND_VETOES` below reds them explicitly on their own error CODE —
+// deterministic where the removed error-TEXT matching was not, since none of
+// those codes can be produced by a failure after a call went out. Crashes
+// AFTER a successful outbound call are out of scope by design and always were:
+// this gate's claim is "reached an outbound call", never "the work was
+// correct" (`probe:examples` and the scenario suites own that).
+//
 // Fail-closed: REACHED-OUTBOUND now requires the marker to be present in the
 // captured output. `BENIGN_FAILURE_SIGNATURES` still fires — but only to
 // supply a human-readable REASON alongside a marker-backed "reached" verdict,
@@ -184,6 +195,39 @@ const BENIGN_FAILURE_SIGNATURES = [
     /invalid[ _-]?api[ _-]?key|invalid x-api-key|authentication_error|permission_error|status (?:401|403)\b|HTTP 40[13]\b|\b40[13] (?:Unauthorized|Forbidden)\b/i,
   ],
 ];
+
+// F-1519 — the marker proves the process REACHED its outbound call site; it
+// cannot prove a socket was ever written. Two crash classes were MEASURED to
+// print the marker and then die before any network syscall: the Agent SDK
+// failing to resolve the `claude` binary (`native binary not found at …` —
+// pure config, no request) and a malformed twin URL (`ERR_INVALID_URL`, thrown
+// by fetch while parsing, after the marker line). Both FAILED under the old
+// text classifier and would silently become passes on the marker alone —
+// F-1478's "a crash before real work reads as success" through the back door,
+// with the `claude` binary going unresolvable in CI converting all four
+// adapter-backed examples at once.
+//
+// So: a veto. Each pattern is an error CODE that cannot be produced by a
+// failure AFTER an outbound call, which is what keeps this deterministic where
+// the error-TEXT matching this ticket removed was not — none of these appear in
+// the SDK's racing error shapes. The imprecision is fail-closed in the safe
+// direction: a pre-outbound class this list misses keeps today's verdict, and
+// no real outbound failure can be redded by it.
+const PRE_OUTBOUND_VETOES = [
+  ["the URL never parsed, so no request was made", /ERR_INVALID_URL/],
+  [
+    "the `claude` CLI could not be resolved, so no model call was made",
+    /native binary not found|ensure Claude Code is installed/,
+  ],
+  ["a module failed to resolve, so nothing outbound ran", /ERR_MODULE_NOT_FOUND/],
+];
+
+function matchPreOutboundVeto(output) {
+  for (const [reason, re] of PRE_OUTBOUND_VETOES) {
+    if (re.test(output)) return reason;
+  }
+  return null;
+}
 
 function matchBenignFailure(output) {
   for (const [reason, re] of BENIGN_FAILURE_SIGNATURES) {
@@ -431,8 +475,7 @@ export function assertEveryExampleEmitsMarker(dir, examples) {
     const pkgPath = join(dir, name, "package.json");
     const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
     const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-    const coveredByAdapter = Boolean(deps["@pome-sh/adapter-claude-sdk"]);
-    if (coveredByAdapter || sourceContainsMarker(join(dir, name, "src"))) continue;
+    if (adapterResolvesToWorkspace(deps) || sourceContainsMarker(join(dir, name, "src"))) continue;
     missing.push(name);
   }
   if (missing.length === 0) return { ok: true, message: null };
@@ -446,11 +489,34 @@ export function assertEveryExampleEmitsMarker(dir, examples) {
   };
 }
 
+// The DEPENDENCY only covers an example if it resolves to the WORKSPACE copy of
+// the adapter. `examples/support-triage` pins the PUBLISHED tarball on purpose
+// (it is `npx degit`-fetchable as a standalone subtree — see
+// scripts/typecheck-examples.mjs's header), and a published tarball cut before
+// the marker existed prints nothing: measured on this branch, its installed
+// `dist/index.js` contains ZERO occurrences of OUTBOUND_MARKER while the three
+// `file:`-linked siblings contain one each, so support-triage FAILED every run
+// while a dependency-NAME check called it covered — the guard waving through
+// the one instance it was written to catch. A registry-pinned example must
+// therefore print the literal itself, and does.
+function adapterResolvesToWorkspace(deps) {
+  const pin = deps["@pome-sh/adapter-claude-sdk"];
+  return typeof pin === "string" && /^(?:file:|link:|\.\.?\/)/.test(pin);
+}
+
+// Emission, not mention: the literal inside a `console.error(...)` call, so a
+// marker named in a COMMENT (or in prose about the marker) does not buy
+// coverage. A static check still cannot prove the line is reachable or
+// correctly placed — `classifyLaunch()` is fail-closed for that, and an
+// example whose marker never actually prints FAILS loudly with the marker
+// named in its reason.
+const MARKER_EMISSION = new RegExp(`console\\.error\\(\\s*["'\`]${OUTBOUND_MARKER}["'\`]`);
+
 function sourceContainsMarker(srcDir) {
   if (!existsSync(srcDir)) return false;
   for (const entry of readdirSync(srcDir, { withFileTypes: true })) {
     if (!entry.isFile() || !entry.name.endsWith(".ts")) continue;
-    if (readFileSync(join(srcDir, entry.name), "utf8").includes(OUTBOUND_MARKER)) return true;
+    if (MARKER_EMISSION.test(readFileSync(join(srcDir, entry.name), "utf8"))) return true;
   }
   return false;
 }
@@ -485,7 +551,11 @@ export function classifyLaunch({ output, stillRunningAtSettle, exitCode, signal,
     return { status: "ok", reason: `still running after ${SETTLE_MS}ms` };
   }
   const how = signal ? `killed by ${signal}` : `exited code ${exitCode}`;
-  const reachedOutbound = output.includes(OUTBOUND_MARKER);
+  // The marker plus proof-of-absence: a crash whose own error code says no
+  // request could have left the process is not "reached", however early the
+  // marker printed.
+  const vetoed = matchPreOutboundVeto(output);
+  const reachedOutbound = output.includes(OUTBOUND_MARKER) && !vetoed;
   // Descriptive only from here down — matchBenignFailure() never gates a
   // verdict, it only names the failure class for a reader once the marker has
   // already proven the process got there.
@@ -498,6 +568,16 @@ export function classifyLaunch({ output, stillRunningAtSettle, exitCode, signal,
         reason: benignReason
           ? `${how} after emitting ${OUTBOUND_MARKER} — an outbound call failed (${benignReason})`
           : `${how} after emitting ${OUTBOUND_MARKER} — an outbound call failed`,
+      };
+    }
+    if (vetoed) {
+      return {
+        status: "fail",
+        reason:
+          `${how} after emitting ${OUTBOUND_MARKER}, but ${vetoed} — the marker proves the process ` +
+          `reached its outbound call SITE, not that a call left it, and this crash's own error code ` +
+          `says none did. Fix the wiring/config it names; a pre-outbound crash must not read as ` +
+          `REACHED-OUTBOUND (F-1519).`,
       };
     }
     return {
@@ -591,6 +671,17 @@ function smokeOne(name) {
       settled = true;
       clearTimeout(timer);
       if (!child.killed) child.kill("SIGKILL");
+      // SIGKILL reaches the direct `tsx` child only; the `claude` CLI
+      // GRANDCHILD the Agent SDK spawned survives holding the write end of
+      // these pipes, so the parent's read handles stay active and node cannot
+      // exit. Measured on this branch: a complete summary printed, then 194s
+      // of nothing before the process ended — in CI (no `timeout-minutes` on
+      // `typecheck-test`, so GitHub's 360-minute default) a hang after a
+      // finished summary is a new flake replacing the one this ticket fixed.
+      // The verdict is already computed from `output`, so releasing the pipes
+      // here loses nothing.
+      child.stdout?.destroy();
+      child.stderr?.destroy();
       resolvePromise({ name, output, ...verdict });
     };
 
