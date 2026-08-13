@@ -26,6 +26,7 @@ import {
   classifyLaunch,
   discoverExamples,
   assertAliveFloor,
+  assertReportedCount,
   missingLiveEnv,
   resolveLiveFlag,
   launchEnv,
@@ -416,6 +417,56 @@ function check(name, got, want) {
     }).reason.includes("credentialed leg"),
     "a non-zero exit must not be excused as a fast correct completion",
   );
+}
+
+// ── F-1518: the counted-numerator property ──────────────────────────────────
+// Measured on PR #417: the summary read "7 of 8" and named seven, and nothing
+// said the eighth (`pr-summary-agent`) had gone MISSING rather than FAILED —
+// classifyLaunch()'s three named outcomes (ok/reached/fail) are worthless if
+// main()'s loop can silently drop an example before it ever reaches them.
+{
+  const all8 = [
+    "gmail-retry-notify",
+    "merge-agent",
+    "minimal-viktor",
+    "minimal-viktor-langgraph",
+    "pr-summary-agent",
+    "pr-summary-review",
+    "support-triage",
+    "triage-agent",
+  ];
+  const clean = assertReportedCount(all8, all8);
+  check("every discovered example reporting is a pass", clean.ok, true);
+  check("a clean pass carries no message", clean.message, null);
+
+  // The exact PR #417 shape: one discovered example silently produced no
+  // verdict at all, and the summary must red naming it — not "failed",
+  // "missing".
+  const oneVanished = assertReportedCount(all8, all8.filter((n) => n !== "pr-summary-agent"));
+  check("one missing example fails the count assertion", oneVanished.ok, false);
+  assert.match(oneVanished.message, /pr-summary-agent/);
+  assert.match(oneVanished.message, /1 of 8/);
+  // Names it as absent from every existing bucket, never as belonging to one.
+  assert.match(oneVanished.message, /neither OK, REACHED-OUTBOUND, nor FAILED/);
+
+  // Compares NAMES, not just lengths: dropping one example and (by some other
+  // bug) reporting an unrelated name twice must still be caught, because the
+  // two lengths would otherwise net out even.
+  const droppedAndDuplicated = assertReportedCount(all8, [
+    ...all8.filter((n) => n !== "triage-agent"),
+    "merge-agent", // duplicate report, same length as the 8 discovered
+  ]);
+  check(
+    "a same-length report that drops one name is still caught",
+    droppedAndDuplicated.ok,
+    false,
+  );
+  assert.match(droppedAndDuplicated.message, /triage-agent/);
+
+  // Zero discovered, zero reported is vacuously fine — discoverExamples()'s
+  // own zero-examples case is a separate hard failure (break-on-purpose 4
+  // above), not this assertion's job to catch.
+  check("nothing discovered, nothing reported is a pass", assertReportedCount([], []).ok, true);
 }
 
 if (failures > 0) {

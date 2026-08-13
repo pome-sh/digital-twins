@@ -307,6 +307,36 @@ export function assertAliveFloor({ live, okCount, total }) {
   };
 }
 
+// F-1518 — the counted-numerator property. `classifyLaunch()` already gives
+// every launch one of three named, counted outcomes (ok / reached / fail); the
+// gap this closes is a DIFFERENT failure mode, one level up: an example that
+// never reaches `classifyLaunch()` at all and so never lands in any of the
+// three buckets — the printed "N of M" total quietly shrinks to N-1 with
+// nothing saying the Mth example went MISSING rather than FAILED. Measured on
+// PR #417: the summary read "7 of 8" and named seven, and nothing said the
+// eighth (`pr-summary-agent`) had vanished rather than failed. Pure and
+// exported so the regression suite can assert it without spawning all eight
+// examples: feed it a discovered list and the names main()'s loop actually
+// produced a verdict for.
+//
+// Deliberately compares NAMES, not just lengths — a bug that drops one name
+// and double-reports another would net to the same length and hide behind a
+// count-only check, defeating the "naming the missing example" requirement.
+export function assertReportedCount(discoveredNames, reportedNames) {
+  const reported = new Set(reportedNames);
+  const missing = discoveredNames.filter((name) => !reported.has(name));
+  if (missing.length === 0) return { ok: true, message: null };
+  return {
+    ok: false,
+    message:
+      `${missing.length} of ${discoveredNames.length} discovered example(s) never reported a verdict at ` +
+      `all — neither OK, REACHED-OUTBOUND, nor FAILED: ${missing.join(", ")}. The count of examples ` +
+      `reporting must equal the count discovered; a launcher bug that drops one silently (an early ` +
+      `return/continue/break in main()'s loop, or smokeOne() rejecting instead of resolving) must red ` +
+      `naming exactly which example vanished, never shrink the "N of M" total without saying so.`,
+  };
+}
+
 export function discoverExamples(dir = examplesDir) {
   const found = [];
   for (const name of readdirSync(dir).sort()) {
@@ -428,11 +458,32 @@ function smokeOne(name) {
       resolvePromise({ name, output, ...verdict });
     };
 
+    // Classify on 'close', not 'exit'. Node only guarantees the piped stdio
+    // streams are drained on 'close'; 'exit' can fire with the child's final
+    // write still unread, and the whole verdict is a regex over `output` — so
+    // an example whose only BENIGN_FAILURE_SIGNATURES match sits in its last
+    // stderr line (`agent errored: … ECONNREFUSED`, written immediately before
+    // `process.exit(1)`) can be read as "no outbound-call failure in its
+    // output" and FAIL on one run and REACHED-OUTBOUND on the next, from the
+    // same commit. 'exit' still records HOW it exited, because 'close' carries
+    // the same code/signal but a lingering grandchild holding the pipe open can
+    // delay it past SETTLE_MS — and a child that has already exited must be
+    // classified on its exit code, never as "still running at the settle",
+    // which would turn a fast exit into a false OK.
+    let exited = null;
     const timer = setTimeout(() => {
-      finish(classifyLaunch({ output, stillRunningAtSettle: true }));
+      finish(
+        exited
+          ? classifyLaunch({ output, stillRunningAtSettle: false, ...exited })
+          : classifyLaunch({ output, stillRunningAtSettle: true }),
+      );
     }, SETTLE_MS);
 
     child.on("exit", (code, signal) => {
+      exited = { exitCode: code, signal };
+    });
+
+    child.on("close", (code, signal) => {
       finish(classifyLaunch({ output, stillRunningAtSettle: false, exitCode: code, signal }));
     });
 
@@ -504,7 +555,19 @@ async function main() {
   const oks = [];
   for (const name of examples) {
     process.stdout.write(`\n=== examples/${name} === `);
-    const result = await smokeOne(name);
+    let result;
+    try {
+      result = await smokeOne(name);
+    } catch (err) {
+      // smokeOne() is designed to always resolve — the SETTLE_MS timer, the
+      // child 'close' handler, and the child 'error' handler each
+      // independently produce a verdict — but this loop must not itself
+      // become the next silent-drop bug. This catch deliberately does NOT
+      // invent a verdict for work that never ran: the name lands in no bucket,
+      // so assertReportedCount() below names it as missing.
+      console.log(`did not report a verdict (runner threw: ${err instanceof Error ? err.message : String(err)})`);
+      continue;
+    }
     const tail = result.output?.trim().split("\n").slice(-12).join("\n") ?? "";
     if (result.status === "ok") {
       console.log(`OK (${result.reason})`);
@@ -522,6 +585,18 @@ async function main() {
     }
   }
 
+  // F-1518 — the reported set is DERIVED from the three verdict buckets, never
+  // tracked alongside them. A separate `reportedNames.push(name)` next to the
+  // `await` would mark a name reported before the ok/reached/fail dispatch had
+  // put it anywhere, so the next silent-drop bug — a `continue` added inside
+  // the dispatch, or a fourth `status` no branch matches — would still net
+  // `ok: true` and still shrink the "N of M" total unannounced. Reading the
+  // buckets makes the assertion check the thing the summary actually counts.
+  const reportedCount = assertReportedCount(
+    examples,
+    [...oks, ...reached, ...failures].map((r) => r.name),
+  );
+
   if (reached.length > 0) {
     console.log(
       `\n${reached.length} of ${examples.length} example(s) got as far as an outbound twin/model ` +
@@ -534,13 +609,18 @@ async function main() {
 
   const floor = assertAliveFloor({ live: LIVE, okCount: oks.length, total: examples.length });
 
-  if (failures.length > 0 || !floor.ok) {
+  if (failures.length > 0 || !reportedCount.ok || !floor.ok) {
     if (failures.length > 0) {
       console.error(
         `\nExamples that crash on launch or return with no evidence of real work: ` +
           failures.map((f) => `${f.name} (${f.reason})`).join("; "),
       );
     }
+    // F-1518 — a missing verdict is reported and reds independently of
+    // `failures`: it is a defect in THIS SCRIPT's own bookkeeping, not in the
+    // example, and folding it into "Examples that crash on launch" above
+    // would misname the fault.
+    if (!reportedCount.ok) console.error(`\n${reportedCount.message}`);
     if (!floor.ok) console.error(`\n${floor.message}`);
     process.exit(1);
   }

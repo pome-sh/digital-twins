@@ -274,22 +274,43 @@ async function main() {
   const run = query({ prompt: wiring.task, options: examineeOptions(mcpServers) });
 
   let exitCode = 0;
-  for await (const msg of run) {
-    if (msg.type === "assistant") {
-      logAssistantMessage(msg);
-    } else if (msg.type === "result") {
-      if (msg.subtype === "success") {
-        console.log("\n— agent finished —");
-        if (msg.result) console.log(msg.result);
-        console.log(
-          `(${msg.usage.input_tokens} in / ${msg.usage.output_tokens} out, $${msg.total_cost_usd.toFixed(4)})`
-        );
-      } else {
-        console.error(`\nagent stopped: ${msg.subtype}`);
-        for (const err of msg.errors) console.error(err);
-        exitCode = 1;
+  try {
+    for await (const msg of run) {
+      if (msg.type === "assistant") {
+        logAssistantMessage(msg);
+      } else if (msg.type === "result") {
+        if (msg.subtype === "success") {
+          console.log("\n— agent finished —");
+          if (msg.result) console.log(msg.result);
+          console.log(
+            `(${msg.usage.input_tokens} in / ${msg.usage.output_tokens} out, $${msg.total_cost_usd.toFixed(4)})`
+          );
+        } else {
+          console.error(`\nagent stopped: ${msg.subtype}`);
+          for (const err of msg.errors) console.error(err);
+          exitCode = 1;
+        }
       }
     }
+  } catch (err) {
+    // F-1518: the Claude Agent SDK's message iterator can REJECT — not just
+    // yield an error `result` message — when the underlying `claude` CLI exits
+    // non-zero (an invalid API key is one way; the SDK calls
+    // `inputStream.error()` on the stream being iterated). Uncaught, that threw
+    // out of this `for await` and killed the process with a raw Node stack
+    // instead of this example's own reporting, so route it through the same
+    // exitCode=1 path the graceful branch uses.
+    //
+    // Log the error OBJECT, never just `err.message`: Node prints name + stack
+    // + `[cause]`, and scripts/smoke-examples.mjs classifies this output by
+    // matching signatures that can live OUTSIDE the message — `AbortError` and
+    // `AI_LoadAPIKeyError` are error NAMES, and undici reports
+    // `ECONNREFUSED`/`ENOTFOUND` only on `err.cause`. Logging the message alone
+    // would show the classifier strictly less than the uncaught rejection did,
+    // turning a benign outbound abort into "no evidence it did any real work" —
+    // trading one nondeterministic red for another.
+    console.error("\nagent errored:", err);
+    exitCode = 1;
   }
 
   // Exit explicitly once the run result has been consumed: done means done —
