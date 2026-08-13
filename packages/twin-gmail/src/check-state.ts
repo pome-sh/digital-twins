@@ -193,6 +193,20 @@ export function resolveMessage(
  * The bare `wanted` is always included so the join still works when the `labels`
  * collection was capped away — a `messageLabels` row carries the bare id
  * regardless.
+ *
+ * ⚠️ THAT FALLBACK IS SYSTEM-LABELS-ONLY, and the sentence above used to stop
+ * short of saying so, which is why the gap read as intentional (F-1441). It
+ * holds when `id === name` — `INBOX`, `UNREAD`, `STARRED`. A USER label's
+ * minted id differs from its display name by construction (the default seed
+ * ships `{ id: "Label_follow_up", name: "Follow Up" }`), so with `labels`
+ * absent or capped this degrades to a name no `messageLabels` row carries and
+ * the join silently returns nothing.
+ *
+ * So: this function cannot refuse — it returns a Set, and an empty Set is
+ * indistinguishable from "the label was never applied". **Every caller must
+ * guard `state.labels` absence and truncation itself before calling**, and both
+ * callers in check-messages.ts now do. Adding a third without that guard
+ * reintroduces the F-1159 class.
  */
 export function labelIdsFor(state: GmailCheckState, wanted: string): Set<string> {
   const ids = new Set<string>([lower(wanted)]);
@@ -260,6 +274,14 @@ export function resolveLabelByName(
  * alone would answer "no draft is addressed to anyone", always. A draft whose
  * message did not survive the export contributes nothing rather than throwing;
  * the caller decides whether that emptiness is answerable.
+ *
+ * ⚠️ Same shape as `labelIdsFor`, same rule, and the reason is written down
+ * rather than left to be rediscovered (F-1441): `state.messages ?? []` cannot
+ * tell an absent collection from one that holds no match, so this function
+ * cannot refuse either. It is safe TODAY only because its sole caller
+ * null-checks `final.messages` first (`check-drafts.ts:63`) — safe-by-caller,
+ * which is precisely how this class survives review. A second caller must
+ * guard, or this must be changed to return a `Resolved`.
  */
 export function draftRecipients(
   state: GmailCheckState,

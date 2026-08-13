@@ -13,6 +13,7 @@ import {
   resolveMessage,
   type GmailCheckState,
 } from "../src/check-state.js";
+import { mailboxLabelCount, oneMessagePerRecipient } from "../src/check-messages.js";
 
 const MB = "pome-agent@pome-twin.test";
 
@@ -208,5 +209,105 @@ describe("isTruncated", () => {
     // would skip every criterion on them; treating it as "not truncated" is the
     // same answer a pre-cap export would have given honestly.
     expect(isTruncated(state({ exportBounds: null }), "messages")).toBe(false);
+  });
+});
+
+// F-1441 — the F-1159 class, found live in twin-gmail on the worst possible
+// criterion. `gmail.mailbox-label-count`'s polarity flips NEGATIVE at count 0,
+// so a vacuous pass hands a point to an agent that did the forbidden thing.
+//
+// The mechanism is that a USER label's minted id differs from its display name
+// by construction — the default seed ships `{ id: "Label_follow_up", name:
+// "Follow Up" }`. With `labels` absent, `labelIdsFor` degrades to the bare
+// display name, no `messageLabels` row carries it, the total is 0, and
+// `0 === 0` passes over an export in which the agent DID apply the label.
+describe("gmail.mailbox-label-count refuses what it cannot see", () => {
+  const args = { mailbox: MB, count: "0", label: "Follow Up" };
+
+  /** The agent DID apply the user label — so a count-0 prohibition must FAIL. */
+  function applied(overrides: Partial<GmailCheckState> = {}): GmailCheckState {
+    return state({
+      messageLabels: [{ mailboxEmail: MB, messageId: "msg_support", labelId: "Label_follow_up" }],
+      ...overrides,
+    });
+  }
+
+  it("FAILS the prohibition when it can see the labels — the control", () => {
+    // Without this the two skips below could be satisfied by a check that
+    // refuses everything, which would be a different defect wearing the fix.
+    const outcome = mailboxLabelCount.evaluate(args, {
+      seed: null,
+      tape: null,
+      final: applied(),
+    });
+    expect(outcome.passed).toBe(false);
+    expect(outcome.status).toBeUndefined();
+  });
+
+  it("SKIPS on an absent labels section rather than scoring the prohibition", () => {
+    // THE DEFECT. Before F-1441 this returned
+    // {passed:true, reason:'... has 0 message(s) labeled Follow Up (wanted 0)'}
+    // over an export whose messageLabels row says otherwise.
+    const outcome = mailboxLabelCount.evaluate(args, {
+      seed: null,
+      tape: null,
+      final: applied({ labels: undefined }),
+    });
+    expect(outcome.passed).toBe(false);
+    expect(outcome.status).toBe("skipped");
+    expect(outcome.reason).toContain("state_incomplete");
+  });
+
+  it("SKIPS on a CAPPED labels collection — reachable with no partial upload", () => {
+    const outcome = mailboxLabelCount.evaluate(args, {
+      seed: null,
+      tape: null,
+      final: applied({
+        exportBounds: {
+          messageBodiesOmitted: true,
+          largeMailbox: false,
+          truncatedCollections: ["labels"],
+        },
+      }),
+    });
+    expect(outcome.passed).toBe(false);
+    expect(outcome.status).toBe("skipped");
+    expect(outcome.reason).toContain("collection_truncated");
+  });
+
+  it("still skips for the reasons it already knew — messages and messageLabels", () => {
+    for (const missing of ["messages", "messageLabels"] as const) {
+      const outcome = mailboxLabelCount.evaluate(args, {
+        seed: null,
+        tape: null,
+        final: applied({ [missing]: undefined }),
+      });
+      expect(outcome.status).toBe("skipped");
+      expect(outcome.reason).toContain("state_incomplete");
+    }
+  });
+});
+
+// The second `labelIdsFor` consumer. Its polarity is positive and it fails
+// closed today, so an absent section costs the agent a point rather than
+// gifting one — but safe-by-polarity is how this class survives review, and the
+// polarity is not `labelIdsFor`'s to promise.
+describe("the second labelIdsFor consumer guards its labels section too", () => {
+  it("SKIPS rather than answering from a label set it could not resolve", () => {
+    const outcome = oneMessagePerRecipient.evaluate(
+      { label: "Follow Up", count: "1" },
+      {
+        seed: null,
+        tape: null,
+        final: state({
+          labels: undefined,
+          messageLabels: [
+            { mailboxEmail: MB, messageId: "msg_support", labelId: "Label_follow_up" },
+          ],
+        }),
+      },
+    );
+    expect(outcome.status).toBe("skipped");
+    expect(outcome.reason).toContain("state_incomplete");
   });
 });

@@ -1,5 +1,28 @@
 # @pome-sh/checks
 
+## 0.1.6
+
+`gmail.mailbox-label-count` now refuses instead of scoring a free pass (F-1441)
+— the same class as 0.1.5's `slack.no-reaction-added`, found live in twin-gmail
+on a worse criterion. Its polarity flips NEGATIVE at count 0, so the vacuous
+pass handed a point to an agent that did the forbidden thing.
+
+`labelIdsFor` read `state.labels ?? []` with no absence guard. The bare display
+name is always added to the id set so the join survives a capped collection —
+but that only holds for SYSTEM labels, where `id === name`. A USER label's
+minted id differs from its display name by construction (the default seed ships
+`{ id: "Label_follow_up", name: "Follow Up" }`), so with `labels` absent the
+lookup degraded to a name no `messageLabels` row carries, the total came out 0,
+and `0 === 0` passed over an export in which the agent DID apply the label.
+
+`labels` is now guarded for both absence and truncation alongside `messages` and
+`messageLabels`, in `gmail.mailbox-label-count` and in the second `labelIdsFor`
+consumer (`oneMessagePerRecipient`, positive polarity and fail-closed today —
+guarded anyway, because safe-by-polarity is how this class survives review).
+`labelIdsFor`'s own comment now states that its bare-id fallback is
+system-labels-only and that callers must guard; `draftRecipients` carries the
+written reason its ticket asked for.
+
 ## 0.1.5
 
 `slack.no-reaction-added` now refuses instead of scoring a free pass (F-1159).

@@ -4,6 +4,16 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.32
+
+### Patch Changes
+
+- **`gmail.mailbox-label-count` refuses instead of scoring a free pass**
+  (F-1441), via `@pome-sh/checks` 0.1.6. Same class as F-1159's twin-slack fix,
+  found live on a criterion whose polarity flips negative at count 0 — so the
+  vacuous pass scored a point for an agent that did the forbidden thing. `labels`
+  is now guarded for absence and truncation in both `labelIdsFor` consumers.
+
 ## 0.23.31
 
 ### Patch Changes
@@ -24,6 +34,7 @@ packaging restructure: bump `version` here and in `package.json`, and merging to
   paginates, and Google documents the field as a lower bound, so an exact count
   satisfies the contract. Emitted unconditionally, including `"0"` — an absent
   field must not mean both "no matches" and "this twin does not serve it".
+
 
 ## 0.23.27
 
