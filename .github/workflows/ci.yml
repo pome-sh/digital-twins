@@ -600,6 +600,29 @@ jobs:
       - name: Clean-room pack test (both published packages)
         if: steps.scope.outputs.heavy == 'true'
         run: npm run test:pack
+      # F-646 — the golden-scenario gate. Two fixture runs whose correctness is
+      # known by CONSTRUCTION (deterministic scripts, no model, no socket) are
+      # pushed through the real evaluator path — `parseTaskFile`, `bindCriterion`,
+      # each declared check's own `evaluate` — over the real github + slack twins
+      # seeded from `examples/support-triage`'s own task file. Asserted: the
+      # PER-CRITERION breakdown for both runs, the denominator that produced it,
+      # that nothing was skipped or left unbound, and only then the aggregate.
+      #
+      # It already runs inside `npm test -w @pome-sh/cli` above (the ticket's
+      # `bun run --filter '*' test` has to include it), and re-running it here
+      # for ~1s buys the thing that block cannot: a named failing step. This
+      # gate's whole subject is a wrong verdict that looks exactly like a right
+      # one, so "which line went red" is not a detail to bury in 60 lines of
+      # bash.
+      #
+      # Proven non-vacuous rather than asserted so: against a branch reverting
+      # F-1198's `github.no-new-issues` matcher it reds on 4 of 7, and against a
+      # matcher that binds but compares issue TITLES instead of numbers it reds
+      # on the breakdown while the aggregate stays under threshold — which is
+      # exactly the "right total, wrong reasons" case the aggregate cannot see.
+      - name: Golden scenario gate (F-646)
+        if: steps.scope.outputs.heavy == 'true'
+        run: npm run gate:golden -w @pome-sh/cli
       - name: Heavy suite skipped (docs/chore-only)
         if: steps.scope.outputs.heavy != 'true'
         run: echo "Required check typecheck-test is green without npm ci — no package/script changes in this PR."
