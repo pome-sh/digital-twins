@@ -63,33 +63,27 @@ jobs:
           trap 'rm -rf "$tmp"' EXIT
           # This step puts the REQUIRED check (`typecheck-test`) behind a
           # third-party CDN fetch, so the backoff is load-bearing, not
-          # decoration. The GitHub release CDN was degraded throughout this
-          # PR's review and took out three separate pinned installs on its own
-          # runs: 31618873218 (gitleaks, 503), a twin-image syft install (503),
-          # and 31619759943 (this step, 503).
+          # decoration. The GitHub release CDN was degraded throughout F-1471's
+          # review and took out three separate pinned installs on its own runs:
+          # 31618873218 (gitleaks, 503), a twin-image syft install (503), and
+          # 31619759943 (this step, 503).
           #
-          # The retry is an explicit loop rather than curl's --retry flags,
-          # because those were measured doing two different things: locally
-          # `--retry-delay 0` backed off 1s/2s/4s as documented, while on the
-          # runner the same flags burned five attempts in 0.8s against a
-          # `curl: (56) Connection died` (run 31620014945) — a retry budget
-          # that looks handled and is not is worse than none. A loop with a
-          # literal `sleep` cannot be version-dependent.
+          # F-1489 moved the loop, the backoff and the sha256 check into
+          # scripts/ci/fetch-pinned-release.sh, which is now the ONE hardened
+          # fetch path for the whole workflow tree — this step and
+          # secret-scan.yml's gitleaks install were two hand-copied variants of
+          # it, and the syft install that started F-1489 had no copy at all.
+          # scripts/ci/assert-hardened-cdn-fetches.mjs (below, in the always-on
+          # block) reds on a third variant. The helper's header records why the
+          # retry is a literal loop rather than curl's --retry flags.
           #
           # Deliberately NOT cached, though that would make an outage a
-          # cold-cache-only problem: a cache hit skips the sha256 verification
-          # below, which is the whole reason for fetching a pinned binary
-          # instead of trusting a third-party Action.
-          url="https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}"
-          for attempt in 1 2 3 4 5; do
-            if curl -sSfL --connect-timeout 10 --max-time 120 "$url" -o "$tmp/$archive"; then break; fi
-            if [ "$attempt" -eq 5 ]; then
-              echo "actionlint download failed after 5 attempts: $url" >&2
-              exit 1
-            fi
-            sleep "$(( attempt * 5 ))"
-          done
-          printf '%s  %s\n' "$ACTIONLINT_SHA256" "$tmp/$archive" | sha256sum -c -
+          # cold-cache-only problem: a cache hit skips the sha256 verification,
+          # which is the whole reason for fetching a pinned binary instead of
+          # trusting a third-party Action.
+          bash scripts/ci/fetch-pinned-release.sh actionlint \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}" \
+            "$ACTIONLINT_SHA256" "$tmp/$archive"
           tar -xzf "$tmp/$archive" -C "$tmp" actionlint
           mkdir -p "$HOME/.local/bin"
           install "$tmp/actionlint" "$HOME/.local/bin/actionlint"
@@ -190,6 +184,23 @@ jobs:
       # alarm files under one key and looks itself up under another.
       - run: node scripts/ci/assert-schedule-alarm-coverage.mjs
       - run: node scripts/ci/assert-schedule-alarm-coverage.test.mjs
+      # F-1489 — every binary `.github/workflows/**` pulls off a release CDN
+      # goes through ONE hardened path, and a new one that does not reds here.
+      # Two shapes: a `run:` block fetching a non-loopback URL must call
+      # scripts/ci/fetch-pinned-release.sh (retry + backoff + an UNCONDITIONAL
+      # sha256 check + a fail-closed message naming the CDN), and a `uses:`
+      # action that installs a binary must appear as a repeated-attempt group,
+      # every copy carrying identical `uses:` and `with:` — the check that keeps
+      # twin-image.yml's three cosign installs on the same `cosign-release`.
+      # The SET of actions to judge is read out of the workflows, never typed
+      # here; the per-action verdict (does this action download an executable?
+      # unreadable from this repo) is a reviewed row in cdn-fetch-actions.json,
+      # and an action with no row reds. Same block as the derivations above and
+      # for the same reason: a `.github/workflows/**`-only diff is classified
+      # docs-only by the scope step, so a heavy-block gate would be skipped by
+      # exactly the PR that adds an unhardened fetch.
+      - run: node scripts/ci/assert-hardened-cdn-fetches.mjs
+      - run: node scripts/ci/assert-hardened-cdn-fetches.test.mjs
       # F-1226 — the plugin manifest is what makes the `skills` installer render
       # one select-all row instead of six unticked checkboxes. It has to live in
       # the always-on block: adding a skill touches only `skills/`, which the
