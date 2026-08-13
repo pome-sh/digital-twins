@@ -4,6 +4,51 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.45
+
+### Patch Changes
+
+- **`GET /repos/:o/:r/compare/:basehead` detects a rename, the way
+  `GET /repos/:o/:r/pulls/:n/files` already did.** A live capture from the real
+  `pome-sh/twin-fixtures-sandbox` read `files[].status` as `["added","renamed"]`
+  upstream against `["added","removed"]` from the twin, and `previous_filename`
+  as present upstream and field-removed from the twin — two CRITICALs on one
+  surface. Real GitHub runs rename detection on both diff surfaces; the twin ran
+  it on one.
+
+  The cause was not a missing rule but a second copy of the question. Both
+  surfaces derive `diff-entry` rows from a pair of file trees, and each had its
+  own path-by-path loop: F-1500 taught the pull request's loop to pair a path
+  that left the base with a path that arrived on the head holding the same blob,
+  and the comparison's loop went on expanding one move into an `added` plus a
+  `removed` carrying no pre-rename path at all. The pull surface then measured
+  green while the comparison measured red, on the same repository, over the same
+  two commits.
+
+  So this is one derivation, not a second correct copy. `diffFileRows` is now the
+  only place the rule lives; `calculatePullFiles` and `computeCompareFiles` differ
+  in where their two trees come from (two branch file tables against two commit
+  snapshots) and in how their urls name the head — a branch ref for a pull
+  request, the head commit sha for a comparison, because `basehead` can be two
+  shas with no branch in it anywhere. The rename semantics F-1500 established are
+  unchanged and now apply to both: exact moves only (git's `--find-renames` at
+  100% similarity), one `renamed` row rather than a removal plus an addition,
+  zero additions and zero deletions, and `previous_filename` emitted on that
+  status and no other.
+
+  What deliberately did NOT move: the comparison's commit walk. `ahead_by`,
+  `behind_by`, `total_commits` and the `commits` array read exactly as before —
+  that count is a separately tracked divergence about the seeded sandbox's git
+  history, and pairing files is a fact about trees. The single-commit surface
+  `GET /repos/:o/:r/commits/:ref` also still reports a move as an add plus a
+  remove: it reads one commit's `file_versions` rows, so there is no pair of
+  trees there to detect a move between.
+
+  The property under test is that the two surfaces AGREE over the same base and
+  head — asserted as a comparison between them rather than as two expected
+  literals, because two literals is exactly the shape that let them drift apart
+  while both looked covered.
+
 ## 0.23.44
 
 ### Patch Changes

@@ -4,6 +4,7 @@
 // encoding, pagination, diff-stat counting. Request-id stamping moved to
 // the engine's recorder with the port.
 import { createHash, randomUUID } from "node:crypto";
+import type { PullRequestFileRow } from "./types.js";
 
 export function nowIso() {
   return new Date().toISOString();
@@ -85,6 +86,72 @@ export function detectRenames(
     if (source !== undefined) renames.set(file.path, source);
   }
   return renames;
+}
+
+/** One side of a file diff: the tree, keyed by path. */
+export type DiffTree = Map<string, { content: string; sha: string }>;
+
+/**
+ * F-1513 — the ONE derivation of GitHub's `diff-entry` rows from a pair of file
+ * trees, serving both `GET /repos/:o/:r/pulls/:n/files` and
+ * `GET /repos/:o/:r/compare/:basehead`.
+ *
+ * The two surfaces ask the same question of two different pairs of trees — the
+ * pull's two branch file tables, the compare's two commit snapshots — and until
+ * this they answered it with two independent path-by-path loops. F-1500 taught
+ * the pull loop to pair a move; the compare loop kept expanding one into an
+ * `added` plus a `removed` carrying no `previous_filename` at all, and a live
+ * capture against the real sandbox read `["added","renamed"]` upstream against
+ * `["added","removed"]` from the twin on a repo where the pull surface was
+ * already green. Two implementations of one rule is HOW they drifted, so the
+ * fix is one implementation rather than a second correct copy: the callers now
+ * differ only in where the trees come from and how the urls are built (a branch
+ * ref for the pull, the head commit sha for the compare).
+ */
+export function diffFileRows(
+  repoId: number,
+  base: DiffTree,
+  head: DiffTree,
+  urls: (path: string) => { blob_url: string; raw_url: string; contents_url: string }
+): PullRequestFileRow[] {
+  const paths = [...new Set([...base.keys(), ...head.keys()])].sort();
+  // F-1500 — which base-only path each head-only path MOVED from, keyed by the
+  // head path. Resolved before the row loop so the removed side can be skipped
+  // in the same pass that emits the renamed row.
+  const renames = detectRenames(
+    paths.filter((path) => base.has(path) && !head.has(path)).map((path) => ({ path, sha: base.get(path)!.sha })),
+    paths.filter((path) => head.has(path) && !base.has(path)).map((path) => ({ path, sha: head.get(path)!.sha }))
+  );
+  const movedFrom = new Set(renames.values());
+  const rows: PullRequestFileRow[] = [];
+  for (const path of paths) {
+    const before = base.get(path);
+    const after = head.get(path);
+    if (before?.sha === after?.sha) continue;
+    // The source side of a move is not a deletion of its own — GitHub reports
+    // one `renamed` entry, not a removal plus an addition. Emitting both would
+    // have the response count the move twice.
+    if (movedFrom.has(path)) continue;
+    const previousFilename = renames.get(path) ?? null;
+    const diff = linesChanged(before?.content, after?.content ?? "");
+    rows.push({
+      repo_id: repoId,
+      pull_number: 0,
+      filename: path,
+      status: previousFilename ? "renamed" : before && after ? "modified" : after ? "added" : "removed",
+      // A detected move is an EXACT one (identical blobs), so it touches no
+      // lines — which is what GitHub reports for it. `linesChanged` would call
+      // the whole file an addition, because from its path-by-path view the
+      // destination is a file that did not exist.
+      additions: previousFilename ? 0 : diff.additions,
+      deletions: previousFilename ? 0 : after ? diff.deletions : before?.content.split("\n").length ?? 0,
+      changes: previousFilename ? 0 : diff.additions + diff.deletions,
+      ...urls(path),
+      patch: `@@ ${path} @@`,
+      previous_filename: previousFilename
+    });
+  }
+  return rows;
 }
 
 export function linesChanged(before: string | undefined, after: string) {
