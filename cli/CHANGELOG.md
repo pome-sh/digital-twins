@@ -4,6 +4,40 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.43
+
+### Patch Changes
+
+- **twin-slack's plain-text `blocks` absence is registered as a measured
+  divergence, not imitated.** A new `packages/twin-slack/FIDELITY.md` bullet (23)
+  records what real Slack does that the twin does not: when a caller sends `text`
+  and no `blocks`, Slack SYNTHESISES a `rich_text` block from the text and returns
+  it. `serializeMessage` folds `blocks` in only when the stored array is non-empty
+  and `seed.ts` seeds no message with blocks, so every plain-text message — written
+  or seeded — comes back with no `blocks` key at all.
+
+  Measured live against `pome-twin-sandbox` on 2026-08-13, two rounds. The
+  synthesis happens on `chat.postMessage`, `chat.update` AND
+  `chat.scheduleMessage` (all three called separately, because F-1487 established
+  that these three validate independently), and it PERSISTS into
+  `conversations.history` with the same structure and a re-minted `block_id`. When
+  the caller DOES send `blocks` no `rich_text` is added, so the divergence is
+  strictly the no-blocks case.
+
+  REGISTERED rather than fixed, and the second round is what decided it. A
+  verbatim round-trip of a plain token would argue for imitation; a payload
+  carrying mrkdwn, a URL and a channel reference came back as styled `text`
+  elements, a `link` element and a `channel` element — a mrkdwn parser, a URL
+  detector and an entity resolver, three element types no twin derives from a
+  stored `text` string. A partial imitation emits a plausible-but-wrong
+  `rich_text` block an agent mis-parses with confidence, which is strictly harder
+  to detect than an honest absent key.
+
+  No twin behaviour changes and no criterion moves: this is a documentation
+  bullet plus its 1:1 registry linkage key. pome-cloud carries the matching
+  `known-divergences/slack.yaml` entry and the leg that now observes the
+  no-blocks case.
+
 ## 0.23.42
 
 ### Patch Changes
