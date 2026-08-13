@@ -76,6 +76,31 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # F-1520 — release.yml's `dispatch-allocate-version` job POSTs this event the
+  # moment a publish lands, which is the ONLY moment `planExampleRepins` can see
+  # the just-published sibling on the registry: the run on the human merge commit
+  # plans before the version exists, and the run on the bump commit it produces
+  # is the one the `[release-bump]` guard below skips. A NAMED type, never a bare
+  # `repository_dispatch:` — that accepts every event type anyone ever POSTs at
+  # this repository as a licence to push to `main`.
+  #
+  # `repository_dispatch` and not `workflow_dispatch`, which is what this shipped
+  # as first and could never have fired: `POST /repos/{owner}/{repo}/dispatches`
+  # needs `contents: write`, which the `pome-ops-push` installation already
+  # holds, while `POST /repos/…/actions/workflows/{id}/dispatches` needs
+  # `actions: write`, which it does not — that call 403s on every release until
+  # an org owner re-approves the app with a wider grant. (Both requirements are
+  # GitHub's documented fine-grained permission for the endpoint.)
+  #
+  # Three properties of this event make it behave identically to the push arm
+  # below, so nothing downstream needs a special case: GitHub only starts it from
+  # the workflow file on the DEFAULT BRANCH, `github.sha` is the last commit on
+  # the default branch, and `github.ref` is the default branch — so the checkout
+  # ref expression resolves to `main` exactly as on a push, and the concurrency
+  # group is the same `allocate-version-refs/heads/main`, which is what makes a
+  # dispatch queue behind an allocation already in flight instead of racing it.
+  repository_dispatch:
+    types: [repin-examples]
   # Changing the allocator or the table it reads must prove the job wiring still
   # works on the PR that changes it — a syntax-valid workflow whose steps are
   # broken is the F-1471 class. The PR arm plans and never writes or pushes.
@@ -121,7 +146,26 @@ jobs:
     # commit is one, so its own diff is already inside the previous release. If
     # this literal and BUMP_COMMIT_MARKER in the script ever drift apart, the job
     # runs and finds nothing to do.
-    if: ${{ !contains(github.event.head_commit.message, '[release-bump]') }}
+    #
+    # SCOPED TO `push` EXPLICITLY, because `github.event.head_commit` exists on
+    # no other event. On `workflow_dispatch` and on `repository_dispatch` it is
+    # null, `contains` casts null to the empty string, and the guard therefore
+    # passes — the right answer (a dispatch is a deliberate request and must run
+    # even when main's tip IS a `[release-bump]` commit, which is precisely the
+    # tip release.yml dispatches from) arrived at by coercion. Naming the event
+    # makes it a decision, and stops the plausible "fix" for that null — widening
+    # the guard to cover every event — which would turn release.yml's dispatch
+    # into a silent no-op and reopen the deadlock it exists to close.
+    #
+    # Termination does NOT rest on this guard for the dispatch arm, and must not:
+    # release.yml dispatches only after a real publish, and the single commit this
+    # run pushes can only cause another publish by MOVING a package version,
+    # which requires a pending `## Unreleased` entry — which this same run
+    # consumes. A re-pin-only commit touches `examples/*` and their lockfiles, no
+    # package version, so release.yml's `plan` finds no diff against the registry,
+    # publishes nothing, and dispatches nothing. The chain is bounded by the
+    # number of pending entries and CI writes none.
+    if: ${{ github.event_name != 'push' || !contains(github.event.head_commit.message, '[release-bump]') }}
     steps:
       # Named before the mint step rather than left to it: the action's own
       # failure on an empty input does not tell a reader which secret, on which

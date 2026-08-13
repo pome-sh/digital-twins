@@ -231,6 +231,18 @@ console.log("\nrelease.yml wiring");
     dispatch.includes("needs.publish.result == 'success' || needs.publish-wire.result == 'success'"),
     dispatch,
   );
+  // Without a status-check function in the `if:`, GitHub requires every job in
+  // `needs:` to have SUCCEEDED — and one of the two publish lanes is skipped on
+  // almost every release (each fires only when its own registry's version moved).
+  // The OR above would then never be reached: the job is dropped for depending on
+  // a skipped lane, and reads as an innocent "skipped" while the re-pin never
+  // happens. This is the one edit that turns this whole job back into decoration,
+  // so it is asserted rather than commented.
+  check(
+    "its `if:` carries a status-check function (!cancelled()), or a skipped publish lane silently drops the job",
+    /!cancelled\(\)/.test(dispatch.split("\n").find((line) => line.trim().startsWith("if:")) ?? ""),
+    dispatch,
+  );
   check(
     "it mints the pome-ops-push app token, the same action pinned SHA as allocate-version.yml's own mint step",
     dispatch.includes("actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1") &&
@@ -239,8 +251,9 @@ console.log("\nrelease.yml wiring");
     dispatch,
   );
   check(
-    "the dispatch step never uses the ambient GITHUB_TOKEN — that push/dispatch is event-suppressed and would silently no-op",
-    !/GH_TOKEN:\s*\$\{\{\s*secrets\.GITHUB_TOKEN/.test(dispatch),
+    "the dispatch step uses the minted app token and never the ambient GITHUB_TOKEN",
+    /GH_TOKEN:\s*\$\{\{\s*steps\.app-token\.outputs\.token/.test(dispatch) &&
+      !/GH_TOKEN:\s*\$\{\{\s*(secrets\.GITHUB_TOKEN|github\.token)/.test(dispatch),
     dispatch,
   );
   check(
@@ -248,10 +261,73 @@ console.log("\nrelease.yml wiring");
     !dispatch.includes("continue-on-error"),
     dispatch,
   );
+
+  // It POSTs a repository_dispatch, NOT a workflow_dispatch. `gh workflow run`
+  // hits POST /repos/…/actions/workflows/{id}/dispatches, which GitHub gates on
+  // `actions: write` — a scope the pome-ops-push installation does not have, so
+  // that spelling 403s on every release. `gh api … /dispatches` is the
+  // `contents: write` endpoint, which it does have.
+  const dispatchCommand = dispatch
+    .split("\n")
+    // The command is a one-line `run:`, so the key is stripped rather than
+    // assumed away — comment lines still begin with `#` and cannot match.
+    .map((line) => line.trim().replace(/^run:\s*/, ""))
+    .find((line) => line.startsWith("gh "));
+  check("the job has a `gh` dispatch command", Boolean(dispatchCommand), dispatch);
   check(
-    "it calls the actual allocate-version.yml workflow, targeting main",
-    dispatch.includes("gh workflow run allocate-version.yml --ref main"),
-    dispatch,
+    "it POSTs repository_dispatch, never `gh workflow run` (that endpoint needs actions: write, which the app lacks)",
+    dispatchCommand?.startsWith("gh api") &&
+      /--method POST/.test(dispatchCommand) &&
+      /repos\/\$\{\{ github\.repository \}\}\/dispatches/.test(dispatchCommand),
+    dispatchCommand,
+  );
+
+  // The event_type and allocate-version.yml's `types:` are two halves of one
+  // wire, typed in two files. A mismatch is not an error anywhere: the POST
+  // answers 204 and starts no run — the silent no-op this whole job exists to
+  // avoid — so they are asserted against each other rather than each against a
+  // literal spelled here twice.
+  const eventType = dispatchCommand?.match(/-f\s+event_type=([\w.-]+)/)?.[1];
+  check("the dispatch names an event_type", Boolean(eventType), dispatchCommand);
+  const allocate = readFileSync(join(ROOT, ".github/workflows/allocate-version.yml"), "utf8");
+  const dispatchTypes = allocate.match(/\n {2}repository_dispatch:\n {4}types:\s*\[([^\]]*)\]/);
+  check(
+    "allocate-version.yml has a repository_dispatch trigger with an explicit `types:` list — never a bare trigger accepting every event anyone POSTs",
+    Boolean(dispatchTypes),
+    "expected `repository_dispatch:` followed by `types: [...]` in allocate-version.yml",
+  );
+  check(
+    `allocate-version.yml listens for exactly the event release.yml sends (${eventType ?? "?"})`,
+    Boolean(eventType) &&
+      (dispatchTypes?.[1] ?? "")
+        .split(",")
+        .map((t) => t.trim())
+        .includes(eventType),
+    `release.yml sends \`${eventType}\`, allocate-version.yml accepts \`${dispatchTypes?.[1] ?? "nothing"}\``,
+  );
+
+  // A repository_dispatch payload has no `head_commit`, so allocate-version.yml's
+  // `[release-bump]` guard cannot read the marker on that event — and the tip it
+  // is dispatched FROM is always a `[release-bump]` commit. The guard therefore
+  // has to be scoped to `push`, or the dispatched run either skips outright (a
+  // dispatch that achieves nothing) or passes only by null-coercion.
+  check(
+    "allocate-version.yml's [release-bump] guard is scoped to `push`, so the dispatched run is not skipped by a marker it cannot read",
+    /if:\s*\$\{\{\s*github\.event_name\s*!=\s*'push'\s*\|\|\s*!contains\(github\.event\.head_commit\.message,\s*'\[release-bump\]'\)\s*\}\}/.test(
+      allocate,
+    ),
+    "expected a job-level `if:` of the form `github.event_name != 'push' || !contains(github.event.head_commit.message, '[release-bump]')`",
+  );
+
+  // The race the dispatch would otherwise lose. `planExampleRepins` only re-pins
+  // to a version the registry already serves, and an E404 is indistinguishable
+  // from "never published" — so if the publish job returns before propagation,
+  // the dispatched run no-ops and the drift persists with no later run to retry
+  // it. The publish job must therefore prove visibility before this job runs.
+  check(
+    "the publish job waits for the registry to serve what it published, with a staleness-forcing read",
+    /npm view "\$\{PKG\}@\$\{version\}"[^\n]*--prefer-online/.test(publish),
+    publish,
   );
 }
 

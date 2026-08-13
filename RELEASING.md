@@ -250,27 +250,50 @@ above) needs a run of `allocate-version.yml` that starts AFTER the version it
 is re-pinning to actually exists on the registry — and no push-triggered run
 ever does: the merge commit's run plans before the number exists, and the
 bump commit's own run is the one `[release-bump]` skips. `release.yml`'s
-`dispatch-allocate-version` job closes that window by calling `gh workflow
-run allocate-version.yml --ref main` right after its own publish succeeds,
-using the same `pome-ops-push` app token minted the same way (a
-`workflow_dispatch` made with the ambient `GITHUB_TOKEN` is event-suppressed
-exactly like a push is, so it would report success having started nothing).
+`dispatch-allocate-version` job closes that window by POSTing a
+`repository_dispatch` event (`event_type: repin-examples`) at this repository
+right after its own publish succeeds, with the same `pome-ops-push` app token
+minted the same way.
 
-**A fourth one-time step belongs next to the three above, and is not yet
-done.** Triggering `workflow_dispatch` over the REST API needs `actions:
-write` on the calling token; the live `pome-ops-push` installation currently
-grants only `contents: write` and `metadata: read` (checked directly against
-the org installation, app_id 4582446). Until an org owner adds `Actions:
-write` under the app's permissions on GitHub (Settings → GitHub Apps →
-pome-ops-push → Permissions — this re-triggers the org's installation
-approval, the same as any permission change to an already-installed app),
-`dispatch-allocate-version` fails loudly with a 403 rather than silently
-doing nothing — the publish it follows has already happened by then, so the
-failure is noise, not breakage, but the re-pin itself will not land until the
-permission is granted. Until then, the deadlock this job exists to close
-still requires the same manual recovery it always did: a docs-only PR, a
-founder ruleset bypass, or `gh workflow run allocate-version.yml --ref main`
-run by a human once the pin has drifted.
+**No new one-time step: the three above are still the whole list.** The event is
+a `repository_dispatch` and not a `workflow_dispatch` precisely so that stays
+true. `POST /repos/{owner}/{repo}/dispatches` is a `contents: write` endpoint,
+and the `pome-ops-push` installation already grants exactly `contents: write` +
+`metadata: read`; `POST /repos/…/actions/workflows/{id}/dispatches`, which is
+what `gh workflow run` calls, needs `actions: write`, which it does not have —
+that spelling would have 403'd on every release, leaving `release.yml` red on
+top of the pin drift on `main` until an org owner re-approved the app with a
+wider grant. (The ambient `GITHUB_TOKEN` would also work here — dispatch events
+are the documented exception to `GITHUB_TOKEN` event suppression, unlike a push
+— but it would mean granting the publishing workflow's ambient token write
+scope to save minting a token this repo already mints, and resting the release
+path on a carve-out to the rule everything else in that file relies on.)
+
+Two properties are what make this safe to leave running unattended, and both are
+asserted in `scripts/ci/decide-publish.test.mjs`:
+
+- **It stops.** A `repository_dispatch` payload has no `head_commit`, so
+  `allocate-version.yml`'s `[release-bump]` guard cannot read the marker on that
+  event — and the tip it is dispatched from always carries it. The guard is
+  therefore scoped to `push` explicitly, and the dispatch arm always runs.
+  Termination is paid for in publishes instead: this job fires only after a real
+  publish; the single commit the dispatched run pushes is either re-pin-only
+  (`examples/*` and their lockfiles, no version — so the next `plan` finds
+  nothing to publish and nothing dispatches) or it moved a version by consuming
+  a pending `## Unreleased` entry, of which CI writes none. Bounded by what a
+  human merged.
+- **The dispatched run can actually see the version.** `planExampleRepins` only
+  re-pins to a version the registry already serves, and an `E404` is deliberately
+  indistinguishable from "never published" — so a read that beat propagation
+  would make the dispatched run a no-op with no later run to retry it (the next
+  PR's own required `typecheck-test` reds on the same drift). So the publish job
+  polls `npm view <pkg>@<version> --prefer-online` until the registry serves what
+  it just published — eighteen attempts over roughly three minutes, sized for the
+  CDN's packument cache and exiting on the first attempt in the ordinary case —
+  before this job runs at all. If that times
+  out the publish job reds — the publish itself is done and must not be re-run;
+  the recovery is `gh workflow run allocate-version.yml --ref main` by hand once
+  the version is visible.
 
 ## The four packages version independently
 
