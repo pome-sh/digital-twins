@@ -12,6 +12,13 @@ name: repo-policy
 # pull_request: drift is caught on every touching PR, not just weekly.
 # repo-policy is not in config/required-checks.json's required set, so this
 # cannot deadlock a merge.
+#
+# Ordering, when you change the required contexts: land the config/required-checks.json
+# edit first and accept a red repo-policy on that PR and until the ruleset is
+# updated by hand (including a failing Monday cron, which will file the
+# schedule-alarm issue). Doing it the other way — requiring a context before the
+# job that reports it exists — leaves every PR waiting forever on a check that
+# never runs, and that is the actual deadlock. The red here is the check working.
 on:
   schedule:
     - cron: "41 5 * * 1"

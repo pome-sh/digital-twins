@@ -22,8 +22,11 @@
 # payload and the empty-array branch below hard-fails. That is why enforcement
 # is not asserted separately — losing it cannot present as a green run.
 # Rules inherited from an ORG-level ruleset do still appear here (with
-# ruleset_source_type "Organization"), and are accepted: the policy is that
-# main is covered, not that a particular ruleset object covers it.
+# ruleset_source_type "Organization"). They count towards coverage — the policy
+# is that main is covered, not that a particular ruleset object covers it — but
+# they are held to the same terms: an org rule contributing a required context
+# not in config/required-checks.json is still a failure, because an unexpected
+# required context is exactly the drift this check exists to surface.
 #
 # NOT covered live (dropped, not silently assumed true) — both are named in
 # the run log on success so a reader is never told coverage is total:
@@ -161,10 +164,11 @@ const checksRules = findRules("required_status_checks");
 if (checksRules.length === 0 || checksRules.some((r) => !r.parameters)) {
   errors.push(`missing rule: required_status_checks (policy: strict required checks matching config/required-checks.json)`);
 } else {
-  for (const rule of checksRules) {
-    if (rule.parameters.strict_required_status_checks_policy !== true) {
-      errors.push("required_status_checks.strict_required_status_checks_policy must be true");
-    }
+  // `strict` is effectively OR'd across matching rules — if any applicable rule
+  // sets it, the branch must be up to date live. Requiring it on every rule
+  // would red a config that is genuinely strict.
+  if (!checksRules.some((r) => r.parameters.strict_required_status_checks_policy === true)) {
+    errors.push("required_status_checks.strict_required_status_checks_policy must be true");
   }
   // GitHub unions required contexts across every matching rule, so compare the
   // union — otherwise a context added via a second ruleset is invisible.

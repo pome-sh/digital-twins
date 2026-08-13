@@ -288,19 +288,21 @@ function main() {
     // The summary count must be derived from assertions that actually ran, so
     // a declared policy with no live assertion cannot present as green. Drive
     // it through a copy of the script with the non_fast_forward block removed.
+    // Pin one short line, not the whole block: this file runs inside the
+    // required typecheck-test job, so a pin on six lines of source turns any
+    // rename in the script into a red required check.
     const src = readFileSync(SCRIPT, "utf8");
-    const block = `const ffRules = findRules("non_fast_forward");
-if (ffRules.length === 0) {
-  errors.push(\`missing rule: non_fast_forward (policy: no force-push to \${branch})\`);
-} else {
-  asserted.add("non_fast_forward");
-}`;
-    assert(src.includes(block), "non_fast_forward assertion block not found — update this test");
+    const marker = 'asserted.add("non_fast_forward");';
+    assert(src.includes(marker), `${marker} not found in the script — update this test`);
+    // Mutant lives in the temp dir, never in the repo tree: a crash between
+    // write and cleanup must not leave a policy script with an assertion
+    // removed sitting in scripts/ci/ ready to be committed. The script derives
+    // REPO_ROOT from its own path, so hand it the config explicitly.
     const dir = mkdtempSync(join(tmpdir(), "assert-policy-selfcheck-"));
-    const mutant = join(ROOT, "scripts/ci/.assert-repo-policy.selfcheck.sh");
+    const mutant = join(dir, "assert-repo-policy.mutant.sh");
     const rulesPath = join(dir, "rules.json");
     writeFileSync(rulesPath, JSON.stringify(baseRules()));
-    writeFileSync(mutant, src.replace(block, "// assertion removed"));
+    writeFileSync(mutant, src.replace(marker, "/* assertion removed */"));
     const r = spawnSync("bash", [mutant], {
       encoding: "utf8",
       env: {
@@ -308,9 +310,9 @@ if (ffRules.length === 0) {
         GITHUB_TOKEN: "test-token",
         GITHUB_REPOSITORY: "pome-sh/digital-twins",
         RULES_JSON: rulesPath,
+        REQUIRED_CHECKS_FILE: join(ROOT, "config/required-checks.json"),
       },
     });
-    rmSync(mutant, { force: true });
     rmSync(dir, { recursive: true, force: true });
     assert(r.status === 1, `dropping an assertion block must fail, got ${r.status}: ${r.stdout}`);
     assert(
@@ -359,9 +361,30 @@ if (ffRules.length === 0) {
       /api -o.*rules\/branches\/\$\{BRANCH\}/s.test(scriptSrc),
       "assert-repo-policy.sh must call GET .../rules/branches/{branch}",
     );
+    // Match the request URL, not `api -o.*<path>`: the legacy calls wrapped the
+    // URL onto its own line, so a `.`-based pattern without /s never saw them
+    // and this guard passed on exactly the code it exists to forbid. Anchoring
+    // on api.github.com also keeps prose in the header comments from tripping it.
     assert(
-      !/api -o.*\/rulesets/.test(scriptSrc) && !/api -o.*\/protection/.test(scriptSrc),
-      "assert-repo-policy.sh must not call the legacy admin-scoped endpoints",
+      !/api\.github\.com\/[^"'\s]*\/rulesets/.test(scriptSrc),
+      "assert-repo-policy.sh must not call the legacy admin-scoped .../rulesets endpoint",
+    );
+    assert(
+      !/api\.github\.com\/[^"'\s]*\/protection/.test(scriptSrc),
+      "assert-repo-policy.sh must not call the legacy admin-scoped .../protection endpoint",
+    );
+    // Guard the guard: prove the patterns above fire on the multi-line shape the
+    // removed code actually used, so they cannot rot back into always-true.
+    const legacyShape = [
+      'code="$(api -o "${LIST_OUT}" -w \'%{http_code}\' \\',
+      '  "https://api.github.com/repos/${REPO}/rulesets")"',
+      'code="$(api -o "${OUT}" -w \'%{http_code}\' \\',
+      '  "https://api.github.com/repos/${REPO}/branches/${BRANCH}/protection")"',
+    ].join("\n");
+    assert(
+      /api\.github\.com\/[^"'\s]*\/rulesets/.test(legacyShape) &&
+        /api\.github\.com\/[^"'\s]*\/protection/.test(legacyShape),
+      "the legacy-endpoint guards no longer match the code they exist to forbid",
     );
   }
 
