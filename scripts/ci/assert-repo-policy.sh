@@ -10,15 +10,35 @@
 # a metadata-scoped GITHUB_TOKEN, no PAT needed.
 #
 # The property that matters: this must FAIL, not silently pass, if the rules
-# it reads stop covering a policy it asserts (ruleset deleted, moved to
-# legacy branch protection, moved to org level, endpoint drops a rule type).
-# An empty/missing rules array, or any policy with no matching rule, is a
-# hard failure naming that policy — never treated as "nothing to check".
+# it reads stop covering a policy it asserts (ruleset deleted, disabled or
+# switched to `evaluate`, protection moved to classic branch protection,
+# endpoint drops a rule type). An empty/missing rules array, or any policy
+# with no matching rule, is a hard failure naming that policy — never
+# treated as "nothing to check".
 #
-# NOT covered by this endpoint (dropped, not silently assumed true): the
-# ruleset's bypass_actors (founder-team bypass). Reading that needs the
-# admin-scoped ruleset detail endpoint this change deliberately stops
-# calling. See the PR for F-1212.
+# Verified against the live repo (F-1212 review): this endpoint returns only
+# rules from rulesets whose enforcement is `active`. A ruleset flipped to
+# `evaluate` or `disabled` drops out entirely, so its rules vanish from this
+# payload and the empty-array branch below hard-fails. That is why enforcement
+# is not asserted separately — losing it cannot present as a green run.
+# Rules inherited from an ORG-level ruleset do still appear here (with
+# ruleset_source_type "Organization"), and are accepted: the policy is that
+# main is covered, not that a particular ruleset object covers it.
+#
+# NOT covered live (dropped, not silently assumed true) — both are named in
+# the run log on success so a reader is never told coverage is total:
+#   1. The ruleset's bypass_actors (founder-team bypass). GitHub elides the
+#      bypass_actors FIELD for callers without Administration:read — the
+#      .../rulesets/{id} endpoint itself is readable (it answers 200 even
+#      unauthenticated on this public repo), but the field is simply absent,
+#      so asserting on it would fail OPEN for GITHUB_TOKEN. Left unwatched
+#      rather than asserted-on-an-absent-field.
+#   2. Deletion protection for main. It is live, but it comes from CLASSIC
+#      branch protection (allow_deletions.enabled=false), which this endpoint
+#      does not surface and which needs Administration:read to read. Ruleset
+#      18797095 carries no `deletion` rule, so there is nothing here to
+#      assert. Fix forward by adding a Deletion rule to the ruleset, then
+#      asserting it below — see the PR for F-1212.
 set -euo pipefail
 
 REPO="${GITHUB_REPOSITORY:-pome-sh/pome-twins}"
@@ -72,6 +92,11 @@ fail_http() {
 echo "Asserting branch rules policy for ${REPO}@${BRANCH}"
 
 if [[ -n "${RULES_JSON:-}" ]]; then
+  # Fixture seam for assert-repo-policy.test.mjs only. Say so loudly: a run
+  # that reads a fixture asserts nothing about the live repo, and must never
+  # be mistaken for a drift check that passed. repo-policy.yml never sets it
+  # (asserted by the regression test).
+  echo "::warning::RULES_JSON is set — reading fixture ${RULES_JSON}, NOT the live GitHub API. This run proves nothing about ${REPO}@${BRANCH}."
   cp "${RULES_JSON}" "${RULES_OUT}"
 else
   code="$(api -o "${RULES_OUT}" -w '%{http_code}' \
@@ -98,6 +123,14 @@ if (!Array.isArray(rules) || rules.length === 0) {
 
 const POLICIES = ["pull_request", "required_status_checks", "non_fast_forward"];
 
+// The declared set above is only worth printing if it is derived from work
+// actually done. `asserted` is added to by each block below at the point it
+// has really run its assertions; the cross-check after them fails if a block
+// stops asserting a declared policy. Without this, deleting an assertion
+// block leaves the summary still claiming that policy was checked — the same
+// decorative-denominator defect this script exists to catch elsewhere.
+const asserted = new Set();
+
 function findRule(type) {
   return rules.find((r) => r.type === type);
 }
@@ -114,6 +147,7 @@ if (!prRule?.parameters) {
   if (params.required_review_thread_resolution !== true) {
     errors.push("pull_request.required_review_thread_resolution must be true");
   }
+  asserted.add("pull_request");
 }
 
 // --- required_status_checks: strict + contexts agree with config/required-checks.json in BOTH directions ---
@@ -135,15 +169,31 @@ if (!checksRule?.parameters) {
       errors.push(`required_status_checks has a live context absent from config/required-checks.json: ${ctx}`);
     }
   }
+  asserted.add("required_status_checks");
 }
 
 // --- non_fast_forward: force-push protection on the branch ---
 const ffRule = findRule("non_fast_forward");
 if (!ffRule) {
   errors.push(`missing rule: non_fast_forward (policy: no force-push to ${branch})`);
+} else {
+  asserted.add("non_fast_forward");
 }
 
-console.log(`read ${rules.length} rule(s) from the API; asserting ${POLICIES.length} polic(y/ies): ${POLICIES.join(", ")}`);
+// Self-check: every declared policy must have been reached by a live block.
+// Only meaningful once the policy assertions themselves passed — on a real
+// failure the specific error above is the useful one.
+if (errors.length === 0) {
+  for (const policy of POLICIES) {
+    if (!asserted.has(policy)) {
+      errors.push(
+        `policy "${policy}" is declared but no assertion ran for it — this check is claiming coverage it does not have`,
+      );
+    }
+  }
+}
+
+console.log(`read ${rules.length} rule(s) from the API; asserted ${asserted.size} of ${POLICIES.length} declared polic(y/ies): ${[...asserted].join(", ") || "(none)"}`);
 
 if (errors.length) {
   for (const e of errors) console.error(`::error::${e}`);
@@ -152,4 +202,10 @@ if (errors.length) {
 }
 console.log(`ok: pull_request (0 reviews, resolved threads) + required_status_checks (strict, contexts match config/required-checks.json) + non_fast_forward, all present in ${rules.length} live rule(s) for ${branch}`);
 console.log("required contexts:", required.join(", "));
+// Name the coverage gaps on every green run. A dropped assertion that prints
+// nothing reads as "all clear"; these two are unwatched and must say so.
+console.log(
+  "NOT verified live (needs Administration:read, deliberately not held): ruleset bypass_actors (founder-team bypass); deletion protection for " +
+    `${branch}, which lives on classic branch protection — ruleset has no \`deletion\` rule to assert`,
+);
 NODE

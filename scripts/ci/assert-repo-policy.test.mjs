@@ -213,7 +213,78 @@ function main() {
   }
 
   {
+    // A rule type present but carrying no `parameters` at all must hard-fail,
+    // not read as "nothing to assert".
+    const r = runAssert([
+      { type: "pull_request" },
+      { type: "required_status_checks" },
+      { type: "non_fast_forward" },
+    ]);
+    assert(r.status === 1, "rules with no parameters must fail");
+    const out = `${r.stdout}\n${r.stderr}`;
+    assert(out.includes("missing rule: pull_request"), out);
+    assert(out.includes("missing rule: required_status_checks"), out);
+  }
+
+  {
+    // A payload that is valid JSON but not an array must hard-fail.
+    const r = runAssert({ message: "Not Found" });
+    assert(r.status === 1, "non-array payload must fail");
+    assert(`${r.stdout}\n${r.stderr}`.includes("returned no rules"), r.stderr);
+  }
+
+  {
+    // The summary count must be derived from assertions that actually ran, so
+    // a declared policy with no live assertion cannot present as green. Drive
+    // it through a copy of the script with the non_fast_forward block removed.
+    const src = readFileSync(SCRIPT, "utf8");
+    const block = `const ffRule = findRule("non_fast_forward");
+if (!ffRule) {
+  errors.push(\`missing rule: non_fast_forward (policy: no force-push to \${branch})\`);
+} else {
+  asserted.add("non_fast_forward");
+}`;
+    assert(src.includes(block), "non_fast_forward assertion block not found — update this test");
+    const dir = mkdtempSync(join(tmpdir(), "assert-policy-selfcheck-"));
+    const mutant = join(ROOT, "scripts/ci/.assert-repo-policy.selfcheck.sh");
+    const rulesPath = join(dir, "rules.json");
+    writeFileSync(rulesPath, JSON.stringify(baseRules()));
+    writeFileSync(mutant, src.replace(block, "// assertion removed"));
+    const r = spawnSync("bash", [mutant], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        GITHUB_TOKEN: "test-token",
+        GITHUB_REPOSITORY: "pome-sh/pome-twins",
+        RULES_JSON: rulesPath,
+      },
+    });
+    rmSync(mutant, { force: true });
+    rmSync(dir, { recursive: true, force: true });
+    assert(r.status === 1, `dropping an assertion block must fail, got ${r.status}: ${r.stdout}`);
+    assert(
+      `${r.stdout}\n${r.stderr}`.includes('policy "non_fast_forward" is declared but no assertion ran'),
+      `${r.stdout}\n${r.stderr}`,
+    );
+  }
+
+  {
+    // Green runs must name what is NOT watched live, so a reader is never
+    // told coverage is total.
+    const r = runAssert(baseRules());
+    assert(r.stdout.includes("NOT verified live"), r.stdout);
+    assert(r.stdout.includes("bypass_actors"), r.stdout);
+    assert(r.stdout.includes("deletion"), r.stdout);
+  }
+
+  {
     const y = readFileSync(join(ROOT, ".github/workflows/repo-policy.yml"), "utf8");
+    // The fixture seam must never be reachable in CI: an env var that stubs
+    // the API is a way to make a live check pass without calling anything.
+    assert(
+      !/RULES_JSON/.test(y),
+      "repo-policy.yml must never set RULES_JSON — that would stub out the live API call",
+    );
     assert(!/administration:\s*read/.test(y), "GITHUB_TOKEN cannot use administration scope");
     assert(
       !/secrets\.REPO_POLICY_TOKEN/.test(y),
