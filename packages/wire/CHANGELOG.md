@@ -4,6 +4,51 @@ SPDX-License-Identifier: Apache-2.0
 
 # @pome-sh/wire — CHANGELOG
 
+## 0.2.3 — 2026-08-13
+
+**New subpath: `@pome-sh/wire/run-completeness`.** Additive — no existing export,
+schema, type or behaviour changed, and the root barrel's snapshot is
+byte-identical.
+
+Three symbols and two structural interfaces: `isIncompleteTally`,
+`tallyCriteriaResults`, `PRE_SATISFIED_REASON`, `CriteriaTallyLike`,
+`CriterionResultLike`. Together they answer one question — does this finished
+run have a verdict to state, or did its grader fail to produce one? — over the
+`skipped` and `reason` fields of a `criteria_results` row.
+
+They moved here from pome-cloud's private `packages/contract` (F-1416). Four
+surfaces in two repositories ask that question about the same run: pome-cloud's
+dashboard badge and markdown report header, and this repo's CLI terminal verdict
+and `verdict.json` `state`. F-1399 had already collapsed the two pome-cloud
+copies into one predicate, and they have not drifted since. Across the repo
+boundary the defect survived: `cli/test/unit/hosted/cross-surface-agreement.
+test.ts` held a hand-written transcription of the predicate so it could assert
+the CLI and the dashboard never split on "did this pass", and it went stale the
+moment F-1399 changed the original — stale GREEN, passing while asserting
+something false about the other repo. Neither repo could fix that alone:
+`@pome-cloud/contract` is private and unpublished, `lint-no-cloud-imports.sh`
+denies the import by design, and no CI check here could diff a transcription
+against a private source. wire is the one package that already crosses this
+boundary, so the predicate lives here now and both sides import it.
+
+**Subpath-only, deliberately off the root barrel.** The barrel's F-942 doc says
+nothing on it knows about sessions, tasks, runs or the cloud REST surface, and
+the five twins / the sdk / the adapter — every root-barrel consumer — have no
+run to ask about. `test/export-surface.test.ts` fails if any of these symbols
+appears on the barrel. The barrel's doc was narrowed to name this one exception
+and why it is not a loosening: the predicate reads two fields of a wire row and
+returns a boolean, names no session / task / run id / REST route / column,
+imports nothing, and takes structural inputs so no cloud type crosses with it.
+
+`trace-contract.json` gains the `runCompleteness` entry in its `exports` map,
+for the same reason `correlation` is in there and `otel/fixtures` is not: it is
+a surface a consumer codes against, not a test artifact.
+
+Consumers must move together — pome-cloud's eight `@pome-sh/wire` pins go
+`0.2.1 → 0.2.3` in one change, and its dashboard, control plane and markdown
+report import from `@pome-sh/wire/run-completeness` instead of from
+`@pome-cloud/contract`, whose copy is deleted.
+
 ## 0.2.2 — 2026-08-12
 
 No schema, type, export or behaviour change. F-1488 fixed

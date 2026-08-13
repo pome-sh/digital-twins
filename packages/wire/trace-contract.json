@@ -1,6 +1,6 @@
 {
   "package": "@pome-sh/wire",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "zod": {
     "range": "^4.1.13",
     "major": 4
@@ -10,7 +10,8 @@
     "recorderEvents": "@pome-sh/wire/recorder-events",
     "otel": "@pome-sh/wire/otel",
     "redaction": "@pome-sh/wire/redaction",
-    "correlation": "@pome-sh/wire/correlation"
+    "correlation": "@pome-sh/wire/correlation",
+    "runCompleteness": "@pome-sh/wire/run-completeness"
   },
   "canonicalSchemas": [
     "recorderEventSchema",

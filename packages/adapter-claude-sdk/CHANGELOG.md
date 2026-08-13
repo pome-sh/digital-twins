@@ -1,5 +1,13 @@
 # @pome-sh/adapter-claude-sdk — CHANGELOG
 
+## 0.3.5
+
+Republished for `@pome-sh/wire` 0.2.3. No source change in this package: it
+depends on `wire` as a workspace `*`, so a wire release changes the bytes this
+package ships and `check-version-bump-required.mjs` requires the bump. The new
+`@pome-sh/wire/run-completeness` subpath is additive and this adapter does not
+consume it.
+
 ## 0.3.4 — 2026-08-12
 
 No user-visible change. Version-only bump: F-1488 fixed
