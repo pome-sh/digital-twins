@@ -194,6 +194,11 @@ async function main() {
   const telemetry = initTelemetry();
   const model = await resolveModel(modelSlug);
   try {
+    // F-1519 — positive-evidence marker `scripts/smoke-examples.mjs` classifies
+    // REACHED-OUTBOUND on, printed immediately before this example's first
+    // outbound (model) call. This example has no @pome-sh dependency to emit
+    // it for free, so it is a literal print, gated so real users never see it.
+    if (process.env.POME_SMOKE_MARK_OUTBOUND === "1") console.error("POME_SMOKE_REACHED_OUTBOUND");
     const result = await generateText({
       model,
       system: buildSystem(slackChannel),

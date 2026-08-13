@@ -271,6 +271,13 @@ async function main() {
     },
   };
 
+  // F-1519 — positive-evidence marker `scripts/smoke-examples.mjs` classifies
+  // REACHED-OUTBOUND on, printed immediately before this example's first
+  // outbound (model) call. This example pins the PUBLISHED
+  // `@pome-sh/adapter-claude-sdk` (it must stay `npx degit`-fetchable
+  // standalone), so the workspace `query()`'s own marker is NOT in the tarball
+  // it installs — the literal has to be here. Gated so real users never see it.
+  if (process.env.POME_SMOKE_MARK_OUTBOUND === "1") console.error("POME_SMOKE_REACHED_OUTBOUND");
   const run = query({ prompt: wiring.task, options: examineeOptions(mcpServers) });
 
   let exitCode = 0;

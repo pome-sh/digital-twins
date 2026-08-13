@@ -15,6 +15,20 @@ type QueryParams = Parameters<typeof sdkQuery>[0];
 type HooksConfig = Partial<Record<HookEvent, HookCallbackMatcher[]>>;
 
 /**
+ * F-1519 — the positive-evidence marker `scripts/smoke-examples.mjs` classifies
+ * REACHED-OUTBOUND on, instead of matching the SDK's failure text. This wrapper
+ * sits directly around `sdkQuery()`, the exact call whose internal race between
+ * stream-parsing and the child process's 'exit' event picks between two error
+ * shapes for the SAME underlying failure (`Claude Code returned an error
+ * result: …` vs `Claude Code process exited with code N…`). Printing this,
+ * synchronously, before that race can even begin — on the very first pull from
+ * the generator, before `sdkQuery()`'s body has done anything — makes the
+ * REACHED verdict independent of which shape wins. Gated on
+ * `POME_SMOKE_MARK_OUTBOUND` so real users never see it.
+ */
+export const OUTBOUND_MARKER = "POME_SMOKE_REACHED_OUTBOUND";
+
+/**
  * Drop-in replacement for `@anthropic-ai/claude-agent-sdk`'s `query()`. The
  * returned async iterator yields every SDK message verbatim while attaching
  * pome's read-only `HookEvent` emitter to every SDK hook event (FDRS-407)
@@ -67,9 +81,25 @@ export function query(params: QueryParams): AsyncGenerator<SDKMessage, void, unk
     withTurnUsage<SDKMessage>(withToolEvents<SDKMessage>(sdkQuery(prepared))),
   );
 
+  // F-1519 — marks the outbound attempt before anything the wrapped stream can
+  // throw. Wrapping `instrumented` (rather than `sdkQuery(prepared)` directly)
+  // keeps the marker outermost-of-the-instrumentation but still fires on the
+  // very first pull, since none of withGenAiSpans/withTurnUsage/withToolEvents
+  // do any work before their own first iteration either.
+  const marked = withOutboundMarker<SDKMessage>(instrumented);
+
   // Outermost, so the wrappers above still see the stream events they read the
   // per-turn output tokens from.
-  return inject ? withoutPartialMessages(instrumented) : instrumented;
+  return inject ? withoutPartialMessages(marked) : marked;
+}
+
+async function* withOutboundMarker<T>(
+  source: AsyncGenerator<T, void, unknown>,
+): AsyncGenerator<T, void, unknown> {
+  if (process.env.POME_SMOKE_MARK_OUTBOUND === "1") {
+    console.error(OUTBOUND_MARKER);
+  }
+  yield* source;
 }
 
 /**
