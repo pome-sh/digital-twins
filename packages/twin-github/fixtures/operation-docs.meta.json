@@ -1,0 +1,41 @@
+{
+  "substrate": "vendor-openapi-projection",
+  "source": {
+    "repo": "github/rest-api-description",
+    "path": "descriptions/api.github.com/api.github.com.json",
+    "commit": "dd9838813134ed73e8ab5f6691cea774a7c04639",
+    "url": "https://raw.githubusercontent.com/github/rest-api-description/dd9838813134ed73e8ab5f6691cea774a7c04639/descriptions/api.github.com/api.github.com.json",
+    "openapi": "3.0.3",
+    "specVersion": "1.1.4",
+    "specPathCount": 808,
+    "specFileSha256": "80850db290cde4eb487e0efb587cf27f305e77b6bef96933ed8a09b5169d5b1d"
+  },
+  "captureDate": "2026-08-13",
+  "producer": "packages/twin-github/scripts/vendor-operation-docs.ts — re-derive and diff with `npm run gate:operation-docs -w @pome-sh/twin-github`",
+  "rawFileSha256": "416131c9bc12c2ef38204aa4013a432d4e00e7ca7002530412d29c5612942399",
+  "operationCount": 63,
+  "restSurfaceCount": 66,
+  "mcpToolCount": 36,
+  "resolution": {
+    "restResolvedByPathShape": 62,
+    "restResolvedByHand": {
+      "DELETE /repos/:owner/:repo/git/refs/heads/*": "git/delete-ref — the twin hardcodes the `heads/` prefix that GitHub carries INSIDE its `{ref}` path parameter, so the twin's shape has one more literal segment than `/repos/{owner}/{repo}/git/refs/{ref}`. Same operation, different spelling of the same url.",
+      "GET /repos/:owner/:repo/contents": "repos/get-content — the root-directory listing is `repos/get-content` with an empty path. GitHub declares only `/repos/{owner}/{repo}/contents/{path}`, so the twin's extra route for the bare directory has no shape to match — it is the same operation reached with `path` empty."
+    },
+    "restTwinOnly": {
+      "GET /repos/:owner/:repo/pulls/:number/diff": "twin-only route, no GitHub operation — GitHub serves a PR diff off `pulls/get` with the `.diff` media type, not off a `/diff` path, so there is no operation this url could name.",
+      "GET /repos/:owner/:repo/pulls/:number/status": "twin-only route, no GitHub operation — GitHub's combined status is `repos/get-combined-status-for-ref` under `/commits/{ref}/status`, which this twin also serves separately. This convenience path is the twin's own."
+    },
+    "mcpDecided": 33,
+    "mcpUnmappable": {
+      "create_branch": "two legs with different operations: the base-ref read (`git/get-ref`) and the ref write (`git/create-ref`). A missing `from_branch` fails the first, an existing branch the second. The twin collapses both into one `domain.createBranch` call, so the failing leg is not recoverable at the throw site.",
+      "get_tag": "two-leg read upstream — `git/get-ref` on `refs/tags/<tag>`, then `git/get-tag` on the returned sha. The twin resolves a tag in one lookup, so a not-found here does not identify which of the two GitHub legs would have raised it.",
+      "push_files": "fans out over `git/create-tree` + `git/create-commit` + `git/update-ref` (GitHub's MCP server builds a tree; it does NOT go through `PUT /contents/*`). None of the three is a REST surface this twin serves, and which leg fails decides the url."
+    }
+  },
+  "genericByMeasurement": [
+    "every 401 — authentication fails before dispatch, so there is no operation to name (8/8 measured)",
+    "every unrouted path — the 501 catch-all names nothing (4/4 measured)",
+    "GET /users/{username} — a genuine GitHub one-off this twin serves no route for (2/2 measured)"
+  ]
+}

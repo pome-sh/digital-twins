@@ -603,19 +603,36 @@ on each bullet's bold title and never on its number, so gaps cost it nothing.
     `status` leaf and the empty url on purpose — so this reads as a gap rather
     than as coverage, and closing it makes the test fail.
 
-32. **`documentation_url` is the generic `https://docs.github.com/rest` where
-    GitHub names the operation.** Measured live 2026-08-12 (F-1490): real GitHub
-    is operation-specific on **45 of 59** error responses —
-    `https://docs.github.com/rest/repos/contents#create-or-update-file-contents`,
-    `…/rest/branches/branches#get-a-branch`, `…/rest/commits/commits#list-commits`
-    and so on. This twin sends the generic url everywhere except the four
-    contents-door `sha` sites and the invalid-base64 site, which can name their
-    operation because a `sha` or base64 refusal can only be raised BY that
-    operation.
+32. **`documentation_url` names no operation on three MCP tools.** NARROWED by
+    F-1498 from "on essentially every error". The measured half is closed: a
+    routed, authenticated error now carries the url real GitHub carries for that
+    operation, on **64 of the 66 REST surfaces** the twin mounts and **33 of the
+    36 MCP tools** it serves. The urls are `externalDocs.url` out of GitHub's
+    published OpenAPI description (`github/rest-api-description@dd98388`, OpenAPI
+    3.0.3, `info.version` 1.1.4), vendored as
+    [`fixtures/operation-docs.raw.json`](fixtures/operation-docs.raw.json) — none
+    is typed from the docs site, because the anchors (`/rest/repos/contents#…`,
+    `/rest/commits/commits#…`, `/rest/branches/branches#…`) are not derivable
+    from the path.
 
-    **The boundary matters as much as the rule, because "operation everywhere"
-    would be a NEW divergence in the opposite direction.** GitHub itself sends
-    the generic url on the remaining **14 of 59**, and the cases are crisp:
+    **What is still generic, and it is three MCP tools:** `push_files`,
+    `create_branch` and `get_tag`. Each is a MULTI-LEG upstream call where the
+    url depends on which leg failed — `push_files` fans out over
+    `git/create-tree` + `git/create-commit` + `git/update-ref` (it does not go
+    through `PUT /contents/*` at all), `create_branch` is a base-ref read plus a
+    ref write, `get_tag` is `git/get-ref` then `git/get-tag` — and this twin
+    collapses each into one domain call, so the failing leg is not recoverable.
+    The per-tool reasons ship on the artifact, in
+    [`fixtures/operation-docs.meta.json`](fixtures/operation-docs.meta.json).
+
+    ⚠️ **This residual is UNMEASURED, and deliberately not fixed.** No lane has
+    ever compared this twin's MCP error envelope to `api.githubcopilot.com/mcp/`,
+    so picking one of the three legs would invent a divergence in the direction
+    F-1498 exists to close. It stays generic until somebody measures it.
+
+    **The genericness is a REQUIREMENT on three classes, not a gap**, and that
+    is the half of this entry that must not be "fixed": GitHub itself sends the
+    generic url on **14 of the 59** measured responses.
 
     * **every 401 — 8 of 8**, on all five route shapes probed and with no
       `Authorization` header at all. Authentication fails before dispatch, so
@@ -624,33 +641,29 @@ on each bullet's bold title and never on its number, so gaps cost it nothing.
       `/repos`, `DELETE /user`).
     * **`GET /users/:username` — 2 of 2.** A genuine GitHub one-off, not a
       pattern: `GET /users/:u/repos` *is* operation-specific, so is `GET /orgs/:o`,
-      and so is `GET /gists/:id`. Only the single-user read is generic.
+      and so is `GET /gists/:id`. Only the single-user read is generic. This twin
+      serves no such route, so there is nothing here to get wrong — recorded so a
+      ticket that adds one does not mechanically stamp it.
 
-    So a faithful fix has to reproduce GitHub's genericness too. The twin is
-    already accidentally right on two of those three classes — its 401s and its
-    unrouted 501 catch-all do not name an operation either.
+    The two twin-only routes — `GET /pulls/:n/diff` and `GET /pulls/:n/status` —
+    are generic for the same reason: GitHub has no operation at those paths to
+    name.
 
-    **Registered rather than fixed because the envelope builder structurally
-    cannot know the answer.** The SDK hook is `errorEnvelope?: (err: unknown) =>
-    {status, body}` — the error, and nothing else. That is not an oversight to
-    route around: `notFound()` raised inside `domain.requireRepo()` is reachable
-    from ~40 REST routes *and* ~30 MCP tools, and the right url depends on which
-    door was knocked on rather than on where the throw happened. Naming the
-    operation means putting a url on all **65 REST surfaces**
-    (`route-inputs.json`) **and 40 MCP tools**; the MCP door emits this same
-    envelope.
+    **Why the url is attached at the DOOR.** The SDK hook is
+    `errorEnvelope?: (err: unknown) => {status, body}` — the error, and nothing
+    else — while the right url depends on which door was knocked on:
+    `notFound()` raised inside `domain.requireRepo()` is reachable from ~40 REST
+    routes *and* ~30 MCP tools. So `routes.ts`'s `route()` helper installs a
+    per-call envelope keyed on the declaration's own `surface` string, and
+    `executeTool` stamps the error it rethrows, keyed on the tool name plus the
+    `method` it just parsed. The two throw-site urls in `src/domain/git.ts`
+    (F-1460, F-1491) are untouched and still win, because a `sha` or base64
+    refusal can only be raised by the contents operations.
 
-    The data for it is not guesswork and that is worth recording: GitHub's
-    published OpenAPI description carries `externalDocs.url` per operation,
-    byte-identical to what was measured on the wire, and 63 of the 65 REST
-    surfaces map mechanically onto a GitHub operation. The two that do not —
-    `GET /pulls/:n/diff` and `GET /pulls/:n/status` — are twin-only routes GitHub
-    would answer generically anyway, so they are already right. What the fix
-    needs decided rather than guessed is the 40-tool mapping, where a tool like
-    `push_files` spans several REST operations.
-
-    Pinned by `test/error-envelope-status.test.ts`, which asserts the generic url
-    on a 404 deliberately.
+    Pinned by `test/operation-documentation-url.test.ts` — both halves, the
+    named and the deliberately generic — and by
+    `test/error-envelope-status.test.ts`, whose two generic-url assertions moved
+    rather than went away.
 
 ## How fidelity is verified
 
@@ -884,8 +897,9 @@ Neither body carries an `errors` array, and both carry the operation-specific
 `#delete-a-file` for `DELETE`. Those two urls are stamped at the throw site,
 which is sound *here* and does not generalise: a `sha` conflict can only be
 raised by the contents operations, so the throw site knows the operation. Most of
-this twin's errors do not have that property, which is why the generic
-`https://docs.github.com/rest` is still what everything else emits.
+this twin's errors do not have that property, which is why every other url is
+attached at the DOOR instead (F-1498, divergence 32) — and why these two still
+win when it is: `withOperationDocs` only overwrites the generic default.
 
 GitHub's own published OpenAPI description declares the 409 independently —
 `PUT /repos/{owner}/{repo}/contents/{path}` lists `409: Conflict` against

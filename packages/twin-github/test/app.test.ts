@@ -120,7 +120,13 @@ describe("github_clone app", () => {
 
     const missing = await app.request(`${base}/repos/acme/api/contents/nope.txt`, withAuth(token));
     expect(missing.status).toBe(404);
-    await expect(missing.json()).resolves.toMatchObject({ message: "Not Found", documentation_url: "https://docs.github.com/rest" });
+    // F-1498 — the url names the operation the caller asked for, which is what
+    // real GitHub answers on a routed, authenticated 404. It read
+    // `https://docs.github.com/rest` until this route learned its own.
+    await expect(missing.json()).resolves.toMatchObject({
+      message: "Not Found",
+      documentation_url: "https://docs.github.com/rest/repos/contents#get-repository-content"
+    });
 
     const invalidNumber = await app.request(`${base}/repos/acme/api/issues/not-a-number`, withAuth(token));
     expect(invalidNumber.status).toBe(422);

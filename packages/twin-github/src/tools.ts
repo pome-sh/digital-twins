@@ -11,7 +11,8 @@ import type { StateDelta } from "@pome-sh/wire";
 import metaListing from "../fixtures/mcp-tools-list.meta.json" with { type: "json" };
 import rawListing from "../fixtures/mcp-tools-list.raw.json" with { type: "json" };
 import type { GitHubDomain } from "./domain/index.js";
-import { TwinError, validationFailed } from "./errors.js";
+import { TwinError, validationFailed, withDocumentationUrl } from "./errors.js";
+import { toolOperationDocumentationUrl } from "./operation-docs.js";
 
 /**
  * The tool table GitHub serves. Every name, description and input schema on
@@ -381,6 +382,31 @@ export function isMutatingTool(name: string) {
 // why membership is a promise rather than a label.
 export { TAPE_ASSERTABLE_TOOLS } from "./tape-assertable-tools.js";
 
+/**
+ * Dispatch an MCP tool call, and put the REST operation's `documentation_url`
+ * on whatever it throws (F-1498).
+ *
+ * GitHub's own MCP server proxies REST errors verbatim, so a tool's error
+ * surfaces the underlying operation's url — but which operation that is depends
+ * on the ARGUMENTS for five of the 36 tools (`issue_read`, `issue_write`,
+ * `pull_request_read` and `pull_request_review_write` split on `method`;
+ * `create_repository` on whether `owner` was sent). That is why the lookup is
+ * here, after the parse, rather than on the tool table in `twin.ts`.
+ *
+ * ⚠️ THE PARSE IS OUTSIDE THE TRY ON PURPOSE. An argument the tool refuses
+ * never reaches a REST operation, and for a per-method tool the twin does not
+ * yet know which operation it would have been. GitHub's MCP server answers its
+ * own argument refusals rather than proxying a REST error, so those stay
+ * generic — see `test/operation-documentation-url.test.ts`.
+ *
+ * The three tools with no single operation (`push_files`, `create_branch`,
+ * `get_tag`) get `undefined` here and skip the wrapper entirely; their reasons
+ * are registered in `fixtures/operation-docs.meta.json`.
+ *
+ * A plain try/catch is enough because the dispatch below is synchronous all the
+ * way down — `node:sqlite` has no async surface and no domain method returns a
+ * promise. A future async domain call would need this to await first.
+ */
 export function executeTool(
   domain: GitHubDomain,
   name: string,
@@ -393,6 +419,22 @@ export function executeTool(
     validationFailed("tool", "invalid", name);
   }
   const parsed = definition.schema.parse(input) as any;
+  const documentationUrl = toolOperationDocumentationUrl(name, parsed);
+  if (documentationUrl === undefined) return dispatchTool(domain, name, parsed, onDelta, options);
+  try {
+    return dispatchTool(domain, name, parsed, onDelta, options);
+  } catch (error) {
+    throw withDocumentationUrl(error, documentationUrl);
+  }
+}
+
+function dispatchTool(
+  domain: GitHubDomain,
+  name: string,
+  parsed: any,
+  onDelta?: (delta: StateDelta) => void,
+  options: ToolExecutionOptions = {}
+) {
   switch (name as ToolName) {
     case "search_repositories":
       return domain.searchRepositories(parsed);

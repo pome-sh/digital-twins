@@ -29,7 +29,9 @@ import {
 } from "@pome-sh/sdk/route-inputs";
 import type { StateDelta } from "@pome-sh/wire";
 import type { GitHubDomain } from "./domain/index.js";
+import { operationErrorEnvelope } from "./error-envelope.js";
 import { TwinError, validationFailed } from "./errors.js";
+import { restOperationDocumentationUrl } from "./operation-docs.js";
 import { decodeRestContent } from "./rest-content.js";
 import { GITHUB_ROUTES } from "./route-inputs.js";
 import { TAPE_ASSERTABLE_TOOLS } from "./tools.js";
@@ -54,16 +56,24 @@ export function registerGitHubRoutes(session: Hono, { domain, recorder }: RouteC
    * `test/tool-stamping.test.ts`. A `was never called` check is only as honest
    * as the doors the recorder watches, and the two halves drifting apart is how
    * it would quietly start lying.
+   *
+   * F-1498 — every error this route raises carries the `documentation_url` real
+   * GitHub puts on THIS operation, and it is attached here, once, for all 66
+   * surfaces. The declaration's own `surface` string is the key, so a route
+   * cannot be mounted under one operation and mapped under another; the two
+   * surfaces with no GitHub operation get `undefined` and keep the generic url,
+   * which is what GitHub would answer for a path it does not serve either.
    */
   const route = <S extends RouteInputSpec>(
     declaration: RouteInputDeclaration<S>,
     handler: (input: Inputs<S>, c: Context) => HandleResult | Promise<HandleResult>,
     tool?: (typeof TAPE_ASSERTABLE_TOOLS)[number]
   ): void => {
+    const errorEnvelope = operationErrorEnvelope(restOperationDocumentationUrl(declaration.surface));
     mountDeclaredRoute(
       session,
       declaration,
-      recorder.handle({ mutation: false, ...(tool ? { tool } : {}) }, async (c) => {
+      recorder.handle({ mutation: false, errorEnvelope, ...(tool ? { tool } : {}) }, async (c) => {
         const input = await parseDeclared(declaration, c);
         const result = await handler(input, c);
         return {
