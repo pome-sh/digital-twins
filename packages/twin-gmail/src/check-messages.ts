@@ -140,10 +140,29 @@ export const mailboxLabelCount: Check<{ mailbox: string; count: string; label: s
     },
     evaluate({ mailbox, count, label }, { final }) {
       const wanted = Number(count);
-      if (final.messages == null || final.messageLabels == null) {
+      // `labels` is guarded alongside the other two (F-1441). Without it this
+      // check was a live instance of the F-1159 class, and on the worst
+      // possible criterion: polarity flips NEGATIVE at count 0, so a vacuous
+      // pass scores a point for an agent that did the forbidden thing.
+      //
+      // The mechanism is that a USER label's minted id differs from its display
+      // name by construction — the default seed ships
+      // `{ id: "Label_follow_up", name: "Follow Up" }`. With `labels` absent,
+      // `labelIdsFor` degrades to the bare display name, no `messageLabels` row
+      // carries it, the total is 0, and `0 === 0` passes over an export in
+      // which the agent DID apply the label.
+      if (final.messages == null || final.messageLabels == null || final.labels == null) {
         return { passed: false, status: "skipped", reason: "state_incomplete" };
       }
-      if (isTruncated(final, "messages") || isTruncated(final, "messageLabels")) {
+      // Truncation reaches the same vacuous pass without a partial upload at
+      // all: a capped `labels` collection loses the id→name row just as an
+      // absent one does. `resolveLabelByName` in check-state.ts has guarded
+      // both since it was written; this check guarded only two of its three.
+      if (
+        isTruncated(final, "messages") ||
+        isTruncated(final, "messageLabels") ||
+        isTruncated(final, "labels")
+      ) {
         return { passed: false, status: "skipped", reason: "collection_truncated" };
       }
       // A mailboxes collection that is present and omits this mailbox means we
@@ -247,10 +266,19 @@ export const oneMessagePerRecipient: Check<{ label: string; count: string }> = d
   },
   evaluate({ label, count }, { final }) {
     const wanted = parseCount(count);
-    if (final.messages == null || final.messageLabels == null) {
+    // The second `labelIdsFor` consumer, guarded on the same terms (F-1441).
+    // This one's polarity is positive and it fails closed today, so an absent
+    // `labels` section costs the agent a point rather than gifting one — but
+    // safe-by-polarity is exactly how this class survives review, and the
+    // polarity is not this function's to promise.
+    if (final.messages == null || final.messageLabels == null || final.labels == null) {
       return { passed: false, status: "skipped", reason: "state_incomplete" };
     }
-    if (isTruncated(final, "messages") || isTruncated(final, "messageLabels")) {
+    if (
+      isTruncated(final, "messages") ||
+      isTruncated(final, "messageLabels") ||
+      isTruncated(final, "labels")
+    ) {
       return { passed: false, status: "skipped", reason: "collection_truncated" };
     }
     const ids = labelIdsFor(final, label);
