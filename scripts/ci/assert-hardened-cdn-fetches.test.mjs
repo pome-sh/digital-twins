@@ -275,7 +275,10 @@ withScratchRoot(
 withScratchRoot(
   {
     "planted.yml": wf(
-      goodGroup().replace("      - name: install 3\n        id: inst_3", "      - name: install 3\n        id: inst_3").replace(
+      // Only the LAST attempt's pin is moved: the negative lookahead makes the
+      // regex bind to the final `uses:` in the group, so the group disagrees
+      // with itself rather than being uniformly on a different pin.
+      goodGroup().replace(
         /uses: vendor\/installer@aaaa\n(?![\s\S]*uses: vendor)/,
         "uses: vendor/installer@bbbb\n",
       ),
