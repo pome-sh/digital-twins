@@ -1,5 +1,68 @@
 # @pome-sh/checks
 
+## 0.1.7
+
+A section a check's verdict reads is now measured HERE, where the worlds are
+authored, instead of being left to an instrument that cannot see it (F-1437).
+
+pome-cloud's `findVacuousStateSectionReaders` derives its candidate sections
+from what DIFFERS between a check's two discriminating worlds. That rule is what
+stops it reporting every section a world carries for realism, and it is also a
+blind spot it has documented rather than folded into its zero: a section
+IDENTICAL in both worlds is never a candidate, so it is never deleted, so a
+verdict that reads it vacuously is invisible there. No widening fixes that — with
+both worlds carrying the same value there is no failing value to swap in, hence
+no proof the verdict reads the section at all.
+
+`test/section-read-sweep.test.ts` reaches it from the other side. It hands
+`evaluate` a recording view of the state tree, so every top-level section the
+predicate ASKS FOR is on the record whether or not the worlds disagree about it;
+then, for exactly the sections the worlds agree on, it runs the detector's own
+step 3 — delete from the passing world, re-evaluate — and a verdict that stays a
+bare `passed` is named. Both trees, `seed` as well as `final`, because the
+detector probes `final` only. Over the shipped vocabulary: 38 state
+declarations and 34 agreed-on section reads (28 on `final`, 6 on `seed`), of
+which 26 are discharged by measurement — 22 return `state_incomplete` and 4 fail
+honestly — and 8 are declared exceptions where the twin reads an absent section
+as a VALUE: the
+`exportBounds` block, whose absence `isTruncated` deliberately answers as "not
+truncated" so an export predating the cap is not skipped wholesale, and
+`gmail.mailbox-label-count`'s `mailboxes`, where an absent collection means
+"count by `mailboxEmail`" and the evidence collections are guarded by name one
+line above. The exception list is pinned in both directions, so a row that stops
+being needed fails the same way an unexplained finding does.
+
+**ONE DECLARATION MOVED, AND IT IS A FIXTURE, NOT A VERDICT.**
+`gmail.message-has-label`'s discriminating worlds built their user label as
+`userLabel(label, label)` — an `id === name` shape only a SYSTEM label has. With
+it, `labelIdsFor`'s bare-display-name fallback answered the join unaided, so
+deleting `labels` from the passing world changed nothing and the verdict stayed
+`passed`: a section the verdict demonstrably reads, proven unread by the only
+world that speaks for it. The label now carries a minted id (`Label_1`) and the
+`messageLabels` rows carry that id, so the deletion moves the verdict to
+`failed` and the read is on the record.
+
+Nothing in any `evaluate` changed. No check id, template, params, polarity,
+subject or vacuity mutant moved, and no criterion changes from bound to unbound
+or from passing to failing on any real export. `discriminatingWorlds` is a
+fixture the probes run; a run's grade does not read it.
+
+`labelIdsFor`'s comment counted TWO callers that must guard `state.labels`. There
+are three — `messageCarriesLabel` in the same file is the third, reached by
+`gmail.message-has-label`, and it answers `false` rather than refusing. That is
+the safe direction for a check whose polarity is always positive, so it is left
+alone and the comment now says which caller does which, with the sweep as the
+thing that keeps it measured rather than assumed.
+
+**What pome-cloud must do.** Pin `0.1.7` in `apps/control-plane` AND `apps/mcp`
+— they must move together or `save_task` accepts criteria the grader cannot
+bind — and restate the blind spot in `findVacuousStateSectionReaders`' doc
+comment as a property of the declarations rather than of the detector, with
+`docs/grading/a3-bucket-ledger.md` §5 item 9 following it. `declared-pin.test.ts`
+needs no other edit: the detector's finding set over the new declarations is
+byte-identical, because `gmail.message-has-label`'s worlds still differ on
+`messageLabels` alone and deleting it still returns `state_incomplete`.
+
 ## 0.1.6
 
 `gmail.mailbox-label-count` now refuses instead of scoring a free pass (F-1441)

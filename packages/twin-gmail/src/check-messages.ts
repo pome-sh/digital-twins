@@ -66,11 +66,29 @@ export const messageHasLabel: Check<{ message: string; label: string }> = define
     // The message is PRESENT in both worlds and only the JOIN row moves. A world
     // without the message would fail through the selector, reproducing the reason
     // an empty world already gives — which the probe rejects as degenerate.
-    const labels = [systemLabel("INBOX"), userLabel(label, label)];
+    //
+    // THE MINTED ID DIFFERS FROM THE DISPLAY NAME, and that is the whole of this
+    // fixture's second job. Both worlds carry the same `labels`, so the engine's
+    // `findVacuousStateSectionReaders` can never make `labels` a candidate and
+    // never deletes it — the section is invisible to that instrument by
+    // construction. It used to be invisible HERE too: this pair built the label
+    // as `userLabel(label, label)`, an id-equals-name shape only a SYSTEM label
+    // has, and with that shape `labelIdsFor`'s bare-display-name fallback answers
+    // the join on its own. Deleting `labels` from the passing world therefore
+    // changed nothing and the verdict still read `passed` — a section the verdict
+    // demonstrably reads, proven unread by the only world that speaks for it.
+    // With a minted id the fallback misses, so the deletion moves the verdict and
+    // the read is on the record. `section-read-sweep.test.ts` in
+    // `@pome-sh/checks` is what measures that, on every run.
+    const labelId = "Label_1";
+    const labels = [systemLabel("INBOX"), userLabel(labelId, label)];
     const base = { messages: [message(id)], labels };
     return {
       passing: finalWorld(
-        gmailState({ ...base, messageLabels: [messageLabel(id, "INBOX"), messageLabel(id, label)] }),
+        gmailState({
+          ...base,
+          messageLabels: [messageLabel(id, "INBOX"), messageLabel(id, labelId)],
+        }),
       ),
       failing: finalWorld(gmailState({ ...base, messageLabels: [messageLabel(id, "INBOX")] })),
     };

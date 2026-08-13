@@ -204,9 +204,25 @@ export function resolveMessage(
  *
  * So: this function cannot refuse — it returns a Set, and an empty Set is
  * indistinguishable from "the label was never applied". **Every caller must
- * guard `state.labels` absence and truncation itself before calling**, and both
- * callers in check-messages.ts now do. Adding a third without that guard
- * reintroduces the F-1159 class.
+ * decide what an absent or capped `labels` collection means before calling**.
+ *
+ * THERE ARE THREE CALLERS, not the two F-1441 counted, and the third is in this
+ * very file:
+ *   * `gmail.mailbox-label-count` and `gmail.one-message-per-recipient` in
+ *     check-messages.ts REFUSE — `state_incomplete` / `collection_truncated` —
+ *     because the first flips NEGATIVE at count 0, where an empty Set is a free
+ *     point for an agent that did the forbidden thing.
+ *   * `messageCarriesLabel` below, reached by `gmail.message-has-label`, does
+ *     NOT refuse: it answers `false`, so an absent `labels` costs that check's
+ *     agent a point rather than gifting one. Its polarity is always positive, so
+ *     the direction is safe — but safe-by-polarity is how this class survives
+ *     review, so it is measured rather than assumed. `section-read-sweep.test.ts`
+ *     in @pome-sh/checks deletes `labels` from that check's own passing world on
+ *     every run and asserts the verdict MOVES; before F-1437 it did not, because
+ *     that world minted the label with `id === name` and the fallback above
+ *     answered the join unaided.
+ *
+ * A fourth caller must pick one of those two and say which.
  */
 export function labelIdsFor(state: GmailCheckState, wanted: string): Set<string> {
   const ids = new Set<string>([lower(wanted)]);
