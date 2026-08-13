@@ -10,7 +10,7 @@ write a version number here or in `package.json` — see `RELEASING.md`. Release
 entries are insertions only: a correction is the next entry, naming the one it
 corrects.
 
-## Unreleased (patch)
+## 0.23.47 — 2026-08-13
 
 No user-visible change to the CLI itself. This release carries the corrected
 release instructions in the shipped `README.md` (and this file's preamble):

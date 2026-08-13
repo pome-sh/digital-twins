@@ -1,6 +1,6 @@
 # @pome-sh/adapter-claude-sdk — CHANGELOG
 
-## Unreleased (patch)
+## 0.3.6 — 2026-08-13
 
 `query()` now prints the literal `POME_SMOKE_REACHED_OUTBOUND` to stderr
 immediately before its first outbound model call, and only when
