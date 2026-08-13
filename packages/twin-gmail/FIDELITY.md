@@ -60,20 +60,26 @@ than renumbering the ones after it, so a gap here means a retirement. The lint
 matches on each bullet's bold title and never on its number.
 
 Unlike the other four twins' lists, every bullet below was **measured, not read
-off the twin's source**. The upstream half is a real human-attended capture
-against a throwaway Gmail mailbox on 2026-08-11 (F-1377), committed as
-`sandboxes/gmail/fixtures/upstream-golden.json` in pome-cloud; the twin half is
-the twin's own answer to the same 14 L1 read surfaces. So
-`verified_against_upstream_at` carries a real date on all seven rather than the
+off the twin's source**. For bullets 1–7 the upstream half is a real
+human-attended capture against a throwaway Gmail mailbox on 2026-08-11 (F-1377),
+committed as `sandboxes/gmail/fixtures/upstream-golden.json` in pome-cloud; the
+twin half is the twin's own answer to the same 14 L1 read surfaces. So
+`verified_against_upstream_at` carries a real date on all of them rather than the
 honest `null` the unmeasured registries carry.
 
-**All seven are registered pending triage (F-1463), which is a disposition and
+**Bullets 1–7 are registered pending triage (F-1463), which is a disposition and
 not a verdict.** Registration is what stops an unregistered divergence reporting
 as new drift every day; it does not say the twin is right. Which of these get a
 real twin fix — bullets 1 and 2 are the substantial candidates, since an agent
 that walks `payload.parts` for an HTML body or reads `Received` / `DKIM-Signature`
 to make a decision sees a structurally different object here than in Gmail — is a
 later ruling on F-1463. Each fix deletes its entry and its bullet together.
+
+**Bullet 8 is not part of that batch and has a different provenance.** It came
+from F-1497's own live probe on 2026-08-13 — an unauthenticated 401 on
+`users.getProfile`, which needs no capture and no credential — and it is the
+residue of a fix rather than a triage item: the rest of what that probe measured
+was closed in the same window.
 
 1. **Message payloads are single-part where Gmail returns `payload.parts`.** A
    delivered Gmail message is `multipart/alternative` with a `text/plain` and a
@@ -124,6 +130,39 @@ later ruling on F-1463. Each fix deletes its entry and its bullet together.
    entirely, on both `settings/sendAs` and `settings/sendAs/{sendAsEmail}`. The
    twin's own `verificationStatus` and `treatAsAlias`, which Gmail did not
    return, are the twin-adds direction and are informational, not drift.
+
+8. **The missing-credential 401 omits Gmail's `details[]`, which names the
+   backend method.** Measured live against `gmail.googleapis.com` on 2026-08-13
+   (F-1497), `GET /gmail/v1/users/me/profile` with no `Authorization` header at
+   all. Google's body carries, alongside the `error.code` / `message` /
+   `errors[]` / `status` this twin does reproduce, a fifth key:
+
+   ```json
+   "details": [{"@type": "type.googleapis.com/google.rpc.ErrorInfo",
+                "reason": "CREDENTIALS_MISSING", "domain": "googleapis.com",
+                "metadata": {"method": "caribou.api.proto.MailboxService.GetProfile",
+                             "service": "gmail.googleapis.com"}}]
+   ```
+
+   The twin omits it. **Not an oversight and not cheap to close**: the
+   `metadata.method` names the gRPC method the request would have been
+   transcoded to, i.e. the OPERATION — and authentication fails before dispatch,
+   so the layer that builds this body does not know which one it was. Filling it
+   with a guess is the same mistake in the opposite direction that twin-github's
+   divergence 32 exists to prevent, where naming an operation on a 401 would
+   itself be the divergence. Closing it properly means teaching the auth layer
+   the route table, which is a change to the shared engine and not to this twin.
+
+   The rest of F-1497's gmail measurement was **fixed, not registered**: the twin
+   now tells a missing credential (`Login Required.` / `reason: "required"`) from
+   an invalid one (`Invalid Credentials` / `reason: "authError"`) where it used
+   to send the invalid body for both, carries Google's full `Expected OAuth 2 …`
+   message tail, and answers its admin-gate 403 with a Google-shaped
+   `PERMISSION_DENIED` envelope instead of the GitHub-shaped
+   `{message, documentation_url: ""}` it was inheriting from `@pome-sh/sdk`.
+
+   Pinned by `test/auth-envelope.test.ts`, whose last assertion reads the
+   *absence* of `details` on purpose, so this stays legible as a gap.
 
 ## Declared input surface (F-1179)
 

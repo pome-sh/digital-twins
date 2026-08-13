@@ -7,7 +7,12 @@ import { HonoRequest } from "hono/request";
 import { resolveLinearCredential } from "./auth-credential.js";
 import { LinearDomain } from "./domain/index.js";
 import { openLinearTwinDatabase } from "./db.js";
-import { linearErrorEnvelope, unauthorizedEnvelope, unsupportedEnvelope } from "./errors.js";
+import {
+  forbiddenEnvelope,
+  linearErrorEnvelope,
+  unauthorizedEnvelope,
+  unsupportedEnvelope,
+} from "./errors.js";
 import { checkPersistedQuery, type PersistedQueryAnswer } from "./graphql/persisted-query.js";
 import { LINEAR_ROUTES } from "./route-inputs.js";
 import { LINEAR_MCP_TOOL_COUNT, linearTools } from "./mcp.js";
@@ -65,6 +70,9 @@ export function createLinearTwinDefinition(
         reportDelta(linearStateDelta(before, domain.exportState()));
         return { ok: true };
       },
+      // F-1497 — declared, so the shared gate in `@pome-sh/sdk` stops
+      // answering a GraphQL twin with GitHub's `{message, documentation_url}`.
+      forbidden: () => forbiddenEnvelope(),
     },
     recordingProjection: projectLinearRecording,
     errorEnvelope: linearErrorEnvelope,
@@ -79,8 +87,14 @@ export function createLinearTwinDefinition(
       requirePathSid: false,
       allowRawBearer: true,
       resolveCredential: (token) => resolveLinearCredential(db, token),
-      unauthorized: () => unauthorizedEnvelope("Bad credentials"),
-      sidMismatch: () => unauthorizedEnvelope("Session id mismatch"),
+      // Both take `unauthorizedEnvelope`'s default: Linear answers a bad
+      // bearer and a missing one with the SAME body (measured 2026-08-13,
+      // F-1497), and has no session-id concept to give the mismatch leg a
+      // third one. The messages that used to be here — "Bad credentials" and
+      // "Session id mismatch" — were the twin's own inventions, and the first
+      // was GitHub's.
+      unauthorized: () => unauthorizedEnvelope(),
+      sidMismatch: () => unauthorizedEnvelope(),
       sessionExtras: (claims) => ({
         linear_email:
           typeof claims.linear_email === "string" && claims.linear_email.length > 0

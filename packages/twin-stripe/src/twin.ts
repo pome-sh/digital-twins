@@ -45,6 +45,18 @@ import { registerX402Routes } from "./session.js";
 import { executeTool, isMutatingTool, stripeToolFixture, toolArgumentSchemas } from "./tools.js";
 import type { SeedState, TwinStripeDatabase } from "./types.js";
 
+/**
+ * Real Stripe's answer to a request with no `Authorization` header at all,
+ * transcribed verbatim from a live 401 on `GET https://api.stripe.com/v1/customers`
+ * (2026-08-13, F-1497 — a read with no body, so nothing was created or charged).
+ * Used by `auth.unauthorized`'s `no_token` leg below.
+ */
+const NO_API_KEY_MESSAGE =
+  "You did not provide an API key. You need to provide your API key in the " +
+  "Authorization header, using Bearer auth (e.g. 'Authorization: Bearer " +
+  "YOUR_SECRET_KEY'). See https://stripe.com/docs/api#authentication for " +
+  "details, or we can help at https://support.stripe.com/.";
+
 // Stripe admin/seed is tolerant: an absent body falls back to the default
 // seed (frozen: garbage object → 200 {ok:true, ...}; seedSchema defaults
 // every collection). Malformed collections still fail loudly via zod.
@@ -306,12 +318,32 @@ export function createStripeTwinDefinition(
         // Frozen wire messages: api-key-shaped tokens that resolve nowhere
         // answer "Invalid API Key provided." (pre-port terminal branch);
         // JWT-shaped failures answer "Bad credentials" / "Token expired".
+        //
+        // F-1497 added the `no_token` leg. Real Stripe was probed live on
+        // 2026-08-13 (`GET /v1/customers`, no request body, nothing created)
+        // and it DOES distinguish a bad key from a missing one — both 401,
+        // both `{"error":{"message":…,"type":"invalid_request_error"}}`, but
+        // the message differs and the missing-key one names the header:
+        //
+        //   bad key     "Invalid API Key provided: f1497-in***…***oken"
+        //   no key      "You did not provide an API key. …"  ← the constant below
+        //
+        // This twin answered the JWT branch's "Bad credentials" — GitHub's
+        // string — to a keyless request. That is the leak F-1497 exists to
+        // stop, and it was reachable from every `/v1/*` path.
+        //
+        // ⚠️ NO `documentation_url` AND NO TOP-LEVEL `status` on either body.
+        // Stripe sends neither, so the leaves F-1497 added to twin-github must
+        // not appear here. (`stripeError` can emit a `doc_url`; auth does not
+        // pass one, and must not start.)
         const message =
-          kind === "expired"
-            ? "Token expired"
-            : info?.token && looksLikeApiKey(info.token)
-              ? "Invalid API Key provided."
-              : "Bad credentials";
+          kind === "no_token"
+            ? NO_API_KEY_MESSAGE
+            : kind === "expired"
+              ? "Token expired"
+              : info?.token && looksLikeApiKey(info.token)
+                ? "Invalid API Key provided."
+                : "Bad credentials";
         const envelope = unauthorized(message);
         return { status: envelope.status, body: envelope.body };
       },

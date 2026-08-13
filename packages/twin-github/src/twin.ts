@@ -30,6 +30,7 @@ import {
 import { openGitHubCloneDatabase } from "./db.js";
 import { GitHubDomain } from "./domain/index.js";
 import { githubErrorEnvelope } from "./error-envelope.js";
+import { githubError } from "./errors.js";
 import { registerGitHubRoutes } from "./routes.js";
 import { defaultSeedState, parseSeed, type ParsedGitHubStateSeed } from "./seed.js";
 import { executeTool, githubToolFixture, isMutatingTool, toolArgumentSchemas } from "./tools.js";
@@ -102,8 +103,16 @@ export const githubTwinDefinition: TwinDefinition<GitHubCloneDatabase, ParsedGit
         domain.seed(seed, reportDelta);
         return { ok: true, repositories: seed.repositories.length };
       },
-      // The admin-gate 403 body is the gate's default GitHub envelope
-      // ({message: "Forbidden"}); no per-twin override needed.
+      // F-1497: the admin-gate 403 body is BUILT HERE now, not defaulted in
+      // `@pome-sh/sdk`. The gate is shared by all five twins, so its default
+      // cannot carry GitHub's `documentation_url`/`status` leaves — and while
+      // it defaulted, this twin's 403 said `documentation_url: ""`.
+      //
+      // The url is the GENERIC one on purpose. Real GitHub's measured 403s
+      // name the operation (3 of 3, F-1490), but `/admin/*` is a twin-only
+      // route with no GitHub operation behind it, which is the same reason
+      // `/pulls/:n/diff` and `/pulls/:n/status` stay generic (divergence 32).
+      forbidden: () => ({ status: 403, body: githubError("Forbidden", 403) }),
     },
     tools: deriveMcpToolTable(githubToolFixture, githubToolImplementations),
     // Frozen healthz shape: {ok, twin, implementation, fidelity, tools,
@@ -134,21 +143,38 @@ export const githubTwinDefinition: TwinDefinition<GitHubCloneDatabase, ParsedGit
     auth: {
       // F-712 pins (wire-frozen): Bearer-header only (no extra token
       // resolvers), raw bearer rejected (allowRawBearer=false), sid mismatch
-      // → 401 {message:"Forbidden"}, and every credential failure — expired
-      // JWT included — renders 401 {message:"Bad credentials"}. The pre-port
-      // explicit "Token expired" branch was dead code: hono/jwt's verify
-      // throws JwtTokenExpired before the branch was ever reached, so the
-      // wire always said "Bad credentials" (pre-ruled: deleting it is zero
-      // wire diff).
+      // → 401 {message:"Forbidden"}, and an expired JWT rendering as
+      // "Bad credentials". The pre-port explicit "Token expired" branch was
+      // dead code: hono/jwt's verify throws JwtTokenExpired before the branch
+      // was ever reached, so the wire always said "Bad credentials"
+      // (pre-ruled: deleting it is zero wire diff).
+      //
+      // ── F-1497 changed two things about these bodies ────────────────────
+      //
+      // 1. They are built by `githubError` now instead of by hand, which is
+      //    what gives them the `documentation_url` and `status` leaves real
+      //    GitHub sends. Measured live 2026-08-13, 401 on `GET /user`:
+      //    `{"message":…,"documentation_url":"https://docs.github.com/rest","status":"401"}`.
+      //    The url is GitHub's GENERIC one and MUST STAY generic — GitHub
+      //    names no operation on a 401 because authentication fails before
+      //    dispatch (8 of 8 measured, F-1490), which is the half of
+      //    divergence 32 that is a requirement rather than a gap. `githubError`
+      //    defaults to exactly that url and this call passes no override.
+      //
+      // 2. A MISSING credential and a BAD one no longer say the same thing.
+      //    Real GitHub, same probe: no `Authorization` header at all answers
+      //    `Requires authentication`, a bad token answers `Bad credentials`.
+      //    The engine already classifies the two (`no_token` vs `invalid`);
+      //    this twin was collapsing them.
       providerToken: { provider: "github", prefixes: ["ghp_pome_", "github_pat_pome_"] },
       allowRawBearer: false,
-      unauthorized: () => ({
+      unauthorized: (kind) => ({
         status: 401,
-        body: { message: "Bad credentials", documentation_url: "" },
+        body: githubError(kind === "no_token" ? "Requires authentication" : "Bad credentials", 401),
       }),
       sidMismatch: () => ({
         status: 401,
-        body: { message: "Forbidden", documentation_url: "" },
+        body: githubError("Forbidden", 401),
       }),
       sessionExtras: (claims) =>
         typeof claims.login === "string" && claims.login.length > 0 ? { login: claims.login } : {},

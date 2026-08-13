@@ -84,8 +84,19 @@ export interface AdminGateOptions {
   forbidden?: () => Response;
 }
 
+/**
+ * Last-resort 403 for a twin that declares no `admin.forbidden`.
+ *
+ * ⚠️ NO `documentation_url` HERE EITHER, and for the reason spelled out on
+ * `auth.ts`'s `defaultUnauthorized` (F-1497): the key it used to send —
+ * `documentation_url: ""` — belongs to GitHub's envelope, and of the five
+ * vendors probed live on 2026-08-13 only GitHub has it. This gate is shared by
+ * all five twins, so anything vendor-specific here is a claim four of them do
+ * not make. github, gmail and linear each declare their own 403 now; slack and
+ * stripe already did.
+ */
 function defaultForbidden(): Response {
-  return Response.json({ message: "Forbidden", documentation_url: "" }, { status: 403 });
+  return Response.json({ message: "Forbidden" }, { status: 403 });
 }
 
 /**
