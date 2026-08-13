@@ -215,6 +215,44 @@ console.log("\nrelease.yml wiring");
   );
   check("plan-wire has packages: read", planWire.includes("packages: read"));
   check("publish-wire has packages: write", publishWire.includes("packages: write"));
+
+  // F-1520 — the dispatch that closes the re-pin deadlock (RELEASING.md /
+  // AGENTS.md P8) must fire once after either publish lane succeeds, never
+  // before, and never mask a real publish failure by swallowing its own.
+  const dispatch = jobOf("dispatch-allocate-version");
+  check("dispatch-allocate-version job exists", Boolean(dispatch));
+  check(
+    "it needs exactly publish and publish-wire — not plan/plan-wire, so a plan-side failure cannot skip it transitively",
+    /needs:\s*\[publish,\s*publish-wire\]/.test(dispatch),
+    dispatch,
+  );
+  check(
+    "its `if:` is an OR over both jobs' .result — a partly-skipped matrix must not suppress it",
+    dispatch.includes("needs.publish.result == 'success' || needs.publish-wire.result == 'success'"),
+    dispatch,
+  );
+  check(
+    "it mints the pome-ops-push app token, the same action pinned SHA as allocate-version.yml's own mint step",
+    dispatch.includes("actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1") &&
+      dispatch.includes("secrets.OPS_APP_ID") &&
+      dispatch.includes("secrets.OPS_APP_PRIVATE_KEY"),
+    dispatch,
+  );
+  check(
+    "the dispatch step never uses the ambient GITHUB_TOKEN — that push/dispatch is event-suppressed and would silently no-op",
+    !/GH_TOKEN:\s*\$\{\{\s*secrets\.GITHUB_TOKEN/.test(dispatch),
+    dispatch,
+  );
+  check(
+    "no continue-on-error anywhere in the job — a failed dispatch must red loudly, not hide behind a green job",
+    !dispatch.includes("continue-on-error"),
+    dispatch,
+  );
+  check(
+    "it calls the actual allocate-version.yml workflow, targeting main",
+    dispatch.includes("gh workflow run allocate-version.yml --ref main"),
+    dispatch,
+  );
 }
 
 if (failures > 0) {

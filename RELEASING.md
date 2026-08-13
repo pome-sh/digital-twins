@@ -243,6 +243,35 @@ v3.2.0 deprecates in favour of `client-id`. It matches pome-cloud's call sites o
 purpose; migrating is a some-day for both repos at once, not a divergence to
 introduce here.
 
+### F-1520 — dispatching `allocate-version.yml` after a publish
+
+Auto-re-pinning `examples/support-triage`'s registry pin (`planExampleRepins`,
+above) needs a run of `allocate-version.yml` that starts AFTER the version it
+is re-pinning to actually exists on the registry — and no push-triggered run
+ever does: the merge commit's run plans before the number exists, and the
+bump commit's own run is the one `[release-bump]` skips. `release.yml`'s
+`dispatch-allocate-version` job closes that window by calling `gh workflow
+run allocate-version.yml --ref main` right after its own publish succeeds,
+using the same `pome-ops-push` app token minted the same way (a
+`workflow_dispatch` made with the ambient `GITHUB_TOKEN` is event-suppressed
+exactly like a push is, so it would report success having started nothing).
+
+**A fourth one-time step belongs next to the three above, and is not yet
+done.** Triggering `workflow_dispatch` over the REST API needs `actions:
+write` on the calling token; the live `pome-ops-push` installation currently
+grants only `contents: write` and `metadata: read` (checked directly against
+the org installation, app_id 4582446). Until an org owner adds `Actions:
+write` under the app's permissions on GitHub (Settings → GitHub Apps →
+pome-ops-push → Permissions — this re-triggers the org's installation
+approval, the same as any permission change to an already-installed app),
+`dispatch-allocate-version` fails loudly with a 403 rather than silently
+doing nothing — the publish it follows has already happened by then, so the
+failure is noise, not breakage, but the re-pin itself will not land until the
+permission is granted. Until then, the deadlock this job exists to close
+still requires the same manual recovery it always did: a docs-only PR, a
+founder ruleset bypass, or `gh workflow run allocate-version.yml --ref main`
+run by a human once the pin has drifted.
+
 ## The four packages version independently
 
 `@pome-sh/cli`, `@pome-sh/adapter-claude-sdk`, `@pome-sh/checks` and

@@ -345,3 +345,91 @@ jobs:
           set -euo pipefail
           printf '//npm.pkg.github.com/:_authToken=%s\n' "${GITHUB_PACKAGES_TOKEN}" >> "$HOME/.npmrc"
           npm publish -w @pome-sh/wire --registry https://npm.pkg.github.com
+
+  # F-1520 — the moment a version lands on a registry is also the moment
+  # scripts/check-example-pins-published.mjs can go red on `main`:
+  # examples/support-triage pins @pome-sh/adapter-claude-sdk from the
+  # registry, and allocate-version.yml is the only thing that re-pins it
+  # (planExampleRepins, wired into the allocator by #426). But the two
+  # allocate-version.yml runs that bracket a publish both miss the window —
+  # the run on the human merge commit plans BEFORE the version exists on the
+  # registry, and the run on the bump commit it produces is deliberately
+  # skipped by that workflow's own `[release-bump]` guard. Nothing else is
+  # on a timer: allocate-version.yml only fires on a push to `main` or a
+  # manual dispatch. So this job dispatches it at the one moment the published
+  # version demonstrably exists — right after this run's own publish.
+  #
+  # Depends on `publish`/`publish-wire` ONLY, not `plan`/`plan-wire`: this
+  # job's implicit success() check (GitHub prepends one to any `if:` that
+  # names no status-check function) is scoped to exactly the jobs listed in
+  # its own `needs:`, so a plan-side failure that already skipped its
+  # publish job cannot also skip this one through a transitive dependency it
+  # was never given. A failed dispatch can therefore never reach backwards
+  # into publishing: nothing downstream of `publish`/`publish-wire` consumes
+  # this job's outcome, so it cannot un-publish, retry, or block either lane
+  # — it can only fire, or fail loudly, after they are already done.
+  #
+  # `if:` is deliberately OR, not AND, and reads only the two publish jobs'
+  # `.result` (not their per-package outputs): a matrix job's `.result` is
+  # 'success' as long as every ENABLED leg passed, so a matrix where most
+  # packages were skipped (nothing to publish for them) still reports
+  # 'success' and must not suppress this. Symmetrically, a job with nothing
+  # enabled at all is 'skipped', not 'success', so "nothing published" (both
+  # skipped) correctly evaluates to false. A real publish failure — 'failure'
+  # on either job — fails the automatic success() check GitHub prepends,
+  # which drops this job before the OR is ever evaluated.
+  #
+  # Loop termination: the commit this dispatch eventually produces (a re-pin,
+  # or a version allocation) always carries BUMP_COMMIT_MARKER
+  # ("[release-bump]", scripts/ci/allocate-release-versions.mjs) in its
+  # message. The push that commit makes re-triggers this workflow, but that
+  # run's `plan`/`plan-wire` see no package.json version change (a re-pin
+  # touches only example manifests) and skip `publish`/`publish-wire`, so
+  # THIS job's own `if:` is false on that run and it does not fire again.
+  # Independently, allocate-version.yml's push arm skips itself outright on a
+  # `[release-bump]` head commit — the SAME marker gates both the workflow
+  # this job dispatches and the workflow whose push would otherwise chain
+  # into it, so the two guards cannot disagree.
+  #
+  # allocate-version.yml's `concurrency: allocate-version-${{ github.ref }}`
+  # covers a `workflow_dispatch` the same as a `push`: both resolve `ref` to
+  # `refs/heads/main`, so a dispatch queues behind (never cancels, and is
+  # never raced by) any allocation already in flight on `main` and the
+  # allocator recomputes from the tip when it starts — the same behaviour
+  # this file already relies on for two merges landing close together.
+  dispatch-allocate-version:
+    name: dispatch allocate-version.yml after a publish
+    needs: [publish, publish-wire]
+    if: needs.publish.result == 'success' || needs.publish-wire.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      # Same app, same mint step as allocate-version.yml's own — see
+      # RELEASING.md, "The credential: pome-ops-push, and the one-time setup
+      # around it". Required here for an independent reason: a
+      # `workflow_dispatch` REST call authenticated with the ambient
+      # `GITHUB_TOKEN` is event-suppressed exactly like a `GITHUB_TOKEN` push
+      # is (documented on allocate-version.yml's own `on:` block) — the call
+      # returns 204 and starts no run, so this step would report green having
+      # dispatched nothing. An App installation token is not event-suppressed.
+      #
+      # UNVERIFIED AT THE TIME OF THIS CHANGE: the `pome-ops-push` installation
+      # currently grants only `contents: write` + `metadata: read` (checked
+      # live against the org installation, app_id 4582446) — triggering
+      # `workflow_dispatch` over the API needs `actions: write` on top of
+      # that, which this installation does not yet have. Until a maintainer
+      # adds it (Settings → GitHub Apps → pome-ops-push → Permissions, which
+      # requires the installing org owner to re-approve), the step below will
+      # fail loudly with a 403 rather than silently no-op — which is the
+      # correct failure mode for an already-completed publish, but the re-pin
+      # this milestone exists for will not actually fire until that grant
+      # lands.
+      - name: Mint a pome-ops-push installation token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.OPS_APP_ID }}
+          private-key: ${{ secrets.OPS_APP_PRIVATE_KEY }}
+      - name: Dispatch allocate-version.yml
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: gh workflow run allocate-version.yml --ref main --repo ${{ github.repository }}
