@@ -85,6 +85,10 @@ on:
       - "scripts/ci/allocate-release-versions.test.mjs"
       - "scripts/ci/changelog-entry.mjs"
       - "scripts/ci/publish-relevance.mjs"
+      # F-1520 — the allocator now imports planExampleRepins from here, so a
+      # change to it is a change to the allocator's own wiring, not just to
+      # the standalone gate that also uses it.
+      - "scripts/check-example-pins-published.mjs"
       - ".github/workflows/allocate-version.yml"
 
 # One allocation at a time, and never cancelled mid-write: the number is a
