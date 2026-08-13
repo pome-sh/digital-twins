@@ -1,5 +1,18 @@
 # @pome-sh/adapter-claude-sdk — CHANGELOG
 
+## 0.3.6 — 2026-08-13
+
+`query()` now prints the literal `POME_SMOKE_REACHED_OUTBOUND` to stderr
+immediately before its first outbound model call, and only when
+`POME_SMOKE_MARK_OUTBOUND=1`. Nothing is printed in a normal run, so a consumer
+who does not set that variable sees no change in output.
+
+The marker exists so `smoke:examples` can classify on evidence the process
+emitted rather than on the text of whichever error it happened to surface. The
+Claude Agent SDK races on `lastErrorResultText` and produces one of two
+unrelated error strings for the same underlying failure, so any classifier
+reading that text is a coin flip (F-1519).
+
 ## 0.3.5
 
 Republished for `@pome-sh/wire` 0.2.3. No source change in this package: it

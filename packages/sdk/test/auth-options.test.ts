@@ -63,11 +63,19 @@ describe("unauthorized(kind) envelope hook (rows 2 + 6)", () => {
     expect(await res.json()).toEqual({ ok: false, error: "token_expired" });
   });
 
-  it("defaults to the frozen github-shaped envelope, expired included (github wire: Bad credentials)", async () => {
+  it("defaults to a VENDOR-NEUTRAL envelope, expired included — no documentation_url (F-1497)", async () => {
+    // ⚠️ THE ABSENT KEY IS THE ASSERTION. This default used to send
+    // `documentation_url: ""` — GitHub's key, with a value GitHub never sends —
+    // and `toEqual` is what makes its removal visible: an extra leaf fails.
+    // Five vendors were probed live on 2026-08-13 (F-1497) and only GitHub has
+    // that key at all, so a default shared by all five cannot carry it. Every
+    // first-party twin declares its own `unauthorized`, which is why this
+    // default reaches no shipped wire — see `auth-envelope-per-twin.test.ts`,
+    // which proves that rather than assuming it.
     const expired = await signTestToken({ expSeconds: -60 });
     const res = await sessionApp().request(path, withAuth(expired));
     expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ message: "Bad credentials", documentation_url: "" });
+    expect(await res.json()).toEqual({ message: "Bad credentials" });
   });
 });
 
@@ -92,11 +100,11 @@ describe("raw bearer pin (row 4)", () => {
 });
 
 describe("sid mismatch pin (row 5)", () => {
-  it("defaults to the frozen 401 Forbidden envelope", async () => {
+  it("defaults to the 401 Forbidden envelope, with no documentation_url (F-1497)", async () => {
     const other = await signTestToken({ sid: "other-sid" });
     const res = await sessionApp().request(path, withAuth(other));
     expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ message: "Forbidden", documentation_url: "" });
+    expect(await res.json()).toEqual({ message: "Forbidden" });
   });
 
   it("renders the twin's pinned mismatch envelope (stripe: 403)", async () => {
@@ -168,7 +176,7 @@ describe("provider-shaped tokens in the middleware (rows 1 + 7)", () => {
     );
     const res = await sessionApp(options).request(path, withAuth(token));
     expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ message: "Forbidden", documentation_url: "" });
+    expect(await res.json()).toEqual({ message: "Forbidden" });
   });
 });
 

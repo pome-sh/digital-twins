@@ -32,6 +32,15 @@
 // legs below exist for the cases where nothing was owed and the release path is
 // broken anyway, which the outcome check cannot see until the next bump.
 //
+//   UNALLOCATED — main carries a pending `## Unreleased` entry that no
+//                 allocation consumed (F-1511). The version number is written on
+//                 main after the merge by allocate-version.yml, so a broken or
+//                 unconfigured allocator produces a state the outcome check
+//                 CANNOT see: main declares the old version, the registry serves
+//                 the old version, everything agrees, and the fix never ships.
+//                 A pending entry is transient by construction — the allocator
+//                 consumes it on the next push — so one still sitting there past
+//                 the grace window is that silence, named.
 //   UNPUBLISHED — main declares a version its registry does not serve. The
 //                 08-06 shape, and the only state a consumer can observe.
 //   BEHIND      — main declares a version BELOW the registry's `latest`. Not
@@ -84,8 +93,12 @@ import { appendFileSync, existsSync, readFileSync, realpathSync } from "node:fs"
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { pendingRelease } from "./changelog-entry.mjs";
+import { PUBLISHED_PACKAGES } from "./publish-relevance.mjs";
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const RELEASE_WORKFLOW = "release.yml";
+const ALLOCATE_WORKFLOW = "allocate-version.yml";
 
 /**
  * Every publish target `release.yml` decides on, read from the workflow itself.
@@ -241,6 +254,69 @@ function inspectReleaseRuns({ repo, head, runs, now, graceMinutes, stuckMinutes 
   return { alarms, lines, headAge, forHead, inFlight };
 }
 
+/**
+ * The allocation leg (F-1511): is anything still WAITING for a number?
+ *
+ * A pending `## Unreleased` entry on main is transient by construction —
+ * allocate-version.yml consumes it on the push that created it — so one still
+ * there is the allocator not running: the secret unset, the ruleset bypass
+ * revoked, three rejected pushes, a crash. None of that is visible to the
+ * outcome leg below, which compares main's declared version against the
+ * registry and finds them in perfect agreement on the OLD number.
+ *
+ * WHAT THIS DOES NOT COVER, stated rather than implied: the other half of what
+ * earns a release is publish RELEVANCE (paths moved with no entry written), and
+ * that half is not checked here. It needs the git history the allocator walks,
+ * and a watcher that re-derives it would either share the allocator's table (and
+ * go blind with it) or keep a second copy (and drift from it). The PR gate
+ * demands an entry for every publish-relevant change, so reaching that state
+ * takes a bypassed gate — and any OTHER package with an entry still fires this
+ * leg in the same run, because a dead allocator is dead for all of them.
+ *
+ * Reads the tree it is checked out in, not the registry, so it costs nothing and
+ * cannot fail for a network reason. The CHANGELOG path per package comes from
+ * scripts/ci/publish-relevance.mjs, the same table the allocator and the PR gate
+ * read.
+ */
+function inspectPendingEntries({ root }) {
+  const alarms = [];
+  const lines = [];
+
+  for (const pkg of PUBLISHED_PACKAGES) {
+    const file = join(root, pkg.changelog);
+    if (!existsSync(file)) {
+      // Asserted pre-merge by check-release-note-required.mjs, so this is
+      // unreachable through a PR. Reported rather than skipped: an alarm that
+      // silently stops watching a package is the shape of every bug in this file.
+      alarms.push(
+        `UNMEASURED — ${pkg.changelog} is missing, so nothing here can say whether ` +
+          `${pkg.name} is waiting for a version number.`,
+      );
+      continue;
+    }
+    let pending;
+    try {
+      pending = pendingRelease(readFileSync(file, "utf8"), pkg.changelog);
+    } catch (error) {
+      alarms.push(
+        `UNALLOCATED — ${pkg.changelog} cannot be read as a release request: ${error.message} ` +
+          `allocate-version.yml fails on the same parse, so nothing is being allocated.`,
+      );
+      continue;
+    }
+    if (!pending) continue;
+    lines.push(`${pkg.name} — pending ${pending.level} entry awaiting a number`);
+    alarms.push(
+      `UNALLOCATED — ${pkg.changelog} carries a pending \`## Unreleased (${pending.level})\` entry ` +
+        `that no allocation consumed. \`${ALLOCATE_WORKFLOW}\` writes the number on main after the ` +
+        `merge, so nothing has published this and the registry agrees with main about the OLD ` +
+        `version — the outcome check below cannot see it.`,
+    );
+  }
+
+  return { alarms, lines };
+}
+
 /** The outcome leg: does each registry serve what main declares? */
 function inspectRegistries({ root, targets, readVersion }) {
   const alarms = [];
@@ -321,13 +397,20 @@ export function check({
   // EARLIER commit missed: `release.yml` diffs against the registry, not against
   // the previous commit, so HEAD's run publishes whatever is still owed.
   if (path.headAge > graceMinutes) {
+    // Same grace window, same reason: an entry that merged four minutes ago is
+    // legitimately still waiting for allocate-version.yml to finish, and firing
+    // there would be the false alarm that gets the label muted.
+    const allocation = inspectPendingEntries({ root });
+    lines.push(...allocation.lines);
+    alarms.push(...allocation.alarms);
     const registries = inspectRegistries({ root, targets, readVersion });
     lines.push(...registries.lines);
     alarms.push(...registries.alarms);
   } else {
     lines.push(
-      `registry drift not evaluated — HEAD is ${path.headAge.toFixed(0)} min old ` +
-        `(grace ${graceMinutes}); its release may still be building.`,
+      `registry drift and pending allocations not evaluated — HEAD is ` +
+        `${path.headAge.toFixed(0)} min old (grace ${graceMinutes}); its number may still be ` +
+        `being allocated and its release may still be building.`,
     );
   }
 

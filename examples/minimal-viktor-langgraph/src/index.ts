@@ -61,6 +61,13 @@ async function main() {
   try {
     const model = await resolveModel(modelSlug);
     const graph = buildGraph(model, { ghUrl, ghToken, slackUrl: slackUrl!, slackToken }, slackChannel);
+    // F-1519 — positive-evidence marker `scripts/smoke-examples.mjs` classifies
+    // REACHED-OUTBOUND on, printed immediately before this example's first
+    // outbound call (the graph's `intake` node calls the GitHub twin before
+    // the model is ever invoked). This example has no @pome-sh dependency to
+    // emit it for free, so it is a literal print, gated so real users never
+    // see it.
+    if (process.env.POME_SMOKE_MARK_OUTBOUND === "1") console.error("POME_SMOKE_REACHED_OUTBOUND");
     const final = await graph.invoke({ task });
     console.log(
       JSON.stringify({

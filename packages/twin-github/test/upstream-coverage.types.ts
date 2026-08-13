@@ -145,7 +145,13 @@ type PullRequestList_Allow =
   | "deletions" | "changed_files";
 const _cov_pullRequestListJson: AssertNoUncovered<PullRequestSimple, ReturnType<typeof pullRequestListJson>, PullRequestList_Allow> = true;
 
-type PullRequestFile_Allow = "previous_filename";
+// F-1500 — `previous_filename` used to sit here. It is served now: the branch
+// diff detects an exact move and `pullRequestFileJson` emits the pre-rename path
+// on `status: "renamed"`, which is the only status GitHub sends it on. Leaving
+// the allowance behind would put the twin on record as still choosing to omit a
+// field it emits — and would stop this guard from failing if the emit were ever
+// dropped again.
+type PullRequestFile_Allow = never;
 const _cov_pullRequestFileJson: AssertNoUncovered<DiffEntry, ReturnType<typeof pullRequestFileJson>, PullRequestFile_Allow> = true;
 
 type Review_Allow = "_links" | "body_html" | "body_text" | "author_association";

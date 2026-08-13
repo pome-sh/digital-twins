@@ -232,6 +232,12 @@ CREATE TABLE IF NOT EXISTS pull_request_files (
   raw_url TEXT NOT NULL DEFAULT '',
   contents_url TEXT NOT NULL DEFAULT '',
   patch TEXT NOT NULL DEFAULT '',
+  -- F-1500 — the pre-rename path, NULL on every status but 'renamed'. Nullable
+  -- rather than DEFAULT '': the serializer reads presence off the status, and
+  -- an empty string here would be indistinguishable from a rename whose source
+  -- path the diff failed to resolve. (No backticks in this literal: it is a
+  -- template string, and one would close it.)
+  previous_filename TEXT,
   PRIMARY KEY (repo_id, pull_number, filename),
   FOREIGN KEY (repo_id, pull_number) REFERENCES pull_requests(repo_id, number) ON DELETE CASCADE
 );
@@ -332,6 +338,10 @@ export function migrate(db: GitHubCloneDatabase) {
   // database migrates without a rewrite; `hydrateDerivedColumns` backfills it
   // from `created_at` for rows written before the column existed.
   ensureColumn(db, "releases", "updated_at", "TEXT NOT NULL DEFAULT ''");
+  // F-1500 — nullable, so a database written before renames were detected
+  // migrates with its existing rows reading `previous_filename: null`, which is
+  // exactly what a non-renamed file should carry.
+  ensureColumn(db, "pull_request_files", "previous_filename", "TEXT");
   ensureIssueNumberCascade(db);
   ensureCommentsAllowPullRequests(db);
   hydrateDerivedColumns(db);

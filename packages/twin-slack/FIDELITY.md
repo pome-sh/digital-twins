@@ -331,6 +331,33 @@ _Shape-anchoring divergences (compile-time anchor to `@slack/web-api`):_
     pome-cloud's registry and the per-member SHAPE is still compared; the same
     reasoning already covers `conversations.members`. F-1434.
 
+23. **A plain-text message carries no `blocks` key; real Slack synthesises a `rich_text` block.**
+    `serializeMessage` folds `blocks` into the message object only when the
+    stored array is non-empty (`serializers.ts`: `...(blocks.length > 0 ?
+    { blocks } : {})`), and `seed.ts` seeds no message with blocks — so every
+    plain-text message, written or seeded, comes back with no `blocks` KEY at
+    all. Real Slack BUILDS one instead. Measured live against
+    `pome-twin-sandbox` on 2026-08-13: a text-only write returns a synthesised
+    `rich_text` → `rich_text_section` block on `chat.postMessage`, `chat.update`
+    AND `chat.scheduleMessage` — all three called separately, because F-1487
+    established that these three validate independently, so one result does not
+    generalise — and it PERSISTS into `conversations.history` with the same
+    structure and a re-minted `block_id`. When the caller DOES send `blocks` no
+    `rich_text` is added and only the caller's own block comes back, so the
+    divergence is strictly the no-blocks case. NOT imitated, and that is the
+    ruling rather than the cheap option: the synthesis is a PARSER, not a
+    projection of the string the twin already stores. The same probe measured
+    `*bold* _italic_ ~strike~` becoming styled elements
+    (`{"type":"text","text":"bold","style":{"bold":true}}`), a bare URL becoming
+    `{"type":"link","url":"https://example.invalid/path"}`, and `<#C0B77EBAB1C>`
+    becoming `{"type":"channel","channel_id":"C0B77EBAB1C"}` — three element
+    types no twin derives from a stored `text` string without shipping a mrkdwn
+    parser, a URL detector and an entity resolver. A PARTIAL one emits a
+    plausible-but-wrong block an agent mis-parses with confidence, which is
+    strictly harder to detect than an honest absent key. The no-blocks case is
+    asserted from pome-cloud by `sandboxes/slack/rest-writes.ts`, which until
+    this entry only ever asserted the block text it SENT. F-1496.
+
 ## Shape anchoring (compile-time, `@slack/web-api@7.16.0`)
 
 The serializers are pinned to Slack's official response types at compile time

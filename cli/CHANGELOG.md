@@ -1,8 +1,221 @@
 # Changelog
 
 Entries are hand-written from 0.9.0 on. Changesets was retired with the
-packaging restructure: bump `version` here and in `package.json`, and merging to
-`main` publishes (see `.github/workflows/release.yml`).
+packaging restructure, and F-1511 took the NUMBER out of PRs: in a PR, add your
+entry under an `## Unreleased (patch)` (or `(minor)`) heading above the newest
+released one. `.github/workflows/allocate-version.yml` rewrites that heading to
+the version it allocates on `main` after the merge, in the same commit that moves
+`package.json`, and `.github/workflows/release.yml` publishes from there. Do not
+write a version number here or in `package.json` — see `RELEASING.md`. Released
+entries are insertions only: a correction is the next entry, naming the one it
+corrects.
+
+## 0.23.47 — 2026-08-13
+
+No user-visible change to the CLI itself. This release carries the corrected
+release instructions in the shipped `README.md` (and this file's preamble):
+F-1511 moved the version number out of PRs, so "bump `version` in
+`cli/package.json` and add the entry in the same PR" is no longer true — the
+entry is yours, the number is `allocate-version.yml`'s. `RELEASING.md` has the
+runbook.
+
+This is the first entry of this shape in the repo, and it is deliberately not
+special: the heading above says `patch` because a consumer has nothing to act on,
+and the pipeline turned it into a number on merge without anyone typing one.
+
+## 0.23.46
+
+### Patch Changes
+
+- **Every twin's 401 and admin-gate 403 now matches its OWN vendor, and the
+  shared SDK default stopped claiming GitHub's.** `packages/sdk`'s `auth.ts` and
+  `admin-gate.ts` hardcoded `documentation_url: ""` on all three refusal
+  envelopes — GitHub's key, with a value GitHub never sends, on a module imported
+  by all five twins. github, gmail and linear were reaching it on their admin 403.
+
+  All five vendors were probed live on 2026-08-13, twice each: with a
+  deliberately invalid bearer, and with no `Authorization` header at all. All
+  read-only, nothing created. **Only GitHub sends `documentation_url` at all**,
+  which is why the fix is per-twin and not a new shared default:
+
+  | vendor | HTTP | bad credential | missing credential |
+  | --- | --- | --- | --- |
+  | github | 401 | `Bad credentials` + generic url + `status:"401"` | `Requires authentication`, same two leaves |
+  | slack | **200** | `{ok:false, error:"invalid_auth"}` | `{ok:false, error:"not_authed"}` |
+  | stripe | 401 | `Invalid API Key provided: …` | `You did not provide an API key. …` |
+  | gmail | 401 | `Invalid Credentials` / `authError` | `Login Required.` / `required` |
+  | linear | 401 | one body | the SAME body — Linear does not distinguish |
+
+  What changed, per twin:
+
+  - **twin-github** — `auth.unauthorized`, `auth.sidMismatch` and a newly
+    declared `admin.forbidden` all build through `githubError`, so each carries
+    `documentation_url: "https://docs.github.com/rest"` and a stringified
+    `status`. The url stays GENERIC on every one of them: GitHub names no
+    operation on a 401 (8/8 measured) because authentication fails before
+    dispatch, and `/admin/*` is a twin-only route. A missing credential now says
+    `Requires authentication` where a bad one says `Bad credentials`; the twin
+    said the latter for both. **Retires FIDELITY.md divergence 31** and widens 32
+    to name the two twin-only surfaces.
+  - **twin-gmail** — tells a missing credential from an invalid one on all three
+    leaves Google does, carries Google's full `Expected OAuth 2 …` message tail,
+    and declares a `PERMISSION_DENIED` admin 403 instead of inheriting GitHub's.
+    New FIDELITY.md bullet 8 registers the one leaf left: Google's `details[]`
+    block names the backend method, which authentication-before-dispatch makes
+    unknowable here.
+  - **twin-linear** — answers Linear's measured body verbatim, including the
+    `extensions.statusCode` / `type` / `userError` / `userPresentableMessage` /
+    `meta` leaves it was dropping. It was saying `Bad credentials` — GitHub's
+    string — and `Session id mismatch`, both twin inventions; Linear sends one
+    body for every authentication failure and now so does this twin. Declares a
+    `FORBIDDEN` GraphQL admin 403.
+  - **twin-stripe** — a keyless request answers Stripe's "You did not provide an
+    API key. …" instead of falling through to the JWT branch's `Bad credentials`.
+  - **twin-slack** — no change; already correct on both leaves and already split
+    `not_authed` from `invalid_auth`.
+
+  CONTRACT.md's auth table splits the `no / invalid bearer` row in two and gains
+  an admin-gate 403 row. The contract suite asserts the new property across all
+  five twins on five envelopes each: a twin may carry its own vendor's
+  `documentation_url` and no other twin's, checked recursively so a leak into a
+  nested `error` object is caught too.
+
+## 0.23.45
+
+### Patch Changes
+
+- **`GET /repos/:o/:r/compare/:basehead` detects a rename, the way
+  `GET /repos/:o/:r/pulls/:n/files` already did.** A live capture from the real
+  `pome-sh/twin-fixtures-sandbox` read `files[].status` as `["added","renamed"]`
+  upstream against `["added","removed"]` from the twin, and `previous_filename`
+  as present upstream and field-removed from the twin — two CRITICALs on one
+  surface. Real GitHub runs rename detection on both diff surfaces; the twin ran
+  it on one.
+
+  The cause was not a missing rule but a second copy of the question. Both
+  surfaces derive `diff-entry` rows from a pair of file trees, and each had its
+  own path-by-path loop: F-1500 taught the pull request's loop to pair a path
+  that left the base with a path that arrived on the head holding the same blob,
+  and the comparison's loop went on expanding one move into an `added` plus a
+  `removed` carrying no pre-rename path at all. The pull surface then measured
+  green while the comparison measured red, on the same repository, over the same
+  two commits.
+
+  So this is one derivation, not a second correct copy. `diffFileRows` is now the
+  only place the rule lives; `calculatePullFiles` and `computeCompareFiles` differ
+  in where their two trees come from (two branch file tables against two commit
+  snapshots) and in how their urls name the head — a branch ref for a pull
+  request, the head commit sha for a comparison, because `basehead` can be two
+  shas with no branch in it anywhere. The rename semantics F-1500 established are
+  unchanged and now apply to both: exact moves only (git's `--find-renames` at
+  100% similarity), one `renamed` row rather than a removal plus an addition,
+  zero additions and zero deletions, and `previous_filename` emitted on that
+  status and no other.
+
+  What deliberately did NOT move: the comparison's commit walk. `ahead_by`,
+  `behind_by`, `total_commits` and the `commits` array read exactly as before —
+  that count is a separately tracked divergence about the seeded sandbox's git
+  history, and pairing files is a fact about trees. The single-commit surface
+  `GET /repos/:o/:r/commits/:ref` also still reports a move as an add plus a
+  remove: it reads one commit's `file_versions` rows, so there is no pair of
+  trees there to detect a move between.
+
+  The property under test is that the two surfaces AGREE over the same base and
+  head — asserted as a comparison between them rather than as two expected
+  literals, because two literals is exactly the shape that let them drift apart
+  while both looked covered.
+
+## 0.23.44
+
+### Patch Changes
+
+- **Divergence 19 names the two commit-count surfaces it was actually measured on,
+  and the number it was measured at.** The bullet listed `/commits`,
+  `/commits/:ref` and `/compare/:basehead`, but `GET /repos/:o/:r/pulls/:n/commits`
+  reports the same seeded-history count difference and was missing — so the prose
+  described less than the registry entry it binds to, which is how a registry
+  starts understating what it covers.
+
+  Measured against the real `pome-sh/twin-fixtures-sandbox` on 2026-08-13, after
+  the sandbox was seeded with the `renamed_from` move: **twin 1 vs upstream 4** on
+  `compare.commits` and on `/pulls/:n/commits`. The bullet now carries that number
+  and the reason it is four rather than the two or three a reader derives from
+  "one twin commit vs a PUT plus a DELETE" — the real repo also carries the
+  branch-convergence merge that gives the move a source to consume (F-1510).
+  Without that sentence the next reader re-derives three, finds four, and
+  concludes the golden went stale.
+
+  Behaviour-free: `FIDELITY.md` only. The twin serialises its own seeded commits
+  faithfully either way; what changed is that the accepted set is now written down
+  where it is read.
+
+## 0.23.43
+
+### Patch Changes
+
+- **twin-slack's plain-text `blocks` absence is registered as a measured
+  divergence, not imitated.** A new `packages/twin-slack/FIDELITY.md` bullet (23)
+  records what real Slack does that the twin does not: when a caller sends `text`
+  and no `blocks`, Slack SYNTHESISES a `rich_text` block from the text and returns
+  it. `serializeMessage` folds `blocks` in only when the stored array is non-empty
+  and `seed.ts` seeds no message with blocks, so every plain-text message — written
+  or seeded — comes back with no `blocks` key at all.
+
+  Measured live against `pome-twin-sandbox` on 2026-08-13, two rounds. The
+  synthesis happens on `chat.postMessage`, `chat.update` AND
+  `chat.scheduleMessage` (all three called separately, because F-1487 established
+  that these three validate independently), and it PERSISTS into
+  `conversations.history` with the same structure and a re-minted `block_id`. When
+  the caller DOES send `blocks` no `rich_text` is added, so the divergence is
+  strictly the no-blocks case.
+
+  REGISTERED rather than fixed, and the second round is what decided it. A
+  verbatim round-trip of a plain token would argue for imitation; a payload
+  carrying mrkdwn, a URL and a channel reference came back as styled `text`
+  elements, a `link` element and a `channel` element — a mrkdwn parser, a URL
+  detector and an entity resolver, three element types no twin derives from a
+  stored `text` string. A partial imitation emits a plausible-but-wrong
+  `rich_text` block an agent mis-parses with confidence, which is strictly harder
+  to detect than an honest absent key.
+
+  No twin behaviour changes and no criterion moves: this is a documentation
+  bullet plus its 1:1 registry linkage key. pome-cloud carries the matching
+  `known-divergences/slack.yaml` entry and the leg that now observes the
+  no-blocks case.
+
+## 0.23.42
+
+### Patch Changes
+
+- **`GET /repos/:o/:r/pulls/:n/files` now serves `previous_filename` on a
+  renamed file, and the twin's branch diff detects the rename that makes it
+  reachable.** The CLI bundles the twins, so this is the bundled twin-github
+  half of the same change published as `@pome-sh/checks@0.1.8`.
+
+  GitHub's `diff-entry` carries `previous_filename` and sends it exactly when
+  `status: "renamed"`. `PullRequestFileRow` had declared `"renamed"` since it was
+  written and nothing could produce it: `calculatePullFiles` diffs the two
+  branches' file tables path by path, so a moved file read as one `removed` entry
+  plus one `added` entry with the whole file counted as a rewrite. An examinee
+  that renamed a file and read its own pull request's diff back saw a shape real
+  GitHub does not serve — and, because nothing in GitHub's REST API is a
+  "rename", that is how every agent moves a file.
+
+  The diff now pairs a path that left the base with a path that arrived on the
+  head when the two hold the same blob, and reports one `renamed` entry carrying
+  the pre-rename path and zero additions, zero deletions. Exact moves only, which
+  is git's `--find-renames` at 100% similarity: a move that also edits the file
+  still reports as an add plus a remove, because picking a similarity threshold
+  GitHub's declared schema does not expose would be inventing vendor behaviour
+  rather than reproducing it. The commit and compare surfaces are unchanged —
+  they read `file_versions`, whose status column has no `renamed` member.
+
+  The seed gained `repositories[].files[].renamed_from`, the only way it can take
+  a path AWAY from a branch: a seeded branch is created from the default branch
+  and inherits every path, and a plain entry can add or overwrite but never
+  remove, so before this the field was unreachable from any seed rather than
+  merely unemitted. `content` is refused alongside `renamed_from` and carried
+  over from the source instead, which makes a seeded move exact by construction.
 
 ## 0.23.41
 

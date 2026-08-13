@@ -40,6 +40,12 @@
       "why": "A JavaScript action that talks to the GitHub API and git for the repository being built. It installs no tool. A failure here is a GitHub outage, which no amount of retrying inside GitHub Actions routes around.",
       "evidence": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 (v7.0.1), action.yml `runs: using: node24`."
     },
+    "actions/create-github-app-token": {
+      "fetchesFromCdn": false,
+      "hardening": "not-needed",
+      "why": "A bundled JavaScript action (dist/main.cjs, no network install) that signs a JWT with the private key it is handed and exchanges it at api.github.com for an installation token. It downloads no executable. Its only network call is to GitHub's own API, so a failure here is a GitHub outage and not a third-party CDN one — and it must NOT be retried blind under continue-on-error, because a failure that is actually a bad/rotated private key or an installation that no longer covers this repository should red allocate-version.yml loudly rather than be attempted three times.",
+      "evidence": "actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1, verified against the live repo to be exactly refs/tags/v3.2.0 (commit \"chore(main): release 3.2.0 (#370)\", 2026-05-12); action.yml `runs: using: node24, main: dist/main.cjs`. Same ref pome-cloud pins in fidelity-watch.yml and declared-diff.yml (PR #730), deliberately, so the two repos' release paths cannot drift onto different versions of the same mint step."
+    },
     "actions/setup-node": {
       "fetchesFromCdn": false,
       "hardening": "not-needed",

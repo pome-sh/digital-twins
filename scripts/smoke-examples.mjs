@@ -67,6 +67,71 @@
 // looking like a nightly that does — and a floor after the run asserts at
 // least one example was alive at the settle for real, naming what it
 // expected when it was not.
+//
+// F-1519: REACHED-OUTBOUND above was decided by matching the FAILURE TEXT
+// against BENIGN_FAILURE_SIGNATURES — an archaeology problem, not a proof.
+// `@anthropic-ai/claude-agent-sdk@0.3.221`'s query() picks between two error
+// shapes on a field (`lastErrorResultText`) set by a race between its own
+// stream-parsing and the child process's 'exit' event: win the race and the
+// thrown error reads "Claude Code returned an error result: … 401 invalid
+// x-api-key" (matches the signature list → REACHED-OUTBOUND); lose it and the
+// SAME underlying failure reads "Claude Code process exited with code 1.
+// stderr: <tail>" (matches nothing → FAIL). Same tree, either verdict —
+// measured on run 31711971267: attempt 1 was "7 of 8" reached + exit 1,
+// the re-run was "8 of 8". No regex over the error text can be made
+// deterministic against a race that lives inside a dependency's internals,
+// and widening the signatures to catch "process exited with code" would
+// convert every pre-wiring crash into a pass — the exact defect F-1478
+// already fixed once, reintroduced through the back door.
+//
+// The fix: classify on POSITIVE EVIDENCE THE EXAMPLE ITSELF EMITS, not on
+// which shape of error text survived the race. `OUTBOUND_MARKER` below is a
+// fixed literal every example prints, synchronously, at the earliest point it
+// is about to make its first outbound (twin or model) call — before either of
+// the SDK's two racing error shapes can even be constructed. Four examples
+// (`pr-summary-agent`, `pr-summary-review`, `support-triage`, `triage-agent`)
+// get this for free from `@pome-sh/adapter-claude-sdk`'s `query()`, the shared
+// seam every one of them already routes through — it wraps the exact racy
+// `sdkQuery()` call, so the marker point and the race are in the same
+// function. The other four (`gmail-retry-notify`, `merge-agent`,
+// `minimal-viktor`, `minimal-viktor-langgraph`) import nothing from
+// `@pome-sh/*` at all — no shared seam covers them — so each prints the
+// literal marker itself, gated on `POME_SMOKE_MARK_OUTBOUND=1` so real users
+// never see it. `assertEveryExampleEmitsMarker()` asserts the PROPERTY (every
+// discovered example has a route to the marker — either the shared seam or
+// its own literal) rather than hand-listing which four need their own, so a
+// ninth example that forgets it reds here by name instead of silently
+// reporting FAIL forever with nothing pointing at why.
+//
+// What the marker does NOT prove: that a socket was written. It is printed at
+// the outbound call SITE, so anything that throws between that line and the
+// syscall prints it first. Two such classes were measured (the SDK failing to
+// resolve the `claude` binary; a malformed twin URL) and both used to FAIL, so
+// `PRE_OUTBOUND_VETOES` below reds them explicitly on their own error CODE —
+// deterministic where the removed error-TEXT matching was not, since none of
+// those codes can be produced by a failure after a call went out. Crashes
+// AFTER a successful outbound call are out of scope by design and always were:
+// this gate's claim is "reached an outbound call", never "the work was
+// correct" (`probe:examples` and the scenario suites own that).
+//
+// Fail-closed: REACHED-OUTBOUND now requires the marker to be present in the
+// captured output. `BENIGN_FAILURE_SIGNATURES` still fires — but only to
+// supply a human-readable REASON alongside a marker-backed "reached" verdict,
+// never to decide the verdict itself. An example that crashes before it ever
+// reaches its marker line cannot be classified as reached no matter how
+// benign-looking its crash text is (verified by launching a deliberately
+// pre-wiring crash whose message contains "ECONNREFUSED"/"401 invalid
+// x-api-key" — it still FAILs).
+//
+// SETTLE_MS is a second, independent nondeterminism this does NOT remove: it
+// is a wall clock racing the `claude` CLI's cold-start time, so the OK
+// (still-alive) vs REACHED (marker-then-exit) split is environment-shaped — a
+// machine with an authenticated `claude` login can report several "still
+// running at the settle" where CI reports zero. That split does not change
+// the pass/fail verdict (both OK and REACHED are passing outcomes, and the
+// marker fires within milliseconds of process start either way, long before
+// SETTLE_MS), so it is stated here and in the printed summary rather than
+// engineered away.
 import { spawn } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -85,6 +150,14 @@ export const SETTLE_MS = 5000;
 // dead zone. This is the exact crash F-900 fixed and F-866's tsc gate missed.
 // A TDZ crash is a hard failure regardless of exit code or timing.
 export const TDZ_SIGNATURE = /(?:Cannot access '[^']+' before initialization|before initialization)/;
+
+// F-1519 — the positive-evidence marker. A fixed literal every example prints
+// to stderr, synchronously, immediately before its first outbound (twin or
+// model) call — see the file header for why this replaced error-text
+// matching as the thing REACHED-OUTBOUND is decided on. Gated behind
+// POME_SMOKE_MARK_OUTBOUND so it never appears in a real user's terminal.
+export const OUTBOUND_MARKER = "POME_SMOKE_REACHED_OUTBOUND";
+export const MARK_OUTBOUND_ENV = "POME_SMOKE_MARK_OUTBOUND";
 
 // A benign, CI-expected reason an example can legitimately exit before the
 // settle: SMOKE_ENV points every twin URL at a dead loopback port and hands
@@ -122,6 +195,39 @@ const BENIGN_FAILURE_SIGNATURES = [
     /invalid[ _-]?api[ _-]?key|invalid x-api-key|authentication_error|permission_error|status (?:401|403)\b|HTTP 40[13]\b|\b40[13] (?:Unauthorized|Forbidden)\b/i,
   ],
 ];
+
+// F-1519 — the marker proves the process REACHED its outbound call site; it
+// cannot prove a socket was ever written. Two crash classes were MEASURED to
+// print the marker and then die before any network syscall: the Agent SDK
+// failing to resolve the `claude` binary (`native binary not found at …` —
+// pure config, no request) and a malformed twin URL (`ERR_INVALID_URL`, thrown
+// by fetch while parsing, after the marker line). Both FAILED under the old
+// text classifier and would silently become passes on the marker alone —
+// F-1478's "a crash before real work reads as success" through the back door,
+// with the `claude` binary going unresolvable in CI converting all four
+// adapter-backed examples at once.
+//
+// So: a veto. Each pattern is an error CODE that cannot be produced by a
+// failure AFTER an outbound call, which is what keeps this deterministic where
+// the error-TEXT matching this ticket removed was not — none of these appear in
+// the SDK's racing error shapes. The imprecision is fail-closed in the safe
+// direction: a pre-outbound class this list misses keeps today's verdict, and
+// no real outbound failure can be redded by it.
+const PRE_OUTBOUND_VETOES = [
+  ["the URL never parsed, so no request was made", /ERR_INVALID_URL/],
+  [
+    "the `claude` CLI could not be resolved, so no model call was made",
+    /native binary not found|ensure Claude Code is installed/,
+  ],
+  ["a module failed to resolve, so nothing outbound ran", /ERR_MODULE_NOT_FOUND/],
+];
+
+function matchPreOutboundVeto(output) {
+  for (const [reason, re] of PRE_OUTBOUND_VETOES) {
+    if (re.test(output)) return reason;
+  }
+  return null;
+}
 
 function matchBenignFailure(output) {
   for (const [reason, re] of BENIGN_FAILURE_SIGNATURES) {
@@ -221,6 +327,10 @@ export function launchEnv(baseEnv, live) {
     }
   }
   delete env.POME_PREFLIGHT; // ensure the real launch path, not the early return
+  // F-1519 — tells every example (directly, or via @pome-sh/adapter-claude-sdk's
+  // query()) to print OUTBOUND_MARKER before its first outbound call. Neither a
+  // credential nor wiring, so it applies unconditionally on both legs.
+  env[MARK_OUTBOUND_ENV] = "1";
   return env;
 }
 
@@ -307,6 +417,36 @@ export function assertAliveFloor({ live, okCount, total }) {
   };
 }
 
+// F-1518 — the counted-numerator property. `classifyLaunch()` already gives
+// every launch one of three named, counted outcomes (ok / reached / fail); the
+// gap this closes is a DIFFERENT failure mode, one level up: an example that
+// never reaches `classifyLaunch()` at all and so never lands in any of the
+// three buckets — the printed "N of M" total quietly shrinks to N-1 with
+// nothing saying the Mth example went MISSING rather than FAILED. Measured on
+// PR #417: the summary read "7 of 8" and named seven, and nothing said the
+// eighth (`pr-summary-agent`) had vanished rather than failed. Pure and
+// exported so the regression suite can assert it without spawning all eight
+// examples: feed it a discovered list and the names main()'s loop actually
+// produced a verdict for.
+//
+// Deliberately compares NAMES, not just lengths — a bug that drops one name
+// and double-reports another would net to the same length and hide behind a
+// count-only check, defeating the "naming the missing example" requirement.
+export function assertReportedCount(discoveredNames, reportedNames) {
+  const reported = new Set(reportedNames);
+  const missing = discoveredNames.filter((name) => !reported.has(name));
+  if (missing.length === 0) return { ok: true, message: null };
+  return {
+    ok: false,
+    message:
+      `${missing.length} of ${discoveredNames.length} discovered example(s) never reported a verdict at ` +
+      `all — neither OK, REACHED-OUTBOUND, nor FAILED: ${missing.join(", ")}. The count of examples ` +
+      `reporting must equal the count discovered; a launcher bug that drops one silently (an early ` +
+      `return/continue/break in main()'s loop, or smokeOne() rejecting instead of resolving) must red ` +
+      `naming exactly which example vanished, never shrink the "N of M" total without saying so.`,
+  };
+}
+
 export function discoverExamples(dir = examplesDir) {
   const found = [];
   for (const name of readdirSync(dir).sort()) {
@@ -318,6 +458,67 @@ export function discoverExamples(dir = examplesDir) {
     if (pkg.scripts?.start) found.push(name);
   }
   return found;
+}
+
+// F-1519 — asserts the PROPERTY, not the instance list: every discovered
+// example must have SOME route to printing OUTBOUND_MARKER before its first
+// outbound call, or classifyLaunch()'s fail-closed rule means it can never
+// report "reached" again — silently, with nothing pointing at why. A
+// dependency on `@pome-sh/adapter-claude-sdk` covers it for free (its
+// `query()` wrapper emits the marker itself, wrapping the exact SDK call that
+// races); anything else must contain the literal marker in its own source. A
+// ninth example that is neither reds here BY NAME, at design time, instead of
+// silently degrading to permanent-FAIL at run time.
+export function assertEveryExampleEmitsMarker(dir, examples) {
+  const missing = [];
+  for (const name of examples) {
+    const pkgPath = join(dir, name, "package.json");
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
+    const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+    if (adapterResolvesToWorkspace(deps) || sourceContainsMarker(join(dir, name, "src"))) continue;
+    missing.push(name);
+  }
+  if (missing.length === 0) return { ok: true, message: null };
+  return {
+    ok: false,
+    message:
+      `${missing.length} example(s) have no route to emitting ${OUTBOUND_MARKER}: ${missing.join(", ")}. ` +
+      `Either depend on @pome-sh/adapter-claude-sdk (its query() emits the marker for you) or print the ` +
+      `literal "${OUTBOUND_MARKER}" yourself, gated on process.env.${MARK_OUTBOUND_ENV} === "1", ` +
+      `immediately before this example's first outbound (twin or model) call.`,
+  };
+}
+
+// The DEPENDENCY only covers an example if it resolves to the WORKSPACE copy of
+// the adapter. `examples/support-triage` pins the PUBLISHED tarball on purpose
+// (it is `npx degit`-fetchable as a standalone subtree — see
+// scripts/typecheck-examples.mjs's header), and a published tarball cut before
+// the marker existed prints nothing: measured on this branch, its installed
+// `dist/index.js` contains ZERO occurrences of OUTBOUND_MARKER while the three
+// `file:`-linked siblings contain one each, so support-triage FAILED every run
+// while a dependency-NAME check called it covered — the guard waving through
+// the one instance it was written to catch. A registry-pinned example must
+// therefore print the literal itself, and does.
+function adapterResolvesToWorkspace(deps) {
+  const pin = deps["@pome-sh/adapter-claude-sdk"];
+  return typeof pin === "string" && /^(?:file:|link:|\.\.?\/)/.test(pin);
+}
+
+// Emission, not mention: the literal inside a `console.error(...)` call, so a
+// marker named in a COMMENT (or in prose about the marker) does not buy
+// coverage. A static check still cannot prove the line is reachable or
+// correctly placed — `classifyLaunch()` is fail-closed for that, and an
+// example whose marker never actually prints FAILS loudly with the marker
+// named in its reason.
+const MARKER_EMISSION = new RegExp(`console\\.error\\(\\s*["'\`]${OUTBOUND_MARKER}["'\`]`);
+
+function sourceContainsMarker(srcDir) {
+  if (!existsSync(srcDir)) return false;
+  for (const entry of readdirSync(srcDir, { withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith(".ts")) continue;
+    if (MARKER_EMISSION.test(readFileSync(join(srcDir, entry.name), "utf8"))) return true;
+  }
+  return false;
 }
 
 // The verdict for one launch, given what we observed. Pure and exported so the
@@ -333,6 +534,15 @@ export function discoverExamples(dir = examplesDir) {
 // positively proves (the process evaluated its module, cleared its startup
 // guards, and got far enough to open an outbound twin/model call) and printed
 // distinctly from "ok", which is the strictly stronger evidence.
+//
+// F-1519 — "reached" now hinges on OUTBOUND_MARKER being present in the
+// captured output, never on matching the failure TEXT. BENIGN_FAILURE_SIGNATURES
+// still runs, but only to decorate a marker-backed verdict with a human-readable
+// reason; a match there with no marker present classifies as FAIL, exactly like
+// a match on any other prose the process happened to print. This is what makes
+// the verdict independent of which of the two error shapes the SDK's internal
+// race produces (see the file header) — the marker is printed before the race
+// can even begin.
 export function classifyLaunch({ output, stillRunningAtSettle, exitCode, signal, live = LIVE }) {
   if (TDZ_SIGNATURE.test(output)) {
     return { status: "fail", reason: "TDZ crash on launch" };
@@ -341,24 +551,59 @@ export function classifyLaunch({ output, stillRunningAtSettle, exitCode, signal,
     return { status: "ok", reason: `still running after ${SETTLE_MS}ms` };
   }
   const how = signal ? `killed by ${signal}` : `exited code ${exitCode}`;
-  // A benign outbound failure only excuses an early exit that FAILED. An
-  // example that hits the dead twin, logs it, and exits 0 anyway has done
-  // nothing and reported success — F-1478's defect verbatim, just with a
-  // recognizable string in the output. `minimal-viktor-langgraph` reds today
-  // only because index.ts sets `exitCode = 1` on a graph failure; had it merely
-  // warned, matching the signature alone would have handed it a pass.
-  const benign = exitCode !== 0 || signal ? matchBenignFailure(output) : null;
-  if (benign) {
-    return { status: "reached", reason: `${how} at an outbound call — ${benign}` };
-  }
-  if (exitCode === 0 && matchBenignFailure(output)) {
+  // The marker plus proof-of-absence: a crash whose own error code says no
+  // request could have left the process is not "reached", however early the
+  // marker printed.
+  const vetoed = matchPreOutboundVeto(output);
+  const reachedOutbound = output.includes(OUTBOUND_MARKER) && !vetoed;
+  // Descriptive only from here down — matchBenignFailure() never gates a
+  // verdict, it only names the failure class for a reader once the marker has
+  // already proven the process got there.
+  const benignReason = matchBenignFailure(output);
+
+  if (exitCode !== 0 || signal) {
+    if (reachedOutbound) {
+      return {
+        status: "reached",
+        reason: benignReason
+          ? `${how} after emitting ${OUTBOUND_MARKER} — an outbound call failed (${benignReason})`
+          : `${how} after emitting ${OUTBOUND_MARKER} — an outbound call failed`,
+      };
+    }
+    if (vetoed) {
+      return {
+        status: "fail",
+        reason:
+          `${how} after emitting ${OUTBOUND_MARKER}, but ${vetoed} — the marker proves the process ` +
+          `reached its outbound call SITE, not that a call left it, and this crash's own error code ` +
+          `says none did. Fix the wiring/config it names; a pre-outbound crash must not read as ` +
+          `REACHED-OUTBOUND (F-1519).`,
+      };
+    }
     return {
       status: "fail",
       reason:
-        `exited code 0 before settling (${SETTLE_MS}ms) while its own output reports an outbound ` +
-        `failure (${matchBenignFailure(output)}) — it swallowed the error and exited clean, which ` +
-        `is the do-nothing-looks-healthy defect this gate exists to catch. Propagate the failure ` +
-        `so the process exits non-zero`,
+        `${how} with no TDZ and no ${OUTBOUND_MARKER} in its output — it crashed before reaching an ` +
+        `outbound twin/model call, so there is no positive evidence it did any real work (the likely ` +
+        `case: broken env/auth resolution, a wrong parse, or a crash during wiring). An error string ` +
+        `that merely LOOKS like a benign network/auth failure does not count — see AGENTS.md's ` +
+        `smoke:examples row / this file's header for why (F-1519).`,
+    };
+  }
+
+  // exitCode === 0
+  if (reachedOutbound && !live) {
+    // SMOKE_ENV's twin/model wiring cannot succeed on the PR leg — dead
+    // loopback ports, invalid keys — so reaching the marker and still exiting
+    // 0 means the failure was swallowed, not that the run actually worked.
+    // F-1478's defect verbatim, just proven by the marker instead of guessed
+    // from failure text.
+    return {
+      status: "fail",
+      reason:
+        `exited code 0 after emitting ${OUTBOUND_MARKER} while running against SMOKE_ENV's dead wiring ` +
+        `(invalid keys, unreachable twin) — success here is impossible, so exit 0 means the failure ` +
+        `was swallowed instead of propagated. Propagate it so the process exits non-zero.`,
     };
   }
   // F-1486 — the third possibility exists ONLY on the credentialed leg, and the
@@ -369,28 +614,29 @@ export function classifyLaunch({ output, stillRunningAtSettle, exitCode, signal,
   // found", the process exits 0 in under 5s — lands HERE, on a FAIL whose text
   // otherwise insists the example is broken. Distinguishing "exited 0 having
   // produced work output" from "exited 0 having done nothing" needs a work
-  // marker no example emits in a common form across three frameworks, so it is
-  // not a cheap fix; naming the possibility in the message is, and it makes the
-  // first red diagnosable instead of training the reader to ignore the alarm.
-  const liveFastExit =
-    live && exitCode === 0
-      ? ` NOTE (credentialed leg): a third possibility applies here and NOWHERE ELSE — with real ` +
-        `twins and a real model key, an example that is CORRECT but FAST can exit 0 inside the ` +
-        `${SETTLE_MS}ms settle (e.g. the twin's seed genuinely contains nothing matching the task, ` +
-        `so the model answers "nothing found" and returns), and OK is defined as "still alive at ` +
-        `the settle", so a correct fast run is indistinguishable from a do-nothing one by timing ` +
-        `alone. Read the tail above BEFORE assuming breakage: if it shows a real answer, the fix ` +
-        `is a seed that matches the task or a work-output signal, not this example.`
-      : "";
+  // marker no example emits in a common form across three frameworks (a
+  // DIFFERENT marker than OUTBOUND_MARKER, which proves only that the attempt
+  // started, not that it succeeded), so it is not a cheap fix; naming the
+  // possibility in the message is, and it makes the first red diagnosable
+  // instead of training the reader to ignore the alarm.
+  const liveFastExit = live
+    ? ` NOTE (credentialed leg): a third possibility applies here and NOWHERE ELSE — with real ` +
+      `twins and a real model key, an example that is CORRECT but FAST can exit 0 inside the ` +
+      `${SETTLE_MS}ms settle (e.g. the twin's seed genuinely contains nothing matching the task, ` +
+      `so the model answers "nothing found" and returns), and OK is defined as "still alive at ` +
+      `the settle", so a correct fast run is indistinguishable from a do-nothing one by timing ` +
+      `alone. Read the tail above BEFORE assuming breakage: if it shows a real answer, the fix ` +
+      `is a seed that matches the task or a work-output signal, not this example.`
+    : "";
   return {
     status: "fail",
     reason:
-      `${how} before settling (${SETTLE_MS}ms) with no TDZ and no outbound-call failure in its ` +
-      `output — it returned without evidence it did any real work. Either the example is broken ` +
-      `(the likely case: a wrong parse, an early return, or a swallowed error read as an empty ` +
-      `result), or it failed on a genuinely benign outbound error this gate does not recognize ` +
-      `yet — if the tail above shows one, add it to BENIGN_FAILURE_SIGNATURES in ` +
-      `scripts/smoke-examples.mjs naming the class, and add a case to smoke-examples.test.mjs.` +
+      (reachedOutbound
+        ? `exited code 0 after emitting ${OUTBOUND_MARKER} but before settling (${SETTLE_MS}ms)`
+        : `exited code 0 before settling (${SETTLE_MS}ms) with no ${OUTBOUND_MARKER} in its output`) +
+      ` — it returned without evidence it did any real work. Either the example is broken (the ` +
+      `likely case: a wrong parse, an early return, or a swallowed error read as an empty result), ` +
+      `or it needs its ${OUTBOUND_MARKER} emission point moved earlier.` +
       liveFastExit,
   };
 }
@@ -425,14 +671,46 @@ function smokeOne(name) {
       settled = true;
       clearTimeout(timer);
       if (!child.killed) child.kill("SIGKILL");
+      // SIGKILL reaches the direct `tsx` child only; the `claude` CLI
+      // GRANDCHILD the Agent SDK spawned survives holding the write end of
+      // these pipes, so the parent's read handles stay active and node cannot
+      // exit. Measured on this branch: a complete summary printed, then 194s
+      // of nothing before the process ended — in CI (no `timeout-minutes` on
+      // `typecheck-test`, so GitHub's 360-minute default) a hang after a
+      // finished summary is a new flake replacing the one this ticket fixed.
+      // The verdict is already computed from `output`, so releasing the pipes
+      // here loses nothing.
+      child.stdout?.destroy();
+      child.stderr?.destroy();
       resolvePromise({ name, output, ...verdict });
     };
 
+    // Classify on 'close', not 'exit'. Node only guarantees the piped stdio
+    // streams are drained on 'close'; 'exit' can fire with the child's final
+    // write still unread, and the whole verdict is a regex over `output` — so
+    // an example whose only BENIGN_FAILURE_SIGNATURES match sits in its last
+    // stderr line (`agent errored: … ECONNREFUSED`, written immediately before
+    // `process.exit(1)`) can be read as "no outbound-call failure in its
+    // output" and FAIL on one run and REACHED-OUTBOUND on the next, from the
+    // same commit. 'exit' still records HOW it exited, because 'close' carries
+    // the same code/signal but a lingering grandchild holding the pipe open can
+    // delay it past SETTLE_MS — and a child that has already exited must be
+    // classified on its exit code, never as "still running at the settle",
+    // which would turn a fast exit into a false OK.
+    let exited = null;
     const timer = setTimeout(() => {
-      finish(classifyLaunch({ output, stillRunningAtSettle: true }));
+      finish(
+        exited
+          ? classifyLaunch({ output, stillRunningAtSettle: false, ...exited })
+          : classifyLaunch({ output, stillRunningAtSettle: true }),
+      );
     }, SETTLE_MS);
 
     child.on("exit", (code, signal) => {
+      exited = { exitCode: code, signal };
+    });
+
+    child.on("close", (code, signal) => {
       finish(classifyLaunch({ output, stillRunningAtSettle: false, exitCode: code, signal }));
     });
 
@@ -494,6 +772,15 @@ async function main() {
     process.exit(1);
   }
 
+  // F-1519 — before anything launches: every discovered example must have a
+  // route to the positive-evidence marker, or a run that never sees it is
+  // indistinguishable from an example that was simply never wired for it.
+  const markerCoverage = assertEveryExampleEmitsMarker(examplesDir, examples);
+  if (!markerCoverage.ok) {
+    console.error(markerCoverage.message);
+    process.exit(1);
+  }
+
   console.log(
     `Launch-smoking ${examples.length} example(s)${LIVE ? " (LIVE — real twin + model credentials)" : ""}: ` +
       examples.join(", "),
@@ -504,7 +791,19 @@ async function main() {
   const oks = [];
   for (const name of examples) {
     process.stdout.write(`\n=== examples/${name} === `);
-    const result = await smokeOne(name);
+    let result;
+    try {
+      result = await smokeOne(name);
+    } catch (err) {
+      // smokeOne() is designed to always resolve — the SETTLE_MS timer, the
+      // child 'close' handler, and the child 'error' handler each
+      // independently produce a verdict — but this loop must not itself
+      // become the next silent-drop bug. This catch deliberately does NOT
+      // invent a verdict for work that never ran: the name lands in no bucket,
+      // so assertReportedCount() below names it as missing.
+      console.log(`did not report a verdict (runner threw: ${err instanceof Error ? err.message : String(err)})`);
+      continue;
+    }
     const tail = result.output?.trim().split("\n").slice(-12).join("\n") ?? "";
     if (result.status === "ok") {
       console.log(`OK (${result.reason})`);
@@ -522,6 +821,18 @@ async function main() {
     }
   }
 
+  // F-1518 — the reported set is DERIVED from the three verdict buckets, never
+  // tracked alongside them. A separate `reportedNames.push(name)` next to the
+  // `await` would mark a name reported before the ok/reached/fail dispatch had
+  // put it anywhere, so the next silent-drop bug — a `continue` added inside
+  // the dispatch, or a fourth `status` no branch matches — would still net
+  // `ok: true` and still shrink the "N of M" total unannounced. Reading the
+  // buckets makes the assertion check the thing the summary actually counts.
+  const reportedCount = assertReportedCount(
+    examples,
+    [...oks, ...reached, ...failures].map((r) => r.name),
+  );
+
   if (reached.length > 0) {
     console.log(
       `\n${reached.length} of ${examples.length} example(s) got as far as an outbound twin/model ` +
@@ -534,13 +845,18 @@ async function main() {
 
   const floor = assertAliveFloor({ live: LIVE, okCount: oks.length, total: examples.length });
 
-  if (failures.length > 0 || !floor.ok) {
+  if (failures.length > 0 || !reportedCount.ok || !floor.ok) {
     if (failures.length > 0) {
       console.error(
         `\nExamples that crash on launch or return with no evidence of real work: ` +
           failures.map((f) => `${f.name} (${f.reason})`).join("; "),
       );
     }
+    // F-1518 — a missing verdict is reported and reds independently of
+    // `failures`: it is a defect in THIS SCRIPT's own bookkeeping, not in the
+    // example, and folding it into "Examples that crash on launch" above
+    // would misname the fault.
+    if (!reportedCount.ok) console.error(`\n${reportedCount.message}`);
     if (!floor.ok) console.error(`\n${floor.message}`);
     process.exit(1);
   }
@@ -549,6 +865,11 @@ async function main() {
   console.log(
     `\nAll ${examples.length} examples reached real work: ` +
       `${oks.length} still running at the settle, ` +
-      `${reached.length} failed at an outbound call.`,
+      `${reached.length} failed at an outbound call. ` +
+      `(The OK/REACHED split is environment-shaped: SETTLE_MS=${SETTLE_MS}ms races the \`claude\` CLI's ` +
+      `cold-start time, so a faster or slower machine shifts examples between the two buckets. Neither ` +
+      `bucket's pass/fail verdict depends on that race — OUTBOUND_MARKER is emitted within milliseconds ` +
+      `of process start, long before the settle — only which of the two passing buckets an example lands ` +
+      `in.)`,
   );
 }

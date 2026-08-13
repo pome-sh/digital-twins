@@ -214,6 +214,18 @@ one is 22: `pull_request_read`'s `get_comments` answered from the review-comment
 table until F-1423 gave the conversation its own read in 0.10.5. The lint matches
 on each bullet's bold title and never on its number, so gaps cost it nothing.
 
+The most recent gap is **31**, retired by F-1497: "The 401 and 403 envelopes
+carry an empty `documentation_url` and no `status` leaf at all." All four
+envelope-building sites it named — `auth.unauthorized`, `auth.sidMismatch`,
+`admin.forbidden` and the SDK default behind the last of them — build through
+`githubError` now, so each carries the generic `https://docs.github.com/rest`
+and a stringified `status`, and a **missing** credential answers
+`Requires authentication` where a **bad** one answers `Bad credentials`. All
+four counts re-measured live against `api.github.com` on 2026-08-13. The half of
+that entry which was never a gap — that these urls must stay GENERIC, because
+authentication fails before dispatch and there is no operation to name — was
+always 32's, and 32 now names the twin-only 401/403 surfaces explicitly.
+
 1. **Search query syntax is substring-based.** The free text left in `q` is
    matched as one case-insensitive substring, scoped to the default branch —
    not as GitHub's ranked, tokenised, boolean-aware index. Four SCOPE
@@ -397,8 +409,16 @@ on each bullet's bold title and never on its number, so gaps cost it nothing.
     The commits-collection length, per-commit `parents` count (seeded commits are roots,
     0 vs 1), and per-commit `files` changed-set count differ because the seeded sandbox's
     git history is not a byte-for-byte mirror of the real repo's commit DAG. On the
-    `GET /repos/:o/:r/commits`, `.../commits/:ref`, `.../compare/:basehead` read surfaces
-    these length differences are accepted (INFO), not drift.
+    `GET /repos/:o/:r/commits`, `.../commits/:ref`, `.../compare/:basehead`,
+    `.../pulls/:n/commits` read surfaces these length differences are accepted (INFO),
+    not drift. Measured against the real sandbox on 2026-08-13: **twin 1 vs upstream 4**
+    on the compare surface's `commits` leaf and on `/pulls/:n/commits`. Four, not the
+    two-commit figure a reader derives from "the twin spends one commit where the
+    Contents API spends a PUT plus a DELETE": the real repo also carries the
+    branch-convergence merge that gives a `renamed_from` move a source to consume
+    (F-1510), and the seeder issues that merge rather than rewriting history through the
+    Git Data API, so the golden and the seeder agree on one commit shape. A count of two
+    or three here means the seeder changed, not that the golden went stale.
 20. **`/labels` and `/collaborators` list counts reflect the seeded sandbox content.**
     The `/labels` (2 vs 10) and `/collaborators` (3 vs 2) collection counts reflect the
     seeded sandbox's smaller label set and different collaborator set, not a serializer
@@ -570,39 +590,6 @@ on each bullet's bold title and never on its number, so gaps cost it nothing.
     unfixed shape on `POST /issues` deliberately — when the global change lands,
     that test fails, and failing is the signal.
 
-31. **The 401 and 403 envelopes carry an empty `documentation_url` and no
-    `status` leaf at all.** Real GitHub answers `401` with
-    `{message, documentation_url: "https://docs.github.com/rest", status: "401"}`
-    — the generic url, but a *real* one, and the `status` leaf present. Measured
-    live 2026-08-12 (F-1490): 8 of 8 401s across five route shapes (`/user`,
-    `/repos/:o/:r`, `/search/repositories`, `/users/:u`,
-    `/repos/:o/:r/contents/*`), with a bad token and with no `Authorization`
-    header at all. 403 is the same but with an operation-specific url (3 of 3).
-
-    This twin answers `{message, documentation_url: ""}` — empty string, and the
-    `status` leaf **missing entirely**. Three of the four envelope-building sites
-    in play never reach `githubError`, which is why F-1490's global `status` fix
-    does not cover them: the 401 bodies are written by hand in `src/twin.ts`
-    (`auth.unauthorized` / `auth.sidMismatch`), and the admin-gate 403 body comes
-    from **`@pome-sh/sdk`** (`admin-gate.ts`, defaulted in `auth.ts`).
-
-    **Registered rather than fixed because two of the three are not
-    twin-github's to change.** `packages/sdk` is shared by all five twins, so an
-    empty-url or missing-`status` fix there moves slack, stripe, gmail and linear
-    at the same time and needs its own ticket with its own cross-twin
-    measurement — twin-github's numbers say nothing about what Slack's 401 looks
-    like. Doing it inside a github envelope ticket would be the same
-    smuggling F-1490 was spawned to avoid.
-
-    One smaller difference in the same family, measured and not fixed here:
-    GitHub distinguishes a **bad** credential (`Bad credentials`) from a
-    **missing** one (`Requires authentication`); this twin says `Bad credentials`
-    for both.
-
-    Pinned by `test/error-envelope-status.test.ts`, which asserts the *absent*
-    `status` leaf and the empty url on purpose — so this reads as a gap rather
-    than as coverage, and closing it makes the test fail.
-
 32. **`documentation_url` names no operation on three MCP tools.** NARROWED by
     F-1498 from "on essentially every error". The measured half is closed: a
     routed, authenticated error now carries the url real GitHub carries for that
@@ -649,6 +636,26 @@ on each bullet's bold title and never on its number, so gaps cost it nothing.
     are generic for the same reason: GitHub has no operation at those paths to
     name.
 
+    **F-1497 added two more surfaces to that same list**, and they are the
+    reason divergence 31 could be retired rather than half-fixed. Both now carry
+    a real url where they used to carry `""`, and both carry the GENERIC one:
+
+    * **the sid-mismatch 401** (`{message: "Forbidden"}`). GitHub has no
+      session-id concept, so there is no GitHub operation behind the refusal and
+      nothing to name — and it is a 401 besides, which is the class GitHub
+      itself keeps generic 8 of 8 times.
+    * **the admin-gate 403** on `POST /admin/reset|seed`. Real GitHub's measured
+      403s ARE operation-specific (3 of 3, e.g.
+      `…/rest/actions/self-hosted-runners#list-self-hosted-runners-for-a-repository`),
+      so this is the one place the twin answers a 403 with a generic url where
+      GitHub would answer a specific one — and it is correct, because `/admin/*`
+      is this twin's own route and GitHub serves nothing at it. Naming an
+      operation there would mean picking one at random.
+
+    So the twin serves **no** operation-specific 403 at all, which is a fact
+    about its route table rather than about its envelope: the only 403 it can
+    emit is the admin gate's.
+
     **Why the url is attached at the DOOR.** The SDK hook is
     `errorEnvelope?: (err: unknown) => {status, body}` — the error, and nothing
     else — while the right url depends on which door was knocked on:
@@ -663,7 +670,11 @@ on each bullet's bold title and never on its number, so gaps cost it nothing.
     Pinned by `test/operation-documentation-url.test.ts` — both halves, the
     named and the deliberately generic — and by
     `test/error-envelope-status.test.ts`, whose two generic-url assertions moved
-    rather than went away.
+    rather than went away, twice: F-1498 re-cut them from "every envelope is
+    generic" to "these three classes are", and F-1497 moved the 401 reading from
+    `""` to the generic url without letting it become operation-specific. That
+    file now asserts `.not.toContain("#")` on the 401's url rather than one
+    literal, so any operation anchor trips it.
 
 ## How fidelity is verified
 

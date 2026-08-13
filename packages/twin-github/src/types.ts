@@ -31,7 +31,20 @@ export type SeedRepository = {
   default_branch?: string;
   collaborators?: string[];
   labels?: Array<{ name: string; color?: string; description?: string }>;
-  files?: Array<{ path: string; content: string; branch?: string }>;
+  // F-1500 — `renamed_from` names the path this file was MOVED from on
+  // `branch`, and is the only way a seed can take a path away from a branch: a
+  // seeded branch is created from the default branch and inherits every path,
+  // and a plain entry can add or overwrite but never remove. `content` is
+  // omitted on a rename and carried over from the source, which is what keeps a
+  // seeded move an EXACT one — the only kind the diff can detect.
+  //
+  // Exactly one of `content` / `renamed_from` is required, and that is enforced
+  // by `seedSchema`'s refine rather than by a union here: `parseSeed`'s OUTPUT is
+  // one object shape with both keys optional, so a union would refuse the very
+  // value `ParsedGitHubStateSeed` hands back. Every path into `seed()` runs
+  // `parseSeed` first, so the rule is checked whichever door a seed arrives
+  // through.
+  files?: Array<{ path: string; content?: string; branch?: string; renamed_from?: string }>;
   // F-1421 — the five entities the twin serves but the seed used to strip.
   milestones?: Array<{
     number?: number;
@@ -216,6 +229,13 @@ export type PullRequestFileRow = {
   raw_url: string;
   contents_url: string;
   patch: string;
+  // F-1500 — the path this file was moved FROM, non-null exactly when `status`
+  // is `"renamed"`. GitHub's `diff-entry` carries `previous_filename` on that
+  // status and omits the key on every other, which is why this is nullable
+  // rather than defaulted to the file's own name: the serializer decides
+  // presence from `status`, and a placeholder here would make an added file
+  // claim to have moved.
+  previous_filename: string | null;
 };
 
 export type CommitStatusRow = {

@@ -474,7 +474,15 @@ export function pullRequestFileJson(file: PullRequestFileRow) {
     blob_url: file.blob_url,
     raw_url: file.raw_url,
     contents_url: file.contents_url,
-    patch: file.patch
+    patch: file.patch,
+    // F-1500 — GitHub sends `previous_filename` exactly when `status` is
+    // `"renamed"` and omits the KEY otherwise, so this is a conditional spread
+    // rather than a `null`: emitting `previous_filename: null` on an added file
+    // would trade a missing-field divergence for a type-changed one and have
+    // every file claim to know where it came from. `status` is what gates it,
+    // not the column being set, so a row that somehow carried a source path on
+    // another status cannot leak it onto the wire.
+    ...(file.status === "renamed" && file.previous_filename ? { previous_filename: file.previous_filename } : {})
   } satisfies DeepPartial<DiffEntry>;
 }
 

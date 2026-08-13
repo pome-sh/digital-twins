@@ -23,7 +23,8 @@ import type {
 } from "../types.js";
 import type { PullRequestStack } from "../upstream-types.js";
 import { conflict, notFound, validationFailed } from "../errors.js";
-import { fileSha, linesChanged, makeSha, nowIso, paginate, stableNumericId, treeSha } from "../util.js";
+import type { DiffTree } from "../util.js";
+import { diffFileRows, fileSha, linesChanged, makeSha, nowIso, paginate, stableNumericId, treeSha } from "../util.js";
 import { defaultSeedState, parseSeed } from "../seed.js";
 import {
   authenticatedUserJson,
@@ -135,12 +136,26 @@ export class GitHubDomain {
         }
         this.createBranchInternal(repo, repo.default_branch, null);
         const files = repoSeed.files?.filter((file) => (file.branch ?? repo.default_branch) === repo.default_branch) ?? [];
-        this.commitFiles(repo, repo.default_branch, "Initial seed commit", files, "pome-agent");
+        // F-1500 — the default branch IS the initial commit, so there is no
+        // earlier tree for a path to have moved out of. Refusing here rather than
+        // letting `commitFiles` fail on a delete of an absent path is what makes
+        // the message name the seed field the author got wrong.
+        const rootRename = files.find((file) => file.renamed_from !== undefined);
+        if (rootRename) {
+          // `conflict`, not `validationFailed`, matching the duplicate-tag refusal
+          // below: a seed fault is read by whoever authored the seed, and
+          // `validationFailed` buries its detail in an `errors[].value` shaped for
+          // an API caller.
+          conflict(
+            `Seed sets renamed_from on ${rootRename.path} with no branch: the default branch is the initial commit, so there is no earlier tree to move out of`
+          );
+        }
+        this.commitFiles(repo, repo.default_branch, "Initial seed commit", files as FileChange[], "pome-agent");
         const nonDefaultBranches = new Set((repoSeed.files ?? []).map((file) => file.branch ?? repo.default_branch).filter((branch) => branch !== repo.default_branch));
         for (const branch of nonDefaultBranches) {
           this.createBranch({ owner: repo.owner, repo: repo.name, branch, from_branch: repo.default_branch });
           const branchFiles = repoSeed.files?.filter((file) => (file.branch ?? repo.default_branch) === branch) ?? [];
-          this.commitFiles(repo, branch, `Seed ${branch}`, branchFiles, "pome-agent");
+          this.commitFiles(repo, branch, `Seed ${branch}`, this.seedFileChanges(repo, branch, branchFiles), "pome-agent");
         }
         for (const issue of repoSeed.issues ?? []) {
           const legacyAssignee = (issue as { assignee?: string | null }).assignee;
@@ -283,6 +298,41 @@ export class GitHubDomain {
       before: { repositories: before },
       after: { repositories: this.summarizeRepositories() }
     });
+  }
+
+  /**
+   * F-1500 — expand a branch's seeded file entries into the commit that produces
+   * them, turning each `renamed_from` into what a move actually is: the source
+   * path deleted and its content written at the new path, in ONE commit.
+   *
+   * The source content is read off the branch rather than taken from the seed, so
+   * a seeded move is an exact one by construction — the two blobs cannot drift
+   * apart, which is the condition `calculatePullFiles` pairs on. (`seedSchema`
+   * refuses a `renamed_from` entry that also names `content` for the same
+   * reason.) The branch was created from the default branch a line earlier, so
+   * the source path is the copy it inherited.
+   */
+  seedFileChanges(
+    repo: RepoRow,
+    branch: string,
+    entries: Array<{ path: string; content?: string; renamed_from?: string }>
+  ): FileChange[] {
+    const changes: FileChange[] = [];
+    for (const entry of entries) {
+      if (entry.renamed_from === undefined) {
+        changes.push({ path: entry.path, content: entry.content ?? "" });
+        continue;
+      }
+      const source = this.getFile(repo.id, branch, normalizePath(entry.renamed_from));
+      if (!source) {
+        conflict(
+          `Seed sets renamed_from to ${entry.renamed_from} on branch ${branch}, which holds no such file: a move's source must exist on the branch it moves on`
+        );
+      }
+      changes.push({ path: entry.renamed_from, content: "", delete: true });
+      changes.push({ path: entry.path, content: source!.content });
+    }
+    return changes;
   }
 
   /**
@@ -835,39 +885,39 @@ export class GitHubDomain {
         blob_url: `https://github.com/${repo.full_name}/blob/${commit.sha}/${version.path}`,
         raw_url: `https://raw.githubusercontent.com/${repo.full_name}/${commit.sha}/${version.path}`,
         contents_url: `https://api.github.com/repos/${repo.full_name}/contents/${version.path}?ref=${commit.sha}`,
-        patch: `@@ ${version.path} @@`
+        patch: `@@ ${version.path} @@`,
+        // F-1513 moved the COMPARE surface onto the shared `diffFileRows`; this
+        // one is still outside it, and for a reason that is not scope. A single
+        // commit's change set is read straight out of `file_versions`, whose
+        // `status` column has no `renamed` member, so there is no pair of trees
+        // here to detect a move BETWEEN — the row loop below sees one version
+        // row at a time. Pairing them would mean re-deriving the commit's parent
+        // tree, which is a different derivation from the one this fixes, on a
+        // route no capture has measured a move on. It reports an add and a
+        // remove and carries no pre-rename path.
+        previous_filename: null
       };
     });
   }
 
 
   computeCompareFiles(repo: RepoRow, base: CommitRow, head: CommitRow): PullRequestFileRow[] {
-    // Build path → latest version snapshot at each commit by walking ancestry
-    // and folding file_versions. Used by /compare.
-    const baseSnapshot = this.snapshotAtCommit(repo.id, base.sha);
-    const headSnapshot = this.snapshotAtCommit(repo.id, head.sha);
-    const paths = [...new Set([...baseSnapshot.keys(), ...headSnapshot.keys()])].sort();
-    const rows: PullRequestFileRow[] = [];
-    for (const path of paths) {
-      const baseFile = baseSnapshot.get(path);
-      const headFile = headSnapshot.get(path);
-      if (baseFile?.sha === headFile?.sha) continue;
-      const diff = linesChanged(baseFile?.content, headFile?.content ?? "");
-      rows.push({
-        repo_id: repo.id,
-        pull_number: 0,
-        filename: path,
-        status: baseFile && headFile ? "modified" : headFile ? "added" : "removed",
-        additions: diff.additions,
-        deletions: headFile ? diff.deletions : (baseFile?.content.split("\n").length ?? 0),
-        changes: diff.additions + diff.deletions,
+    // F-1513 — the trees this surface diffs are built by walking ancestry and
+    // folding `file_versions`, where the pull surface reads two branch file
+    // tables; past that the two answer the same question and now do it with the
+    // same code, so a move reads as one `renamed` entry here too. The urls are
+    // the difference that stays: a comparison names the head COMMIT, because
+    // `basehead` can be two shas with no branch anywhere in it.
+    return diffFileRows(
+      repo.id,
+      this.snapshotAtCommit(repo.id, base.sha),
+      this.snapshotAtCommit(repo.id, head.sha),
+      (path) => ({
         blob_url: `https://github.com/${repo.full_name}/blob/${head.sha}/${path}`,
         raw_url: `https://raw.githubusercontent.com/${repo.full_name}/${head.sha}/${path}`,
-        contents_url: `https://api.github.com/repos/${repo.full_name}/contents/${path}?ref=${head.sha}`,
-        patch: `@@ ${path} @@`
-      });
-    }
-    return rows;
+        contents_url: `https://api.github.com/repos/${repo.full_name}/contents/${path}?ref=${head.sha}`
+      })
+    );
   }
 
 
@@ -1028,38 +1078,35 @@ export class GitHubDomain {
   }
 
 
+  /** The tree a branch holds right now, in the shape `diffFileRows` diffs. */
+  branchTree(repoId: number, branch: string): DiffTree {
+    const files = this.db.prepare("SELECT path, content, sha FROM files WHERE repo_id = ? AND branch = ?").all(repoId, branch) as Array<{ path: string; content: string; sha: string }>;
+    return new Map(files.map((file) => [file.path, { content: file.content, sha: file.sha }]));
+  }
+
+
   calculatePullFiles(baseRepo: RepoRow, baseRef: string, headRepo: RepoRow, headRef: string): PullRequestFileRow[] {
-    const baseFiles = new Map((this.db.prepare("SELECT * FROM files WHERE repo_id = ? AND branch = ?").all(baseRepo.id, baseRef) as FileRow[]).map((file) => [file.path, file]));
-    const headFiles = new Map((this.db.prepare("SELECT * FROM files WHERE repo_id = ? AND branch = ?").all(headRepo.id, headRef) as FileRow[]).map((file) => [file.path, file]));
-    const paths = [...new Set([...baseFiles.keys(), ...headFiles.keys()])].sort();
-    const rows: PullRequestFileRow[] = [];
-    for (const path of paths) {
-      const base = baseFiles.get(path);
-      const head = headFiles.get(path);
-      if (base?.sha === head?.sha) continue;
-      const diff = linesChanged(base?.content, head?.content ?? "");
-      rows.push({
-        repo_id: baseRepo.id,
-        pull_number: 0,
-        filename: path,
-        status: base && head ? "modified" : head ? "added" : "removed",
-        additions: diff.additions,
-        deletions: head ? diff.deletions : base?.content.split("\n").length ?? 0,
-        changes: diff.additions + diff.deletions,
+    // F-1513 — the rows themselves are `diffFileRows`, shared with
+    // `computeCompareFiles`. What is local to a pull request is the pair of
+    // trees (two BRANCHES, one of which can live in a fork) and the urls, which
+    // name the head branch ref because that is what the PR is opened against.
+    return diffFileRows(
+      baseRepo.id,
+      this.branchTree(baseRepo.id, baseRef),
+      this.branchTree(headRepo.id, headRef),
+      (path) => ({
         blob_url: `https://github.com/${headRepo.full_name}/blob/${headRef}/${path}`,
         raw_url: `https://raw.githubusercontent.com/${headRepo.full_name}/${headRef}/${path}`,
-        contents_url: `https://api.github.com/repos/${headRepo.full_name}/contents/${path}`,
-        patch: `@@ ${path} @@`
-      });
-    }
-    return rows;
+        contents_url: `https://api.github.com/repos/${headRepo.full_name}/contents/${path}`
+      })
+    );
   }
 
 
   replacePullFiles(repoId: number, pullNumber: number, files: PullRequestFileRow[]) {
     this.db.prepare("DELETE FROM pull_request_files WHERE repo_id = ? AND pull_number = ?").run(repoId, pullNumber);
     for (const file of files) {
-      this.db.prepare("INSERT INTO pull_request_files (repo_id, pull_number, filename, status, additions, deletions, changes, blob_url, raw_url, contents_url, patch) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
+      this.db.prepare("INSERT INTO pull_request_files (repo_id, pull_number, filename, status, additions, deletions, changes, blob_url, raw_url, contents_url, patch, previous_filename) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
         repoId,
         pullNumber,
         file.filename,
@@ -1070,7 +1117,8 @@ export class GitHubDomain {
         file.blob_url,
         file.raw_url,
         file.contents_url,
-        file.patch
+        file.patch,
+        file.previous_filename
       );
     }
   }
