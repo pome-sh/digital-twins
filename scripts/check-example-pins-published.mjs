@@ -226,26 +226,46 @@ export function planExampleRepins(repoRoot, npmView = defaultNpmView) {
   const { exact } = discoverExampleSiblingDeps(repoRoot);
   const { violations } = checkExamplePinsPublished(exact, npmView);
 
-  return violations.map((v) => {
+  // A regex rather than a literal-string match (unlike this file's siblings'
+  // `"version": "x"` searches): a hand-formatted `package.json` always has a
+  // space after the colon, but nothing in npm requires one, so matching only
+  // the formatted shape would silently find zero occurrences on a compact file
+  // instead of one — a formatting failure no author intended. The capture
+  // groups mean only the pin's own bytes are replaced, never a coincidental
+  // earlier occurrence of the same string inside the matched text.
+  const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  // One example can carry TWO drifted `@pome-sh/*` pins, and `applyAllocations`
+  // writes entries in order, so last write wins per path: each entry's
+  // `contents` must therefore already carry every EARLIER substitution to the
+  // same manifest, or the first repin is silently dropped while the commit
+  // message still claims it — the read-side gate would then keep reddening on a
+  // drift the commit says it fixed.
+  const latest = new Map();
+  const repins = [];
+  for (const v of violations) {
     const manifestRelPath = `examples/${v.example}/package.json`;
-    const contents = readFileSync(join(repoRoot, manifestRelPath), "utf8");
-    // A regex rather than a literal-string match (unlike this file's siblings'
-    // `"version": "x"` searches): a hand-formatted `package.json` always has a
-    // space after the colon, but nothing in npm requires one, so matching only
-    // the formatted shape would silently find zero occurrences on a compact
-    // file instead of one — the same "refuse to guess" failure this function
-    // already raises, just for a formatting reason no author intended.
-    const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const pattern = new RegExp(`"${escape(v.dep)}"\\s*:\\s*"${escape(v.pin)}"`, "g");
+    const contents = latest.get(manifestRelPath) ?? readFileSync(join(repoRoot, manifestRelPath), "utf8");
+    const pattern = new RegExp(`("${escape(v.dep)}"\\s*:\\s*")${escape(v.pin)}(")`, "g");
     const occurrences = contents.match(pattern)?.length ?? 0;
     if (occurrences !== 1) {
-      throw new Error(
-        `${manifestRelPath}: expected exactly one \`"${v.dep}": "${v.pin}"\`, found ${occurrences}. Refusing to ` +
-          "guess which one is the pin drifted out from under.",
+      // Deliberately NOT a throw. This runs inside `planAllocations`, on every
+      // push to `main`, so throwing would stop EVERY package's release over one
+      // ambiguous example manifest (a `"@pome-sh/x": "<pin>"` repeated in
+      // `overrides`, or in a second install field) — a repo-wide release outage
+      // caused by the thing meant to remove a one-line PR. Skip this one pin
+      // instead: `reportExamplePinParity` still reds on it, so it cannot go
+      // silent, and a human re-pins it the way they did before F-1520.
+      console.warn(
+        `::warning::${manifestRelPath}: expected exactly one \`"${v.dep}": "${v.pin}"\`, found ${occurrences} — ` +
+          "refusing to guess which one is the pin, so it is NOT re-pinned automatically. " +
+          "check-example-pins-published.mjs keeps reporting the drift until it is fixed by hand.",
       );
+      continue;
     }
-    const replacement = contents.replace(pattern, (match) => match.replace(v.pin, v.workspaceVersion));
-    return {
+    const replacement = contents.replace(pattern, `$1${v.workspaceVersion}$2`);
+    latest.set(manifestRelPath, replacement);
+    repins.push({
       example: v.example,
       dep: v.dep,
       from: v.pin,
@@ -255,8 +275,9 @@ export function planExampleRepins(repoRoot, npmView = defaultNpmView) {
       // there is nothing to gain from a real `node_modules` and a real install
       // would need dev toolchains (tsx, vitest) this job has no other use for.
       regenerate: [`(cd examples/${v.example} && npm install --package-lock-only --no-audit --no-fund)`],
-    };
-  });
+    });
+  }
+  return repins;
 }
 
 /**

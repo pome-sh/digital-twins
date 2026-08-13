@@ -401,6 +401,107 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
     }
   }
 
+  // 16b. TWO drifted pins in ONE example. `applyAllocations` writes a plan's
+  // entries in order and last write wins per path, so the LAST entry for a
+  // manifest must already carry every earlier substitution — otherwise the
+  // first repin is silently dropped while the commit message still claims it,
+  // and the read-side gate keeps reddening on a drift the commit says it fixed.
+  {
+    const root = mkdtempSync(join(tmpdir(), "example-pins-two-"));
+    writeFileSync(join(root, "package.json"), JSON.stringify({ name: "root", workspaces: ["packages/*"] }));
+    for (const [dir, name, version] of [
+      ["adapter-claude-sdk", "@pome-sh/adapter-claude-sdk", "0.3.6"],
+      ["checks", "@pome-sh/checks", "1.2.0"],
+    ]) {
+      mkdirSync(join(root, "packages", dir), { recursive: true });
+      writeFileSync(join(root, "packages", dir, "package.json"), JSON.stringify({ name, version }));
+    }
+    mkdirSync(join(root, "examples", "support-triage"), { recursive: true });
+    writeFileSync(
+      join(root, "examples", "support-triage", "package.json"),
+      JSON.stringify({
+        name: "support-triage-example",
+        dependencies: { "@pome-sh/adapter-claude-sdk": "0.3.5", "@pome-sh/checks": "1.1.0" },
+      }),
+    );
+    const repins = planExampleRepins(root, () => ({ status: "published" }));
+    // Whichever entry lands last for that path is what ends up on disk.
+    const lastForPath = repins.filter((r) => r.writes[0].path === "examples/support-triage/package.json").at(-1);
+    const onDisk = JSON.parse(lastForPath?.writes[0].contents ?? "{}");
+    if (
+      repins.length === 2 &&
+      onDisk.dependencies["@pome-sh/adapter-claude-sdk"] === "0.3.6" &&
+      onDisk.dependencies["@pome-sh/checks"] === "1.2.0"
+    ) {
+      pass("16b. two drifted pins in one example both survive the last-write-wins apply");
+    } else {
+      fail("16b. two drifted pins in one example both survive the last-write-wins apply", JSON.stringify({ repins, onDisk }));
+    }
+  }
+
+  // 16c. An ambiguous manifest — the same `"<dep>": "<pin>"` bytes repeated in
+  // an `overrides` block, which npm accepts and this gate does not read as a
+  // second install field. `planExampleRepins` runs inside `planAllocations` on
+  // EVERY push to main, so throwing here would stop every package's release
+  // over one example manifest. It must skip that pin and keep going, leaving
+  // the read-side gate to red on it.
+  {
+    const root = mkdtempSync(join(tmpdir(), "example-pins-ambig-"));
+    writeFileSync(join(root, "package.json"), JSON.stringify({ name: "root", workspaces: ["packages/*"] }));
+    mkdirSync(join(root, "packages", "adapter-claude-sdk"), { recursive: true });
+    writeFileSync(
+      join(root, "packages", "adapter-claude-sdk", "package.json"),
+      JSON.stringify({ name: "@pome-sh/adapter-claude-sdk", version: "0.3.6" }),
+    );
+    mkdirSync(join(root, "examples", "support-triage"), { recursive: true });
+    writeFileSync(
+      join(root, "examples", "support-triage", "package.json"),
+      JSON.stringify({
+        name: "support-triage-example",
+        dependencies: { "@pome-sh/adapter-claude-sdk": "0.3.5" },
+        overrides: { "@pome-sh/adapter-claude-sdk": "0.3.5" },
+      }),
+    );
+    let threw = null;
+    let repins = null;
+    try {
+      repins = planExampleRepins(root, () => ({ status: "published" }));
+    } catch (e) {
+      threw = e;
+    }
+    // The gate itself must still call it drift — skipping the WRITE must never
+    // skip the READ.
+    const { violations } = checkExamplePinsPublished(discoverExampleSiblingDeps(root).exact, () => ({
+      status: "published",
+    }));
+    if (threw === null && repins?.length === 0 && violations.length === 1) {
+      pass("16c. an ambiguous pin is skipped, not thrown on, and still reds the read-side gate");
+    } else {
+      fail("16c. an ambiguous pin is skipped, not thrown on, and still reds the read-side gate", String(threw ?? JSON.stringify({ repins, violations })));
+    }
+  }
+
+  // 16d. …and one ambiguous pin must not cost a DIFFERENT example its repin.
+  {
+    const root = fixture({
+      workspaceVersion: "0.3.6",
+      examplePin: "0.3.5",
+      extraExamples: {
+        "ambiguous-example": {
+          name: "ambiguous-example",
+          dependencies: { "@pome-sh/adapter-claude-sdk": "0.3.4" },
+          overrides: { "@pome-sh/adapter-claude-sdk": "0.3.4" },
+        },
+      },
+    });
+    const repins = planExampleRepins(root, () => ({ status: "published" }));
+    if (repins.length === 1 && repins[0].example === "support-triage" && repins[0].to === "0.3.6") {
+      pass("16d. an ambiguous example does not block a clean one in the same run");
+    } else {
+      fail("16d. an ambiguous example does not block a clean one in the same run", JSON.stringify(repins));
+    }
+  }
+
   // 16. No `package.json` at the repo root (a throwaway fixture, like
   // allocate-release-versions.test.mjs's) — must return empty, not throw.
   {
