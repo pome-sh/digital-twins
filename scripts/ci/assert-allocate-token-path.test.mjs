@@ -225,6 +225,16 @@ console.log("the pushing step");
     editInStep(t, PUSH, /^\s*if:/, () => "        if: github.event_name != 'pull_request' && false"),
   );
   check("a neutralised guard reds", names(neutralised).includes("pushing step"), names(neutralised));
+
+  // The first live run spent all three attempts reporting "a merge landed first"
+  // while main was answering GH013. Collapsing the rule-violation branch back
+  // into a bare retry is the "simplification" that would restore that.
+  const raceOnly = run((t) => t.replace(/GH013/g, "GH0XX"));
+  check(
+    "losing the rule-violation branch reds — a refusal is not a race",
+    /does not distinguish a rule violation/.test(names(raceOnly)),
+    names(raceOnly),
+  );
 }
 
 console.log("the fallback itself");

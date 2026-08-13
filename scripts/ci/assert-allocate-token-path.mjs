@@ -262,6 +262,20 @@ export function checkAllocateTokenPath(root) {
           `bypass actor, and a push made with it does not trigger release.yml.`,
       );
     }
+    // A refusal is not a race. The first live run of this workflow spent all
+    // three attempts reporting "a merge landed first" while main was answering
+    // GH013 (classic branch protection's duplicate required-checks rule, which no
+    // App can bypass). Retrying cannot fix a rule, and a retry loop that cannot
+    // tell the two apart hides the one thing a human needs to read. This asserts
+    // the distinction survives — collapsing the branch back into a bare retry is
+    // exactly the "simplification" that would restore the misdiagnosis.
+    if (!/GH013/.test(step.text)) {
+      errors.push(
+        `the pushing step "${step.name}" does not distinguish a rule violation (GH013) from a ` +
+          `non-fast-forward race. Retrying a refusal wastes every attempt and reports the wrong cause; ` +
+          `it must stop on the first refusal and name the layer that refused.`,
+      );
+    }
   }
 
   // 4 — every ambient-token occurrence is the one sanctioned fallback.

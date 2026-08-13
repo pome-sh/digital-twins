@@ -190,6 +190,36 @@ the ruleset source or owner organization` until step 1 is done):
    # bypass_actors = Team 16601595 (always) + {"actor_id": 4582446, "actor_type": "Integration", "bypass_mode": "always"}
    ```
 
+**Every layer guarding `main` must let the app through, and classic branch
+protection cannot be made to.** The ruleset bypass above is one layer; the repo
+also had *classic* branch protection carrying a duplicate
+`required_status_checks` rule with `enforce_admins: true`, which no GitHub App can
+bypass. On 2026-08-13 that layer refused the first live allocation:
+
+```
+remote: error: GH013: Repository rule violations found for refs/heads/main.
+remote: - 3 of 3 required status checks are expected.
+```
+
+Note what the refusal did NOT say: nothing about the pull-request rule. The
+ruleset bypass was working; the legacy copy was the only blocker. It was deleted
+(`gh api -X DELETE repos/pome-sh/digital-twins/branches/main/protection/required_status_checks`),
+which loses nothing that is checked — the ruleset enforces the same three contexts
+with `strict`, and that is the copy
+[`scripts/ci/assert-repo-policy.sh`](scripts/ci/assert-repo-policy.sh) asserts, in
+both directions. Force-push and deletion protection stayed.
+
+**Nothing in CI can assert it stays deleted**, and that is stated rather than
+implied: `GET /repos/…/branches/main/protection` answers 401 without
+`Administration:read`, which `GITHUB_TOKEN` cannot hold (F-1212 deleted the PAT
+that could), and the `rules/branches/main` endpoint the policy check does read
+returns ruleset-sourced rules only. So a re-added copy is caught by
+`release-alarm.yml`'s `UNALLOCATED` leg — `main` carries a pending entry that no
+allocation consumed — at the next daily cron, **~24h latency**, not as a red PR.
+`allocate-version.yml` makes that window as cheap as possible: a rule refusal
+stops on the first attempt instead of retrying three times, and names both layers
+in the run log.
+
 **Why an App and not a fine-grained PAT** — this job was first written against
 one. A PAT expires, and its expiry day is a release-freeze day nobody scheduled;
 it also binds the release path to one person's account. An App private key does

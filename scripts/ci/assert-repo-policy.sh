@@ -28,9 +28,10 @@
 # not in config/required-checks.json is still a failure, because an unexpected
 # required context is exactly the drift this check exists to surface.
 #
-# NOT covered live (dropped, not silently assumed true) — named in the run
-# log on success so a reader is never told coverage is total: the ruleset's
-# bypass_actors (founder-team bypass). GitHub elides the bypass_actors FIELD
+# NOT covered live (dropped, not silently assumed true) — both are named in the
+# run log on success so a reader is never told coverage is total:
+#
+#   1. The ruleset's bypass_actors (founder-team bypass). GitHub elides the bypass_actors FIELD
 # for callers without Administration:read — the .../rulesets/{id} endpoint
 # itself is readable (it answers 200 even unauthenticated on this public repo),
 # but the field is simply absent, so asserting on it would fail OPEN for
@@ -224,6 +225,9 @@ console.log("required contexts:", required.join(", "));
 // Name the coverage gap on every green run. A dropped assertion that prints
 // nothing reads as "all clear"; this is unwatched and must say so.
 console.log(
-  "NOT verified live (needs Administration:read, deliberately not held): ruleset bypass_actors (founder-team bypass)",
+  "NOT verified live (needs Administration:read, deliberately not held): ruleset bypass_actors "
+    + "(founder-team bypass); and classic branch protection's own required_status_checks copy, which "
+    + "this endpoint cannot see at all — deleted 2026-08-13 because no App can bypass it, and a "
+    + "re-added copy is caught by release-alarm.yml's UNALLOCATED leg within a day, not here",
 );
 NODE
