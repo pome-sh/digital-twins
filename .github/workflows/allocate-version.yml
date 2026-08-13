@@ -87,8 +87,13 @@ on:
       - "scripts/ci/publish-relevance.mjs"
       # F-1520 — the allocator now imports planExampleRepins from here, so a
       # change to it is a change to the allocator's own wiring, not just to
-      # the standalone gate that also uses it.
+      # the standalone gate that also uses it. The second entry is the TRANSITIVE
+      # half of that import: check-example-pins-published.mjs imports
+      # loadWorkspaceMembers from it, so the allocator's behaviour on main
+      # depends on it too — listing only the direct import would leave the arm
+      # blind to exactly the PR that changes how examples are discovered.
       - "scripts/check-example-pins-published.mjs"
+      - "scripts/check-workspace-pins-match-workspace.mjs"
       - ".github/workflows/allocate-version.yml"
 
 # One allocation at a time, and never cancelled mid-write: the number is a

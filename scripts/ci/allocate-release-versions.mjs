@@ -261,7 +261,27 @@ export function planAllocations({ root = resolve(HERE, "../.."), date = today(),
   // exists to fix. That version's example pin gets corrected on the FIRST
   // subsequent run of this workflow after `release.yml` actually publishes it —
   // still fully automatic, still no human PR, just one push later.
-  const repins = npmView ? planExampleRepins(root, npmView) : planExampleRepins(root);
+  //
+  // ONE guard around the whole call, rather than a guard per throw site. A
+  // re-pin is cosmetic; an allocation is not — and this function runs on every
+  // push to `main`, so ANY throw from the example walk stops EVERY package's
+  // release over one example directory. The reachable vectors today are already
+  // more than one (an ambiguous pin, a malformed `examples/*/package.json` that
+  // `discoverExampleSiblingDeps` `JSON.parse`s unguarded, `loadWorkspaceMembers`
+  // on an empty `workspaces` glob) and the next one arrives with the next
+  // caller, so the invariant is enforced here where it is total. The failure is
+  // loud — `notes` is printed as `::warning::` — and the read-side gate in
+  // `ci.yml` still reds on whatever the example is doing wrong, so nothing is
+  // swallowed, only de-escalated to the blast radius it should have had.
+  let repins = [];
+  try {
+    repins = npmView ? planExampleRepins(root, npmView) : planExampleRepins(root);
+  } catch (err) {
+    notes.push(
+      `example re-pin planning failed and was SKIPPED so it cannot block this allocation — ${err.message}. ` +
+        "check-example-pins-published.mjs still reds on the drift.",
+    );
+  }
 
   return { head, date, allocations, repins, notes, message: commitMessage(allocations, repins, head) };
 }

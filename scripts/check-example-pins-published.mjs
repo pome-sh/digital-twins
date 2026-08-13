@@ -197,6 +197,19 @@ export function checkExamplePinsPublished(pins, npmView = defaultNpmView) {
 }
 
 /**
+ * The write side's registry budget, deliberately ONE attempt where the read
+ * side takes three. `defaultNpmView`'s retry exists because the gate is a
+ * REQUIRED status check that must not flake on a transient 5xx. The re-pin has
+ * the opposite cost function: it runs inside `allocate-version.yml`'s three-
+ * attempt push loop, synchronously, per exact pin, in a `timeout-minutes: 20`
+ * job that also runs `npm ci` — so three attempts × a 60s timeout × the backoff
+ * × the push retries is minutes of stalling in the release path, and it buys
+ * nothing, because a missed re-pin costs exactly one cycle and the next run
+ * plans it again. Cheap to lose, expensive to wait for.
+ */
+const writeSideNpmView = (name, version) => defaultNpmView(name, version, { attempts: 1 });
+
+/**
  * F-1520 — the write-side of this gate's own read-side logic. `checkExample
  * PinsPublished`'s `violations` ARE, by construction, the only pins safe to
  * rewrite automatically: the sibling is confirmed PUBLISHED (an `npm view`
@@ -220,11 +233,23 @@ export function checkExamplePinsPublished(pins, npmView = defaultNpmView) {
  * builds are neither, and this function is called unconditionally from every
  * plan, not just ones that touch examples.
  */
-export function planExampleRepins(repoRoot, npmView = defaultNpmView) {
+export function planExampleRepins(repoRoot, npmView = writeSideNpmView) {
   if (!existsSync(join(repoRoot, "package.json")) || !existsSync(join(repoRoot, "examples"))) return [];
 
   const { exact } = discoverExampleSiblingDeps(repoRoot);
-  const { violations } = checkExamplePinsPublished(exact, npmView);
+  const { violations, errors } = checkExamplePinsPublished(exact, npmView);
+
+  if (errors.length > 0) {
+    // `checkExamplePinsPublished` is emphatic that a non-E404 answer is a hard
+    // failure and never a skip. The write side cannot honour that literally — a
+    // registry outage must not stop a release — but it must not launder it into
+    // "nothing drifted" either, which is what silently dropping `errors` would
+    // do. Say so; the read-side gate is the one that hard-fails.
+    console.warn(
+      `::warning::${errors.length} example pin(s) could not be checked against the registry, so they are NOT ` +
+        `re-pinned in this run: ${errors.map((e) => `examples/${e.example} ${e.dep}@${e.workspaceVersion} (${e.detail})`).join("; ")}`,
+    );
+  }
 
   // A regex rather than a literal-string match (unlike this file's siblings'
   // `"version": "x"` searches): a hand-formatted `package.json` always has a
@@ -274,7 +299,9 @@ export function planExampleRepins(repoRoot, npmView = defaultNpmView) {
       // `--package-lock-only`: this workflow never runs the example itself, so
       // there is nothing to gain from a real `node_modules` and a real install
       // would need dev toolchains (tsx, vitest) this job has no other use for.
-      regenerate: [`(cd examples/${v.example} && npm install --package-lock-only --no-audit --no-fund)`],
+      // The path is QUOTED: `v.example` is a directory name off `readdirSync`,
+      // and this string is `bash`ed by a job holding a write-capable App token.
+      regenerate: [`(cd "examples/${v.example}" && npm install --package-lock-only --no-audit --no-fund)`],
     });
   }
   return repins;

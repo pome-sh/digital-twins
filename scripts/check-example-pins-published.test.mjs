@@ -349,7 +349,8 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
       repins[0].writes[0].path === "examples/support-triage/package.json" &&
       JSON.parse(repins[0].writes[0].contents).dependencies["@pome-sh/adapter-claude-sdk"] === "0.3.6" &&
       repins[0].regenerate.length === 1 &&
-      repins[0].regenerate[0].includes("cd examples/support-triage") &&
+      repins[0].regenerate[0].includes('cd "examples/support-triage"') && // quoted: this string is bash'ed in CI
+
       repins[0].regenerate[0].includes("npm install --package-lock-only")
     ) {
       pass("11. a drifted, published pin plans a manifest rewrite and a lockfile regen command");

@@ -484,6 +484,36 @@ console.log("F-1520 — the repin path is a no-op without examples/");
   }
 }
 
+console.log("F-1520 — a broken example can never block a version allocation");
+{
+  const dir = repo();
+  try {
+    // The whole reason the repin call is wrapped: this runs on EVERY push to
+    // main, so a throw anywhere in the example walk would stop every package's
+    // release over one example directory. A manifest that is not valid JSON is
+    // the cheapest reachable vector (discoverExampleSiblingDeps JSON.parses it
+    // unguarded); the guard is around the call, so it covers the others too.
+    withExamples(dir, { adapterPin: "0.9.0" });
+    write(dir, "examples/broken/package.json", "{ this is not json");
+    pend(dir, CLI, { body: "- a fix consumers need" });
+    git(dir, "add", "-A");
+    git(dir, "commit", "-qm", "a merge (#912)");
+
+    const result = plan(dir, onlyPublished("@pome-sh/adapter-claude-sdk", "1.0.0"));
+    check("the CLI still gets its version", named(result, "@pome-sh/cli")?.to === "1.0.1", JSON.stringify(result.allocations));
+    check("the repin is dropped, not fatal", result.repins.length === 0, JSON.stringify(result.repins));
+    check(
+      "and the failure is announced as a ::warning:: note rather than swallowed",
+      result.notes.some((n) => n.includes("example re-pin planning failed")),
+      JSON.stringify(result.notes),
+    );
+    land(dir, result);
+    check("the release still lands", JSON.parse(read(dir, CLI.manifest)).version === "1.0.1");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 console.log("F-1520 — a drifted pin against an already-published sibling is repinned");
 {
   const dir = repo();
