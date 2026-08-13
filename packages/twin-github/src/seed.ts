@@ -29,7 +29,58 @@ export const seedSchema = z.object({
           })
         )
         .default([]),
-      files: z.array(z.object({ path: z.string().min(1), content: z.string(), branch: z.string().optional() })).default([]),
+      // F-1500 — `renamed_from` is how a seed expresses a MOVE, and with it the
+      // `status: "renamed"` the row type has always declared and no world could
+      // reach. A seeded branch is created from the default branch and inherits
+      // every path, and a plain `files[]` entry can only add or overwrite, so
+      // before this there was no way to make a path ABSENT from the head branch
+      // — and `previous_filename` was therefore unreachable from any seed, not
+      // merely unemitted.
+      //
+      // `content` is refused alongside `renamed_from` rather than merged with
+      // it: the diff detects a move by pairing identical blobs (see
+      // `calculatePullFiles`), so a seed naming a source AND different content
+      // would be asking for a rename the diff would report as an add plus a
+      // remove. Refusing it keeps "the seed asked for a rename" and "the twin
+      // serves a rename" the same statement. The content comes from the source
+      // path, which the domain resolves on the branch the move happens on.
+      files: z
+        .array(
+          z
+            .object({
+              path: z.string().min(1),
+              content: z.string().optional(),
+              branch: z.string().optional(),
+              renamed_from: z.string().min(1).optional()
+            })
+            .superRefine((file, ctx) => {
+              if (file.renamed_from === undefined) {
+                if (file.content === undefined) {
+                  ctx.addIssue({
+                    code: "custom",
+                    path: ["content"],
+                    message: "content is required on a file entry that declares no renamed_from"
+                  });
+                }
+                return;
+              }
+              if (file.content !== undefined) {
+                ctx.addIssue({
+                  code: "custom",
+                  path: ["content"],
+                  message: `renamed_from carries the source file's content, so content must be omitted (${file.path})`
+                });
+              }
+              if (file.renamed_from === file.path) {
+                ctx.addIssue({
+                  code: "custom",
+                  path: ["renamed_from"],
+                  message: `renamed_from must name a different path than the file it moves to (${file.path})`
+                });
+              }
+            })
+        )
+        .default([]),
       // F-1421 — milestones, tags and releases are repository-level entities the
       // twin already SERVES (`GET /milestones`, `/tags`, `/releases`,
       // `/releases/latest`, `/releases/tags/:tag`) and the seed could not
