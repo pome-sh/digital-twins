@@ -26,8 +26,26 @@ export const PER_TWIN = {
     sessionHealthz: { status: 200 },
     // github validates seeds: a garbage body is a 422 GitHub validation error.
     adminSeedGarbage: { status: 422, check: (b) => b.message === "Validation Failed" },
-    noAuth: { status: 401, check: (b) => b.message === "Bad credentials" },
-    wrongSid: { status: 401, check: (b) => b.message === "Forbidden" },
+    // F-1497 CONTRACT CHANGE: `noAuth` sends NO Authorization header, and real
+    // GitHub answers that with `Requires authentication` — `Bad credentials`
+    // is what it answers a bad token. Measured live 2026-08-13 on `GET /user`,
+    // both ways. The twin collapsed the two until F-1497; CONTRACT.md's auth
+    // table moved with this line. No pome-cloud consumer reads either string
+    // (searched: zero hits for "Bad credentials" in that repo).
+    noAuth: {
+      status: 401,
+      check: (b) =>
+        b.message === "Requires authentication" &&
+        b.documentation_url === "https://docs.github.com/rest" &&
+        b.status === "401",
+    },
+    wrongSid: {
+      status: 401,
+      check: (b) =>
+        b.message === "Forbidden" &&
+        b.documentation_url === "https://docs.github.com/rest" &&
+        b.status === "401",
+    },
     // hono/jwt's verify throws on an expired token before auth.ts's explicit
     // "Token expired" branch is reached, so the wire says "Bad credentials".
     expired: { status: 401, check: (b) => b.message === "Bad credentials" },
@@ -242,6 +260,110 @@ function checkBody(expectation, body, label) {
 }
 
 /**
+ * F-1497 — what each vendor actually puts on an auth-refusal envelope, and the
+ * 403 body the twin's admin gate must answer with.
+ *
+ * ── HOW THIS WAS OBTAINED ─────────────────────────────────────────────────
+ *
+ * All five vendors were probed live on 2026-08-13, twice each: once with
+ * `Authorization: Bearer <deliberately invalid>` and once with no
+ * `Authorization` header at all. Read-only endpoints, nothing created:
+ * `api.github.com/user`, `slack.com/api/auth.test`, `api.stripe.com/v1/customers`,
+ * `gmail.googleapis.com/gmail/v1/users/me/profile`,
+ * `api.linear.app/graphql` (`{ viewer { id } }`).
+ *
+ * ⚠️ ONE of the five sends `documentation_url`. GitHub. The other four send no
+ * such key anywhere in the body, which is why `docsUrl: null` below is an
+ * assertion and not a "not measured" — it says the twin must not invent one.
+ * Before F-1497 all five COULD, because the 401/403 defaults in `@pome-sh/sdk`
+ * carried `documentation_url: ""`, and gmail + linear were reaching that
+ * default on their admin 403.
+ *
+ * The `docsUrl` github does send is the GENERIC one on every 401 (8/8, F-1490)
+ * — authentication fails before dispatch, so there is no operation to name, and
+ * the twin's admin route is twin-only for the same reason.
+ */
+const AUTH_ENVELOPE = {
+  github: {
+    docsUrl: "https://docs.github.com/rest",
+    adminForbidden: {
+      message: "Forbidden",
+      documentation_url: "https://docs.github.com/rest",
+      status: "403",
+    },
+  },
+  slack: {
+    docsUrl: null,
+    adminForbidden: { ok: false, error: "restricted_action" },
+  },
+  stripe: {
+    docsUrl: null,
+    adminForbidden: {
+      error: { type: "invalid_request_error", code: "forbidden", message: "Forbidden" },
+    },
+  },
+  gmail: {
+    docsUrl: null,
+    adminForbidden: {
+      error: {
+        code: 403,
+        message: "Forbidden",
+        errors: [{ message: "Forbidden", domain: "global", reason: "forbidden" }],
+        status: "PERMISSION_DENIED",
+      },
+    },
+  },
+  linear: {
+    docsUrl: null,
+    adminForbidden: {
+      errors: [{ message: "Forbidden", extensions: { code: "FORBIDDEN", http: { status: 403 } } }],
+    },
+  },
+};
+
+/** Every `documentation_url` anywhere in a body, however deeply nested. */
+function collectDocumentationUrls(value, found = []) {
+  if (Array.isArray(value)) {
+    for (const item of value) collectDocumentationUrls(item, found);
+    return found;
+  }
+  if (value && typeof value === "object") {
+    for (const [key, item] of Object.entries(value)) {
+      if (key === "documentation_url") found.push(item);
+      else collectDocumentationUrls(item, found);
+    }
+  }
+  return found;
+}
+
+/**
+ * The cross-twin half of F-1497: a twin may carry its OWN vendor's
+ * `documentation_url` and no other twin's, and a twin whose vendor sends none
+ * must send none — not `""`, not a nested one, not GitHub's.
+ *
+ * Recursive rather than a top-level key check on purpose: gmail's and linear's
+ * bodies are nested, so a leak into `error.documentation_url` would be
+ * invisible to a shallow read.
+ */
+function assertVendorDocsUrl(name, body, label) {
+  const expected = AUTH_ENVELOPE[name].docsUrl;
+  const found = collectDocumentationUrls(body ?? {});
+  if (expected === null) {
+    assert.deepEqual(
+      found,
+      [],
+      `${label}: ${name}'s vendor sends no documentation_url on an auth refusal, so the twin must not — got ${JSON.stringify(body)}`
+    );
+    return;
+  }
+  assert.deepEqual(
+    found,
+    [expected],
+    `${label}: ${name}'s vendor sends exactly one documentation_url (${expected}) — got ${JSON.stringify(body)}`
+  );
+}
+
+/**
  * The per-twin contract suite. `label` distinguishes multiple runs against
  * the same twin name (e.g. the sdk-booted proof entry).
  */
@@ -363,6 +485,20 @@ export function contractSuite(twin, exp, label = twin.name) {
         headers: { Authorization: mintSessionJwt({ sid: SID }) },
       });
       assert.equal(raw.status, exp.rawToken.status, "raw (prefix-less) bearer behavior is frozen per twin");
+
+      // F-1497 — the same four refusals, read for ONE leaf across all five
+      // twins: `documentation_url` is GitHub's key and only GitHub's vendor
+      // sends it. This ran green while every twin was emitting
+      // `documentation_url: ""` from the shared SDK default, which is exactly
+      // the leak it now catches; see AUTH_ENVELOPE above for the measurements.
+      for (const [label, body] of [
+        ["no auth", noAuth.json],
+        ["garbage bearer", garbage.json],
+        ["wrong sid", wrongSid.json],
+        ["expired", expired.json],
+      ]) {
+        assertVendorDocsUrl(twin.name, body, label);
+      }
     });
 
 
@@ -468,6 +604,23 @@ export function adminGateCase(twin, label = twin.name) {
       assert.equal(missing.status, 403);
       const wrong = await req(t.base, "/admin/reset", { method: "POST", headers: { "X-Admin-Token": "nope" } });
       assert.equal(wrong.status, 403);
+
+      // F-1497 — the BODY, not just the status. This gate lives in
+      // `@pome-sh/sdk` and is shared by all five twins, so its default could
+      // never be vendor-shaped: it answered github's
+      // `{message:"Forbidden", documentation_url:""}` on every twin that had
+      // not declared its own, which was github, gmail and linear. Each twin
+      // declares one now, and the whole body is asserted so a declaration that
+      // drops a sibling key (gmail's `errors[]`, linear's `extensions.http`)
+      // cannot pass on the leaf that moved.
+      for (const [label, res] of [["missing header", missing], ["wrong token", wrong]]) {
+        assert.deepEqual(
+          res.json,
+          AUTH_ENVELOPE[twin.name].adminForbidden,
+          `${label}: ${twin.name}'s admin-gate 403 body is its OWN vendor's envelope`
+        );
+        assertVendorDocsUrl(twin.name, res.json, `admin 403 (${label})`);
+      }
       const right = await req(t.base, "/admin/reset", { method: "POST", headers: { "X-Admin-Token": "contract-admin-token" } });
       assert.equal(right.status, 200);
       assert.equal(right.json?.ok, true);

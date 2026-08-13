@@ -166,12 +166,37 @@ describe("F-1498 — the three classes GitHub answers GENERICALLY stay generic",
     });
     expect(got.status).toBe(401);
 
-    // ⚠️ The empty string is divergence 31's gap (GitHub sends the generic url
-    // here, and this body is built in the SDK's auth layer), and it is NOT this
-    // ticket's to close. What F-1498 must not do is put `…#get-a-repository`
-    // here, which is what "name the operation everywhere" would have done.
+    // ⚠️ THE URL MOVED FROM `""` TO `GENERIC`, AND THE ASSERTION DID NOT SOFTEN.
+    // The empty string was divergence 31's gap — a leaf GitHub fills that this
+    // twin left blank — and F-1497 closed it by building this body through
+    // `githubError` instead of by hand. What F-1498 pinned here is untouched and
+    // is the reason both tickets could land: GitHub answers a 401 with the
+    // GENERIC url, never an operation-specific one, so `…#get-a-repository`
+    // would be a new divergence pointing the other way. Whole body, so a fix
+    // that filled the url by dropping `message` or `status` still reds.
     const body = (await got.json()) as Record<string, unknown>;
-    expect(body).toEqual({ message: "Bad credentials", documentation_url: "" });
+    expect(body).toEqual({
+      message: "Bad credentials",
+      documentation_url: GENERIC,
+      status: "401",
+    });
+    expect(String(body.documentation_url)).not.toContain("#");
+  });
+
+  it("a 401 with NO Authorization header is generic too, and says the other thing", async () => {
+    // GitHub's 8/8 generic 401s include the header-less probes. F-1497 split the
+    // message (`Requires authentication` vs `Bad credentials`) — the split must
+    // not drag an operation url onto either leg.
+    const app = createGitHubCloneApp();
+    const got = await app.request(`${base}/repos/acme/api`);
+    expect(got.status).toBe(401);
+
+    const body = (await got.json()) as Record<string, unknown>;
+    expect(body).toEqual({
+      message: "Requires authentication",
+      documentation_url: GENERIC,
+      status: "401",
+    });
     expect(String(body.documentation_url)).not.toContain("#");
   });
 

@@ -4,6 +4,63 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.46
+
+### Patch Changes
+
+- **Every twin's 401 and admin-gate 403 now matches its OWN vendor, and the
+  shared SDK default stopped claiming GitHub's.** `packages/sdk`'s `auth.ts` and
+  `admin-gate.ts` hardcoded `documentation_url: ""` on all three refusal
+  envelopes — GitHub's key, with a value GitHub never sends, on a module imported
+  by all five twins. github, gmail and linear were reaching it on their admin 403.
+
+  All five vendors were probed live on 2026-08-13, twice each: with a
+  deliberately invalid bearer, and with no `Authorization` header at all. All
+  read-only, nothing created. **Only GitHub sends `documentation_url` at all**,
+  which is why the fix is per-twin and not a new shared default:
+
+  | vendor | HTTP | bad credential | missing credential |
+  | --- | --- | --- | --- |
+  | github | 401 | `Bad credentials` + generic url + `status:"401"` | `Requires authentication`, same two leaves |
+  | slack | **200** | `{ok:false, error:"invalid_auth"}` | `{ok:false, error:"not_authed"}` |
+  | stripe | 401 | `Invalid API Key provided: …` | `You did not provide an API key. …` |
+  | gmail | 401 | `Invalid Credentials` / `authError` | `Login Required.` / `required` |
+  | linear | 401 | one body | the SAME body — Linear does not distinguish |
+
+  What changed, per twin:
+
+  - **twin-github** — `auth.unauthorized`, `auth.sidMismatch` and a newly
+    declared `admin.forbidden` all build through `githubError`, so each carries
+    `documentation_url: "https://docs.github.com/rest"` and a stringified
+    `status`. The url stays GENERIC on every one of them: GitHub names no
+    operation on a 401 (8/8 measured) because authentication fails before
+    dispatch, and `/admin/*` is a twin-only route. A missing credential now says
+    `Requires authentication` where a bad one says `Bad credentials`; the twin
+    said the latter for both. **Retires FIDELITY.md divergence 31** and widens 32
+    to name the two twin-only surfaces.
+  - **twin-gmail** — tells a missing credential from an invalid one on all three
+    leaves Google does, carries Google's full `Expected OAuth 2 …` message tail,
+    and declares a `PERMISSION_DENIED` admin 403 instead of inheriting GitHub's.
+    New FIDELITY.md bullet 8 registers the one leaf left: Google's `details[]`
+    block names the backend method, which authentication-before-dispatch makes
+    unknowable here.
+  - **twin-linear** — answers Linear's measured body verbatim, including the
+    `extensions.statusCode` / `type` / `userError` / `userPresentableMessage` /
+    `meta` leaves it was dropping. It was saying `Bad credentials` — GitHub's
+    string — and `Session id mismatch`, both twin inventions; Linear sends one
+    body for every authentication failure and now so does this twin. Declares a
+    `FORBIDDEN` GraphQL admin 403.
+  - **twin-stripe** — a keyless request answers Stripe's "You did not provide an
+    API key. …" instead of falling through to the JWT branch's `Bad credentials`.
+  - **twin-slack** — no change; already correct on both leaves and already split
+    `not_authed` from `invalid_auth`.
+
+  CONTRACT.md's auth table splits the `no / invalid bearer` row in two and gains
+  an admin-gate 403 row. The contract suite asserts the new property across all
+  five twins on five envelopes each: a twin may carry its own vendor's
+  `documentation_url` and no other twin's, checked recursively so a leak into a
+  nested `error` object is caught too.
+
 ## 0.23.45
 
 ### Patch Changes

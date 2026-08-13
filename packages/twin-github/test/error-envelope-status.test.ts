@@ -189,23 +189,94 @@ describe("F-1490 — on the wire, across every error class the twin can be made 
   });
 });
 
-describe("F-1490 — the envelopes this fix does NOT reach, pinned as gaps", () => {
-  it("401 carries an empty documentation_url and NO status leaf — divergence 31", async () => {
+describe("F-1490's gaps, closed by F-1497 — the 401 envelopes now carry both leaves", () => {
+  it("a BAD credential answers GitHub's 401 body, whole (was divergence 31)", async () => {
     const app = createGitHubCloneApp();
 
-    // ⚠️ A GAP, not a fidelity claim. Real GitHub answers
-    // `{message:"Bad credentials", documentation_url:"https://docs.github.com/rest", status:"401"}`
-    // — measured 8/8 across five route shapes. This body is built by hand in
-    // `src/twin.ts` (and defaulted in `@pome-sh/sdk`'s `auth.ts`), never reaching
-    // `githubError`, which is the whole reason the ticket's "githubError builds
-    // every envelope" premise was wrong. Fixing it touches the SDK and therefore
-    // all five twins, so it is registered and ticketed instead.
+    // ⚠️ THIS TEST USED TO ASSERT THE OPPOSITE, and the flip is the point.
+    // It read `{message:"Bad credentials", documentation_url:""}` with no
+    // `status` leaf, deliberately, so divergence 31 could not be mistaken for
+    // coverage. F-1497 closed it: `auth.unauthorized` in `src/twin.ts` builds
+    // through `githubError` now, so both leaves arrive.
+    //
+    // Real GitHub, re-measured live 2026-08-13 on `GET /user` with a bad
+    // bearer — byte for byte what is asserted below:
+    //   {"message":"Bad credentials",
+    //    "documentation_url":"https://docs.github.com/rest","status":"401"}
+    //
+    // The whole body, not the two leaves that moved: a fix that dropped
+    // `message` while adding `status` would pass a per-leaf assertion.
     const got = await app.request(`${base}/repos/acme/api`, { headers: { authorization: "Bearer ghp_pome_not_a_real_token" } });
     expect(got.status).toBe(401);
+    expect(typeof got.status).toBe("number");
 
-    const body = await got.json() as Record<string, unknown>;
-    expect(body).toEqual({ message: "Bad credentials", documentation_url: "" });
-    expect("status" in body).toBe(false);
+    expect(await got.json()).toEqual({
+      message: "Bad credentials",
+      documentation_url: "https://docs.github.com/rest",
+      status: "401"
+    });
+  });
+
+  it("a MISSING credential says `Requires authentication`, not `Bad credentials`", async () => {
+    const app = createGitHubCloneApp();
+
+    // The second half of F-1497's github fix, and the reason `unauthorized`
+    // takes `kind`. Same probe, same day, no `Authorization` header at all:
+    //   {"message":"Requires authentication",
+    //    "documentation_url":"https://docs.github.com/rest","status":"401"}
+    // The twin answered `Bad credentials` to both until F-1497 — measured and
+    // registered by F-1490, unfixed until now.
+    const got = await app.request(`${base}/repos/acme/api`);
+    expect(got.status).toBe(401);
+
+    expect(await got.json()).toEqual({
+      message: "Requires authentication",
+      documentation_url: "https://docs.github.com/rest",
+      status: "401"
+    });
+  });
+
+  it("a sid mismatch stays `Forbidden`, and gains the same two leaves", async () => {
+    // A twin-only failure mode — GitHub has no session id — rendered in
+    // GitHub's 401 family. The message is the frozen F-712 row 5 pin; what
+    // F-1497 changed is that it now carries the leaves every GitHub 401 does.
+    const app = createGitHubCloneApp();
+    const token = await signTestToken({ sid: "someone-else" });
+    const got = await app.request(`${base}/repos/acme/api`, withAuth(token));
+    expect(got.status).toBe(401);
+
+    expect(await got.json()).toEqual({
+      message: "Forbidden",
+      documentation_url: "https://docs.github.com/rest",
+      status: "401"
+    });
+  });
+
+  it("the admin-gate 403 is github-shaped too, and no longer the SDK's default", async () => {
+    // Before F-1497 this body came from `@pome-sh/sdk`'s `admin-gate.ts` and
+    // read `{message:"Forbidden", documentation_url:""}`. The gate is shared by
+    // all five twins, so it could not be made github-shaped — twin-github
+    // declares `admin.forbidden` instead.
+    //
+    // The url is GENERIC on purpose even though GitHub's measured 403s name the
+    // operation (3/3): `/admin/*` is a twin-only route with no GitHub operation
+    // behind it, the same reason `/pulls/:n/diff` stays generic (divergence 32).
+    const previous = process.env.TWIN_ADMIN_TOKEN;
+    process.env.TWIN_ADMIN_TOKEN = "f1497-admin-token";
+    try {
+      const app = createGitHubCloneApp();
+      const got = await app.request("/admin/reset", { method: "POST" });
+      expect(got.status).toBe(403);
+
+      expect(await got.json()).toEqual({
+        message: "Forbidden",
+        documentation_url: "https://docs.github.com/rest",
+        status: "403"
+      });
+    } finally {
+      if (previous === undefined) delete process.env.TWIN_ADMIN_TOKEN;
+      else process.env.TWIN_ADMIN_TOKEN = previous;
+    }
   });
 
   it("the 501 catch-all carries no status leaf either", async () => {
@@ -218,24 +289,37 @@ describe("F-1490 — the envelopes this fix does NOT reach, pinned as gaps", () 
   it("the 401 and the 501 catch-all still name NO operation — and must not (F-1498)", async () => {
     const app = createGitHubCloneApp();
 
-    // ⚠️ RE-CUT BY F-1498, not deleted. This assertion used to read "every
-    // reached envelope still carries the GENERIC documentation_url" and stood
-    // for divergence 32's whole surface. That half is closed: a routed,
-    // authenticated error now names its operation (see
-    // `test/operation-documentation-url.test.ts`).
+    // ⚠️ RE-CUT BY F-1498, then again by F-1497, and it survived both because
+    // it is the boundary between them. It began as "every reached envelope
+    // still carries the GENERIC documentation_url" and stood for divergence
+    // 32's whole surface; F-1498 closed the half where a routed, authenticated
+    // error must NAME its operation (`test/operation-documentation-url.test.ts`).
     //
     // What survives is the part of divergence 32 that was never a gap. GitHub
     // itself answers generically on 14 of 59 measured errors, and two of those
     // three classes are these — every 401 (8/8), because authentication fails
-    // before dispatch, and every unrouted path (4/4). The twin was accidentally
-    // right on both, so this pins them as REQUIREMENTS now rather than as an
-    // absence: a later change that stamped an operation here would be a new
-    // divergence pointing the other way.
-    const unauthorized = await app.request(`${base}/repos/acme/api`, {
-      headers: { authorization: "Bearer ghp_pome_not_a_real_token" }
-    });
-    expect(unauthorized.status).toBe(401);
-    expect(((await unauthorized.json()) as { documentation_url: string }).documentation_url).toBe("");
+    // before dispatch, and every unrouted path (4/4).
+    //
+    // ⚠️ F-1497 CHANGED THE 401 READING FROM `""` TO THE GENERIC URL, and the
+    // two must not be confused. `""` was divergence 31's gap — an empty leaf
+    // where GitHub sends a real url. The generic url is divergence 32's
+    // REQUIREMENT — the right url, which must never become
+    // `…#get-a-repository`. F-1497 fixed the first without touching the
+    // second, which is the whole trap it had to walk past: the `.not.toContain`
+    // below is what would catch a fix that stamped the operation here, and it
+    // is written as the anchor character rather than as one url so any
+    // operation url trips it.
+    const generic = "https://docs.github.com/rest";
+    for (const init of [
+      { headers: { authorization: "Bearer ghp_pome_not_a_real_token" } },
+      {}, // no Authorization header at all — GitHub is generic here too (8/8)
+    ]) {
+      const unauthorized = await app.request(`${base}/repos/acme/api`, init);
+      expect(unauthorized.status).toBe(401);
+      const url = ((await unauthorized.json()) as { documentation_url: string }).documentation_url;
+      expect(url).toBe(generic);
+      expect(url).not.toContain("#");
+    }
 
     const unrouted = await rest(app, "GET", "/repos/acme/api/actions/runs");
     expect(unrouted.status).toBe(501);

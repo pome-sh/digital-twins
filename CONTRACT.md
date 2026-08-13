@@ -54,14 +54,29 @@ Several rows are under active ruling in FDRS-712. They are frozen **as-is**: cha
 | `/healthz` extras | `access_control` | — | `tthw_seconds` |
 | `GET /s/:sid/healthz` | 200 `{ok, sid}` | 200 `{ok, sid}` | **501** (route absent) |
 | `/admin/seed` with garbage body | **422** validation error | 200 accepted | 200 accepted |
-| no / invalid bearer | 401 `{message: "Bad credentials"}` | 401 `{ok:false, error:"not_authed"/"invalid_auth"}` | 401 `{error:{code:"unauthorized"}}` |
+| **no** bearer | 401 `{message:"Requires authentication", documentation_url, status}` | 401 `{ok:false, error:"not_authed"}` | 401 `{error:{code:"unauthorized", message:"You did not provide an API key. …"}}` |
+| **invalid** bearer | 401 `{message:"Bad credentials", documentation_url, status}` | 401 `{ok:false, error:"invalid_auth"}` | 401 `{error:{code:"unauthorized"}}` |
 | expired JWT | 401 `"Bad credentials"` | 401 `error:"token_expired"` | 401 `unauthorized` |
-| sid mismatch | 401 `{message:"Forbidden"}` | 401 `invalid_auth` | **403** `{error:{code:"forbidden"}}` |
+| sid mismatch | 401 `{message:"Forbidden", documentation_url, status}` | 401 `invalid_auth` | **403** `{error:{code:"forbidden"}}` |
+| admin-gate 403 body | `{message:"Forbidden", documentation_url, status:"403"}` | `{ok:false, error:"restricted_action"}` | `{error:{code:"forbidden"}}` |
 | raw bearer (no `Bearer ` prefix) | 401 rejected | 401 rejected | **200 accepted** |
 | unknown tool via `/mcp/call` | 422 validation | 404 `unknown_tool` | 400 `tool_unknown` |
 | unknown **root** route | 404 | 404 | **401** (the `/v1` auth wall answers first) |
 | root `/v1/*` SDK-compat mount (no path sid; bearer alone) | — | — | yes |
 | extra session routes | `/_pome/access-control` | — | — |
+
+**The four auth rows moved in F-1497, and only for github and stripe.** Each
+vendor's 401 was probed live on 2026-08-13 with a deliberately invalid bearer
+and with no `Authorization` header at all, and the answer is that they share no
+envelope: github sends `documentation_url` (always the generic
+`https://docs.github.com/rest` — authentication fails before dispatch, so there
+is no operation to name) plus a `status` STRING; slack answers `ok:false` with
+neither; stripe answers `{error:{message,type}}` with neither. So the `no` and
+`invalid` bearer rows split (github: `Requires authentication` vs
+`Bad credentials`; stripe: the "You did not provide an API key…" text vs
+"Invalid API Key provided."), and the shared 401/403 defaults in
+`@pome-sh/sdk` stopped carrying github's `documentation_url` key. gmail and
+linear are the same story and are covered by their own FIDELITY.md.
 
 ### Body-parsing and tape corners (pinned 2026-07-08, F-683 review)
 

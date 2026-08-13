@@ -251,14 +251,38 @@ export interface BearerAuthOptions {
   sessionExtras?: (claims: SessionClaims) => Record<string, unknown>;
 }
 
+/**
+ * The engine's last-resort 401 bodies, for a twin that declares neither hook.
+ *
+ * ⚠️ THESE CARRY NO VENDOR-SPECIFIC KEY, AND THAT IS THE POINT (F-1497). They
+ * used to send `documentation_url: ""` — GitHub's key, with a value GitHub
+ * never sends — which is a claim about a vendor this module cannot know. All
+ * five vendors were probed live on 2026-08-13 with a deliberately invalid
+ * bearer and with no `Authorization` header at all, and only ONE of them has
+ * that key at all:
+ *
+ *   | vendor | HTTP | body on a bad credential                                    |
+ *   |--------|------|-------------------------------------------------------------|
+ *   | github | 401  | `{message, documentation_url:"https://docs.github.com/rest", status:"401"}` |
+ *   | slack  | 200  | `{ok:false, error:"invalid_auth"}`                           |
+ *   | stripe | 401  | `{error:{message, type:"invalid_request_error"}}`            |
+ *   | gmail  | 401  | `{error:{code, message, errors:[…], status:"UNAUTHENTICATED"}}` |
+ *   | linear | 401  | `{errors:[{message, extensions:{…, http:{status:401}}}]}`    |
+ *
+ * So there is no shared shape to default to, and a default that picked one
+ * would put GitHub's envelope on four twins that never send it. Every
+ * first-party twin declares `unauthorized` and `sidMismatch` for exactly that
+ * reason; these two exist so a twin under construction fails loudly on the
+ * status line rather than on a `documentation_url` it never asked for.
+ */
 const defaultUnauthorized = (): AuthEnvelope => ({
   status: 401,
-  body: { message: "Bad credentials", documentation_url: "" },
+  body: { message: "Bad credentials" },
 });
 
 const defaultSidMismatch = (): AuthEnvelope => ({
   status: 401,
-  body: { message: "Forbidden", documentation_url: "" },
+  body: { message: "Forbidden" },
 });
 
 function respond(envelope: AuthEnvelope): Response {

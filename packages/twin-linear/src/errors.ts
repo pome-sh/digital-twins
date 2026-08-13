@@ -24,7 +24,39 @@ export class LinearTwinError extends Error {
   }
 }
 
-export function unauthorizedEnvelope(message = "Authentication required"): {
+/**
+ * Linear's 401, measured live against `api.linear.app/graphql` on 2026-08-13
+ * (F-1497) — `POST` with `{ viewer { id } }`, once with a garbage bearer and
+ * once with no `Authorization` header at all. **Both answered byte-identically:**
+ *
+ * ```json
+ * {"errors":[{"message":"Authentication required, not authenticated",
+ *   "extensions":{"type":"authentication error","code":"AUTHENTICATION_ERROR",
+ *   "statusCode":401,"userError":true,
+ *   "userPresentableMessage":"You need to authenticate to access this operation.",
+ *   "meta":{},"http":{"status":401}}}]}
+ * ```
+ *
+ * Three things that fixes, all measured:
+ *
+ * - the message was `Bad credentials` — GitHub's string, on a Linear twin,
+ *   which is the leak F-1497 exists to stop. It was also `Session id mismatch`
+ *   on the sid-mismatch leg; Linear has no session-id concept and sends ONE
+ *   body for every authentication failure, so the twin sends one too. (The
+ *   `message` parameter stays for callers who need a different one; both auth
+ *   hooks take the default.)
+ * - `extensions.statusCode` was absent. This is Linear's answer to F-1497's
+ *   "does the vendor send a status leaf" question, and it does — twice, as
+ *   `statusCode` and as `http.status`, both NUMBERS. The twin sent only the
+ *   second.
+ * - `type`, `userError`, `userPresentableMessage` and `meta` were absent.
+ *
+ * ⚠️ NO `documentation_url`. Linear does not send that key, so the leaves
+ * F-1497 added to twin-github must not appear here.
+ */
+export function unauthorizedEnvelope(
+  message = "Authentication required, not authenticated"
+): {
   status: number;
   body: unknown;
 } {
@@ -34,11 +66,42 @@ export function unauthorizedEnvelope(message = "Authentication required"): {
       errors: [
         {
           message,
-          extensions: { code: "AUTHENTICATION_ERROR", http: { status: 401 } },
+          extensions: {
+            type: "authentication error",
+            code: "AUTHENTICATION_ERROR",
+            statusCode: 401,
+            userError: true,
+            userPresentableMessage: "You need to authenticate to access this operation.",
+            meta: {},
+            http: { status: 401 },
+          },
         },
       ],
     },
   };
+}
+
+/**
+ * The admin gate's 403, in this twin's own GraphQL error family (F-1497).
+ *
+ * Declared rather than defaulted: `/admin/*` is a twin-only route, so the gate
+ * in `@pome-sh/sdk` used to answer it, and that default was GitHub's envelope —
+ * `{message:"Forbidden", documentation_url:""}` — on a GraphQL twin that sends
+ * neither a top-level `message` nor a `documentation_url` anywhere.
+ *
+ * ⚠️ The BODY SHAPE here is this twin's own (`LinearTwinError` → `errors[]` with
+ * an `extensions.code`, the same projection every other Linear error takes); the
+ * 403 was NOT measured against upstream, because reaching a Linear permission
+ * refusal needs a real authenticated principal that lacks the permission, and
+ * F-1497's probes were unauthenticated by design. What is measured is that this
+ * twin's neighbours in the same family are right, and that GitHub's envelope is
+ * wrong here.
+ */
+export function forbiddenEnvelope(message = "Forbidden"): {
+  status: number;
+  body: unknown;
+} {
+  return linearErrorEnvelope(new LinearTwinError(403, "FORBIDDEN", message));
 }
 
 export function unsupportedEnvelope(method: string, path: string): {
