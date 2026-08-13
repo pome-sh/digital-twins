@@ -1,26 +1,54 @@
 #!/usr/bin/env bash
 # F-696 — assert public-repo policy for pome-twins main.
+# F-1212 — the live drift check used to call the legacy
+# GET .../branches/{branch}/protection + GET .../rulesets endpoints, which
+# need Administration:read. GITHUB_TOKEN cannot hold that scope, so the
+# check depended on a hand-minted PAT (REPO_POLICY_TOKEN) that never existed
+# — the weekly cron has been red since it shipped and the live step never
+# ran once. GET .../rules/branches/{branch} returns the same effective rules
+# (pull_request review count, required status checks, non-fast-forward) for
+# a metadata-scoped GITHUB_TOKEN, no PAT needed.
 #
-# Split enforcement (classic + ruleset):
-#   Classic branch protection: strict required checks, no force-push/delete.
-#   Ruleset "main founder-bypass": PR required + conversation resolution + the
-#   same required checks, with zero required approving reviews (two-person
-#   founder team — either can merge on green CI). Team `founder` remains a
-#   bypass actor for conversation-resolution / future rules.
+# The property that matters: this must FAIL, not silently pass, if the rules
+# it reads stop covering a policy it asserts (ruleset deleted, disabled or
+# switched to `evaluate`, protection moved to classic branch protection,
+# endpoint drops a rule type). An empty/missing rules array, or any policy
+# with no matching rule, is a hard failure naming that policy — never
+# treated as "nothing to check".
 #
-# GET .../branches/{branch}/protection and .../rulesets need Administration:read.
-# The default Actions GITHUB_TOKEN cannot be granted that scope (invalid in
-# workflow `permissions:`). Pass a fine-grained PAT via GITHUB_TOKEN /
-# REPO_POLICY_TOKEN.
+# Verified against the live repo (F-1212 review): this endpoint returns only
+# rules from rulesets whose enforcement is `active`. A ruleset flipped to
+# `evaluate` or `disabled` drops out entirely, so its rules vanish from this
+# payload and the empty-array branch below hard-fails. That is why enforcement
+# is not asserted separately — losing it cannot present as a green run.
+# Rules inherited from an ORG-level ruleset do still appear here (with
+# ruleset_source_type "Organization"). They count towards coverage — the policy
+# is that main is covered, not that a particular ruleset object covers it — but
+# they are held to the same terms: an org rule contributing a required context
+# not in config/required-checks.json is still a failure, because an unexpected
+# required context is exactly the drift this check exists to surface.
+#
+# NOT covered live (dropped, not silently assumed true) — both are named in
+# the run log on success so a reader is never told coverage is total:
+#   1. The ruleset's bypass_actors (founder-team bypass). GitHub elides the
+#      bypass_actors FIELD for callers without Administration:read — the
+#      .../rulesets/{id} endpoint itself is readable (it answers 200 even
+#      unauthenticated on this public repo), but the field is simply absent,
+#      so asserting on it would fail OPEN for GITHUB_TOKEN. Left unwatched
+#      rather than asserted-on-an-absent-field.
+#   2. Deletion protection for main. It is live, but it comes from CLASSIC
+#      branch protection (allow_deletions.enabled=false), which this endpoint
+#      does not surface and which needs Administration:read to read. Ruleset
+#      18797095 carries no `deletion` rule, so there is nothing here to
+#      assert. Fix forward by adding a Deletion rule to the ruleset, then
+#      asserting it below — see the PR for F-1212.
 set -euo pipefail
 
-REPO="${GITHUB_REPOSITORY:-pome-sh/pome-twins}"
+REPO="${GITHUB_REPOSITORY:-pome-sh/digital-twins}"
 BRANCH="${POLICY_BRANCH:-main}"
-TOKEN="${GITHUB_TOKEN:?GITHUB_TOKEN required (fine-grained PAT with Administration: Read-only)}"
-OUT="$(mktemp)"
-RULESETS_OUT="$(mktemp)"
-LIST_OUT="$(mktemp)"
-trap 'rm -f "${OUT}" "${RULESETS_OUT}" "${LIST_OUT}"' EXIT
+TOKEN="${GITHUB_TOKEN:?GITHUB_TOKEN required (ordinary Actions token; no PAT needed)}"
+RULES_OUT="$(mktemp)"
+trap 'rm -f "${RULES_OUT}"' EXIT
 
 # F-1180 — the contexts live in config/required-checks.json. A second
 # hand-maintained copy of the same list is the F-1135 shape: one goes stale
@@ -44,8 +72,6 @@ REQUIRED_CHECKS=()
 while IFS= read -r line; do
   [[ -n "${line}" ]] && REQUIRED_CHECKS+=("${line}")
 done <<<"${REQUIRED_CHECKS_RAW}"
-FOUNDER_TEAM_ID="16601595"
-RULESET_NAME="main founder-bypass"
 
 api() {
   curl -sS \
@@ -59,17 +85,6 @@ fail_http() {
   local code="$1"
   local label="$2"
   local dest="$3"
-  if [[ "${code}" == "403" ]]; then
-    echo "::error::HTTP 403 reading ${label} — token lacks Administration:read."
-    echo "Create a fine-grained PAT (Administration: Read-only) and set repo secret REPO_POLICY_TOKEN."
-    cat "${dest}" >&2 || true
-    exit 1
-  fi
-  if [[ "${code}" == "404" ]]; then
-    echo "::error::${label} not found (HTTP 404)"
-    cat "${dest}" >&2 || true
-    exit 1
-  fi
   if [[ "${code}" != "200" ]]; then
     echo "::error::unexpected HTTP ${code} reading ${label}"
     cat "${dest}" >&2 || true
@@ -77,181 +92,138 @@ fail_http() {
   fi
 }
 
-echo "Asserting classic protection + ruleset policy for ${REPO}@${BRANCH}"
+echo "Asserting branch rules policy for ${REPO}@${BRANCH}"
 
-if [[ -n "${POLICY_JSON:-}" ]]; then
-  cp "${POLICY_JSON}" "${OUT}"
+if [[ -n "${RULES_JSON:-}" ]]; then
+  # Fixture seam for assert-repo-policy.test.mjs only. Say so loudly: a run
+  # that reads a fixture asserts nothing about the live repo, and must never
+  # be mistaken for a drift check that passed. repo-policy.yml never sets it
+  # (asserted by the regression test).
+  echo "::warning::RULES_JSON is set — reading fixture ${RULES_JSON}, NOT the live GitHub API. This run proves nothing about ${REPO}@${BRANCH}."
+  cp "${RULES_JSON}" "${RULES_OUT}"
 else
-  code="$(api -o "${OUT}" -w '%{http_code}' \
-    "https://api.github.com/repos/${REPO}/branches/${BRANCH}/protection")"
-  fail_http "${code}" "branch protection for ${BRANCH}" "${OUT}"
+  code="$(api -o "${RULES_OUT}" -w '%{http_code}' \
+    "https://api.github.com/repos/${REPO}/rules/branches/${BRANCH}")"
+  fail_http "${code}" "branch rules for ${BRANCH}" "${RULES_OUT}"
 fi
 
-# List endpoint omits rules/bypass_actors — fetch the named ruleset by id.
-# Offline fixtures pass a detailed rulesets array via RULESETS_JSON.
-if [[ -n "${RULESETS_JSON:-}" ]]; then
-  cp "${RULESETS_JSON}" "${RULESETS_OUT}"
-else
-  code="$(api -o "${LIST_OUT}" -w '%{http_code}' \
-    "https://api.github.com/repos/${REPO}/rulesets")"
-  fail_http "${code}" "repository rulesets" "${LIST_OUT}"
-
-  RULESET_ID="$(RULESET_NAME="${RULESET_NAME}" LIST_OUT="${LIST_OUT}" node -e '
-    const fs = require("fs");
-    const list = JSON.parse(fs.readFileSync(process.env.LIST_OUT, "utf8"));
-    const name = process.env.RULESET_NAME;
-    const hit = Array.isArray(list) ? list.find((r) => r.name === name) : null;
-    if (!hit?.id) {
-      console.error(`::error::missing ruleset named "${name}"`);
-      process.exit(1);
-    }
-    process.stdout.write(String(hit.id));
-  ')"
-
-  DETAIL="$(mktemp)"
-  trap 'rm -f "${OUT}" "${RULESETS_OUT}" "${LIST_OUT}" "${DETAIL}"' EXIT
-  code="$(api -o "${DETAIL}" -w '%{http_code}' \
-    "https://api.github.com/repos/${REPO}/rulesets/${RULESET_ID}")"
-  fail_http "${code}" "ruleset ${RULESET_ID}" "${DETAIL}"
-  # Normalize to a one-element array for the shared validator.
-  DETAIL="${DETAIL}" RULESETS_OUT="${RULESETS_OUT}" node -e '
-    const fs = require("fs");
-    const detail = JSON.parse(fs.readFileSync(process.env.DETAIL, "utf8"));
-    fs.writeFileSync(process.env.RULESETS_OUT, JSON.stringify([detail]));
-  '
-fi
-
-POLICY_JSON_PATH="${OUT}" \
-RULESETS_JSON_PATH="${RULESETS_OUT}" \
+RULES_JSON_PATH="${RULES_OUT}" \
 REQUIRED_CHECKS_JSON="$(printf '%s\n' "${REQUIRED_CHECKS[@]}" | node -e 'const fs=require("fs"); console.log(JSON.stringify(fs.readFileSync(0,"utf8").trim().split(/\n/)))')" \
-FOUNDER_TEAM_ID="${FOUNDER_TEAM_ID}" \
-RULESET_NAME="${RULESET_NAME}" \
 POLICY_BRANCH="${BRANCH}" \
 node <<'NODE'
 const fs = require("fs");
-const p = JSON.parse(fs.readFileSync(process.env.POLICY_JSON_PATH, "utf8"));
-const rulesets = JSON.parse(fs.readFileSync(process.env.RULESETS_JSON_PATH, "utf8"));
+const rules = JSON.parse(fs.readFileSync(process.env.RULES_JSON_PATH, "utf8"));
 const required = JSON.parse(process.env.REQUIRED_CHECKS_JSON);
-const founderTeamId = Number(process.env.FOUNDER_TEAM_ID);
-const rulesetName = process.env.RULESET_NAME;
 const branch = process.env.POLICY_BRANCH;
 const errors = [];
 
-function contextsFrom(statusChecks) {
-  const contextList = statusChecks?.contexts;
-  const checkList = statusChecks?.checks?.map((c) => c.context);
-  return contextList?.length ? contextList : (checkList ?? []);
+// Coverage, not just correctness: an empty/missing response must hard-fail,
+// never read as "no rules configured, nothing to check".
+if (!Array.isArray(rules) || rules.length === 0) {
+  console.error(`::error::GET rules/branches/${branch} returned no rules — treating this as a hard failure, not "nothing to check" (a ruleset move/deletion must be visible, not silently pass)`);
+  process.exit(1);
 }
 
-function patternMatchesBranch(pattern, branchName) {
-  if (pattern === "~DEFAULT_BRANCH") return branchName === "main";
-  const candidates = [branchName, `refs/heads/${branchName}`];
-  const escaped = String(pattern).replace(/[.+^${}()|[\]\\]/g, "\\$&");
-  const regex = new RegExp(`^${escaped.replace(/\*/g, ".*").replace(/\?/g, ".")}$`);
-  return candidates.some((candidate) => regex.test(candidate));
+const POLICIES = ["pull_request", "required_status_checks", "non_fast_forward"];
+
+// The declared set above is only worth printing if it is derived from work
+// actually done. `asserted` is added to by each block below at the point it
+// has really run its assertions; the cross-check after them fails if a block
+// stops asserting a declared policy. Without this, deleting an assertion
+// block leaves the summary still claiming that policy was checked — the same
+// decorative-denominator defect this script exists to catch elsewhere.
+const asserted = new Set();
+
+// Every rule of a type, not the first. Two rulesets can both match main (a
+// repo one plus an org one), and the endpoint returns a rule per source. With
+// `find`, a second, laxer pull_request rule — or extra contexts contributed by
+// a second required_status_checks rule — would go unread while the summary
+// still reported the policy as asserted.
+function findRules(type) {
+  return rules.filter((r) => r.type === type);
 }
 
-function rulesetAppliesToBranch(ruleset, branchName) {
-  if (String(ruleset.target).toLowerCase() !== "branch") return false;
-
-  const refName = ruleset.conditions?.ref_name;
-  if (!refName) return true;
-
-  const includes = Array.isArray(refName.include) ? refName.include : [];
-  const excludes = Array.isArray(refName.exclude) ? refName.exclude : [];
-  const included = includes.length === 0 || includes.some((p) => patternMatchesBranch(p, branchName));
-  const excluded = excludes.some((p) => patternMatchesBranch(p, branchName));
-  return included && !excluded;
-}
-
-// --- Classic: checks + no force-push/delete (reviews live on the ruleset) ---
-if (p.allow_force_pushes?.enabled !== false) {
-  errors.push("classic allow_force_pushes must be false");
-}
-if (p.allow_deletions?.enabled !== false) {
-  errors.push("classic allow_deletions must be false");
-}
-if (!p.required_status_checks) {
-  errors.push("classic required_status_checks must be configured");
-} else if (p.required_status_checks.strict !== true) {
-  errors.push("classic required_status_checks.strict must be true");
-}
-const classicContexts = contextsFrom(p.required_status_checks);
-for (const ctx of required) {
-  if (!classicContexts.includes(ctx)) {
-    errors.push(`classic missing required status check context: ${ctx}`);
-  }
-}
-
-// --- Ruleset: PR + conversation resolution (0 reviews) + founder bypass ---
-if (!Array.isArray(rulesets)) {
-  errors.push("rulesets payload must be an array");
+// --- pull_request: 0 required reviews (founder team merges on green CI), thread resolution required ---
+const prRules = findRules("pull_request");
+if (prRules.length === 0 || prRules.some((r) => !r.parameters)) {
+  errors.push(`missing rule: pull_request (policy: PR required with 0 approving reviews + resolved threads)`);
 } else {
-  const rs = rulesets.find((r) => r.name === rulesetName) ?? rulesets[0];
-  if (!rs || rs.name !== rulesetName) {
-    errors.push(`missing ruleset named "${rulesetName}"`);
-  } else {
-    if (String(rs.enforcement).toLowerCase() !== "active") {
-      errors.push(`ruleset "${rulesetName}" must be active`);
+  for (const { parameters: params } of prRules) {
+    if (Number(params.required_approving_review_count) !== 0) {
+      errors.push("pull_request.required_approving_review_count must be 0");
     }
-    if (!rulesetAppliesToBranch(rs, branch)) {
-      errors.push(`ruleset "${rulesetName}" must target branch ${branch}`);
+    if (params.required_review_thread_resolution !== true) {
+      errors.push("pull_request.required_review_thread_resolution must be true");
     }
+  }
+  asserted.add("pull_request");
+}
 
-    const bypass = rs.bypass_actors ?? [];
-    const founderById = bypass.some(
-      (a) =>
-        a.actor_type === "Team" &&
-        Number(a.actor_id) === founderTeamId &&
-        String(a.bypass_mode || "always").toLowerCase() === "always",
-    );
-    if (!founderById) {
+// --- required_status_checks: strict + contexts agree with config/required-checks.json in BOTH directions ---
+const checksRules = findRules("required_status_checks");
+if (checksRules.length === 0 || checksRules.some((r) => !r.parameters)) {
+  errors.push(`missing rule: required_status_checks (policy: strict required checks matching config/required-checks.json)`);
+} else {
+  // `strict` is effectively OR'd across matching rules — if any applicable rule
+  // sets it, the branch must be up to date live. Requiring it on every rule
+  // would red a config that is genuinely strict.
+  if (!checksRules.some((r) => r.parameters.strict_required_status_checks_policy === true)) {
+    errors.push("required_status_checks.strict_required_status_checks_policy must be true");
+  }
+  // GitHub unions required contexts across every matching rule, so compare the
+  // union — otherwise a context added via a second ruleset is invisible.
+  const liveContexts = [
+    ...new Set(
+      checksRules.flatMap((rule) => (rule.parameters.required_status_checks ?? []).map((c) => c.context)),
+    ),
+  ];
+  for (const ctx of required) {
+    if (!liveContexts.includes(ctx)) {
+      errors.push(`required_status_checks missing context present in config/required-checks.json: ${ctx}`);
+    }
+  }
+  for (const ctx of liveContexts) {
+    if (!required.includes(ctx)) {
+      errors.push(`required_status_checks has a live context absent from config/required-checks.json: ${ctx}`);
+    }
+  }
+  asserted.add("required_status_checks");
+}
+
+// --- non_fast_forward: force-push protection on the branch ---
+const ffRules = findRules("non_fast_forward");
+if (ffRules.length === 0) {
+  errors.push(`missing rule: non_fast_forward (policy: no force-push to ${branch})`);
+} else {
+  asserted.add("non_fast_forward");
+}
+
+// Self-check: every declared policy must have been reached by a live block.
+// Only meaningful once the policy assertions themselves passed — on a real
+// failure the specific error above is the useful one.
+if (errors.length === 0) {
+  for (const policy of POLICIES) {
+    if (!asserted.has(policy)) {
       errors.push(
-        `ruleset "${rulesetName}" must bypass Team founder (id ${founderTeamId}) with mode always`,
+        `policy "${policy}" is declared but no assertion ran for it — this check is claiming coverage it does not have`,
       );
-    }
-
-    const rules = rs.rules ?? [];
-    const prRule = rules.find((r) => r.type === "pull_request");
-    if (!prRule?.parameters) {
-      errors.push(`ruleset "${rulesetName}" must include a pull_request rule`);
-    } else {
-      const params = prRule.parameters;
-      if (Number(params.required_approving_review_count) !== 0) {
-        errors.push("ruleset required_approving_review_count must be 0");
-      }
-      if (params.required_review_thread_resolution !== true) {
-        errors.push("ruleset required_review_thread_resolution must be true");
-      }
-    }
-
-    const checkRule = rules.find((r) => r.type === "required_status_checks");
-    if (!checkRule?.parameters) {
-      errors.push(`ruleset "${rulesetName}" must include required_status_checks`);
-    } else {
-      if (checkRule.parameters.strict_required_status_checks_policy !== true) {
-        errors.push("ruleset strict_required_status_checks_policy must be true");
-      }
-      const rsContexts = (checkRule.parameters.required_status_checks ?? []).map(
-        (c) => c.context,
-      );
-      for (const ctx of required) {
-        if (!rsContexts.includes(ctx)) {
-          errors.push(`ruleset missing required status check context: ${ctx}`);
-        }
-      }
     }
   }
 }
+
+console.log(`read ${rules.length} rule(s) from the API; asserted ${asserted.size} of ${POLICIES.length} declared polic(y/ies): ${[...asserted].join(", ") || "(none)"}`);
 
 if (errors.length) {
   for (const e of errors) console.error(`::error::${e}`);
-  console.error("classic protection payload:", JSON.stringify(p, null, 2));
-  console.error("rulesets payload:", JSON.stringify(rulesets, null, 2));
+  console.error("rules payload:", JSON.stringify(rules, null, 2));
   process.exit(1);
 }
+console.log(`ok: pull_request (0 reviews, resolved threads) + required_status_checks (strict, contexts match config/required-checks.json) + non_fast_forward, all present in ${rules.length} live rule(s) for ${branch}`);
+console.log("required contexts:", required.join(", "));
+// Name the coverage gaps on every green run. A dropped assertion that prints
+// nothing reads as "all clear"; these two are unwatched and must say so.
 console.log(
-  "ok: classic checks + no force-push/delete; ruleset PR/conversations (0 required reviews) with founder bypass",
+  "NOT verified live (needs Administration:read, deliberately not held): ruleset bypass_actors (founder-team bypass); deletion protection for " +
+    `${branch}, which lives on classic branch protection — ruleset has no \`deletion\` rule to assert`,
 );
-console.log("classic required contexts:", classicContexts.join(", "));
 NODE
