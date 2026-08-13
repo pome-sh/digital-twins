@@ -6,8 +6,8 @@
 # check depended on a hand-minted PAT (REPO_POLICY_TOKEN) that never existed
 # — the weekly cron has been red since it shipped and the live step never
 # ran once. GET .../rules/branches/{branch} returns the same effective rules
-# (pull_request review count, required status checks, non-fast-forward) for
-# a metadata-scoped GITHUB_TOKEN, no PAT needed.
+# (pull_request review count, required status checks, non-fast-forward,
+# deletion) for a metadata-scoped GITHUB_TOKEN, no PAT needed.
 #
 # The property that matters: this must FAIL, not silently pass, if the rules
 # it reads stop covering a policy it asserts (ruleset deleted, disabled or
@@ -29,13 +29,12 @@
 # required context is exactly the drift this check exists to surface.
 #
 # NOT covered live (dropped, not silently assumed true) — named in the run
-# log on success so a reader is never told coverage is total:
-#   1. The ruleset's bypass_actors (founder-team bypass). GitHub elides the
-#      bypass_actors FIELD for callers without Administration:read — the
-#      .../rulesets/{id} endpoint itself is readable (it answers 200 even
-#      unauthenticated on this public repo), but the field is simply absent,
-#      so asserting on it would fail OPEN for GITHUB_TOKEN. Left unwatched
-#      rather than asserted-on-an-absent-field.
+# log on success so a reader is never told coverage is total: the ruleset's
+# bypass_actors (founder-team bypass). GitHub elides the bypass_actors FIELD
+# for callers without Administration:read — the .../rulesets/{id} endpoint
+# itself is readable (it answers 200 even unauthenticated on this public repo),
+# but the field is simply absent, so asserting on it would fail OPEN for
+# GITHUB_TOKEN. Left unwatched rather than asserted-on-an-absent-field.
 set -euo pipefail
 
 REPO="${GITHUB_REPOSITORY:-pome-sh/digital-twins}"

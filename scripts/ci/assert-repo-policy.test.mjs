@@ -280,11 +280,14 @@ function main() {
 
   {
     // A rule type present but carrying no `parameters` at all must hard-fail,
-    // not read as "nothing to assert".
+    // not read as "nothing to assert". Every declared policy is present so the
+    // only reason to red is the missing parameters — otherwise a `missing rule:`
+    // error for an absent type would satisfy the exit code on its own.
     const r = runAssert([
       { type: "pull_request" },
       { type: "required_status_checks" },
       { type: "non_fast_forward" },
+      { type: "deletion" },
     ]);
     assert(r.status === 1, "rules with no parameters must fail");
     const out = `${r.stdout}\n${r.stderr}`;
