@@ -197,6 +197,69 @@ export function checkExamplePinsPublished(pins, npmView = defaultNpmView) {
 }
 
 /**
+ * F-1520 — the write-side of this gate's own read-side logic. `checkExample
+ * PinsPublished`'s `violations` ARE, by construction, the only pins safe to
+ * rewrite automatically: the sibling is confirmed PUBLISHED (an `npm view`
+ * that just returned a real answer), so `npm install --package-lock-only`
+ * against it can succeed for real, unlike a version this same push is still in
+ * the middle of allocating (see the header of `allocate-release-versions.mjs`'s
+ * `planAllocations` for why a freshly-bumped-in-this-run version must NOT be
+ * repinned to here — it isn't on the registry yet).
+ *
+ * Returns one entry per example whose pin can be safely corrected: the
+ * rewritten `package.json` text (a plain textual substitution, matching
+ * `allocate-release-versions.mjs`'s own `rewriteVersion` — round-tripping
+ * through `JSON.stringify` would lose formatting) plus the shell command that
+ * regenerates that example's lockfile against the now-confirmed-published
+ * version. Nothing here executes the command or writes the file; the caller
+ * (`allocate-release-versions.mjs`) folds both into the same commit it already
+ * builds.
+ *
+ * Silently produces nothing when `repoRoot` has no `package.json` or no
+ * `examples/` — the throwaway git fixtures `allocate-release-versions.test.mjs`
+ * builds are neither, and this function is called unconditionally from every
+ * plan, not just ones that touch examples.
+ */
+export function planExampleRepins(repoRoot, npmView = defaultNpmView) {
+  if (!existsSync(join(repoRoot, "package.json")) || !existsSync(join(repoRoot, "examples"))) return [];
+
+  const { exact } = discoverExampleSiblingDeps(repoRoot);
+  const { violations } = checkExamplePinsPublished(exact, npmView);
+
+  return violations.map((v) => {
+    const manifestRelPath = `examples/${v.example}/package.json`;
+    const contents = readFileSync(join(repoRoot, manifestRelPath), "utf8");
+    // A regex rather than a literal-string match (unlike this file's siblings'
+    // `"version": "x"` searches): a hand-formatted `package.json` always has a
+    // space after the colon, but nothing in npm requires one, so matching only
+    // the formatted shape would silently find zero occurrences on a compact
+    // file instead of one — the same "refuse to guess" failure this function
+    // already raises, just for a formatting reason no author intended.
+    const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp(`"${escape(v.dep)}"\\s*:\\s*"${escape(v.pin)}"`, "g");
+    const occurrences = contents.match(pattern)?.length ?? 0;
+    if (occurrences !== 1) {
+      throw new Error(
+        `${manifestRelPath}: expected exactly one \`"${v.dep}": "${v.pin}"\`, found ${occurrences}. Refusing to ` +
+          "guess which one is the pin drifted out from under.",
+      );
+    }
+    const replacement = contents.replace(pattern, (match) => match.replace(v.pin, v.workspaceVersion));
+    return {
+      example: v.example,
+      dep: v.dep,
+      from: v.pin,
+      to: v.workspaceVersion,
+      writes: [{ path: manifestRelPath, contents: replacement }],
+      // `--package-lock-only`: this workflow never runs the example itself, so
+      // there is nothing to gain from a real `node_modules` and a real install
+      // would need dev toolchains (tsx, vitest) this job has no other use for.
+      regenerate: [`(cd examples/${v.example} && npm install --package-lock-only --no-audit --no-fund)`],
+    };
+  });
+}
+
+/**
  * Run discovery + the registry check and print a report in the shape
  * `typecheck-examples.mjs` expects: throws on zero eligible pins (a check
  * examining nothing must not report a pass), prints the skip count even when

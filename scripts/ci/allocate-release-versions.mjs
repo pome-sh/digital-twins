@@ -78,6 +78,7 @@ import { readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { planExampleRepins } from "../check-example-pins-published.mjs";
 import { bumpVersion, pendingRelease, writeRelease } from "./changelog-entry.mjs";
 import { PUBLISHED_PACKAGES, packagesTouchedBy } from "./publish-relevance.mjs";
 
@@ -169,7 +170,7 @@ function derivedEntry({ pkg, files, commits }) {
  * What `main`'s tip owes, per package. Pure read — nothing is written unless
  * `applyAllocations()` is called with the result.
  */
-export function planAllocations({ root = resolve(HERE, "../.."), date = today() } = {}) {
+export function planAllocations({ root = resolve(HERE, "../.."), date = today(), npmView } = {}) {
   if (git(root, ["rev-parse", "--is-shallow-repository"]).trim() === "true") {
     throw new Error(
       "refusing to allocate versions in a shallow clone: the walk for 'when did this " +
@@ -239,7 +240,30 @@ export function planAllocations({ root = resolve(HERE, "../.."), date = today() 
     });
   }
 
-  return { head, date, allocations, notes, message: commitMessage(allocations, head) };
+  // F-1520 — an example that pins a `@pome-sh/*` package from the registry
+  // (today only `examples/support-triage`) must never fall out of sync with
+  // that sibling's published version: two incidents (adapter 0.3.4 and 0.3.6,
+  // both 2026-08-13) each reddened `check-example-pins-published.mjs` until a
+  // human noticed and opened a one-line PR. `planExampleRepins` is the part of
+  // that gate's own logic that already answers "which pins are safely fixable
+  // right now" (its `violations`: drifted AND the sibling is CONFIRMED
+  // published) — reused rather than re-implemented, discovered from
+  // `examples/*/package.json` rather than a hand-kept list.
+  //
+  // Deliberately measured against the manifests ON DISK, before this run's own
+  // `writes` above are applied: a package THIS SAME run is bumping is not yet
+  // published (that happens in `release.yml`'s run of the commit this script is
+  // about to push), so `planExampleRepins`'s own registry check correctly finds
+  // it unpublished and leaves it alone — repinning to a version that does not
+  // exist yet would need a lockfile entry `npm install --package-lock-only`
+  // cannot resolve, and a manifest pin with no matching lockfile entry breaks
+  // `npm ci` for that example outright, which is worse than the drift this
+  // exists to fix. That version's example pin gets corrected on the FIRST
+  // subsequent run of this workflow after `release.yml` actually publishes it —
+  // still fully automatic, still no human PR, just one push later.
+  const repins = npmView ? planExampleRepins(root, npmView) : planExampleRepins(root);
+
+  return { head, date, allocations, repins, notes, message: commitMessage(allocations, repins, head) };
 }
 
 /**
@@ -265,17 +289,20 @@ function rewriteVersion(manifest, { from, to, path }) {
   return manifest.replace(line(from), line(to));
 }
 
-function commitMessage(allocations, head) {
-  if (allocations.length === 0) return "";
+function commitMessage(allocations, repins, head) {
+  if (allocations.length === 0 && repins.length === 0) return "";
   const named = allocations.map((a) => `${a.name} ${a.to}`);
   const subject =
-    allocations.length <= 2
-      ? `release: ${named.join(", ")} ${BUMP_COMMIT_MARKER}`
-      : `release: ${allocations.length} packages ${BUMP_COMMIT_MARKER}`;
+    allocations.length === 0
+      ? `chore: re-pin ${repins.length} example dep(s) to the published version ${BUMP_COMMIT_MARKER}`
+      : allocations.length <= 2
+        ? `release: ${named.join(", ")} ${BUMP_COMMIT_MARKER}`
+        : `release: ${allocations.length} packages ${BUMP_COMMIT_MARKER}`;
   return [
     subject,
     "",
     ...allocations.map((a) => `- ${a.name} ${a.from} → ${a.to} (${a.level}, ${a.reason})`),
+    ...repins.map((r) => `- examples/${r.example} ${r.dep} ${r.from} → ${r.to} (published pin re-pin, F-1520)`),
     "",
     `Allocated from ${head.slice(0, 8)} by .github/workflows/allocate-version.yml.`,
     "The version number is written here, after the merge, and never in a PR;",
@@ -287,7 +314,7 @@ function commitMessage(allocations, head) {
 /** Applies a plan's writes. Returns the paths written. */
 export function applyAllocations(plan, { root = resolve(HERE, "../..") } = {}) {
   const written = [];
-  for (const allocation of plan.allocations) {
+  for (const allocation of [...plan.allocations, ...plan.repins]) {
     for (const write of allocation.writes) {
       writeFileSync(join(root, write.path), write.contents);
       written.push(write.path);
@@ -314,14 +341,18 @@ export function main(argv = process.argv.slice(2)) {
   const plan = planAllocations({ root });
   for (const note of plan.notes) console.log(`::warning::${note}`);
 
-  if (plan.allocations.length === 0) {
+  if (plan.allocations.length === 0 && plan.repins.length === 0) {
     console.log(`Nothing to allocate at ${plan.head.slice(0, 8)} — no pending entry, no unreleased`);
-    console.log("publish-relevant change. (This is what the bump commit's own push looks like.)");
+    console.log("publish-relevant change, no example pin drifted from an already-published sibling.");
+    console.log("(This is what the bump commit's own push looks like.)");
   }
   for (const a of plan.allocations) {
     console.log(`${a.name}: ${a.from} → ${a.to}  (${a.level}, ${a.reason})`);
     for (const file of a.relevantFiles.slice(0, 10)) console.log(`    ${file}`);
     if (a.relevantFiles.length > 10) console.log(`    … ${a.relevantFiles.length - 10} more`);
+  }
+  for (const r of plan.repins) {
+    console.log(`examples/${r.example}: ${r.dep} ${r.from} → ${r.to}  (published pin drift, F-1520)`);
   }
 
   const planOut = flagValue("--plan-out");
@@ -335,7 +366,7 @@ export function main(argv = process.argv.slice(2)) {
   // regenerated, and the command belongs next to the file it writes.
   const regenOut = flagValue("--regen-out");
   if (regenOut) {
-    const commands = plan.allocations.flatMap((a) => a.regenerate);
+    const commands = [...plan.allocations, ...plan.repins].flatMap((a) => a.regenerate);
     writeFileSync(regenOut, commands.length ? `set -euo pipefail\n${commands.join("\n")}\n` : "");
   }
 
