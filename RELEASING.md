@@ -159,10 +159,12 @@ Two independent reasons the ambient token cannot stand in:
   (`actor_type: Integration`), which is why this app exists. The rules it is
   bypassing are the live ones
   [`scripts/ci/assert-repo-policy.sh`](scripts/ci/assert-repo-policy.sh) asserts:
-  a pull request with resolved threads, strict required status checks, and
-  non-fast-forward. Classic branch protection sits underneath them (it is where
-  deletion protection lives, per F-1212) and can refuse a push on its own, so
-  that is the second layer to look at if the bypass alone is not enough.
+  a pull request with resolved threads, strict required status checks,
+  non-fast-forward, and deletion. Classic branch protection sits underneath them
+  and can refuse a push on its own, so that is the second layer to look at if
+  the bypass alone is not enough — note it also forbids deletion
+  (`allow_deletions: false`, `enforce_admins: true`), which the ruleset bypass
+  does not lift.
 - **A `GITHUB_TOKEN` push does not trigger workflows.** It would land the number
   and no `release.yml` run would ever see it. An App installation token is not
   event-suppressed — only `GITHUB_TOKEN` is.

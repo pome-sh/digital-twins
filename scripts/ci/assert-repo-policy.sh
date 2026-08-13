@@ -6,8 +6,8 @@
 # check depended on a hand-minted PAT (REPO_POLICY_TOKEN) that never existed
 # — the weekly cron has been red since it shipped and the live step never
 # ran once. GET .../rules/branches/{branch} returns the same effective rules
-# (pull_request review count, required status checks, non-fast-forward) for
-# a metadata-scoped GITHUB_TOKEN, no PAT needed.
+# (pull_request review count, required status checks, non-fast-forward,
+# deletion) for a metadata-scoped GITHUB_TOKEN, no PAT needed.
 #
 # The property that matters: this must FAIL, not silently pass, if the rules
 # it reads stop covering a policy it asserts (ruleset deleted, disabled or
@@ -28,20 +28,13 @@
 # not in config/required-checks.json is still a failure, because an unexpected
 # required context is exactly the drift this check exists to surface.
 #
-# NOT covered live (dropped, not silently assumed true) — both are named in
-# the run log on success so a reader is never told coverage is total:
-#   1. The ruleset's bypass_actors (founder-team bypass). GitHub elides the
-#      bypass_actors FIELD for callers without Administration:read — the
-#      .../rulesets/{id} endpoint itself is readable (it answers 200 even
-#      unauthenticated on this public repo), but the field is simply absent,
-#      so asserting on it would fail OPEN for GITHUB_TOKEN. Left unwatched
-#      rather than asserted-on-an-absent-field.
-#   2. Deletion protection for main. It is live, but it comes from CLASSIC
-#      branch protection (allow_deletions.enabled=false), which this endpoint
-#      does not surface and which needs Administration:read to read. Ruleset
-#      18797095 carries no `deletion` rule, so there is nothing here to
-#      assert. Fix forward by adding a Deletion rule to the ruleset, then
-#      asserting it below — see the PR for F-1212.
+# NOT covered live (dropped, not silently assumed true) — named in the run
+# log on success so a reader is never told coverage is total: the ruleset's
+# bypass_actors (founder-team bypass). GitHub elides the bypass_actors FIELD
+# for callers without Administration:read — the .../rulesets/{id} endpoint
+# itself is readable (it answers 200 even unauthenticated on this public repo),
+# but the field is simply absent, so asserting on it would fail OPEN for
+# GITHUB_TOKEN. Left unwatched rather than asserted-on-an-absent-field.
 set -euo pipefail
 
 REPO="${GITHUB_REPOSITORY:-pome-sh/digital-twins}"
@@ -124,7 +117,7 @@ if (!Array.isArray(rules) || rules.length === 0) {
   process.exit(1);
 }
 
-const POLICIES = ["pull_request", "required_status_checks", "non_fast_forward"];
+const POLICIES = ["pull_request", "required_status_checks", "non_fast_forward", "deletion"];
 
 // The declared set above is only worth printing if it is derived from work
 // actually done. `asserted` is added to by each block below at the point it
@@ -198,6 +191,14 @@ if (ffRules.length === 0) {
   asserted.add("non_fast_forward");
 }
 
+// --- deletion: no deleting the branch outright ---
+const delRules = findRules("deletion");
+if (delRules.length === 0) {
+  errors.push(`missing rule: deletion (policy: no deleting ${branch})`);
+} else {
+  asserted.add("deletion");
+}
+
 // Self-check: every declared policy must have been reached by a live block.
 // Only meaningful once the policy assertions themselves passed — on a real
 // failure the specific error above is the useful one.
@@ -218,12 +219,11 @@ if (errors.length) {
   console.error("rules payload:", JSON.stringify(rules, null, 2));
   process.exit(1);
 }
-console.log(`ok: pull_request (0 reviews, resolved threads) + required_status_checks (strict, contexts match config/required-checks.json) + non_fast_forward, all present in ${rules.length} live rule(s) for ${branch}`);
+console.log(`ok: pull_request (0 reviews, resolved threads) + required_status_checks (strict, contexts match config/required-checks.json) + non_fast_forward + deletion, all present in ${rules.length} live rule(s) for ${branch}`);
 console.log("required contexts:", required.join(", "));
-// Name the coverage gaps on every green run. A dropped assertion that prints
-// nothing reads as "all clear"; these two are unwatched and must say so.
+// Name the coverage gap on every green run. A dropped assertion that prints
+// nothing reads as "all clear"; this is unwatched and must say so.
 console.log(
-  "NOT verified live (needs Administration:read, deliberately not held): ruleset bypass_actors (founder-team bypass); deletion protection for " +
-    `${branch}, which lives on classic branch protection — ruleset has no \`deletion\` rule to assert`,
+  "NOT verified live (needs Administration:read, deliberately not held): ruleset bypass_actors (founder-team bypass)",
 );
 NODE

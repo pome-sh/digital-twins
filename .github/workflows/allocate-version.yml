@@ -42,7 +42,7 @@ name: allocate version
 #
 #   1. `main`'s live rules (ruleset "main founder-bypass" 18797095, the ones
 #      scripts/ci/assert-repo-policy.sh asserts) require a pull request, resolved
-#      threads, strict required status checks and non-fast-forward, and classic
+#      threads, strict required status checks, non-fast-forward and deletion, and classic
 #      branch protection sits underneath them. A direct push needs an actor those
 #      rules let bypass — and `github-actions` can NEVER be one: the UI and the
 #      API both refuse it, and org policy disables deploy keys. An App

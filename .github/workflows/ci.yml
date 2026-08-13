@@ -120,9 +120,17 @@ jobs:
       # entry. It is the re-scoped check-version-bump-required.mjs — same
       # publish-relevance table (now in scripts/ci/publish-relevance.mjs, shared
       # with the allocator so the two cannot disagree about what a release owes),
-      # inverted demand. Only meaningful against the PR's actual base.
+      # inverted demand. Only meaningful against the PR's actual base — and
+      # `github.event.pull_request.base.sha` is NOT it. That field is pinned at
+      # the last PR synchronize, while the checkout is refs/pull/N/merge, which
+      # merges main as it is NOW. The moment main advances under an open PR the
+      # two disagree, and since the commit that advances it is usually
+      # allocate-version.yml's own `[release-bump]`, main's version line and
+      # released CHANGELOG entry read as PR-authored: this gate reds, naming a
+      # hand-written version the author never wrote, on every PR open across a
+      # release. Derive the base from the history actually checked out.
       - if: github.event_name == 'pull_request'
-        run: node scripts/ci/check-release-note-required.mjs "${{ github.event.pull_request.base.sha }}"
+        run: node scripts/ci/check-release-note-required.mjs "$(git merge-base HEAD "origin/${{ github.base_ref }}")"
       - run: node scripts/ci/check-release-note-required.test.mjs
       # The writer's own suite. Drives real git repositories, because the two
       # properties that matter are properties of history: the bump commit cannot
