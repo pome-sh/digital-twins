@@ -58,6 +58,12 @@ function baseRules(overrides = {}) {
       ruleset_source: "pome-sh/pome-twins",
       ruleset_id: 18797095,
     },
+    {
+      type: "deletion",
+      ruleset_source_type: "Repository",
+      ruleset_source: "pome-sh/pome-twins",
+      ruleset_id: 18797095,
+    },
   ];
   return overrides.rules !== undefined ? overrides.rules : rules;
 }
@@ -84,7 +90,7 @@ function main() {
     const r = runAssert(baseRules());
     assert(r.status === 0, `expected ok fixture to pass: ${r.stderr}\n${r.stdout}`);
     assert(r.stdout.includes("ok:"), r.stdout);
-    assert(r.stdout.includes("read 3 rule(s)"), r.stdout);
+    assert(r.stdout.includes("read 4 rule(s)"), r.stdout);
   }
 
   {
@@ -110,6 +116,15 @@ function main() {
     const r = runAssert(baseRules().filter((rule) => rule.type !== "non_fast_forward"));
     assert(r.status === 1, "missing non_fast_forward rule must fail");
     assert(`${r.stdout}\n${r.stderr}`.includes("missing rule: non_fast_forward"), r.stderr);
+  }
+
+  {
+    // Missing deletion rule (F-1517: branch-deletion protection) must hard-fail,
+    // naming the policy — this is the red proof that the ruleset actually needs
+    // the rule, not just that the script mentions it.
+    const r = runAssert(baseRules().filter((rule) => rule.type !== "deletion"));
+    assert(r.status === 1, "missing deletion rule must fail");
+    assert(`${r.stdout}\n${r.stderr}`.includes("missing rule: deletion"), r.stderr);
   }
 
   {
@@ -323,11 +338,14 @@ function main() {
 
   {
     // Green runs must name what is NOT watched live, so a reader is never
-    // told coverage is total.
+    // told coverage is total. F-1517: deletion is now asserted live (the
+    // ruleset carries the rule), so bypass_actors is the only named gap and
+    // the NOT-verified line must no longer mention deletion.
     const r = runAssert(baseRules());
     assert(r.stdout.includes("NOT verified live"), r.stdout);
     assert(r.stdout.includes("bypass_actors"), r.stdout);
-    assert(r.stdout.includes("deletion"), r.stdout);
+    const notVerifiedLine = r.stdout.split("\n").find((l) => l.includes("NOT verified live"));
+    assert(notVerifiedLine && !notVerifiedLine.includes("deletion"), r.stdout);
   }
 
   {
