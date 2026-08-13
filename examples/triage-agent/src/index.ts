@@ -172,6 +172,17 @@ async function main() {
         }
       }
     }
+  } catch (err) {
+    // F-1518: the Claude Agent SDK's message iterator can REJECT — not just
+    // yield an error `result` message — when the underlying `claude` CLI
+    // subprocess exits non-zero after already reporting an error result (an
+    // invalid API key is one way). Uncaught, that throws out of this `for
+    // await` with no handler above it, crashing the process from what
+    // `smoke-examples.mjs` sees as an indistinguishable uncaught rejection —
+    // identical text to the graceful path below, but never captured by it.
+    // Route it through the same exitCode=1 path so both shapes converge.
+    console.error(`\nagent errored: ${err instanceof Error ? err.message : String(err)}`);
+    exitCode = 1;
   } finally {
     thinking.stop();
   }

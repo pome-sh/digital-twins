@@ -307,6 +307,36 @@ export function assertAliveFloor({ live, okCount, total }) {
   };
 }
 
+// F-1518 — the counted-numerator property. `classifyLaunch()` already gives
+// every launch one of three named, counted outcomes (ok / reached / fail); the
+// gap this closes is a DIFFERENT failure mode, one level up: an example that
+// never reaches `classifyLaunch()` at all and so never lands in any of the
+// three buckets — the printed "N of M" total quietly shrinks to N-1 with
+// nothing saying the Mth example went MISSING rather than FAILED. Measured on
+// PR #417: the summary read "7 of 8" and named seven, and nothing said the
+// eighth (`pr-summary-agent`) had vanished rather than failed. Pure and
+// exported so the regression suite can assert it without spawning all eight
+// examples: feed it a discovered list and the names main()'s loop actually
+// produced a verdict for.
+//
+// Deliberately compares NAMES, not just lengths — a bug that drops one name
+// and double-reports another would net to the same length and hide behind a
+// count-only check, defeating the "naming the missing example" requirement.
+export function assertReportedCount(discoveredNames, reportedNames) {
+  const reported = new Set(reportedNames);
+  const missing = discoveredNames.filter((name) => !reported.has(name));
+  if (missing.length === 0) return { ok: true, message: null };
+  return {
+    ok: false,
+    message:
+      `${missing.length} of ${discoveredNames.length} discovered example(s) never reported a verdict at ` +
+      `all — neither OK, REACHED-OUTBOUND, nor FAILED: ${missing.join(", ")}. The count of examples ` +
+      `reporting must equal the count discovered; a launcher bug that drops one silently (an early ` +
+      `return/continue/break in main()'s loop, or smokeOne() rejecting instead of resolving) must red ` +
+      `naming exactly which example vanished, never shrink the "N of M" total without saying so.`,
+  };
+}
+
 export function discoverExamples(dir = examplesDir) {
   const found = [];
   for (const name of readdirSync(dir).sort()) {
@@ -502,9 +532,28 @@ async function main() {
   const failures = [];
   const reached = [];
   const oks = [];
+  // F-1518 — every name pushed here got an actual verdict below. Compared
+  // against `examples` after the loop so a name that never makes it into any
+  // bucket (this array, or oks/reached/failures) is named, not silently
+  // dropped from the "N of M" total.
+  const reportedNames = [];
   for (const name of examples) {
     process.stdout.write(`\n=== examples/${name} === `);
-    const result = await smokeOne(name);
+    let result;
+    try {
+      result = await smokeOne(name);
+    } catch (err) {
+      // smokeOne() is designed to always resolve — the SETTLE_MS timer, the
+      // child 'exit' handler, and the child 'error' handler each
+      // independently produce a verdict — but this loop must not itself
+      // become the next silent-drop bug. A rejection here is left OUT of
+      // reportedNames on purpose: assertReportedCount() below names it as
+      // missing rather than this catch inventing a verdict for work that
+      // never actually ran.
+      console.log(`did not report a verdict (runner threw: ${err instanceof Error ? err.message : String(err)})`);
+      continue;
+    }
+    reportedNames.push(name);
     const tail = result.output?.trim().split("\n").slice(-12).join("\n") ?? "";
     if (result.status === "ok") {
       console.log(`OK (${result.reason})`);
@@ -522,6 +571,8 @@ async function main() {
     }
   }
 
+  const reportedCount = assertReportedCount(examples, reportedNames);
+
   if (reached.length > 0) {
     console.log(
       `\n${reached.length} of ${examples.length} example(s) got as far as an outbound twin/model ` +
@@ -534,13 +585,18 @@ async function main() {
 
   const floor = assertAliveFloor({ live: LIVE, okCount: oks.length, total: examples.length });
 
-  if (failures.length > 0 || !floor.ok) {
+  if (failures.length > 0 || !reportedCount.ok || !floor.ok) {
     if (failures.length > 0) {
       console.error(
         `\nExamples that crash on launch or return with no evidence of real work: ` +
           failures.map((f) => `${f.name} (${f.reason})`).join("; "),
       );
     }
+    // F-1518 — a missing verdict is reported and reds independently of
+    // `failures`: it is a defect in THIS SCRIPT's own bookkeeping, not in the
+    // example, and folding it into "Examples that crash on launch" above
+    // would misname the fault.
+    if (!reportedCount.ok) console.error(`\n${reportedCount.message}`);
     if (!floor.ok) console.error(`\n${floor.message}`);
     process.exit(1);
   }

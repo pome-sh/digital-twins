@@ -274,22 +274,36 @@ async function main() {
   const run = query({ prompt: wiring.task, options: examineeOptions(mcpServers) });
 
   let exitCode = 0;
-  for await (const msg of run) {
-    if (msg.type === "assistant") {
-      logAssistantMessage(msg);
-    } else if (msg.type === "result") {
-      if (msg.subtype === "success") {
-        console.log("\n— agent finished —");
-        if (msg.result) console.log(msg.result);
-        console.log(
-          `(${msg.usage.input_tokens} in / ${msg.usage.output_tokens} out, $${msg.total_cost_usd.toFixed(4)})`
-        );
-      } else {
-        console.error(`\nagent stopped: ${msg.subtype}`);
-        for (const err of msg.errors) console.error(err);
-        exitCode = 1;
+  try {
+    for await (const msg of run) {
+      if (msg.type === "assistant") {
+        logAssistantMessage(msg);
+      } else if (msg.type === "result") {
+        if (msg.subtype === "success") {
+          console.log("\n— agent finished —");
+          if (msg.result) console.log(msg.result);
+          console.log(
+            `(${msg.usage.input_tokens} in / ${msg.usage.output_tokens} out, $${msg.total_cost_usd.toFixed(4)})`
+          );
+        } else {
+          console.error(`\nagent stopped: ${msg.subtype}`);
+          for (const err of msg.errors) console.error(err);
+          exitCode = 1;
+        }
       }
     }
+  } catch (err) {
+    // F-1518: the Claude Agent SDK's message iterator can REJECT — not just
+    // yield an error `result` message — when the underlying `claude` CLI
+    // subprocess exits non-zero after already reporting an error result (an
+    // invalid API key is one way). Uncaught, that throws out of this `for
+    // await` with no handler above it and no `finally` to even run
+    // `process.exit()` — the process crashes from what `smoke-examples.mjs`
+    // sees as an indistinguishable uncaught rejection, identical text to the
+    // graceful path above but never captured by it. Route it through the
+    // same exitCode=1 path so both shapes converge.
+    console.error(`\nagent errored: ${err instanceof Error ? err.message : String(err)}`);
+    exitCode = 1;
   }
 
   // Exit explicitly once the run result has been consumed: done means done —
