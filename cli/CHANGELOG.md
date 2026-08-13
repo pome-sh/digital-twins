@@ -4,6 +4,35 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.33
+
+### Patch Changes
+
+- **`pome checks add` no longer appends a duplicate of a criterion the task
+  already scores** (F-1443). The duplicate guard compared RENDERED lines
+  (`existing === line.trim()`), and the command renders `- [code] <text>` — no
+  marker annotation, and no twin tag unless the task declares more than one
+  twin. So a stored `- [code always-scored] X` or `- [code:github] X` read as a
+  different criterion and the refusal never fired: `pome checks add
+  cli/tasks/03-already-triaged.md --check github.no-new-labels --arg
+  repo=acme/api` appended a second graded copy of that task's line 22. Two
+  copies of one check inflate the denominator with something the exam already
+  scores, which is the failure `DuplicateCriterionError` exists to refuse.
+
+  The guard now compares parsed criteria — kind, resolved twin, and text. The
+  `[code]` side comes from `readCodeCriteria` (the parser's own reader), so the
+  `tag ?? config.twins[0]` rule that decides which twin a bare marker means has
+  ONE definition rather than a second one here that could drift from it. The
+  `always-scored` keyword is deliberately not part of criterion identity: it
+  says how an existing check is scored, not what it checks.
+
+  The refusal now quotes the spelling the FILE carries and names the added one
+  only when the two differ, so the line it reports is one the author can find by
+  searching. `parseTask.ts`'s `CRITERION_LINE_RE` is untouched.
+
+- 0.23.33 rather than 0.23.31: #403 (F-1417) and #406 (F-1441) took 0.23.31 and
+  0.23.32 while this branch was in review.
+
 ## 0.23.32
 
 ### Patch Changes
@@ -13,6 +42,7 @@ packaging restructure: bump `version` here and in `package.json`, and merging to
   found live on a criterion whose polarity flips negative at count 0 — so the
   vacuous pass scored a point for an agent that did the forbidden thing. `labels`
   is now guarded for absence and truncation in both `labelIdsFor` consumers.
+
 
 ## 0.23.31
 

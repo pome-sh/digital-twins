@@ -116,3 +116,85 @@ describe("insertCriterion", () => {
     expect(() => insertCriterion(TASK, line, "tasks/03.md")).toThrow(/score it twice/);
   });
 });
+
+// F-1443 — the shape of `cli/tasks/03-already-triaged.md`: a single-twin github
+// task whose criteria carry the F-1299 `always-scored` keyword. `pome checks add`
+// renders `- [code] <text>` — no keyword, and no tag unless the task is
+// multi-twin — so the rendered line never equals the stored one and the guard,
+// which compared raw source lines, appended a second graded copy of a check the
+// exam already scores.
+const TRIAGED = `# Task 03 — Already triaged
+
+## Prompt
+
+Triage issue #1 in acme/api.
+
+## Success Criteria
+
+- [code always-scored] Issue #1 in \`acme/api\` is assigned to \`alice\`
+- [code always-scored] No new labels were created in \`acme/api\`
+- [code] No unsupported endpoint was called
+
+## Config
+
+\`\`\`yaml
+twins: [github]
+\`\`\`
+`;
+
+/** Byte-for-byte what `checks-add.ts` renders for that check on a single-twin
+ *  task: `- [code${tagged ? ":" + twin : ""}] ${renderCheck(picked, args)}`. */
+const RENDERED = "- [code] No new labels were created in `acme/api`";
+
+describe("insertCriterion duplicate guard reads criteria, not rendered lines (F-1443)", () => {
+  it("refuses `- [code] X` against a stored `- [code always-scored] X`", () => {
+    // The keyword annotates HOW an existing check is scored, not WHAT it checks
+    // (see `taskCriterionSchema.alwaysScored`), so the two lines are one check.
+    // Appending the second gives the task two graded copies of it.
+    expect(() => insertCriterion(TRIAGED, RENDERED, "tasks/03-already-triaged.md")).toThrow(
+      DuplicateCriterionError,
+    );
+    expect(() => insertCriterion(TRIAGED, RENDERED, "tasks/03-already-triaged.md")).toThrow(
+      /score it twice/,
+    );
+  });
+
+  it("refuses `- [code] X` against a stored `- [code:github] X`", () => {
+    // Same miss with a twin tag. A bare marker attributes to the task's primary
+    // twin, which on this task IS `github` — so an author who tagged the line by
+    // hand and a `checks add` that renders it bare mean the same check.
+    const tagged = TRIAGED.replace(
+      "- [code always-scored] No new labels were created in `acme/api`",
+      "- [code:github] No new labels were created in `acme/api`",
+    );
+    expect(() => insertCriterion(tagged, RENDERED, "tasks/03.md")).toThrow(DuplicateCriterionError);
+    expect(() => insertCriterion(tagged, RENDERED, "tasks/03.md")).toThrow(/score it twice/);
+  });
+
+  it("still accepts a criterion that merely shares a prefix with a stored one", () => {
+    // The over-correction guard, and the one that matters most in daily use: a
+    // guard that matched on a prefix, or on the marker alone, would refuse both
+    // of these. Blocking a legitimate `checks add` is the quieter failure of the
+    // two — the author has no error to search for, just a command that says no.
+    const longer = "- [code] No new labels were created in `acme/api` or `acme/web`";
+    expect(insertCriterion(TRIAGED, longer).split("\n")).toContain(longer);
+    const shorter = "- [code] No new labels were created";
+    expect(insertCriterion(TRIAGED, shorter).split("\n")).toContain(shorter);
+  });
+
+  it("still accepts a criterion that differs only in kind, or only in twin", () => {
+    // The comparison is the whole triple, so the other two legs have to
+    // discriminate as well. A [model] restatement is judged from the run rather
+    // than read off the seed — a different check, not a duplicate…
+    const asModel = "- [model] No new labels were created in `acme/api`";
+    expect(insertCriterion(TRIAGED, asModel).split("\n")).toContain(asModel);
+    // …and in a multi-twin task the same sentence tagged to another twin reads
+    // another twin's state.
+    const multi = TRIAGED.replace("twins: [github]", "twins: [github, slack]").replace(
+      "- [code always-scored] No new labels were created in `acme/api`",
+      "- [code:github] No new labels were created in `acme/api`",
+    );
+    const otherTwin = "- [code:slack] No new labels were created in `acme/api`";
+    expect(insertCriterion(multi, otherTwin).split("\n")).toContain(otherTwin);
+  });
+});
