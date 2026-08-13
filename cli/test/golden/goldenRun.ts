@@ -43,13 +43,19 @@ import { sign } from "hono/jwt";
 
 import { parseCheck, type CheckSubstrate, type CheckTapeEvent } from "@pome-sh/sdk/checks";
 import { toTwinHttpEventRow } from "@pome-sh/sdk/server";
-import type { RecorderEvent } from "@pome-sh/wire";
 
 import { findCheck } from "../../src/cli/checks.js";
 import { bindCriterion } from "../../src/cli/criterion-binding.js";
 import { createRecorder } from "../../src/recorder/recorder.js";
 import { parseTaskFile, seedStateForTwin } from "../../src/task/parseTask.js";
 import { bootTwin, type TwinHarness } from "../../src/twin/twinHarness.js";
+
+/** A recorded twin call in the shape `events.jsonl` persists, which is where
+ *  `event_id` comes from — `recorder.events()` alone does not carry it, and a
+ *  tape check cites its evidence by exactly that field. Derived from the real
+ *  wrapper rather than re-declared, so it cannot drift from what finalize
+ *  writes. */
+type TapeRow = ReturnType<typeof toTwinHttpEventRow>;
 
 /** One `tools/call` over a twin's real MCP JSON-RPC endpoint. This is the
  *  transport `examples/support-triage`'s examinee uses, and — unlike the domain
@@ -242,7 +248,7 @@ function mcpCaller(
  *  product's — this function chooses nothing. */
 function gradeCriterion(
   criterion: { marker: string; twin: string; text: string },
-  substrates: { seed: Record<string, unknown>; final: Record<string, unknown>; tape: RecorderEvent[] },
+  substrates: { seed: Record<string, unknown>; final: Record<string, unknown>; tape: TapeRow[] },
 ): GradedCriterion {
   const binding = bindCriterion(criterion);
   if (binding.kind !== "bound") {
@@ -295,8 +301,15 @@ function gradeCriterion(
 /** The tape as a `substrate: "tape"` check sees it: scoped to ONE twin, oldest
  *  first. The engine does this scoping before a check is called, and the
  *  narrowing is load-bearing — an unsupported call to a different twin in a
- *  multi-twin session must not fail this twin's prohibition. */
-function tapeFor(tape: RecorderEvent[], twin: string): CheckTapeEvent[] {
+ *  multi-twin session must not fail this twin's prohibition.
+ *
+ *  The cast is a WIDENING, not a claim: `TapeRow` carries every field
+ *  `CheckTapeEvent` names — `toTwinHttpEventRow` is what puts `event_id` on it,
+ *  which is the one a tape check cites evidence by — plus several
+ *  (`state_delta`, `run_id`) it does not. It is spelled `as unknown as` only
+ *  because `fidelity` is an enum on one side and a loose `string | null` on the
+ *  other, which is the direction that cannot lose information. */
+function tapeFor(tape: TapeRow[], twin: string): CheckTapeEvent[] {
   return tape
     .filter((event) => event.twin === twin)
     .map((event) => event as unknown as CheckTapeEvent);
