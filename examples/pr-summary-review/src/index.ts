@@ -121,6 +121,27 @@ async function main() {
       ...(MODEL ? { model: MODEL } : {}),
       permissionMode: "bypassPermissions",
       maxTurns: 40,
+      // Two doors, and shutting one says nothing about the other. Neither of
+      // them is `allowedTools` below: that only AUTO-APPROVES, it does not
+      // restrict — measured 2026-08-05, a one-entry `allowedTools` left 152
+      // tools live including `Bash`, `Read`, `Write` and `WebFetch`.
+      //
+      // `tools: []` REPLACES the SDK's built-in base set, so it is complete by
+      // construction: no list of names to keep current, and no way for a
+      // built-in nobody thought of to arrive enabled. The twin tools this
+      // example registers are unaffected — they arrive through `mcpServers`,
+      // not the built-in set — so the surface the exam is about stays whole.
+      //
+      // `settingSources: []` closes the OTHER door: FILESYSTEM settings — user
+      // (~/.claude/settings.json), project (.claude/settings.json) and local
+      // (.claude/settings.local.json) — INCLUDING the Claude Code plugin MCP
+      // servers configured on whoever's machine this runs on. Omitted, the SDK
+      // loads all three ("matches CLI defaults"); `[]` is its documented
+      // isolation mode. Measured 2026-08-05 (F-1295): a sibling example with
+      // `tools: []` already set searched the DEVELOPER's real Slack workspace,
+      // made zero twin calls, and would have scored as a triage failure.
+      tools: [],
+      settingSources: [],
       allowedTools: tools.map((t) => t.name),
       mcpServers: {
         "github-twin": { type: "sdk", name: "github-twin", instance: server.instance }

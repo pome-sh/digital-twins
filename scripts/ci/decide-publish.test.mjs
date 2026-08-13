@@ -215,6 +215,157 @@ console.log("\nrelease.yml wiring");
   );
   check("plan-wire has packages: read", planWire.includes("packages: read"));
   check("publish-wire has packages: write", publishWire.includes("packages: write"));
+
+  // F-1520 — the dispatch that closes the re-pin deadlock (RELEASING.md /
+  // AGENTS.md P8) must fire once after either publish lane succeeds, never
+  // before, and never mask a real publish failure by swallowing its own.
+  const dispatch = jobOf("dispatch-allocate-version");
+  check("dispatch-allocate-version job exists", Boolean(dispatch));
+  check(
+    "it needs exactly publish and publish-wire — not plan/plan-wire, so a plan-side failure cannot skip it transitively",
+    /needs:\s*\[publish,\s*publish-wire\]/.test(dispatch),
+    dispatch,
+  );
+  check(
+    "its `if:` is an OR over both jobs' .result — a partly-skipped matrix must not suppress it",
+    dispatch.includes("needs.publish.result == 'success' || needs.publish-wire.result == 'success'"),
+    dispatch,
+  );
+  // Without a status-check function in the `if:`, GitHub requires every job in
+  // `needs:` to have SUCCEEDED — and one of the two publish lanes is skipped on
+  // almost every release (each fires only when its own registry's version moved).
+  // The OR above would then never be reached: the job is dropped for depending on
+  // a skipped lane, and reads as an innocent "skipped" while the re-pin never
+  // happens. This is the one edit that turns this whole job back into decoration,
+  // so it is asserted rather than commented.
+  check(
+    "its `if:` carries a status-check function (!cancelled()), or a skipped publish lane silently drops the job",
+    /!cancelled\(\)/.test(dispatch.split("\n").find((line) => line.trim().startsWith("if:")) ?? ""),
+    dispatch,
+  );
+  check(
+    "it mints the pome-ops-push app token, the same action pinned SHA as allocate-version.yml's own mint step",
+    dispatch.includes("actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1") &&
+      dispatch.includes("secrets.OPS_APP_ID") &&
+      dispatch.includes("secrets.OPS_APP_PRIVATE_KEY"),
+    dispatch,
+  );
+  check(
+    "the dispatch step uses the minted app token and never the ambient GITHUB_TOKEN",
+    /GH_TOKEN:\s*\$\{\{\s*steps\.app-token\.outputs\.token/.test(dispatch) &&
+      !/GH_TOKEN:\s*\$\{\{\s*(secrets\.GITHUB_TOKEN|github\.token)/.test(dispatch),
+    dispatch,
+  );
+  check(
+    "no continue-on-error anywhere in the job — a failed dispatch must red loudly, not hide behind a green job",
+    !dispatch.includes("continue-on-error"),
+    dispatch,
+  );
+
+  // It POSTs a repository_dispatch, NOT a workflow_dispatch. `gh workflow run`
+  // hits POST /repos/…/actions/workflows/{id}/dispatches, which GitHub gates on
+  // `actions: write` — a scope the pome-ops-push installation does not have, so
+  // that spelling 403s on every release. `gh api … /dispatches` is the
+  // `contents: write` endpoint, which it does have.
+  const dispatchCommand = dispatch
+    .split("\n")
+    // The command is a one-line `run:`, so the key is stripped rather than
+    // assumed away — comment lines still begin with `#` and cannot match.
+    .map((line) => line.trim().replace(/^run:\s*/, ""))
+    .find((line) => line.startsWith("gh "));
+  check("the job has a `gh` dispatch command", Boolean(dispatchCommand), dispatch);
+  check(
+    "it POSTs repository_dispatch, never `gh workflow run` (that endpoint needs actions: write, which the app lacks)",
+    dispatchCommand?.startsWith("gh api") &&
+      /--method POST/.test(dispatchCommand) &&
+      /repos\/\$\{\{ github\.repository \}\}\/dispatches/.test(dispatchCommand),
+    dispatchCommand,
+  );
+
+  // The event_type and allocate-version.yml's `types:` are two halves of one
+  // wire, typed in two files. A mismatch is not an error anywhere: the POST
+  // answers 204 and starts no run — the silent no-op this whole job exists to
+  // avoid — so they are asserted against each other rather than each against a
+  // literal spelled here twice.
+  const eventType = dispatchCommand?.match(/-f\s+event_type=([\w.-]+)/)?.[1];
+  check("the dispatch names an event_type", Boolean(eventType), dispatchCommand);
+  const allocate = readFileSync(join(ROOT, ".github/workflows/allocate-version.yml"), "utf8");
+  const dispatchTypes = allocate.match(/\n {2}repository_dispatch:\n {4}types:\s*\[([^\]]*)\]/);
+  check(
+    "allocate-version.yml has a repository_dispatch trigger with an explicit `types:` list — never a bare trigger accepting every event anyone POSTs",
+    Boolean(dispatchTypes),
+    "expected `repository_dispatch:` followed by `types: [...]` in allocate-version.yml",
+  );
+  check(
+    `allocate-version.yml listens for exactly the event release.yml sends (${eventType ?? "?"})`,
+    Boolean(eventType) &&
+      (dispatchTypes?.[1] ?? "")
+        .split(",")
+        .map((t) => t.trim())
+        .includes(eventType),
+    `release.yml sends \`${eventType}\`, allocate-version.yml accepts \`${dispatchTypes?.[1] ?? "nothing"}\``,
+  );
+
+  // A repository_dispatch payload has no `head_commit`, so allocate-version.yml's
+  // `[release-bump]` guard cannot read the marker on that event — and the tip it
+  // is dispatched FROM is always a `[release-bump]` commit. The guard therefore
+  // has to be scoped to `push`, or the dispatched run either skips outright (a
+  // dispatch that achieves nothing) or passes only by null-coercion.
+  check(
+    "allocate-version.yml's [release-bump] guard is scoped to `push`, so the dispatched run is not skipped by a marker it cannot read",
+    /if:\s*\$\{\{\s*github\.event_name\s*!=\s*'push'\s*\|\|\s*!contains\(github\.event\.head_commit\.message,\s*'\[release-bump\]'\)\s*\}\}/.test(
+      allocate,
+    ),
+    "expected a job-level `if:` of the form `github.event_name != 'push' || !contains(github.event.head_commit.message, '[release-bump]')`",
+  );
+
+  // The race the dispatch would otherwise lose. `planExampleRepins` only re-pins
+  // to a version the registry already serves, and an E404 is indistinguishable
+  // from "never published" — so if the publish job returns before propagation,
+  // the dispatched run no-ops and the drift persists with no later run to retry
+  // it. The publish job must therefore prove visibility before this job runs.
+  check(
+    "the publish job waits for the registry to serve what it published, with a staleness-forcing read",
+    /npm view "\$\{PKG\}@\$\{version\}"[^\n]*--prefer-online/.test(publish),
+    publish,
+  );
+
+  // …and the version it waits for is READ CORRECTLY, which a grep cannot tell
+  // you. `npm pkg get version -w <name> --json` answers `{"<name>": "0.3.6"}` on
+  // the npm@11.5.1 that job pins and `{"<name>": {"version": "0.3.6"}}` on npm
+  // 12, so an expression written against one shape yields `undefined` on the
+  // other — `npm view <pkg>@undefined` then 404s for the whole budget and reds
+  // every publish. So the expression is pulled out of the workflow and RUN here
+  // against both shapes, rather than asserted to exist.
+  const extractor = publish.match(/node -p '(const v=JSON\.parse[^']*)'/)?.[1];
+  check("the version extractor is findable in the wait step", Boolean(extractor), publish);
+  if (extractor) {
+    const evaluate = (input) =>
+      spawnSync(process.execPath, ["-p", extractor], {
+        input,
+        encoding: "utf8",
+        env: { ...process.env, PKG: "@pome-sh/thing" },
+      });
+    for (const [label, input] of [
+      ["npm 11.5.1's flat shape", '{"@pome-sh/thing":"0.9.9"}'],
+      ["npm 12's nested shape", '{"@pome-sh/thing":{"version":"0.9.9"}}'],
+    ]) {
+      const r = evaluate(input);
+      check(
+        `the version extractor reads ${label}`,
+        r.status === 0 && r.stdout.trim() === "0.9.9",
+        `status=${r.status} stdout=${JSON.stringify(r.stdout)} stderr=${r.stderr?.split("\n")[0]}`,
+      );
+    }
+    // A third shape must fail HERE and name what npm said, never interpolate
+    // `undefined` into the registry query and blame the registry for the 404.
+    const r = evaluate('{"@pome-sh/thing":{"nope":true}}');
+    check(
+      "the version extractor throws on a shape it does not recognise, rather than yielding undefined",
+      r.status !== 0 && /no version for @pome-sh\/thing/.test(r.stderr ?? ""),
+      `status=${r.status} stderr=${(r.stderr ?? "").split("\n").slice(0, 3).join(" | ")}`,
+    );
+  }
 }
 
 if (failures > 0) {

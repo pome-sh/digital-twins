@@ -145,6 +145,27 @@ export function examineeOptions(mcpServers: Record<string, McpServerConfig>) {
     // are independent knobs and the web clamp should not depend on which one a
     // future SDK version reinterprets.
     tools: BUILT_IN_TOOLS,
+    // A DIFFERENT door from `tools`, and shutting one says nothing about the
+    // other. `tools` governs the SDK's built-in base set; `settingSources`
+    // governs FILESYSTEM settings — user (~/.claude/settings.json), project
+    // (.claude/settings.json) and local (.claude/settings.local.json) —
+    // INCLUDING the Claude Code plugin MCP servers configured on whoever's
+    // machine this runs on. The SDK loads all three when the option is omitted
+    // ("matches CLI defaults"); `[]` is its documented isolation mode.
+    //
+    // Measured 2026-08-05 (F-1295), on a `claude-haiku-4-5` trial of this very
+    // task with `tools: []` ALREADY SET: the examinee called
+    // `mcp__plugin_slack_slack__slack_search_channels`, `…__slack_search_public`
+    // and `…__slack_list_channel_members` — it searched the DEVELOPER's real
+    // Slack workspace, made zero twin calls, and would have scored as "the agent
+    // failed to triage". A verdict about the wrong workspace entirely. With this
+    // line the same trial called only `mcp__github__*` / `mcp__slack__*`,
+    // searched issues first, commented on #1, posted the link, and scored 75.
+    //
+    // Local, and therefore inherited from a machine nobody controls: this is the
+    // one exam surface that changes depending on who runs it. `scripts/check-example-sdk-isolation.mjs`
+    // is what stops it being deleted along with the comment that explains it.
+    settingSources: [],
     disallowedTools: deniedTools(),
     mcpServers,
   };

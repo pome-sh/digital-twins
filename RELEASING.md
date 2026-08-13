@@ -243,6 +243,58 @@ v3.2.0 deprecates in favour of `client-id`. It matches pome-cloud's call sites o
 purpose; migrating is a some-day for both repos at once, not a divergence to
 introduce here.
 
+### F-1520 — dispatching `allocate-version.yml` after a publish
+
+Auto-re-pinning `examples/support-triage`'s registry pin (`planExampleRepins`,
+above) needs a run of `allocate-version.yml` that starts AFTER the version it
+is re-pinning to actually exists on the registry — and no push-triggered run
+ever does: the merge commit's run plans before the number exists, and the
+bump commit's own run is the one `[release-bump]` skips. `release.yml`'s
+`dispatch-allocate-version` job closes that window by POSTing a
+`repository_dispatch` event (`event_type: repin-examples`) at this repository
+right after its own publish succeeds, with the same `pome-ops-push` app token
+minted the same way.
+
+**No new one-time step: the three above are still the whole list.** The event is
+a `repository_dispatch` and not a `workflow_dispatch` precisely so that stays
+true. `POST /repos/{owner}/{repo}/dispatches` is a `contents: write` endpoint,
+and the `pome-ops-push` installation already grants exactly `contents: write` +
+`metadata: read`; `POST /repos/…/actions/workflows/{id}/dispatches`, which is
+what `gh workflow run` calls, needs `actions: write`, which it does not have —
+that spelling would have 403'd on every release, leaving `release.yml` red on
+top of the pin drift on `main` until an org owner re-approved the app with a
+wider grant. (The ambient `GITHUB_TOKEN` would also work here — dispatch events
+are the documented exception to `GITHUB_TOKEN` event suppression, unlike a push
+— but it would mean granting the publishing workflow's ambient token write
+scope to save minting a token this repo already mints, and resting the release
+path on a carve-out to the rule everything else in that file relies on.)
+
+Two properties are what make this safe to leave running unattended, and both are
+asserted in `scripts/ci/decide-publish.test.mjs`:
+
+- **It stops.** A `repository_dispatch` payload has no `head_commit`, so
+  `allocate-version.yml`'s `[release-bump]` guard cannot read the marker on that
+  event — and the tip it is dispatched from always carries it. The guard is
+  therefore scoped to `push` explicitly, and the dispatch arm always runs.
+  Termination is paid for in publishes instead: this job fires only after a real
+  publish; the single commit the dispatched run pushes is either re-pin-only
+  (`examples/*` and their lockfiles, no version — so the next `plan` finds
+  nothing to publish and nothing dispatches) or it moved a version by consuming
+  a pending `## Unreleased` entry, of which CI writes none. Bounded by what a
+  human merged.
+- **The dispatched run can actually see the version.** `planExampleRepins` only
+  re-pins to a version the registry already serves, and an `E404` is deliberately
+  indistinguishable from "never published" — so a read that beat propagation
+  would make the dispatched run a no-op with no later run to retry it (the next
+  PR's own required `typecheck-test` reds on the same drift). So the publish job
+  polls `npm view <pkg>@<version> --prefer-online` (as does the dispatched run's own read, and its lockfile regen — a cached packument cannot prove a version is absent, and both workflows restore npm's HTTP cache) until the registry serves what
+  it just published — eighteen attempts over roughly three minutes, sized for the
+  CDN's packument cache and exiting on the first attempt in the ordinary case —
+  before this job runs at all. If that times
+  out the publish job reds — the publish itself is done and must not be re-run;
+  the recovery is `gh workflow run allocate-version.yml --ref main` by hand once
+  the version is visible.
+
 ## The four packages version independently
 
 `@pome-sh/cli`, `@pome-sh/adapter-claude-sdk`, `@pome-sh/checks` and
