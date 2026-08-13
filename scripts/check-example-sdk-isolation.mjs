@@ -359,12 +359,27 @@ export function scanSource(source, fileName = "index.ts") {
       if (!params) {
         findings.push({ line, reason: "unresolvable-params", missing: [...REQUIRED_OPTIONS] });
       } else {
+        // Quoted as well as bare, matching `unconditionalKeys` — a gate that
+        // reads `options:` but not `"options":` would report both doors open on
+        // a call that shuts them.
         const optionsProperty = params.properties.find(
-          (p) => p.name && ts.isIdentifier(p.name) && p.name.text === "options",
+          (p) =>
+            p.name &&
+            (ts.isIdentifier(p.name) || ts.isStringLiteral(p.name)) &&
+            p.name.text === "options",
         );
-        const options = optionsProperty && ts.isPropertyAssignment(optionsProperty)
-          ? resolveObjectLiteral(optionsProperty.initializer, resolvables)
-          : null;
+        // `query({ prompt, options })` is the same call as `options: options`,
+        // and resolving the shorthand through the same table is what keeps it
+        // from reading as an unresolvable object — a false RED on correct work,
+        // which is how a gate gets deleted rather than obeyed.
+        const optionsValue = !optionsProperty
+          ? undefined
+          : ts.isPropertyAssignment(optionsProperty)
+            ? optionsProperty.initializer
+            : ts.isShorthandPropertyAssignment(optionsProperty)
+              ? optionsProperty.name
+              : undefined;
+        const options = optionsValue ? resolveObjectLiteral(optionsValue, resolvables) : null;
         if (!options) {
           findings.push({
             line,

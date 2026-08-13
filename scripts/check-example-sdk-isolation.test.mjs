@@ -126,6 +126,10 @@ const SEALED = {
   "named constants": `${IMPORT_LINE}\nawait query({ prompt: "go", options: { tools: BUILT_IN_TOOLS, settingSources: NO_FS } });`,
   "an unconditional spread carries the keys": `${IMPORT_LINE}\nconst ISOLATION = { tools: [], settingSources: [] };\nawait query({ prompt: "go", options: { ...ISOLATION, maxTurns: 5 } });`,
   "quoted keys": `${IMPORT_LINE}\nawait query({ prompt: "go", options: { "tools": [], "settingSources": [] } });`,
+  "a quoted `options` key": `${IMPORT_LINE}\nawait query({ prompt: "go", "options": { tools: [], settingSources: [] } });`,
+  // `query({ prompt, options })` is the same call as `options: options`; reading
+  // it as unresolvable would be a false RED on correct work.
+  "shorthand options": `${IMPORT_LINE}\nconst options = { tools: [], settingSources: [] };\nawait query({ prompt, options });`,
   "aliased import": `import { query as ask } from "@pome-sh/adapter-claude-sdk";\nawait ask({ prompt: "go", options: { tools: [], settingSources: [] } });`,
   "namespace import": `import * as sdk from "@anthropic-ai/claude-agent-sdk";\nawait sdk.query({ prompt: "go", options: { tools: [], settingSources: [] } });`,
   "raw SDK import": `import { query } from "@anthropic-ai/claude-agent-sdk";\nawait query({ prompt: "go", options: { tools: [], settingSources: [] } });`,
