@@ -90,6 +90,12 @@ on:
       - ".github/workflows/release-alarm.yml"
       - ".github/workflows/release.yml"
       - "scripts/ci/decide-publish.sh"
+      # F-1511 — the alarm's UNALLOCATED leg reads these two: the CHANGELOG
+      # grammar it parses a pending entry with, and the table that says which
+      # CHANGELOG belongs to which published package. A change to either can
+      # blind that leg without touching a file above.
+      - "scripts/ci/changelog-entry.mjs"
+      - "scripts/ci/publish-relevance.mjs"
 
 concurrency:
   group: release-alarm-${{ github.ref }}
@@ -215,6 +221,8 @@ jobs:
           ```
 
           </details>
+
+          **UNALLOCATED** — `main` carries a pending `## Unreleased` entry and no version number was written for it, so nothing published and `main` and the registry agree on the old version. The number is allocated after the merge by `allocate-version.yml` (see `RELEASING.md`): check that run, the `OPS_APP_ID` / `OPS_APP_PRIVATE_KEY` secrets, and that the `pome-ops-push` app (app_id 4582446) is still both installed on this repository and in ruleset 18797095's bypass list. Recovery is `gh workflow run allocate-version.yml --ref main` — do NOT hand-write the version to unstick it.
 
           **UNPUBLISHED / BEHIND** — a version on `main` that its registry does not serve. Re-dispatch the release once the cause is fixed: `gh workflow run release.yml --ref main`. A 404 at the publish step is an AUTH failure (npm Trusted Publishing matches repo *and* workflow filename), not a missing package.
 

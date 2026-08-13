@@ -111,13 +111,41 @@ jobs:
       # block) so an exit inside SETTLE_MS can't quietly go back to reading as
       # success. Pure-function tests, no npm ci needed, so it runs here too.
       - run: node scripts/smoke-examples.test.mjs
-      # release.yml only publishes on a version diff against npm — a PR that
-      # changes a published package's source without bumping its version
-      # merges clean and silently never reaches npm. Only meaningful against
-      # the PR's actual base (a push to main has already merged).
+      # F-1511 — release.yml still publishes only on a version diff against the
+      # registry, but the version is now written on main after the merge by
+      # allocate-version.yml, not by a PR (RELEASING.md, "Why the number is not
+      # yours to write"). So what this gate demands of a PR is the WORDS and
+      # not the number: an `## Unreleased (patch|minor)` entry for every artifact
+      # the PR moves, no hand-written version line, and no rewrite of a released
+      # entry. It is the re-scoped check-version-bump-required.mjs — same
+      # publish-relevance table (now in scripts/ci/publish-relevance.mjs, shared
+      # with the allocator so the two cannot disagree about what a release owes),
+      # inverted demand. Only meaningful against the PR's actual base.
       - if: github.event_name == 'pull_request'
-        run: node scripts/ci/check-version-bump-required.mjs "${{ github.event.pull_request.base.sha }}"
-      - run: node scripts/ci/check-version-bump-required.test.mjs
+        run: node scripts/ci/check-release-note-required.mjs "${{ github.event.pull_request.base.sha }}"
+      - run: node scripts/ci/check-release-note-required.test.mjs
+      # The writer's own suite. Drives real git repositories, because the two
+      # properties that matter are properties of history: the bump commit cannot
+      # re-trigger a publish loop, and two merges inside one allocation window
+      # cannot double-allocate a number. Network-free and install-free, so it
+      # belongs in this block — and allocate-version.yml runs it again, on main,
+      # before letting the allocator write anything.
+      - run: node scripts/ci/allocate-release-versions.test.mjs
+      # F-1511 — allocate-version.yml's checkout carries
+      # `token: ${{ steps.app-token.outputs.token || github.token }}`, and that
+      # fallback must be reachable ONLY on the plan-only pull_request arm (a fork
+      # PR has no secrets at all). Reaching it on a push is a silent double
+      # failure: `github-actions` can never be a ruleset bypass actor, so the push
+      # is refused — and a push made with GITHUB_TOKEN does not trigger workflows,
+      # so a landed commit would publish nothing. Four one-line edits would each
+      # make it reachable (drop the credential precondition, mark it or the mint
+      # step continue-on-error, narrow either guard, hand the push step the
+      # ambient token), and a comment saying "PR-only" guards none of them. Lives
+      # in the always-on block because a `.github/workflows/**`-only diff is
+      # classified docs-only by the scope step above — i.e. skipped by exactly the
+      # PR that would break this.
+      - run: node scripts/ci/assert-allocate-token-path.mjs
+      - run: node scripts/ci/assert-allocate-token-path.test.mjs
       # F-949 — @pome-sh/wire publishes to GitHub Packages, and the two ways that
       # silently stops working are both readable straight from its package.json:
       # `private: true` makes `npm publish -w` skip the workspace and EXIT 0 (a

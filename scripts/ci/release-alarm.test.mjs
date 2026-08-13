@@ -21,6 +21,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { PUBLISHED_PACKAGES } from "./publish-relevance.mjs";
 import { check, compareVersions, parseTargets } from "./release-alarm.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -46,8 +47,24 @@ function check_(label, condition, detail = "") {
 
 const minutesAgo = (m) => new Date(NOW - m * 60_000).toISOString();
 
+/**
+ * A CHANGELOG with nothing pending, for every published package — the state
+ * every allocation leaves behind (F-1511). `pending` names packages that get an
+ * `## Unreleased` section instead, which is the state a dead allocator leaves.
+ */
+function writeChangelogs(dir, pending = {}) {
+  for (const pkg of PUBLISHED_PACKAGES) {
+    mkdirSync(join(dir, dirname(pkg.changelog)), { recursive: true });
+    const section = pending[pkg.name] ? `${pending[pkg.name]}\n\n- words from a PR\n\n` : "";
+    writeFileSync(
+      join(dir, pkg.changelog),
+      `# ${pkg.name} — CHANGELOG\n\n${section}## 1.0.0 — 2026-08-01\n\nShipped.\n`,
+    );
+  }
+}
+
 /** A repo root carrying the real release.yml and manifests at the paths it names. */
-function fixture(versions = {}) {
+function fixture(versions = {}, pending = {}) {
   const dir = mkdtempSync(join(tmpdir(), "release-alarm-"));
   mkdirSync(join(dir, ".github/workflows"), { recursive: true });
   cpSync(
@@ -61,6 +78,7 @@ function fixture(versions = {}) {
       JSON.stringify({ name: t.name, version: versions[t.name] ?? "1.0.0" }),
     );
   }
+  writeChangelogs(dir, pending);
   return dir;
 }
 
@@ -93,9 +111,9 @@ const registryStub = (map) => (name, registry) =>
   map[`${name}@${registry || "npm"}`] ?? map[name] ?? { version: "1.0.0" };
 
 function run(opts = {}) {
-  const { versions, head, runs, registry = {}, ...rest } = opts;
+  const { versions, head, runs, registry = {}, pending, ...rest } = opts;
   return check({
-    root: opts.root ?? fixture(versions),
+    root: opts.root ?? fixture(versions, pending),
     repo: REPO,
     now: NOW,
     gitHub: ghStub({ head, runs }),
@@ -272,6 +290,52 @@ console.log("FAILED — a broken release path with nothing owed");
   check_("a skipped run does not", !kinds(run({ runs: [{ ageMin: 200, conclusion: "skipped" }] })).includes("FAILED"));
 }
 
+console.log("UNALLOCATED — a number nobody wrote (F-1511)");
+{
+  // The state a broken or unconfigured allocate-version.yml leaves: main carries
+  // the words and not the number, main and the registry agree on the OLD version,
+  // and every other leg is green. The outcome check cannot see this at all, which
+  // is the whole reason this leg exists.
+  const r = run({
+    runs: [{ ageMin: 300, conclusion: "success" }],
+    pending: { "@pome-sh/cli": "## Unreleased (patch)" },
+  });
+  check_("fires", kinds(r).includes("UNALLOCATED"), r.alarms.join("\n"));
+  check_(
+    "names the file and the level",
+    r.alarms.some((a) => a.includes("cli/CHANGELOG.md") && a.includes("(patch)")),
+    r.alarms.join("\n"),
+  );
+  check_(
+    "and nothing else fires — every version matches its registry",
+    r.alarms.length === 1,
+    r.alarms.join("\n"),
+  );
+  check_("the report names the waiting package", /@pome-sh\/cli — pending patch/.test(r.report), r.report);
+
+  // A `## Unreleased` heading with no level is refused by the same parser
+  // allocate-version.yml runs, so the allocator is failing on it too — reported,
+  // never silently read as "nothing pending".
+  const malformed = run({
+    runs: [{ ageMin: 300, conclusion: "success" }],
+    pending: { "@pome-sh/wire": "## Unreleased" },
+  });
+  check_(
+    "a malformed pending heading is UNALLOCATED, not silence",
+    kinds(malformed).includes("UNALLOCATED") &&
+      malformed.alarms.some((a) => a.includes("not a release request")),
+    malformed.alarms.join("\n"),
+  );
+
+  // Inside the grace window an entry is legitimately still being allocated.
+  const fresh = run({
+    head: { sha: HEAD_SHA, ageMin: 4 },
+    runs: [{ ageMin: 4, status: "in_progress" }],
+    pending: { "@pome-sh/cli": "## Unreleased (minor)" },
+  });
+  check_("stays silent inside the grace window", fresh.alarms.length === 0, fresh.alarms.join("\n"));
+}
+
 console.log("UNMEASURED — an unreadable registry is never read as 'unpublished'");
 {
   // wire is in sync on npmjs and unreadable on GitHub Packages: the ONLY
@@ -318,6 +382,10 @@ console.log("2026-08-06, replayed");
       mkdirSync(join(dir, dirname(manifest)), { recursive: true });
       writeFileSync(join(dir, manifest), JSON.stringify({ version }));
     }
+    // Today's CHANGELOGs even in a historical fixture: the allocation leg's
+    // subject is the tree the alarm is checked out in, and the replay below is
+    // about the registry and the run list, not about F-1511's contract.
+    writeChangelogs(dir);
     return dir;
   }
 
