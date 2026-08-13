@@ -56,6 +56,18 @@ that binds today moves to a different check or a different verdict.
 `CORPUS_SHAPE_BASELINE` to move only once a task actually writes the new
 sentence; this release adds vocabulary and edits no criterion.
 
+**And one thing to CHECK rather than inherit, because its failure is silent.**
+`github.tool-was-called` distinguishes `tool: null` ("this surface declares no
+action" — a real world, and the null agent's) from `tool` ABSENT ("this
+recording predates F-1125" — a skip). The twin writes `null` explicitly on every
+unstamped surface, but `twinHttpEventSchema` types the field
+`.nullable().optional()`, so a tape mapper or jsonb round-trip that DROPS
+null-valued keys would make every read-only run look like a legacy recording —
+and this check would `skipped` the null agent instead of failing it, which is
+the one outcome it exists to prevent. A skip does not announce itself the way a
+wrong verdict does. Confirm a persisted tape row for an unstamped call still
+carries `"tool": null` when the pin lands.
+
 ## 0.1.8
 
 **Grading-vocabulary change: twin-github's seed gained

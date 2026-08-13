@@ -297,6 +297,20 @@ export const toolWasCalled: Check<{ tool: string }> = defineCheck({
     // row named this action" and "no row COULD have named it" are the same
     // absence. `tape.length > 0` keeps the empty tape out of this branch: `[]`
     // is a real world with a real verdict, and it is the null agent.
+    //
+    // ⚠️ THIS BRANCH RESTS ON A CROSS-REPO FACT, and it is worth stating because
+    // the failure would be silent in the one direction that matters. The
+    // recorder writes `tool: null` EXPLICITLY on every unstamped surface
+    // (`tool-stamping.test.ts` asserts `[null]` for a plain read), and
+    // `twinHttpEventSchema` types the field `.nullable().optional()` — so a
+    // consumer that persisted or re-serialised the tape by DROPPING null-valued
+    // keys would make every read-only run look like a pre-F-1125 recording, and
+    // this check would SKIP the null agent instead of failing it. That is the
+    // one outcome this whole declaration exists to prevent, and a skip does not
+    // announce itself the way a wrong verdict does. The test below the fold
+    // ("does NOT refuse when the recorder stamped `null` on every row") pins our
+    // half; pome-cloud's tape mapper owns the other half, and the pin-bump PR
+    // should check it rather than inherit it.
     if (tape.length > 0 && !tape.some((event) => event.tool !== undefined)) {
       return { passed: false, status: "skipped", reason: "tool_not_recorded" };
     }
