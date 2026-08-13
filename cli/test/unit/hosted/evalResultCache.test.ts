@@ -9,7 +9,7 @@
 // from a trial the grader never finished, and both used to trip the old
 // `anyFailed` boolean the same way.
 
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -767,6 +767,176 @@ describe("verdict artifact (FDRS-644)", () => {
       expect(discovery.unreadableCount).toBe(1);
       expect(discovery.unreadablePaths).toEqual([corruptDir]);
       expect(discovery.staleVersionCount).toBe(0);
+    });
+  });
+
+  // F-1445 — the counts above are only honest about DAMAGE if a file that is
+  // merely mid-write can never reach them. `pome fix-prompt` scanning a root
+  // while a `pome run` finalizes in it is an ordinary thing to do, and a
+  // plain `writeFile` publishes the path first (O_TRUNC empties it) and the
+  // bytes second, so the scanner had a real window in which to read a prefix
+  // and report it as "truncated, hand-edited, or not a verdict artifact".
+  describe("verdict.json is published by rename, so a concurrent scan never sees a prefix (F-1445)", () => {
+    /** Big enough that the write is a measurable interval rather than an
+     *  instant: ~4 MB of JSON. On the pre-F-1445 code the artifact path is
+     *  observably empty (or partial) for that whole interval, which is what
+     *  lets this test fail on `origin/main` instead of passing vacuously —
+     *  a small artifact lands in one syscall and the window is too narrow to
+     *  sample reliably. */
+    function largeVerdict(sid: string): VerdictArtifact {
+      return verdict({
+        session_id: sid,
+        criteria_results: Array.from({ length: 3000 }, (_, i) => ({
+          criterion: { type: "model" as const, text: `criterion ${i} ${"c".repeat(320)}` },
+          passed: true,
+          skipped: false,
+          reason: `reason ${i} ${"r".repeat(320)}`,
+        })),
+      });
+    }
+
+    it("a scan running throughout a large write never reports an unreadable count", async () => {
+      const tmp = await mkdtemp(join(tmpdir(), "verdict-atomic-scan-"));
+      const runDir = join(tmp, "scn", "ses_hot");
+      await mkdir(runDir, { recursive: true });
+      const artifact = largeVerdict("ses_hot");
+      // Seed one COMPLETE artifact first: the claim is that a reader sees
+      // either the previous artifact or the new one, which needs a previous
+      // one to exist.
+      await writeVerdictArtifact(runDir, artifact);
+
+      let writing = true;
+      const writer = (async () => {
+        try {
+          for (let i = 0; i < 20; i += 1) {
+            await writeVerdictArtifact(runDir, artifact);
+          }
+        } finally {
+          writing = false;
+        }
+      })();
+      const scans: { unreadable: number; sets: number }[] = [];
+      const scanner = async () => {
+        while (writing) {
+          const d = await discoverRunSet(tmp);
+          scans.push({ unreadable: d.unreadableCount, sets: d.totalSets });
+        }
+      };
+      await Promise.all([writer, scanner(), scanner()]);
+
+      // Sampling proof: an assertion over zero observations is not evidence.
+      expect(scans.length).toBeGreaterThan(10);
+      // The ticket's claim, both halves: no scan accused the run of damage,
+      // and every scan still found the one complete run set — "silently saw
+      // nothing" would be the same race wearing the pre-F-1411 face.
+      expect(scans.filter((s) => s.unreadable > 0)).toEqual([]);
+      expect(scans.filter((s) => s.sets !== 1)).toEqual([]);
+    }, 60_000);
+
+    it("republishing swaps the directory entry (new inode) instead of truncating in place", async () => {
+      const tmp = await mkdtemp(join(tmpdir(), "verdict-atomic-inode-"));
+      const runDir = join(tmp, "scn", "ses_swap");
+      await mkdir(runDir, { recursive: true });
+
+      await writeVerdictArtifact(runDir, verdict({ session_id: "ses_swap" }));
+      const first = await stat(join(runDir, "verdict.json"));
+      await writeVerdictArtifact(runDir, verdict({ session_id: "ses_swap", score: 40 }));
+      const second = await stat(join(runDir, "verdict.json"));
+
+      // The deterministic half of the claim above, which the concurrency test
+      // can only sample: `writeFile` reuses the inode (it opens the SAME file
+      // with O_TRUNC), a rename replaces the directory entry with a different
+      // one. A same-inode second write is an in-place rewrite, i.e. a window.
+      expect(second.ino).not.toBe(first.ino);
+      // And the content is the new artifact, not a stale one left behind.
+      const onDisk = JSON.parse(await readFile(join(runDir, "verdict.json"), "utf8")) as {
+        score: number;
+      };
+      expect(onDisk.score).toBe(40);
+    });
+
+    it("leaves no temp file behind in the run dir", async () => {
+      const tmp = await mkdtemp(join(tmpdir(), "verdict-atomic-tidy-"));
+      const runDir = join(tmp, "scn", "ses_tidy");
+      await mkdir(runDir, { recursive: true });
+      await writeVerdictArtifact(runDir, verdict({ session_id: "ses_tidy" }));
+      await writeVerdictArtifact(runDir, verdict({ session_id: "ses_tidy" }));
+      // The temp file is a SIBLING (same directory ⇒ same filesystem ⇒ the
+      // rename is atomic), so tidiness is this module's problem: a leftover
+      // `.verdict.json.*.tmp` in every run dir would be a visible mess in the
+      // user's runs/ even though no reader looks at it.
+      expect(await readdir(runDir)).toEqual(["verdict.json"]);
+    });
+  });
+
+  // F-1445 — `readVerdictArtifactDetailed` used to collapse "there is no
+  // verdict.json here" into `unreadable`, which is why both call sites
+  // re-`existsSync`'d the path they had just failed to read. The status now
+  // carries the distinction, so the re-stat (and the check-then-read window
+  // it opened) is gone.
+  describe("an absent verdict.json is `missing`, not `unreadable` (F-1445)", () => {
+    it("names the absence directly, for a run dir with no verdict.json and for a dir that isn't there", async () => {
+      const tmp = await mkdtemp(join(tmpdir(), "verdict-missing-"));
+      const empty = join(tmp, "scn", "ses_never_finalized");
+      await mkdir(empty, { recursive: true });
+
+      expect(await readVerdictArtifactDetailed(empty)).toEqual({ status: "missing" });
+      expect(await readVerdictArtifactDetailed(join(tmp, "scn", "nope"))).toEqual({
+        status: "missing",
+      });
+      // The collapsing reader still collapses: callers that only want usable
+      // trials are unaffected.
+      expect(await readVerdictArtifact(empty)).toBeNull();
+    });
+
+    it("every path that does not RESOLVE is `missing`, so the scan's junk-skipping is unchanged", async () => {
+      // The `existsSync` guard this status replaces answered `false` for more
+      // than ENOENT, and each of those is a count that would otherwise move.
+      // ENOTDIR is the one that reaches a real user: the scan walks every
+      // entry under a task slug as a run dir, so `<root>/<slug>/loose.txt`
+      // gets read as `<...>/loose.txt/verdict.json`. Keying `missing` on
+      // ENOENT alone would newly count every stray file under a task slug as
+      // a damaged artifact. ELOOP and ENAMETOOLONG are the same fact for a
+      // path a user typed at `pome fix-prompt`.
+      const tmp = await mkdtemp(join(tmpdir(), "verdict-missing-notdir-"));
+      await writeTrial(tmp, "scn", "ses_ok", {});
+      const loose = join(tmp, "scn", "loose.txt");
+      await writeFile(loose, "not a run dir", "utf8");
+      const loop = join(tmp, "scn", "loop");
+      await symlink(loop, loop); // self-referential → ELOOP on resolve
+      const tooLong = join(tmp, "scn", "n".repeat(5000)); // → ENAMETOOLONG
+
+      expect(await readVerdictArtifactDetailed(loose)).toEqual({ status: "missing" });
+      expect(await readVerdictArtifactDetailed(loop)).toEqual({ status: "missing" });
+      expect(await readVerdictArtifactDetailed(tooLong)).toEqual({ status: "missing" });
+
+      const { trials, unreadableDirs } = await scanVerdictArtifactsDetailed(tmp);
+      expect(trials.map((t) => t.verdict.session_id)).toEqual(["ses_ok"]);
+      expect(unreadableDirs).toEqual([]);
+      const discovery = await discoverRunSet(tmp);
+      expect(discovery.totalSets).toBe(1);
+      expect(discovery.unreadableCount).toBe(0);
+    });
+
+    it("a fix-prompt target with no verdict.json still falls through to the artifacts-root read", async () => {
+      // `discoverRunSet` distinguishes "you pointed me at a damaged trial"
+      // from "you pointed me at a root" — with `missing` that is a status
+      // check rather than a second stat of the same path.
+      const tmp = await mkdtemp(join(tmpdir(), "verdict-missing-root-"));
+      await writeTrial(tmp, "scn", "ses_fail", { passed: false, state: "fail" });
+
+      const discovery = await discoverRunSet(tmp);
+      expect(discovery.kind).toBe("root");
+      expect(discovery.totalSets).toBe(1);
+      expect(discovery.unreadableCount).toBe(0);
+      expect(discovery.set?.trials.map((t) => t.verdict.session_id)).toEqual(["ses_fail"]);
+
+      // A root that does not exist at all is still an empty root, not a
+      // trial dir.
+      const gone = await discoverRunSet(join(tmp, "not-here"));
+      expect(gone.kind).toBe("root");
+      expect(gone.totalSets).toBe(0);
+      expect(gone.unreadableCount).toBe(0);
     });
   });
 });
