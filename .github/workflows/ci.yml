@@ -319,6 +319,21 @@ jobs:
           # here rather than after `npm run build`.
           npm run lint:import-meta-main
           node scripts/lint-no-bare-import-meta-main.test.mjs
+          # F-1295 — `options.tools` and `options.settingSources` close DIFFERENT
+          # doors, and a bundled example that omits either is not isolated
+          # however carefully its comments say it is. A measured trial with
+          # `tools: []` already set searched the DEVELOPER's real Slack
+          # workspace through inherited Claude Code plugin MCP servers, made
+          # zero twin calls, and would have scored as a triage failure — a
+          # verdict about the wrong workspace entirely. Parses every source
+          # file of every examples/* package that declares the SDK (discovered
+          # from the manifests, never a hand-kept list), because the likeliest
+          # regression is deleting the options and keeping the comment that
+          # explains them, which a grep would call green. Same dependency
+          # profile as the line above — the typescript parser, no build — so it
+          # runs here.
+          npm run lint:example-isolation
+          node scripts/check-example-sdk-isolation.test.mjs
           # F-705 — zero native deps is an invariant: no gyp-marked package in the
           # production closure (prebuilt installers like esbuild/fsevents pass).
           npm run gate:no-native
