@@ -213,6 +213,57 @@ function main() {
   }
 
   {
+    // Two rulesets can both match main (repo + org), so the endpoint returns a
+    // rule per source. A second, laxer pull_request rule must not hide behind
+    // the compliant first one.
+    const rules = [
+      ...baseRules(),
+      {
+        type: "pull_request",
+        parameters: {
+          required_approving_review_count: 2,
+          required_review_thread_resolution: true,
+        },
+        ruleset_source_type: "Organization",
+        ruleset_source: "pome-sh",
+        ruleset_id: 99999,
+      },
+    ];
+    const r = runAssert(rules);
+    assert(r.status === 1, `a second laxer pull_request rule must fail: ${r.stdout}`);
+    assert(
+      `${r.stdout}\n${r.stderr}`.includes("required_approving_review_count must be 0"),
+      r.stderr,
+    );
+  }
+
+  {
+    // Same for contexts: an extra context contributed by a second
+    // required_status_checks rule must be seen, not shadowed.
+    const rules = [
+      ...baseRules(),
+      {
+        type: "required_status_checks",
+        parameters: {
+          strict_required_status_checks_policy: true,
+          required_status_checks: [{ context: "sneaky-org-check" }],
+        },
+        ruleset_source_type: "Organization",
+        ruleset_source: "pome-sh",
+        ruleset_id: 99999,
+      },
+    ];
+    const r = runAssert(rules);
+    assert(r.status === 1, `a second rule's extra context must fail: ${r.stdout}`);
+    assert(
+      `${r.stdout}\n${r.stderr}`.includes(
+        "has a live context absent from config/required-checks.json: sneaky-org-check",
+      ),
+      r.stderr,
+    );
+  }
+
+  {
     // A rule type present but carrying no `parameters` at all must hard-fail,
     // not read as "nothing to assert".
     const r = runAssert([
@@ -238,8 +289,8 @@ function main() {
     // a declared policy with no live assertion cannot present as green. Drive
     // it through a copy of the script with the non_fast_forward block removed.
     const src = readFileSync(SCRIPT, "utf8");
-    const block = `const ffRule = findRule("non_fast_forward");
-if (!ffRule) {
+    const block = `const ffRules = findRules("non_fast_forward");
+if (ffRules.length === 0) {
   errors.push(\`missing rule: non_fast_forward (policy: no force-push to \${branch})\`);
 } else {
   asserted.add("non_fast_forward");

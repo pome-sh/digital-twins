@@ -131,34 +131,48 @@ const POLICIES = ["pull_request", "required_status_checks", "non_fast_forward"];
 // decorative-denominator defect this script exists to catch elsewhere.
 const asserted = new Set();
 
-function findRule(type) {
-  return rules.find((r) => r.type === type);
+// Every rule of a type, not the first. Two rulesets can both match main (a
+// repo one plus an org one), and the endpoint returns a rule per source. With
+// `find`, a second, laxer pull_request rule — or extra contexts contributed by
+// a second required_status_checks rule — would go unread while the summary
+// still reported the policy as asserted.
+function findRules(type) {
+  return rules.filter((r) => r.type === type);
 }
 
 // --- pull_request: 0 required reviews (founder team merges on green CI), thread resolution required ---
-const prRule = findRule("pull_request");
-if (!prRule?.parameters) {
+const prRules = findRules("pull_request");
+if (prRules.length === 0 || prRules.some((r) => !r.parameters)) {
   errors.push(`missing rule: pull_request (policy: PR required with 0 approving reviews + resolved threads)`);
 } else {
-  const params = prRule.parameters;
-  if (Number(params.required_approving_review_count) !== 0) {
-    errors.push("pull_request.required_approving_review_count must be 0");
-  }
-  if (params.required_review_thread_resolution !== true) {
-    errors.push("pull_request.required_review_thread_resolution must be true");
+  for (const { parameters: params } of prRules) {
+    if (Number(params.required_approving_review_count) !== 0) {
+      errors.push("pull_request.required_approving_review_count must be 0");
+    }
+    if (params.required_review_thread_resolution !== true) {
+      errors.push("pull_request.required_review_thread_resolution must be true");
+    }
   }
   asserted.add("pull_request");
 }
 
 // --- required_status_checks: strict + contexts agree with config/required-checks.json in BOTH directions ---
-const checksRule = findRule("required_status_checks");
-if (!checksRule?.parameters) {
+const checksRules = findRules("required_status_checks");
+if (checksRules.length === 0 || checksRules.some((r) => !r.parameters)) {
   errors.push(`missing rule: required_status_checks (policy: strict required checks matching config/required-checks.json)`);
 } else {
-  if (checksRule.parameters.strict_required_status_checks_policy !== true) {
-    errors.push("required_status_checks.strict_required_status_checks_policy must be true");
+  for (const rule of checksRules) {
+    if (rule.parameters.strict_required_status_checks_policy !== true) {
+      errors.push("required_status_checks.strict_required_status_checks_policy must be true");
+    }
   }
-  const liveContexts = (checksRule.parameters.required_status_checks ?? []).map((c) => c.context);
+  // GitHub unions required contexts across every matching rule, so compare the
+  // union — otherwise a context added via a second ruleset is invisible.
+  const liveContexts = [
+    ...new Set(
+      checksRules.flatMap((rule) => (rule.parameters.required_status_checks ?? []).map((c) => c.context)),
+    ),
+  ];
   for (const ctx of required) {
     if (!liveContexts.includes(ctx)) {
       errors.push(`required_status_checks missing context present in config/required-checks.json: ${ctx}`);
@@ -173,8 +187,8 @@ if (!checksRule?.parameters) {
 }
 
 // --- non_fast_forward: force-push protection on the branch ---
-const ffRule = findRule("non_fast_forward");
-if (!ffRule) {
+const ffRules = findRules("non_fast_forward");
+if (ffRules.length === 0) {
   errors.push(`missing rule: non_fast_forward (policy: no force-push to ${branch})`);
 } else {
   asserted.add("non_fast_forward");
