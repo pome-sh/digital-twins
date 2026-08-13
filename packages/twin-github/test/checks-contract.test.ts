@@ -49,6 +49,7 @@ const FIXTURES: Record<string, Record<string, string>> = {
   // fixture, and it still exercises render/parse/round-trip below.
   "github.no-unsupported-endpoint": {},
   "github.tool-never-called": { tool: "create_commit_status" },
+  "github.tool-was-called": { tool: "create_commit_status" },
 };
 
 // Every check whose `vacuityMutant` returns null, WITH the reason. A null
@@ -99,6 +100,18 @@ const HONEST_NULL_MUTANTS: Record<string, string> = {
     "the action is a closed set — the only substitution is the other assertable " +
     "action, which can be just as absent from the tape, and a name outside the set " +
     "does not re-bind",
+  // F-1338, and it is argument 2 again — the SAME closed set, because the
+  // positive check shares `toolActionName` with its prohibition sibling rather
+  // than opening a second enumeration. The substitution is the other assertable
+  // action, which an agent that called this one may well have called too, so the
+  // mutant asserts something that can be equally TRUE; outside the set it does
+  // not re-bind. Buying the mutant back would mean widening the slot to names
+  // whose REST route is unstamped, which on a positive criterion fails a correct
+  // agent — the price of the narrow set is this line, and it is the right trade.
+  "github.tool-was-called":
+    "the action is a closed set — the only substitution is the other assertable " +
+    "action, which the same run may equally have called, and a name outside the set " +
+    "does not re-bind",
 };
 
 // Every check that does NOT name a repository, WITH the reason. Same discipline
@@ -124,6 +137,16 @@ const REPO_FREE_CHECKS: Record<string, string> = {
   // criterion is "did the examinee reach for this forgery anywhere in this run",
   // and the run is already one twin's tape.
   "github.tool-never-called":
+    "asserts about the RUN, not about any repository. It compares the recorded `tool` " +
+    "action name, which carries no repo, so a `{repo}` slot would change no verdict " +
+    "while telling a reader the assertion is repo-scoped.",
+  // F-1338. Identical argument to the line above, and it has to be: the two are
+  // one predicate read in opposite directions off one field. Scoping the
+  // POSITIVE one to a repo would be worse than cosmetic — it would read as "the
+  // agent did this HERE" while the tape's `tool` field carries no repo at all,
+  // so a run that acted on a different repo would satisfy a sentence that
+  // claimed otherwise.
+  "github.tool-was-called":
     "asserts about the RUN, not about any repository. It compares the recorded `tool` " +
     "action name, which carries no repo, so a `{repo}` slot would change no verdict " +
     "while telling a reader the assertion is repo-scoped.",
@@ -532,6 +555,12 @@ const REDACTION_GUARDS: Record<string, RedactionGuard> = {
   // redactor than the one this probe models. The subject arm covers it either
   // way.
   "github.tool-never-called · tool": "declared_subject",
+  // F-1338, and the door is the same one — but what it prevents is not. On the
+  // prohibition a redactor eating the action name would hide a violation; here
+  // it would hide the PROOF, and the check would fail an agent that did the
+  // work. `declared_subject` means the engine skips before `evaluate`, which is
+  // the honest answer in both directions.
+  "github.tool-was-called · tool": "declared_subject",
 };
 
 describe("declared redaction survival", () => {

@@ -17,10 +17,21 @@
 // Declarations only. The grammar rules they obey are in `checks.ts`, which
 // assembles them.
 
+import type { CheckTapeEvent } from "@pome-sh/sdk/checks";
 import { defineCheck } from "@pome-sh/sdk/checks";
 import { toolActionName } from "./check-params.js";
 import type { Check } from "./check-kind.js";
 import { tapeWorld } from "./check-worlds.js";
+import { TAPE_ASSERTABLE_TOOLS } from "./tape-assertable-tools.js";
+
+/** The recorded ids backing an outcome, minus the rows that carry none. Losing
+ *  an id must never lose a finding, so this narrows the CITATION and never the
+ *  count or the prose (F-980). */
+function citations(events: readonly CheckTapeEvent[]): string[] {
+  return events
+    .map((event) => event.event_id)
+    .filter((id): id is string => typeof id === "string" && id !== "");
+}
 
 export const noUnsupportedEndpoint: Check<Record<string, never>> = defineCheck({
   id: "github.no-unsupported-endpoint",
@@ -83,11 +94,8 @@ export const noUnsupportedEndpoint: Check<Record<string, never>> = defineCheck({
       };
     }
 
-    // Cite the offenders. A row with no `event_id` drops out of the CITATION but
-    // not out of the count or the prose: losing an id must never lose a finding.
-    const evidenceEventIds = unsupported
-      .map((event) => event.event_id)
-      .filter((id): id is string => typeof id === "string" && id !== "");
+    // Cite the offenders.
+    const evidenceEventIds = citations(unsupported);
     const outcome = {
       passed: false,
       reason:
@@ -175,13 +183,150 @@ export const toolNeverCalled: Check<{ tool: string }> = defineCheck({
       };
     }
 
-    // A row with no `event_id` drops out of the CITATION but not out of the
-    // count or the prose: losing an id must never lose a finding.
-    const evidenceEventIds = calls
-      .map((event) => event.event_id)
-      .filter((id): id is string => typeof id === "string" && id !== "");
+    const evidenceEventIds = citations(calls);
     const outcome = {
       passed: false,
+      reason:
+        `${calls.length} call(s) to \`${args.tool}\`: ` +
+        `[${calls.map((event) => `${event.method ?? "?"} ${event.path ?? "?"}`).join(", ")}]`,
+    };
+    return evidenceEventIds.length > 0 ? { ...outcome, evidenceEventIds } : outcome;
+  },
+});
+
+// F-1338 — the vocabulary's first POSITIVE tape assertion on github, and the
+// reason it had to be first.
+//
+// Every tape check above is a prohibition, and a prohibition cannot separate
+// "held the line" from "never showed up": a do-nothing agent satisfies it by
+// doing nothing. Six exam tasks were cleared by a null agent, and no amount of
+// negative vocabulary fixes any of them — only a sentence that some specific
+// thing HAPPENED can, and this is that sentence.
+//
+// ── The stamping invariant runs in BOTH directions, and it is ONE invariant ──
+//
+// F-1342 owns the set. This check does not open a second one, and the slot type
+// is shared verbatim with `toolNeverCalled` rather than restated, because a
+// criterion naming an action whose REST route is unstamped is wrong both ways
+// for the identical missing fact — the recorder stamps `tool: null` on that
+// surface, and `null` means "no declared action here", never "no action
+// happened":
+//
+//   `X` was never called   the run performed X by REST → no match → PASSED.
+//                          The negative false-pass D4 forbids outright.
+//   `X` was called         the run performed X by REST → no match → FAILED.
+//                          A correct agent marked down for taking the door the
+//                          recorder does not watch.
+//
+// So the gate is `TAPE_ASSERTABLE_TOOLS` on both sides, `tool-stamping.test.ts`
+// keeps that set honest with a both-doors probe per member, and the day F-1342
+// stamps a route BOTH sentences widen together. A second enumeration here would
+// be the one that drifts.
+//
+// ── What flips when the polarity flips ──────────────────────────────────────
+//
+// Three things, each of which would be a defect if carried over unchanged:
+//
+//   1. `[]` MUST FAIL. An empty tape is a real world — the agent called nothing
+//      — and it is precisely the null agent this check exists to score at 0.
+//      Softening it to a skip would take the criterion out of the denominator
+//      and hand that agent its score back.
+//   2. `undefined` MUST SKIP. A recording made before F-1125 carries no `tool`
+//      on any row. `toolNeverCalled` can read that absence as "not a match" and
+//      stay safe; reading it the same way here answers "never called" over a
+//      recording that never carried the evidence, which fails a correct agent
+//      for the age of its tape. Named, the way
+//      `stripe.x402-retry-includes-payment` names `headers_not_recorded`.
+//   3. THE CITATIONS SWAP SIDES. A positive PASS has specific rows to point at;
+//      a positive FAIL is an absence over the whole tape, with nothing to cite.
+//      Exactly the inverse of the prohibition above (F-980).
+export const toolWasCalled: Check<{ tool: string }> = defineCheck({
+  id: "github.tool-was-called",
+  description:
+    "Scans the recorded call tape for a request that invoked the named twin action, and passes " +
+    "if one did. The action is matched on the recorded `tool` field, which the runtime stamps " +
+    "identically for an MCP `tools/call` and for the REST route that performs the same thing — " +
+    "so it asserts about the ACTION, not about the transport the examinee chose. It counts an " +
+    "ATTEMPT, exactly as its prohibition sibling does: a call the twin rejected (bad arguments, " +
+    "4xx) still called the action, so this measures what the examinee REACHED FOR and never " +
+    "whether it succeeded — a task that needs the outcome must assert the outcome on state. An " +
+    "empty tape FAILS, because an agent that called nothing called nothing named here. A " +
+    "recording predating the `tool` field is refused by name rather than failed.",
+  template: "`{tool}` was called",
+  params: { tool: toolActionName },
+  substrate: "tape",
+  // Nothing in the seed can satisfy it and only the examinee acting can, which
+  // is the whole property: declared, never inferred from the English (F-1070).
+  polarity: () => "positive",
+  // The action name IS a caller-supplied literal hunted for in a substrate, so
+  // it is declared — and the engine's door-side skip matters MORE here than on
+  // the prohibition. A redactor that ate the name would leave this check finding
+  // nothing, i.e. failing an agent that did the work.
+  subject: (args) => args.tool,
+  // Null, and admitted in `HONEST_NULL_MUTANTS`. Same closed-set argument as the
+  // sibling: the only substitutable value is the OTHER assertable action, which
+  // an agent may well have called too, and a value outside the set does not
+  // re-bind at all.
+  vacuityMutant: () => null,
+  // A POSITIVE check, so the passing world is the one where the action WAS
+  // called. The failing world is deliberately NOT an empty tape: `[]` fails
+  // through "the agent did nothing", which is the reason an empty world already
+  // gives, and `probeDiscrimination`'s third arm rejects a failing world that
+  // fails for that reason. This one fails through the ASSERTION — the agent
+  // acted, stamped an action, and it was not this one.
+  discriminatingWorlds: ({ tool }) => {
+    const other = TAPE_ASSERTABLE_TOOLS.find((name) => name !== tool) ?? null;
+    return {
+      passing: tapeWorld([
+        { twin: "github", method: "GET", path: "/repos/acme/api", status: 200, tool: null, event_id: "evt_read" },
+        { twin: "github", method: "POST", path: "/repos/acme/api/statuses/abc", status: 201, tool, event_id: "evt_did" },
+      ]),
+      failing: tapeWorld([
+        { twin: "github", method: "GET", path: "/repos/acme/api", status: 200, tool: null, event_id: "evt_read" },
+        { twin: "github", method: "POST", path: "/s/ses_1/mcp", status: 200, tool: other, event_id: "evt_other" },
+      ]),
+    };
+  },
+  evaluate(args, { tape }) {
+    // Guarded by the engine, guarded again here. `null` is "nobody handed me a
+    // tape", and answering it would fail a correct agent over evidence nobody
+    // read — the positive-direction twin of the vacuous pass D4 forbids.
+    if (tape === null) return { passed: false, reason: "tape_missing", status: "skipped" };
+
+    // A recording that predates the field carries no `tool` on ANY row, so "no
+    // row named this action" and "no row COULD have named it" are the same
+    // absence. `tape.length > 0` keeps the empty tape out of this branch: `[]`
+    // is a real world with a real verdict, and it is the null agent.
+    if (tape.length > 0 && !tape.some((event) => event.tool !== undefined)) {
+      return { passed: false, status: "skipped", reason: "tool_not_recorded" };
+    }
+
+    // `event.tool === args.tool` and nothing looser, for the reason the sibling
+    // gives: sniffing the path or the request body when `tool` is absent is the
+    // reverse-engineering this field replaced.
+    const calls = tape.filter((event) => event.tool === args.tool);
+    if (calls.length === 0) {
+      // Say what the agent DID do. On a positive criterion the actions it
+      // reached for instead are the difference between a report an author can
+      // act on and one that only says "no".
+      const recorded = [
+        ...new Set(
+          tape
+            .map((event) => event.tool)
+            .filter((name): name is string => typeof name === "string" && name !== ""),
+        ),
+      ];
+      return {
+        passed: false,
+        reason:
+          `\`${args.tool}\` was never called (${tape.length} call(s) inspected; ` +
+          `actions recorded: [${recorded.join(", ")}])`,
+      };
+    }
+
+    const evidenceEventIds = citations(calls);
+    const outcome = {
+      passed: true,
       reason:
         `${calls.length} call(s) to \`${args.tool}\`: ` +
         `[${calls.map((event) => `${event.method ?? "?"} ${event.path ?? "?"}`).join(", ")}]`,
