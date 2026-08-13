@@ -13,20 +13,41 @@
 // was a run the CLI called INCOMPLETE and the dashboard called PASS, shipped
 // for as long as it took a human to notice the two screens disagreeing.
 //
-// `dashboardRunStatus` below is a TRANSCRIPTION, named clause by clause so a
-// reviewer can diff it against the original, and deliberately NOT a
-// generalization of it. It is the oracle, not an implementation: nothing in
-// `src/` imports it. When pome-cloud changes its predicate, this table is what
-// goes red.
+// `dashboardRunStatus` below WAS a transcription — a hand copy of pome-cloud's
+// three clauses, named clause by clause so a reviewer could diff it against the
+// original. F-1416 deleted the copy. It now CALLS the real predicate, which
+// both repositories install from `@pome-sh/wire/run-completeness`.
 //
-// F-1399 moved the arithmetic out of `run-status.ts` and into
-// `@pome-cloud/contract`'s `isIncompleteTally` (`packages/contract/src/
-// run-completeness.ts`), the shared predicate the dashboard and the control
-// plane's markdown report both now call instead of keeping their own copies —
-// closing the exact defect class this file exists to catch, one repo over.
-// This transcription still cannot import that package (ADR-002: no cloud
-// imports in OSS), so it stays a transcription; see the note at the bottom of
-// this file on what a real fix would take.
+// WHY THAT MATTERS MORE THAN IT LOOKS. F-1399 moved the arithmetic out of
+// `run-status.ts` into a shared predicate inside pome-cloud, closing this exact
+// defect class one repo over — and the copy in THIS file went stale the moment
+// it did, and went stale GREEN: it kept passing while asserting something false
+// about the other repo. F-1413 was the second time that happened. Both times
+// nothing detected it; it was caught because one person happened to be holding
+// both sides. A transcription is a parallel copy with the longest possible
+// feedback loop, and it was sitting inside the very test written to prove
+// parallel copies are gone.
+//
+// The fix was a cross-repo move, not a one-file patch: `isIncompleteTally`,
+// `tallyCriteriaResults` and `PRE_SATISFIED_REASON` now live in
+// `packages/wire/src/run-completeness.ts` here, published as
+// `@pome-sh/wire/run-completeness` and imported by pome-cloud's dashboard,
+// control plane and markdown report instead of by a private cloud package.
+// There is one implementation left across both repos. Changing it can no longer
+// leave this file asserting the old behaviour — the two things that could
+// happen are a type error and a red test, and no third thing.
+//
+// WHAT IS STILL WRITTEN OUT BY HAND HERE, stated so nobody has to guess: the
+// two-line COMPOSITION in `dashboardRunStatus` — incomplete outranks the score,
+// and the pass bar is a hard 100. That is `deriveRunStatus`
+// (`apps/dashboard/src/lib/run-status.ts`), and it stays cloud-side on purpose:
+// its `RunStatus` includes `in_progress`, a state derived from a `runs` row's
+// `finished_at`, and wire has no business knowing what a runs row is. What
+// moved is the ARITHMETIC — the counting, the exemption, the empty denominator
+// — which is the part that drifted twice and the part that drifts SILENTLY,
+// because a miscounting copy still returns a boolean. An ordering change is a
+// different animal: it is one line, it has no counts in it, and it cannot be
+// wrong by an off-by-one.
 //
 // There is no known divergence between the two surfaces today — F-1399 closed
 // the last one (below). A row CAN still carry a `divergence` marker if the two
@@ -44,6 +65,7 @@
 import { mkdir, mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { isIncompleteTally, tallyCriteriaResults } from "@pome-sh/wire/run-completeness";
 import { describe, expect, it } from "vitest";
 import type { CriterionResult } from "../../../src/contract/index.js";
 import {
@@ -55,31 +77,25 @@ import {
 import { PRE_SATISFIED_REASON, scoreStatus } from "../../../src/hosted/evalResultView.js";
 import { scoreFromFinalizeResponse } from "../../../src/hosted/uploadAndFinalize.js";
 
-// ── The oracle: pome-cloud's answer, transcribed ────────────────────────────
+// ── The oracle: pome-cloud's answer, CALLED rather than copied ──────────────
 //
-// @pome-cloud/contract's packages/contract/src/run-completeness.ts:
-//   isIncompleteTally (107-109) — three clauses, in order:
-//     1. `total === 0` ⇒ false, never incomplete (no criteria recorded is a
-//        different fact from "recorded and none could be evaluated").
-//     2. `notEvaluated - preSatisfied > 0` ⇒ incomplete (F-925, narrowed by
-//        F-1296's seed-exclusion exemption).
-//     3. `evaluated === 0` ⇒ incomplete (F-1399). Fires for exactly the shape
-//        clause 2 does not already catch: every criterion excluded as already
-//        true in the seed. That run has an empty denominator and used to fall
-//        through to `satisfaction_score === 100 ? pass : fail` and land on
-//        `fail` — a verdict about the agent for a run nothing was ever at
-//        risk in.
+// This is `deriveRunStatus` (`apps/dashboard/src/lib/run-status.ts`), minus the
+// `in_progress` arm that only a live `runs` row can be in. Every line of
+// counting inside it is now an import:
 //
-// apps/dashboard/src/lib/run-status.ts:
-//   deriveCriteriaCounts (73-93)   — skipped ⇒ notEvaluated, +preSatisfied
-//                                    when the reason matches; else evaluated
-//                                    (+passed)
-//   isRunIncomplete      (110-114) — isIncompleteTally(deriveCriteriaCounts(results))
-//   deriveRunStatus      (127-133) — incomplete first, then
-//                                    satisfaction_score === 100 ? pass : fail
+//   isRunIncomplete(results)
+//     = isIncompleteTally(deriveCriteriaCounts(results))     ← dashboard
+//     = isIncompleteTally(tallyCriteriaResults(results))     ← here
+//
+// The two are the same call. `deriveCriteriaCounts` is `{ passed, ...
+// tallyCriteriaResults(results) }` — it adds the score's numerator, which the
+// predicate does not read, and pome-cloud's own `run-status.test.ts` asserts
+// that equality directly. So this function makes the same two decisions the
+// dashboard makes, out of the same package, and the only thing left written
+// down twice is their ORDER.
 //
 // The satisfaction score the dashboard reads is the run row's, which the
-// control plane computes in `score-merge.ts:314-315` as
+// control plane computes in `score-merge.ts` as
 // `evaluated === 0 ? 0 : round(passed / evaluated * 100)` — the same number
 // /finalize returns to the CLI, so one `satisfaction` input drives both sides
 // of every row below.
@@ -89,16 +105,10 @@ function dashboardRunStatus(
   results: readonly CriterionResult[],
   satisfactionScore: number,
 ): DashboardStatus {
-  let notEvaluated = 0;
-  let preSatisfied = 0;
-  for (const r of results) {
-    if (!r.skipped) continue;
-    notEvaluated += 1;
-    if (r.reason === PRE_SATISFIED_REASON) preSatisfied += 1;
-  }
-  const total = results.length;
-  const evaluated = total - notEvaluated;
-  if (total > 0 && (notEvaluated - preSatisfied > 0 || evaluated === 0)) return "incomplete";
+  // F-925 — incomplete outranks the score, including a failing one. If `fail`
+  // won that contest, the same instrument gap would produce a different run
+  // state depending on how the agent performed.
+  if (isIncompleteTally(tallyCriteriaResults(results))) return "incomplete";
   return satisfactionScore === 100 ? "pass" : "fail";
 }
 
@@ -254,11 +264,13 @@ describe("CLI and dashboard answer `what state is this run in?` the same way (F-
 
   // ── isIncompleteTally's FIRST clause, which no row above reaches ─────────
   //
-  // `total === 0 ⇒ never incomplete` is transcribed above as the `total > 0 &&`
-  // conjunct, and every row in the table has criteria, so nothing exercises
-  // it: delete that conjunct and the whole table stays green. A transcribed
-  // clause with no assertion on it is this file's own defect one level down,
-  // so it gets assertions here.
+  // `total === 0 ⇒ never incomplete` is the one clause no row in the table
+  // exercises, since every row has criteria. Since F-1416 the clause itself is
+  // pinned where it is implemented (`packages/wire/test/run-completeness.
+  // test.ts` exhausts all three), so what these two cases are for is no longer
+  // "cover the transcription" — it is the CROSS-SURFACE fact, which is the only
+  // thing this file has ever been about: on the empty-results shape the two
+  // surfaces answer DIFFERENTLY, and that is correct rather than a divergence.
   //
   // It is NOT a table row because the table's third assertion — the two
   // surfaces never split on `passed` — is false for this input at
@@ -375,49 +387,22 @@ describe("CLI and dashboard answer `what state is this run in?` the same way (F-
   });
 });
 
-// ── F-1413: why this stays a transcription, and what would stop it drifting
-// again ───────────────────────────────────────────────────────────────────
+// ── What the table is still worth, now that the arithmetic is shared ────────
 //
-// F-1413 is the second time this table has gone stale-green: pome-cloud
-// changed the predicate under it and nothing here noticed until a human read
-// both repos side by side. That is the parallel-copy defect this repo is
-// otherwise trying to close (D3) — one level up, across a repo boundary
-// instead of within one file.
+// A reasonable question after F-1416: if both surfaces call one predicate, is a
+// row-by-row agreement table anything but a tautology? No, and the rows above
+// say why. `dashboardRunStatus` and `cliRunStatus` reach their answers by
+// genuinely different routes — the dashboard runs the shared predicate over
+// `criteria_results` and then a hard-100 bar, while the CLI goes through
+// `scoreFromFinalizeResponse` (which builds its own `Score`, including its own
+// `preSatisfied` subtraction and the A5 `can_pass` guard) and then
+// `scoreStatus`. Nothing forces those two routes to land on the same word; the
+// shared predicate only forces them to count the same way. The empty-results
+// case a few blocks up is the standing proof — same input, two different
+// answers, both correct.
 //
-// This repo cannot import `@pome-cloud/contract` to fix that at the root.
-// Two independent reasons, not one:
-//   1. Policy — `scripts/lint-no-cloud-imports.sh` denies every `pome-cloud/*`
-//      import (bare or scoped) anywhere under `packages/`, `cli/src/`,
-//      `cli/scripts/`, `scripts/`; this file lives under `cli/test/`, which
-//      the gate does not cover, but the module it would need to import does
-//      not reach here regardless of the gate — see (2).
-//   2. Reachability — `@pome-cloud/contract` is a `private` workspace member
-//      of pome-cloud, published to no registry. `@pome-sh/wire` is the one
-//      package this repo publishes FOR pome-cloud to consume (GitHub
-//      Packages, F-949); nothing runs the other direction today.
-//
-// A REAL fix exists but is a cross-repo migration, not a one-file patch:
-// extract `isIncompleteTally` + `PRE_SATISFIED_REASON` out of pome-cloud's
-// private `packages/contract` and into the already-published `@pome-sh/wire`
-// (or a new sibling package built the same way), with the dashboard, the
-// control plane, and the markdown report importing it from there instead of
-// owning the source — the same collapse F-1399 just did for `run-status.ts`
-// and `run-report.ts`, one repo boundary further out. That needs a pome-cloud
-// PR to consume the published package, a `@pome-sh/wire` version bump here,
-// and this file's `dashboardRunStatus`/`cliRunStatus` comparison rewritten
-// against ONE real predicate instead of an oracle transcription — at which
-// point a table like this one still has value (agreement is still worth
-// pinning row by row) but the copy of the ARITHMETIC disappears, and with it
-// the only thing that can go stale.
-//
-// Short of that, there is no self-detecting middle ground available from
-// inside this repo's CI: a job that diffs this transcription against
-// pome-cloud's source would need read access to a private repo, which is
-// exactly the credential the public repo's "zero embedded cloud config"
-// guardrail (AGENTS.md, Public Repo Guardrails) exists to keep out of here.
-// A pinned commit SHA plus a maintainer-run (non-CI) diff script is possible
-// and would be strictly better than today — it turns "silently stale" into
-// "stale unless someone runs the check" — but it is still not automatic, and
-// building it is out of scope for this ticket. Filing the `@pome-sh/wire`
-// extraction as its own ticket is the concrete next step if this drift is
-// worth spending more than a comment on.
+// So the table pins what it always pinned: that two independently-implemented
+// readers of one wire shape agree, row by row, and never split on the single
+// bit CI can act on. What F-1416 removed is the part that was never a test at
+// all — a copy of the other repo's counting, which could only ever agree with
+// itself.

@@ -221,3 +221,42 @@ describe("@pome-sh/wire/correlation subpath surface (F-950)", () => {
     expect(CORRELATION_HEADER).toBe("x-pome-correlation-id");
   });
 });
+
+// F-1416. `run-completeness/` is the THIRD subpath-only surface, and the one
+// whose absence from the root barrel is load-bearing rather than economical:
+// the barrel's own doc says nothing on it knows about runs, the five twins /
+// the sdk / the adapter all import the barrel and none of them has a run to ask
+// about, and this block is what turns that sentence into a check. The four
+// symbols below are also the ONE copy of a predicate two repositories call, so
+// a rename here is a breaking change for pome-cloud's dashboard and control
+// plane — which is exactly the coupling F-1416 wanted, replacing a transcribed
+// copy that could go stale green with an import that cannot.
+describe("@pome-sh/wire/run-completeness subpath surface (F-1416)", () => {
+  const EXPECTED_RUN_COMPLETENESS_EXPORTS = [
+    "PRE_SATISFIED_REASON",
+    "isIncompleteTally",
+    "tallyCriteriaResults",
+  ] as const;
+
+  it("exports exactly the run-completeness surface", async () => {
+    const runCompleteness = await import("../src/run-completeness.js");
+    expect(Object.keys(runCompleteness).sort()).toEqual([...EXPECTED_RUN_COMPLETENESS_EXPORTS]);
+  });
+
+  it("stays off the root barrel — the F-942 claim, checked", async () => {
+    for (const name of EXPECTED_RUN_COMPLETENESS_EXPORTS) {
+      expect(Object.keys(api)).not.toContain(name);
+    }
+  });
+
+  it("pins the reason string every surface keys the exemption off", async () => {
+    // Both sides of one wire value. pome-cloud's control plane STAMPS this
+    // literal on an excluded criterion (`evaluators/deterministic/
+    // pre-satisfied.ts`); the dashboard, the markdown report and this repo's
+    // CLI all read it back off `criteria_results.reason`. A rename on one side
+    // without the other counts every exclusion as an abstention and stamps
+    // `Incomplete` on every correctly-scored dedup run.
+    const { PRE_SATISFIED_REASON } = await import("../src/run-completeness.js");
+    expect(PRE_SATISFIED_REASON).toBe("already_true_in_seed");
+  });
+});

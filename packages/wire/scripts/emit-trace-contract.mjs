@@ -240,6 +240,13 @@ export function buildContract({ pkg, eventKinds, fixtures }) {
       // `x-pome-correlation-id` protocol whose recorder side these event
       // schemas describe.
       correlation: "@pome-sh/wire/correlation",
+      // F-1416. Present for the same reason `correlation` is: it is a surface a
+      // consumer codes against, not a test artifact. pome-cloud's dashboard and
+      // control plane import it to answer "does this finished run have a
+      // verdict to state?" over the `criteria_results` rows these schemas put
+      // on the wire, and the CLI imports it so its cross-surface agreement test
+      // compares against the real predicate instead of a transcription of it.
+      runCompleteness: "@pome-sh/wire/run-completeness",
     },
     canonicalSchemas: [...CANONICAL_SCHEMAS],
     // Union declaration order, not sorted: the contract mirrors the schema.

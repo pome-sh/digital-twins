@@ -23,6 +23,7 @@
 // the unified "code"/"model" vocabulary (legacy "D"/"P" tolerated) while
 // scenario files still parse [code]/[model] markers. This module renders CLOUD
 // verdicts, so it takes the wide wire shape (FDRS-643 live-run finding).
+import { PRE_SATISFIED_REASON } from "@pome-sh/wire/run-completeness";
 import type { z } from "zod";
 import type { criterionSchema } from "../types/shared.js";
 
@@ -103,16 +104,25 @@ export function outcomeOf(result: CriterionResult): CriterionOutcome {
 // satisfied — the control plane graded the FINAL state alone, found the
 // criterion true before the agent ran, and moved it out of the score
 // denominator so a task cannot earn credit for doing nothing (AutomationBench's
-// "no reward for doing nothing" rule). Restated here rather than imported: the
-// CLI shares no code with the control plane, and this travels as a string on
-// the `criteria_results` wire shape (`apps/control-plane/src/services/
-// evaluators/deterministic/pre-satisfied.ts` on the pome-cloud side).
+// "no reward for doing nothing" rule). It travels as a string on the
+// `criteria_results` wire shape (`apps/control-plane/src/services/evaluators/
+// deterministic/pre-satisfied.ts` on the pome-cloud side).
 //
 // F-1392 — the CLI is the fifth surface this string has to agree with
 // (score-merge, run-report, run-status and drift-telemetry are the other
-// four, per pre-satisfied.ts's own doc comment). Defined ONCE and read from
-// here at every call site so the string is never repeated inline.
-export const PRE_SATISFIED_REASON = "already_true_in_seed";
+// four, per pre-satisfied.ts's own doc comment). Re-exported ONCE from here so
+// every call site in this module reads one name and the string is never
+// repeated inline.
+//
+// F-1416 — IMPORTED rather than restated. The comment that used to sit here
+// said "restated here rather than imported: the CLI shares no code with the
+// control plane", and that stopped being true when the predicate this string
+// feeds moved into `@pome-sh/wire` — the package this repo publishes and
+// pome-cloud consumes. A literal restated on both sides of a repo boundary is
+// the D3 parallel copy with the longest possible feedback loop; a rename now
+// breaks the build on whichever side has not moved, instead of quietly making
+// one of them count every seed exclusion as an abstention.
+export { PRE_SATISFIED_REASON };
 
 /**
  * Was this criterion excluded for having already been true in the seed?
