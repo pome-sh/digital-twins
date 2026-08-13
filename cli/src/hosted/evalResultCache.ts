@@ -21,8 +21,8 @@
 // this file itself can't be called that anymore) and grouped under
 // `hosted/` since it caches a CLOUD response, not a recorder concern.
 
-import { existsSync } from "node:fs";
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { CriterionResult } from "../types/shared.js";
 import type { ScoreStatus } from "./evalResultView.js";
@@ -119,15 +119,45 @@ export interface TrialVerdict {
   verdict: VerdictArtifact;
 }
 
+/** F-1445 — publish by RENAME, never by writing the live path in place.
+ *  `writeFile` opens with `O_TRUNC` and the bytes land afterwards, so
+ *  `verdict.json` was observably empty and then partial for the whole of a
+ *  write, and a `pome fix-prompt` scanning the root while a `pome run`
+ *  finalized in it read that prefix. Since F-1411 it REPORTED that read: path
+ *  named, counted in `unreadableCount`, described as "truncated, hand-edited,
+ *  or not a verdict artifact" — a correct read of the bytes and a wrong
+ *  account of the run, whose suggested fix (inspect it, delete it) is wrong
+ *  for a file that is complete a moment later. `rename` is atomic within a
+ *  filesystem, so a reader now sees the previous artifact or the complete new
+ *  one, never a prefix.
+ *
+ *  The temp file MUST be a sibling inside `runDir`, and that is the whole of
+ *  the same-filesystem guarantee: a directory cannot span a mount, so this
+ *  rename is always the atomic kind. `os.tmpdir()` is not a substitute — with
+ *  an artifacts root on another mount (container volume, external disk, network
+ *  share) `rename(2)` fails `EXDEV`, and the reflex fix for `EXDEV` is a copy,
+ *  which is exactly the torn window this removes. That would still pass a
+ *  same-machine test, so the constraint is stated here rather than left to CI.
+ *
+ *  Deliberately not fsync'd: the window this closes belongs to a concurrent
+ *  READER, not a power cut, and this file is a cache of a cloud response the
+ *  dashboard holds authoritatively (see the header). */
 export async function writeVerdictArtifact(
   runDir: string,
   verdict: VerdictArtifact,
 ): Promise<void> {
-  await writeFile(
-    join(runDir, VERDICT_FILENAME),
-    `${JSON.stringify(verdict, null, 2)}\n`,
-    "utf8",
-  );
+  const tmpPath = join(runDir, `.${VERDICT_FILENAME}.${process.pid}.${randomUUID()}.tmp`);
+  try {
+    await writeFile(tmpPath, `${JSON.stringify(verdict, null, 2)}\n`, "utf8");
+    await rename(tmpPath, join(runDir, VERDICT_FILENAME));
+  } catch (err) {
+    // No debris in the user's runs/ when the write or the rename fails. The
+    // caller treats that as "fix-prompt won't see this trial" (runTaskHosted
+    // step 11) and must still receive the original error, so a failure to
+    // clean up never replaces it.
+    await rm(tmpPath, { force: true }).catch(() => {});
+    throw err;
+  }
 }
 
 /** Read one trial's verdict.json. Returns null when absent or when the file
@@ -208,11 +238,36 @@ function isVerdictArtifact(parsed: unknown): parsed is VerdictArtifact {
  *  new fields being absent, so the status never claims more than it checked:
  *  a file that says `version: 2` and is malformed is a corrupt CURRENT file
  *  (`unreadable`), not a prior version. `version` is null when the file
- *  carries no numeric `version` at all. */
+ *  carries no numeric `version` at all.
+ *
+ *  F-1445 — `missing` is the fourth: no verdict.json at this path at all (no
+ *  run finished here yet, or the caller pointed at an artifacts root rather
+ *  than a trial dir). It used to collapse into `unreadable`, which is why both
+ *  callers below re-`existsSync`'d the file they had just failed to read — a
+ *  second stat answering what the read already knew, and its own
+ *  check-then-read window. */
 export type VerdictReadResult =
   | { status: "ok"; trial: TrialVerdict }
   | { status: "stale-version"; version: number | null }
-  | { status: "unreadable" };
+  | { status: "unreadable" }
+  | { status: "missing" };
+
+/** F-1445 — the errno set for "this path does not resolve to a file": exactly
+ *  the set `existsSync` answered `false` for, since a `stat` fails the same
+ *  way. ENOENT alone would move a user-visible count — the scan walks every
+ *  entry under a task slug as a run dir, so a stray FILE there yields ENOTDIR
+ *  on `<file>/verdict.json`; ELOOP and ENAMETOOLONG are the same fact for a
+ *  path typed at `pome fix-prompt`. EACCES and EISDIR are NOT here: something
+ *  IS at that path and this process could not read it, which is `unreadable`,
+ *  as before (`existsSync` succeeds on a file whose parent is traversable). */
+const MISSING_ERROR_CODES: ReadonlySet<string> = new Set([
+  "ENOENT", "ENOTDIR", "ELOOP", "ENAMETOOLONG",
+]);
+
+function isMissingFileError(err: unknown): boolean {
+  const code = (err as NodeJS.ErrnoException | null)?.code;
+  return typeof code === "string" && MISSING_ERROR_CODES.has(code);
+}
 
 export async function readVerdictArtifactDetailed(
   runDir: string,
@@ -221,8 +276,8 @@ export async function readVerdictArtifactDetailed(
   let raw: string;
   try {
     raw = await readFile(path, "utf8");
-  } catch {
-    return { status: "unreadable" };
+  } catch (err) {
+    return isMissingFileError(err) ? { status: "missing" } : { status: "unreadable" };
   }
   let parsed: unknown;
   try {
@@ -253,8 +308,8 @@ export async function readVerdictArtifact(
  *  truncated, hand-edited, or otherwise damaged. Kept out of `staleVersionDirs`
  *  on purpose — a prior-version file and a corrupt one are different facts
  *  (upgrade vs. damage) and want different fixes. A run dir with no
- *  verdict.json at all (no run finished there yet) is neither: `existsSync`
- *  below is what tells "never written" apart from "written, then damaged".
+ *  verdict.json at all is neither (no run finished there yet): F-1445 put that
+ *  distinction in the read's `missing` status, not a re-stat here.
  *
  *  `unreadableDirs` is SORTED, unlike the other two: it is the only one whose
  *  order reaches a user, via the path list `pome fix-prompt` prints and trims
@@ -293,9 +348,7 @@ export async function scanVerdictArtifactsDetailed(
       const result = await readVerdictArtifactDetailed(runDir);
       if (result.status === "ok") trials.push(result.trial);
       else if (result.status === "stale-version") staleVersionDirs.push(runDir);
-      else if (result.status === "unreadable" && existsSync(join(runDir, VERDICT_FILENAME))) {
-        unreadableDirs.push(runDir);
-      }
+      else if (result.status === "unreadable") unreadableDirs.push(runDir);
     }
   }
   unreadableDirs.sort();
@@ -381,14 +434,11 @@ export async function discoverRunSet(target: string): Promise<RunSetDiscovery> {
   // F-1411 — same reasoning as the stale-version branch above, for a target
   // whose verdict.json exists but is damaged: name it as a trial-dir skip
   // rather than falling through to the "root" branch, which would scan
-  // `target` itself (two levels too shallow) and find nothing. The
-  // `existsSync` check is what tells this apart from a target that is
-  // actually an artifacts root (which has no verdict.json of its own either,
-  // and must fall through).
-  if (
-    anchorResult.status === "unreadable" &&
-    existsSync(join(target, VERDICT_FILENAME))
-  ) {
+  // `target` itself (two levels too shallow) and find nothing. F-1445 — what
+  // tells this apart from a target that IS an artifacts root (no verdict.json
+  // of its own either, and must fall through) is the read's own `missing`
+  // status, not a second `existsSync` of the path the read just failed on.
+  if (anchorResult.status === "unreadable") {
     return {
       kind: "trial-dir",
       set: null,
@@ -427,17 +477,11 @@ export async function discoverRunSet(target: string): Promise<RunSetDiscovery> {
     };
   }
 
-  if (!existsSync(target)) {
-    return {
-      kind: "root",
-      set: null,
-      incompleteSet: null,
-      totalSets: 0,
-      staleVersionCount: 0,
-      unreadableCount: 0,
-      unreadablePaths: [],
-    };
-  }
+  // `missing` — no verdict.json at `target`, so it is an artifacts root (or
+  // nothing at all). F-1445 also dropped the `if (!existsSync(target))` early
+  // return that sat here: on a root that isn't there `readdir` throws and is
+  // caught, and the three empty arrays give the same nulls and zeros through
+  // `groupRunSets` / `latestFailedRunSet` / `latestIncompleteRunSet`.
   const { trials, staleVersionDirs, unreadableDirs } =
     await scanVerdictArtifactsDetailed(target);
   const sets = groupRunSets(trials);

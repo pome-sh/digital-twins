@@ -4,6 +4,34 @@ Entries are hand-written from 0.9.0 on. Changesets was retired with the
 packaging restructure: bump `version` here and in `package.json`, and merging to
 `main` publishes (see `.github/workflows/release.yml`).
 
+## 0.23.34
+
+### Patch Changes
+
+- **`verdict.json` is published by tmp-file + `rename`, so a scan can no longer
+  read it half-written** (F-1445). `writeVerdictArtifact` used a plain
+  `writeFile`, which opens the live path with `O_TRUNC` and lands the bytes
+  afterwards — the artifact was observably empty, then partial, for the whole
+  of a write. A `pome fix-prompt` scanning a root while a hosted `pome run`
+  finalized in it read that prefix, and since F-1411 it REPORTED that read:
+  the path named, counted in `unreadableCount`, and described as "truncated,
+  hand-edited, or not a verdict artifact". The bytes were read correctly; the
+  account of the run was wrong, and the suggested action (inspect the file,
+  delete it) is wrong for a file that is complete a moment later. The temp
+  file is a sibling inside the run dir — a directory cannot span a mount, so
+  the rename is the atomic kind by construction; `os.tmpdir()` would put it
+  one `EXDEV` away from a copy, which is the torn window again.
+
+- `readVerdictArtifactDetailed` gained a `missing` status, and both call sites
+  dropped the `existsSync` re-stat they used to need. "There is no verdict.json
+  here" used to collapse into `unreadable`, so the scan and `pome fix-prompt`'s
+  discovery each re-stat'ed the file they had just failed to read in order to
+  recover the distinction — a check-then-read window of their own. No
+  user-visible count moves: `missing` covers every errno for which a `stat`
+  fails too (ENOENT, ENOTDIR, ELOOP, ENAMETOOLONG), so a stray file under a
+  task slug is still silently skipped rather than counted as damage, while
+  EACCES/EISDIR stay `unreadable` exactly as before.
+
 ## 0.23.33
 
 ### Patch Changes
@@ -32,6 +60,7 @@ packaging restructure: bump `version` here and in `package.json`, and merging to
 
 - 0.23.33 rather than 0.23.31: #403 (F-1417) and #406 (F-1441) took 0.23.31 and
   0.23.32 while this branch was in review.
+
 
 ## 0.23.32
 
