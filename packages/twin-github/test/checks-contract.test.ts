@@ -89,27 +89,29 @@ const HONEST_NULL_MUTANTS: Record<string, string> = {
     "the sentence has no slots at all; the trigger is a fidelity stamp on the tape, " +
     "which no mutation of the criterion text can reach",
   // F-1125, and this one is argument 2 in its sharpest form. The slot is typed to
-  // `TAPE_ASSERTABLE_TOOLS`, so the only substitutable value is the OTHER
-  // assertable action — which may be equally absent from the tape, moving no
+  // `TAPE_ASSERTABLE_TOOLS`, so every substitutable value is ANOTHER assertable
+  // action — each of which may be equally absent from the tape, moving no
   // verdict — and anything outside the set does not re-bind at all, which reads
   // as "the verdict moved" and would bless the criterion the probe exists to
   // catch. The narrow set is what makes the check safe (it cannot name an action
   // whose REST door is unstamped) and the same narrowness is what costs the
-  // mutant. Admitted rather than bought back by widening the slot.
+  // mutant. Admitted rather than bought back by widening the slot. F-1521 grew
+  // the set from two names to three and changes none of that: the argument is
+  // about the set being CLOSED, not about how many members it holds.
   "github.tool-never-called":
-    "the action is a closed set — the only substitution is the other assertable " +
+    "the action is a closed set — every substitution names another assertable " +
     "action, which can be just as absent from the tape, and a name outside the set " +
     "does not re-bind",
   // F-1338, and it is argument 2 again — the SAME closed set, because the
   // positive check shares `toolActionName` with its prohibition sibling rather
-  // than opening a second enumeration. The substitution is the other assertable
+  // than opening a second enumeration. Every substitution is another assertable
   // action, which an agent that called this one may well have called too, so the
   // mutant asserts something that can be equally TRUE; outside the set it does
   // not re-bind. Buying the mutant back would mean widening the slot to names
   // whose REST route is unstamped, which on a positive criterion fails a correct
   // agent — the price of the narrow set is this line, and it is the right trade.
   "github.tool-was-called":
-    "the action is a closed set — the only substitution is the other assertable " +
+    "the action is a closed set — every substitution names another assertable " +
     "action, which the same run may equally have called, and a name outside the set " +
     "does not re-bind",
 };

@@ -10,6 +10,37 @@ write a version number here or in `package.json` — see `RELEASING.md`. Release
 entries are insertions only: a correction is the next entry, naming the one it
 corrects.
 
+## Unreleased (patch)
+
+**`` `add_issue_comment` was called `` binds offline** (F-1521).
+`pome checks github` lists it, and the offline binder resolves it to
+`github.tool-was-called` — the sentence M0's slice task uses to prove the
+examinee actually left its comment, beside the state criteria that prove one
+exists. Its prohibition sibling widened in the same edit: both sentences take one
+slot from the twin's `TAPE_ASSERTABLE_TOOLS`, so
+`` `add_issue_comment` was never called `` binds too, and neither could have
+widened alone.
+
+**This corrects 0.23.48 below**, which named this exact sentence as its example of
+one that stays UNBOUND, on the (then correct) ground that the twin's REST comment
+route was unstamped. That route is stamped now, so the example is no longer true
+of this CLI. What 0.23.48 says about the RULE is unchanged and is why the example
+had to be replaced rather than the rule relaxed: a sentence binds only for an
+action the recorder watches on both doors. `` `merge_pull_request` was called ``
+and `` `add_issue_labels` was called `` are still unbound, and still for that
+reason.
+
+**Patch, not minor.** One more sentence binds; nothing a consumer must act on.
+Every criterion that bound before binds now, to the same check id, and `pome
+checks audit` reaches the same verdict on every existing task file.
+
+`pome checks add --check github.tool-was-called` with the new action **still
+waits for the cloud pin**, by design: `@pome-sh/checks`' digest moved with the
+widened slot, so the handshake in `checks-add.ts` reports `this CLI has it, the
+cloud does not` and declines until the cloud pins the matching
+`@pome-sh/checks`. Reading and auditing are unaffected — only the write door
+waits.
+
 ## 0.23.49 — 2026-08-13
 
 **A golden-scenario gate ships in the test surface (`gate:golden`).** Two fixture

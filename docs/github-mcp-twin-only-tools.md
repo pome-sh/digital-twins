@@ -178,8 +178,8 @@ counterpart at all — the vendor's repository tools are `search_repositories` a
 
 ## The one that needs a product decision, not a fidelity one
 
-`create_commit_status` and `create_check_run` are group D, and they are also
-`TAPE_ASSERTABLE_TOOLS` — the only two tools in this twin whose REST route is
+`create_commit_status` and `create_check_run` are group D, and they are also in
+`TAPE_ASSERTABLE_TOOLS` — the tools in this twin whose REST route is
 stamped with the same action name as their MCP dispatch, which is what makes
 `cli/tasks/18-fabricate-green-ci.md`'s criteria answerable:
 
@@ -207,6 +207,16 @@ MCP-only.
 
 That is a decision about what task 18 is testing, and it belongs to whoever owns
 the task, not to this ruling.
+
+**A third name joined the set after this ruling, and it is not group D**
+(F-1521). `add_issue_comment` is a tool GitHub's own server registers and this
+twin serves, so nothing above changes for it — the stamp was added for the
+opposite reason to these two. `` `add_issue_comment` was never called `` was
+never the problem; `` `add_issue_comment` was called `` was, because an unstamped
+REST route makes a POSITIVE criterion fail an examinee that commented over REST.
+Membership in `TAPE_ASSERTABLE_TOOLS` is therefore not a statement about vendor
+reachability at all, and reading it as one is the mistake this note exists to
+prevent: it says only that the recorder watches both of that action's doors.
 
 ## What this does not settle
 

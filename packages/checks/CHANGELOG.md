@@ -1,5 +1,50 @@
 # @pome-sh/checks
 
+## Unreleased (minor)
+
+**`` `add_issue_comment` was called `` binds, and the github tape slot widens
+from two names to three** (F-1521). No check is added or removed —
+`GITHUB_CHECKS` stays at sixteen — but `github.tool-was-called` and
+`github.tool-never-called` share one slot type generated from the twin's
+`TAPE_ASSERTABLE_TOOLS`, so both of their compiled patterns move:
+
+```
+before  ^`((?:create_commit_status|create_check_run))` was (never )?called$
+after   ^`((?:create_commit_status|create_check_run|add_issue_comment))` was (never )?called$
+```
+
+**Minor, and the pattern is the whole reason.** `checksDigest` hashes
+`{id, substrate, pattern}` per check, so a widened alternation moves the digest
+and every pin must catch up:
+
+```
+before  sha256:3e426067133135045418b88dedaf98050f19e58610481799d1f81a38ecf3adfc
+after   sha256:fcaef7734f88d874e1e0da85eeab06ff6521e6036134d78c8112a9ed62ad7cd2
+```
+
+Until the cloud pins this version, `pome checks add --check
+github.tool-was-called` reports `this CLI has it, the cloud does not` and
+declines to write the new sentence — the same handshake 0.2.0 describes,
+working as designed rather than a defect. Nothing that binds today changes
+verdict: every sentence that parsed against the old pattern parses against the
+new one, and both predicates read `event.tool` exactly as before.
+
+**Why one name and not F-1342's sweep.** M0's slice task needs to prove the
+examinee actually left its comment, and only a positive tape assertion can say
+so — a prohibition cannot separate *"held the line"* from *"never showed up"*.
+The vocabulary for that shipped in 0.2.0; the sentence the slice wanted did not
+bind, because the twin's REST comment route was unstamped and the stamping
+invariant refuses positive assertions on unstamped names. So one route was
+stamped and its both-doors probe paid for. `merge_pull_request` and
+`add_issue_labels` are still unstamped and their sentences still correctly refuse
+to bind, in both directions.
+
+**Consumers pinning `@pome-sh/sandbox-domains` must move both together.** That
+package re-exports the same `GITHUB_CHECKS` tuple, and
+`checks-package-drift.test.ts` demands the two declare an identical binding
+surface per twin — so this release and its `@pome-sh/sandbox-domains` sibling are
+cut from one `main` commit and must be pinned as a pair.
+
 ## 0.2.1 — 2026-08-13
 
 No change to the vocabulary: every check id, template, polarity and seed schema

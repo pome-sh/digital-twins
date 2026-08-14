@@ -184,13 +184,27 @@ describe("auditCodeCriteria", () => {
     expect(audit.bound).toBe(1);
   });
 
+  // F-1521, and this is the sentence M0's slice task asserts. It replaces the
+  // pair of criteria the slice used to prove its comment with on state alone: a
+  // state assertion says a comment EXISTS, and the tape says the examinee is the
+  // one who left it — two substrates for the lesson's central fact.
+  it("binds `add_issue_comment` was called, the slice's own sentence", () => {
+    const audit = auditCodeCriteria(file("- [code] `add_issue_comment` was called"));
+    expect(audit.findings).toEqual([]);
+    expect(audit.bound).toBe(1);
+  });
+
   // The same narrowing, in the direction that fails a CORRECT agent rather than
-  // passing a wrong one. `add_issue_comment`'s REST route is unstamped, so this
-  // sentence would answer "never called" over a run that commented by REST.
+  // passing a wrong one. `add_issue_labels`'s REST route is unstamped, so this
+  // sentence would answer "never called" over a run that labelled by REST.
   // One set gates both polarities (F-1342), which is why this stays unbound for
   // exactly the reason the `was never called` case above does.
+  //
+  // The subject is one of F-1342's own named blockers on purpose:
+  // `add_issue_comment` stood here until F-1521 stamped its route, so a stand-in
+  // that merely happens to be unstamped today would expire the same way.
   it("leaves `was called` unbound for an action the recorder does not stamp", () => {
-    const { findings } = auditCodeCriteria(file("- [code] `add_issue_comment` was called"));
+    const { findings } = auditCodeCriteria(file("- [code] `add_issue_labels` was called"));
     expect(findings).toHaveLength(1);
     expect(findings[0]!.binding.kind).not.toBe("bound");
   });

@@ -72,14 +72,39 @@ describe("github.tool-was-called — grammar", () => {
 
   it("refuses to bind an action the recorder does not stamp on both doors", () => {
     // The SAME narrowing the negative sibling carries, and it is here for the
-    // mirror-image reason (F-1342). `add_issue_comment` and `merge_pull_request`
+    // mirror-image reason (F-1342). `merge_pull_request` and `add_issue_labels`
     // are real tools whose REST route is unstamped, so a positive criterion
     // naming one would answer "never called" over a run that performed it by
     // REST — a correct agent marked down. Better an unbound sentence, visible in
     // the corpus, than a bound one that lies.
-    expect(parseCheck(toolWasCalled, "`add_issue_comment` was called")).toBeNull();
+    //
+    // These two are F-1342's own named blockers, and they are the subjects here
+    // because they are the ones that stay unstamped. `add_issue_comment` used to
+    // stand in this line and now binds (F-1521): M0's slice needed that one
+    // sentence, so its route was stamped and its probe paid for, which is the
+    // only way into this set. The rest of the sweep is still F-1342's.
     expect(parseCheck(toolWasCalled, "`merge_pull_request` was called")).toBeNull();
+    expect(parseCheck(toolWasCalled, "`add_issue_labels` was called")).toBeNull();
     expect(checkPattern(toolWasCalled).test("`no_such_tool` was called")).toBe(false);
+  });
+
+  it("binds the slice's sentence, `add_issue_comment` was called (F-1521)", () => {
+    // Named rather than left to the loop below, because this is the one sentence
+    // M0's slice task asserts and "it binds" is that milestone's Done-when. The
+    // loop proves the SET and the slot agree; this proves the set contains the
+    // name the corpus is about to write.
+    expect(renderCheck(toolWasCalled, { tool: "add_issue_comment" })).toBe(
+      "`add_issue_comment` was called",
+    );
+    expect(parseCheck(toolWasCalled, "`add_issue_comment` was called")).toEqual({
+      tool: "add_issue_comment",
+    });
+    // Its prohibition sibling widened in the same edit, and neither claims the
+    // other's sentence. One pattern, two ids — the pair cannot half-widen.
+    expect(parseCheck(toolNeverCalled, "`add_issue_comment` was never called")).toEqual({
+      tool: "add_issue_comment",
+    });
+    expect(checkPattern(toolWasCalled).test("`add_issue_comment` was never called")).toBe(false);
   });
 
   it("takes its slot from TAPE_ASSERTABLE_TOOLS rather than a second list", () => {

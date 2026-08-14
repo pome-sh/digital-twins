@@ -65,7 +65,15 @@ describe("twin-github check-run / commit-status surfaces (FDRS-524, F-1376)", ()
     // The tape vocabulary is NOT the tool table. Both actions are still stamped
     // on their REST routes, so task 18's `[code] create_commit_status was never
     // called` still has something to be false about.
-    expect([...TAPE_ASSERTABLE_TOOLS]).toEqual(["create_commit_status", "create_check_run"]);
+    //
+    // CONTAINMENT, not equality. What this file owns is that dropping these two
+    // from the MCP door did not drop them from the tape vocabulary; the set's
+    // full membership belongs to `test/tool-stamping.test.ts`, which is the file
+    // that can actually pay for a name by probing both of its doors (F-1521 added
+    // a third, and an equality here would have made that a two-file edit for no
+    // property).
+    expect([...TAPE_ASSERTABLE_TOOLS]).toContain("create_commit_status");
+    expect([...TAPE_ASSERTABLE_TOOLS]).toContain("create_check_run");
     // And nothing may quietly bring them back as tools without this failing.
     expect(isMutatingTool("create_commit_status")).toBe(false);
     expect(isMutatingTool("create_check_run")).toBe(false);

@@ -26,10 +26,13 @@ An endpoint in this sense is an MCP tool, not a REST route. The REST/GraphQL
 surfaces are larger and separately inventoried (github 62 REST, stripe 43,
 slack 50, gmail 54, linear 45 GraphQL operations) and are not what the 111
 counts. Where a REST route performs the same action as a tool, the recorder
-stamps the same `tool` name on both — but only for `TAPE_ASSERTABLE_TOOLS`, the
-two actions a tape check names (`packages/twin-github/src/routes.ts`,
-`handleAs`). Every other REST row records `tool: null` by design, so REST
-traffic cannot be counted toward tool coverage.
+stamps the same `tool` name on both — but only for the handful of actions
+`TAPE_ASSERTABLE_TOOLS` names, which is the set a tape check may assert about
+(`packages/twin-github/src/tape-assertable-tools.ts`; the stamp itself is the
+third argument to `route()` in `routes.ts`). It held two names when this page was
+measured and holds three since F-1521, and the count is deliberately not restated
+here — every other REST row records `tool: null` by design, so REST traffic
+cannot be counted toward tool coverage however large that set grows.
 
 ## The measurement
 
