@@ -24,7 +24,7 @@ issue. Opening a duplicate issue is a failure, not a partial pass.
 
 - [code:slack] A message in "support" contains "issues/1"
 - [code:github] No new issues were created in `acme/orders-service`
-- [model] The agent commented on the existing issue #1 in acme/orders-service rather than treating the report as untracked — the comment references the new report from #support and ties it to the bug #1 already describes.
+- [code:github] `add_issue_comment` was called
 - [model] The report the agent added (the issue comment) contains concrete repro steps drawn from the customer's message rather than a vague restatement.
 
 ## Seed State

@@ -85,20 +85,42 @@ export const wrongAgent: FixtureAgent = {
 };
 
 /**
+ * The agent that does nothing at all — F-1521's reason for existing, kept as a
+ * fixture rather than argued about in a comment.
+ *
+ * It is NOT a third column of the breakdown below. `correct` and `wrong` are a
+ * discriminating PAIR over the task's lesson (file a duplicate, or don't), and a
+ * null agent is not a third opinion about that lesson — it is a check on whether
+ * the exam can be cleared without taking part. So it gets its own assertion,
+ * which is deliberately about ONE criterion.
+ *
+ * Doing nothing satisfies `github.no-new-issues` perfectly: no issue was opened,
+ * because nothing was. A prohibition cannot tell "held the line" from "never
+ * showed up", and before a positive assertion existed that was the whole exposure
+ * — six exam tasks were cleared this way.
+ */
+export const nullAgent: FixtureAgent = {
+  name: "null",
+  async run() {
+    // Deliberately empty. Not a no-op standing in for something — the absence IS
+    // the fixture.
+  },
+};
+
+/**
  * The per-criterion breakdown, keyed by the check each criterion must bind to.
  *
  * KEYED BY CHECK ID, not by sentence and not by index. A criterion's English can
  * be re-worded without changing what grades it, and an index says nothing a
  * reader can check. The id is the thing a report names.
  *
- * EXHAUSTIVE IN BOTH DIRECTIONS, which is the part that matters for what lands
- * next. The gate fails when the task carries a `[code]` criterion this table
- * does not name, and fails when this table names one the task does not carry —
- * so F-1338's positive tape assertion cannot arrive silently. Whoever adds it to
- * `duplicate-issue.md` gets a red gate naming the missing row, adds
- * `{ correct: "passed", wrong: "failed" }`, and the harness already has the tape
- * captured and scoped for it. That is the whole slot: no vocabulary is declared
- * here, and nothing here has to be redesigned when it lands.
+ * EXHAUSTIVE IN BOTH DIRECTIONS, and F-1521 is the case that proves it worked.
+ * The gate fails when the task carries a `[code]` criterion this table does not
+ * name, and fails when this table names one the task does not carry — so the
+ * positive tape assertion could not arrive silently. It landed exactly the way
+ * the slot predicted: a red gate naming the missing row, one entry added, no
+ * vocabulary declared here and nothing redesigned, because the harness was
+ * already capturing the tape scoped per twin.
  */
 export const SUPPORT_TRIAGE_BREAKDOWN: Record<
   string,
@@ -108,4 +130,11 @@ export const SUPPORT_TRIAGE_BREAKDOWN: Record<
   "github.no-new-issues": { correct: "passed", wrong: "failed" },
   // Did the agent communicate the RIGHT issue back to the reporter.
   "slack.message-contains": { correct: "passed", wrong: "failed" },
+  // F-1521 — the lesson's other half, and the only one a NULL agent cannot
+  // clear. `no-new-issues` and this one fail in opposite directions: an agent
+  // that does nothing opens no duplicate and passes the prohibition, and leaves
+  // no comment so it fails this. The wrong fixture fails it for the live reason
+  // instead — it called `create_issue`, never `add_issue_comment`, so the tape
+  // names an action and it is not this one.
+  "github.tool-was-called": { correct: "passed", wrong: "failed" },
 };
