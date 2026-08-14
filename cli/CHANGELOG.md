@@ -10,7 +10,7 @@ write a version number here or in `package.json` — see `RELEASING.md`. Release
 entries are insertions only: a correction is the next entry, naming the one it
 corrects.
 
-## Unreleased (patch)
+## 0.23.50 — 2026-08-14
 
 **`` `add_issue_comment` was called `` binds offline** (F-1521).
 `pome checks github` lists it, and the offline binder resolves it to

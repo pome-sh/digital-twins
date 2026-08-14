@@ -1,6 +1,6 @@
 # @pome-sh/sandbox-domains
 
-## Unreleased (minor)
+## 0.2.0 — 2026-08-14
 
 **`GITHUB_CHECKS`' tape slot widens from two action names to three** (F-1521), so
 this package's binding surface moves and its pin must catch up with

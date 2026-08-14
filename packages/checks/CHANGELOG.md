@@ -1,6 +1,6 @@
 # @pome-sh/checks
 
-## Unreleased (minor)
+## 0.3.0 — 2026-08-14
 
 **`` `add_issue_comment` was called `` binds, and the github tape slot widens
 from two names to three** (F-1521). No check is added or removed —
