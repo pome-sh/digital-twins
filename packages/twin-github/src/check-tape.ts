@@ -148,7 +148,7 @@ export const toolNeverCalled: Check<{ tool: string }> = defineCheck({
   // that a verified fact rather than an assumption.
   subject: (args) => args.tool,
   // Null, and admitted in `HONEST_NULL_MUTANTS`. The only slot is a closed set,
-  // so there is no value guaranteed to be false: a mutant naming the OTHER
+  // so there is no value guaranteed to be false: a mutant naming ANOTHER
   // assertable action asserts something that may well also be true, and a value
   // outside the set does not re-bind at all — which reads as "the verdict moved"
   // and would bless the very criterion the probe exists to catch.
@@ -219,9 +219,16 @@ export const toolNeverCalled: Check<{ tool: string }> = defineCheck({
 //                          recorder does not watch.
 //
 // So the gate is `TAPE_ASSERTABLE_TOOLS` on both sides, `tool-stamping.test.ts`
-// keeps that set honest with a both-doors probe per member, and the day F-1342
-// stamps a route BOTH sentences widen together. A second enumeration here would
-// be the one that drifts.
+// keeps that set honest with a both-doors probe per member, and the day a route
+// is stamped BOTH sentences widen together. A second enumeration here would be
+// the one that drifts.
+//
+// That day has since come once, and it came from THIS side of the invariant:
+// F-1521 stamped `add_issue_comment`'s REST route so M0's slice could assert its
+// comment on the tape, and `` `add_issue_comment` was never called `` widened in
+// the same edit without anyone touching it. One name, not the sweep — F-1342
+// still owns the remaining ~37, and `merge_pull_request` and `add_issue_labels`
+// still correctly refuse to bind in either direction.
 //
 // ── What flips when the polarity flips ──────────────────────────────────────
 //
@@ -264,9 +271,9 @@ export const toolWasCalled: Check<{ tool: string }> = defineCheck({
   // nothing, i.e. failing an agent that did the work.
   subject: (args) => args.tool,
   // Null, and admitted in `HONEST_NULL_MUTANTS`. Same closed-set argument as the
-  // sibling: the only substitutable value is the OTHER assertable action, which
-  // an agent may well have called too, and a value outside the set does not
-  // re-bind at all.
+  // sibling: every substitutable value is ANOTHER assertable action, which an
+  // agent may well have called too, and a value outside the set does not re-bind
+  // at all.
   vacuityMutant: () => null,
   // A POSITIVE check, so the passing world is the one where the action WAS
   // called. The failing world is deliberately NOT an empty tape: `[]` fails

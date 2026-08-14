@@ -1,5 +1,73 @@
 # @pome-sh/twin-github — CHANGELOG
 
+## 0.12.0 — 2026-08-14
+
+`TAPE_ASSERTABLE_TOOLS` gains `add_issue_comment` (F-1521) — the first name added
+to it, and the first added for a POSITIVE criterion rather than a prohibition.
+Minor for the reason 0.11.0 was: the exported tuple changes shape, so both tape
+checks' patterns move, `checksDigest` moves, and every pin must catch up.
+
+- `POST /repos/:owner/:repo/issues/:number/comments` declares
+  `add_issue_comment` as the action it performs, so the recorder stamps the same
+  name it already stamped for an MCP `tools/call`. That is the whole behavioural
+  change: no route, tool, seed, wire shape or domain function moves, and the
+  comment written is byte-identical to the one written before.
+- `` `add_issue_comment` was called `` and
+  `` `add_issue_comment` was never called `` both bind, because both checks read
+  one slot type generated from this set. Neither could widen alone.
+- `GITHUB_CHECKS` is unchanged at sixteen entries. No check id, template,
+  polarity or predicate moves; every sentence that bound before binds to the same
+  check now.
+
+**Why the positive direction is what forced it.** F-1338 shipped
+`github.tool-was-called` and settled that ONE set gates both polarities, because a
+criterion naming an action whose REST door is unstamped is wrong in both
+directions for the identical missing fact — the recorder stamps `tool: null`
+there, and `null` means "no declared action for this surface", never "no action
+happened":
+
+| sentence | run commented by REST | verdict |
+| -- | -- | -- |
+| `` `add_issue_comment` was never called `` | `tool` is `null`, no match | `passed` — the negative false-pass D4 forbids |
+| `` `add_issue_comment` was called `` | `tool` is `null`, no match | `failed` — a correct agent marked down |
+
+M0's slice task needs the second sentence: its lesson's central fact is that the
+examinee left the comment, and only a positive assertion can say so — a
+prohibition is satisfied by an agent that did nothing. So the route was stamped
+and the sentence bound, rather than the slot widened to a name the recorder does
+not watch.
+
+**One name, not F-1342's sweep.** That ticket owns the remaining ~37 tools and
+keeps them; `merge_pull_request` and `add_issue_labels` are still unstamped and
+their sentences still correctly refuse to bind in either direction. This one was
+pulled forward because M0 depended on it while F-1342 did not enumerate it, which
+would have left a milestone bullet hanging on an unnamed dependency.
+
+**What a name costs, paid here.** `test/tool-stamping.test.ts` keeps one probe per
+member and asserts its key set EQUALS the constant, so a name cannot be added by
+editing the constant alone. Those probes now declare each action's REST call and
+its MCP arguments separately instead of deriving the second from the first: REST
+carries an action's identifiers in the PATH and MCP carries them in the tool's
+arguments, which coincided while every member keyed on a commit sha and stops
+coinciding at an issue number — a derived MCP call would have been missing a
+required argument and the probe would have proved the stamp on an argument
+refusal rather than on a dispatch.
+
+Each probe also declares whether this twin SERVES the action over MCP, and the
+served ones must not come back an error. That distinction was invisible before and
+is load-bearing now: the MCP door stamps the name the CALLER used even for a name
+the twin does not serve, so the stamp assertion alone is satisfied by an `Unknown
+tool` refusal. `create_commit_status` and `create_check_run` legitimately take
+that path (F-1376 left them off the tool table); `add_issue_comment` does not, and
+one renamed argument would have silently turned its probe into a test of the
+refusal path.
+
+`test/check-status-and-merge-gate.test.ts`'s claim on the set relaxed from
+equality to containment in the same edit. What that file owns is that F-1376
+taking `create_commit_status` and `create_check_run` off the MCP door did not take
+them off the tape; the set's full membership belongs to the file that can pay for
+a name by probing both of its doors.
+
 ## 0.11.0 — 2026-08-13
 
 `` `create_commit_status` was called `` and `` `create_check_run` was called ``

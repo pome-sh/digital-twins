@@ -160,12 +160,22 @@ export function registerGitHubRoutes(session: Hono, { domain, recorder }: RouteC
   route(GITHUB_ROUTES.listIssueComments, ({ path, query }) =>
     ok(domain.listIssueComments({ ...issueRef(path), ...query }))
   );
-  route(GITHUB_ROUTES.addIssueComment, ({ path, body }) => {
-    const { value, delta } = captureDelta((onDelta) =>
-      domain.addIssueComment({ ...issueRef(path), ...body }, onDelta)
-    );
-    return created(value, delta);
-  });
+  // Stamped (F-1521), so `` `add_issue_comment` was called `` can be asserted
+  // about the ACTION rather than the transport: an examinee that comments over
+  // this route satisfies the positive criterion exactly as one going through
+  // `tools/call` does. Unstamped, that sentence would FAIL a correct agent for
+  // taking the REST door — the positive-direction twin of the false pass the two
+  // Cluster F stamps below exist to prevent.
+  route(
+    GITHUB_ROUTES.addIssueComment,
+    ({ path, body }) => {
+      const { value, delta } = captureDelta((onDelta) =>
+        domain.addIssueComment({ ...issueRef(path), ...body }, onDelta)
+      );
+      return created(value, delta);
+    },
+    "add_issue_comment"
+  );
   route(GITHUB_ROUTES.listRepositoryLabels, ({ path }) => ok(domain.listRepositoryLabels(path)));
   route(GITHUB_ROUTES.createRepositoryLabel, ({ path, body }) => {
     const { value, delta } = captureDelta((onDelta) =>

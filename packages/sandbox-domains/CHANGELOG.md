@@ -1,5 +1,31 @@
 # @pome-sh/sandbox-domains
 
+## Unreleased (minor)
+
+**`GITHUB_CHECKS`' tape slot widens from two action names to three** (F-1521), so
+this package's binding surface moves and its pin must catch up with
+`@pome-sh/checks`' in the same step.
+
+The tuple's LENGTH does not change — still sixteen checks, none added or removed.
+What moves is the compiled pattern of `github.tool-was-called` and
+`github.tool-never-called`: both take their `{tool}` slot from the twin's
+`TAPE_ASSERTABLE_TOOLS`, which gained `add_issue_comment`, so
+`` `add_issue_comment` was called `` now binds where it previously did not.
+`checksDigest` hashes that pattern, so the digest moves.
+
+**This release and `@pome-sh/checks`' are one release, cut from one commit.**
+`checks-package-drift.test.ts` demands the declarations package and this runtime
+declare an identical binding surface per twin, with no allowlist — publishing a
+widened vocabulary whose runtime could not follow is the wall F-1524 recorded.
+Pinning one of the two without the other reds that gate.
+
+**The runtime half.** `GitHubDomain.addIssueComment` is unchanged in behaviour;
+what changed is upstream of this package's exports, in the twin's REST route,
+which now declares `add_issue_comment` as the action it performs so the recorder
+stamps the same name it already stamped for an MCP `tools/call`. A consumer of
+this package sees that only through the widened vocabulary above — the HTTP door
+ships in the twin's own server entry, which this package does not re-export.
+
 ## 0.1.0 — 2026-08-13
 
 First release. The **domain layer** — the in-process runtime a bound check
