@@ -1,5 +1,31 @@
 # @pome-sh/sandbox-domains
 
+## Unreleased (patch)
+
+**`SlackDomain.seed` writes files, and `slackSeedSchema` accepts them** (F-1509).
+The seed gained
+`files: [{id?, name, title?, filetype?, user?, channels?, content?}]`, so
+`filesList` / `filesInfo` / `slack_read_file` read a populated table on a freshly
+seeded world. Until now `filesUpload` — a mutation — was the `files` table's only
+writer, so every read-only run against a fresh seed answered on an empty table.
+
+`user` and `channels` take seed HANDLES (a user/channel `name`) or ids, the same
+currency `channels[].members` already accepts. `mimetype` is derived from
+`filetype`, `size` from the byte length of `content`, and `title` defaults to
+`name` — the same derivations `filesUpload` applies, so a seeded file and an
+uploaded one are indistinguishable in a response. A `channels` entry naming no
+seeded channel is dropped rather than stored, so `files.list?channel=…` can never
+filter against an id no channel has.
+
+**No check vocabulary moved**, so this release does NOT need to be pinned in
+lockstep with `@pome-sh/checks` the way 0.2.0 below did — `checks-package-drift`
+compares the binding surface, and the binding surface is unchanged. Both packages
+carry an entry only because both re-export the seed schema.
+
+**Patch, not minor.** `files` defaults to `[]`: every existing seed parses to the
+same value and the `files` table is untouched when the key is empty. Widening an
+input schema cannot break a caller.
+
 ## 0.2.0 — 2026-08-14
 
 **`GITHUB_CHECKS`' tape slot widens from two action names to three** (F-1521), so

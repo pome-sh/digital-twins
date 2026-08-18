@@ -58,10 +58,41 @@ export type SeedEmoji = {
   alias?: string;
 };
 
+/**
+ * A file present in the world before the agent touches it (F-1509).
+ *
+ * Until this existed the `files` table had exactly ONE writer — `filesUpload`,
+ * a mutation — so every read of `files.list` / `files.info` against a freshly
+ * seeded world answered on an empty table. That is not a serializer gap and it
+ * was not a deliberate ruling; it is simply a hole in the seed vocabulary, and
+ * it made `files.list` a surface no read-only comparison could measure.
+ *
+ * `user` and `channels` carry SEED HANDLES (a user `name` / channel `name`), the
+ * same currency `SeedMessage.user` and `SeedChannel.members` use, so a seed never
+ * has to know a minted id. Both also accept an explicit id.
+ */
+export type SeedFile = {
+  /** Explicit stable id (`F…`). Minted from the workspace counter when absent. */
+  id?: string;
+  /** Filename, e.g. `runbook.md`. */
+  name: string;
+  /** Display title. Defaults to `name`, matching `files.upload`. */
+  title?: string;
+  /** Slack filetype (`text`, `markdown`, `javascript`, …). Drives `mimetype`. */
+  filetype?: string;
+  /** Uploader — a seed user handle or id. Defaults to the seed's agent user. */
+  user?: string;
+  /** Channels the file is shared into — seed channel handles or ids. */
+  channels?: string[];
+  /** File body. `size` is derived from it, as `files.upload` derives it. */
+  content?: string;
+};
+
 export type SlackStateSeed = {
   team?: SeedTeam;
   users?: SeedUser[];
   channels?: SeedChannel[];
+  files?: SeedFile[];
   emoji?: SeedEmoji[];
 };
 

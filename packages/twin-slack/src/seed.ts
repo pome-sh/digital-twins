@@ -53,6 +53,22 @@ export const seedSchema = z.object({
       })
     )
     .default([]),
+  // F-1509. Files present in the world before the agent runs. `user` and
+  // `channels` are seed HANDLES (a user/channel `name`) or ids — the same
+  // currency `channels[].members` and `channels[].messages[].user` already use.
+  files: z
+    .array(
+      z.object({
+        id: z.string().regex(/^F[A-Z0-9_]+$/).optional(),
+        name: z.string().min(1),
+        title: z.string().optional(),
+        filetype: z.string().min(1).default("text"),
+        user: z.string().optional(),
+        channels: z.array(z.string()).default([]),
+        content: z.string().optional(),
+      })
+    )
+    .default([]),
   emoji: z
     .array(
       z.object({

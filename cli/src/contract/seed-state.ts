@@ -182,6 +182,21 @@ export const slackSeedStateSchema = z.object({
       })
     )
     .default([]),
+  // F-1509. Mirrors `seedSchema.files` in `@pome-sh/twin-slack`. `user` and
+  // `channels` are seed HANDLES (a user/channel `name`) or ids.
+  files: z
+    .array(
+      z.object({
+        id: z.string().regex(/^F[A-Z0-9_]+$/).optional(),
+        name: z.string().min(1),
+        title: z.string().optional(),
+        filetype: z.string().min(1).default("text"),
+        user: z.string().optional(),
+        channels: z.array(z.string()).default([]),
+        content: z.string().optional(),
+      })
+    )
+    .default([]),
   emoji: z
     .array(
       z.object({
