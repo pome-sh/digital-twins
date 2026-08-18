@@ -450,6 +450,27 @@ ${seed ? `\n## Seed State\n\`\`\`json\n${seed}\n\`\`\`\n` : ""}${MULTI_CONFIG}`;
     expect("channels" in envelope.slack).toBe(true);
   });
 
+  // F-1509. The slack arm is the union's only `.strict()` one, so an unlisted key
+  // is REJECTED rather than stripped — `files` had to be added to the arm, not
+  // just to the twin. Without that line this parse throws.
+  it("carries a slack seed's files key through the envelope", () => {
+    const scenario = parseTask(
+      multiTask(
+        "- [code:github] x\n- [code:slack] y",
+        JSON.stringify({
+          github: { repositories: [{ owner: "acme", name: "api" }] },
+          slack: {
+            channels: [{ name: "general" }],
+            files: [{ id: "F_RUNBOOK", name: "runbook.md", channels: ["general"] }],
+          },
+        }),
+      ),
+    );
+    const envelope = scenario.seedState as SeedEnvelope;
+    const files = (envelope.slack as { files?: Array<{ name?: unknown }> }).files;
+    expect(files?.map((f) => f.name)).toEqual(["runbook.md"]);
+  });
+
   it("fills a twin's default seed when its envelope key is missing", () => {
     const scenario = parseTask(
       multiTask(

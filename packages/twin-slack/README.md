@@ -56,6 +56,35 @@ The default seed creates:
 - Workspace `T_POME` ("Pome Twin Workspace", domain `pome-twin`)
 - Users `pome-agent` (`U_PRIMARY`, admin), `alice` (`U_ALICE`), `bob` (`U_BOB`)
 - Channels `#general` (`C_GENERAL`, all three members, 2 seeded messages) and `#random` (`C_RANDOM`, no members)
+- No files. `files` is a seed key (below) and the default seed declares none.
+
+A seed may also plant files, so `files.list` / `files.info` /
+`slack_read_file` have something to read before the agent uploads anything
+(F-1509 — until that key existed `files.upload` was the table's only writer):
+
+```json
+{
+  "files": [
+    {
+      "id": "F_RUNBOOK",
+      "name": "runbook.md",
+      "title": "Incident runbook",
+      "filetype": "markdown",
+      "user": "alice",
+      "channels": ["general"],
+      "content": "# Runbook\n1. Page the on-call.\n"
+    }
+  ]
+}
+```
+
+`user` and `channels` take seed HANDLES (a user/channel `name`) or ids, the same
+as `channels[].members`. `mimetype` comes from `filetype`, `size` from the byte
+length of `content` and `title` defaults to `name` — the same derivations
+`files.upload` applies, so a seeded file and an uploaded one are
+indistinguishable in a response. A `channels` entry naming no seeded channel is
+dropped rather than stored, so `files.list?channel=…` can never filter against
+an id no channel has.
 
 ## APIs
 

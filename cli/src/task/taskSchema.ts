@@ -99,7 +99,12 @@ export const slackSeedStateSchema = z
   .object({
     team: z.record(z.string(), z.unknown()).optional(),
     users: z.array(z.record(z.string(), z.unknown())).default([]),
-    channels: z.array(z.record(z.string(), z.unknown())).default([])
+    channels: z.array(z.record(z.string(), z.unknown())).default([]),
+    // F-1509. Permissive like its siblings — the vendored `parseSeed` does the
+    // regex-level validation. It has to be listed at all because `.strict()`
+    // REJECTS an unlisted key: without this line a slack seed declaring `files`
+    // fails to parse rather than being stripped.
+    files: z.array(z.record(z.string(), z.unknown())).default([])
   })
   .strict();
 
