@@ -10,6 +10,34 @@ write a version number here or in `package.json` — see `RELEASING.md`. Release
 entries are insertions only: a correction is the next entry, naming the one it
 corrects.
 
+## 0.24.0 — 2026-08-18
+
+**A Slack seed can plant files** (F-1509). `slackSeedStateSchema` gains a `files`
+key — `{id?, name, title?, filetype?, user?, channels?, content?}` — and
+`SlackDomain.seed` writes the rows, so `files.list` / `files.info` /
+`slack_read_file` have something to read before the agent uploads anything.
+`user` and `channels` take seed handles or ids, exactly as `channels[].members`
+does; `mimetype`, `size` and the `title` default are derived the way
+`files.upload` derives them, so a seeded file and an uploaded one are
+indistinguishable in a response.
+
+**Minor, not patch:** it is new seed vocabulary. Every existing seed still
+parses byte-identically — `files` defaults to `[]` and the twin's `files` table
+is untouched when it is empty — but a task file can now declare something this
+CLI could not express before, and a task that declares it will not parse on an
+older CLI.
+
+**Why it existed as a hole.** `files` had exactly one writer, `filesUpload`, a
+MUTATION. So every read-only capture against a freshly seeded world answered on
+an empty table, and pome-cloud's fidelity watchdog measured
+`GET /files.list upstream=1 twin=0` — the twin serving no files where real Slack
+served one. Worse than the count: the diff engine compares NO array elements when
+either side is empty, so the empty array was masking every field-level comparison
+on the surface. Seeding one file is what makes the file object's 41 upstream
+leaves comparable at all; the 15 the twin does not serve are registered as
+twin-slack divergence #24, and the canvas-is-a-file modelling difference the same
+capture surfaced is #25.
+
 ## 0.23.50 — 2026-08-14
 
 **`` `add_issue_comment` was called `` binds offline** (F-1521).

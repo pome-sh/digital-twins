@@ -1,5 +1,23 @@
 # @pome-sh/checks
 
+## 0.3.1 — 2026-08-18
+
+**`slackSeedSchema` accepts a `files` key** (F-1509). This package re-exports
+twin-slack's seed schema (`slackSeedSchema` / `parseSlackSeed` /
+`defaultSlackSeed`), and that schema gained
+`files: [{id?, name, title?, filetype?, user?, channels?, content?}]` so a Slack
+world can be seeded with files rather than only acquiring them through a
+`files.upload` mutation.
+
+**No check changed.** `SLACK_CHECKS` is the same tuple, every compiled pattern is
+byte-identical, and `checksDigest` does not move — so a cloud pin does NOT have to
+catch up for this release, unlike 0.3.0 above. The seed schema is a separate export
+from the check vocabulary and only the former widened.
+
+**Patch, not minor.** `files` defaults to `[]`, so every seed that parsed before
+parses to the same value, and no consumer must act. It is a widening of an INPUT
+schema, which is the direction that cannot break a caller.
+
 ## 0.3.0 — 2026-08-14
 
 **`` `add_issue_comment` was called `` binds, and the github tape slot widens

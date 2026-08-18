@@ -108,7 +108,7 @@ so the MCP divergence lane reads a decision rather than an omission.
 | `users.profile.set` | warm | semantic | `domain.test.ts`, `app-routes.test.ts` | Warm-ruled (no vendor MCP write): see the tier-mismatch ledger. |
 | `pins.add` / `remove` / `list` | warm | semantic | `domain.test.ts`, `app-routes.test.ts` | `already_pinned` / `no_pin` codes; SQL constraint-mapped on race. Warm-ruled: see the tier-mismatch ledger. |
 | `search.messages` | hot | semantic | `domain.test.ts`, `performance.test.ts` | Substring (LIKE-based) match; query syntax is intentionally smaller than real Slack search. |
-| `files.upload` / `info` / `list` / `delete` | warm | shape | `domain.test.ts`, `app-routes.test.ts` | Metadata-only; no binary storage. URL fields point to deterministic `pome-twin-files.slack.com` hosts. Shape is at the warm target (SL5). |
+| `files.upload` / `info` / `list` / `delete` | warm | shape | `domain.test.ts`, `app-routes.test.ts`, `seed-files.test.ts` | Metadata-only; no binary storage. URL fields point to deterministic `pome-twin-files.slack.com` hosts. Since F-1509 the seed's `files` key can plant rows, so these read on a populated table without a prior upload; the file object's leaf set is divergence #24. Shape is at the warm target (SL5). |
 | `bookmarks.add` / `remove` / `list` | warm | semantic | `domain.test.ts`, `app-routes.test.ts` | `link` type accepted; other bookmark types are unsupported per real Slack 2024 changelog. Warm-ruled: see the tier-mismatch ledger. |
 | `team.info` | warm | semantic | `app-routes.test.ts` | Returns workspace metadata; enterprise fields are NULL for non-Enterprise twins. Warm-ruled context read: see the tier-mismatch ledger. |
 | `canvases.create` / `canvases.edit` / `canvases.delete` | warm | shape | `domain-wave3.test.ts`, `app-routes.test.ts` | Wave 3 (SL3). Markdown title/content persistence; section_id-relative edits are coarse whole-document ops (shape at warm target). Since F-1330 `edit` applies every operation in `changes`, in order, against one snapshot — it used to apply the first and answer ok for the rest. Reading a canvas is MCP-only (`slack_read_canvas`); real Slack reads one over `files.info`, which this twin backs from a separate table. |
@@ -206,8 +206,8 @@ out. The number is built from source, never hand-typed
   the MCP-envelope check rolls out next), 20 mutating REST methods (no write
   round-trip yet — including the `chat.postMessage` / `reactions.add` that back the
   3 verified MCP write tools, since the REST contract is verified separately), and
-  `files.info` (needs a minted file id; see the L1 read exception). A surface is
-  counted only once it has its own evidence — never credited by proxy.
+  `files.info` (not yet an L1 capture row; see the L1 read exception). A surface
+  is counted only once it has its own evidence — never credited by proxy.
 
 ## Known divergences from real Slack
 
@@ -357,6 +357,51 @@ _Shape-anchoring divergences (compile-time anchor to `@slack/web-api`):_
     strictly harder to detect than an honest absent key. The no-blocks case is
     asserted from pome-cloud by `sandboxes/slack/rest-writes.ts`, which until
     this entry only ever asserted the block text it SENT. F-1496.
+
+24. **File objects omit thumbnail, collaborative-edit, per-file-ACL and
+    Slack-AI metadata.** `serializeFile` emits 27 leaves; the file real Slack
+    returns on `files.list` carries 41, and the 15 it has that the twin does not
+    split cleanly in two. ELEVEN are leaves `@slack/web-api` types and this
+    package's own compile-time anchor already declares deliberate omissions —
+    they are in `File_Allow` (`test/upstream-coverage.types.ts`), which is the
+    twin saying "known, not emitted": the per-file permission level `access`,
+    the collaborative-edit trio `editors` / `edit_timestamp` /
+    `update_notification`, the server-side `updated` mtime, the unread hint
+    `show_badge`, the sharing-policy pair `teams_shared_with` /
+    `is_restricted_sharing_enabled`, and the canvas-document leaves
+    `quip_thread_id` / `title_blocks` / `url_static_preview`. FOUR are leaves the
+    SDK does not type at all, so the anchor never saw them and only live capture
+    could: `canvas_creator_id`, `canvas_readtime`, `is_ai_suggested` and
+    `is_modified_by_ai` — the same SDK-lags-Slack situation divergence #16
+    describes, one object over. The twin's `files` table is metadata-only (no
+    binary storage, no thumbnails, no ACL model, no edit history), so all 15 are
+    absent rather than wrong, and NONE is fabricated: `access: "write"` or an
+    `updated` copied off `created` would be a plausible-but-wrong value an agent
+    trusts, which is strictly harder to detect than an honest absent key (the
+    same reasoning as #23). On an L1 READ surface an upstream-only leaf the twin
+    omits is INFO, not drift. Measured 2026-08-13 against
+    `pome-twin-sandbox`; unmeasurable before that, because the twin served
+    `files: []` and the diff engine compares NO elements when either array side
+    is empty. F-1509.
+
+25. **A canvas is a FILE to real Slack and a separate entity here, so
+    `files.list` does not enumerate canvases.** Real Slack stores a canvas in the
+    file table: the only file in `pome-twin-sandbox` on 2026-08-13 was one, and
+    it came back from `files.list` as an ordinary file row with
+    `filetype: "quip"`, `mode: "quip"`, `pretty_type: "Canvas"` and
+    `mimetype: "application/vnd.slack-docs"`. This twin keeps canvases in their
+    own `canvases` table (`domain/canvases.ts`) — which is why reading one is
+    `slack_read_canvas` rather than `files.info`, as the Wave-3 row in the
+    capability table above already says — and `filesList` selects from `files`
+    only. So `canvases.create` followed by `files.list` shows nothing, where real
+    Slack shows the new canvas. NOT imitated here, and the reason is blast radius
+    rather than difficulty: projecting a canvas row into a file row is
+    mechanical, but it changes what `files.list` / `files.info` / `slack_read_file`
+    return for every already-saved task whose criteria count or address files,
+    and a criterion that silently starts seeing one more entity is the failure
+    mode a twin change must not ship as a side effect. Registered as the fact it
+    is; imitating it is its own decision, with its own re-verification of the
+    task corpus. F-1509.
 
 ## Shape anchoring (compile-time, `@slack/web-api@7.16.0`)
 

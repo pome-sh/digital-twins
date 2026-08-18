@@ -40,6 +40,50 @@ describe("slackSeedStateSchema", () => {
     });
     expect(parsed.success).toBe(false);
   });
+
+  // F-1509 — the seed vocabulary the hosted contract has to speak for a scenario
+  // to declare a file. The twin's own `seedSchema` is the strict authority; this
+  // schema has to accept the same shape or the cloud strips the key on the way in.
+  it("accepts a files key with handles for user and channels", () => {
+    const parsed = slackSeedStateSchema.safeParse({
+      channels: [{ name: "general" }],
+      files: [
+        {
+          id: "F_RUNBOOK",
+          name: "runbook.md",
+          title: "Incident runbook",
+          filetype: "markdown",
+          user: "alice",
+          channels: ["general"],
+          content: "# Runbook\n",
+        },
+      ],
+    });
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data.files[0]!.filetype).toBe("markdown");
+  });
+
+  it("defaults files to an empty array, so every pre-F-1509 seed is unchanged", () => {
+    const parsed = slackSeedStateSchema.safeParse({ channels: [{ name: "general" }] });
+    expect(parsed.success && parsed.data.files).toEqual([]);
+  });
+
+  it("defaults a file's filetype and channels rather than leaving them absent", () => {
+    const parsed = slackSeedStateSchema.safeParse({ files: [{ name: "notes.txt" }] });
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data.files[0]!.filetype).toBe("text");
+    expect(parsed.success && parsed.data.files[0]!.channels).toEqual([]);
+  });
+
+  it("rejects a file id that is not Slack-file-shaped", () => {
+    const parsed = slackSeedStateSchema.safeParse({ files: [{ id: "C_NOPE", name: "x.txt" }] });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("rejects a file with no name", () => {
+    const parsed = slackSeedStateSchema.safeParse({ files: [{ title: "no name" }] });
+    expect(parsed.success).toBe(false);
+  });
 });
 
 describe("providerScopedSeedStateSchema", () => {

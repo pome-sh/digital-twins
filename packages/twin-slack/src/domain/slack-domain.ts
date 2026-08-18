@@ -43,6 +43,7 @@ import type {
   WorkspaceRow,
 } from "../types.js";
 import { cursorDecode, cursorEncode, nowIso, nowUnix, padTsCounter, tsBaseSeconds } from "../util.js";
+import { filetypeMimetype } from "./helpers.js";
 import * as bookmarks from "./bookmarks.js";
 import * as chat from "./chat.js";
 import * as conversations from "./conversations.js";
@@ -131,9 +132,15 @@ export class SlackDomain {
       }
 
       // Channels + members + messages.
+      // `channelIdByHandle` is what lets `files[].channels` name a channel the
+      // way `channels[].members` names a user — by seed handle, never by a
+      // minted id (F-1509).
+      const channelIdByHandle = new Map<string, string>();
       const seedChannels = state.channels ?? [];
       for (const ch of seedChannels) {
         const channelId = ch.id ?? this.allocId(teamId, ch.is_private ? "G" : "C");
+        channelIdByHandle.set(ch.name, channelId);
+        channelIdByHandle.set(channelId, channelId);
         const creator = this.resolveSeedUserId(ch.creator, userIdByHandle) ?? DEFAULT_BOT_USER;
         this.db
           .prepare(
@@ -195,6 +202,41 @@ export class SlackDomain {
               .run(channelId, ts, r.name, reactorId, now);
           }
         }
+      }
+
+      // Files (F-1509). Written with the SAME derivations `filesUpload` uses —
+      // `mimetype` from `filetype`, `size` from the byte length of `content`,
+      // `title` defaulting to `name` — so a seeded file and an uploaded one are
+      // indistinguishable to `serializeFile`. A `channels` handle that names no
+      // seeded channel is DROPPED rather than stored raw: storing it would make
+      // `files.list?channel=…` filter against an id no channel has, which reads
+      // as "the file is in no channel" from every angle except the stored row.
+      for (const f of state.files ?? []) {
+        const fileId = f.id ?? this.allocId(teamId, "F");
+        const uploader = this.resolveSeedUserId(f.user, userIdByHandle) ?? DEFAULT_BOT_USER;
+        const channelIds = (f.channels ?? [])
+          .map((ref) => channelIdByHandle.get(ref))
+          .filter((id): id is string => id !== undefined);
+        const filetype = f.filetype ?? "text";
+        const content = f.content ?? null;
+        this.db
+          .prepare(
+            `INSERT INTO files (id, team_id, user_id, name, title, mimetype, filetype, size, url_private, channels_json, deleted, content, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, '', ?, 0, ?, ?)`
+          )
+          .run(
+            fileId,
+            teamId,
+            uploader,
+            f.name,
+            f.title ?? f.name,
+            filetypeMimetype(filetype),
+            filetype,
+            content === null ? 0 : Buffer.byteLength(content, "utf8"),
+            JSON.stringify(channelIds),
+            content,
+            now
+          );
       }
 
       const seedEmoji = state.emoji ?? [];
