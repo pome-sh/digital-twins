@@ -138,6 +138,38 @@ function isTwinScriptPath(file) {
 }
 
 /**
+ * A twin's own `Dockerfile` is the recipe for its GHCR image, and that image is
+ * not an npm artifact: `release.yml` publishes tarballs, `twin-image.yml`
+ * publishes images, and no version number spans the two. It ships in no tarball
+ * for the same load-bearing reason as the three carve-outs above — every twin is
+ * `private: true` — and here the weaker reason happens to hold as well: no
+ * twin's `files` array names a Dockerfile, unlike the `dist/examples/` and
+ * `dist/scripts/` cases.
+ *
+ * The CLI's and `@pome-sh/sandbox-domains`' tarballs are the other artifacts
+ * that could carry these bytes, and do not: tsup inlines twin source reached
+ * from each twin's package `exports`, which resolve into `src/` only, and a
+ * Dockerfile is imported by nothing.
+ *
+ * Fourth instance of the F-1455 over-match, one file over from `examples/`,
+ * top-level `.md` and `scripts/`: `packages/twin-` is a plain prefix, so
+ * patching a base image demanded BOTH a `@pome-sh/cli` and a
+ * `@pome-sh/sandbox-domains` release — two republishes that would each be
+ * byte-identical. Found on F-1532, where a fixable base-image CVE had frozen the
+ * twin image publish deterministically and the remedy could only be applied in
+ * these five files. RELEASING.md's "if your change doesn't warrant a release it
+ * shouldn't be touching a publish-relevant path" has no answer here either: a
+ * twin's Dockerfile has nowhere else to live.
+ *
+ * The filename is matched EXACTLY and anchored directly under the twin root, so
+ * a Dockerfile somewhere a bundler could plausibly reach —
+ * `packages/twin-stripe/src/Dockerfile` — is NOT exempt.
+ */
+function isTwinDockerfilePath(file) {
+  return /^packages\/twin-[^/]+\/Dockerfile$/.test(file);
+}
+
+/**
  * F-1511 — a `CHANGELOG.md` is exempt, and this one is NOT the F-1455 shape:
  * these bytes really do ship (`packages/checks/package.json` and
  * `packages/twin-linear/package.json` name `CHANGELOG.md` in `files`, and npm
@@ -179,6 +211,7 @@ export function isPublishIrrelevantPath(file) {
   if (isTwinExamplePath(file)) return "a twin's top-level examples/ (every twin is `private: true`)";
   if (isTwinTopLevelDocPath(file)) return "a twin's top-level docs (every twin is `private: true`)";
   if (isTwinScriptPath(file)) return "a twin's top-level scripts/ (dev tooling, in no tarball)";
+  if (isTwinDockerfilePath(file)) return "a twin's Dockerfile (a GHCR image recipe, in no tarball)";
   if (isChangelogPath(file)) return "a CHANGELOG.md (the entry, not the artifact — see publish-relevance.mjs)";
   return null;
 }
