@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1489 — every binary `.github/workflows/**` pulls off a release CDN must go
-// through one hardened path, and a new one that does not must red CI.
+// F-1489 — every third-party network call `.github/workflows/**` makes on the
+// publish path must go through one hardened path, and a new one that does not
+// must red CI.
 //
 // WHY THIS EXISTS. `anchore/sbom-action` fetched syft with no retry; a CDN 503
 // killed the stripe twin-image job twice on 2026-08-12 (#390, #391), and on
@@ -13,7 +14,18 @@
 // bug: it stays green while a sixth install lands unhardened. So this is a
 // PROPERTY check over the workflow tree.
 //
-// TWO SHAPES.
+// F-1530 widened it from fetches to network calls, because the same shape found
+// a third instance: with both twin-image.yml fetches hardened, the REGISTRY
+// WRITE standing between them was still a single unretried `docker push`. On
+// 2026-08-14 GHCR answered `unknown blob` after every layer had reported
+// `Pushed`, `stripe-bbf27bf` was never published, and nothing re-ran the step —
+// so four consecutive twin-snapshot-verify runs failed and pome-cloud#752
+// reported `stripe — no-image` for four days. The file's NAME still says
+// cdn-fetches: renaming it would move a required gate's wiring across ci.yml,
+// AGENTS.md and this file's test for no property gained, and shapes (a) and (b)
+// are still what most of it does.
+//
+// THREE SHAPES.
 //
 //   (a) A `run:` block that fetches a remote URL. Detected by scanning every
 //       `run:` script for a `curl` / `wget` / `aria2c` / `gh release download`
@@ -41,6 +53,15 @@
 //       carries a paragraph of comment defending, because cosign v3
 //       `attest --type spdx` rejects the anchore SBOM predicate.
 //
+//   (c) A `run:` block that WRITES to a container registry — `docker push`,
+//       `docker manifest push`, `docker buildx imagetools create`. Same
+//       treatment as shape (a): it must go through
+//       `scripts/ci/push-scanned-image.sh`, which is the only place the retry
+//       budget, the backoff, the per-tag manifest read-back and the fail-closed
+//       message live. Registry READS (`docker pull`, `imagetools inspect`) are
+//       deliberately not in the list: a read that fails fails the step it is in
+//       and publishes nothing, so it cannot leave a tag behind.
+//
 // WHAT THIS GATE CANNOT DERIVE, STATED PLAINLY. Whether a third-party action
 // downloads an executable is a fact about that action's implementation, not
 // about this repo — nothing in the string `anchore/sbom-action` says "fetches
@@ -50,16 +71,30 @@
 // someone classifies it), while the VERDICT PER ACTION is a reviewed row in
 // cdn-fetch-actions.json carrying its evidence. Rows are keyed on `owner/repo`,
 // so a sha bump keeps the classification and a major rewrite under the same
-// name would not be noticed. Two further known holes, recorded rather than
-// papered over: a fetch smuggled through a tool this scanner does not know
-// (a python one-liner, a Makefile) is invisible to shape (a); and two actions
-// are classified `step-is-the-check` — deliberately not retried, because
-// retrying a scanner turns "found a secret / found a CVE" into two swallowed
-// failures — each with a `residual` field naming what stays exposed.
+// name would not be noticed. Three further known holes, recorded rather than
+// papered over: a fetch or a registry write smuggled through a tool this scanner
+// does not know (a python one-liner, a Makefile, `crane`/`skopeo`/`oras`) is
+// invisible to shapes (a) and (c); two actions are classified
+// `step-is-the-check` — deliberately not retried, because retrying a scanner
+// turns "found a secret / found a CVE" into two swallowed failures — each with a
+// `residual` field naming what stays exposed; and shape (c) covers the IMAGE
+// write only. Every cosign call in scripts/ci/sign-image-digests.sh also talks
+// to GHCR — `sign`/`attest` write, `verify`/`verify-attestation` read — and none
+// is retried. That residual is measured, not hypothetical: on 2026-08-18 GHCR
+// was degraded for a whole twin-image run (32144441622) and took out three of
+// the five legs in two different steps. gmail and linear died in the step this
+// gate now covers (`error parsing HTTP 403 response body` on the first tag,
+// nothing published). stripe got further — both tags pushed, both signed,
+// both attested — and then died on `verify-attestation`'s registry read with
+// `DENIED: denied`, i.e. AFTER publication, which is a red job over a correct
+// artifact. Closing it is the same loop around that script's per-tag body; it is
+// not claimed here.
 //
 // Usage: node scripts/ci/assert-hardened-cdn-fetches.mjs
 // Exits 1, naming every offender, on:
 //   - a `run:` block fetching a non-loopback URL outside the hardened helper
+//   - a `run:` block writing to a container registry outside the hardened push
+//     helper
 //   - a `uses:` action with no row in cdn-fetch-actions.json
 //   - a row that is internally inconsistent (fetches from a CDN but claims
 //     `not-needed`, a `step-is-the-check` row with no `residual`, an empty `why`)
@@ -68,8 +103,8 @@
 //     or `with:`, or whose gating `if:` does not reference every earlier attempt
 //   - the structural step parse and the flat line scan disagreeing about which
 //     actions the tree uses (a parser regression makes the group check vacuous)
-//   - zero fetches, zero classified CDN actions, or zero hardened-helper call
-//     sites discovered (a vacuous green, not a true fact about the tree)
+//   - zero fetches, zero classified CDN actions, or zero call sites for either
+//     hardened helper (a vacuous green, not a true fact about the tree)
 
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
@@ -78,8 +113,11 @@ import { workflowLines } from "./list-scheduled-workflows.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
-/** The hardened path, relative to the repo root. */
+/** The hardened fetch path, relative to the repo root. */
 export const HELPER = "scripts/ci/fetch-pinned-release.sh";
+
+/** The hardened registry-write path, relative to the repo root (F-1530). */
+export const PUSH_HELPER = "scripts/ci/push-scanned-image.sh";
 
 /**
  * The F-1494 pattern is 2 escapable attempts + 1 fatal one. Fewer than three
@@ -89,6 +127,23 @@ export const HELPER = "scripts/ci/fetch-pinned-release.sh";
 export const MIN_ATTEMPTS = 3;
 
 const FETCH_COMMANDS = /(?:^|[\s(`$])(?:curl|wget|aria2c|gh\s+release\s+download)(?=\s|$)/;
+
+/**
+ * Every way a `run:` block commits a manifest to a registry (F-1530). Writes
+ * only: `docker pull` and `docker buildx imagetools inspect` are reads, and a
+ * read that fails cannot leave a tag behind — `imagetools inspect` is in fact
+ * the read this repo's hardened push path and pome-cloud's
+ * resolve-image-digest.ts both make, so flagging it would red the fix.
+ *
+ * Not exhaustive over every registry client in existence, and the header says
+ * so: `crane`, `skopeo` and `oras` would each need a line here, and none is in
+ * this tree today.
+ */
+const REGISTRY_WRITE_COMMANDS = [
+  /(?:^|[\s(`$])docker\s+push(?=\s|$)/,
+  /(?:^|[\s(`$])docker\s+manifest\s+push(?=\s|$)/,
+  /(?:^|[\s(`$])docker\s+buildx\s+imagetools\s+create(?=\s|$)/,
+];
 
 const LOOPBACK = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"]);
 
@@ -243,20 +298,36 @@ export function isLoopback(url) {
 }
 
 /**
+ * One shell script as `{ text, segments }`: comments dropped, then split at
+ * every separator a command can start after.
+ *
+ * workflowLines() has already stripped YAML comments, which inside a `run: |`
+ * block are the same `#` a shell comment uses — so in production this second
+ * strip is a no-op. It is here so the rule holds for a script handed straight
+ * to one of the finders below: a commented-out fetch is not a fetch, and a gate
+ * that read one as a violation is a gate someone deletes.
+ */
+function shellSegments(script) {
+  const text = script
+    .split("\n")
+    .filter((l) => !/^\s*#/.test(l))
+    .join("\n");
+  return {
+    text,
+    segments: text
+      .split(/\n|;|&&|\|\||\|/)
+      .map((raw) => raw.trim())
+      .filter((segment) => segment !== ""),
+  };
+}
+
+/**
  * Every fetch invocation in one shell script, with the URL it targets when
  * that can be worked out. An unresolvable target is reported as `null`, which
  * every caller must treat as remote — the fail-safe direction.
  */
 export function findFetchesInScript(script) {
-  // workflowLines() has already stripped YAML comments, which inside a `run: |`
-  // block are the same `#` a shell comment uses — so in production this second
-  // strip is a no-op. It is here so the rule holds for a script handed straight
-  // to this function: a commented-out fetch is not a fetch, and a gate that
-  // read one as a violation is a gate someone deletes.
-  const text = script
-    .split("\n")
-    .filter((l) => !/^\s*#/.test(l))
-    .join("\n");
+  const { text, segments } = shellSegments(script);
   const vars = new Map();
   for (const m of text.matchAll(
     /^\s*(?:local\s+|export\s+|declare\s+)?([A-Za-z_][A-Za-z0-9_]*)=(?:"([^"]*)"|'([^']*)'|(\S+))\s*$/gm,
@@ -264,12 +335,18 @@ export function findFetchesInScript(script) {
     vars.set(m[1], m[2] ?? m[3] ?? m[4] ?? "");
   }
   const findings = [];
-  for (const raw of text.split(/\n|;|&&|\|\||\|/)) {
-    const segment = raw.trim();
-    if (segment === "" || !FETCH_COMMANDS.test(segment)) continue;
+  for (const segment of segments) {
+    if (!FETCH_COMMANDS.test(segment)) continue;
     findings.push({ segment, target: resolveTarget(segment, vars) });
   }
   return findings;
+}
+
+/** Every registry-WRITE invocation in one shell script (F-1530). */
+export function findRegistryWritesInScript(script) {
+  return shellSegments(script).segments.filter((segment) =>
+    REGISTRY_WRITE_COMMANDS.some((command) => command.test(segment)),
+  );
 }
 
 function resolveTarget(segment, vars) {
@@ -299,6 +376,37 @@ export function findUnhardenedRunFetches(root) {
           problems.push(
             `${file}:${step.line} (job ${job.name}) fetches ${target ?? "an unresolvable target"} ` +
               `outside ${HELPER}: ${segment}`,
+          );
+        }
+      }
+    }
+  }
+  return { problems, hardened: hardened.sort() };
+}
+
+// ---------------------------------------------------------------------------
+// Shape (c): registry writes inside `run:` scripts (F-1530).
+// ---------------------------------------------------------------------------
+
+/** `run:` blocks that write to a registry without using the hardened path. */
+export function findUnhardenedRegistryWrites(root) {
+  const problems = [];
+  const hardened = [];
+  for (const [file, lines] of workflowLines(root)) {
+    for (const job of parseJobs(lines)) {
+      for (const step of job.steps) {
+        const keys = stepKeys(step);
+        const script = keyText(keys, "run");
+        if (script === null) continue;
+        if (script.includes(PUSH_HELPER)) {
+          hardened.push(`${file}:${step.line} (${job.name})`);
+          continue;
+        }
+        for (const segment of findRegistryWritesInScript(script)) {
+          problems.push(
+            `${file}:${step.line} (job ${job.name}) writes to a container registry outside ${PUSH_HELPER}: ` +
+              `${segment}. A single \`unknown blob\` from GHCR then fails the leg (F-1530), leaving a commit ` +
+              "with no image and nothing to re-run it.",
           );
         }
       }
@@ -515,9 +623,15 @@ export function main(root = resolve(HERE, "../.."), table = loadTable()) {
   if (!existsSync(join(root, HELPER))) {
     throw new Error(`${HELPER} is missing — the one hardened fetch path this gate points every workflow at.`);
   }
+  if (!existsSync(join(root, PUSH_HELPER))) {
+    throw new Error(`${PUSH_HELPER} is missing — the one hardened registry-write path this gate points every workflow at.`);
+  }
 
   const { problems: runProblems, hardened } = findUnhardenedRunFetches(root);
   failures.push(...runProblems);
+
+  const { problems: writeProblems, hardened: hardenedWrites } = findUnhardenedRegistryWrites(root);
+  failures.push(...writeProblems);
 
   const refs = findActionRefsByLine(root);
   failures.push(...findTableDefects(table, refs));
@@ -562,21 +676,30 @@ export function main(root = resolve(HERE, "../.."), table = loadTable()) {
         "Refusing to report a vacuous green.",
     );
   }
+  if (hardenedWrites.length === 0) {
+    throw new Error(
+      `no workflow calls ${PUSH_HELPER}, so the hardened registry-write path is dead code and shape (c) checked ` +
+        "nothing. Refusing to report a vacuous green.",
+    );
+  }
 
   if (failures.length > 0) {
     throw new Error(
-      `${failures.length} unhardened CDN fetch problem(s) in .github/workflows:\n  - ${failures.join("\n  - ")}\n\n` +
+      `${failures.length} unhardened network call(s) in .github/workflows:\n  - ${failures.join("\n  - ")}\n\n` +
         `Shape (a): route the fetch through ${HELPER} (pin + sha256, retry with backoff, fail closed by name).\n` +
         "Shape (b): give the action a row in scripts/ci/cdn-fetch-actions.json, and if it downloads a binary, " +
-        "repeat the step (see this file's header for the exact shape).",
+        "repeat the step (see this file's header for the exact shape).\n" +
+        `Shape (c): route the registry write through ${PUSH_HELPER} (retry with backoff, read the manifest back ` +
+        "per tag, fail closed by name).",
     );
   }
 
   console.log(`hardened CDN fetches OK: ${refs.size} action(s) classified, ${classifiedCdn.length} of them CDN-fetching`);
   for (const [repo, row] of classifiedCdn) console.log(`  - ${repo}: ${row.hardening}`);
   console.log(`  ${groups.length} repeated-attempt group(s): ${groups.join(", ")}`);
-  console.log(`  ${hardened.length} hardened helper call site(s): ${hardened.join(", ")}`);
-  return { refs, groups, hardened };
+  console.log(`  ${hardened.length} hardened fetch call site(s): ${hardened.join(", ")}`);
+  console.log(`  ${hardenedWrites.length} hardened registry-write call site(s): ${hardenedWrites.join(", ")}`);
+  return { refs, groups, hardened, hardenedWrites };
 }
 
 // NOT `import.meta.main` (Node 24.2+; root `engines` allows >=24, so on

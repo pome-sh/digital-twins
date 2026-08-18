@@ -240,21 +240,28 @@ jobs:
       # the tree while leaving every caller compliant.
       - run: node scripts/ci/assert-schedule-alarm-coverage.mjs
       - run: node scripts/ci/assert-schedule-alarm-coverage.test.mjs
-      # F-1489 — every binary `.github/workflows/**` pulls off a release CDN
-      # goes through ONE hardened path, and a new one that does not reds here.
-      # Two shapes: a `run:` block fetching a non-loopback URL must call
-      # scripts/ci/fetch-pinned-release.sh (retry + backoff + an UNCONDITIONAL
-      # sha256 check + a fail-closed message naming the CDN), and a `uses:`
-      # action that installs a binary must appear as a repeated-attempt group,
-      # every copy carrying identical `uses:` and `with:` — the check that keeps
-      # twin-image.yml's three cosign installs on the same `cosign-release`.
+      # F-1489 — every third-party network call `.github/workflows/**` makes on
+      # the publish path goes through ONE hardened path, and a new one that does
+      # not reds here. Three shapes: a `run:` block fetching a non-loopback URL
+      # must call scripts/ci/fetch-pinned-release.sh (retry + backoff + an
+      # UNCONDITIONAL sha256 check + a fail-closed message naming the CDN); a
+      # `uses:` action that installs a binary must appear as a repeated-attempt
+      # group, every copy carrying identical `uses:` and `with:` — the check that
+      # keeps twin-image.yml's three cosign installs on the same
+      # `cosign-release`; and (F-1530) a `run:` block that WRITES to a container
+      # registry must call scripts/ci/push-scanned-image.sh, which retries per
+      # tag and reads each manifest back before calling it published. That third
+      # shape is the one this gate's own subject taught it: with both
+      # twin-image.yml fetches hardened, the `docker push` standing between them
+      # was still bare, and one `unknown blob` from GHCR cost four days of
+      # twin-snapshot-verify.
       # The SET of actions to judge is read out of the workflows, never typed
       # here; the per-action verdict (does this action download an executable?
       # unreadable from this repo) is a reviewed row in cdn-fetch-actions.json,
       # and an action with no row reds. Same block as the derivations above and
       # for the same reason: a `.github/workflows/**`-only diff is classified
       # docs-only by the scope step, so a heavy-block gate would be skipped by
-      # exactly the PR that adds an unhardened fetch.
+      # exactly the PR that adds an unhardened call.
       - run: node scripts/ci/assert-hardened-cdn-fetches.mjs
       - run: node scripts/ci/assert-hardened-cdn-fetches.test.mjs
       # F-1226 — the plugin manifest is what makes the `skills` installer render

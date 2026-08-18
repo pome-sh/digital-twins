@@ -13,6 +13,8 @@
 //
 //   - a `run:` block curling a release CDN outside the hardened helper
 //   - a fetch whose target the resolver cannot work out (must red, not pass)
+//   - a `run:` block writing to a container registry outside the hardened push
+//     helper (F-1530), and a registry READ that must NOT red
 //   - a `uses:` action with no row in the classification table
 //   - a table row that contradicts itself, or an exemption with no residual
 //   - a binary-installing action used as ONE step
@@ -23,9 +25,13 @@
 //   - the whole gate, end to end, over a scratch tree
 //   - the vacuous-green dead guards
 //
-// The helper half drives the real shell script against a local server that
-// 503s on demand: retry-then-succeed, exhaustion failing closed with the CDN
-// HOST in the message, and a good download with a wrong sha256 still refused.
+// The helper half drives both real shell scripts. `fetch-pinned-release.sh`
+// runs against a local server that 503s on demand: retry-then-succeed,
+// exhaustion failing closed with the CDN HOST in the message, and a good
+// download with a wrong sha256 still refused. `push-scanned-image.sh` runs
+// against a fake `docker` that reproduces F-1530's GHCR answer — every layer
+// `Pushed`, then `unknown blob` — and, separately, a push that exits 0 while
+// the manifest is never committed.
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createServer } from "node:http";
@@ -36,10 +42,13 @@ import { fileURLToPath } from "node:url";
 import {
   HELPER,
   MIN_ATTEMPTS,
+  PUSH_HELPER,
   findFetchesInScript,
   findParseDisagreements,
+  findRegistryWritesInScript,
   findTableDefects,
   findUnhardenedActionGroups,
+  findUnhardenedRegistryWrites,
   findUnhardenedRunFetches,
   findActionRefsByLine,
   hostOf,
@@ -50,6 +59,7 @@ import {
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const HELPER_PATH = join(HERE, "fetch-pinned-release.sh");
+const PUSH_HELPER_PATH = join(HERE, "push-scanned-image.sh");
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg);
@@ -67,9 +77,10 @@ function withScratchRoot(files, fn) {
   const dir = join(root, ".github", "workflows");
   mkdirSync(dir, { recursive: true });
   mkdirSync(join(root, "scripts", "ci"), { recursive: true });
-  // main() refuses to run without the hardened path it points every workflow
-  // at, so the scratch tree carries a stand-in.
+  // main() refuses to run without the hardened paths it points every workflow
+  // at, so the scratch tree carries a stand-in for each.
   writeFileSync(join(root, HELPER), "#!/usr/bin/env bash\nexit 0\n");
+  writeFileSync(join(root, PUSH_HELPER), "#!/usr/bin/env bash\nexit 0\n");
   for (const [name, content] of Object.entries(files)) writeFileSync(join(dir, name), content);
   try {
     return fn(root);
@@ -195,6 +206,88 @@ assert(hostOf("https://user@github.com:443/x") === "github.com", "userinfo and p
 assert(findFetchesInScript("echo curling is fine\n# curl https://x.example/y\n").length === 0, "prose is not a fetch");
 assert(findFetchesInScript("wget https://x.example/y").length === 1, "wget counts");
 assert(findFetchesInScript("gh release download v1 -R o/r").length === 1, "gh release download counts");
+
+// ---------------------------------------------------------------------------
+// Shape (c): registry WRITES in `run:` blocks (F-1530).
+//
+// `Push scanned image` was one bare `docker push` with no retry, sitting
+// between two `uses:` installs that had both been given three-attempt ladders
+// (F-1489, F-1494). On 2026-08-14 GHCR answered `unknown blob` after every
+// layer had reported `Pushed`, the stripe leg died, and `stripe-bbf27bf` did
+// not exist — which failed four consecutive twin-snapshot-verify runs and
+// opened pome-cloud#752, because nothing re-ran that step for four days.
+// ---------------------------------------------------------------------------
+
+// PLANTED FAILURE — the exact shape twin-image.yml's push step had.
+withScratchRoot(
+  {
+    "planted.yml": wf(`      - name: Push scanned image
+        run: |
+          printf '%s\\n' "$TAGS" | while IFS= read -r tag; do
+            docker push "$tag"
+          done`),
+  },
+  (root) => {
+    const { problems } = findUnhardenedRegistryWrites(root);
+    assertNames(problems, "docker push", "an unretried registry write must red");
+    assertNames(problems, PUSH_HELPER, "the message must say where the hardened path is");
+    assertNames(problems, "planted.yml", "the offending file must be named");
+  },
+);
+
+// PLANTED FAILURE — the other two ways a workflow commits a manifest to a
+// registry. Naming only `docker push` would leave a gate that a one-line
+// rewrite walks around.
+withScratchRoot(
+  {
+    "planted.yml": wf(`      - name: Fan out
+        run: |
+          docker manifest push ghcr.io/o/r:v1
+          docker buildx imagetools create -t ghcr.io/o/r:v1 ghcr.io/o/r@sha256:aa`),
+  },
+  (root) => {
+    const { problems } = findUnhardenedRegistryWrites(root);
+    assertNames(problems, "docker manifest push", "a manifest push is a registry write");
+    assertNames(problems, "imagetools create", "a manifest-list write is a registry write");
+  },
+);
+
+// A registry READ is not a write. `docker buildx imagetools inspect` is the
+// exact call pome-cloud's resolve-image-digest.ts makes and the one
+// sign-image-digests.sh makes per tag; a gate that red on it would be a gate
+// someone deletes.
+withScratchRoot(
+  {
+    "reads.yml": wf(`      - name: Look, do not touch
+        run: |
+          docker pull ghcr.io/o/r:v1
+          docker buildx imagetools inspect ghcr.io/o/r:v1 --format '{{.Manifest.Digest}}'`),
+  },
+  (root) => {
+    const { problems } = findUnhardenedRegistryWrites(root);
+    assert(problems.length === 0, `a registry read must not red: ${problems.join("; ")}`);
+  },
+);
+
+// The same push routed through the hardened helper is clean, and counts for
+// the dead guard below.
+withScratchRoot(
+  {
+    "ok.yml": wf(`      - name: Push scanned image
+        env:
+          IMAGE_TAGS: \${{ steps.meta.outputs.tags }}
+        run: bash ${PUSH_HELPER}`),
+  },
+  (root) => {
+    const { problems, hardened } = findUnhardenedRegistryWrites(root);
+    assert(problems.length === 0, `the hardened push path must not red: ${problems.join("; ")}`);
+    assert(hardened.length === 1, "the helper call site must be counted for the dead guard");
+  },
+);
+
+assert(findRegistryWritesInScript("# docker push ghcr.io/o/r:v1\n").length === 0, "a commented-out push is not a push");
+assert(findRegistryWritesInScript("echo 'docker pushes images'").length === 0, "prose is not a push");
+assert(findRegistryWritesInScript("docker push ghcr.io/o/r:v1").length === 1, "a bare push counts");
 
 // ---------------------------------------------------------------------------
 // Shape (b): the classification table.
@@ -328,12 +421,18 @@ function mainThrows(files, table, needle, msg) {
   });
 }
 
+// One call site per hardened path, so a fixture that is meant to red on ONE
+// planted violation is not instead answered by a dead guard.
+const HARDENED_STEPS = `      - name: Install thing
+        run: |
+          bash ${HELPER} thing "https://cdn.example.com/t.tgz" "$SHA" /tmp/t.tgz
+      - name: Push scanned image
+        run: bash ${PUSH_HELPER}`;
+
 // A tree that is otherwise correct, plus one planted raw curl.
 mainThrows(
   {
-    "ok.yml": wf(
-      `${goodGroup()}\n      - name: Install thing\n        run: |\n          bash ${HELPER} thing "https://cdn.example.com/t.tgz" "$SHA" /tmp/t.tgz`,
-    ),
+    "ok.yml": wf(`${goodGroup()}\n${HARDENED_STEPS}`),
     "planted.yml": wf(`      - name: Install other\n        run: |\n          curl -sSfL https://evil-cdn.example.com/o.tgz -o /tmp/o.tgz`),
   },
   TABLE,
@@ -341,17 +440,40 @@ mainThrows(
   "the assembled gate must red on a planted raw fetch",
 );
 
+// The same, for shape (c): an unretried registry write must reach the assembled
+// gate, not just the finder.
+mainThrows(
+  {
+    "ok.yml": wf(`${goodGroup()}\n${HARDENED_STEPS}`),
+    "planted.yml": wf(`      - name: Publish\n        run: |\n          docker push ghcr.io/o/r:v1`),
+  },
+  TABLE,
+  "docker push ghcr.io/o/r:v1",
+  "the assembled gate must red on a planted raw registry write",
+);
+
 // Dead guards: a tree with a correct group but nothing using the hardened
 // helper means shape (a) checked nothing, and must refuse to report green.
 mainThrows({ "ok.yml": wf(goodGroup()) }, TABLE, "Refusing to report a vacuous green", "no helper call site must red");
+
+// The same guard for shape (c): if no workflow pushes an image through the
+// hardened path, the registry-write half checked nothing.
+mainThrows(
+  {
+    "ok.yml": wf(
+      `${goodGroup()}\n      - name: Install thing\n        run: |\n          bash ${HELPER} thing "https://cdn.example.com/t.tgz" "$SHA" /tmp/t.tgz`,
+    ),
+  },
+  TABLE,
+  PUSH_HELPER,
+  "no hardened registry-write call site must red",
+);
 
 // A tree whose actions are all inert means the repeated-attempt half checked
 // nothing.
 mainThrows(
   {
-    "ok.yml": wf(
-      `      - uses: vendor/inert@cccc\n      - name: Install thing\n        run: |\n          bash ${HELPER} thing "https://cdn.example.com/t.tgz" "$SHA" /tmp/t.tgz`,
-    ),
+    "ok.yml": wf(`      - uses: vendor/inert@cccc\n${HARDENED_STEPS}`),
   },
   TABLE,
   "vacuous green",
@@ -449,6 +571,243 @@ try {
   assert(ok.stdout.includes("verified sha256"), "a passing fetch must say it verified");
 } finally {
   server.close();
+}
+
+// ---------------------------------------------------------------------------
+// scripts/ci/push-scanned-image.sh itself (F-1530).
+//
+// Driven against a fake `docker` on PATH rather than a real registry: the
+// failure to reproduce is GHCR accepting every layer and then refusing the
+// manifest PUT, which no local registry offers on demand. State lives in files
+// so the counters survive the separate `docker` invocations one retry ladder
+// makes.
+// ---------------------------------------------------------------------------
+
+const FAKE_DOCKER = `#!/usr/bin/env bash
+set -euo pipefail
+state="\${FAKE_DOCKER_STATE:?}"
+# take <file> — succeeds (and spends one) while that file's budget is positive.
+take() {
+  n=0
+  if [ -f "$1" ]; then n="$(cat "$1")"; fi
+  if [ "$n" -gt 0 ]; then printf '%s' "$((n - 1))" > "$1"; return 0; fi
+  return 1
+}
+if [ "\${1:-}" = "push" ]; then
+  tag="$2"
+  slug="\${tag//[^A-Za-z0-9]/_}"
+  echo "$tag" >> "\${state}/pushes"
+  echo "5f70bf18a086: Pushed"
+  if take "\${state}/pushfail_\${slug}"; then
+    # F-1530's answer from GHCR: every layer reports Pushed, then the manifest
+    # PUT is refused because the registry cannot see a blob it just accepted.
+    echo "unknown blob" >&2
+    exit 1
+  fi
+  # A push that exits 0 having committed nothing is the other half of the same
+  # fault, and the one a bare exit-code check cannot see.
+  if ! take "\${state}/nomanifest_\${slug}"; then
+    : > "\${state}/manifest_\${slug}"
+  fi
+  exit 0
+fi
+if [ "\${1:-}" = "buildx" ] && [ "\${2:-}" = "imagetools" ] && [ "\${3:-}" = "inspect" ]; then
+  tag="$4"
+  slug="\${tag//[^A-Za-z0-9]/_}"
+  if [ -f "\${state}/manifest_\${slug}" ]; then
+    echo "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    exit 0
+  fi
+  # The literal shape resolve-image-digest.ts reports on the tag that was never
+  # committed.
+  echo "ERROR: \${tag}: not found" >&2
+  exit 1
+fi
+echo "fake docker: unexpected invocation: $*" >&2
+exit 127
+`;
+
+const ROLLING = "ghcr.io/pome-sh/twins:stripe";
+// The per-commit tag docker/metadata-action emits LAST, and the one
+// pome-cloud's resolve-image-digest.ts looks up.
+const PER_COMMIT = "ghcr.io/pome-sh/twins:stripe-bbf27bf";
+
+function runPush(tags, plan = {}, { attempts = 3 } = {}) {
+  const dir = mkdtempSync(join(tmpdir(), "push-scanned-image-"));
+  const state = join(dir, "state");
+  const bin = join(dir, "bin");
+  mkdirSync(state);
+  mkdirSync(bin);
+  writeFileSync(join(bin, "docker"), FAKE_DOCKER, { mode: 0o755 });
+  for (const [tag, spec] of Object.entries(plan)) {
+    const slug = tag.replace(/[^A-Za-z0-9]/g, "_");
+    if (spec.pushFailures) writeFileSync(join(state, `pushfail_${slug}`), String(spec.pushFailures));
+    if (spec.manifestMisses) writeFileSync(join(state, `nomanifest_${slug}`), String(spec.manifestMisses));
+  }
+  const child = spawn("bash", [PUSH_HELPER_PATH], {
+    env: {
+      ...process.env,
+      PATH: `${bin}:${process.env.PATH}`,
+      IMAGE_TAGS: tags,
+      FAKE_DOCKER_STATE: state,
+      // `attempts: null` leaves the knob unset, which is how the case below
+      // measures the PRODUCTION budget rather than one the test chose.
+      ...(attempts === null ? {} : { PUSH_SCANNED_IMAGE_ATTEMPTS: String(attempts) }),
+      PUSH_SCANNED_IMAGE_SLEEP_UNIT: "0",
+    },
+  });
+  let stdout = "";
+  let stderr = "";
+  child.stdout.on("data", (d) => (stdout += d));
+  child.stderr.on("data", (d) => (stderr += d));
+  return new Promise((resolvePromise) => {
+    child.on("close", (status) => {
+      let pushes = [];
+      try {
+        pushes = readFileSync(join(state, "pushes"), "utf8").split("\n").filter(Boolean);
+      } catch {
+        /* nothing was pushed; that is the assertion's business, not ours */
+      }
+      rmSync(dir, { recursive: true, force: true });
+      resolvePromise({ status, stdout, stderr, pushes });
+    });
+  });
+}
+
+// The PRODUCTION retry budget, pinned. Every other case here passes its own
+// `attempts`, so on its own this suite would stay green with the default
+// silently cut to 1 — which is the state F-1530 was reporting. Measured by
+// leaving the knob unset: four faults must be survivable and the fifth must not.
+{
+  const survives = await runPush(PER_COMMIT, { [PER_COMMIT]: { pushFailures: 4 } }, { attempts: null });
+  assert(survives.status === 0, `the default budget must survive 4 faults, got ${survives.status}`);
+  assert(survives.pushes.length === 5, `4 faults then a good push is 5 attempts, got ${survives.pushes.length}`);
+  const exhausts = await runPush(PER_COMMIT, { [PER_COMMIT]: { pushFailures: 5 } }, { attempts: null });
+  assert(exhausts.status !== 0, "the default budget must be spent by 5 faults, not open-ended");
+  assert(exhausts.stderr.includes("after 5 attempts"), `expected a 5-attempt budget, got: ${exhausts.stderr}`);
+}
+
+// F-1530's first done-when, measured rather than asserted in a comment: a
+// single `unknown blob` no longer fails the leg.
+{
+  const flaky = await runPush(`${ROLLING}\n${PER_COMMIT}`, { [PER_COMMIT]: { pushFailures: 1 } });
+  assert(flaky.status === 0, `one \`unknown blob\` then a good push must succeed, got ${flaky.status}\n${flaky.stderr}`);
+  assert(
+    flaky.pushes.filter((t) => t === PER_COMMIT).length === 2,
+    `the failed tag must be pushed again, got ${flaky.pushes.join(", ")}`,
+  );
+  assert(
+    `${flaky.stdout}${flaky.stderr}`.includes("only on attempt 2"),
+    `a flaky-but-passing push must SAY so, got: ${flaky.stdout}${flaky.stderr}`,
+  );
+  assert(flaky.stdout.includes("ghcr.io"), "a passing push must name the registry it published to");
+}
+
+// A push that exits 0 while the registry commits no manifest is the fault an
+// exit-code check cannot see — and the one that would hand the sign step a tag
+// that resolves to nothing. It must count as a failed attempt and be retried.
+{
+  const late = await runPush(PER_COMMIT, { [PER_COMMIT]: { manifestMisses: 1 } });
+  assert(late.status === 0, `a manifest committed on the retry must pass, got ${late.status}\n${late.stderr}`);
+  assert(late.pushes.length === 2, `the uncommitted push must be retried, got ${late.pushes.join(", ")}`);
+}
+
+// The two faults are NOT reported as one. Both end in "this tag does not
+// resolve", and the retry treats them the same — but the run log has to say
+// which happened, because "the registry refused the manifest" is a re-run and
+// "the push exited 0 and committed nothing" is a read of the code. Collapsing
+// them (`docker push || true`, and let the read-back decide) keeps every other
+// assertion here green while destroying that distinction.
+// Keyed on the SCRIPT's own words, never on `unknown blob` — the fake docker
+// prints that itself, so an assertion on it would pass no matter what this
+// script concluded.
+{
+  const refused = await runPush(PER_COMMIT, { [PER_COMMIT]: { pushFailures: 1 } });
+  assert(
+    refused.stderr.includes("exited non-zero"),
+    `a push the registry refused must be named as such, got: ${refused.stderr}`,
+  );
+  const uncommitted = await runPush(PER_COMMIT, { [PER_COMMIT]: { manifestMisses: 1 } });
+  assert(
+    uncommitted.stderr.includes("exited 0"),
+    `a push that committed nothing must be named as such, got: ${uncommitted.stderr}`,
+  );
+  assert(
+    !uncommitted.stderr.includes("exited non-zero"),
+    `the two faults must not share one message, got: ${uncommitted.stderr}`,
+  );
+}
+
+// F-1530's second done-when. A registry that never commits fails the step, by
+// name — and the per-commit tag pome-cloud resolves is left absent, which is
+// the "reports not found rather than resolving a partial manifest" half.
+{
+  const dead = await runPush(PER_COMMIT, { [PER_COMMIT]: { pushFailures: 99 } }, { attempts: 2 });
+  assert(dead.status !== 0, "a registry that never accepts the manifest must fail the step");
+  assert(dead.stderr.includes("::error::"), "the failure must be an annotated error");
+  assert(dead.stderr.includes(PER_COMMIT), "the message must name the tag that could not be published");
+  assert(dead.stderr.includes("ghcr.io"), "the message must name the registry that would not answer");
+  assert(dead.stderr.includes("after 2 attempts"), "the message must say how many attempts were spent");
+  assert(dead.stderr.includes("Failing closed"), "the message must say the refusal is deliberate");
+  assert(dead.pushes.length === 2, `exactly the attempt budget must be spent, got ${dead.pushes.join(", ")}`);
+}
+
+// The half-published case, which is the reason the per-commit tag is pushed
+// LAST. When an earlier tag exhausts its attempts the script must STOP: pushing
+// on would publish a per-commit tag whose predecessor never landed, and that
+// tag is the one pome-cloud resolves and pome-cloud's gate expects to be
+// signed. The tags that DID land are named, because the sign/attest step never
+// runs after this failure — so they are published and unsigned.
+{
+  const partial = await runPush(`${ROLLING}\n${PER_COMMIT}`, { [ROLLING]: { pushFailures: 99 } }, { attempts: 2 });
+  assert(partial.status !== 0, "an exhausted tag must fail the step");
+  assert(
+    !partial.pushes.includes(PER_COMMIT),
+    `no tag may be pushed after an exhausted one, got ${partial.pushes.join(", ")}`,
+  );
+}
+
+{
+  const partial = await runPush(
+    `${ROLLING}\n${PER_COMMIT}`,
+    { [PER_COMMIT]: { pushFailures: 99 } },
+    { attempts: 2 },
+  );
+  assert(partial.status !== 0, "an exhausted tag must fail the step");
+  assert(partial.stderr.includes(ROLLING), "the message must name the tag that DID land");
+  assert(
+    /not signed|unsigned/i.test(partial.stderr),
+    `the message must say the landed tag is unsigned, got: ${partial.stderr}`,
+  );
+}
+
+// A push of zero tags is not a successful push. `steps.meta.outputs.tags` is
+// empty on a metadata-action misconfiguration, and an empty loop exits 0 —
+// which reads as "published" while nothing was. Asserted in both shapes,
+// because they are refused by two different guards: an empty variable never
+// enters the loop, while a variable holding only blank lines enters it and
+// pushes nothing.
+for (const [label, tags] of [
+  ["empty", ""],
+  ["blank lines only", "\n \n"],
+]) {
+  const none = await runPush(tags);
+  assert(none.status !== 0, `a ${label} IMAGE_TAGS must fail rather than read as a publish`);
+  assert(none.stderr.includes("IMAGE_TAGS"), `the ${label} message must name the input, got: ${none.stderr}`);
+  assert(none.pushes.length === 0, "nothing may be pushed when there is nothing to push");
+}
+
+// The ordinary case: every tag lands, each is verified to resolve, and the run
+// log records the digest — the same digest pome-cloud will resolve.
+{
+  const ok = await runPush(`${ROLLING}\n\n${PER_COMMIT}\n`);
+  assert(ok.status === 0, `a clean push must pass: ${ok.stderr}`);
+  assert(
+    ok.pushes.join(",") === `${ROLLING},${PER_COMMIT}`,
+    `every tag must be pushed once, in order, got ${ok.pushes.join(", ")}`,
+  );
+  assert(ok.stdout.includes("sha256:1111"), "the resolved digest must reach the run log");
+  assert(!/::warning::/.test(`${ok.stdout}${ok.stderr}`), "a clean push must not warn about degradation");
 }
 
 console.log("assert-hardened-cdn-fetches.test.mjs: all assertions passed");
