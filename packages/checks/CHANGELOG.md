@@ -1,6 +1,6 @@
 # @pome-sh/checks
 
-## Unreleased (patch)
+## 0.3.1 — 2026-08-18
 
 **`slackSeedSchema` accepts a `files` key** (F-1509). This package re-exports
 twin-slack's seed schema (`slackSeedSchema` / `parseSlackSeed` /

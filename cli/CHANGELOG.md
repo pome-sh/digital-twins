@@ -10,7 +10,7 @@ write a version number here or in `package.json` — see `RELEASING.md`. Release
 entries are insertions only: a correction is the next entry, naming the one it
 corrects.
 
-## Unreleased (minor)
+## 0.24.0 — 2026-08-18
 
 **A Slack seed can plant files** (F-1509). `slackSeedStateSchema` gains a `files`
 key — `{id?, name, title?, filetype?, user?, channels?, content?}` — and

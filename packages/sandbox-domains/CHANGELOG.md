@@ -1,6 +1,6 @@
 # @pome-sh/sandbox-domains
 
-## Unreleased (patch)
+## 0.2.1 — 2026-08-18
 
 **`SlackDomain.seed` writes files, and `slackSeedSchema` accepts them** (F-1509).
 The seed gained
