@@ -26,6 +26,10 @@
  *           over: a twin's top-level `.md`.
  *   F-1354  Same prefix again: a twin's own top-level `scripts/`, found on the
  *           PR whose whole job was wiring such a script into CI.
+ *   F-1532  Same prefix, one file over: a twin's own `Dockerfile`. A GHCR image
+ *           is not an npm artifact, so patching a base image was demanding both
+ *           a cli and a sandbox-domains release. Found on the PR that had to
+ *           edit all five to clear a fixable base-image CVE.
  *
  * Each carve-out is paired with an anchoring case (`src/examples/`,
  * `src/scripts/`, `cli/scripts/`, a doc riding along with a src change) because
@@ -252,6 +256,46 @@ console.log("check-release-note-required.mjs — publish relevance (inherited)")
   });
   check(
     "a script change RIDING ALONG with a src change still demands an entry",
+    r.status === 1 && r.out.includes("@pome-sh/cli"),
+    r.out,
+  );
+}
+
+{
+  // F-1532: a twin's Dockerfile builds its GHCR image, which no tarball carries.
+  // The real case was all five at once, to clear a fixable base-image CVE.
+  const r = run({
+    changes: {
+      "packages/twin-github/Dockerfile": "FROM node:24-trixie-slim\n",
+      "packages/twin-gmail/Dockerfile": "FROM node:26-trixie-slim\n",
+      "packages/twin-linear/Dockerfile": "FROM node:26-trixie-slim\n",
+      "packages/twin-slack/Dockerfile": "FROM node:24-trixie-slim\n",
+      "packages/twin-stripe/Dockerfile": "FROM node:24-trixie-slim\n",
+    },
+  });
+  check("a change confined to the twins' Dockerfiles needs no entry", r.status === 0, r.out);
+}
+
+{
+  // Anchoring check, exact filename under the twin root: `src/` is where tsup
+  // actually reaches, so a Dockerfile sitting there is not exempt.
+  const r = run({ changes: { "packages/twin-stripe/src/Dockerfile": "FROM scratch\n" } });
+  check(
+    "a Dockerfile under a twin's src/ with no entry still fails",
+    r.status === 1 && r.out.includes("@pome-sh/cli"),
+    r.out,
+  );
+}
+
+{
+  const r = run({
+    changes: {
+      "packages/twin-stripe/Dockerfile": "FROM node:24-trixie-slim\n",
+      "packages/twin-stripe/src/index.ts": "export const a = 1;\n",
+    },
+  });
+  check(
+    "a Dockerfile change RIDING ALONG with a src change still demands an entry",
     r.status === 1 && r.out.includes("@pome-sh/cli"),
     r.out,
   );
