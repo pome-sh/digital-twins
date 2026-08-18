@@ -627,10 +627,16 @@ echo "fake docker: unexpected invocation: $*" >&2
 exit 127
 `;
 
-const ROLLING = "ghcr.io/pome-sh/twins:stripe";
+// Asserted against as part of a whole sentence the script emits, never as a bare
+// `stderr.includes("ghcr.io")`: the latter is the weaker assertion (the host
+// appearing anywhere satisfies it, including in a tag the script merely echoed)
+// and CodeQL reads it as `js/incomplete-url-substring-sanitization`, which is a
+// false positive here but a fair complaint about the assertion.
+const REGISTRY = "ghcr.io";
+const ROLLING = `${REGISTRY}/pome-sh/twins:stripe`;
 // The per-commit tag docker/metadata-action emits LAST, and the one
 // pome-cloud's resolve-image-digest.ts looks up.
-const PER_COMMIT = "ghcr.io/pome-sh/twins:stripe-bbf27bf";
+const PER_COMMIT = `${REGISTRY}/pome-sh/twins:stripe-bbf27bf`;
 
 function runPush(tags, plan = {}, { attempts = 3 } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "push-scanned-image-"));
@@ -700,7 +706,10 @@ function runPush(tags, plan = {}, { attempts = 3 } = {}) {
     `${flaky.stdout}${flaky.stderr}`.includes("only on attempt 2"),
     `a flaky-but-passing push must SAY so, got: ${flaky.stdout}${flaky.stderr}`,
   );
-  assert(flaky.stdout.includes("ghcr.io"), "a passing push must name the registry it published to");
+  assert(
+    flaky.stdout.includes(`published and verified 2 tag(s) to ${REGISTRY}`),
+    `a passing push must say what it published and where, got: ${flaky.stdout}`,
+  );
 }
 
 // A push that exits 0 while the registry commits no manifest is the fault an
@@ -746,7 +755,10 @@ function runPush(tags, plan = {}, { attempts = 3 } = {}) {
   assert(dead.status !== 0, "a registry that never accepts the manifest must fail the step");
   assert(dead.stderr.includes("::error::"), "the failure must be an annotated error");
   assert(dead.stderr.includes(PER_COMMIT), "the message must name the tag that could not be published");
-  assert(dead.stderr.includes("ghcr.io"), "the message must name the registry that would not answer");
+  assert(
+    dead.stderr.includes(`to ${REGISTRY} after 2 attempts`),
+    `the message must name the registry that would not answer, got: ${dead.stderr}`,
+  );
   assert(dead.stderr.includes("after 2 attempts"), "the message must say how many attempts were spent");
   assert(dead.stderr.includes("Failing closed"), "the message must say the refusal is deliberate");
   assert(dead.pushes.length === 2, `exactly the attempt budget must be spent, got ${dead.pushes.join(", ")}`);
