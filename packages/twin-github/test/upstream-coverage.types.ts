@@ -169,8 +169,15 @@ const _cov_milestoneJson: AssertNoUncovered<Milestone, ReturnType<typeof milesto
 type Tag_Allow = never;
 const _cov_tagJson: AssertNoUncovered<Tag, ReturnType<typeof tagJson>, Tag_Allow> = true;
 
+// F-1533 dropped `immutable` (now emitted) and, with it, `updated_at` — which
+// F-1459 emitted and left listed here. A stale entry is invisible to the
+// assertion below: `AssertNoUncovered` is one-directional, reddening on an
+// upstream field that is neither emitted nor allowed, never on an allowance
+// with nothing behind it. So the header's claim that a green typecheck makes
+// every `_Allow` union "provably exact" holds in one direction only; keeping
+// these two would have read as two deliberate omissions that were not.
 type Release_Allow =
-  | "updated_at" | "reactions" | "body_html" | "body_text" | "immutable"
+  | "reactions" | "body_html" | "body_text"
   | "mentions_count" | "discussion_url";
 const _cov_releaseJson: AssertNoUncovered<Release, ReturnType<typeof releaseJson>, Release_Allow> = true;
 

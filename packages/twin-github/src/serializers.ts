@@ -610,7 +610,24 @@ export function releaseJson(release: ReleaseRow, repo: RepoRow) {
     upload_url: `https://uploads.github.com/repos/${repo.full_name}/releases/${release.id}/assets{?name,label}`,
     tarball_url: `https://api.github.com/repos/${repo.full_name}/tarball/${release.tag_name}`,
     zipball_url: `https://api.github.com/repos/${repo.full_name}/zipball/${release.tag_name}`,
-    assets: []
+    assets: [],
+    // F-1533 — the last leaf real GitHub sends on all three release surfaces
+    // that this twin did not. Same shape of fix as `updated_at` above (F-1459),
+    // and the same reason it went unnoticed: `satisfies DeepPartial<Release>`
+    // encodes "faithful SUBSET", so it cannot see an omission.
+    //
+    // `false` is the TRUE value here, not a placeholder. This twin models no
+    // immutable-release feature and has no route that could enable one — no
+    // `PUT /repos/:o/:r/immutable-releases`, nothing on the seed — so every
+    // release in every reachable twin state IS mutable. That is what separates
+    // this from the nine sibling fields F-1504 registered rather than fixed:
+    // stating `false` invents no model.
+    //
+    // Not a column. A stored value would be a second source of truth for a
+    // feature that does not exist, and the first route to enable immutability
+    // is the change that owes one — the inverse of `updated_at`, which IS a
+    // column precisely because a future update route must be able to move it.
+    immutable: false
   } satisfies DeepPartial<Release>;
 }
 

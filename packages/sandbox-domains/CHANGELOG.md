@@ -1,5 +1,15 @@
 # @pome-sh/sandbox-domains
 
+## Unreleased (patch)
+
+**`GitHubDomain`'s three release surfaces carry `immutable`** (F-1533).
+`listReleases`, `getLatestRelease` and `getReleaseByTag` now emit
+`immutable: false`, the last top-level leaf real GitHub sends on those routes
+that the twin did not. `false` is the true value rather than a placeholder: the
+twin models no immutable-release feature and has no route that could enable one,
+so every release in every reachable state is mutable. Nothing a consumer must
+act on — the key is added, none is removed or renamed.
+
 ## 0.2.1 — 2026-08-18
 
 **`SlackDomain.seed` writes files, and `slackSeedSchema` accepts them** (F-1509).
