@@ -242,19 +242,25 @@ jobs:
       - run: node scripts/ci/assert-schedule-alarm-coverage.test.mjs
       # F-1489 — every third-party network call `.github/workflows/**` makes on
       # the publish path goes through ONE hardened path, and a new one that does
-      # not reds here. Three shapes: a `run:` block fetching a non-loopback URL
+      # not reds here. Four shapes: a `run:` block fetching a non-loopback URL
       # must call scripts/ci/fetch-pinned-release.sh (retry + backoff + an
       # UNCONDITIONAL sha256 check + a fail-closed message naming the CDN); a
       # `uses:` action that installs a binary must appear as a repeated-attempt
       # group, every copy carrying identical `uses:` and `with:` — the check that
       # keeps twin-image.yml's three cosign installs on the same
-      # `cosign-release`; and (F-1530) a `run:` block that WRITES to a container
+      # `cosign-release`; (F-1530) a `run:` block that WRITES to a container
       # registry must call scripts/ci/push-scanned-image.sh, which retries per
-      # tag and reads each manifest back before calling it published. That third
-      # shape is the one this gate's own subject taught it: with both
-      # twin-image.yml fetches hardened, the `docker push` standing between them
-      # was still bare, and one `unknown blob` from GHCR cost four days of
-      # twin-snapshot-verify.
+      # tag and reads each manifest back before calling it published; and
+      # (F-1534) a `run:` block invoking cosign must call
+      # scripts/ci/sign-image-digests.sh, which retries every GHCR interaction
+      # per operation and fails closed naming what is already public.
+      # The last two shapes are the ones this gate's own subject taught it, one
+      # after the other: with both twin-image.yml fetches hardened, the
+      # `docker push` standing between them was still bare, and one
+      # `unknown blob` from GHCR cost four days of twin-snapshot-verify; with
+      # that hardened too, the cosign calls below it were the last bare ones,
+      # and four days later a `DENIED: denied` on `verify-attestation` red a leg
+      # whose tags were already pushed, signed and attested.
       # The SET of actions to judge is read out of the workflows, never typed
       # here; the per-action verdict (does this action download an executable?
       # unreadable from this repo) is a reviewed row in cdn-fetch-actions.json,

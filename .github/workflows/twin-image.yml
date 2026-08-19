@@ -341,6 +341,21 @@ jobs:
         env:
           IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
         run: bash scripts/ci/push-scanned-image.sh
+      # F-1534 — with the two fetches above and the push below hardened, the
+      # cosign calls in this step were the last unretried GHCR interaction in
+      # this job. On 2026-08-18 run 32144441622 hit a degraded GHCR: gmail and
+      # linear died in the push, and stripe got all the way through — both tags
+      # pushed, signed and attested — then died HERE on `verify-attestation`'s
+      # registry READ with `DENIED: denied`. A red job over an artifact that was
+      # correct and already public.
+      #
+      # The ladder is per OPERATION and lives in the script, not here: an inline
+      # loop is the shape the fetches above were in before F-1489, and
+      # scripts/ci/assert-hardened-cdn-fetches.mjs (shape d) now reds on a
+      # cosign call in any `run:` block that does not go through that helper.
+      # Reads are in scope for shape (d) where they are exempt from shape (c),
+      # for the reason this failure shows: by the time this step runs, the push
+      # step has already published every tag.
       - name: Sign pushed image digests and attest SBOM
         id: sign
         if: ${{ github.event_name != 'pull_request' }}

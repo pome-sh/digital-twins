@@ -25,7 +25,17 @@
 // AGENTS.md and this file's test for no property gained, and shapes (a) and (b)
 // are still what most of it does.
 //
-// THREE SHAPES.
+// F-1534 closed the residual this header used to record at the bottom. With (a)
+// and (c) hardened, `sign-image-digests.sh`'s cosign calls were the last
+// unretried GHCR interaction in that job, and on 2026-08-18 they were the ones
+// that broke: run 32144441622's stripe leg pushed both tags, signed them and
+// attested them, then died on `verify-attestation`'s registry READ with
+// `DENIED: denied`. A red job over a published, correct artifact. Shape (d) is
+// that call site, and it exists so the sign path and the push path cannot drift
+// apart again — a gate that covered only the push would stay green through
+// exactly the revert that reopened this.
+//
+// FOUR SHAPES.
 //
 //   (a) A `run:` block that fetches a remote URL. Detected by scanning every
 //       `run:` script for a `curl` / `wget` / `aria2c` / `gh release download`
@@ -62,6 +72,20 @@
 //       deliberately not in the list: a read that fails fails the step it is in
 //       and publishes nothing, so it cannot leave a tag behind.
 //
+//   (d) A `run:` block that invokes `cosign`. Same treatment again: it must go
+//       through `scripts/ci/sign-image-digests.sh`, which is the only place the
+//       per-operation retry budget, the backoff and the fail-closed message
+//       naming what is already public live. EVERY subcommand counts, reads
+//       included — which is where (d) parts company with (c), and deliberately.
+//       Shape (c) exempts reads because a read that fails publishes nothing;
+//       here the opposite holds, because this step runs AFTER the push step has
+//       published every tag. `cosign verify-attestation`'s read is the exact
+//       call that failed on 2026-08-18, and it failed over an artifact that was
+//       already correct and already public. Nor is the finder a list of the four
+//       subcommands the script runs today: `cosign copy` writes to a registry
+//       and `cosign triangulate` reads from one, and an enumeration would be
+//       walked around by either.
+//
 // WHAT THIS GATE CANNOT DERIVE, STATED PLAINLY. Whether a third-party action
 // downloads an executable is a fact about that action's implementation, not
 // about this repo — nothing in the string `anchore/sbom-action` says "fetches
@@ -72,29 +96,34 @@
 // cdn-fetch-actions.json carrying its evidence. Rows are keyed on `owner/repo`,
 // so a sha bump keeps the classification and a major rewrite under the same
 // name would not be noticed. Three further known holes, recorded rather than
-// papered over: a fetch or a registry write smuggled through a tool this scanner
-// does not know (a python one-liner, a Makefile, `crane`/`skopeo`/`oras`) is
-// invisible to shapes (a) and (c); two actions are classified
-// `step-is-the-check` — deliberately not retried, because retrying a scanner
-// turns "found a secret / found a CVE" into two swallowed failures — each with a
-// `residual` field naming what stays exposed; and shape (c) covers the IMAGE
-// write only. Every cosign call in scripts/ci/sign-image-digests.sh also talks
-// to GHCR — `sign`/`attest` write, `verify`/`verify-attestation` read — and none
-// is retried. That residual is measured, not hypothetical: on 2026-08-18 GHCR
-// was degraded for a whole twin-image run (32144441622) and took out three of
-// the five legs in two different steps. gmail and linear died in the step this
-// gate now covers (`error parsing HTTP 403 response body` on the first tag,
-// nothing published). stripe got further — both tags pushed, both signed,
-// both attested — and then died on `verify-attestation`'s registry read with
-// `DENIED: denied`, i.e. AFTER publication, which is a red job over a correct
-// artifact. Closing it is the same loop around that script's per-tag body; it is
-// not claimed here.
+// papered over: a fetch, a registry write or a signing call smuggled through a
+// tool this scanner does not know (a python one-liner, a Makefile,
+// `crane`/`skopeo`/`oras`) is invisible to shapes (a), (c) and (d); two
+// actions are classified `step-is-the-check` — deliberately not retried, because
+// retrying a scanner turns "found a secret / found a CVE" into two swallowed
+// failures — each with a `residual` field naming what stays exposed; and shape
+// (d) matches cosign in COMMAND POSITION only, so `bash -c "cosign …"` and a
+// call assembled in a variable are invisible to it (see SIGNING_COMMANDS below
+// for why that precision is bought rather than free).
+//
+// The hole this header used to record as a FOURTH is closed. It read: shape (c)
+// covers the IMAGE write only, and every cosign call in
+// scripts/ci/sign-image-digests.sh also talks to GHCR with no retry. That was
+// measured, not hypothetical — on 2026-08-18 a degraded GHCR took out three of
+// run 32144441622's five legs in two different steps: gmail and linear in the
+// push (`error parsing HTTP 403 response body` on the first tag, nothing
+// published), and stripe on `verify-attestation`'s read with `DENIED: denied`
+// AFTER both tags were pushed, signed and attested. Shape (d) above is what
+// closes it, and the helper it points at retries per OPERATION rather than
+// around the per-tag body — re-signing a digest because the VERIFY could not
+// read it is wasted work and a second signature layer over a good one.
 //
 // Usage: node scripts/ci/assert-hardened-cdn-fetches.mjs
 // Exits 1, naming every offender, on:
 //   - a `run:` block fetching a non-loopback URL outside the hardened helper
 //   - a `run:` block writing to a container registry outside the hardened push
 //     helper
+//   - a `run:` block invoking cosign outside the hardened sign helper
 //   - a `uses:` action with no row in cdn-fetch-actions.json
 //   - a row that is internally inconsistent (fetches from a CDN but claims
 //     `not-needed`, a `step-is-the-check` row with no `residual`, an empty `why`)
@@ -103,8 +132,9 @@
 //     or `with:`, or whose gating `if:` does not reference every earlier attempt
 //   - the structural step parse and the flat line scan disagreeing about which
 //     actions the tree uses (a parser regression makes the group check vacuous)
-//   - zero fetches, zero classified CDN actions, or zero call sites for either
-//     hardened helper (a vacuous green, not a true fact about the tree)
+//   - zero fetches, zero classified CDN actions, or zero call sites for any of
+//     the three hardened helpers (a vacuous green, not a true fact about the
+//     tree)
 
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
@@ -118,6 +148,9 @@ export const HELPER = "scripts/ci/fetch-pinned-release.sh";
 
 /** The hardened registry-write path, relative to the repo root (F-1530). */
 export const PUSH_HELPER = "scripts/ci/push-scanned-image.sh";
+
+/** The hardened sign/attest/verify path, relative to the repo root (F-1534). */
+export const SIGN_HELPER = "scripts/ci/sign-image-digests.sh";
 
 /**
  * The F-1494 pattern is 2 escapable attempts + 1 fatal one. Fewer than three
@@ -143,6 +176,37 @@ const REGISTRY_WRITE_COMMANDS = [
   /(?:^|[\s(`$])docker\s+push(?=\s|$)/,
   /(?:^|[\s(`$])docker\s+manifest\s+push(?=\s|$)/,
   /(?:^|[\s(`$])docker\s+buildx\s+imagetools\s+create(?=\s|$)/,
+];
+
+/**
+ * Every way a `run:` block reaches a registry through cosign (F-1534). ANY
+ * subcommand, not a list of the four sign-image-digests.sh runs: `sign` and
+ * `attest` write, `verify` and `verify-attestation` read, `copy` writes,
+ * `triangulate` reads, and `initialize` pulls the TUF root off a CDN. Every one
+ * is a third-party network call on the publish path, which is the property this
+ * gate is about — and an enumeration is the list-shaped thing this file's header
+ * refuses. A cosign invocation that genuinely needs no hardening does not exist
+ * in this tree; if one ever does, it belongs in a reviewed row, not in a widened
+ * regex.
+ *
+ * Matched in COMMAND POSITION, which is where this shape parts company from the
+ * `[\s(`$]`-prefixed patterns above. `docker push` reads as a command wherever
+ * it appears; `cosign` is also an ENGLISH WORD in this tree — twin-image.yml's
+ * three-attempt install ladder annotates every attempt with an
+ * `echo "…cosign-installer fetches cosign from…"`, and a rule that read those
+ * as invocations would red the whole tree on its own prose, which is a rule
+ * someone deletes. So: the start of a segment (behind any prefix a command can
+ * hide behind), or immediately inside a command substitution.
+ *
+ * The trade, stated rather than hidden: a call assembled in a variable or run
+ * through `bash -c "cosign …"` is invisible here — the same class of hole this
+ * file's header already records for `crane`, `skopeo` and a Makefile.
+ */
+const COMMAND_PREFIX =
+  "(?:(?:!|time|exec|sudo|env|command|if|then|else|elif|do|while|until)\\s+|[A-Za-z_][A-Za-z0-9_]*=\\S*\\s+)*";
+const SIGNING_COMMANDS = [
+  new RegExp(`^\\s*${COMMAND_PREFIX}cosign(?=\\s|$)`),
+  new RegExp(`(?:\\$\\(|\\x60)\\s*${COMMAND_PREFIX}cosign(?=\\s|$)`),
 ];
 
 const LOOPBACK = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"]);
@@ -349,6 +413,13 @@ export function findRegistryWritesInScript(script) {
   );
 }
 
+/** Every cosign invocation in one shell script (F-1534). */
+export function findSigningCallsInScript(script) {
+  return shellSegments(script).segments.filter((segment) =>
+    SIGNING_COMMANDS.some((command) => command.test(segment)),
+  );
+}
+
 function resolveTarget(segment, vars) {
   const literal = /[a-z][a-z0-9+.-]*:\/\/[^\s"'`)]+/i.exec(segment);
   if (literal) return literal[0];
@@ -407,6 +478,38 @@ export function findUnhardenedRegistryWrites(root) {
             `${file}:${step.line} (job ${job.name}) writes to a container registry outside ${PUSH_HELPER}: ` +
               `${segment}. A single \`unknown blob\` from GHCR then fails the leg (F-1530), leaving a commit ` +
               "with no image and nothing to re-run it.",
+          );
+        }
+      }
+    }
+  }
+  return { problems, hardened: hardened.sort() };
+}
+
+// ---------------------------------------------------------------------------
+// Shape (d): cosign calls inside `run:` scripts (F-1534).
+// ---------------------------------------------------------------------------
+
+/** `run:` blocks that invoke cosign without using the hardened path. */
+export function findUnhardenedSigningCalls(root) {
+  const problems = [];
+  const hardened = [];
+  for (const [file, lines] of workflowLines(root)) {
+    for (const job of parseJobs(lines)) {
+      for (const step of job.steps) {
+        const keys = stepKeys(step);
+        const script = keyText(keys, "run");
+        if (script === null) continue;
+        if (script.includes(SIGN_HELPER)) {
+          hardened.push(`${file}:${step.line} (${job.name})`);
+          continue;
+        }
+        for (const segment of findSigningCallsInScript(script)) {
+          problems.push(
+            `${file}:${step.line} (job ${job.name}) calls cosign outside ${SIGN_HELPER}: ${segment}. ` +
+              "Every cosign subcommand talks to the registry, and this step runs after the image is " +
+              "already published — a single `DENIED` from a degraded GHCR then reds the job over a correct, " +
+              "public artifact (F-1534). Reads are in scope here for exactly that reason, unlike shape (c).",
           );
         }
       }
@@ -626,12 +729,18 @@ export function main(root = resolve(HERE, "../.."), table = loadTable()) {
   if (!existsSync(join(root, PUSH_HELPER))) {
     throw new Error(`${PUSH_HELPER} is missing — the one hardened registry-write path this gate points every workflow at.`);
   }
+  if (!existsSync(join(root, SIGN_HELPER))) {
+    throw new Error(`${SIGN_HELPER} is missing — the one hardened signing path this gate points every workflow at.`);
+  }
 
   const { problems: runProblems, hardened } = findUnhardenedRunFetches(root);
   failures.push(...runProblems);
 
   const { problems: writeProblems, hardened: hardenedWrites } = findUnhardenedRegistryWrites(root);
   failures.push(...writeProblems);
+
+  const { problems: signProblems, hardened: hardenedSigns } = findUnhardenedSigningCalls(root);
+  failures.push(...signProblems);
 
   const refs = findActionRefsByLine(root);
   failures.push(...findTableDefects(table, refs));
@@ -682,6 +791,12 @@ export function main(root = resolve(HERE, "../.."), table = loadTable()) {
         "nothing. Refusing to report a vacuous green.",
     );
   }
+  if (hardenedSigns.length === 0) {
+    throw new Error(
+      `no workflow calls ${SIGN_HELPER}, so the hardened signing path is dead code and shape (d) checked ` +
+        "nothing. Refusing to report a vacuous green.",
+    );
+  }
 
   if (failures.length > 0) {
     throw new Error(
@@ -690,7 +805,9 @@ export function main(root = resolve(HERE, "../.."), table = loadTable()) {
         "Shape (b): give the action a row in scripts/ci/cdn-fetch-actions.json, and if it downloads a binary, " +
         "repeat the step (see this file's header for the exact shape).\n" +
         `Shape (c): route the registry write through ${PUSH_HELPER} (retry with backoff, read the manifest back ` +
-        "per tag, fail closed by name).",
+        "per tag, fail closed by name).\n" +
+        `Shape (d): route the cosign call through ${SIGN_HELPER} (retry each operation with backoff, fail closed ` +
+        "naming which operation ran out and what is already published).",
     );
   }
 
@@ -699,7 +816,8 @@ export function main(root = resolve(HERE, "../.."), table = loadTable()) {
   console.log(`  ${groups.length} repeated-attempt group(s): ${groups.join(", ")}`);
   console.log(`  ${hardened.length} hardened fetch call site(s): ${hardened.join(", ")}`);
   console.log(`  ${hardenedWrites.length} hardened registry-write call site(s): ${hardenedWrites.join(", ")}`);
-  return { refs, groups, hardened, hardenedWrites };
+  console.log(`  ${hardenedSigns.length} hardened signing call site(s): ${hardenedSigns.join(", ")}`);
+  return { refs, groups, hardened, hardenedWrites, hardenedSigns };
 }
 
 // NOT `import.meta.main` (Node 24.2+; root `engines` allows >=24, so on
