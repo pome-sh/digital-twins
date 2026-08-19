@@ -376,6 +376,60 @@ describe("F-1421 — the release surfaces that had no seedable state", () => {
     expect(body.map((tag: { name: string }) => tag.name)).toEqual([WORLD_A.tagName]);
   });
 
+  // F-1533 — the three release surfaces serve one object, so a leaf missing
+  // from ONE of them is the whole defect. Asserted per surface rather than on
+  // `releaseJson` directly, because a serializer-level test passes while a
+  // route serves something else, and it is the ROUTE that the declared lane
+  // measures (`topLevelKeys(body[0])` of the committed capture).
+  //
+  // Neither existing guard catches an omission here, which is why this test is
+  // written by hand:
+  //   - `satisfies DeepPartial<Release>` permits omitting any field. That is
+  //     the point of the anchor — it encodes "faithful SUBSET" — so it fires on
+  //     a wrong name or a wrong type and never on a missing one.
+  //   - `AssertNoUncovered` in upstream-coverage.types.ts is one-directional:
+  //     it reds on an upstream field that is neither emitted nor listed in
+  //     `Release_Allow`, and `immutable` was listed. (So was `updated_at`, long
+  //     after F-1459 emitted it — a dead allowance the assertion cannot see.)
+  //
+  // The whole reason this is one test over three surfaces: F-1459 fixed the
+  // same serializer for `updated_at` and left no test behind, so the next leaf
+  // to go missing had nothing to fail against.
+  const RELEASE_SURFACES: Array<{ id: string; path: string; element: (body: any) => any }> = [
+    { id: "GET /releases", path: "/repos/acme/api/releases", element: (body) => body[0] },
+    { id: "GET /releases/latest", path: "/repos/acme/api/releases/latest", element: (body) => body },
+    {
+      id: "GET /releases/tags/:tag",
+      path: `/repos/acme/api/releases/tags/${WORLD_A.tagName}`,
+      element: (body) => body
+    }
+  ];
+
+  it.each(RELEASE_SURFACES)("serves `immutable` on $id", async ({ path, element }) => {
+    const { status, body } = await get(appFor(WORLD_A), path);
+    expect(status).toBe(200);
+    const release = element(body);
+    expect(release).toMatchObject({ tag_name: WORLD_A.tagName });
+    // Two assertions, because the defect is the KEY and the value is `false`.
+    // `toHaveProperty` first so an omission reports as a missing leaf, which is
+    // what it is; on its own, `toBe(false)` against an absent key reads as a
+    // value bug and sends the next reader to the wrong place.
+    expect(release).toHaveProperty("immutable");
+    // `false` is the true value, not a placeholder: this twin models no
+    // immutable-release feature and has no route that could enable one, so
+    // every release in every reachable state IS mutable.
+    expect(release.immutable).toBe(false);
+  });
+
+  // The leaf F-1459 added, retro-covered by the same property. It had no test
+  // either, and it is one `git revert` away from being the next silent
+  // omission on exactly these three surfaces.
+  it.each(RELEASE_SURFACES)("serves `updated_at` on $id", async ({ path, element }) => {
+    const release = element((await get(appFor(WORLD_A), path)).body);
+    expect(release).toHaveProperty("updated_at");
+    expect(typeof release.updated_at).toBe("string");
+  });
+
   it("mints the tag for a release whose tag the seed did not declare", async () => {
     const untagged = world(WORLD_A);
     untagged.repositories[0]!.tags = [];
