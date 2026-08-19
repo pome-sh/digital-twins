@@ -15,6 +15,9 @@
 //   - a fetch whose target the resolver cannot work out (must red, not pass)
 //   - a `run:` block writing to a container registry outside the hardened push
 //     helper (F-1530), and a registry READ that must NOT red
+//   - a `run:` block invoking cosign outside the hardened sign helper (F-1534),
+//     the READ subcommands included — unlike shape (c), a failed read here
+//     happens AFTER publication
 //   - a `uses:` action with no row in the classification table
 //   - a table row that contradicts itself, or an exemption with no residual
 //   - a binary-installing action used as ONE step
@@ -25,13 +28,17 @@
 //   - the whole gate, end to end, over a scratch tree
 //   - the vacuous-green dead guards
 //
-// The helper half drives both real shell scripts. `fetch-pinned-release.sh`
+// The helper half drives all three real shell scripts. `fetch-pinned-release.sh`
 // runs against a local server that 503s on demand: retry-then-succeed,
 // exhaustion failing closed with the CDN HOST in the message, and a good
 // download with a wrong sha256 still refused. `push-scanned-image.sh` runs
 // against a fake `docker` that reproduces F-1530's GHCR answer — every layer
 // `Pushed`, then `unknown blob` — and, separately, a push that exits 0 while
-// the manifest is never committed.
+// the manifest is never committed. `sign-image-digests.sh` runs against a fake
+// `cosign` that reproduces F-1534's — `DENIED: denied` off the GHCR token
+// endpoint, injectable per subcommand, so the case that actually happened (both
+// tags pushed, signed and attested, dead on `verify-attestation`'s READ) is a
+// fixture rather than a paragraph.
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createServer } from "node:http";
@@ -43,13 +50,16 @@ import {
   HELPER,
   MIN_ATTEMPTS,
   PUSH_HELPER,
+  SIGN_HELPER,
   findFetchesInScript,
   findParseDisagreements,
   findRegistryWritesInScript,
+  findSigningCallsInScript,
   findTableDefects,
   findUnhardenedActionGroups,
   findUnhardenedRegistryWrites,
   findUnhardenedRunFetches,
+  findUnhardenedSigningCalls,
   findActionRefsByLine,
   hostOf,
   isLoopback,
@@ -60,6 +70,7 @@ import {
 const HERE = dirname(fileURLToPath(import.meta.url));
 const HELPER_PATH = join(HERE, "fetch-pinned-release.sh");
 const PUSH_HELPER_PATH = join(HERE, "push-scanned-image.sh");
+const SIGN_HELPER_PATH = join(HERE, "sign-image-digests.sh");
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg);
@@ -81,6 +92,7 @@ function withScratchRoot(files, fn) {
   // at, so the scratch tree carries a stand-in for each.
   writeFileSync(join(root, HELPER), "#!/usr/bin/env bash\nexit 0\n");
   writeFileSync(join(root, PUSH_HELPER), "#!/usr/bin/env bash\nexit 0\n");
+  writeFileSync(join(root, SIGN_HELPER), "#!/usr/bin/env bash\nexit 0\n");
   for (const [name, content] of Object.entries(files)) writeFileSync(join(dir, name), content);
   try {
     return fn(root);
@@ -290,6 +302,107 @@ assert(findRegistryWritesInScript("echo 'docker pushes images'").length === 0, "
 assert(findRegistryWritesInScript("docker push ghcr.io/o/r:v1").length === 1, "a bare push counts");
 
 // ---------------------------------------------------------------------------
+// Shape (d): cosign calls in `run:` blocks (F-1534).
+//
+// With shapes (a) and (c) closed, the sign/attest/verify step was the last
+// unretried GHCR interaction on the publish path — a single step at
+// twin-image.yml:344 with no attempt siblings, sitting between an SBOM fetch
+// and a cosign install that both have three-attempt ladders. On 2026-08-18 a
+// degraded GHCR answered `DENIED: denied` off its token endpoint and killed the
+// stripe leg of run 32144441622 on `verify-attestation` — AFTER both tags were
+// pushed, signed and attested. A red job over a correct, published artifact.
+// ---------------------------------------------------------------------------
+
+// PLANTED FAILURE — the WRITE half, inline. This is the shape the sign step
+// had before F-1534.
+withScratchRoot(
+  {
+    "planted.yml": wf(`      - name: Sign pushed image digests
+        run: |
+          cosign sign --yes "$REF"
+          cosign attest --yes --predicate sbom.json --type spdx "$REF"`),
+  },
+  (root) => {
+    const { problems } = findUnhardenedSigningCalls(root);
+    assertNames(problems, "cosign sign", "an unretried cosign sign must red");
+    assertNames(problems, "cosign attest", "an unretried cosign attest must red");
+    assertNames(problems, SIGN_HELPER, "the message must say where the hardened path is");
+    assertNames(problems, "planted.yml", "the offending file must be named");
+  },
+);
+
+// PLANTED FAILURE — the READ half. This is the one that separates shape (d)
+// from shape (c), where reads are deliberately exempt: a `docker pull` that
+// fails publishes nothing, but `cosign verify-attestation` runs AFTER the push
+// step has published every tag, so its failure reds a job over an artifact that
+// is already public. A shape (d) that copied (c)'s exemption would miss the
+// exact call that broke.
+withScratchRoot(
+  {
+    "planted.yml": wf(`      - name: Verify what we signed
+        run: |
+          cosign verify --certificate-oidc-issuer "$ISSUER" "$REF" >/dev/null
+          cosign verify-attestation --type spdx "$REF" >/dev/null`),
+  },
+  (root) => {
+    const { problems } = findUnhardenedSigningCalls(root);
+    assertNames(problems, "cosign verify", "an unretried cosign verify must red");
+    assertNames(problems, "cosign verify-attestation", "the call that actually broke must red");
+    assertNames(
+      problems,
+      "already published",
+      "the message must say why a READ is in scope here when it is not in shape (c)",
+    );
+  },
+);
+
+// The same signing routed through the hardened helper is clean, and counts for
+// the dead guard below.
+withScratchRoot(
+  {
+    "ok.yml": wf(`      - name: Sign pushed image digests
+        env:
+          IMAGE_TAGS: \${{ steps.meta.outputs.tags }}
+        run: |
+          bash ${SIGN_HELPER} "Signed digests" twin.spdx.json`),
+  },
+  (root) => {
+    const { problems, hardened } = findUnhardenedSigningCalls(root);
+    assert(problems.length === 0, `the hardened sign path must not red: ${problems.join("; ")}`);
+    assert(hardened.length === 1, "the helper call site must be counted for the dead guard");
+  },
+);
+
+assert(findSigningCallsInScript("# cosign sign --yes $REF\n").length === 0, "a commented-out sign is not a sign");
+assert(findSigningCallsInScript("echo 'cosign signs digests'").length === 0, "prose is not a sign");
+assert(findSigningCallsInScript("cosign sign --yes $REF").length === 1, "a bare sign counts");
+// Every cosign subcommand in this tree reaches GHCR, so the finder is not a
+// list of the four the sign script happens to run today: `cosign copy` is a
+// registry-to-registry write and `cosign triangulate` a read, and a shape (d)
+// that enumerated subcommands would be walked around by either.
+assert(findSigningCallsInScript("cosign copy ghcr.io/o/r:v1 ghcr.io/o/r:v2").length === 1, "copy counts");
+assert(findSigningCallsInScript("cosign triangulate ghcr.io/o/r:v1").length === 1, "triangulate counts");
+
+// `cosign` is also an English word in this tree, which `docker push` is not:
+// twin-image.yml's install ladder annotates all three attempts with an `echo`
+// naming the binary. A prefix rule like shape (a)'s and (c)'s reads those two
+// lines as unhardened invocations and reds the repo on its own prose — measured,
+// not imagined: it did, on the first run of this gate.
+for (const prose of [
+  `echo "::warning::cosign install attempt 1 failed. sigstore/cosign-installer fetches cosign from github.com/sigstore/cosign/releases"`,
+  `echo "::error::could not install cosign after 3 attempts. sigstore/cosign-installer fetches the pinned cosign v2.6.4 binary from the sigstore release CDN"`,
+]) {
+  assert(findSigningCallsInScript(prose).length === 0, `an echo naming cosign is not a cosign call: ${prose}`);
+}
+
+// …and the positions a REAL call hides in are still calls, so the tightening
+// above did not buy its precision by going blind.
+assert(findSigningCallsInScript('if cosign verify "$REF"; then :; fi').length === 1, "a guarded call counts");
+assert(findSigningCallsInScript('out="$(cosign triangulate "$REF")"').length === 1, "a substituted call counts");
+assert(findSigningCallsInScript("COSIGN_EXPERIMENTAL=1 cosign sign $REF").length === 1, "an assignment prefix counts");
+assert(findSigningCallsInScript("docker build . && cosign sign $REF").length === 1, "a call after && counts");
+
+// ---------------------------------------------------------------------------
 // Shape (b): the classification table.
 // ---------------------------------------------------------------------------
 
@@ -427,7 +540,9 @@ const HARDENED_STEPS = `      - name: Install thing
         run: |
           bash ${HELPER} thing "https://cdn.example.com/t.tgz" "$SHA" /tmp/t.tgz
       - name: Push scanned image
-        run: bash ${PUSH_HELPER}`;
+        run: bash ${PUSH_HELPER}
+      - name: Sign pushed image digests
+        run: bash ${SIGN_HELPER} "Signed digests" twin.spdx.json`;
 
 // A tree that is otherwise correct, plus one planted raw curl.
 mainThrows(
@@ -452,6 +567,17 @@ mainThrows(
   "the assembled gate must red on a planted raw registry write",
 );
 
+// The same, for shape (d): an inline cosign call must reach the assembled gate.
+mainThrows(
+  {
+    "ok.yml": wf(`${goodGroup()}\n${HARDENED_STEPS}`),
+    "planted.yml": wf(`      - name: Sign\n        run: |\n          cosign sign --yes ghcr.io/o/r@sha256:aa`),
+  },
+  TABLE,
+  "cosign sign --yes ghcr.io/o/r@sha256:aa",
+  "the assembled gate must red on a planted inline cosign call",
+);
+
 // Dead guards: a tree with a correct group but nothing using the hardened
 // helper means shape (a) checked nothing, and must refuse to report green.
 mainThrows({ "ok.yml": wf(goodGroup()) }, TABLE, "Refusing to report a vacuous green", "no helper call site must red");
@@ -461,12 +587,26 @@ mainThrows({ "ok.yml": wf(goodGroup()) }, TABLE, "Refusing to report a vacuous g
 mainThrows(
   {
     "ok.yml": wf(
-      `${goodGroup()}\n      - name: Install thing\n        run: |\n          bash ${HELPER} thing "https://cdn.example.com/t.tgz" "$SHA" /tmp/t.tgz`,
+      `${goodGroup()}\n      - name: Install thing\n        run: |\n          bash ${HELPER} thing "https://cdn.example.com/t.tgz" "$SHA" /tmp/t.tgz\n      - name: Sign\n        run: bash ${SIGN_HELPER} "t" t.json`,
     ),
   },
   TABLE,
   PUSH_HELPER,
   "no hardened registry-write call site must red",
+);
+
+// And for shape (d): with the sign step deleted rather than hardened, the
+// signing half checked nothing. This is the guard that keeps F-1534's fix from
+// being quietly reverted into a green gate.
+mainThrows(
+  {
+    "ok.yml": wf(
+      `${goodGroup()}\n      - name: Install thing\n        run: |\n          bash ${HELPER} thing "https://cdn.example.com/t.tgz" "$SHA" /tmp/t.tgz\n      - name: Push scanned image\n        run: bash ${PUSH_HELPER}`,
+    ),
+  },
+  TABLE,
+  SIGN_HELPER,
+  "no hardened signing call site must red",
 );
 
 // A tree whose actions are all inert means the repeated-attempt half checked
@@ -614,6 +754,15 @@ fi
 if [ "\${1:-}" = "buildx" ] && [ "\${2:-}" = "imagetools" ] && [ "\${3:-}" = "inspect" ]; then
   tag="$4"
   slug="\${tag//[^A-Za-z0-9]/_}"
+  echo "$tag" >> "\${state}/inspects"
+  # A degraded GHCR refuses the manifest READ as readily as the manifest PUT —
+  # F-1534's \`DENIED: denied\` off the token endpoint arrives here too. Only the
+  # sign suite below sets this budget; the push cases above leave it unset,
+  # where \`take\` on a missing file is a no-op.
+  if take "\${state}/inspectfail_\${slug}"; then
+    echo "ERROR: GET https://ghcr.io/token?scope=repository:pome-sh/twins:pull&service=ghcr.io: DENIED: denied" >&2
+    exit 1
+  fi
   if [ -f "\${state}/manifest_\${slug}" ]; then
     echo "sha256:1111111111111111111111111111111111111111111111111111111111111111"
     exit 0
@@ -637,6 +786,18 @@ const ROLLING = `${REGISTRY}/pome-sh/twins:stripe`;
 // The per-commit tag docker/metadata-action emits LAST, and the one
 // pome-cloud's resolve-image-digest.ts looks up.
 const PER_COMMIT = `${REGISTRY}/pome-sh/twins:stripe-bbf27bf`;
+
+/**
+ * The clause of a fail-closed message that lists what DID land, or "" when the
+ * script printed no such clause.
+ *
+ * Needed because the two real tags are prefix-related — `…:stripe` is a
+ * substring of `…:stripe-bbf27bf` — so a bare
+ * `stderr.includes(ROLLING)` is satisfied by the FAILING tag being named and
+ * passes with the landed list deleted outright. Measured: deleting it from
+ * either helper left this suite green until this split was introduced.
+ */
+const landedClause = (stderr, label) => stderr.split(label)[1] ?? "";
 
 function runPush(tags, plan = {}, { attempts = 3 } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "push-scanned-image-"));
@@ -786,10 +947,13 @@ function runPush(tags, plan = {}, { attempts = 3 } = {}) {
     { attempts: 2 },
   );
   assert(partial.status !== 0, "an exhausted tag must fail the step");
-  assert(partial.stderr.includes(ROLLING), "the message must name the tag that DID land");
   assert(
     /not signed|unsigned/i.test(partial.stderr),
     `the message must say the landed tag is unsigned, got: ${partial.stderr}`,
+  );
+  assert(
+    landedClause(partial.stderr, "Already published and NOT signed").includes(ROLLING),
+    `the message must name the tag that DID land, in the landed clause, got: ${partial.stderr}`,
   );
 }
 
@@ -820,6 +984,287 @@ for (const [label, tags] of [
   );
   assert(ok.stdout.includes("sha256:1111"), "the resolved digest must reach the run log");
   assert(!/::warning::/.test(`${ok.stdout}${ok.stderr}`), "a clean push must not warn about degradation");
+}
+
+// ---------------------------------------------------------------------------
+// scripts/ci/sign-image-digests.sh itself (F-1534).
+//
+// Driven against a fake `cosign` alongside the fake `docker` above. The fault
+// to reproduce is a registry that authenticates fine for one call and answers
+// `DENIED: denied` for the next, which no local registry offers on demand —
+// and which, unlike the push fault, strikes AFTER every tag is public.
+// ---------------------------------------------------------------------------
+
+const FAKE_COSIGN = `#!/usr/bin/env bash
+set -euo pipefail
+state="\${FAKE_COSIGN_STATE:?}"
+op="\${1:?}"
+# cosign always takes the image ref LAST, on every subcommand this script runs.
+for ref in "$@"; do :; done
+tag="\${ref%@*}"
+slug="\${tag//[^A-Za-z0-9]/_}"
+echo "\${op} \${ref}" >> "\${state}/cosign"
+take() {
+  n=0
+  if [ -f "$1" ]; then n="$(cat "$1")"; fi
+  if [ "$n" -gt 0 ]; then printf '%s' "$((n - 1))" > "$1"; return 0; fi
+  return 1
+}
+if take "\${state}/cosignfail_\${op}_\${slug}"; then
+  # Verbatim from run 32144441622 on 2026-08-18, the stripe leg. Both tags were
+  # pushed, signed and attested before this answer arrived on the READ.
+  echo "Error: GET https://ghcr.io/token?scope=repository:pome-sh/twins:pull&service=ghcr.io: DENIED: denied" >&2
+  exit 1
+fi
+exit 0
+`;
+
+const SIGN_OPS = ["sign", "attest", "verify", "verify-attestation"];
+
+/**
+ * `plan` is keyed by TAG, like runPush's — `{ [tag]: { inspect, sign, attest,
+ * verify, "verify-attestation" } }`, each a count of consecutive faults. Keyed
+ * per tag rather than per subcommand so the half-verified case below can fault
+ * the SECOND tag only, which is the state the fail-closed message has to
+ * describe.
+ */
+function runSign(tags, plan = {}, { attempts = 3, sbom = true } = {}) {
+  const dir = mkdtempSync(join(tmpdir(), "sign-image-digests-"));
+  const state = join(dir, "state");
+  const bin = join(dir, "bin");
+  mkdirSync(state);
+  mkdirSync(bin);
+  writeFileSync(join(bin, "docker"), FAKE_DOCKER, { mode: 0o755 });
+  writeFileSync(join(bin, "cosign"), FAKE_COSIGN, { mode: 0o755 });
+  const sbomFile = join(dir, "twin.spdx.json");
+  if (sbom) writeFileSync(sbomFile, "{}\n");
+  const output = join(dir, "github_output");
+  const summary = join(dir, "github_step_summary");
+  writeFileSync(output, "");
+  writeFileSync(summary, "");
+  // Every tag reaching this script has already been pushed AND read back by
+  // push-scanned-image.sh, so its manifest exists unless a case says otherwise.
+  for (const tag of tags.split("\n").map((t) => t.trim()).filter(Boolean)) {
+    writeFileSync(join(state, `manifest_${tag.replace(/[^A-Za-z0-9]/g, "_")}`), "");
+  }
+  for (const [tag, spec] of Object.entries(plan)) {
+    const slug = tag.replace(/[^A-Za-z0-9]/g, "_");
+    if (spec.inspect) writeFileSync(join(state, `inspectfail_${slug}`), String(spec.inspect));
+    for (const op of SIGN_OPS) {
+      if (spec[op]) writeFileSync(join(state, `cosignfail_${op}_${slug}`), String(spec[op]));
+    }
+  }
+  const child = spawn("bash", [SIGN_HELPER_PATH, "Signed twin-stripe image digests", sbomFile], {
+    env: {
+      ...process.env,
+      PATH: `${bin}:${process.env.PATH}`,
+      IMAGE_TAGS: tags,
+      GITHUB_REPOSITORY: "pome-sh/digital-twins",
+      GITHUB_OUTPUT: output,
+      GITHUB_STEP_SUMMARY: summary,
+      FAKE_DOCKER_STATE: state,
+      FAKE_COSIGN_STATE: state,
+      // `attempts: null` leaves the knob unset, which is how the case below
+      // measures the PRODUCTION budget rather than one the test chose.
+      ...(attempts === null ? {} : { SIGN_IMAGE_DIGESTS_ATTEMPTS: String(attempts) }),
+      SIGN_IMAGE_DIGESTS_SLEEP_UNIT: "0",
+    },
+  });
+  let stdout = "";
+  let stderr = "";
+  child.stdout.on("data", (d) => (stdout += d));
+  child.stderr.on("data", (d) => (stderr += d));
+  return new Promise((resolvePromise) => {
+    child.on("close", (status) => {
+      const read = (p) => {
+        try {
+          return readFileSync(p, "utf8");
+        } catch {
+          return "";
+        }
+      };
+      const calls = read(join(state, "cosign")).split("\n").filter(Boolean);
+      const inspects = read(join(state, "inspects")).split("\n").filter(Boolean);
+      const result = { status, stdout, stderr, calls, inspects, output: read(output), summary: read(summary) };
+      rmSync(dir, { recursive: true, force: true });
+      resolvePromise(result);
+    });
+  });
+}
+
+const opsFor = (calls, ref) => calls.filter((c) => c.endsWith(` ${ref}`)).map((c) => c.split(" ")[0]);
+
+// The PRODUCTION retry budget, pinned — the same guard runPush carries, for the
+// same reason: every other case here passes its own `attempts`, so the default
+// could be cut to 1 with this suite still green. It must also be the SAME
+// budget as push-scanned-image.sh's, so the publish path has one number.
+{
+  const survives = await runSign(PER_COMMIT, { [PER_COMMIT]: { "verify-attestation": 4 } }, { attempts: null });
+  assert(survives.status === 0, `the default budget must survive 4 faults, got ${survives.status}\n${survives.stderr}`);
+  const exhausts = await runSign(PER_COMMIT, { [PER_COMMIT]: { "verify-attestation": 5 } }, { attempts: null });
+  assert(exhausts.status !== 0, "the default budget must be spent by 5 faults, not open-ended");
+  assert(exhausts.stderr.includes("after 5 attempts"), `expected a 5-attempt budget, got: ${exhausts.stderr}`);
+  // …and the SAME budget, read out of both scripts. The publish path having one
+  // number to reason about is a claim both headers make; two knobs is exactly
+  // how that claim rots.
+  const knob = (path, name) => new RegExp(`\\$\\{${name}:-(\\d+)\\}`).exec(readFileSync(path, "utf8"))?.[1] ?? null;
+  for (const [what, sign, push] of [
+    ["attempt budget", "SIGN_IMAGE_DIGESTS_ATTEMPTS", "PUSH_SCANNED_IMAGE_ATTEMPTS"],
+    ["backoff unit", "SIGN_IMAGE_DIGESTS_SLEEP_UNIT", "PUSH_SCANNED_IMAGE_SLEEP_UNIT"],
+  ]) {
+    const a = knob(SIGN_HELPER_PATH, sign);
+    const b = knob(PUSH_HELPER_PATH, push);
+    assert(a !== null && a === b, `the sign and push ${what} must be one number, got ${a} vs ${b}`);
+  }
+}
+
+// F-1534's first done-when, one case per GHCR interaction the script makes. A
+// `DENIED` on ANY of them is the registry being degraded, not a verdict about
+// the artifact, so none may fail the leg on the first answer.
+for (const op of SIGN_OPS) {
+  const flaky = await runSign(PER_COMMIT, { [PER_COMMIT]: { [op]: 1 } });
+  assert(flaky.status === 0, `one DENIED on \`cosign ${op}\` must not fail the leg, got ${flaky.status}\n${flaky.stderr}`);
+  const ops = opsFor(flaky.calls, `${PER_COMMIT}@sha256:1111111111111111111111111111111111111111111111111111111111111111`);
+  assert(
+    ops.filter((o) => o === op).length === 2,
+    `\`cosign ${op}\` must be retried, got ${ops.join(", ")}`,
+  );
+  // Keyed on the "landed only on attempt N" line specifically, not on any
+  // `::warning::`: the retry itself warns before sleeping, so a bare
+  // `/::warning::/` stays green with the succeeded-late notice deleted — and
+  // that notice is the whole signal that GHCR is degrading before the day it
+  // is total, which is how F-1530 went unnoticed for four days.
+  assert(
+    `${flaky.stdout}${flaky.stderr}`.includes("landed only on attempt 2"),
+    `a flaky-but-passing \`cosign ${op}\` must SAY so, got: ${flaky.stdout}${flaky.stderr}`,
+  );
+}
+
+// The digest READ is a GHCR interaction too, and the first one this script
+// makes — an unretried `imagetools inspect` would fail the leg before cosign
+// is ever reached, leaving the retry ladder below it unreachable.
+{
+  const flaky = await runSign(PER_COMMIT, { [PER_COMMIT]: { inspect: 1 } });
+  assert(flaky.status === 0, `one DENIED on the digest read must not fail the leg, got ${flaky.status}\n${flaky.stderr}`);
+  assert(flaky.inspects.length === 2, `the digest read must be retried, got ${flaky.inspects.join(", ")}`);
+}
+
+// F-1534's second done-when. Exhaustion still fails closed — but by the time
+// anything here fails, push-scanned-image.sh has already published every tag,
+// so the message has to say which operation ran out, on which ref, and what
+// state that leaves public. `##[error]The process failed with exit code 1` is
+// exactly the message that made 2026-08-18 read like a broken twin.
+{
+  const dead = await runSign(PER_COMMIT, { [PER_COMMIT]: { "verify-attestation": 99 } }, { attempts: 2 });
+  assert(dead.status !== 0, "a registry that never answers the verify must fail the step");
+  assert(dead.stderr.includes("::error::"), "the failure must be an annotated error");
+  assert(dead.stderr.includes(PER_COMMIT), "the message must name the ref that could not be verified");
+  assert(dead.stderr.includes("verify-attestation"), "the message must name the operation that ran out");
+  assert(dead.stderr.includes("after 2 attempts"), "the message must say how many attempts were spent");
+  assert(dead.stderr.includes("Failing closed"), "the message must say the refusal is deliberate");
+  assert(
+    /already published/i.test(dead.stderr),
+    `the message must say the tag is already public — that is the whole difference from a push failure, got: ${dead.stderr}`,
+  );
+  assert(
+    opsFor(dead.calls, `${PER_COMMIT}@sha256:1111111111111111111111111111111111111111111111111111111111111111`).filter(
+      (o) => o === "verify-attestation",
+    ).length === 2,
+    "exactly the attempt budget must be spent",
+  );
+}
+
+// "Names what landed", measured. Two tags, the second unverifiable: the first
+// is signed, attested AND verified, and a human reading this failure has to
+// know that — re-running is safe, and the twin is not broken.
+{
+  const partial = await runSign(
+    `${ROLLING}\n${PER_COMMIT}`,
+    { [PER_COMMIT]: { "verify-attestation": 99 } },
+    { attempts: 2 },
+  );
+  assert(partial.status !== 0, "an exhausted operation must fail the step");
+  assert(
+    partial.stderr.includes("signed") && partial.stderr.includes("attested"),
+    `the message must say how far the failing ref got, got: ${partial.stderr}`,
+  );
+  // `${ROLLING}@` and not `${ROLLING}`: the failing ref is `…:stripe-bbf27bf@…`,
+  // which contains `…:stripe` but not `…:stripe@`.
+  assert(
+    landedClause(partial.stderr, "Signed, attested and verified:").includes(`${ROLLING}@`),
+    `the message must name the ref that IS fully verified, in the landed clause, got: ${partial.stderr}`,
+  );
+}
+
+// The distinct partial states are not collapsed into one word. A ref that could
+// not be SIGNED is published-and-unsigned; a ref that could not be VERIFIED is
+// published, signed and attested. Those are different re-run decisions, and a
+// message that said "not signed" for both would misdirect on the one that
+// actually happens.
+{
+  const unsigned = await runSign(PER_COMMIT, { [PER_COMMIT]: { sign: 99 } }, { attempts: 2 });
+  assert(/not.{0,20}signed|unsigned/i.test(unsigned.stderr), `a ref that never signed must say so, got: ${unsigned.stderr}`);
+  const unverified = await runSign(PER_COMMIT, { [PER_COMMIT]: { "verify-attestation": 99 } }, { attempts: 2 });
+  assert(
+    /signed and attested/i.test(unverified.stderr),
+    `a ref that signed and attested but could not verify must say so, got: ${unverified.stderr}`,
+  );
+  assert(
+    !/unsigned/i.test(unverified.stderr),
+    `a signed ref must not be reported as unsigned, got: ${unverified.stderr}`,
+  );
+}
+
+// An empty IMAGE_TAGS is refused rather than read as a signing of zero refs —
+// the same guard push-scanned-image.sh carries, for the same reason.
+for (const [label, tags] of [
+  ["empty", ""],
+  ["blank lines only", "\n \n"],
+]) {
+  const none = await runSign(tags);
+  assert(none.status !== 0, `a ${label} IMAGE_TAGS must fail rather than read as a signing`);
+  assert(none.calls.length === 0, "nothing may be signed when there is nothing to sign");
+}
+
+// A CRLF-flavoured tag list is signed as the tags the registry knows, not as
+// `<tag>\r`. Untrimmed, a whitespace bug of OURS spends the full ladder — five
+// attempts and 50s of backoff per operation — and then fails closed blaming a
+// degraded GHCR, which is the most expensive possible way to be wrong.
+{
+  const crlf = await runSign(`${ROLLING}\r\n${PER_COMMIT}\r`);
+  assert(crlf.status === 0, `a CRLF tag list must sign cleanly, got ${crlf.status}\n${crlf.stderr}`);
+  const digest = "sha256:1111111111111111111111111111111111111111111111111111111111111111";
+  assert(
+    opsFor(crlf.calls, `${ROLLING}@${digest}`).join(",") === SIGN_OPS.join(","),
+    `the trimmed ref must be the one signed, got ${crlf.calls.join(" | ")}`,
+  );
+  assert(!/::warning::/.test(`${crlf.stdout}${crlf.stderr}`), "a trimmed tag must not cost a retry");
+}
+
+// A missing SBOM predicate is refused before anything is signed: an attestation
+// over a file that is not there is not an attestation.
+{
+  const noSbom = await runSign(PER_COMMIT, {}, { sbom: false });
+  assert(noSbom.status !== 0, "a missing SBOM predicate must fail the step");
+  assert(noSbom.calls.length === 0, "nothing may be signed without the predicate");
+}
+
+// The ordinary case: every ref is signed, attested and both-ways verified
+// exactly once, the digests reach `signed_digests` for the step that consumes
+// them, and a clean run does not cry degradation.
+{
+  const ok = await runSign(`${ROLLING}\n\n${PER_COMMIT}\n`);
+  assert(ok.status === 0, `a clean sign must pass: ${ok.stderr}`);
+  const digest = "sha256:1111111111111111111111111111111111111111111111111111111111111111";
+  for (const tag of [ROLLING, PER_COMMIT]) {
+    assert(
+      opsFor(ok.calls, `${tag}@${digest}`).join(",") === SIGN_OPS.join(","),
+      `${tag} must be signed, attested and verified once each, got ${opsFor(ok.calls, `${tag}@${digest}`).join(", ")}`,
+    );
+  }
+  assert(ok.output.includes(`${PER_COMMIT}@${digest}`), `the signed digest must reach GITHUB_OUTPUT, got: ${ok.output}`);
+  assert(ok.summary.includes(`${ROLLING}@${digest}`), `the run summary must list what was signed, got: ${ok.summary}`);
+  assert(!/::warning::/.test(`${ok.stdout}${ok.stderr}`), "a clean sign must not warn about degradation");
 }
 
 console.log("assert-hardened-cdn-fetches.test.mjs: all assertions passed");
