@@ -1,6 +1,6 @@
 # @pome-sh/sandbox-domains
 
-## Unreleased (patch)
+## 0.2.2 — 2026-08-19
 
 **`GitHubDomain`'s three release surfaces carry `immutable`** (F-1533).
 `listReleases`, `getLatestRelease` and `getReleaseByTag` now emit

@@ -10,7 +10,7 @@ write a version number here or in `package.json` — see `RELEASING.md`. Release
 entries are insertions only: a correction is the next entry, naming the one it
 corrects.
 
-## Unreleased (patch)
+## 0.24.1 — 2026-08-19
 
 **twin-github's three release surfaces carry `immutable`** (F-1533).
 `GET /repos/:o/:r/releases`, `GET /repos/:o/:r/releases/latest` and
