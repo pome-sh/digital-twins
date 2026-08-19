@@ -321,14 +321,26 @@ jobs:
       # this gate the GITHUB_TOKEN from a fork or unauthorized actor could poison
       # the image. `github.event_name` is the PR-vs-push signal that survives
       # merge-queue retargeting.
+      #
+      # F-1530 — this step was the last unretried network call on the publish
+      # path, and the one that broke: on 2026-08-14 GHCR logged every layer of
+      # the stripe twin as `Pushed`, answered `unknown blob`, and exited 1.
+      # Nothing re-ran it, so `twins:stripe-bbf27bf` never existed —
+      # twin-snapshot-verify failed four nights running and pome-cloud#752
+      # reported `stripe — no-image`. The retry, the per-tag manifest read-back
+      # and the fail-closed message live in scripts/ci/push-scanned-image.sh
+      # rather than here: an inline loop is the shape the two fetches above were
+      # in before F-1489, and scripts/ci/assert-hardened-cdn-fetches.mjs (shape
+      # c) now reds on a registry write that does not go through that helper.
+      #
+      # Tags arrive through `env:`, not `${{ }}` interpolated into the script,
+      # matching the sign step below: a registry/tag string spliced into a shell
+      # body is one metadata-action change away from being a shell body.
       - name: Push scanned image
         if: ${{ github.event_name != 'pull_request' }}
-        run: |
-          printf '%s\n' "${{ steps.meta.outputs.tags }}" | while IFS= read -r tag; do
-            [ -n "$tag" ] || continue
-            echo "pushing $tag"
-            docker push "$tag"
-          done
+        env:
+          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
+        run: bash scripts/ci/push-scanned-image.sh
       - name: Sign pushed image digests and attest SBOM
         id: sign
         if: ${{ github.event_name != 'pull_request' }}
