@@ -13,6 +13,22 @@ Evaluation and scoring are hosted features — `pome run --local` records a trac
 only, no local scoring. The Pome platform (evaluation, simulation,
 observability) is at https://pome.sh. Apache-2.0.
 
+## Product vocabulary — read before writing anything a user reads
+
+Product nouns are defined in **[`VOCABULARY.md`](https://github.com/pome-sh/pome-cloud/blob/main/VOCABULARY.md)** in `pome-cloud`. Applies to this repo's README, `llms.txt`, per-package READMEs, and the CLI's human-readable output.
+
+| Word | Means |
+|---|---|
+| `sandbox` | the container a user starts — one id, one TTL, 1–3 twins, the billing unit |
+| `digital twin` | one stateful emulation of a real API. Full phrase on first use per page; `twin` is the short form after, and in every identifier (`pome twin start`, `packages/twin-github`) |
+| `pod` | the per-twin microVM. Internal only |
+
+**Banned in user-facing text:** `clone` (it already means a copy of the *customer's agent* in the hosted product — the opposite thing), `service`, `simulation` as a noun, `environment` for a twin, `mock`/`stub`/`fake`, `staging layer`, `self-healing`.
+
+**Never print a twin count without the depth number** — a bare "5 twins" invites a comparison we lose. Say "5 digital twins, 137 MCP tools, every route graded against live upstream daily".
+
+Identifiers do not move. `pome twin start`, `MOUNTED_TWINS`, `TWIN_*` env vars, `TwinHttpEvent`, and the `twins` key in the published `pome.json` schema all stay — `TwinHttpEvent` in particular is a v1.0-frozen discriminant stamped into every persisted trace.
+
 ## Docs
 
 Repo layout, full build/test workflow, conventions, and the contributor guide
