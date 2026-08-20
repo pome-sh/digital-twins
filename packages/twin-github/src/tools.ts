@@ -468,7 +468,7 @@ function dispatchTool(
           // `get_sub_issues` and `get_parent` are GitHub methods this twin does
           // not model. Loud, not silent: an examinee must not read an empty
           // answer as "this issue has no parent".
-          throw new TwinError(`issue_read method '${parsed.method}' is not supported by this GitHub twin clone.`, 501);
+          throw new TwinError(`issue_read method '${parsed.method}' is not supported by this GitHub twin.`, 501);
       }
     case "issue_write":
       switch (parsed.method) {
@@ -521,7 +521,7 @@ function dispatchTool(
         }
         default:
           throw new TwinError(
-            `pull_request_read method '${parsed.method}' is not supported by this GitHub twin clone.`,
+            `pull_request_read method '${parsed.method}' is not supported by this GitHub twin.`,
             501
           );
       }
@@ -529,7 +529,7 @@ function dispatchTool(
     case "pull_request_review_write":
       if (parsed.method !== "create") {
         throw new TwinError(
-          `pull_request_review_write method '${parsed.method}' is not supported by this GitHub twin clone.`,
+          `pull_request_review_write method '${parsed.method}' is not supported by this GitHub twin.`,
           501
         );
       }
@@ -538,7 +538,7 @@ function dispatchTool(
       // caller did not ask to submit.
       if (parsed.event === undefined) {
         throw new TwinError(
-          "pull_request_review_write method 'create' without an `event` opens a pending review, which this GitHub twin clone does not model.",
+          "pull_request_review_write method 'create' without an `event` opens a pending review, which this GitHub twin does not model.",
           501
         );
       }

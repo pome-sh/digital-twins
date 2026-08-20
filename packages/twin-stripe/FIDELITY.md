@@ -112,7 +112,7 @@ etc.) is the unlisted cold tail and returns:
   "error": {
     "type": "invalid_request_error",
     "code": "endpoint_not_supported",
-    "message": "This endpoint is not supported by this Stripe twin clone.",
+    "message": "This endpoint is not supported by this Stripe twin.",
     "fidelity": "unsupported",
     "supported_surfaces": [
       "Stripe-shaped REST under /v1/* (see FIDELITY.md)",

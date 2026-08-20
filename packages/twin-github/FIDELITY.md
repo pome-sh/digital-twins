@@ -93,7 +93,7 @@ unsupported routes return a loud 501 envelope:
 
 ```json
 {
-  "message": "This endpoint is not supported by this GitHub twin clone.",
+  "message": "This endpoint is not supported by this GitHub twin.",
   "_twin": {
     "fidelity": "unsupported",
     "supported_surfaces": [

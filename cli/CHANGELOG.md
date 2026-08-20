@@ -10,6 +10,27 @@ write a version number here or in `package.json` — see `RELEASING.md`. Release
 entries are insertions only: a correction is the next entry, naming the one it
 corrects.
 
+## Unreleased (patch)
+
+**The 501 unsupported body says "twin", not "twin clone"** (F-1547). Every cold
+route on the GitHub and Stripe twins answered
+`"This endpoint is not supported by this GitHub twin clone."`; it now reads
+`"… by this GitHub twin."` (and the Stripe equivalent). Four GitHub MCP
+refusals — `issue_read`, `pull_request_read`, and two `pull_request_review_write`
+paths — carry the same wording change.
+
+`clone` already means a copy of the *customer's agent* elsewhere in the product
+(`intake_clone_scope`), so using it for the twin named the opposite thing.
+
+`CONTRACT.md`'s frozen surface for this case is the **501 status** and
+`_twin.fidelity: "unsupported"`, and both are untouched — hence `(patch)`. The
+strings `CONTRACT.md` does freeze verbatim are the auth ones (`"Bad
+credentials"`, `"Requires authentication"`), which mirror real GitHub; this one
+mirrors nothing upstream and is ours to word.
+
+Act on it only if you **string-match the message**. Match on the status code or
+on `_twin.fidelity` instead — those are the contract, and they did not move.
+
 ## 0.24.1 — 2026-08-19
 
 **twin-github's three release surfaces carry `immutable`** (F-1533).
