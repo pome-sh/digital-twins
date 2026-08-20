@@ -4,7 +4,7 @@
 
 # Pome Digital Twins
 
-**Simulation testing infrastructure for AI agents.**
+**Testing infrastructure for AI agents.**
 Stateful, local digital twins of the APIs your agent calls — GitHub, Stripe, Slack, Gmail, and Linear.
 
 [![CI](https://github.com/pome-sh/pome-twins/actions/workflows/ci.yml/badge.svg)](https://github.com/pome-sh/pome-twins/actions/workflows/ci.yml)
