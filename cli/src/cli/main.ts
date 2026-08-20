@@ -518,8 +518,13 @@ export function createProgram() {
       },
     );
 
+  // F-1557 — `sandbox` is the product noun (VOCABULARY.md); `session` is the
+  // spelling the CLI shipped with and every existing script types. Commander
+  // resolves both to this one command, so every subcommand, flag and line of
+  // output below is reachable under either without a second tree to drift.
   const session = program
     .command("session")
+    .alias("sandbox")
     .description(
       "Hosted sandbox sessions (same API as the dashboard Twins page — requires login)",
     );
