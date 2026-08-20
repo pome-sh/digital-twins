@@ -1,5 +1,21 @@
 # @pome-sh/sandbox-domains
 
+## Unreleased (patch)
+
+**The 501 unsupported body says "twin", not "twin clone"** (F-1547). The
+GitHub and Stripe twins' cold-route refusal now reads `"This endpoint is not
+supported by this GitHub twin."` instead of `"… this GitHub twin clone."`, and
+the four GitHub MCP method refusals reachable through `executeTool` carry the
+same wording.
+
+`clone` already means a copy of the *customer's agent* elsewhere in the product
+(`intake_clone_scope`), so using it for the twin named the opposite thing.
+
+No exported symbol, signature or type changes — this is a message **value**
+behind an unchanged public surface, hence `(patch)`. Act on it only if you
+string-match that message; match the 501 status or `_twin.fidelity:
+"unsupported"` instead.
+
 ## 0.2.2 — 2026-08-19
 
 **`GitHubDomain`'s three release surfaces carry `immutable`** (F-1533).

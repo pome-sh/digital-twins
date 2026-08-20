@@ -12,7 +12,7 @@
 export const unsupportedEnvelope = {
   status: 501,
   body: {
-    message: "This endpoint is not supported by this GitHub twin clone.",
+    message: "This endpoint is not supported by this GitHub twin.",
     _twin: {
       fidelity: "unsupported" as const,
       supported_surfaces: [

@@ -34,7 +34,7 @@ describe("GitHub-shaped error semantics", () => {
       _twin: { fidelity: string };
     };
     expect(body).toMatchObject({
-      message: "This endpoint is not supported by this GitHub twin clone.",
+      message: "This endpoint is not supported by this GitHub twin.",
       _twin: { fidelity: "unsupported" }
     });
     expect(body.fidelity).toBeUndefined();

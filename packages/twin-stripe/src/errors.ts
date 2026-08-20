@@ -150,7 +150,7 @@ export function unsupported() {
   return stripeError(
     "invalid_request_error",
     "endpoint_not_supported",
-    "This endpoint is not supported by this Stripe twin clone.",
+    "This endpoint is not supported by this Stripe twin.",
     {
       statusCode: 501,
       fidelity: "unsupported",
