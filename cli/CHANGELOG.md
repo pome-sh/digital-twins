@@ -10,7 +10,7 @@ write a version number here or in `package.json` — see `RELEASING.md`. Release
 entries are insertions only: a correction is the next entry, naming the one it
 corrects.
 
-## Unreleased (patch)
+## 0.24.2 — 2026-08-20
 
 **The 501 unsupported body says "twin", not "twin clone"** (F-1547). Every cold
 route on the GitHub and Stripe twins answered

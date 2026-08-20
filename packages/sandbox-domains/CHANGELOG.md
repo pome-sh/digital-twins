@@ -1,6 +1,6 @@
 # @pome-sh/sandbox-domains
 
-## Unreleased (patch)
+## 0.2.3 — 2026-08-20
 
 **The 501 unsupported body says "twin", not "twin clone"** (F-1547). The
 GitHub and Stripe twins' cold-route refusal now reads `"This endpoint is not
