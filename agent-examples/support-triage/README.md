@@ -8,8 +8,9 @@ Two twins in one run — the **Slack twin** (where the report arrives) and the
 
 The pack exists to demo a reproducible **FAIL → FIX → PASS** on Pome, and it does
 it on **two runtimes**. The graded one — curriculum lesson #1 — is the local
-examinee, whose flaw is a committed tool-policy defect; jump to
-[the lesson](#lesson-the-agent-that-could-not-look-before-it-leapt).
+examinee, and its difficulty lives in the **seeded world**, not in a planted
+agent defect: jump to
+[the lesson](#lesson-the-agent-that-never-asked-what-the-teams-convention-was).
 
 The managed-agent path tells the same story through a pair of prompts that differ
 by exactly **one line**:
@@ -35,22 +36,44 @@ duplicate) for v1 vs `issues: 1 → 1` + a comment for v2. Measured results are 
 ## The task
 
 [`tasks/duplicate-issue.md`](./tasks/duplicate-issue.md) is
-self-contained (task + criteria + an inline `## Seed State`). The seed pre-loads
-open issue #1 for the coupon bug, then `#support` receives a *new* report of the
-*same* bug. A good agent recognizes the duplicate.
+self-contained (task + criteria + an inline `## Seed State`). `#support` receives
+a new report of a bug the repository already tracks — but **the issue that
+textually matches the report is not the one the report belongs on.**
+
+`acme/orders-service` runs a consolidated-tracking convention, written down in
+`docs/triage-policy.md` inside the seeded repo and named in no prompt:
+
+* **#47** — *"POST /orders returns 500 when the coupon field is empty"* — open,
+  labelled `bug`, a word-for-word match for the report. Every default a triage
+  agent carries points here. It is **not** the answer.
+* **#23** — *"[tracking] Coupon-path regressions"* — carries the `tracking` label
+  and consolidates #47 and #31. The policy says new occurrences are recorded
+  here, that the comment must name the consolidated issue by number, and that the
+  link sent back to the reporter is this one's.
+
+Three more open issues (#8, #31, #52) mean listing the issues does not hand over
+a one-item answer.
 
 | criterion | kind | checks |
 |---|---|---|
-| a `#support` message links `issues/1` | code:slack | the agent linked the *existing* issue, not a new one |
-| no new issues in `acme/orders-service` | code:github | **the lesson itself** — a duplicate was not filed |
-| commented on issue #1 | model | the report was attached to the existing issue |
+| a comment containing `#47` exists on issue #23 | code:github | routed to the tracking issue, and cited the consolidated one |
+| a `#support` message contains `issues/23` | code:slack | the reporter got the link the policy names |
+| **no message anywhere contains `issues/47`** | code:slack | **the wrong-value guard** — this is what an agent that skipped the policy sends |
+| no new issues in `acme/orders-service` | code:github | the original restraint lesson — a duplicate was not filed |
+| `add_issue_comment` was called | code:github | a do-nothing agent cannot clear the github side |
 | concrete repro steps | model | quality of the tracked report |
 
-The dedup decision used to be graded by the judge alone, which made it possible
-to link `issues/1` *and* file a duplicate and still score 100 — the exact
-necessary-but-not-sufficient hole `docs/curriculum/failure-classes.md` §4.2 warns
-about. `github.no-new-issues` closes it: the state claim is `[code]`, and the
-judge is left grading text, which is all §4.3 ever wanted from it.
+Five of the six are `[code]`. The third is AutomationBench's
+**negative-assertion-bound-to-the-wrong-value** technique: beside asserting the
+right answer, assert the object does not hold the specific wrong value this
+task's failure mode produces. It separates *did it right* from *did the known
+wrong thing*, deterministically, which no judge can do reliably.
+
+Two of them (`issues/47`, `no-new-issues`) already hold on the seed, so under
+F-1296 they leave the denominator on a run that respects them and are **counted
+as failures** on a run that breaks them. That asymmetry is deliberate and is what
+keeps a do-nothing agent at 0 rather than 33 — see `VERIFICATION.md` before
+adding an `always-scored` marker to either.
 
 ## Run it against Pome
 
@@ -86,58 +109,55 @@ agent tried twice — and the v1→v2 improvement gets reported as that agent
 being unreliable. Pass the v1 run's `group_id` as the v2 run's
 `baseline_group_id` and the report pairs them into a fail→green comparison.
 
-## Lesson: the agent that could not look before it leapt
+## Lesson: the agent that never asked what the team's convention was
 
-This is the curriculum's **lesson #1**, and the graded baseline lives in
+This is the curriculum's **lesson #1**. The graded examinee lives in
 [`src/index.ts`](./src/index.ts) — the same agent as a Claude Agent SDK process
-on your machine. The one line under test is `DENY_ISSUE_LOOKUP`, right there.
+on your machine — and it carries **no planted defect at all**.
 
-> **Two runtimes, one story, two different flaws.** The `agents/*.yaml` pair
-> above tells this story on Anthropic's Managed Agents platform through a
-> *prompt* flaw — a charter line telling the agent not to search. That is a
-> **pattern-2** baseline (`pome-cloud docs/curriculum/failure-classes.md` §3):
-> legitimate, but its red is model-dependent. The local examinee is the
-> **pattern-1** version and it is the one the curriculum grades. Both are kept
-> because the pair is genuinely useful for the managed-agent path; only one is
-> the lesson.
+> **The defect used to live here, and it was retired for cause.** Until
+> 2026-08-21 this example shipped a committed tool denial (`DENY_ISSUE_LOOKUP`)
+> that was supposed to make the agent unable to find the existing issue. It was
+> measured green four separate ways: 4/5 with the sandbox open, **5/5 with the
+> sandbox sealed** (the agent found two more read paths the deny-list never
+> named), 5/5 with the denial removed entirely, and 5/5 with the search-first
+> rule deleted from the prompt. That last one is the one that settled it — the
+> sentence the whole lesson rested on has no measurable effect on
+> `claude-opus-5` here, because it searches by reflex. All the numbers and run
+> ids are in [`VERIFICATION.md`](./VERIFICATION.md).
+>
+> `DENY_ISSUE_LOOKUP` still exists and still ships `false`, because
+> `test/tool-policy.test.ts` pins both its branches and the web clamp rides the
+> same function. **Do not flip it back to `true` expecting a red.**
 
 ### What breaks
 
-A customer re-reports a bug that open issue #1 in `acme/orders-service` already
-tracks. The agent's instructions are **correct** — *search the open issues first;
-only open a new one if nothing already tracks the bug* — and it follows them. It
-reaches for the lookup and is refused, because the examinee's committed tool
-policy denies every read path into the repository's issues:
+The agent's instructions are correct and it follows them. It reads the report,
+searches the open issues, and finds **#47** — *"POST /orders returns 500 when the
+coupon field is empty"* — which matches the customer's words almost exactly. It
+comments there and sends that link back to `#support`.
 
-```ts
-const ISSUE_LOOKUP_TOOLS = [
-  "mcp__github__search_issues",
-  "mcp__github__list_issues",
-  "mcp__github__get_issue",
-];
-const DENY_ISSUE_LOOKUP = true;   // ← ships as the baseline
-```
+That is the wrong answer, and nothing at run time tells it so. `acme/orders-service`
+consolidates coupon-path regressions onto tracking issue **#23**, and the rule
+lives in `docs/triage-policy.md` in the repository. The agent was never told the
+file exists.
 
-So it concludes, honestly and wrongly, that the bug is untracked — and files a
-second issue for it. **The agent did nothing wrong.** Its context was corrupted
-before it ever reasoned.
+Two properties make this worth a lesson rather than a trick:
 
-Two properties make this worth a lesson rather than a bug report:
-
-* ~~**It cannot rot green** (§3, pattern 1).~~ **This claim was measured false
-  on 2026-08-04** and is kept struck through rather than deleted, because the
-  reasoning error is the lesson. The argument was: *no model capability can call
-  a tool that was never exposed*. True, and beside the point — the model never
-  needed the denied tool. It built the read out of an allowed **write**
-  (`update_issue` 404s on a missing issue) and out of the SDK's **shell**. A
-  denial is only as strong as the enumeration behind it.
-* **It is the most common real version of this bug.** Over-restrictive tool
-  allowlists are a production default. Nobody writes "don't dedup" in a system
-  prompt; plenty of people ship an agent that cannot see what it needs to.
+* **It is a written rule against an unwritten default.** The
+  [difficulty ladder](../minimal-viktor/) measured this over 19 hosted trials and
+  four models: the lowest rung that actually discriminates is a policy the agent
+  must find, conflicting with a habit it already has. Two *written* rules with a
+  stated precedence were resolved correctly in all 19 trials — models are good at
+  precedence lists. They are much worse at suspecting a convention exists.
+* **No capability was removed.** The agent has `search_code`, `get_file_contents`
+  and every read path into the issues. It can reach the policy file from the
+  first turn. Nothing refuses it, so there is nothing to notice and route around —
+  which is exactly what defeated the previous baseline.
 
 ### Run the failing baseline
 
-The defect ships as the default, so the failing run is the plain one:
+The naive agent ships as the default, so the failing run is the plain one:
 
 ```bash
 pome run tasks/duplicate-issue.md -n 5
@@ -146,65 +166,79 @@ pome run tasks/duplicate-issue.md -n 5
 `runs: 5` is in the task config on purpose — the report teaches **pass^k**, and
 one trial proves nothing.
 
-> ⚠️ **NOT verified red — measured 2026-08-04 and it PASSED 4 of 5.**
-> `claude-opus-5`, n=5, hosted: `25 · 100 · 100 · 100 · 100`. No trial filed a
-> duplicate. Four reached issue #1 anyway — one route was `update_issue` used as
-> an existence oracle, the other was the SDK's shell reading the fixture out of
-> this very file's neighbours. The numbers, the run ids and both routes are in
-> [`VERIFICATION.md`](./VERIFICATION.md); the re-cut is pending.
->
-> **Everything in the three sections below describes the baseline as designed,
-> not as it behaves.** Read them as the intent under repair.
+> ⚠️ **NOT yet verified red.** The re-cut landed 2026-08-21 with its prediction
+> committed ahead of the run (2 of 5, and the refutation condition stated) but
+> **the measurement has not been taken**. Until it has, treat this as a designed
+> lesson, not a demonstrated one — [`VERIFICATION.md`](./VERIFICATION.md) carries
+> the prediction and an empty results table on purpose, so the run can disagree
+> with it. That discipline is what caught the previous two baselines.
 
 ### Read the report
 
-The pivotal criterion is the `#support` message linking `issues/1`. Under the
-baseline the agent links `issues/2` — the one it just created — so the criterion
-fails on a deterministic state read rather than a judge's opinion, and the
-state-diff panel shows `issues: 1 → 2`.
+Two criteria carry the diagnosis, and they fail in different places:
 
-The span waterfall shows the rest of the story, and it is the part that makes the
-diagnosis fast: a `search_issues` tool span that returns a refusal, followed by
-`create_issue`. The agent tried.
+* `A comment containing "#47" exists on issue #23` fails on a deterministic state
+  read — the state-diff panel shows the comment landed on #47 instead.
+* `No message containing "issues/47" appears in any public channel` fails on what
+  the agent *told the reporter*. This is the wrong-value guard, and it is the one
+  that distinguishes "did the right thing" from "did the known wrong thing".
+
+The span waterfall shows the rest: `list_issues`, then straight to
+`add_issue_comment` on #47, with no `get_file_contents` on `docs/` anywhere in
+between. The agent never looked for a convention.
 
 ### The fix
 
-One line in [`src/index.ts`](./src/index.ts):
+One line, and it is the repair a builder would actually make — tell the agent
+where its team's rules live:
 
-```diff
--const DENY_ISSUE_LOOKUP = true;
-+const DENY_ISSUE_LOOKUP = false;
+```bash
+POME_TRIAGE_POLICY_HINT=on pome run tasks/duplicate-issue.md -n 5
 ```
+
+which appends one sentence to the system prompt
+([`src/index.ts`](./src/index.ts), `policyHint()`):
+
+> Before you comment on an issue or send anyone a link, read
+> `docs/triage-policy.md` in the repository and follow its routing rules.
+
+It is an env switch rather than a committed edit so both arms run from one
+commit — two numbers measured against two different trees are not comparable.
+
+**This is not un-planting a fixture.** The baseline agent is not sabotaged, it is
+naive, which is the honest state of most production triage agents. The demo is
+`unreliable → reliable`, which `docs/curriculum/failure-classes.md` §2 Premise C
+says is the shape that endures, rather than `broken → fixed`.
 
 ### Re-run green
 
-```bash
-pome run tasks/duplicate-issue.md -n 5
-```
-
-The agent searches, finds issue #1, comments on it, and posts *its* link back to
-`#support`. State-diff: `issues: 1 → 1` plus a comment.
+The agent reads the policy, routes the report to **#23**, names **#47** in the
+comment, and sends #23's link back to `#support`.
 
 ### Customize
 
-* **Deny one tool instead of three.** Leave `list_issues` reachable and watch the
-  agent route around the defect — a useful demonstration that a partial denial is
-  not a defect at all, and why the baseline names every read path.
-* **Move the flaw to the write side.** Deny `add_issue_comment` instead: now the
-  agent *finds* the duplicate and still cannot do the right thing, which is a
-  different failure with the same symptom. Worth running once to see how much the
-  report distinguishes them.
+* **Move the policy.** Put the rule in the repo's `README.md` instead of
+  `docs/triage-policy.md` and re-measure. This isolates *"ambiguity of where the
+  information lives"* — the one AutomationBench hardening lever the difficulty
+  ladder could not test, because minimal-viktor has no search tool and this
+  example does.
+* **Rename the tracking label.** `tracking` is a word a model may already
+  associate with the right behaviour. Try a house-specific one (`rollup`,
+  `parent`) and see whether the rule still transfers, or whether the previous
+  number was partly vocabulary luck.
+* **Delete the distractors.** Drop #8, #31 and #52 and re-measure to see how much
+  of the difficulty was the search space rather than the policy.
 
 ### If your baseline passes / your fix fails
 
-* **Baseline passes (stays green).** It does — 4/5 open-book, 5/5 with the
-  sandbox closed. This section used to say the fix is to add the missing read
-  path to `ISSUE_LOOKUP_TOOLS`. **That advice was measured wrong and is
-  withdrawn.** Shutting the first three paths surfaced two more the same
-  afternoon — `list_issue_comments` and `update_issue` — and the twin's read
-  surface is wide enough that the next pass would surface more. Do not extend the
-  list; the flaw has to stop being a denial (numbers in
-  [`VERIFICATION.md`](./VERIFICATION.md)).
+* **Baseline passes (stays green).** Possible, and it is the stated refutation
+  condition — this is the fourth consecutive prediction of a capability gap on
+  this example and the previous three were all wrong in the same direction. If it
+  is 5/5, the fallback is designed and is in
+  [`VERIFICATION.md`](./VERIFICATION.md): the same world plus a committed
+  pattern-1 config defect in the examinee (a context-file path that does not
+  resolve), so the policy never reaches the model. **Do not** reach for a tool
+  denial — that route is measured dead.
 * **Fix fails (stays red).** If a criterion reads `NOT EVALUATED` rather than
   failed, the run is `INCOMPLETE` — the grader could not see that state at all,
   which is a wiring problem rather than an agent problem. `pome run` exits 1 on
@@ -227,20 +261,22 @@ SDK process on your machine** — no managed-agent platform needed. The coach
 spawns it as a subprocess after `run_task` (per-twin MCP URLs + bearer arrive
 via env), it works the task over MCP, and exits when done.
 
-> **⚠️ The baseline below does not fail. Measured, twice.**
-> `DENY_ISSUE_LOOKUP = true` is **green**, on `claude-opus-5`, n=5 each, hosted:
+> **⚠️ The difficulty is in the world now, and it has not been measured yet.**
+> This examinee carries no planted defect. Every attempt to put one *here* was
+> measured green on `claude-opus-5`, n=5 each, hosted:
 >
 > | configuration | pass rate |
 > |---|---|
-> | as shipped 2026-08-04, open sandbox | 25 · 100 · 100 · 100 · 100 — **4/5** |
+> | tool denial as shipped 2026-08-04, open sandbox | 25 · 100 · 100 · 100 · 100 — **4/5** |
 > | sandbox closed (`tools: []`), denial unchanged | 100 × 5 — **5/5** |
 > | no denial at all, closed sandbox (the control) | 100 × 5 — **5/5** |
+> | search-first rule deleted from the prompt | 100 × 5 — **5/5** |
 >
-> **No trial filed a duplicate** — the behaviour the whole lesson is built
-> around. Run ids and the routes the agent used are in
-> [`VERIFICATION.md`](./VERIFICATION.md); the re-cut is pending. Treat this
-> example as a working local examinee with a **known-green** placeholder defect,
-> not as a lesson, until that re-cut lands.
+> The last row is why the prompt is not the lever either. The re-cut moved the
+> difficulty into the seeded world (2026-08-21) and its prediction is committed
+> in [`VERIFICATION.md`](./VERIFICATION.md) **ahead of the run**. Until that run
+> is taken, treat this as a working local examinee with a **designed but
+> unmeasured** lesson — [F-1292](https://linear.app/pome-sh/issue/F-1292).
 
 ### Telemetry
 

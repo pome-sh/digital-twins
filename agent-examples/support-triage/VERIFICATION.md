@@ -142,6 +142,32 @@ A do-nothing agent scoring 0 is One Working Curriculum M0's own Done-when and th
 entire reason F-1338 and F-1521 were built. The marker hands it 33 for free, which
 is the reward-hacking case AutomationBench's exclusion exists to prevent.
 
+### ⚠️ What this re-cut breaks, and it needs a call
+
+**The managed-agent `agents/support-triage-v1.yaml` / `v2.yaml` pair no longer
+tells a story against this task.** The two versions differ only on whether the
+charter tells the agent to search existing issues first. Neither knows the
+repository consolidates onto tracking issues, so against the hardened world
+**both are expected to fail**, and the v1→v2 delta the pair exists to demonstrate
+collapses to no delta at all.
+
+That pair is referenced from the README's opening and is the managed-agent path's
+whole demo, so it is not something to quietly delete. Three options, none taken
+here because it is a product call:
+
+1. **Give v2 the policy sentence** — the yaml equivalent of
+   `POME_TRIAGE_POLICY_HINT=on`. Keeps the one-line-diff shape and re-points it at
+   the new lesson. Cheapest, and it makes the two runtimes tell the *same* story
+   again, which was the original intent.
+2. **Point the pair at a second, easier task**, keeping it as the managed-agent
+   onboarding demo with the hardened task reserved for the local examinee.
+3. **Retire the pair.** It is the last pattern-2 baseline in the catalog and
+   `failure-classes.md` §3 already flags pattern-2 as model-dependent.
+
+Option 1 is the recommendation. Until one is taken, do not run the yaml pair
+against `duplicate-issue.md` and read the result as a regression — it is this
+re-cut working as designed, on an agent that was never told the rule.
+
 ### The prediction
 
 Stated before the first trial, at `claude-opus-5`, n=5, hosted, sandbox sealed,
