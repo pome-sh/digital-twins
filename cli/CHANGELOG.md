@@ -10,6 +10,28 @@ write a version number here or in `package.json` — see `RELEASING.md`. Release
 entries are insertions only: a correction is the next entry, naming the one it
 corrects.
 
+## Unreleased (minor)
+
+**`pome sandbox` is `pome session`** (F-1557). The `session` command now also
+answers to `sandbox`. `pome sandbox create`, `list` and `stop` — plus `stop`'s
+own `kill` alias — run the same code, take the same flags and print the same
+output as the `session` spelling; `pome --help` and `pome sandbox --help` both
+show it as `session|sandbox`.
+
+**Minor, not patch:** `sandbox` is a command spelling that did not exist before,
+so a script written against it will not run on an older CLI. Nothing existing
+moves. `session` is untouched, keeps working permanently, and is not deprecated
+— pick either.
+
+**Why both spellings.** `sandbox` is the product noun; `session` is what this
+CLI shipped with and what every existing script types. One Commander alias means
+there is no second command tree for the two to drift apart in — a subcommand or
+flag added to `session` is reachable under `sandbox` the moment it lands.
+
+Untouched: `pome twin start|reset|status` (the twin is the unit, already named
+correctly), and `@pome-sh/sandbox-domains`, which despite its name is the twin
+runtime rather than anything to do with sandboxes.
+
 ## 0.24.2 — 2026-08-20
 
 **The 501 unsupported body says "twin", not "twin clone"** (F-1547). Every cold
