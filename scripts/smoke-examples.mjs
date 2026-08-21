@@ -368,7 +368,7 @@ export const LIVE = resolveLiveFlag(process.env.SMOKE_EXAMPLES_LIVE).live;
 // gateway key alone would still strand that example at "no evidence of real
 // work" while reporting the OTHER seven's gateway-routed calls as proof the
 // leg is credentialed. `POME_AUTH_TOKEN` is the one twin-side signal every
-// wired example reads (see AGENTS.md's smoke:examples row); its presence is
+// wired example reads (see this file's header); its presence is
 // what distinguishes "real local twins were booted for this run" from
 // SMOKE_ENV's dead loopback ports, without hand-enumerating which of the
 // three twin REST/MCP URL pairs a given example needs.
@@ -586,8 +586,8 @@ export function classifyLaunch({ output, stillRunningAtSettle, exitCode, signal,
         `${how} with no TDZ and no ${OUTBOUND_MARKER} in its output — it crashed before reaching an ` +
         `outbound twin/model call, so there is no positive evidence it did any real work (the likely ` +
         `case: broken env/auth resolution, a wrong parse, or a crash during wiring). An error string ` +
-        `that merely LOOKS like a benign network/auth failure does not count — see AGENTS.md's ` +
-        `smoke:examples row / this file's header for why (F-1519).`,
+        `that merely LOOKS like a benign network/auth failure does not count — see this file's ` +
+        `header for why.`,
     };
   }
 

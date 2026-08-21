@@ -21,8 +21,8 @@
 // `Pushed`, `stripe-bbf27bf` was never published, and nothing re-ran the step —
 // so four consecutive twin-snapshot-verify runs failed and pome-cloud#752
 // reported `stripe — no-image` for four days. The file's NAME still says
-// cdn-fetches: renaming it would move a required gate's wiring across ci.yml,
-// AGENTS.md and this file's test for no property gained, and shapes (a) and (b)
+// cdn-fetches: renaming it would move a required gate's wiring across ci.yml
+// and this file's test for no property gained, and shapes (a) and (b)
 // are still what most of it does.
 //
 // F-1534 closed the residual this header used to record at the bottom. With (a)
