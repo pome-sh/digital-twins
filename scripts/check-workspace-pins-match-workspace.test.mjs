@@ -25,7 +25,7 @@
 // different rule (needs the registry, tolerates a pin equal to a version that
 // simply has not published yet) and is NOT this suite's subject — see
 // `scripts/check-example-pins-published.mjs` (F-1483) and its own regression
-// suite, wired from `scripts/typecheck-examples.mjs`.
+// suite, wired from `scripts/gate-examples.mjs`.
 
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";

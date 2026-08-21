@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // F-1483 — `examples/*` pins a PUBLISHED `@pome-sh/*` version on purpose
-// (`examples/support-triage` documents why in `typecheck-examples.mjs`'s
+// (`examples/support-triage` documents why in `gate-examples.mjs`'s
 // header: it is `npx degit`-fetchable as a standalone subtree, so a `file:`
 // link out of its own directory would break its `npm install`). Nothing
 // watched that pin drift out from under the sibling workspace version twice
@@ -14,7 +14,7 @@
 // before `npm ci`, and its rule ("a `@pome-sh/*` dep must resolve to the
 // workspace") is the wrong rule for a pin that is published on purpose. This
 // gate needs the registry, so it lives where `examples/*` are already
-// installed — `typecheck-examples.mjs` already runs `npm ci` per example in
+// installed — `gate-examples.mjs` already runs `npm ci` per example in
 // CI's heavy (networked) job — rather than standing up a second CI mechanism.
 //
 // THE RULE, in two parts:
@@ -327,7 +327,7 @@ export function planExampleRepins(repoRoot, npmView = writeSideNpmView) {
 
 /**
  * Run discovery + the registry check and print a report in the shape
- * `typecheck-examples.mjs` expects: throws on zero eligible pins (a check
+ * `gate-examples.mjs` expects: throws on zero eligible pins (a check
  * examining nothing must not report a pass), prints the skip count even when
  * everything else is green, and returns `true`/`false` for the caller to fold
  * into its own exit code.

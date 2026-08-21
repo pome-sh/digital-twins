@@ -1,10 +1,25 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-866 example-typecheck gate. The bundled `examples/*` projects are
-// standalone npm packages (each with its own lockfile), NOT workspaces, so the
-// root `npm run typecheck` never covers them. That gap is how a zod-4 / Claude
-// Agent SDK `tool()` typing regression sat latent until F-866. This gate
-// typechecks every example that declares a `typecheck` script.
+// The `examples/*` gate: typecheck, then test, each example in its own install.
+//
+// The bundled `examples/*` projects are standalone npm packages (each with its
+// own lockfile), NOT workspaces, so neither the root `npm run typecheck` nor the
+// root `npm test` covers them. That gap is how a zod-4 / Claude Agent SDK
+// `tool()` typing regression sat latent until F-866.
+//
+// The same gap had swallowed the examples' own TESTS for as long as they have
+// existed. Four examples declare `"test": "vitest run"` and 49 test cases across
+// five of those files ran nowhere at all: `npm test --workspaces` skips a
+// non-workspace, no workflow invoked them, and
+// `check-packages-scripts-wired.mjs` -- the gate whose whole subject is a
+// declared check nothing runs -- scopes itself to `packages/*` and `cli/`, so it
+// could not see them. (`examples/triage-agent` is the exception: quickstart-
+// smoke.yml runs its 4 tests, but only behind that workflow's path filter.)
+//
+// So the loop below runs `npm test --if-present` beside the typecheck it already
+// ran, inside an `npm ci` it was already paying for. Discovery stays keyed on
+// the `typecheck` script, so an example that adds tests later is covered with no
+// edit here.
 //
 // Three of the four Claude-Agent-SDK examples consume
 // `@pome-sh/adapter-claude-sdk` through a local `file:` link, so the adapter's
@@ -49,14 +64,14 @@ function discoverExamples() {
     const pkgPath = join(examplesDir, name, "package.json");
     if (!existsSync(pkgPath)) continue;
     const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
-    if (pkg.scripts?.typecheck) found.push(name);
+    if (pkg.scripts?.typecheck || pkg.scripts?.test) found.push(name);
   }
   return found;
 }
 
 const examples = discoverExamples();
 if (examples.length === 0) {
-  console.error("No examples with a `typecheck` script found.");
+  console.error("No examples with a `typecheck` or `test` script found.");
   process.exit(1);
 }
 
@@ -77,18 +92,42 @@ for (const name of examples) {
   console.log(`\n=== examples/${name} ===`);
   try {
     run("npm", ["ci"], cwd);
-    run("npm", ["run", "typecheck"], cwd);
-    console.log(`examples/${name}: OK`);
   } catch {
-    failures.push(name);
-    console.error(`examples/${name}: FAILED`);
+    failures.push(`${name} (install)`);
+    console.error(`examples/${name}: FAILED (install)`);
+    continue;
+  }
+  // One try PER LEG, not one around both. With both in a single try a tsc error
+  // stopped that example's tests from running at all, so a type error and a test
+  // regression in the same commit took two CI rounds to see — and "a check that
+  // silently stops running behind another check's failure" is the exact shape the
+  // pin-parity note below calls this milestone's whole subject. Putting the test
+  // leg behind the typecheck leg would have re-armed it one directory over.
+  const broke = [];
+  for (const [leg, args] of [
+    ["typecheck", ["run", "typecheck"]],
+    // --if-present: only four of the eight examples ship a test script, and an
+    // example without one is not a failure.
+    ["test", ["test", "--if-present"]],
+  ]) {
+    try {
+      run("npm", args, cwd);
+    } catch {
+      broke.push(leg);
+    }
+  }
+  if (broke.length === 0) {
+    console.log(`examples/${name}: OK`);
+  } else {
+    failures.push(`${name} (${broke.join(" + ")})`);
+    console.error(`examples/${name}: FAILED (${broke.join(" + ")})`);
   }
 }
 
 if (failures.length > 0) {
-  console.error(`\nExamples failing typecheck: ${failures.join(", ")}`);
+  console.error(`\nExamples failing: ${failures.join(", ")}`);
 } else {
-  console.log(`\nAll ${examples.length} examples typechecked clean.`);
+  console.log(`\nAll ${examples.length} examples typechecked and tested clean.`);
 }
 
 // F-1483 — confirm each bundled example's exact `@pome-sh/*` pin still equals

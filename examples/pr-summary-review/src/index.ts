@@ -244,7 +244,7 @@ function startThinkingIndicator() {
  * gate can exercise every tool against a live twin without a model — F-1152.
  * This example and `pr-summary-agent` both shipped a `comment_on_pull_request`
  * the GitHub twin answered `404 Issue not found` for, on every subject, for as
- * long as the examples existed, and no gate looked: `typecheck:examples` is
+ * long as the examples existed, and no gate looked: `gate:examples` is
  * green on a well-typed tool whose endpoint 404s, and `smoke:examples` returns
  * before any tool fires.
  */
