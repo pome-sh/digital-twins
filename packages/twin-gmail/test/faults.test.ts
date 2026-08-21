@@ -106,4 +106,31 @@ describe("sendMessage gate", () => {
     }
     expect(status).toBe(429); // 2nd throttled
   });
+
+  // The gate has to run OUTSIDE sendMessage's transaction. A throttled call must
+  // still advance the counter — that is what lets a retrying agent walk out of
+  // the throttle window. Move checkFault inside the transaction and the rollback
+  // undoes its own increment, so the window never closes and every retry 429s
+  // forever. Nothing but the call site's position enforces that, so this is the
+  // test that fails if it moves.
+  it("lets a retry walk out of the throttle window", () => {
+    const db = openGmailTwinDatabase(":memory:");
+    const gmail = new GmailDomain(db);
+    gmail.seed({
+      primaryMailbox: { email: "agent@pome-twin.test", displayName: "Agent" },
+      faults: [{ name: "rate-limited", target: "messages.send", succeedFirst: 0, throttleFor: 1 }],
+    } as never);
+    const raw = composeMime({
+      from: "agent@pome-twin.test",
+      to: ["x@pome-twin.test"],
+      subject: "hi",
+      text: "hi",
+      date: "2026-07-24T12:00:00.000Z",
+      messageId: "retry-recovers@test",
+    });
+    const send = () => gmail.sendMessage("agent@pome-twin.test", raw);
+    expect(send).toThrow(); // call 1 throttled, and it still counted
+    expect(send).not.toThrow(); // so the retry clears the window
+    expect((db.prepare("SELECT COUNT(*) AS n FROM messages").get() as { n: number }).n).toBeGreaterThan(0);
+  });
 });
