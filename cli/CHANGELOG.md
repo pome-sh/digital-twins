@@ -10,7 +10,7 @@ write a version number here or in `package.json` — see `RELEASING.md`. Release
 entries are insertions only: a correction is the next entry, naming the one it
 corrects.
 
-## Unreleased (minor)
+## 0.26.0 — 2026-08-21
 
 **`pome scenarios` is gone** (F-1578). The hidden alias that ran `pome tasks`
 under the retired spelling has been removed. `pome scenarios` now exits with
