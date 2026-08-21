@@ -35,7 +35,7 @@
 //      THROWS, naming the file and the line. The alternative — treating it as
 //      "no pending entry" — means a release request that reads as silence, which
 //      is the failure mode this repo has been bitten by often enough to have a
-//      row about it in AGENTS.md.
+//      rule about it in AGENTS.md.
 //   3. No default level. `## Unreleased` with no level is refused rather than
 //      assumed to be a patch: whether a change forces consumers to act is not
 //      something a script can infer, and quietly guessing "patch" would ship a

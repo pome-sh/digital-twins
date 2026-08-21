@@ -216,9 +216,9 @@ console.log("\nrelease.yml wiring");
   check("plan-wire has packages: read", planWire.includes("packages: read"));
   check("publish-wire has packages: write", publishWire.includes("packages: write"));
 
-  // F-1520 — the dispatch that closes the re-pin deadlock (RELEASING.md /
-  // AGENTS.md P8) must fire once after either publish lane succeeds, never
-  // before, and never mask a real publish failure by swallowing its own.
+  // The dispatch that closes the re-pin deadlock (RELEASING.md) must fire once
+  // after either publish lane succeeds, never before, and never mask a real
+  // publish failure by swallowing its own.
   const dispatch = jobOf("dispatch-allocate-version");
   check("dispatch-allocate-version job exists", Boolean(dispatch));
   check(
