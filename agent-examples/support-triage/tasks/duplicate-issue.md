@@ -154,27 +154,44 @@ passThreshold: 100
 
 Measured 2026-08-21, hosted, examinee `examples/support-triage` as committed (no
 planted defect, `POME_TRIAGE_POLICY_HINT` unset). Model pinned per arm via
-`ANTHROPIC_MODEL`. Discriminating by `minimal-viktor/LADDER.md`'s pre-fixed
-definition: at least one model below 100 and at least one at 100. Full narrative,
-including the refuted prediction, in `../VERIFICATION.md`.
+`ANTHROPIC_MODEL`. Discriminating by `minimal-viktor/LADDER.md`'s definition — but
+read the `cause` field before quoting any pass rate.
+
+⚠️ **The `claude-haiku-4-5` rows are NOT usable as evidence about haiku.** Five of
+its eight trials failed because two twin defects handed it wrong answers, not
+because it reasoned badly: `list_issues` 422s on the `labels: []` array its own
+MCP schema declares (F-1614), and `search_issues` whole-string-matches so a
+multi-word query returns `total_count: 0` (F-791). Those trials searched twice,
+correctly, were told nothing existed, and filed a duplicate — behaviour that would
+have PASSED against real GitHub. They are kept, marked `twin-defect`, because
+deleting them would hide the reason the arm was dropped.
+
+**The discrimination verdict rests on `claude-sonnet-5`**, whose two failures are
+clean: it listed the issues, saw both #47 and #23, and chose #47.
 
 ```json
 {
   "fingerprint": "b9459b5a4e067458fb307e5a81d7cf3238ac8d1c15494281204d968eafbbe92c",
   "measured_at": "2026-08-21",
   "verdict": "discriminating",
+  "verdict_rests_on": "claude-opus-5 (5/5) vs claude-sonnet-5 (1/3, both failures genuine)",
   "trials": [
-    { "model": "claude-opus-5",    "run_id": "run_BF1Ta2q9beZcgawm", "score": 100, "verdict": "pass" },
-    { "model": "claude-opus-5",    "run_id": "run_YMoWSl1L2gKKk2vQ", "score": 100, "verdict": "pass" },
-    { "model": "claude-opus-5",    "run_id": "run_j6vDUFrb5Qq2g5Ay", "score": 100, "verdict": "pass" },
-    { "model": "claude-opus-5",    "run_id": "run_8dg0TEowP7rd0bPb", "score": 100, "verdict": "pass" },
-    { "model": "claude-opus-5",    "run_id": "run_mct3R7EuAXalVgRe", "score": 100, "verdict": "pass" },
-    { "model": "claude-sonnet-5",  "run_id": "run_JKzQsboH4kkas0Fr", "score": 40,  "verdict": "fail" },
-    { "model": "claude-sonnet-5",  "run_id": "run_lHQG4JRlzV3u3Lc4", "score": 40,  "verdict": "fail" },
-    { "model": "claude-sonnet-5",  "run_id": "run_ymWzSlSP8NwxwQvX", "score": 100, "verdict": "pass" },
-    { "model": "claude-haiku-4-5", "run_id": "run_2CI8p7FYeDURna8j", "score": 20,  "verdict": "fail" },
-    { "model": "claude-haiku-4-5", "run_id": "run_ZUzcIQ2xk1RbcEU7", "score": 60,  "verdict": "fail" },
-    { "model": "claude-haiku-4-5", "run_id": "run_m6HTDgHFK2BYJ0jw", "score": 20,  "verdict": "fail" }
+    { "model": "claude-opus-5",    "run_id": "run_BF1Ta2q9beZcgawm", "score": 100, "verdict": "pass", "cause": "clean" },
+    { "model": "claude-opus-5",    "run_id": "run_YMoWSl1L2gKKk2vQ", "score": 100, "verdict": "pass", "cause": "clean" },
+    { "model": "claude-opus-5",    "run_id": "run_j6vDUFrb5Qq2g5Ay", "score": 100, "verdict": "pass", "cause": "clean" },
+    { "model": "claude-opus-5",    "run_id": "run_8dg0TEowP7rd0bPb", "score": 100, "verdict": "pass", "cause": "clean" },
+    { "model": "claude-opus-5",    "run_id": "run_mct3R7EuAXalVgRe", "score": 100, "verdict": "pass", "cause": "clean" },
+    { "model": "claude-sonnet-5",  "run_id": "run_JKzQsboH4kkas0Fr", "score": 40,  "verdict": "fail", "cause": "genuine — saw #47 and #23, chose #47" },
+    { "model": "claude-sonnet-5",  "run_id": "run_lHQG4JRlzV3u3Lc4", "score": 40,  "verdict": "fail", "cause": "genuine — saw #47 and #23, chose #47" },
+    { "model": "claude-sonnet-5",  "run_id": "run_ymWzSlSP8NwxwQvX", "score": 100, "verdict": "pass", "cause": "clean" },
+    { "model": "claude-haiku-4-5", "run_id": "run_2CI8p7FYeDURna8j", "score": 20,  "verdict": "fail", "cause": "twin-defect — F-1614 + F-791" },
+    { "model": "claude-haiku-4-5", "run_id": "run_ZUzcIQ2xk1RbcEU7", "score": 60,  "verdict": "fail", "cause": "genuine — saw #47 and #23, chose #47" },
+    { "model": "claude-haiku-4-5", "run_id": "run_m6HTDgHFK2BYJ0jw", "score": 20,  "verdict": "fail", "cause": "twin-defect — F-791" },
+    { "model": "claude-haiku-4-5", "run_id": "run_eJbw0oYADmoVNy3F", "score": 20,  "verdict": "fail", "cause": "twin-defect — F-1614 + F-791" },
+    { "model": "claude-haiku-4-5", "run_id": "run_o1AtdjDcQXfqtRaA", "score": 20,  "verdict": "fail", "cause": "twin-defect — F-1614 + F-791" },
+    { "model": "claude-haiku-4-5", "run_id": "run_nOxDnKXPzQDwUB5z", "score": 40,  "verdict": "fail", "cause": "genuine — saw #47 and #23, chose #47" },
+    { "model": "claude-haiku-4-5", "run_id": "run_iQQkXGdfkOv1Qwcd", "score": 0,   "verdict": "fail", "cause": "twin-defect — F-1614 + F-791" },
+    { "model": "claude-haiku-4-5", "run_id": "run_cKMcBhOj6Pq6vzJg", "score": 60,  "verdict": "fail", "cause": "genuine — saw #47 and #23, chose #47" }
   ]
 }
 ```

@@ -290,6 +290,74 @@ existing issue and post ITS link back*; the policy says otherwise. That is the L
 shape — a written rule against a standing obligation the agent already carries —
 and opus resolves it correctly most, but not all, of the time.
 
+### ⚠️ AUDIT 2026-08-21 (evening): the haiku arm is contaminated — two twin defects, not a capability gap
+
+Before adopting `claude-haiku-4-5` as the quickstart's failing baseline, every
+trace was read. **Five of haiku's eight failures were caused by the twin handing
+it wrong answers.** The chain is identical each time:
+
+1. haiku calls `list_issues({owner, repo, state:"OPEN", labels:["bug"]})` — the
+   shape the tool's **own MCP `inputSchema` declares**.
+2. The twin returns **422 Validation Failed**, `field: "labels"`,
+   `code: "invalid_type"` — it rejects the array it declares (**F-1614**).
+3. haiku falls back to `search_issues` with a multi-word query.
+4. `search_issues` matches the whole query as one literal substring, so
+   `"coupon 500"` finds nothing even though #47's title contains both words —
+   **`total_count: 0`** (**F-791**, filed 2026-07-17, still Backlog).
+5. haiku concludes *"no existing issue tracks this bug"* — **a correct inference
+   from two wrong answers** — and files a duplicate.
+6. Scored 0–20, and the report reads as *"the agent failed to check for
+   duplicates."*
+
+Probed directly against a live sandbox, no agent involved:
+
+| call | result |
+|---|---|
+| `GET /issues?state=open` | 5 issues ✅ |
+| `GET /issues?state=open&labels=bug` | 3 issues ✅ |
+| MCP `list_issues {state:"OPEN"}` | 5 issues ✅ |
+| MCP `list_issues {state:"OPEN", labels:["bug"]}` | **422 invalid_type** ❌ |
+| `search_issues q=coupon` | 3 ✅ |
+| `search_issues q="coupon 500"` | **0** ❌ |
+| `search_issues q="repo:… is:open coupon"` | **0** ❌ |
+
+**Against real GitHub every one of those trials would have found #47 and passed.**
+The twin manufactured the failure and then graded the agent for it — the
+anti-predictive case, which is the one property a measurement instrument cannot
+have.
+
+#### What survives the audit
+
+| | trials | clean | genuine failure | twin-caused |
+|---|---|---|---|---|
+| `claude-opus-5` | 5 | 5 pass | — | — |
+| `claude-sonnet-5` | 3 | 1 pass | **2** | 0 |
+| `claude-haiku-4-5` | 8 | 0 pass | 3 | **5** |
+
+**The discrimination verdict still holds, but it rests on sonnet, not haiku.**
+Sonnet's two failures are clean: it listed the issues with no label filter, saw
+both #47 and #23 in the result, and chose #47. That is the lesson firing.
+
+#### What the audit cleared
+
+* **No leakage.** Across all five audited trials the examinee called only
+  `mcp__github__*` / `mcp__slack__*` — zero SDK built-ins, zero
+  `mcp__plugin_*` (the developer's own connectors), zero web. `tools: []` +
+  `settingSources: []` hold.
+* **The examinee never sees the answer.** Verified from its own startup banner:
+  it receives `examinee_task.prompt` only. `## Setup`, `## Expected Behavior` and
+  the criteria never reach it.
+* **No reward hacking.** No trial satisfied a criterion without doing the work;
+  the two seed-true negatives behaved exactly as designed.
+
+#### A grading defect the audit also turned up
+
+On three trials with **identical** behaviour (created an issue, added no comment),
+the judge graded the `[model]` criterion *"the report the agent added (the issue
+comment)"* **two different ways** — twice it silently substituted the new issue's
+body and passed; once it correctly said the premise was not met and failed. 20
+points of variance injected by the grader. Filed as **F-1615**.
+
 ### What this settles, and what it does not
 
 **Settles:** the seed was the right lever. This task went from saturated at every
