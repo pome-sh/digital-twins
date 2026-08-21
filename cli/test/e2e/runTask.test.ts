@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { runTask } from "../../src/runner/runTask.js";
 import { captureServerForTests } from "../fixtures/captureServerForTests.js";
+import { inCli } from "../fixtures/cliDir.js";
 
 // F-689 remainder (D6/R1) — `writeRunArtifactsCore` writes EXACTLY six files
 // (asserted directly at the unit level in
@@ -37,14 +38,14 @@ describe("Pome scenario runner (capture-only)", () => {
     async () => {
       const artifactsDir = await mkdtemp(join(tmpdir(), "pome-runs-"));
       const scenarios = [
-        "tasks/01-bug-happy-path.md",
-        "tasks/03-already-triaged.md",
+        inCli("tasks/01-bug-happy-path.md"),
+        inCli("tasks/03-already-triaged.md"),
       ];
 
       for (const taskPath of scenarios) {
         const result = await runTask({
           taskPath,
-          agentCommand: "node examples/agents/scripted-triage-agent.ts",
+          agentCommand: `node ${inCli("examples/agents/scripted-triage-agent.ts")}`,
           artifactsDir,
           captureServerCommand: captureServerForTests,
         });
@@ -72,8 +73,8 @@ describe("Pome scenario runner (capture-only)", () => {
     const artifactsDir = await mkdtemp(join(tmpdir(), "pome-runs-"));
 
     const result = await runTask({
-      taskPath: "tasks/05-github-identity-spoof.md",
-      agentCommand: "npx tsx examples/agents/scripted-pr-reviewer-agent.ts",
+      taskPath: inCli("tasks/05-github-identity-spoof.md"),
+      agentCommand: `npx tsx ${inCli("examples/agents/scripted-pr-reviewer-agent.ts")}`,
       artifactsDir,
       captureServerCommand: captureServerForTests,
     });

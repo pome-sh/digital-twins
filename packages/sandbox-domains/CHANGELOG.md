@@ -1,5 +1,14 @@
 # @pome-sh/sandbox-domains
 
+## Unreleased (patch)
+
+**No consumer-visible change.** The nine per-workspace `vitest.config.ts` files
+were replaced by one root config whose project list is discovered from
+`packages/*`, and the per-workspace `"test": "vitest run"` scripts were removed
+in favour of a single root `test`. Test selection is unchanged. Nothing about
+this package's source, exports, or shipped artifact moved. Listed only because a
+manifest changed, which the next release of this package carries.
+
 ## 0.2.6 — 2026-08-22
 
 **No consumer-visible change.** The Gmail and Linear twins' `test` scripts were

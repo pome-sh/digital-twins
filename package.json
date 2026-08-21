@@ -9,8 +9,9 @@
   "packageManager": "npm@11.5.1",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "npm run test --workspaces --if-present",
+    "test": "vitest run",
     "test:contract": "node contract/run.mjs",
+    "gate:golden": "vitest run --project cli cli/test/golden",
     "test:pack": "node scripts/clean-room-pack-test.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "gate:examples": "node scripts/gate-examples.mjs",
@@ -52,7 +53,8 @@
   },
   "devDependencies": {
     "knip": "^6.31.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
   },
   "overrides": {
     "hono": "^4.13.0",

@@ -270,7 +270,7 @@ published package):
 npm run dev          # boot this twin on :3333 from source
 npm run seed         # seed the local DB
 npm run typecheck
-npm test
+npx vitest run --project twin-github
 npm run smoke
 npm run fidelity:parity
 npm run validate:mcp # prints the wire-protocol / legacy-shim parity diff

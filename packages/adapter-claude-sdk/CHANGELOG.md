@@ -1,5 +1,15 @@
 # @pome-sh/adapter-claude-sdk — CHANGELOG
 
+## Unreleased (patch)
+
+**No consumer-visible change.** The nine per-workspace `vitest.config.ts` files
+were replaced by one root config declaring every workspace as a vitest project,
+and the per-workspace `"test": "vitest run"` scripts were removed in favour of a
+single root `test`. Test selection is byte-identical -- 3,748 cases before and
+after, same names. Nothing about this package's source, exports, or shipped
+artifact moved. Listed only because a manifest changed, which the next release
+of this package carries.
+
 ## 0.3.7 — 2026-08-21
 
 **No code change.** Carries `packages/wire/README.md`'s removal of a link to a
