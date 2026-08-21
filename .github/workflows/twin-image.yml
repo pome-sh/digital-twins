@@ -27,7 +27,7 @@ on:
 
 jobs:
   # On PRs, build only twins whose package tree (or shared runtime inputs)
-  # changed. main/tags/dispatch always build the full matrix so GHCR stays
+  # changed. main/dispatch always build the full matrix so GHCR stays
   # coherent. @pome-sh/wire / lockfiles / Docker wiring ⇒ all twins. (The cloud
   # contract in cli/src/contract is deliberately NOT here: no twin imports it.)
   #
@@ -98,8 +98,10 @@ jobs:
   # run for every event this workflow does: it triggers on `pull_request` and
   # `push: branches: [main]`, so on a `main` ref there is a run to wait for and
   # anywhere else there is not. Waiting where no run exists polls until the
-  # 30-minute timeout and fails the publish. `main` covers every publishing
-  # event, since `Push scanned image` below is `event_name != 'pull_request'`.
+  # 30-minute timeout and fails the publish. That covers push and dispatch on
+  # `main`. It does NOT cover a `workflow_dispatch` on another ref, which still
+  # publishes a `<twin>-<sha>` tag: `Push scanned image` below is only
+  # `event_name != 'pull_request'`, so write access is the whole gate there.
   wait-gates:
     runs-on: ubuntu-latest
     permissions:
@@ -150,8 +152,8 @@ jobs:
         id: meta
         with:
           # One shared package, one image per twin distinguished by tag
-          # prefix: ghcr.io/pome-sh/twins:<twin> (rolling), :<twin>-<version>,
-          # :<twin>-<sha>. `latest=false` — a single `latest` can't span three
+          # prefix: ghcr.io/pome-sh/twins:<twin> (rolling) and :<twin>-<sha>.
+          # `latest=false` — a single `latest` can't span three
           # twins in one package.
           images: ghcr.io/pome-sh/twins
           flavor: |

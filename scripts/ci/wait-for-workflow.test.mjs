@@ -132,7 +132,11 @@ function main() {
     // condition", so it would pass a config that guards a neighbouring wait and
     // leaves this one bare. Unguarded, this waits on a run secret-scan.yml
     // never produces off `main` and times out after 30 minutes.
-    const steps = y.split(/\n      - (?=name:|uses:)/);
+    // Split on the step indent alone. Anchoring the lookahead on `name:` or
+    // `uses:` merges any step whose first key is something else (`run:`, `env:`,
+    // `if:`) into the preceding block, which passes a bare wait sitting next to
+    // a guarded one.
+    const steps = y.split(/\n      - /);
     const secretStep = steps.find((b) => /wait-for-workflow\.sh secret-scan\.yml/.test(b));
     assert(secretStep, "twin-image must wait for secret-scan.yml");
     assert(

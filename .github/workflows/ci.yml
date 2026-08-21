@@ -64,7 +64,7 @@ jobs:
           # third-party CDN fetch, so the backoff is load-bearing, not
           # decoration. The GitHub release CDN was degraded throughout F-1471's
           # review and took out three separate pinned installs on its own runs:
-          # 31618873218 (a secret-scan install, 503), a twin-image syft install
+          # 31618873218, a twin-image syft install
           # (503), and
           # 31619759943 (this step, 503).
           #
