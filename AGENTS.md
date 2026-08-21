@@ -1,18 +1,15 @@
 # AGENTS.md
 
-What you need to work in this repo. Everything else is at https://docs.pome.sh.
+## Intro
 
-## What this is
+Open-sourced Digital Twins of APIs and the `pome` CLI.
 
-The open-source Pome digital twins and the `pome` CLI.
-
-A digital twin is a local, resettable emulation of a real API — GitHub, Stripe,
-Slack, Gmail, Linear — answering the same REST, GraphQL and MCP calls your agent
-makes in production, backed by real SQLite state. The CLI boots a twin, runs an
-agent against it, and records the trace.
+A digital twin is a local, resettable emulation of a real API that answers the same
+REST, GraphQL and MCP calls your agent makes in production, backed by real SQLite state.
+The CLI boots a twin, runs an agent against it, and records the trace.
 
 Recording is open source. Evaluation and scoring are hosted: `pome run --local`
-records a trace and scores nothing. Apache-2.0.
+records a trace. Apache-2.0.
 
 ## Layout
 
@@ -39,18 +36,6 @@ skills/               Claude skills shipped as a plugin
 examples/             runnable agents, each with its own install
 ```
 
-## Setup
-
-Node >= 24, npm >= 11.5.1.
-
-```bash
-npm ci        # once, from the root — installs every workspace
-npm run build # required before any test: packages import each other's dist/
-```
-
-`npm ci` before `npm run build` before `npm test`. Tests import built output, so
-a fresh checkout fails on `Cannot find package '@pome-sh/wire/...'` until you build.
-
 ## Commands
 
 ```bash
@@ -73,10 +58,6 @@ Single package: `npm test -w @pome-sh/twin-github`. Single file:
 
 ## Rules
 
-Things you cannot infer from reading the code.
-
-**npm only.** One root `package-lock.json`. Never yarn or pnpm.
-
 **Internal `@pome-sh/*` deps are `"*"`.** Workspace linking resolves them. An
 exact pin between siblings installs a second registry copy and you get two zod
 schema identities in one runtime. This holds for `@pome-sh/wire` too, even
@@ -88,15 +69,6 @@ rule above and both are correct.
 
 **`zod` is a `peerDependency` in published packages, never bundled.** Two copies
 means two schema identities.
-
-**No evaluation, scoring, judging or correlation in this repo.** Capture is open
-source; grading is the hosted product. This is the product boundary, not a
-style preference.
-
-**No version numbers in a PR.** Add an `## Unreleased (patch)` or
-`## Unreleased (minor)` entry to the package's `CHANGELOG.md`. CI allocates the
-number on `main` after merge. A PR that moves a `version` field is refused. See
-[`RELEASING.md`](RELEASING.md).
 
 **Released changelog entries are insertions only.** Correct a released entry
 with a new entry naming the one it corrects.
@@ -133,9 +105,6 @@ that passed.
 
 ## Vocabulary
 
-Applies to the README, `llms.txt`, per-package READMEs, and every string the
-CLI prints.
-
 | Word | Means |
 |---|---|
 | `digital twin` | one stateful emulation of a real API. Full phrase on first use per page, `twin` after |
@@ -168,8 +137,6 @@ rather than guessing at the rule.
 The ones that catch people: `gate:no-eval` (product boundary),
 `lint:no-cloud-imports`, `lint:dead-code`, `gate:route-inputs`,
 `gate:mcp-tools-list`, `test:pack`, and the tarball audits.
-
-`main` requires a PR and green checks. Direct push is release automation only.
 
 Secrets: `.github/workflows/secret-scan.yml` runs gitleaks and TruffleHog.
 Install the local hook with `bash scripts/hooks/install.sh`.
