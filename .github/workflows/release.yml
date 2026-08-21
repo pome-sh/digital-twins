@@ -393,7 +393,7 @@ jobs:
           echo "cannot see this version, so examples/* keep the previous pin and"
           echo "check-example-pins-published.mjs reds on main. Once the version is visible, run"
           echo "  gh workflow run allocate-version.yml --ref main"
-          echo "to land the re-pin by hand (RELEASING.md, 'F-1520')."
+          echo "to land the re-pin by hand."
           exit 1
 
   # @pome-sh/wire → GitHub Packages. See the file header for why this is its own
