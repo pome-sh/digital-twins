@@ -10,6 +10,32 @@ write a version number here or in `package.json`. Released
 entries are insertions only: a correction is the next entry, naming the one it
 corrects.
 
+## Unreleased (patch)
+
+**The GitHub twin answers two calls it used to get wrong** (F-1614, F-791). Both
+were measured against real GitHub rather than reasoned about, and both had been
+answering plausibly for months.
+
+`list_issues` over MCP now accepts `labels` as the string ARRAY its own tool
+schema declares, and UNIONS them the way GitHub's MCP does (it runs on GraphQL,
+which ORs the set); it used to reject the array with 422 `invalid_type` while
+accepting a CSV string GitHub itself refuses. An empty array is no filter, and
+label names match case-insensitively. The REST door is unchanged: `?labels=a,b`
+still intersects, because GitHub's REST does.
+
+`search_issues` now tokenises the free text and requires every term to match a
+WHOLE token of the issue's title-and-body, so `coupon 500` finds an issue whose
+title carries both words — it used to match the whole query as one substring and
+answer nothing. `is:` is parsed: `is:open`/`is:closed` filter by state,
+`is:issue` is the identity, `is:pr` answers empty, and a value the surface cannot
+honour answers empty rather than becoming search text. Previously any query
+carrying `is:open`, GitHub's commonest issue qualifier, returned nothing.
+
+**Agents may see MORE results than before.** A multi-word query that silently
+returned nothing now returns matches, and a two-label MCP filter returns the
+union. A query relying on a PARTIAL word (`coup` for `coupon`) no longer matches,
+which is also GitHub's behaviour. The other four search surfaces are unchanged.
+
 ## 0.26.1 — 2026-08-21
 
 **The README no longer links a `RELEASING.md` that does not exist.** The release

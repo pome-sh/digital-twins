@@ -31,10 +31,13 @@
 // `GET /search/issues` is the deliberate exception and is asserted as one.
 // GitHub's search API has no `state=open` default — a search returns what the
 // query asks for — so `searchIssues` keeps filtering only on an explicit state.
-// That is not an oversight the next reader should "fix": the twin's search is
-// substring-based over the seeded world, so imposing an open default would
-// answer `[]` for any query whose only match is closed, turning a value
-// mismatch into an empty-array divergence in the other direction.
+// That is not an oversight the next reader should "fix": the twin's search
+// matches tokens over the seeded world rather than ranking it, so imposing an
+// open default would answer `[]` for any query whose only match is closed,
+// turning a value mismatch into an empty-array divergence in the other
+// direction. (This read "substring-based" until F-791 tokenised the term; the
+// argument does not depend on which of the two it is, and the state qualifier
+// itself now also answers to GitHub's `is:open` spelling.)
 //
 // Where that explicit state is SPELLED moved in F-1389: `state` is a `q`
 // qualifier (`q=idempotency state:closed`), not a query parameter. GitHub's

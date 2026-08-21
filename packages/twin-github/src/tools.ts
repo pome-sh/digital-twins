@@ -100,6 +100,21 @@ function normalizeCommentId<T extends { comment_id?: number; commentId?: number 
 }
 
 /**
+ * The MCP door's `labels`, turned into the filter the domain takes (F-1614).
+ *
+ * This sits beside `normalizeIssueState` because it is the same kind of job —
+ * the MCP spelling of an argument translated once, at the boundary, rather than
+ * in each caller's head. It is NOT a join to the REST door's CSV: that door
+ * INTERSECTS and this one UNIONS, measured on both, so a join would answer
+ * empty for a two-label call GitHub answers with the union. `LabelFilter`'s
+ * comment carries the numbers.
+ */
+function normalizeIssueLabels<T extends { labels?: readonly string[] }>(input: T) {
+  const names = input.labels;
+  return { ...input, labels: names === undefined ? undefined : { names, match: "any" as const } };
+}
+
+/**
  * How each tool's arguments are validated, indexed by the name the fixture
  * declares. `githubToolInputSchema` is the projection that produced every
  * `inputSchema` in the fixture, and the contract suite runs it over each
@@ -195,7 +210,14 @@ export const toolArgumentSchemas = [
   },
   {
     name: "list_issues",
-    schema: z.object({ ...ownerRepo, state: z.enum(["OPEN", "CLOSED"]).optional(), labels: z.string().optional(), assignee: z.string().optional(), ...pageShape })
+    // `labels` is an ARRAY here and a CSV string on the REST door, and that is
+    // the vendor's own split rather than an inconsistency — see `LabelFilter` in
+    // `domain/issues.ts`. The string spelling is REFUSED on purpose: GitHub's MCP
+    // server answers `parameter labels could not be coerced to []string, is
+    // string` (`pkg/github/params.go`'s `OptionalStringArrayParam`, confirmed
+    // against the deployed server), so accepting it here would score a call the
+    // vendor rejects.
+    schema: z.object({ ...ownerRepo, state: z.enum(["OPEN", "CLOSED"]).optional(), labels: z.array(z.string()).optional(), assignee: z.string().optional(), ...pageShape })
   },
   {
     name: "add_issue_comment",
@@ -480,7 +502,7 @@ function dispatchTool(
     case "search_issues":
       return domain.searchIssues(parsed);
     case "list_issues":
-      return domain.listIssues(normalizeIssueState(parsed));
+      return domain.listIssues(normalizeIssueLabels(normalizeIssueState(parsed)));
     case "add_issue_comment":
       return domain.addIssueComment(normalizeIssueNumber(parsed), onDelta);
     case "create_issue":

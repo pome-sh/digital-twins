@@ -57,8 +57,8 @@ in the package README. Changing any of those is a breaking change for
 | `create_or_update_file` | SQLite files/commits | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts` | Requires `sha` for updates to preserve optimistic locking. |
 | `create_branch` | SQLite branches/files | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts`, `concurrency.test.ts` | Branch protection is not modeled. |
 | `push_files` | SQLite files/commits | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts` | Multi-file pushes are one local commit; Git object APIs are simplified. |
-| `search_issues` | SQLite issues | hot | semantic | `mcp-contract.test.ts`, `performance.test.ts`, `fixture-endpoints.test.ts`, `search-query-qualifiers.test.ts` | Free text is substring based; `repo:`/`user:`/`org:`/`state:` are parsed, other qualifiers are not (divergence #1). No `state=open` default, deliberately (F-1427). |
-| `list_issues` | SQLite issues | hot | semantic | `mcp-contract.test.ts`, `performance.test.ts`, `fixture-endpoints.test.ts`, `list-state-default.test.ts` | Only state, labels, assignee, and pagination filters are supported. ⚠️ The two doors differ, as GitHub's do (F-1468): the MCP tool takes `state` as `["OPEN","CLOSED"]` and returns BOTH when it is absent, which is what GitHub's own listing declares and describes; the REST `GET /issues` takes `open`/`closed`/`all` and defaults to `open` (F-1427). |
+| `search_issues` | SQLite issues | hot | semantic | `mcp-contract.test.ts`, `performance.test.ts`, `fixture-endpoints.test.ts`, `search-query-qualifiers.test.ts`, `upstream-measured-semantics.test.ts` | Free text is TOKENISED, all-terms, whole-token (F-791); `repo:`/`user:`/`org:`/`state:`/`is:` are parsed, other qualifiers are not (divergence #1). No `state=open` default, deliberately (F-1427). |
+| `list_issues` | SQLite issues | hot | semantic | `mcp-contract.test.ts`, `performance.test.ts`, `fixture-endpoints.test.ts`, `list-state-default.test.ts`, `upstream-measured-semantics.test.ts` | Only state, labels, assignee, and pagination filters are supported. ⚠️ The two doors differ, as GitHub's do, on TWO arguments. `state` (F-1468): the MCP tool takes `["OPEN","CLOSED"]` and returns BOTH when it is absent, which is what GitHub's own listing declares and describes; the REST `GET /issues` takes `open`/`closed`/`all` and defaults to `open` (F-1427). `labels` (F-1614): the MCP tool takes a string ARRAY and UNIONS it (GitHub's MCP runs on GraphQL); REST takes a CSV and INTERSECTS it. See "The two doors take `labels` differently". |
 | `add_issue_comment` | SQLite issue comments | hot | semantic | `mcp-contract.test.ts`, `state-export.test.ts` | Comment edit/delete APIs are not implemented. |
 | `create_issue` | SQLite issues | hot | semantic | `mcp-contract.test.ts` | Issue templates and milestones are not modeled. |
 | `create_pull_request_review` | SQLite PR reviews | hot | semantic | `mcp-contract.test.ts`, `state-export.test.ts` | Inline review comments are not created by this tool. |
@@ -226,21 +226,63 @@ that entry which was never a gap — that these urls must stay GENERIC, because
 authentication fails before dispatch and there is no operation to name — was
 always 32's, and 32 now names the twin-only 401/403 surfaces explicitly.
 
-1. **Search query syntax is substring-based.** The free text left in `q` is
-   matched as one case-insensitive substring, scoped to the default branch —
-   not as GitHub's ranked, tokenised, boolean-aware index. Four SCOPE
-   qualifiers are lifted out of `q` and honoured on `/search/code`,
-   `/search/commits` and `/search/issues` (F-1389): `repo:owner/name`,
-   `user:login`, `org:login`, and `state:open|closed` on `/search/issues` only,
-   several of them OR-ing together the way GitHub's do. Everything else GitHub
-   has — `in:`, `language:`, `path:`, `is:`, `label:`, `author:`, the boolean
-   operators — is **not parsed**, and an unparsed qualifier stays in the
-   free-text term rather than being dropped, so it narrows the answer to nothing
-   instead of silently widening it past what GitHub would return. Three further
-   simplifications, each deliberate: `user:` and `org:` both resolve to the
-   repository's owner login with no account-type check; `search_repositories`
+1. **Search query syntax is simplified, and `/search/issues` is TOKENISED while
+   the other four are still substring-based.** `/search/issues` splits the free
+   text into tokens and requires every one of them to be a token of the issue's
+   title-plus-body — not GitHub's ranked, semantic index, but the same
+   all-terms, whole-token answer for an ordinary query. `/search/code`,
+   `/search/commits`, `/search/repositories` and `/search/users` still match the
+   whole remaining `q` as one case-insensitive substring.
+
+   Five SCOPE qualifiers are lifted out of `q` (F-1389, F-791):
+   `repo:owner/name`, `user:login`, `org:login` on all three scoped searches, and
+   `state:open|closed` plus `is:` on `/search/issues` only, several of them
+   OR-ing together the way GitHub's do. `is:open`/`is:closed` set the same filter
+   `state:` does, `is:issue` is the identity on this surface and `is:pr` answers
+   empty (this twin keeps pull requests out of the issues table), and an `is:`
+   value the surface cannot honour answers empty rather than becoming free text.
+   Everything else GitHub has — `in:`, `language:`, `path:`, `label:`, `author:`,
+   the boolean operators — is **not parsed**, and an unparsed qualifier stays in
+   the free-text term rather than being dropped, so it narrows the answer to
+   nothing instead of silently widening it past what GitHub would return. Three
+   further simplifications, each deliberate: `user:` and `org:` both resolve to
+   the repository's owner login with no account-type check; `search_repositories`
    and `search_users` parse no qualifiers at all and still match the whole `q`;
    and quoted qualifier values (`repo:"a/b"`) are not unquoted.
+
+   **⚠️ WHAT THIS ENTRY USED TO SAY, AND WHY IT WAS THE DEFECT (F-791).** It read
+   *"the free text left in `q` is matched as one case-insensitive substring"* and
+   listed `is:` among the unparsed, with `narrowing is the safe failure` as the
+   reason for both. Narrowing is the safe failure for a SIMULATOR. It is not for
+   a grading instrument, and these two turned it into the opposite of one:
+   `search_issues(q="coupon 500")` answered `total_count: 0` for an issue whose
+   title carries both words, and any query carrying `is:open` — GitHub's
+   commonest issue qualifier — answered nothing at all. An agent that searched
+   before filing was told the bug was untracked, filed a duplicate, and was
+   graded for not checking. Measured on a hosted run: five of one model's eight
+   failures were this, and every one of them would have passed against real
+   GitHub. A twin that says the agent is bad where production says it is fine is
+   the one property the instrument cannot have, and it fails as a plausible
+   number rather than as an error.
+
+   The replacement is measured rather than reasoned. Against `cli/cli`,
+   2026-08-21: `codespaces` 345 and `authentication` 607 answer 37 together, so
+   terms AND; `authenticati` answers 0 against `authentication`'s 607, so a term
+   matches a whole token and not a prefix; `is:open` and `state:open` answer the
+   same 5; `is:issue` 21 and `is:pr` 16 partition the unscoped 37; and
+   `is:bogusvalue` answers 0 rather than searching for the literal. The
+   whole-token half matters as much as the multi-word half and pulls the other
+   way — splitting the query and testing each term with a substring match, the
+   fix F-791 itself prescribed, would answer 607 for `authenticati` and score a
+   call GitHub refuses to serve. `test/upstream-measured-semantics.test.ts`
+   carries the table and the provenance of every row.
+
+   Still simplified, and still divergent: GitHub's index is ranked and — on the
+   MCP door — semantic (`search_issues` there is documented as *"natural-language
+   semantic matching … already scoped to `is:issue`"*), so a paraphrase that
+   shares no token with the issue finds it at GitHub and not here. That is a
+   narrowing this twin does not attempt to close; what it no longer does is
+   answer empty for a query whose every term is present.
 2. **PR diffs and patches are simplified placeholders.** `get_pull_request_diff`
    and `get_pull_request_files` return a unified-diff-shaped envelope whose
    `patch` bodies are placeholders, not byte-accurate GitHub patches.
@@ -838,6 +880,46 @@ All nine are now undeclared, which under the `ignore` ruling above means
 discarded rather than refused: a request still sending one gets the answer it
 would have got without it, the way real GitHub answers. None of the three
 surfaces 4xx's.
+
+### The two doors take `labels` differently, and both are right (F-1614)
+
+**This is fidelity, not an inconsistency. Do not "unify" it.** The same shape of
+fact as `content` below, and resolved the same way — but this one is a
+disagreement about MEANING as well as spelling, so it reaches one level further
+in:
+
+| door | takes | matches | measured 2026-08-21 |
+|---|---|---|---|
+| REST `GET /repos/:o/:r/issues?labels=a,b` | a CSV **string** | **all** of them | `gh api`, `cli/cli`: `auth,codespaces` → 0, against 18 and 21 alone |
+| MCP `list_issues {labels:["a","b"]}` | a string **array** | **any** of them | the deployed server at `api.githubcopilot.com/mcp/` → 39, an exact union |
+
+The MCP tool is not a wrapper over that REST route. `github/github-mcp-server`
+@ `c2bc7dc0` (the commit `config/mcp-capture-sources.json` pins) builds a
+**GraphQL** query in `pkg/github/issues.go` and hands `labels` to
+`issues(labels: [String!])`, which ORs the set — confirmed directly against
+GitHub's GraphQL API as well as end to end through the deployed MCP server. So
+an examinee filtering on two labels gets the union at GitHub and would have got
+the intersection from any twin that joined the array into the REST door's CSV.
+
+Three more measurements the same probe settled, all now matched:
+
+| sent to real GitHub's MCP | it answers |
+|---|---|
+| `labels: "auth"` — the REST CSV spelling | **refused**: `parameter labels could not be coerced to []string, is string` |
+| `labels: []` | no filter (the server guards its GraphQL argument with `len(labels) > 0`) |
+| `labels: ["AUTH"]`, `?labels=AUTH` | 18 — label names match **case-insensitively**, on both doors |
+
+The array→filter translation therefore lives at the MCP boundary
+(`normalizeIssueLabels` in `src/tools.ts`, beside `normalizeIssueState`) and the
+CSV split at the REST one, while the domain takes an explicit `LabelFilter`
+carrying `match: "all" | "any"` and never guesses from the argument's type.
+Case-insensitivity is the domain's, because both doors have it.
+
+⚠️ **The MCP door REFUSES the string on purpose.** Accepting both — the shape
+twin-slack's `jsonStringOrArray` uses, correctly, because Slack was measured to
+take both — would be a false PASS here: the twin would serve a call the vendor
+rejects. `test/upstream-measured-semantics.test.ts` and
+`test/mcp-argument-surface.test.ts` both fail if that comes back.
 
 ### The two doors take `content` differently, and both are right (F-1460)
 
