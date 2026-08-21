@@ -4,7 +4,7 @@ SPDX-License-Identifier: Apache-2.0
 
 # @pome-sh/wire — CHANGELOG
 
-## Unreleased (patch)
+## 0.2.4 — 2026-08-21
 
 **The README no longer links a `RELEASING.md` that does not exist.** No code
 change; the two-registry publish model it described is unchanged.

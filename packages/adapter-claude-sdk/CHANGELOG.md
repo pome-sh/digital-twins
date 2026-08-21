@@ -1,6 +1,6 @@
 # @pome-sh/adapter-claude-sdk — CHANGELOG
 
-## Unreleased (patch)
+## 0.3.7 — 2026-08-21
 
 **No code change.** Carries `packages/wire/README.md`'s removal of a link to a
 `RELEASING.md` that no longer exists.

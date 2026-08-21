@@ -10,7 +10,7 @@ write a version number here or in `package.json`. Released
 entries are insertions only: a correction is the next entry, naming the one it
 corrects.
 
-## Unreleased (patch)
+## 0.26.1 — 2026-08-21
 
 **The README no longer links a `RELEASING.md` that does not exist.** The release
 procedure moved out of the repository; the packaged README now points at the
