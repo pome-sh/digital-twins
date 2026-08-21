@@ -95,7 +95,43 @@ export function createIssue(domain: GitHubDomain, input: { owner: string; repo: 
 }
 
 
-export function listIssues(domain: GitHubDomain, input: { owner: string; repo: string; state?: "open" | "closed" | "all"; labels?: string; assignee?: string } & PageOptions) {
+/**
+ * How a label filter matches, because real GitHub's two doors DISAGREE and both
+ * are right (F-1614). This is the same shape of fact as F-1460's `content`, and
+ * it is resolved the same way: the disagreement lives at the boundary, and the
+ * domain is TOLD which semantics it was handed rather than sniffing the type.
+ *
+ * | door | argument | matches | measured 2026-08-21, `cli/cli` |
+ * |---|---|---|---|
+ * | REST `GET /issues?labels=a,b` | CSV | **all** of them | `auth,codespaces` → 0, against 18 and 21 alone |
+ * | MCP `list_issues {labels:["a","b"]}` | array | **any** of them | the same two → 39, an exact union |
+ *
+ * The MCP tool is not a wrapper over that REST route: `github/github-mcp-server`
+ * @ c2bc7dc0 `pkg/github/issues.go` builds a GraphQL query and hands `labels` to
+ * `issues(labels: [String!])`, which ORs the set. Confirmed end to end against
+ * the deployed server at `https://api.githubcopilot.com/mcp/`.
+ *
+ * Names match CASE-INSENSITIVELY on both doors (`?labels=AUTH` and
+ * `labels:["AUTH"]` each answered 18), so that part belongs here rather than at
+ * either boundary.
+ */
+export interface LabelFilter {
+  readonly names: readonly string[];
+  readonly match: "all" | "any";
+}
+
+/** A CSV from the REST door, an already-shaped filter from the MCP door, or nothing. */
+function labelFilter(labels: string | LabelFilter | undefined): LabelFilter | undefined {
+  if (labels === undefined) return undefined;
+  const raw = typeof labels === "string" ? { names: labels.split(","), match: "all" as const } : labels;
+  const names = raw.names.map((name) => name.trim().toLowerCase()).filter(Boolean);
+  // An EMPTY set is NO FILTER on both doors, not a match-nothing: REST answers
+  // the unfiltered list for `?labels=`, and the MCP server guards its GraphQL
+  // argument with `len(labels) > 0` so an empty array never reaches the query.
+  return names.length ? { names, match: raw.match } : undefined;
+}
+
+export function listIssues(domain: GitHubDomain, input: { owner: string; repo: string; state?: "open" | "closed" | "all"; labels?: string | LabelFilter; assignee?: string } & PageOptions) {
   const repo = domain.requireRepo(input.owner, input.repo);
   let rows = domain.listIssuesRows(repo.id);
   // Real GitHub defaults this route to `state=open` (F-1427). The filter used to
@@ -105,11 +141,13 @@ export function listIssues(domain: GitHubDomain, input: { owner: string; repo: s
   // constant-mismatch and `[].closed_at` type-changed against real GitHub.
   const state = input.state ?? "open";
   if (state !== "all") rows = rows.filter((issue) => issue.state === state);
-  if (input.labels) {
-    const wanted = input.labels.split(",").map((label) => label.trim()).filter(Boolean);
+  const wanted = labelFilter(input.labels);
+  if (wanted) {
     rows = rows.filter((issue) => {
-      const names = domain.listIssueLabels(repo.id, issue.number).map((label) => label.name);
-      return wanted.every((label) => names.includes(label));
+      const names = domain.listIssueLabels(repo.id, issue.number).map((label) => label.name.toLowerCase());
+      return wanted.match === "all"
+        ? wanted.names.every((label) => names.includes(label))
+        : wanted.names.some((label) => names.includes(label));
     });
   }
   if (input.assignee) rows = rows.filter((issue) => domain.listIssueAssignees(repo.id, issue.number).includes(input.assignee!));

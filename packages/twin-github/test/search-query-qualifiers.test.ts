@@ -265,11 +265,36 @@ describe("search `q` qualifiers (F-1389)", () => {
     });
 
     it("leaves the qualifiers GitHub has that this twin does not parse in the term", async () => {
-      // `in:`, `language:`, `path:`, `is:` and the boolean operators are named
-      // in FIDELITY.md divergence 1 as unparsed. They are unparsed the same way
+      // `in:`, `language:`, `path:` and the boolean operators are named in
+      // FIDELITY.md divergence 1 as unparsed. They are unparsed the same way
       // `bogus:` is — left in the term — rather than dropped.
-      expect(await issues("idempotency is:open")).toEqual([]);
+      //
+      // ⚠️ `is:` USED TO BE ON THAT LIST AND IS NOT ANY MORE (F-791). It was the
+      // costliest member of it: `is:open` is GitHub's commonest issue qualifier,
+      // so leaving it in the term zeroed every query that carried one, and an
+      // agent that wrote the request GitHub documents was told nothing existed.
+      // It is parsed now, and the case below pins the new behaviour.
       expect(await code("idempotency language:ts")).toEqual([]);
+    });
+
+    it("parses `is:` on `/search/issues`, where GitHub has it (F-791)", async () => {
+      // Measured against real GitHub 2026-08-21 on `cli/cli`: `is:open` and
+      // `state:open` answered the SAME 5 issues, and `is:issue` (21) + `is:pr`
+      // (16) partitioned the unscoped 37 exactly. So `is:open` is not a second
+      // filter with its own semantics — it is the spelling GitHub's own docs use
+      // for the one this surface already had.
+      expect(await issues("idempotency is:open")).toEqual(await issues("idempotency state:open"));
+      expect(await issues("idempotency repo:acme/api is:closed")).toEqual(["acme/api#2"]);
+      // `is:issue` is the identity here: this surface reads the issues table.
+      expect(await issues("idempotency is:issue")).toEqual(await issues("idempotency"));
+    });
+
+    it("is NOT a qualifier on `/search/code`, so `is:` stays free text there", async () => {
+      // Same rule `state:` follows two describes up, and the same reason:
+      // GitHub's code search has `is:archived` / `is:fork`, which this twin does
+      // not model, so lifting `is:` out of a code query would answer a BROADER
+      // set than GitHub rather than a narrower one.
+      expect(await code("idempotency is:archived")).toEqual([]);
     });
 
     it("leaves a `repo:` with no owner in the term — GitHub takes `owner/name`", async () => {

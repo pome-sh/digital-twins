@@ -81,21 +81,67 @@ import type { FileChange, MutatingOptions, PageOptions, StateDeltaCallback } fro
  * correct one, and dropping the three parameters alone would have left that
  * standing.
  *
- * Four qualifiers are lifted out. Everything else GitHub has — `in:`,
- * `language:`, `path:`, `is:`, the boolean operators — stays in the free-text
+ * Five qualifiers are lifted out. Everything else GitHub has — `in:`,
+ * `language:`, `path:`, the boolean operators — stays in the free-text
  * term (FIDELITY.md divergence 1).
  */
-const QUALIFIER = /(^|\s)(repo|user|org|state):(\S+)/gi;
+const QUALIFIER = /(^|\s)(repo|user|org|state|is):(\S+)/gi;
 
 interface ParsedSearchQuery {
   /** What is left of `q` once the qualifiers are lifted out, lowercased. */
   readonly text: string;
+  /**
+   * The same remainder TOKENISED. `/search/issues` matches on this and every
+   * term has to be present; the code and commit searches still match `text` as
+   * one substring, which is divergence 1's remaining half.
+   */
+  readonly terms: readonly string[];
   /** `user:` / `org:` values — repository owner logins, lowercased. */
   readonly owners: readonly string[];
   /** `repo:` values — repository FULL names (`owner/name`), lowercased. */
   readonly fullNames: readonly string[];
-  /** `state:`, on the surfaces that have one. */
+  /** `state:` or `is:open|closed`, on the surfaces that have one. */
   readonly state?: "open" | "closed";
+  /** `is:issue` / `is:pr`, on the surfaces that have them. */
+  readonly type?: "issue" | "pr";
+  /**
+   * An `is:` value the surface cannot honour. GitHub reads the qualifier and
+   * answers NOTHING rather than searching for the text — measured 2026-08-21,
+   * `repo:cli/cli … is:bogusvalue` → `total_count: 0` where the same query
+   * without it answers 37. Modelled as a flag rather than as unmatched text so
+   * the answer does not depend on whether the literal happens to be indexed.
+   */
+  readonly unhonourable: boolean;
+}
+
+/**
+ * GitHub's issue index is TOKENISED, and a term matches a WHOLE token rather
+ * than a substring. Measured 2026-08-21 against `cli/cli`:
+ *
+ *   `authentication`  → 607      `authenticati` (a prefix of it) → 0
+ *   `codespaces` 345 ∧ `authentication` 607 → `codespaces authentication` 37
+ *
+ * So terms AND, and a partial word matches nothing. Both halves matter here and
+ * they pull in opposite directions: matching the whole query as one substring
+ * (the F-791 defect) answers EMPTY for a query whose terms are all present,
+ * while splitting the query and testing each term with `includes` — the fix the
+ * ticket prescribed — would answer 607 for `authenticati` and score a call
+ * GitHub refuses to serve. A false hit is the worse of the two for a grading
+ * instrument, so the match is token equality.
+ *
+ * `_` stays inside a token and `-` breaks one, which is GitHub's own split:
+ * `per_page` → 110 and `per page` → 226 are different queries there, while
+ * `pull-request` → 3222 and `pull request` → 3298 are the same one.
+ */
+function tokenise(text: string): string[] {
+  return text.toLowerCase().split(/[^a-z0-9_]+/).filter(Boolean);
+}
+
+/** Whether every term in `q` appears as a token of `document`. */
+function matchesTerms(terms: readonly string[], ...document: string[]): boolean {
+  if (terms.length === 0) return true;
+  const tokens = new Set(tokenise(document.join(" ")));
+  return terms.every((term) => tokens.has(term));
 }
 
 /**
@@ -112,10 +158,12 @@ interface ParsedSearchQuery {
  * Lifting `state:` out of a code search would filter by nothing and widen the
  * answer for the same reason.
  */
-function parseSearchQuery(raw: string, options: { state?: boolean } = {}): ParsedSearchQuery {
+function parseSearchQuery(raw: string, options: { state?: boolean; is?: boolean } = {}): ParsedSearchQuery {
   const owners: string[] = [];
   const fullNames: string[] = [];
   let state: "open" | "closed" | undefined;
+  let type: "issue" | "pr" | undefined;
+  let unhonourable = false;
   const text = raw.replace(QUALIFIER, (whole, lead: string, key: string, rawValue: string) => {
     const value = rawValue.toLowerCase();
     switch (key.toLowerCase()) {
@@ -138,11 +186,38 @@ function parseSearchQuery(raw: string, options: { state?: boolean } = {}): Parse
         if (!options.state || (value !== "open" && value !== "closed")) return whole;
         state = value;
         return lead;
+      case "is":
+        // GitHub's commonest issue qualifier, and the one whose absence hurt
+        // most: `is:open` left in the free text zeroed EVERY query carrying it
+        // (F-791). Measured 2026-08-21 on `cli/cli`: `is:open` and `state:open`
+        // returned the same 5, and `is:issue` 21 + `is:pr` 16 partitioned the
+        // unscoped 37 exactly.
+        //
+        // Gated on `options.is` for the same reason `state:` is: `is:archived`
+        // and `is:fork` are code-search qualifiers this twin does not model, and
+        // lifting them out there would widen the answer past GitHub's.
+        if (!options.is) return whole;
+        switch (value) {
+          case "open":
+          case "closed":
+            state = value;
+            return lead;
+          case "issue":
+          case "pr":
+            type = value;
+            return lead;
+          default:
+            // Not free text. GitHub reads the qualifier, cannot honour the
+            // value, and answers nothing — measured, `is:bogusvalue` → 0.
+            unhonourable = true;
+            return lead;
+        }
       default:
         return whole;
     }
   });
-  return { text: text.replace(/\s+/g, " ").trim().toLowerCase(), owners, fullNames, state };
+  const normalized = text.replace(/\s+/g, " ").trim().toLowerCase();
+  return { text: normalized, terms: tokenise(normalized), owners, fullNames, state, type, unhonourable };
 }
 
 /**
@@ -234,13 +309,20 @@ export function searchCommits(domain: GitHubDomain, input: { query?: string; q?:
 
 
 export function searchIssues(domain: GitHubDomain, input: { query?: string; q?: string; owner?: string; repo?: string; state?: "open" | "closed" | "all" } & PageOptions) {
-  const parsed = parseSearchQuery(input.query ?? input.q ?? "", { state: true });
+  const parsed = parseSearchQuery(input.query ?? input.q ?? "", { state: true, is: true });
   const rows = domain.db
     .prepare(
       "SELECT issues.*, repositories.owner, repositories.name, repositories.full_name, repositories.description, repositories.private, repositories.default_branch, repositories.fork, repositories.parent_full_name, repositories.entity_counter, repositories.created_at AS repo_created_at, repositories.updated_at AS repo_updated_at FROM issues INNER JOIN repositories ON issues.repo_id = repositories.id ORDER BY issues.updated_at DESC"
     )
     .all() as Array<IssueRow & { owner: string; name: string; full_name: string; description: string; private: 0 | 1; default_branch: string; fork: 0 | 1; parent_full_name: string | null; entity_counter: number; repo_created_at: string; repo_updated_at: string }>;
-  let filtered = rows.filter((issue) => !parsed.text || issue.title.toLowerCase().includes(parsed.text) || issue.body.toLowerCase().includes(parsed.text) || issue.full_name.toLowerCase().includes(parsed.text));
+  // The free text matches TOKENS of one document — title and body together, the
+  // way GitHub indexes an issue, which is why `in:title` / `in:body` exist there
+  // to narrow it. The repository's full name is deliberately NOT in that
+  // document: `repo:` is the qualifier that addresses it (and this twin parses
+  // it), and folding the name into an all-terms match would answer a query like
+  // `acme coupon` that GitHub answers with nothing — divergence 1's stated
+  // unsafe direction.
+  let filtered = rows.filter((issue) => matchesTerms(parsed.terms, issue.title, issue.body));
   filtered = filtered.filter((issue) => inScope(parsed, issue.owner, issue.full_name));
   if (input.owner) filtered = filtered.filter((issue) => issue.owner === input.owner);
   if (input.repo) filtered = filtered.filter((issue) => issue.name === input.repo);
@@ -258,6 +340,16 @@ export function searchIssues(domain: GitHubDomain, input: { query?: string; q?: 
   // qualifier is the half GitHub would have read.
   const state = parsed.state ?? (input.state === "all" ? undefined : input.state);
   if (state) filtered = filtered.filter((issue) => issue.state === state);
+  // `is:pr` asks for pull requests and this surface reads the `issues` table,
+  // which holds none — real GitHub models a PR as an issue and this twin keeps
+  // them apart. Answering EMPTY is the honest reply; answering with issues is
+  // the false PASS the MCP-lane registry files as GITHUB-MCP-010 (a search for
+  // PRs scored as if it had returned them). The missing `search_pull_requests`
+  // TOOL is the other half of that entry and is not closed here.
+  //
+  // `unhonourable` is the same shape for a different reason: GitHub reads an
+  // `is:` value it cannot serve and returns nothing.
+  if (parsed.type === "pr" || parsed.unhonourable) filtered = [];
   return {
     total_count: filtered.length,
     incomplete_results: false,
