@@ -44,7 +44,7 @@ function baseRules(overrides = {}) {
         do_not_enforce_on_create: false,
         required_status_checks: [
           { context: "typecheck-test" },
-          { context: "gitleaks + trufflehog" },
+          { context: "secret scan" },
           { context: "dependency review" },
         ],
       },

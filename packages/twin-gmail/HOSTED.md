@@ -13,7 +13,7 @@ imports belong in this package.
 | JWT claim | `gmail_email` — default local mailbox `pome-agent@pome-twin.test` |
 | Agent token env | `POME_AUTH_TOKEN` + alias `POME_GMAIL_TOKEN` (same JWT) |
 | Seed / admin | `/admin/seed`, `/admin/reset`, `/_pome/state`, `/_pome/events` |
-| Image tag family | `ghcr.io/pome-sh/twins:gmail-*` (publish after CI + secret-scan) |
+| Image tag family | `ghcr.io/pome-sh/twins:gmail-*` (publish after CI) |
 | Local tasks | Inbox triage, first-party MCP parity, multi-twin with GitHub |
 | Fidelity artifacts | `fidelity.inventory.json`, `FIDELITY.md`, fixtures under `fixtures/` |
 

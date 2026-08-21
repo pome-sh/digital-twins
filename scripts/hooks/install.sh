@@ -13,5 +13,4 @@ chmod +x scripts/hooks/pre-commit
 git config core.hooksPath scripts/hooks
 
 echo "✅ git hooks installed (core.hooksPath = scripts/hooks)"
-echo "   pre-commit will run OSS boundary, copy-marker, and staged secret scans."
-echo "   Install gitleaks + trufflehog locally before committing staged changes."
+echo "   pre-commit will run the OSS boundary, no-eval, and copy-marker gates."

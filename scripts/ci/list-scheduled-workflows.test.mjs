@@ -98,8 +98,8 @@ withScratchRoot({ "none.yml": "name: x\non:\n  push:\n    branches: [main]\njobs
   assert(threw, "a missing .github/workflows directory must throw, not report zero");
 }
 
-// Against the real tree: this repo carries at least repo-policy.yml,
-// secret-scan.yml and release-alarm.yml on a schedule today. A regression
+// Against the real tree: this repo carries at least repo-policy.yml and
+// release-alarm.yml on a schedule today. A regression
 // here would mean the real-tree floor assertion (this same non-zero-count
 // logic, run by main()) is not actually watching anything.
 // The three YAML shapes the first revision of the parser silently missed. Each
@@ -203,7 +203,7 @@ withScratchRoot(
 
 {
   const real = findScheduledWorkflows(fileURLToPath(new URL("../..", import.meta.url)));
-  for (const expected of ["repo-policy.yml", "secret-scan.yml", "release-alarm.yml"]) {
+  for (const expected of ["repo-policy.yml", "release-alarm.yml"]) {
     assert(real.includes(expected), `expected ${expected} in the real tree's scheduled set, got ${real}`);
   }
 }

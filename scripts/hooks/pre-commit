@@ -8,7 +8,9 @@
 #  - ADR-002 open-core boundary: no `pome-cloud` imports in packages/.
 #  - Capture-only OSS boundary: no local eval/scoring/judging/correlation.
 #  - No cross-package file-copy markers.
-#  - Secret scan staged file contents (requires gitleaks + trufflehog).
+#
+# Every gate here is pure node/bash from this repo's dev deps — nothing to
+# install. Secrets are scanned in CI by secret-scan.yml, not here.
 
 set -euo pipefail
 
@@ -23,42 +25,3 @@ npm run gate:no-eval
 
 echo "pre-commit: copy-marker gate"
 npm run lint:copy-markers
-
-staged_count="$(git diff --cached --name-only --diff-filter=ACMR | wc -l | tr -d ' ')"
-if [ "$staged_count" = "0" ]; then
-  echo "pre-commit: no staged files for secret scan"
-  exit 0
-fi
-
-if ! command -v gitleaks >/dev/null 2>&1; then
-  echo "pre-commit: gitleaks is required for staged secret scans." >&2
-  echo "Install it from https://github.com/gitleaks/gitleaks, then retry." >&2
-  exit 1
-fi
-
-if ! command -v trufflehog >/dev/null 2>&1; then
-  echo "pre-commit: trufflehog is required for staged secret scans." >&2
-  echo "Install it from https://github.com/trufflesecurity/trufflehog, then retry." >&2
-  exit 1
-fi
-
-echo "pre-commit: gitleaks staged scan"
-gitleaks protect --staged --verbose --config .gitleaks.toml
-
-staged_snapshot="$(mktemp -d)"
-staged_list="$(mktemp)"
-cleanup_secret_scan_snapshot() {
-  rm -rf "$staged_snapshot" "$staged_list"
-}
-trap cleanup_secret_scan_snapshot EXIT
-
-git diff --cached --name-only --diff-filter=ACMR -z > "$staged_list"
-while IFS= read -r -d '' path; do
-  [ -f "$path" ] || continue
-  target="$staged_snapshot/$path"
-  mkdir -p "$(dirname "$target")"
-  git show ":$path" > "$target"
-done < "$staged_list"
-
-echo "pre-commit: trufflehog staged verified-secret scan"
-trufflehog filesystem --only-verified --fail "$staged_snapshot"

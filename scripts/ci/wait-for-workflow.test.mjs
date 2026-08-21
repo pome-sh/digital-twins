@@ -3,7 +3,7 @@
  * Regression coverage for scripts/ci/wait-for-workflow.sh (F-696).
  * Mocks curl on PATH and asserts success / failure / newest-run selection /
  * in-progress polling / timeout / cancelled. Also asserts twin-image.yml waits
- * on both ci.yml and secret-scan.yml.
+ * on ci.yml, and on secret-scan.yml only where a run exists to wait for.
  */
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, chmodSync, rmSync, readFileSync } from "node:fs";
@@ -126,9 +126,22 @@ function main() {
   {
     const y = readFileSync(join(ROOT, ".github/workflows/twin-image.yml"), "utf8");
     assert(/wait-for-workflow\.sh ci\.yml/.test(y), "twin-image must wait for ci.yml");
+    // The secret-scan wait must live on its own step WITH an `if:`. Asserted
+    // structurally, over the step block, not as a regex window over a `run:`
+    // script: a text window cannot express "this line is inside that
+    // condition", so it would pass a config that guards a neighbouring wait and
+    // leaves this one bare. Unguarded, this waits on a run secret-scan.yml
+    // never produces off `main` and times out after 30 minutes.
+    // Split on the step indent alone. Anchoring the lookahead on `name:` or
+    // `uses:` merges any step whose first key is something else (`run:`, `env:`,
+    // `if:`) into the preceding block, which passes a bare wait sitting next to
+    // a guarded one.
+    const steps = y.split(/\n      - /);
+    const secretStep = steps.find((b) => /wait-for-workflow\.sh secret-scan\.yml/.test(b));
+    assert(secretStep, "twin-image must wait for secret-scan.yml");
     assert(
-      /wait-for-workflow\.sh secret-scan\.yml/.test(y),
-      "twin-image must wait for secret-scan.yml",
+      /^\s*if:.*refs\/heads\/main/m.test(secretStep),
+      `the secret-scan wait needs an \`if:\` on refs/heads/main; got step:\n${secretStep}`,
     );
     assert(
       /needs:\s*wait-gates/.test(y) ||

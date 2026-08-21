@@ -115,7 +115,7 @@ Tuning: with 5 recipients, `succeedFirst: 2` + `throttleFor: 3` means the last 3
 ### Environment (confirmed 2026-07-24)
 
 - **Agent model calls (local):** `ANTHROPIC_API_KEY` present in the environment.
-- **Hosted twins + hosted eval:** global `pome` CLI **0.7.0** (upgraded from 0.5.0), logged in (keychain `sh.pome.cli`, validated via `pome session list` → exit 0). `pome run` is hosted-by-default; `-n <trials>` sets the trial group. Fallback auth `POME_API_KEY` (Pome team key) is used **only as a shell env var this session** — never written to any file, fixture, spec, plan, or commit (repo secret-scan / gitleaks enforced).
+- **Hosted twins + hosted eval:** global `pome` CLI **0.7.0** (upgraded from 0.5.0), logged in (keychain `sh.pome.cli`, validated via `pome session list` → exit 0). `pome run` is hosted-by-default; `-n <trials>` sets the trial group. Fallback auth `POME_API_KEY` (Pome team key) is used **only as a shell env var this session** — never written to any file, fixture, spec, plan, or commit (repo secret-scan enforced).
 - **Hosted twins available:** github, slack, gmail, linear. **Stripe is unhosted** → stripe-dependent tasks are not hosted-runnable.
 
 ### Level 1 — automated (local, CI-parity)

@@ -26,9 +26,9 @@ name: schedule alarm
 # inside the workflow that never ran (F-1180). The watcher has to survive the
 # thing it watches.
 #
-# `repo-policy.yml` and `secret-scan.yml` are a different shape. Their
-# failure mode is observed and it is NOT "never triggers" — their weekly cron
-# has been firing reliably (that is precisely how repo-policy.yml's red runs
+# `repo-policy.yml` is a different shape. Its failure mode is observed and it
+# is NOT "never triggers" — its weekly cron has been firing reliably (that is
+# precisely how repo-policy.yml's red runs
 # were noticed by hand every Monday); the gap is that a run FIRES, FAILS, and
 # nobody is told. A `failure()`-guarded job inside the same workflow file sees
 # that failure in the same run, for free, with the actual step-level error
@@ -41,8 +41,8 @@ name: schedule alarm
 # commits — is a risk this repo already carries and has already accepted for
 # release-alarm.yml itself (see that file's own comment): a repo quiet enough
 # to lose its cron is a repo whose release path nobody is exercising either.
-# Embedding the alarm in repo-policy.yml/secret-scan.yml does not make that
-# pre-existing, accepted risk any worse. The other half of "never fires" — a
+# Embedding the alarm in repo-policy.yml does not make that pre-existing,
+# accepted risk any worse. The other half of "never fires" — a
 # future edit that deletes or breaks a workflow's own `schedule:` block or its
 # alarm job — is a code-review-time regression, not a runtime outage, and is
 # F-1471's job: a static CI check over the workflow files themselves, which

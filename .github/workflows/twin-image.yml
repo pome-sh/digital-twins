@@ -2,7 +2,6 @@ name: twin image
 on:
   push:
     branches: [main]
-    tags: ['v*']
   pull_request:
     paths:
       - 'packages/twin-github/**'
@@ -23,13 +22,12 @@ on:
       - 'scripts/ci/wait-for-workflow.test.mjs'
       - 'scripts/ci/sign-image-digests.sh'
       - '.github/workflows/ci.yml'
-      - '.github/workflows/secret-scan.yml'
       - '.github/workflows/twin-image.yml'
   workflow_dispatch:
 
 jobs:
   # On PRs, build only twins whose package tree (or shared runtime inputs)
-  # changed. main/tags/dispatch always build the full matrix so GHCR stays
+  # changed. main/dispatch always build the full matrix so GHCR stays
   # coherent. @pome-sh/wire / lockfiles / Docker wiring ⇒ all twins. (The cloud
   # contract in cli/src/contract is deliberately NOT here: no twin imports it.)
   #
@@ -92,9 +90,18 @@ jobs:
           echo "twins=[${joined%,}]" >> "$GITHUB_OUTPUT"
           echo "PR twin matrix: [${joined%,}]"
 
-  # Package typecheck/test live in `ci`; secret scanning is a parallel required
-  # gate. Wait for both on this SHA before building/scanning/pushing so a red
-  # twin cannot still ship a rolling tag to GHCR (FDRS-586 / F-696).
+  # Package typecheck/test live in `ci`; secret scanning is a parallel gate.
+  # Wait for both on this SHA before building/scanning/pushing so a red twin
+  # cannot still ship a rolling tag to GHCR (FDRS-586 / F-696).
+  #
+  # The secret-scan wait carries its own `if:`, because secret-scan.yml does not
+  # run for every event this workflow does: it triggers on `pull_request` and
+  # `push: branches: [main]`, so on a `main` ref there is a run to wait for and
+  # anywhere else there is not. Waiting where no run exists polls until the
+  # 30-minute timeout and fails the publish. That covers push and dispatch on
+  # `main`. It does NOT cover a `workflow_dispatch` on another ref, which still
+  # publishes a `<twin>-<sha>` tag: `Push scanned image` below is only
+  # `event_name != 'pull_request'`, so write access is the whole gate there.
   wait-gates:
     runs-on: ubuntu-latest
     permissions:
@@ -102,7 +109,7 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Wait for ci + secret-scan workflows on this SHA
+      - name: Wait for the ci workflow on this SHA
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # PRs use the merge commit as github.sha; workflow runs are keyed by the
@@ -113,7 +120,12 @@ jobs:
           set -euo pipefail
           sha="${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
           bash scripts/ci/wait-for-workflow.sh ci.yml "$sha"
-          bash scripts/ci/wait-for-workflow.sh secret-scan.yml "$sha"
+      - name: Wait for the secret-scan workflow on this SHA
+        if: ${{ github.ref == 'refs/heads/main' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.sha }}
+        run: bash scripts/ci/wait-for-workflow.sh secret-scan.yml "$SHA"
 
   publish:
     name: ${{ matrix.twin }}
@@ -140,16 +152,14 @@ jobs:
         id: meta
         with:
           # One shared package, one image per twin distinguished by tag
-          # prefix: ghcr.io/pome-sh/twins:<twin> (rolling), :<twin>-<version>,
-          # :<twin>-<sha>. `latest=false` — a single `latest` can't span three
+          # prefix: ghcr.io/pome-sh/twins:<twin> (rolling) and :<twin>-<sha>.
+          # `latest=false` — a single `latest` can't span three
           # twins in one package.
           images: ghcr.io/pome-sh/twins
           flavor: |
             latest=false
           tags: |
             type=raw,value=${{ matrix.twin }},enable={{is_default_branch}}
-            type=semver,pattern=${{ matrix.twin }}-{{version}}
-            type=semver,pattern=${{ matrix.twin }}-v{{version}}
             type=sha,prefix=${{ matrix.twin }}-,format=short
       # /healthz reports these via the Dockerfiles' GIT_SHA/BUILD_TIME args;
       # without them every published image says git_sha:"dev".

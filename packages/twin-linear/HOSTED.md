@@ -14,7 +14,7 @@ imports belong in this package.
 | Agent token env | `POME_AUTH_TOKEN` + alias `POME_LINEAR_TOKEN` (same JWT) |
 | Local tokens | Seeded personal tokens (e.g. `lin_test_admin`) via `resolveCredential` |
 | Seed / admin | `/admin/seed`, `/admin/reset`, `/_pome/state`, `/_pome/events` |
-| Image tag family | `ghcr.io/pome-sh/twins:linear-*` (publish after CI + secret-scan) |
+| Image tag family | `ghcr.io/pome-sh/twins:linear-*` (publish after CI) |
 | Local tasks | Issue triage; multi-twin with GitHub |
 | Fidelity artifacts | `fidelity.inventory.json`, `FIDELITY.md`, fixtures under `fixtures/` |
 
