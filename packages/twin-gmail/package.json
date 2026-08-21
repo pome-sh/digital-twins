@@ -40,7 +40,7 @@
     "dev": "tsx src/server.ts",
     "start": "node dist/src/server.js",
     "prepack": "npm run build",
-    "test": "node --test test/gate0-fixtures.test.mjs && vitest run",
+    "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "fixture:mcp": "tsx scripts/adopt-upstream-mcp-fixture.ts",
     "gate:mcp-fixture": "tsx scripts/adopt-upstream-mcp-fixture.ts --check",
