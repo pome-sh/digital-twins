@@ -330,9 +330,11 @@ export function searchIssues(domain: GitHubDomain, input: { query?: string; q?: 
   // surfaces gained one because real GitHub defaults them; GitHub's SEARCH API
   // does not — a search returns what the query asks for, and `state:open` is a
   // query qualifier, not a default. Adding one to match the lists would be a new
-  // divergence in the other direction, and a worse one: this search is substring
-  // matching over the seeded world, so any query whose only match is closed would
-  // answer `[]` — an empty-array divergence in place of a value one.
+  // divergence in the other direction, and a worse one: this search matches
+  // tokens over the seeded world rather than ranking it, so any query whose only
+  // match is closed would answer `[]` — an empty-array divergence in place of a
+  // value one. (That clause read "substring matching" until F-791 tokenised the
+  // term; the argument it makes is unchanged by which of the two it is.)
   //
   // `state:` in `q` is GitHub's own spelling and wins over `input.state`, which
   // only an MCP caller can still set (F-1389 took `?state=` off the REST
