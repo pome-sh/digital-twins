@@ -166,12 +166,20 @@ pome run tasks/duplicate-issue.md -n 5
 `runs: 5` is in the task config on purpose — the report teaches **pass^k**, and
 one trial proves nothing.
 
-> ⚠️ **NOT yet verified red.** The re-cut landed 2026-08-21 with its prediction
-> committed ahead of the run (2 of 5, and the refutation condition stated) but
-> **the measurement has not been taken**. Until it has, treat this as a designed
-> lesson, not a demonstrated one — [`VERIFICATION.md`](./VERIFICATION.md) carries
-> the prediction and an empty results table on purpose, so the run can disagree
-> with it. That discipline is what caught the previous two baselines.
+> **`verified red: claude-sonnet-5 2/3 · claude-haiku-4-5 3/3, 2026-08-21` — and
+> GREEN on `claude-opus-5`.** 11 hosted trials against this exact file:
+>
+> | model | n | scores | pass rate |
+> |---|---|---|---|
+> | `claude-opus-5` | 5 | 100 × 5 | **5 / 5** |
+> | `claude-sonnet-5` | 3 | 40 · 40 · 100 | **1 / 3** |
+> | `claude-haiku-4-5` | 3 | 20 · 60 · 20 | **0 / 3** |
+>
+> The prediction committed before the run said 2 of 5 on opus. It was wrong —
+> opus fetches `docs/triage-policy.md` **by name, unprompted**, in every trial.
+> So **run the failing baseline on sonnet or haiku, not on opus.** Run ids and
+> the full narrative are in [`VERIFICATION.md`](./VERIFICATION.md); the
+> per-trial record is the `## Discrimination` section of the task file.
 
 ### Read the report
 
@@ -231,14 +239,14 @@ comment, and sends #23's link back to `#support`.
 
 ### If your baseline passes / your fix fails
 
-* **Baseline passes (stays green).** Possible, and it is the stated refutation
-  condition — this is the fourth consecutive prediction of a capability gap on
-  this example and the previous three were all wrong in the same direction. If it
-  is 5/5, the fallback is designed and is in
+* **Baseline passes (stays green).** On `claude-opus-5` it does, every time, and
+  that is measured rather than suspected — it reads the policy file by reflex. Run
+  the baseline on `claude-sonnet-5` (1/3) or `claude-haiku-4-5` (0/3) instead. If
+  you need a red on opus specifically, the designed fallback is in
   [`VERIFICATION.md`](./VERIFICATION.md): the same world plus a committed
-  pattern-1 config defect in the examinee (a context-file path that does not
-  resolve), so the policy never reaches the model. **Do not** reach for a tool
-  denial — that route is measured dead.
+  pattern-1 config defect (a context-file path that does not resolve), so the
+  policy never reaches the model. **Do not** reach for a tool denial — that route
+  is measured dead.
 * **Fix fails (stays red).** If a criterion reads `NOT EVALUATED` rather than
   failed, the run is `INCOMPLETE` — the grader could not see that state at all,
   which is a wiring problem rather than an agent problem. `pome run` exits 1 on
