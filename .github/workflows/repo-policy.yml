@@ -32,9 +32,8 @@ on:
       - ".github/workflows/repo-policy.yml"
       - ".github/workflows/dependency-review.yml"
       - ".github/workflows/ci.yml"
-      # Owns the `secret scan` required context: a rename here silently drops
-      # a required check, so the live-drift assertion must re-run on this PR
-      # rather than on next Monday's cron.
+      # Owns the `secret scan` required context: renaming that job drops a
+      # required check, so the live-drift assertion has to re-run on the PR.
       - ".github/workflows/secret-scan.yml"
 
 permissions:

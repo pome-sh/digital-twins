@@ -2,7 +2,6 @@ name: twin image
 on:
   push:
     branches: [main]
-    tags: ['v*']
   pull_request:
     paths:
       - 'packages/twin-github/**'
@@ -95,14 +94,12 @@ jobs:
   # Wait for both on this SHA before building/scanning/pushing so a red twin
   # cannot still ship a rolling tag to GHCR (FDRS-586 / F-696).
   #
-  # The secret-scan wait is GATED on push-to-main, because that is the only
-  # publishing event for which a run exists to wait on: secret-scan.yml triggers
-  # on `pull_request` and `push: branches: [main]`, and the `Push scanned image`
-  # step below is itself `github.event_name != 'pull_request'`. Ungated, a
-  # `v*` tag or a workflow_dispatch would poll for a run that never appears and
-  # fail the publish at the 30-minute timeout — which is what the ungated form
-  # did for tags all along (F-1606). A tag is not a coverage hole: it points at a
-  # commit already on main, which the push run scanned when it landed.
+  # The secret-scan wait carries its own `if:`, because secret-scan.yml does not
+  # run for every event this workflow does: it triggers on `pull_request` and
+  # `push: branches: [main]`, so on a `main` ref there is a run to wait for and
+  # anywhere else there is not. Waiting where no run exists polls until the
+  # 30-minute timeout and fails the publish. `main` covers every publishing
+  # event, since `Push scanned image` below is `event_name != 'pull_request'`.
   wait-gates:
     runs-on: ubuntu-latest
     permissions:
@@ -110,7 +107,7 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Wait for ci (+ secret-scan on main) on this SHA
+      - name: Wait for the ci workflow on this SHA
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # PRs use the merge commit as github.sha; workflow runs are keyed by the
@@ -121,9 +118,12 @@ jobs:
           set -euo pipefail
           sha="${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
           bash scripts/ci/wait-for-workflow.sh ci.yml "$sha"
-          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
-            bash scripts/ci/wait-for-workflow.sh secret-scan.yml "$sha"
-          fi
+      - name: Wait for the secret-scan workflow on this SHA
+        if: ${{ github.ref == 'refs/heads/main' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.sha }}
+        run: bash scripts/ci/wait-for-workflow.sh secret-scan.yml "$SHA"
 
   publish:
     name: ${{ matrix.twin }}
@@ -158,8 +158,6 @@ jobs:
             latest=false
           tags: |
             type=raw,value=${{ matrix.twin }},enable={{is_default_branch}}
-            type=semver,pattern=${{ matrix.twin }}-{{version}}
-            type=semver,pattern=${{ matrix.twin }}-v{{version}}
             type=sha,prefix=${{ matrix.twin }}-,format=short
       # /healthz reports these via the Dockerfiles' GIT_SHA/BUILD_TIME args;
       # without them every published image says git_sha:"dev".

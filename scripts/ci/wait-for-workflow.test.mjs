@@ -3,7 +3,7 @@
  * Regression coverage for scripts/ci/wait-for-workflow.sh (F-696).
  * Mocks curl on PATH and asserts success / failure / newest-run selection /
  * in-progress polling / timeout / cancelled. Also asserts twin-image.yml waits
- * on ci.yml, and on nothing that cannot report for a push or tag event.
+ * on ci.yml, and on secret-scan.yml only where a run exists to wait for.
  */
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, chmodSync, rmSync, readFileSync } from "node:fs";
@@ -126,20 +126,18 @@ function main() {
   {
     const y = readFileSync(join(ROOT, ".github/workflows/twin-image.yml"), "utf8");
     assert(/wait-for-workflow\.sh ci\.yml/.test(y), "twin-image must wait for ci.yml");
-    // F-1606 — the secret-scan wait must exist AND be gated on push-to-main.
-    // secret-scan.yml runs on `pull_request` and `push: branches: [main]` only,
-    // so an ungated wait polls a run that never appears on a `v*` tag or a
-    // workflow_dispatch and fails the publish at the 30-minute timeout. Both
-    // halves are asserted: dropping the wait loses the gate on the one
-    // publishing event that has one, and dropping the guard breaks tag
-    // publishes.
+    // The secret-scan wait must live on its own step WITH an `if:`. Asserted
+    // structurally, over the step block, not as a regex window over a `run:`
+    // script: a text window cannot express "this line is inside that
+    // condition", so it would pass a config that guards a neighbouring wait and
+    // leaves this one bare. Unguarded, this waits on a run secret-scan.yml
+    // never produces off `main` and times out after 30 minutes.
+    const steps = y.split(/\n      - (?=name:|uses:)/);
+    const secretStep = steps.find((b) => /wait-for-workflow\.sh secret-scan\.yml/.test(b));
+    assert(secretStep, "twin-image must wait for secret-scan.yml");
     assert(
-      /wait-for-workflow\.sh secret-scan\.yml/.test(y),
-      "twin-image must wait for secret-scan.yml",
-    );
-    assert(
-      /github\.event_name\s*}}"?\s*==\s*"push"[\s\S]{0,200}?refs\/heads\/main[\s\S]{0,200}?wait-for-workflow\.sh secret-scan\.yml/.test(y),
-      "the secret-scan wait must be gated on push-to-main (no run exists for a tag or dispatch SHA)",
+      /^\s*if:.*refs\/heads\/main/m.test(secretStep),
+      `the secret-scan wait needs an \`if:\` on refs/heads/main; got step:\n${secretStep}`,
     );
     assert(
       /needs:\s*wait-gates/.test(y) ||

@@ -64,15 +64,15 @@ jobs:
           # third-party CDN fetch, so the backoff is load-bearing, not
           # decoration. The GitHub release CDN was degraded throughout F-1471's
           # review and took out three separate pinned installs on its own runs:
-          # 31618873218 (gitleaks, 503), a twin-image syft install (503), and
+          # 31618873218 (a secret-scan install, 503), a twin-image syft install
+          # (503), and
           # 31619759943 (this step, 503).
           #
           # F-1489 moved the loop, the backoff and the sha256 check into
           # scripts/ci/fetch-pinned-release.sh, which is now the ONE hardened
-          # fetch path for the whole workflow tree — this step and (until
-          # F-1606 deleted it) secret-scan.yml's gitleaks install were two
-          # hand-copied variants of it, and the syft install that started
-          # F-1489 had no copy at all.
+          # fetch path for the whole workflow tree — this step was a
+          # hand-copied variant of it, and the syft install that started F-1489
+          # had no copy at all.
           # scripts/ci/assert-hardened-cdn-fetches.mjs (below, in the always-on
           # block) reds on a third variant. The helper's header records why the
           # retry is a literal loop rather than curl's --retry flags.

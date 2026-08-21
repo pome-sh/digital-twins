@@ -477,7 +477,7 @@ and the pipeline turned it into a number on merge without anyone typing one.
   with no retry, and a 503 there killed the `stripe` twin-image job twice on
   2026-08-12 — noise on a PR, but on `main` the cosign sign/attest steps do run,
   so the same 503 fails an image publish. The repo already had the fix in two
-  hand-copied variants (ci.yml's actionlint install, secret-scan.yml's gitleaks
+  hand-copied variants (ci.yml's actionlint install, the secret-scan
   install) and missing entirely from a third install.
 
   All three now go through `scripts/ci/fetch-pinned-release.sh`: five attempts
@@ -531,7 +531,7 @@ and the pipeline turned it into a number on merge without anyone typing one.
   with no retry, and a 503 there killed the `stripe` twin-image job twice on
   2026-08-12 — noise on a PR, but on `main` the cosign sign/attest steps do run,
   so the same 503 fails an image publish. The repo already had the fix in two
-  hand-copied variants (ci.yml's actionlint install, secret-scan.yml's gitleaks
+  hand-copied variants (ci.yml's actionlint install, the secret-scan
   install) and missing entirely from a third install.
 
   All three now go through `scripts/ci/fetch-pinned-release.sh`: five attempts
@@ -563,7 +563,7 @@ and the pipeline turned it into a number on merge without anyone typing one.
   with no retry, and a 503 there killed the `stripe` twin-image job twice on
   2026-08-12 — noise on a PR, but on `main` the cosign sign/attest steps do run,
   so the same 503 fails an image publish. The repo already had the fix in two
-  hand-copied variants (ci.yml's actionlint install, secret-scan.yml's gitleaks
+  hand-copied variants (ci.yml's actionlint install, the secret-scan
   install) and missing entirely from a third install.
 
   All three now go through `scripts/ci/fetch-pinned-release.sh`: five attempts

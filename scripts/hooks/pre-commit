@@ -9,11 +9,8 @@
 #  - Capture-only OSS boundary: no local eval/scoring/judging/correlation.
 #  - No cross-package file-copy markers.
 #
-# Deliberately NOT here (F-1606): a staged secret scan. It required every
-# contributor to install two Go binaries and hard-failed the commit when either
-# was missing, for a check secret-scan.yml already makes on the PR — and a
-# `--no-verify` commit was caught there anyway. Every gate above is pure
-# node/bash already in this repo's dev deps.
+# Every gate here is pure node/bash from this repo's dev deps — nothing to
+# install. Secrets are scanned in CI by secret-scan.yml, not here.
 
 set -euo pipefail
 

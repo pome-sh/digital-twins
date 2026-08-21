@@ -3,10 +3,8 @@
 #
 # F-1489 — the ONE hardened path every release-CDN fetch in
 # `.github/workflows/**` goes through. Before this file there were two
-# hand-copied variants of the same loop (ci.yml's actionlint install and
-# secret-scan.yml's gitleaks install, since deleted by F-1606), each with its
-# own retry budget, its own
-# message and its own chance of getting the verification wrong; the same
+# hand-copied variants of the same loop, each with its own retry budget, its
+# own message and its own chance of getting the verification wrong; the same
 # degradation that produced them also killed a twin-image syft install, which
 # had no retry at all.
 #

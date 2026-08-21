@@ -14,7 +14,7 @@
 - **Vocabulary: "task", never "scenario"** in new code/docs/copy. Config key is `runs:` (not "trials"). Criterion markers are `[code]` / `[model]` only — never the retired D/P bracket forms.
 - **Additive contract only.** The default Gmail seed must remain byte-for-byte unchanged (`faults` defaults to `[]`). No behavior change unless a task opts in.
 - **No Retry-After HTTP header.** The shared sdk error path returns `{status, body}` with no header channel; the retry hint goes in the 429 body, not a header. Do not modify the shared sdk twin harness.
-- **Secret handling.** The Pome API key (`pme_…`) is used only as a shell env var this session — NEVER written to any file, fixture, test, spec, plan, or commit. Repo secret-scan (gitleaks + TruffleHog) is enforced.
+- **Secret handling.** The Pome API key (`pme_…`) is used only as a shell env var this session — NEVER written to any file, fixture, test, spec, plan, or commit. Repo secret-scan (TruffleHog) is enforced.
 - **No changeset needed** (this PR does not touch `cli/`). Do NOT hand-bump `package.json` `version` fields — package releases are a separate `pome-package-release` flow; only add "Unreleased" CHANGELOG entries.
 - **Node ≥ 24**; run twin tests with `cd packages/twin-gmail && npm test` after a root `npm ci` + shared-types runtime build.
 - **Fault names are teaching vocabulary** — the only registered name this PR ships is `rate-limited`; the registry stays extensible but no second primitive is built.

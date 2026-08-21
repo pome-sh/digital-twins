@@ -111,7 +111,7 @@
       "fetchesFromCdn": true,
       "hardening": "step-is-the-check",
       "why": "Named in F-1489's sweep list, and swept: at the pinned ref it is a composite action that `docker run`s ghcr.io/trufflesecurity/trufflehog (and apt-get installs jq if missing). That is a container-registry pull, not a release-CDN binary fetch, so the sha256-pinned-fetch path has nothing to pin. It is also, like trivy, a step that IS the check — its failure normally means a verified secret was found, and retrying it twice under `continue-on-error` would swallow exactly that.",
-      "residual": "A GHCR outage still reds secret-scan (a required context) with no retry. The fix, if it ever costs a run, is a `docker pull` of the image in a repeated-attempt group BEFORE the scan step, leaving the scan itself un-retried — not wrapping the scan. Note the image tag is pinned only because secret-scan.yml passes `version:` explicitly; this action's own default is the mutable `latest`, so that input is part of the pin, not a convenience.",
+      "residual": "A GHCR outage still reds secret-scan (a required context) with no retry. The fix, if it ever costs a run, is a `docker pull` of the image in a repeated-attempt group BEFORE the scan step, leaving the scan itself un-retried — not wrapping the scan. The image tag is pinned only because secret-scan.yml passes `version:` explicitly; this action's own default is the mutable `latest`, so that input is part of the pin, not a convenience.",
       "evidence": "trufflesecurity/trufflehog@27b0417c16317ca9a472a9a8092acce143b49c55 (v3.95.9), action.yml `runs: using: composite`, `image` input defaulting to ghcr.io/trufflesecurity/trufflehog."
     }
   }

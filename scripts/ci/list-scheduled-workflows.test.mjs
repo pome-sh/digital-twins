@@ -203,8 +203,6 @@ withScratchRoot(
 
 {
   const real = findScheduledWorkflows(fileURLToPath(new URL("../..", import.meta.url)));
-  // secret-scan.yml is deliberately absent: F-1606 dropped its weekly cron
-  // (and with it the alarm pair), leaving it `pull_request`-only.
   for (const expected of ["repo-policy.yml", "release-alarm.yml"]) {
     assert(real.includes(expected), `expected ${expected} in the real tree's scheduled set, got ${real}`);
   }
