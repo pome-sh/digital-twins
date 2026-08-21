@@ -566,3 +566,71 @@ function issues(error: z.ZodError): string {
     .map((issue) => `${issue.path.join(".") || "<root>"}: ${issue.message}`)
     .join("; ");
 }
+
+// ── THE TYPE AXIS OF A CONFORMANCE COMPARISON (F-1614) ──────────────────────
+//
+// Each twin's `tool-schema-conformance.ts` compares its validators against the
+// vendor's `inputSchema` from the fixture above. Both of the two that exist
+// compared a key's PRESENCE and its requiredness, and neither compared the TYPE
+// of a key both sides declare — so twin-github advertised
+// `labels: {"type":"array","items":{"type":"string"}}`, validated it as
+// `z.string()`, and answered `tools/call` with 422 `invalid_type` to the exact
+// shape its own listing published. Both conformance reports were green
+// throughout: github's pinned residue carried nothing about `labels`, and
+// slack's asserts the empty list.
+//
+// The comparison lives here, once, rather than in each twin. Two copies of a
+// check drift, and a check that drifts is the failure this whole module exists
+// to end.
+
+/**
+ * A property's declared type as one comparable word, or `undefined` when it
+ * cannot be stated plainly.
+ *
+ * `integer` folds into `number`: zod emits `integer` for `.int()` and vendors
+ * spell the same argument `number`, so splitting them would report the
+ * projection rather than a disagreement an examinee can hit. Unions, `anyOf`,
+ * `$ref` and a missing `type` return `undefined` — silence, not a guess, for the
+ * same reason.
+ */
+export function describeSchemaType(spec: unknown): string | undefined {
+  if (!spec || typeof spec !== "object") return undefined;
+  const schema = spec as { type?: unknown; items?: unknown };
+  const name = (raw: unknown): string | undefined =>
+    typeof raw !== "string" ? undefined : raw === "integer" ? "number" : raw;
+  const type = name(schema.type);
+  if (!type) return undefined;
+  if (type !== "array") return type;
+  const items = schema.items && typeof schema.items === "object" ? (schema.items as { type?: unknown }) : undefined;
+  const element = name(items?.type);
+  return element ? `array<${element}>` : "array";
+}
+
+/**
+ * Every key both documents declare whose type they disagree about, phrased for
+ * a conformance residue.
+ *
+ * PURE and exported so each twin's argument-surface test can PLANT a pair and
+ * prove the comparison fires. Running it only over the real fixture cannot tell
+ * a working check from one that always returns `[]` — and `[]` is what both
+ * twins get today, which is the state a regression would also produce.
+ *
+ * @param vendor the vendor's name as the residue line should say it ("GitHub")
+ */
+export function typeDisagreements(
+  toolName: string,
+  vendor: string,
+  upstreamProperties: Record<string, unknown>,
+  projectedProperties: Record<string, unknown>,
+): string[] {
+  const problems: string[] = [];
+  for (const key of Object.keys(projectedProperties)) {
+    if (!(key in upstreamProperties)) continue;
+    const theirs = describeSchemaType(upstreamProperties[key]);
+    const ours = describeSchemaType(projectedProperties[key]);
+    if (theirs && ours && theirs !== ours) {
+      problems.push(`'${toolName}' validates '${key}' as ${ours}, and ${vendor} declares it as ${theirs}`);
+    }
+  }
+  return problems;
+}

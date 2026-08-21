@@ -50,8 +50,9 @@
 //     `fields`, `draft`, `reviewers`). Silently dropped rather than refused, so
 //     an examinee that passes it is graded on a call the twin did not make.
 import { describe, expect, it } from "vitest";
+import { typeDisagreements } from "@pome-sh/sdk/mcp-tool-fixture";
 import { toolSchemaConformance } from "../src/tool-schema-conformance.js";
-import { toolArgumentSchemas } from "../src/tools.js";
+import { githubToolFixture, toolArgumentSchemas } from "../src/tools.js";
 
 /** Every known disagreement between GitHub's declared arguments and this twin's
  * validators, sorted. Sorted so the diff of an addition is one line. */
@@ -186,6 +187,73 @@ describe("MCP argument surface vs GitHub's declared one (F-1468)", () => {
       // …and absent is still absent.
       expect(schema.safeParse({}).success, `${name} {}`).toBe(false);
     }
+  });
+
+  // ── THE TYPE AXIS (F-1614) ────────────────────────────────────────────────
+  //
+  // The residue above compares which arguments each side has and which it
+  // requires. Until F-1614 it compared nothing else, and that gap shipped a
+  // defect for as long as the pin existed: GitHub declared `list_issues.labels`
+  // as an array of strings, this twin validated it as one string, both
+  // documents had the key, neither required it, and `toolSchemaConformance()`
+  // reported nothing — while the twin answered 422 `invalid_type` to the exact
+  // shape its own listing advertises.
+  //
+  // These three cases are the guard on the guard. The real fixture now agrees
+  // everywhere, so a test that only read it would pass whether the comparison
+  // worked or not.
+  describe("a TYPE disagreement on a shared key is reported", () => {
+    it("catches the exact shape F-1614 was, replayed against a planted pair", () => {
+      expect(
+        typeDisagreements(
+          "list_issues",
+          "GitHub",
+          { labels: { type: "array", items: { type: "string" } } },
+          { labels: { type: "string" } },
+        ),
+      ).toEqual(["'list_issues' validates 'labels' as string, and GitHub declares it as array<string>"]);
+    });
+
+    it("says nothing when the two agree, including on the element type", () => {
+      const array = { type: "array", items: { type: "string" } };
+      expect(typeDisagreements("t", "GitHub", { labels: array }, { labels: array })).toEqual([]);
+      // An array of the WRONG element type is still a disagreement — this is the
+      // half a bare `type` comparison would miss.
+      expect(
+        typeDisagreements("t", "GitHub", { labels: array }, { labels: { type: "array", items: { type: "number" } } }),
+      ).toEqual(["'t' validates 'labels' as array<number>, and GitHub declares it as array<string>"]);
+    });
+
+    it("stays silent on shapes it cannot state, rather than guessing", () => {
+      // A key only one side has belongs to the presence checks above, not here.
+      expect(typeDisagreements("t", "GitHub", { a: { type: "string" } }, { b: { type: "number" } })).toEqual([]);
+      // `anyOf` / `$ref` / a missing `type` are projection artefacts with no
+      // vendor counterpart; reporting them would fill the residue with lines
+      // nobody can act on.
+      expect(typeDisagreements("t", "GitHub", { a: { anyOf: [] } }, { a: { type: "string" } })).toEqual([]);
+      expect(typeDisagreements("t", "GitHub", { a: { type: "string" } }, { a: {} })).toEqual([]);
+      // `integer` and `number` are the same argument spelled two ways.
+      expect(typeDisagreements("t", "GitHub", { a: { type: "number" } }, { a: { type: "integer" } })).toEqual([]);
+    });
+  });
+
+  // F-1614's own regression at the fixture level: the tool that carried the
+  // defect is asserted against GitHub's declaration directly, so a future edit
+  // that puts `labels` back on a string fails here as well as in
+  // `upstream-measured-semantics.test.ts`.
+  it("validates list_issues.labels as the array GitHub declares", () => {
+    const declared = githubToolFixture.tools.find((tool) => tool.name === "list_issues")!;
+    const labels = (declared.inputSchema as { properties: Record<string, { type?: string }> }).properties.labels;
+    expect(labels.type).toBe("array");
+
+    const schema = toolArgumentSchemas.find((tool) => tool.name === "list_issues")!.schema;
+    const call = { owner: "o", repo: "r" };
+    expect(schema.safeParse({ ...call, labels: ["bug"] }).success, "the advertised array").toBe(true);
+    expect(schema.safeParse({ ...call, labels: [] }).success, "an empty array").toBe(true);
+    // GitHub's MCP server refuses the CSV string with "parameter labels could
+    // not be coerced to []string, is string" — so accepting it here would be a
+    // false PASS, the class this file's header calls first in line.
+    expect(schema.safeParse({ ...call, labels: "bug" }).success, "the REST CSV spelling").toBe(false);
   });
 
   it("names no tool the twin does not serve", () => {

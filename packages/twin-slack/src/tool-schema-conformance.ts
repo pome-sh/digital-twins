@@ -6,6 +6,7 @@
 // `tools.ts`: pome-cloud's fidelity-watch loads twin tool tables under bun,
 // which implements no `node:sqlite`, and the sdk root barrel reaches it.
 import { z } from "zod";
+import { typeDisagreements } from "@pome-sh/sdk/mcp-tool-fixture";
 import { slackToolFixture, toolSchemas } from "./tools.js";
 
 /**
@@ -65,6 +66,14 @@ export function toolSchemaConformance(): string[] {
         problems.push(`'${tool.name}' does not model Slack's parameter '${key}'`);
       }
     }
+
+    // The TYPE of the keys both sides declare (F-1614). twin-github shipped a
+    // 422 on the array its own listing advertised for a year because the two
+    // checks above see a key's PRESENCE and not its shape; this twin's
+    // conformance had the same blind spot and asserts `[]`, so the gap would
+    // have been indistinguishable from having none. `typeDisagreements` is
+    // shared rather than copied — one comparison, two vendors.
+    problems.push(...typeDisagreements(tool.name, "Slack", upstream.properties ?? {}, projected.properties ?? {}));
 
     const upstreamRequired = [...(upstream.required ?? [])].sort().join(",");
     const ourRequired = [...(projected.required ?? [])].sort().join(",");

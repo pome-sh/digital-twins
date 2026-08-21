@@ -28,6 +28,8 @@
 //     ignored today, which is survivable, but not silently;
 //   - a required-set disagreement in either direction — the twin refusing a
 //     call GitHub accepts, or accepting one GitHub refuses;
+//   - a TYPE disagreement on a key both sides declare — the twin validating a
+//     string where GitHub declares an array of them (F-1614);
 //   - a validator that rejects an unknown key where GitHub's schema declares no
 //     `additionalProperties`.
 //
@@ -51,6 +53,7 @@
 // is the same discipline as pome-cloud's `EXPECTED_OPT_OUTS` and for the same
 // reason: a count or an allowance would let the next one arrive unread.
 import { z } from "zod";
+import { typeDisagreements } from "@pome-sh/sdk/mcp-tool-fixture";
 import { githubToolFixture, toolArgumentSchemas } from "./tools.js";
 
 export function toolSchemaConformance(): string[] {
@@ -93,6 +96,26 @@ export function toolSchemaConformance(): string[] {
         problems.push(`'${tool.name}' does not model GitHub's parameter '${key}'`);
       }
     }
+
+    // ── AND THE TYPE OF THE KEYS BOTH SIDES HAVE (F-1614) ───────────────────
+    //
+    // The three checks above are about a key's PRESENCE and its requiredness,
+    // and for a year that was the whole comparison. It is not enough, and the
+    // gap is not theoretical: `list_issues.labels` was declared
+    // `{"type":"array","items":{"type":"string"}}` by GitHub and validated as
+    // `z.string()` here. Both sides had the key, neither side required it, so
+    // every check above passed and the pinned residue carried nothing about it
+    // — while `tools/call` answered 422 `invalid_type` to the exact shape the
+    // listing advertises. An examinee that read the schema and obeyed it was
+    // refused, and the guard whose job is that disagreement reported green.
+    //
+    // Only COMPARABLE types are reported. A zod schema projects unions, refines
+    // and coercions into shapes the vendor's hand-written JSON Schema has no
+    // counterpart for, and a residue line nobody can act on is the failure
+    // `EXPECTED_OPT_OUTS` and this list are both built to avoid.
+    // `describeSchemaType` returns undefined for anything it cannot state plainly, and an unstatable
+    // type is silence rather than a guess.
+    problems.push(...typeDisagreements(tool.name, "GitHub", upstream.properties ?? {}, projected.properties ?? {}));
 
     // ── REQUIRED-NESS IS PROBED, NOT PROJECTED ──────────────────────────────
     //

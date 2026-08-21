@@ -12,6 +12,7 @@
 
 import { describe, expect, it } from "vitest";
 import { MUTATING_TOOL_NAMES, slackToolFixture, toolSchemas } from "../src/tools.js";
+import { describeSchemaType, typeDisagreements } from "@pome-sh/sdk/mcp-tool-fixture";
 import { toolSchemaConformance } from "../src/tool-schema-conformance.js";
 
 interface ExpectedTool {
@@ -134,6 +135,32 @@ describe("MCP tools contract", () => {
   // same keys, same required set, and no rejection of an unknown key.
   it("validates exactly the argument surface Slack declares", () => {
     expect(toolSchemaConformance()).toEqual([]);
+  });
+
+  // ⚠️ AND THAT `[]` NOW COVERS THE TYPE AXIS TOO (F-1614) — it did not before.
+  //
+  // twin-github advertised `list_issues.labels` as an array of strings,
+  // validated it as one string, and answered 422 `invalid_type` to the shape its
+  // own listing publishes. Its conformance stayed green the whole time, because
+  // the comparison looked at which arguments each side HAS and which it
+  // REQUIRES and never at their type. This twin's comparison had the same blind
+  // spot, and an empty residue is the one result that cannot tell the two apart.
+  //
+  // So the check is planted rather than assumed. `typeDisagreements` is shared
+  // (`@pome-sh/sdk/mcp-tool-fixture`) so both twins run one comparison.
+  it("would REPORT a type disagreement, so the empty residue above means something", () => {
+    expect(
+      typeDisagreements("slack_send_message", "Slack", { blocks: { type: "array" } }, { blocks: { type: "string" } }),
+    ).toEqual(["'slack_send_message' validates 'blocks' as string, and Slack declares it as array"]);
+  });
+
+  // The other half of "not a vacuum": at least one real key has a type BOTH
+  // documents state, so the comparison above ran over the fixture rather than
+  // skipping every key as unstatable.
+  it("compares a real key's type, not only planted ones", () => {
+    const declared = slackToolFixture.tools.find((tool) => tool.name === "slack_send_message")!;
+    const channel = (declared.inputSchema as { properties: Record<string, unknown> }).properties.channel_id;
+    expect(describeSchemaType(channel)).toBe("string");
   });
 
   it("the fixture serves camelCase inputSchema (MCP spec)", () => {
