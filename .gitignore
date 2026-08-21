@@ -17,7 +17,7 @@ coverage/
 !.env.example
 
 # Local twin state (SQLite-backed runtime data). Unanchored: direct twin
-# boots (cwd = package root) self-generate .pome-data/<twin>/secret (F-708).
+# boots (cwd = package root) self-generate .pome-data/<twin>/secret.
 .pome-data/
 .pome/
 .stripe_clone/

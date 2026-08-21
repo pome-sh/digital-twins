@@ -1,4 +1,4 @@
-# Trivy ignore policy — twin image publish gate (FDRS-586)
+# Trivy ignore policy — twin image publish gate
 #
 # The twin-*-image workflows fail the publish on FIXABLE HIGH/CRITICAL CVEs
 # (severity HIGH,CRITICAL + ignore-unfixed: true). To ship past a specific CVE
@@ -18,36 +18,3 @@
 #
 # (No exceptions currently. Keep this list empty unless a fixable HIGH/CRITICAL
 # genuinely cannot be remediated in time and has been reviewed.)
-#
-# ── Decision record: CVE-2026-53615 (util-linux) — F-1532, 2026-08-18 ─────────
-#
-# NOT excepted here, and the list above is still empty. Written down anyway: the
-# next person to hit a fixable base-image CVE reads this file first, and the
-# exception this file exists to grant was considered and refused on the record.
-#
-# THE FINDING. Nine rows, one source package — bsdutils, libblkid1,
-# liblastlog2-2, libmount1, libsmartcols1, libuuid1, login, mount, util-linux —
-# all at 2.41-5, all fixed in 2.41.5-0+deb13u1. No image changed to produce it:
-# Trivy passed on the same commit on 08-14 and failed on 08-18, so a DB entry
-# published in between landed on digest-frozen contents. It refused the stripe
-# publish outright (push + sign skipped, nothing reached GHCR), and the three
-# twins on the same base were one merge away from the same wall.
-#
-# CHOSEN: install the fix in the runtime stage — `apt-get upgrade`, see
-# packages/twin-*/Dockerfile. Debian had already shipped 2.41.5-0+deb13u1 to
-# trixie-security, so the fix existed the whole time and only the digest pin
-# stood between the image and it. This spends no exception and needs no
-# exploitability judgement, because nothing vulnerable remains in the image.
-#
-# REJECTED: bump the pinned base digest. Upstream had rebuilt both tags
-# (24-trixie-slim → sha256:0711b541…, 26-trixie-slim → sha256:4ebb5ace…), so a
-# bump was available — but a pull and scan of BOTH new digests found the same
-# nine rows at the same util-linux 2.41-5. No digest carrying the fix existed to
-# bump to, for either node major, so the bump is not a remedy for this CVE at
-# all. Digest currency stays Renovate's fortnightly job, on its own merits.
-#
-# REJECTED: add CVE-2026-53615 to the list above. It would have needed rule 1's
-# named human assessment of a libblkid path a twin never walks, and the closing
-# note's bar — a fixable finding that "genuinely cannot be remediated in time" —
-# is not met by one Debian had already fixed and that a build could take the
-# same day. It would also have left a review-by date to service, for nothing.
