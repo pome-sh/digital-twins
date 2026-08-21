@@ -126,15 +126,20 @@ function main() {
   {
     const y = readFileSync(join(ROOT, ".github/workflows/twin-image.yml"), "utf8");
     assert(/wait-for-workflow\.sh ci\.yml/.test(y), "twin-image must wait for ci.yml");
-    // F-1606 — secret-scan.yml is `pull_request`-only, so it produces no run
-    // for the push-to-main and tag SHAs that actually publish. A wait on it
-    // would poll a run that never appears and fail every publish at the
-    // 30-minute timeout. The old wait passed only because that workflow also
-    // triggered on push. Asserted as an absence so the wait cannot be restored
-    // without also restoring a trigger that makes it satisfiable.
+    // F-1606 — the secret-scan wait must exist AND be gated on push-to-main.
+    // secret-scan.yml runs on `pull_request` and `push: branches: [main]` only,
+    // so an ungated wait polls a run that never appears on a `v*` tag or a
+    // workflow_dispatch and fails the publish at the 30-minute timeout. Both
+    // halves are asserted: dropping the wait loses the gate on the one
+    // publishing event that has one, and dropping the guard breaks tag
+    // publishes.
     assert(
-      !/wait-for-workflow\.sh secret-scan\.yml/.test(y),
-      "twin-image must not wait for secret-scan.yml (pull_request-only: no run exists for a push or tag SHA)",
+      /wait-for-workflow\.sh secret-scan\.yml/.test(y),
+      "twin-image must wait for secret-scan.yml",
+    );
+    assert(
+      /github\.event_name\s*}}"?\s*==\s*"push"[\s\S]{0,200}?refs\/heads\/main[\s\S]{0,200}?wait-for-workflow\.sh secret-scan\.yml/.test(y),
+      "the secret-scan wait must be gated on push-to-main (no run exists for a tag or dispatch SHA)",
     );
     assert(
       /needs:\s*wait-gates/.test(y) ||
