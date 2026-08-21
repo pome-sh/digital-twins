@@ -243,7 +243,7 @@ published package):
 ```bash
 npm run dev                        # boot on :3333 with default seed
 npm run typecheck                  # tsc --noEmit
-npm run test                       # vitest, 32 files / 237 tests
+npx vitest run --project twin-stripe  # vitest, 32 files / 237 tests
 npm run build                      # tsc → dist/src/server.js
 node dist/src/server.js            # production-shape boot
 ```

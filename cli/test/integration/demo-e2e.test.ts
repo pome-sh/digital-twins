@@ -14,6 +14,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { runDemo } from "../../src/demo/runDemo.js";
 import { captureServerForTests } from "../fixtures/captureServerForTests.js";
 import { demoLlmRequestSchema } from "../fixtures/demo/demoLlmSchema.js";
+import { inCli } from "../fixtures/cliDir.js";
 
 interface StubCloud {
   server: Server;
@@ -218,7 +219,7 @@ describe("pome demo end-to-end against a stub cloud (FDRS-643)", () => {
       artifactsDir,
       out: (line) => out.push(line),
       // Run from source under tsx, mirroring captureServerForTests's overrides.
-      agentCommand: "npx tsx src/cli/main.ts demo-agent",
+      agentCommand: `npx tsx ${inCli("src/cli/main.ts")} demo-agent`,
       captureServerCommand: captureServerForTests,
     });
 

@@ -102,8 +102,10 @@ check(
 );
 
 // Case 5: a bare "test" is an npm LIFECYCLE name — the one fixed set this
-// gate carries, closed by npm rather than by us, wired uniformly elsewhere.
-// An unreferenced one must not red.
+// gate carries. No `packages/*` member declares one any more (root `test` is a
+// bare `vitest run` over the root config's discovered project list), but the
+// name stays exempt: a package that reintroduces one is not a check this gate
+// should demand wiring for, and its tests run either way.
 check(
   "unwired bare 'test' (no colon) is not flagged",
   {

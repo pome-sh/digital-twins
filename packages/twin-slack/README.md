@@ -187,8 +187,8 @@ npm run dev          # boot the twin on :3333
 npm run smoke        # 12-step end-to-end smoke test
 npm run validate:mcp # JSON-RPC SDK round-trip against /s/<sid>/mcp
 npm run typecheck    # tsc --noEmit
-npm run test         # full vitest run
-npm run test:coverage # coverage gate (lines 90%+, funcs 90%+)
+npx vitest run --project twin-slack   # full vitest run
+npm run test:coverage -w @pome-sh/twin-slack # coverage gate (lines 90%+, funcs 90%+)
 npm run agent:claude "<task>"   # Claude-driven smoke flow
 ```
 

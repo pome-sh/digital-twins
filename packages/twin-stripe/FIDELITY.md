@@ -395,7 +395,7 @@ not exposed at the root mount — those remain at `/s/:sid/_pome/*` and
 ## Verification commands
 
 ```bash
-npm run test            # 32 files / 237 tests, all green
+npx vitest run --project twin-stripe  # 32 files / 237 tests, all green
 npm run smoke           # full x402 flow against built server
 npm run fidelity:parity # every inventoried MCP tool end-to-end
 npm run typecheck

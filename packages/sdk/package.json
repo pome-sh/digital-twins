@@ -55,7 +55,6 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepublishOnly": "tsc -p tsconfig.build.json",
     "emit-fidelity": "tsx scripts/emit-fidelity.ts"

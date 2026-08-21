@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { runTask } from "../../src/runner/runTask.js";
 import { captureServerForTests } from "../fixtures/captureServerForTests.js";
+import { inCli } from "../fixtures/cliDir.js";
 
 // FDRS-411 e2e: a fake CAS-style adapter agent writes M0 HookEvent rows to
 // POME_ADAPTER_SIGNALS_PATH. The runner must (a) inject that env var
@@ -18,9 +19,9 @@ describe("runTask + POME_ADAPTER_SIGNALS_PATH", () => {
     async () => {
       const artifactsDir = await mkdtemp(join(tmpdir(), "pome-runs-"));
       const result = await runTask({
-        taskPath: "tasks/01-bug-happy-path.md",
+        taskPath: inCli("tasks/01-bug-happy-path.md"),
         captureServerCommand: captureServerForTests,
-        agentCommand: "npx tsx test/fixtures/adapter-signals-agent.ts",
+        agentCommand: `npx tsx ${inCli("test/fixtures/adapter-signals-agent.ts")}`,
         artifactsDir,
       });
 
@@ -63,9 +64,9 @@ describe("runTask + POME_ADAPTER_SIGNALS_PATH", () => {
     async () => {
       const artifactsDir = await mkdtemp(join(tmpdir(), "pome-runs-"));
       const result = await runTask({
-        taskPath: "tasks/01-bug-happy-path.md",
+        taskPath: inCli("tasks/01-bug-happy-path.md"),
         captureServerCommand: captureServerForTests,
-        agentCommand: "node examples/agents/scripted-triage-agent.ts",
+        agentCommand: `node ${inCli("examples/agents/scripted-triage-agent.ts")}`,
         artifactsDir,
       });
 

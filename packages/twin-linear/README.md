@@ -145,7 +145,7 @@ that pins and verifies the new signed digest.
 Contributor-only, from a repo checkout:
 
 ```bash
-npm test -w @pome-sh/twin-linear
+npx vitest run --project twin-linear
 npm run typecheck -w @pome-sh/twin-linear
 npm run fidelity:parity -w @pome-sh/twin-linear
 ```

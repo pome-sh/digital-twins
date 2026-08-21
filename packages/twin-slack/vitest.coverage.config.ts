@@ -1,15 +1,16 @@
 import { defineConfig } from "vitest/config";
 
+// Coverage-only config, invoked by `test:coverage` with an explicit --config.
+// See the sibling file in packages/twin-github for why coverage cannot live in
+// the root config's `projects` entries.
 export default defineConfig({
   test: {
-    environment: "node",
     include: ["test/**/*.test.ts"],
-    // Socket-boundary tests drive a real @modelcontextprotocol/sdk handshake
-    // over a listening socket; on a contended CI runner the sequential
-    // round-trips can cross vitest's 5s default (twin-github and twin-stripe
-    // already run with this 30s budget).
     testTimeout: 30_000,
-    setupFiles: ["./test/setup.ts"],
+    env: {
+      TWIN_AUTH_SECRET: "test-secret-32-chars-minimum-length",
+      SLACK_DETERMINISTIC_TS: "1",
+    },
     coverage: {
       provider: "v8",
       include: ["src/**/*.ts"],

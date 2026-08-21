@@ -434,7 +434,7 @@ jobs:
         run: |
           set -euo pipefail
           npm run typecheck -w @pome-sh/wire
-          npm test -w @pome-sh/wire
+          npx vitest run --project wire
       # trace-contract.json is in wire's `files`, so it SHIPS — and it embeds
       # wire's own version. Without this the tarball can carry a contract
       # descriptor claiming a different version than the package.json beside it.
