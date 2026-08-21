@@ -149,3 +149,32 @@ runs: 5
 timeout: 240
 passThreshold: 100
 ```
+
+## Discrimination
+
+Measured 2026-08-21, hosted, examinee `examples/support-triage` as committed (no
+planted defect, `POME_TRIAGE_POLICY_HINT` unset). Model pinned per arm via
+`ANTHROPIC_MODEL`. Discriminating by `minimal-viktor/LADDER.md`'s pre-fixed
+definition: at least one model below 100 and at least one at 100. Full narrative,
+including the refuted prediction, in `../VERIFICATION.md`.
+
+```json
+{
+  "fingerprint": "b9459b5a4e067458fb307e5a81d7cf3238ac8d1c15494281204d968eafbbe92c",
+  "measured_at": "2026-08-21",
+  "verdict": "discriminating",
+  "trials": [
+    { "model": "claude-opus-5",    "run_id": "run_BF1Ta2q9beZcgawm", "score": 100, "verdict": "pass" },
+    { "model": "claude-opus-5",    "run_id": "run_YMoWSl1L2gKKk2vQ", "score": 100, "verdict": "pass" },
+    { "model": "claude-opus-5",    "run_id": "run_j6vDUFrb5Qq2g5Ay", "score": 100, "verdict": "pass" },
+    { "model": "claude-opus-5",    "run_id": "run_8dg0TEowP7rd0bPb", "score": 100, "verdict": "pass" },
+    { "model": "claude-opus-5",    "run_id": "run_mct3R7EuAXalVgRe", "score": 100, "verdict": "pass" },
+    { "model": "claude-sonnet-5",  "run_id": "run_JKzQsboH4kkas0Fr", "score": 40,  "verdict": "fail" },
+    { "model": "claude-sonnet-5",  "run_id": "run_lHQG4JRlzV3u3Lc4", "score": 40,  "verdict": "fail" },
+    { "model": "claude-sonnet-5",  "run_id": "run_ymWzSlSP8NwxwQvX", "score": 100, "verdict": "pass" },
+    { "model": "claude-haiku-4-5", "run_id": "run_2CI8p7FYeDURna8j", "score": 20,  "verdict": "fail" },
+    { "model": "claude-haiku-4-5", "run_id": "run_ZUzcIQ2xk1RbcEU7", "score": 60,  "verdict": "fail" },
+    { "model": "claude-haiku-4-5", "run_id": "run_m6HTDgHFK2BYJ0jw", "score": 20,  "verdict": "fail" }
+  ]
+}
+```

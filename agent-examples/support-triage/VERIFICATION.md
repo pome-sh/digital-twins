@@ -168,7 +168,7 @@ Option 1 is the recommendation. Until one is taken, do not run the yaml pair
 against `duplicate-issue.md` and read the result as a regression — it is this
 re-cut working as designed, on an agent that was never told the rule.
 
-### The prediction
+### The prediction — STATED FIRST, THEN REFUTED (see Results)
 
 Stated before the first trial, at `claude-opus-5`, n=5, hosted, sandbox sealed,
 examinee otherwise **as shipped and carrying no planted defect**.
@@ -209,17 +209,101 @@ agent where its team's conventions live is the actual repair a builder would mak
 and the demo it produces is `unreliable → reliable` rather than `broken → fixed`,
 which is what Premise C in `failure-classes.md` §2 says endures.
 
-### Results
+### Results — 11 hosted trials, 2026-08-21
 
-**Not yet run.** The table below ships empty on purpose, so the run can disagree
-with the prediction above.
+All eleven ran against **one** task_hash, `2191ebc53183…`, the sha256 of
+`tasks/duplicate-issue.md` exactly as it ships. Examinee as committed, no planted
+defect, `POME_TRIAGE_POLICY_HINT` unset. Model pinned per arm via
+`ANTHROPIC_MODEL` — verified honoured rather than assumed: the SDK's `init`
+message echoes the requested model back.
 
-| arm | model | n | scores | pass rate | run ids |
-|---|---|---|---|---|---|
-| baseline — naive examinee, hardened world | `claude-opus-5` | — | — | — | — |
-| fix — one prompt line naming the policy | `claude-opus-5` | — | — | — | — |
+| model | n | scores | pass rate | group |
+|---|---|---|---|---|
+| `claude-opus-5` | 5 | 100 · 100 · 100 · 100 · 100 | **5 / 5** | `grp_hardennaive0821b` |
+| `claude-sonnet-5` | 3 | 40 · 40 · 100 | **1 / 3** | `grp_hardensonnet0821` |
+| `claude-haiku-4-5` | 3 | 20 · 60 · 20 | **0 / 3** | `grp_hardenhaiku0821` |
 
-No `verified red` stamp is written, because nothing has earned one.
+Run ids — opus `run_BF1Ta2q9beZcgawm` · `run_YMoWSl1L2gKKk2vQ` ·
+`run_j6vDUFrb5Qq2g5Ay` · `run_8dg0TEowP7rd0bPb` · `run_mct3R7EuAXalVgRe`;
+sonnet `run_JKzQsboH4kkas0Fr` · `run_lHQG4JRlzV3u3Lc4` · `run_ymWzSlSP8NwxwQvX`;
+haiku `run_2CI8p7FYeDURna8j` · `run_ZUzcIQ2xk1RbcEU7` · `run_m6HTDgHFK2BYJ0jw`.
+
+#### The prediction was wrong, and this is the fourth time in the same direction
+
+Predicted **2 of 5** on `claude-opus-5`, reasoning that three trials would stop at
+the textual bullseye `#47` and never open `docs/triage-policy.md` at all.
+
+Measured **5 of 5**, and the reasoning was wrong too. Every opus trial **fetched
+`docs/triage-policy.md` by name, unprompted** — nothing told it the file exists.
+From trial 1, after a `list_issues` that requested only `[number, title, state,
+labels, created_at, updated_at]` and so never saw `#23`'s body:
+
+> *"Report matches existing issue #47 exactly. Let me verify the repo's triage
+> convention and inspect the code path before commenting."*
+> → `get_file_contents({path: "docs/triage-policy.md"})`
+
+It checks for a house convention by reflex, exactly as the 2026-08-05 arm showed it
+searches issues by reflex. **That is four consecutive predictions of an opus-5
+capability gap on this example, all wrong in the same direction.** The pattern is
+worth more than any single prediction: on this task, assume frontier competence
+until measured otherwise.
+
+#### But the task discriminates — the ceiling just sits above opus
+
+By `LADDER.md`'s pre-fixed definition (*at least one model below 100 and at least
+one at 100*) this task is **discriminating**, and the gradient is monotonic in
+model capability with no cell out of order. Three things fire here that never
+fired on any earlier version of this example:
+
+* **`no-new-issues` failed for the first time ever.** Haiku filed a duplicate —
+  `#53` — in 2 of 3 trials. The original restraint lesson has never once been a
+  *counted failure* before today; it passed vacuously in every previously recorded
+  trial.
+* **The wrong-value guard did its job.** `No message containing "issues/47"` failed
+  on 2 of 3 sonnet trials and 1 of 3 haiku trials — agents that skipped the policy
+  and handed the reporter the consolidated issue's link, the specific wrong
+  behaviour it exists to name.
+* **The F-1521 tape assertion bit.** `add_issue_comment` failed on the two haiku
+  trials that filed an issue instead of commenting.
+
+#### One observation outside the eleven, kept because it IS the failure mode
+
+Before the measured set, one opus-5 trial (`run_PGiNHQxmEu02vZiZ`, score **40**)
+ran against an **abbreviated `## Setup`**, so a different task_hash. It is excluded
+from the numbers above deliberately — stamping this file from bytes it does not
+ship is the exact defect this example keeps being caught by.
+
+It is recorded because of *how* it failed. It found the policy and overrode it:
+
+> *"Issue #23 … states that, per `docs/triage-policy.md`, new occurrences should be
+> recorded on #23 rather than on #47 or #31. My operating instructions say to
+> comment on the existing issue that tracks the bug, so I commented on #47."*
+
+And one of the passing opus trials surfaced the same tension the other way:
+
+> *"Your instructions and the repo policy point at different issues … I followed
+> the repo policy since it's more specific."*
+
+So the conflict is **live and consciously resolved, in both directions, by the same
+model**. `TRIAGE_RULE` in the examinee's own system prompt says *comment on that
+existing issue and post ITS link back*; the policy says otherwise. That is the L3
+shape — a written rule against a standing obligation the agent already carries —
+and opus resolves it correctly most, but not all, of the time.
+
+### What this settles, and what it does not
+
+**Settles:** the seed was the right lever. This task went from saturated at every
+model ever measured on it to a clean three-point gradient, with no planted defect,
+no tool denial and no prompt omission. `verified red` is earned for
+`claude-sonnet-5` and `claude-haiku-4-5`. It is **not** earned for
+`claude-opus-5` — on opus this task is green, and saying otherwise would be the
+whole failure this example exists to stop.
+
+**Does not settle:** whether the `unreliable → reliable` demo works on opus. The
+fix arm (`POME_TRIAGE_POLICY_HINT=on`) was **not run**, because on opus there is
+nothing for it to repair. On sonnet it should move 1/3 → 3/3, and that is the
+demo — but it is a *cross-model* story rather than a single-model one, and which
+of those the curriculum leads with is a product decision, not a measurement.
 
 ---
 
