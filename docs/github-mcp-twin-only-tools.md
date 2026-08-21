@@ -1,15 +1,15 @@
 # The 36 MCP tools twin-github serves that GitHub does not declare
 
-F-1355 gave the MCP lane its divergence arm, and its first run against the
-committed goldens found that 36 of the 65 tools `twin-github` serves are matched
-by no entry in GitHub's `tools/list`. The promotion gate's criterion 9 refuses
-the snapshot on it, in these words:
+The MCP lane's divergence arm compares the committed goldens against GitHub's
+own `tools/list`, and 36 of the tools `twin-github` serves are matched by no
+entry in it. The promotion gate's criterion 9 refuses the snapshot on that, in
+these words:
 
 > An examinee that calls one of these **PASSES against the twin and would fail
 > against the vendor**, so promoting this snapshot ships an exam that scores work
 > the agent could not have done.
 
-F-1376 is the ruling. This page is its evidence.
+This page is the per-tool ruling behind each one.
 
 There is no bulk answer, and the registry
 (`known-divergences/github.mcp.yaml`, in pome-cloud) is deliberately empty so
@@ -104,9 +104,8 @@ the divergence, not an acceptable difference on top of it.
 to read an issue or a pull request, and `examples/` calls them over MCP
 (`TwinMcpClient.call`) in `triage-agent`, `pr-summary-agent`, `pr-summary-review`,
 `merge-agent`, `minimal-viktor` and `minimal-viktor-langgraph`. Deleting them
-without serving the vendor's consolidated tools first trades this ticket's false
-pass for F-1330's false failure — the twin would refuse a call the vendor
-answers. The honest sequence is: serve `issue_read`, `issue_write`,
+without serving the vendor's consolidated tools first trades a false pass for a
+false failure — the twin would refuse a call the vendor answers. The honest sequence is: serve `issue_read`, `issue_write`,
 `pull_request_read`, `pull_request_review_write` and
 `list_repository_collaborators` (which also closes 5 of the lane's 15
 `upstream-only` findings), migrate the examples onto them, then drop the old
@@ -127,7 +126,7 @@ set.
 
 Registered rather than removed, because removing them would make the twin refuse
 a call the vendor answers for any examinee whose MCP config sets
-`X-MCP-Features` — F-1330's defect, introduced deliberately, to fix this one.
+`X-MCP-Features` — trading this defect for a worse one.
 
 **What would have to change for the acceptance to stop being acceptable:**
 
@@ -208,10 +207,9 @@ MCP-only.
 That is a decision about what task 18 is testing, and it belongs to whoever owns
 the task, not to this ruling.
 
-**A third name joined the set after this ruling, and it is not group D**
-(F-1521). `add_issue_comment` is a tool GitHub's own server registers and this
-twin serves, so nothing above changes for it — the stamp was added for the
-opposite reason to these two. `` `add_issue_comment` was never called `` was
+**A third name carries the stamp and is not group D.** `add_issue_comment` is a
+tool GitHub's own server registers and this twin serves, so nothing above
+changes for it — the stamp is there for the opposite reason to these two. `` `add_issue_comment` was never called `` was
 never the problem; `` `add_issue_comment` was called `` was, because an unstamped
 REST route makes a POSITIVE criterion fail an examinee that commented over REST.
 Membership in `TAPE_ASSERTABLE_TOOLS` is therefore not a statement about vendor

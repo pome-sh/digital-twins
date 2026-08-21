@@ -1,14 +1,11 @@
 # What each twin does with an undeclared route input
 
-F-1179 gave every twin one answer to "an agent sent a query parameter this
-route's declaration does not name": refuse it, 4xx. That answer was a default
-nobody had measured — its PR escalated the question and ended "Please rule",
-and no ruling came, so the strict side landed.
-
-F-1372 measured the vendors instead. They disagree, so the answer is now the
-twin's, declared once at the top of each `packages/twin-*/src/route-inputs.ts`
-through `routeInputDeclarer()`. This page is the evidence behind each of those
-five lines.
+The vendors disagree on "an agent sent a query parameter this route's
+declaration does not name", so there is no single right answer for all five
+twins. Each one declares its own, once, at the top of
+`packages/twin-*/src/route-inputs.ts` through `routeInputDeclarer()`. This page
+is the measured evidence behind each of those five lines — read it before
+changing one.
 
 ## The ruling
 
@@ -40,8 +37,7 @@ Both directions of getting this wrong cost something, and they are not
 symmetric:
 
 - **Refusing where the vendor accepts** fails an agent that did nothing wrong.
-  It is [F-1330](https://linear.app/pome-sh/issue/F-1330)'s shape one layer
-  down: the twin invents a rule, the agent trips over it, the report says the
+  The twin invents a rule, the agent trips over it, and the report says the
   agent failed. On `twin-linear`'s OAuth routes it was worse than a divergence
   from the vendor — it was a violation of the RFC the twin's own OAuth flow
   implements.
@@ -58,19 +54,17 @@ Two things, and they are what make the ruling narrow enough to take:
 1. **A handler still cannot see an undeclared input.** `parse()` returns
    declared names only, in both dispositions — `readQuery` reads the declared
    names out of the search params rather than filtering what arrived, and the
-   body schema is a plain `z.object` that strips. F-1179's structural
-   guarantees are untouched; `ignore` decides what the CALLER is told, never
-   what the handler is handed.
+   body schema is a plain `z.object` that strips. `ignore` decides what the
+   CALLER is told, never what the handler is handed.
 2. **The published artifact does not move.** `inputs` is derived from the
    declared schemas alone, so `packages/twin-*/route-inputs.json` is
-   byte-identical either way (`npm run gate:route-inputs` confirmed this across
-   all five twins on the change that flipped three of them). A twin whose
+   byte-identical either way, which `npm run gate:route-inputs` enforces. A
+   twin whose
    declaration is short of the vendor's real surface is still exactly as
    visible to pome-cloud's declared-fidelity lane as it was. Runtime strictness
    was never how declaration completeness got enforced — that is
    `scripts/lint-route-input-declarations.mjs` plus the lane — which is why
-   `ignore` costs nothing on F-1179's deliverable and had to be argued on
-   fidelity alone.
+   `ignore` costs nothing there and stands on fidelity alone.
 
 ## Evidence
 
@@ -116,8 +110,8 @@ way: 401 bare and 401 probed is an auth gate reached before any parameter is
 looked at, which is a fact about GitHub's ordering. Ten surfaces carry the
 finding; that one is the control.
 
-Recorded consequence: this twin is the one where F-1179's default was most
-expensive. 66 routes refused a parameter GitHub serves.
+This is the twin where a blanket refuse costs most: 66 routes would refuse a
+parameter GitHub serves.
 
 ### `twin-slack` — Slack accepts and gets on with the call
 
@@ -194,9 +188,8 @@ Stripe's published error-code reference carries:
 > `parameter_unknown` — The request contains one or more unexpected parameters.
 > Remove these and try again.
 
-The twin has agreed with this since F-1179 without anyone checking: it already
-renders `UndeclaredInputError` as `parameter_unknown`, which is Stripe's own
-word for exactly this refusal.
+The twin already renders `UndeclaredInputError` as `parameter_unknown`, which
+is Stripe's own word for exactly this refusal.
 
 **What could not be measured.** Stripe answers 401 before it validates
 parameters:
@@ -253,11 +246,9 @@ in the JSON body, and an unknown key in the query string, each left Linear's
 answer byte for byte where it was — it went on to fail on authentication, which
 is what it does for the bare request too.
 
-**One thing this did not settle — `extensions` (settled by F-1385).**
-GraphQL-over-HTTP has a fourth envelope member, `extensions`, which Apollo
-clients send for persisted queries. F-1372 left it out, and F-1385 measured it
-properly. It turned out not to be a disposition question at all: `extensions`
-is a key Linear *specifically parses*, not one it happens to reject, so it is
+**`extensions` is not a disposition question.** GraphQL-over-HTTP has a fourth
+envelope member, `extensions`, which Apollo clients send for persisted queries.
+It is a key Linear *specifically parses*, not one it happens to reject, so it is
 DECLARED on both `/graphql` surfaces and answered by
 [`packages/twin-linear/src/graphql/persisted-query.ts`](../packages/twin-linear/src/graphql/persisted-query.ts).
 The transcript is [below](#extensions--linears-persisted-query-contract-f-1385).
@@ -282,15 +273,13 @@ things now make that reconciliation compulsory rather than remembered.
 So a flip is: measure the vendor, add the transcript here, change the one
 `routeInputDeclarer()` line, change the one `RULED` line. Anything less is red.
 
-## `extensions` — Linear's persisted-query contract (F-1385)
+## `extensions` — Linear's persisted-query contract
 
 Measured against `https://api.linear.app/graphql` on **2026-08-11**, with no
 credentials: every line below is answered before authentication.
 
-**The reading F-1385 was filed with is wrong, and this is the correction.** The
-ticket took the 400 for "automatic persisted queries are switched off" — an
-unhandled path rather than a contract. It is neither. Linear runs APQ in
-**verify-only** mode: it checks that `sha256Hash` is the SHA-256 of the `query`
+**Do not read the 400 as "automatic persisted queries are switched off".** It
+is not an unhandled path. Linear runs APQ in **verify-only** mode: it checks that `sha256Hash` is the SHA-256 of the `query`
 sent with it, and the 400 is that check failing.
 
 ```

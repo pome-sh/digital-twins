@@ -1,12 +1,12 @@
 # twin-github: the ten MCP tools GitHub declares and this twin does not serve
 
-F-1468. Companion to [`github-mcp-twin-only-tools.md`](github-mcp-twin-only-tools.md),
-which rules the two tools going the other way.
+Companion to [`github-mcp-twin-only-tools.md`](github-mcp-twin-only-tools.md),
+which rules the tools going the other way.
 
 ## Where this list comes from
 
-`packages/twin-github/fixtures/mcp-tools-list.*` stopped being a transcription of
-`src/tools.ts` in F-1468 and became a projection of the upstream capture at
+`packages/twin-github/fixtures/mcp-tools-list.*` is not a transcription of
+`src/tools.ts`. It is a projection of the upstream capture at
 [`fixtures/mcp-tools-list/github.*`](../fixtures/mcp-tools-list/) — GitHub's own
 `default` toolset, built from `github/github-mcp-server` at the pinned release.
 The producer is

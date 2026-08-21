@@ -10,8 +10,8 @@
 // below are Slack's.
 //
 // This is a domain-level driver, so it is deliberately NOT the twin's coverage
-// story for MCP dispatch (docs/declared-endpoint-coverage.md makes that
-// distinction); `config/twin-endpoint-probes.json` calls all 18 over the wire.
+// story for MCP dispatch; `config/twin-endpoint-probes.json` calls all 18 over
+// the wire, and `npm run probe:twins` is what gates that.
 
 import { describe, expect, it } from "vitest";
 import { openSlackTwinDatabase } from "../src/db.js";
