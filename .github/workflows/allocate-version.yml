@@ -1,16 +1,9 @@
 name: allocate version
 
-# F-1511 — the version number leaves the PR author's hands; this is the hand it
-# lands in. A number written in a PR is a claim about `main` that goes stale
+# The version number leaves the PR author's hands; this is the hand it lands in.
+# A number written in a PR is a claim about `main` that goes stale
 # silently: it invalidates every other open PR that pinned it, and those PRs
 # stay green, because their CI ran before the merge.
-#
-# Every twins PR used to hand-write the shared version line, so every merge
-# invalidated every open PR that had pinned a consumed number — silently, while
-# still green, across workspaces and humans. Measured 2026-08-13: #402/#405 went
-# stale-green overnight, five renumber+force-push cycles in one batch night,
-# 0.23.35/.36 burned unpublished. `strict_required_status_checks_policy` on main
-# existed only to keep the version gate's verdict fresh against a moving base.
 #
 # This workflow reads `main`'s tip, allocates the numbers that tip has earned
 # (`scripts/ci/allocate-release-versions.mjs` decides), writes them into the
@@ -26,10 +19,9 @@ name: allocate version
 # the run on the HUMAN merge commit sees no version diff and publishes nothing
 # (correct — the number does not exist yet at that sha), and `release.yml`'s
 # `concurrency: release-${{ github.ref }}` with `cancel-in-progress: false` is
-# what serialises the publish half, as it already did.
+# what serialises the publish half.
 #
-# This is NOT a return to changesets or batch releases. Nothing waits for a
-# release PR, nothing batches, and #239's deletion of both stands: what moved is
+# Nothing here waits for a release PR and nothing batches. What this moves is
 # WHO WRITES THE NUMBER, not when a release happens.
 #
 # ── WHY AN APP TOKEN AND NOT THE AMBIENT GITHUB_TOKEN ────────────────────────
@@ -50,32 +42,22 @@ name: allocate version
 #      workflows. That push would land the number and no `release.yml` run would
 #      ever see it — a release that silently never happens, which is the failure
 #      class this whole apparatus exists to remove. (`release-alarm.mjs`'s
-#      NEVER_RAN leg names exactly this trap, because F-1180 walked into it.) An
-#      App installation token is NOT event-suppressed: only `GITHUB_TOKEN` is.
+#      NEVER_RAN leg names exactly this trap.) An App installation token is NOT
+#      event-suppressed: only `GITHUB_TOKEN` is.
 #
-# WHY AN APP AND NOT A FINE-GRAINED PAT, which is what this job was first written
-# against. A PAT expires — and its expiry day is a release-freeze day nobody
-# scheduled — and it binds the release path to one person's account. An App
-# private key does not expire and rotates in one click. `pome-ops-push` was built
-# 2026-08-13 for exactly this problem class in pome-cloud (PR #730:
-# fidelity-watch.yml, declared-diff.yml, SECRETS.md), and the pattern is proven in
-# production there: commit 6bbf202d pushed through pome-cloud's ACTIVE "main
-# founder-bypass" ruleset the same day.
+# WHY AN APP AND NOT A FINE-GRAINED PAT. A PAT expires — and its expiry day is a
+# release-freeze day nobody scheduled — and it binds the release path to one
+# person's account. An App private key does not expire and rotates in one click.
 #
-# THE F-1212 LESSON, WHICH CUT AGAINST THE PAT VERSION OF THIS AND IS WHY THE APP
-# IS THE BETTER ANSWER: this repo just DELETED its only PAT dependency
-# (`REPO_POLICY_TOKEN`) because the PAT was never minted, so repo-policy.yml's
-# weekly cron was red from the day it shipped and its live check never ran once. A
-# credential nobody creates is a check nobody runs. The App removes the recurring
-# half of that risk (nothing to re-mint on a schedule); the fail-loud half stays
-# either way — a missing secret is a hard, named failure and never a fallback,
-# because falling back to `GITHUB_TOKEN` would push nothing (reason 1) or publish
-# nothing (reason 2), and both of those look like a quiet green.
+# Either way, the credential must fail loud: a missing secret is a hard, named
+# failure and never a fallback, because falling back to `GITHUB_TOKEN` would push
+# nothing (reason 1) or publish nothing (reason 2), and both of those look like a
+# quiet green.
 on:
   push:
     branches: [main]
   workflow_dispatch:
-  # F-1520 — release.yml's `dispatch-allocate-version` job POSTs this event the
+  # release.yml's `dispatch-allocate-version` job POSTs this event the
   # moment a publish lands, which is the ONLY moment `planExampleRepins` can see
   # the just-published sibling on the registry: the run on the human merge commit
   # plans before the version exists, and the run on the bump commit it produces
@@ -102,14 +84,15 @@ on:
     types: [repin-examples]
   # Changing the allocator or the table it reads must prove the job wiring still
   # works on the PR that changes it — a syntax-valid workflow whose steps are
-  # broken is the F-1471 class. The PR arm plans and never writes or pushes.
+  # broken belongs to the static workflow-file check in ci.yml. The PR arm plans
+  # and never writes or pushes.
   pull_request:
     paths:
       - "scripts/ci/allocate-release-versions.mjs"
       - "scripts/ci/allocate-release-versions.test.mjs"
       - "scripts/ci/changelog-entry.mjs"
       - "scripts/ci/publish-relevance.mjs"
-      # F-1520 — the allocator now imports planExampleRepins from here, so a
+      # the allocator now imports planExampleRepins from here, so a
       # change to it is a change to the allocator's own wiring, not just to
       # the standalone gate that also uses it. The second entry is the TRANSITIVE
       # half of that import: check-example-pins-published.mjs imports
@@ -192,9 +175,9 @@ jobs:
 
       # An installation token, not a PAT: nothing to re-mint before an expiry
       # nobody scheduled, and no binding of the release path to one person's
-      # account. `app-id` (not `client-id`) matches pome-cloud's #730 call sites so
-      # both repos read the same way; v3.2.0 prints a deprecation warning for it,
-      # and migrating is a some-day for the two repos together, not a divergence to
+      # account. `app-id` (not `client-id`) matches pome-cloud's call sites so both
+      # repos read the same way; v3.2.0 prints a deprecation warning for it, and
+      # migrating is a some-day for the two repos together, not a divergence to
       # introduce here. No `owner`/`repositories` inputs: the default scopes the
       # token to this repository through the org installation, which is exactly
       # what the push needs.
@@ -217,9 +200,9 @@ jobs:
       # entry is already on main and belongs in the same release. On a
       # pull_request, `github.ref` — the merge ref — because that arm's whole job
       # is to prove THIS PR's allocator still runs, and a checkout of `main` does
-      # not contain the PR's files at all (which is exactly how PR #421's first
-      # run died: `Cannot find module …/allocate-release-versions.test.mjs`). The
-      # merge ref is also the better preview: it is what main will look like.
+      # not contain the PR's files at all — a checkout of `main` on that arm dies
+      # with `Cannot find module …/allocate-release-versions.test.mjs`. The merge
+      # ref is also the better preview: it is what main will look like.
       #
       # `|| github.token` is for the pull_request arm ONLY, where the mint step is
       # skipped and its output is empty — a fork PR has no secrets at all. That

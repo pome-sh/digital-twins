@@ -92,7 +92,7 @@ jobs:
 
   # Package typecheck/test live in `ci`; secret scanning is a parallel gate.
   # Wait for both on this SHA before building/scanning/pushing so a red twin
-  # cannot still ship a rolling tag to GHCR (FDRS-586 / F-696).
+  # cannot still ship a rolling tag to GHCR.
   #
   # The secret-scan wait carries its own `if:`, because secret-scan.yml does not
   # run for every event this workflow does: it triggers on `pull_request` and
@@ -195,20 +195,19 @@ jobs:
           exit-code: '1'
           ignore-unfixed: true
           trivyignores: .trivyignore
-      # F-1489 — anchore/sbom-action fetches the syft binary from the anchore
+      # anchore/sbom-action fetches the syft binary from the anchore
       # release CDN (github.com/anchore/syft/releases) on every run, with no
-      # retry of its own. A 503 there killed this job twice on 2026-08-12
-      # (#390, #391) with `[error] received HTTP status=503 … unable to find
-      # tag=''`; on a PR that is noise, but on main the cosign sign/attest steps
-      # below DO run, so the same 503 fails an image publish.
+      # retry of its own, so a 503 there kills this job. On a PR that is noise,
+      # but on main the cosign sign/attest steps below DO run, so the same 503
+      # fails an image publish.
       #
       # An action step cannot be wrapped in a shell retry loop, so the retry is
       # the STEP, repeated. Attempts 1 and 2 are `continue-on-error`; each later
       # attempt runs only `if:` the earlier ones actually FAILED (a skipped
       # step's outcome is `skipped`, never `failure`, so the chain cannot
       # self-trigger). The last attempt carries no escape hatch, so a genuinely
-      # unavailable CDN still refuses the publish exactly as it does today —
-      # this is persistence, not a policy change.
+      # unavailable CDN still refuses the publish — this is persistence, not a
+      # relaxed policy.
       #
       # Every copy MUST carry byte-identical `uses:` and `with:` — a retry that
       # installs a different build, or writes a different output file, is not a
@@ -267,7 +266,7 @@ jobs:
       # was reverted: it gave no benefit — the pome-cloud deploy gate hard-gates
       # only the image SIGNATURE, which verifies on un-timestamped v2 signatures
       # too because the hashedrekord Rekor SET anchors the expired Fulcio cert
-      # (the SPDX attestation is best-effort there, ADR-016 decision #4). And
+      # (the SPDX attestation is best-effort there). And
       # cosign v3 `attest --type spdx` rejected the anchore SBOM predicate
       # ("invalid attestation: decoding json"), failing the sign step on every
       # v3 run and producing NO attestation. v2 signs + attests cleanly.
@@ -275,16 +274,16 @@ jobs:
       # `cosign-release` MUST stay pinned to a v2.x binary. The installer
       # action's DEFAULT cosign version tracks the action major (v3.x installer
       # → cosign v2 default; v4.x installer → cosign v3 default), so an automated
-      # bump of the action alone (as in #167) silently drifts the binary to v3
-      # and reintroduces the failure above. Pinning the binary here decouples us
+      # bump of the action alone silently drifts the binary to v3 and
+      # reintroduces the failure above. Pinning the binary here decouples us
       # from the action version.
       #
-      # F-1489 — repeated for the same reason as the SBOM group above: this
+      # Repeated for the same reason as the SBOM group above: this
       # installer's whole job is to pull the cosign binary off the sigstore
       # release CDN, and it sits on the publish path one step before signing.
       # ⚠️ ALL THREE COPIES MUST CARRY THE SAME `cosign-release: 'v2.6.4'`.
       # A retry that installs a different cosign is not a retry, and v3 is the
-      # exact version the comment above explains was reverted.
+      # exact version the comment above rules out.
       # scripts/ci/assert-hardened-cdn-fetches.mjs reds if the three `with:`
       # blocks ever disagree.
       - name: Install cosign (attempt 1 of 3)
@@ -332,16 +331,12 @@ jobs:
       # the image. `github.event_name` is the PR-vs-push signal that survives
       # merge-queue retargeting.
       #
-      # F-1530 — this step was the last unretried network call on the publish
-      # path, and the one that broke: on 2026-08-14 GHCR logged every layer of
-      # the stripe twin as `Pushed`, answered `unknown blob`, and exited 1.
-      # Nothing re-ran it, so `twins:stripe-bbf27bf` never existed —
-      # twin-snapshot-verify failed four nights running and pome-cloud#752
-      # reported `stripe — no-image`. The retry, the per-tag manifest read-back
-      # and the fail-closed message live in scripts/ci/push-scanned-image.sh
-      # rather than here: an inline loop is the shape the two fetches above were
-      # in before F-1489, and scripts/ci/assert-hardened-cdn-fetches.mjs (shape
-      # c) now reds on a registry write that does not go through that helper.
+      # GHCR can log every layer as `Pushed`, then answer `unknown blob` and
+      # exit 1 — a tag that never existed, with a green-looking push behind it.
+      # So the retry, the per-tag manifest read-back and the fail-closed message
+      # live in scripts/ci/push-scanned-image.sh rather than inline here, and
+      # scripts/ci/assert-hardened-cdn-fetches.mjs (shape c) reds on a registry
+      # write that does not go through that helper.
       #
       # Tags arrive through `env:`, not `${{ }}` interpolated into the script,
       # matching the sign step below: a registry/tag string spliced into a shell
@@ -351,21 +346,17 @@ jobs:
         env:
           IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
         run: bash scripts/ci/push-scanned-image.sh
-      # F-1534 — with the two fetches above and the push below hardened, the
-      # cosign calls in this step were the last unretried GHCR interaction in
-      # this job. On 2026-08-18 run 32144441622 hit a degraded GHCR: gmail and
-      # linear died in the push, and stripe got all the way through — both tags
-      # pushed, signed and attested — then died HERE on `verify-attestation`'s
-      # registry READ with `DENIED: denied`. A red job over an artifact that was
-      # correct and already public.
+      # A degraded GHCR can fail `verify-attestation`'s registry READ with
+      # `DENIED: denied` after the tags are already pushed, signed and attested
+      # — a red job over an artifact that is correct and already public. So
+      # these cosign calls retry too.
       #
-      # The ladder is per OPERATION and lives in the script, not here: an inline
-      # loop is the shape the fetches above were in before F-1489, and
-      # scripts/ci/assert-hardened-cdn-fetches.mjs (shape d) now reds on a
-      # cosign call in any `run:` block that does not go through that helper.
-      # Reads are in scope for shape (d) where they are exempt from shape (c),
-      # for the reason this failure shows: by the time this step runs, the push
-      # step has already published every tag.
+      # The ladder is per OPERATION and lives in the script, not here, and
+      # scripts/ci/assert-hardened-cdn-fetches.mjs (shape d) reds on a cosign
+      # call in any `run:` block that does not go through that helper. Reads are
+      # in scope for shape (d) where they are exempt from shape (c), for the
+      # reason above: by the time this step runs, the push step has already
+      # published every tag.
       - name: Sign pushed image digests and attest SBOM
         id: sign
         if: ${{ github.event_name != 'pull_request' }}

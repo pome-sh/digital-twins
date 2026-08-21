@@ -23,25 +23,19 @@ WORKDIR /repo
 ENV NODE_ENV=production
 ENV LINEAR_TWIN_HOST=0.0.0.0
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
-# F-1532 — take Debian's published security fixes on top of the pinned digest.
-# The digest freezes this image's package contents; Trivy's vulnerability DB is
-# refreshed on every run. So a fix Debian ships BEFORE upstream rebuilds the
+# Take Debian's published security fixes on top of the pinned digest. The digest
+# freezes this image's package contents while Trivy's vulnerability DB refreshes
+# on every run, so a fix Debian ships BEFORE upstream rebuilds the
 # node:*-trixie-slim tag lands as a FIXABLE HIGH on frozen contents, and the
 # publish gate then refuses this image identically on every future run — not a
-# flake, and a re-run cannot clear it. CVE-2026-53615 (util-linux; nine binary
-# packages, one source) did exactly that on 2026-08-18, and neither upstream
-# digest then current carried the fix, so bumping the pin was not a remedy.
-# The pin still fixes where the image STARTS; this layer lets a rebuild move.
-# Decision record, and why no .trivyignore exception was spent: .trivyignore.
+# flake, and a re-run cannot clear it. The pin still fixes where the image
+# STARTS; this layer lets a rebuild move.
 RUN apt-get update \
   && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y --no-install-recommends \
   && rm -rf /var/lib/apt/lists/*
 COPY --from=build /repo/node_modules ./node_modules
-# The twin's dist imports @pome-sh/wire; ship its built output. Before F-942 this
-# was `COPY packages/shared-types` -- the WHOLE directory, sources included -- because
-# that package exported `./src/index.ts` and `build:runtime` emitted the runtime
-# `.js` in place beside each `.ts`. wire builds to dist/ like every other
-# package, so package.json + dist is the entire runtime need.
+# The twin's dist imports @pome-sh/wire; ship its built output — package.json
+# plus dist is the entire runtime need.
 COPY --from=build /repo/packages/wire/package.json ./packages/wire/package.json
 COPY --from=build /repo/packages/wire/dist ./packages/wire/dist
 COPY --from=build /repo/packages/sdk/package.json ./packages/sdk/package.json

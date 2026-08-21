@@ -1,40 +1,31 @@
 name: schedule alarm
 
-# F-1230 — a scheduled workflow that fails tells nobody.
+# A scheduled workflow that fails tells nobody: the error can be precise and
+# actionable and still cost a human reading Actions run history by hand.
 #
-# `repo-policy.yml`'s weekly cron has failed every Monday since it shipped
-# with the precise, actionable error `REPO_POLICY_TOKEN is required for
-# schedule drift checks`, and it still took a human reading Actions run
-# history by hand to notice. This is the reusable workflow every
-# schedule-triggered workflow in this repo calls from a `failure()`-guarded
-# job: constant title, one long-lived tracking issue reused across
-# consecutive failures (never a new issue per run), one label per alarm so
-# unrelated alarms never collide on the same issue, and a body naming what
-# failed plus the run URL — the pattern check-release-staleness.yml proved
-# (#300) before it was deleted alongside the Changesets flow it watched
-# (a3c9441). Green is asserted as hard as red: recovery CLOSES the tracking
-# issue, the same stance scripts/ci/release-alarm.mjs takes for the release
-# path.
+# This is the reusable workflow every schedule-triggered workflow in this repo
+# calls from a `failure()`-guarded job: constant title, one long-lived tracking
+# issue reused across consecutive failures (never a new issue per run), one
+# label per alarm so unrelated alarms never collide on the same issue, and a
+# body naming what failed plus the run URL. Green is asserted as hard as red:
+# recovery CLOSES the tracking issue, the same stance
+# scripts/ci/release-alarm.mjs takes for the release path.
 #
 # ── Why a `failure()`-guarded call here is enough, and NOT a second
 #    separately-cron'd file like release-alarm.yml ──────────────────────────
 #
 # `release-alarm.yml` is a separate file on its OWN daily cron because
-# `release.yml` is PUSH-triggered and had no failure path at all: on
-# 2026-08-06 four consecutive runs failed and nothing fired, because a push
+# `release.yml` is PUSH-triggered and has no failure path of its own: a push
 # that triggers no run at all is invisible to an `if: failure()` step living
-# inside the workflow that never ran (F-1180). The watcher has to survive the
-# thing it watches.
+# inside the workflow that never ran. The watcher has to survive the thing it
+# watches.
 #
-# `repo-policy.yml` is a different shape. Its failure mode is observed and it
-# is NOT "never triggers" — its weekly cron has been firing reliably (that is
-# precisely how repo-policy.yml's red runs
-# were noticed by hand every Monday); the gap is that a run FIRES, FAILS, and
-# nobody is told. A `failure()`-guarded job inside the same workflow file sees
-# that failure in the same run, for free, with the actual step-level error
-# text available in its own job env — which is exactly what the ticket asks
-# the alarm body to name. Embedding here is proportionate to the failure mode
-# that has actually been observed.
+# `repo-policy.yml` is a different shape. Its failure mode is NOT "never
+# triggers" — its weekly cron fires reliably; the gap is that a run FIRES,
+# FAILS, and nobody is told. A `failure()`-guarded job inside the same workflow
+# file sees that failure in the same run, for free, with the actual step-level
+# error text available in its own job env to put in the alarm body. Embedding
+# is proportionate to that failure mode.
 #
 # The theoretical case release-alarm.yml's separateness DOES guard against —
 # GitHub disabling a repository's scheduled workflows after 60 days with no
@@ -44,13 +35,12 @@ name: schedule alarm
 # Embedding the alarm in repo-policy.yml does not make that pre-existing,
 # accepted risk any worse. The other half of "never fires" — a
 # future edit that deletes or breaks a workflow's own `schedule:` block or its
-# alarm job — is a code-review-time regression, not a runtime outage, and is
-# F-1471's job: a static CI check over the workflow files themselves, which
-# gets feedback on the PR that causes it rather than waiting for a missed
-# cadence.
+# alarm job — is a code-review-time regression, not a runtime outage, and
+# belongs to the static CI check over the workflow files themselves, which gets
+# feedback on the PR that causes it rather than waiting for a missed cadence.
 #
-# `release-alarm.yml` is itself schedule-triggered and therefore inside D5's
-# own property, but its subject (does every version main declares reach its
+# `release-alarm.yml` is itself schedule-triggered and therefore inside this
+# same property, but its subject (does every version main declares reach its
 # registry) is unrelated to whether ITS OWN mechanism is intact — a checkout
 # failure, a broken regression suite, or a `release-alarm.mjs` throw before
 # it reaches a verdict is a different fact than "the release is not
