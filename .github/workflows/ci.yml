@@ -113,8 +113,8 @@ jobs:
       - run: node scripts/smoke-examples.test.mjs
       # F-1511 — release.yml still publishes only on a version diff against the
       # registry, but the version is now written on main after the merge by
-      # allocate-version.yml, not by a PR (RELEASING.md, "Why the number is not
-      # yours to write"). So what this gate demands of a PR is the WORDS and
+      # allocate-version.yml, not by a PR. So what this gate demands of a PR
+      # is the WORDS and
       # not the number: an `## Unreleased (patch|minor)` entry for every artifact
       # the PR moves, no hand-written version line, and no rewrite of a released
       # entry. It is the re-scoped check-version-bump-required.mjs — same

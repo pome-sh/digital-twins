@@ -299,8 +299,8 @@ jobs:
           echo "E415 hard-link check OK: $tgz"
       # @pome-sh/wire's own package.json sets `publishConfig.registry` to
       # GitHub Packages (npm.pkg.github.com) as its DEFAULT — see
-      # publish-wire's "Publish to GitHub Packages" step and
-      # RELEASING.md — and ci.yml's `gate:wire-manifest` asserts that value on
+      # publish-wire's "Publish to GitHub Packages" step — and ci.yml's
+      # `gate:wire-manifest` asserts that value on
       # every PR, so it cannot be changed or removed here without failing that
       # gate. `publishConfig` outranks the ambient registry that
       # `registry-url: https://registry.npmjs.org` above configured, so
@@ -393,7 +393,7 @@ jobs:
           echo "cannot see this version, so examples/* keep the previous pin and"
           echo "check-example-pins-published.mjs reds on main. Once the version is visible, run"
           echo "  gh workflow run allocate-version.yml --ref main"
-          echo "to land the re-pin by hand (RELEASING.md, 'F-1520')."
+          echo "to land the re-pin by hand."
           exit 1
 
   # @pome-sh/wire → GitHub Packages. See the file header for why this is its own
@@ -557,9 +557,8 @@ jobs:
     if: ${{ !cancelled() && (needs.publish.result == 'success' || needs.publish-wire.result == 'success') }}
     runs-on: ubuntu-latest
     steps:
-      # Same app, same mint step as allocate-version.yml's own — see
-      # RELEASING.md, "The credential: pome-ops-push, and the one-time setup
-      # around it". The `pome-ops-push` installation (app_id 4582446, org
+      # Same app, same mint step as allocate-version.yml's own. The
+      # `pome-ops-push` installation (app_id 4582446, org
       # installation 153466692) holds exactly `contents: write` +
       # `metadata: read`, and `POST /repos/{owner}/{repo}/dispatches` — GitHub's
       # documented requirement for the repository_dispatch event — is a

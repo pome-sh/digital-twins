@@ -1,5 +1,10 @@
 # @pome-sh/adapter-claude-sdk — CHANGELOG
 
+## Unreleased (patch)
+
+**No code change.** Carries `packages/wire/README.md`'s removal of a link to a
+`RELEASING.md` that no longer exists.
+
 ## 0.3.6 — 2026-08-13
 
 `query()` now prints the literal `POME_SMOKE_REACHED_OUTBOUND` to stderr

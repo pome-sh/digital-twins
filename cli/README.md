@@ -131,7 +131,7 @@ there, rewriting that heading and the manifest in one commit, and
 `.github/workflows/release.yml` compares the local version against npm and
 publishes when they differ. `pome --version` reports the allocated value from a
 build-time constant, so a user can always tell whether their install carries a
-given fix. See [`RELEASING.md`](../RELEASING.md).
+given fix.
 
 ## License
 

@@ -14,9 +14,7 @@
 // consumed number, silently, across workspaces and humans (measured 2026-08-13:
 // #402/#405 stale-green overnight, five renumber+force-push cycles in one night,
 // 0.23.35/.36 burned unpublished). The NUMBER moved to
-// `allocate-release-versions.mjs`, on `main`, after the merge — RELEASING.md's
-// "Why the number is not yours to write" carries the reasoning and the rejected
-// alternative; the full ADR lives in the private pome-cloud docs.
+// `allocate-release-versions.mjs`, on `main`, after the merge.
 //
 // The publish-relevance logic — which paths move which artifact, including the
 // wire→cli/adapter/checks coupling — did not become wrong; it became the
@@ -107,7 +105,7 @@ for (const pkg of PUBLISHED_PACKAGES) {
         `.github/workflows/allocate-version.yml — a PR that carries one is invalidated by any ` +
         `other merge that consumes it, silently and while still green. Revert the version line ` +
         `and describe the change under \`${PENDING_HEADING_EXAMPLE}\` in ${pkg.changelog} ` +
-        `instead. (RELEASING.md, "Why the number is not yours to write")`,
+        `instead. The number is not yours to write; the words are.`,
     );
   }
 
@@ -134,7 +132,7 @@ for (const pkg of PUBLISHED_PACKAGES) {
         `        <what a consumer of ${pkg.name} needs to know>\n` +
         `    \`(minor)\` if a consumer must act — a breaking change to this package's public ` +
         `surface, an \`engines\` floor, or for the CLI a change to the frozen twin contract — ` +
-        `\`(patch)\` otherwise (RELEASING.md). The number is not yours to write; the words are.`,
+        `\`(patch)\` otherwise. The number is not yours to write; the words are.`,
     );
   }
 
