@@ -1,16 +1,19 @@
 # Verification — the self-fix flip on `duplicate-issue`
 
-## Two baselines, and only one of them is measured here
+## Three baselines, and none of them is the curriculum stamp yet
 
-This example now carries **two** failing baselines, on two runtimes:
+This example has carried **three** attempts at a failing baseline. The first two are
+measured and both are superseded; the third is stated but not yet run:
 
 | Baseline | Where | Flaw | Curriculum pattern | Measured below |
 |---|---|---|---|---|
-| Managed-agent v1/v2 prompt pair | `agents/*.yaml` | charter line telling the agent not to search | 2 (policy constant) | **yes** |
-| Local examinee | `src/index.ts` — `DENY_ISSUE_LOOKUP` | tool policy denies every issue read path | 1 (config defect) | **no — pending** |
+| Managed-agent v1/v2 prompt pair | `agents/*.yaml` | charter line telling the agent not to search | 2 (policy constant) | **yes — superseded** |
+| Local examinee | `src/index.ts` — `DENY_ISSUE_LOOKUP` | tool policy denies every issue read path | 1 (config defect) | **yes — refuted, see below** |
+| **Hardened world** | `tasks/duplicate-issue.md` — the seed | none: the red comes from task difficulty | — (difficulty, not a planted flaw) | **not yet — prediction stated below** |
 
-**Everything below measures the first one.** The local examinee's pattern-1
-baseline is the one the curriculum grades, and it has **no stamp yet**.
+**The 2026-07 numbers below measure the first one.** The pattern-1 baseline was
+measured on 2026-08-04/05 and refuted; the hardened re-cut is stated in the next
+section with its prediction. **Nothing here is stamped.**
 
 Three reasons the numbers below do not transfer to it, each independently
 sufficient:
@@ -28,6 +31,169 @@ sufficient:
 They are kept, unedited, because the "33, not 0" story is real and this is where
 it was actually measured — and because deleting the provenance of a number the
 whole onboarding narrative rests on would be worse than dating it.
+
+---
+
+## THE RE-CUT: the red moves into the world, and this is the prediction
+
+**Written 2026-08-21, before any trial of the hardened task was launched.** This
+section is committed ahead of the run on purpose. It is the same discipline that
+caught the two wrong beliefs recorded further down this file — the prediction was
+written first, the run disagreed with it on every line, and that is the only
+reason the disagreement was visible instead of being rationalised afterwards.
+
+### Why the flaw left the examinee entirely
+
+Three measurements below, taken 2026-08-04/05, close off three separate places a
+red could have come from:
+
+| what was tried | result |
+|---|---|
+| the shipped tool-policy denial, open sandbox | 4/5 green |
+| the same denial, sandbox closed (`tools: []`) | **5/5 — closing the hole made it greener** |
+| no denial at all, honest prompt, closed sandbox | 5/5 |
+| the search-first rule deleted from the prompt (`POME_TRIAGE_RULE=neutral`) | 5/5 |
+
+The last row is the one that decides this. The sentence the whole v1→v2 lesson
+rests on has **no measurable effect on `claude-opus-5` for this task** — every
+trial called `list_issues` before writing anything, with nothing instructing it
+to. It searches by reflex. So the original demo was only ever red because v1
+*forbade* searching, and the "one-line fix" was un-planting a sabotage.
+
+`docs/curriculum/failure-classes.md` §3 bans omission-only prompt flaws and bans
+capability-anchored baselines. Both bans held. What is left is the seed: under
+AutomationBench's taxonomy this task's decision had a search space of exactly one
+issue in one repository, which is their `simple` class — the 200 tasks they ship
+and **deliberately exclude from scoring**.
+
+### What changed in the world
+
+Nothing was removed from the examinee. The agent keeps every tool it had.
+
+| | before | after |
+|---|---|---|
+| open issues | 1 | 5 (`#8`, `#23`, `#31`, `#47`, `#52`) |
+| the textual bullseye | `#1`, and it is the answer | `#47`, and it is **not** the answer |
+| the answer | comment on `#1` | comment on `#23`, the `tracking` issue |
+| where the rule lives | nowhere — it is obvious | `docs/triage-policy.md`, committed in the repo, named in no prompt |
+
+`#47` is the instrument. It is open, labelled `bug`, and a word-for-word match for
+evan's report — every default a triage agent carries points at it. Only the policy
+file says otherwise, and the policy file has to be found.
+
+This is the L3 shape from `examples/minimal-viktor/LADDER.md`, which measured the
+difficulty ceiling over 19 hosted trials and four models: the lowest
+*discriminating* rung was conflicting policy, and the load-bearing finding was that
+**the productive conflict is a written rule against an unwritten default the agent
+already carries** — not two written rules with a stated precedence, which every
+model resolved correctly in all 19 trials.
+
+Fairness rules honoured, each one a cap stated rather than smuggled:
+
+* **Noise never enters a lookup table.** The policy file is exactly correct. The
+  distractors live in the issue list, which is data. A correct lookup always
+  yields the correct answer.
+* **The examinee cannot read the answer key.** Unchanged from the seal that landed
+  in #318: `tools: []` plus `settingSources: []`.
+* **No treasure hunt without a search tool.** The agent has `search_code` and
+  `get_file_contents`, and `README.md` points at `docs/`. The ladder had to cap
+  this lever because minimal-viktor has no search tool; here it is genuinely
+  reachable, which also means **this is the first Pome task to test "ambiguity of
+  where the information lives" at all**. New ground, so it is called out.
+* **The comment needle is policy-mandated, not guessed.** `#47` is required in the
+  comment by rule 2 of the policy file itself, so the criterion asserts a stated
+  convention rather than a guess about how a model phrases things.
+
+### The grading, and one thing that must not be "fixed"
+
+Six criteria, five `[code]`, all five bound (`validate_task`: `bound: 5,
+unbound: 0`). `verify_seed` on this seed: *"No success criterion already passes on
+the seed's initial twin state — the seed is clean."*
+
+| # | criterion | at seed |
+|---|---|---|
+| c1 | `[code:github]` a comment containing `#47` exists on issue `#23` | **failed** (positive, FAIL_TO_PASS) |
+| c2 | `[code:slack]` a message in `support` contains `issues/23` | **failed** (positive, FAIL_TO_PASS) |
+| c3 | `[code:slack]` no message containing `issues/47` in any public channel | passed (negative) |
+| c4 | `[code:github]` no new issues in `acme/orders-service` | passed (negative) |
+| c5 | `[code:github]` `add_issue_comment` was called | unreadable at seed (tape) |
+| c6 | `[model]` the comment carries the customer's concrete repro | judged at run time |
+
+c3 is the AutomationBench **negative-assertion-bound-to-the-wrong-value** technique
+that M3 adopted on 2026-08-13: beside asserting the right answer, assert the object
+does not hold *the specific wrong value this task's failure mode produces*. Linking
+`#47` back to the reporter is precisely what an agent that skipped the policy does,
+and rule 3 of the policy file bans it in as many words.
+
+⚠️ **c3 and c4 are deliberately NOT marked `always-scored`, and adding the marker
+would break this task.** `verify_seed` emits a generic note suggesting it for
+seed-true criteria. Do not take it here. Under F-1296 a seed-true criterion is
+excluded from the denominator only when it *also* passes at finish; when the
+examinee breaks it, it is **counted as a failure** (`docs/grading/seed-exclusion.md`,
+row 2). So the guards still bite. What the marker would change is the do-nothing
+agent:
+
+| | c3/c4 unmarked (shipped) | c3/c4 `always-scored` |
+|---|---|---|
+| correct run | 4 of 4 → **100** | 6 of 6 → 100 |
+| **null agent** | 0 of 4 → **0** | 2 of 6 → **33** |
+
+A do-nothing agent scoring 0 is One Working Curriculum M0's own Done-when and the
+entire reason F-1338 and F-1521 were built. The marker hands it 33 for free, which
+is the reward-hacking case AutomationBench's exclusion exists to prevent.
+
+### The prediction
+
+Stated before the first trial, at `claude-opus-5`, n=5, hosted, sandbox sealed,
+examinee otherwise **as shipped and carrying no planted defect**.
+
+> **2 of 5 pass.** I expect three trials to comment on `#47` — the textual match —
+> and never open `docs/triage-policy.md` at all. Of the two that find the policy, I
+> expect both to apply it completely, because once the rule is in context it is
+> unambiguous.
+>
+> I expect **zero** trials to open a new issue: `no-new-issues` has passed in every
+> trial ever run on this task and the distractors do not make filing more
+> attractive.
+>
+> The most likely single point of failure among trials that *do* find the policy is
+> **c3, not c1** — an agent that routes correctly to `#23` but still pastes `#47`'s
+> link into Slack "for reference".
+
+**What would refute this: 5 of 5.** That would mean the L3 lever does not transfer
+from an eight-pull-request world to a five-issue one, and that difficulty on this
+task has to come from somewhere this re-cut does not reach. It is a live
+possibility — this is the fourth consecutive prediction of a capability gap on this
+example, and the previous three were all wrong in the same direction.
+
+**If it is refuted**, the fallback is already designed and is not a redesign: the
+same world, plus a committed pattern-1 config defect in the examinee — a
+`TRIAGE_CONTEXT_FILES` entry pointing at a path that does not exist, so the policy
+never reaches context. That is `failure-classes.md` §3 pattern (1) by the book, and
+the fix is one line correcting the path.
+
+### The fix arm, and why it is a real fix
+
+The green arm is one line added to the examinee's system prompt: *"Before
+commenting, check `docs/triage-policy.md` for routing rules."*
+
+This is **not** un-planting a fixture. The baseline examinee is not sabotaged; it
+is naive, which is the true state of most production triage agents. Telling an
+agent where its team's conventions live is the actual repair a builder would make,
+and the demo it produces is `unreliable → reliable` rather than `broken → fixed`,
+which is what Premise C in `failure-classes.md` §2 says endures.
+
+### Results
+
+**Not yet run.** The table below ships empty on purpose, so the run can disagree
+with the prediction above.
+
+| arm | model | n | scores | pass rate | run ids |
+|---|---|---|---|---|---|
+| baseline — naive examinee, hardened world | `claude-opus-5` | — | — | — | — |
+| fix — one prompt line naming the policy | `claude-opus-5` | — | — | — | — |
+
+No `verified red` stamp is written, because nothing has earned one.
 
 ---
 
