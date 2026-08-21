@@ -1,15 +1,15 @@
 name: repo-policy
 
-# F-696 — assert protected main policy (PR + review + required checks).
-# F-1212 — the live check now reads GET .../rules/branches/{branch}, which an
-# ordinary contents:read GITHUB_TOKEN can call. The legacy pair it replaces
-# needed Administration:read, which GITHUB_TOKEN cannot hold: GET .../protection
-# is auth-gated outright (401 unauthenticated), and while GET .../rulesets/{id}
-# does answer 200 for any caller on a public repo, it ELIDES the bypass_actors
-# field for callers without that scope — so the old check depended on a PAT
-# (REPO_POLICY_TOKEN) that was never minted, and the weekly cron was red since
-# it shipped. No PAT anywhere now, so the live check also runs on
-# pull_request: drift is caught on every touching PR, not just weekly.
+# Assert protected main policy (PR + review + required checks).
+#
+# The live check reads GET .../rules/branches/{branch}, which an ordinary
+# contents:read GITHUB_TOKEN can call. Do not move it to GET .../protection or
+# GET .../rulesets/{id}: both need Administration:read, which GITHUB_TOKEN
+# cannot hold. /protection is auth-gated outright (401 unauthenticated), and
+# /rulesets/{id} answers 200 for any caller on a public repo but ELIDES the
+# bypass_actors field without that scope — so it would pass while checking
+# nothing. Needing no PAT is what lets this run on pull_request, so drift is
+# caught on every touching PR rather than once a week.
 # repo-policy is not in config/required-checks.json's required set, so this
 # cannot deadlock a merge.
 #
@@ -27,7 +27,7 @@ on:
     paths:
       - "scripts/ci/assert-repo-policy.sh"
       - "scripts/ci/assert-repo-policy.test.mjs"
-      # F-1180 — the required-context list moved here; this script now reads it.
+      # the required-context list moved here; this script now reads it.
       - "config/required-checks.json"
       - ".github/workflows/repo-policy.yml"
       - ".github/workflows/dependency-review.yml"
@@ -53,14 +53,13 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: bash scripts/ci/assert-repo-policy.sh
 
-  # F-1230 — repo-policy.yml's weekly cron was firing and failing since it
-  # shipped (REPO_POLICY_TOKEN never existed, F-1212) with nobody told. This
-  # job sees that failure in the same run `assert` failed in — see
+  # A cron that fires, fails and tells nobody is the failure this job closes:
+  # it sees the failure in the same run `assert` failed in. See
   # schedule-alarm.yml for why an embedded failure() job, not a second
   # separately-cron'd file, is the right shape here.
   # Gated on the events that actually run the live drift check, rather than on
-  # `!= 'pull_request'`. F-1212 dropped the PAT and now runs the live check on
-  # every event, but stating the positive set here still means a future event
+  # `!= 'pull_request'`. The live check runs on every event, but stating the
+  # positive set here still means a future event
   # (e.g. `push:`) cannot silently start filing (or, worse, CLOSING) this
   # alarm before someone decides it should.
   schedule-alarm:
@@ -74,7 +73,7 @@ jobs:
       title: "the repo-policy weekly cron is failing"
       label: "schedule-alarm:repo-policy"
       outcome: failure
-      detail: "repo-policy.yml's scheduled run failed. F-1212 removed the REPO_POLICY_TOKEN dependency, so check the run log for the actual assertion in scripts/ci/assert-repo-policy.sh that broke."
+      detail: "repo-policy.yml's scheduled run failed. It needs no credential beyond the ambient GITHUB_TOKEN, so check the run log for the actual assertion in scripts/ci/assert-repo-policy.sh that broke."
 
   # The other direction: a recovered run closes the tracking issue.
   schedule-alarm-recovery:
