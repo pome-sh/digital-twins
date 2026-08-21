@@ -6,8 +6,7 @@
 // One answer, two callers. This table used to live inside
 // `check-version-bump-required.mjs`, where it powered a PR-time demand ("bump
 // this version yourself"). The version number no longer leaves the pipeline's
-// hands (RELEASING.md, "Why the number is not yours to write"), so the
-// same question is now asked at two different moments:
+// hands, so the same question is now asked at two different moments:
 //
 //   - `allocate-release-versions.mjs`, on `main`, to decide which packages get
 //     a NUMBER. This is the authority: a package whose publish-relevant paths
@@ -85,7 +84,7 @@ function isTwinExamplePath(file) {
  * Same shape of over-match as F-1455, one directory over: `packages/twin-` is a
  * plain prefix, so documentation that cannot change one byte of any published
  * artifact was demanding a `@pome-sh/cli` release — i.e. a republish that would
- * be byte-identical. RELEASING.md's advice ("if your change doesn't warrant a
+ * be byte-identical. The usual advice ("if your change doesn't warrant a
  * release it shouldn't be touching a publish-relevant path") has no answer here:
  * a twin's FIDELITY.md has nowhere else to live.
  *
@@ -125,9 +124,9 @@ function isTwinTopLevelDocPath(file) {
  * prefix, so editing a validator that CI runs was demanding an `@pome-sh/cli`
  * release — a republish that would be byte-identical. Found on F-1354, which had
  * to touch `packages/twin-github/scripts/validate-mcp.ts` to wire that script
- * into CI at all, and RELEASING.md's "if your change doesn't warrant a release
- * it shouldn't be touching a publish-relevant path" has no answer: a twin's own
- * validator has nowhere else to live.
+ * into CI at all, and "if your change doesn't warrant a release it shouldn't be
+ * touching a publish-relevant path" has no answer: a twin's own validator has
+ * nowhere else to live.
  *
  * `[^/]+` is deliberately one path segment and `scripts` is anchored directly
  * under the twin root, so `packages/twin-stripe/src/scripts/x.ts` — which
@@ -157,9 +156,9 @@ function isTwinScriptPath(file) {
  * `@pome-sh/sandbox-domains` release — two republishes that would each be
  * byte-identical. Found on F-1532, where a fixable base-image CVE had frozen the
  * twin image publish deterministically and the remedy could only be applied in
- * these five files. RELEASING.md's "if your change doesn't warrant a release it
- * shouldn't be touching a publish-relevant path" has no answer here either: a
- * twin's Dockerfile has nowhere else to live.
+ * these five files. "If your change doesn't warrant a release it shouldn't be
+ * touching a publish-relevant path" has no answer here either: a twin's
+ * Dockerfile has nowhere else to live.
  *
  * The filename is matched EXACTLY and anchored directly under the twin root, so
  * a Dockerfile somewhere a bundler could plausibly reach —
@@ -332,8 +331,8 @@ export const PUBLISHED_PACKAGES = [
     // trace-contract.json is in wire's `files`, so it SHIPS, and it embeds
     // wire's own `version`. `check:trace-contract` (a required ci.yml gate) is a
     // byte compare, so a version moved without regenerating it reds `main` —
-    // RELEASING.md has carried "bumping wire's version also means re-running
-    // emit:trace-contract" as a human instruction since F-1201, and a human
+    // "Bumping wire's version also means re-running emit:trace-contract" was a
+    // human instruction from F-1201 until this table replaced it, and a human
     // instruction is exactly what stops being followed when the version stops
     // being written by a human.
     //

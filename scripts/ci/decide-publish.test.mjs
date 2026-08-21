@@ -216,7 +216,7 @@ console.log("\nrelease.yml wiring");
   check("plan-wire has packages: read", planWire.includes("packages: read"));
   check("publish-wire has packages: write", publishWire.includes("packages: write"));
 
-  // The dispatch that closes the re-pin deadlock (RELEASING.md) must fire once
+  // The dispatch that closes the re-pin deadlock must fire once
   // after either publish lane succeeds, never before, and never mask a real
   // publish failure by swallowing its own.
   const dispatch = jobOf("dispatch-allocate-version");

@@ -4,6 +4,11 @@ SPDX-License-Identifier: Apache-2.0
 
 # @pome-sh/wire — CHANGELOG
 
+## Unreleased (patch)
+
+**The README no longer links a `RELEASING.md` that does not exist.** No code
+change; the two-registry publish model it described is unchanged.
+
 ## 0.2.3 — 2026-08-13
 
 **New subpath: `@pome-sh/wire/run-completeness`.** Additive — no existing export,

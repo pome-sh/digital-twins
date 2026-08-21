@@ -9,7 +9,6 @@
 - [Endpoint-tier rubric](./packages/sdk/ENDPOINT-TIERS.md): semantic / shape / 501 fidelity tiers
 - [Contributor & agent conventions](./AGENTS.md): how to work in this repo
 - [Internal package architecture](./packages/README.md): the twin registry, the shared `@pome-sh/wire` trace surface, and which packages are private vs. published
-- [Releasing](./RELEASING.md): how `@pome-sh/cli` and `@pome-sh/adapter-claude-sdk` version and publish
 
 ## Twins
 

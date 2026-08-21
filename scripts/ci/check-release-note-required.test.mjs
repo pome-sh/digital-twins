@@ -305,7 +305,7 @@ console.log("the coupling: one change, several artifacts");
 
 {
   // wire's bytes are inlined into the CLI's and the adapter's tarballs, so one
-  // wire change is THREE releases (RELEASING.md says so in as many words), and
+  // wire change is THREE releases, and
   // the demand names all three: a PR that writes one entry and forgets two ships
   // two releases with no record of what is in them. `@pome-sh/checks` is
   // deliberately not among them — its relevance is named declaration FILES, not

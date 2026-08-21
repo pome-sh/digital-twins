@@ -6,13 +6,12 @@
 // The old contract was one rule: a package's `CHANGELOG.md` top heading must
 // equal the version in the same PR. That rule is what made every open PR carry
 // the number twice, and it is why a merge somewhere else invalidated both copies
-// at once. The new contract splits it where the ADR splits authorship
-// (RELEASING.md, "Why the number is not yours to write"):
+// at once. The new contract splits it by authorship:
 //
 //   ## Unreleased (patch)      ← the AUTHOR writes this, in the PR, with the
 //                                 prose under it. `patch` / `minor` is a
-//                                 judgement about consumers (RELEASING.md's
-//                                 "minor plays the major role"), so it stays
+//                                 judgement about consumers (all packages are
+//                                 pre-1.0, so minor plays the major role), so it stays
 //                                 with the person who made the change.
 //   ## 0.23.46 — 2026-08-14    ← `allocate-release-versions.mjs` writes this,
 //                                 on `main`, once, when it cuts the number.
@@ -53,7 +52,7 @@ export const PENDING_HEADING_EXAMPLE = "## Unreleased (patch)";
  *
  * KNOWN LIMIT, stated rather than discovered later: fenced code blocks are not
  * tracked, so a line inside one that starts with `## ` is read as a heading. An
- * entry quoting this very format — as RELEASING.md and cli/README.md do — must
+ * entry quoting this very format — as cli/README.md does — must
  * indent it or wrap it inline, and the failure is loud (the parse refuses, or the
  * PR gate reports a heading mismatch) rather than a silently mis-split file.
  */
@@ -184,8 +183,8 @@ export function writeRelease(text, { version, date, body, label = "CHANGELOG.md"
  * script inventing a release policy.
  *
  * There is no `major` level, and that is the same refusal in a different place —
- * all four packages are pre-1.0, where RELEASING.md has minor playing the major
- * role. A 1.0.0 is a deliberate decision about a package's stability promise; it
+ * every package here is pre-1.0, where minor plays the major role. A 1.0.0 is
+ * a deliberate decision about a package's stability promise; it
  * is not something to reach by typing a word in a changelog heading.
  */
 export function bumpVersion(version, level) {

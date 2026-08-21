@@ -1,10 +1,9 @@
 name: allocate version
 
 # F-1511 — the version number leaves the PR author's hands; this is the hand it
-# lands in. The reasoning, the rejected alternative and the one-time credential
-# setup are in RELEASING.md ("Why the number is not yours to write" and "The
-# credential: pome-ops-push, and the one-time setup around it"); the full ADR
-# lives in the private pome-cloud docs, where this repo's design records live.
+# lands in. A number written in a PR is a claim about `main` that goes stale
+# silently: it invalidates every other open PR that pinned it, and those PRs
+# stay green, because their CI ran before the merge.
 #
 # Every twins PR used to hand-write the shared version line, so every merge
 # invalidated every open PR that had pinned a consumed number — silently, while
@@ -181,7 +180,7 @@ jobs:
           if [[ -z "${OPS_APP_ID}" || -z "${OPS_APP_PRIVATE_KEY}" ]]; then
             echo "::error::OPS_APP_ID / OPS_APP_PRIVATE_KEY are not both set, so no version can be allocated and nothing will publish."
             echo "These are the org's pome-ops-push GitHub App (app_id 4582446). Three one-time steps,"
-            echo "in this order — RELEASING.md has the commands:"
+            echo "in this order:"
             echo "  1. App installation -> Repository access includes pome-sh/digital-twins (UI only)."
             echo "  2. Generate a SECOND private key (pome-cloud holds the first, write-only), then"
             echo "     gh secret set OPS_APP_ID / OPS_APP_PRIVATE_KEY on this repository."
@@ -326,7 +325,6 @@ jobs:
               echo "  - ruleset 18797095 'main founder-bypass' — needs the app in bypass_actors as actor_type Integration;"
               echo "  - CLASSIC branch protection — CANNOT be bypassed by an app at all, so it must carry no"
               echo "    required_status_checks rule (deleted 2026-08-13; a re-added one breaks this workflow again)."
-              echo "See RELEASING.md, 'The credential: pome-ops-push, and the one-time setup around it'."
               exit 1
             fi
 

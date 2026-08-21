@@ -6,9 +6,15 @@ entry under an `## Unreleased (patch)` (or `(minor)`) heading above the newest
 released one. `.github/workflows/allocate-version.yml` rewrites that heading to
 the version it allocates on `main` after the merge, in the same commit that moves
 `package.json`, and `.github/workflows/release.yml` publishes from there. Do not
-write a version number here or in `package.json` — see `RELEASING.md`. Released
+write a version number here or in `package.json`. Released
 entries are insertions only: a correction is the next entry, naming the one it
 corrects.
+
+## Unreleased (patch)
+
+**The README no longer links a `RELEASING.md` that does not exist.** The release
+procedure moved out of the repository; the packaged README now points at the
+workflows and the CI gate that enforce it, which are still here. No code change.
 
 ## 0.26.0 — 2026-08-21
 

@@ -194,9 +194,11 @@ GitHub Packages copy requires a GitHub token even to read and would 401 for
 them. The GitHub Packages copy exists for exactly one reason: `pome-cloud`
 lives in a different repository and needs the same trace vocabulary, and
 duplicating Zod schemas across a repo boundary is what produced the two-schema-
-identities bug that dissolved `@pome-sh/shared-types` in the first place. See
-[`RELEASING.md`](../RELEASING.md) for the publish model and the one-time
-package-visibility step.
+identities bug that dissolved `@pome-sh/shared-types` in the first place.
 
-For how the five published packages version and release, see
-[`RELEASING.md`](../RELEASING.md) at the repo root.
+How the five published packages version and release is
+[`.github/workflows/allocate-version.yml`](../.github/workflows/allocate-version.yml)
+(the number, written on `main` after the merge) and
+[`release.yml`](../.github/workflows/release.yml) (the publish, on a version
+diff against the registry). What a PR owes is
+[`scripts/ci/check-release-note-required.mjs`](../scripts/ci/check-release-note-required.mjs).

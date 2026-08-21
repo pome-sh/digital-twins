@@ -23,7 +23,7 @@ neither:
   today that means `pome-sh/pome-cloud`, which needs the same trace vocabulary
   and must not fork a second copy of these Zod schemas. Reading it requires a
   GitHub token; it is not an end-user install surface and has no public API
-  promise. See [`RELEASING.md`](../../RELEASING.md).
+  promise.
 
 ## What is NOT here
 

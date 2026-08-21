@@ -8,11 +8,12 @@
 // (stale-green), across workspaces and humans, worse the more work ran in
 // parallel. Measured 2026-08-13: #402/#405 went stale-green overnight, five
 // renumber+force-push cycles in one batch night, 0.23.35/.36 burned unpublished.
-// The reasoning, the rejected alternative (a placeholder the merge pipeline
-// rewrites — it makes release.yml's plan job vacuous) and the properties below
-// are recorded in RELEASING.md under "Why the number is not yours to write"; the
-// full ADR lives in the private pome-cloud docs, where this repo's design
-// records live.
+// The rejected alternative, recorded because it is the cheaper one and someone
+// will suggest it again: have PRs write a placeholder and compute the real
+// number at publish time from the registry's `latest`. It makes release.yml's
+// `plan` job vacuous — "behind the registry is a hard failure" becomes
+// structurally impossible to trip, so the check passes forever without ever
+// being able to fire.
 //
 // This script is the whole of "the pipeline writes it". `.github/workflows/
 // allocate-version.yml` runs it on every push to `main`; it writes version lines
@@ -146,7 +147,7 @@ export function lastVersionChange(root, manifest) {
  * today, only the coupled case: wire moved, so the CLI's, the adapter's and
  * checks' tarballs all carry different bytes and each needs a release, and
  * whoever changed wire may have had nothing to say about three other packages.
- * RELEASING.md has accepted version-only releases for exactly this since
+ * Version-only releases have been accepted for exactly this since
  * `cli/CHANGELOG.md` 0.21.7.
  *
  * WRITTEN, NOT REFUSED. Failing here would mean not publishing, which is the
@@ -325,8 +326,7 @@ function commitMessage(allocations, repins, head) {
     ...repins.map((r) => `- examples/${r.example} ${r.dep} ${r.from} → ${r.to} (published pin re-pin, F-1520)`),
     "",
     `Allocated from ${head.slice(0, 8)} by .github/workflows/allocate-version.yml.`,
-    "The version number is written here, after the merge, and never in a PR;",
-    "see RELEASING.md, \"Why the number is not yours to write\".",
+    "The version number is written here, after the merge, and never in a PR.",
     "",
   ].join("\n");
 }
