@@ -10,7 +10,7 @@ write a version number here or in `package.json` — see `RELEASING.md`. Release
 entries are insertions only: a correction is the next entry, naming the one it
 corrects.
 
-## Unreleased (minor)
+## 0.25.0 — 2026-08-21
 
 **`pome sandbox` is `pome session`** (F-1557). The `session` command now also
 answers to `sandbox`. `pome sandbox create`, `list` and `stop` — plus `stop`'s
