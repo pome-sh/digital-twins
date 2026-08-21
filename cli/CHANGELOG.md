@@ -10,7 +10,7 @@ write a version number here or in `package.json`. Released
 entries are insertions only: a correction is the next entry, naming the one it
 corrects.
 
-## Unreleased (patch)
+## 0.26.2 — 2026-08-21
 
 **The GitHub twin answers two calls it used to get wrong** (F-1614, F-791). Both
 were measured against real GitHub rather than reasoned about, and both had been

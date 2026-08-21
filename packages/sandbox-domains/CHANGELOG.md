@@ -1,6 +1,6 @@
 # @pome-sh/sandbox-domains
 
-## Unreleased (patch)
+## 0.2.4 — 2026-08-21
 
 **The GitHub twin answers two calls it used to get wrong** (F-1614, F-791). Both
 were measured against real GitHub rather than reasoned about, and both had been
