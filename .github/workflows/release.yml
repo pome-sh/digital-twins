@@ -15,30 +15,29 @@ name: release
 # published version. There is no lockstep to enforce and therefore no
 # sync-versions script.
 #
-# @pome-sh/checks is the npmjs lane's third matrix entry (F-1308). It exists
+# @pome-sh/checks is the npmjs lane's third matrix entry. It exists
 # because @pome-sh/sdk and the five @pome-sh/twin-* packages are `private: true`
 # and stay that way, which froze pome-cloud's grading vocabulary: it npm-installs
 # the check declarations and could no longer receive a correction. Publishing the
 # declaration layer on its own restores that path without reversing the
-# privatisation that fixed the two-zod-identities bug (F-942).
+# privatisation that keeps zod from resolving to two schema identities.
 #
-# @pome-sh/sandbox-domains (F-1526) is the matrix entry that finished that job, and
-# the reason it took a second package is worth stating once here. F-1308 gave the
-# DECLARATIONS a publish path and left the RUNTIME behind: pome-cloud boots the
-# twin domain layer in-process, and `checks-package-drift.test.ts` demands the
-# two declare an identical binding surface. When F-1338 widened the vocabulary,
-# the vocabulary leg could publish and the runtime leg had no lane at all — so
-# the gate went red with no legal move available, on purpose and by design.
-# Bundling the domain layer the same way (tsup `noExternal`, zod as a peer)
-# puts both legs on THIS lane, cut from the same commit by the same allocator
-# run, so a widening is now two pins moving in one pome-cloud PR. The twins and
-# the sdk stay `private: true`; nothing about F-942 or F-1308 is reversed.
+# @pome-sh/sandbox-domains is the matrix entry that takes it the rest of the
+# way, and the reason it takes a second package is worth stating once here.
+# @pome-sh/checks gives the DECLARATIONS a publish path; the RUNTIME needs its
+# own. pome-cloud boots the twin domain layer in-process, and
+# `checks-package-drift.test.ts` demands the two declare an identical binding
+# surface — so widening the vocabulary with only the declaration leg
+# publishable turns that gate red with no legal move available. Bundling the
+# domain layer the same way (tsup `noExternal`, zod as a peer) puts both legs on
+# THIS lane, cut from the same commit by the same allocator run, so a widening
+# is two pins moving in one pome-cloud PR. The twins and the sdk stay
+# `private: true`.
 #
-# @pome-sh/wire (F-949) publishes to BOTH registries now, independently, from
-# the SAME version line. It originally shipped to GitHub Packages only, for
-# cross-repo internal consumers like pome-cloud — not end users. pome-cloud's
-# migration off the deprecated @pome-sh/shared-types needs to npm-install wire
-# too, and a scope can only resolve from one registry per consumer: pome-cloud's
+# @pome-sh/wire publishes to BOTH registries, independently, from the SAME
+# version line. GitHub Packages serves cross-repo internal consumers like
+# pome-cloud; npmjs is needed as well because a scope can only resolve from one
+# registry per consumer, and pome-cloud's
 # other unavoidable @pome-sh/* deps (sdk, twin-*) exist only on public npmjs, so
 # routing @pome-sh/wire there for GitHub Packages would break those. Public npm
 # has no confidentiality downside for wire — it is trace-vocabulary Zod schemas
@@ -120,7 +119,7 @@ jobs:
           scripts/ci/decide-publish.sh "@pome-sh/adapter-claude-sdk" "packages/adapter-claude-sdk/package.json" "adapter"
           scripts/ci/decide-publish.sh "@pome-sh/checks" "packages/checks/package.json" "checks"
           # @pome-sh/sandbox-domains — the grading RUNTIME, the other leg of
-          # pome-cloud's drift gate (F-1526). Decided on the same lane and in
+          # pome-cloud's drift gate. Decided on the same lane and in
           # the same step as @pome-sh/checks on purpose: the two are compared
           # against each other in the consumer, so a release that moves one and
           # not the other is exactly the failure this entry exists to prevent.
@@ -181,7 +180,7 @@ jobs:
             enabled: ${{ needs.plan.outputs.cli }}
           - package: "@pome-sh/adapter-claude-sdk"
             enabled: ${{ needs.plan.outputs.adapter }}
-          # @pome-sh/checks — the grading vocabulary, for pome-cloud (F-1308).
+          # @pome-sh/checks — the grading vocabulary, for pome-cloud.
           # Same lane, same OIDC trusted publishing, its own version line. It is
           # the third npmjs package rather than a second GitHub Packages one
           # because a scope can only route to one registry: pome-cloud's whole
@@ -189,12 +188,12 @@ jobs:
           # need an .npmrc change it cannot make without breaking @pome-sh/cli.
           - package: "@pome-sh/checks"
             enabled: ${{ needs.plan.outputs.checks }}
-          # @pome-sh/sandbox-domains — the grading RUNTIME (F-1526), and the
-          # package that made the drift gate's red a fixable condition rather
-          # than a wall. @pome-sh/checks carries the check DECLARATIONS to
-          # pome-cloud; this carries the in-process domain layer those
-          # declarations read, so `checks-package-drift.test.ts` finally has two
-          # legs that can both move. Both are cut from the same `main` commit by
+          # @pome-sh/sandbox-domains — the grading RUNTIME, and what keeps the
+          # drift gate's red a fixable condition rather than a wall.
+          # @pome-sh/checks carries the check DECLARATIONS to pome-cloud; this
+          # carries the in-process domain layer those declarations read, so
+          # `checks-package-drift.test.ts` has two legs that can both move.
+          # Both are cut from the same `main` commit by
           # the same allocator run, which is what makes their binding surfaces
           # agree by construction.
           #
@@ -205,7 +204,7 @@ jobs:
           # leak). See the header of scripts/ci/check-sandbox-domains-tarball.mjs.
           - package: "@pome-sh/sandbox-domains"
             enabled: ${{ needs.plan.outputs.sandboxDomains }}
-          # @pome-sh/wire — the odd one out twice over (F-949). It is on this
+          # @pome-sh/wire — the odd one out twice over. It is on this
           # npmjs lane ADDITIONALLY to (not instead of) its separate GitHub
           # Packages jobs further down in this file: pome-cloud's migration off
           # @pome-sh/shared-types needs to npm-install wire, and the rest of its
@@ -269,7 +268,7 @@ jobs:
       # it inlines six `private: true` workspace packages, so a leaked
       # @pome-sh/* dependency is unresolvable rather than merely wrong. Also
       # asserts the twin engine did not ride along and that zod stayed external
-      # (two zod copies = two schema identities, F-942).
+      # (two zod copies = two schema identities).
       - name: Audit the @pome-sh/checks tarball
         if: matrix.enabled == 'true' && matrix.package == '@pome-sh/checks'
         run: npm run gate:checks-tarball
@@ -279,7 +278,7 @@ jobs:
       # driver to be present (a runtime bundle without one has openers that
       # cannot open), requires every bare specifier in the shipped bytes to be a
       # declared dependency and every declared dependency to be imported, and
-      # asserts F-1526's export spec against the packed modules.
+      # asserts the package's export spec against the packed modules.
       - name: Audit the @pome-sh/sandbox-domains tarball
         if: matrix.enabled == 'true' && matrix.package == '@pome-sh/sandbox-domains'
         run: npm run gate:sandbox-domains-tarball
@@ -325,7 +324,7 @@ jobs:
         env:
           NPM_CONFIG_PROVENANCE: "true"
 
-      # F-1520 — "published" has to mean "the registry SERVES it" before anything
+      # "published" has to mean "the registry SERVES it" before anything
       # downstream reads it, and one thing downstream reads it seconds later:
       # `dispatch-allocate-version` fires at the end of this run, and the re-pin
       # it triggers acts only on a version `npm view` already answers for. An
@@ -462,11 +461,11 @@ jobs:
           printf '//npm.pkg.github.com/:_authToken=%s\n' "${GITHUB_PACKAGES_TOKEN}" >> "$HOME/.npmrc"
           npm publish -w @pome-sh/wire --registry https://npm.pkg.github.com
 
-  # F-1520 — the moment a version lands on a registry is also the moment
+  # The moment a version lands on a registry is also the moment
   # scripts/check-example-pins-published.mjs can go red on `main`:
   # examples/support-triage pins @pome-sh/adapter-claude-sdk from the
   # registry, and allocate-version.yml is the only thing that re-pins it
-  # (planExampleRepins, wired into the allocator by #426). But the two
+  # (planExampleRepins, which the allocator imports). But the two
   # allocate-version.yml runs that bracket a publish both miss the window —
   # the run on the human merge commit plans BEFORE the version exists on the
   # registry, and the run on the bump commit it produces is deliberately

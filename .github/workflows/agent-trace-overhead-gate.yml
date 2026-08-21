@@ -1,9 +1,9 @@
 name: agent-trace-overhead-gate
 
-# FDRS-405 — runs the bundled triage scenario in capture-on/off A/B pairs,
+# Runs the bundled triage scenario in capture-on/off A/B pairs,
 # accumulates N per-call latency samples from each, and fails the build when
-# p99(with − without) exceeds the 5ms budget. F-728: N=1000 (p99 stability),
-# and when the first pair lands over budget the gate escalates to 3 pairs —
+# p99(with − without) exceeds the 5ms budget. N=1000 buys p99 stability, and
+# when the first pair lands over budget the gate escalates to 3 pairs —
 # median delta judged against budget + an A/A noise allowance measured from
 # the no-capture baselines — so shared-runner tail noise can't flip the
 # verdict while a real capture-path regression still fails every path.
@@ -12,12 +12,12 @@ name: agent-trace-overhead-gate
 # TwinHttpEvent (tool_call_id: null) in events.jsonl, and `pome inspect`
 # exits 0 with a "Trace health" section.
 #
-# F-722 adds a durable-recorder micro-benchmark (heap vs file-backed fsync)
-# with an explicit per-event p99 budget, and expands path filters to
+# A durable-recorder micro-benchmark (heap vs file-backed fsync) with an
+# explicit per-event p99 budget runs alongside it; the path filters cover
 # packages/sdk + twin-slack/stripe so recorder durability changes trip the gate.
 #
-# FDRS-413 adds a second job step that runs scenario 01 against the
-# CAS-adapter triage fixture and enforces PR/FAQ acceptance #2: ≥1
+# A second job step runs scenario 01 against the CAS-adapter triage fixture and
+# enforces PR/FAQ acceptance #2: ≥1
 # LlmCallEvent + ≥1 TwinHttpEvent with non-null tool_call_id + ≥1
 # ToolUseEvent + ≥1 HookEvent(PreToolUse), and `pome inspect` reports the
 # CAS adapter layer as present. The resulting trace is uploaded as a build
@@ -75,7 +75,7 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
       # Repo-root install populates every workspace package plus its devDeps
-      # (notably @anthropic-ai/claude-agent-sdk) so the FDRS-413 fixture can
+      # (notably @anthropic-ai/claude-agent-sdk) so the acceptance fixture can
       # resolve `withPome()` + the SDK's `tool()` at runtime, and so the pack
       # step below can build all publishable packages.
       - run: npm ci
@@ -89,24 +89,24 @@ jobs:
       - name: Run agent-trace overhead gate (PR/FAQ #1)
         env:
           # Wired by `cli/scripts/overhead-gate.ts` (`gate:agent-trace-overhead`
-          # in cli/package.json — F-1476 named it so check-packages-scripts-
+          # in cli/package.json — a named script so check-packages-scripts-
           # wired.mjs's cli/ audit can see it wired, same `npm run <name> -w
-          # <pkg>` shape as everywhere else in this file). Budget is FDRS-405's
-          # 5ms; N and the escalation pair count are F-728's recalibration for
-          # shared-runner noise. Overrideable for local triage runs.
+          # <pkg>` shape as everywhere else in this file). The budget is 5ms; N
+          # and the escalation pair count are calibrated for shared-runner noise.
+          # Overrideable for local triage runs.
           OVERHEAD_BENCH_N: '1000'
           OVERHEAD_BENCH_PAIRS: '3'
           OVERHEAD_BENCH_BUDGET_MS: '5'
         run: npm run gate:agent-trace-overhead -w @pome-sh/cli
-      - name: Run durable recorder overhead gate (F-722)
+      - name: Run durable recorder overhead gate
         env:
           RECORDER_OVERHEAD_N: '200'
           RECORDER_OVERHEAD_BUDGET_MS: '1'
         run: npm run gate:recorder-overhead -w @pome-sh/cli
       - name: Run CAS-adapter acceptance gate (PR/FAQ #2)
         env:
-          # F-1476 named this `gate:cas-adapter-acceptance` for the same reason
-          # as gate:agent-trace-overhead above.
+          # Named `gate:cas-adapter-acceptance` for the same reason as
+          # gate:agent-trace-overhead above.
           CAS_ACCEPTANCE_ARTIFACT_OUT: ${{ github.workspace }}/cas-adapter-trace
         run: npm run gate:cas-adapter-acceptance -w @pome-sh/cli
       - name: Upload CAS-adapter trace

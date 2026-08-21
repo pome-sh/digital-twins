@@ -1,32 +1,16 @@
 name: release alarm
 
-# F-1350 — a failed release must reach a human without a human going looking.
+# A failed release must reach a human without a human going looking.
 #
-# On 2026-08-06 four consecutive push-triggered `release.yml` runs failed over
-# eleven hours. Nothing fired: `release.yml` has no failure path, so a publish
-# that died reads exactly like a merge that owed no publish. Two of the four
-# were the merges of F-1308 and F-949's wire work — the packages the grading
-# vocabulary depends on — reporting themselves as merged while publishing
-# nothing. The first signal was a human noticing two packages missing from npm.
+# `release.yml` has no failure path of its own, so a publish that died reads
+# exactly like a merge that owed no publish, and the first signal is somebody
+# noticing a package missing from npm.
 #
-# ── Why this is a SEPARATE workflow file ─────────────────────────────────────
+# ── Why this is a SEPARATE workflow file ─────────────────────────────────
 #
-# `check-release-staleness.yml` said it before it was deleted alongside the
-# Changesets flow it watched (`a3c9441`, "replace two release systems with
-# one"):
-#
-#   "Deliberately a SEPARATE workflow file from cli-release.yml, with its own
-#    independent trigger. The alarm has to survive the thing it is watching: a
-#    cli-release.yml that is broken, disabled, or never triggered would take an
-#    embedded check down with it, and 'no release PR and no alarm' is precisely
-#    the silence this ticket is about."
-#
-# Deleting it with its subject was reasonable; not replacing it was the gap. The
-# reasoning transferred to the new release system and the file did not. An
-# `if: failure()` step inside `release.yml` still cannot see the silence that
-# bit the CLI release in F-1180 — a release workflow that never triggers at all
-# takes an embedded check down with it, and "never ran" is the silence this repo
-# has now been bitten by twice.
+# The alarm has to survive the thing it watches. An `if: failure()` step inside
+# `release.yml` cannot see the worse silence — a release workflow that never
+# triggers at all takes an embedded check down with it, and reports nothing.
 #
 # ── Why it lives in digital-twins and not in pome-cloud ──────────────────────
 #
@@ -39,10 +23,10 @@ name: release alarm
 #      exhausted, the org suspended — are ORG-scoped, and pome-cloud is the same
 #      org and the same billing account. Moving the alarm one repo sideways buys
 #      protection only against someone disabling Actions on this repo alone,
-#      while costing everything below. The cause that DID produce the eleven
-#      hours (an npm Trusted Publishing identity mismatch after a workflow
-#      rename) lives entirely inside `release.yml`'s publish step and cannot
-#      touch a separately-triggered sibling.
+#      while costing everything below. The failure class this watches for — an
+#      npm Trusted Publishing identity mismatch, a publish step that throws —
+#      lives entirely inside `release.yml` and cannot touch a
+#      separately-triggered sibling.
 #   2. The issue has to be filed where the fix happens. `issues: write` is
 #      per-repo: filing into digital-twins from pome-cloud needs a long-lived
 #      cross-repo PAT in pome-cloud's secrets — the exact credential
@@ -54,8 +38,7 @@ name: release alarm
 #      on GitHub Packages needs a token even to READ a version, and the ambient
 #      `packages: read` below covers it exactly as `release.yml`'s `plan-wire`
 #      job does. A pome-cloud alarm would need another PAT or would carry a
-#      blind spot on a fifth of what it watches — and blind spots are the
-#      subject of this ticket.
+#      blind spot on a fifth of what it watches, which is the whole point.
 #   4. This repo is public, so its Actions minutes are free; pome-cloud's are
 #      billed. Smallest of the four, but it points the same way.
 #
@@ -90,7 +73,7 @@ on:
       - ".github/workflows/release-alarm.yml"
       - ".github/workflows/release.yml"
       - "scripts/ci/decide-publish.sh"
-      # F-1511 — the alarm's UNALLOCATED leg reads these two: the CHANGELOG
+      # the alarm's UNALLOCATED leg reads these two: the CHANGELOG
       # grammar it parses a pending entry with, and the table that says which
       # CHANGELOG belongs to which published package. A change to either can
       # blind that leg without touching a file above.
@@ -118,7 +101,7 @@ jobs:
       actions: read
       issues: write # the tracking issue
       packages: read # @pome-sh/wire's GitHub Packages version, as plan-wire reads it
-    # F-1230 — whether this job's OWN mechanism ever reached a verdict, for
+    # whether this job's OWN mechanism ever reached a verdict, for
     # the meta-alarm job below. 'success' or 'failure' both mean the mechanism
     # worked and evaluated the release, whether or not it liked what it found.
     #
@@ -297,7 +280,7 @@ jobs:
           echo "::error::The release alarm fired — see the tracking issue and the step log above."
           exit 1
 
-  # F-1230 — who watches the watchman. `alarm`'s job conclusion is 'failure'
+  # who watches the watchman. `alarm`'s job conclusion is 'failure'
   # in two different situations that must not be reported the same way: the
   # deliberate last step above exiting 1 because it correctly found the
   # release broken (already communicated via the "twins release is not

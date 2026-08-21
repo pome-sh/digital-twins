@@ -1,9 +1,10 @@
 name: quickstart-smoke
 # The clean-machine quickstart (README): `npx @pome-sh/cli twin start github`
 # then the bundled triage agent must reach the twin with env-only auth.
-# F-604 broke the old quickstart via agent↔twin disk-path coupling; F-647
-# replaced disk probing with env auth — this gate keeps the npx-equivalent
-# flow from silently re-breaking. F-647.
+# Auth is env-only by design — the agent must not probe the twin's disk for a
+# secret, which couples the two to a shared filesystem and breaks the moment
+# they are not on one. This gate keeps the npx-equivalent flow from silently
+# re-breaking.
 on:
   pull_request:
     paths:
@@ -45,15 +46,14 @@ jobs:
   # checkout and run `twin start github` — the same in-process boot path the
   # published `npx @pome-sh/cli` front door uses.
   #
-  # F-1135 — the twins here are NOT the CLI's published @pome-sh/* deps: the
+  # the twins here are NOT the CLI's published @pome-sh/* deps: the
   # "Build the CLI from this checkout" step below runs
   # scripts/use-local-pome-tarballs.mjs, which overwrites those deps with
   # tarballs packed from packages/. So this job exercises the boot path against
   # WORKSPACE twins, and an npx user's declared pins are never installed by any
-  # lane in this repo. (An earlier version of this comment claimed the opposite,
-  # which is why readers believed the published pins had coverage — they had
-  # none until F-1132 shipped a CLI that refused every `pome checks add`.) What
-  # keeps workspace @pome-sh edges honest is scripts/check-workspace-pins-match-workspace.mjs
+  # lane in this repo — do not read this job as coverage of an npx user's
+  # published pins, because it is not. What keeps workspace @pome-sh edges
+  # honest is scripts/check-workspace-pins-match-workspace.mjs
   # in ci.yml (exact pins between private packages are banned; deps are `"*"`).
   #
   # The agent mints a JWT from the shared TWIN_AUTH_SECRET env, probes the twin's
@@ -79,7 +79,7 @@ jobs:
       # from the workspace node_modules, so the module import in the test
       # succeeds.
       - run: npm ci
-      # FDRS-658 — build the adapter's dist BEFORE the example installs. The
+      # build the adapter's dist BEFORE the example installs. The
       # adapter is dist-only (`files: [dist]`, `exports: ./dist/index.js`, no
       # `src`) and the example consumes it via a `file:` dep that npm packs on
       # install; without a built dist the packed package has nothing to import
