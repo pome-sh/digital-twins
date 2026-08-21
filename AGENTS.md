@@ -42,8 +42,8 @@ live at **https://docs.pome.sh**.
   F-860, F-892). Never introduce "scenario" in new code, docs, or CLI copy.
   F-892 completed the CLI rename end-to-end: the command (`pome tasks`), scaffold
   (`./tasks/`), and the internal runner/schema surface (`src/task/`, `runTask*`,
-  the `Task` type, `parseTask`, `taskSchema`). `pome scenarios` survives only as
-  a hidden deprecated alias. The ONLY remaining sanctioned survivors are the
+  the `Task` type, `parseTask`, `taskSchema`). No CLI command answers to
+  `scenarios`. The ONLY remaining sanctioned survivors are the
   serialized `scenario` / `scenario_*` keys that have a contract behind them —
   `meta.json`'s `scenario` slug (uploaded to cloud finalize; also read back by
   `pome eval` / `pome inspect` from run dirs older CLIs wrote) and the

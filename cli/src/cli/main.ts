@@ -341,55 +341,41 @@ export function createProgram() {
       await runDocsCommand(topic, { site: opts.site, urlOnly: Boolean(opts.url) });
     });
 
-  const registerTasksCommand = (name: string, hidden: boolean) => {
-    const cmd = program
-      .command(name, { hidden })
-      .argument(
-        "[twin]",
-        "Twin id (e.g. github). Omit to list available twins.",
-      )
-      .option(
-        "--copy",
-        "Copy the twin's runnable tasks into the local project.",
-        false,
-      )
-      .option(
-        "--force",
-        "With --copy, overwrite existing files in the destination.",
-        false,
-      )
-      .option(
-        "--dest <dir>",
-        "With --copy, write into this directory instead of ./tasks/.",
-      )
-      .description(
-        "Browse the bundled task library (or copy a twin's tasks into the local project)",
-      )
-      .action(
-        async (
-          twin: string | undefined,
-          opts: { copy: boolean; force: boolean; dest?: string },
-        ) => {
-          // F-892 — `pome scenarios` was renamed to `pome tasks`. The old name
-          // stays as a hidden, still-working alias with a one-line pointer so
-          // existing muscle memory / scripts don't break; help only shows
-          // `pome tasks`.
-          if (hidden) {
-            console.error(
-              "`pome scenarios` was renamed to `pome tasks` — running it for you. Update your scripts; the old name will be removed in a future release.",
-            );
-          }
-          await runTasksCommand(twin, {
-            copy: opts.copy,
-            force: opts.force,
-            dest: opts.dest,
-          });
-        },
-      );
-    return cmd;
-  };
-  registerTasksCommand("tasks", false);
-  registerTasksCommand("scenarios", true);
+  program
+    .command("tasks")
+    .argument(
+      "[twin]",
+      "Twin id (e.g. github). Omit to list available twins.",
+    )
+    .option(
+      "--copy",
+      "Copy the twin's runnable tasks into the local project.",
+      false,
+    )
+    .option(
+      "--force",
+      "With --copy, overwrite existing files in the destination.",
+      false,
+    )
+    .option(
+      "--dest <dir>",
+      "With --copy, write into this directory instead of ./tasks/.",
+    )
+    .description(
+      "Browse the bundled task library (or copy a twin's tasks into the local project)",
+    )
+    .action(
+      async (
+        twin: string | undefined,
+        opts: { copy: boolean; force: boolean; dest?: string },
+      ) => {
+        await runTasksCommand(twin, {
+          copy: opts.copy,
+          force: opts.force,
+          dest: opts.dest,
+        });
+      },
+    );
 
   // F-1074 — `pome checks` is a TOP-LEVEL group, not `pome tasks checks`:
   // `pome tasks` already takes `[twin]` positionally, so `tasks checks` would

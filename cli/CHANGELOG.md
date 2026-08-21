@@ -10,6 +10,24 @@ write a version number here or in `package.json` — see `RELEASING.md`. Release
 entries are insertions only: a correction is the next entry, naming the one it
 corrects.
 
+## Unreleased (minor)
+
+**`pome scenarios` is gone** (F-1578). The hidden alias that ran `pome tasks`
+under the retired spelling has been removed. `pome scenarios` now exits with
+`unknown command`.
+
+**Minor, not patch:** a script typing `scenarios` stops working. It was hidden
+from `--help` and printed a rename pointer on every run, so nothing was pointed
+at it on purpose.
+
+The alias existed to protect muscle memory from the `scenario` → `task` rename.
+There are no users to have any, and the cost was real: `pome tasks` was built by
+a two-argument factory whose second argument existed only to decide whether to
+print the deprecation line. One command spelling, one registration, no branch.
+
+Unchanged: the serialized `scenario` / `scenario_*` keys that have a server
+contract behind them. This was the command spelling only.
+
 ## 0.25.0 — 2026-08-21
 
 **`pome sandbox` is `pome session`** (F-1557). The `session` command now also

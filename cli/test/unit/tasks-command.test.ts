@@ -238,40 +238,14 @@ describe("pome tasks", () => {
     expect(existsSync(join(dir, "tasks"))).toBe(false);
   });
 
-  // F-892 — `pome scenarios` is a hidden deprecated alias: it still runs the
-  // command but prints a one-line pointer to `pome tasks`.
-  describe("deprecated `pome scenarios` alias", () => {
-    it("still lists twins and prints the rename pointer", async () => {
-      await inTempDir();
-      const captured = captureConsole();
+  it("`pome scenarios` is not a command", async () => {
+    await inTempDir();
+    const program = createProgram();
+    program.exitOverride();
+    program.configureOutput({ writeErr: () => {} });
 
-      await createProgram().parseAsync(["node", "pome", "scenarios"]);
-
-      const out = captured.log.concat(captured.error).join("\n");
-      expect(out.toLowerCase()).toContain("github");
-      const err = captured.error.join("\n");
-      expect(err).toContain("`pome scenarios` was renamed to `pome tasks`");
-    });
-
-    it("still copies into ./tasks/ (same behavior as `pome tasks`)", async () => {
-      const dir = await inTempDir();
-      captureConsole();
-
-      await createProgram().parseAsync([
-        "node",
-        "pome",
-        "scenarios",
-        "github",
-        "--copy",
-      ]);
-
-      expect(existsSync(join(dir, "tasks", "01-bug-happy-path.md"))).toBe(true);
-    });
-
-    it("is hidden from the help output", async () => {
-      const help = createProgram().helpInformation();
-      expect(help).toContain("tasks ");
-      expect(help).not.toContain("scenarios ");
-    });
+    await expect(
+      program.parseAsync(["node", "pome", "scenarios"]),
+    ).rejects.toThrow(/unknown command/i);
   });
 });
