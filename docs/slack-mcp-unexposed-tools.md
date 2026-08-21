@@ -1,12 +1,12 @@
 # The MCP tool Slack declares that twin-slack does not serve
 
-F-1330 replaced twin-slack's tool table with Slack's own — F-1329's live OAuth
-capture of `https://mcp.slack.com/mcp`, 19 tools. The twin serves 18 of them.
-This page is the ruling on the nineteenth.
+twin-slack's tool table is Slack's own — a live OAuth capture of
+`https://mcp.slack.com/mcp`, 19 tools. The twin serves 18 of them. This page is
+the ruling on the nineteenth.
 
 It is the mirror of [`github-mcp-twin-only-tools.md`](./github-mcp-twin-only-tools.md),
 which answers the opposite question for the opposite twin: that one is about 36
-tools the twin served and the vendor does not declare, reported by the MCP lane
+tools the twin serves and the vendor does not declare, reported by the MCP lane
 as `mcp-tool-twin-only`. This one is about the lane's other arm,
 `mcp-tool-upstream-only` — a name the vendor declares and the twin answers
 `unknown_tool` to.
@@ -17,8 +17,8 @@ the exam credits work the vendor would have refused. An upstream-only tool is a
 **false failure**: an examinee does the right thing and is marked down for it.
 False failures are the louder of the two — the examinee's author sees them —
 which is the only reason this direction is the smaller problem. It is still the
-product's core claim inverted, and it is exactly the defect F-1330 fixed for the
-eight fabricated names.
+product's core claim inverted — the same defect as a twin serving a name the
+vendor never had, pointed the other way.
 
 So the bar for leaving a vendor tool unexposed is not "we have not built it
 yet." It is a ruling under [`packages/sdk/ENDPOINT-TIERS.md`](../packages/sdk/ENDPOINT-TIERS.md)
@@ -32,8 +32,7 @@ that the tool is `cold`, plus a registered entry the lane can read.
 19 tools, which is the count Slack's own MCP documentation states.
 
 The other 18 all reach a domain implementation this twin already had, at or
-above the fidelity their heat asks for — with one correction to F-1330's gate-1
-ruling, recorded below.
+above the fidelity their heat asks for — with one exception, recorded below.
 
 ## `slack_send_message_draft` — `cold`, not served
 
@@ -42,8 +41,7 @@ ruling, recorded below.
 
 `cold` under the rubric's `client-UI concepts` criterion, and this is not a new
 judgement made to justify an absence. `packages/twin-slack/fidelity.inventory.json`
-has said so since the F-729 ruling, before anyone had read Slack's `tools/list`
-at all:
+says so independently of Slack's `tools/list`:
 
 > Message drafts have no Web API analog to name a row for (PS, client-UI
 > concept) — recorded here, not as a surface.
@@ -68,16 +66,15 @@ is loud.
 
 **Registration.** The entry belongs in pome-cloud's
 `known-divergences/slack.mcp.yaml`, with this page as its reason — the same
-arrangement F-1376 used for github's two. The registry is deliberately not in
+arrangement github's two use. The registry is deliberately not in
 this repo: turning a lane finding green is a decision about what an exam
 measures, and it should not be possible to make it in the same commit that
 causes the finding.
 
-## The seven newly exposed, and one correction
+## The seven exposed with no prior counterpart, and one exception
 
-F-1330's gate-1 `[DECISION]` ruled heat for the eight tools that had no twin
-counterpart, and stated that all seven of the exposed ones were pure wiring over
-a domain implementation that already existed. Six of the seven check out:
+Six of the seven are pure wiring over a domain implementation that already
+existed:
 
 | tool | heat | backing domain | wiring only? |
 | --- | --- | --- | --- |
@@ -95,7 +92,7 @@ table counted include the two `coerce*` helpers. Real Slack reads a canvas over
 `files.info` — a canvas is a file of type `quip` — but this twin stores canvases
 in their own table, so `files.info` does not reach them either.
 
-F-1330 added `canvasesRead` at the shape tier the warm ruling asks for. It
+`canvasesRead` was added at the shape tier the warm ruling asks for. It
 reports a `section_id_mapping` of exactly one entry covering the whole document,
 because the twin has no section model and per-heading ids that
 `slack_update_canvas` could not honour would be worse than one id that it can.
