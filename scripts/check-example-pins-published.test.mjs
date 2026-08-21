@@ -29,7 +29,7 @@ function pass(name) {
 }
 
 /** A throwaway root with one workspace package and one example, mirroring the
- * real tree's `packages/adapter-claude-sdk` + `examples/support-triage`
+ * real tree's `packages/adapter-claude-sdk` + `agent-examples/support-triage`
  * shape. */
 function fixture({ workspaceVersion, examplePin, exampleField = "dependencies", extraExamples = {} }) {
   const root = mkdtempSync(join(tmpdir(), "example-pins-"));
@@ -39,17 +39,17 @@ function fixture({ workspaceVersion, examplePin, exampleField = "dependencies", 
     join(root, "packages", "adapter-claude-sdk", "package.json"),
     JSON.stringify({ name: "@pome-sh/adapter-claude-sdk", version: workspaceVersion }),
   );
-  mkdirSync(join(root, "examples", "support-triage"), { recursive: true });
+  mkdirSync(join(root, "agent-examples", "support-triage"), { recursive: true });
   writeFileSync(
-    join(root, "examples", "support-triage", "package.json"),
+    join(root, "agent-examples", "support-triage", "package.json"),
     JSON.stringify({
       name: "support-triage-example",
       [exampleField]: { "@pome-sh/adapter-claude-sdk": examplePin },
     }),
   );
   for (const [name, manifest] of Object.entries(extraExamples)) {
-    mkdirSync(join(root, "examples", name), { recursive: true });
-    writeFileSync(join(root, "examples", name, "package.json"), JSON.stringify(manifest));
+    mkdirSync(join(root, "agent-examples", name), { recursive: true });
+    writeFileSync(join(root, "agent-examples", name, "package.json"), JSON.stringify(manifest));
   }
   return root;
 }
@@ -118,7 +118,7 @@ for (const pin of ["*", "^0.3.3", "~0.3.1", "0.3.x", ">=0.3.0", "latest", "npm:@
   else fail("3b. an unwatchable pin reds even when another exact pin matches cleanly", `returned ${ok}`);
 }
 
-// 4. Zero EXACT pins under `examples/*` must throw rather than report a pass
+// 4. Zero EXACT pins under `agent-examples/*` must throw rather than report a pass
 // having made no registry call. Asserted on the MESSAGE, not merely "something
 // threw": with an empty `packages/` the fixture used to throw
 // `no workspace manifests found` out of `loadWorkspaceMembers` before the floor
@@ -148,7 +148,7 @@ for (const pin of ["*", "^0.3.3", "~0.3.1", "0.3.x", ">=0.3.0", "latest", "npm:@
 {
   const root = fixture({ workspaceVersion: "0.3.3", examplePin: "0.3.3" });
   writeFileSync(
-    join(root, "examples", "support-triage", "package.json"),
+    join(root, "agent-examples", "support-triage", "package.json"),
     JSON.stringify({ dependencies: { "@pome-sh/nonexistent-sibling": "1.0.0" } }),
   );
   const { exact, linked, unwatchable } = discoverExampleSiblingDeps(root);
@@ -339,17 +339,17 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
   {
     const root = fixture({ workspaceVersion: "0.3.6", examplePin: "0.3.5" });
     const repins = planExampleRepins(root, published("@pome-sh/adapter-claude-sdk", "0.3.6"));
-    const manifestAfter = JSON.parse(readFileSync(join(root, "examples/support-triage/package.json"), "utf8"));
+    const manifestAfter = JSON.parse(readFileSync(join(root, "agent-examples/support-triage/package.json"), "utf8"));
     if (
       repins.length === 1 &&
       repins[0].example === "support-triage" &&
       repins[0].from === "0.3.5" &&
       repins[0].to === "0.3.6" &&
       manifestAfter.dependencies["@pome-sh/adapter-claude-sdk"] === "0.3.5" && // on disk: repins only PLANS writes
-      repins[0].writes[0].path === "examples/support-triage/package.json" &&
+      repins[0].writes[0].path === "agent-examples/support-triage/package.json" &&
       JSON.parse(repins[0].writes[0].contents).dependencies["@pome-sh/adapter-claude-sdk"] === "0.3.6" &&
       repins[0].regenerate.length === 1 &&
-      repins[0].regenerate[0].includes('cd "examples/support-triage"') && // quoted: this string is bash'ed in CI
+      repins[0].regenerate[0].includes('cd "agent-examples/support-triage"') && // quoted: this string is bash'ed in CI
 
       repins[0].regenerate[0].includes("npm install --package-lock-only")
     ) {
@@ -417,9 +417,9 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
       mkdirSync(join(root, "packages", dir), { recursive: true });
       writeFileSync(join(root, "packages", dir, "package.json"), JSON.stringify({ name, version }));
     }
-    mkdirSync(join(root, "examples", "support-triage"), { recursive: true });
+    mkdirSync(join(root, "agent-examples", "support-triage"), { recursive: true });
     writeFileSync(
-      join(root, "examples", "support-triage", "package.json"),
+      join(root, "agent-examples", "support-triage", "package.json"),
       JSON.stringify({
         name: "support-triage-example",
         dependencies: { "@pome-sh/adapter-claude-sdk": "0.3.5", "@pome-sh/checks": "1.1.0" },
@@ -427,7 +427,7 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
     );
     const repins = planExampleRepins(root, () => ({ status: "published" }));
     // Whichever entry lands last for that path is what ends up on disk.
-    const lastForPath = repins.filter((r) => r.writes[0].path === "examples/support-triage/package.json").at(-1);
+    const lastForPath = repins.filter((r) => r.writes[0].path === "agent-examples/support-triage/package.json").at(-1);
     const onDisk = JSON.parse(lastForPath?.writes[0].contents ?? "{}");
     if (
       repins.length === 2 &&
@@ -454,9 +454,9 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
       join(root, "packages", "adapter-claude-sdk", "package.json"),
       JSON.stringify({ name: "@pome-sh/adapter-claude-sdk", version: "0.3.6" }),
     );
-    mkdirSync(join(root, "examples", "support-triage"), { recursive: true });
+    mkdirSync(join(root, "agent-examples", "support-triage"), { recursive: true });
     writeFileSync(
-      join(root, "examples", "support-triage", "package.json"),
+      join(root, "agent-examples", "support-triage", "package.json"),
       JSON.stringify({
         name: "support-triage-example",
         dependencies: { "@pome-sh/adapter-claude-sdk": "0.3.5" },
@@ -522,7 +522,7 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
   }
 }
 
-// 10. Aimed at the REAL tree, not only fixtures: `examples/*` must still carry
+// 10. Aimed at the REAL tree, not only fixtures: `agent-examples/*` must still carry
 // at least one exact `@pome-sh/*` pin with a workspace sibling, and nothing
 // unwatchable. No fixture can prove the gate points at the live corpus.
 {

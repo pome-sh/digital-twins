@@ -303,8 +303,8 @@ describe("github.pr-comment-exists", () => {
   const args = { pr: "1", repo: REPO };
 
   it("renders and binds the sentence the corpus already carries", () => {
-    // Byte-identical to the six criteria in `examples/pr-summary-agent` and
-    // `examples/pr-summary-review`. If this string ever changes, those six stop
+    // Byte-identical to the six criteria in `agent-examples/pr-summary-agent` and
+    // `agent-examples/pr-summary-review`. If this string ever changes, those six stop
     // binding and pome-cloud's exhaustive arm goes red — which is the intended
     // alarm, not a nuisance.
     const sentence = "Pull request #1 in `acme/api` has at least one comment";

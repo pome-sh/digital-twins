@@ -1,7 +1,7 @@
 /**
  * OTLP trace wiring for observed LangGraph trials.
  *
- * Same pome contract as `examples/minimal-viktor/src/telemetry.ts`: `pome run`
+ * Same pome contract as `agent-examples/minimal-viktor/src/telemetry.ts`: `pome run`
  * (hosted) injects POME_OTEL_EXPORTER_OTLP_ENDPOINT — a FULL traces URL
  * (`<base>/v1/sessions/<id>/traces`) — plus POME_OTEL_EXPORTER_OTLP_HEADERS as
  * "k=v,k=v" (the team x-api-key). When present we stand up an OTLP/JSON exporter

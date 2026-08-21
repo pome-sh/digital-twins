@@ -38,7 +38,7 @@
 //
 // [DECISION] F-1295 — central AND per-example, and the central half is NOT here.
 // Per-example options are what this gate enforces, and they are load-bearing on
-// their own: `examples/support-triage` is `npx degit`-fetchable as a standalone
+// their own: `agent-examples/support-triage` is `npx degit`-fetchable as a standalone
 // subtree, so the options a reader copies out must carry the isolation with
 // them. The central half belongs in `@pome-sh/adapter-claude-sdk`'s `query()`
 // — the one in-process chokepoint EVERY bundled example already routes through,
@@ -103,7 +103,7 @@ const SCRIPT_KINDS = new Map([
 export const MIN_QUERY_CALL_SITES = 4;
 
 /**
- * Every `examples/*` directory whose package.json declares the Claude Agent SDK
+ * Every `agent-examples/*` directory whose package.json declares the Claude Agent SDK
  * — DISCOVERED by reading the manifests, never a hand-kept list. A hand-kept
  * list stops covering its subject the day an example is added and nothing
  * notices, which is the enumeration failure this whole ticket family is about.
@@ -112,7 +112,7 @@ export const MIN_QUERY_CALL_SITES = 4;
  * files the SDK under says nothing about whether it launches an agent.
  */
 export function discoverSdkExamples(repoRoot = REPO_ROOT) {
-  const examplesDir = join(repoRoot, "examples");
+  const examplesDir = join(repoRoot, "agent-examples");
   let entries;
   try {
     entries = readdirSync(examplesDir, { withFileTypes: true });
@@ -222,7 +222,7 @@ function collectQueryBindings(sourceFile) {
  * Single-assignment `const X = <expr>` initializers, plus same-file functions'
  * single `return <expr>` expressions, both keyed by name.
  *
- * Load-bearing rather than a nicety. `examples/support-triage` composes its
+ * Load-bearing rather than a nicety. `agent-examples/support-triage` composes its
  * exam surface in `examineeOptions(mcpServers)` and passes the CALL to
  * `query()` — deliberately, so its own test can assert the policy constants are
  * wired in. A resolver that only understood an inline object literal would find
@@ -460,7 +460,7 @@ if (invokedDirectly) {
 
   if (examples.length === 0) {
     console.error(
-      `No examples/* package declares ${SDK_PACKAGE}, so this gate scanned nothing — refusing to report a pass. ` +
+      `No agent-examples/* package declares ${SDK_PACKAGE}, so this gate scanned nothing — refusing to report a pass. ` +
         "If the examples moved, move this gate's discovery with them.",
     );
     process.exit(1);

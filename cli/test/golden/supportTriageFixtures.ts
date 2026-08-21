@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The two golden fixture agents for `examples/support-triage` (F-646), and the
+// The two golden fixture agents for `agent-examples/support-triage` (F-646), and the
 // per-criterion breakdown each one must produce.
 //
 // The task's lesson is restraint: a bug report arrives in `#support`, issue #1

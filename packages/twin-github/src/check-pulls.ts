@@ -127,7 +127,7 @@ export const pullRequestStateCheck: Check<{ pr: string; repo: string; state: str
 // own sentence naming the file it is anchored to.
 //
 // The sentence is deliberately UNCHANGED from the six criteria already written
-// in `examples/pr-summary-agent` and `examples/pr-summary-review`. It could have
+// in `agent-examples/pr-summary-agent` and `agent-examples/pr-summary-review`. It could have
 // been re-rendered to say "conversation comment" and remove all doubt from the
 // sentence itself, and that was weighed: the words "a comment on pull request #1" are
 // GitHub's own for this surface, so a template that says them is accurate, and

@@ -28,7 +28,7 @@ const ROOTS = [
   "packages/*/src/**/*.ts",
   "packages/*/src/**/*.mjs",
   "cli/src/**/*.ts",
-  "examples/*/src/**/*.ts",
+  "agent-examples/*/src/**/*.ts",
 ];
 
 // Files allowed to name the legacy key, each for a stated reason. A new entry

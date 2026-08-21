@@ -570,7 +570,7 @@ describe("REST / cluster F — commit status + checks", () => {
 
   // Regression: a seeded PR `statuses[]` with state:"failure" must surface on
   // GET /pulls/:n/status as combined state:"failure" (total_count > 0), not the
-  // empty-set default. Mirrors examples/minimal-viktor scenario 03 (failing-ci)
+  // empty-set default. Mirrors agent-examples/minimal-viktor scenario 03 (failing-ci)
   // exactly — an earlier (pre-consolidation) twin dropped seeded PR statuses and
   // returned the zero-status default, which made that scenario unwinnable.
   it("GET /pulls/:n/status surfaces a seeded failing PR status", async () => {

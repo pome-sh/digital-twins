@@ -43,7 +43,7 @@ candidate is one bad end-state the agent could reach and the good one it should.
 Ground every candidate in something you actually read — a missing check in the
 prompt, a tool it holds, a surface it trusts — never a generic template.
 
-Reuse the bundled example tasks as skeletons: `examples/*/tasks/*.md` (prefer
+Reuse the bundled example tasks as skeletons: `agent-examples/*/tasks/*.md` (prefer
 same-twin ones) are the library-first adaptation source for a cold-start team
 with an empty catalog. When the MCP is connected, `list_tasks` shows the team
 catalog too — adapt the nearest existing task before writing a fresh shape.

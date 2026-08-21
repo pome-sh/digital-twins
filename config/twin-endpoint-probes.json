@@ -218,7 +218,7 @@
         }
       },
       {
-        "note": "F-1151 regression fixture. `comment_on_pull_request` in examples/pr-summary-agent and examples/pr-summary-review wrapped add_issue_comment at a PULL REQUEST's number, and the twin answered `404 Issue not found` for every one of those calls, on every subject, for as long as the examples existed. The issue-number probe above cannot see that class: it comments on issue #1, which always worked. This is the same tool at a pull request's number.",
+        "note": "F-1151 regression fixture. `comment_on_pull_request` in agent-examples/pr-summary-agent and agent-examples/pr-summary-review wrapped add_issue_comment at a PULL REQUEST's number, and the twin answered `404 Issue not found` for every one of those calls, on every subject, for as long as the examples existed. The issue-number probe above cannot see that class: it comments on issue #1, which always worked. This is the same tool at a pull request's number.",
         "tool": "add_issue_comment",
         "args": {
           "owner": "acme",

@@ -7,7 +7,7 @@
 // F-1125 stamps the twin ACTION on the tape even for a failed call, so the
 // end-to-end test can assert the action name reaches the report. And `twin()`
 // SWALLOWS a non-2xx and returns it as a value instead of throwing — copying
-// `examples/merge-agent`'s `gh()` — so the fixture also exercises the path
+// `agent-examples/merge-agent`'s `gh()` — so the fixture also exercises the path
 // where the handler's return value proves nothing and only the wire counts.
 export function buildTools(config) {
   const twin = async (tool, args) => {

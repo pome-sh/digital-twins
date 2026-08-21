@@ -37,8 +37,8 @@
 // that restructure deleted. This scan now covers it too, so that regression is
 // caught here rather than rediscovered the hard way again.
 //
-// NOT in scope: `examples/*`. Those are standalone npm packages with their own
-// lockfiles that install from the REGISTRY on purpose (`examples/support-triage`
+// NOT in scope: `agent-examples/*`. Those are standalone npm packages with their own
+// lockfiles that install from the REGISTRY on purpose (`agent-examples/support-triage`
 // is `npx degit`-fetchable as a standalone subtree, so it cannot use a `file:`
 // link out of its own directory), so "must resolve to the workspace" is the
 // wrong rule for them and applying it here would red a deliberate pin.
@@ -70,7 +70,7 @@ const SCOPE = "@pome-sh/";
 // throws rather than reporting a pass over nothing.
 // Shared with `scripts/check-example-pins-published.mjs` (F-1483): that gate
 // needs the same sibling-name → workspace-version map to know which
-// `examples/*` pins have a sibling to compare against, and duplicating this
+// `agent-examples/*` pins have a sibling to compare against, and duplicating this
 // walk would let the two derivations disagree about what a "sibling" is.
 export function loadWorkspaceMembers(repoRoot) {
   const root = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8"));

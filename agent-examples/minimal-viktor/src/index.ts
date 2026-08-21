@@ -62,7 +62,7 @@ function buildSystem(slackChannel: string) {
  *
  * Exported and config-taking (rather than closing over module-level env) so a
  * gate can exercise every tool against a live twin without a model — F-1152. The
- * config field names match `examples/minimal-viktor-langgraph`'s `TwinConfig` so
+ * config field names match `agent-examples/minimal-viktor-langgraph`'s `TwinConfig` so
  * the two viktor examples read the same.
  *
  * `twinFetch()` hands a non-2xx BACK to the model instead of throwing, so it can

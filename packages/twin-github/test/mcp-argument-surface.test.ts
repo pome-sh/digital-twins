@@ -41,7 +41,7 @@
 //     The other four went in F-1468's tightening, once the heat read found them
 //     free: `query` on the five search tools and `branch` on the two file
 //     writers had zero callers anywhere, and `list_issues.state` had exactly one
-//     (examples/triage-agent), migrated in the same change.
+//     (agent-examples/triage-agent), migrated in the same change.
 //   ALIAS — the twin validates a snake_case spelling GitHub does not declare
 //     (`per_page`, `pull_number`, `q`, `expected_head_sha`) ALONGSIDE the
 //     camelCase one. Breaks nobody today and is invisible to an examinee
