@@ -21,8 +21,8 @@
 // Usage: node scripts/ci/list-scheduled-workflows.mjs [--json]
 // Exits 1 (naming the reason) if the workflows directory is missing or if
 // literally nothing has a schedule trigger — a walk that finds zero scheduled
-// workflows when `repo-policy.yml` and `secret-scan.yml` have carried a weekly
-// cron for a long time, and `release-alarm.yml` a daily one, is a parser that
+// workflows when `repo-policy.yml` has carried a weekly cron for a long time,
+// and `release-alarm.yml` a daily one, is a parser that
 // has silently stopped matching, not a true fact about the tree; an alarm
 // covering zero workflows passes forever.
 

@@ -32,7 +32,6 @@ on:
       - ".github/workflows/repo-policy.yml"
       - ".github/workflows/dependency-review.yml"
       - ".github/workflows/ci.yml"
-      - ".github/workflows/secret-scan.yml"
 
 permissions:
   contents: read
@@ -60,8 +59,7 @@ jobs:
   # `!= 'pull_request'`. F-1212 dropped the PAT and now runs the live check on
   # every event, but stating the positive set here still means a future event
   # (e.g. `push:`) cannot silently start filing (or, worse, CLOSING) this
-  # alarm before someone decides it should — see secret-scan.yml, where that
-  # shape is real.
+  # alarm before someone decides it should.
   schedule-alarm:
     needs: assert
     if: failure() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')

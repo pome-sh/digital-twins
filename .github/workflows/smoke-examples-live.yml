@@ -150,7 +150,7 @@ jobs:
   # file, with a recovery sibling and a title/label pair unique across the
   # tree. Gated on schedule/workflow_dispatch specifically (this workflow has
   # no pull_request trigger at all, but stating the positive set matches the
-  # pattern repo-policy.yml/secret-scan.yml already established).
+  # pattern repo-policy.yml already established).
   schedule-alarm:
     needs: smoke-live
     if: failure() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')

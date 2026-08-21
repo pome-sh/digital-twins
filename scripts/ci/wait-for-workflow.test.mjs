@@ -3,7 +3,7 @@
  * Regression coverage for scripts/ci/wait-for-workflow.sh (F-696).
  * Mocks curl on PATH and asserts success / failure / newest-run selection /
  * in-progress polling / timeout / cancelled. Also asserts twin-image.yml waits
- * on both ci.yml and secret-scan.yml.
+ * on ci.yml, and on nothing that cannot report for a push or tag event.
  */
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, chmodSync, rmSync, readFileSync } from "node:fs";
@@ -126,9 +126,15 @@ function main() {
   {
     const y = readFileSync(join(ROOT, ".github/workflows/twin-image.yml"), "utf8");
     assert(/wait-for-workflow\.sh ci\.yml/.test(y), "twin-image must wait for ci.yml");
+    // F-1606 — secret-scan.yml is `pull_request`-only, so it produces no run
+    // for the push-to-main and tag SHAs that actually publish. A wait on it
+    // would poll a run that never appears and fail every publish at the
+    // 30-minute timeout. The old wait passed only because that workflow also
+    // triggered on push. Asserted as an absence so the wait cannot be restored
+    // without also restoring a trigger that makes it satisfiable.
     assert(
-      /wait-for-workflow\.sh secret-scan\.yml/.test(y),
-      "twin-image must wait for secret-scan.yml",
+      !/wait-for-workflow\.sh secret-scan\.yml/.test(y),
+      "twin-image must not wait for secret-scan.yml (pull_request-only: no run exists for a push or tag SHA)",
     );
     assert(
       /needs:\s*wait-gates/.test(y) ||

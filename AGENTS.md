@@ -138,11 +138,13 @@ The ones that catch people: `gate:no-eval` (product boundary),
 `lint:no-cloud-imports`, `lint:dead-code`, `gate:route-inputs`,
 `gate:mcp-tools-list`, `test:pack`, and the tarball audits.
 
-Secrets: `.github/workflows/secret-scan.yml` runs gitleaks and TruffleHog.
-Install the local hook with `bash scripts/hooks/install.sh`.
+Secrets: `.github/workflows/secret-scan.yml` runs TruffleHog over the PR diff,
+verified findings only — one scanner, on `pull_request`, and nothing else
+(F-1606). `main` is PR-only with that check required, so every commit that
+lands is scanned. There is no local secret hook; `bash scripts/hooks/install.sh`
+wires the boundary and copy-marker gates.
 
-Twin images publish only after `ci` and `secret-scan` both pass on the same
-SHA, then Trivy. GHCR digests are cosign-signed and carry an SPDX SBOM.
+Twin images publish only after `ci` passes on the same SHA, then Trivy. GHCR digests are cosign-signed and carry an SPDX SBOM.
 
 "Zero embedded cloud config" means no credentials and no non-overridable env
 wiring. An overridable public API base (`https://api.pome.sh`, via `--api-url`

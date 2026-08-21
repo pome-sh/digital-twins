@@ -50,8 +50,7 @@ jobs:
       # actionlint also runs shellcheck over every embedded `run:` block when
       # shellcheck is on PATH (pre-installed on ubuntu-latest), so a broken
       # inline script is caught the same way. Binary fetched and checksummed
-      # rather than installed from a registry, same pattern as secret-scan.yml's
-      # gitleaks install.
+      # rather than installed from a registry.
       - name: Install actionlint
         env:
           ACTIONLINT_VERSION: 1.7.12
@@ -70,9 +69,10 @@ jobs:
           #
           # F-1489 moved the loop, the backoff and the sha256 check into
           # scripts/ci/fetch-pinned-release.sh, which is now the ONE hardened
-          # fetch path for the whole workflow tree — this step and
-          # secret-scan.yml's gitleaks install were two hand-copied variants of
-          # it, and the syft install that started F-1489 had no copy at all.
+          # fetch path for the whole workflow tree — this step and (until
+          # F-1606 deleted it) secret-scan.yml's gitleaks install were two
+          # hand-copied variants of it, and the syft install that started
+          # F-1489 had no copy at all.
           # scripts/ci/assert-hardened-cdn-fetches.mjs (below, in the always-on
           # block) reds on a third variant. The helper's header records why the
           # retry is a literal loop rather than curl's --retry flags.

@@ -23,7 +23,6 @@ on:
       - 'scripts/ci/wait-for-workflow.test.mjs'
       - 'scripts/ci/sign-image-digests.sh'
       - '.github/workflows/ci.yml'
-      - '.github/workflows/secret-scan.yml'
       - '.github/workflows/twin-image.yml'
   workflow_dispatch:
 
@@ -92,9 +91,16 @@ jobs:
           echo "twins=[${joined%,}]" >> "$GITHUB_OUTPUT"
           echo "PR twin matrix: [${joined%,}]"
 
-  # Package typecheck/test live in `ci`; secret scanning is a parallel required
-  # gate. Wait for both on this SHA before building/scanning/pushing so a red
-  # twin cannot still ship a rolling tag to GHCR (FDRS-586 / F-696).
+  # Package typecheck/test live in `ci`. Wait for it on this SHA before
+  # building/scanning/pushing so a red twin cannot still ship a rolling tag to
+  # GHCR (FDRS-586 / F-696).
+  #
+  # secret-scan is deliberately NOT waited on any more (F-1606). It is now a
+  # `pull_request`-only workflow, so on the push-to-main and tag events that
+  # actually publish there is no run for this SHA to wait for — the wait passed
+  # only because the old workflow also ran on push. The content was scanned on
+  # the PR that merged it, and `main` cannot be reached except through a PR with
+  # that check required (scripts/ci/assert-repo-policy.sh).
   wait-gates:
     runs-on: ubuntu-latest
     permissions:
@@ -102,7 +108,7 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Wait for ci + secret-scan workflows on this SHA
+      - name: Wait for the ci workflow on this SHA
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # PRs use the merge commit as github.sha; workflow runs are keyed by the
@@ -113,7 +119,6 @@ jobs:
           set -euo pipefail
           sha="${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
           bash scripts/ci/wait-for-workflow.sh ci.yml "$sha"
-          bash scripts/ci/wait-for-workflow.sh secret-scan.yml "$sha"
 
   publish:
     name: ${{ matrix.twin }}

@@ -3,7 +3,7 @@
 #
 # Shared filing logic for `.github/workflows/schedule-alarm.yml`, the reusable
 # workflow every schedule-triggered workflow in this repo calls with a
-# `failure()`-guarded job (see repo-policy.yml, secret-scan.yml, and the
+# `failure()`-guarded job (see repo-policy.yml and the
 # meta-alarm job in release-alarm.yml). Copies check-release-staleness.yml's
 # retired pattern (#300, deleted in a3c9441 alongside the Changesets flow it
 # watched): a constant title, ONE long-lived tracking issue reused across
