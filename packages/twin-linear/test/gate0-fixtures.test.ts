@@ -1,12 +1,11 @@
-import assert from "node:assert/strict";
+import { expect, test } from "vitest";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { test } from "node:test";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-function readJson(rel) {
+function readJson(rel: string) {
   return JSON.parse(readFileSync(join(root, rel), "utf8"));
 }
 
@@ -45,14 +44,14 @@ const LINEAR_LAUNCH_TOOLS = [
 
 test("MCP canonical launch tool set matches Gate-1 freeze", () => {
   const canonical = readJson("fixtures/mcp-tools-list.canonical.json");
-  assert.equal(canonical.meta.liveToolCount, LINEAR_LAUNCH_TOOLS.length);
-  assert.equal(LINEAR_LAUNCH_TOOLS.length, 22);
-  const names = canonical.result.tools.map((t) => t.name);
-  assert.deepEqual([...canonical.meta.liveToolOrder].sort(), LINEAR_LAUNCH_TOOLS);
-  assert.deepEqual([...names].sort(), LINEAR_LAUNCH_TOOLS);
+  expect(canonical.meta.liveToolCount).toBe(LINEAR_LAUNCH_TOOLS.length);
+  expect(LINEAR_LAUNCH_TOOLS.length).toBe(22);
+  const names = canonical.result.tools.map((t: any) => t.name);
+  expect([...canonical.meta.liveToolOrder].sort()).toEqual(LINEAR_LAUNCH_TOOLS);
+  expect([...names].sort()).toEqual(LINEAR_LAUNCH_TOOLS);
   for (const tool of canonical.result.tools) {
-    assert.ok(tool.inputSchema, tool.name);
-    assert.ok(tool.description, tool.name);
+    expect(tool.inputSchema, tool.name).toBeTruthy();
+    expect(tool.description, tool.name).toBeTruthy();
   }
 });
 
@@ -62,23 +61,20 @@ test("MCP canonical tool ORDER is the upstream capture's, not re-sorted", () => 
   // producer that re-ordered — an edit, not a subtraction — pass unnoticed.
   const canonical = readJson("fixtures/mcp-tools-list.canonical.json");
   const upstream = readJson("../../fixtures/mcp-tools-list/linear.raw.json");
-  const upstreamNames = upstream.result.tools.map((t) => t.name);
-  const served = canonical.result.tools.map((t) => t.name);
+  const upstreamNames = upstream.result.tools.map((t: any) => t.name);
+  const served = canonical.result.tools.map((t: any) => t.name);
 
-  assert.equal(upstreamNames.length, 58);
-  assert.deepEqual(
-    served,
-    upstreamNames.filter((name) => served.includes(name)),
-  );
-  assert.deepEqual(canonical.meta.liveToolOrder, served);
+  expect(upstreamNames.length).toBe(58);
+  expect(served).toEqual(upstreamNames.filter((name: string) => served.includes(name)));
+  expect(canonical.meta.liveToolOrder).toEqual(served);
 });
 
 test("graphql-surface freezes launch queries and mutations", () => {
   const surface = readJson("fixtures/graphql-surface.json");
-  assert.ok(surface.queries.includes("viewer"));
-  assert.ok(surface.queries.includes("issues"));
-  assert.ok(surface.mutations.includes("issueCreate"));
-  assert.ok(surface.mutations.includes("issueAddLabel"));
-  assert.ok(surface.mutations.includes("webhookCreate"));
-  assert.ok(surface.mutations.includes("commentDelete"));
+  expect(surface.queries).toContain("viewer");
+  expect(surface.queries).toContain("issues");
+  expect(surface.mutations).toContain("issueCreate");
+  expect(surface.mutations).toContain("issueAddLabel");
+  expect(surface.mutations).toContain("webhookCreate");
+  expect(surface.mutations).toContain("commentDelete");
 });

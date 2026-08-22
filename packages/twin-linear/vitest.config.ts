@@ -1,10 +1,5 @@
 import { defineConfig } from "vitest/config";
 
-// F-1325 — added for the reason F-1128 added twin-gmail's: the `test` script
-// was a hand-maintained list of nineteen paths, so a test file that exists and
-// passes could sit in this directory never having run. `include` restricts the
-// sweep to `.test.ts` and leaves the two `node --test` `.mjs` files to the
-// first half of the script, which is what runs them today.
 export default defineConfig({
   test: {
     environment: "node",
