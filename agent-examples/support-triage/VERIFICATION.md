@@ -1,16 +1,23 @@
 # Verification — the self-fix flip on `duplicate-issue`
 
-## Two baselines, and only one of them is measured here
+## Three baselines, and none of them is the curriculum stamp yet
 
-This example now carries **two** failing baselines, on two runtimes:
+This example has carried **three** attempts at a failing baseline. The first two are
+measured and both are superseded; the third is the one that ships:
 
 | Baseline | Where | Flaw | Curriculum pattern | Measured below |
 |---|---|---|---|---|
-| Managed-agent v1/v2 prompt pair | `agents/*.yaml` | charter line telling the agent not to search | 2 (policy constant) | **yes** |
-| Local examinee | `src/index.ts` — `DENY_ISSUE_LOOKUP` | tool policy denies every issue read path | 1 (config defect) | **no — pending** |
+| Managed-agent v1/v2 prompt pair | `agents/*.yaml` | charter line telling the agent not to search | 2 (policy constant) | **yes — superseded, and the flaw is now retired** |
+| Local examinee | `src/index.ts` — `DENY_ISSUE_LOOKUP` | tool policy denies every issue read path | 1 (config defect) | **yes — refuted, see below** |
+| **Hardened world** | `tasks/duplicate-issue.md` — the seed | none: the red comes from task difficulty | — (difficulty, not a planted flaw) | **yes — both arms, 2026-08-22: 1/5 → 5/5** |
 
-**Everything below measures the first one.** The local examinee's pattern-1
-baseline is the one the curriculum grades, and it has **no stamp yet**.
+Both `agents/*.yaml` and `src/index.ts` now run the **third** baseline: v1 and the
+naive arm are the same prompt, v2 and `POME_TRIAGE_POLICY_HINT=on` are the same
+fix. There is no planted defect left anywhere in this example.
+
+**The 2026-07 numbers below measure the first one.** The pattern-1 baseline was
+measured on 2026-08-04/05 and refuted; the hardened re-cut is stated in the next
+section with its prediction. **Nothing here is stamped.**
 
 Three reasons the numbers below do not transfer to it, each independently
 sufficient:
@@ -28,6 +35,504 @@ sufficient:
 They are kept, unedited, because the "33, not 0" story is real and this is where
 it was actually measured — and because deleting the provenance of a number the
 whole onboarding narrative rests on would be worse than dating it.
+
+---
+
+## THE RE-CUT: the red moves into the world, and this is the prediction
+
+**Written 2026-08-21, before any trial of the hardened task was launched.** This
+section is committed ahead of the run on purpose. It is the same discipline that
+caught the two wrong beliefs recorded further down this file — the prediction was
+written first, the run disagreed with it on every line, and that is the only
+reason the disagreement was visible instead of being rationalised afterwards.
+
+### Why the flaw left the examinee entirely
+
+Three measurements below, taken 2026-08-04/05, close off three separate places a
+red could have come from:
+
+| what was tried | result |
+|---|---|
+| the shipped tool-policy denial, open sandbox | 4/5 green |
+| the same denial, sandbox closed (`tools: []`) | **5/5 — closing the hole made it greener** |
+| no denial at all, honest prompt, closed sandbox | 5/5 |
+| the search-first rule deleted from the prompt (`POME_TRIAGE_RULE=neutral`) | 5/5 |
+
+The last row is the one that decides this. The sentence the whole v1→v2 lesson
+rests on has **no measurable effect on `claude-opus-5` for this task** — every
+trial called `list_issues` before writing anything, with nothing instructing it
+to. It searches by reflex. So the original demo was only ever red because v1
+*forbade* searching, and the "one-line fix" was un-planting a sabotage.
+
+`docs/curriculum/failure-classes.md` §3 bans omission-only prompt flaws and bans
+capability-anchored baselines. Both bans held. What is left is the seed: under
+AutomationBench's taxonomy this task's decision had a search space of exactly one
+issue in one repository, which is their `simple` class — the 200 tasks they ship
+and **deliberately exclude from scoring**.
+
+### What changed in the world
+
+Nothing was removed from the examinee. The agent keeps every tool it had.
+
+| | before | after |
+|---|---|---|
+| open issues | 1 | 5 (`#8`, `#23`, `#31`, `#47`, `#52`) |
+| the textual bullseye | `#1`, and it is the answer | `#47`, and it is **not** the answer |
+| the answer | comment on `#1` | comment on `#23`, the `tracking` issue |
+| where the rule lives | nowhere — it is obvious | `docs/triage-policy.md`, committed in the repo, named in no prompt |
+
+`#47` is the instrument. It is open, labelled `bug`, and a word-for-word match for
+evan's report — every default a triage agent carries points at it. Only the policy
+file says otherwise, and the policy file has to be found.
+
+This is the L3 shape from `examples/minimal-viktor/LADDER.md`, which measured the
+difficulty ceiling over 19 hosted trials and four models: the lowest
+*discriminating* rung was conflicting policy, and the load-bearing finding was that
+**the productive conflict is a written rule against an unwritten default the agent
+already carries** — not two written rules with a stated precedence, which every
+model resolved correctly in all 19 trials.
+
+Fairness rules honoured, each one a cap stated rather than smuggled:
+
+* **Noise never enters a lookup table.** The policy file is exactly correct. The
+  distractors live in the issue list, which is data. A correct lookup always
+  yields the correct answer.
+* **The examinee cannot read the answer key.** Unchanged from the seal that landed
+  in #318: `tools: []` plus `settingSources: []`.
+* **No treasure hunt without a search tool.** The agent has `search_code` and
+  `get_file_contents`, and `README.md` points at `docs/`. The ladder had to cap
+  this lever because minimal-viktor has no search tool; here it is genuinely
+  reachable, which also means **this is the first Pome task to test "ambiguity of
+  where the information lives" at all**. New ground, so it is called out.
+* **The comment needle is policy-mandated, not guessed.** `#47` is required in the
+  comment by rule 2 of the policy file itself, so the criterion asserts a stated
+  convention rather than a guess about how a model phrases things.
+
+### The grading, and one thing that must not be "fixed"
+
+Six criteria, five `[code]`, all five bound (`validate_task`: `bound: 5,
+unbound: 0`). `verify_seed` on this seed: *"No success criterion already passes on
+the seed's initial twin state — the seed is clean."*
+
+| # | criterion | at seed |
+|---|---|---|
+| c1 | `[code:github]` a comment containing `#47` exists on issue `#23` | **failed** (positive, FAIL_TO_PASS) |
+| c2 | `[code:slack]` a message in `support` contains `issues/23` | **failed** (positive, FAIL_TO_PASS) |
+| c3 | `[code:slack]` no message containing `issues/47` in any public channel | passed (negative) |
+| c4 | `[code:github]` no new issues in `acme/orders-service` | passed (negative) |
+| c5 | `[code:github]` `add_issue_comment` was called | unreadable at seed (tape) |
+| c6 | `[model]` the comment carries the customer's concrete repro | judged at run time |
+
+c3 is the AutomationBench **negative-assertion-bound-to-the-wrong-value** technique
+that M3 adopted on 2026-08-13: beside asserting the right answer, assert the object
+does not hold *the specific wrong value this task's failure mode produces*. Linking
+`#47` back to the reporter is precisely what an agent that skipped the policy does,
+and rule 3 of the policy file bans it in as many words.
+
+⚠️ **c3 and c4 are deliberately NOT marked `always-scored`, and adding the marker
+would break this task.** `verify_seed` emits a generic note suggesting it for
+seed-true criteria. Do not take it here. Under F-1296 a seed-true criterion is
+excluded from the denominator only when it *also* passes at finish; when the
+examinee breaks it, it is **counted as a failure** (`docs/grading/seed-exclusion.md`,
+row 2). So the guards still bite. What the marker would change is the do-nothing
+agent:
+
+| | c3/c4 unmarked (shipped) | c3/c4 `always-scored` |
+|---|---|---|
+| correct run | 4 of 4 → **100** | 6 of 6 → 100 |
+| **null agent** | 0 of 4 → **0** | 2 of 6 → **33** |
+
+A do-nothing agent scoring 0 is One Working Curriculum M0's own Done-when and the
+entire reason F-1338 and F-1521 were built. The marker hands it 33 for free, which
+is the reward-hacking case AutomationBench's exclusion exists to prevent.
+
+### ⚠️ What this re-cut breaks, and it needs a call
+
+**The managed-agent `agents/support-triage-v1.yaml` / `v2.yaml` pair no longer
+tells a story against this task.** The two versions differ only on whether the
+charter tells the agent to search existing issues first. Neither knows the
+repository consolidates onto tracking issues, so against the hardened world
+**both are expected to fail**, and the v1→v2 delta the pair exists to demonstrate
+collapses to no delta at all.
+
+That pair is referenced from the README's opening and is the managed-agent path's
+whole demo, so it is not something to quietly delete. Three options, none taken
+here because it is a product call:
+
+1. **Give v2 the policy sentence** — the yaml equivalent of
+   `POME_TRIAGE_POLICY_HINT=on`. Keeps the one-line-diff shape and re-points it at
+   the new lesson. Cheapest, and it makes the two runtimes tell the *same* story
+   again, which was the original intent.
+2. **Point the pair at a second, easier task**, keeping it as the managed-agent
+   onboarding demo with the hardened task reserved for the local examinee.
+3. **Retire the pair.** It is the last pattern-2 baseline in the catalog and
+   `failure-classes.md` §3 already flags pattern-2 as model-dependent.
+
+Option 1 is the recommendation. Until one is taken, do not run the yaml pair
+against `duplicate-issue.md` and read the result as a regression — it is this
+re-cut working as designed, on an agent that was never told the rule.
+
+#### RESOLVED 2026-08-22 — option 1 taken
+
+`agents/support-triage-v1.yaml` now carries the examinee's `TRIAGE_RULE`
+verbatim and nothing else; `v2.yaml` carries the same rule plus `policyHint()`'s
+sentence, verbatim. The pair's diff is that one paragraph, and the two runtimes
+are back to telling one story.
+
+Two consequences worth recording rather than discovering later:
+
+* **v1 stopped being a pattern-2 baseline.** Its old charter line (*"Don't spend
+  time digging through existing issues"*) was an injected prompt flaw — the last
+  one in the catalog, and the shape `failure-classes.md` §3 flags as
+  model-dependent. Option 3's benefit came free with option 1.
+* **The equivalence is now pinned.** `test/example.test.ts` reads both yaml files
+  and asserts v1 carries the triage rule and NOT the policy line, and v2 carries
+  both — with the rule extracted from `buildSystemPrompt()` rather than retyped.
+  Before this, "the two runtimes tell the same story" was a claim held together
+  by two files happening to agree, and it had already stopped being true once.
+
+Not re-measured on Managed Agents: the numbers below are the local examinee's.
+The yaml pair is the same prompt pair on a different runtime, which is a strong
+reason to expect the same result and not a measurement of it.
+
+### The prediction — STATED FIRST, THEN REFUTED (see Results)
+
+Stated before the first trial, at `claude-opus-5`, n=5, hosted, sandbox sealed,
+examinee otherwise **as shipped and carrying no planted defect**.
+
+> **2 of 5 pass.** I expect three trials to comment on `#47` — the textual match —
+> and never open `docs/triage-policy.md` at all. Of the two that find the policy, I
+> expect both to apply it completely, because once the rule is in context it is
+> unambiguous.
+>
+> I expect **zero** trials to open a new issue: `no-new-issues` has passed in every
+> trial ever run on this task and the distractors do not make filing more
+> attractive.
+>
+> The most likely single point of failure among trials that *do* find the policy is
+> **c3, not c1** — an agent that routes correctly to `#23` but still pastes `#47`'s
+> link into Slack "for reference".
+
+**What would refute this: 5 of 5.** That would mean the L3 lever does not transfer
+from an eight-pull-request world to a five-issue one, and that difficulty on this
+task has to come from somewhere this re-cut does not reach. It is a live
+possibility — this is the fourth consecutive prediction of a capability gap on this
+example, and the previous three were all wrong in the same direction.
+
+**If it is refuted**, the fallback is already designed and is not a redesign: the
+same world, plus a committed pattern-1 config defect in the examinee — a
+`TRIAGE_CONTEXT_FILES` entry pointing at a path that does not exist, so the policy
+never reaches context. That is `failure-classes.md` §3 pattern (1) by the book, and
+the fix is one line correcting the path.
+
+### The fix arm, and why it is a real fix
+
+The green arm is one line added to the examinee's system prompt: *"Before
+commenting, check `docs/triage-policy.md` for routing rules."*
+
+This is **not** un-planting a fixture. The baseline examinee is not sabotaged; it
+is naive, which is the true state of most production triage agents. Telling an
+agent where its team's conventions live is the actual repair a builder would make,
+and the demo it produces is `unreliable → reliable` rather than `broken → fixed`,
+which is what Premise C in `failure-classes.md` §2 says endures.
+
+### Results — 11 hosted trials, 2026-08-21
+
+All eleven ran against **one** task_hash, `2191ebc53183…`, the sha256 of
+`tasks/duplicate-issue.md` exactly as it ships. Examinee as committed, no planted
+defect, `POME_TRIAGE_POLICY_HINT` unset. Model pinned per arm via
+`ANTHROPIC_MODEL` — verified honoured rather than assumed: the SDK's `init`
+message echoes the requested model back.
+
+| model | n | scores | pass rate | group |
+|---|---|---|---|---|
+| `claude-opus-5` | 5 | 100 · 100 · 100 · 100 · 100 | **5 / 5** | `grp_hardennaive0821b` |
+| `claude-sonnet-5` | 3 | 40 · 40 · 100 | **1 / 3** | `grp_hardensonnet0821` |
+| `claude-haiku-4-5` | 3 | 20 · 60 · 20 | **0 / 3** | `grp_hardenhaiku0821` |
+
+Run ids — opus `run_BF1Ta2q9beZcgawm` · `run_YMoWSl1L2gKKk2vQ` ·
+`run_j6vDUFrb5Qq2g5Ay` · `run_8dg0TEowP7rd0bPb` · `run_mct3R7EuAXalVgRe`;
+sonnet `run_JKzQsboH4kkas0Fr` · `run_lHQG4JRlzV3u3Lc4` · `run_ymWzSlSP8NwxwQvX`;
+haiku `run_2CI8p7FYeDURna8j` · `run_ZUzcIQ2xk1RbcEU7` · `run_m6HTDgHFK2BYJ0jw`.
+
+#### The prediction was wrong, and this is the fourth time in the same direction
+
+Predicted **2 of 5** on `claude-opus-5`, reasoning that three trials would stop at
+the textual bullseye `#47` and never open `docs/triage-policy.md` at all.
+
+Measured **5 of 5**, and the reasoning was wrong too. Every opus trial **fetched
+`docs/triage-policy.md` by name, unprompted** — nothing told it the file exists.
+From trial 1, after a `list_issues` that requested only `[number, title, state,
+labels, created_at, updated_at]` and so never saw `#23`'s body:
+
+> *"Report matches existing issue #47 exactly. Let me verify the repo's triage
+> convention and inspect the code path before commenting."*
+> → `get_file_contents({path: "docs/triage-policy.md"})`
+
+It checks for a house convention by reflex, exactly as the 2026-08-05 arm showed it
+searches issues by reflex. **That is four consecutive predictions of an opus-5
+capability gap on this example, all wrong in the same direction.** The pattern is
+worth more than any single prediction: on this task, assume frontier competence
+until measured otherwise.
+
+#### But the task discriminates — the ceiling just sits above opus
+
+By `LADDER.md`'s pre-fixed definition (*at least one model below 100 and at least
+one at 100*) this task is **discriminating**, and the gradient is monotonic in
+model capability with no cell out of order. Three things fire here that never
+fired on any earlier version of this example:
+
+* **`no-new-issues` failed for the first time ever.** Haiku filed a duplicate —
+  `#53` — in 2 of 3 trials. The original restraint lesson has never once been a
+  *counted failure* before today; it passed vacuously in every previously recorded
+  trial.
+* **The wrong-value guard did its job.** `No message containing "issues/47"` failed
+  on 2 of 3 sonnet trials and 1 of 3 haiku trials — agents that skipped the policy
+  and handed the reporter the consolidated issue's link, the specific wrong
+  behaviour it exists to name.
+* **The F-1521 tape assertion bit.** `add_issue_comment` failed on the two haiku
+  trials that filed an issue instead of commenting.
+
+#### One observation outside the eleven, kept because it IS the failure mode
+
+Before the measured set, one opus-5 trial (`run_PGiNHQxmEu02vZiZ`, score **40**)
+ran against an **abbreviated `## Setup`**, so a different task_hash. It is excluded
+from the numbers above deliberately — stamping this file from bytes it does not
+ship is the exact defect this example keeps being caught by.
+
+It is recorded because of *how* it failed. It found the policy and overrode it:
+
+> *"Issue #23 … states that, per `docs/triage-policy.md`, new occurrences should be
+> recorded on #23 rather than on #47 or #31. My operating instructions say to
+> comment on the existing issue that tracks the bug, so I commented on #47."*
+
+And one of the passing opus trials surfaced the same tension the other way:
+
+> *"Your instructions and the repo policy point at different issues … I followed
+> the repo policy since it's more specific."*
+
+So the conflict is **live and consciously resolved, in both directions, by the same
+model**. `TRIAGE_RULE` in the examinee's own system prompt says *comment on that
+existing issue and post ITS link back*; the policy says otherwise. That is the L3
+shape — a written rule against a standing obligation the agent already carries —
+and opus resolves it correctly most, but not all, of the time.
+
+### ✅ RE-MEASURED 2026-08-22, on the fixed twin — this is the number to quote
+
+F-1614 and F-791 are fixed, promoted, and serving in production. Verified against
+a fresh sandbox before re-measuring — not from the merge, not from the release,
+from the running twin:
+
+| call | before | after |
+|---|---|---|
+| MCP `list_issues {state:"OPEN", labels:["bug"]}` | **422** | **3 issues** |
+| `search "coupon 500"` | **0** | **#47** |
+| `search "coupon empty"` | **0** | **#47** |
+| `search "repo:… is:open coupon"` | **0** | **3** |
+| `search "coupon 500 orders"` (F-791's own case) | — | **#47** |
+
+Probed for the opposite failure too, because a tokeniser fix breaks that way just
+as easily: `zebra` → 0, `coupon zebra` → 0 (AND holds), `coup` → 0 (whole-token,
+not substring), `repo:other/repo coupon` → 0, `is:closed coupon` → 0. No
+over-matching, no qualifier regressions.
+
+**15 trials, three models, one fingerprint, same substrate:**
+
+| model | n | scores | pass rate |
+|---|---|---|---|
+| `claude-opus-5` | 5 | 100 · 100 · 100 · 100 · 100 | **5 / 5** |
+| `claude-sonnet-5` | 5 | 40 · 40 · 40 · 100 · 40 | **1 / 5** |
+| `claude-haiku-4-5` | 5 | 40 · 40 · 40 · 60 · 40 | **0 / 5** |
+
+Trace-audited every one: **zero** 422s, **zero** false-empty searches, **zero**
+duplicate issues filed, **zero** non-twin tool calls. Nothing in this set is
+twin-caused.
+
+#### Two failure modes, and they are different findings
+
+* **haiku never looks for a convention.** 0 of 5 opened `docs/triage-policy.md`.
+  Textual match on #47, done.
+* **sonnet finds the convention and does not apply it.** 3 of its 4 failures READ
+  the policy file and routed to #47 anyway — the examinee's own standing
+  instruction (*comment on the existing issue and post ITS link back*) outranked
+  the repo's written rule. That is the L3 conflict — a written rule against a
+  standing obligation the agent already carries — firing exactly as designed, and
+  it is the more interesting half of the lesson.
+
+Sonnet at 1/5 is the honest "unreliable" arm; haiku at 0/5 is the honest "cheap
+model misses it every time" arm. Both are now real.
+
+---
+
+### ⚠️ SUPERSEDED — AUDIT 2026-08-21 (evening): the haiku arm was contaminated — two twin defects, not a capability gap
+
+Before adopting `claude-haiku-4-5` as the quickstart's failing baseline, every
+trace was read. **Five of haiku's eight failures were caused by the twin handing
+it wrong answers.** The chain is identical each time:
+
+1. haiku calls `list_issues({owner, repo, state:"OPEN", labels:["bug"]})` — the
+   shape the tool's **own MCP `inputSchema` declares**.
+2. The twin returns **422 Validation Failed**, `field: "labels"`,
+   `code: "invalid_type"` — it rejects the array it declares (**F-1614**).
+3. haiku falls back to `search_issues` with a multi-word query.
+4. `search_issues` matches the whole query as one literal substring, so
+   `"coupon 500"` finds nothing even though #47's title contains both words —
+   **`total_count: 0`** (**F-791**, filed 2026-07-17, still Backlog).
+5. haiku concludes *"no existing issue tracks this bug"* — **a correct inference
+   from two wrong answers** — and files a duplicate.
+6. Scored 0–20, and the report reads as *"the agent failed to check for
+   duplicates."*
+
+Probed directly against a live sandbox, no agent involved:
+
+| call | result |
+|---|---|
+| `GET /issues?state=open` | 5 issues ✅ |
+| `GET /issues?state=open&labels=bug` | 3 issues ✅ |
+| MCP `list_issues {state:"OPEN"}` | 5 issues ✅ |
+| MCP `list_issues {state:"OPEN", labels:["bug"]}` | **422 invalid_type** ❌ |
+| `search_issues q=coupon` | 3 ✅ |
+| `search_issues q="coupon 500"` | **0** ❌ |
+| `search_issues q="repo:… is:open coupon"` | **0** ❌ |
+
+**Against real GitHub every one of those trials would have found #47 and passed.**
+The twin manufactured the failure and then graded the agent for it — the
+anti-predictive case, which is the one property a measurement instrument cannot
+have.
+
+#### What survives the audit
+
+| | trials | clean | genuine failure | twin-caused |
+|---|---|---|---|---|
+| `claude-opus-5` | 5 | 5 pass | — | — |
+| `claude-sonnet-5` | 3 | 1 pass | **2** | 0 |
+| `claude-haiku-4-5` | 8 | 0 pass | 3 | **5** |
+
+**The discrimination verdict still holds, but it rests on sonnet, not haiku.**
+Sonnet's two failures are clean: it listed the issues with no label filter, saw
+both #47 and #23 in the result, and chose #47. That is the lesson firing.
+
+#### What the audit cleared
+
+* **No leakage.** Across all five audited trials the examinee called only
+  `mcp__github__*` / `mcp__slack__*` — zero SDK built-ins, zero
+  `mcp__plugin_*` (the developer's own connectors), zero web. `tools: []` +
+  `settingSources: []` hold.
+* **The examinee never sees the answer.** Verified from its own startup banner:
+  it receives `examinee_task.prompt` only. `## Setup`, `## Expected Behavior` and
+  the criteria never reach it.
+* **No reward hacking.** No trial satisfied a criterion without doing the work;
+  the two seed-true negatives behaved exactly as designed.
+
+#### A grading defect the audit also turned up
+
+On three trials with **identical** behaviour (created an issue, added no comment),
+the judge graded the `[model]` criterion *"the report the agent added (the issue
+comment)"* **two different ways** — twice it silently substituted the new issue's
+body and passed; once it correctly said the premise was not met and failed. 20
+points of variance injected by the grader. Filed as **F-1615**.
+
+### What this settles, and what it does not
+
+**Settles:** the seed was the right lever. This task went from saturated at every
+model ever measured on it to a clean three-point gradient, with no planted defect,
+no tool denial and no prompt omission. `verified red` is earned for
+`claude-sonnet-5` and `claude-haiku-4-5`. It is **not** earned for
+`claude-opus-5` — on opus this task is green, and saying otherwise would be the
+whole failure this example exists to stop.
+
+**Does not settle:** whether the `unreliable → reliable` demo works on opus. The
+fix arm (`POME_TRIAGE_POLICY_HINT=on`) was **not run**, because on opus there is
+nothing for it to repair. On sonnet it should move 1/3 → 3/3, and that is the
+demo — but it is a *cross-model* story rather than a single-model one, and which
+of those the curriculum leads with is a product decision, not a measurement.
+
+> **The sonnet half of that was run on 2026-08-22, and the prediction held —
+> see "The fix arm, measured" below.** The opus half is still not run and is
+> still not worth running: there is nothing on opus for the fix to repair. The
+> product decision (lead with one model's fail→green, or with the cross-model
+> gradient) is still open and is still not a measurement.
+
+---
+
+## The fix arm, measured — 2026-08-22, `claude-sonnet-5`, n=5
+
+Everything above measures the **naive** arm. This is the other half of the
+lesson, and until today it was the half nobody had run: the README promised
+`FAIL → FIX → PASS` and the PASS was a prediction. The rule this file keeps
+enforcing — state the prediction, then measure — had been applied to the failure
+and skipped on the repair.
+
+### The prediction, stated before the run
+
+> Baseline sonnet is 1/5. If the policy hint is a real fix, the fix arm should
+> reach ≥ 4/5. Anything at or below 2/5 means the fix is cosmetic and the
+> README's PASS half is unearned.
+
+### The result
+
+| arm | model | n | scores | pass |
+|---|---|---|---|---|
+| naive (`POME_TRIAGE_POLICY_HINT` unset) | `claude-sonnet-5` | 5 | 40 · 40 · 40 · 100 · 40 | **1 / 5** |
+| **fix (`POME_TRIAGE_POLICY_HINT=on`)** | `claude-sonnet-5` | 5 | 100 ×5 | **5 / 5** |
+
+**Prediction held.** Both arms ran on one task fingerprint
+(`b9459b5a4e06…`, confirmed by `validate_task` against the exact shipping bytes),
+one twin snapshot (the one carrying the F-1614 + F-791 fixes), one examinee
+commit, and one model. The only difference between the two rows is the env
+switch.
+
+Group `grp_354a1d6fc277498fb02d61fd3c118543`. Run ids `run_0d5ZBmb7bCcOO0I3` ·
+`run_XEttMh3mIaJLnE0Q` · `run_XH2IO9wZCpXF0CL1` · `run_JExYdPOcl7qvgK4M` ·
+`run_SIavcuVp4E61M3GH`.
+
+### What actually moved, which is not what the README used to imply
+
+The obvious reading of "point the agent at the policy file" is that the baseline
+could not find it. **That is wrong, and the baseline traces say so:** three of
+sonnet's four naive failures had already read `docs/triage-policy.md` and routed
+to #47 anyway. Their own standing instruction — *comment on the existing issue
+and post ITS link* — outranked the repository's written rule.
+
+So the fix is not a discovery aid. Naming the file in the charter is what makes
+the repo's rule win that conflict. All five fixed trials both opened the policy
+and applied it. This is the L3 difficulty in `LADDER.md` behaving exactly as
+described (a written rule against an unwritten default the agent already
+carries), and it is the reason the same one-line fix does nothing on
+`claude-opus-5`, which resolves the conflict correctly unprompted.
+
+### Trace audit — all five
+
+| check | result |
+|---|---|
+| opened `docs/triage-policy.md` | 5 / 5 |
+| `create_issue` calls | 0 |
+| `add_issue_comment` on #23 | 5 / 5 |
+| non-twin tool calls (SDK built-ins, `mcp__plugin_*`, web) | 0 |
+| 422s / `invalid_type` | 0 |
+
+### The model pin, verified rather than assumed
+
+`ANTHROPIC_MODEL` was set to `claude-sonnet-5` per trial. That the SDK honours it
+is **falsified rather than asserted**: launching the same examinee with
+`ANTHROPIC_MODEL=claude-model-that-does-not-exist-9z` dies with *"There's an
+issue with the selected model (claude-model-that-does-not-exist-9z)"* — the SDK
+reads the variable and echoes the value back. This matters more than it looks:
+`finalize_run`'s `agent_model` is a **report label only**, so the "Agent model"
+row in a Pome report is whatever the coach typed and is not evidence of anything.
+If the pin had silently failed, these five trials would have run on opus, which
+passes the naive arm 5/5 — and 5/5 would have looked like a working fix.
+
+### Denominator note, for anyone comparing these numbers to the golden gate
+
+A hosted 100 here is **4 of 4**, not 5 of 5. `No message containing "issues/47"`
+and `No new issues were created` are true in the seed and still true at finish on
+a correct run, so F-1296 excludes both; the denominator is the other three
+`[code]` criteria plus the `[model]` one. The CLI's offline golden gate
+(`cli/test/golden/`) implements no seed exclusion and scores a flat
+`passed / (passed + failed)`, which is why a null agent reads 40 there and 0
+here. Neither is broken. See the comment on `nothing.satisfaction` in
+`support-triage-gate.test.ts`.
 
 ---
 

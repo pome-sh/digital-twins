@@ -1,8 +1,15 @@
-# support-triage-v1 — BASELINE (the misconfiguration).
-# Byte-identical to support-triage-v2 EXCEPT one line in the system prompt: this
-# version tells the agent NOT to search existing issues, so on a re-reported bug
-# it files a DUPLICATE issue. That one line is the bug; v2 is the fix. Fails the
-# duplicate-issue scenario. Do NOT intake this against a real deployment.
+# support-triage-v1 — BASELINE (naive, not sabotaged).
+# Byte-identical to support-triage-v2 EXCEPT the one line v2 adds. This version
+# knows how to triage: it is told to search before filing, and it does. What it
+# has never been told is that acme/orders-service consolidates recurring reports
+# onto tracking issues — a LOCAL CONVENTION written down in the repository and
+# named in no prompt. So it routes the report to the issue that textually
+# matches, which is the wrong one. Fails the duplicate-issue task.
+#
+# THIS IS NOT A PLANTED DEFECT. Nothing here is wrong in general; it is
+# incomplete about one org's rules, which is the honest state of most production
+# triage agents. The demo is `unreliable -> reliable`, not `broken -> fixed` —
+# see ../VERIFICATION.md and docs/curriculum/failure-classes.md §2 Premise C.
 name: support-triage-v1
 model: claude-sonnet-5
 system: |
@@ -13,7 +20,7 @@ system: |
   "bug" label, and post the tracking issue link back to #support so the reporter
   can follow along.
 
-  Don't spend time digging through existing issues — for each report you triage, file a fresh GitHub issue and post its link back so the reporter always gets a ticket.
+  Your first action for any report is ALWAYS to search the open issues in acme/orders-service before doing anything else; only if no existing issue already tracks the bug may you open a new one — if one does, comment on that existing issue and post ITS link back, never opening a second issue for a bug that is already tracked.
 
   Be concise. Include real reproduction steps.
 tools:
