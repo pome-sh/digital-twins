@@ -138,7 +138,11 @@ const WORLD: GitHubStateSeed = {
         {
           number: 31,
           title: "Docs: describe the couponless checkout flow",
-          body: "The couponless path is undocumented.",
+          // `apply_coupon` is the compound case and it is load-bearing: a bare
+          // `coupon` has to reach it, and `couponless` in the title has to stay
+          // out of reach. One issue carries both so a tokeniser cannot satisfy
+          // one by breaking the other.
+          body: "The couponless path is undocumented. See apply_coupon in src/orders.py.",
           state: "open",
           labels: ["tracking"],
         },
@@ -269,9 +273,9 @@ describe("F-791 — free text is tokenised, and a term matches a whole token", (
   });
 
   it("ANDs the terms — a term that matches nothing empties the answer", async () => {
-    // #31 carries `couponless`, not `coupon`, so it is absent here for the same
-    // reason the prefix case below says it must be.
-    expect(await searchIssues("coupon")).toEqual([8, 23]);
+    // #31 is here through `apply_coupon` in its body, not through `couponless`
+    // in its title — see the compound case below, which pins both directions.
+    expect(await searchIssues("coupon")).toEqual([8, 23, 31]);
     expect(await searchIssues("coupon refunds")).toEqual([]);
   });
 
@@ -279,7 +283,33 @@ describe("F-791 — free text is tokenised, and a term matches a whole token", (
   // A per-term `.includes()` would answer #31 here and would be a false HIT.
   it("does NOT match a prefix of a token — `coupon` must not reach `couponless`", async () => {
     expect(await searchIssues("couponless")).toEqual([31]);
-    expect(await searchIssues("coupon")).not.toContain(31 as never);
+  });
+
+  // Measured by NEGATION, which is the only query that settles containment:
+  // `per_page NOT page` → 0, `per_page NOT per` → 0, `pull-request NOT request`
+  // → 0 on `cli/cli`. Every document carrying the compound also answers to its
+  // parts, so the index emits both.
+  //
+  // ⚠️ This is the case F-791's own first fix got wrong. Reading only
+  // `per_page` 110 ≠ `per page` 226, it concluded `_` holds a token together —
+  // and a bare `coupon` then missed a body that says `apply_coupon`, which is
+  // F-791's false-empty class in a narrower form.
+  it("a bare term REACHES inside a snake_case or hyphenated compound", async () => {
+    // #31's body says `apply_coupon` and its title says `couponless`. The first
+    // must be reachable by `coupon`, the second must not — same issue, so this
+    // cannot be satisfied by loosening the match.
+    expect(await searchIssues("coupon")).toEqual([8, 23, 31]);
+    expect(await searchIssues("apply")).toEqual([31]);
+  });
+
+  it("…and a query naming the compound stays NARROWER than its parts", async () => {
+    // `per_page` 110 < `per page` 226 on `cli/cli`: only a document that really
+    // carries the compound offers it, so the query keeps `_` and `-` intact.
+    expect(await searchIssues("apply_coupon")).toEqual([31]);
+    // #8's title has `orders` and #31's body has `apply`, but no issue carries
+    // the compound `apply-orders`, so the narrower query answers nothing while
+    // the two loose terms would have matched.
+    expect(await searchIssues("apply-orders")).toEqual([]);
   });
 
   it("is case-insensitive on both sides of the match", async () => {
@@ -292,7 +322,7 @@ describe("F-791 — `is:` is GitHub's commonest issue qualifier and is parsed", 
   // leave `is:open` in the free text, so ANY query carrying it answered [].
   it("`is:open` filters to the open issues, exactly as `state:open` does", async () => {
     expect(await searchIssues("refunds is:open")).toEqual([]);
-    expect(await searchIssues("coupon is:open")).toEqual([8, 23]);
+    expect(await searchIssues("coupon is:open")).toEqual([8, 23, 31]);
     expect(await searchIssues("coupon is:open")).toEqual(await searchIssues("coupon state:open"));
   });
 

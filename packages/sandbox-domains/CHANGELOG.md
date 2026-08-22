@@ -1,5 +1,22 @@
 # @pome-sh/sandbox-domains
 
+## Unreleased (patch)
+
+**`search_issues` reaches inside a compound word again** (F-791 follow-up). The
+tokeniser shipped in the previous release treated `apply_coupon` as a single
+token, so a search for `coupon` did not find a body that only says
+`apply_coupon`. Real GitHub indexes a compound BOTH whole and in parts — measured
+by negation on `cli/cli`: `per_page NOT page`, `per_page NOT per` and
+`pull-request NOT request` all answer 0 — so a bare term does reach inside one.
+
+A document now offers every compound plus the parts `_` and `-` join, while a
+query term keeps its compound intact, which is what keeps `per_page` (110)
+narrower than `per page` (226). A PREFIX still matches nothing: `coupon` does not
+reach `couponless`.
+
+**Agents may see slightly MORE results than the previous release**, on queries
+whose term appears only inside a snake_case or hyphenated identifier.
+
 ## 0.2.4 — 2026-08-21
 
 **The GitHub twin answers two calls it used to get wrong** (F-1614, F-791). Both

@@ -129,18 +129,52 @@ interface ParsedSearchQuery {
  * GitHub refuses to serve. A false hit is the worse of the two for a grading
  * instrument, so the match is token equality.
  *
- * `_` stays inside a token and `-` breaks one, which is GitHub's own split:
- * `per_page` → 110 and `per page` → 226 are different queries there, while
- * `pull-request` → 3222 and `pull request` → 3298 are the same one.
+ * ── A COMPOUND IS INDEXED WHOLE *AND* IN PARTS, SO THE TWO SIDES DIFFER ─────
+ *
+ * `per_page` → 110 and `per page` → 226 are different queries, so a compound is
+ * a token in its own right and a query naming one asks for something narrower
+ * than its parts. It is tempting to conclude from that pair alone that `_` holds
+ * a token together — this file did conclude it, and it was wrong, because the
+ * pair says nothing about CONTAINMENT. The query that settles it is the negation:
+ *
+ *   `per_page NOT page`      → 0      every per_page document also has `page`
+ *   `per_page NOT per`       → 0
+ *   `pull-request NOT request` → 0    the same for the hyphen
+ *
+ * Zero on all three: the index emits the compound AND the parts `_` or `-` join.
+ * So a bare `coupon` DOES reach a body that only says `apply_coupon`, and the
+ * earlier reading made that a false EMPTY — F-791's own class, in a narrower
+ * form, introduced by F-791's own fix.
+ *
+ * Hence the asymmetry, which is not an accident and must not be "tidied" into one
+ * function: a DOCUMENT offers each compound plus its parts, and a QUERY term
+ * keeps its compound intact. Both measurements then hold at once — `coupon`
+ * reaches `apply_coupon` through the parts, and `per_page` stays narrower than
+ * `per page` because only a document that really carries the compound offers it.
+ * A prefix still matches nothing either way: `couponless` has no separator, so it
+ * offers only itself.
  */
-function tokenise(text: string): string[] {
-  return text.toLowerCase().split(/[^a-z0-9_]+/).filter(Boolean);
+
+/** What a QUERY asks for: `_` and `-` stay inside a term. */
+function queryTerms(text: string): string[] {
+  return text.toLowerCase().split(/[^a-z0-9_-]+/).filter(Boolean);
 }
 
-/** Whether every term in `q` appears as a token of `document`. */
+/** What a DOCUMENT offers: every compound, plus the parts `_` and `-` join. */
+function documentTokens(text: string): Set<string> {
+  const tokens = new Set<string>();
+  for (const compound of text.toLowerCase().split(/[^a-z0-9_-]+/)) {
+    if (!compound) continue;
+    tokens.add(compound);
+    for (const part of compound.split(/[_-]+/)) if (part) tokens.add(part);
+  }
+  return tokens;
+}
+
+/** Whether every term in `q` is a token the document offers. */
 function matchesTerms(terms: readonly string[], ...document: string[]): boolean {
   if (terms.length === 0) return true;
-  const tokens = new Set(tokenise(document.join(" ")));
+  const tokens = documentTokens(document.join(" "));
   return terms.every((term) => tokens.has(term));
 }
 
@@ -217,7 +251,7 @@ function parseSearchQuery(raw: string, options: { state?: boolean; is?: boolean 
     }
   });
   const normalized = text.replace(/\s+/g, " ").trim().toLowerCase();
-  return { text: normalized, terms: tokenise(normalized), owners, fullNames, state, type, unhonourable };
+  return { text: normalized, terms: queryTerms(normalized), owners, fullNames, state, type, unhonourable };
 }
 
 /**
