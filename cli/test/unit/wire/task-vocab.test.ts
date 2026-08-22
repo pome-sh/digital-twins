@@ -12,14 +12,14 @@ import {
   LEGACY_CRITERION_KIND_MAP,
   LEGACY_TASK_VOCAB_KEY_MAP,
   normalizeTaskVocabKeys,
-} from "../../src/contract/task-vocab.js";
+} from "../../../src/contract/task-vocab.js";
 import {
   CRITERION_KINDS,
   criterionKindSchema,
   criterionResultSchema,
   criterionSchema,
   runSchema,
-} from "../../src/contract/run.js";
+} from "../../../src/contract/run.js";
 import {
   createSessionRequestSchema,
   persistedScenarioSchema,
@@ -29,7 +29,7 @@ import {
   submitResultRequestSchema,
   taskConfigSchema,
   taskSchema,
-} from "../../src/contract/index.js";
+} from "../../../src/contract/index.js";
 import { eventSchema, recorderEventSchema } from "@pome-sh/wire";
 
 // ─── normalizeTaskVocabKeys (the raw key mapper) ─────────────────────────────

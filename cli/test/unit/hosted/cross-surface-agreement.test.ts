@@ -58,7 +58,7 @@
 // `state` field of the `verdict.json` a hosted run writes, which is what CI
 // reads instead of scraping stderr. It answers with the CLI's word by
 // construction (`runTaskHosted.ts` passes the one `verdict` local it already
-// computed into the artifact; `test/e2e/runTaskHosted.test.ts` pins that end
+// computed into the artifact; `test/e2e/runTaskHosted.spawned.test.ts` pins that end
 // to end). What this file adds is the VOCABULARY claim — that the artifact
 // spells the answer in the dashboard's three words and no others.
 

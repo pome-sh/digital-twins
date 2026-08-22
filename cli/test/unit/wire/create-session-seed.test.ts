@@ -12,7 +12,7 @@
 // githubSeedStateSchema.
 
 import { describe, expect, it } from "vitest";
-import { createSessionRequestSchema, githubSeedStateSchema } from "../../src/contract/index.js";
+import { createSessionRequestSchema, githubSeedStateSchema } from "../../../src/contract/index.js";
 
 describe("createSessionRequestSchema.seed — permissive boundary (FDRS-580, ADR-015)", () => {
   it("forwards unknown / future seed fields verbatim instead of stripping them", () => {

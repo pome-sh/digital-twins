@@ -6,7 +6,7 @@
 // with and without the new keys.
 
 import { describe, expect, it } from "vitest";
-import { criterionSchema } from "../../src/contract/run.js";
+import { criterionSchema } from "../../../src/contract/run.js";
 import {
   agentResponseSchema,
   createAgentRequestSchema,
@@ -17,7 +17,7 @@ import {
   perTwinStateKeysSchema,
   seedEnvelopeSchema,
   stateUploadUrlResponseSchema,
-} from "../../src/contract/index.js";
+} from "../../../src/contract/index.js";
 
 describe("criterionSchema.twin (run.ts) — rides the D/P→code/model transform", () => {
   it("parses code/model criteria with an explicit twin", () => {

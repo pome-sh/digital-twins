@@ -6,8 +6,8 @@ import {
   laneSchema,
   runSchema,
   stepSchema,
-} from "../../src/contract/run.js";
-import { submitResultRequestSchema } from "../../src/contract/index.js";
+} from "../../../src/contract/run.js";
+import { submitResultRequestSchema } from "../../../src/contract/index.js";
 
 describe("stepSchema", () => {
   it("parses a Step with lane_ids and a populated label", () => {
