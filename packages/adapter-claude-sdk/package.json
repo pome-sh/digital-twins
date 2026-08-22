@@ -31,7 +31,6 @@
   ],
   "scripts": {
     "build": "tsup",
-    "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepublishOnly": "node scripts/assert-publishable.mjs && npm run build"
   },

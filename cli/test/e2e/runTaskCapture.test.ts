@@ -13,6 +13,7 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { runTask } from "../../src/runner/runTask.js";
 import { captureServerForTests } from "../fixtures/captureServerForTests.js";
+import { inCli } from "../fixtures/cliDir.js";
 
 function listenEphemeral(server: ReturnType<typeof createNetServer>): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -68,7 +69,7 @@ describe("runTask — capture-server wiring (FDRS-399)", () => {
     let capturedPid = -1;
     try {
       const result = await runTask({
-        taskPath: "tasks/01-bug-happy-path.md",
+        taskPath: inCli("tasks/01-bug-happy-path.md"),
         agentCommand: `npx tsx ${probePath}`,
         artifactsDir,
         captureServerCommand: captureServerForTests,

@@ -48,8 +48,6 @@
     "pome": "node dist/src/cli/main.js",
     "prepublishOnly": "node scripts/assert-publishable.mjs && npm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run",
-    "gate:golden": "vitest run test/golden",
     "gate:recorder-overhead": "tsx scripts/recorder-overhead-gate.ts",
     "gate:agent-trace-overhead": "tsx scripts/overhead-gate.ts",
     "gate:cas-adapter-acceptance": "tsx scripts/cas-adapter-acceptance.ts",

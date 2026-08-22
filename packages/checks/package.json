@@ -67,7 +67,6 @@
   ],
   "scripts": {
     "build": "tsup && node ../../scripts/bundle-declarations.mjs .",
-    "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepublishOnly": "npm run build"
   },

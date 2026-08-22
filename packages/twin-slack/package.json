@@ -43,8 +43,7 @@
     "agent:claude": "tsx examples/claude-slack-agent.ts",
     "start": "node dist/src/server.js",
     "prepack": "npm run build",
-    "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
+    "test:coverage": "vitest run --config vitest.coverage.config.ts --coverage",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "fidelity:parity": "tsx scripts/fidelity-parity.ts"
   },
