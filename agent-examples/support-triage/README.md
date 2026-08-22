@@ -12,26 +12,42 @@ examinee, and its difficulty lives in the **seeded world**, not in a planted
 agent defect: jump to
 [the lesson](#lesson-the-agent-that-never-asked-what-the-teams-convention-was).
 
-The managed-agent path tells the same story through a pair of prompts that differ
-by exactly **one line**:
+The managed-agent path tells the **same** story through a pair of prompts that
+differ by exactly **one line**:
 
-- `agents/support-triage-v1.yaml` — **baseline**. Its charter tells the agent
-  *not* to search existing issues. On a re-reported bug it files a **duplicate**
-  issue. **Fails.**
-- `agents/support-triage-v2.yaml` — **fixed**. The one line is replaced by a
-  *search-before-filing* rule, so it comments on the existing issue instead of
-  opening a second one. **Passes.**
+- `agents/support-triage-v1.yaml` — **baseline**. A competent triage agent: it is
+  told to search before filing, and it does. What it has never been told is that
+  `acme/orders-service` consolidates recurring reports onto **tracking issues** —
+  a convention written down in the repository and named in no prompt. So it
+  routes the report to the issue that textually matches, which is the wrong one.
+  **Fails.**
+- `agents/support-triage-v2.yaml` — **fixed**. One sentence pointing at the
+  repository's own rules. **Passes.**
 
 ```bash
 diff agents/support-triage-v1.yaml agents/support-triage-v2.yaml   # one line
 ```
 
-The failure — filing a duplicate issue for a bug that's already tracked — is the
-kind of thing a happy-path demo never shows and an issue tracker hates at scale.
-Pome catches it by grading the twin's real end state: `issues: 1 → 2` (a
-duplicate) for v1 vs `issues: 1 → 1` + a comment for v2. Measured results are in
-[`VERIFICATION.md`](./VERIFICATION.md) (v1 **0/5**, v2 **4/5** on
-`claude-sonnet-5`).
+That one line is the same sentence the local examinee adds behind
+`POME_TRIAGE_POLICY_HINT=on`, and `test/example.test.ts` pins the two together —
+the two runtimes are one experiment, not two demos that resemble each other.
+
+**The baseline is not sabotaged.** Nothing in v1 is wrong in general; it is
+incomplete about one org's rules, which is the honest state of most production
+triage agents. That makes the demo `unreliable → reliable` rather than
+`broken → fixed`, and the difficulty lives in the **seeded world** rather than in
+a planted defect — which is the whole reason this is curriculum lesson #1.
+
+Measured on the local examinee, `claude-sonnet-5`, 5 trials per arm, one task
+fingerprint, one twin snapshot:
+
+| arm | pass | scores |
+|---|---|---|
+| baseline — naive | **1 / 5** | 40 · 40 · 40 · 100 · 40 |
+| fixed — one sentence added | **5 / 5** | 100 · 100 · 100 · 100 · 100 |
+
+Full record, including what the failures actually did and why `claude-opus-5`
+passes the baseline outright, is in [`VERIFICATION.md`](./VERIFICATION.md).
 
 ## The task
 
@@ -126,9 +142,9 @@ on your machine — and it carries **no planted defect at all**.
 > `claude-opus-5` here, because it searches by reflex. All the numbers and run
 > ids are in [`VERIFICATION.md`](./VERIFICATION.md).
 >
-> `DENY_ISSUE_LOOKUP` still exists and still ships `false`, because
-> `test/tool-policy.test.ts` pins both its branches and the web clamp rides the
-> same function. **Do not flip it back to `true` expecting a red.**
+> `DENY_ISSUE_LOOKUP` still exists and still ships `false`, because the web
+> clamp (`WebSearch`/`WebFetch`) rides the same function. **Do not flip it back
+> to `true` expecting a red** — you will get a 5/5 and a false story.
 
 ### What breaks
 
@@ -220,8 +236,22 @@ says is the shape that endures, rather than `broken → fixed`.
 
 ### Re-run green
 
-The agent reads the policy, routes the report to **#23**, names **#47** in the
-comment, and sends #23's link back to `#support`.
+**5 of 5, every criterion, on the same fingerprint and the same twin snapshot as
+the baseline** — measured 2026-08-22, `claude-sonnet-5`, run ids in
+[`VERIFICATION.md`](./VERIFICATION.md). The agent reads the policy, routes the
+report to **#23**, names **#47** in the comment, and sends #23's link back to
+`#support`.
+
+The interesting part is *what* moved. In the baseline, three of sonnet's four
+failures had **already read `docs/triage-policy.md`** and routed to #47 anyway —
+its own standing instruction (*comment on the existing issue and post ITS link*)
+outranked the repository's written rule. So the fix is not "now it finds the
+file". It is that naming the file in the charter is what makes the repo's rule
+win the conflict. All five fixed trials opened the policy **and applied it**.
+
+That is also why the score jumps rather than drifts: `passThreshold` is 100, so
+the run that routes to #47 scores 40 and fails, and there is no partial credit to
+climb through.
 
 ### Customize
 
@@ -406,19 +436,20 @@ why it is not left to intention: `scripts/check-example-sdk-isolation.mjs` in
 this repo's CI fails any bundled Claude-Agent-SDK example whose `query()`
 options omit either door (F-1295).
 
-`npm run typecheck` type-checks; `npm test` runs the env-contract and
-tool-policy tests.
+`npm run typecheck` type-checks; `npm test` runs `test/example.test.ts`. Both
+legs also run in CI for every bundled example, independently, via
+`scripts/gate-examples.mjs`.
 
 ## Layout
 
 ```
 pome.json                       committed manifest: agent.slug + framework + tasks dir
-agents/support-triage-v1.yaml   managed-agent baseline (prompt flaw, pattern 2)
+agents/support-triage-v1.yaml   managed-agent baseline — naive, pattern 1
 agents/support-triage-v2.yaml   managed-agent fix; one line different
-tasks/duplicate-issue.md        the task (inline ## Seed State)
-src/index.ts                    the graded examinee — the pattern-1 baseline lives here
-test/tool-policy.test.ts        the lesson pinned as a property (both branches)
-test/env.test.ts                unit test for the launch env contract
+tasks/duplicate-issue.md        the task (inline ## Seed State, ## Discrimination)
+src/index.ts                    the graded examinee — both arms, behind one env switch
+test/example.test.ts            the silent-failure guards (see its header for what is
+                                deliberately left to the other gates)
 VERIFICATION.md                 measured results, and what each measurement was of
 ```
 

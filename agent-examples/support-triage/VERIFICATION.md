@@ -3,13 +3,17 @@
 ## Three baselines, and none of them is the curriculum stamp yet
 
 This example has carried **three** attempts at a failing baseline. The first two are
-measured and both are superseded; the third is stated but not yet run:
+measured and both are superseded; the third is the one that ships:
 
 | Baseline | Where | Flaw | Curriculum pattern | Measured below |
 |---|---|---|---|---|
-| Managed-agent v1/v2 prompt pair | `agents/*.yaml` | charter line telling the agent not to search | 2 (policy constant) | **yes — superseded** |
+| Managed-agent v1/v2 prompt pair | `agents/*.yaml` | charter line telling the agent not to search | 2 (policy constant) | **yes — superseded, and the flaw is now retired** |
 | Local examinee | `src/index.ts` — `DENY_ISSUE_LOOKUP` | tool policy denies every issue read path | 1 (config defect) | **yes — refuted, see below** |
-| **Hardened world** | `tasks/duplicate-issue.md` — the seed | none: the red comes from task difficulty | — (difficulty, not a planted flaw) | **not yet — prediction stated below** |
+| **Hardened world** | `tasks/duplicate-issue.md` — the seed | none: the red comes from task difficulty | — (difficulty, not a planted flaw) | **yes — both arms, 2026-08-22: 1/5 → 5/5** |
+
+Both `agents/*.yaml` and `src/index.ts` now run the **third** baseline: v1 and the
+naive arm are the same prompt, v2 and `POME_TRIAGE_POLICY_HINT=on` are the same
+fix. There is no planted defect left anywhere in this example.
 
 **The 2026-07 numbers below measure the first one.** The pattern-1 baseline was
 measured on 2026-08-04/05 and refuted; the hardened re-cut is stated in the next
@@ -167,6 +171,29 @@ here because it is a product call:
 Option 1 is the recommendation. Until one is taken, do not run the yaml pair
 against `duplicate-issue.md` and read the result as a regression — it is this
 re-cut working as designed, on an agent that was never told the rule.
+
+#### RESOLVED 2026-08-22 — option 1 taken
+
+`agents/support-triage-v1.yaml` now carries the examinee's `TRIAGE_RULE`
+verbatim and nothing else; `v2.yaml` carries the same rule plus `policyHint()`'s
+sentence, verbatim. The pair's diff is that one paragraph, and the two runtimes
+are back to telling one story.
+
+Two consequences worth recording rather than discovering later:
+
+* **v1 stopped being a pattern-2 baseline.** Its old charter line (*"Don't spend
+  time digging through existing issues"*) was an injected prompt flaw — the last
+  one in the catalog, and the shape `failure-classes.md` §3 flags as
+  model-dependent. Option 3's benefit came free with option 1.
+* **The equivalence is now pinned.** `test/example.test.ts` reads both yaml files
+  and asserts v1 carries the triage rule and NOT the policy line, and v2 carries
+  both — with the rule extracted from `buildSystemPrompt()` rather than retyped.
+  Before this, "the two runtimes tell the same story" was a claim held together
+  by two files happening to agree, and it had already stopped being true once.
+
+Not re-measured on Managed Agents: the numbers below are the local examinee's.
+The yaml pair is the same prompt pair on a different runtime, which is a strong
+reason to expect the same result and not a measurement of it.
 
 ### The prediction — STATED FIRST, THEN REFUTED (see Results)
 
@@ -419,6 +446,93 @@ fix arm (`POME_TRIAGE_POLICY_HINT=on`) was **not run**, because on opus there is
 nothing for it to repair. On sonnet it should move 1/3 → 3/3, and that is the
 demo — but it is a *cross-model* story rather than a single-model one, and which
 of those the curriculum leads with is a product decision, not a measurement.
+
+> **The sonnet half of that was run on 2026-08-22, and the prediction held —
+> see "The fix arm, measured" below.** The opus half is still not run and is
+> still not worth running: there is nothing on opus for the fix to repair. The
+> product decision (lead with one model's fail→green, or with the cross-model
+> gradient) is still open and is still not a measurement.
+
+---
+
+## The fix arm, measured — 2026-08-22, `claude-sonnet-5`, n=5
+
+Everything above measures the **naive** arm. This is the other half of the
+lesson, and until today it was the half nobody had run: the README promised
+`FAIL → FIX → PASS` and the PASS was a prediction. The rule this file keeps
+enforcing — state the prediction, then measure — had been applied to the failure
+and skipped on the repair.
+
+### The prediction, stated before the run
+
+> Baseline sonnet is 1/5. If the policy hint is a real fix, the fix arm should
+> reach ≥ 4/5. Anything at or below 2/5 means the fix is cosmetic and the
+> README's PASS half is unearned.
+
+### The result
+
+| arm | model | n | scores | pass |
+|---|---|---|---|---|
+| naive (`POME_TRIAGE_POLICY_HINT` unset) | `claude-sonnet-5` | 5 | 40 · 40 · 40 · 100 · 40 | **1 / 5** |
+| **fix (`POME_TRIAGE_POLICY_HINT=on`)** | `claude-sonnet-5` | 5 | 100 ×5 | **5 / 5** |
+
+**Prediction held.** Both arms ran on one task fingerprint
+(`b9459b5a4e06…`, confirmed by `validate_task` against the exact shipping bytes),
+one twin snapshot (the one carrying the F-1614 + F-791 fixes), one examinee
+commit, and one model. The only difference between the two rows is the env
+switch.
+
+Group `grp_354a1d6fc277498fb02d61fd3c118543`. Run ids `run_0d5ZBmb7bCcOO0I3` ·
+`run_XEttMh3mIaJLnE0Q` · `run_XH2IO9wZCpXF0CL1` · `run_JExYdPOcl7qvgK4M` ·
+`run_SIavcuVp4E61M3GH`.
+
+### What actually moved, which is not what the README used to imply
+
+The obvious reading of "point the agent at the policy file" is that the baseline
+could not find it. **That is wrong, and the baseline traces say so:** three of
+sonnet's four naive failures had already read `docs/triage-policy.md` and routed
+to #47 anyway. Their own standing instruction — *comment on the existing issue
+and post ITS link* — outranked the repository's written rule.
+
+So the fix is not a discovery aid. Naming the file in the charter is what makes
+the repo's rule win that conflict. All five fixed trials both opened the policy
+and applied it. This is the L3 difficulty in `LADDER.md` behaving exactly as
+described (a written rule against an unwritten default the agent already
+carries), and it is the reason the same one-line fix does nothing on
+`claude-opus-5`, which resolves the conflict correctly unprompted.
+
+### Trace audit — all five
+
+| check | result |
+|---|---|
+| opened `docs/triage-policy.md` | 5 / 5 |
+| `create_issue` calls | 0 |
+| `add_issue_comment` on #23 | 5 / 5 |
+| non-twin tool calls (SDK built-ins, `mcp__plugin_*`, web) | 0 |
+| 422s / `invalid_type` | 0 |
+
+### The model pin, verified rather than assumed
+
+`ANTHROPIC_MODEL` was set to `claude-sonnet-5` per trial. That the SDK honours it
+is **falsified rather than asserted**: launching the same examinee with
+`ANTHROPIC_MODEL=claude-model-that-does-not-exist-9z` dies with *"There's an
+issue with the selected model (claude-model-that-does-not-exist-9z)"* — the SDK
+reads the variable and echoes the value back. This matters more than it looks:
+`finalize_run`'s `agent_model` is a **report label only**, so the "Agent model"
+row in a Pome report is whatever the coach typed and is not evidence of anything.
+If the pin had silently failed, these five trials would have run on opus, which
+passes the naive arm 5/5 — and 5/5 would have looked like a working fix.
+
+### Denominator note, for anyone comparing these numbers to the golden gate
+
+A hosted 100 here is **4 of 4**, not 5 of 5. `No message containing "issues/47"`
+and `No new issues were created` are true in the seed and still true at finish on
+a correct run, so F-1296 excludes both; the denominator is the other three
+`[code]` criteria plus the `[model]` one. The CLI's offline golden gate
+(`cli/test/golden/`) implements no seed exclusion and scores a flat
+`passed / (passed + failed)`, which is why a null agent reads 40 there and 0
+here. Neither is broken. See the comment on `nothing.satisfaction` in
+`support-triage-gate.test.ts`.
 
 ---
 

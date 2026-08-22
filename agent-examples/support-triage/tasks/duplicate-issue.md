@@ -199,3 +199,38 @@ defects rather than capability.
   ]
 }
 ```
+
+### The fix arm — measured 2026-08-22, same fingerprint, same snapshot
+
+The rows above are the **naive** arm (`POME_TRIAGE_POLICY_HINT` unset), which is
+what the discrimination question asks about. The curriculum also needs the arm
+where the builder applies the documented one-line fix, and it is recorded here
+because a `FAIL → FIX → PASS` lesson whose PASS half was never run is a claim,
+not a result.
+
+`claude-sonnet-5`, n=5, `POME_TRIAGE_POLICY_HINT=on`, examinee otherwise
+byte-identical, `ANTHROPIC_MODEL` honoured (verified by falsification: a bogus
+model name errors and the SDK echoes it back). Trace-audited: 5 of 5 opened
+`docs/triage-policy.md`, zero `create_issue`, zero non-twin tool calls, zero
+422s.
+
+**1 / 5 → 5 / 5.** The measured mechanism is not "it now finds the file" — three
+of the naive arm's four failures had already read it. It is that naming the file
+in the charter makes the repository's written rule outrank the agent's own
+standing instruction.
+
+```json
+{
+  "fingerprint": "b9459b5a4e067458fb307e5a81d7cf3238ac8d1c15494281204d968eafbbe92c",
+  "arm": "POME_TRIAGE_POLICY_HINT=on",
+  "measured_at": "2026-08-22",
+  "group_id": "grp_354a1d6fc277498fb02d61fd3c118543",
+  "trials": [
+    { "model": "claude-sonnet-5", "run_id": "run_0d5ZBmb7bCcOO0I3", "score": 100, "verdict": "pass" },
+    { "model": "claude-sonnet-5", "run_id": "run_XEttMh3mIaJLnE0Q", "score": 100, "verdict": "pass" },
+    { "model": "claude-sonnet-5", "run_id": "run_XH2IO9wZCpXF0CL1", "score": 100, "verdict": "pass" },
+    { "model": "claude-sonnet-5", "run_id": "run_JExYdPOcl7qvgK4M", "score": 100, "verdict": "pass" },
+    { "model": "claude-sonnet-5", "run_id": "run_SIavcuVp4E61M3GH", "score": 100, "verdict": "pass" }
+  ]
+}
+```
