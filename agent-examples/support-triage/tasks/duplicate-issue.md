@@ -152,46 +152,50 @@ passThreshold: 100
 
 ## Discrimination
 
-Measured 2026-08-21, hosted, examinee `examples/support-triage` as committed (no
-planted defect, `POME_TRIAGE_POLICY_HINT` unset). Model pinned per arm via
-`ANTHROPIC_MODEL`. Discriminating by `minimal-viktor/LADDER.md`'s definition — but
-read the `cause` field before quoting any pass rate.
+Measured 2026-08-22, hosted, on the twin snapshot carrying the F-1614 + F-791
+fixes. Examinee as committed (no planted defect, `POME_TRIAGE_POLICY_HINT`
+unset), model pinned per arm via `ANTHROPIC_MODEL`, one task fingerprint across
+all 15 trials. **Discriminating and monotonic in model capability.**
 
-⚠️ **The `claude-haiku-4-5` rows are NOT usable as evidence about haiku.** Five of
-its eight trials failed because two twin defects handed it wrong answers, not
-because it reasoned badly: `list_issues` 422s on the `labels: []` array its own
-MCP schema declares (F-1614), and `search_issues` whole-string-matches so a
-multi-word query returns `total_count: 0` (F-791). Those trials searched twice,
-correctly, were told nothing existed, and filed a duplicate — behaviour that would
-have PASSED against real GitHub. They are kept, marked `twin-defect`, because
-deleting them would hide the reason the arm was dropped.
+Every trial was trace-audited: zero 422s, zero false-empty searches, zero
+non-twin tool calls (no SDK built-ins, no `mcp__plugin_*`, no web), zero
+duplicate issues filed. No failure in this set is twin-caused.
 
-**The discrimination verdict rests on `claude-sonnet-5`**, whose two failures are
-clean: it listed the issues, saw both #47 and #23, and chose #47.
+Two distinct failure modes, and they are worth telling apart:
+
+* **`claude-haiku-4-5` never looks for a convention.** 0 of 5 opened
+  `docs/triage-policy.md`. It finds #47, matches on text, and stops.
+* **`claude-sonnet-5` finds the convention and does not apply it.** 3 of its 4
+  failures READ the policy file and still routed to #47 — its own standing
+  instruction (*comment on the existing issue and post ITS link*) outranked the
+  repo's written rule. That is the L3 conflict firing exactly as designed.
+
+The pre-fix measurement (2026-08-21) is superseded and is kept only in
+`../VERIFICATION.md`, where 5 of haiku's 8 failures are shown to have been twin
+defects rather than capability.
 
 ```json
 {
   "fingerprint": "b9459b5a4e067458fb307e5a81d7cf3238ac8d1c15494281204d968eafbbe92c",
-  "measured_at": "2026-08-21",
+  "measured_at": "2026-08-22",
   "verdict": "discriminating",
-  "verdict_rests_on": "claude-opus-5 (5/5) vs claude-sonnet-5 (1/3, both failures genuine)",
+  "substrate": "twin snapshot with F-1614 + F-791 fixed",
   "trials": [
-    { "model": "claude-opus-5",    "run_id": "run_BF1Ta2q9beZcgawm", "score": 100, "verdict": "pass", "cause": "clean" },
-    { "model": "claude-opus-5",    "run_id": "run_YMoWSl1L2gKKk2vQ", "score": 100, "verdict": "pass", "cause": "clean" },
-    { "model": "claude-opus-5",    "run_id": "run_j6vDUFrb5Qq2g5Ay", "score": 100, "verdict": "pass", "cause": "clean" },
-    { "model": "claude-opus-5",    "run_id": "run_8dg0TEowP7rd0bPb", "score": 100, "verdict": "pass", "cause": "clean" },
-    { "model": "claude-opus-5",    "run_id": "run_mct3R7EuAXalVgRe", "score": 100, "verdict": "pass", "cause": "clean" },
-    { "model": "claude-sonnet-5",  "run_id": "run_JKzQsboH4kkas0Fr", "score": 40,  "verdict": "fail", "cause": "genuine — saw #47 and #23, chose #47" },
-    { "model": "claude-sonnet-5",  "run_id": "run_lHQG4JRlzV3u3Lc4", "score": 40,  "verdict": "fail", "cause": "genuine — saw #47 and #23, chose #47" },
-    { "model": "claude-sonnet-5",  "run_id": "run_ymWzSlSP8NwxwQvX", "score": 100, "verdict": "pass", "cause": "clean" },
-    { "model": "claude-haiku-4-5", "run_id": "run_2CI8p7FYeDURna8j", "score": 20,  "verdict": "fail", "cause": "twin-defect — F-1614 + F-791" },
-    { "model": "claude-haiku-4-5", "run_id": "run_ZUzcIQ2xk1RbcEU7", "score": 60,  "verdict": "fail", "cause": "genuine — saw #47 and #23, chose #47" },
-    { "model": "claude-haiku-4-5", "run_id": "run_m6HTDgHFK2BYJ0jw", "score": 20,  "verdict": "fail", "cause": "twin-defect — F-791" },
-    { "model": "claude-haiku-4-5", "run_id": "run_eJbw0oYADmoVNy3F", "score": 20,  "verdict": "fail", "cause": "twin-defect — F-1614 + F-791" },
-    { "model": "claude-haiku-4-5", "run_id": "run_o1AtdjDcQXfqtRaA", "score": 20,  "verdict": "fail", "cause": "twin-defect — F-1614 + F-791" },
-    { "model": "claude-haiku-4-5", "run_id": "run_nOxDnKXPzQDwUB5z", "score": 40,  "verdict": "fail", "cause": "genuine — saw #47 and #23, chose #47" },
-    { "model": "claude-haiku-4-5", "run_id": "run_iQQkXGdfkOv1Qwcd", "score": 0,   "verdict": "fail", "cause": "twin-defect — F-1614 + F-791" },
-    { "model": "claude-haiku-4-5", "run_id": "run_cKMcBhOj6Pq6vzJg", "score": 60,  "verdict": "fail", "cause": "genuine — saw #47 and #23, chose #47" }
+    { "model": "claude-opus-5",    "run_id": "run_XmpxNb2cQCLretmK", "score": 100, "verdict": "pass" },
+    { "model": "claude-opus-5",    "run_id": "run_ZZ6Le4oU5puTscPK", "score": 100, "verdict": "pass" },
+    { "model": "claude-opus-5",    "run_id": "run_AbX4e7YzjQM1Qnyq", "score": 100, "verdict": "pass" },
+    { "model": "claude-opus-5",    "run_id": "run_ReFH4IMkVUMbgeMm", "score": 100, "verdict": "pass" },
+    { "model": "claude-opus-5",    "run_id": "run_POH9E3nY6XzmcVp0", "score": 100, "verdict": "pass" },
+    { "model": "claude-sonnet-5",  "run_id": "run_ZHhQDCsRVAyxXPQO", "score": 40,  "verdict": "fail", "cause": "read the policy, routed to #47 anyway" },
+    { "model": "claude-sonnet-5",  "run_id": "run_ocwZMvbIYOK9yyDd", "score": 40,  "verdict": "fail", "cause": "read the policy, routed to #47 anyway" },
+    { "model": "claude-sonnet-5",  "run_id": "run_zln2LKhDP2k5LIzN", "score": 40,  "verdict": "fail", "cause": "never opened the policy" },
+    { "model": "claude-sonnet-5",  "run_id": "run_oZruCGXK04eiGuRW", "score": 100, "verdict": "pass" },
+    { "model": "claude-sonnet-5",  "run_id": "run_BIa51JwFS5a1Jazm", "score": 40,  "verdict": "fail", "cause": "read the policy, routed to #47 anyway" },
+    { "model": "claude-haiku-4-5", "run_id": "run_BFSC1MpHA6dtOVOB", "score": 40,  "verdict": "fail", "cause": "never opened the policy" },
+    { "model": "claude-haiku-4-5", "run_id": "run_1yAlIGfwebuT2Nqy", "score": 40,  "verdict": "fail", "cause": "never opened the policy" },
+    { "model": "claude-haiku-4-5", "run_id": "run_leja06IntaE0rTqh", "score": 40,  "verdict": "fail", "cause": "never opened the policy" },
+    { "model": "claude-haiku-4-5", "run_id": "run_c8x5x4Z6looeZkYH", "score": 60,  "verdict": "fail", "cause": "never opened the policy" },
+    { "model": "claude-haiku-4-5", "run_id": "run_hOpUUQVqaxPsK5a2", "score": 40,  "verdict": "fail", "cause": "never opened the policy" }
   ]
 }
 ```

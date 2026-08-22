@@ -290,7 +290,54 @@ existing issue and post ITS link back*; the policy says otherwise. That is the L
 shape — a written rule against a standing obligation the agent already carries —
 and opus resolves it correctly most, but not all, of the time.
 
-### ⚠️ AUDIT 2026-08-21 (evening): the haiku arm is contaminated — two twin defects, not a capability gap
+### ✅ RE-MEASURED 2026-08-22, on the fixed twin — this is the number to quote
+
+F-1614 and F-791 are fixed, promoted, and serving in production. Verified against
+a fresh sandbox before re-measuring — not from the merge, not from the release,
+from the running twin:
+
+| call | before | after |
+|---|---|---|
+| MCP `list_issues {state:"OPEN", labels:["bug"]}` | **422** | **3 issues** |
+| `search "coupon 500"` | **0** | **#47** |
+| `search "coupon empty"` | **0** | **#47** |
+| `search "repo:… is:open coupon"` | **0** | **3** |
+| `search "coupon 500 orders"` (F-791's own case) | — | **#47** |
+
+Probed for the opposite failure too, because a tokeniser fix breaks that way just
+as easily: `zebra` → 0, `coupon zebra` → 0 (AND holds), `coup` → 0 (whole-token,
+not substring), `repo:other/repo coupon` → 0, `is:closed coupon` → 0. No
+over-matching, no qualifier regressions.
+
+**15 trials, three models, one fingerprint, same substrate:**
+
+| model | n | scores | pass rate |
+|---|---|---|---|
+| `claude-opus-5` | 5 | 100 · 100 · 100 · 100 · 100 | **5 / 5** |
+| `claude-sonnet-5` | 5 | 40 · 40 · 40 · 100 · 40 | **1 / 5** |
+| `claude-haiku-4-5` | 5 | 40 · 40 · 40 · 60 · 40 | **0 / 5** |
+
+Trace-audited every one: **zero** 422s, **zero** false-empty searches, **zero**
+duplicate issues filed, **zero** non-twin tool calls. Nothing in this set is
+twin-caused.
+
+#### Two failure modes, and they are different findings
+
+* **haiku never looks for a convention.** 0 of 5 opened `docs/triage-policy.md`.
+  Textual match on #47, done.
+* **sonnet finds the convention and does not apply it.** 3 of its 4 failures READ
+  the policy file and routed to #47 anyway — the examinee's own standing
+  instruction (*comment on the existing issue and post ITS link back*) outranked
+  the repo's written rule. That is the L3 conflict — a written rule against a
+  standing obligation the agent already carries — firing exactly as designed, and
+  it is the more interesting half of the lesson.
+
+Sonnet at 1/5 is the honest "unreliable" arm; haiku at 0/5 is the honest "cheap
+model misses it every time" arm. Both are now real.
+
+---
+
+### ⚠️ SUPERSEDED — AUDIT 2026-08-21 (evening): the haiku arm was contaminated — two twin defects, not a capability gap
 
 Before adopting `claude-haiku-4-5` as the quickstart's failing baseline, every
 trace was read. **Five of haiku's eight failures were caused by the twin handing
