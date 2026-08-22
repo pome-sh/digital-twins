@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // F-900 example-launch smoke. `tsc` cannot see a temporal-dead-zone crash:
-// F-866's typecheck-examples gate was green while every real launch of
+// F-866's examples typecheck gate was green while every real launch of
 // `examples/triage-agent` died at startup with
 //   ReferenceError: Cannot access 'TwinMcpClient' before initialization
 // because the top-level `await main()` ran before the `class TwinMcpClient`
@@ -492,7 +492,7 @@ export function assertEveryExampleEmitsMarker(dir, examples) {
 // The DEPENDENCY only covers an example if it resolves to the WORKSPACE copy of
 // the adapter. `examples/support-triage` pins the PUBLISHED tarball on purpose
 // (it is `npx degit`-fetchable as a standalone subtree — see
-// scripts/typecheck-examples.mjs's header), and a published tarball cut before
+// scripts/gate-examples.mjs's header), and a published tarball cut before
 // the marker existed prints nothing: measured on this branch, its installed
 // `dist/index.js` contains ZERO occurrences of OUTBOUND_MARKER while the three
 // `file:`-linked siblings contain one each, so support-triage FAILED every run

@@ -44,6 +44,7 @@ npm run typecheck            # every workspace
 npm run build                # every workspace, dependency-ordered
 npm run test:contract        # contract/ suite, needs a built cli/
 npm run test:pack            # installs both tarballs in a clean room
+npm run gate:examples        # typechecks + tests every example, own install
 npm run smoke:examples       # launches every example for real
 npm run lint:dead-code       # knip
 npm run lint:code-health     # barrels + file size

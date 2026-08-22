@@ -11,7 +11,7 @@
 // *did the agent leave a summary*. F-1151 fixed the twin. Nothing had noticed,
 // because the two older example gates each stop short of a twin call:
 //
-//   scripts/typecheck-examples.mjs — compiles each example. A tool whose
+//   scripts/gate-examples.mjs     — compiles and tests each example. A tool whose
 //     arguments are well-typed and whose endpoint 404s is green.
 //   scripts/smoke-examples.mjs     — launches each example and fails on a
 //     crash-on-load. It exits before any tool runs, deliberately, because a

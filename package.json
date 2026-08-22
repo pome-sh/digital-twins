@@ -13,7 +13,7 @@
     "test:contract": "node contract/run.mjs",
     "test:pack": "node scripts/clean-room-pack-test.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "typecheck:examples": "node scripts/typecheck-examples.mjs",
+    "gate:examples": "node scripts/gate-examples.mjs",
     "smoke:examples": "node scripts/smoke-examples.mjs",
     "probe:examples": "node scripts/probe-example-tools.mjs",
     "probe:twins": "node scripts/probe-twin-endpoints.mjs",

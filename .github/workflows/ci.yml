@@ -337,7 +337,7 @@ jobs:
       # published pins. The regression suite is pure functions with an
       # injected registry answer (no network, no npm ci), so it runs here
       # alongside its offline sibling; the live registry check itself runs in
-      # `typecheck-examples.mjs` in the heavy job below, where every example
+      # `gate-examples.mjs` in the heavy job below, where every example
       # is already `npm ci`'d against the real registry.
       - run: node scripts/check-example-pins-published.test.mjs
       - run: bash scripts/lint-no-cloud-imports.sh
@@ -488,18 +488,21 @@ jobs:
           # diverges — but stays printed in the diff. Needs the build above.
           npm run validate:mcp -w @pome-sh/twin-github
           # the bundled examples/ projects are standalone npm packages
-          # (own lockfiles), not workspaces, so `npm run typecheck` above misses
-          # them. Typecheck each against the just-built adapter so a zod-4 / SDK
-          # `tool()` typing regression can't sit latent again.
-          npm run typecheck:examples
-          # tsc cannot see a temporal-dead-zone crash: typecheck:examples
+          # (own lockfiles), not workspaces, so NEITHER `npm run typecheck` nor
+          # `npm test` above covers them. This typechecks each against the
+          # just-built adapter so a zod-4 / SDK `tool()` typing regression can't
+          # sit latent again, AND runs each example's own test suite -- 49 cases
+          # across five files that this repo had never executed anywhere, in
+          # four examples that declared a `test` script nothing invoked.
+          npm run gate:examples
+          # tsc cannot see a temporal-dead-zone crash: gate:examples
           # was green while every real launch of examples/triage-agent died with
           # `Cannot access 'TwinMcpClient' before initialization` (top-level
           # `await main()` ran above the class it uses). Launch each example for
           # real (POME_PREFLIGHT unset) and fail if it crashes on load.
           npm run smoke:examples
           # the two gates above each stop short of a twin call:
-          # typecheck:examples is green on a well-typed tool whose endpoint
+          # gate:examples is green on a well-typed tool whose endpoint
           # 404s, and smoke:examples returns before any tool fires because a
           # real run needs a model. Both examples/pr-summary-agent and
           # examples/pr-summary-review shipped a `comment_on_pull_request` the

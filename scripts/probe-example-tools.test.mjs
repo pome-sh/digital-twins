@@ -7,7 +7,7 @@
  * `add_issue_comment` at a pull request's number, the GitHub twin answered
  * `404 Issue not found` for every one of those calls on all four subjects for
  * as long as the examples had existed, and both older example gates
- * (typecheck:examples, smoke:examples) were green throughout. The cases below
+ * (gate:examples, smoke:examples) were green throughout. The cases below
  * are written from that incident.
  */
 import { spawn } from "node:child_process";
