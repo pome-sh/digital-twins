@@ -9,9 +9,9 @@
 
 import { describe, expect, it } from "vitest";
 import * as wire from "@pome-sh/wire";
-import * as hub from "../../src/types/shared.js";
-import * as barrel from "../../src/contract/index.js";
-import * as run from "../../src/contract/run.js";
+import * as hub from "../../../src/types/shared.js";
+import * as barrel from "../../../src/contract/index.js";
+import * as run from "../../../src/contract/run.js";
 
 // F-942 — the recorder-events / otel / redaction leaves moved to
 // `@pome-sh/wire`, so the contract barrel no longer carries them; their

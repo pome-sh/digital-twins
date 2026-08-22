@@ -47,5 +47,5 @@ contract.
 
 ## How this repo consumes it
 
-`cli/test/contract/v1-fixture-parity.test.ts` parses every fixture under the
+`cli/test/unit/wire/v1-fixture-parity.test.ts` parses every fixture under the
 mapped schema and asserts the two-vocabulary normalization.

@@ -20,11 +20,11 @@ import {
   createSessionResponseSchema,
   planTierSchema,
   usageResponseSchema,
-} from "../../src/contract/index.js";
-import { runSchema } from "../../src/contract/run.js";
+} from "../../../src/contract/index.js";
+import { runSchema } from "../../../src/contract/run.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const corpusRoot = join(here, "..", "fixtures", "contract", "v1");
+const corpusRoot = join(here, "..", "..", "fixtures", "contract", "v1");
 
 // Directory name → schema. Keep in lockstep with fixtures/contract/v1/README.md.
 //

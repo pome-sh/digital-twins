@@ -19,7 +19,7 @@
 // the same PR.
 
 import { describe, expect, it } from "vitest";
-import * as api from "../../src/contract/index.js";
+import * as api from "../../../src/contract/index.js";
 // TYPE-surface guard: `Object.keys` only sees runtime values, so dropping an
 // `export type` / `export interface` — or a whole type-only leaf re-export —
 // would pass the runtime snapshot silently. This type-only import enumerates
@@ -94,7 +94,7 @@ import type {
   TeamRole,
   UsageResponse,
   User,
-} from "../../src/contract/index.js";
+} from "../../../src/contract/index.js";
 
 // Referencing every imported type keeps the guard alive under
 // noUnusedLocals-style settings; the tuple is never instantiated.

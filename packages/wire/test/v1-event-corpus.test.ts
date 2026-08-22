@@ -2,7 +2,7 @@
 //
 // F-1201 — the event-kind corpus (the wire half of the former
 // shared-types `v1-fixture-parity.test.ts`; the session/run/plan/usage half
-// moved with its schemas to `cli/test/contract/v1-fixture-parity.test.ts`).
+// moved with its schemas to `cli/test/unit/wire/v1-fixture-parity.test.ts`).
 //
 // `test/fixtures/v1/event/<Kind>/` is the only place a member of the event union
 // is described by a wire payload rather than by its own schema. Before F-1201
