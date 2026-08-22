@@ -3,7 +3,7 @@
 //
 // F-1152 example twin-tool probe gate.
 //
-// `examples/pr-summary-agent` and `examples/pr-summary-review` each exposed
+// `agent-examples/pr-summary-agent` and `agent-examples/pr-summary-review` each exposed
 // exactly one comment tool, `comment_on_pull_request`, wrapping
 // `add_issue_comment` at the pull request's number. The GitHub twin answered
 // `404 Issue not found` for every one of those calls, on all four subjects, for
@@ -197,7 +197,7 @@ export function discoverSeeds(exampleDir) {
  * directory with its own seeds and no manifest entry would still be silently
  * skipped by `runGate`'s `Object.keys(manifest)` loop. Comparing this set
  * against the manifest's keys in `runGate` is what makes that omission red
- * instead of quiet — `examples/support-triage` ships no `.seed.json` at all
+ * instead of quiet — `agent-examples/support-triage` ships no `.seed.json` at all
  * (its tasks are markdown prompts, a different format this gate does not
  * cover) and is correctly absent from both sides by construction, with no
  * exclusion list naming it.
@@ -334,7 +334,7 @@ function resolveFactToken(token, facts) {
  * rather than fixed one framework at a time. Reading only the wire status has a
  * floor the original gate had no assertion for: NO wire call at all reduces to
  * `status = 0`, which is `< 400`, which reads as "the twin did not refuse". Every
- * probe against `examples/minimal-viktor-langgraph` produced `calls: []` from the
+ * probe against `agent-examples/minimal-viktor-langgraph` produced `calls: []` from the
  * day it shipped, because the driver recognised `handler`/`execute` and LangChain
  * tools expose `.invoke()` — and the gate reported OK for all of it. Adding a
  * third shape to the driver fixes that instance; asserting that every probe
@@ -459,7 +459,7 @@ const SEED_INVARIANT = new Set(["unprobed-tool", "unknown-tool"]);
 export function formatFindings(findings) {
   const lines = [];
   for (const [example, group] of groupBy(findings, (finding) => finding.example)) {
-    lines.push(`FAILED  examples/${example}`);
+    lines.push(`FAILED  agent-examples/${example}`);
     const shown = new Set();
     for (const finding of group) {
       if (SEED_INVARIANT.has(finding.kind)) {
@@ -561,7 +561,7 @@ export function assertManifestEntry(name, entry, exampleDir, seeds, twinIds) {
     .filter((tool, index, all) => all.indexOf(tool) !== index);
   if (duplicated.length > 0) {
     throw new Error(
-      `examples/${name} declares more than one probe for tool(s) [${[...new Set(duplicated)].join(", ")}] — ` +
+      `agent-examples/${name} declares more than one probe for tool(s) [${[...new Set(duplicated)].join(", ")}] — ` +
         "results are keyed by tool name, so only the last would be judged",
     );
   }
@@ -574,12 +574,12 @@ export function assertManifestEntry(name, entry, exampleDir, seeds, twinIds) {
       try {
         return resolveFactToken(probe.expect_status_if, facts) === true;
       } catch (err) {
-        throw new Error(`examples/${name} (${seed}), tool ${probe.tool}: ${err.message}`);
+        throw new Error(`agent-examples/${name} (${seed}), tool ${probe.tool}: ${err.message}`);
       }
     });
     if (firesOn.length === 0) {
       throw new Error(
-        `examples/${name}, tool ${probe.tool}: declares expect_status ${probe.expect_status} when ` +
+        `agent-examples/${name}, tool ${probe.tool}: declares expect_status ${probe.expect_status} when ` +
           `${probe.expect_status_if}, but no seed this example ships satisfies that condition ` +
           `(checked ${seeds.length}: ${seeds.join(", ")}) — the exemption can never fire, drop it`,
       );
@@ -626,7 +626,7 @@ export async function probeExample(name, entry, opts) {
       }
       return resolved;
     } catch (err) {
-      throw new Error(`examples/${name} (${entry.seed}), tool ${probe.tool}: ${err.message}`);
+      throw new Error(`agent-examples/${name} (${entry.seed}), tool ${probe.tool}: ${err.message}`);
     }
   });
 
@@ -641,7 +641,7 @@ export async function probeExample(name, entry, opts) {
     const twinModule = TWIN_MODULES[id];
     if (!twinModule) {
       throw new Error(
-        `examples/${name} declares twin "${id}", which this gate cannot boot ` +
+        `agent-examples/${name} declares twin "${id}", which this gate cannot boot ` +
           `(knows: ${Object.keys(TWIN_MODULES).join(", ")})`,
       );
     }
@@ -749,7 +749,7 @@ async function runDriver(exampleDir, spec) {
 
 export async function runGate(opts = {}) {
   const repoRoot = opts.repoRoot ?? REPO_ROOT;
-  const examplesDir = opts.examplesDir ?? join(repoRoot, "examples");
+  const examplesDir = opts.examplesDir ?? join(repoRoot, "agent-examples");
   const manifestPath = opts.manifestPath ?? join(repoRoot, "config/example-tool-probes.json");
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   const names = Object.keys(manifest).sort();
@@ -798,7 +798,7 @@ export async function runGate(opts = {}) {
   for (const name of names) {
     const seeds = seedsByExample.get(name);
     for (const seed of seeds) {
-      process.stdout.write(`\n=== examples/${name} (${seed}) === `);
+      process.stdout.write(`\n=== agent-examples/${name} (${seed}) === `);
       const found = await probeExample(name, { ...manifest[name], seed }, { repoRoot, examplesDir });
       console.log(found.length === 0 ? `OK (${manifest[name].probes.length} tools)` : `${found.length} finding(s)`);
       findings.push(...found);

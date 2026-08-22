@@ -127,7 +127,7 @@
         "test/**/*.ts"
       ]
     },
-    "examples/*": {
+    "agent-examples/*": {
       "entry": [
         "src/index.ts",
         "test/**/*.ts"

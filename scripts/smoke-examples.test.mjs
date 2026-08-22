@@ -619,7 +619,7 @@ function check(name, got, want) {
 
     // NOT covered: it DEPENDS on the adapter, but from the REGISTRY — a
     // published tarball cut before the marker existed prints nothing, which is
-    // `examples/support-triage`'s real shape (measured: zero occurrences of the
+    // `agent-examples/support-triage`'s real shape (measured: zero occurrences of the
     // marker in its installed dist). A dependency-name-only check called this
     // covered while every run FAILED it.
     mkdirSync(join(dir, "registry-pinned", "src"), { recursive: true });
@@ -668,7 +668,7 @@ function check(name, got, want) {
   }
 }
 
-// ── F-1519: the real examples/ directory in THIS repo passes the guard ─────
+// ── F-1519: the real agent-examples/ directory in THIS repo passes the guard ─────
 // The synthetic fixtures above prove the guard's logic; this proves the
 // guard actually holds against the tree it will run against in CI.
 {
@@ -681,7 +681,7 @@ function examplesDirForRepo() {
   // fileURLToPath, not `.pathname`: the latter stays percent-encoded, so a
   // checkout under a path with a space reds this on ENOENT for a reason that
   // has nothing to do with the property being asserted.
-  return fileURLToPath(new URL("../examples", import.meta.url));
+  return fileURLToPath(new URL("../agent-examples", import.meta.url));
 }
 
 if (failures > 0) {

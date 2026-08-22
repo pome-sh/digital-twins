@@ -36,7 +36,7 @@ jobs:
           fi
           # Paths that can affect package build/test/parity or the CI contract.
           if git diff --name-only "${BASE_SHA}" HEAD | grep -qE \
-            '^(packages/|cli/|examples/|scripts/|contract/|config/|knip\.json|package(-lock)?\.json$|\.github/workflows/ci\.yml$)'; then
+            '^(packages/|cli/|agent-examples/|scripts/|contract/|config/|knip\.json|package(-lock)?\.json$|\.github/workflows/ci\.yml$)'; then
             echo "heavy=true" >> "$GITHUB_OUTPUT"
             echo "Running heavy suite (package/cli/script/lockfile/ci changes)."
           else
@@ -328,12 +328,12 @@ jobs:
       # The scan's subject is the root `workspaces` field, not a hand-kept
       # `packages/*` list, so `cli/package.json` is in scope too and a PR
       # reintroducing an exact pin there is caught by the same walk.
-      # `examples/*` are deliberately NOT in scope — they
+      # `agent-examples/*` are deliberately NOT in scope — they
       # install from the registry by design; see the script's header.
       # Dependency-free, so it runs here before `npm ci`.
       - run: node scripts/check-workspace-pins-match-workspace.mjs
       - run: node scripts/check-workspace-pins-match-workspace.test.mjs
-      # the sibling of the gate above for `examples/*`'s deliberately
+      # the sibling of the gate above for `agent-examples/*`'s deliberately
       # published pins. The regression suite is pure functions with an
       # injected registry answer (no network, no npm ci), so it runs here
       # alongside its offline sibling; the live registry check itself runs in
@@ -371,7 +371,7 @@ jobs:
           # allows `>=24`, and a guard built on it exits 0 having run nothing.
           # scripts/probe-twin-endpoints.mjs and SIX bundled examples shipped
           # exactly that shape; this PARSES every source file under scripts/,
-          # contract/, cli/src/, cli/scripts/, packages/ and examples/ (never a
+          # contract/, cli/src/, cli/scripts/, packages/ and agent-examples/ (never a
           # hand-kept list) so the next one reds instead of going quiet. Every
           # one of those roots is in the heavy-suite scope regex above, so this
           # is not path-filtered away from any diff that could trip it. Needs
@@ -386,7 +386,7 @@ jobs:
           # Slack workspace through inherited Claude Code plugin MCP servers,
           # makes zero twin calls, and scores as a triage failure — a verdict
           # about the wrong workspace entirely. Parses every source
-          # file of every examples/* package that declares the SDK (discovered
+          # file of every agent-examples/* package that declares the SDK (discovered
           # from the manifests, never a hand-kept list), because the likeliest
           # regression is deleting the options and keeping the comment that
           # explains them, which a grep would call green. Same dependency
@@ -487,7 +487,7 @@ jobs:
           # two callers are different HTTP clients, not because the twin
           # diverges — but stays printed in the diff. Needs the build above.
           npm run validate:mcp -w @pome-sh/twin-github
-          # the bundled examples/ projects are standalone npm packages
+          # the bundled agent-examples/ projects are standalone npm packages
           # (own lockfiles), not workspaces, so NEITHER `npm run typecheck` nor
           # `npm test` above covers them. This typechecks each against the
           # just-built adapter so a zod-4 / SDK `tool()` typing regression can't
@@ -496,7 +496,7 @@ jobs:
           # four examples that declared a `test` script nothing invoked.
           npm run gate:examples
           # tsc cannot see a temporal-dead-zone crash: gate:examples
-          # was green while every real launch of examples/triage-agent died with
+          # was green while every real launch of agent-examples/triage-agent died with
           # `Cannot access 'TwinMcpClient' before initialization` (top-level
           # `await main()` ran above the class it uses). Launch each example for
           # real (POME_PREFLIGHT unset) and fail if it crashes on load.
@@ -504,8 +504,8 @@ jobs:
           # the two gates above each stop short of a twin call:
           # gate:examples is green on a well-typed tool whose endpoint
           # 404s, and smoke:examples returns before any tool fires because a
-          # real run needs a model. Both examples/pr-summary-agent and
-          # examples/pr-summary-review shipped a `comment_on_pull_request` the
+          # real run needs a model. Both agent-examples/pr-summary-agent and
+          # agent-examples/pr-summary-review shipped a `comment_on_pull_request` the
           # GitHub twin answered `404 Issue not found` for, on every subject,
           # for as long as they existed. Boot each example's declared twins on
           # EVERY seed the example ships and invoke every registered tool once
@@ -629,7 +629,7 @@ jobs:
       # known by CONSTRUCTION (deterministic scripts, no model, no socket) are
       # pushed through the real evaluator path — `parseTaskFile`, `bindCriterion`,
       # each declared check's own `evaluate` — over the real github + slack twins
-      # seeded from `examples/support-triage`'s own task file. Asserted: the
+      # seeded from `agent-examples/support-triage`'s own task file. Asserted: the
       # PER-CRITERION breakdown for both runs, the denominator that produced it,
       # that nothing was skipped or left unbound, and only then the aggregate.
       #

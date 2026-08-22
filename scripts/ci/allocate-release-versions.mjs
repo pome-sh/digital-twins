@@ -242,14 +242,14 @@ export function planAllocations({ root = resolve(HERE, "../.."), date = today(),
   }
 
   // F-1520 — an example that pins a `@pome-sh/*` package from the registry
-  // (today only `examples/support-triage`) must never fall out of sync with
+  // (today only `agent-examples/support-triage`) must never fall out of sync with
   // that sibling's published version: two incidents (adapter 0.3.4 and 0.3.6,
   // both 2026-08-13) each reddened `check-example-pins-published.mjs` until a
   // human noticed and opened a one-line PR. `planExampleRepins` is the part of
   // that gate's own logic that already answers "which pins are safely fixable
   // right now" (its `violations`: drifted AND the sibling is CONFIRMED
   // published) — reused rather than re-implemented, discovered from
-  // `examples/*/package.json` rather than a hand-kept list.
+  // `agent-examples/*/package.json` rather than a hand-kept list.
   //
   // Deliberately measured against the manifests ON DISK, before this run's own
   // `writes` above are applied: a package THIS SAME run is bumping is not yet
@@ -267,7 +267,7 @@ export function planAllocations({ root = resolve(HERE, "../.."), date = today(),
   // re-pin is cosmetic; an allocation is not — and this function runs on every
   // push to `main`, so ANY throw from the example walk stops EVERY package's
   // release over one example directory. The reachable vectors today are already
-  // more than one (an ambiguous pin, a malformed `examples/*/package.json` that
+  // more than one (an ambiguous pin, a malformed `agent-examples/*/package.json` that
   // `discoverExampleSiblingDeps` `JSON.parse`s unguarded, `loadWorkspaceMembers`
   // on an empty `workspaces` glob) and the next one arrives with the next
   // caller, so the invariant is enforced here where it is total. The failure is
@@ -323,7 +323,7 @@ function commitMessage(allocations, repins, head) {
     subject,
     "",
     ...allocations.map((a) => `- ${a.name} ${a.from} → ${a.to} (${a.level}, ${a.reason})`),
-    ...repins.map((r) => `- examples/${r.example} ${r.dep} ${r.from} → ${r.to} (published pin re-pin, F-1520)`),
+    ...repins.map((r) => `- agent-examples/${r.example} ${r.dep} ${r.from} → ${r.to} (published pin re-pin, F-1520)`),
     "",
     `Allocated from ${head.slice(0, 8)} by .github/workflows/allocate-version.yml.`,
     "The version number is written here, after the merge, and never in a PR.",
@@ -372,7 +372,7 @@ export function main(argv = process.argv.slice(2)) {
     if (a.relevantFiles.length > 10) console.log(`    … ${a.relevantFiles.length - 10} more`);
   }
   for (const r of plan.repins) {
-    console.log(`examples/${r.example}: ${r.dep} ${r.from} → ${r.to}  (published pin drift, F-1520)`);
+    console.log(`agent-examples/${r.example}: ${r.dep} ${r.from} → ${r.to}  (published pin drift, F-1520)`);
   }
 
   const planOut = flagValue("--plan-out");

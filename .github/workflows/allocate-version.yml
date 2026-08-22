@@ -143,7 +143,7 @@ jobs:
     # release.yml dispatches only after a real publish, and the single commit this
     # run pushes can only cause another publish by MOVING a package version,
     # which requires a pending `## Unreleased` entry — which this same run
-    # consumes. A re-pin-only commit touches `examples/*` and their lockfiles, no
+    # consumes. A re-pin-only commit touches `agent-examples/*` and their lockfiles, no
     # package version, so release.yml's `plan` finds no diff against the registry,
     # publishes nothing, and dispatches nothing. The chain is bounded by the
     # number of pending entries and CI writes none.

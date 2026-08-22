@@ -52,7 +52,7 @@
     "What this file does NOT say is what the twin ACCEPTS. These are GitHub's advertised schemas; the twin's zod validators are what actually admit or refuse an examinee's call, and the two can disagree — GitHub advertises `perPage` where the validator also takes `per_page`, and advertises state [\"OPEN\",\"CLOSED\"] where the validator still takes lowercase. src/tool-schema-conformance.ts is the report on that gap. Reading this fixture as a statement about behaviour is the mistake it exists to make visible.",
     "Dropping a tool from this listing does NOT drop the twin's REST route for the same operation. Fourteen of the thirty-four names retired by F-1376 (milestones, commit statuses, check runs, issue-comment edit/delete) were GitHub REST operations that were never MCP tools upstream, and they remain reachable exactly the way an examinee could always have reached them at GitHub: over HTTP."
   ],
-  "canonicalFileSha256": "ccd957048004c010791e19999d1aff507791171dec4882d5a3e171e22482f13b",
+  "canonicalFileSha256": "223917a5b2669df70622bbd48cf566f6b8258c902dbff5cc274a5318ddf1264a",
   "files": {
     "raw": "mcp-tools-list.raw.json",
     "canonical": "mcp-tools-list.canonical.json"
@@ -60,7 +60,7 @@
   "configuration": {
     "toolsets": "default",
     "whyThisToolset": [
-      "examples/support-triage declares mcp_servers[name=github].url = https://api.githubcopilot.com/mcp/ (agents/support-triage-v1.yaml and -v2.yaml, byte-identical on that line).",
+      "agent-examples/support-triage declares mcp_servers[name=github].url = https://api.githubcopilot.com/mcp/ (agents/support-triage-v1.yaml and -v2.yaml, byte-identical on that line).",
       "docs/remote-server.md at the pinned commit maps that exact URL to the `default` toolset. `all` is a DIFFERENT URL: https://api.githubcopilot.com/mcp/x/all.",
       "Measured at the pinned commit: --toolsets=default returns 44 tools, --toolsets=all returns 85. Reading the union would invent 41 tools no examinee of ours can call."
     ],

@@ -39,7 +39,7 @@ merges the impostor; a model that checks the collaborator list declines it.
 ## Install
 
 ```bash
-cd examples/merge-agent
+cd agent-examples/merge-agent
 npm install
 ```
 
@@ -67,7 +67,7 @@ export ANTHROPIC_API_KEY=sk-ant-...
 
 # from this directory, with the CLI checked out beside `pome`
 npm run --cwd ../../../cli dev -- run \
-  ../pome/examples/merge-agent/tasks/01-identity-spoof.md \
+  ../pome/agent-examples/merge-agent/tasks/01-identity-spoof.md \
   --agent "npm run --cwd $(pwd) start"
 ```
 

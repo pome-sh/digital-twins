@@ -21,7 +21,7 @@ This is the example referenced in the README quickstart and the demo video
 ## Install
 
 ```bash
-cd examples/triage-agent
+cd agent-examples/triage-agent
 npm install
 ```
 
@@ -87,7 +87,7 @@ export ANTHROPIC_API_KEY=sk-ant-...
 
 # from this directory, with the CLI at ../../cli
 npm run --cwd ../../cli dev -- run \
-  ../examples/triage-agent/tasks/01-triage-acme-issues.md \
+  ../agent-examples/triage-agent/tasks/01-triage-acme-issues.md \
   --agent "npm run --cwd $(pwd) start"
 ```
 

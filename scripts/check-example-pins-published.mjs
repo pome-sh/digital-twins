@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1483 — `examples/*` pins a PUBLISHED `@pome-sh/*` version on purpose
-// (`examples/support-triage` documents why in `gate-examples.mjs`'s
+// F-1483 — `agent-examples/*` pins a PUBLISHED `@pome-sh/*` version on purpose
+// (`agent-examples/support-triage` documents why in `gate-examples.mjs`'s
 // header: it is `npx degit`-fetchable as a standalone subtree, so a `file:`
 // link out of its own directory would break its `npm install`). Nothing
 // watched that pin drift out from under the sibling workspace version twice
@@ -13,7 +13,7 @@
 // `check-workspace-pins-match-workspace.mjs` cannot own this: it runs OFFLINE
 // before `npm ci`, and its rule ("a `@pome-sh/*` dep must resolve to the
 // workspace") is the wrong rule for a pin that is published on purpose. This
-// gate needs the registry, so it lives where `examples/*` are already
+// gate needs the registry, so it lives where `agent-examples/*` are already
 // installed — `gate-examples.mjs` already runs `npm ci` per example in
 // CI's heavy (networked) job — rather than standing up a second CI mechanism.
 //
@@ -38,11 +38,11 @@
 // compared" must never mean "silently uncounted" — that is the D5 failure shape
 // this gate exists to close, and the first draft of it had exactly that hole:
 // discovery `continue`d past every non-exact pin, so re-pinning
-// `examples/support-triage` to `^0.3.3` made its watch evaporate while the
+// `agent-examples/support-triage` to `^0.3.3` made its watch evaporate while the
 // report still printed a clean pass. (It only reddened at all because
 // support-triage happens to own the sole exact pin in the tree, so the
 // zero-eligible-pins floor caught it by arithmetic accident; add one more
-// exact pin anywhere under `examples/*` and the range pin goes silent.)
+// exact pin anywhere under `agent-examples/*` and the range pin goes silent.)
 //
 // So every `@pome-sh/*` dep that HAS a workspace sibling is classified, and all
 // three classes are reported:
@@ -60,7 +60,7 @@
 //                     A pin nobody can check must not read as a pin nobody
 //                     needs to check.
 //
-// Discovery, not a list: every `examples/*/package.json`, walked fresh each
+// Discovery, not a list: every `agent-examples/*/package.json`, walked fresh each
 // run, is the corpus — so a new example shipping its own published pin is
 // covered with no edit here.
 
@@ -83,7 +83,7 @@ const SCOPE = "@pome-sh/";
 const INSTALL_FIELDS = ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"];
 
 /**
- * Every `@pome-sh/*` dep under `examples/*` that has a same-named sibling among
+ * Every `@pome-sh/*` dep under `agent-examples/*` that has a same-named sibling among
  * the root workspace members, classified into `exact` / `linked` /
  * `unwatchable` (see this file's header for why all three are reported and none
  * is dropped). One walk, so the three classes cannot disagree about what a
@@ -91,7 +91,7 @@ const INSTALL_FIELDS = ["dependencies", "devDependencies", "peerDependencies", "
  * packages.
  */
 export function discoverExampleSiblingDeps(repoRoot) {
-  const examplesDir = join(repoRoot, "examples");
+  const examplesDir = join(repoRoot, "agent-examples");
   const siblingsByName = new Map(
     loadWorkspaceMembers(repoRoot).map((member) => [member.manifest.name, member]),
   );
@@ -241,12 +241,12 @@ const writeSideNpmView = (name, version) => defaultNpmView(name, version, { atte
  * builds.
  *
  * Silently produces nothing when `repoRoot` has no `package.json` or no
- * `examples/` — the throwaway git fixtures `allocate-release-versions.test.mjs`
+ * `agent-examples/` — the throwaway git fixtures `allocate-release-versions.test.mjs`
  * builds are neither, and this function is called unconditionally from every
  * plan, not just ones that touch examples.
  */
 export function planExampleRepins(repoRoot, npmView = writeSideNpmView) {
-  if (!existsSync(join(repoRoot, "package.json")) || !existsSync(join(repoRoot, "examples"))) return [];
+  if (!existsSync(join(repoRoot, "package.json")) || !existsSync(join(repoRoot, "agent-examples"))) return [];
 
   const { exact } = discoverExampleSiblingDeps(repoRoot);
   const { violations, errors } = checkExamplePinsPublished(exact, npmView);
@@ -259,7 +259,7 @@ export function planExampleRepins(repoRoot, npmView = writeSideNpmView) {
     // do. Say so; the read-side gate is the one that hard-fails.
     console.warn(
       `::warning::${errors.length} example pin(s) could not be checked against the registry, so they are NOT ` +
-        `re-pinned in this run: ${errors.map((e) => `examples/${e.example} ${e.dep}@${e.workspaceVersion} (${e.detail})`).join("; ")}`,
+        `re-pinned in this run: ${errors.map((e) => `agent-examples/${e.example} ${e.dep}@${e.workspaceVersion} (${e.detail})`).join("; ")}`,
     );
   }
 
@@ -281,7 +281,7 @@ export function planExampleRepins(repoRoot, npmView = writeSideNpmView) {
   const latest = new Map();
   const repins = [];
   for (const v of violations) {
-    const manifestRelPath = `examples/${v.example}/package.json`;
+    const manifestRelPath = `agent-examples/${v.example}/package.json`;
     const contents = latest.get(manifestRelPath) ?? readFileSync(join(repoRoot, manifestRelPath), "utf8");
     const pattern = new RegExp(`("${escape(v.dep)}"\\s*:\\s*")${escape(v.pin)}(")`, "g");
     const occurrences = contents.match(pattern)?.length ?? 0;
@@ -318,7 +318,7 @@ export function planExampleRepins(repoRoot, npmView = writeSideNpmView) {
       // packument that predates it makes the install fail on a version the
       // registry really does serve.
       regenerate: [
-        `(cd "examples/${v.example}" && npm install --package-lock-only --no-audit --no-fund --prefer-online)`,
+        `(cd "agent-examples/${v.example}" && npm install --package-lock-only --no-audit --no-fund --prefer-online)`,
       ],
     });
   }
@@ -336,7 +336,7 @@ export function reportExamplePinParity(repoRoot, npmView = defaultNpmView) {
   const { exact, linked, unwatchable } = discoverExampleSiblingDeps(repoRoot);
   // The floor counts EXACT pins only. Counting `linked` here would have let a
   // tree whose examples are all `file:` links report a green pass having made
-  // zero registry calls — and converting `examples/support-triage` to a `file:`
+  // zero registry calls — and converting `agent-examples/support-triage` to a `file:`
   // link is a plausible edit (three other examples already are one), so that
   // would delete this gate's only watch silently, which is the whole shape it
   // exists to catch. `unwatchable` reds on its own below, so it does not need
@@ -344,8 +344,8 @@ export function reportExamplePinParity(repoRoot, npmView = defaultNpmView) {
   if (exact.length === 0) {
     throw new Error(
       "check-example-pins-published found zero exact-version @pome-sh/* pins with a workspace sibling under " +
-        `examples/* (${linked.length} file:/link: link(s), ${unwatchable.length} unwatchable) — refusing to ` +
-        "report a pass having made no registry call at all. examples/support-triage must keep an exact pin: " +
+        `agent-examples/* (${linked.length} file:/link: link(s), ${unwatchable.length} unwatchable) — refusing to ` +
+        "report a pass having made no registry call at all. agent-examples/support-triage must keep an exact pin: " +
         "its README offers `npx degit` of that subtree alone, which cannot resolve a link out of the tree.",
     );
   }
@@ -355,7 +355,7 @@ export function reportExamplePinParity(repoRoot, npmView = defaultNpmView) {
   if (errors.length > 0) {
     console.error(`\n❌ registry lookup FAILED for ${errors.length} pin(s) (not a skip — a real error):\n`);
     for (const e of errors) {
-      console.error(`  examples/${e.example} (${e.field}.${e.dep}@${e.workspaceVersion}): ${e.detail}`);
+      console.error(`  agent-examples/${e.example} (${e.field}.${e.dep}@${e.workspaceVersion}): ${e.detail}`);
     }
   }
 
@@ -363,7 +363,7 @@ export function reportExamplePinParity(repoRoot, npmView = defaultNpmView) {
     console.error(`\n❌ published pin DRIFT in ${violations.length} example(s):\n`);
     for (const v of violations) {
       console.error(
-        `  examples/${v.example} (${v.field}.${v.dep}): pins ${v.pin}, but the workspace sibling is ` +
+        `  agent-examples/${v.example} (${v.field}.${v.dep}): pins ${v.pin}, but the workspace sibling is ` +
           `${v.workspaceVersion} and ${v.workspaceVersion} is published. Re-pin to ${v.workspaceVersion}.`,
       );
     }
@@ -371,15 +371,15 @@ export function reportExamplePinParity(repoRoot, npmView = defaultNpmView) {
 
   if (unwatchable.length > 0) {
     console.error(
-      `\n❌ ${unwatchable.length} @pome-sh/* dep(s) under examples/* resolve from the registry but have no ` +
+      `\n❌ ${unwatchable.length} @pome-sh/* dep(s) under agent-examples/* resolve from the registry but have no ` +
         `single version to check — an unwatched pin, not an exempt one:\n`,
     );
     for (const u of unwatchable) {
       console.error(
-        `  examples/${u.example} (${u.field}.${u.dep}): "${u.pin}" is neither an exact version nor a ` +
+        `  agent-examples/${u.example} (${u.field}.${u.dep}): "${u.pin}" is neither an exact version nor a ` +
           `file:/link: workspace link. Pin it to the workspace version (${u.workspaceVersion}) so it can be ` +
           `watched. A file: link is the alternative ONLY for an example that is not offered for standalone ` +
-          `fetch — examples/support-triage is (its README documents \`npx degit\` of that subtree alone), so a ` +
+          `fetch — agent-examples/support-triage is (its README documents \`npx degit\` of that subtree alone), so a ` +
           `link out of the tree breaks its \`npm install\` and empties this gate at the same time.`,
       );
     }
@@ -388,7 +388,7 @@ export function reportExamplePinParity(repoRoot, npmView = defaultNpmView) {
   if (skips.length > 0) {
     console.log(`\n⚠️  skipped ${skips.length} pin(s) — sibling workspace version not yet published:`);
     for (const s of skips) {
-      console.log(`  examples/${s.example} (${s.field}.${s.dep}): workspace is ${s.workspaceVersion}, pin is ${s.pin}`);
+      console.log(`  agent-examples/${s.example} (${s.field}.${s.dep}): workspace is ${s.workspaceVersion}, pin is ${s.pin}`);
     }
   }
 

@@ -1,5 +1,14 @@
 # @pome-sh/checks
 
+## Unreleased (patch)
+
+**No consumer-visible change.** The repo's top-level `examples/` directory is now
+`agent-examples/`, so comments and one MCP tools-list provenance note that named
+the old path were updated with it. No tool, schema, status code, response body or
+shipped artifact moved; `packages/twin-github`'s fixture still serves the same 36
+tools. Listed only because those files sit under a path the next release of this
+package carries.
+
 ## 0.3.2 — 2026-08-22
 
 **No consumer-visible change.** The nine per-workspace `vitest.config.ts` files

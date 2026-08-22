@@ -70,7 +70,7 @@ jobs:
       - name: Install each example's own dependencies
         run: |
           set -euo pipefail
-          for dir in examples/*/; do
+          for dir in agent-examples/*/; do
             (cd "$dir" && npm ci)
           done
       # One secret shared by every twin this run boots (same TWIN_AUTH_SECRET

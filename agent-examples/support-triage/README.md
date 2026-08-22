@@ -271,7 +271,7 @@ This example is built to be spawned as a **local subprocess** by the coach
 1. **Fetch just this folder** onto the builder's machine:
 
    ```bash
-   npx degit pome-sh/digital-twins/examples/support-triage support-triage-local
+   npx degit pome-sh/digital-twins/agent-examples/support-triage support-triage-local
    cd support-triage-local && npm install
    ```
 

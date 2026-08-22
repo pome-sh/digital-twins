@@ -133,8 +133,8 @@ function assertNoStrayTarballArtifacts(tarball, label) {
     fail(`${label}: tarball contains dangling sourcemaps:\n${sourcemaps.join("\n")}`);
   }
 
-  // A compiled `examples/` directory under `dist/` would mean the top-level
-  // workspace `examples/` (standalone demo projects, never meant to publish)
+  // A compiled `agent-examples/` directory under `dist/` would mean the top-level
+  // workspace `agent-examples/` (standalone demo projects, never meant to publish)
   // got swept into the bundle output. `cli/examples/**` (raw .ts demo
   // agents) is a deliberate, separate top-level `files` entry — this only
   // guards the BUILD OUTPUT, not the package's own declared source examples.

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The `examples/*` gate: typecheck, then test, each example in its own install.
+// The `agent-examples/*` gate: typecheck, then test, each example in its own install.
 //
-// The bundled `examples/*` projects are standalone npm packages (each with its
+// The bundled `agent-examples/*` projects are standalone npm packages (each with its
 // own lockfile), NOT workspaces, so neither the root `npm run typecheck` nor the
 // root `npm test` covers them. That gap is how a zod-4 / Claude Agent SDK
 // `tool()` typing regression sat latent until F-866.
@@ -13,7 +13,7 @@
 // non-workspace, no workflow invoked them, and
 // `check-packages-scripts-wired.mjs` -- the gate whose whole subject is a
 // declared check nothing runs -- scopes itself to `packages/*` and `cli/`, so it
-// could not see them. (`examples/triage-agent` is the exception: quickstart-
+// could not see them. (`agent-examples/triage-agent` is the exception: quickstart-
 // smoke.yml runs its 4 tests, but only behind that workflow's path filter.)
 //
 // So the loop below runs `npm test --if-present` beside the typecheck it already
@@ -28,7 +28,7 @@
 // source in the working tree — a prior root `npm ci`/`npm install` must have
 // populated node_modules.
 //
-// `examples/support-triage` is the fourth and the exception: it pins the
+// `agent-examples/support-triage` is the fourth and the exception: it pins the
 // PUBLISHED adapter by exact version (#308), because its README documents it as
 // standalone-fetchable via `npx degit`, which copies that subtree and nothing
 // above it, so a `file:` path out of the tree breaks its `npm install`. So this
@@ -52,7 +52,7 @@ import { fileURLToPath } from "node:url";
 import { reportExamplePinParity } from "./check-example-pins-published.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const examplesDir = join(repoRoot, "examples");
+const examplesDir = join(repoRoot, "agent-examples");
 
 function run(cmd, args, cwd) {
   execFileSync(cmd, args, { cwd, stdio: "inherit" });
@@ -89,12 +89,12 @@ try {
 const failures = [];
 for (const name of examples) {
   const cwd = join(examplesDir, name);
-  console.log(`\n=== examples/${name} ===`);
+  console.log(`\n=== agent-examples/${name} ===`);
   try {
     run("npm", ["ci"], cwd);
   } catch {
     failures.push(`${name} (install)`);
-    console.error(`examples/${name}: FAILED (install)`);
+    console.error(`agent-examples/${name}: FAILED (install)`);
     continue;
   }
   // One try PER LEG, not one around both. With both in a single try a tsc error
@@ -117,10 +117,10 @@ for (const name of examples) {
     }
   }
   if (broke.length === 0) {
-    console.log(`examples/${name}: OK`);
+    console.log(`agent-examples/${name}: OK`);
   } else {
     failures.push(`${name} (${broke.join(" + ")})`);
-    console.error(`examples/${name}: FAILED (${broke.join(" + ")})`);
+    console.error(`agent-examples/${name}: FAILED (${broke.join(" + ")})`);
   }
 }
 
@@ -134,12 +134,12 @@ if (failures.length > 0) {
 // the sibling workspace version wherever that version is published.
 //
 // Deliberately NOT behind the typecheck exit above. It used to be, and that
-// made an unrelated tsc error in ANY example (say `examples/merge-agent`) hide a
+// made an unrelated tsc error in ANY example (say `agent-examples/merge-agent`) hide a
 // real published-pin drift until someone fixed the typecheck and CI came round
 // again — a check that silently stops running behind another check's failure is
 // this milestone's whole subject. It reads manifests and calls the registry, so
 // it needs none of the installs above to have succeeded.
-console.log("\n=== examples/* pin↔registry parity ===");
+console.log("\n=== agent-examples/* pin↔registry parity ===");
 const parityOk = reportExamplePinParity(repoRoot);
 if (!parityOk) {
   console.error(

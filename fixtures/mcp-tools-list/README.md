@@ -103,7 +103,7 @@ is the golden MINUS that entry and the two shas differ by construction. gmail wi
 
 ## The trap the github adapter exists to avoid
 
-`api.githubcopilot.com/mcp/` — the URL `examples/support-triage` actually declares — serves the
+`api.githubcopilot.com/mcp/` — the URL `agent-examples/support-triage` actually declares — serves the
 `default` toolset, **not** every toolset. Measured at the pinned commit: `default` is 44 tools,
 `all` is 85. An adapter that read the Go source naively would take the union and report 41 coverage
 gaps for tools no examinee of ours can call. F-1179: a lane reporting divergence that is not real is

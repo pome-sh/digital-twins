@@ -57,7 +57,7 @@
   "configuration": {
     "toolsets": "default",
     "whyThisToolset": [
-      "examples/support-triage declares mcp_servers[name=github].url = https://api.githubcopilot.com/mcp/ (agents/support-triage-v1.yaml and -v2.yaml, byte-identical on that line).",
+      "agent-examples/support-triage declares mcp_servers[name=github].url = https://api.githubcopilot.com/mcp/ (agents/support-triage-v1.yaml and -v2.yaml, byte-identical on that line).",
       "docs/remote-server.md at the pinned commit maps that exact URL to the `default` toolset. `all` is a DIFFERENT URL: https://api.githubcopilot.com/mcp/x/all.",
       "Measured at the pinned commit: --toolsets=default returns 44 tools, --toolsets=all returns 85. Reading the union would invent 41 tools no examinee of ours can call."
     ],
@@ -87,7 +87,7 @@
     "package": "./cmd/github-mcp-server",
     "language": "go"
   },
-  "canonicalFileSha256": "f94cef03ce5c97b147985afd7c7f1c1483b351612c4457f6d3758d6b9a6cff5e",
+  "canonicalFileSha256": "fcfc9503ea51bf7b2c35ac6d18611529b0c40c1d3868e53293f1c59fbdf6b51b",
   "files": {
     "raw": "github.raw.json",
     "canonical": "github.canonical.json"

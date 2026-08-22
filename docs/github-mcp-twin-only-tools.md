@@ -47,7 +47,7 @@ Three facts from that source shape every ruling below.
    (`pkg/github/feature_flags.go`), which is the allowlist of flags "that can be
    enabled by users via `--features` CLI flag or `X-MCP-Features` HTTP header".
    So an examinee pointed at `https://api.githubcopilot.com/mcp/` — the URL
-   `examples/support-triage` declares — that sets `X-MCP-Features:
+   `agent-examples/support-triage` declares — that sets `X-MCP-Features:
    issues_granular` **is** served `create_issue`. These two are the only members
    of the 36 an agent can call against the real vendor under any configuration.
 
@@ -101,7 +101,7 @@ agent written against the twin calls `get_issue` and GitHub refuses it. That is
 the divergence, not an acceptable difference on top of it.
 
 **These 14 cannot simply be deleted, either.** They are the twin's only MCP path
-to read an issue or a pull request, and `examples/` calls them over MCP
+to read an issue or a pull request, and `agent-examples/` calls them over MCP
 (`TwinMcpClient.call`) in `triage-agent`, `pr-summary-agent`, `pr-summary-review`,
 `merge-agent`, `minimal-viktor` and `minimal-viktor-langgraph`. Deleting them
 without serving the vendor's consolidated tools first trades a false pass for a
@@ -150,7 +150,7 @@ a call the vendor answers for any examinee whose MCP config sets
 Not group B: in every case the **name** the twin serves does not exist at the
 vendor, so there is no configuration under which an examinee's call lands. The
 `labels` toolset is reachable only at a different URL than the one
-`examples/support-triage` declares.
+`agent-examples/support-triage` declares.
 
 ### Group D — no vendor MCP tool at all (16)
 

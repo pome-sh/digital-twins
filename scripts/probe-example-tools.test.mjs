@@ -3,7 +3,7 @@
  * Regression coverage for scripts/probe-example-tools.mjs (F-1152).
  *
  * The gate exists because `comment_on_pull_request` in
- * examples/pr-summary-agent and examples/pr-summary-review wrapped
+ * agent-examples/pr-summary-agent and agent-examples/pr-summary-review wrapped
  * `add_issue_comment` at a pull request's number, the GitHub twin answered
  * `404 Issue not found` for every one of those calls on all four subjects for
  * as long as the examples had existed, and both older example gates
@@ -55,7 +55,7 @@ function assertThrows(fn, match, msg) {
 // Mirrors cli/src/task/parseTask.ts. Envelope-iff-multi-twin, decided from the
 // declared twin list alone — never by sniffing the seed shape.
 //
-// A single-twin example ships a FLAT seed. examples/triage-agent's is
+// A single-twin example ships a FLAT seed. agent-examples/triage-agent's is
 // { _meta, users, repositories }.
 {
   const flat = { _meta: { version: 1 }, users: [], repositories: [{ owner: "acme", name: "api" }] };
@@ -282,14 +282,14 @@ assertThrows(
   // rename 03-failing-ci and there is nothing left behind to go stale.
   const viktorFacts = (seed) =>
     deriveSeedFacts(
-      splitSeed(JSON.parse(readFileSync(join(ROOT, "examples/minimal-viktor/tasks", seed), "utf8")), [
+      splitSeed(JSON.parse(readFileSync(join(ROOT, "agent-examples/minimal-viktor/tasks", seed), "utf8")), [
         "github",
         "slack",
       ]).github,
     );
   assert(
     viktorFacts("03-failing-ci.seed.json").pr.merge_blocked === true,
-    "examples/minimal-viktor/tasks/03-failing-ci.seed.json derives merge_blocked from its own seed",
+    "agent-examples/minimal-viktor/tasks/03-failing-ci.seed.json derives merge_blocked from its own seed",
   );
   for (const seed of [
     "01-clean-merge.seed.json",
@@ -322,15 +322,15 @@ assertThrows(
 // Discovery, not a hand-kept list — a new .seed.json under an example's
 // tasks/ is covered with no edit anywhere in this repo.
 {
-  const viktorSeeds = discoverSeeds(join(ROOT, "examples/minimal-viktor"));
+  const viktorSeeds = discoverSeeds(join(ROOT, "agent-examples/minimal-viktor"));
   assert(viktorSeeds.length === 6, `discoverSeeds finds all 6 minimal-viktor seeds (got ${viktorSeeds.length})`);
   assert(viktorSeeds[0] === "tasks/01-clean-merge.seed.json", "discoverSeeds returns seed-relative paths, sorted");
   assert(viktorSeeds.every((seed) => seed.endsWith(".seed.json")), "discoverSeeds only returns *.seed.json");
 
-  const reviewSeeds = discoverSeeds(join(ROOT, "examples/pr-summary-review"));
+  const reviewSeeds = discoverSeeds(join(ROOT, "agent-examples/pr-summary-review"));
   assert(reviewSeeds.length === 3, `discoverSeeds finds all 3 pr-summary-review seeds (got ${reviewSeeds.length})`);
 
-  const withSeeds = discoverExamplesWithSeeds(join(ROOT, "examples"));
+  const withSeeds = discoverExamplesWithSeeds(join(ROOT, "agent-examples"));
   for (const name of [
     "gmail-retry-notify",
     "merge-agent",
@@ -340,7 +340,7 @@ assertThrows(
     "pr-summary-review",
     "triage-agent",
   ]) {
-    assert(withSeeds.includes(name), `discoverExamplesWithSeeds includes examples/${name}`);
+    assert(withSeeds.includes(name), `discoverExamplesWithSeeds includes agent-examples/${name}`);
   }
   // support-triage's tasks are markdown prompts, not JSON seeds — a different
   // format this gate does not cover. It is correctly absent by construction
@@ -362,7 +362,7 @@ assertThrows(
 // if its args were actually re-derived rather than reused from the first seed.
 await withWireRuntime(async () => {
   const tmp = mkdtempSync(join(tmpdir(), "probe-f1163-dowith-"));
-  const examplesDir = join(tmp, "examples");
+  const examplesDir = join(tmp, "agent-examples");
   mkdirSync(examplesDir, { recursive: true });
   cpSync(join(ROOT, "scripts/fixtures/probe-examples/sound"), join(examplesDir, "sound"), { recursive: true });
   const manifestPath = join(tmp, "manifest.json");
@@ -445,7 +445,7 @@ await withWireRuntime(async () => {
 // ── totality: manifest keys and on-disk seeds must name the same examples ───
 await withWireRuntime(async () => {
   const tmp = mkdtempSync(join(tmpdir(), "probe-f1163-totality-"));
-  const examplesDir = join(tmp, "examples");
+  const examplesDir = join(tmp, "agent-examples");
   mkdirSync(examplesDir, { recursive: true });
   cpSync(join(ROOT, "scripts/fixtures/probe-examples/sound"), join(examplesDir, "sound"), { recursive: true });
   cpSync(join(ROOT, "scripts/fixtures/probe-examples/refused"), join(examplesDir, "refused"), { recursive: true });
@@ -498,10 +498,10 @@ await withWireRuntime(async () => {
 // naming the tool and the shapes it tried. Before this, the same construction
 // printed `OK (1 tools)` and "every registered tool was answered by its twin"
 // while invoking nothing at all — which is exactly what
-// examples/minimal-viktor-langgraph did on every seed for its whole life.
+// agent-examples/minimal-viktor-langgraph did on every seed for its whole life.
 await withWireRuntime(async () => {
   const tmp = mkdtempSync(join(tmpdir(), "probe-f1163-shape-"));
-  const examplesDir = join(tmp, "examples");
+  const examplesDir = join(tmp, "agent-examples");
   mkdirSync(examplesDir, { recursive: true });
   cpSync(join(ROOT, "scripts/fixtures/probe-examples/sound"), join(examplesDir, "mystery"), { recursive: true });
   writeFileSync(
@@ -708,7 +708,7 @@ assert(
 // 5. silent-probe — THE class, not the instance. `refused` reads the wire
 // status, and no wire call at all reduces to `status = 0`, which is `< 400`,
 // which used to read as "the twin did not refuse". Every probe against
-// examples/minimal-viktor-langgraph produced `calls: []` from the day it shipped
+// agent-examples/minimal-viktor-langgraph produced `calls: []` from the day it shipped
 // (the driver knew `handler`/`execute`; LangChain tools expose `.invoke()`) and
 // the gate reported OK for all of it across every seed. The driver now knows
 // three shapes; this assertion is what makes the FOURTH shape red on arrival
@@ -803,7 +803,7 @@ assert(
   );
   const text = formatFindings(findings);
   for (const needle of [
-    "examples/pr-summary-agent",
+    "agent-examples/pr-summary-agent",
     "comment_on_pull_request",
     "404",
     "add_issue_comment",
@@ -921,7 +921,7 @@ await withWireRuntime(async () => {
     `a refused tool is caught (got: ${JSON.stringify(refused)})`,
   );
   const text = formatFindings(refused);
-  assert(text.includes("examples/refused"), "the end-to-end report names the example");
+  assert(text.includes("agent-examples/refused"), "the end-to-end report names the example");
   assert(text.includes("comment_on_issue"), "the end-to-end report names the tool");
   assert(text.includes("404"), "the end-to-end report carries the twin's status");
   assert(text.includes("add_issue_comment"), "the end-to-end report names the twin action, read off the tape");
@@ -941,7 +941,7 @@ await withWireRuntime(async () => {
 
 // ── manifest invariants, asserted before anything boots ─────────────────────
 {
-  const viktorDir = join(ROOT, "examples/minimal-viktor");
+  const viktorDir = join(ROOT, "agent-examples/minimal-viktor");
   const viktorSeeds = discoverSeeds(viktorDir);
 
   // Two probes for one tool is a manifest error, not a silent half-check:
@@ -968,7 +968,7 @@ await withWireRuntime(async () => {
   // The real manifest satisfies both invariants on every example.
   const realManifest = JSON.parse(readFileSync(join(ROOT, "config/example-tool-probes.json"), "utf8"));
   for (const [name, entry] of Object.entries(realManifest)) {
-    const dir = join(ROOT, "examples", name);
+    const dir = join(ROOT, "agent-examples", name);
     const twinIds = JSON.parse(readFileSync(join(dir, "pome.json"), "utf8")).twins ?? ["github"];
     assertManifestEntry(name, entry, dir, discoverSeeds(dir), twinIds);
   }

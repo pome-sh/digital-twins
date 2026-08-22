@@ -22,7 +22,7 @@ shape applied to pull requests — and how to source the Claude API key from
 ## Install
 
 ```bash
-cd examples/pr-summary-agent
+cd agent-examples/pr-summary-agent
 npm install
 ```
 
@@ -97,7 +97,7 @@ export ANTHROPIC_API_KEY=sk-ant-...    # or run under `infisical run -- ...`
 
 # from this directory, with the CLI repo checked out beside `pome`
 npm run --cwd ../../../cli dev -- run \
-  ../pome/examples/pr-summary-agent/tasks/01-summarize-prs.md \
+  ../pome/agent-examples/pr-summary-agent/tasks/01-summarize-prs.md \
   --agent "npm run --cwd $(pwd) start"
 ```
 

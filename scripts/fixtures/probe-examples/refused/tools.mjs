@@ -6,7 +6,7 @@
 // behind it — this fixture's seed carries `issues: []`, exactly as all four of
 // the real subjects did — so the twin answers `404 Issue not found` on every
 // call. And `twin()` swallows it and hands the caller `{ok: false, status}`,
-// copying `examples/merge-agent`'s `gh()`, so a gate that watched for a thrown
+// copying `agent-examples/merge-agent`'s `gh()`, so a gate that watched for a thrown
 // error would see nothing at all.
 export function buildTools(config) {
   const twin = async (tool, args) => {

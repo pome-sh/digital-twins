@@ -9,7 +9,7 @@ on:
   pull_request:
     paths:
       - 'README.md'
-      - 'examples/triage-agent/**'
+      - 'agent-examples/triage-agent/**'
       - 'packages/wire/**'
       - 'packages/sdk/**'
       # Smoke boots github + gmail via the CLI; keep both twins in the filter.
@@ -25,7 +25,7 @@ on:
     # Match PR paths — do not pay pack/CLI-build cost on unrelated main merges.
     paths:
       - 'README.md'
-      - 'examples/triage-agent/**'
+      - 'agent-examples/triage-agent/**'
       - 'packages/wire/**'
       - 'packages/sdk/**'
       - 'packages/twin-github/**'
@@ -73,7 +73,7 @@ jobs:
           cache: npm
           cache-dependency-path: |
             package-lock.json
-            examples/triage-agent/package-lock.json
+            agent-examples/triage-agent/package-lock.json
       # Root install so the example's adapter dep resolves. The example's
       # `file:` adapter dep resolves its own @anthropic-ai/claude-agent-sdk
       # from the workspace node_modules, so the module import in the test
@@ -93,7 +93,7 @@ jobs:
       - run: npm run build -w @pome-sh/wire
       - run: npm run build -w @pome-sh/adapter-claude-sdk
       - name: Auth-token unit test
-        working-directory: examples/triage-agent
+        working-directory: agent-examples/triage-agent
         run: |
           npm ci
           npm test
@@ -124,7 +124,7 @@ jobs:
           cat twin.log
           exit 1
       - name: Quickstart preflight (env-secret JWT mint + reach twin)
-        working-directory: examples/triage-agent
+        working-directory: agent-examples/triage-agent
         env:
           POME_PREFLIGHT: "1"
           # preflight probes the twin only; it never calls Claude in this mode,
