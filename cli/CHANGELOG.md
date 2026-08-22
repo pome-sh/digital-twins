@@ -10,7 +10,7 @@ write a version number here or in `package.json`. Released
 entries are insertions only: a correction is the next entry, naming the one it
 corrects.
 
-## Unreleased (patch)
+## 0.26.4 — 2026-08-22
 
 **No consumer-visible change.** The Gmail and Linear twins' `test` scripts were
 `node --test <fixture files> && vitest run`; they are now a bare `vitest run`,

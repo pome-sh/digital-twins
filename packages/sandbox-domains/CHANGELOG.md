@@ -1,6 +1,6 @@
 # @pome-sh/sandbox-domains
 
-## Unreleased (patch)
+## 0.2.6 — 2026-08-22
 
 **No consumer-visible change.** The Gmail and Linear twins' `test` scripts were
 `node --test <fixture files> && vitest run`; they are now a bare `vitest run`,
