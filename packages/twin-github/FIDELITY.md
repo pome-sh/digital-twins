@@ -277,6 +277,18 @@ always 32's, and 32 now names the twin-only 401/403 surfaces explicitly.
    call GitHub refuses to serve. `test/upstream-measured-semantics.test.ts`
    carries the table and the provenance of every row.
 
+   **A compound is indexed whole AND in parts, and the two sides of the match
+   therefore differ.** `per_page` → 110 against `per page` → 226 says a compound
+   is a token in its own right; it says nothing about containment, and reading
+   only that pair is how F-791's first fix concluded `_` holds a token together
+   and made a bare `coupon` miss a body saying `apply_coupon` — its own
+   false-empty class, one size smaller. The negation settles it:
+   `per_page NOT page` → 0, `per_page NOT per` → 0, `pull-request NOT request`
+   → 0. Every document carrying a compound also answers to its parts. So a
+   DOCUMENT offers each compound plus the parts `_` and `-` join, while a QUERY
+   term keeps its compound intact — which is what holds both measurements at
+   once, and is why those two functions must not be merged.
+
    Still simplified, and still divergent: GitHub's index is ranked and — on the
    MCP door — semantic (`search_issues` there is documented as *"natural-language
    semantic matching … already scoped to `is:issue`"*), so a paraphrase that
