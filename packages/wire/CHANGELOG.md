@@ -4,7 +4,7 @@ SPDX-License-Identifier: Apache-2.0
 
 # @pome-sh/wire — CHANGELOG
 
-## Unreleased (patch)
+## 0.2.5 — 2026-08-22
 
 **No consumer-visible change.** The nine per-workspace `vitest.config.ts` files
 were replaced by one root config declaring every workspace as a vitest project,

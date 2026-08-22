@@ -1,6 +1,6 @@
 # @pome-sh/sandbox-domains
 
-## Unreleased (patch)
+## 0.2.7 — 2026-08-22
 
 **No consumer-visible change.** The nine per-workspace `vitest.config.ts` files
 were replaced by one root config whose project list is discovered from

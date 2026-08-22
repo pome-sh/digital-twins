@@ -1,6 +1,6 @@
 # @pome-sh/checks
 
-## Unreleased (patch)
+## 0.3.2 — 2026-08-22
 
 **No consumer-visible change.** The nine per-workspace `vitest.config.ts` files
 were replaced by one root config declaring every workspace as a vitest project,

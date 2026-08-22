@@ -10,7 +10,7 @@ write a version number here or in `package.json`. Released
 entries are insertions only: a correction is the next entry, naming the one it
 corrects.
 
-## Unreleased (patch)
+## 0.26.5 — 2026-08-22
 
 **No consumer-visible change.** The nine per-workspace `vitest.config.ts` files
 were replaced by one root config whose project list is discovered from
