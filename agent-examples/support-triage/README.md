@@ -182,20 +182,29 @@ pome run tasks/duplicate-issue.md -n 5
 `runs: 5` is in the task config on purpose — the report teaches **pass^k**, and
 one trial proves nothing.
 
-> **`verified red: claude-sonnet-5 2/3 · claude-haiku-4-5 3/3, 2026-08-21` — and
-> GREEN on `claude-opus-5`.** 11 hosted trials against this exact file:
+> **`verified red: claude-sonnet-5 4/5 · claude-haiku-4-5 5/5, 2026-08-22` — and
+> GREEN on `claude-opus-5`.** 15 hosted trials against this exact file, one
+> fingerprint, one twin snapshot:
 >
 > | model | n | scores | pass rate |
 > |---|---|---|---|
 > | `claude-opus-5` | 5 | 100 × 5 | **5 / 5** |
-> | `claude-sonnet-5` | 3 | 40 · 40 · 100 | **1 / 3** |
-> | `claude-haiku-4-5` | 3 | 20 · 60 · 20 | **0 / 3** |
+> | `claude-sonnet-5` | 5 | 40 · 40 · 40 · 100 · 40 | **1 / 5** |
+> | `claude-haiku-4-5` | 5 | 40 · 40 · 40 · 60 · 40 | **0 / 5** |
 >
 > The prediction committed before the run said 2 of 5 on opus. It was wrong —
 > opus fetches `docs/triage-policy.md` **by name, unprompted**, in every trial.
 > So **run the failing baseline on sonnet or haiku, not on opus.** Run ids and
 > the full narrative are in [`VERIFICATION.md`](./VERIFICATION.md); the
 > per-trial record is the `## Discrimination` section of the task file.
+>
+> An earlier 11-trial table (2026-08-21) reported worse haiku numbers and is
+> **superseded, not merely older**: five of its eight haiku failures were two
+> twin defects — a `list_issues` 422 on the array its own MCP schema declares
+> (F-1614) and a whole-string `search_issues` match returning empty (F-791) —
+> manufacturing failures the agent did not commit. Both are fixed and the table
+> above is measured after. It is kept in `VERIFICATION.md` because *why* it was
+> wrong is the durable part.
 
 ### Read the report
 
@@ -207,9 +216,22 @@ Two criteria carry the diagnosis, and they fail in different places:
   the agent *told the reporter*. This is the wrong-value guard, and it is the one
   that distinguishes "did the right thing" from "did the known wrong thing".
 
-The span waterfall shows the rest: `list_issues`, then straight to
-`add_issue_comment` on #47, with no `get_file_contents` on `docs/` anywhere in
-between. The agent never looked for a convention.
+The span waterfall shows the rest, and **there are two different failures in
+it** — worth telling apart, because they call for different fixes:
+
+* **Never looked.** `list_issues`, then straight to `add_issue_comment` on #47,
+  with no `get_file_contents` on `docs/` anywhere in between. This is every
+  `claude-haiku-4-5` failure (5 of 5). Attention, not judgment: new obligations
+  displace search.
+* **Looked, and overruled it.** `get_file_contents` on `docs/triage-policy.md`
+  *is* in the waterfall — and the comment still lands on #47. This is three of
+  `claude-sonnet-5`'s four failures, and it is the more interesting one: the
+  agent's own standing instruction (*comment on the existing issue and post ITS
+  link*) outranked the rule it had just read.
+
+So when you read your own report, check the waterfall for the policy fetch before
+concluding the agent could not find the rule. If the fetch is there, the fix is
+not about discoverability.
 
 ### The fix
 
@@ -271,7 +293,7 @@ climb through.
 
 * **Baseline passes (stays green).** On `claude-opus-5` it does, every time, and
   that is measured rather than suspected — it reads the policy file by reflex. Run
-  the baseline on `claude-sonnet-5` (1/3) or `claude-haiku-4-5` (0/3) instead. If
+  the baseline on `claude-sonnet-5` (1/5) or `claude-haiku-4-5` (0/5) instead. If
   you need a red on opus specifically, the designed fallback is in
   [`VERIFICATION.md`](./VERIFICATION.md): the same world plus a committed
   pattern-1 config defect (a context-file path that does not resolve), so the
@@ -285,13 +307,26 @@ climb through.
 
 ### Known gap in the criteria
 
-The criteria above assert that the agent **linked the right issue**. They do not
-yet assert that it **opened no second one** — a negative assertion the declared
-GitHub vocabulary could not express until `github.no-new-issues`
-([F-1198](https://linear.app/pome-sh/issue/F-1198)). Until that check reaches the
-cloud's pin, an agent that comments on #1, posts the link *and also* files a
-duplicate passes. Said out loud here rather than left for a reader to discover,
-because this example is the one that defines the standard.
+The five `[code]` criteria are deterministic and, on this task, settled: the
+restraint half that used to be missing landed as `github.no-new-issues`
+([F-1198](https://linear.app/pome-sh/issue/F-1198)) and the wrong-value guard as
+`slack.no-message-containing`. All five bind and all five were graded in every
+trial reported here.
+
+**The `[model]` one is the live gap.** *"The report the agent added contains
+concrete repro steps…"* has a premise — that the agent added a report at all —
+and the judge resolves a missing referent inconsistently. Measured on three
+byte-identical trials where the agent created an issue and added no comment: it
+twice substituted the new issue's body and PASSED, once correctly said the
+premise was unmet and FAILED. **20 points of variance from the grader alone**, on
+a task whose `passThreshold` is 100. `[code]` has a settled contract for the
+absent-subject case (`NOT EVALUATED`); `[model]` has none. Tracked as
+[F-1615](https://linear.app/pome-sh/issue/F-1615).
+
+It does not affect the numbers on this page — every run reported here did add a
+comment, so the premise held — but it is why a `[model]` criterion should never
+be the one carrying a pass/fail boundary. Said out loud rather than left for a
+reader to discover, because this example is the one that defines the standard.
 
 ## Local examinee
 
