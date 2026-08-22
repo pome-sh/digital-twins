@@ -44,7 +44,7 @@
 // land alongside the classification rather than as its own measured change.
 //
 // What the subtree rule must NOT swallow is the ten `README.md` /
-// `VERIFICATION.md` files sitting beside `examples/<agent>/tasks` — a plain
+// `VERIFICATION.md` files sitting beside `agent-examples/<agent>/tasks` — a plain
 // recursive `*.md` walk books them as tasks and inflates a pinned denominator
 // with files carrying no criteria. They stay out because their directory is
 // neither a corpus root nor under a `tasks/`.
@@ -56,7 +56,7 @@ import { fileURLToPath } from "node:url";
 const root = process.cwd();
 
 // Both corpora, same list pome-cloud's `DEFAULT_TASK_CORPORA` carries.
-const CORPORA = ["cli/tasks", "examples"];
+const CORPORA = ["cli/tasks", "agent-examples"];
 const MAX_DEPTH = 3;
 const SKIP_DIRS = new Set([".git", "node_modules", "dist", "build", "coverage"]);
 

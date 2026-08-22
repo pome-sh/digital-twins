@@ -374,7 +374,7 @@ describe("migrated sentences", () => {
   });
 
   it("re-renders the two criteria carried across from pome-cloud's regexes", () => {
-    // `examples/gmail-retry-notify/tasks/01-throttled-send.md`. The legacy
+    // `agent-examples/gmail-retry-notify/tasks/01-throttled-send.md`. The legacy
     // patterns were case-insensitive and accepted a trailing period, `labelled`,
     // and three quote styles; the generated pattern is anchored and
     // case-sensitive, so that task file is rewritten in this same commit.
@@ -480,7 +480,7 @@ describe("gmail.mailbox-label-count's two ways of not finding a mailbox", () => 
   // F-1157. Both are a skip and neither is a wrong verdict, so this is entirely
   // about the NAME a reader gets — which is the whole cost the ticket measured.
   // `mailbox_not_found` sends whoever triages the row to
-  // `examples/gmail-retry-notify/` looking for a seed that forgot to declare a
+  // `agent-examples/gmail-retry-notify/` looking for a seed that forgot to declare a
   // mailbox; when a redactor ate the address instead, that seed is correct and
   // the reader has been sent to the wrong repo.
   const ARGS = { mailbox: "pome-agent@pome-twin.test", count: "5", label: "SENT" };

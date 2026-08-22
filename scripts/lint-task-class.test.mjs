@@ -75,7 +75,7 @@ check("1. every task declaring a valid class is green", {
   files: {
     "cli/tasks/01-a.md": task("conformance"),
     "cli/tasks/02-b.md": task("restraint"),
-    "examples/agent/tasks/03-c.md": task("adversarial"),
+    "agent-examples/agent/tasks/03-c.md": task("adversarial"),
   },
   expect: "green",
   contains: "1 conformance, 1 restraint, 1 adversarial",
@@ -111,16 +111,16 @@ check("5. a corpus that resolves to zero task files is RED, not green", {
   contains: "Refusing to pass a zero-file scan",
 });
 
-// The walk, asserted rather than assumed. `examples/<agent>/tasks/<file>.md` is
+// The walk, asserted rather than assumed. `agent-examples/<agent>/tasks/<file>.md` is
 // two levels down; a walker that only looked at direct children of the corpus
 // root would silently exempt every example task.
 check("6. an example task two levels below the corpus root is seen", {
   files: {
     "cli/tasks/01-a.md": task("conformance"),
-    "examples/agent/tasks/01-unlabelled.md": task(null),
+    "agent-examples/agent/tasks/01-unlabelled.md": task(null),
   },
   expect: "red",
-  contains: "examples/agent/tasks/01-unlabelled.md",
+  contains: "agent-examples/agent/tasks/01-unlabelled.md",
 });
 
 // F-1300's walker gap, asserted from the other side: a task nested UNDER a
@@ -140,9 +140,9 @@ check("7. a task in a subdirectory of `tasks/` is seen", {
 // denominator pome-cloud pins, and it carries no criteria to classify.
 check("8. a README beside the tasks is not counted as a task", {
   files: {
-    "examples/agent/tasks/01-a.md": task("conformance"),
-    "examples/agent/README.md": "# how to run this example\n",
-    "examples/agent/VERIFICATION.md": "# verification\n",
+    "agent-examples/agent/tasks/01-a.md": task("conformance"),
+    "agent-examples/agent/README.md": "# how to run this example\n",
+    "agent-examples/agent/VERIFICATION.md": "# verification\n",
   },
   expect: "green",
   contains: "1 task(s)",

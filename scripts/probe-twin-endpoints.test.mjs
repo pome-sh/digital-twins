@@ -261,7 +261,7 @@ assert(
 
 // The F-1151 regression, as a live fixture. `add_issue_comment` at a PULL
 // REQUEST's number is the call that answered `404 Issue not found` for the
-// whole life of examples/pr-summary-agent and examples/pr-summary-review.
+// whole life of agent-examples/pr-summary-agent and agent-examples/pr-summary-review.
 {
   const findings = await probeTwin("github", {
     probes: [

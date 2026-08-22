@@ -113,7 +113,7 @@ for (const [label, { source, missing }] of Object.entries(OPEN_DOORS)) {
 // ── the shapes that must stay GREEN ─────────────────────────────────────────
 const SEALED = {
   "both inline": `${IMPORT_LINE}\nawait query({ prompt: "go", options: { tools: [], settingSources: [] } });`,
-  // examples/support-triage's real shape: the options are composed in a named
+  // agent-examples/support-triage's real shape: the options are composed in a named
   // function so its own test can assert the policy is WIRED IN, and the call
   // site passes the call. A resolver that only read inline literals would have
   // to red the one example that already got this right.
@@ -164,13 +164,13 @@ for (const [label, source] of Object.entries(NOT_SUBJECTS)) {
   const tmp = realpathSync(mkdtempSync(join(tmpdir(), "f1295-")));
   try {
     const write = (name, manifest) => {
-      mkdirSync(join(tmp, "examples", name, "src"), { recursive: true });
-      writeFileSync(join(tmp, "examples", name, "package.json"), JSON.stringify(manifest));
+      mkdirSync(join(tmp, "agent-examples", name, "src"), { recursive: true });
+      writeFileSync(join(tmp, "agent-examples", name, "package.json"), JSON.stringify(manifest));
     };
     write("uses-sdk", { dependencies: { "@anthropic-ai/claude-agent-sdk": "^0.3.221" } });
     write("dev-dep-only", { devDependencies: { "@anthropic-ai/claude-agent-sdk": "^0.3.221" } });
     write("other-framework", { dependencies: { ai: "^6.0.241" } });
-    mkdirSync(join(tmp, "examples", "no-manifest"), { recursive: true });
+    mkdirSync(join(tmp, "agent-examples", "no-manifest"), { recursive: true });
 
     const found = discoverSdkExamples(tmp).map((e) => e.name);
     assert(
@@ -181,9 +181,9 @@ for (const [label, source] of Object.entries(NOT_SUBJECTS)) {
     // An SDK example with no `query()` call is reported, not skipped: "this
     // example launches no agent" and "the call is in a shape I cannot see" read
     // identically otherwise, and only the first is a pass.
-    writeFileSync(join(tmp, "examples", "uses-sdk", "src", "index.ts"), 'export const x = 1;\n');
+    writeFileSync(join(tmp, "agent-examples", "uses-sdk", "src", "index.ts"), 'export const x = 1;\n');
     writeFileSync(
-      join(tmp, "examples", "dev-dep-only", "src", "index.ts"),
+      join(tmp, "agent-examples", "dev-dep-only", "src", "index.ts"),
       `${IMPORT_LINE}\nawait query({ prompt: "go", options: { tools: [], settingSources: [] } });\n`,
     );
     const scan = scanExamples(tmp);
@@ -196,7 +196,7 @@ for (const [label, source] of Object.entries(NOT_SUBJECTS)) {
     // A repo with no SDK example at all must not print a pass — the runner
     // exits 1 on it, and this is the unit-level half of that.
     const empty = discoverSdkExamples(join(tmp, "nope"));
-    assert(empty.length === 0, "a missing examples/ directory discovers nothing rather than throwing");
+    assert(empty.length === 0, "a missing agent-examples/ directory discovers nothing rather than throwing");
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
@@ -233,13 +233,13 @@ for (const [label, source] of Object.entries(NOT_SUBJECTS)) {
 {
   const tmp = realpathSync(mkdtempSync(join(tmpdir(), "f1295-exit-")));
   try {
-    mkdirSync(join(tmp, "examples", "leaky", "src"), { recursive: true });
+    mkdirSync(join(tmp, "agent-examples", "leaky", "src"), { recursive: true });
     writeFileSync(
-      join(tmp, "examples", "leaky", "package.json"),
+      join(tmp, "agent-examples", "leaky", "package.json"),
       JSON.stringify({ dependencies: { "@anthropic-ai/claude-agent-sdk": "^0.3.221" } }),
     );
     writeFileSync(
-      join(tmp, "examples", "leaky", "src", "index.ts"),
+      join(tmp, "agent-examples", "leaky", "src", "index.ts"),
       `${IMPORT_LINE}\nawait query({ prompt: "go", options: { tools: [] } });\n`,
     );
     // The runner derives its repo root from its own location, so run a COPY of

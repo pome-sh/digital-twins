@@ -28,7 +28,7 @@ function assert(cond, msg) {
 }
 
 /** Every root the gate must cover, and one real file under each. */
-const REQUIRED_ROOTS = ["scripts", "contract", "cli/src", "cli/scripts", "packages", "examples"];
+const REQUIRED_ROOTS = ["scripts", "contract", "cli/src", "cli/scripts", "packages", "agent-examples"];
 
 // ── findBareImportMetaMain: every real shape must red ───────────────────────
 // Formatting cannot hide it: a line break, parens, optional chaining, negation,
@@ -278,7 +278,7 @@ for (const [label, source] of Object.entries(GUARD_GAP_CLEAN_CASES)) {
 // F-1481's own history is the argument for this assertion: F-1353 fixed
 // `contract/run.mjs`, the same bug survived ten lines away under `scripts/`,
 // and this gate's first cut then covered only those two roots while six live
-// instances sat in `examples/*/src/*.ts`. A root dropping out of the walk must
+// instances sat in `agent-examples/*/src/*.ts`. A root dropping out of the walk must
 // red here rather than quietly stop being covered.
 {
   const byRoot = discoverSourceFiles(ROOT);
@@ -288,7 +288,7 @@ for (const [label, source] of Object.entries(GUARD_GAP_CLEAN_CASES)) {
   }
   const all = [...byRoot.values()].flat();
   assert(
-    all.some((f) => /examples\/[^/]+\/src\/index\.ts$/.test(f)),
+    all.some((f) => /(^|\/)agent-examples\/[^/]+\/src\/index\.ts$/.test(f)),
     "a bundled example's entry module is in scope — the six live F-1481 instances were exactly these files"
   );
   assert(all.some((f) => f.includes("/cli/src/")), "cli/src is in scope");

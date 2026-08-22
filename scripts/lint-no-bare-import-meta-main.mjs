@@ -24,7 +24,7 @@
 // MetaProperty node at all.
 //
 // The parser is `typescript`, not a JS-only one, because the defect's live
-// instances were in `.ts`: six bundled examples under `examples/*/src/` shipped
+// instances were in `.ts`: six bundled examples under `agent-examples/*/src/` shipped
 // a bare guard, and a JS-only parser cannot read those files at all — a gate
 // that silently cannot parse its subject is the shape D5 targets. typescript is
 // already a direct devDependency of all ten workspaces (uniformly `^5.9.3`),
@@ -65,12 +65,12 @@ const REPO_ROOT = resolve(HERE, "..");
 const SOURCE_EXTENSIONS = new Set([".mjs", ".js", ".cjs", ".ts", ".mts", ".cts", ".tsx"]);
 
 // Every root that ships an entry point. This is `scripts/no-eval-in-oss.mjs`'s
-// root list plus `contract/` and `examples/` — the two the narrower first cut
+// root list plus `contract/` and `agent-examples/` — the two the narrower first cut
 // of this gate covered (`scripts`, `contract`) left the class open one
 // directory over, which is precisely how F-1481 itself happened: F-1353 fixed
 // `contract/run.mjs` and the same bug survived ten lines from `probe:examples`.
-// `examples/` is load-bearing, not defensive: six examples were live instances.
-const SCAN_ROOTS = ["scripts", "contract", "cli/src", "cli/scripts", "packages", "examples"];
+// `agent-examples/` is load-bearing, not defensive: six examples were live instances.
+const SCAN_ROOTS = ["scripts", "contract", "cli/src", "cli/scripts", "packages", "agent-examples"];
 
 // Pruned at ANY depth. Without this the walk finds ~19,600 files instead of
 // ~740 and parses third-party CJS, which reds spuriously.
@@ -567,7 +567,7 @@ if (invokedDirectly) {
       "\nThat property is undefined on Node 24.0.0/24.0.1/24.0.2/24.1.0 (it landed in 24.2), and root " +
         "`engines` allows `>=24` — an entry guard built on it exits 0 having done nothing there. Use " +
         "`realpathSync(process.argv[1])` vs. `realpathSync(fileURLToPath(import.meta.url))` instead " +
-        "(see scripts/smoke-examples.mjs, contract/run.mjs, or examples/support-triage/src/index.ts)."
+        "(see scripts/smoke-examples.mjs, contract/run.mjs, or agent-examples/support-triage/src/index.ts)."
     );
   }
   if (guardGaps.length > 0) {

@@ -2,7 +2,7 @@
  * The twin surface as LangChain tools.
  *
  * Each tool maps to exactly one supported twin endpoint (same set as
- * `examples/minimal-viktor`), so the agent can never hit an unsupported route.
+ * `agent-examples/minimal-viktor`), so the agent can never hit an unsupported route.
  * Invoking a tool via `.invoke()` (which the graph nodes do) opens an
  * OpenInference `TOOL` span carrying `tool.name` — that is what pome's projector
  * maps onto `gen_ai_tool_name` so tool calls render as `tool` rows on the span

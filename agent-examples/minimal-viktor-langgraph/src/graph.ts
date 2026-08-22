@@ -1,7 +1,7 @@
 /**
  * Viktor as an explicit LangGraph state machine.
  *
- * Where `examples/minimal-viktor` is a single Vercel-AI-SDK tool loop, this is a
+ * Where `agent-examples/minimal-viktor` is a single Vercel-AI-SDK tool loop, this is a
  * hand-built `StateGraph` with named nodes, which is what makes the trace
  * legible: OpenInference emits a CHAIN span per node (`intake`, `gather`,
  * `decide`, `act`, `report`), an LLM span for the one model call in `decide`

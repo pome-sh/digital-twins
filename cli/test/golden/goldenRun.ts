@@ -58,7 +58,7 @@ import { bootTwin, type TwinHarness } from "../../src/twin/twinHarness.js";
 type TapeRow = ReturnType<typeof toTwinHttpEventRow>;
 
 /** One `tools/call` over a twin's real MCP JSON-RPC endpoint. This is the
- *  transport `examples/support-triage`'s examinee uses, and — unlike the domain
+ *  transport `agent-examples/support-triage`'s examinee uses, and — unlike the domain
  *  methods a unit test would reach for — it is the one that stamps `tool` on the
  *  recorded event. A tape assertion has nothing to read otherwise. */
 export interface FixtureTwins {

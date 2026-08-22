@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The golden-scenario CI gate (F-646) — `examples/support-triage`.
+// The golden-scenario CI gate (F-646) — `agent-examples/support-triage`.
 //
 // WHY IT EXISTS. Nothing asserted end to end that the scoring pipeline produces
 // the right answer for a run whose correctness is known by construction.
@@ -54,7 +54,7 @@ import {
 // disagreed for as long as nothing compared them.
 const TASK = resolve(
   dirname(fileURLToPath(import.meta.url)),
-  "../../../examples/support-triage/tasks/duplicate-issue.md",
+  "../../../agent-examples/support-triage/tasks/duplicate-issue.md",
 );
 
 const previousSecret = process.env.TWIN_AUTH_SECRET;

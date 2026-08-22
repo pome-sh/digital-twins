@@ -124,7 +124,7 @@ export const BUILT_IN_TOOLS: string[] = [];
  * A `function` declaration rather than a `const` arrow: this file's top-level
  * `await main()` sits above it, and a `const` here would be a temporal dead zone
  * at call time (the `scripts/smoke-examples.mjs` gate exists because exactly
- * that crash once shipped in `examples/triage-agent`).
+ * that crash once shipped in `agent-examples/triage-agent`).
  *
  * Exported so `test/tool-policy.test.ts` can assert the two policy constants are
  * WIRED IN, not merely declared. Asserting `BUILT_IN_TOOLS` is empty proves

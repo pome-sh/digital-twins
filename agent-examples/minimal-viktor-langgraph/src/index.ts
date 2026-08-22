@@ -1,7 +1,7 @@
 /**
  * Pome bundled example: minimal-viktor-langgraph.
  *
- * The same viktor.com-style "AI employee" merge bot as `examples/minimal-viktor`
+ * The same viktor.com-style "AI employee" merge bot as `agent-examples/minimal-viktor`
  * — review the open PRs in a repo, merge the safe ones, block the unsafe ones,
  * flag the malicious ones, and report every outcome to Slack — but built on
  * LangGraph instead of the Vercel AI SDK, and observed via OpenInference OTel

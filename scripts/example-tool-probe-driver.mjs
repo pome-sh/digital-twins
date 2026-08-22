@@ -14,9 +14,9 @@
 // and `tsx` registers a process-wide loader, so a `.mjs` entry can still
 // dynamically import a `.ts` module.
 //
-// The fetch hook is the whole point. `examples/merge-agent`,
-// `examples/minimal-viktor`, `examples/gmail-retry-notify`, and
-// `examples/minimal-viktor-langgraph` all deliberately SWALLOW a non-2xx and
+// The fetch hook is the whole point. `agent-examples/merge-agent`,
+// `agent-examples/minimal-viktor`, `agent-examples/gmail-retry-notify`, and
+// `agent-examples/minimal-viktor-langgraph` all deliberately SWALLOW a non-2xx and
 // hand the model `{ok: false, status}` so one bad twin call cannot abort a run
 // — so a probe that only watched for a thrown error would be silent on exactly
 // the failure this gate exists to catch. Only the response status counts.
@@ -67,7 +67,7 @@ try {
 // Three tool shapes the bundled examples use: the Claude Agent SDK's `tool()`
 // returns `{name, description, inputSchema, handler}` objects that callers
 // collect into an ARRAY; the Vercel AI SDK keeps a RECORD of name -> `{execute}`;
-// and LangChain's `tool()` (`examples/minimal-viktor-langgraph`) returns a
+// and LangChain's `tool()` (`agent-examples/minimal-viktor-langgraph`) returns a
 // `StructuredTool` instance invoked through its `.invoke()` method, also kept
 // in a name -> tool RECORD. `.invoke` has to be bound to the tool instance —
 // destructuring it the way `handler`/`execute` are read here would call it

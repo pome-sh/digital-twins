@@ -21,7 +21,7 @@
 // fixture with its own root manifest, so the gate is proven to fire on the shape
 // rather than trusted to, but no fixture can prove it is aimed at the real tree.
 //
-// The failure class through `examples/*`'s deliberately-published pins is a
+// The failure class through `agent-examples/*`'s deliberately-published pins is a
 // different rule (needs the registry, tolerates a pin equal to a version that
 // simply has not published yet) and is NOT this suite's subject — see
 // `scripts/check-example-pins-published.mjs` (F-1483) and its own regression

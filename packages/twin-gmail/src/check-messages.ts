@@ -196,7 +196,7 @@ export const mailboxLabelCount: Check<{ mailbox: string; count: string; label: s
         // which leaves the ROW in place with the address replaced: the mailbox
         // is in the export and simply unreadable. Reporting that as
         // `mailbox_not_found` sends whoever triages the row to
-        // `examples/gmail-retry-notify/` looking for a seed that forgot a
+        // `agent-examples/gmail-retry-notify/` looking for a seed that forgot a
         // mailbox, and that seed declares it.
         //
         // `subject` cannot make this distinction for us. It names ONE literal,

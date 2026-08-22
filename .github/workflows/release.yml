@@ -389,7 +389,7 @@ jobs:
           echo "::error::${PKG}@${version} published, but registry.npmjs.org did not serve it within 18 attempts over ~3 minutes."
           echo "The publish itself succeeded — do not re-run it. What this costs is the re-pin:"
           echo "dispatch-allocate-version either does not run at all, or dispatches a run that"
-          echo "cannot see this version, so examples/* keep the previous pin and"
+          echo "cannot see this version, so agent-examples/* keep the previous pin and"
           echo "check-example-pins-published.mjs reds on main. Once the version is visible, run"
           echo "  gh workflow run allocate-version.yml --ref main"
           echo "to land the re-pin by hand."
@@ -463,7 +463,7 @@ jobs:
 
   # The moment a version lands on a registry is also the moment
   # scripts/check-example-pins-published.mjs can go red on `main`:
-  # examples/support-triage pins @pome-sh/adapter-claude-sdk from the
+  # agent-examples/support-triage pins @pome-sh/adapter-claude-sdk from the
   # registry, and allocate-version.yml is the only thing that re-pins it
   # (planExampleRepins, which the allocator imports). But the two
   # allocate-version.yml runs that bracket a publish both miss the window —
@@ -506,7 +506,7 @@ jobs:
   # `publish` FAILING no longer suppresses this job when `publish-wire`
   # succeeded, and that is correct rather than tolerated — the matrix does not
   # fail fast, so a run where the adapter published and the CLI failed has
-  # already put a version on the registry that `examples/*` is now drifted from.
+  # already put a version on the registry that `agent-examples/*` is now drifted from.
   # Suppressing the re-pin there would leave `main` red on the drift as well as
   # on the failure.
   #
@@ -521,7 +521,7 @@ jobs:
   #   1. This job fires only when `publish`/`publish-wire` actually published,
   #      which needs a local version differing from the registry's.
   #   2. The dispatched run pushes at most ONE commit. If it is re-pin-only it
-  #      touches `examples/*` manifests and their lockfiles — no package version
+  #      touches `agent-examples/*` manifests and their lockfiles — no package version
   #      — so the `plan`/`plan-wire` of the run that commit triggers find every
   #      version equal to the registry's (the wait step above proved it is
   #      served), publish nothing, and this job's `if:` is false. Chain over.

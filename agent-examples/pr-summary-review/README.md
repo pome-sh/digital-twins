@@ -29,7 +29,7 @@ is sourced from **Infisical or your local environment**.
 ## Install
 
 ```bash
-cd examples/pr-summary-review
+cd agent-examples/pr-summary-review
 npm install
 ```
 

@@ -2,7 +2,7 @@
 //
 // F-900 example-launch smoke. `tsc` cannot see a temporal-dead-zone crash:
 // F-866's examples typecheck gate was green while every real launch of
-// `examples/triage-agent` died at startup with
+// `agent-examples/triage-agent` died at startup with
 //   ReferenceError: Cannot access 'TwinMcpClient' before initialization
 // because the top-level `await main()` ran before the `class TwinMcpClient`
 // below it was evaluated. The POME_PREFLIGHT path (a hoisted-function early
@@ -138,7 +138,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const examplesDir = join(repoRoot, "examples");
+const examplesDir = join(repoRoot, "agent-examples");
 
 // How long to let each example run before we conclude it survived module
 // evaluation and reached real (async) work. A launch-above-class TDZ throws
@@ -364,7 +364,7 @@ export const LIVE = resolveLiveFlag(process.env.SMOKE_EXAMPLES_LIVE).live;
 // is required unconditionally rather than accepting `AI_GATEWAY_API_KEY` as an
 // alternative: `minimal-viktor-langgraph` constructs its `ChatAnthropic` model
 // from `ANTHROPIC_API_KEY` directly and never consults the gateway key (see
-// examples/minimal-viktor-langgraph/src/index.ts), so a leg that accepted the
+// agent-examples/minimal-viktor-langgraph/src/index.ts), so a leg that accepted the
 // gateway key alone would still strand that example at "no evidence of real
 // work" while reporting the OTHER seven's gateway-routed calls as proof the
 // leg is credentialed. `POME_AUTH_TOKEN` is the one twin-side signal every
@@ -490,7 +490,7 @@ export function assertEveryExampleEmitsMarker(dir, examples) {
 }
 
 // The DEPENDENCY only covers an example if it resolves to the WORKSPACE copy of
-// the adapter. `examples/support-triage` pins the PUBLISHED tarball on purpose
+// the adapter. `agent-examples/support-triage` pins the PUBLISHED tarball on purpose
 // (it is `npx degit`-fetchable as a standalone subtree — see
 // scripts/gate-examples.mjs's header), and a published tarball cut before
 // the marker existed prints nothing: measured on this branch, its installed
@@ -649,7 +649,7 @@ function smokeOne(name) {
       resolvePromise({
         name,
         status: "fail",
-        reason: `tsx not installed (run \`npm ci\` in examples/${name})`,
+        reason: `tsx not installed (run \`npm ci\` in agent-examples/${name})`,
         output: "",
       });
       return;
@@ -790,7 +790,7 @@ async function main() {
   const reached = [];
   const oks = [];
   for (const name of examples) {
-    process.stdout.write(`\n=== examples/${name} === `);
+    process.stdout.write(`\n=== agent-examples/${name} === `);
     let result;
     try {
       result = await smokeOne(name);

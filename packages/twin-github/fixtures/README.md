@@ -40,7 +40,7 @@ off GitHub. Nothing here has ever been compared to what
 
 **The 65 is deliberate.** F-1326's upstream golden
 (`fixtures/mcp-tools-list/github.canonical.json`, at the repo root) records 44
-tools for the `default` toolset that `examples/support-triage` actually points
+tools for the `default` toolset that `agent-examples/support-triage` actually points
 at. That gap is real and this fixture does not close it: reporting divergence
 between the two is F-1327's job, and F-1325 changed where this twin's table
 lives, not what is in it. Every byte this twin serves is identical before and

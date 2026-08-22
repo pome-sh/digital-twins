@@ -84,17 +84,17 @@ function repo() {
 }
 
 /**
- * F-1520 — `repo()` has no root `package.json`/`examples/`, so `planExample
+ * F-1520 — `repo()` has no root `package.json`/`agent-examples/`, so `planExample
  * Repins` is a no-op against it (proven in "the repin path is a no-op" below).
  * This adds the shape it needs: a root `workspaces` field naming
- * `ADAPTER.manifest`'s directory, and `examples/support-triage` pinning the
+ * `ADAPTER.manifest`'s directory, and `agent-examples/support-triage` pinning the
  * adapter the same way the real tree does.
  */
 function withExamples(dir, { adapterPin }) {
   write(dir, "package.json", JSON.stringify({ name: "root", private: true, workspaces: ["packages/*", "cli"] }));
   write(
     dir,
-    "examples/support-triage/package.json",
+    "agent-examples/support-triage/package.json",
     JSON.stringify({
       name: "support-triage-example",
       dependencies: { "@pome-sh/adapter-claude-sdk": adapterPin },
@@ -471,11 +471,11 @@ console.log("the script's own surface");
   }
 }
 
-console.log("F-1520 — the repin path is a no-op without examples/");
+console.log("F-1520 — the repin path is a no-op without agent-examples/");
 {
   const dir = repo();
   try {
-    // repo() never creates a root package.json or examples/, exactly like
+    // repo() never creates a root package.json or agent-examples/, exactly like
     // every OTHER fixture above — proving that stays true is what keeps this
     // whole suite honest about the new code path touching nothing by default.
     check("no repins are planned", plan(dir).repins.length === 0);
@@ -494,7 +494,7 @@ console.log("F-1520 — a broken example can never block a version allocation");
     // the cheapest reachable vector (discoverExampleSiblingDeps JSON.parses it
     // unguarded); the guard is around the call, so it covers the others too.
     withExamples(dir, { adapterPin: "0.9.0" });
-    write(dir, "examples/broken/package.json", "{ this is not json");
+    write(dir, "agent-examples/broken/package.json", "{ this is not json");
     pend(dir, CLI, { body: "- a fix consumers need" });
     git(dir, "add", "-A");
     git(dir, "commit", "-qm", "a merge (#912)");
@@ -530,15 +530,15 @@ console.log("F-1520 — a drifted pin against an already-published sibling is re
     check("it names the example, the dep, and both versions", repin.example === "support-triage" && repin.from === "0.9.0" && repin.to === "1.0.0", JSON.stringify(repin));
     const rewritten = JSON.parse(repin.writes[0].contents);
     check("the manifest write carries the new pin", rewritten.dependencies["@pome-sh/adapter-claude-sdk"] === "1.0.0", repin.writes[0].contents);
-    check("a lockfile-regen command is named for that example", repin.regenerate[0].includes("examples/support-triage"), JSON.stringify(repin.regenerate));
+    check("a lockfile-regen command is named for that example", repin.regenerate[0].includes("agent-examples/support-triage"), JSON.stringify(repin.regenerate));
     check(
       "a repin-only commit gets its own message, not an empty one",
-      result.message.startsWith("chore: re-pin 1 example dep(s)") && result.message.includes("examples/support-triage @pome-sh/adapter-claude-sdk 0.9.0 → 1.0.0"),
+      result.message.startsWith("chore: re-pin 1 example dep(s)") && result.message.includes("agent-examples/support-triage @pome-sh/adapter-claude-sdk 0.9.0 → 1.0.0"),
       result.message,
     );
 
     land(dir, result);
-    check("the example manifest is actually rewritten on disk", JSON.parse(read(dir, "examples/support-triage/package.json")).dependencies["@pome-sh/adapter-claude-sdk"] === "1.0.0");
+    check("the example manifest is actually rewritten on disk", JSON.parse(read(dir, "agent-examples/support-triage/package.json")).dependencies["@pome-sh/adapter-claude-sdk"] === "1.0.0");
     check("running again with the same npmView is a clean no-op", plan(dir, npmView).repins.length === 0 && plan(dir, npmView).allocations.length === 0);
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -569,7 +569,7 @@ console.log("F-1520 — the version THIS run allocates is never repinned to in t
     );
 
     land(dir, result);
-    check("the manifest still pins 1.0.0 after landing — nothing broke npm ci", JSON.parse(read(dir, "examples/support-triage/package.json")).dependencies["@pome-sh/adapter-claude-sdk"] === "1.0.0");
+    check("the manifest still pins 1.0.0 after landing — nothing broke npm ci", JSON.parse(read(dir, "agent-examples/support-triage/package.json")).dependencies["@pome-sh/adapter-claude-sdk"] === "1.0.0");
 
     // The NEXT run, once 1.0.1 is (now) published, closes the gap fully
     // automatically — no human PR, just one push later.
