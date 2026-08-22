@@ -10,7 +10,7 @@ write a version number here or in `package.json`. Released
 entries are insertions only: a correction is the next entry, naming the one it
 corrects.
 
-## Unreleased (patch)
+## 0.26.6 — 2026-08-22
 
 **No consumer-visible change.** The repo's top-level `examples/` directory is now
 `agent-examples/`, so comments and one MCP tools-list provenance note that named

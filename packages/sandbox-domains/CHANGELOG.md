@@ -1,6 +1,6 @@
 # @pome-sh/sandbox-domains
 
-## Unreleased (patch)
+## 0.2.8 — 2026-08-22
 
 **No consumer-visible change.** The repo's top-level `examples/` directory is now
 `agent-examples/`, so comments and one MCP tools-list provenance note that named
