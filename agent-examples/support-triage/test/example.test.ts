@@ -20,9 +20,15 @@
 // on either one going missing. A copy here would be a second, weaker assertion
 // of a thing a dedicated gate already owns.
 
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
 import { buildSystemPrompt, policyHint, resolveTwinWiring } from "../src/index.ts";
+
+const agentYaml = (version: "v1" | "v2") =>
+  readFileSync(fileURLToPath(new URL(`../agents/support-triage-${version}.yaml`, import.meta.url)), "utf8");
 
 const FULL_ENV = {
   POME_GITHUB_MCP_URL: "http://127.0.0.1:4001/s/sess_1/mcp",
@@ -71,5 +77,33 @@ describe("support-triage", () => {
     for (const hint of [policyHint(true), policyHint(false)]) {
       expect(buildSystemPrompt(hint)).toContain("search the open issues");
     }
+  });
+
+  // The README's opening claim is that this example tells ONE story on two
+  // runtimes: the local examinee's `POME_TRIAGE_POLICY_HINT` arms and the
+  // managed-agent `agents/*.yaml` pair are the same experiment. That claim is
+  // load-bearing — ../VERIFICATION.md reports one measurement and the README
+  // points both paths at it — and it is held together by nothing but two files
+  // agreeing, so it rots the first time someone edits one of them.
+  //
+  // Compared as text rather than through a YAML parser on purpose: the example's
+  // dependencies are exact-pinned and published, and a parser is a lot of
+  // supply chain to buy a substring check. What matters is that the sentences
+  // are the same sentences.
+  it("keeps the managed-agent yaml pair telling the same story as the local arms", () => {
+    // The examinee's own triage rule, taken from the prompt it actually builds
+    // rather than retyped — a copy here would be the third place to keep in sync.
+    const triageRule = buildSystemPrompt(policyHint(false))
+      .split("\n\n")
+      .find((para) => para.startsWith("Your first action"));
+    expect(triageRule).toBeDefined();
+
+    // v1 is the naive arm: the same triage rule, and NOT the policy line.
+    expect(agentYaml("v1")).toContain(triageRule);
+    expect(agentYaml("v1")).not.toContain("docs/triage-policy.md");
+
+    // v2 is the fix arm: the same rule, plus the one line, verbatim.
+    expect(agentYaml("v2")).toContain(triageRule);
+    expect(agentYaml("v2")).toContain(policyHint(true).trim());
   });
 });
