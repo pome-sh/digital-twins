@@ -10,7 +10,7 @@ write a version number here or in `package.json`. Released
 entries are insertions only: a correction is the next entry, naming the one it
 corrects.
 
-## Unreleased (patch)
+## 0.26.3 — 2026-08-22
 
 **`search_issues` reaches inside a compound word again** (F-791 follow-up). The
 tokeniser shipped in the previous release treated `apply_coupon` as a single

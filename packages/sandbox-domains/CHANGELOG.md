@@ -1,6 +1,6 @@
 # @pome-sh/sandbox-domains
 
-## Unreleased (patch)
+## 0.2.5 — 2026-08-22
 
 **`search_issues` reaches inside a compound word again** (F-791 follow-up). The
 tokeniser shipped in the previous release treated `apply_coupon` as a single
