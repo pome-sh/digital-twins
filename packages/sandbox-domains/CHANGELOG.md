@@ -1,5 +1,14 @@
 # @pome-sh/sandbox-domains
 
+## 0.2.6 — 2026-08-22
+
+**No consumer-visible change.** The Gmail and Linear twins' `test` scripts were
+`node --test <fixture files> && vitest run`; they are now a bare `vitest run`,
+because the three fixture tests those scripts named moved from `node:test`
+`.mjs` to vitest `.test.ts`. No twin behaviour, wire shape, or bundled artifact
+moved. Listed only because a `packages/twin-*` manifest changed, which the next
+release of this package carries.
+
 ## 0.2.5 — 2026-08-22
 
 **`search_issues` reaches inside a compound word again** (F-791 follow-up). The
