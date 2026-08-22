@@ -45,8 +45,7 @@
     "review:harness": "tsx scripts/review-harness.ts",
     "start": "node dist/src/server.js",
     "prepack": "npm run build",
-    "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
+    "test:coverage": "vitest run --config vitest.coverage.config.ts --coverage",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "capture:fixtures": "tsx scripts/capture-gh-fixtures.ts",
     "fidelity:parity": "tsx scripts/fidelity-parity.ts"

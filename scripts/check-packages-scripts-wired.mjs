@@ -107,8 +107,11 @@ const ROOT = process.cwd();
  *
  * What makes the list safe is not who owns the names but that each is reached
  * WITHOUT the `-w <package>` shape below, uniformly across every workspace:
- * root `test` and `typecheck` are `npm run <name> --workspaces --if-present`
- * (package.json:12,15), root `build` is `scripts/build.mjs` over the whole
+ * root `typecheck` is `npm run typecheck --workspaces --if-present`, root
+ * `test` is a bare `vitest run` against the one root `vitest.config.ts` whose
+ * project list is DISCOVERED from `packages/*` (so a new package's tests are
+ * picked up without an edit there or here), root `build` is
+ * `scripts/build.mjs` over the whole
  * workspace graph, `prepack`/`prepare`/`prepublishOnly`/`postinstall` are npm's
  * own pack/publish/install hooks, and `dev`/`start` are runtime entry points
  * that assert nothing.

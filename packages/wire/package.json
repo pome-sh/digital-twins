@@ -59,7 +59,6 @@
   "license": "Apache-2.0",
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
-    "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepublishOnly": "npm run build",
     "emit:trace-contract": "node scripts/emit-trace-contract.mjs",

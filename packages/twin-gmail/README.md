@@ -65,7 +65,7 @@ behaviour, not just its text:
 ```bash
 node scripts/capture-mcp-tools-list.mjs --twin gmail   # from the repo root: re-read Google
 npm run fixture:mcp -w @pome-sh/twin-gmail             # adopt the capture
-npm test -w @pome-sh/twin-gmail                        # what the new listing now claims
+npx vitest run --project twin-gmail                    # what the new listing now claims
 ```
 
 `list_labels` takes no arguments and returns every label, system ones included.
@@ -154,7 +154,7 @@ that pins and verifies the new signed digest.
 Contributor-only, from a repo checkout:
 
 ```bash
-npm test -w @pome-sh/twin-gmail
+npx vitest run --project twin-gmail
 npm run typecheck -w @pome-sh/twin-gmail
 ```
 

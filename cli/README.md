@@ -116,7 +116,7 @@ Three rules CI must honor:
 npm install
 npm run typecheck
 npm run build
-npm test
+npx vitest run --project cli
 ```
 
 The package publishes the `pome` binary from `dist/src/cli/main.js`.

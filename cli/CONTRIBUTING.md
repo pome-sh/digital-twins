@@ -27,7 +27,7 @@ npm run pome -- --help           # built dist/ output
 
 ```bash
 npm run typecheck    # tsc --noEmit
-npm test             # vitest unit tests — includes test/e2e/**, no separate script
+npx vitest run --project cli   # vitest unit tests — includes test/e2e/**, no separate script
 npm run build        # full publishable build
 ```
 

@@ -39,7 +39,7 @@ examples/             runnable agents, each with its own install
 ## Commands
 
 ```bash
-npm test                     # every workspace
+npm test                     # every vitest test in the repo, one process
 npm run typecheck            # every workspace
 npm run build                # every workspace, dependency-ordered
 npm run test:contract        # contract/ suite, needs a built cli/
@@ -50,11 +50,23 @@ npm run lint:code-health     # barrels + file size
 npm run probe:twins          # every declared endpoint answers
 ```
 
-`npm test` runs `--workspaces --if-present`, which does **not** include
-`contract/` or `scripts/`. Those have their own scripts above.
+`npm test` is `vitest run` against the one root `vitest.config.ts`, which
+declares every workspace as a project. It does **not** include `contract/` or
+`scripts/`; those have their own scripts above.
 
-Single package: `npm test -w @pome-sh/twin-github`. Single file:
-`cd cli && npx vitest run test/unit/tasks-command.test.ts`.
+Single project: `npx vitest run --project twin-github`. Single file:
+`npx vitest run cli/test/unit/tasks-command.test.ts`.
+
+**Two test conventions, and that is all.** A test that runs in-process against
+source is a vitest `.test.ts` under the workspace's `test/`. The black-box
+contract suite in `contract/` is plain `.mjs` on `node --test`, because running
+it without TypeScript is what proves the published artifact boots — see
+`CONTRACT.md`. A self-test *of a script* stays beside its script as `.mjs`.
+
+Coverage cannot live in the root config: vitest reads `coverage` only at the
+top level and drops a `coverage` block inside a project entry **silently**.
+twin-github and twin-slack each keep a `vitest.coverage.config.ts` that
+`test:coverage` passes with `--config`.
 
 ## Rules
 

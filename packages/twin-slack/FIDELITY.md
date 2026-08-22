@@ -437,8 +437,8 @@ above — never the reverse.
 ```bash
 cd packages/twin-slack
 npm run typecheck                       # zero TS errors
-npm run test                            # all tests pass
-npm run test:coverage                   # ≥ 90% lines, ≥ 90% funcs
+npx vitest run --project twin-slack     # all tests pass
+npm run test:coverage -w @pome-sh/twin-slack  # ≥ 90% lines, ≥ 90% funcs
 npm run validate:mcp                    # JSON-RPC SDK round-trip
 npm run fidelity:parity                 # every MCP tool through /mcp/call (F-730)
 TWIN_AUTH_SECRET=dev SLACK_DETERMINISTIC_TS=1 npm run smoke
