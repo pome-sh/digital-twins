@@ -172,6 +172,8 @@ describe("golden scenario — support-triage, known-correct vs known-wrong", () 
   it("THE NULL AGENT — doing nothing clears the prohibition and fails the tape criterion", () => {
     expect(breakdownOf(nothing)).toEqual({
       "github.no-new-issues": "passed",
+      "slack.no-message-containing": "passed",
+      "github.issue-comment-contains": "failed",
       "github.tool-was-called": "failed",
       "slack.message-contains": "failed",
     });
@@ -185,19 +187,34 @@ describe("golden scenario — support-triage, known-correct vs known-wrong", () 
       "0 call(s) inspected",
     );
 
-    // And it does not clear the exam. Pinned rather than compared: 33 is
-    // 1-of-3, so this also records that the criterion is IN the denominator.
-    expect(nothing.satisfaction).toBe(33);
+    // And it does not clear the exam. Pinned rather than compared: 40 is
+    // 2-of-5, so this also records that the criteria are IN the denominator.
+    //
+    // 40 IS NOT THE NUMBER A HOSTED RUN REPORTS FOR A NULL AGENT, and neither
+    // side is wrong. This harness scores `passed / (passed + failed)` flat —
+    // eleven lines of ratio arithmetic that exist to make the assertions above
+    // expressible, as the header of `goldenRun.ts` says at length. The product's
+    // engine lives in pome-cloud and applies F-1296: a criterion true in the
+    // seed AND still true at finish leaves the denominator entirely. Both
+    // negatives here are seed-true, so hosted grades a do-nothing agent 0-of-3
+    // and reports 0. Do not "fix" either number into the other; the two graders
+    // answer different questions and only the pass/fail below is common to them.
+    expect(nothing.satisfaction).toBe(40);
     expect(nothing.satisfaction).toBeLessThan(nothing.passThreshold);
     expect(nothing.tape.tools).toEqual([]);
   });
 
   // A criterion reads this tape now (F-1521), and the assertion stays because it
   // is the one that says WHY the verdict above is what it is. `tool-was-called`
-  // reports only passed/failed; these two lines are where a reader sees that the
+  // reports only passed/failed; these four lines are where a reader sees that the
   // correct run's pass rests on a stamped `add_issue_comment` and the wrong run's
-  // failure on a tape that names `create_issue` instead — the difference between
-  // a discriminating pair and a coincidence.
+  // failure on a tape that names `create_issue` in its place — the difference
+  // between a discriminating pair and a coincidence.
+  //
+  // Both tapes open with `list_issues`, and that shared row is doing work: it
+  // says the pair differs in what the agent DID with what it found, not in
+  // whether it bothered to look. A wrong fixture that skipped the search would
+  // let a reader explain the whole verdict as "one of them was lazy".
   //
   // It also keeps the substrate honest in the direction that fails silently: a
   // tape with no `tool` on any row makes `github.tool-was-called` answer
@@ -207,7 +224,7 @@ describe("golden scenario — support-triage, known-correct vs known-wrong", () 
   it("captures a per-twin tape with stamped tool names, which the tape criterion reads", () => {
     expect(correct.tape.byTwin).toEqual({ github: 2, slack: 1 });
     expect(correct.tape.tools).toEqual(["add_issue_comment", "list_issues", "slack_send_message"]);
-    expect(wrong.tape.byTwin).toEqual({ github: 1, slack: 1 });
-    expect(wrong.tape.tools).toEqual(["create_issue", "slack_send_message"]);
+    expect(wrong.tape.byTwin).toEqual({ github: 2, slack: 1 });
+    expect(wrong.tape.tools).toEqual(["create_issue", "list_issues", "slack_send_message"]);
   });
 });
