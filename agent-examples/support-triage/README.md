@@ -38,16 +38,28 @@ triage agents. That makes the demo `unreliable → reliable` rather than
 `broken → fixed`, and the difficulty lives in the **seeded world** rather than in
 a planted defect — which is the whole reason this is curriculum lesson #1.
 
-Measured on the local examinee, `claude-sonnet-5`, 5 trials per arm, one task
-fingerprint, one twin snapshot:
+Measured on the local examinee, 5 trials per arm, one task fingerprint, one twin
+snapshot, one examinee commit. The only difference between the two rows is an env
+switch:
 
-| arm | pass | scores |
+| model | baseline — naive | fixed — one sentence added |
 |---|---|---|
-| baseline — naive | **1 / 5** | 40 · 40 · 40 · 100 · 40 |
-| fixed — one sentence added | **5 / 5** | 100 · 100 · 100 · 100 · 100 |
+| **`claude-haiku-4-5`** (what this walk uses) | **0 / 5** — 50 · 67 · 25 · 25 · 25 | **5 / 5** — 100 ×5 |
+| `claude-sonnet-5` | 1 / 5 | 5 / 5 |
+| `claude-opus-5` | 5 / 5 | — nothing to repair |
 
-Full record, including what the failures actually did and why `claude-opus-5`
-passes the baseline outright, is in [`VERIFICATION.md`](./VERIFICATION.md).
+**Every point on this page comes from the twin — its recorded call tape and its
+final state. No LLM judge takes part in this task's verdict.** All five criteria
+are deterministic `[code]` checks; the task declares zero `[model]` criteria, and
+`cli/test/golden/support-triage-gate.test.ts` pins that at zero so a judge cannot
+quietly re-enter the pass/fail boundary. (There *was* a sixth, `[model]`
+criterion. It was removed for cause — see
+[`VERIFICATION.md`](./VERIFICATION.md).)
+
+Run the walk on **haiku**: it is the cleanest flip (0/5 → 5/5, no ambiguous
+partial pass), the cheapest, and the fastest. The sonnet row is the more
+interesting failure and is worth reading about below. On opus the baseline simply
+passes, so there is nothing to demonstrate.
 
 ## The task
 
@@ -77,19 +89,29 @@ a one-item answer.
 | **no message anywhere contains `issues/47`** | code:slack | **the wrong-value guard** — this is what an agent that skipped the policy sends |
 | no new issues in `acme/orders-service` | code:github | the original restraint lesson — a duplicate was not filed |
 | `add_issue_comment` was called | code:github | a do-nothing agent cannot clear the github side |
-| concrete repro steps | model | quality of the tracked report |
 
-Five of the six are `[code]`. The third is AutomationBench's
+All five are `[code]`. The third is AutomationBench's
 **negative-assertion-bound-to-the-wrong-value** technique: beside asserting the
 right answer, assert the object does not hold the specific wrong value this
 task's failure mode produces. It separates *did it right* from *did the known
 wrong thing*, deterministically, which no judge can do reliably.
 
-Two of them (`issues/47`, `no-new-issues`) already hold on the seed, so under
+**A sixth criterion used to sit here** — a `[model]` judge call on whether the
+comment carried the customer's repro. It is gone, and the reason is the sharpest
+lesson in this example about writing criteria: across **25** measured trials it
+passed **every single time, including on runs that commented on the wrong
+issue**. Its sentence — *"the report the agent added contains concrete repro
+steps"* — never named which issue the report had to be on, so a well-written
+comment in the wrong place satisfied it. That is a **free assertion**: it cannot
+fail, so it measures nothing, and on a failing run it was worth a free 20 points.
+Removing it widened the gap (a routed-to-#47 run went 40 → 25) and took the last
+non-deterministic thing out of the verdict.
+
+Two criteria (`issues/47`, `no-new-issues`) already hold on the seed, so under
 F-1296 they leave the denominator on a run that respects them and are **counted
 as failures** on a run that breaks them. That asymmetry is deliberate and is what
-keeps a do-nothing agent at 0 rather than 33 — see `VERIFICATION.md` before
-adding an `always-scored` marker to either.
+keeps a do-nothing agent at 0 — see `VERIFICATION.md` before adding an
+`always-scored` marker to either.
 
 ## Run it against Pome
 
@@ -176,35 +198,37 @@ Two properties make this worth a lesson rather than a trick:
 The naive agent ships as the default, so the failing run is the plain one:
 
 ```bash
-pome run tasks/duplicate-issue.md -n 5
+ANTHROPIC_MODEL=claude-haiku-4-5 pome run tasks/duplicate-issue.md -n 5
 ```
 
-`runs: 5` is in the task config on purpose — the report teaches **pass^k**, and
-one trial proves nothing.
+Two things in that line are deliberate. `runs: 5` is in the task config because
+the report teaches **pass^k** and one trial proves nothing. And the model is
+**pinned**, because which model you run is part of the experiment, not a detail —
+see the table below.
 
-> **`verified red: claude-sonnet-5 4/5 · claude-haiku-4-5 5/5, 2026-08-22` — and
-> GREEN on `claude-opus-5`.** 15 hosted trials against this exact file, one
-> fingerprint, one twin snapshot:
+> **`verified red: claude-haiku-4-5 5/5, 2026-08-23`** — 5 hosted trials against
+> this exact file, one fingerprint, one twin snapshot:
 >
-> | model | n | scores | pass rate |
+> | model | n | scores | fails |
 > |---|---|---|---|
-> | `claude-opus-5` | 5 | 100 × 5 | **5 / 5** |
-> | `claude-sonnet-5` | 5 | 40 · 40 · 40 · 100 · 40 | **1 / 5** |
-> | `claude-haiku-4-5` | 5 | 40 · 40 · 40 · 60 · 40 | **0 / 5** |
+> | `claude-haiku-4-5` | 5 | 50 · 67 · 25 · 25 · 25 | **5 / 5** |
 >
-> The prediction committed before the run said 2 of 5 on opus. It was wrong —
-> opus fetches `docs/triage-policy.md` **by name, unprompted**, in every trial.
-> So **run the failing baseline on sonnet or haiku, not on opus.** Run ids and
-> the full narrative are in [`VERIFICATION.md`](./VERIFICATION.md); the
-> per-trial record is the `## Discrimination` section of the task file.
+> Run ids are in the `## Discrimination` section of the task file. Every score
+> there is a count of deterministic checks against twin state — no judge.
 >
-> An earlier 11-trial table (2026-08-21) reported worse haiku numbers and is
-> **superseded, not merely older**: five of its eight haiku failures were two
-> twin defects — a `list_issues` 422 on the array its own MCP schema declares
-> (F-1614) and a whole-string `search_issues` match returning empty (F-791) —
-> manufacturing failures the agent did not commit. Both are fixed and the table
-> above is measured after. It is kept in `VERIFICATION.md` because *why* it was
-> wrong is the durable part.
+> **On `claude-opus-5` this task is GREEN, 5 of 5, and that is measured rather
+> than suspected**: opus fetches `docs/triage-policy.md` by name, unprompted, in
+> every trial. The prediction committed before that run said 2 of 5. It was
+> wrong. Run the failing baseline on haiku or sonnet, not on opus.
+>
+> **Two earlier tables are superseded**, and both are kept in
+> [`VERIFICATION.md`](./VERIFICATION.md) because why they were wrong is the
+> durable part. The 2026-08-21 set was taken through two twin defects — a
+> `list_issues` 422 on the array its own MCP schema declares (F-1614) and a
+> whole-string `search_issues` match returning empty (F-791) — which manufactured
+> failures the agent did not commit. The 2026-08-22 set is clean but was scored
+> with the sixth, `[model]` criterion still in the denominator, so its numbers
+> are 15 points higher on a failing run than they would be today.
 
 ### Read the report
 
@@ -216,18 +240,26 @@ Two criteria carry the diagnosis, and they fail in different places:
   the agent *told the reporter*. This is the wrong-value guard, and it is the one
   that distinguishes "did the right thing" from "did the known wrong thing".
 
-The span waterfall shows the rest, and **there are two different failures in
-it** — worth telling apart, because they call for different fixes:
+The span waterfall shows the rest, and **three different failures live in it** —
+worth telling apart, because they call for different fixes:
 
-* **Never looked.** `list_issues`, then straight to `add_issue_comment` on #47,
-  with no `get_file_contents` on `docs/` anywhere in between. This is every
-  `claude-haiku-4-5` failure (5 of 5). Attention, not judgment: new obligations
+* **Never looked, wrong destination.** `list_issues`, then straight to
+  `add_issue_comment` on #47, with no `get_file_contents` on `docs/` anywhere in
+  between. Three of haiku's five. Attention, not judgment: new obligations
   displace search.
+* **Never looked, right destination anyway.** Two of haiku's five commented on
+  **#23** without ever opening the policy — they inferred it from the tracking
+  issue's own body, which names the file. **Both still failed**, because neither
+  named #47 in the comment and both put `issues/47` in front of the reporter.
+  This is the one worth staring at: the agent arrived at the right place by luck
+  and the criteria did not give it credit. Getting the destination right is not
+  the same as following the rule, and a looser criterion would have scored these
+  as wins.
 * **Looked, and overruled it.** `get_file_contents` on `docs/triage-policy.md`
   *is* in the waterfall — and the comment still lands on #47. This is three of
-  `claude-sonnet-5`'s four failures, and it is the more interesting one: the
-  agent's own standing instruction (*comment on the existing issue and post ITS
-  link*) outranked the rule it had just read.
+  `claude-sonnet-5`'s four failures, and it is the most interesting: the agent's
+  own standing instruction (*comment on the existing issue and post ITS link*)
+  outranked the rule it had just read.
 
 So when you read your own report, check the waterfall for the policy fetch before
 concluding the agent could not find the rule. If the fetch is there, the fix is
@@ -239,7 +271,8 @@ One line, and it is the repair a builder would actually make — tell the agent
 where its team's rules live:
 
 ```bash
-POME_TRIAGE_POLICY_HINT=on pome run tasks/duplicate-issue.md -n 5
+POME_TRIAGE_POLICY_HINT=on ANTHROPIC_MODEL=claude-haiku-4-5 \
+  pome run tasks/duplicate-issue.md -n 5
 ```
 
 which appends one sentence to the system prompt
@@ -259,21 +292,32 @@ says is the shape that endures, rather than `broken → fixed`.
 ### Re-run green
 
 **5 of 5, every criterion, on the same fingerprint and the same twin snapshot as
-the baseline** — measured 2026-08-22, `claude-sonnet-5`, run ids in
-[`VERIFICATION.md`](./VERIFICATION.md). The agent reads the policy, routes the
-report to **#23**, names **#47** in the comment, and sends #23's link back to
-`#support`.
+the baseline** — measured 2026-08-23, `claude-haiku-4-5`, run ids in the task
+file's `## Discrimination` section. The agent reads the policy, routes the report
+to **#23**, names **#47** in the comment, and sends #23's link back to `#support`.
 
-The interesting part is *what* moved. In the baseline, three of sonnet's four
-failures had **already read `docs/triage-policy.md`** and routed to #47 anyway —
-its own standing instruction (*comment on the existing issue and post ITS link*)
-outranked the repository's written rule. So the fix is not "now it finds the
-file". It is that naming the file in the charter is what makes the repo's rule
-win the conflict. All five fixed trials opened the policy **and applied it**.
+**0 / 5 → 5 / 5.** Same fingerprint, same snapshot, same examinee commit; one env
+variable is the entire difference.
 
-That is also why the score jumps rather than drifts: `passThreshold` is 100, so
-the run that routes to #47 scores 40 and fails, and there is no partial credit to
-climb through.
+The interesting part is *what* moved, and it is not what the fix looks like it
+does. "Point the agent at the policy file" reads as a discoverability aid. On
+haiku that is half true — 0 of 5 naive trials opened the file, 5 of 5 fixed ones
+did. But on `claude-sonnet-5`, **three of four naive failures had already read
+it** and routed to #47 anyway, because the agent's own standing instruction
+(*comment on the existing issue and post ITS link*) outranked the rule it had
+just fetched.
+
+That is the general mechanism, and it is worth carrying to your own agent: a file
+the agent reads is **data**; its system prompt is **instruction**; and a model
+correctly ranks instruction above data — otherwise anything it read could
+hijack it. So naming the file in the charter is not teaching it where to look. It
+is **transferring authority** to that file. If you want your agent to obey your
+team's written conventions, you have to say so; it will not assume a document it
+found outranks you.
+
+That is also why the score jumps rather than drifts: `passThreshold` is 100, so a
+run that routes to #47 scores 25 and fails outright. There is no partial credit
+to climb through.
 
 ### Customize
 
@@ -293,7 +337,7 @@ climb through.
 
 * **Baseline passes (stays green).** On `claude-opus-5` it does, every time, and
   that is measured rather than suspected — it reads the policy file by reflex. Run
-  the baseline on `claude-sonnet-5` (1/5) or `claude-haiku-4-5` (0/5) instead. If
+  the baseline on `claude-haiku-4-5` (0/5) or `claude-sonnet-5` (1/5) instead. If
   you need a red on opus specifically, the designed fallback is in
   [`VERIFICATION.md`](./VERIFICATION.md): the same world plus a committed
   pattern-1 config defect (a context-file path that does not resolve), so the
@@ -302,31 +346,50 @@ climb through.
 * **Fix fails (stays red).** If a criterion reads `NOT EVALUATED` rather than
   failed, the run is `INCOMPLETE` — the grader could not see that state at all,
   which is a wiring problem rather than an agent problem. `pome run` exits 1 on
-  that too, and the score names its own denominator. If the `[model]` criteria
-  are the red ones, raise `-n`: one clean set is a signal, not proof.
+  that too, and the score names its own denominator. Note that this task has no
+  `[model]` criteria at all, so a red here is never judge variance — it is a fact
+  about the twin's final state or its call tape, and the report names which.
 
-### Known gap in the criteria
+### Why this task has no judge in it
 
 The five `[code]` criteria are deterministic and, on this task, settled: the
 restraint half that used to be missing landed as `github.no-new-issues`
 ([F-1198](https://linear.app/pome-sh/issue/F-1198)) and the wrong-value guard as
-`slack.no-message-containing`. All five bind and all five were graded in every
-trial reported here.
+`slack.no-message-containing`. All five bind, and all five were graded in every
+trial reported on this page.
 
-**The `[model]` one is the live gap.** *"The report the agent added contains
-concrete repro steps…"* has a premise — that the agent added a report at all —
-and the judge resolves a missing referent inconsistently. Measured on three
-byte-identical trials where the agent created an issue and added no comment: it
-twice substituted the new issue's body and PASSED, once correctly said the
-premise was unmet and FAILED. **20 points of variance from the grader alone**, on
-a task whose `passThreshold` is 100. `[code]` has a settled contract for the
-absent-subject case (`NOT EVALUATED`); `[model]` has none. Tracked as
+There used to be a sixth, `[model]` criterion, and **two independent things were
+wrong with it**. Both are worth knowing before you write your own.
+
+**1. It could not fail.** *"The report the agent added contains concrete repro
+steps drawn from the customer's message"* does not say **which issue** the report
+has to be on. So an agent that wrote an excellent comment on the *wrong* issue
+satisfied it. Across 25 measured trials — three models, both arms, including runs
+that failed every other criterion — it passed every time. A criterion that cannot
+fail is not lenient, it is **inert**: it measures nothing and inflates the
+denominator. AutomationBench calls this a *free assertion* and excludes the class;
+we copied the technique and then shipped one anyway. Worth 20 points to every
+failing run until it was removed.
+
+**2. When it *can* fail, it is inconsistent.** Its sentence has a premise — that a
+report exists at all. Measured on three byte-identical trials where the agent
+created an issue and added no comment, the judge twice substituted the new
+issue's body and PASSED, once correctly said the premise was unmet and FAILED.
+**20 points of variance from the grader alone**, on a task whose `passThreshold`
+is 100. `[code]` has a settled contract for the absent-subject case
+(`NOT EVALUATED`); `[model]` has none. Tracked as
 [F-1615](https://linear.app/pome-sh/issue/F-1615).
 
-It does not affect the numbers on this page — every run reported here did add a
-comment, so the premise held — but it is why a `[model]` criterion should never
-be the one carrying a pass/fail boundary. Said out loud rather than left for a
-reader to discover, because this example is the one that defines the standard.
+Note that these pull in opposite directions, which is why fixing the wording
+would not have been enough: binding the criterion to #23 would make it able to
+fail, and would walk it straight into the variance in (2). The right move on a
+task whose whole point is a deterministic verdict was to remove it.
+
+**The rule this example now follows, and recommends:** a `[model]` criterion is
+for things no check can express, it belongs on tasks where you want a
+*qualitative* read, and it should never be the thing carrying a pass/fail
+boundary. Said out loud rather than left for a reader to discover, because this
+example is the one that defines the standard.
 
 ## Local examinee
 

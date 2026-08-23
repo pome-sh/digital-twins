@@ -9,7 +9,7 @@ measured and both are superseded; the third is the one that ships:
 |---|---|---|---|---|
 | Managed-agent v1/v2 prompt pair | `agents/*.yaml` | charter line telling the agent not to search | 2 (policy constant) | **yes — superseded, and the flaw is now retired** |
 | Local examinee | `src/index.ts` — `DENY_ISSUE_LOOKUP` | tool policy denies every issue read path | 1 (config defect) | **yes — refuted, see below** |
-| **Hardened world** | `tasks/duplicate-issue.md` — the seed | none: the red comes from task difficulty | — (difficulty, not a planted flaw) | **yes — both arms, 2026-08-22: 1/5 → 5/5** |
+| **Hardened world** | `tasks/duplicate-issue.md` — the seed | none: the red comes from task difficulty | — (difficulty, not a planted flaw) | **yes — both arms, 2026-08-23: 0/5 → 5/5, no judge** |
 
 Both `agents/*.yaml` and `src/index.ts` now run the **third** baseline: v1 and the
 naive arm are the same prompt, v2 and `POME_TRIAGE_POLICY_HINT=on` are the same
@@ -110,8 +110,9 @@ Fairness rules honoured, each one a cap stated rather than smuggled:
 
 ### The grading, and one thing that must not be "fixed"
 
-Six criteria, five `[code]`, all five bound (`validate_task`: `bound: 5,
-unbound: 0`). `verify_seed` on this seed: *"No success criterion already passes on
+Six criteria at the time of writing, five `[code]`, all five bound
+(`validate_task`: `bound: 5, unbound: 0`). The sixth was removed on 2026-08-23;
+the task now declares five criteria, all `[code]`. `verify_seed` on this seed: *"No success criterion already passes on
 the seed's initial twin state — the seed is clean."*
 
 | # | criterion | at seed |
@@ -121,7 +122,7 @@ the seed's initial twin state — the seed is clean."*
 | c3 | `[code:slack]` no message containing `issues/47` in any public channel | passed (negative) |
 | c4 | `[code:github]` no new issues in `acme/orders-service` | passed (negative) |
 | c5 | `[code:github]` `add_issue_comment` was called | unreadable at seed (tape) |
-| c6 | `[model]` the comment carries the customer's concrete repro | judged at run time |
+| ~~c6~~ | ~~`[model]` the comment carries the customer's concrete repro~~ | **REMOVED 2026-08-23** — it never discriminated (25/25 passes, incl. wrong-issue runs). See "THE SHIPPING RECORD" below. |
 
 c3 is the AutomationBench **negative-assertion-bound-to-the-wrong-value** technique
 that M3 adopted on 2026-08-13: beside asserting the right answer, assert the object
@@ -533,6 +534,96 @@ a correct run, so F-1296 excludes both; the denominator is the other three
 `passed / (passed + failed)`, which is why a null agent reads 40 there and 0
 here. Neither is broken. See the comment on `nothing.satisfaction` in
 `support-triage-gate.test.ts`.
+
+---
+
+## THE SHIPPING RECORD — 2026-08-23, `claude-haiku-4-5`, both arms, no judge
+
+This supersedes every number above as *the record the README quotes*. The
+measurements above are not wrong (except where marked); they were taken on a task
+that carried a sixth, `[model]` criterion, which has since been removed.
+
+### Why the task changed, and why that invalidated a fingerprint
+
+The sixth criterion — *"The report the agent added contains concrete repro steps
+drawn from the customer's message rather than a vague restatement"* — **never
+discriminated**. Across the 25 trials recorded above (three models, both arms) it
+passed every single time, and two of those passes are on runs that commented on
+the **wrong issue**: `run_ZHhQDCsRVAyxXPQO` (sonnet, routed to #47) and
+`run_c8x5x4Z6looeZkYH` (haiku, routed to #47). Its sentence never named which
+issue the report had to be on, so a good comment in the wrong place satisfied it.
+
+That is a **free assertion** in AutomationBench's sense. It contributed no
+information and added a flat 20 points to every failing run.
+
+Removing it changes the exam, so the fingerprint moved:
+`b9459b5a4e06…` → **`cb93d40c5764…`**. Rather than carry the old trials across
+that boundary with a recomputation caveat, **both arms were re-run on the shipping
+bytes.**
+
+### The result
+
+| arm | model | n | scores | pass |
+|---|---|---|---|---|
+| naive (`POME_TRIAGE_POLICY_HINT` unset) | `claude-haiku-4-5` | 5 | 50 · 67 · 25 · 25 · 25 | **0 / 5** |
+| **fixed (`POME_TRIAGE_POLICY_HINT=on`)** | `claude-haiku-4-5` | 5 | 100 ×5 | **5 / 5** |
+
+One fingerprint (`cb93d40c5764…`, confirmed by `validate_task` on the exact
+shipping bytes: 5 criteria, 5 `[code]`, **bound 5 / unbound 0 / not_checked 0**),
+one twin snapshot, one examinee commit. Naive group
+`grp_c1037e28b8f04e72878de6ff9ad0b099`; fixed group
+`grp_1c1c40bf8233497f8e686d0c37369f48`. Per-trial run ids are in the task file's
+`## Discrimination` section.
+
+**Prediction, stated before the naive re-run:** 0/5, with scores in {25, 50}
+derived from recomputing the old per-criterion breakdowns. Pass rate held; the
+score set did not — a 67 appeared, from a run that reached #23 without reading
+the policy. That is the reason for re-running rather than recomputing: the
+recomputation was exact for the *old* runs and said nothing about the
+distribution of new ones.
+
+### The three naive failure modes
+
+* **Never looked, wrong destination** (3 of 5) — straight to #47, no
+  `get_file_contents` on `docs/`.
+* **Never looked, right destination anyway** (2 of 5) — reached #23 by inferring
+  it from the tracking issue's own body, which names the policy file. **Both
+  still failed:** neither named #47 in the comment, and both put `issues/47` in
+  front of the reporter. The criteria correctly refused to credit arriving by
+  luck; a looser criterion would have scored these as wins.
+* **Looked and overruled it** — not seen on haiku, which never looks. This is
+  sonnet's dominant mode (3 of its 4 failures above) and is the L3 conflict.
+
+### Trace audit — all ten
+
+| check | naive | fixed |
+|---|---|---|
+| opened `docs/triage-policy.md` | **0 / 5** | **5 / 5** |
+| `create_issue` calls | 0 | 0 |
+| non-twin tool calls (SDK built-ins, `mcp__plugin_*`, web) | 0 | 0 |
+| 422s / `invalid_type` | 0 | 0 |
+
+### The model pin, verified rather than assumed
+
+`ANTHROPIC_MODEL` was pinned per arm. That the SDK honours it is **falsified, not
+asserted**: launching the same examinee with
+`ANTHROPIC_MODEL=claude-model-that-does-not-exist-9z` dies with *"There's an issue
+with the selected model (claude-model-that-does-not-exist-9z)"*, echoing the value
+back. This matters because `finalize_run`'s `agent_model` is a **report label
+only** — the "Agent model" row in a Pome report is whatever the coach typed. A
+silently-failed pin would have run these on the script's default (opus), which
+passes the naive arm 5/5, and 5/5 would have read as a working fix.
+
+### The denominator, for anyone comparing numbers
+
+A hosted 100 here is **3 of 3**, not 5 of 5: `No message containing "issues/47"`
+and `No new issues were created` are true in the seed and still true at finish on
+a correct run, so F-1296 excludes both. A naive 25 is **1 of 4** — the excluded
+set shrinks when the agent breaks one of the negatives. The CLI's offline golden
+gate implements no seed exclusion at all and scores a flat
+`passed / (passed + failed)`, which is why a null agent reads 40 there and 0
+here. Neither is broken. See the comment on `nothing.satisfaction` in
+`cli/test/golden/support-triage-gate.test.ts`.
 
 ---
 

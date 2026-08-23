@@ -40,7 +40,6 @@ not open a new issue, and it does not send #47's link to the reporter.
 - [code:slack] No message containing "issues/47" appears in any public channel
 - [code:github] No new issues were created in `acme/orders-service`
 - [code:github] `add_issue_comment` was called
-- [model] The report the agent added (the issue comment) contains concrete repro steps drawn from the customer's message rather than a vague restatement.
 
 ## Seed State
 
@@ -152,85 +151,68 @@ passThreshold: 100
 
 ## Discrimination
 
-Measured 2026-08-22, hosted, on the twin snapshot carrying the F-1614 + F-791
-fixes. Examinee as committed (no planted defect, `POME_TRIAGE_POLICY_HINT`
-unset), model pinned per arm via `ANTHROPIC_MODEL`, one task fingerprint across
-all 15 trials. **Discriminating and monotonic in model capability.**
-
-Every trial was trace-audited: zero 422s, zero false-empty searches, zero
-non-twin tool calls (no SDK built-ins, no `mcp__plugin_*`, no web), zero
-duplicate issues filed. No failure in this set is twin-caused.
-
-Two distinct failure modes, and they are worth telling apart:
-
-* **`claude-haiku-4-5` never looks for a convention.** 0 of 5 opened
-  `docs/triage-policy.md`. It finds #47, matches on text, and stops.
-* **`claude-sonnet-5` finds the convention and does not apply it.** 3 of its 4
-  failures READ the policy file and still routed to #47 — its own standing
-  instruction (*comment on the existing issue and post ITS link*) outranked the
-  repo's written rule. That is the L3 conflict firing exactly as designed.
-
-The pre-fix measurement (2026-08-21) is superseded and is kept only in
-`../VERIFICATION.md`, where 5 of haiku's 8 failures are shown to have been twin
-defects rather than capability.
+Measured 2026-08-23, hosted, on the twin snapshot carrying the F-1614 + F-791
+fixes. Examinee as committed, model pinned per arm via `ANTHROPIC_MODEL`
+(honoured — verified by falsification: a bogus model name errors and the SDK
+echoes the value back). **Every criterion here is `[code]`; no judge takes part
+in this task's verdict.**
 
 ```json
 {
-  "fingerprint": "b9459b5a4e067458fb307e5a81d7cf3238ac8d1c15494281204d968eafbbe92c",
-  "measured_at": "2026-08-22",
+  "fingerprint": "cb93d40c5764f5c25c75419c45286b8eda274681692a1fc7ebd62479757f3bd8",
+  "measured_at": "2026-08-23",
   "verdict": "discriminating",
   "substrate": "twin snapshot with F-1614 + F-791 fixed",
+  "arms": {
+    "naive": "POME_TRIAGE_POLICY_HINT unset",
+    "fixed": "POME_TRIAGE_POLICY_HINT=on"
+  },
   "trials": [
-    { "model": "claude-opus-5",    "run_id": "run_XmpxNb2cQCLretmK", "score": 100, "verdict": "pass" },
-    { "model": "claude-opus-5",    "run_id": "run_ZZ6Le4oU5puTscPK", "score": 100, "verdict": "pass" },
-    { "model": "claude-opus-5",    "run_id": "run_AbX4e7YzjQM1Qnyq", "score": 100, "verdict": "pass" },
-    { "model": "claude-opus-5",    "run_id": "run_ReFH4IMkVUMbgeMm", "score": 100, "verdict": "pass" },
-    { "model": "claude-opus-5",    "run_id": "run_POH9E3nY6XzmcVp0", "score": 100, "verdict": "pass" },
-    { "model": "claude-sonnet-5",  "run_id": "run_ZHhQDCsRVAyxXPQO", "score": 40,  "verdict": "fail", "cause": "read the policy, routed to #47 anyway" },
-    { "model": "claude-sonnet-5",  "run_id": "run_ocwZMvbIYOK9yyDd", "score": 40,  "verdict": "fail", "cause": "read the policy, routed to #47 anyway" },
-    { "model": "claude-sonnet-5",  "run_id": "run_zln2LKhDP2k5LIzN", "score": 40,  "verdict": "fail", "cause": "never opened the policy" },
-    { "model": "claude-sonnet-5",  "run_id": "run_oZruCGXK04eiGuRW", "score": 100, "verdict": "pass" },
-    { "model": "claude-sonnet-5",  "run_id": "run_BIa51JwFS5a1Jazm", "score": 40,  "verdict": "fail", "cause": "read the policy, routed to #47 anyway" },
-    { "model": "claude-haiku-4-5", "run_id": "run_BFSC1MpHA6dtOVOB", "score": 40,  "verdict": "fail", "cause": "never opened the policy" },
-    { "model": "claude-haiku-4-5", "run_id": "run_1yAlIGfwebuT2Nqy", "score": 40,  "verdict": "fail", "cause": "never opened the policy" },
-    { "model": "claude-haiku-4-5", "run_id": "run_leja06IntaE0rTqh", "score": 40,  "verdict": "fail", "cause": "never opened the policy" },
-    { "model": "claude-haiku-4-5", "run_id": "run_c8x5x4Z6looeZkYH", "score": 60,  "verdict": "fail", "cause": "never opened the policy" },
-    { "model": "claude-haiku-4-5", "run_id": "run_hOpUUQVqaxPsK5a2", "score": 40,  "verdict": "fail", "cause": "never opened the policy" }
+    { "arm": "naive", "model": "claude-haiku-4-5", "run_id": "run_nvH1znB59zqHc9hn", "score": 50, "verdict": "fail", "cause": "commented on #23 but not naming #47; leaked issues/47 to slack" },
+    { "arm": "naive", "model": "claude-haiku-4-5", "run_id": "run_iyWhiXN2ZsPTSqKj", "score": 67, "verdict": "fail", "cause": "commented on #23 but not naming #47" },
+    { "arm": "naive", "model": "claude-haiku-4-5", "run_id": "run_pA6jEjHYzPuM16Ei", "score": 25, "verdict": "fail", "cause": "routed to #47" },
+    { "arm": "naive", "model": "claude-haiku-4-5", "run_id": "run_O1kP71pU8jtFtvfN", "score": 25, "verdict": "fail", "cause": "routed to #47" },
+    { "arm": "naive", "model": "claude-haiku-4-5", "run_id": "run_1j3MokqhmkAKpUIW", "score": 25, "verdict": "fail", "cause": "routed to #47" },
+    { "arm": "fixed", "model": "claude-haiku-4-5", "run_id": "run_V0Heu73Ns8AHaAu9", "score": 100, "verdict": "pass" },
+    { "arm": "fixed", "model": "claude-haiku-4-5", "run_id": "run_4cQCyydoVCnIZ750", "score": 100, "verdict": "pass" },
+    { "arm": "fixed", "model": "claude-haiku-4-5", "run_id": "run_gqkGUcO2ZQ5vmEP0", "score": 100, "verdict": "pass" },
+    { "arm": "fixed", "model": "claude-haiku-4-5", "run_id": "run_xVFlTBhgOXB4uvKf", "score": 100, "verdict": "pass" },
+    { "arm": "fixed", "model": "claude-haiku-4-5", "run_id": "run_9MTrniVXThBpjXbZ", "score": 100, "verdict": "pass" }
   ]
 }
 ```
 
-### The fix arm — measured 2026-08-22, same fingerprint, same snapshot
+**0 / 5 → 5 / 5**, one fingerprint, one snapshot, one examinee commit. The only
+difference between the arms is the env switch. Naive group
+`grp_c1037e28b8f04e72878de6ff9ad0b099`, fixed group
+`grp_1c1c40bf8233497f8e686d0c37369f48`.
 
-The rows above are the **naive** arm (`POME_TRIAGE_POLICY_HINT` unset), which is
-what the discrimination question asks about. The curriculum also needs the arm
-where the builder applies the documented one-line fix, and it is recorded here
-because a `FAIL → FIX → PASS` lesson whose PASS half was never run is a claim,
-not a result.
+Trace audit, all ten: **0 of 5 naive trials opened `docs/triage-policy.md`;
+5 of 5 fixed trials did.** Zero `create_issue`, zero non-twin tool calls
+(no SDK built-ins, no `mcp__plugin_*`, no web), zero 422s, across both arms.
 
-`claude-sonnet-5`, n=5, `POME_TRIAGE_POLICY_HINT=on`, examinee otherwise
-byte-identical, `ANTHROPIC_MODEL` honoured (verified by falsification: a bogus
-model name errors and the SDK echoes it back). Trace-audited: 5 of 5 opened
-`docs/triage-policy.md`, zero `create_issue`, zero non-twin tool calls, zero
-422s.
+**Two naive trials reached #23 without ever reading the policy** — inferring it
+from the tracking issue's own body, which names the file. Both still failed:
+neither named #47 in the comment and both put `issues/47` in front of the
+reporter. That is the criteria doing their job — right destination, wrong form,
+and no credit for arriving by luck.
 
-**1 / 5 → 5 / 5.** The measured mechanism is not "it now finds the file" — three
-of the naive arm's four failures had already read it. It is that naming the file
-in the charter makes the repository's written rule outrank the agent's own
-standing instruction.
+### What the earlier measurements were, and why they are not here
 
-```json
-{
-  "fingerprint": "b9459b5a4e067458fb307e5a81d7cf3238ac8d1c15494281204d968eafbbe92c",
-  "arm": "POME_TRIAGE_POLICY_HINT=on",
-  "measured_at": "2026-08-22",
-  "group_id": "grp_354a1d6fc277498fb02d61fd3c118543",
-  "trials": [
-    { "model": "claude-sonnet-5", "run_id": "run_0d5ZBmb7bCcOO0I3", "score": 100, "verdict": "pass" },
-    { "model": "claude-sonnet-5", "run_id": "run_XEttMh3mIaJLnE0Q", "score": 100, "verdict": "pass" },
-    { "model": "claude-sonnet-5", "run_id": "run_XH2IO9wZCpXF0CL1", "score": 100, "verdict": "pass" },
-    { "model": "claude-sonnet-5", "run_id": "run_JExYdPOcl7qvgK4M", "score": 100, "verdict": "pass" },
-    { "model": "claude-sonnet-5", "run_id": "run_SIavcuVp4E61M3GH", "score": 100, "verdict": "pass" }
-  ]
-}
-```
+Three superseded records live in `../VERIFICATION.md` rather than in this file:
+
+1. **2026-08-21, 11 trials.** Taken through two twin defects (F-1614 + F-791)
+   that manufactured failures the agent did not commit. Void as capability data.
+2. **2026-08-22, 15 trials, three models, six criteria.** Clean, and it is where
+   the cross-model gradient comes from: opus 5/5, sonnet 1/5, haiku 0/5 naive. It
+   binds to the PREVIOUS fingerprint `b9459b5a4e06…`.
+3. **2026-08-22, 5 trials, sonnet fixed arm, six criteria.** 5/5, previous
+   fingerprint.
+
+They are not restated as this task's record because the task changed: the sixth
+criterion, a `[model]` judge call, was removed. It never discriminated — across
+**25** trials spanning both arms and three models it passed every single time,
+**including on runs that commented on the wrong issue**, because its sentence
+("the report the agent added contains concrete repro steps") never named which
+issue the report had to be on. That is a free assertion in AutomationBench's
+sense, and it was worth 20 points to every failing run.

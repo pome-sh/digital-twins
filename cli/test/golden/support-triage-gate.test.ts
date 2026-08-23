@@ -145,19 +145,27 @@ describe("golden scenario — support-triage, known-correct vs known-wrong", () 
     expect([correct.satisfaction, wrong.satisfaction]).toEqual([100, 0]);
   });
 
-  it("runs no [model] criterion and no model — the gate is deterministic and free", () => {
-    // The task declares ONE `[model]` criterion. It is counted and NOT graded: a
-    // judge in CI would make this gate slow, paid and flaky, which is the reason
-    // golden tasks are restricted to the `[code]` half.
+  it("declares ZERO [model] criteria — this task's verdict has no judge in it", () => {
+    // Pinned at zero, and this is the strongest single assertion in the file.
     //
-    // It was two until F-1521. The one that went was the criterion asking a
-    // MODEL whether the agent had commented at all — a deterministic fact the
-    // tape now answers — and the one that stayed judges whether the comment
-    // carries the customer's actual repro, which no check can express. The count
-    // dropping is the measurable half of that trade, so it is pinned rather than
-    // relaxed.
-    expect(correct.modelCriteria).toBe(1);
-    expect(wrong.modelCriteria).toBe(1);
+    // The count went 2 → 1 → 0. F-1521 took the first: a MODEL was being asked
+    // whether the agent had commented at all, which the tape answers
+    // deterministically. The last one asked whether the comment carried the
+    // customer's repro — and it was removed because it never discriminated. It
+    // passed on all 25 measured trials spanning both arms and three models,
+    // INCLUDING runs that commented on the wrong issue, because its sentence
+    // never named which issue the report had to be on. A free assertion, in
+    // AutomationBench's sense, worth 20 points to every failing run.
+    //
+    // Zero is now a PROPERTY of this task and not an accident of the golden
+    // harness: `support-triage` is the quickstart, every point it reports comes
+    // from twin state or the recorded tape, and a judge re-entering here would
+    // put grader variance back on the pass/fail boundary of the one lesson a
+    // stranger walks first. Adding a `[model]` criterion to this task reds this
+    // line, deliberately — argue it in the PR, do not relax it.
+    expect(correct.modelCriteria).toBe(0);
+    expect(wrong.modelCriteria).toBe(0);
+    expect(nothing.modelCriteria).toBe(0);
   });
 
   // F-1521's Done-when, measured on the real task rather than on a hand-built
