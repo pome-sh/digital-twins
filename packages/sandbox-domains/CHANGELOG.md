@@ -1,6 +1,6 @@
 # @pome-sh/sandbox-domains
 
-## Unreleased (patch)
+## 0.2.11 — 2026-08-23
 
 **No consumer-visible change.** Internal tracker ids were removed from source
 comments, JSDoc and test names across the workspace, and the comment blocks
