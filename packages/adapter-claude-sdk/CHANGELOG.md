@@ -1,6 +1,6 @@
 # @pome-sh/adapter-claude-sdk — CHANGELOG
 
-## Unreleased (patch)
+## 0.3.9 — 2026-08-23
 
 **No consumer-visible change.** `@pome-sh/wire` dropped its legacy event → span
 shim and the legacy fixture family that fed it. This package never imported

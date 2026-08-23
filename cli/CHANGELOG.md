@@ -10,7 +10,7 @@ write a version number here or in `package.json`. Released
 entries are insertions only: a correction is the next entry, naming the one it
 corrects.
 
-## Unreleased (patch)
+## 0.26.7 — 2026-08-23
 
 **No consumer-visible change.** `@pome-sh/wire` dropped its legacy event → span
 shim (`shimLegacyEventToSpan` and the `LEGACY_*` constants) and the legacy

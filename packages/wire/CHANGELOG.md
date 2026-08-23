@@ -4,7 +4,7 @@ SPDX-License-Identifier: Apache-2.0
 
 # @pome-sh/wire — CHANGELOG
 
-## Unreleased (minor)
+## 0.3.0 — 2026-08-23
 
 **BREAKING — the legacy event → span shim is removed.** `src/otel/legacy-shim.ts`
 translated the three pre-OTel recorder variants (`TwinHttpEvent`, `LlmCallEvent`,
