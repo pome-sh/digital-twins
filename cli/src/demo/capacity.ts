@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-643 / FDRS-662 — honest at-capacity states for the anonymous demo.
+// Honest at-capacity states for the anonymous demo.
 //
 // The demo's cloud surface returns machine-readable 402/429 errors at three
 // choke points (mint, model-call gateway, finalize/judge). Each maps to an

@@ -9,7 +9,7 @@
  *   - dashboard `/runs/:id` — renders lane-timeline + state-inspector + handoff card
  *
  * Lane/Step are flat parallel arrays on Run (not nested), aligning with the
- * `runs.lanes jsonb` + `runs.steps jsonb` two-column DB shape from FDRS-327.
+ * `runs.lanes jsonb` + `runs.steps jsonb` two-column DB shape.
  * Cross-reference: `Lane.step_id` → `Step.id`; `Lane.request_ids[]` →
  * `RecorderEvent.request_id`.
  */
@@ -25,7 +25,7 @@ export const judgeModelSchema = z.string().min(1);
 export type JudgeModel = z.infer<typeof judgeModelSchema>;
 
 // Which server-side correlator produced a run's lanes/steps. Reconciled from
-// pome-cloud /v1 (FDRS-613): OTEL M4/M6 clients distinguish heuristic legacy
+// pome-cloud /v1: OTEL M4/M6 clients distinguish heuristic legacy
 // timelines from exact span-context timelines.
 export const correlatorKindSchema = z.enum([
   "heuristic",
@@ -34,7 +34,7 @@ export const correlatorKindSchema = z.enum([
 ]);
 export type CorrelatorKind = z.infer<typeof correlatorKindSchema>;
 
-// Criterion kind — W3 vocab (FDRS-653): `code` = deterministic/code-checked
+// Criterion kind: `code` = deterministic/code-checked
 // predicate (formerly `D`), `model` = LLM-judged (formerly `P`). The canonical
 // enum is `code | model`; the INPUT schema below additionally accepts the
 // 0.3.0-era `D` / `P` spellings and normalizes them at parse time (tolerant
@@ -124,7 +124,7 @@ export const laneSchema = z.object({
 });
 export type Lane = z.infer<typeof laneSchema>;
 
-// Canonical Run row. W3 vocab (FDRS-653): `task_name` / `task_hash` /
+// Canonical Run row. Task vocab: `task_name` / `task_hash` /
 // `promoted_task_id` are the canonical wire keys (cloud DB: `tasks` table,
 // `runs.task_name`). The exported `runSchema` below wraps this object in the
 // tolerant-reader preprocess so 0.3.0-era rows carrying `scenario_name` /
@@ -137,7 +137,7 @@ const runObjectSchema = z.object({
   task_hash: z.string(),                       // sha256 of source markdown; 0.3.0 alias: scenario_hash
   satisfaction_score: z.number().int().min(0).max(100),  // CLI-computed (BYOK Flavor #1)
   criteria_results: z.array(criterionResultSchema),
-  trace_s3_key: z.string().nullable(),         // s3 key for events.jsonl (hosted only; F-689 deleted tool_calls.jsonl)
+  trace_s3_key: z.string().nullable(),         // s3 key for events.jsonl (hosted only)
   state_s3_key: z.string().nullable(),         // s3 key for state_final.json
   meta_s3_key: z.string().nullable(),
   duration_ms: z.number().int(),
@@ -145,7 +145,7 @@ const runObjectSchema = z.object({
   judge_model: judgeModelSchema,               // which model judged [model] criteria (free-form)
   judge_tokens_in: z.number().int().min(0).nullable(),
   judge_tokens_out: z.number().int().min(0).nullable(),
-  // ── FDRS-613: reconciled from pome-cloud /v1 wire truth (all additive with
+  // ── Reconciled from pome-cloud /v1 wire truth (all additive with
   // defaults so pre-existing Run constructors stay valid) ────────────────────
   // Sim deep-telemetry — per-run agent telemetry rollup, computed at finalize
   // from the agent's independently-correlated `gen_ai` span tree. Null = no
@@ -159,12 +159,12 @@ const runObjectSchema = z.object({
   agent_telemetry_span_count: z.number().int().min(0).nullable().default(null),
   // Which server-side correlator produced lanes/steps.
   correlator_kind: correlatorKindSchema.default("heuristic"),
-  // M0.2 (FDRS-509) — which surface this run belongs to. 'simulation' =
+  // M0.2 — which surface this run belongs to. 'simulation' =
   // CLI/staging scenario run (default for every legacy row); 'production' = an
   // ingested OTLP production trace (M2).
   environment: z.enum(["production", "simulation"]).default("simulation"),
-  // M0.5 (FDRS-512) — replay loop linkage (prod-run → task → replay-run).
-  // W3 vocab: canonical key; 0.3.0 alias: promoted_scenario_id.
+  // M0.5 — replay loop linkage (prod-run → task → replay-run).
+  // Canonical key; 0.3.0 alias: promoted_scenario_id.
   promoted_task_id: z.string().nullable().default(null),
   replay_run_id: z.string().nullable().default(null),
   // Storage key for the tar-and-upload state archive the replay engine seeds a
@@ -180,7 +180,7 @@ const runObjectSchema = z.object({
   // LLM endpoint failure, or legacy pre-M4-1 runs.
   fix_prompt: z.string().nullable().default(null),
   // Storage KEY (path) of the raw events.jsonl blob — NOT a URL (dashboard mints
-  // a signed GET URL on read). FDRS-613: relaxed from `.url()` to match the
+  // a signed GET URL on read). Relaxed from `.url()` to match the
   // pome-cloud shape, since persisted storage keys are not URLs. Null in
   // self-host mode, on upload failure, --no-upload opt-out, or legacy runs.
   events_jsonl_url: z.string().nullable().default(null),
@@ -188,7 +188,7 @@ const runObjectSchema = z.object({
   finished_at: z.string().datetime().nullable(),
 });
 
-// Tolerant reader (FDRS-653): accepts both the 0.3.0 `scenario_*` and the
+// Tolerant reader: accepts both the 0.3.0 `scenario_*` and the
 // canonical `task_*` keys and normalizes to the new vocabulary. When both are
 // present, the canonical key wins. The parsed output carries `task_*` only.
 export const runSchema = z.preprocess(normalizeTaskVocabKeys, runObjectSchema);

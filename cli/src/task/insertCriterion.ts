@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * F-1074 — append one rendered criterion to a task file's `## Success Criteria`,
+ * Append one rendered criterion to a task file's `## Success Criteria`,
  * touching nothing else.
  *
  * It does NOT parse and re-serialize the markdown. Re-serializing is how the
@@ -20,12 +20,12 @@ const NEXT_HEADING_RE = /^##\s+/;
 // It reads a line; it does not VALIDATE one. A retired marker, or a tag naming
 // no declared twin, is still the parser's error to raise. That is also why the
 // `[code]` criteria this file compares against come from `readCodeCriteria`
-// rather than from this regex (F-1443): the twin a bare marker attributes to is
+// rather than from this regex: the twin a bare marker attributes to is
 // the parser's rule, and one rule in one place cannot disagree with itself.
 const CRITERION_RE =
   /^[-*]\s+\[(code|model)(?::([a-z][a-z0-9_-]*))?(\s+always-scored)?\]\s+(.+)$/;
 
-/** One criterion as the duplicate guard compares it — F-1443. NOT the rendered
+/** One criterion as the duplicate guard compares it. NOT the rendered
  *  line: the same check has several legal spellings (`- [code] X`,
  *  `- [code:github] X` and `- [code always-scored] X` all name it on a github
  *  task), and comparing the text an author sees instead of the check it
@@ -45,7 +45,7 @@ function identityKey(criterion: CriterionIdentity): string {
 }
 
 /** Read one line as a criterion, or `undefined` when it is not one. Group 3 (the
- *  F-1299 `always-scored` keyword) is deliberately not read: it says how an
+ *  the `always-scored` keyword) is deliberately not read: it says how an
  *  existing check is scored, not what it checks (see
  *  `taskCriterionSchema.alwaysScored`), so `- [code] X` and
  *  `- [code always-scored] X` are ONE check — appending the second gives the
@@ -88,7 +88,7 @@ export class MissingCriteriaSectionError extends Error {
 // a refusal rather than a warning.
 export class DuplicateCriterionError extends Error {
   constructor(path: string, line: string, existing = line) {
-    // F-1443 — echo the STORED spelling, and name the added one only when the
+    // Echo the STORED spelling, and name the added one only when the
     // two differ. They now can: the guard matches `- [code] X` against a stored
     // `- [code always-scored] X`, and an author sent to look for a line their
     // file does not contain has nothing to search for.
@@ -127,7 +127,7 @@ export function insertCriterion(source: string, line: string, path = "this task 
 
   // The `[code]` criteria the task already declares, keyed by identity and
   // valued by the spelling the file actually carries. `readCodeCriteria` is the
-  // parser's own reader (F-1134): it applies the `tag ?? twins[0]` rule, so a
+  // parser's own reader: it applies the `tag ?? twins[0]` rule, so a
   // bare `- [code] X` recognises a stored `- [code:github] X` on a github task,
   // and its reconstructed `marker` is built to be searchable in the file — which
   // is what the refusal now quotes.
@@ -173,7 +173,7 @@ export function insertCriterion(source: string, line: string, path = "this task 
     insertAt = lines[start + 1]?.trim() === "" ? start + 2 : start + 1;
   }
 
-  // F-1134 — a section whose only content is its blank line puts `insertAt` on
+  // A section whose only content is its blank line puts `insertAt` on
   // the NEXT heading, so the criterion would land against it with nothing
   // between. Cosmetic (it parses either way), but this is the very first write
   // into a freshly scaffolded task, which is the file an author reads hardest.

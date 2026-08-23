@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-643 — pure terminal rendering for `pome demo`, matching the
+// Pure terminal rendering for `pome demo`, matching the
 // design-of-record (CLI moments.dc.html moment 01, task/code-model
 // vocabulary):
 //

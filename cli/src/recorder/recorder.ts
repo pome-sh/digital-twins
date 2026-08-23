@@ -9,9 +9,9 @@ import {
 
 /**
  * The CLI's event buffer. Structurally the engine's `RecorderStore` — the
- * ported twins (F-682) no longer export a per-twin Recorder type to borrow.
+ * ported twins no longer export a per-twin Recorder type to borrow.
  *
- * F-698: when `eventsPath` is set, uses the twin-core durable store so twin
+ * When `eventsPath` is set, uses the twin-core durable store so twin
  * HTTP events stream to `events.jsonl` during the run (crash-safe).
  */
 export type Recorder = RecorderStore;

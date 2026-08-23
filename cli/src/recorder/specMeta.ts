@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// meta.json contract constants (D18.1 / F-689 remainder). `spec_version` and
+// meta.json contract constants (D18.1). `spec_version` and
 // the twin package versions let cloud's ingest validate that a run's meta.json
 // matches a shape it knows how to parse, and let the dashboard attribute a
 // run's captured behavior to the exact twin build that produced it.

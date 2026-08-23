@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
-// F-893 — `pome install` (Gen-1 agent-driven wiring) is retired.
+// `pome install` (Gen-1 agent-driven wiring) is retired.
 //
 // It used to run a headless coding-agent session whose knowledge layer was the
 // `pome-setup` skill, staging the edits in a shadow copy and gating them behind
-// a terminal diff (FDRS-642/661). F-859 turned `pome-setup` into a redirect
+// a terminal diff. `pome-setup` then became a redirect
 // tombstone — so the wiring no longer actually ran, it just injected a pointer.
 // This command is now a thin redirect to the Gen-2 path; the shadow-diff engine
 // (`embedded-wiring.ts`) and the Agent SDK provisioning (`agent-sdk.ts`) were

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * F-1137 — WHY do this CLI and the cloud disagree about a twin's vocabulary?
+ * WHY do this CLI and the cloud disagree about a twin's vocabulary?
  *
  * `checksDigest` hashes three fields per check: `id`, `substrate`, and the
  * COMPILED pattern (`packages/sdk/src/checks.ts`). The refusal in `checks-add.ts`
@@ -12,11 +12,11 @@
  *
  * The fix is a taxonomy with no silent branch: `explainSkew` returns a NON-EMPTY
  * list by construction, and the type says so. The class names are pome-cloud's
- * (`apps/control-plane/src/services/vocabulary-parity.ts`, F-1136) so the two
+ * (`apps/control-plane/src/services/vocabulary-parity.ts`) so the two
  * surfaces that explain the same disagreement stay greppable against each other.
  *
  * This side can say more than the cloud-side monitor can. `GET /v1/checks`
- * publishes the compiled `pattern` and the parameter patterns (F-1074 Phase 3),
+ * publishes the compiled `pattern` and the parameter patterns,
  * which the CLI's own `checks --json` does not — so a generator-only skew is
  * localisable to a check HERE, and only falls back to the unlocalised
  * `pattern_generation` class when the control plane published nothing to diff.

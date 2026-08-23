@@ -17,7 +17,7 @@ export type SupportedSdk = (typeof SUPPORTED_SDKS)[number];
 
 export interface ScaffoldResult {
   /** The `agent.framework` label `pome init --sdk` writes into the manifest.
-   *  Typed to `KnownFramework`, not `string` (F-1393): the `--sdk` FLAG name is
+   *  Typed to `KnownFramework`, not `string`: the `--sdk` FLAG name is
    *  a CLI selector (`claude`), not a framework label, and writing the flag
    *  name straight through produced a manifest that `pome register agent`'s own
    *  `warnUnknownFramework` then rejected as unknown on the very next command,

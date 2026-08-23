@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The pome MANIFEST loader (F-819, format spec F-804). Replaces the legacy
+// The pome MANIFEST loader. Replaces the legacy
 // `pome.config.json` handling — no back-compat, 0 users. The committed manifest
 // is `pome.json` (canonical) with `pome.yaml` / `pome.yml` as interchangeable
 // carriers of the same snake_case keys. One canonical zod schema
@@ -177,7 +177,7 @@ function slugErrorMessage(raw: Record<string, unknown>, path: string): string {
  *  normalized but NOT validated here — the server returns a friendly error for
  *  an unknown twin. Returns undefined when nothing survives so the cloud's
  *  default enablement still applies. Shared by the register command and the
- *  run-path identity resolver (F-926). */
+ *  run-path identity resolver. */
 export function normalizeManifestTwins(
   manifestTwins: readonly string[] | undefined,
 ): string[] | undefined {

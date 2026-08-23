@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
-// The `/seed` subpath, not the package root (F-1306): a schema is data, and the
+// The `/seed` subpath, not the package root: a schema is data, and the
 // roots carry each twin's domain + server. See `parseTask.ts`'s note.
 import { seedSchema as githubSeedStateSchema } from "@pome-sh/twin-github/seed";
 import { gmailSeedSchema as gmailSeedStateSchema } from "@pome-sh/twin-gmail/seed";
 import { linearSeedSchema as linearSeedStateSchema } from "@pome-sh/twin-linear/seed";
 // Criterion kinds are owned by the published contract. The markdown marker
-// grammar is `[code]`/`[model]` (F-778); `criterionSchema`'s tolerant input
+// grammar is `[code]`/`[model]`; `criterionSchema`'s tolerant input
 // (legacy `D`/`P` enum values) exists only for 0.3.0-era persisted artifacts,
 // never for scenario markdown. The former local criterion-kind fork is
 // retired here (M6 — one published contract).
@@ -14,7 +14,7 @@ import { z } from "zod";
 
 export { criterionSchema };
 
-// F-1296 (pome-cloud) / F-1299 (this repo) — the published contract's
+// The published contract's
 // criterion, plus the one thing this parser has to say about it that the
 // contract does not carry yet.
 //
@@ -37,7 +37,7 @@ export const taskCriterionSchema = criterionSchema.extend({
   alwaysScored: z.boolean().optional(),
 });
 
-// F-1302 — which population a task belongs to. See `taskClassSchema` in
+// Which population a task belongs to. See `taskClassSchema` in
 // ../contract/task.ts for what the three values mean and why the field is
 // optional here but mandatory for the tasks THIS repo ships.
 export const taskClassSchema = z.enum(["conformance", "restraint", "adversarial"]);
@@ -50,7 +50,7 @@ export const taskConfigSchema = z.object({
   passThreshold: z.number().min(0).max(100).default(100)
 });
 
-// FDRS-339: scenario-level failure injection. Mirrors the packaged
+// Scenario-level failure injection. Mirrors the packaged
 // twin-stripe `failureInjectionRuleSchema` without importing it into the
 // parser, so scenario validation stays decoupled from twin boot/runtime code.
 export const stripeFailureInjectionRuleSchema = z.object({
@@ -63,7 +63,7 @@ export const stripeFailureInjectionRuleSchema = z.object({
 });
 
 // `.strict()` at the top level: unknown keys (notably the legacy
-// `stripe: { seed: ... }` wrapper rejected by FDRS-365) fail parsing loudly
+// `stripe: { seed: ... }` wrapper) fail parsing loudly
 // instead of silently being stripped to an empty seed.
 export const stripeSeedStateSchema = z
   .object({
@@ -87,7 +87,7 @@ export const stripeSeedStateSchema = z
   })
   .strict();
 
-// FDRS-529: Slack seed shape (`{ team?, users: [...], channels: [...] }`).
+// Slack seed shape (`{ team?, users: [...], channels: [...] }`).
 // Kept LOCAL and permissive (arrays of records) for the same reason the Stripe
 // schema is — the scenario parser shouldn't take a structural dep on twin
 // internals; the vendored `cli/src/twin-slack` `parseSeed` does the strict,
@@ -100,7 +100,7 @@ export const slackSeedStateSchema = z
     team: z.record(z.string(), z.unknown()).optional(),
     users: z.array(z.record(z.string(), z.unknown())).default([]),
     channels: z.array(z.record(z.string(), z.unknown())).default([]),
-    // F-1509. Permissive like its siblings — the vendored `parseSeed` does the
+    // Permissive like its siblings — the vendored `parseSeed` does the
     // regex-level validation. It has to be listed at all because `.strict()`
     // REJECTS an unlisted key: without this line a slack seed declaring `files`
     // fails to parse rather than being stripped.
@@ -108,7 +108,7 @@ export const slackSeedStateSchema = z
   })
   .strict();
 
-// FDRS-365 [DECISION 2026-05-12]: scenario seeds are FLAT per twin.
+// [DECISION 2026-05-12]: scenario seeds are FLAT per twin.
 // GitHub scenarios use the GitHub seed shape (`{ repositories: [...] }`),
 // Stripe scenarios use the Stripe seed shape (`{ api_keys: [...], ... }`),
 // Slack scenarios use the Slack seed shape (`{ users, channels, ... }`).

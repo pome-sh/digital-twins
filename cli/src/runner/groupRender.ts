@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-636 — pure terminal rendering for `pome run -n k` trial groups,
+// Pure terminal rendering for `pome run -n k` trial groups,
 // matching the design-of-record (CLI moments.dc.html moment 04,
 // task/code-model vocabulary):
 //
@@ -29,7 +29,7 @@ export type TrialRow =
       /** Cloud-authoritative satisfaction score, 0-100. */
       score: number;
       /**
-       * F-925 — three states, not a boolean. `incomplete` means the trial ran
+       * Three states, not a boolean. `incomplete` means the trial ran
        * and finalized but at least one criterion never produced a verdict, so
        * it is neither a pass nor the agent's failure. It was `passed: boolean`
        * fed from `exitCode === 0`, which counted a 100/100 run with 3 of 4
@@ -52,7 +52,7 @@ export function flagHintLine(agentCommandSource: string): string {
 }
 
 /** Printed once the upfront mints are done (the cloud provisions one
- *  isolated twin sandbox per session — ADR-012). FDRS-663: when the plan's
+ *  isolated twin sandbox per session — ADR-012). When the plan's
  *  concurrent-twin quota bounded the upfront mint below k, the bound is
  *  named honestly — k stays the design default, the wall-clock stretches. */
 export function provisioningLine(
@@ -79,7 +79,7 @@ export function trialRowLine(n: number, row: TrialRow): string {
   }
   // A dash for the ungradable trial: it ran, and it asserts nothing. Reusing
   // ✗ would make a grader gap look like the agent's failure at a glance, which
-  // is the whole reading F-925 removes.
+  // is the whole reading this removes.
   const mark =
     row.verdict === "pass" ? "✓" : row.verdict === "incomplete" ? "–" : "✗";
   const base = `trial ${n}  ${mark}  ${String(row.score).padEnd(9)}${row.seconds.toFixed(1)}s`;
@@ -102,7 +102,7 @@ export function groupSummaryLines(input: GroupSummaryInput): string[] {
   );
   const passed = completed.filter((r) => r.verdict === "pass").length;
   const incomplete = completed.filter((r) => r.verdict === "incomplete").length;
-  // F-925 — the fraction's denominator is the GRADED trials. A trial that
+  // The fraction's denominator is the GRADED trials. A trial that
   // finalized but could not be fully graded leaves both the numerator and the
   // denominator, so a 5-trial set with one of them reads "3 of 4", never the
   // "4 of 5" that counted it as a pass.
@@ -161,7 +161,7 @@ export function groupExitCode(rows: TrialRow[]): number {
     (r): r is Extract<TrialRow, { kind: "completed" }> => r.kind === "completed",
   );
   if (completed.length === 0) return 2;
-  // F-925 — an ungradable trial is not a pass, so a group holding one cannot
+  // An ungradable trial is not a pass, so a group holding one cannot
   // exit 0: green here would tell CI the set was verified when part of it was
   // never checked. It stays 1 rather than 2 even when EVERY trial was
   // incomplete — `2` means nothing completed, and these completed.
@@ -188,7 +188,7 @@ export function shortReason(reason: string): string {
   return flat.length > 72 ? `${flat.slice(0, 69)}…` : flat;
 }
 
-/** FDRS-644 — the fix & green handoff, printed under the group summary when
+/** The fix & green handoff, printed under the group summary when
  *  at least one COMPLETED trial failed (errored trials are sandbox noise —
  *  the answer there is re-run, not a code fix). Copy stays modest per the
  *  north-star honesty note ("don't sell a 5-trial bump as proof"): a

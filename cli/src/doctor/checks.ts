@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-634 — the doctor check engine: config → twin → routing → egress, in
+// The doctor check engine: config → twin → routing → egress, in
 // order, stopping at the first failure so the report carries exactly ONE
 // named cause and one concrete fix. "Never a false success": a wall of
 // maybes hides the next step; one cause names it.
 //
 // The engine is deliberately separate from the `pome doctor` command so
-// `pome run` can reuse it as a preflight gate (FDRS-641). Checks are written
+// `pome run` can reuse it as a preflight gate. Checks are written
 // against the generic twin surface (bootTwin / the sdk's `/_pome/health`
 // route contract) — twin internals are the architecture refactor's
 // construction zone and stay untouched.
@@ -41,7 +41,7 @@ export interface RunDoctorChecksOptions {
   // (floor wildcard) — NOT forwarded to any agent.
   env?: Record<string, string | undefined>;
   // "full" (default, `pome doctor` + local-run gate) boots the local twin.
-  // "hosted" (the hosted-run gate, FDRS-641) skips the local twin boot: a
+  // "hosted" (the hosted-run gate) skips the local twin boot: a
   // hosted run never touches it — the cloud provisions the session twin —
   // so booting a throwaway node:sqlite-backed twin here would gate the run
   // on machinery it never uses. Config/routing/egress still gate.
@@ -180,7 +180,7 @@ async function checkTwinReachable(_configDir: string): Promise<DoctorCheck> {
 
     // "boots locally", not "reachable": this check brings a throwaway twin up
     // on an ephemeral port and tears it down — it does NOT prove a twin is
-    // listening now. Overstating that (the F-906 cold walk read "reachable" as
+    // listening now. Overstating that (a cold walk read "reachable" as
     // "a twin is up") is exactly what this wording avoids.
     return {
       id: "twin",

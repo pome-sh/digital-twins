@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-643 — client for the anonymous demo model-call gateway (FDRS-637):
+// Client for the anonymous demo model-call gateway:
 // POST {POME_API_BASE}/v1/demo/sessions/:id/llm, Authorization: Bearer
 // <demo_token>.
 //

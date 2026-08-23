@@ -18,7 +18,7 @@ export interface WriteRunInput {
   stateFinal: unknown;
 }
 
-// Self-host (`pome run --local`) is CAPTURE-ONLY (FDRS-657): write the raw
+// Self-host (`pome run --local`) is CAPTURE-ONLY: write the raw
 // trace + state artifacts and DO NOT score, judge, or correlate. Local
 // evaluation was removed entirely from the OSS CLI — a verdict comes only from
 // the cloud (`pome eval <dir>`, or a hosted `pome run`). This produces an audit

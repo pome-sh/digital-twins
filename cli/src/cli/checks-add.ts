@@ -8,7 +8,7 @@
  * the cloud resolves them from a different one. Before writing, ask the cloud
  * for the vocabulary it GRADES against and compare digests.
  *   equal        → write, silently
- *   different    → REFUSE, and name what moved (`vocabulary-skew.ts`, F-1137 —
+ *   different    → REFUSE, and name what moved (`vocabulary-skew.ts` —
  *                  a check, a field of one, or the sdk that compiled it, but
  *                  never an empty list)
  *   unreachable  → write from the local pin with a named note on stderr
@@ -79,7 +79,7 @@ export async function handshake(
 
   if (localDigest(twin) === remote.digest) return { kind: "match" };
 
-  // F-1137 — the taxonomy lives in `vocabulary-skew.ts` and is NON-EMPTY by
+  // The taxonomy lives in `vocabulary-skew.ts` and is NON-EMPTY by
   // construction, so this refusal cannot name the disagreement and then list
   // nothing. Which is what it did whenever the skew was in `substrate` or in the
   // compiled pattern: the two fields `checksDigest` hashes that the old
@@ -291,7 +291,7 @@ export async function runChecksAddCommand(file: string, opts: ChecksAddOptions):
       : "  positive — this should FAIL on an untouched seed; the examinee has to make it true.",
   );
 
-  // F-1134 — audit the WHOLE block, not just the line just appended. A
+  // Audit the WHOLE block, not just the line just appended. A
   // hand-edited criterion binds nothing and leaves the score denominator in
   // silence, and this is the one moment a local-only author is looking at the
   // file. Audits `next`, so the sentence just written is included and has to come

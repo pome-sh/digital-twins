@@ -16,7 +16,7 @@
 //   2. `pome twin start github` only pays for github.
 //
 // THIS MODULE IS NOT THE WHOLE STORY, and for six releases it was the wrong
-// half of it (F-1306). Everything above was true here and false in aggregate:
+// half of it. Everything above was true here and false in aggregate:
 // `cli/src/task/{parseTask,taskSchema,githubSeedCompat,seed-compiler,
 // seed-compiler-hosted}.ts` top-level-imported twin-github/gmail/linear's
 // PACKAGE ROOTS to reach a zod seed schema, and a root export carries the domain
@@ -170,9 +170,9 @@ export const TWIN_REGISTRY: Record<TwinName, TwinEntry> = {
     version: stripeManifest.version,
     defaultSeed: async () => (await import("@pome-sh/twin-stripe")).defaultSeed(),
     async boot({ seedState, runId, recorder, twinBaseUrl }) {
-      // Engine-based twin (F-684): the factory owns middleware, MCP mount, and
+      // Engine-based twin: the factory owns middleware, MCP mount, and
       // the failure-injection store — seed rules ride in via `seed` and land in
-      // the same store the session middleware reads (FDRS-369), so e.g.
+      // the same store the session middleware reads, so e.g.
       // scenario 14's lost-response 402 actually fires. Recorder counters
       // (dropped) come from the engine handle, so the shared CLI recorder
       // suffices here too.

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-634 — terminal rendering for the doctor report, per
+// Terminal rendering for the doctor report, per
 // `CLI moments.dc.html` moment 03: one line per executed check, then (on
 // failure) exactly one cause/fix card and the two closing warning lines.
 // Plain text, no color deps — matches the rest of the CLI's output.
@@ -13,13 +13,13 @@ const CONTINUATION = " ".repeat(FIX_COLUMN.length);
 export interface RenderDoctorReportOptions {
   /** First line of the report. `pome doctor` and the run gate keep the
    *  moment-03 default; `pome install` passes moment 02's
-   *  "verifying the wiring …" (FDRS-642). */
+   *  "verifying the wiring …". */
   header?: string;
-  /** F-906 — when the report passes, append a caveat that a green check means
+  /** When the report passes, append a caveat that a green check means
    *  the wiring is right, not that the examinee runs cleanly. `pome doctor`
    *  never launches the agent; and a `pome run` preflight probe launches it
    *  with POME_PREFLIGHT=1, which most scaffolds honour by exiting before
-   *  their real work path — so a bug on that skipped path (as in F-900)
+   *  their real work path — so a bug on that skipped path
    *  surfaces only on a full trial run. Opt-in so only `pome doctor` shows it
    *  — the `run`/`install` consumers print the report as a gate, not as a
    *  self-diagnosis. */

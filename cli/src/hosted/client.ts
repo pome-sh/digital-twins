@@ -86,7 +86,7 @@ export interface HostedClientConfig {
   finalizePollInitialDelayMs?: number;
   /** Maximum async-finalize polling delay. Defaults to 5s. */
   finalizePollMaxDelayMs?: number;
-  /** FDRS-643 — how the credential travels. "x-api-key" (default) is the
+  /** How the credential travels. "x-api-key" (default) is the
    *  team-key contract. "bearer" sends `Authorization: Bearer <apiKey>` for
    *  the session-token surface (upload-url/finalize accept a sid-scoped JWT
    *  via requireApiKeyOrSessionToken; `pome demo` authenticates each trial's
@@ -100,20 +100,20 @@ export interface CreateSessionInput {
   /** Omit for one-off sessions; reuse only when intentionally replaying a create after network uncertainty. */
   idempotencyKey?: string;
   /** Agents-as-first-class-entity (ADR-013). Resolved by callers from the
-   *  manifest slug via `.pome/link.json` / the `POST /v1/agents` resolver
-   *  (F-819). Server validates `agent.team_id === apiKey.team_id` and
+   *  manifest slug via `.pome/link.json` / the `POST /v1/agents` resolver.
+   *  Server validates `agent.team_id === apiKey.team_id` and
    *  `requested_twins ⊆ agent_enabled_services`. Optional during rollout;
    *  will become required once the dashboard / control-plane catch up. */
   agentId?: string;
-  /** F-818 (spec F-804): per-run agent version. The manifest's `agent.version`,
+  /** Per-run agent version. The manifest's `agent.version`,
    *  or the `--agent-version` override. Opaque, user-declared; stamped onto the
-   *  session/run rows (F-820). An older cloud strips it, so sending is safe. */
+   *  session/run rows. An older cloud strips it, so sending is safe. */
   agentVersion?: string;
   /** Pre-resolved seed JSON. When supplied, cloud uses it directly and skips
    *  extracting JSON from the scenario markdown — required for the post-2026-05-22
    *  prose `## Seed State` shape, where the markdown has no fenced JSON block. */
   seed?: unknown;
-  /** FDRS-636 — trial-group identity (`grp_` + nanoid21). `pome run -n k`
+  /** Trial-group identity (`grp_` + nanoid21). `pome run -n k`
    *  (k>1) stamps ONE shared id on every mint of the invocation; the cloud
    *  copies it onto `sessions.group_id` at mint and `runs.group_id` at
    *  finalize, and the reliability page reads the group by it.
@@ -124,7 +124,7 @@ export interface CreateSessionInput {
   groupId?: string;
 }
 
-/** FDRS-636 — POST /v1/sessions/:id/abandon response. `abandoned: false`
+/** POST /v1/sessions/:id/abandon response. `abandoned: false`
  *  means the session was already terminal and nothing was rewritten (the
  *  idempotent no-op branch); `state` echoes the row's current state. */
 export interface AbandonSessionResponse {
@@ -134,7 +134,7 @@ export interface AbandonSessionResponse {
   abandoned: boolean;
 }
 
-// FDRS-655/656 — `pome eval <run-dir>` capture/eval split. The cloud mints
+// `pome eval <run-dir>` capture/eval split. The cloud mints
 // a twin-less "eval session" scoped to an agent + task name; the existing
 // upload-url routes and /finalize then work unchanged on that session.
 export interface CreateEvalSessionInput {
@@ -162,21 +162,21 @@ export interface SubmitResultInput {
   judgeTokensIn: number | null;
   judgeTokensOut: number | null;
   // Free-form SDK / framework label persisted to runs.agent_sdk (pome-cloud
-  // ADR-013). CLI reads it from the manifest's `agent.framework` (F-819);
+  // ADR-013). CLI reads it from the manifest's `agent.framework`;
   // common values: "claude-agent-sdk", "openai-agents", "langgraph",
   // "custom". Omit / null when the user has not declared it — control-plane
   // accepts both shapes.
   agentSdk?: string | null;
-  // Correlator output (FDRS-326). Empty arrays when no adapter signals were
+  // Correlator output. Empty arrays when no adapter signals were
   // captured AND the heuristic correlator is unavailable.
   lanes: Lane[];
   steps: Step[];
-  // Wire field for a CLI-supplied fix prompt (FDRS-323). FDRS-657: the OSS CLI
+  // Wire field for a CLI-supplied fix prompt. The OSS CLI
   // is capture-only and never generates one CLI-side, so runners always submit
   // `null` here — the cloud owns the managed judge/fix-prompt handoff. Kept on
   // the finalize contract for compatibility.
   fixPrompt: string | null;
-  // FDRS-357: storage key returned by requestEventsUploadUrl, or null if the
+  // Storage key returned by requestEventsUploadUrl, or null if the
   // upload was skipped / failed. Cloud persists this into runs.events_jsonl_url.
   eventsJsonlUrl: string | null;
   traceJsonl: string;
@@ -233,7 +233,7 @@ export interface FinalizeInput {
   // Criterion *definitions* (not results). Cloud judges these against the
   // recorded trace/state and returns the authoritative score. Writer-side
   // input type (z.input, not z.infer): the CLI may send legacy "D"/"P" kinds
-  // during the F-778 compat window; cloud normalizes to "code"/"model" on
+  // during the criterion-kind compat window; cloud normalizes to "code"/"model" on
   // parse. z.input keeps this compiling against both the published 0.9.x
   // contract (D/P only) and the tolerant 0.10.0 reader.
   criteria: CriterionDefWire[];
@@ -273,9 +273,9 @@ export interface FinalizeOptions {
 
 export interface HostedClient {
   createSession(input: CreateSessionInput): Promise<CreateSessionResponse>;
-  /** FDRS-655/656 — POST /v1/eval-sessions. Mints a twin-less session for
+  /** POST /v1/eval-sessions. Mints a twin-less session for
    *  uploading + finalizing an EXISTING raw trace directory (`pome eval`).
-   *  Requires a control plane that ships the FDRS-655 route. */
+   *  Requires a control plane that ships the eval-sessions route. */
   createEvalSession(
     input: CreateEvalSessionInput,
   ): Promise<CreateEvalSessionResponse>;
@@ -298,7 +298,7 @@ export interface HostedClient {
     sessionId: string,
     input: SubmitResultInput,
   ): Promise<SubmitResultResponse>;
-  /** FDRS-636 — mark an errored trial's session failed NOW with a short
+  /** Mark an errored trial's session failed NOW with a short
    *  machine `error_code` (e.g. "agent_timeout"), instead of letting it sit
    *  open until the expiry sweeper reaps it. Contract: pome-cloud
    *  routes/abandon.ts — auth is the same surface as /finalize; an
@@ -327,7 +327,7 @@ export interface HostedClient {
    *  plane; callers must tolerate it silently). */
   requestMetaUploadUrl(sessionId: string): Promise<MetaUploadUrlResponse>;
   /** @param bestEffort default true — hosted runner swallows network errors on teardown
-   *  @param opts.discard F-983 — set true to confirm discarding an ungraded
+   *  @param opts.discard set true to confirm discarding an ungraded
    *  session after catching {@link HostedDiscardRefusedError}. Never implied
    *  by `bestEffort`: a refusal is a deliberate server decision, not
    *  transport noise. */
@@ -426,7 +426,7 @@ interface DiscardRefusal {
  *  token:
  *   - `none`     — an ordinary already-closed conflict, or an unparseable
  *                  body. Keeps the historic "409 means idempotent success".
- *   - `refusal`  — a well-formed F-983 refusal; replayable.
+ *   - `refusal`  — a well-formed discard refusal; replayable.
  *   - `unusable` — it CLAIMS to be a refusal but carries no usable
  *                  `discard_token`. The delete did not happen and cannot be
  *                  confirmed, so this must fail loudly; folding it into
@@ -436,7 +436,7 @@ type DiscardRefusalRead =
   | { kind: "refusal"; refusal: DiscardRefusal }
   | { kind: "unusable" };
 
-/** Read a 409 body as an F-983 discard refusal. Only ever called for status
+/** Read a 409 body as a discard refusal. Only ever called for status
  *  409 — a non-409 that happens to echo `details.reason` is a server error,
  *  not a refusal, and must keep its own status-based handling. */
 async function readDiscardRefusal(res: Response): Promise<DiscardRefusalRead> {
@@ -529,7 +529,7 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
         throw new HostedAuthError(msg, reqId);
       }
       if (res.status === 402 || res.status === 429) {
-        // FDRS-643 — carry the machine-readable envelope details (e.g.
+        // Carry the machine-readable envelope details (e.g.
         // `kind: "daily_judge_cap"`) so `pome demo` can render an honest
         // labeled at-capacity state instead of a generic quota message.
         throw new HostedQuotaError(msg, reqId, cloudDetails);
@@ -1171,7 +1171,7 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
 
     async deleteSession(sessionId, bestEffort = true, opts = {}) {
       // One DELETE attempt, including the read of a 409 body. `confirmDiscard`
-      // replays the token the control plane hands back with an F-983 refusal.
+      // replays the token the control plane hands back with a refusal.
       const attempt = async (
         confirmDiscard?: string,
       ): Promise<{ res: Response; read: DiscardRefusalRead } | null> => {
@@ -1186,7 +1186,7 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
             {
               method: "DELETE",
               // authHeaders, not a hardcoded x-api-key: demo teardown carries a
-              // bearer demo_token (FDRS-643 live-run finding — the hardcoded
+              // bearer demo_token (a live-run finding — the hardcoded
               // header made every demo DELETE an opaque 404, silently swallowed
               // by best-effort).
               headers: authHeaders,
@@ -1215,7 +1215,7 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
       if (!first) return; // bestEffort transport failure
       let res = first.res;
 
-      // F-983: a 409 carrying reason=ungraded_session is a REFUSAL, not the
+      // A 409 carrying reason=ungraded_session is a REFUSAL, not the
       // already-closed race. Never fold it into the idempotent-success branch
       // below — that swallow is exactly what made the CLI lie about stopping.
       // Scoped to 409: a 5xx that echoes the same `details` is a server
@@ -1255,7 +1255,7 @@ export function createHostedClient(config: HostedClientConfig): HostedClient {
 
       // Cloud spec (pome-cloud docs/05-api-spec.md): 204 on success. Accept
       // 200 too in case a future control-plane returns a body. A 409 that is
-      // NOT an F-983 refusal keeps best-effort teardown idempotent when a
+      // NOT a discard refusal keeps best-effort teardown idempotent when a
       // concurrent reaper already closed the row.
       if (res.status === 204 || res.status === 200 || res.status === 409) return;
       if (res.status === 404) {

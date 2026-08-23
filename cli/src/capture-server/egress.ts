@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-635 — deny-by-default egress floor for the capture-server.
+// Deny-by-default egress floor for the capture-server.
 //
 // "Prod-safety is a network control, not a rule" (north-star board block 06):
 // under `pome run` the CONNECT proxy refuses tunnels to any host outside the
@@ -13,7 +13,7 @@
 // through the paired valves — POME_AGENT_ENV_ALLOWLIST for the key,
 // POME_EGRESS_ALLOW for the host.
 //
-// Known boundary (by design, see FDRS-635): the floor only binds processes
+// Known boundary (by design): the floor only binds processes
 // that honor proxy env vars. Agents that bypass HTTPS_PROXY are caught by
 // `pome doctor`'s routing probe — the two layers are complementary.
 
@@ -100,7 +100,7 @@ export function parseAllowCsv(csv: string | undefined): string[] {
 // base-URL hosts + the POME_EGRESS_ALLOW valve + the twin URLs the runner is
 // about to inject (loopback in self-host; hosted twin domains future-proof).
 //
-// FDRS-643 — `extraHosts` is the demo-mode valve: `pome demo` adds the
+// `extraHosts` is the demo-mode valve: `pome demo` adds the
 // POME_API_BASE host so the bundled agent's anonymous-gateway calls
 // (POST /v1/demo/sessions/:id/llm) survive the deny-by-default floor. Same
 // pattern rules as everything else (exact host or `*.suffix`).

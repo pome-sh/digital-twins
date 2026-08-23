@@ -10,6 +10,14 @@ write a version number here or in `package.json`. Released
 entries are insertions only: a correction is the next entry, naming the one it
 corrects.
 
+## Unreleased (patch)
+
+**No consumer-visible change.** Internal tracker ids were removed from source
+comments and JSDoc across `src/`, and from the `--help` text of two flags that
+had been printing an id to users: `-n, --trials` and `--allow`. Both now open
+with what the flag does instead of a ticket number. No flag name, default, exit
+code, wire field or schema changed.
+
 ## 0.26.8 — 2026-08-23
 
 **No consumer-visible change.** Internal tracker ids were removed from the

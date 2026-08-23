@@ -48,15 +48,15 @@ export interface RunTaskHostedOptions {
   client?: HostedClient;
   /** Informational; passed through to `runs.agent_model`. Defaults to "unknown". */
   agentModel?: string;
-  /** F-819 — `--agent-version` override. Wins over the manifest's
+  /** `--agent-version` override. Wins over the manifest's
    *  `agent.version` when stamping the session/run. */
   agentVersion?: string;
-  /** FDRS-636 — a session minted by the caller (trial groups mint all k
+  /** A session minted by the caller (trial groups mint all k
    *  upfront with one shared `group_id`). When set, the runner skips its own
    *  POST /v1/sessions and runs against this session; the `finally` teardown
    *  still DELETEs it (the trial owns its session either way). */
   premintedSession?: CreateSessionResponse;
-  /** FDRS-636 — group-trial failure semantics. When true, an agent failure
+  /** Group-trial failure semantics. When true, an agent failure
    *  (preflight failure / timeout / non-zero exit) or a machinery crash
    *  ABANDONS the session (POST /:id/abandon with a machine error_code,
    *  landing BEFORE the teardown DELETE so the code is recorded while the
@@ -65,7 +65,7 @@ export interface RunTaskHostedOptions {
    *  today's single-run behavior (finalize even on agent timeout) is
    *  unchanged. */
   abandonOnFailure?: boolean;
-  /** FDRS-644 — the trial group's shared id, recorded into the trial's
+  /** The trial group's shared id, recorded into the trial's
    *  verdict.json so `pome fix-prompt` can reassemble the run set from
    *  local artifacts. Absent on single runs (verdict.json gets null). */
   groupId?: string;
@@ -79,7 +79,7 @@ export interface RunTaskHostedResult {
   artifacts: RunArtifacts;
   score: Score;
   /**
-   * F-925 — the run's own three-state verdict, computed ONCE here and carried
+   * The run's own three-state verdict, computed ONCE here and carried
    * out so a caller never re-derives it. `exitCode` cannot express it: 1 means
    * both "failed" and "could not be graded", and a trial group needs to tell
    * them apart to keep the ungradable one out of its fraction.
@@ -87,7 +87,7 @@ export interface RunTaskHostedResult {
   verdict: ScoreStatus;
   exitCode: number;
   /** Wall time from run start to post-agent state capture — the same value
-   *  reported to /finalize as duration_ms. FDRS-636 renders it as the trial
+   *  reported to /finalize as duration_ms. Rendered as the trial
    *  row's duration. */
   durationMs: number;
 }
@@ -227,7 +227,7 @@ export async function runTaskHosted(
     options.client ??
     createHostedClient({ baseUrl: options.hosted.baseUrl, apiKey: options.hosted.apiKey });
 
-  // F-819 — resolve the agent id + version from the manifest (`agent.slug` →
+  // Resolve the agent id + version from the manifest (`agent.slug` →
   // `.pome/link.json` cache, team-gated, re-resolved by slug on miss) and the
   // `agent.framework` (the dashboard "SDK badge", formerly `agent.sdk`). The
   // `agent_version` stamps the session; `--agent-version` overrides it. All are
@@ -250,7 +250,7 @@ export async function runTaskHosted(
   // don't race the read in the empty case.
   await writeFile(signalsPath, "");
 
-  // 1. Spawn cloud session — fails fast on auth/quota/orch. FDRS-636 trial
+  // 1. Spawn cloud session — fails fast on auth/quota/orch. Trial
   // groups mint all k sessions upfront (one shared group_id) and pass each
   // one in as `premintedSession`; the single-run path mints its own here.
   // Forward the resolved seed (sidecar -> inline JSON -> twin defaults, in that
@@ -349,7 +349,7 @@ export async function runTaskHosted(
 
     let agentResult = preflight;
     if (preflight.exitCode === 0) {
-      // F-771 — the preflight probe appended its own signals (turns/steps/
+      // The preflight probe appended its own signals (turns/steps/
       // tool_calls) to the shared POME_ADAPTER_SIGNALS_PATH file. Those must
       // NOT reach the uploaded signals.jsonl / usage ledger. Truncate before
       // the real run so the blob counts real-run telemetry only. runAgentCommand
@@ -364,7 +364,7 @@ export async function runTaskHosted(
       });
     }
 
-    // FDRS-636 — group-trial failure semantics. An agent failure on a group
+    // Group-trial failure semantics. An agent failure on a group
     // trial ABANDONS the session with a machine error_code and throws,
     // instead of finalizing: verdicts come from cloud evaluation only, and a
     // crashed/timed-out trial must render as an errored row EXCLUDED from
@@ -382,7 +382,7 @@ export async function runTaskHosted(
       // scenario timeout. Only a real-run failure classifies as
       // agent_timeout / agent_exit_nonzero.
       //
-      // FDRS-667 — name the cause. The errored trial row renders the reason
+      // Name the cause. The errored trial row renders the reason
       // verbatim, so a bare "agent preflight failed" leaves the user with
       // zero forensics (the k=5 first-publish e2e died five times on the
       // same swallowed stderr). Append the agent's last stderr line to the
@@ -406,7 +406,7 @@ export async function runTaskHosted(
                 errorCode: "agent_exit_nonzero",
                 reason: `agent exited non-zero (exit ${agentResult.exitCode})${cause ? ` — ${cause}` : ""}`,
               };
-      // FDRS-667 — an abandoned trial never reaches the artifact write in
+      // An abandoned trial never reaches the artifact write in
       // step 5, so land the agent's output where a completed trial's would
       // go (runs/<slug>/<session>/): stdout.txt + stderr.log, redacted like
       // writeRunArtifactsCore's copies. Best effort — forensics must never
@@ -459,10 +459,10 @@ export async function runTaskHosted(
     // that signature here.
     const legacyEvents = events as unknown as LegacyGithubRecorderEvent[];
 
-    // 5. Write local artifacts — RAW TRACE + state. ADR-013 / FDRS-657:
+    // 5. Write local artifacts — RAW TRACE + state. Per ADR-013:
     //    the OSS CLI never scores locally (no score.json is ever written).
     //    Cloud is the authoritative judge; what /finalize returns is printed
-    //    to the terminal and — since FDRS-644 — also cached next to the
+    //    to the terminal and also cached next to the
     //    trace as a provenance-labeled verdict.json (step 11) so
     //    `pome fix-prompt` can read the cloud's verdict offline.
     const completedAt = new Date().toISOString();
@@ -504,7 +504,7 @@ export async function runTaskHosted(
       }
     }
 
-    // 6. FDRS-657 — NO local correlation. Correlation (like scoring/judging)
+    // 6. NO local correlation. Correlation (like scoring/judging)
     //    is a cloud responsibility; the OSS CLI only captures the raw trace.
     //    Cloud correlates the uploaded events/signals server-side. The events
     //    are uploaded exactly as captured (no local step_id back-fill).
@@ -514,13 +514,13 @@ export async function runTaskHosted(
     //    the conventional `team-<>/session-<>/events.jsonl` path, so cloud's
     //    judge finds the trace without an explicit override. State blobs
     //    and signals have no conventional fallback today — without an
-    //    explicit override the judge sees "{}" for state files (FDRS-395)
+    //    explicit override the judge sees "{}" for state files
     //    and skips the adapter-rich correlator (F0-4 / L7). All four
     //    uploads are best-effort: any failure leaves the corresponding
     //    blob missing, the judge still runs against whatever it does have,
     //    and the dashboard handles nulls gracefully.
     // Wrap legacy RecorderEvents (no `kind` discriminator) into the unified
-    // FDRS-398 shape before upload — cloud's schema gate rejects raw legacy
+    // canonical shape before upload — cloud's schema gate rejects raw legacy
     // rows. Matches the wrap that `writeRunArtifactsCore` applies for the
     // local events.jsonl file. Use `legacyEvents` (already cast) because
     // `toTwinHttpEvent`'s input is the legacy twin/github RecorderEvent type.
@@ -529,7 +529,7 @@ export async function runTaskHosted(
     const stateInitialJson = JSON.stringify(redactSecrets(stateInitial));
     const stateFinalJson = JSON.stringify(redactSecrets(stateFinal));
 
-    // Upload orchestration lives in ../hosted/uploadAndFinalize.ts (FDRS-656)
+    // Upload orchestration lives in ../hosted/uploadAndFinalize.ts
     // so `pome eval` shares the exact best-effort semantics. Signals are
     // read + redacted here (the tmp file is runner-owned); empty payloads
     // skip the upload inside uploadRunBlobs. Read + redaction stay inside a
@@ -590,13 +590,13 @@ export async function runTaskHosted(
     //    storage, calls the managed judge via AI Gateway, persists the run
     //    row, and returns the authoritative score the dashboard records.
     //    The CLI prints this score on the `score:` line.
-    // The finalize wire carries the canonical `code`/`model` kinds (F-778;
+    // The finalize wire carries the canonical `code`/`model` kinds (
     // needs shared-types >= 0.10.0 cloud-side, whose tolerant reader also
     // still accepts the legacy `D`/`P` spellings from older released CLIs).
     // Multi-twin (M3): carry the per-criterion twin attribution so the cloud
     // judge checks each criterion against its twin's state. Absent = the
     // primary twin (single-twin scenarios omit it entirely).
-    // F-1299: also carry the parsed `always-scored` flag — the cloud's
+    // Also carry the parsed `always-scored` flag — the cloud's
     // seed-exclusion escape hatch reads it off THIS request body
     // (criteria[].always_scored), not off re-parsed markdown, so a flag the
     // parser reads but this map drops would repeat the exact silent-loss
@@ -628,7 +628,7 @@ export async function runTaskHosted(
       // back. For events.jsonl the conventional `team-<>/session-<>/events.jsonl`
       // path matches what /result-upload-url signs, so omitting traceStorageKey
       // still resolves correctly. For state blobs there is no conventional
-      // fallback today (FDRS-395) — omitting them means cloud's judge sees
+      // fallback today — omitting them means cloud's judge sees
       // "{}", which we accept as best-effort degradation.
       traceStorageKey: eventsJsonlUrl ?? undefined,
       stateInitialStorageKey: stateKeys.initialKey ?? undefined,
@@ -641,11 +641,11 @@ export async function runTaskHosted(
     });
 
     // 9. Synthesize the cloud verdict for terminal display + the exit code.
-    //    FDRS-657: the CLI never computes a verdict — this is the CLOUD's,
+    //    The CLI never computes a verdict — this is the CLOUD's,
     //    reshaped. Synthesis (incl. the F0-3 / L5 criteria_results handling
-    //    and the A1/FDRS-618 caveat) lives in scoreFromFinalizeResponse —
-    //    shared with `pome eval` (FDRS-656). Step 11 caches it to
-    //    verdict.json (FDRS-644); score.json stays never-written.
+    //    and the A1 caveat) lives in scoreFromFinalizeResponse —
+    //    shared with `pome eval`. Step 11 caches it to
+    //    verdict.json; score.json stays never-written.
     const score: Score = scoreFromFinalizeResponse(finalized);
 
     // 10. Map cloud score → exit code. F18 / F0-5: the old policy
@@ -663,17 +663,17 @@ export async function runTaskHosted(
     //     Pre-finalize agent failures (auth, quota, twin spawn, exec
     //     errors) take other code paths via thrown HostedAuthError /
     //     HostedQuotaError / HostedOrchError and never reach this line.
-    //     F-925 — the score alone is not the verdict. A 100/100 run with a
+    //     The score alone is not the verdict. A 100/100 run with a
     //     criterion that never ran is `incomplete`, and exiting 0 on it is how
     //     "the fix passed" came to mean "the check never ran". `scoreStatus`
-    //     applies the A5 guard `pome eval` has always applied; the FDRS-618
+    //     applies the A5 guard `pome eval` has always applied; the older-cloud
     //     compat this used to preserve is already preserved inside
     //     `scoreFromFinalizeResponse`, which sets can_pass true when the
     //     response carries no criteria_results at all.
     const verdict = scoreStatus(score, scenario.config.passThreshold);
     const exitCode = verdict === "pass" ? 0 : 1;
 
-    // 11. FDRS-644 — cache the CLOUD verdict payload next to the raw trace
+    // 11. Cache the CLOUD verdict payload next to the raw trace
     //     (verdict.json, provenance-labeled `source: "cloud-finalize"`).
     //     Not a local score: evaluation stayed in the cloud; this records
     //     what /finalize returned so `pome fix-prompt` can hand grouped
@@ -681,11 +681,11 @@ export async function runTaskHosted(
     //     effort: a disk failure degrades to "fix-prompt won't see this
     //     trial", never fails a finalized run.
     try {
-      // F-1195 — `counts` is the SAME arithmetic `runScoreLine` prints beside
+      // `counts` is the SAME arithmetic `runScoreLine` prints beside
       // the terminal's verdict word, so the artifact's "N of total" can never
       // drift from what the terminal already said. `state` is the `verdict`
       // local computed above (`scoreStatus`), not a second derivation — the
-      // one place F-1392 shipped a bug was two call sites disagreeing on this
+      // one place a bug shipped was two call sites disagreeing on this
       // exact word.
       const counts = evaluationCounts(score);
       await writeVerdictArtifact(artifacts.runDir, {
@@ -730,7 +730,7 @@ export async function runTaskHosted(
       durationMs,
     };
   } catch (err) {
-    // FDRS-636 — a machinery crash on a group trial (twin state fetch,
+    // A machinery crash on a group trial (twin state fetch,
     // upload orchestration, finalize itself) also abandons the session so
     // the reliability page shows an errored slot with a cause instead of a
     // session stuck open until the sweeper. Must run BEFORE the `finally`
@@ -744,11 +744,11 @@ export async function runTaskHosted(
   } finally {
     // Best-effort teardown. TTL would reap anyway; explicit delete keeps
     // the dashboard sessions list tidy.
-    // F-983: this teardown deliberately discards. On the success path the
+    // This teardown deliberately discards. On the success path the
     // session is already `done` (finalize closed it) and the DELETE is a
     // no-op; on the failure path we accept losing an ungraded tape rather
     // than leaving open sessions to linger to TTL and pollute the
-    // reliability view. Flagged as known residue in the F-983 spec.
+    // reliability view. Known residue in the discard-refusal design.
     await client
       .deleteSession(session.session_id, true, { discard: true })
       .catch(() => undefined);
@@ -845,7 +845,7 @@ function mergeEventsByTimestamp(events: RecorderEvent[]): RecorderEvent[] {
     .map(({ event }) => event);
 }
 
-/** FDRS-667 — the last non-empty stderr line, flattened and bounded, as the
+/** The last non-empty stderr line, flattened and bounded, as the
  *  one named cause an errored trial row can render inline. Redacted with the
  *  same rules as the on-disk stderr.log copy. */
 function stderrTail(stderr: string): string | null {

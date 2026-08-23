@@ -44,7 +44,7 @@ export interface ResolvedCredentials {
   apiKey: string;
   apiBaseUrl: string;
   /** The team the api key belongs to, when known (stored at login). Powers the
-   *  `.pome/link.json` team gate (F-819). Undefined for a bare `POME_API_KEY`
+   *  `.pome/link.json` team gate. Undefined for a bare `POME_API_KEY`
    *  env key, whose team is known only server-side. */
   teamId?: string;
 }

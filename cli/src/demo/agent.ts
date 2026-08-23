@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-643 — the bundled demo agent: a small tool-loop agent that drives the
+// The bundled demo agent: a small tool-loop agent that drives the
 // packaged first-run demo task against the LOCAL GitHub twin, with its model
-// calls served by pome's anonymous demo gateway (FDRS-637).
+// calls served by pome's anonymous demo gateway.
 //
 // It is spawned by `pome demo` as `pome demo-agent`, a child of the REAL
 // capture path (runTask): the runner injects the standard POME_* twin

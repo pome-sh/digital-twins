@@ -3,15 +3,15 @@ import { readFile, writeFile } from "node:fs/promises";
 import { eventSchema, type Event } from "../types/shared.js";
 import { redactEvent } from "../recorder/redaction.js";
 
-// Post-run merge of the adapter signals JSONL into the canonical events.jsonl
-// (FDRS-411 + FDRS-412). This is a pure ts-sort/interleave step implemented
+// Post-run merge of the adapter signals JSONL into the canonical
+// events.jsonl. This is a pure ts-sort/interleave step implemented
 // inline so the OSS capture path has no dependency on any correlator package.
 //
 // Three sources write events.jsonl during a self-host run:
 //   1. The capture-server child appends `LlmCallEvent` rows as each CONNECT
-//      tunnel closes (FDRS-399) — capture-close order, not ts-order.
+//      tunnel closes — capture-close order, not ts-order.
 //   2. The trace writer then appends `TwinHttpEvent` rows from the in-process
-//      twin recorder (FDRS-415).
+//      twin recorder.
 //   3. This helper reads `signals.jsonl` (HookEvent / ToolUseEvent /
 //      ToolResultEvent / SubagentSpawnEvent / LlmTurnEvent rows written by the
 //      agent subprocess via `POME_ADAPTER_SIGNALS_PATH`), validates each line
@@ -26,7 +26,7 @@ import { redactEvent } from "../recorder/redaction.js";
 // events.jsonl rows that fail to parse are passed through unsorted at the
 // head of the file so a corrupted in-flight write is never silently dropped.
 /**
- * F-1200 — give every twin HTTP row the tool call that caused it.
+ * Give every twin HTTP row the tool call that caused it.
  *
  * The twin writes `parent_event_id: null` because it runs in its own process
  * and cannot know the agent-side `event_id`; the adapter knows the `event_id`
@@ -34,14 +34,14 @@ import { redactEvent } from "../recorder/redaction.js";
  * in hand, so the join belongs here — and it is a pure data operation over two
  * finished files, with no dependency on the order the two writers ran in.
  *
- * The join key is the SDK's `tool_use_id`, which since F-1200 is what the
+ * The join key is the SDK's `tool_use_id`, which is what the
  * adapter stamps on `x-pome-correlation-id`. The twin persists that header as
  * `correlation_id` ALWAYS and as `tool_call_id` only when it pins
  * `stampToolCallId` (github's frozen tape shape) — so `correlation_id` is the
  * key that works for every twin, with `tool_call_id` preferred when present
  * because it is unambiguously the header rather than the request-id fallback.
  *
- * A row keeps its null parent when the id names no tool call: a pre-F-1200
+ * A row keeps its null parent when the id names no tool call: an older
  * `tlc_…`, a `req_…` from the no-header fallback, or a direct REST call made
  * outside any tool handler. An unresolvable parent is the honest answer there —
  * inventing one would put twin calls under tools that did not make them.

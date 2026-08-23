@@ -8,9 +8,9 @@ import type { RecorderEvent } from "@pome-sh/wire";
 import { redactEvent, redactSecrets } from "./redaction.js";
 import { META_SPEC_VERSION, resolveTwinPackageVersions } from "./specMeta.js";
 
-// FDRS-399 / FDRS-398 — wrap a legacy RecorderEvent into the unified
+// Wrap a legacy RecorderEvent into the unified
 // events.jsonl shape. Delegates to twin-core `toTwinHttpEventRow` so durable
-// stream rows and finalize appends stay byte-identical (F-698).
+// stream rows and finalize appends stay byte-identical.
 export const toTwinHttpEvent = toTwinHttpEventRow;
 
 export type RunArtifacts = {
@@ -32,13 +32,13 @@ export type RunArtifactCoreInput = {
   stateFinal: unknown;
 };
 
-// FDRS-657 / F-689 — the OSS CLI is CAPTURE-ONLY: it writes raw trace + state
+// The OSS CLI is CAPTURE-ONLY: it writes raw trace + state
 // artifacts and NEVER a score.json. Local artifacts are trace/audit only; a
 // verdict comes only from the cloud and is printed ephemerally to the
 // terminal (hosted `pome run`, `pome eval`) — never persisted next to the
 // trace. There is no `writeScoreJson`/`readScore` anymore.
 //
-// F-689 remainder (D6) — a completed run dir contains EXACTLY these six
+// Per D6, a completed run dir contains EXACTLY these six
 // files: `meta.json`, `events.jsonl`, `state_initial.json`,
 // `state_final.json`, `stdout.txt`, `stderr.log`. The intermediate
 // correlation artifacts this CLI used to also write (`tool_calls.jsonl`,
@@ -68,12 +68,12 @@ export async function writeRunArtifactsCore(input: RunArtifactCoreInput): Promis
     spec_version: META_SPEC_VERSION,
     twin_versions: resolveTwinPackageVersions(input.scenario.config.twins),
   });
-  // events.jsonl is the unified discriminated-union view (FDRS-398). The
+  // events.jsonl is the unified discriminated-union view. The
   // in-process twin recorders still expose legacy RecorderEvent rows via
   // `events()`; wrap each into a TwinHttpEvent before serializing so
-  // `pome inspect` (FDRS-403) and dashboard ingest (FDRS-415) can parse them.
+  // `pome inspect` and dashboard ingest can parse them.
   //
-  // F-698: the durable recorder may already have appended TwinHttpEvent rows
+  // The durable recorder may already have appended TwinHttpEvent rows
   // during the run. Skip re-appending any event whose `event_id`/`request_id`
   // is already on disk so finalize does not duplicate crash-streamed rows.
   // APPEND (not truncate) so capture-server LlmCallEvent rows also survive.
@@ -93,14 +93,14 @@ export async function writeRunArtifactsCore(input: RunArtifactCoreInput): Promis
     await appendFile(eventsPath, eventsJsonl);
   } else if (!existsSync(eventsPath)) {
     // Preserve the six-file run-dir contract when nothing was streamed and
-    // the recorder emitted no events (F-689 / D6).
+    // the recorder emitted no events (D6).
     await writeFile(eventsPath, "");
   }
   await writeJson(join(runDir, "state_initial.json"), input.stateInitial);
   await writeJson(join(runDir, "state_final.json"), input.stateFinal);
   await writeFile(join(runDir, "stdout.txt"), redactText(input.stdout));
   await writeFile(join(runDir, "stderr.log"), redactText(input.stderr));
-  // F-933 — `task`, not `scenario`. latest.json is a purely local pointer:
+  // `task`, not `scenario`. latest.json is a purely local pointer:
   // every run overwrites it and its only readers are `pome eval` / `pome
   // inspect`, which dereference `run_dir`/`run_id`. Nothing on the wire and
   // nothing in the cloud parses it, so the rename needs no compat window.

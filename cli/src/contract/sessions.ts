@@ -15,7 +15,7 @@ import { z } from "zod";
 // and reachable through the multi-twin runtime. Distinct from `KNOWN_TWIN_IDS`
 // (re-exported from `./recorder-events.ts`) which serves dashboard-rendering
 // pattern-matching for arbitrary `RecorderEvent.twin` values. Mirrored from
-// pome-cloud shared-types (FDRS-613).
+// pome-cloud shared-types.
 export const MOUNTED_TWINS = ["github", "stripe", "slack", "gmail", "linear"] as const;
 
 export const sessionStateSchema = z.enum([
@@ -31,7 +31,7 @@ export type SessionState = z.infer<typeof sessionStateSchema>;
 // Internal DB row shape — includes pod_id and api_key_id which are NOT exposed publicly.
 //
 // Multi-twin (M3): `twins[]` is the new authoritative field. `twin_type` is kept
-// populated as legacy = `twins[0]` for ≥1 OSS CLI release. FDRS-613: `twins`
+// populated as legacy = `twins[0]` for ≥1 OSS CLI release. `twins`
 // adopted from pome-cloud so a cloud-issued Session / SessionPublic parses here.
 export const sessionSchema = z.object({
   id: z.string(),                              // ses_<nanoid>

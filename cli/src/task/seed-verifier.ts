@@ -8,7 +8,7 @@
  *
  * Throws if the twin rejects the seed; otherwise returns silently.
  *
- * ASYNC because the twin import is DYNAMIC (F-1306). This is the one seed-side
+ * ASYNC because the twin import is DYNAMIC. This is the one seed-side
  * module that genuinely needs the github twin's domain and SQLite schema — every
  * other one wants only the zod schema and reads it from `@pome-sh/twin-github/seed`.
  * A top-level import here put 205 KB of domain into the CLI's startup path via

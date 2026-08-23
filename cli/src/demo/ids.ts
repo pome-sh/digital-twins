@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-643 — trial-group identity for `pome demo`.
+// Trial-group identity for `pome demo`.
 //
 // One `grp_` + nanoid21 id per demo invocation, shared by all k=5 demo
 // sessions (mint body `group_id`), copied by the cloud onto

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Cloud-verdict DISPLAY model + pure label/render helpers (FDRS-656/657).
+// Cloud-verdict DISPLAY model + pure label/render helpers.
 //
 // The OSS CLI is CAPTURE-ONLY: it never computes a score, never runs a judge,
 // and never correlates locally. Every helper here operates on a score object
@@ -11,10 +11,10 @@
 // This is the relocation of the former `src/evaluator/score.ts` + the
 // verdict-rendering half of `src/cli/render.ts`. The local scoring engine
 // (`scoreResults`, the deterministic matchers, the BYOK LLM judge) was deleted
-// under FDRS-657; only the pure display model survives, moved out of the
+// under the no-eval-in-OSS rule; only the pure display model survives, moved out of the
 // `evaluator/` tree so the `no-eval-in-oss` gate can assert that tree is gone.
 //
-// F-689/D16 — moved AGAIN from `src/score/view.ts` to here. `score/` (a
+// Moved AGAIN from `src/score/view.ts` to here. `score/` (a
 // module-name stem the repo-wide gate now denies outright) has to cease to
 // exist, so this pure display model lives under `hosted/` with the rest of
 // the cloud-facing surface it renders.
@@ -22,14 +22,14 @@
 // Wire-side criterion, NOT the scenario-markdown one: cloud responses carry
 // the unified "code"/"model" vocabulary (legacy "D"/"P" tolerated) while
 // scenario files still parse [code]/[model] markers. This module renders CLOUD
-// verdicts, so it takes the wide wire shape (FDRS-643 live-run finding).
+// verdicts, so it takes the wide wire shape (a live-run finding).
 import { PRE_SATISFIED_REASON } from "@pome-sh/wire/run-completeness";
 import type { z } from "zod";
 import type { criterionSchema } from "../types/shared.js";
 
 type WireCriterion = z.infer<typeof criterionSchema>;
 
-// FDRS-591 + FDRS-611 — unified per-criterion outcome model as reported by the
+// Unified per-criterion outcome model as reported by the
 // cloud judge.
 //
 //   passed   — criterion evaluated and satisfied.
@@ -44,7 +44,7 @@ export type CriterionOutcome = "passed" | "failed" | "skipped" | "errored";
 
 export type CriterionResult = {
   criterion: WireCriterion;
-  // FDRS-591/611: explicit four-state outcome. ADDITIVE + OPTIONAL — when
+  // Explicit four-state outcome. ADDITIVE + OPTIONAL — when
   // absent (older cloud producers) it is derived from `passed`/`skipped` via
   // `outcomeOf`.
   outcome?: CriterionOutcome;
@@ -70,7 +70,7 @@ export type Score = {
   failed: number;
   skipped: number;
   errored: number;
-  // F-1392 — the SUBSET of `skipped` excluded because the seed already
+  // The SUBSET of `skipped` excluded because the seed already
   // satisfied it (`PRE_SATISFIED_REASON`/`isPreSatisfied` above). Not a
   // separate outcome — these criteria still count in `skipped` and still
   // render with the `-` marker (`outcomeOf` keeps mapping them to
@@ -100,7 +100,7 @@ export function outcomeOf(result: CriterionResult): CriterionOutcome {
   return result.passed ? "passed" : "failed";
 }
 
-// F-1296 (pome-cloud) stamps this reason on a criterion the seed already
+// pome-cloud stamps this reason on a criterion the seed already
 // satisfied — the control plane graded the FINAL state alone, found the
 // criterion true before the agent ran, and moved it out of the score
 // denominator so a task cannot earn credit for doing nothing (AutomationBench's
@@ -108,13 +108,13 @@ export function outcomeOf(result: CriterionResult): CriterionOutcome {
 // `criteria_results` wire shape (`apps/control-plane/src/services/evaluators/
 // deterministic/pre-satisfied.ts` on the pome-cloud side).
 //
-// F-1392 — the CLI is the fifth surface this string has to agree with
+// The CLI is the fifth surface this string has to agree with
 // (score-merge, run-report, run-status and drift-telemetry are the other
 // four, per pre-satisfied.ts's own doc comment). Re-exported ONCE from here so
 // every call site in this module reads one name and the string is never
 // repeated inline.
 //
-// F-1416 — IMPORTED rather than restated. The comment that used to sit here
+// IMPORTED rather than restated. The comment that used to sit here
 // said "restated here rather than imported: the CLI shares no code with the
 // control plane", and that stopped being true when the predicate this string
 // feeds moved into `@pome-sh/wire` — the package this repo publishes and
@@ -144,20 +144,20 @@ export type ScoreStatus = "pass" | "fail" | "incomplete";
 // required criterion was evaluated (can_pass), AND satisfaction cleared the
 // threshold. PURE — no computation of the score itself.
 //
-// F-932 renamed the third state from `unevaluated` to `incomplete` and CHANGED
+// The third state was renamed from `unevaluated` to `incomplete`, and that CHANGED
 // NOTHING ELSE HERE. The guard is the one place the CLI refuses to inflate a
 // partial run into a pass — the same refusal pome-cloud added server-side in
-// F-925 — so the rename must not become a loosening.
+// So the rename must not become a loosening.
 //
 // One rule, two repos: `can_pass` is false for any abstention EXCEPT a
 // criterion the seed already satisfied (`PRE_SATISFIED_REASON` above) —
 // `uploadAndFinalize.ts`'s `scoreFromFinalizeResponse` subtracts
 // `preSatisfied` out of the `skipped` tally before deciding `can_pass`, and
 // pome-cloud subtracts the same `preSatisfied` count out of `notEvaluated`
-// over the same `criteria_results`. Since F-1399 that subtraction lives in
+// over the same `criteria_results`. That subtraction lives in
 // `@pome-cloud/contract`'s `isIncompleteTally`, which the dashboard's
 // `isRunIncomplete` (apps/dashboard/src/lib/run-status.ts) and the markdown
-// report both CALL rather than each keeping a copy of. F-1392 — the CLI used
+// report both CALL rather than each keeping a copy of. The CLI used
 // to count every `skipped` result with no exemption, which called a run
 // INCOMPLETE that the dashboard called PASS. ANY OTHER skipped reason, and
 // every `errored`, still fails this guard — only the one named exemption is
@@ -167,18 +167,18 @@ export type ScoreStatus = "pass" | "fail" | "incomplete";
 // The all-pre-satisfied run — nothing passed, nothing failed, so no
 // denominator — is `incomplete` here: `evaluated` is false and the A5 guard
 // predates and outranks the exemption. Calling it `fail` locally would blame
-// the agent for a run in which nothing was ever at risk, which is the F-925
+// the agent for a run in which nothing was ever at risk, which is the
 // inversion pointed the other way. `runScoreLine` names this state explicitly
 // instead of printing "0 of N criteria not evaluated".
 //
-// F-1399 — the dashboard used to answer that same run `fail`, and this
+// The dashboard used to answer that same run `fail`, and this
 // paragraph used to say so at length. `isIncompleteTally`'s third clause
 // (`evaluated === 0`) closed it: both surfaces read it `incomplete` now, and
 // the last shape they still word differently is a task whose `passThreshold`
 // is not 100 (the dashboard's bar is a hard `satisfaction_score === 100` and
 // it has no field to learn the task's threshold from).
 //
-// F-1413 is what the correction cost, and is why the prose is here and not
+// Correcting that cost real work, and is why the prose is here and not
 // also somewhere else: pome-cloud shipped the fix and every copy of the old
 // claim in this repo went false while staying green.
 // `cross-surface-agreement.test.ts` pins the two PREDICATES row by row, which
@@ -195,7 +195,7 @@ export function taskPassed(score: Score, passThreshold: number): boolean {
   return scoreStatus(score, passThreshold) === "pass";
 }
 
-// FDRS-591/611 per-criterion marker: ✓ passed, ✗ failed, - skipped, ! errored.
+// Per-criterion marker: ✓ passed, ✗ failed, - skipped, ! errored.
 export function markerFor(outcome: CriterionOutcome): string {
   switch (outcome) {
     case "passed":
@@ -237,7 +237,7 @@ function criteriaWord(n: number): string {
   return n === 1 ? "criterion" : "criteria";
 }
 
-// F-1195 — the completeness arithmetic, factored out of `runScoreLine` so
+// The completeness arithmetic, factored out of `runScoreLine` so
 // `verdict.json` (runTaskHosted.ts) can carry the SAME counts the terminal
 // line already prints instead of a second, hand-rolled computation. Before
 // this existed, `verdict.json` wrote `score: 100, pass_threshold: 100,
@@ -284,9 +284,9 @@ export function runScoreLine(
     // Leads with the COUNT, which is the fact the reader needs and the same
     // fact the cloud's own header now states. The old copy said "cannot pass",
     // which is a verdict about the AGENT for a gap in the GRADER — the exact
-    // inversion F-925 exists to stop, one surface over.
+    // inversion this guard exists to stop, one surface over.
     //
-    // F-1392 — `preSatisfied` criteria are named APART from the abstentions
+    // `preSatisfied` criteria are named APART from the abstentions
     // instead of folded into "not evaluated", the way the dashboard's
     // `verdictLine` does (run-status.ts:174-206): a pre-satisfied criterion
     // reached a verdict (the grader wasn't gapped), it just tested nothing.

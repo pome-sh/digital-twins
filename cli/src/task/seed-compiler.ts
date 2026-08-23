@@ -14,7 +14,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { parseGitHubSeedState } from "./githubSeedCompat.js";
-// `/seed`, not the package root (F-1306) — see `parseTask.ts`'s note.
+// `/seed`, not the package root — see `parseTask.ts`'s note.
 import { seedSchema as seedStateSchema } from "@pome-sh/twin-github/seed";
 
 export const COMPILER_MODEL = "claude-opus-4-7";

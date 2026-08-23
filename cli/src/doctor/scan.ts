@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-634 — static routing scan: the named-cause half of doctor's routing
+// Static routing scan: the named-cause half of doctor's routing
 // check.
 //
 // Finds hardcoded production API hosts (file:line) that would bypass the
