@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-645 — "run yours": bare `pome run` (no path) defaults to the demo
+// "run yours": bare `pome run` (no path) defaults to the demo
 // task, closing the demo → run-yours seam (north-star moment 05: their
 // agent, k=5, the same task they just watched the demo agent attempt).
 //

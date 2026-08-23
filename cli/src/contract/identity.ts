@@ -19,7 +19,7 @@ export const userSchema = z.object({
 });
 export type User = z.infer<typeof userSchema>;
 
-// FDRS-613: reconciled to pome-cloud /v1 wire truth — `hobby` and `team` were
+// Reconciled to pome-cloud /v1 wire truth — `hobby` and `team` were
 // added cloud-side for the launch pricing tiers; adopted here so a cloud-issued
 // MeResponse / UsageResponse (plan_tier) parses under the twins schema.
 export const planTierSchema = z.enum([

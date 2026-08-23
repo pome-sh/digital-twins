@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-643 — anonymous demo session minting.
+// Anonymous demo session minting.
 //
 // POST {POME_API_BASE}/v1/demo/sessions with
 //   { task_name: "first-run-demo", task_hash: "", group_id: "grp_…" }

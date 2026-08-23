@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// `pome fix-prompt` — assemble a paste-into-IDE remediation prompt for a run
-// (FDRS-657). CAPTURE-ONLY: no LLM/judge call happens here. The former BYOK
+// `pome fix-prompt` — assemble a paste-into-IDE remediation prompt for a
+// run. CAPTURE-ONLY: no LLM/judge call happens here. The former BYOK
 // CLI-side judge call (`callJudge`) that generated the handoff was removed;
 // this now returns the fully-assembled prompt (system instructions + the
 // task's criteria + the captured trace) for the developer to paste into
@@ -29,7 +29,7 @@ export function buildFixPrompt(ctx: FixPromptContext): string {
 }
 
 /**
- * FDRS-644 — run-set mode: ONE prompt for a whole trial group, from the
+ * Run-set mode: ONE prompt for a whole trial group, from the
  * persisted cloud verdicts (grouped failure signatures) + raw traces.
  * Still PURE: no network, no LLM, no local judging — the verdicts were the
  * cloud's, cached at run time.

@@ -13,16 +13,15 @@ import { seedStateSchema } from "./seed-state.js";
 // 3. TASKS (formerly "scenarios") — originally adopted verbatim from
 //    oslo/pome/src/scenario/scenarioSchema.ts
 //
-// W3 vocab (FDRS-653): "task" is the canonical name; the `scenario*` exports
-// below are deprecated aliases kept for the 0.3.0 window (FDRS-654 swaps the
-// consumers).
+// Task vocab: "task" is the canonical name; the `scenario*` exports
+// below are deprecated aliases kept for the 0.3.0 window.
 //
 // `criterionSchema` and `judgeModelSchema` were moved to `./run.ts` (2026-05-11
 // split) because CriterionResult depends on them; imported here from `./run.js`
 // and re-exported to consumers via the index.ts barrel.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// F-1302 — which POPULATION a task belongs to, declared in its `## Config`
+// Which POPULATION a task belongs to, declared in its `## Config`
 // block. Three values, and the line between the first and the other two is what
 // the field exists for:
 //
@@ -51,7 +50,7 @@ export type TaskClass = z.infer<typeof taskClassSchema>;
 
 export const taskConfigSchema = z.object({
   twins: z.array(z.string()).default(["github"]),
-  class: taskClassSchema.optional(),                        // F-1302 — conformance vs the exam half
+  class: taskClassSchema.optional(),                        // conformance vs the exam half
   timeout: z.number().int().positive().default(60),         // seconds
   runs: z.number().int().positive().default(1),
   passThreshold: z.number().min(0).max(100).default(100),
@@ -59,13 +58,13 @@ export const taskConfigSchema = z.object({
 });
 export type TaskConfig = z.infer<typeof taskConfigSchema>;
 
-/** @deprecated FDRS-653 — use `taskConfigSchema`. Removed after the 0.3.0 window. */
+/** @deprecated Use `taskConfigSchema`. Removed after the 0.3.0 window. */
 export const scenarioConfigSchema = taskConfigSchema;
-/** @deprecated FDRS-653 — use `TaskConfig`. */
+/** @deprecated Use `TaskConfig`. */
 export type ScenarioConfig = TaskConfig;
 
 // The parsed task (formerly "scenario") markdown shape. Criterion kinds inside
-// `criteria` normalize D→code, P→model (tolerant reader, FDRS-653).
+// `criteria` normalize D→code, P→model (tolerant reader).
 export const taskSchema = z.object({
   slug: z.string().min(1),
   title: z.string().min(1),
@@ -78,14 +77,14 @@ export const taskSchema = z.object({
 });
 export type Task = z.infer<typeof taskSchema>;
 
-/** @deprecated FDRS-653 — use `taskSchema`. Removed after the 0.3.0 window. */
+/** @deprecated Use `taskSchema`. Removed after the 0.3.0 window. */
 export const scenarioSchema = taskSchema;
-/** @deprecated FDRS-653 — use `Task`. */
+/** @deprecated Use `Task`. */
 export type Scenario = Task;
 
 // Persisted Task row (dashboard upload path; cloud DB `tasks` table). Per
 // 04-data-model.md. Row ids keep the historical `scn_` prefix (persisted data;
-// renaming ids is a data migration, deliberately NOT part of FDRS-653).
+// renaming ids is a data migration, deliberately out of scope for the rename).
 export const persistedTaskSchema = z.object({
   id: z.string(),                              // scn_<nanoid>
   team_id: z.string(),
@@ -98,7 +97,7 @@ export const persistedTaskSchema = z.object({
 });
 export type PersistedTask = z.infer<typeof persistedTaskSchema>;
 
-/** @deprecated FDRS-653 — use `persistedTaskSchema`. Removed after the 0.3.0 window. */
+/** @deprecated Use `persistedTaskSchema`. Removed after the 0.3.0 window. */
 export const persistedScenarioSchema = persistedTaskSchema;
-/** @deprecated FDRS-653 — use `PersistedTask`. */
+/** @deprecated Use `PersistedTask`. */
 export type PersistedScenario = PersistedTask;

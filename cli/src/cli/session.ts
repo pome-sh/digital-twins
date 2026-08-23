@@ -289,7 +289,7 @@ export async function runSessionList(opts: {
 export async function runSessionStop(opts: {
   apiBaseUrl: string;
   sessionId: string;
-  /** F-983: confirm destroying a session whose run has not been graded.
+  /** Confirm destroying a session whose run has not been graded.
    *  Off by default — a human-typed destructive command gets the refusal
    *  printed instead of silently discarding the evidence. */
   discard?: boolean;

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// `pome twin start <twin>` (F-709) — the docker-free front door. Boots any
+// `pome twin start <twin>` — the docker-free front door. Boots any
 // of the three twins as a long-lived foreground server (Ctrl-C to stop) on
 // the same in-process boot path `pome run --local` uses (`bootTwin`), so
 // `npx @pome-sh/cli twin start github` serves the identical control plane
@@ -9,10 +9,10 @@
 // Auth: the twin's bearer middleware reads `TWIN_AUTH_SECRET` from the env
 // (engine contract). The CLI resolves the secret the same way an operator
 // would — an env-injected `TWIN_AUTH_SECRET` always wins, else the secret a
-// prior twin boot persisted at `.pome-data/<twin>/secret` (F-708 write side;
+// prior twin boot persisted at `.pome-data/<twin>/secret` (the twin writes it;
 // `POME_TWIN_DATA_DIR` overrides the directory) is reused, else a per-boot
 // ephemeral secret is generated. Loopback binds deliberately do NOT persist
-// a new secret file — that mirrors F-708's loopback carve-out, and the
+// a new secret file — that mirrors the twin's own loopback carve-out, and the
 // ready-to-use JWT is reprinted on every boot anyway.
 
 import { randomBytes } from "node:crypto";
@@ -35,7 +35,7 @@ export type StandaloneAuthSecret = {
 };
 
 /**
- * Read side of the F-708 secret contract. Resolution order:
+ * Read side of the boot-secret contract. Resolution order:
  *   1. env `TWIN_AUTH_SECRET` (always wins — same rule as the twin boots)
  *   2. the persisted `.pome-data/<twin>/secret` (`POME_TWIN_DATA_DIR`
  *      overrides the directory); blank file = absent, < 32 chars = loud
@@ -62,7 +62,7 @@ export function resolveStandaloneAuthSecret(
     return { secret: persisted, source: "persisted", path: secretPath };
   }
   if (persisted.length > 0) {
-    // Same rule as the engine's readSecretFile (F-708): a short secret is
+    // Same rule as the engine's readSecretFile: a short secret is
     // operator content we must not silently serve or regenerate over.
     throw new Error(
       `The persisted secret at ${secretPath} is shorter than 32 chars — fix or delete the file, or inject TWIN_AUTH_SECRET.`,

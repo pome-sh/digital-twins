@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * F-1134 — does a `[code]` criterion bind to a check its twin declares?
+ * Does a `[code]` criterion bind to a check its twin declares?
  *
  * A criterion that binds nothing is not an error anywhere: the grader skips it
  * and the score is computed over the rest, so the denominator moves for a reason
@@ -11,15 +11,14 @@
  *
  * OFFLINE BY CONSTRUCTION. Nothing here consults the cloud. Binding is a
  * question about the sentence and the CLI's own pinned declaration, and any
- * answer that needed the network would inherit F-1132's skew problem in the one
+ * answer that needed the network would inherit the pin-skew problem in the one
  * mode where this gap lives. The digest handshake in `checks-add.ts` remains the
  * place where the two pins are compared — that is a question about WRITING a
  * sentence, and it is a different question from whether one already binds.
  *
  * Resolution comes from `./checks.js` and nowhere else. That module is already a
  * deliberate SECOND resolution point (pome-cloud's registry is the first); a
- * third would be a third thing that can silently resolve nothing, which is
- * F-989's lesson.
+ * third would be a third thing that can silently resolve nothing.
  */
 import { checkNearMissPattern, checkPattern, templateSlots } from "@pome-sh/sdk/checks";
 

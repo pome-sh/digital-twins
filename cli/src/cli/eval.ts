@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // `pome eval [run-dir]` — upload an EXISTING raw trace directory to Pome
-// cloud for authoritative evaluation and print the score (FDRS-656; the
+// cloud for authoritative evaluation and print the score (the
 // capture/eval split contract: CLI captures, cloud evaluates). No local
 // scoring happens anywhere in this command (ADR-013) — the printed verdict
 // is whatever POST /v1/sessions/:id/finalize returns.
 //
-// Server contract (FDRS-655, pome-cloud — must land + deploy first):
+// Server contract (pome-cloud — must land + deploy first):
 //   POST /v1/eval-sessions  { agent, task_name } → 201 { session_id, expires_at }
 // After that the EXISTING presigned upload-url routes and /finalize work
 // unchanged on the minted session.
@@ -174,7 +174,7 @@ function validateJsonl(name: string, raw: string): void {
 }
 
 /** Read + validate a raw trace directory. Every missing/corrupt artifact
- *  fails with an error that names the offending file (FDRS-656). */
+ *  fails with an error that names the offending file. */
 export async function readRunDirArtifacts(
   runDir: string,
 ): Promise<RunDirArtifacts> {
@@ -422,15 +422,15 @@ export async function runEval(options: RunEvalOptions): Promise<RunEvalResult> {
   // events.jsonl and the state blobs are written pre-redacted (and
   // pre-wrapped) by artifacts.ts, but `pome eval` also accepts hand-assembled
   // dirs — redaction is idempotent, so this is cheap insurance that mirrors
-  // what the hosted runner uploads (cloud's FDRS-398 schema gate rejects raw
+  // what the hosted runner uploads (cloud's schema gate rejects raw
   // legacy rows).
   //
-  // Only LEGACY rows (pre-FDRS-398 — no `kind` discriminator) get wrapped into
+  // Only LEGACY rows (no `kind` discriminator) get wrapped into
   // a TwinHttpEvent. Rows that already carry a `kind` (any union member —
   // LlmTurnEvent, ToolUseEvent, LlmCallEvent, …) are preserved as-is: routing
   // them through toTwinHttpEvent re-wraps every non-TwinHttpEvent kind,
   // clobbering `kind` to "TwinHttpEvent" and setting event_id to an absent
-  // `request_id` (the pre-F-766 corruption bug).
+  // `request_id` (an old corruption bug).
   const eventsJsonl =
     artifacts.eventsJsonl
       .split("\n")
@@ -493,7 +493,7 @@ export async function runEval(options: RunEvalOptions): Promise<RunEvalResult> {
       agentModel: "unknown",
       agentSdk: projectIdentity?.framework ?? null,
       // Eval sessions carry no client-side criteria — the cloud eval judge
-      // owns them (FDRS-655). Cloud's finalize schema defaults all scenario
+      // owns them. Cloud's finalize schema defaults all scenario
       // fields, so empty strings are accepted.
       criteria: [],
       taskName: taskName,
@@ -525,17 +525,17 @@ export async function runEval(options: RunEvalOptions): Promise<RunEvalResult> {
     finalized = await uploadAndFinalize(sessionId);
   }
 
-  // FDRS-657 — the cloud verdict is EPHEMERAL: printed to the terminal below,
+  // The cloud verdict is EPHEMERAL: printed to the terminal below,
   // never persisted next to the trace. Local artifacts stay trace-only (no
   // score.json), and the verdict lives in the cloud (see the dashboard URL).
   const score = scoreFromFinalizeResponse(finalized);
 
-  // Exit-code policy — the full FDRS-591/611 A5 guard: exit 0 ONLY when the run
+  // Exit-code policy — the full A5 guard: exit 0 ONLY when the run
   // was evaluated, every criterion was judged (can_pass), AND the score clears
   // the threshold. An INCOMPLETE verdict (any criterion not evaluated) exits 1.
   //
-  // F-925 retired the divergence that used to be documented here. `pome run`
-  // mapped the raw cloud score because "pre-FDRS-618 cloud builds don't emit
+  // The divergence that used to be documented here is retired. `pome run`
+  // mapped the raw cloud score because "older cloud builds don't emit
   // criteria_results" — but `scoreFromFinalizeResponse` already handles that
   // case (`hasCriteriaResults ? … : true`), so the guard degrades to score-only
   // for exactly those builds on its own. The divergence was protecting a case
@@ -654,11 +654,11 @@ export async function runEvalCommand(
     ) {
       // The upgrade hint promised at the client layer (createEvalSession):
       // a 404/405 means this control plane predates `POST /v1/eval-sessions`
-      // (FDRS-655) — the exact release-gate scenario where the endpoint is on
+      // — the exact release-gate scenario where the endpoint is on
       // main but not yet deployed to prod. Point the user at the cause instead
       // of a bare "Not Found".
       console.error(
-        "Tip: this control plane does not serve `POST /v1/eval-sessions` yet — the Pome cloud eval path (FDRS-655) is not deployed. Upgrade the control plane (or wait for the deploy). In the meantime, a hosted `pome run` still returns a cloud verdict.",
+        "Tip: this control plane does not serve `POST /v1/eval-sessions` yet — the Pome cloud eval path is not deployed. Upgrade the control plane (or wait for the deploy). In the meantime, a hosted `pome run` still returns a cloud verdict.",
       );
     }
     process.exitCode = code;

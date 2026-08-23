@@ -94,7 +94,7 @@ const DEFAULT_AGENT_FILE = "examples/agents/scripted-triage-agent.ts";
 // with no error pointing at the real cause.
 const DEFAULT_AGENT_COMMAND = `node ${DEFAULT_AGENT_FILE}`;
 const MANIFEST_SCHEMA_URL = "https://pome.sh/schemas/v1/pome.json";
-// F-1411 — cap on how many unreadable verdict.json paths `fix-prompt`
+// Cap on how many unreadable verdict.json paths `fix-prompt`
 // discovery names individually, same "kept first N" convention as
 // `fix-prompt/prompt.ts`'s MAX_EVENTS trim.
 const MAX_UNREADABLE_PATHS_SHOWN = 5;
@@ -175,7 +175,7 @@ export function createProgram() {
         return;
       }
 
-      // F-904 — a directory that already has a package.json is the "bring your
+      // A directory that already has a package.json is the "bring your
       // own agent" case: scaffold only the manifest, never the starter library
       // (a 2026-07-24 cold walk dumped 28 untracked files into a real project).
       // --starter / --bare override the auto-decision in either direction.
@@ -233,12 +233,12 @@ export function createProgram() {
       }
 
       // Point the manifest at an existing task directory so bare `pome run`
-      // (F-865) resolves it. The starter path always creates tasks/; bare mode
+      // resolves it. The starter path always creates tasks/; bare mode
       // only claims it when the user already keeps their tasks there.
       const tasksDir =
         !bare || (await hasMarkdownTasks("tasks")) ? "tasks" : undefined;
 
-      // The manifest requires `agent.slug` (F-804). `pome init` runs before
+      // The manifest requires `agent.slug`. `pome init` runs before
       // `pome register`, so seed a portable slug derived from the directory
       // name; register later overwrites it with the server-canonical slug.
       const existing = await readManifest(process.cwd());
@@ -273,14 +273,14 @@ export function createProgram() {
 
   program
     .command("install")
-    // F-893 — the Gen-1 agent-driven wiring is retired; this is a redirect to
+    // The Gen-1 agent-driven wiring is retired; this is a redirect to
     // the Gen-2 path. allowUnknownOption + allowExcessArguments keep old
     // invocations (`pome install --interactive`, `--api-url …`) landing on the
     // redirect instead of erroring on a now-removed flag or stray operand.
     .allowUnknownOption()
     .allowExcessArguments()
     .description(
-      "Retired (F-893). Prints the Gen-2 wiring path: `claude mcp add … pome` + `npx skills add pome-sh/digital-twins --skill '*'`, then the pome-intake / REST-launch preflight.",
+      "Retired. Prints the Gen-2 wiring path: `claude mcp add … pome` + `npx skills add pome-sh/digital-twins --skill '*'`, then the pome-intake / REST-launch preflight.",
     )
     .action(async () => {
       const { runInstall } = await import("./install.js");
@@ -377,7 +377,7 @@ export function createProgram() {
       },
     );
 
-  // F-1074 — `pome checks` is a TOP-LEVEL group, not `pome tasks checks`:
+  // `pome checks` is a TOP-LEVEL group, not `pome tasks checks`:
   // `pome tasks` already takes `[twin]` positionally, so `tasks checks` would
   // parse "checks" as a twin id, and `pome task` one letter from `pome tasks`
   // is a trap.
@@ -418,7 +418,7 @@ export function createProgram() {
       });
     });
 
-  // F-1134 — the read-only half. `checks add` warns about the block it writes
+  // The read-only half. `checks add` warns about the block it writes
   // into, which covers an author mid-edit; this answers the same question about a
   // file already on disk, which is what a builder's own CI needs. Offline: it
   // reads this CLI's pinned declarations and never calls the cloud.
@@ -456,7 +456,7 @@ export function createProgram() {
       if (code !== 0) process.exitCode = code;
     });
 
-  // F-893 — `pome skills` / `pome skills install` retired. It only symlinked
+  // `pome skills` / `pome skills install` retired. It only symlinked
   // the two Gen-1 tombstone skills into ~/.claude/skills/; the Gen-2 coach set
   // installs via `npx skills add pome-sh/digital-twins`.
 
@@ -504,7 +504,7 @@ export function createProgram() {
       },
     );
 
-  // F-1557 — `sandbox` is the product noun (VOCABULARY.md); `session` is the
+  // `sandbox` is the product noun (VOCABULARY.md); `session` is the
   // spelling the CLI shipped with and every existing script types. Commander
   // resolves both to this one command, so every subcommand, flag and line of
   // output below is reachable under either without a second tree to drift.
@@ -624,7 +624,7 @@ export function createProgram() {
     )
     .option(
       "--discard",
-      "Confirm destroying a session whose run has not been graded (F-983)",
+      "Confirm destroying a session whose run has not been graded",
       false,
     )
     .action(
@@ -658,9 +658,9 @@ export function createProgram() {
     .option("--agent <command>", "Agent command to run")
     .option(
       "-n, --trials <count>",
-      "FDRS-636: run <count> isolated trials of the task as ONE trial group (integer 1-20; hosted only). " +
+      "Run <count> isolated trials of the task as ONE trial group (integer 1-20; hosted only). " +
         "Default is the task config's `runs` field (capped at 20). k>1 mints sessions with a shared group id up to your " +
-        "plan's concurrent-twin quota (FDRS-663: remaining trials reuse slots as earlier trials finish), runs trials at that " +
+        "plan's concurrent-twin quota (remaining trials reuse slots as earlier trials finish), runs trials at that " +
         "concurrency, prints the per-trial verdict table (numeric cloud-judge scores), and exits 0 iff at least one " +
         "trial completed and every completed trial passed (1: a completed trial failed; 2: nothing completed). " +
         "k=1 keeps today's single-run behavior exactly.",
@@ -682,7 +682,7 @@ export function createProgram() {
     )
     .option(
       "--no-capture",
-      "Self-host only: skip spawning the capture-server child and don't inject HTTP_PROXY/HTTPS_PROXY into the agent. Used by the CI overhead gate (FDRS-405) to baseline proxy-on-vs-off latency. No-op on hosted runs.",
+      "Self-host only: skip spawning the capture-server child and don't inject HTTP_PROXY/HTTPS_PROXY into the agent. Used by the CI overhead gate to baseline proxy-on-vs-off latency. No-op on hosted runs.",
     )
     .option(
       "--local",
@@ -715,7 +715,7 @@ export function createProgram() {
         // HostedUsageError, HostedOrchError) here and map via
         // `exitCodeFor` so the documented contract holds.
 
-        // FDRS-636 — validate -n before anything runs (documented exit 5 on
+        // Validate -n before anything runs (documented exit 5 on
         // a bad value, same as any other usage error).
         let trialsFlag: number | undefined;
         if (options.trials !== undefined) {
@@ -728,11 +728,11 @@ export function createProgram() {
           }
         }
 
-        // Read the manifest once — both bare-run task resolution (F-865) and
+        // Read the manifest once — both bare-run task resolution and
         // the agent command below consume it.
         const manifestRead = await readManifest(process.cwd()).catch(() => null);
 
-        // FDRS-645 / F-865 — bare `pome run` (no path) resolves its default:
+        // Bare `pome run` (no path) resolves its default:
         //   - a MIGRATED project (manifest with a `tasks` key) runs that whole
         //     declared directory, exactly like `pome run <that-dir>`: no demo
         //     drop, no "run yours" frame, each file at its own `runs`/-n;
@@ -777,7 +777,7 @@ export function createProgram() {
           return;
         }
 
-        // F-865 — make a manifest-driven bare run legible: name where the set
+        // Make a manifest-driven bare run legible: name where the set
         // came from, and never let an empty declared dir no-op silently.
         if (bareViaManifestTasks) {
           const manifestFile = basename(manifestRead!.path);
@@ -812,7 +812,7 @@ export function createProgram() {
 
         // Hosted is the default. Self-host runs against an in-process twin via
         // `--local` (documented) or POME_LOCAL=1 (an internal escape hatch).
-        // FDRS-657: self-host is CAPTURE-ONLY — it records the raw trace and
+        // Self-host is CAPTURE-ONLY — it records the raw trace and
         // never scores/judges/correlates. A verdict comes only from the cloud
         // (`pome eval <dir>`, or a hosted `pome run`). The --hosted flag is a
         // deprecated no-op kept for one release.
@@ -825,7 +825,7 @@ export function createProgram() {
           console.error("Note: --hosted is now the default; the flag is a deprecated no-op and will be removed in a future release.");
         }
 
-        // FDRS-636 — trial groups are a hosted feature: the verdicts come
+        // Trial groups are a hosted feature: the verdicts come
         // from cloud evaluation, and self-host runs are capture-only. Reject
         // the combination loudly instead of silently ignoring the flag.
         if (trialsFlag !== undefined && useLocal) {
@@ -836,15 +836,14 @@ export function createProgram() {
           return;
         }
 
-        // FDRS-641 — doctor preflight gate. A repo failing any applicable
+        // Doctor preflight gate. A repo failing any applicable
         // doctor check refuses to spawn the agent — BEFORE credentials are
         // resolved and before any twin/session is provisioned. Local runs get
         // the full engine (incl. local twin boot); hosted runs skip the local
         // twin (the cloud provisions the session twin) but still gate on
         // config, routing, and the egress floor. Deliberately no --force /
         // --skip-checks escape: "never a false success" — pome will not run
-        // trials against a live API. (Design: CLI moments 03; engine:
-        // FDRS-634.)
+        // trials against a live API. (Design: CLI moments 03.)
         {
           const { runDoctorChecks } = await import("../doctor/checks.js");
           const { renderDoctorReport } = await import("../doctor/render.js");
@@ -876,7 +875,7 @@ export function createProgram() {
           return;
         }
 
-        // FDRS-645 — the moment-05 frame, only for the bare-run default and
+        // The moment-05 frame, only for the bare-run default and
         // only once every gate that could refuse the run has passed.
         if (defaultTask) {
           for (const line of runYoursFrameLines()) console.error(line);
@@ -888,7 +887,7 @@ export function createProgram() {
             // documented exit codes. Anything else falls through to Commander
             // (treated like self-host).
             try {
-              // FDRS-636 — effective trial count: -n wins, else the task
+              // Effective trial count: -n wins, else the task
               // config's `runs` field (both capped at 20). k>1 takes the
               // trial-group path; k=1 stays EXACTLY the single-run path
               // below (no group is ever stamped for it).
@@ -901,7 +900,7 @@ export function createProgram() {
                 const { runTrialGroup } = await import(
                   "../runner/runTrialGroup.js"
                 );
-                // FDRS-644 — the literal re-run command the fix handoff
+                // The literal re-run command the fix handoff
                 // prints: bare default-task runs re-run as bare `pome run`;
                 // explicit paths re-run by (cwd-relative) path + -n.
                 const fileForRerun = relative(process.cwd(), file);
@@ -966,7 +965,7 @@ export function createProgram() {
               if (code > worstExit) worstExit = code;
             }
           } else {
-            // Self-host path (FDRS-657): CAPTURE-ONLY. Record the raw trace;
+            // Self-host path: CAPTURE-ONLY. Record the raw trace;
             // no score, no verdict, no judge. Let exceptions (file-not-found,
             // parse errors, agent failures) propagate to Commander's top-level
             // handler.
@@ -982,7 +981,7 @@ export function createProgram() {
             console.error(
               `  captured; run \`pome eval ${result.artifacts.runDir}\` for a cloud verdict.`,
             );
-            // FDRS-635 — name every host the egress floor refused, so a stray
+            // Name every host the egress floor refused, so a stray
             // production call is a visible event, never a silent passthrough.
             if (result.blockedEgress.length > 0) {
               const refusals = result.blockedEgress.reduce((n, b) => n + b.count, 0);
@@ -1045,7 +1044,7 @@ export function createProgram() {
     );
 
   // Hidden: the bundled demo agent `pome demo` spawns as its trial child
-  // through the real capture path (FDRS-643). Reads the POME_* env contract
+  // through the real capture path. Reads the POME_* env contract
   // injected by runTask plus POME_DEMO_* gateway coordinates.
   program
     .command("demo-agent", { hidden: true })
@@ -1105,7 +1104,7 @@ export function createProgram() {
       },
     );
 
-  // NOTE (FDRS-657): `matrix` / `matrix-html` / `eval-report` were removed.
+  // NOTE: `matrix` / `matrix-html` / `eval-report` were removed.
   // They were a pure LOCAL-scoring orchestrator — they shelled out to
   // `pome run` with POME_LOCAL=1 and aggregated the local score.json each
   // child wrote. With local evaluation gone (the OSS CLI is capture-only),
@@ -1124,7 +1123,7 @@ export function createProgram() {
 
       const eventsResult = await readEventsJsonl(runDir);
       if (eventsResult.kind === "legacy") {
-        // Exit code 2 is reserved by FDRS-403 for "legacy events.jsonl
+        // Exit code 2 is reserved for "legacy events.jsonl
         // detected" — distinct from a JSON parse error (which throws and
         // surfaces as exit code 1 via commander's default handling).
         console.error(LEGACY_EVENTS_MESSAGE);
@@ -1147,7 +1146,7 @@ export function createProgram() {
         for (const line of renderTraceHealth(health)) console.log(line);
         for (const line of renderEvents(eventsResult.events)) console.log(line);
       }
-      // FDRS-657 — `pome inspect` shows ONLY trace/audit content. There is no
+      // `pome inspect` shows ONLY trace/audit content. There is no
       // local verdict: score.json is never written (local artifacts are
       // trace-only). A verdict comes from the cloud — run `pome eval <dir>`
       // (or a hosted `pome run`) and read it on the terminal / dashboard.
@@ -1168,7 +1167,7 @@ export function createProgram() {
     )
     .action(async (target?: string, taskArg?: string) => {
       // Legacy 2-arg form: <events.jsonl> <task.md> — unchanged
-      // (CAPTURE-ONLY, FDRS-657: raw trace + declared criteria, no verdict).
+      // (CAPTURE-ONLY: raw trace + declared criteria, no verdict).
       if (target !== undefined && target.endsWith(".jsonl")) {
         if (!taskArg) {
           console.error(
@@ -1197,13 +1196,13 @@ export function createProgram() {
         return;
       }
 
-      // FDRS-644 — run-set mode. Reassemble the run set from persisted
+      // Run-set mode. Reassemble the run set from persisted
       // CLOUD verdicts (verdict.json, written by hosted `pome run`) + raw
       // traces, and emit ONE prompt with grouped failure signatures. Still
       // no network and no local judging — the verdicts were the cloud's.
       const root = target ?? "runs";
       const discovery = await discoverRunSet(resolve(root));
-      // F-1195 — a verdict.json this CLI can't read is a RECOGNIZABLE prior
+      // A verdict.json this CLI can't read is a RECOGNIZABLE prior
       // artifact version, not a foreign file, and the skip is named EVERY
       // time it happens — not only when nothing else was found. A runs/ that
       // holds one readable trial beside two stale ones would otherwise build
@@ -1215,7 +1214,7 @@ export function createProgram() {
           `${discovery.staleVersionCount} verdict.json file(s) under ${root} are not artifact version ${VERDICT_ARTIFACT_VERSION} (the only version this CLI reads) and were skipped — re-run \`pome run\` to record those trials again.`,
         );
       }
-      // F-1411 — a verdict.json that EXISTS but is truncated, hand-edited, or
+      // A verdict.json that EXISTS but is truncated, hand-edited, or
       // otherwise damaged is a different fact from a prior-version file (an
       // older CLI wrote that one correctly) and gets its own line, naming the
       // path(s) — a count alone would tell the user something was skipped but
@@ -1243,7 +1242,7 @@ export function createProgram() {
         return;
       }
       if (!discovery.set) {
-        // F-1404 — a root whose only non-passing run set is INCOMPLETE (the
+        // A root whose only non-passing run set is INCOMPLETE (the
         // grader never reached some criterion) is neither "all passed" nor a
         // failure to hand to a coding agent: routing it would assert an agent
         // defect nothing here established, and "all passed" would be false
@@ -1401,7 +1400,7 @@ export function createProgram() {
     )
     .option(
       "--allow <hosts>",
-      "FDRS-635: comma-separated egress allowlist patterns (exact host or *.suffix). The floor is deny-by-default: only these hosts + loopback are tunnelled; everything else gets 403.",
+      "Comma-separated egress allowlist patterns (exact host or *.suffix). The floor is deny-by-default: only these hosts + loopback are tunnelled; everything else gets 403.",
     )
     .option(
       "--egress-out <path>",
@@ -1505,7 +1504,7 @@ async function taskFiles(target: string) {
     .map((entry) => join(resolved, entry));
 }
 
-// F-904 — does the cwd already carry a task directory worth recording in the
+// Does the cwd already carry a task directory worth recording in the
 // manifest? A directory named `dir` counts only when it holds at least one
 // `.md` (an empty scaffold dir is not a task set).
 async function hasMarkdownTasks(dir: string): Promise<boolean> {

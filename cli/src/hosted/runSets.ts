@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
-// F-1411 — split out of evalResultCache.ts to keep that module under the
+// Split out of evalResultCache.ts to keep that module under the
 // file-size tripwire: grouping trials into run sets and deriving their
 // outcome is a distinct concern from reading/writing/scanning the
 // verdict.json artifact itself, and depends on nothing but `TrialVerdict`.
 
 import type { TrialVerdict } from "./evalResultCache.js";
 
-// F-1404 — the three-way verdict a run SET can carry, named like
+// The three-way verdict a run SET can carry, named like
 // `ScoreStatus` (the per-trial word) because it is built from it: "fail" =
 // at least one trial genuinely failed (graded, unsatisfied) — the only
 // outcome that asserts an agent defect. "incomplete" = no trial failed, but
@@ -28,7 +28,7 @@ export interface RunSet {
   /** Trials sorted by finalized_at ascending. */
   trials: TrialVerdict[];
   latestFinalizedAt: string;
-  /** F-1404 — derived from the on-disk `state` (see `RunSetOutcome`), never
+  /** Derived from the on-disk `state` (see `RunSetOutcome`), never
    *  from `passed` alone: `passed` is false for BOTH a genuine failure and a
    *  trial the grader never finished, so it can't tell "agent defect" from
    *  "never graded" apart. The ONE computation both the routing decision
@@ -40,8 +40,8 @@ export interface RunSet {
 /** Group trials into run sets: trials sharing a group_id form one set; a
  *  null group_id is its own single-run set.
  *
- *  F-1404 — `outcome` reads the on-disk `state` (F-1195), not `!passed`
- *  (F-1392's finding: `!passed` is true for both a genuine failure and an
+ *  `outcome` reads the on-disk `state`, not `!passed`
+ *  (the finding was that `!passed` is true for both a genuine failure and an
  *  incomplete trial, so a set holding only incomplete trials used to trip
  *  the old `anyFailed` and get handed to `pome fix-prompt` as an agent
  *  defect). `evalResultCache.test.ts` pins all three outcomes against the
@@ -85,7 +85,7 @@ export function latestFailedRunSet(sets: RunSet[]): RunSet | null {
   return null;
 }
 
-/** F-1404 — the newest run set whose worst outcome is INCOMPLETE: no trial
+/** The newest run set whose worst outcome is INCOMPLETE: no trial
  *  failed, but at least one trial's grading never finished. Callers use this
  *  to name the gap distinctly from both "fix this" (a fail set exists) and
  *  "nothing to fix" (every set passed) — never silently folded into either. */

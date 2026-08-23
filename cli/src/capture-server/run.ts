@@ -9,7 +9,7 @@ import { runCaptureServer } from "./index.js";
 export interface RunCaptureServerCommandOptions {
   port: number;
   eventsOut: string;
-  // FDRS-635 — egress-floor allowlist patterns (already parsed from CSV) and
+  // Egress-floor allowlist patterns (already parsed from CSV) and
   // the sidecar path for refused-CONNECT rows.
   allowHosts?: readonly string[];
   egressOut?: string;

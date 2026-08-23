@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
  * `pome checks lint <file...>` — do this task's `[code]` criteria bind to a check
- * their twin declares? (F-1134)
+ * their twin declares?
  *
  * `pome checks add` warns about the block it writes into, which covers an author
  * mid-edit. This covers the rest: a file already on disk, a whole directory of

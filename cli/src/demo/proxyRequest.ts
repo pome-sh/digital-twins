@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-643 — proxy-aware JSON POST for the bundled demo agent.
+// Proxy-aware JSON POST for the bundled demo agent.
 //
-// The demo agent is spawned through the real capture path (FDRS-399): the
+// The demo agent is spawned through the real capture path: the
 // runner injects HTTP(S)_PROXY pointing at the capture-server, whose CONNECT
 // tunnels become the LlmCallEvent rows in events.jsonl and whose
-// deny-by-default egress floor (FDRS-635) is the prod-safety control. Node's
+// deny-by-default egress floor is the prod-safety control. Node's
 // global fetch does NOT honor proxy env vars, so an agent that used bare
 // fetch for its gateway calls would silently bypass both — no trace row, no
 // floor. This helper restores the contract without adding a dependency:
@@ -185,7 +185,7 @@ function connectTunnel(
       if (headerEnd === -1) return;
       sock.off("data", onData);
       if (!/^HTTP\/1\.[01] 200/.test(buf)) {
-        // FDRS-635 — a refused CONNECT (egress floor) surfaces as its 403
+        // A refused CONNECT (egress floor) surfaces as its 403
         // status line, so the caller can say WHY the call failed.
         fail(new Error(`CONNECT ${targetHost}:${targetPort} refused: ${buf.split("\r\n")[0]}`));
         return;

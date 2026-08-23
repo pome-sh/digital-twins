@@ -37,7 +37,7 @@ export const DOCS_TOPICS: DocsTopic[] = [
       "register",
       "pome.json",
       "connect",
-      // Migrated from the retired skills-setup topic (F-893): wiring your own
+      // Migrated from the retired skills-setup topic: wiring your own
       // agent is now the "bring your own agent" path. ("pome-setup" / "setup"
       // already resolve to getting-started via its "setup" keyword.)
       "wire",
@@ -49,8 +49,8 @@ export const DOCS_TOPICS: DocsTopic[] = [
     path: "/docs/how-pome-works",
     keywords: ["twins", "scenarios", "runs", "scoring", "artifacts", "loop"],
   },
-  // F-889 dropped the Gen-1 /setup and /test-with-pome skill pages from the
-  // docs nav; F-893 retired the CLI commands that pointed at them. The two
+  // The Gen-1 /setup and /test-with-pome skill pages were dropped from the docs
+  // nav, and the CLI commands that pointed at them are gone. The two
   // topic entries are gone, but their still-live keywords are MIGRATED onto the
   // surviving replacement topics so `pome docs <kw>` keeps routing:
   //   wire → existing-agent;  test-with-pome / pome-test → cli-run;
@@ -97,7 +97,7 @@ export const DOCS_TOPICS: DocsTopic[] = [
     id: "cli",
     title: "Command Line Interface",
     path: "/docs/cli",
-    // "eval" migrated from the retired skills-test topic (F-893): there is no
+    // "eval" migrated from the retired skills-test topic: there is no
     // dedicated `pome eval` docs page, and it is a distinct workflow from
     // `pome inspect`, so it routes to the CLI reference index that documents
     // every command rather than to a sibling command's page.
@@ -116,7 +116,7 @@ export const DOCS_TOPICS: DocsTopic[] = [
       "default",
       "demo task",
       "run yours",
-      // Migrated from the retired skills-test topic (F-893): running tasks is
+      // Migrated from the retired skills-test topic: running tasks is
       // how you test an agent with pome.
       "test-with-pome",
       "pome-test",
@@ -131,7 +131,7 @@ export const DOCS_TOPICS: DocsTopic[] = [
   {
     id: "cli-tasks",
     title: "pome tasks",
-    // F-912 — the M4 docs door renamed the docs.pome.sh page from
+    // The M4 docs door renamed the docs.pome.sh page from
     // /docs/cli/scenarios to /docs/cli/tasks (a redirect keeps the old URL
     // alive), so `path` now points at the new route. The "scenarios" keyword
     // stays so `pome docs scenarios` still resolves to this topic.

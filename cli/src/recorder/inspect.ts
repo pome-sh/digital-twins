@@ -20,7 +20,7 @@ import {
  *   - `kind: "events"` — every row parsed cleanly against the discriminated
  *     union; the renderer walks `events` to print sections + trace health.
  *   - `kind: "legacy"` — at least one row is missing the `kind` discriminator
- *     (pre-FDRS-398 shape). `pome inspect` prints the legacy error and exits 2.
+ *     (legacy shape). `pome inspect` prints the legacy error and exits 2.
  *   - `kind: "missing"` — `events.jsonl` does not exist (run never produced
  *     trace blobs). Renderer prints a one-line note; no exit-2.
  */
@@ -60,7 +60,7 @@ export async function readEventsJsonl(runDir: string): Promise<ReadEventsResult>
 // ─────────────────────────────────────────────────────────────────────────────
 // Trace health
 //
-// Three layers, counted per FDRS-403 acceptance criteria:
+// Three layers:
 //   - proxy : LlmCallEvent           (HTTP_PROXY CONNECT capture-server)
 //   - twin  : TwinHttpEvent          (twin runtime HTTP traffic)
 //   - cas   : ToolUse/ToolResult/    (claude-agent-sdk adapter)
@@ -130,7 +130,7 @@ export function computeTraceHealth(input: TraceHealthInput): TraceHealthLayer[] 
 
   // CAS adapter layer — only active when the agent is wired through
   // `@pome-sh/claude-agent-sdk`. Heuristic: any of ToolUse/ToolResult/
-  // SubagentSpawn/Hook/LlmTurn indicates adapter is live. LlmTurnEvent (F-766)
+  // SubagentSpawn/Hook/LlmTurn indicates adapter is live. LlmTurnEvent
   // is adapter-emitted like its siblings, so it counts toward this layer.
   const casCount =
     counts.ToolUseEvent +

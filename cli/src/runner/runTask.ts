@@ -38,7 +38,7 @@ export type RunTaskOptions = {
   agentCommand: string;
   artifactsDir?: string;
   captureServerCommand?: CaptureServerCommand;
-  // FDRS-405 — skip spawning the capture-server child and do NOT inject
+  // Skip spawning the capture-server child and do NOT inject
   // HTTP_PROXY/HTTPS_PROXY into the agent env. Used by the overhead-gate
   // CI workflow to measure proxy-on-vs-off latency, and exposed as
   // `pome run --no-capture` for ad-hoc baselining.
@@ -46,13 +46,13 @@ export type RunTaskOptions = {
   // Fired once the capture-server child is up and listening, with its pid.
   // Tests use this to assert no orphan after the run.
   onCaptureServerSpawned?: (pid: number) => void;
-  // FDRS-643 — extra env injected into the agent child on top of the POME_*
+  // Extra env injected into the agent child on top of the POME_*
   // contract vars. `pome demo` uses this to hand the bundled agent its
   // anonymous-gateway coordinates (POME_DEMO_LLM_URL, POME_DEMO_TOKEN, …).
   // Spread after the built-ins (a caller may deliberately override them) but
   // BEFORE the proxy vars — the capture path is not overridable.
   extraAgentEnv?: Record<string, string>;
-  // FDRS-643 — extra egress-floor allowlist patterns for this run (demo mode
+  // Extra egress-floor allowlist patterns for this run (demo mode
   // adds the POME_API_BASE host so gateway CONNECTs aren't refused).
   egressExtraHosts?: readonly string[];
 };
@@ -63,11 +63,11 @@ export async function runTask(options: RunTaskOptions) {
   const artifactsDir = options.artifactsDir ?? "runs";
   const startedAt = new Date().toISOString();
 
-  // FDRS-657 — self-host is CAPTURE-ONLY: record the raw trace + state, never
+  // Self-host is CAPTURE-ONLY: record the raw trace + state, never
   // score/judge/correlate locally. A verdict comes only from the cloud.
   const writeRun = writeRunNoScore;
 
-  // FDRS-411: per-run signals file. Lives as a sibling of events.jsonl in the
+  // Per-run signals file. Lives as a sibling of events.jsonl in the
   // run's artifact directory so adapters that import `@pome-sh/adapter-claude-sdk`
   // and call `withPome()` can write M0 HookEvent / ToolUseEvent rows. The
   // runner merges these into events.jsonl post-run via
@@ -85,12 +85,12 @@ export async function runTask(options: RunTaskOptions) {
   // dies before any rows are written).
   await writeFile(eventsJsonlPath, "");
 
-  // FDRS-399: spawn the capture-server child BEFORE the twin and the agent.
+  // Spawn the capture-server child BEFORE the twin and the agent.
   // The agent inherits HTTP_PROXY/HTTPS_PROXY pointing at this child;
   // NO_PROXY keeps twin traffic out of the proxy so it isn't double-counted
-  // as LlmCallEvent. FDRS-405: `noCapture` skips spawn + env injection.
+  // as LlmCallEvent. `noCapture` skips spawn + env injection.
   //
-  // FDRS-635: the child enforces the deny-by-default egress floor. The
+  // The child enforces the deny-by-default egress floor. The
   // allowlist is LLM providers + custom base-URL hosts + POME_EGRESS_ALLOW;
   // the self-host twin lives on loopback, which the floor always allows.
   // Refused CONNECTs land in the egress sidecar, read back after the run so
@@ -199,7 +199,7 @@ export async function runTask(options: RunTaskOptions) {
 
   const proxyEnv: Record<string, string> = captureServer
     ? {
-        // FDRS-399 — agent's outbound traffic flows through the capture-server.
+        // Agent's outbound traffic flows through the capture-server.
         // Twin traffic is localhost, NO_PROXY excludes it so it stays a
         // TwinHttpEvent (recorded in-process) and isn't double-counted as a
         // proxy-captured LlmCallEvent.

@@ -3,7 +3,7 @@
 //   0 — pass; 1 — below pass-threshold; 2 — twin/orch error;
 //   3 — auth (401/403); 4 — quota (402/429); 5 — usage error.
 //
-// Session A (Linear FDRS-423) audit confirmed cloud-side responses map
+// An audit confirmed cloud-side responses map
 // cleanly: 401 only from `lib/auth.ts` (CLI exit 3), 402/429 = quota (CLI
 // exit 4), 502 = downstream/gateway (CLI exit 2), 410/426 are not auth
 // errors (CLI exit 2). F0-5 covers the CLI-side mapping gaps the test
@@ -16,7 +16,7 @@
 //     `runTaskHosted.ts` mapped any non-zero agent exit to exit 3,
 //     stealing the auth slot.
 //
-// FDRS-636 — trial groups (`pome run -n k`, k>1) map the WHOLE GROUP to one
+// Trial groups (`pome run -n k`, k>1) map the WHOLE GROUP to one
 // exit code ([DECISION 2026-07-05]):
 //   0 — at least one trial completed AND every completed trial passed;
 //   1 — at least one completed trial failed its pass threshold;
@@ -34,7 +34,7 @@ export class HostedAuthError extends Error {
 
 export class HostedQuotaError extends Error {
   /** `details` mirrors the cloud error envelope's machine-readable details
-   *  (e.g. `{ kind: "daily_judge_cap" }`) so `pome demo` (FDRS-643/662) can
+   *  (e.g. `{ kind: "daily_judge_cap" }`) so `pome demo` can
    *  render honest labeled at-capacity states. Optional: older responses and
    *  the twin-pod 401 shape carry none. */
   constructor(
@@ -50,7 +50,7 @@ export class HostedQuotaError extends Error {
 export class HostedOrchError extends Error {
   /** `status` is the HTTP status that produced this error, when one exists
    *  (network/parse failures leave it undefined). `pome eval` uses it to
-   *  scope its reaped-session retry to 404/410 only (FDRS-656 review). */
+   *  scope its reaped-session retry to 404/410 only. */
   constructor(
     message: string,
     public readonly requestId?: string,
@@ -75,7 +75,7 @@ export class HostedUsageError extends Error {
   }
 }
 
-/** FDRS-636 — a group trial errored before a cloud verdict existed
+/** A group trial errored before a cloud verdict existed
  *  (preflight failure, agent timeout, agent crash). The session was
  *  abandoned (POST /v1/sessions/:id/abandon) with `errorCode`; the group
  *  runner renders the trial as an errored row EXCLUDED from the verdict
@@ -87,7 +87,7 @@ export class HostedTrialError extends Error {
   }
 }
 
-/** F-983 — `DELETE /v1/sessions/:id` refused to destroy a session whose run
+/** `DELETE /v1/sessions/:id` refused to destroy a session whose run
  *  has not been graded. Pome creates the `runs` row at finalize, so an open
  *  session holds an ungraded run and deleting it discards the evidence. The
  *  control plane issues `discardToken`; replaying it confirms the discard.

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // contract — /v1/sessions/:id/finalize response family (part of §4 PUBLIC
-// REST API). ADR-013 managed-judge synchronous result plus the F-700 async
+// REST API). ADR-013 managed-judge synchronous result plus the async
 // `Prefer: respond-async` accepted/status/union shapes. Re-exported through the
 // `cli/src/contract` barrel (index.ts).
 
@@ -19,7 +19,7 @@ import { criterionDefSchema, perTwinStateKeysSchema } from "./rest.js";
 //
 // Not `.strict()`: a tolerant reader that strips unknown additive keys, matching
 // the rest of the §4 request/response family. Field set mirrors the CLI body
-// exactly — `scenario_*` vocab (finalize does not take the W3 `task_*` aliases),
+// exactly — `scenario_*` vocab (finalize does not take the `task_*` aliases),
 // storage keys optional (cloud falls back to conventional paths when omitted).
 export const finalizeRequestSchema = z.object({
   stop_reason: z.string(),                       // "completed" | "timeout" | "preflight_failed" | …
@@ -62,7 +62,7 @@ export const finalizeResponseSchema = z.object({
 });
 export type FinalizeResponse = z.infer<typeof finalizeResponseSchema>;
 
-// F-700: `status_url` is a same-origin absolute URL *or* an absolute-path
+// `status_url` is a same-origin absolute URL *or* an absolute-path
 // relative URL (cloud returns `/v1/sessions/:id/evaluation`).
 export const finalizeStatusUrlSchema = z
   .string()
@@ -115,7 +115,7 @@ export type FinalizeRunningStatusResponse = z.infer<
   typeof finalizeRunningStatusResponseSchema
 >;
 
-// F-700 wire error on GET .../evaluation failed status.
+// Wire error on GET .../evaluation failed status.
 export const finalizeFailureErrorSchema = z.object({
   type: z.string().min(1),
   message: z.string().min(1),

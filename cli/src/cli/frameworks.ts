@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Client-side did-you-mean for the manifest's open-enum `agent.framework`
-// (F-804 / F-819). An unknown framework is NEVER a validation error — the
+// Client-side did-you-mean for the manifest's open-enum `agent.framework`.
+// An unknown framework is NEVER a validation error — the
 // manifest schema keeps it a free string. We only surface a friendly warning
 // with the nearest known value so a typo like "langraph" is caught locally
 // before it reaches the dashboard badge.
@@ -22,7 +22,7 @@ export const KNOWN_FRAMEWORKS = [
 ] as const;
 
 /** A framework label the CLI itself recognizes. Anything a Pome surface WRITES
- *  into a manifest must be one of these (F-1393): the open enum tolerates an
+ *  into a manifest must be one of these: the open enum tolerates an
  *  author's own value, but a label the CLI mints and then warns about on the
  *  next command is the CLI disagreeing with itself. Authoring a value outside
  *  this union is a typecheck error, not a runtime surprise. */

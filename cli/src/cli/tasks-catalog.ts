@@ -7,8 +7,8 @@
  * Stripe/Slack tasks remain opt-in via `pome tasks <twin> --copy`.
  *
  * `runnable: false` marks an entry the copy commands skip. NO ENTRY CARRIES IT
- * TODAY (F-1303 deleted `00-default-seed.md`, its only user), and the field is
- * kept rather than retired because F-1305 is what it is for: the twin-smoke
+ * TODAY (`00-default-seed.md`, its only user, was deleted), and the field is
+ * kept rather than retired because of what it is for: the twin-smoke
  * tasks — `10`, `13`, `23`, whose prompts say "the Stripe clone" and "exercise
  * all thirteen available Gmail tools" — are our self-tests, and they leave the
  * starter library the moment the zero-model prober can cover their routes.

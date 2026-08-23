@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// contract §6 — the pome.json / pome.yaml MANIFEST (F-818, format spec
-// F-804). One canonical zod schema; JSON and YAML are interchangeable carriers
+// contract §6 — the pome.json / pome.yaml MANIFEST. One canonical zod schema; JSON and YAML are interchangeable carriers
 // of the same snake_case keys (both files present is a hard error at the CLI
 // loader, not here). The `agent` block is the stable cross-carrier identity
 // contract; top-level keys are CLI run-config and may evolve faster.
@@ -10,7 +9,7 @@
 // control-plane /v1/agents, dashboard, MCP). SLUG_RE is byte-identical to the
 // pome-cloud control-plane's regex; deriveAgentSlug is a behavior-identical
 // port of packages/db/src/agent-slug.ts (equivalence pinned in
-// test/manifest.test.ts). pome-cloud imports both from here as of F-820 —
+// test/manifest.test.ts). pome-cloud imports both from here —
 // local and server validation must never drift again.
 
 import { z } from "zod";
@@ -69,10 +68,10 @@ export const manifestSchema = z.object({
 });
 export type Manifest = z.infer<typeof manifestSchema>;
 // Writer-side shape: what an author may put in pome.json / pome.yaml before
-// the run-config defaults are injected (z.input trick, F-778).
+// the run-config defaults are injected (z.input trick).
 export type ManifestInput = z.input<typeof manifestSchema>;
 
-// The JSON Schema served at pome.sh/schemas/v1/pome.json (F-821) and resolved
+// The JSON Schema served at pome.sh/schemas/v1/pome.json and resolved
 // by editors via the manifest's `$schema` pointer. `io: "input"` emits the
 // AUTHOR-side shape — run-config keys with defaults stay optional instead of
 // being promoted to required by the parsed (output) view. Shared by the

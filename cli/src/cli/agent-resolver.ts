@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The `POST /v1/agents` resolver round-trip (F-820), shared by `pome register`
+// The `POST /v1/agents` resolver round-trip, shared by `pome register`
 // (interactive near-miss) and the run paths (silent re-resolution of a
 // committed slug under the caller's team). Kept import-neutral — no register/
 // session dependency — so both sides can consume it without a cycle.
@@ -16,7 +16,7 @@ import type { ResolvedCredentials } from "./credentials.js";
 export interface InteractiveSeams {
   stdinIsTTY?: boolean;
   confirm?: (question: string) => Promise<boolean>;
-  /** Free-text prompt. Added by F-1074: picking a check from a numbered list and
+  /** Free-text prompt. Picking a check from a numbered list and
    *  filling its typed parameters needs an answer, not a yes/no. */
   ask?: (question: string) => Promise<string>;
 }
@@ -101,7 +101,7 @@ function mapHttpError(status: number, json: unknown): Error {
   return new HostedOrchError(err?.message ?? `POST /v1/agents → HTTP ${status}`);
 }
 
-/** Extract the near-miss suggested slug from a 409 conflict envelope. F-820
+/** Extract the near-miss suggested slug from a 409 conflict envelope. The resolver
  *  returns it under `error.details.suggestion`; we also tolerate `suggestions[]`
  *  and `slug` as forward-compatible fallbacks. */
 export function nearMissSuggestion(json: unknown): string | undefined {

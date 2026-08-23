@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-636 — trial-count resolution for `pome run -n k`.
+// Trial-count resolution for `pome run -n k`.
 //
 // [DECISION 2026-07-05]: -n is an integer 1..20 on the hosted run path. The
 // DEFAULT is the scenario config's `runs` field (taskConfigSchema parses

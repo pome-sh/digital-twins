@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1392 / D3 — "no surface states more than it checked", applied to the two
+// D3 — "no surface states more than it checked", applied to the two
 // surfaces that answer ONE question: is this run a pass, a fail, or a run the
 // grader did not finish?
 //
@@ -9,20 +9,20 @@
 // run-status.ts`, pome-cloud). They share no code — the two repos publish no
 // module to each other, and the only thing that crosses is the
 // `criteria_results` wire shape plus one reason string. So "they agree" is a
-// claim someone has to check, and until this file existed nobody did: F-1392
-// was a run the CLI called INCOMPLETE and the dashboard called PASS, shipped
+// claim someone has to check, and until this file existed nobody did. The
+// defect was a run the CLI called INCOMPLETE and the dashboard called PASS, shipped
 // for as long as it took a human to notice the two screens disagreeing.
 //
 // `dashboardRunStatus` below WAS a transcription — a hand copy of pome-cloud's
 // three clauses, named clause by clause so a reviewer could diff it against the
-// original. F-1416 deleted the copy. It now CALLS the real predicate, which
+// original. That copy is deleted. It now CALLS the real predicate, which
 // both repositories install from `@pome-sh/wire/run-completeness`.
 //
-// WHY THAT MATTERS MORE THAN IT LOOKS. F-1399 moved the arithmetic out of
+// WHY THAT MATTERS MORE THAN IT LOOKS. The arithmetic moved out of
 // `run-status.ts` into a shared predicate inside pome-cloud, closing this exact
 // defect class one repo over — and the copy in THIS file went stale the moment
 // it did, and went stale GREEN: it kept passing while asserting something false
-// about the other repo. F-1413 was the second time that happened. Both times
+// about the other repo. That happened twice. Both times
 // nothing detected it; it was caught because one person happened to be holding
 // both sides. A transcription is a parallel copy with the longest possible
 // feedback loop, and it was sitting inside the very test written to prove
@@ -49,12 +49,12 @@
 // different animal: it is one line, it has no counts in it, and it cannot be
 // wrong by an off-by-one.
 //
-// There is no known divergence between the two surfaces today — F-1399 closed
-// the last one (below). A row CAN still carry a `divergence` marker if the two
+// There is no known divergence between the two surfaces today — the last one
+// is closed (below). A row CAN still carry a `divergence` marker if the two
 // surfaces disagree again: a known divergence with a test on it is a fact; the
-// same divergence with no test on it is the F-1392 defect again.
+// same divergence with no test on it is the original defect again.
 //
-// F-1195 — there is now a THIRD surface answering the same question: the
+// There is now a THIRD surface answering the same question: the
 // `state` field of the `verdict.json` a hosted run writes, which is what CI
 // reads instead of scraping stderr. It answers with the CLI's word by
 // construction (`runTaskHosted.ts` passes the one `verdict` local it already
@@ -105,7 +105,7 @@ function dashboardRunStatus(
   results: readonly CriterionResult[],
   satisfactionScore: number,
 ): DashboardStatus {
-  // F-925 — incomplete outranks the score, including a failing one. If `fail`
+  // Incomplete outranks the score, including a failing one. If `fail`
   // won that contest, the same instrument gap would produce a different run
   // state depending on how the agent performed.
   if (isIncompleteTally(tallyCriteriaResults(results))) return "incomplete";
@@ -186,7 +186,7 @@ const table: Row[] = [
     expected: "incomplete",
   },
   {
-    name: "F-925: an abstention outranks a failing score",
+    name: "an abstention outranks a failing score",
     results: [passing("a"), failing("b"), abstained("c")],
     satisfaction: 50,
     expected: "incomplete",
@@ -198,7 +198,7 @@ const table: Row[] = [
     expected: "incomplete",
   },
   {
-    // The F-1392 hero shape: support-triage-dedup scores 100 over three
+    // The hero shape: support-triage-dedup scores 100 over three
     // criteria with a fourth excluded as already true in the seed. This is the
     // row that used to read pass / incomplete.
     name: "seed-excluded criterion beside three passes",
@@ -219,7 +219,7 @@ const table: Row[] = [
     expected: "fail",
   },
   {
-    // F-1399 added `isIncompleteTally`'s third clause (`evaluated === 0`):
+    // `isIncompleteTally` gained a third clause (`evaluated === 0`):
     // an all-excluded run has an empty denominator, which used to fall
     // through to `satisfaction_score === 100 ? pass : fail` and land on
     // `fail` here. Both surfaces now agree it is `incomplete` — the CLI
@@ -237,7 +237,7 @@ const table: Row[] = [
  *  Not `table.find((r) => r.divergence)`: that predicate selected the row only
  *  while the row was MARKED as a divergence, so closing the divergence handed
  *  its caller `undefined` and the test kept passing on a `!`-asserted ghost
- *  (F-1413). Renaming a row must red with a readable message instead. */
+ *  Renaming a row must red with a readable message instead. */
 function rowNamed(name: string): Row {
   const row = table.find((r) => r.name === name);
   if (row === undefined) {
@@ -246,7 +246,7 @@ function rowNamed(name: string): Row {
   return row;
 }
 
-describe("CLI and dashboard answer `what state is this run in?` the same way (F-1392)", () => {
+describe("CLI and dashboard answer `what state is this run in?` the same way", () => {
   for (const row of table) {
     const label = row.divergence ? `${row.name} [known divergence]` : row.name;
     it(label, () => {
@@ -265,7 +265,7 @@ describe("CLI and dashboard answer `what state is this run in?` the same way (F-
   // ── isIncompleteTally's FIRST clause, which no row above reaches ─────────
   //
   // `total === 0 ⇒ never incomplete` is the one clause no row in the table
-  // exercises, since every row has criteria. Since F-1416 the clause itself is
+  // exercises, since every row has criteria. The clause itself is
   // pinned where it is implemented (`packages/wire/test/run-completeness.
   // test.ts` exhausts all three), so what these two cases are for is no longer
   // "cover the transcription" — it is the CROSS-SURFACE fact, which is the only
@@ -298,15 +298,15 @@ describe("CLI and dashboard answer `what state is this run in?` the same way (F-
     });
   });
 
-  // ── The third surface: verdict.json's `state` (F-1195) ───────────────────
+  // ── The third surface: verdict.json's `state` ───────────────────────────
   //
   // `runTaskHosted.ts` writes `state: verdict` — the same local that produced
   // the terminal's word — so agreement between the artifact and the terminal
   // is structural, and the e2e tests prove the wiring. The risk this block
   // covers is the OTHER one: that the artifact spells the answer in a
-  // vocabulary of its own, which would be the F-1392 defect reappearing in a
+  // vocabulary of its own, which would be the original defect reappearing in a
   // new file.
-  describe("verdict.json spells the state in the same three words (F-1195)", () => {
+  describe("verdict.json spells the state in the same three words", () => {
     async function roundtripState(state: string): Promise<string | undefined> {
       const dir = join(await mkdtemp(join(tmpdir(), "xsurface-")), "scn", "ses_1");
       await mkdir(dir, { recursive: true });
@@ -352,35 +352,35 @@ describe("CLI and dashboard answer `what state is this run in?` the same way (F-
       });
     }
 
-    it("records the same word as the dashboard now that F-1399 closed the divergence, and the closure is stated in the artifact's own doc", async () => {
+    it("records the same word as the dashboard now that the divergence is closed, and the closure is stated in the artifact's own doc", async () => {
       const row = rowNamed("every criterion seed-excluded — no denominator");
       const cliWord = cliRunStatus(row.results, row.satisfaction);
-      // The all-pre-satisfied run: F-1399 added `isIncompleteTally`'s
+      // The all-pre-satisfied run: `isIncompleteTally` gained an
       // `evaluated === 0` clause, so the dashboard now reads `incomplete`
       // here too — the CLI already did, via its own A5 guard. `passed` — the
-      // only bit CI can act on — agreed even before F-1399; now the word
+      // only bit CI can act on — agreed even before that; now the word
       // itself does too.
       expect(cliWord).toBe("incomplete");
       expect(dashboardRunStatus(row.results, row.satisfaction)).toBe("incomplete");
       expect(await roundtripState(cliWord)).toBe("incomplete");
 
       // The claim in this test's name is checked, not asserted: the field a
-      // CI reader meets first is `VerdictArtifact.state`, so the F-1399
-      // history has to be legible from there. Delete the mention and this
-      // goes red rather than the artifact quietly losing the only place that
-      // history was written down.
+      // CI reader meets first is `VerdictArtifact.state`, so the mechanism that
+      // closed the divergence has to be legible from there. Delete the
+      // explanation and this goes red rather than the artifact quietly losing
+      // the only place it was written down.
       const artifactSource = await readFile(
         new URL("../../../src/hosted/evalResultCache.ts", import.meta.url),
         "utf8",
       );
-      expect(artifactSource).toContain("F-1399");
+      expect(artifactSource).toContain("`evaluated === 0` clause");
     });
   });
 
   it("has no known divergences between the two surfaces", () => {
     // A guard on the guard: adding a `divergence` to a row is how this file
     // would be silenced, so the count is asserted rather than left to review.
-    // F-1399 closed the last one (the empty-denominator row above); the next
+    // The last one (the empty-denominator row above) is closed; the next
     // one has to be added deliberately, not slip in unnoticed.
     const diverging = table.filter((row) => row.divergence);
     expect(diverging.map((row) => row.name)).toEqual([]);
@@ -389,7 +389,7 @@ describe("CLI and dashboard answer `what state is this run in?` the same way (F-
 
 // ── What the table is still worth, now that the arithmetic is shared ────────
 //
-// A reasonable question after F-1416: if both surfaces call one predicate, is a
+// A reasonable question: if both surfaces call one predicate, is a
 // row-by-row agreement table anything but a tautology? No, and the rows above
 // say why. `dashboardRunStatus` and `cliRunStatus` reach their answers by
 // genuinely different routes — the dashboard runs the shared predicate over
@@ -403,6 +403,6 @@ describe("CLI and dashboard answer `what state is this run in?` the same way (F-
 //
 // So the table pins what it always pinned: that two independently-implemented
 // readers of one wire shape agree, row by row, and never split on the single
-// bit CI can act on. What F-1416 removed is the part that was never a test at
+// bit CI can act on. What was removed is the part that was never a test at
 // all — a copy of the other repo's counting, which could only ever agree with
 // itself.

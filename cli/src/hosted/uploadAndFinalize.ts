@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Shared presigned-upload + finalize-score orchestration for cloud sessions
-// (ADR-013). Extracted verbatim from runTaskHosted.ts (FDRS-656) so
+// (ADR-013). Extracted verbatim from runTaskHosted.ts so
 // `pome eval <run-dir>` reuses the exact same best-effort PUT semantics
 // without duplicating them. Behavior-preserving for the hosted run path:
 // warning text, the 30s PUT timeout, and the null-key fallbacks all match
@@ -112,7 +112,7 @@ async function putBlob(
  * `team-<>/session-<>/events.jsonl` path, so cloud's judge finds the trace
  * without an explicit override. State blobs and signals have no conventional
  * fallback today — without an explicit override the judge sees "{}" for
- * state files (FDRS-395) and skips the adapter-rich correlator (F0-4 / L7).
+ * state files and skips the adapter-rich correlator (F0-4 / L7).
  * meta.json (D18.1/D18.6) DOES have a conventional fallback: cloud finalize
  * auto-discovers it at `team-<>/session-<>/meta.json`, so its key is uploaded
  * to that path and never threaded onto /finalize (see uploadMeta below).
@@ -311,19 +311,19 @@ export async function uploadRunBlobs(
  * builds (pre-Session A) omit the field; default to an empty array — the
  * fix-prompt action still bails cleanly when results are missing.
  *
- * A1 CAVEAT (FDRS-618): `satisfaction` here is the CLOUD-authoritative
+ * A1 CAVEAT: `satisfaction` here is the CLOUD-authoritative
  * score (`finalized.score`) — the hosted judge does NOT yet implement the
- * FDRS-591/611 outcome semantics, so `evaluated`/`can_pass` are derived
+ * Four-state outcome semantics, so `evaluated`/`can_pass` are derived
  * locally only when /finalize returns per-criterion results. Older cloud
  * builds omit `criteria_results`; for those, preserve the cloud score as
  * renderable instead of inventing an empty local A5 verdict.
  *
- * F-1392 — `can_pass` exempts a `skipped` result stamped
+ * `can_pass` exempts a `skipped` result stamped
  * `PRE_SATISFIED_REASON` (`already_true_in_seed`): the seed already satisfied
  * that criterion, so it is not an abstention and a run holding one can still
  * pass. Every OTHER skipped reason, and every `errored`, still blocks
  * `can_pass` — this is the same exemption pome-cloud's `isRunIncomplete`
- * applies over the same `criteria_results` (F-1296), narrowed to nothing
+ * applies over the same `criteria_results`, narrowed to nothing
  * else.
  *
  * `errored` is a DISPLAY-MODEL state with no wire producer today: it is
@@ -348,7 +348,7 @@ export function scoreFromFinalizeResponse(finalized: FinalizeResponse): Score {
   const totalRequired = passed + failed;
   // The abstentions that actually block a pass: every skipped result MINUS
   // the ones the seed already satisfied, plus every errored result (never
-  // exempted — F-1392's "Traps": a pre-satisfied result is a wire-observed
+  // exempted — the trap here is that a pre-satisfied result is a wire-observed
   // fact for `skipped`, not for `errored`).
   const unresolvedAbstentions = skipped - preSatisfied + errored;
   return {
@@ -372,7 +372,7 @@ export function scoreFromFinalizeResponse(finalized: FinalizeResponse): Score {
 
 /** Redact a JSONL payload line-by-line before upload. Lines that fail to
  *  parse as JSON are redacted as raw strings. Moved verbatim from
- *  runTaskHosted.ts (FDRS-656). */
+ *  runTaskHosted.ts. */
 export function redactJsonl(body: string): string {
   const lines = body.split("\n");
   const redacted = lines

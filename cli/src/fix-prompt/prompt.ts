@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Assembles the paste-into-IDE fix prompt for a failed run (FDRS-657).
+// Assembles the paste-into-IDE fix prompt for a failed run.
 //
 // CAPTURE-ONLY: the OSS CLI does NOT call an LLM here. `pome fix-prompt`
 // assembles a self-contained prompt — system instructions + the task's
 // criteria + the raw captured trace — and prints it so the developer can paste
 // it into THEIR own coding assistant (Cursor / Claude Code). The former BYOK
 // local-judge call that generated the handoff CLI-side was removed under
-// FDRS-657 (no local LLM/judge anywhere in the OSS CLI). This module was also
+// No local LLM/judge anywhere in the OSS CLI. This module was also
 // relocated out of the deleted `src/evaluator/` tree.
 
 import { readFileSync } from "node:fs";
@@ -122,7 +122,7 @@ ${escapeTagContent(trace)}
 </agent-trace>`;
 }
 
-// ── FDRS-644: run-set mode ──────────────────────────────────────────────
+// ── Run-set mode ───────────────────────────────────────────────────────
 //
 // One prompt for a whole trial group, built from persisted CLOUD verdicts
 // (verdict.json — provenance-labeled /finalize payloads, still no local
@@ -157,7 +157,7 @@ function failedResults(verdict: VerdictArtifact): CriterionResult[] {
   return verdict.criteria_results.filter((r) => outcomeOf(r) === "failed");
 }
 
-/** F-1404 — a trial whose grading FINISHED: the only kind whose pass/fail
+/** A trial whose grading FINISHED: the only kind whose pass/fail
  *  this prompt may count. A trial's `state` is `"incomplete"` whenever the
  *  grader never reached some criterion (`scoreStatus`'s A5 guard), and such a
  *  trial is neither a pass nor a failure — it belongs in no numerator and no
@@ -199,7 +199,7 @@ function flattenLine(text: string, max = 300): string {
  *  outcome to actually be `passed` — skipped/errored are named as such,
  *  never counted as passes.
  *
- *  F-1392 — a criterion the seed already satisfied is `skipped` on the wire
+ *  A criterion the seed already satisfied is `skipped` on the wire
  *  and used to land in "not uniformly evaluated", which sends the reader's
  *  coding agent hunting for a grader gap that does not exist. It is its own
  *  class here, for the same reason it is its own count in `Score`: the grader
@@ -213,11 +213,11 @@ function renderGroupedSignatures(trials: TrialFixInput[]): string {
   >();
   // Criterion text → the set of outcome classes seen for it. "excluded" is a
   // class here and not in `outcomeOf` (the per-criterion marker stays `-`,
-  // F-1392's trap): this map exists to decide which NOTE a criterion belongs
+  // the trap): this map exists to decide which NOTE a criterion belongs
   // under, and "the seed already satisfied it" is a different note from "the
   // grader never reached it".
   const outcomesSeen = new Map<string, Set<string>>();
-  // F-1404 — per-criterion denominator: how many trials actually GRADED this
+  // Per-criterion denominator: how many trials actually GRADED this
   // criterion (reached a pass or a fail on it). The old denominator was
   // `trials.length`, which counted trials that never graded the criterion at
   // all — and once a set may hold an INCOMPLETE trial, a criterion can be
@@ -300,7 +300,7 @@ function renderGroupedSignatures(trials: TrialFixInput[]): string {
 /** The failing trial with the most failed criteria — the representative
  *  whose full trace anchors the prompt.
  *
- *  F-1404 — `state === "fail"`, not `!passed`: an INCOMPLETE trial is not a
+ *  `state === "fail"`, not `!passed`: an INCOMPLETE trial is not a
  *  failing one, and anchoring the prompt's one trace on it under the heading
  *  "the most-failing trial" asserted a failure the grading never reached. */
 export function representativeFailingTrial(
@@ -316,7 +316,7 @@ export function representativeFailingTrial(
 }
 
 export function buildGroupFixUserPrompt(ctx: GroupFixPromptContext): string {
-  // F-1404 — every fraction below is over GRADED trials only. An INCOMPLETE
+  // Every fraction below is over GRADED trials only. An INCOMPLETE
   // trial gets its own named section instead of being counted as a non-pass
   // in a denominator labelled "completed".
   const incomplete = ctx.trials.filter((t) => !isGraded(t));
@@ -393,7 +393,7 @@ ${escapeTagContent(trace)}
 ${escapeTagContent(redactSecrets(lines.join("\n")) as string)}`);
   }
 
-  // F-1404 — the gap, named, as the LAST thing the reading agent sees before
+  // The gap, named, as the LAST thing the reading agent sees before
   // it starts work. The prompt is allowed to be built over a set holding an
   // ungraded trial (a genuine failure alongside it, or a trial dir the user
   // pointed at directly); it is not allowed to let that trial read as

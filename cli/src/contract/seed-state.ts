@@ -12,7 +12,7 @@ import { z } from "zod";
 // Future twins (Linear, Slack) will add their own seed shapes; we union those
 // in here as the family grows.
 //
-// FDRS-653 (ported from pome-cloud): this schema used to model only the
+// Ported from pome-cloud: this schema used to model only the
 // issue-triage subset (repositories[].{issues,labels,collaborators}). Anywhere
 // it is used as a narrowing boundary, a field MISSING here is silently
 // zod-stripped before it reaches the twin pod's own parseSeed — which is
@@ -182,7 +182,7 @@ export const slackSeedStateSchema = z.object({
       })
     )
     .default([]),
-  // F-1509. Mirrors `seedSchema.files` in `@pome-sh/twin-slack`. `user` and
+  // Same shape as `seedSchema.files` in `@pome-sh/twin-slack`. `user` and
   // `channels` are seed HANDLES (a user/channel `name`) or ids.
   files: z
     .array(

@@ -37,9 +37,9 @@ const REGISTRIES: Record<string, readonly DeclaredCheck[]> = {
 //
 // The distinction is still real: `pome checks <twin>` must answer "not migrated
 // yet" for a twin that exists, and "no such twin" for a typo. What is no longer
-// real is the hand-maintained literal. F-1126 removed slack from it, F-1127
-// stripe, F-1128 gmail, and F-1129 would have emptied it — four tickets each
-// editing one line of a list that `MOUNTED_TWINS` already knows.
+// real is the hand-maintained literal. Slack, stripe and gmail each came off it
+// one at a time, and the next migration would have emptied it — four changes
+// each editing one line of a list that `MOUNTED_TWINS` already knows.
 //
 // So it is a set difference instead. Today it is EMPTY, which is A3's whole
 // acceptance criterion. The day a sixth twin mounts, it repopulates itself and
@@ -60,12 +60,12 @@ export function twinsWithChecks(): string[] {
  *
  * Exported because the no-vocabulary PATH is a real behaviour with its own
  * tests, and those tests need a twin on this list to exercise it. Naming one
- * inline is what broke five of them when stripe left the list (F-1127) — a
+ * inline is what broke five of them when stripe left the list — a
  * literal there asserts the MEMBERSHIP of the set, where the test means to
- * assert the behaviour, which is the same defect F-1075 hit with a hard-coded
- * picker index.
+ * assert the behaviour, which is the same defect a hard-coded picker index
+ * once caused.
  *
- * A3 empties this list, and F-1129 answered the question that raised: the PATH
+ * A3 empties this list, and that raised a question with a clear answer: the PATH
  * stays, the LITERAL goes. It is now `MOUNTED_TWINS` minus the registry, so an
  * empty result is a fact about the world rather than a list nobody updated.
  */
@@ -225,7 +225,7 @@ export async function runChecksCommand(
     console.log(`    ${dim(`pome checks add <file> --check ${def.id} ${argFlagsFor(def)}`)}`);
     console.log("");
   }
-  // F-1126 — the digest, shown rather than only computed.
+  // The digest, shown rather than only computed.
   //
   // `checks add` already refuses to write a sentence when this disagrees with
   // the control plane's (`checks-add.ts`), and that refusal is correct but

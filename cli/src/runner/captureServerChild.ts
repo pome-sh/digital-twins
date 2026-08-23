@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-399 — spawn `pome capture-server` as a child process for `pome run`.
+// Spawn `pome capture-server` as a child process for `pome run`.
 //
 // The runner needs an out-of-process CONNECT proxy so the agent subprocess
 // can be pointed at it via HTTPS_PROXY. Running capture-server in-process is
@@ -19,10 +19,10 @@ import { spawn, type ChildProcess } from "node:child_process";
 export interface SpawnCaptureServerChildOptions {
   // Absolute path to events.jsonl. Passed verbatim to `--events-out`.
   eventsOut: string;
-  // FDRS-635 — egress-floor allowlist patterns, passed as `--allow` (CSV).
+  // Egress-floor allowlist patterns, passed as `--allow` (CSV).
   // Omitted/empty means loopback-only: the floor is deny-by-default.
   allowHosts?: readonly string[];
-  // FDRS-635 — sidecar path for refused-CONNECT rows, passed as `--egress-out`.
+  // Sidecar path for refused-CONNECT rows, passed as `--egress-out`.
   egressOut?: string;
   // Override for tests. Defaults to process.execPath.
   execPath?: string;

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-406 — HTTP CONNECT-tunnel proxy that emits one `LlmCallEvent` row per
-// tunnel into `events.jsonl`. Spawned by `pome run` (FDRS-399) as a child
+// HTTP CONNECT-tunnel proxy that emits one `LlmCallEvent` row per
+// tunnel into `events.jsonl`. Spawned by `pome run` as a child
 // process; agent traffic flows through it via `HTTPS_PROXY`.
 //
 // Mode: CONNECT-only (no TLS termination). The proxy never sees plaintext
@@ -22,7 +22,7 @@ import { isHostAllowed, type EgressRefusedRow } from "./egress.js";
 export interface CaptureServerOptions {
   port: number; // 0 = ephemeral
   eventsOut: string;
-  // FDRS-635 — deny-by-default egress floor. CONNECTs to hosts outside this
+  // Deny-by-default egress floor. CONNECTs to hosts outside this
   // allowlist (patterns: exact host, `*.suffix`, or bare `*`) are refused
   // with 403 before any upstream dial. Loopback is always allowed so twin
   // traffic can never be broken by a bad allowlist. Omitting the option means
@@ -46,7 +46,7 @@ export interface CaptureServerHandle {
 }
 
 // Mirror of `llmCallEventSchema` in `packages/wire/src/recorder-events.ts`
-// (locked by FDRS-398). The cli vendors shared-types at 0.3.0 which predates
+// (locked by the unified event schema). The cli vendors shared-types at 0.3.0 which predates
 // the unified discriminated-union schema, so the shape lives here as a
 // structural mirror. Bumping the vendored tarball is a separate ticket — the
 // on-disk JSON is what matters for downstream consumers, and that stays in
@@ -168,7 +168,7 @@ function handleConnect({
   }
   const { host, port } = target;
 
-  // FDRS-635 — the egress floor: refuse the tunnel BEFORE dialing upstream.
+  // The egress floor: refuse the tunnel BEFORE dialing upstream.
   // The refusal is recorded in the egress sidecar so `pome run` can name the
   // blocked host in its output.
   if (!isHostAllowed(host, allowHosts)) {

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-644 — the per-trial CLOUD verdict artifact.
+// The per-trial CLOUD verdict artifact.
 //
 // Hosted `pome run` persists each finalized trial's cloud verdict payload
 // (what /finalize returned and the terminal rendered) as `verdict.json`
 // next to the trial's raw trace. This is a provenance-labeled CACHE of the
 // cloud judge's output — NOT a local score: the OSS CLI still has no
-// scoring engine (FDRS-657 / no-eval-in-oss), score.json is still never
+// scoring engine (no-eval-in-oss), score.json is still never
 // written, and deleting verdict.json loses nothing the dashboard doesn't
 // hold. `pome fix-prompt` reads these to hand grouped failure signatures
 // to the user's coding agent without a credentialed cloud round-trip —
@@ -16,7 +16,7 @@
 //   <artifacts-root>/<task-slug>/<session-id>/verdict.json
 // (runDir shape from recorder/artifacts.ts `writeRunArtifactsCore`).
 //
-// F-689/D16 — moved from `src/recorder/verdictArtifact.ts` to here (and
+// Moved from `src/recorder/verdictArtifact.ts` to here (and
 // renamed: the repo-wide no-eval gate denies any module NAMED verdict*, so
 // this file itself can't be called that anymore) and grouped under
 // `hosted/` since it caches a CLOUD response, not a recorder concern.
@@ -33,7 +33,7 @@ import {
   type RunSet,
 } from "./runSets.js";
 
-// F-1195 — bumped 1 → 2: the artifact gained `state` (the run's three-state
+// Bumped 1 → 2: the artifact gained `state` (the run's three-state
 // verdict, by name) and the `evaluated`/`not_evaluated`/`pre_satisfied`/
 // `total` counts `score` is computed over. Before this, a CI script reading
 // `score >= pass_threshold` on an incomplete run read `true`, because
@@ -69,7 +69,7 @@ export interface VerdictArtifact {
   cloud_dashboard_url: string;
   judge_model: string | null;
   /** Cloud-authoritative satisfaction score, 0-100 — the percentage over
-   *  `evaluated` ALONE, never over `total`. F-1195 shipped `evaluated`
+   *  `evaluated` ALONE, never over `total`. Version 2 shipped `evaluated`
    *  beside it for that reason: `score` on its own does not say how much of
    *  the task it covers, and `score >= pass_threshold` is not the gate on a
    *  run where `not_evaluated > 0` (`state` and `passed` are). When
@@ -77,7 +77,7 @@ export interface VerdictArtifact {
    *  "nothing was scored", not "nothing was correct". */
   score: number;
   pass_threshold: number;
-  /** F-1195 — the run's three-state verdict, BY NAME, taken from
+  /** The run's three-state verdict, BY NAME, taken from
    *  `RunTaskHostedResult.verdict` (itself `scoreStatus(score,
    *  passThreshold)`) rather than re-derived here. `passed` alone told a
    *  reader "not a pass" with no reason; `state` says which of the two
@@ -93,17 +93,17 @@ export interface VerdictArtifact {
    *      the task's threshold from. `pass_threshold` is in this artifact
    *      beside `state` precisely so a reader can see which bar was used.
    *
-   *  F-1399 closed the other one: a run whose criteria were ALL pre-satisfied
+   *  The other one is closed: a run whose criteria were ALL pre-satisfied
    *  used to read `incomplete` here (no denominator, so no verified pass —
    *  the A5 guard) against `fail` on the dashboard. pome-cloud's shared
    *  incomplete-run predicate now adds an `evaluated === 0` clause, so both
    *  surfaces say `incomplete`. The reasoning is in `evalResultView.ts`'s
    *  `scoreStatus` comment and stated only there: one place to correct when
    *  pome-cloud changes this again, rather than four that go false
-   *  independently (F-1413). */
+   *  independently. */
   state: ScoreStatus;
   passed: boolean;
-  /** F-1195 — `EvaluationCounts` from `evalResultView.ts`, so `score` is
+  /** `EvaluationCounts` from `evalResultView.ts`, so `score` is
    *  legible as "N of what" instead of a bare number beside a threshold. */
   evaluated: number;
   not_evaluated: number;
@@ -119,11 +119,11 @@ export interface TrialVerdict {
   verdict: VerdictArtifact;
 }
 
-/** F-1445 — publish by RENAME, never by writing the live path in place.
+/** Publish by RENAME, never by writing the live path in place.
  *  `writeFile` opens with `O_TRUNC` and the bytes land afterwards, so
  *  `verdict.json` was observably empty and then partial for the whole of a
  *  write, and a `pome fix-prompt` scanning the root while a `pome run`
- *  finalized in it read that prefix. Since F-1411 it REPORTED that read: path
+ *  finalized in it read that prefix. It then REPORTED that read: path
  *  named, counted in `unreadableCount`, described as "truncated, hand-edited,
  *  or not a verdict artifact" — a correct read of the bytes and a wrong
  *  account of the run, whose suggested fix (inspect it, delete it) is wrong
@@ -167,11 +167,11 @@ export async function writeVerdictArtifact(
  *  shape, or the FILE is rejected — discovery treats a half-recognizable
  *  verdict.json as foreign rather than crashing downstream on it.
  *
- *  F-1195 — this is RECOGNITION, not reading: the shape shared by every
+ *  This is RECOGNITION, not reading: the shape shared by every
  *  artifact version this repo has ever written, so a prior-version file can
  *  be told apart from a foreign/corrupt one and its skip NAMED rather than
  *  folded into "not a verdict file". Deliberately more generous than
- *  `isVerdictArtifact` below — including the pre-F-933 `scenario_path`
+ *  `isVerdictArtifact` below — including the legacy `scenario_path`
  *  spelling, which no reader accepts any more (see `isVerdictArtifact`) but
  *  which still identifies the file as one of ours worth naming. */
 function looksLikeVerdictArtifactBase(parsed: unknown): parsed is Record<string, unknown> {
@@ -201,13 +201,13 @@ function looksLikeVerdictArtifactBase(parsed: unknown): parsed is Record<string,
   });
 }
 
-/** F-1195 — the CURRENT version's shape: the base fields plus `version ===
+/** The CURRENT version's shape: the base fields plus `version ===
  *  VERDICT_ARTIFACT_VERSION`, the named `state`, and the four counts. A file
  *  that passes `looksLikeVerdictArtifactBase` but fails this is a prior
  *  version or a corrupt current one — `readVerdictArtifactDetailed` tells
  *  those two apart.
  *
- *  F-1195 also retired the pre-F-933 `scenario_path` tolerance the read path
+ *  Version 2 also retired the legacy `scenario_path` tolerance the read path
  *  used to carry: `task_path` is required here. Every file spelling it the
  *  old way was written by `@pome-sh/cli` <= 0.8.x at artifact version 1, so
  *  the version check refuses it before the spelling could matter — the
@@ -226,12 +226,12 @@ function isVerdictArtifact(parsed: unknown): parsed is VerdictArtifact {
   return true;
 }
 
-/** F-1195 — the detailed read: distinguishes "current-version artifact",
+/** The detailed read: distinguishes "current-version artifact",
  *  "recognizable, but written at a DIFFERENT artifact version" (a real trial
  *  this CLI can no longer read), and "not a verdict file at all"
  *  (foreign/corrupt/missing). Callers that only care about usable trials
  *  (`readVerdictArtifact`, `scanVerdictArtifacts`) collapse the last two
- *  together, same as before F-1195; discovery callers that need to NAME a
+ *  together, same as at version 1; discovery callers that need to NAME a
  *  version skip instead of silently reporting "no runs" use this directly.
  *
  *  `stale-version` is keyed on the version NUMBER differing, never on the
@@ -240,7 +240,7 @@ function isVerdictArtifact(parsed: unknown): parsed is VerdictArtifact {
  *  (`unreadable`), not a prior version. `version` is null when the file
  *  carries no numeric `version` at all.
  *
- *  F-1445 — `missing` is the fourth: no verdict.json at this path at all (no
+ *  `missing` is the fourth: no verdict.json at this path at all (no
  *  run finished here yet, or the caller pointed at an artifacts root rather
  *  than a trial dir). It used to collapse into `unreadable`, which is why both
  *  callers below re-`existsSync`'d the file they had just failed to read — a
@@ -252,7 +252,7 @@ export type VerdictReadResult =
   | { status: "unreadable" }
   | { status: "missing" };
 
-/** F-1445 — the errno set for "this path does not resolve to a file": exactly
+/** The errno set for "this path does not resolve to a file": exactly
  *  the set `existsSync` answered `false` for, since a `stat` fails the same
  *  way. ENOENT alone would move a user-visible count — the scan walks every
  *  entry under a task slug as a run dir, so a stray FILE there yields ENOTDIR
@@ -299,17 +299,17 @@ export async function readVerdictArtifact(
   return result.status === "ok" ? result.trial : null;
 }
 
-/** F-1195 — the detailed scan behind `scanVerdictArtifacts`: also collects
+/** The detailed scan behind `scanVerdictArtifacts`: also collects
  *  the dirs whose verdict.json was recognizable but a prior artifact version,
  *  so `discoverRunSet` can name that skip instead of it looking identical to
  *  "no run happened here".
  *
- *  F-1411 — likewise for `unreadableDirs`: a verdict.json that EXISTS but is
+ *  Likewise for `unreadableDirs`: a verdict.json that EXISTS but is
  *  truncated, hand-edited, or otherwise damaged. Kept out of `staleVersionDirs`
  *  on purpose — a prior-version file and a corrupt one are different facts
  *  (upgrade vs. damage) and want different fixes. A run dir with no
- *  verdict.json at all is neither (no run finished there yet): F-1445 put that
- *  distinction in the read's `missing` status, not a re-stat here.
+ *  verdict.json at all is neither (no run finished there yet), and that
+ *  distinction lives in the read's `missing` status, not a re-stat here.
  *
  *  `unreadableDirs` is SORTED, unlike the other two: it is the only one whose
  *  order reaches a user, via the path list `pome fix-prompt` prints and trims
@@ -374,7 +374,7 @@ export interface RunSetDiscovery {
    *  set is `incompleteSet` below rather than a failure to hand to an
    *  agent. */
   set: RunSet | null;
-  /** F-1404 — `kind: "root"` only, and only populated when `set` is null:
+  /** `kind: "root"` only, and only populated when `set` is null:
    *  the newest run set whose outcome is `"incomplete"`. Kept distinct from
    *  `set` so a caller can never conflate "route this to fix-prompt" with
    *  "something was never graded" — the routing decision and the message it
@@ -383,13 +383,13 @@ export interface RunSetDiscovery {
   /** Total finalized run sets seen — lets the caller distinguish "no runs
    *  at all" from "runs exist but none failed". */
   totalSets: number;
-  /** F-1195 — verdict.json files recognized as a PRIOR artifact version under
+  /** Verdict.json files recognized as a PRIOR artifact version under
    *  the scanned root (or, for `kind: "trial-dir"`, at the target itself).
    *  Named so a stale-version skip never renders identically to "no runs
    *  happened here" — a v1 file dropped silently is the exact shape this
    *  milestone exists to remove. */
   staleVersionCount: number;
-  /** F-1411 — verdict.json files that EXIST under the scanned root (or, for
+  /** Verdict.json files that EXIST under the scanned root (or, for
    *  `kind: "trial-dir"`, at the target itself) but could not be read: a
    *  truncated file, one hand-edited into an unexpected `state`, or valid
    *  JSON that isn't a verdict artifact at all. Never folded into
@@ -431,10 +431,10 @@ export async function discoverRunSet(target: string): Promise<RunSetDiscovery> {
       unreadablePaths: [],
     };
   }
-  // F-1411 — same reasoning as the stale-version branch above, for a target
+  // Same reasoning as the stale-version branch above, for a target
   // whose verdict.json exists but is damaged: name it as a trial-dir skip
   // rather than falling through to the "root" branch, which would scan
-  // `target` itself (two levels too shallow) and find nothing. F-1445 — what
+  // `target` itself (two levels too shallow) and find nothing. What
   // tells this apart from a target that IS an artifacts root (no verdict.json
   // of its own either, and must fall through) is the read's own `missing`
   // status, not a second `existsSync` of the path the read just failed on.
@@ -478,7 +478,7 @@ export async function discoverRunSet(target: string): Promise<RunSetDiscovery> {
   }
 
   // `missing` — no verdict.json at `target`, so it is an artifacts root (or
-  // nothing at all). F-1445 also dropped the `if (!existsSync(target))` early
+  // nothing at all). The `if (!existsSync(target))` early
   // return that sat here: on a root that isn't there `readdir` throws and is
   // caught, and the three empty arrays give the same nulls and zeros through
   // `groupRunSets` / `latestFailedRunSet` / `latestIncompleteRunSet`.

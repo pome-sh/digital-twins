@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Twin-agnostic in-process boot for the self-host runner (FDRS-528 / FDRS-529).
+// Twin-agnostic in-process boot for the self-host runner.
 //
 // `bootTwin` is a thin wrapper over `TWIN_REGISTRY`: given a twin name + the
 // scenario's (already twin-shaped) seed state, it stands up the matching
@@ -61,7 +61,7 @@ export async function bootTwin(opts: {
   runId: string;
   twinBaseUrl?: string;
   /**
-   * F-698: when set, twin HTTP events stream to this NDJSON path via the
+   * When set, twin HTTP events stream to this NDJSON path via the
    * twin-core durable recorder (same file capture-server appends to).
    */
   eventsPath?: string;

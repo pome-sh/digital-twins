@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // `pome register agent <name>` / `pome install` — the vercel-link seam. POSTs
-// the manifest identity to `POST /v1/agents` (the F-820 slug resolver: live
+// the manifest identity to `POST /v1/agents` (the slug resolver: live
 // slug → alias → near-miss 409 → auto-create under the caller's team), then
 // persists the server-canonical identity into `pome.json` and caches the
 // resolved `agt_` id in gitignored `.pome/link.json`.
 //
-// Wire shape (pome-cloud `docs/05-api-spec.md`, ADR-013, F-820):
+// Wire shape (pome-cloud `docs/05-api-spec.md`, ADR-013):
 //   POST /v1/agents  { name, slug?, description?, version?, framework?, twins?, confirm? }
 //     200 AgentResponse { id, slug, display_name, judge_model, framework?, … }
 //     401/403 auth | 404 route skew | 409 conflict (near-miss w/ details.suggestion)
@@ -73,7 +73,7 @@ export function normalizeRegisterTwins(raw: string | undefined): string[] | unde
 }
 
 /** Effective register twins = the manifest's declared `twins` (the default twin
- *  set for runs) unioned with any `--twins` flag additions (F-926). Before this,
+ *  set for runs) unioned with any `--twins` flag additions. Before this,
  *  the CLI sent only the flag, so a manifest like `twins: ["gmail"]` never
  *  reached `POST /v1/agents` and the server's `github` default won — the first
  *  `pome run` then errored with "Requested twins are not enabled".
@@ -116,7 +116,7 @@ function warnUnknownFramework(existingAgent: Record<string, unknown>): void {
   console.error(`Unknown agent.framework "${framework}".${hint} (Recorded as-is.)`);
 }
 
-/** F-861 — surface the slug rename when the resolver matched an old slug via an
+/** Surface the slug rename when the resolver matched an old slug via an
  *  alias (cloud emits `resolved_via: "alias"` + a `hint` since v0.4.18). By this
  *  point the manifest has already been rewritten to the new canonical slug, so
  *  attribution self-heals silently; this only makes the change visible. Shared
@@ -168,9 +168,9 @@ async function createAndPersistAgent(input: {
 
   // Write the manifest from the response — slug + display name are canonical;
   // description/version fall back to the manifest when the cloud returns
-  // nothing (older control plane). `framework` is NOT echoed back at all
-  // (F-1393): it is the author's declaration, never the cloud's — including
-  // when the cloud has nothing stored (F-1213: null, not a guessed default).
+  // nothing (older control plane). `framework` is NOT echoed back at all:
+  // it is the author's declaration, never the cloud's — including
+  // when the cloud has nothing stored (null, not a guessed default).
   // `nextAgent` already carries whatever the manifest declared (or omitted)
   // via the initial spread of `existingAgent` above; leave it untouched.
   const nextAgent: Record<string, unknown> = { ...existingAgent, slug: agent.slug };
@@ -217,7 +217,7 @@ export async function runRegisterAgent(opts: RegisterAgentOptions): Promise<void
   }
 
   // Send the manifest's declared twins (unioned with any --twins flag) so the
-  // cloud's enabled services match the manifest, not the server default (F-926).
+  // cloud's enabled services match the manifest, not the server default.
   const twins = mergeRegisterTwins(manifestRead.manifest.twins, opts.twins);
 
   const agent = await createAndPersistAgent({

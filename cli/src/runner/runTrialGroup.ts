@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-636 — `pome run <task> -n k`: real trial groups end-to-end.
-// FDRS-663 — bounded/lazy minting + bounded trial parallelism.
+// `pome run <task> -n k`: real trial groups end-to-end.
+// Bounded/lazy minting + bounded trial parallelism.
 //
-// Flow per the 2026-07-05 [DECISION] set, revised by FDRS-663's 2026-07-06
+// Flow per the 2026-07-05 [DECISION] set, revised by the 2026-07-06
 // [DECISION] (option A — the free-tier `concurrentTwins: 3` mint gate was
 // killing the k=5 default at the 4th upfront mint):
 //   1. Mint sessions upfront (POST /v1/sessions), one shared
@@ -62,7 +62,7 @@ import type { CreateSessionResponse } from "../types/shared.js";
 /** Per-request transport timeout. Durable evaluation has a separate budget. */
 export const GROUP_FINALIZE_TIMEOUT_MS = 60_000;
 
-/** FDRS-663 — a lazy mint can quota-fail even though a trial just finished:
+/** A lazy mint can quota-fail even though a trial just finished:
  *  the finished trial's DELETE propagates asynchronously. Pause and retry a
  *  bounded number of times before declaring that trial errored. */
 export const LAZY_MINT_RETRY_MS = 2_000;
@@ -83,9 +83,9 @@ export interface RunTrialGroupOptions {
   dashboardBaseUrl: string;
   /** Informational; forwarded to every trial's `runs.agent_model`. */
   agentModel?: string;
-  /** F-819 — `--agent-version` override, forwarded to every trial's session. */
+  /** `--agent-version` override, forwarded to every trial's session. */
   agentVersion?: string;
-  /** FDRS-644 — the literal command the fix handoff tells the user to
+  /** The literal command the fix handoff tells the user to
    *  re-run after their coding agent applies a fix. The caller knows the
    *  invocation shape (bare `pome run` vs an explicit path + -n); default
    *  reconstructs it from taskPath + trials. */
@@ -95,7 +95,7 @@ export interface RunTrialGroupOptions {
   client?: HostedClient;
   runTaskHostedFn?: typeof runTaskHosted;
   groupId?: string;
-  /** FDRS-663 — lazy-mint retry pause; defaults to a real setTimeout. */
+  /** Lazy-mint retry pause; defaults to a real setTimeout. */
   sleepFn?: (ms: number) => Promise<void>;
 }
 
@@ -128,7 +128,7 @@ export async function runTrialGroup(
 
   const scenario = await parseTaskFile(options.taskPath);
   const taskSource = await readFile(options.taskPath, "utf8");
-  // Same agent resolution as the single-run path (F-819): the group's trials
+  // Same agent resolution as the single-run path: the group's trials
   // are recorded under the agent the manifest's `agent.slug` resolves to.
   const identity = await resolveRunAgentIdentity({
     startDir: dirname(options.taskPath),
@@ -158,7 +158,7 @@ export async function runTrialGroup(
       idempotencyKey: randomUUID(),
     });
 
-  // 1. Mint upfront, quota-bounded (FDRS-663). The group exists before the
+  // 1. Mint upfront, quota-bounded. The group exists before the
   // first agent spawns, and auth/orch failures surface HERE as one clean
   // error instead of half-way through a run. A quota push-back mid-mint is
   // NOT an error: it discovers the plan's concurrent-twin bound and the
@@ -178,7 +178,7 @@ export async function runTrialGroup(
     // sessions polluting the reliability view; then let the caller map the
     // error to the documented exit code.
     await Promise.all(
-      // F-983: these sessions were minted and never launched, so there is no
+      // These sessions were minted and never launched, so there is no
       // tape to lose — an explicit discard is honest here.
       sessions.map((s) =>
         client.deleteSession(s.session_id, true, { discard: true }).catch(
@@ -213,7 +213,7 @@ export async function runTrialGroup(
     }
   };
 
-  // 2. Trials at bounded concurrency (FDRS-663 resolves FDRS-636's deferred
+  // 2. Trials at bounded concurrency (resolves the earlier deferred
   // "bounded trial parallelism" thread: the bound IS the plan's quota).
   // Rows render in trial order — a finished trial's line waits for every
   // earlier trial's line.
@@ -239,7 +239,7 @@ export async function runTrialGroup(
         agentModel: options.agentModel,
         premintedSession: session,
         abandonOnFailure: true,
-        // FDRS-644 — stamped into the trial's verdict.json so fix-prompt
+        // Stamped into the trial's verdict.json so fix-prompt
         // can reassemble this run set from local artifacts.
         groupId,
       });
@@ -250,7 +250,7 @@ export async function runTrialGroup(
       row = {
         kind: "completed",
         score: result.score.satisfaction,
-        // F-925 — the trial's own verdict, carried out of the run rather than
+        // The trial's own verdict, carried out of the run rather than
         // re-derived here. It was `result.exitCode === 0`, which cannot express
         // the third state (1 means both "failed" and "could not be graded"), so
         // a 100/100 trial with 3 of 4 criteria skipped counted as a clean pass.
@@ -292,10 +292,10 @@ export async function runTrialGroup(
   );
 
   // 3. Summary + the framed handoff to the task's reliability page.
-  // FDRS-665 — the URL carries the agent by construction (Reliability IA v1
+  // The URL carries the agent by construction (Reliability IA v1
   // decision 1): a registered repo prints /agents/<slug>/tasks/<taskName>
   // with ?group for the run set (forward-compat — the page honors it in M1).
-  // Legacy fallbacks, both served by FDRS-668's cloud-side redirects:
+  // Legacy fallbacks, both served by cloud-side redirects:
   // agentId without a slug → /runs/task/<name>?agent=<id> (server-side
   // id→slug redirect); unregistered repo → the bare task URL, which
   // auto-selects when exactly one agent has runs for that task. Task name =
@@ -317,11 +317,11 @@ export async function runTrialGroup(
     out(line);
   }
 
-  // 4. FDRS-644 — the fix & green handoff, only when a COMPLETED trial
+  // 4. The fix & green handoff, only when a COMPLETED trial
   // failed. Errored trials are sandbox noise: the answer there is re-run,
   // not a code fix, so an errored-only group gets no handoff.
   //
-  // F-925 — `fail`, NOT "anything that isn't a pass". This was `!r.passed`,
+  // `fail`, NOT "anything that isn't a pass". This was `!r.passed`,
   // which now includes the incomplete trial, and pointing someone at
   // `pome fix-prompt` for a criterion that never ran tells them to fix an agent
   // that may be blameless. An abstention is a grader gap; the handoff is for

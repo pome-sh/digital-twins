@@ -32,7 +32,7 @@ export type MeResponse = z.infer<typeof meResponseSchema>;
 
 // POST /v1/sessions
 //
-// W3 vocab (FDRS-653): `task_source` / `task_id` are canonical; the exported
+// Task vocab: `task_source` / `task_id` are canonical; the exported
 // schema wraps this object in the tolerant-reader preprocess so 0.3.0 CLIs
 // sending `scenario_source` / `scenario_id` keep working unchanged.
 const createSessionRequestObjectSchema = z
@@ -53,7 +53,7 @@ const createSessionRequestObjectSchema = z
     twins: z.array(z.string()).min(1).default(["github"]),
     task_source: z.string().optional(),        // base64-encoded UTF-8 markdown; 0.3.0 alias: scenario_source
     task_id: z.string().optional(),            // alternative: stored task; 0.3.0 alias: scenario_id
-    // FDRS-580 / ADR-015 (adopted from pome-cloud, FDRS-613): the seed override
+    // ADR-015 (adopted from pome-cloud): the seed override
     // is a PERMISSIVE, shape-blind boundary. The twin pod's own `parseSeed` is
     // the sole authority on the seed's domain shape; the cloud forwards it
     // verbatim. `z.record` keeps the one invariant that is the boundary's
@@ -66,14 +66,14 @@ const createSessionRequestObjectSchema = z
     // POST /v1/sessions. The dashboard generates one per Start-button click;
     // legacy clients work without it.
     idempotency_key: z.string().uuid().optional(),
-    // M3 / FDRS-636: client-minted trial-group identity — `pome run -n k`
+    // Client-minted trial-group identity — `pome run -n k`
     // (and `pome demo`) stamp one id per invocation, shared by all k trial
     // sessions. The cloud copies it onto sessions.group_id at mint and onto
     // runs.group_id at finalize; the demo/eval mints already accept the same
     // field. Format mirrors the cloud's GROUP_ID_RE. Legacy clients omit it.
     group_id: z.string().regex(/^[A-Za-z0-9_-]{6,64}$/).optional(),
-    // F-818 (spec F-804): per-run override of the manifest's agent.version —
-    // an opaque user-declared label stamped onto the session/run rows (F-820).
+    // Per the manifest format spec: per-run override of the manifest's agent.version —
+    // an opaque user-declared label stamped onto the session/run rows.
     // Absent = the agent's registered version. Additive; older clients omit it
     // and an older cloud strips it.
     agent_version: z.string().optional(),
@@ -83,7 +83,7 @@ const createSessionRequestObjectSchema = z
     { message: "Provide exactly one of task_source or task_id (scenario_source / scenario_id are accepted 0.3.0 aliases)" }
   );
 
-// Tolerant reader (FDRS-653): accepts both vocabularies, normalizes to task_*.
+// Tolerant reader: accepts both vocabularies, normalizes to task_*.
 export const createSessionRequestSchema = z.preprocess(
   normalizeTaskVocabKeys,
   createSessionRequestObjectSchema,
@@ -139,7 +139,7 @@ function normalizeCreateSessionResponse(value: unknown): unknown {
 // CLI release. `session_token` is the public token used in URLs — same value as
 // `session_id` in V1, but named separately so URL-shaped consumers stop reading
 // internal-id-shaped fields. Both `session_token` and `per_twin` reconciled
-// from pome-cloud /v1 wire truth (FDRS-613).
+// from pome-cloud /v1 wire truth.
 export const createSessionResponseSchema = z.preprocess(normalizeCreateSessionResponse, z.object({
   session_id: z.string(),
   session_token: z.string(),                   // = session_id in V1; public URL token
@@ -221,7 +221,7 @@ export const perTwinStateKeysSchema = z.record(
 );
 export type PerTwinStateKeys = z.infer<typeof perTwinStateKeysSchema>;
 
-// W3 vocab (FDRS-653): `task_name` / `task_hash` canonical; the exported
+// Task vocab: `task_name` / `task_hash` canonical; the exported
 // schema accepts 0.3.0 CLIs' `scenario_name` / `scenario_hash` and criterion
 // kinds D/P inside `criteria_results`, normalizing both.
 const submitResultRequestObjectSchema = z.object({
@@ -243,9 +243,9 @@ const submitResultRequestObjectSchema = z.object({
   lanes: z.array(laneSchema).default([]),
   steps: z.array(stepSchema).default([]),
   fix_prompt: z.string().nullable().default(null),
-  // FDRS-357 (adopted from pome-cloud, FDRS-613): storage key (NOT URL) returned
+  // Adopted from pome-cloud: storage key (NOT URL) returned
   // by POST /v1/sessions/:id/result-upload-url. Null on upload failure
-  // (best-effort), --no-upload opt-out, or pre-FDRS-357 CLI.
+  // (best-effort), --no-upload opt-out, or a CLI that predates the key.
   events_jsonl_url: z.string().nullable().default(null),
   // Trace blobs — safe to upload (HTTP between agent and twin, not LLM prompts):
   trace_jsonl_b64: z.string(),
@@ -256,7 +256,7 @@ const submitResultRequestObjectSchema = z.object({
   // locally for the [model] judge then discards it.
 });
 
-// Tolerant reader (FDRS-653): accepts both vocabularies, normalizes to task_*.
+// Tolerant reader: accepts both vocabularies, normalizes to task_*.
 export const submitResultRequestSchema = z.preprocess(
   normalizeTaskVocabKeys,
   submitResultRequestObjectSchema,
@@ -279,7 +279,7 @@ export type CreateEvalSessionResponse = z.infer<typeof createEvalSessionResponse
 export const criterionDefSchema = z.object({
   id: z.string().min(1),
   text: z.string().min(1),
-  // Tolerant reader (F-778): released CLIs still send the legacy "D"/"P"
+  // Tolerant reader: released CLIs still send the legacy "D"/"P"
   // spellings; parsed output is always the canonical "code"/"model". Single
   // source of truth for the rename is LEGACY_CRITERION_KIND_MAP.
   kind: z
@@ -291,7 +291,7 @@ export const criterionDefSchema = z.object({
   // attributes to. Absent = the session's primary twin (twins[0]). Additive —
   // single-twin tasks omit it and score against the sole twin as before.
   twin: z.string().min(1).optional(),
-  // F-1296 (pome-cloud) / F-1299 — forwards the markdown `always-scored`
+  // Forwards the markdown `always-scored`
   // keyword so the cloud's seed-exclusion rule
   // (docs/grading/seed-exclusion.md, pome-cloud) knows this [code] criterion
   // must be graded even when the seed already satisfies it. snake_case to
@@ -304,7 +304,7 @@ export const criterionDefSchema = z.object({
   always_scored: z.boolean().optional(),
 });
 export type CriterionDef = z.infer<typeof criterionDefSchema>;
-// Writer-side shape of the finalize wire during the F-778 compat window: a
+// Writer-side shape of the finalize wire during the criterion-kind compat window: a
 // producer may still send the legacy "D"/"P" spellings (released CLIs do);
 // readers always see the canonical CriterionDef after parse.
 export type CriterionDefInput = z.input<typeof criterionDefSchema>;
@@ -313,7 +313,7 @@ export type CriterionDefInput = z.input<typeof criterionDefSchema>;
 // canonical for the slug; the CLI persists whatever id/slug it returns.
 export const createAgentRequestSchema = z.object({
   name: z.string().min(1),
-  // Manifest identity (F-818, spec F-804): human-ish slug input — the server
+  // Manifest identity (per the format spec): human-ish slug input — the server
   // derives the canonical kebab slug with the same deriveAgentSlug exported
   // from `./manifest.js`, then validates it against SLUG_RE. Cap mirrors the
   // control-plane edge; shape is deliberately NOT enforced here.
@@ -322,7 +322,7 @@ export const createAgentRequestSchema = z.object({
   // User-declared version label from the manifest's agent.version — an opaque
   // string, never auto-bumped, never semver-interpreted.
   version: z.string().optional(),
-  // Open enum by design (F-804): unknown frameworks get a did-you-mean warning
+  // Open enum by design: unknown frameworks get a did-you-mean warning
   // server-side, never a validation error.
   framework: z.string().min(1).optional(),
   // Multi-twin (M3): the twins this agent is allowed to exercise. Absent = the
@@ -339,18 +339,18 @@ export const agentResponseSchema = z.object({
   slug: z.string(),
   display_name: z.string(),
   judge_model: z.string(),
-  // Manifest identity (F-818): registered agent.framework / agent.description /
-  // agent.version, nullable where the server has nothing stored (F-1213:
-  // unset, never a guessed default). Optional for the pre-F-820 cloud, which
+  // Manifest identity: registered agent.framework / agent.description /
+  // agent.version, nullable where the server has nothing stored (unset,
+  // never a guessed default). Optional for a cloud that predates the resolver, which
   // omits them.
   framework: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
   version: z.string().nullable().optional(),
-  // F-818 resolver semantics: true when POST /v1/agents auto-registered a new
+  // Resolver semantics: true when POST /v1/agents auto-registered a new
   // agent for this slug, false when it resolved an existing one. Optional for
-  // the pre-F-820 cloud; absence means "unknown", not "resolved".
+  // a cloud that predates the resolver; absence means "unknown", not "resolved".
   created: z.boolean().optional(),
-  // F-861 slug-rename hint (cloud-emitted since v0.4.18): how the resolver
+  // Slug-rename hint (cloud-emitted since v0.4.18): how the resolver
   // matched this slug. Known values today are "slug" (live match), "alias" (an
   // old slug that was renamed; the returned `slug` is the new canonical), and
   // "created" (fresh auto-register) — the CLI surfaces a rename notice only on
@@ -397,7 +397,7 @@ export const stateUploadUrlResponseSchema = z.object({
 export type StateUploadUrlResponse = z.infer<typeof stateUploadUrlResponseSchema>;
 
 // GET /v1/usage — live concurrent-session quota snapshot.
-// FDRS-613: `sessions_remaining` tightened to `.int().min(0)` to match the
+// `sessions_remaining` tightened to `.int().min(0)` to match the
 // pome-cloud /v1 wire truth (cloud clamps remaining at 0 rather than exposing
 // negative overage on this live snapshot).
 export const usageResponseSchema = z.object({

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-643 — the packaged first-run demo task.
+// The packaged first-run demo task.
 //
 // `assets/demo/first-run-demo.md` (+ its hand-written seed sidecar) is the
 // CANONICAL demo task content. The cloud's server-owned judge definition

@@ -5,7 +5,7 @@ import { readFile } from "node:fs/promises";
 import { basename, extname } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
-// The `/seed` SUBPATH, never the package root (F-1306). What this module wants
+// The `/seed` SUBPATH, never the package root. What this module wants
 // from a twin is its zod seed schema and its default world — pure data. The root
 // export additionally carries the domain, the SQLite schema, the Hono app and
 // (for linear) a GraphQL executor, and `main.ts` reaches this module on every
@@ -41,7 +41,7 @@ export async function parseTaskFile(path: string): Promise<Task> {
   return parseTask(markdown, slugFromPath(path), sidecarSeed, path);
 }
 
-/** The task's declared twins, read WITHOUT requiring criteria (F-1074).
+/** The task's declared twins, read WITHOUT requiring criteria.
  *  `taskSchema` demands at least one criterion, and `pome checks add` needs the
  *  twin list BEFORE it has written one. Reuses this module's own section
  *  splitter and config schema, so it is not a second parser. */
@@ -54,7 +54,7 @@ export function readConfigTwins(markdown: string): string[] {
 }
 
 /** Which heading holds the criteria. ONE definition, shared by `parseTask` and
- *  `readCodeCriteria` (F-1134): a reader that knew fewer spellings than the parser
+ *  `readCodeCriteria`: a reader that knew fewer spellings than the parser
  *  would find zero criteria in a task that has several, and zero criteria reads as
  *  a clean bill. Blessing a file whose criteria were never looked at is the exact
  *  failure the binding check exists to remove. */
@@ -73,7 +73,7 @@ export interface CodeCriterion {
 }
 
 /** The task's `[code]` criteria with each one's attributed twin, read WITHOUT the
- *  full task schema (F-1134). Same reason `readConfigTwins` exists, one step
+ *  full task schema. Same reason `readConfigTwins` exists, one step
  *  further along: `pome checks add` and `pome checks lint` audit files that are
  *  mid-edit, and `taskSchema` refuses one carrying no criteria or no resolvable
  *  seed. Reuses this module's own section splitter and criterion grammar, so it
@@ -101,7 +101,7 @@ export function readCodeCriteria(markdown: string): CodeCriterion[] {
     const match = rawLine.trim().match(CRITERION_LINE_RE);
     if (!match || match[1] !== "code") continue;
     const tag = match[2];
-    // F-1299: group 3 is the always-scored keyword, text moved to group 4.
+    // Group 3 is the always-scored keyword, text moved to group 4.
     // Reconstructing the marker WITH the keyword keeps the echoed line
     // findable by search, same reason the twin tag is reconstructed into it.
     const alwaysScored = match[3] !== undefined;
@@ -315,13 +315,13 @@ function splitSections(markdown: string) {
   return sections;
 }
 
-// Criterion marker grammar (F-778): `[code]` / `[model]` optionally carrying a
+// Criterion marker grammar: `[code]` / `[model]` optionally carrying a
 // twin tag, `[code:<twin>]` / `[model:<twin>]`, where <twin> is
 // `[a-z][a-z0-9_-]*`. The marker spells the canonical criterion kind directly.
 // The tag lands on `criterion.twin`; a bare marker leaves it undefined
 // (attributes to the session's primary twin, `twins[0]`).
 //
-// F-1296 (pome-cloud) / F-1299 added a third, optional part: the keyword
+// A third, optional part was added: the keyword
 // `always-scored`, after the kind and any tag — `- [code:slack always-scored]
 // No message was posted to …`. It marks a criterion graded even when the seed
 // already satisfies it (see `taskCriterionSchema.alwaysScored` in
@@ -332,15 +332,15 @@ function splitSections(markdown: string) {
 // (`apps/mcp/src/task/parseTask.ts`, pome-cloud): a task written with the
 // keyword used to parse hosted and silently lose the criterion here, because
 // the older CLI-side regex did not match the line and `parseCriteria` skipped
-// it as unrecognised prose — the exact defect F-1299 closes.
+// it as unrecognised prose — the exact defect this regex closes.
 const CRITERION_LINE_RE =
   /^[-*]\s+\[(code|model)(?::([a-z][a-z0-9_-]*))?(\s+always-scored)?\]\s+(.+)$/;
-// The retired pre-F-778 marker spelling, matched ONLY to fail loudly. Without
+// The retired legacy marker spelling, matched ONLY to fail loudly. Without
 // this guard a legacy `[D]`/`[P]` line would fall through the silent
 // skip-non-criterion path below and the scenario would "pass" with fewer
 // criteria than its author wrote.
 const LEGACY_CRITERION_LINE_RE = /^[-*]\s+\[([DP])(?::([a-z][a-z0-9_-]*))?\]\s+(.+)$/;
-// A line that REACHES for a criterion marker and misses (F-1444). The grammar
+// A line that REACHES for a criterion marker and misses. The grammar
 // above is exact and `parseCriteria` skips anything it does not match as prose,
 // so `- [code always-scored ] …`, `- [code:slack always-scored extra] …` and
 // `- [code alwaysscored] …` each loaded the task with one fewer criterion and no
@@ -365,7 +365,7 @@ const LEGACY_CRITERION_LINE_RE = /^[-*]\s+\[([DP])(?::([a-z][a-z0-9_-]*))?\]\s+(
 //
 // Must stay identical to the hosted parser's (`apps/mcp/src/task/parseTask.ts`,
 // pome-cloud), refusal message included. A guard in only one of the two repos
-// re-opens the cross-parser disagreement F-1299 closed with the sign flipped: a
+// re-opens the cross-parser disagreement, with the sign flipped: a
 // typo would parse hosted and throw here.
 const NEAR_MISS_CRITERION_LINE_RE = /^[-*]\s*\[\s*(code|model)\b[^\]]*\]/;
 
@@ -399,7 +399,7 @@ function parseCriteria(input: string, twins: string[]): Criterion[] {
     }
     const match = line.match(CRITERION_LINE_RE);
     if (!match) {
-      // F-1444: a near-miss is refused here rather than skipped. Reached only
+      // A near-miss is refused here rather than skipped. Reached only
       // after the grammar has said no, so an accepted line never lands here.
       if (NEAR_MISS_CRITERION_LINE_RE.test(line)) {
         throw new Error(nearMissCriterionMessage(line));
@@ -408,7 +408,7 @@ function parseCriteria(input: string, twins: string[]): Criterion[] {
     }
     const kind = match[1]!; // "code" | "model"
     const tag = match[2]; // twin tag or undefined
-    const alwaysScored = match[3] !== undefined; // F-1296/F-1299 `always-scored` keyword
+    const alwaysScored = match[3] !== undefined; // `always-scored` keyword
     const text = match[4]!.trim();
     // Reconstruct the human-facing marker for error messages.
     const marker = `[${kind}${tag ? `:${tag}` : ""}${alwaysScored ? " always-scored" : ""}]`;
@@ -477,7 +477,7 @@ function parseFencedYaml(input: string) {
   return parseYaml(stripFence(input));
 }
 
-// FDRS-365: scenario seed shape is FLAT per twin, disambiguated by config.twins.
+// Scenario seed shape is FLAT per twin, disambiguated by config.twins.
 // Stripe-only scenarios parse with the Stripe schema; everything else (default
 // `["github"]`, or explicit github) parses with the GitHub schema.
 function parseSeedStateForTask(input: unknown, config: TaskConfig): SeedState {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// `.pome/link.json` — the gitignored, machine-local resolver cache (F-819,
-// spec F-804). It maps the committed `agent.slug` to the `agt_` id the platform
+// `.pome/link.json` — the gitignored, machine-local resolver cache (see the
+// manifest format spec). It maps the committed `agent.slug` to the `agt_` id the platform
 // resolved for it, scoped to the team that resolved it. The cache is TRUSTED
 // only when its `team_id` matches the caller's team: a re-clone under the same
 // team short-circuits (Champion TTHW), a fork or team switch silently

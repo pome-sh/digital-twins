@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * task-vocab — the W3 "scenario → task" wire-vocabulary rename (FDRS-653).
+ * task-vocab — the "scenario → task" wire-vocabulary rename.
  *
- * W3 decision (binding, 2026-06): everything "scenario" becomes "task" on the
+ * The rename (binding, 2026-06): everything "scenario" becomes "task" on the
  * wire, and criterion kinds `D` / `P` become `code` / `model`. The cloud DB is
  * already renamed (`tasks` table, `runs.task_name`); this module gives the
  * shared trace format the same vocabulary WITHOUT breaking 0.3.0-era artifacts.
@@ -15,7 +15,7 @@
  *     vocabulary at parse time. Nothing a 0.3.0-era artifact contains becomes
  *     invalid: shipped CLIs vendor shared-types 0.3.0 and keep sending
  *     `scenario_*` keys and `D` / `P` criterion kinds for at least one more
- *     release train (the CLI vendored-tarball bump rides FDRS-654/657).
+ *     release train (the CLI vendored-tarball bump swaps the consumers).
  *   - When BOTH keys are present, the new key wins (a 0.5.0-aware writer is
  *     more authoritative about the canonical field than a mirrored legacy key).
  *
@@ -80,9 +80,9 @@ export function normalizeTaskVocabKeys(value: unknown): unknown {
 }
 
 /**
- * Legacy criterion kind → canonical criterion kind (W3: D→code, P→model).
+ * Legacy criterion kind → canonical criterion kind (D→code, P→model).
  *
- * SANCTIONED EXCEPTION (F-778). The full D/P→code/model migration removed the
+ * SANCTIONED EXCEPTION. The full D/P→code/model migration removed the
  * legacy spelling everywhere — including the markdown authoring marker, which
  * is now `[code]` / `[model]` — EXCEPT this read-only shim. It exists because:
  *   - 0.3.0-era persisted artifacts (run rows, `criteria_results` jsonb) carry

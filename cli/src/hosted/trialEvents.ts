@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// F-1411 — split out of evalResultCache.ts to keep that module under the
+// Split out of evalResultCache.ts to keep that module under the
 // file-size tripwire: this loads a trial's raw HTTP trace (events.jsonl),
 // which shares no shape or helper with the verdict.json artifact that file
 // reads/writes. Same behavior, just filed under its own concern.

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Run-path agent identity (F-819). Resolves the `agt_` id + version to stamp on
+// Run-path agent identity. Resolves the `agt_` id + version to stamp on
 // a hosted session from the committed manifest + gitignored `.pome/link.json`.
 //
 // The cached id is trusted only when its `team_id` matches the caller's team: a
@@ -76,8 +76,8 @@ export async function resolveRunAgentIdentity(
     }
     // Silent re-resolution — a run never prompts for a near-miss. Send the
     // manifest's twins so a fork / first `pome run` that auto-creates the agent
-    // enables the declared services instead of the server's `github` default
-    // (F-926); the server merges additively, so this is safe when the agent
+    // enables the declared services instead of the server's `github` default;
+    // the server merges additively, so this is safe when the agent
     // already exists.
     const resolved = await postAgentResolver(
       creds,

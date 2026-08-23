@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-643 — `pome demo` orchestration: zero-auth cold start.
+// `pome demo` orchestration: zero-auth cold start.
 //
 // Flow per the 2026-07-05 [DECISION] set:
 //   1. Reassurance frame first.
@@ -11,10 +11,10 @@
 //      POST /finalize (explicit 60s timeout) — the terminal verdict comes
 //      from that cloud evaluation. The CLI never scores locally.
 //   4. Errored trials are excluded from the verdict fraction; at-capacity
-//      402/429s render as honest labeled states (FDRS-662), never stack
+//      402/429s render as honest labeled states, never stack
 //      traces, never fabricated completions. Any trial that errors after its
 //      session was minted best-effort ABANDONS that session with a machine
-//      error_code before the CLI exits (F-710 / F-664 decision 3), so the
+//      error_code before the CLI exits, so the
 //      share view flips the slot to errored immediately instead of waiting
 //      out the staleness window; a capacity abort also abandons the
 //      minted-but-never-run remainder.
@@ -173,7 +173,7 @@ export async function runDemo(options: RunDemoOptions): Promise<RunDemoResult> {
     const progress = { finalized: false };
 
     let verdict: TrialVerdict;
-    // F-710 — the machine error_code the abandon carries when this trial's
+    // The machine error_code the abandon carries when this trial's
     // error also aborts the whole demo (capacity); the never-run remainder
     // below reuses it so every orphaned slot names the same cause.
     let abortCode: string | null = null;
@@ -207,8 +207,8 @@ export async function runDemo(options: RunDemoOptions): Promise<RunDemoResult> {
           reason: shortReason(err instanceof Error ? err.message : String(err)),
         };
       }
-      // F-710 — flip the errored slot on the share view NOW instead of
-      // waiting out the staleness window (F-664 decision 3). Never after a
+      // Flip the errored slot on the share view NOW instead of
+      // waiting out the staleness window. Never after a
       // successful finalize: a judged run row must not race an abandon.
       if (!progress.finalized) {
         await abandonQuietly(client, session.session_id, abortCode ?? "trial_crashed");
@@ -219,7 +219,7 @@ export async function runDemo(options: RunDemoOptions): Promise<RunDemoResult> {
     out(trialLine(trialNumber, verdict));
 
     if (capacityAbort) {
-      // F-710 — the abort orphans every minted-but-never-run session; abandon
+      // The abort orphans every minted-but-never-run session; abandon
       // each with the same capacity code so the share view settles honestly
       // instead of showing "running" ghosts for the staleness window.
       for (let j = i + 1; j < trials; j += 1) {
@@ -264,7 +264,7 @@ interface RunOneTrialInput {
   captureServerCommand?: RunTaskOptions["captureServerCommand"];
   out: (line: string) => void;
   collectedFailures: string[];
-  /** F-710 — set once finalize succeeds, so the caller's error handling
+  /** Set once finalize succeeds, so the caller's error handling
    *  never abandons a session that already has a judged run row. */
   progress: { finalized: boolean };
 }
@@ -360,11 +360,11 @@ async function runOneTrial(input: RunOneTrialInput): Promise<TrialVerdict> {
   return { kind: "errored", reason: "cloud could not evaluate the trace" };
 }
 
-/** F-710 — best-effort session abandon on a trial error path: flips the
- *  share-view slot to errored with a machine error_code immediately (F-664
- *  decision 3). SILENT by contract — a network failure or non-200 must change
+/** Best-effort session abandon on a trial error path: flips the
+ *  share-view slot to errored with a machine error_code immediately.
+ *  SILENT by contract — a network failure or non-200 must change
  *  neither the CLI's exit code nor its terminal output; server-side staleness
- *  (F-664 decision 1) remains the fallback. */
+ *  remains the fallback. */
 async function abandonQuietly(
   client: DemoTrialClient,
   sessionId: string,
