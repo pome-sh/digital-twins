@@ -10,6 +10,17 @@ write a version number here or in `package.json`. Released
 entries are insertions only: a correction is the next entry, naming the one it
 corrects.
 
+## Unreleased (patch)
+
+**No consumer-visible change.** `@pome-sh/wire` dropped its legacy event → span
+shim (`shimLegacyEventToSpan` and the `LEGACY_*` constants) and the legacy
+fixture family that fed it. The CLI never called any of it from `src/` — the one
+reference was a convenience assertion in the `mergeAdapterSignals` test, now
+asserting the same join on `parent_event_id` directly. The CLI ships as a `bin`
+with no library surface, so nothing a user imports moved: no command, flag,
+output shape, or frozen twin-contract behaviour changed. Listed only because the
+next release of this package carries the wire change.
+
 ## 0.26.6 — 2026-08-22
 
 **No consumer-visible change.** The repo's top-level `examples/` directory is now
