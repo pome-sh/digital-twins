@@ -43,14 +43,6 @@ const ALLOWED = new Map([
     "accepts `parent_id` as a legacy input key on the OTel arm",
   ],
   [
-    "packages/wire/src/otel/legacy-shim.ts",
-    "reads raw pre-F-1200 rows straight off disk",
-  ],
-  [
-    "packages/wire/src/otel/fixtures/data.ts",
-    "golden corpus — its `legacy:` inputs ARE pre-F-1200 rows",
-  ],
-  [
     // Not the trace format at all: a Linear issue has a parent issue, and
     // `parent_id` is that SQLite column — in the schema DDL, the seed inserts,
     // the SELECT projections and the cycle check. Scoping the gate by field

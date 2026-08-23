@@ -2,14 +2,11 @@
 /**
  * otel/fixtures/data — frozen golden-fixture corpus (M1.3 / FDRS-482).
  *
- * The single source of truth for trace fixtures across M1.2 and M2–M6. Static
+ * The single source of truth for trace fixtures across M2–M6. Static
  * data, deterministic by construction, and DEEP-FROZEN on export (review
- * finding #6 — exported fixtures were runtime-mutable shared state). Four
+ * finding #6 — exported fixtures were runtime-mutable shared state). Three
  * families:
  *
- *   - LEGACY_FIXTURES      — (legacy record → expected OtelSpanEvent) pairs.
- *                            `expected` is the FROZEN output of the M1.2 shim;
- *                            M1.2's golden test asserts the shim reproduces it.
  *   - EMITTER_FIXTURES     — real-emitter spans (Traceloop / Vercel AI SDK /
  *                            Pydantic Logfire), normalized to `OtelSpanInput`
  *                            with provenance + version metadata. M1.1 parses them.
@@ -25,17 +22,7 @@
  * records its source so M2 can swap in a live capture without changing keys.
  */
 
-import type {
-  LlmCallEvent,
-  ToolUseEvent,
-  TwinHttpEvent,
-} from "../../recorder-events.js";
-import type { OtelSpanEvent } from "../span-event.js";
 import type { OtelSpanInput } from "../map-span.js";
-
-// The legacy variants the M1.2 shim translates. Declared here (off M1.1) so the
-// corpus depends only on the M1.1 schema, not on the M1.2 shim it feeds.
-export type LegacyEventRecord = TwinHttpEvent | LlmCallEvent | ToolUseEvent;
 
 // How a fixture's attribute shape was sourced. Kept explicit so consumers never
 // mistake a documentation-derived example for a live capture.
@@ -51,20 +38,6 @@ export type FixtureDerivedFrom =
   | "pome-internal"
   | "otel-spec"
   | "live-capture";
-
-// Mirror of the shim's option shape (kept structurally identical).
-export interface LegacyFixtureShimOptions {
-  run_id?: string;
-}
-
-export interface LegacyFixture {
-  name: string;
-  provenance: string;
-  derivedFrom: FixtureDerivedFrom;
-  legacy: LegacyEventRecord;
-  options: LegacyFixtureShimOptions;
-  expected: OtelSpanEvent;
-}
 
 export interface EmitterFixture {
   name: string;
@@ -102,199 +75,6 @@ function deepFreeze<T>(value: T): T {
   }
   return value;
 }
-
-// ─── Legacy → span pairs (frozen expected outputs of the M1.2 shim) ──────────
-
-export const LEGACY_FIXTURES: readonly LegacyFixture[] = deepFreeze<readonly LegacyFixture[]>([
-  {
-    name: "twin-http/github-create-issue",
-    provenance:
-      "Pome TwinHttpEvent (packages/wire/src/recorder-events.ts). Frozen output of shimLegacyEventToSpan (M1.2).",
-    derivedFrom: "pome-internal",
-    legacy: {
-      ts: "2026-06-02T12:00:00.000Z",
-      run_id: "run_otel_demo",
-      twin: "github",
-      request_id: "req_001",
-      step_id: null,
-      tool_call_id: null,
-      method: "POST",
-      path: "/repos/acme/app/issues",
-      request_body: { title: "Bug", body: "broken" },
-      status: 201,
-      response_body: { number: 7 },
-      latency_ms: 134,
-      fidelity: "semantic",
-      state_mutation: true,
-      state_delta: { before: null, after: { number: 7 } },
-      error: null,
-      kind: "TwinHttpEvent",
-      event_id: "evt_http_1",
-      parent_id: null,
-    },
-    options: {},
-    expected: {
-      ts: "2026-06-02T12:00:00.000Z",
-      event_id: "legacy:evt_http_1",
-      parent_event_id: null,
-      kind: "OtelSpanEvent",
-      trace_id: "legacy:run_otel_demo",
-      span_id: "legacy:evt_http_1",
-      parent_span_id: null,
-      name: "POST",
-      span_kind: "CLIENT",
-      start_time_unix_nano: "1780401600000000000",
-      end_time_unix_nano: "1780401600134000000",
-      status_code: "UNSET",
-      status_message: null,
-      gen_ai_provider_name: null,
-      gen_ai_operation_name: null,
-      gen_ai_request_model: null,
-      gen_ai_agent_name: null,
-      gen_ai_agent_id: null,
-      gen_ai_tool_name: null,
-      gen_ai_usage_input_tokens: null,
-      gen_ai_usage_output_tokens: null,
-      http_request_method: "POST",
-      http_response_status_code: 201,
-      url_full: null,
-      url_path: "/repos/acme/app/issues",
-      server_address: null,
-      server_port: null,
-      error_type: null,
-      attributes: {
-        "http.request.method": "POST",
-        "http.response.status_code": 201,
-        "url.path": "/repos/acme/app/issues",
-        "pome.legacy.kind": "TwinHttpEvent",
-        "pome.legacy.record_json":
-          '{"ts":"2026-06-02T12:00:00.000Z","run_id":"run_otel_demo","twin":"github","request_id":"req_001","step_id":null,"tool_call_id":null,"method":"POST","path":"/repos/acme/app/issues","request_body":{"title":"Bug","body":"broken"},"status":201,"response_body":{"number":7},"latency_ms":134,"fidelity":"semantic","state_mutation":true,"state_delta":{"before":null,"after":{"number":7}},"error":null,"kind":"TwinHttpEvent","event_id":"evt_http_1","parent_id":null}',
-      },
-    },
-  },
-  {
-    name: "llm-call/anthropic-messages",
-    provenance:
-      "Pome LlmCallEvent (recorder-events.ts). Frozen output of shimLegacyEventToSpan with run_id option.",
-    derivedFrom: "pome-internal",
-    legacy: {
-      ts: "2026-06-02T12:00:01.000Z",
-      event_id: "evt_llm_1",
-      parent_id: "evt_http_1",
-      kind: "LlmCallEvent",
-      host: "api.anthropic.com",
-      port: 443,
-      latency_ms: 820,
-      bytes_in: 512,
-      bytes_out: 2048,
-      url: "https://api.anthropic.com/v1/messages",
-      method: "POST",
-      status: 200,
-      model: "claude-haiku-4-5",
-      prompt_tokens: 320,
-      completion_tokens: 96,
-      cost_usd: 0.0012,
-    },
-    options: { run_id: "run_otel_demo" },
-    expected: {
-      ts: "2026-06-02T12:00:01.000Z",
-      event_id: "legacy:evt_llm_1",
-      parent_event_id: "legacy:evt_http_1",
-      kind: "OtelSpanEvent",
-      trace_id: "legacy:run_otel_demo",
-      span_id: "legacy:evt_llm_1",
-      parent_span_id: "legacy:evt_http_1",
-      name: "chat claude-haiku-4-5",
-      span_kind: "CLIENT",
-      start_time_unix_nano: "1780401601000000000",
-      end_time_unix_nano: "1780401601820000000",
-      status_code: "UNSET",
-      status_message: null,
-      gen_ai_provider_name: null,
-      gen_ai_operation_name: "chat",
-      gen_ai_request_model: "claude-haiku-4-5",
-      gen_ai_agent_name: null,
-      gen_ai_agent_id: null,
-      gen_ai_tool_name: null,
-      gen_ai_usage_input_tokens: 320,
-      gen_ai_usage_output_tokens: 96,
-      http_request_method: "POST",
-      http_response_status_code: 200,
-      url_full: "https://api.anthropic.com/v1/messages",
-      url_path: null,
-      server_address: "api.anthropic.com",
-      server_port: 443,
-      error_type: null,
-      attributes: {
-        "gen_ai.operation.name": "chat",
-        "gen_ai.request.model": "claude-haiku-4-5",
-        "gen_ai.usage.input_tokens": 320,
-        "gen_ai.usage.output_tokens": 96,
-        "http.request.method": "POST",
-        "http.response.status_code": 200,
-        "url.full": "https://api.anthropic.com/v1/messages",
-        "server.address": "api.anthropic.com",
-        "server.port": 443,
-        "pome.legacy.kind": "LlmCallEvent",
-        "pome.legacy.record_json":
-          '{"ts":"2026-06-02T12:00:01.000Z","event_id":"evt_llm_1","parent_id":"evt_http_1","kind":"LlmCallEvent","host":"api.anthropic.com","port":443,"latency_ms":820,"bytes_in":512,"bytes_out":2048,"url":"https://api.anthropic.com/v1/messages","method":"POST","status":200,"model":"claude-haiku-4-5","prompt_tokens":320,"completion_tokens":96,"cost_usd":0.0012}',
-      },
-    },
-  },
-  {
-    name: "tool-use/create-issue",
-    provenance:
-      "Pome ToolUseEvent (recorder-events.ts). Frozen output of shimLegacyEventToSpan with run_id option.",
-    derivedFrom: "pome-internal",
-    legacy: {
-      ts: "2026-06-02T12:00:02.000Z",
-      event_id: "evt_tool_1",
-      parent_id: "evt_llm_1",
-      kind: "ToolUseEvent",
-      tool_use_id: "toolu_abc",
-      tool_name: "create_issue",
-      input: { title: "Bug" },
-    },
-    options: { run_id: "run_otel_demo" },
-    expected: {
-      ts: "2026-06-02T12:00:02.000Z",
-      event_id: "legacy:evt_tool_1",
-      parent_event_id: "legacy:evt_llm_1",
-      kind: "OtelSpanEvent",
-      trace_id: "legacy:run_otel_demo",
-      span_id: "legacy:evt_tool_1",
-      parent_span_id: "legacy:evt_llm_1",
-      name: "execute_tool create_issue",
-      span_kind: "INTERNAL",
-      start_time_unix_nano: "1780401602000000000",
-      end_time_unix_nano: null,
-      status_code: "UNSET",
-      status_message: null,
-      gen_ai_provider_name: null,
-      gen_ai_operation_name: "execute_tool",
-      gen_ai_request_model: null,
-      gen_ai_agent_name: null,
-      gen_ai_agent_id: null,
-      gen_ai_tool_name: "create_issue",
-      gen_ai_usage_input_tokens: null,
-      gen_ai_usage_output_tokens: null,
-      http_request_method: null,
-      http_response_status_code: null,
-      url_full: null,
-      url_path: null,
-      server_address: null,
-      server_port: null,
-      error_type: null,
-      attributes: {
-        "gen_ai.operation.name": "execute_tool",
-        "gen_ai.tool.name": "create_issue",
-        "pome.legacy.kind": "ToolUseEvent",
-        "pome.legacy.record_json":
-          '{"ts":"2026-06-02T12:00:02.000Z","event_id":"evt_tool_1","parent_id":"evt_llm_1","kind":"ToolUseEvent","tool_use_id":"toolu_abc","tool_name":"create_issue","input":{"title":"Bug"}}',
-      },
-    },
-  },
-]);
 
 // ─── Real-emitter spans (normalized OtelSpanInput; keys from each emitter) ────
 // Successful spans are left status-UNSET (the OTel convention — `OK` is not set

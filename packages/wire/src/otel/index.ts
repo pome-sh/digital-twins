@@ -9,7 +9,7 @@
  * "pome-cloud mirrors this directory verbatim" claim, which no longer held):
  *   - FORMAT schemas are canonical HERE, in `pome-sh/pome-twins`
  *     `@pome-sh/shared-types` v0.5.0+ (now `@pome-sh/wire`): `span-event`, `event-schema`,
- *     `semconv`, `nano`, `project`, `map-span`, `legacy-shim`, and the
+ *     `semconv`, `nano`, `project`, `map-span`, and the
  *     `fixtures/` corpus. pome-cloud CONSUMES this surface (FDRS-654 swaps it
  *     onto the published package); it does not fork it.
  *   - INGEST-side utilities are cloud-owned consumers and intentionally do NOT
@@ -22,5 +22,4 @@ export * from "./nano.js";
 export * from "./project.js";
 export * from "./span-event.js";
 export * from "./map-span.js";
-export * from "./legacy-shim.js";
 export * from "./event-schema.js";

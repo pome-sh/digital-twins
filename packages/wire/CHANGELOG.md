@@ -4,6 +4,33 @@ SPDX-License-Identifier: Apache-2.0
 
 # @pome-sh/wire — CHANGELOG
 
+## Unreleased (minor)
+
+**BREAKING — the legacy event → span shim is removed.** `src/otel/legacy-shim.ts`
+translated the three pre-OTel recorder variants (`TwinHttpEvent`, `LlmCallEvent`,
+`ToolUseEvent`) into `OtelSpanEvent`s for a transition window that has since
+closed. Nothing in this repo called it outside its own test, and no consumer
+outside it does either, so the translation was maintained for a caller that never
+arrived.
+
+Removed from the root barrel and from `@pome-sh/wire/otel`:
+
+- `shimLegacyEventToSpan`, `shimmableLegacyEventSchema`, `ShimmableLegacyEvent`,
+  `LegacyShimOptions`
+- `LEGACY_SHIM_SEMCONV_VERSION`, `LEGACY_ATTR_NAMESPACE`, `LEGACY_ID_PREFIX`
+
+Removed from `@pome-sh/wire/otel/fixtures` along with it, because the family
+existed only to feed the shim's golden test:
+
+- `getLegacyFixtures`, `getLegacyFixtureByName`, `LEGACY_FIXTURES`
+- the `LegacyFixture`, `LegacyEventRecord` and `LegacyFixtureShimOptions` types
+
+Unchanged: `eventSchema`, `recorderEventSchema`, `otelEventSchema`,
+`otelSpanEventSchema`, `mapOtelSpanToEvent`, the `semconv` pins, and the emitter /
+trace / external-API fixture families. `OtelSpanEvent` still accepts `legacy:<id>`
+trace and span ids, so spans the shim already produced remain valid on the wire —
+only the code that produced them is gone.
+
 ## 0.2.5 — 2026-08-22
 
 **No consumer-visible change.** The nine per-workspace `vitest.config.ts` files

@@ -1,5 +1,15 @@
 # @pome-sh/adapter-claude-sdk — CHANGELOG
 
+## Unreleased (patch)
+
+**No consumer-visible change.** `@pome-sh/wire` dropped its legacy event → span
+shim and the legacy fixture family that fed it. This package never imported
+either; its only edit is a comment in `turn-usage.ts` that explained a null
+`parent_event_id` by naming the shim's `trace_id` derivation, reworded to state
+the same fact without pointing at a file that no longer exists. Every export in
+`index.ts` is unchanged. Listed only because the next release of this package
+carries the wire change.
+
 ## 0.3.8 — 2026-08-22
 
 **No consumer-visible change.** The nine per-workspace `vitest.config.ts` files
