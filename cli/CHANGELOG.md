@@ -10,7 +10,7 @@ write a version number here or in `package.json`. Released
 entries are insertions only: a correction is the next entry, naming the one it
 corrects.
 
-## Unreleased (patch)
+## 0.26.8 — 2026-08-23
 
 **No consumer-visible change.** Internal tracker ids were removed from the
 markdown this package ships — the packaged `demo` task, the bundled task corpus

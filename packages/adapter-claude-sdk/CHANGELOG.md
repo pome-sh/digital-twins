@@ -1,6 +1,6 @@
 # @pome-sh/adapter-claude-sdk — CHANGELOG
 
-## Unreleased (patch)
+## 0.3.10 — 2026-08-23
 
 **No consumer-visible change.** Internal tracker ids were removed from this
 package's README and from `@pome-sh/wire`'s. Documentation prose only; every

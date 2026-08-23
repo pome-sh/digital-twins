@@ -1,6 +1,6 @@
 # @pome-sh/sandbox-domains
 
-## Unreleased (patch)
+## 0.2.9 — 2026-08-23
 
 **No consumer-visible change.** Internal tracker ids were removed from the
 package READMEs, `packages/sdk/ENDPOINT-TIERS.md` and the twins' fixture
