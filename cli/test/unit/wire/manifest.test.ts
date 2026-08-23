@@ -15,7 +15,7 @@ import {
   deriveAgentSlug,
   manifestAgentSchema,
   manifestSchema,
-} from "../../src/contract/index.js";
+} from "../../../src/contract/index.js";
 
 // The F-804 canonical pome.json example, verbatim.
 const POME_JSON_EXAMPLE = `{

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "vitest";
-import { gmailSeedStateSchema } from "../../src/contract/seed-state.js";
+import { gmailSeedStateSchema } from "../../../src/contract/seed-state.js";
 
 describe("gmailSeedStateSchema faults", () => {
   it("defaults faults to []", () => {

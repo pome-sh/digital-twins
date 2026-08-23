@@ -7,7 +7,7 @@ import {
   createSessionResponseSchema,
   gmailSeedStateSchema,
   providerScopedSeedStateSchema,
-} from "../../src/contract/index.js";
+} from "../../../src/contract/index.js";
 
 const mailbox = {
   email: "POME-Agent@POME-TWIN.TEST",

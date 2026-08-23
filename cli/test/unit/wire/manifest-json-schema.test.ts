@@ -10,9 +10,9 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { SLUG_RE, buildManifestJsonSchema } from "../../src/contract/index.js";
+import { SLUG_RE, buildManifestJsonSchema } from "../../../src/contract/index.js";
 
-const COMMITTED_PATH = new URL("../../src/contract/manifest-schema.json", import.meta.url);
+const COMMITTED_PATH = new URL("../../../src/contract/manifest-schema.json", import.meta.url);
 
 describe("manifest JSON Schema emission (F-818)", () => {
   it("matches the committed manifest-schema.json byte-for-byte", () => {

@@ -3,7 +3,7 @@
 // Export-surface guard for @pome-sh/wire — the wire half of the former
 // `@pome-sh/shared-types` guard (F-754, then F-1201). F-942 split that barrel
 // three ways; this file keeps the SAME argument for the trace surface, and
-// `cli/test/contract/export-surface.test.ts` keeps it for the cloud
+// `cli/test/unit/wire/export-surface.test.ts` keeps it for the cloud
 // control-plane clusters. Between them they still name every symbol the old
 // 145-value / 68-type snapshot named, so the split is auditable as a partition
 // rather than as a loosening.
