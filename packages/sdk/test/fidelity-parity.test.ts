@@ -23,7 +23,7 @@ afterAll(() => {
   else process.env.TWIN_AUTH_SECRET = previousSecret;
 });
 
-const BASELINE = "pre-M5 baseline; heat awaits the F-729 rubric ruling";
+const BASELINE = "pre-M5 baseline; heat awaits the rubric ruling";
 
 function toyInventory(): FidelityInventory {
   return fidelityInventorySchema.parse({
@@ -230,7 +230,7 @@ describe("parseFidelityDocRows / lintFidelityInventory", () => {
       justification: "implemented but not yet documented",
     });
     inventory.doc_drift = [
-      { kind: "rest", name: "POST /items", reason: "docs lag the route", ticket: "F-733" },
+      { kind: "rest", name: "POST /items", reason: "docs lag the route", ticket: "" },
     ];
     expect(lintFidelityInventory(inventory, docs)).toEqual([]);
 
@@ -267,7 +267,7 @@ describe("parseFidelityDocRows / lintFidelityInventory", () => {
   });
 });
 
-// F-1368 — the arm that compares the `rest` half to the routes the twin really
+// The arm that compares the `rest` half to the routes the twin really
 // registers. Everything above this point compares two DOCUMENTS to each other.
 describe("lintFidelityRestRoutes", () => {
   const REGISTERED = ["GET /items", "GET /items/*", "POST /items"];
@@ -291,7 +291,7 @@ describe("lintFidelityRestRoutes", () => {
   });
 
   it("reports a route the inventory does not account for", () => {
-    // The F-1368 direction: a route is added to the twin and the inventory —
+    // The other direction: a route is added to the twin and the inventory —
     // the denominator every fidelity lane counts against — stays green.
     expect(lintFidelityRestRoutes(inventoryWith({ name: "POST /items" }), REGISTERED).join("\n"))
       .toContain("route 'GET /items/*' is registered but absent from fidelity.inventory.json");

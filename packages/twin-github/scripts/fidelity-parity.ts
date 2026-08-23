@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// fidelity:parity — declarative parity scenario for twin-github (F-730).
+// fidelity:parity — declarative parity scenario for twin-github.
 // The runner lives in @pome-sh/sdk/parity; this file is scenario data only:
 // an ordered, stateful chain that exercises every MCP tool in
 // fidelity.inventory.json against the seeded acme/api world, plus the
@@ -33,7 +33,7 @@ const steps: ParityStep[] = [
   // Repositories + branches + files
   { tool: "create_repository", arguments: { owner: "qa", name: "parity" } },
   { tool: "fork_repository", arguments: { ...repo, organization: "forks" } },
-  // `branch` is required since F-1468 — GitHub declares it required and the
+  // `branch` is required since — GitHub declares it required and the
   // twin took it as optional, which let a write land on a branch nobody named.
   { tool: "create_or_update_file", arguments: { ...repo, branch: "main", path: "parity.txt", message: "Add parity", content: "ok\n" } },
   { tool: "create_branch", arguments: { ...repo, branch: "parity" } },
@@ -55,7 +55,7 @@ const steps: ParityStep[] = [
   { tool: "issue_write", arguments: { method: "update", ...repo, issue_number: 1, state: "open" } },
   { tool: "issue_write", arguments: { method: "create", ...repo, title: "Parity issue via issue_write" } },
   { tool: "search_issues", arguments: { query: "500" } },
-  // No `state` (F-1468). GitHub's MCP enum here is ["OPEN","CLOSED"] with no
+  // No `state`. GitHub's MCP enum here is ["OPEN","CLOSED"] with no
   // `all`, and its description says both are returned when the argument is
   // absent — so omission is how "all" is spelled on this door. Note the NEXT
   // line up: `issue_write.state` is lowercase ["open","closed"], because that is
@@ -85,7 +85,7 @@ const steps: ParityStep[] = [
   ),
   { tool: "create_pull_request_review", arguments: (state) => ({ ...repo, pull_number: state.pullNumber, event: "APPROVE" }) },
   { tool: "pull_request_review_write", arguments: (state) => ({ method: "create", ...repo, pullNumber: state.pullNumber, event: "COMMENT", body: "Parity review via the consolidated writer" }) },
-  // GitHub declares no `create_pull_request_review_comment` MCP tool (F-1376),
+  // GitHub declares no `create_pull_request_review_comment` MCP tool,
   // so the reply tool's subject is built over the REST route the twin still
   // serves. Not coverage — `add_reply_to_pull_request_comment` below is.
   {
@@ -108,7 +108,7 @@ const steps: ParityStep[] = [
   { tool: "list_tags", arguments: { ...repo } },
   { tool: "list_releases", arguments: { ...repo } },
   { tool: "get_latest_release", arguments: { ...repo } },
-  // M5 hot gaps (F-735)
+  // M5 hot gaps
   { tool: "get_release_by_tag", arguments: { ...repo, tag: "v0.0.1-parity" } },
   { tool: "get_tag", arguments: { ...repo, tag: "v0.0.1-parity" } },
   { tool: "search_commits", arguments: { query: "parity" } },

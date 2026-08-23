@@ -1,11 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// F-745 / D4 — the no-catch-and-continue gate must (a) pass on the real SDK
-// engine tree (every catch there rethrows, returns an error/sentinel, rejects,
-// or is a documented fingerprint-allowlisted fall-through) and (b) FAIL the
-// moment a statement-level catch clause in packages/sdk/src swallows a failure
-// without throwing, returning, or rejecting. Promise `.catch(cb)` handlers are
-// OUT of scope. Exit keywords are strict: `.throw(`/`.return(`/`.reject(`
-// property calls and identifiers like `throwaway`/`returnValue` do NOT count.
+// D4 — the no-catch-and-continue gate must (a) pass on the real SDK engine tree (every
+// catch there rethrows, returns an error/sentinel, rejects, or is a.
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";

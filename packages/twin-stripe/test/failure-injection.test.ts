@@ -1,18 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// FDRS-339 (M3a/B): scenario-level failure injection.
-//
-// Two modes:
-//   - `before_handler` → matched request never invokes the route handler; the
-//     middleware returns the configured envelope directly. No state mutation.
-//   - `after_handler` → handler runs (state IS mutated and `state_delta` is
-//     recorded), but the response delivered to the client is overridden with
-//     the configured envelope. Models a "server processed but response delivery
-//     failed" failure, which is exactly what the FDRS-316 hero scenario needs
-//     to reproduce the lost-response double-refund bug.
-//
-// Counter increments per `(account_id, method, path)` so successive POSTs
-// resolve to `attempt: 1`, `attempt: 2`, …, deterministically.
+// Scenario-level failure injection. Two modes: - `before_handler` → matched request
+// never invokes the route handler; the middleware returns the configured.
 
 import { describe, expect, it } from "vitest";
 import { createStripeApp, rest, type StripeTestApp } from "./_appHelper.js";
@@ -195,7 +183,7 @@ describe("Failure injection — POST /admin/seed + per-request middleware", () =
     expect(r1.status).toBe(402);
   });
 
-  it("FDRS-316 vertical-slice gate: 14-stripe-refund-retry.md hero bug reproduces (after_handler, attempt 1)", async () => {
+ it("vertical-slice gate: 14-stripe-refund-retry.md hero bug reproduces (after_handler, attempt 1)", async () => {
     // This mirrors `cli/tasks/14-stripe-refund-retry.md` exactly:
     // the agent has no Idempotency-Key, the twin's failure-injection middleware
     // fires for attempt 1 in `after_handler` mode → refund row #1 IS persisted

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// Moved from packages/twin-slack/test (F-683): the secret-resolution
-// mechanism is the engine's, so its unit coverage lives with the engine.
+// Moved from packages/twin-slack/test: the secret-resolution mechanism is the
+// engine's, so its unit coverage lives with the engine.
 import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -32,10 +32,8 @@ describe("resolveAuthSecret", () => {
   });
 });
 
-// F-708: a twin bound to a non-loopback host with no env-injected secret
-// self-generates one, persists it at the compose-era contract location
-// (.pome-data/<twin>/secret; POME_TWIN_DATA_DIR overrides the directory),
-// prints it once to stdout, and reuses it on subsequent boots.
+// A twin bound to a non-loopback host with no env-injected secret self-generates one,
+// persists it at the compose-era contract location (.pome-data/<twin>/secret.
 describe("ensureTwinAuthSecret", () => {
   const HEX_64 = /^[0-9a-f]{64}$/;
   const prevSecret = process.env.TWIN_AUTH_SECRET;

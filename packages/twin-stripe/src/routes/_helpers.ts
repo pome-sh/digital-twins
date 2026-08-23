@@ -55,7 +55,7 @@ export type RouteResult = {
   /**
    * Optional row-level before/after for state-inspector rendering. When the
    * route doesn't supply one (the default), respond() emits `state_delta:
-   * null` regardless of `state_mutation`. Per FDRS-318 canonical schema.
+   * null` regardless of `state_mutation`. Per the canonical schema.
    */
   stateDelta?: StateDelta;
 };
@@ -111,7 +111,7 @@ export async function handle(
   } catch (error) {
     if (error instanceof TwinError) {
       // Almost every TwinError is thrown before any write. The card
-      // decline (F-731) is the exception: it commits a failed charge +
+      // decline is the exception: it commits a failed charge +
       // events + PI transition and then throws the 402, carrying the
       // committed delta so the recorder logs the mutation truthfully.
       return respond(
@@ -203,9 +203,9 @@ export function respond(
   const reqId = requestId();
   // The handler's own answer, before any transport-level substitution below.
   // The idempotency middleware wraps this handler and reads it on the way out;
-  // `setHandlerResult`'s doc carries what goes wrong without it (F-1138).
+  // `setHandlerResult`'s doc carries what goes wrong without it.
   setHandlerResult(c, { status, body: responseBody });
-  // FDRS-339: if the failure-injection middleware matched in `after_handler`
+  // If the failure-injection middleware matched in `after_handler`
   // mode, it parked an override on the context. The handler has already
   // mutated state (so state_mutation + state_delta stay truthful), but the
   // status + response_body on both the recorded event and the wire response
@@ -215,7 +215,7 @@ export function respond(
     | undefined) ?? null;
   const finalStatus = override ? override.status : status;
   const finalBody = override ? override.body : responseBody;
-  // FDRS-402 / FDRS-653 stamping, engine parity (F-684): correlation_id
+  // stamping, engine parity: correlation_id
   // persists the adapter's x-pome-correlation-id (falling back to the
   // request id), and x-pome-scenario-step-id lands as the canonical
   // task_step_id plus the legacy scenario_step_id key.
@@ -233,7 +233,7 @@ export function respond(
     method: c.req.method,
     path: new URL(c.req.url).pathname,
     request_body: requestBody,
-    // F-1125 — one shared implementation with the engine's own emit(), so
+    // One shared implementation with the engine's own emit(), so
     // "which headers get recorded" has a single answer across every site.
     request_headers: recordedRequestHeaders(c),
     // Stripe's REST routes are not declared as twin actions: no criterion asks

@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// FDRS-599 / FDRS-590 parity: the Docker/package twin must expose `create_refund`
-// AND record the attempt even when the domain refuses it. This is the signal the
-// action-`[code]` in cli/tasks/19-stripe-rerefund-persuasion.md reads: an agent
-// that fires a second refund on an already-fully-refunded charge is caught by the
-// recorded tool call, not by a (server-rejected) refund row.
+// Parity: the Docker/package twin must expose `create_refund` AND record the attempt
+// even when the domain refuses it.
 import { describe, expect, it } from "vitest";
 import { createRecorderStore } from "@pome-sh/sdk/server";
 import { createTwinStripeApp } from "../src/twin.js";

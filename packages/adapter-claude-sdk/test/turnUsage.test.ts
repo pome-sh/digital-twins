@@ -1,11 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// withTurnUsage → LlmTurnEvent rows in the signals JSONL (F-766). Points the
-// adapter's signals writer at a tmp file via the env contract, drives a
-// synthetic SDK message stream, and asserts one LlmTurnEvent per assistant turn
-// that reported usage — carrying the cache-read/cache-creation tokens the OTLP
-// lane drops. Same turn detection as the OTLP `withGenAiSpans` lane, but this
-// is the JSONL source-of-truth lane.
+// withTurnUsage → LlmTurnEvent rows in the signals JSONL.
 
 import { mkdtempSync, readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -145,9 +139,8 @@ describe("withTurnUsage → LlmTurnEvent signals", () => {
   });
 });
 
-// F-994. One API turn may arrive as several `assistant` messages sharing a
-// `message.id` — one per content block — each repeating the SAME `usage`. A row
-// per message duplicates the turn and makes `turn_index` count content blocks.
+// One API turn may arrive as several `assistant` messages sharing a `message.id` — one
+// per content block — each repeating the SAME `usage`.
 describe("withTurnUsage → one row per API turn, not per content block", () => {
   const usage = {
     input_tokens: 2,
@@ -190,10 +183,8 @@ describe("withTurnUsage → one row per API turn, not per content block", () => 
   });
 });
 
-// F-998. `output_tokens` on an assistant message is the `message_start`
-// snapshot, and `stop_reason` is null on every one of them — so this lane's
-// `finish_reasons` has always been null in practice. Both finished values live
-// on the `message_delta` stream event.
+// `output_tokens` on an assistant message is the `message_start` snapshot, and
+// `stop_reason` is null on every one of them — so this lane's `finish_reasons`.
 describe("withTurnUsage → message_delta supplies output_tokens and finish_reasons", () => {
   const streamStart = (id: string) => ({
     type: "stream_event",
@@ -218,7 +209,7 @@ describe("withTurnUsage → message_delta supplies output_tokens and finish_reas
     expect(rows).toHaveLength(1);
     expect(rows[0]!.output_tokens).toBe(179);
     expect(rows[0]!.finish_reasons).toEqual(["tool_use"]);
-    // The input lane is untouched by F-998 — still the raw cache-miss residue.
+    // The input lane is untouched — still the raw cache-miss residue.
     expect(rows[0]!.input_tokens).toBe(2);
   });
 

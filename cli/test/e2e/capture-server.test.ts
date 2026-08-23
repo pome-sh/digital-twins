@@ -1,18 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-406 — integration test for `pome capture-server`.
-//
-// Boots the capture-server in-process on an ephemeral port against a
-// localhost upstream, runs one CONNECT-tunnelled request through it, and
-// asserts an `LlmCallEvent` row was appended to `events.jsonl` with the
-// expected shape.
-//
-// CONNECT tunnels are opaque to the proxy — the bytes inside are TLS, plain
-// HTTP, or anything else, and the proxy never inspects them. So the upstream
-// here is a plain TCP echo server: the proxy's behavior under CONNECT is
-// identical whether the inner bytes are a real TLS handshake or arbitrary
-// payload. The acceptance criterion (`bytes_out > 0`, host matches) exercises
-// the same code path either way, without dragging openssl into the test
-// runtime.
+// Integration test for `pome capture-server`.
 
 import { mkdtemp, readFile } from "node:fs/promises";
 import { createServer as createNetServer, createConnection, type Socket } from "node:net";

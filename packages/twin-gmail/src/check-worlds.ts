@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The fixture worlds Gmail's declarations name (F-1128).
+// The fixture worlds Gmail's declarations name.
 //
 // In `src/` rather than `test/` for the same reason twin-github's and
 // twin-slack's are: `discriminatingWorlds` is a DECLARED field read from npm by

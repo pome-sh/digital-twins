@@ -1,12 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// Billing warm surfaces — F-734 (shape tier per the F-729 ruling).
-//
-// Shape-level tests: Stripe-shaped responses off stored rows, referential
-// 404s, and the deliberate ABSENCE of the semantic billing machine — no
-// events emitted, no invoices minted, no billing-cycle arithmetic. The
-// compile-time anchor (`satisfies DeepPartial<Stripe.*>` in serializers.ts)
-// carries the field-level shape check; these tests pin the wire behavior.
+// Billing warm surfaces (shape tier per the ruling).
 
 import { describe, expect, it } from "vitest";
 import { createStripeApp, rest, type StripeTestApp } from "./_appHelper.js";

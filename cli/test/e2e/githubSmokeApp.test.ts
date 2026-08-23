@@ -30,9 +30,8 @@ describe("github twin smoke app (registry)", () => {
       headers: { Authorization: `Bearer ${token}` }
     });
     const tools = (await toolsResponse.json()) as { tools: Array<{ name: string }> };
-    // Full packaged twin-github surface (consolidated in FDRS-648): the CLI now
-    // serves @pome-sh/twin-github, not the former in-CLI subset (was 37).
-    // 36 since F-1376 cut the table to what GitHub's own tools/list declares.
+    // Full packaged twin-github surface: the CLI now serves @pome-sh/twin-github, not
+    // the former in-CLI subset (was 37).
     expect(tools.tools).toHaveLength(36);
     const toolNames = tools.tools.map((tool) => tool.name);
     expect(toolNames).toContain("merge_pull_request");

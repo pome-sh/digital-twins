@@ -61,7 +61,7 @@ async function startFakeCloud(opts?: { finalizeScore?: number }) {
       ],
     })
   );
-  // Full RecorderEvent shape — correlator (FDRS-326) reads ts/twin/tool_call_id.
+  // Full RecorderEvent shape — correlator reads ts/twin/tool_call_id.
   app.get("/s/:sid/_pome/events", (c) =>
     c.json([
       {
@@ -264,8 +264,7 @@ describe("runTaskHosted happy path", () => {
 
 describe("runTaskHosted with upload route stubbed", () => {
   // Separate describe with its own minimal fake server that includes both the
-  // upload-url endpoint and a fake PUT target. This proves the end-to-end wire
-  // format (FDRS-357 happy path).
+  // upload-url endpoint and a fake PUT target.
   let uploadServer: ServerType | undefined;
   let uploadPort = 0;
   let uploadTmp: string | undefined;
@@ -422,7 +421,7 @@ describe("runTaskHosted with upload route stubbed", () => {
     expect(received.trace_storage_key).toBe(
       `team-tm_test/session-${FAKE_SESSION_ID}/events.jsonl`,
     );
-    // FDRS-395: /finalize must also carry both state storage keys so the
+    // /finalize must also carry both state storage keys so the
     // cloud judge loads the real twin state instead of substituting "{}".
     expect(received.state_initial_storage_key).toBe(
       `team-tm_test/session-${FAKE_SESSION_ID}/state_initial.json`,
@@ -439,7 +438,7 @@ describe("runTaskHosted with upload route stubbed", () => {
     expect(parsed.twin).toBe("github");
     expect(parsed.fidelity).toBe("semantic");
 
-    // FDRS-395: state PUT bodies must be valid JSON copies of the twin state
+    // State PUT bodies must be valid JSON copies of the twin state
     // returned from /_pome/state.
     expect(stateInitialBody).not.toBeNull();
     expect(stateFinalBody).not.toBeNull();
@@ -937,16 +936,8 @@ describe("runTaskHosted single-twin old-cloud (no per_twin) env parity", () => {
     expect(agentEnv.ghm).toBe(`${twinUrl}/mcp`);
     expect(agentEnv.ghr).toBe(twinUrl);
     expect(agentEnv.base).toBe(twinUrl);
-    // F-1211: `POME_GITHUB_TOKEN` is currently
-    // `provider_credentials.github.token ?? agent_token` — here the PAT
-    // `"ght_provider"`, which the twin proxy 404s on because it verifies
-    // bearers only against `agent_token`. Asserting that exact value pinned
-    // the defect (F-1375: a test that pins a known defect is the defect with
-    // a second lock on it), so the value is not asserted; F-1211 owns the
-    // fix, after which this becomes `agentEnv.auth` unconditionally, matching
-    // the stripe/slack/gmail bearers. What is true on BOTH sides of that fix
-    // is that the agent is handed one of the two bearers this session
-    // actually carries — never a third, empty or absent one.
+    // `POME_GITHUB_TOKEN` is currently `provider_credentials.github.token ??
+    // agent_token` — here the PAT `"ght_provider"`, which the twin proxy 404s on because.
     expect(agentEnv.ght).toBeTruthy();
     expect([agentEnv.auth, "ght_provider"]).toContain(agentEnv.ght);
     // Stripe vars injected UNCONDITIONALLY even on a github-only run.

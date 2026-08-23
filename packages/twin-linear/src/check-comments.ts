@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// What Linear's declared checks can assert about COMMENTS (F-1129).
+// What Linear's declared checks can assert about COMMENTS.
 //
 // The threaded-reply check is the vocabulary's only `seed+final` member, and it
 // is a delta for a reason task 25 states in its own prompt: "Reply in-thread to

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// How a declared check READS the exported GitHub tree (F-1075).
+// How a declared check READS the exported GitHub tree.
 //
 // Split from `checks.ts` so that file is only declarations: what the vocabulary
 // can assert is a different question from how the tree is shaped, and the tree
@@ -23,7 +23,7 @@
 //     different sets. Confusing them is the defect `github.no-new-labels`'s
 //     description exists to prevent.
 //
-// F-1197 — the resolvers below also return the POINTER they walked, so a check
+// The resolvers below also return the POINTER they walked, so a check
 // can cite where it looked. Nothing else about them changed; the shapes above
 // are still the only thing that decides how the tree is read.
 
@@ -70,7 +70,7 @@ export interface GitHubCheckStatePullRequest {
   // empty array. The predicate has to tell those apart or it fails a correct
   // agent for a gap in the recording.
   reviews?: GitHubCheckStateReview[] | null;
-  // The CONVERSATION timeline (F-1151) — the same shape as `issue.comments`
+  // The CONVERSATION timeline — the same shape as `issue.comments`
   // because it is the same table, which is what GitHub does too. Not
   // `reviews[].body` and not `review_comments[]`: those are two other things a
   // reader could reasonably call "a comment on the PR", and the whole point of
@@ -116,7 +116,7 @@ export interface GitHubCheckState {
 // owner/name fallback is for a state export that somehow omits `full_name`,
 // not for a bare-name reference, which cannot reach this function.
 //
-// F-1197 — it returns the INDEX beside the row. The index is not decoration: a
+// It returns the INDEX beside the row. The index is not decoration: a
 // check cites where it looked as a JSON Pointer, and a pointer into an array
 // needs the position the walk actually stopped at. Computing it here, in the
 // same loop that decides which repo matched, is what keeps the citation and the
@@ -164,7 +164,7 @@ export function labelNames(repo: GitHubCheckStateRepo): Set<string> {
 // throwing keeps the "repo not found" verdict a normal `failed` with a sentence
 // an author can act on.
 //
-// F-1197 added a pointer to BOTH arms, and the second one is the interesting
+// There is a pointer on BOTH arms, and the second one is the interesting
 // half. `path` on the found arm is the address the resolution walked to, which
 // the check extends with the field it goes on to read.
 //

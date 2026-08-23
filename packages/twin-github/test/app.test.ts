@@ -43,7 +43,7 @@ describe("github_clone app", () => {
     expect(tools.tools.map((tool: { name: string }) => tool.name)).toContain("issue_write");
     expect(tools.tools.map((tool: { name: string }) => tool.name)).toContain("list_branches");
     expect(tools.tools.map((tool: { name: string }) => tool.name)).toContain("get_me");
-    // F-1376: labels and releases have no MCP tool at GitHub, so none here either.
+    // Labels and releases have no MCP tool at GitHub, so none here either.
     expect(tools.tools.map((tool: { name: string }) => tool.name)).not.toContain("create_label");
     expect(tools.tools.map((tool: { name: string }) => tool.name)).not.toContain("create_release");
   });
@@ -120,9 +120,8 @@ describe("github_clone app", () => {
 
     const missing = await app.request(`${base}/repos/acme/api/contents/nope.txt`, withAuth(token));
     expect(missing.status).toBe(404);
-    // F-1498 — the url names the operation the caller asked for, which is what
-    // real GitHub answers on a routed, authenticated 404. It read
-    // `https://docs.github.com/rest` until this route learned its own.
+    // The url names the operation the caller asked for, which is what real GitHub
+    // answers on a routed, authenticated 404.
     await expect(missing.json()).resolves.toMatchObject({
       message: "Not Found",
       documentation_url: "https://docs.github.com/rest/repos/contents#get-repository-content"

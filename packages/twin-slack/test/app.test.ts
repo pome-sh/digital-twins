@@ -158,7 +158,7 @@ describe("twin-slack HTTP contract", () => {
     expect(body._twin.fidelity).toBe("unsupported");
   });
 
-  it("named cold surfaces (F-736 ruling) return the loud 501 unsupported envelope", async () => {
+ it("named cold surfaces (heat ruling) return the loud 501 unsupported envelope", async () => {
     const { app } = freshApp();
     const coldProbes: Array<{ path: string; method: string }> = [
       { path: "chat.postEphemeral", method: "POST" },

@@ -46,7 +46,7 @@ export function usersList(domain: SlackDomain, args: { cursor?: string; limit?: 
   const slice = rows.slice(0, limit);
   return {
     // users.list embeds each user's profile WITHOUT `email` — real Slack only
-    // returns the email on the single-user reads (FDRS-473 Kind B).
+    // returns the email on the single-user reads (Kind B).
     members: slice.map((row) => serializeUser(row, { include_locale: args.include_locale, omitProfileEmail: true })),
     cache_ts: nowUnix(),
     response_metadata: {
@@ -79,7 +79,7 @@ export function usersProfileGet(domain: SlackDomain, args: { user?: string; incl
   if (!target) slackError("user_not_found", 404);
   // users.profile.get returns the bare profile WITHOUT `team` — real Slack omits
   // it on this endpoint (it carries it in the embedded user.profile elsewhere)
-  // (FDRS-473 Kind B).
+  // (Kind B).
   return { profile: serializeUserProfile(target!, { omitTeam: true }) };
 }
 
@@ -93,7 +93,7 @@ export function usersProfileSet(domain: SlackDomain, args: { user?: string; prof
     const before = domain.db.prepare(`SELECT * FROM users WHERE id = ?`).get(target!.id) as UserRow;
     let profile = safeParseJson(before.profile_json);
     if (args.profile) {
-      // F-1462 — Slack takes `profile` as a JSON string OR as an object, so the
+      // Slack takes `profile` as a JSON string OR as an object, so the
       // parse only runs on the branch that needs it. `safeParseJson` over an
       // object would be a category error, not a no-op: it would swallow the
       // fields and write nothing, which is a silent partial success.
@@ -108,7 +108,7 @@ export function usersProfileSet(domain: SlackDomain, args: { user?: string; prof
     const after = domain.db.prepare(`SELECT * FROM users WHERE id = ?`).get(target!.id) as UserRow;
     onDelta({ before, after });
     // users.profile.set echoes the bare profile, same shape as users.profile.get
-    // (no `team`) — FDRS-473 Kind B.
+    // (no `team`) — Kind B.
     return { profile: serializeUserProfile(after, { omitTeam: true }) };
   })();
   return out;

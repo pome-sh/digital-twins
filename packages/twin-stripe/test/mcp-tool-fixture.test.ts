@@ -1,13 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1325 — the fixture is the tool table, not a document about it.
-//
-// The derivation is structural (`deriveMcpToolTable` throws on any 1:1
-// mismatch), but "structurally impossible" is a claim worth one round trip:
-// this suite drives the real `tools/list` surface and compares the answer to
-// the fixture field by field. It also re-derives the canonical bytes and
-// re-hashes the raw file from disk, which is the half of the load-time assert
-// a bundled twin cannot make for itself.
+// The fixture is the tool table, not a document about it.
 
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -78,18 +70,8 @@ describe("stripe MCP tool fixture", () => {
     expect(meta.liveToolCount).toBe(26);
   });
 
-  // F-1485 — these two assertions used to pin the sentence's claim that this
-  // table had NEVER been compared upstream and could not be. That was true when
-  // F-1326 wrote it and false from 2026-08-10, when the golden landed; the test
-  // kept a green check on the false version, which is the failure mode where a
-  // guard reads as coverage it is not. Pinning provenance prose survives the
-  // correction — it is why the drift was catchable at all — so both pins move
-  // to the corrected sentence rather than being deleted.
-  //
-  // `Restricted API Key` moves verbatim: the per-credential mechanism is still
-  // the reason the comparison is scoped, it just no longer implies "and so
-  // there is nothing to compare". `never` moves to the clause that is now the
-  // true one — a consumer may never read the unshared names as full coverage.
+  // These two assertions used to pin the sentence's claim that this table had NEVER
+  // been compared upstream and could not be.
   it("pins a provenance sentence that says what was actually compared", () => {
     const compared = meta.transcription?.comparedToUpstream ?? "";
 
@@ -97,7 +79,7 @@ describe("stripe MCP tool fixture", () => {
     expect(compared).toMatch(/never as full coverage/);
 
     // The correction, not just any sentence: it has to name the capture that
-    // made comparison possible, and must not re-open with F-1326's verdict.
+    // made comparison possible, and must not re-open with the verdict.
     expect(compared).toMatch(/https:\/\/mcp\.stripe\.com/);
     expect(compared).toMatch(/2026-08-10/);
     expect(compared).not.toMatch(/never, and not comparable/);
@@ -130,9 +112,8 @@ describe("stripe MCP tool fixture", () => {
     expect(compared).toContain(`upstream_only=${upstream.size - shared.length}`);
   });
 
-  // F-1325 — the fixture carries the inputSchema the wire serves, and the zod
-  // schemas in tools.ts are what `tools/call` validates against. Nothing keeps
-  // the two together except this.
+  // The fixture carries the inputSchema the wire serves, and the zod schemas in
+  // tools.ts are what `tools/call` validates against.
   it("every declared schema projects to exactly the inputSchema the fixture serves", () => {
     expect(toolArgumentSchemas.map((tool) => tool.name).sort()).toEqual(
       [...stripeToolFixture.toolNames].sort()

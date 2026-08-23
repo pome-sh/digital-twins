@@ -1,11 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-643 test fixture — structural MIRROR of the cloud's demo model-call
-// gateway request schema (pome-cloud apps/control-plane/src/routes/demo-llm.ts,
-// FDRS-637). The strictness IS the contract: a `system` role, a `model`
-// field, or any unknown key is a 422 on the real gateway, so the stub
-// servers in these tests validate with the same shape to prove the CLI's
-// wire bodies would survive the real thing. Any change to the server schema
-// must be reflected here (and vice versa).
+// Test fixture — structural MIRROR of the cloud's demo model-call gateway request
+// schema (pome-cloud apps/control-plane/src/routes/demo-llm.ts).
 
 import { z } from "zod";
 

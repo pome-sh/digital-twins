@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1498 — the derivation behind `fixtures/operation-docs.raw.json`, and the
+// The derivation behind `fixtures/operation-docs.raw.json`, and the
 // invariants `--check` re-asserts without it.
 //
 // Split out of `vendor-operation-docs.ts` so the gate's teeth are importable:
@@ -20,7 +20,7 @@
 // `POST /orgs/:owner/repos` says `:owner`. A shape that matches zero or more
 // than one operation is a hard refusal, never a guess.
 //
-// DECIDED (F-1498's `[DECISION]` comment, before any code): the two surfaces
+// DECIDED (the `[DECISION]` comment, before any code): the two surfaces
 // whose shapes cannot match, the two twin-only routes with no GitHub operation
 // at all, the per-tool MCP mapping, and the three tools registered unmappable
 // with their reasons. Those tables are here, and they are copied into the
@@ -155,7 +155,7 @@ export const MCP_OPERATIONS: Record<string, McpOperationEntry> = {
       get_files: "pulls/list-files",
       get_commits: "pulls/list-commits",
       get_reviews: "pulls/list-reviews",
-      // A pull request's CONVERSATION is issue comments (F-1151), which is
+      // A pull request's CONVERSATION is issue comments, which is
       // both GitHub's model and this twin's.
       get_comments: "issues/list-comments",
       get_review_comments: "pulls/list-review-comments",
@@ -175,7 +175,7 @@ export const MCP_OPERATIONS: Record<string, McpOperationEntry> = {
  * Tools whose errors cannot name one operation, and why. Each is a multi-leg
  * upstream call where the url depends on WHICH LEG failed, and the MCP door has
  * never been measured — so naming one would invent a divergence in the exact
- * direction F-1498 exists to close.
+ * direction this artifact exists to close.
  */
 export const UNMAPPABLE_TOOLS: Record<string, string> = {
   push_files:
@@ -229,7 +229,7 @@ function operationRow(method: string, path: string, operation: SpecOperation): O
  * MOUNTS, which is 66. ⚠️ NOT `route-inputs.json`, which publishes 65 because
  * `buildRouteInputArtifact` drops surfaces with zero declared inputs, and
  * `GET /user` has none. Keying the gate on the artifact instead of on the
- * declarations is how `GET /user` went missing from F-1498's own mapping table.
+ * declarations is how `GET /user` went missing from the own mapping table.
  *
  * `tools` is every name in `toolArgumentSchemas` — 36.
  */
@@ -304,7 +304,7 @@ export function deriveOperationDocs(input: {
       throw new Error(
         `the twin serves MCP tool '${tool}' and neither MCP_OPERATIONS nor UNMAPPABLE_TOOLS names ` +
           `it. Every tool is either decided or registered unmappable WITH A REASON — dropping one ` +
-          `to unmappable to make this pass is the divergence F-1498 exists to close.`
+          `to unmappable to make this pass is the divergence exists to close.`
       );
     }
     if ("operationId" in entry) need(entry.operationId, `MCP_OPERATIONS['${tool}']`);

@@ -1,25 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// Socket-boundary characterization suite (FDRS-603).
-//
-// Every other HTTP test in this package drives Hono via `app.request()` — a
-// synthetic web Request that never touches @hono/node-server's
-// IncomingMessage→Request translation, header normalization, body streaming,
-// or socket teardown. This suite boots the twin through the ACTUAL
-// `serve()` bridge on an ephemeral port (port: 0 — vitest workers run in
-// parallel; never a fixed port) and characterizes the wire contract:
-//
-//   * real @modelcontextprotocol/sdk Client over StreamableHTTPClientTransport
-//     (promoted from scripts/validate-mcp.ts, which since F-1354 is no longer
-//     manual — it runs in ci.yml's heavy suite as `validate:mcp`),
-//   * the 202/405 status contract for MCP notifications and GET/DELETE,
-//   * JSON-RPC error framing (-32700) for malformed bytes,
-//   * the loud-501 unsupported-route envelope,
-//   * auth over the socket,
-//   * chunked (streamed) request bodies and raw mixed-case header bytes
-//     through node:http's header normalization.
-//
-// One server per file; closed in afterAll so vitest exits cleanly.
+// Socket-boundary characterization suite. Every other HTTP test in this package drives
+// Hono via `app.request()` — a synthetic web Request that never touches.
 
 import { connect } from "node:net";
 import { serve } from "@hono/node-server";

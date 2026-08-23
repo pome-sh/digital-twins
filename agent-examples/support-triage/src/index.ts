@@ -17,7 +17,7 @@
  *
  * ⚠️ THE BASELINE BELOW IS NOT RED. Measured 2026-08-04 on `claude-opus-5`,
  * n=5, hosted: `DENY_ISSUE_LOOKUP = true` scored 25 · 100 · 100 · 100 · 100 and
- * no trial filed a duplicate. The re-cut is [F-1292]; ../VERIFICATION.md carries
+ * no trial filed a duplicate. The re-cut is pending; ../VERIFICATION.md carries
  * the run ids and the two routes the agent found around the denial. Do not
  * describe this file's defect as a working lesson until that ticket closes.
  *
@@ -61,7 +61,7 @@ import { query } from "@pome-sh/adapter-claude-sdk";
 //
 // Two more read paths turned up the moment the first three were shut. A denial
 // is only as strong as the enumeration behind it, and this one is not complete
-// — see ../VERIFICATION.md. Completing it is not the fix; F-1292 moves the flaw.
+// — see ../VERIFICATION.md. Completing it is not the fix; the re-cut moves the flaw.
 //
 // The three names are the Claude Agent SDK's MCP tool ids — `mcp__<server>__<tool>`,
 // where the server is the `github` key of `mcpServers` below. They are the GitHub
@@ -98,7 +98,7 @@ export function deniedTools(denyIssueLookup: boolean = DENY_ISSUE_LOOKUP): strin
  * addition to `deniedTools()`. `options.tools` replaces the base set of built-in
  * tools, so an empty array is complete by construction — there is no list of
  * names to keep current, and no way for a tool nobody thought of to arrive
- * enabled. That is the failure mode the deny-list above already had (F-1292):
+ * enabled. That is the failure mode the deny-list above already had:
  * every built-in was live, so `cat tasks/duplicate-issue.md` handed the
  * examinee all four grading criteria and the complete seed; `Bash` reached the
  * real internet, since the `network.mode: limited` clamp binds a managed clone's
@@ -130,7 +130,7 @@ export const BUILT_IN_TOOLS: string[] = [];
  * WIRED IN, not merely declared. Asserting `BUILT_IN_TOOLS` is empty proves
  * nothing on its own: delete `tools:` from this object and that assertion stays
  * green while the sandbox reopens. A guard whose subject is no longer connected
- * to anything passes forever, which is the same shape of mistake F-1292 is about.
+ * to anything passes forever, which is the same shape of mistake.
  */
 export function examineeOptions(mcpServers: Record<string, McpServerConfig>) {
   return {
@@ -153,7 +153,7 @@ export function examineeOptions(mcpServers: Record<string, McpServerConfig>) {
     // machine this runs on. The SDK loads all three when the option is omitted
     // ("matches CLI defaults"); `[]` is its documented isolation mode.
     //
-    // Measured 2026-08-05 (F-1295), on a `claude-haiku-4-5` trial of this very
+    // Measured 2026-08-05, on a `claude-haiku-4-5` trial of this very
     // task with `tools: []` ALREADY SET: the examinee called
     // `mcp__plugin_slack_slack__slack_search_channels`, `…__slack_search_public`
     // and `…__slack_list_channel_members` — it searched the DEVELOPER's real
@@ -292,7 +292,7 @@ async function main() {
     },
   };
 
-  // F-1519 — positive-evidence marker `scripts/smoke-examples.mjs` classifies
+  // Positive-evidence marker `scripts/smoke-examples.mjs` classifies
   // REACHED-OUTBOUND on, printed immediately before this example's first
   // outbound (model) call. This example pins the PUBLISHED
   // `@pome-sh/adapter-claude-sdk` (it must stay `npx degit`-fetchable
@@ -321,7 +321,7 @@ async function main() {
       }
     }
   } catch (err) {
-    // F-1518: the Claude Agent SDK's message iterator can REJECT — not just
+    // The Claude Agent SDK's message iterator can REJECT — not just
     // yield an error `result` message — when the underlying `claude` CLI exits
     // non-zero (an invalid API key is one way; the SDK calls
     // `inputStream.error()` on the stream being iterated). Uncaught, that threw

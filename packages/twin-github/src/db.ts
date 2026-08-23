@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // GitHub twin schema — DDL + reset only (domain). The sqlite driver and the
-// pome pragma set live in the engine (`openTwinDatabase`, F-681); twins
+// pome pragma set live in the engine (`openTwinDatabase`); twins
 // never import a sqlite driver directly.
 import { openTwinDatabase } from "@pome-sh/sdk";
 import type { GitHubCloneDatabase } from "./types.js";
@@ -183,7 +183,7 @@ CREATE TABLE IF NOT EXISTS issue_labels (
 );
 
 -- issue_number names an issue OR a pull request, so no FK to issues — see
--- ensureCommentsAllowPullRequests below (F-1151).
+-- ensureCommentsAllowPullRequests below.
 CREATE TABLE IF NOT EXISTS issue_comments (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   repo_id INTEGER NOT NULL,
@@ -232,7 +232,7 @@ CREATE TABLE IF NOT EXISTS pull_request_files (
   raw_url TEXT NOT NULL DEFAULT '',
   contents_url TEXT NOT NULL DEFAULT '',
   patch TEXT NOT NULL DEFAULT '',
-  -- F-1500 — the pre-rename path, NULL on every status but 'renamed'. Nullable
+  -- The pre-rename path, NULL on every status but 'renamed'. Nullable
   -- rather than DEFAULT '': the serializer reads presence off the status, and
   -- an empty string here would be indistinguishable from a rename whose source
   -- path the diff failed to resolve. (No backticks in this literal: it is a
@@ -333,12 +333,12 @@ export function migrate(db: GitHubCloneDatabase) {
   ensureColumn(db, "pull_request_review_comments", "commit_sha", "TEXT");
   ensureColumn(db, "pull_request_review_comments", "in_reply_to_id", "INTEGER");
   ensureColumn(db, "collaborators", "invitation_state", "TEXT NOT NULL DEFAULT 'accepted'");
-  // F-1459 — real GitHub returns `updated_at` on every release and the twin
+  // Real GitHub returns `updated_at` on every release and the twin
   // omitted the key entirely. Defaulted to '' rather than NULL so an older
   // database migrates without a rewrite; `hydrateDerivedColumns` backfills it
   // from `created_at` for rows written before the column existed.
   ensureColumn(db, "releases", "updated_at", "TEXT NOT NULL DEFAULT ''");
-  // F-1500 — nullable, so a database written before renames were detected
+  // Nullable, so a database written before renames were detected
   // migrates with its existing rows reading `previous_filename: null`, which is
   // exactly what a non-renamed file should carry.
   ensureColumn(db, "pull_request_files", "previous_filename", "TEXT");
@@ -359,7 +359,7 @@ function ensureColumn(db: GitHubCloneDatabase, table: string, column: string, de
 }
 
 function ensureIssueNumberCascade(db: GitHubCloneDatabase) {
-  // `issue_comments` used to be rebuilt here too. It is not any more: F-1151
+  // `issue_comments` used to be rebuilt here too. It is not any more: a
   // removed its `issues` FK outright, so it has no cascade to fix, and leaving
   // it in this list would have this function put the constraint back on every
   // boot of an older database. `ensureCommentsAllowPullRequests` owns it now.
@@ -400,7 +400,7 @@ DROP TABLE issue_labels_old;
   db.pragma("foreign_keys = ON");
 }
 
-// F-1151 — a comment may hang off a PULL REQUEST, not only an issue.
+// A comment may hang off a PULL REQUEST, not only an issue.
 //
 // Real GitHub models every pull request as an issue and documents the Issue
 // Comments endpoints as the way to comment on a PR's conversation. The twin's
@@ -467,7 +467,7 @@ SET
   head_sha = COALESCE(head_sha, (SELECT head_sha FROM branches WHERE branches.repo_id = pull_requests.head_repo_id AND branches.name = pull_requests.head_ref)),
   base_sha = COALESCE(base_sha, (SELECT head_sha FROM branches WHERE branches.repo_id = pull_requests.base_repo_id AND branches.name = pull_requests.base_ref));
 
--- F-1459. \`updated_at\` arrived after \`releases\` existed, so a database written
+-- \`updated_at\` arrived after \`releases\` existed, so a database written
 -- by an earlier build has it at the column default (''). A release this twin
 -- serves has never been edited — there is no release-update route — so its
 -- update instant IS its creation instant, and backfilling is exact rather than

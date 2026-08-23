@@ -62,7 +62,7 @@ export function createFailureInjectionStore(): FailureInjectionStore {
   // method, path) counter keys keep accounts independent for matching;
   // rules themselves apply to whichever account issues the matching
   // request. Single-account scenarios (the common case, including the
-  // FDRS-316 hero) don't need to express scope per rule.
+  // hero scenario) don't need to express scope per rule.
   let rules: FailureInjectionRule[] = [];
   const counters = new Map<string, number>();
   const tuplesWithRules = new Set<string>();

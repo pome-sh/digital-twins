@@ -1,41 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-754 export-surface guard, for the cloud control-plane half of the former
-// `@pome-sh/shared-types` barrel (F-942 moved these clusters to
-// `cli/src/contract/`; the trace half is
-// `packages/wire/test/export-surface.test.ts`). Between the two files every
-// symbol the old snapshot named is still named, so the three-way split is
-// auditable as a partition rather than as a loosening. The GitHub access-control
-// values left in the same milestone and are exercised by
-// `packages/twin-github/test/access-control-catalog.test.ts`.
-//
-// `pome-cloud` imports these runtime values by name. If a re-export is dropped,
-// renamed, or shadowed by an `export *` collision, the sorted key list below
-// drifts and this test fails loud.
-//
-// The expected list is an explicit inline array (not a `.snap` file) so the
-// surface reads plainly in review. It was generated from the pre-refactor
-// `main` build. When you intentionally add/remove an export, update this list in
-// the same PR.
+// Export-surface guard, for the cloud control-plane half of the former
+// `@pome-sh/shared-types` barrel (these clusters moved to `cli/src/contract/`; the trace.
 
 import { describe, expect, it } from "vitest";
 import * as api from "../../../src/contract/index.js";
-// TYPE-surface guard: `Object.keys` only sees runtime values, so dropping an
-// `export type` / `export interface` — or a whole type-only leaf re-export —
-// would pass the runtime snapshot silently. This type-only import enumerates
-// every `export type` / `export interface` that must remain on the barrel
-// (grep-grounded from the pre-refactor index.ts, minus intentionally removed
-// EvaluatorHooks / TraceUploadContext in 0.9.0). It is enforced when
-// `npm run typecheck` compiles this test: a dropped or renamed type breaks
-// the build.
-//
-// F-1201 added the trace surface — `Event`, `OtelEvent`, `RecorderEvent` and
-// the eight per-kind variant types. They had been absent since F-754, so a
-// dropped or renamed event kind was the one public-type change this guard could
-// not see, on exactly the surface `trace-contract.json` calls canonical. Note
-// what this guard does and does not do: it catches a kind that DISAPPEARS or is
-// RENAMED. A kind that is ADDED is the fixture gate's job
-// (`scripts/emit-trace-contract.mjs`), because no tuple can require a payload.
+// TYPE-surface guard: `Object.keys` only sees runtime values, so dropping an `export
+// type` / `export interface` — or a whole type-only leaf re-export — would.
 import type {
   AcceptInviteRequest,
   AcceptInviteResponse,
@@ -234,10 +204,7 @@ const EXPECTED_EXPORTS = [
   "stripeSeedStateSchema",
   "submitResultRequestSchema",
   "submitResultResponseSchema",
-  // F-1302 — a task's population (`conformance` / `restraint` / `adversarial`).
-  // Added deliberately, which is what this pinned list is for: the barrel is a
-  // published surface, and a schema arriving in it unnoticed is how one becomes
-  // load-bearing before anyone decided it should be.
+  // A task's population (`conformance` / `restraint` / `adversarial`).
   "taskClassSchema",
   "taskConfigSchema",
   "taskSchema",
@@ -249,7 +216,7 @@ const EXPECTED_EXPORTS = [
   "userSchema",
 ] as const;
 
-describe("cli/src/contract barrel export surface (F-754, F-942)", () => {
+describe("cli/src/contract barrel export surface", () => {
   it("re-exports exactly the pre-refactor runtime value surface", () => {
     expect(Object.keys(api).sort()).toEqual([...EXPECTED_EXPORTS]);
   });

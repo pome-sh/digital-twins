@@ -2,7 +2,7 @@
 // v1 default seed mints exactly one api key (sk_test_pome_default → sid="default").
 // Other twin state is empty by design — agent runs create their own PIs.
 //
-// FDRS-364 extends the seed shape to also accept prerequisite Stripe state
+// The seed shape also accepts prerequisite Stripe state
 // (payment_intents / charges / refunds / balance_transactions) so scenarios
 // can stand up "agent walks in mid-flow" situations like scenario 14's
 // refund-retry double-charge. Each new collection mirrors the wire shape
@@ -144,10 +144,10 @@ export function parseSeed(input: unknown): SeedState {
 
 /**
  * Boot-time seed loader: prefer `POME_SEED_JSON` env (set by the cloud
- * control-plane from the CLI-supplied scenario seed; see FDRS-353 +
- * FDRS-361) and fall back to `defaultSeed()` when the env is absent.
+ * control-plane from the CLI-supplied scenario seed;  +
+ * and fall back to `defaultSeed()` when the env is absent.
  *
- * Unwrap contract (FDRS-365 + FDRS-369): scenarios may send the
+ * Unwrap contract: scenarios may send the
  * canonical wrapped shape `{ stripe: { seed: {...} } }` (what scenario
  * 14 uses) or the flat shape `{ payment_intents: [...], ... }`. We peel
  * `body.stripe?.seed ?? body` so both shapes work end-to-end without

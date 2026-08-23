@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-722 — recorder hot-path overhead gate.
+// Recorder hot-path overhead gate.
 // Micro-benchmarks heap vs durable (file-backed, fsync) `record()` latency
 // using the same twin-core store production twins use, and fails if durable
 // p99 exceeds RECORDER_OVERHEAD_BUDGET_MS (default 5ms per event).
@@ -43,7 +43,7 @@ function sampleEvent(i: number): RecorderEvent {
     method: "POST",
     path: "/s/test/items",
     request_body: { i },
-    // F-1125 — a representative row, because the durable store's cost is
+    // A representative row, because the durable store's cost is
     // dominated by `JSON.stringify` of it. `request_headers` is the widest field
     // a real request adds and it is on EVERY event, so a sample that omitted it
     // would under-measure the hot path this gate exists to protect and report a

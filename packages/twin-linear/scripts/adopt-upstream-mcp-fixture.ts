@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Derive `fixtures/mcp-tools-list.{raw,meta,canonical}.json` from the upstream
-// golden at `fixtures/mcp-tools-list/linear.*` (F-1470).
+// golden at `fixtures/mcp-tools-list/linear.*`.
 //
 // ── WHAT THIS REPLACED ──────────────────────────────────────────────────────
 //
@@ -10,7 +10,7 @@
 // was ours. pome-cloud's MCP lane priced that at 435 findings across all 22
 // compared tools — every single one diverged — against twin-slack's 0.
 //
-// It is the same shape F-1468 retired on twin-github, one step further from the
+// It is the same shape retired on twin-github, one step further from the
 // vendor: github at least transcribed a table it served, this one was authored
 // from prose. And it is the EASIER of the two to fix, because twin-linear's 22
 // names are a STRICT SUBSET of the golden's 58 (`twin_only` is 0, measured).
@@ -23,9 +23,9 @@
 // copies every surviving name, description, inputSchema and annotation through
 // byte for byte. It cannot rename, re-describe, re-shape a schema, or add a tool
 // Linear does not serve — which is exactly the set of edits that produced the
-// defect F-1330 fixed on twin-slack.
+// defect fixed on twin-slack.
 //
-// `DROPPED` is the subtraction and each entry gives its reason. F-1470 ruled the
+// `DROPPED` is the subtraction and each entry gives its reason. The ruling covers the
 // same 36 in pome-cloud's `known-divergences/linear.mcp.yaml` against
 // `mcp-tool-upstream-only` — as NINE entries, one per capability family, because
 // each family is one absence rather than N independent ones. That yaml is the
@@ -54,14 +54,14 @@ const PRODUCER =
 
 /**
  * The 36 tools Linear declares under a read+write grant that this twin does not
- * model, and why. F-1470's scope ruling, grouped by CAPABILITY: each family is
+ * model, and why. the scope ruling, grouped by CAPABILITY: each family is
  * one absence, and modelling any member means building the thing all of them
  * read from.
  *
  * ⚠️ THESE ARE REAL TOOLS, NOT SCOPE ARTIFACTS, and that was measured rather
  * than assumed — see `fixtures/mcp-tools-list/linear.meta.json`'s
  * `configuration.matchesExaminee`: the same endpoint, captured the same day,
- * answered 36 tools under `read` and 58 under `read write`. F-1394 asked whether
+ * answered 36 tools under `read` and 58 under `read write`. The question was whether
  * the golden had been captured under too narrow a grant; the capture that
  * answers it holds BOTH scopes, which are the only two `mcp.linear.app` gates
  * tools behind.

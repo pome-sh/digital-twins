@@ -15,7 +15,7 @@ const port = Number(process.env.PORT ?? process.env.SLACK_CLONE_PORT ?? 3333);
 const host = process.env.SLACK_CLONE_HOST ?? "127.0.0.1";
 const dbPath = process.env.SLACK_CLONE_DB ?? ".slack_clone/slack.db";
 
-// F-708: an env-injected TWIN_AUTH_SECRET always wins; a non-loopback bind
+// An env-injected TWIN_AUTH_SECRET always wins; a non-loopback bind
 // with no env self-generates a secret and persists it at the compose-era
 // contract location (.pome-data/slack/secret). The engine's serve() runs
 // the same guard; calling it here first keeps a failed boot from touching
@@ -23,11 +23,11 @@ const dbPath = process.env.SLACK_CLONE_DB ?? ".slack_clone/slack.db";
 ensureTwinAuthSecret("slack", host);
 
 const db = openSlackTwinDatabase(dbPath);
-// POME_SEED_JSON (FDRS-353) is strict-parsed: a malformed cloud seed fails
+// POME_SEED_JSON is strict-parsed: a malformed cloud seed fails
 // the boot loudly instead of silently serving the default world.
 const seed = process.env.SLACK_CLONE_NO_SEED === "1" ? undefined : loadSeedFromEnv();
 
-// F-698: durable when POME_RECORDER_EVENTS_PATH is set (resolved inside serve).
+// Durable when POME_RECORDER_EVENTS_PATH is set (resolved inside serve).
 await serve(slackTwinDefinition, {
   port,
   hostname: host,

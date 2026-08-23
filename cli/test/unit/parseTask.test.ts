@@ -73,7 +73,7 @@ passThreshold: 75
     ).toThrow(/prompt/i);
   });
 
-  it("parses flat Stripe seed state (FDRS-365)", () => {
+  it("parses flat Stripe seed state", () => {
     const scenario = parseTask(`# Stripe Demo
 
 ## Prompt
@@ -184,7 +184,7 @@ twins: ["linear"]
     });
   });
 
-  it("rejects wrapped Stripe seed shape (FDRS-365)", () => {
+  it("rejects wrapped Stripe seed shape", () => {
     expect(() =>
       parseTask(`# Wrapped should fail
 
@@ -213,7 +213,7 @@ twins: ["stripe"]
     ).toThrow();
   });
 
-  it("parses Stripe failure_injection rules (FDRS-339)", () => {
+  it("parses Stripe failure_injection rules", () => {
     const scenario = parseTask(`# Stripe Failure Injection
 
 ## Prompt
@@ -450,9 +450,8 @@ ${seed ? `\n## Seed State\n\`\`\`json\n${seed}\n\`\`\`\n` : ""}${MULTI_CONFIG}`;
     expect("channels" in envelope.slack).toBe(true);
   });
 
-  // F-1509. The slack arm is the union's only `.strict()` one, so an unlisted key
-  // is REJECTED rather than stripped — `files` had to be added to the arm, not
-  // just to the twin. Without that line this parse throws.
+  // The slack arm is the union's only `.strict()` one, so an unlisted key is REJECTED
+  // rather than stripped — `files` had to be added to the arm, not just to.
   it("carries a slack seed's files key through the envelope", () => {
     const scenario = parseTask(
       multiTask(
@@ -534,7 +533,7 @@ p
   });
 });
 
-describe("criterion marker grammar — [code]/[model] (F-778)", () => {
+describe("criterion marker grammar — [code]/[model]", () => {
   const single = (criteria: string) => `# Markers
 
 ## Prompt
@@ -607,16 +606,9 @@ twins: ["github", "slack"]
   });
 });
 
-// F-1296 (pome-cloud) / F-1299 — the `always-scored` marker keyword. The
-// hosted mirror (`apps/mcp/src/task/parseTask.ts`) has accepted this grammar
-// since F-1296; this CLI's copy did not, so a task written with the keyword
-// parsed hosted and lost the criterion here — the older regex did not match
-// the line and `parseCriteria` skipped it as unrecognised prose, same as any
-// other line it does not understand. See docs/grading/seed-exclusion.md
-// (pome-cloud) for what the keyword is FOR: exempting a criterion from the
-// seed-exclusion rule so an inverse task ("refusing to act is the exam") does
-// not lose its whole state half.
-describe("criterion marker grammar — always-scored (F-1296/F-1299)", () => {
+// The `always-scored` marker keyword. The hosted mirror
+// (`apps/mcp/src/task/parseTask.ts`) has accepted this grammar for longer; this CLI's copy did not.
+describe("criterion marker grammar — always-scored", () => {
   const single = (criteria: string) => `# Markers
 
 ## Prompt
@@ -670,7 +662,7 @@ twins: ["github", "slack"]
     expect(task.criteria).toHaveLength(1);
     const criterion = task.criteria[0]!;
     expect(Object.hasOwn(criterion, "alwaysScored")).toBe(false);
-    // Byte-identical to the pre-F-1299 shape: exactly {type, text}.
+    // Byte-identical to the legacy shape: exactly {type, text}.
     expect(criterion).toEqual({ type: "code", text: "Something deterministic" });
   });
 
@@ -713,22 +705,8 @@ twins: ["github", "slack"]
   });
 });
 
-// F-1444 — a line that reaches for the criterion grammar and MISSES.
-//
-// F-1299 made both parsers accept `always-scored`; neither noticed a line that
-// tried to use it and mistyped it. `parseCriteria` skips every line the marker
-// regex refuses, so each of the three lines below loaded the task with one fewer
-// criterion and no error — the task ran, scored out of a smaller denominator,
-// and read as a clean bill. Same failure class the retired-marker guard already
-// covers for [D]/[P], which is why the fix has the same shape: a SEPARATE regex
-// beside CRITERION_LINE_RE, which is untouched (it is the registered authority
-// pome-cloud's scripts/check-criterion-grammar.ts compares across five copies).
-//
-// The over-correction is the thing to watch. A near-miss rule that fires on
-// "bullet, then bracket" turns ordinary markdown — task lists, prose asides —
-// into a parse error, which is louder than the silent drop but far more
-// disruptive. The prose cases below are as load-bearing as the throwing ones.
-describe("near-miss criterion lines are refused, not dropped as prose (F-1444)", () => {
+// A line that reaches for the criterion grammar and MISSES.
+describe("near-miss criterion lines are refused, not dropped as prose", () => {
   const single = (criteria: string) => `# Markers
 
 ## Prompt
@@ -772,10 +750,7 @@ twins: ["slack"]
   }
 
   // The message is pinned WHOLE, because it is shared with the hosted parser
-  // (`apps/mcp/src/task/parseTask.ts`, pome-cloud) word for word. Wording that
-  // drifts is the cross-parser disagreement F-1299 closed, in a new costume:
-  // the same typo would be described two different ways depending on where the
-  // task was parsed.
+  // (`apps/mcp/src/task/parseTask.ts`, pome-cloud) word for word.
   it("refuses with the exact wording the hosted parser uses", () => {
     expect(() => parseTask(withKeeper("- [code alwaysscored] X"))).toThrow(
       'Criterion line "- [code alwaysscored] X" reaches for a [code]/[model] marker but does ' +
@@ -860,11 +835,9 @@ twins: [github]
   });
 });
 
-// F-1134 — the tolerant reader `pome checks add` and `pome checks lint` use to
-// audit a file they did not necessarily finish writing. Separate from
-// `parseTask` on purpose: an in-progress task file may carry zero criteria and
-// no resolvable seed, both of which `taskSchema` refuses.
-describe("readCodeCriteria (F-1134)", () => {
+// The tolerant reader `pome checks add` and `pome checks lint` use to audit a file
+// they did not necessarily finish writing.
+describe("readCodeCriteria", () => {
   const file = (criteria: string, twins = "[github]") => `# Audit
 
 ## Prompt
@@ -897,12 +870,8 @@ twins: ${twins}
     ]);
   });
 
-  // F-1299 regression: CRITERION_LINE_RE gained a capture group for
-  // always-scored, shifting every group after it. readCodeCriteria reads the
-  // SAME regex by index (match[2] tag, match[3]/[4] text) — a stale index
-  // here would silently corrupt `text` (e.g. report " always-scored" or the
-  // wrong slice) instead of failing loudly, which is exactly the silent-drop
-  // defect class this file exists to catch, one level down.
+  // Regression: CRITERION_LINE_RE gained a capture group for always-scored, shifting
+  // every group after it.
   it("reads the criterion's text correctly when the marker carries always-scored", () => {
     const found = readCodeCriteria(
       file("- [code:slack always-scored] A message was posted", "[github, slack]"),

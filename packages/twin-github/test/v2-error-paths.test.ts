@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-300 — defensive error paths and edge cases for v2 hot paths.
-// Targets uncovered branches (malformed JSON, missing required params, etc.).
+// Defensive error paths and edge cases for v2 hot paths.
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -62,7 +61,7 @@ describe("v2 error paths — REST envelope", () => {
     const app = createGitHubCloneApp();
     const response = await app.request(`${base}/some/totally/made/up/path`, withAuth(token));
     expect(response.status).toBe(501);
-    // FDRS-431: the 'unsupported' envelope lives under `_twin.*`, matching
+    // The 'unsupported' envelope lives under `_twin.*`, matching
     // twin-slack / twin-stripe. No bare top-level `fidelity` key (clean cutover).
     const body = await response.json() as {
       fidelity?: unknown;

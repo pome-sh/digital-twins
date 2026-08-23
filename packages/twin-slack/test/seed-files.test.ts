@@ -1,19 +1,4 @@
-/**
- * Seeded files (F-1509).
- *
- * WHAT WAS WRONG, stated as the thing these tests refuse. `files` had exactly
- * one writer — `filesUpload`, a mutation — so `files.list` and `files.info`
- * against a freshly seeded world always answered on an empty table. The
- * fidelity watchdog measured that as `GET /files.list upstream=1 twin=0` and,
- * because the diff engine compares NO elements when either array side is empty,
- * the empty twin array masked every field-level comparison on the surface: one
- * count finding, and not one thing more.
- *
- * So the load-bearing assertion here is not "a row exists" — it is that a
- * SEEDED file reaches `files.list` and `files.info` with the SAME derivations an
- * UPLOADED file gets. A seed that planted rows `serializeFile` renders
- * differently would trade the empty-array blind spot for a subtler one.
- */
+/** Seeded files. WHAT WAS WRONG, stated as the thing these tests refuse. */
 import { describe, expect, it } from "vitest";
 import { openSlackTwinDatabase } from "../src/db.js";
 import { SlackDomain } from "../src/domain/index.js";

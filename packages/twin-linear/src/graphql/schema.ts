@@ -302,7 +302,7 @@ export const linearGraphQLSchema: GraphQLSchema = buildSchema(`
     team: Team
   }
 
-  """Linear's AgentSessionStatus, member-for-member (F-1172)."""
+  """Linear's AgentSessionStatus, member-for-member."""
   enum AgentSessionStatus {
     pending
     active
@@ -325,7 +325,7 @@ export const linearGraphQLSchema: GraphQLSchema = buildSchema(`
     activities(first: Int, after: String, last: Int, before: String): AgentActivityConnection!
   }
 
-  """Linear's AgentActivitySignal, member-for-member (F-1176)."""
+  """Linear's AgentActivitySignal, member-for-member."""
   enum AgentActivitySignal {
     stop
     continue
@@ -339,7 +339,7 @@ export const linearGraphQLSchema: GraphQLSchema = buildSchema(`
     Linear's AgentActivityContent union, carried as an opaque payload: a
     {type, body} object for five of the six members, {type, action, parameter}
     for the action member. The union itself is a scalar-level divergence,
-    written up in REFERENCE-DIVERGENCES.md (F-1176).
+    written up in REFERENCE-DIVERGENCES.md.
     """
     content: JSON!
     signal: AgentActivitySignal
@@ -501,13 +501,13 @@ export const linearGraphQLSchema: GraphQLSchema = buildSchema(`
     enabled: Boolean
   }
 
-  """Linear's AgentSessionExternalUrlInput, field-for-field (F-1172)."""
+  """Linear's AgentSessionExternalUrlInput, field-for-field."""
   input AgentSessionExternalUrlInput {
     url: String!
     label: String!
   }
 
-  """Linear's AgentSessionCreateOnIssue, minus the fields the twin does not model (F-1176)."""
+  """Linear's AgentSessionCreateOnIssue, minus the fields the twin does not model."""
   input AgentSessionCreateOnIssue {
     issueId: String!
     externalUrls: [AgentSessionExternalUrlInput!]
@@ -519,7 +519,7 @@ export const linearGraphQLSchema: GraphQLSchema = buildSchema(`
   }
 
   """
-  Linear declares no status and no id field here (F-1176). Status follows the
+  Linear declares no status and no id field here. Status follows the
   agent's activities; id is the mutation's own non-null argument.
   """
   input AgentSessionUpdateInput {

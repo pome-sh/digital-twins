@@ -8,7 +8,7 @@ export class TwinError extends Error {
      * Overrides the generic `https://docs.github.com/rest` below. Real GitHub
      * points at the SPECIFIC operation on some errors, and where this twin
      * reproduces such an error verbatim it has to reproduce that too — the
-     * envelope is compared leaf by leaf, so a generic url is a diff (F-1460).
+     * envelope is compared leaf by leaf, so a generic url is a diff.
      */
     readonly documentationUrl?: string
   ) {
@@ -22,8 +22,8 @@ export class TwinError extends Error {
  *
  * Not a fallback nobody meant: GitHub itself answers exactly this on 14 of 59
  * measured errors — every 401, every unrouted path, and `GET /users/:username`
- * (F-1490's transcript). `withOperationDocs` below only overwrites THIS value,
- * so a url a throw site already knew (F-1460, F-1491) survives.
+ * (the transcript). `withOperationDocs` below only overwrites THIS value,
+ * so a url a throw site already knew survives.
  */
 export const GENERIC_DOCUMENTATION_URL = "https://docs.github.com/rest";
 
@@ -31,7 +31,7 @@ export const GENERIC_DOCUMENTATION_URL = "https://docs.github.com/rest";
  * Build GitHub's error body: `{message, documentation_url, status, errors?}`.
  *
  * `status` is rendered as a **STRING**, which looks like a bug and is not.
- * Measured live against `api.github.com` on 2026-08-12 (F-1490): **59 of 59**
+ * Measured live against `api.github.com` on 2026-08-12: **59 of 59**
  * error responses across 400 / 401 / 403 / 404 / 409 / 422 sent it quoted, with
  * no exceptions and no absences, and GitHub's own published OpenAPI description
  * declares it that way too — `basic-error` has `status: {type: string}`. Two
@@ -51,8 +51,7 @@ export function githubError(message: string, status: number, errors?: unknown[],
 }
 
 /**
- * Attach the operation's `documentation_url` to an already-projected envelope
- * (F-1498). The DOOR knows the operation; the error does not.
+ * Attach the operation's `documentation_url` to an already-projected envelope. The DOOR knows the operation; the error does not.
  *
  * Deliberately envelope-side rather than error-side on the REST leg: it has to
  * reach the zod branch and the JSON-parse branch too, which raise no
@@ -61,7 +60,7 @@ export function githubError(message: string, status: number, errors?: unknown[],
  *
  * Two things it will not do:
  * - **overwrite a url the throw site already knew.** `domain/git.ts` stamps the
- *   contents-door `sha` and base64 errors (F-1460, F-1491); those are the same
+ *   contents-door `sha` and base64 errors; those are the same
  *   operation this would stamp, and re-stamping them would make the throw-site
  *   constants dead code that looks live.
  * - **name an operation on a 501.** The twin's own refusals — an unrouted path,
@@ -81,7 +80,7 @@ export function withOperationDocs(
 }
 
 /**
- * The same attachment, error-side, for the MCP door (F-1498).
+ * The same attachment, error-side, for the MCP door.
  *
  * The MCP leg cannot use the envelope form: the SDK projects a tool error
  * through the twin-wide `errorEnvelope` with no per-tool hook, and the operation
@@ -109,7 +108,7 @@ export function conflict(message: string, documentationUrl?: string): never {
  * GitHub's answer to a required body field the caller did not send: 422, this
  * message, and NO `errors` array.
  *
- * Measured live 2026-08-12 (F-1491) on four unrelated surfaces, which is what
+ * Measured live 2026-08-12 on four unrelated surfaces, which is what
  * makes this a general rule rather than one route's quirk — `PUT /contents/*`
  * and `DELETE /contents/*` (`sha`), `POST /issues` (`title`), `POST /pulls`
  * (`head`) all answered `Invalid request.\n\n"<field>" wasn't supplied.`

@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// Moved from `packages/adapter-claude-sdk/test/fetch.test.ts` by F-950 — the
-// fetch hook is now wire's, so its guard is too. The cases are unchanged except
-// for the renamed exports and `withCorrelation` in place of a raw
-// `callContext.run`; the two-gate contract they pin (ALS scope AND allowlisted
-// origin) is exactly the pre-move one.
+// Moved from `packages/adapter-claude-sdk/test/fetch.test.ts` — the fetch hook is now
+// wire's, so its guard is too.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { withCorrelation } from "../src/correlation/context.js";
@@ -138,9 +134,8 @@ describe("installCorrelationFetchHook", () => {
   });
 
   it("carries the SAME id across two microtask hops and a parallel fan-out", async () => {
-    // The FDRS-322 silent-failure mode, at the level of the neutral core: an ALS
-    // store that did not survive chained awaits produced an absent header while
-    // every "header present" assertion above still passed for the simple case.
+    // The silent-failure mode, at the level of the neutral core: an ALS store that did
+    // not survive chained awaits produced an absent header while every "header.
     installCorrelationFetchHook({ twinHosts: ["http://127.0.0.1:3333"] });
     await withCorrelation("tlc_hops", async () => {
       await new Promise((r) => setTimeout(r, 0));

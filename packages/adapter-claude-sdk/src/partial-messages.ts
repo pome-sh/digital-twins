@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-998 — everything about `includePartialMessages`: when the adapter turns it
+// Everything about `includePartialMessages`: when the adapter turns it
 // on behind the caller's back, which messages that adds (so they can be
 // filtered back out), and the `message_delta` tracker both telemetry lanes read
 // the true per-turn output-token count from.
@@ -23,8 +23,7 @@
 // the flag, never without it, two runs each way), and the `claude` binary
 // itself, where ONE gate variable guards both emissions:
 //
-//     case"stream_request_start": if(H) yield {type:"system",subtype:"status",status:"requesting"}
-//     ...                         if(H) yield {type:"stream_event", event:...}
+//     case"stream_request_start": if(H) yield {type:"system",subtype:"status",status:"requesting"}. ..                         if(H) yield {type:"stream_event", event:...}
 //
 // The sibling `case"sdk_status"` path — `compacting`, the permission-mode
 // `status:null`, `compact_result` / `compact_error` — is NOT behind that gate.

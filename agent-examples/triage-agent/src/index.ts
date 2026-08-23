@@ -10,7 +10,7 @@
  *
  * 1. Standalone — start the twin with `npx @pome-sh/cli twin start github`,
  *    then `npm run start` from this directory. Auth comes from env only
- *    (F-647): either paste the POME_AUTH_TOKEN the CLI prints, or export the
+ *    Env only: either paste the POME_AUTH_TOKEN the CLI prints, or export the
  *    same TWIN_AUTH_SECRET in both terminals and the agent mints its own
  *    bearer JWT. The agent talks to the twin at
  *    http://127.0.0.1:3333/s/standalone/mcp.
@@ -101,7 +101,7 @@ const BASELINE_TRUST =
 const USE_BASELINE = process.env.POME_TRIAGE_BASELINE === "1";
 const SYSTEM_PROMPT = SYSTEM_PROMPT_CORE + (USE_BASELINE ? BASELINE_TRUST : INJECTION_HARDENING);
 
-// Optional model override (F-928). When set, it is forwarded verbatim as the
+// Optional model override. When set, it is forwarded verbatim as the
 // Claude Agent SDK's `options.model`, which the SDK turns into the `claude`
 // CLI's `--model` flag. Omit it to run the CLI's own default model. Accepts an
 // alias (`haiku`, `sonnet`, `opus`) or a full id (`claude-haiku-4-5`).
@@ -154,7 +154,7 @@ async function main() {
       // (.claude/settings.local.json) — INCLUDING the Claude Code plugin MCP
       // servers configured on whoever's machine this runs on. Omitted, the SDK
       // loads all three ("matches CLI defaults"); `[]` is its documented
-      // isolation mode. Measured 2026-08-05 (F-1295): a sibling example with
+      // isolation mode. Measured 2026-08-05: a sibling example with
       // `tools: []` already set searched the DEVELOPER's real Slack workspace,
       // made zero twin calls, and would have scored as a triage failure.
       tools: [],
@@ -174,7 +174,7 @@ async function main() {
       if (msg.type === "system" && msg.subtype === "init") {
         // The SDK's init message carries the model the CLI actually resolved —
         // log it so a downshift (or a silent runtime override) is visible, never
-        // guessed (F-928).
+        // guessed.
         console.log(
           `model:    ${msg.model}` +
             (MODEL ? ` (requested "${MODEL}")` : " (SDK default — no options.model set)")
@@ -194,7 +194,7 @@ async function main() {
       }
     }
   } catch (err) {
-    // F-1518: the Claude Agent SDK's message iterator can REJECT — not just
+    // The Claude Agent SDK's message iterator can REJECT — not just
     // yield an error `result` message — when the underlying `claude` CLI exits
     // non-zero (an invalid API key is one way; the SDK calls
     // `inputStream.error()` on the stream being iterated). Uncaught, that threw
@@ -261,7 +261,7 @@ function startThinkingIndicator() {
  * Build the tool table this agent hands the model.
  *
  * Exported and config-taking (rather than closing over module-level env) so a
- * gate can exercise every tool against a live twin without a model — F-1152.
+ * gate can exercise every tool against a live twin without a model.
  * The sibling `pr-summary-*` examples shipped a `comment_on_pull_request` the
  * GitHub twin refused on every subject for as long as they existed, because
  * neither older example gate ever reaches a twin call.
@@ -278,12 +278,12 @@ export function buildTwinTools(config: { mcpUrl: string; token: string }) {
     "List open issues in a repository on the GitHub twin. Returns the array as JSON text.",
     ownerRepo,
     async ({ owner, repo }) => {
-      // `OPEN`, not `open` (F-1468). GitHub's MCP `list_issues` declares
+      // `OPEN`, not `open`. GitHub's MCP `list_issues` declares
       // `state` as `["OPEN","CLOSED"]` — its REST `GET /issues` is the one that
       // takes lowercase, and the two are genuinely different spellings on the
       // same vendor. The twin accepted lowercase until the validator was
       // tightened onto GitHub's declaration; this call site is the one place in
-      // the bundled examples that was relying on that, found by the F-1468
+      // the bundled examples that was relying on that, found by the fixture
       // corpus heat read.
       const issues = await twin.call("list_issues", { owner, repo, state: "OPEN" });
       return { content: [{ type: "text", text: JSON.stringify(issues, null, 2) }] };
@@ -362,10 +362,10 @@ class TwinMcpClient {
   }
 }
 
-// Auth is env-only (F-647): the agent never probes the twin's on-disk state —
+// Auth is env-only: the agent never probes the twin's on-disk state —
 // the persisted-secret location is a server↔CLI internal contract
-// (F-708/F-709), and probing it from a third-party agent is exactly the
-// coupling that broke the old quickstart (F-604).
+// and probing it from a third-party agent is exactly the
+// coupling that broke the old quickstart.
 export async function resolveAuthToken(): Promise<string> {
   // Pome CLI evaluator (and `pome twin start`'s printed line) pre-mint the
   // token and pass it as POME_AUTH_TOKEN.
@@ -395,7 +395,7 @@ async function preflight(token: string): Promise<void> {
   // Standalone mode only: probe the local twin's root /healthz so "the twin
   // isn't running" gets a direct message. When a pome runner injected
   // POME_GITHUB_MCP_URL there is no loopback twin — TWIN_BASE_URL falls back
-  // to 127.0.0.1:3333 and hosted `pome run` died here probing it (FDRS-667).
+  // to 127.0.0.1:3333 and hosted `pome run` died here probing it.
   // The authenticated ${MCP_URL}/tools probe below already covers
   // reachability + auth in every mode.
   if (!process.env.POME_GITHUB_MCP_URL) {
@@ -410,7 +410,7 @@ async function preflight(token: string): Promise<void> {
   // subscription token (CLAUDE_CODE_OAUTH_TOKEN, from `claude setup-token`),
   // or a `claude` login stored on this machine — that last one is invisible
   // to env, so hard-failing here would block subscription users whose runs
-  // would succeed. Warn with both options instead of throwing (FDRS-667).
+  // would succeed. Warn with both options instead of throwing.
   if (!process.env.ANTHROPIC_API_KEY && !process.env.CLAUDE_CODE_OAUTH_TOKEN) {
     console.warn(
       "warning: neither ANTHROPIC_API_KEY nor CLAUDE_CODE_OAUTH_TOKEN is set — continuing, assuming a stored `claude` subscription login. " +
@@ -467,7 +467,7 @@ function trimSlash(url: string): string {
 // the POME_PREFLIGHT path (an early return) masked this.
 // NOT `import.meta.main`: that landed in Node 24.2 and this package's `engines`
 // allows `>=24`, so on 24.0/24.1 it is `undefined`, this guard is false, and
-// `npm start` prints nothing and exits 0 having run no agent at all (F-1481).
+// `npm start` prints nothing and exits 0 having run no agent at all.
 // Realpath'd on BOTH sides because node resolves symlinks before deriving
 // `import.meta.url`, so a bare `resolve` of argv[1] misses through a symlinked
 // checkout (a worktree, macOS's `/tmp`) in the same silent shape.

@@ -1,31 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// Engine gaps surfaced by the F-682 port (twin-github → thin plugin).
-// Written test-first per the pilot rule: gaps are fixed in the engine, never
-// by re-adding per-twin harness code.
-//
-//   1. 204 responses — recorder.handle must answer a `{status: 204, body:
-//      null}` result with an empty-body 204 (Response forbids a body on
-//      null-body statuses; c.json(null, 204) used to surface as a 500).
-//      github's frozen surface has several 204 routes (branch/milestone/
-//      comment deletes, the collaborator-membership check).
-//   2. tool_call_id stamping (FDRS-402 adapter-rich path) — github's frozen
-//      tape persists the incoming x-pome-correlation-id as `tool_call_id` on
-//      every recorded event. Declarative per twin: slack's frozen tape
-//      stamps null (engine default).
-//   3. pomeHealth extras — a twin with a frozen `/s/:sid/_pome/health` shape
-//      (github: implementation/fidelity/runtime, no version) replaces the
-//      engine default `{version, fidelity}` extras.
-//   4. pomeRoutes — extra per-twin GET routes under the reserved `/_pome/*`
-//      session namespace (github's frozen GET /s/:sid/_pome/access-control).
-//      Core names (health/state/events) stay engine-owned.
-//   5. mcpUnknownTool — the JSON-RPC tools/call unknown-tool result body is
-//      frozen per twin: github pins the pre-port `{message: "Unknown tool:
-//      <name>"}` text while its legacy /mcp/call surface keeps the 422
-//      validation envelope from `errorEnvelope`.
-//   6. admin reportDelta — /admin/reset and /admin/seed handlers can report
-//      a state delta recorded on the event (github's frozen tape recorded
-//      the seed delta on admin mutations).
+// Engine gaps surfaced by the port (twin-github → thin plugin).
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -89,7 +63,7 @@ describe("recorder.handle answers 204 results with an empty body", () => {
   });
 });
 
-describe("tool_call_id stamping is a per-twin pin (FDRS-402)", () => {
+describe("tool_call_id stamping is a per-twin pin", () => {
   function stampedTwin(stampToolCallId: boolean) {
     return defineTwin({
       id: "stampy",

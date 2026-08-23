@@ -4,7 +4,7 @@
 //
 // One-import surface for users of Anthropic's `claude-agent-sdk` who want
 // pome step-boundary + tool-call signals overlaid on the trace. See README.md
-// for the full architecture; the [DECISION] comment on FDRS-322 captures the
+// for the full architecture; the [DECISION] comment captures the
 // rationale for the wrap-and-re-export design (vs. global fetch monkey-patch,
 // sidechannel-only correlator merge, etc.).
 //
@@ -17,7 +17,7 @@
 //     const myTool = tool("name", "desc", schema, handler);
 //     for await (const msg of query({ prompt, options: { ... } })) { ... }
 //
-// F-950: the correlation core this package used to own — the AsyncLocalStorage
+// The correlation core this package used to own — the AsyncLocalStorage
 // store and the `x-pome-correlation-id` fetch injection — now lives in
 // `@pome-sh/wire/correlation`, framework-agnostic, so a Vercel AI SDK or
 // LangGraph adapter gets the same race-proof guarantee instead of re-deriving

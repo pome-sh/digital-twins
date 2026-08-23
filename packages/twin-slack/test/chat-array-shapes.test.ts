@@ -1,46 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// `blocks` and `attachments` take a JSON STRING *or* a native ARRAY (F-1487).
-//
-// ── WHAT WAS MEASURED, AND AGAINST WHOM ────────────────────────────────────
-//
-// Five declarations in `route-inputs.ts` were `absentIfEmpty()` =
-// `z.string().optional()`, and the domain ran `sanitizeJsonString` over each:
-//
-//   POST /chat.postMessage      blocks, attachments
-//   POST /chat.update           blocks, attachments
-//   POST /chat.scheduleMessage  blocks
-//
-// So a body like `{"channel":"C1","blocks":[{"type":"section", …}]}` — the
-// natural spelling under `application/json`, and what an SDK produces — failed
-// the route parse and the method answered `{ok:false, error:"invalid_arguments"}`
-// at HTTP 200, the shape a status-code-only check reads as success.
-//
-// ⚠️ THIS WAS NOT INHERITED FROM F-1462. That ticket measured an OBJECT
-// `profile` on a profile method; these are ARRAYS on three messaging methods
-// with different validators behind them, and assuming they agree is the exact
-// error F-1462 was opened to prevent. All five were called separately on
-// 2026-08-12 against `pome-twin-sandbox`, three requests each:
-//
-//   C  form-encoded + JSON string   ok:true   (Slack's documented shape)
-//   B  application/json + string    ok:true   (so JSON bodies are fine here)
-//   A  application/json + ARRAY     ok:true   and each array's contents came
-//                                             back inside `message.blocks` /
-//                                             `message.attachments` — APPLIED,
-//                                             not merely tolerated
-//
-// B is what makes A readable: without it a refusal could have meant "Slack takes
-// no JSON body on this method", which is a different ticket. Slack accepts BOTH
-// forms on all five, so the twin refusing one was a false FAILURE — an
-// examinee's agent that sends the natural JSON shape fails here and passes in
-// production.
-//
-// ⚠️ THE STRING FORM IS NOT DEPRECATED BY THIS. Both are real, and the string
-// form is what `sandboxes/slack/rest-writes.ts` and every form-encoded SDK send.
-// A fix that swapped one for the other would move the divergence rather than
-// close it, so every case below is asserted in both shapes, and the assertions
-// read the WRITTEN STATE back — through `conversations.history`, or out of the
-// `scheduled_messages` row — rather than trusting the write's echo.
+// `blocks` and `attachments` take a JSON STRING *or* a native ARRAY.
 import { beforeEach, describe, expect, it } from "vitest";
 import { createSlackTwinApp } from "../src/twin.js";
 import { openSlackTwinDatabase } from "../src/db.js";

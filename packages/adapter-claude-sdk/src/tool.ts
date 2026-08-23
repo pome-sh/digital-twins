@@ -31,7 +31,7 @@ type ToolExtras = Parameters<typeof sdkTool>[4];
  * `createSdkMcpServer` — trips a cross-copy structural check on the handler's
  * contravariant `args` (`InferShape<any>` widens to `{ [x: string]: unknown }`)
  * and fails to typecheck. Widening the return sidesteps that trap without
- * losing per-handler `args` inference. (F-866.)
+ * losing per-handler `args` inference.
  */
 export function tool<Schema extends AnyZodRawShape>(
   name: string,
@@ -40,9 +40,9 @@ export function tool<Schema extends AnyZodRawShape>(
   handler: (args: InferShape<Schema>, extra: unknown) => Promise<ToolCallResult>,
   extras?: ToolExtras,
 ): SdkMcpToolDefinition<any> {
-  // F-1200: `extra` is load-bearing now — `wrapHandler` reads the SDK's real
+  // `extra` is load-bearing now — `wrapHandler` reads the SDK's real
   // `tool_use_id` off its `_meta` and forwards the argument on to the handler,
-  // which the pre-F-1200 wrapper dropped.
+  // which the legacy wrapper dropped.
   const wrapped = wrapHandler(handler as (a: unknown, extra: unknown) => Promise<ToolCallResult>);
   return sdkTool(
     name,

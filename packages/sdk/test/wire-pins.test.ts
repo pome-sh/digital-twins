@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// Engine pins from the F-683 M1 review: per-twin body readers, the
-// session-middleware slot, legacy /mcp/call alias keys, the pomeHealth
-// extras hook, the admin error envelope, the unrecorded /_pome/state
-// export, bounded recorder stores, and mint/verify exp symmetry.
+// Engine pins from the M1 review: per-twin body readers, the session-middleware slot,
+// legacy /mcp/call alias keys, the pomeHealth extras hook, the admin.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 import type { Context } from "hono";

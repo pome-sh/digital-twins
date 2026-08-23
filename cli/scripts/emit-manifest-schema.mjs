@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Emits src/contract/manifest-schema.json from the zod manifest schema (F-818),
+// Emits src/contract/manifest-schema.json from the zod manifest schema,
 // following the emit-trace-contract.mjs pattern: default mode writes the file,
 // --check fails if the committed file is missing or stale. The committed file is
 // what pome.sh/schemas/v1/pome.json serves, so a drift here is a drift in a

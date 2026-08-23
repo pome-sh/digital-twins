@@ -4,6 +4,13 @@ SPDX-License-Identifier: Apache-2.0
 
 # @pome-sh/wire — CHANGELOG
 
+## Unreleased (patch)
+
+**No consumer-visible change.** Internal tracker ids were removed from source
+comments, JSDoc and test names across the workspace, and the comment blocks
+touched in test files were cut to the claim they document. Prose only: no
+export, schema, tool, route, status code or response body moved.
+
 ## 0.3.1 — 2026-08-23
 
 **No consumer-visible change.** Internal tracker ids were removed from this

@@ -1,19 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1176: the agent-session MUTATION INPUTS are Linear's, and so is the model
-// they imply.
-//
-// F-1172 fixed the output type and said, in the guard file's own words, "do not
-// read this file as evidence about the input surface". The inputs still carried
-// `status` and `id` on `AgentSessionUpdateInput`, `appUserId` and `plan` on the
-// two creates, and `sessionId` / `type` / `body` on `AgentActivityCreateInput`
-// — none of which Linear declares. `test/linear-schema-subset.test.ts` now
-// guards the NAMES against Linear's real introspection; this file drives the
-// BEHAVIOUR they imply, which introspection cannot show:
-//
-//   * an argument Linear does not accept is refused here too, and
-//   * a session's status moves through activities, because upstream there is
-//     no other way to move it.
+// The agent-session MUTATION INPUTS are Linear's, and so is the model they imply.
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_LINEAR_TOKEN,
@@ -79,7 +65,7 @@ const CREATE_ACTIVITY = `mutation ($input: AgentActivityCreateInput!) {
   }
 }`;
 
-describe("the mutation inputs refuse what Linear refuses (F-1176)", () => {
+describe("the mutation inputs refuse what Linear refuses", () => {
   it("agentSessionUpdate has no status field — status is not settable by hand", async () => {
     const instance = app();
     const session = await newSession(instance);
@@ -174,7 +160,7 @@ describe("the mutation inputs refuse what Linear refuses (F-1176)", () => {
   });
 });
 
-describe("a session's status follows its activities (F-1176)", () => {
+describe("a session's status follows its activities", () => {
   it("moves the session for every AgentActivityType, from the one table that says so", async () => {
     // Driven off the table itself so a member added to `AgentActivityType`
     // without a transition cannot pass by being forgotten here.
@@ -234,7 +220,7 @@ describe("a session's status follows its activities (F-1176)", () => {
   });
 });
 
-describe("content is Linear's AgentActivityContent, not a free-text body (F-1176)", () => {
+describe("content is Linear's AgentActivityContent, not a free-text body", () => {
   it("round-trips an action's action/parameter/result, which carry no body upstream", async () => {
     const instance = app();
     const session = await newSession(instance);
@@ -325,7 +311,7 @@ describe("content is Linear's AgentActivityContent, not a free-text body (F-1176
   });
 });
 
-describe("signal, agentSession and user complete the AgentActivity surface (F-1176)", () => {
+describe("signal, agentSession and user complete the AgentActivity surface", () => {
   it("round-trips a signal and refuses one Linear does not declare", async () => {
     const instance = app();
     const session = await newSession(instance);
@@ -412,7 +398,7 @@ describe("signal, agentSession and user complete the AgentActivity surface (F-11
 // (REFERENCE-DIVERGENCES.md). Its `status` used to be read off the session
 // BEFORE the activity landed, which was harmless while nothing moved the
 // session and is a lie now that the activity is what moves it.
-describe("the prompted webhook carries the status the activity produced (F-1176)", () => {
+describe("the prompted webhook carries the status the activity produced", () => {
   it("reports pending after a prompt lands on an active session", async () => {
     const db = openLinearTwinDatabase(":memory:");
     const commands = new LinearDomain(db);

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// What Gmail's declared checks can assert about LABEL DEFINITIONS (F-1128).
+// What Gmail's declared checks can assert about LABEL DEFINITIONS.
 //
 // Separate from `check-messages.ts` because it asks a different question of a
 // different collection: whether a label EXISTS in the mailbox at all, not

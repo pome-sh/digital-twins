@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Derive `fixtures/mcp-tools-list.{raw,meta,canonical}.json` from the upstream
-// golden at `fixtures/mcp-tools-list/slack.*` (F-1330).
+// golden at `fixtures/mcp-tools-list/slack.*`.
 //
 // ── WHY THIS EXISTS ──────────────────────────────────────────────────────────
 //
-// The table is SLACK'S, captured live over OAuth by F-1329, and the twin's job
+// The table is SLACK'S, captured live over OAuth, and the twin's job
 // is to serve it. So the code is what has to follow, and the only thing this
 // script is allowed to do to the vendor's bytes is DROP a tool the heat ruling
 // says this twin does not expose.
 //
 // (This comment used to open by contrasting twin-github, "which derives its
-// fixture from `src/tools.ts`, because that twin's table is its own". F-1468
+// fixture from `src/tools.ts`, because that twin's table is its own". That
 // retired that: twin-github projects GitHub's capture now, through
 // `packages/twin-github/scripts/adopt-upstream-mcp-fixture.ts`. The one
 // remaining difference is that its producer can also ADD — two tools GitHub
@@ -21,7 +21,7 @@
 //
 // It cannot rename, cannot re-describe, cannot re-shape an inputSchema, and
 // cannot add a tool the capture does not carry. That is the whole point:
-// F-1330 exists because eleven names were typed into TypeScript from an
+// The adoption exists because eleven names were typed into TypeScript from an
 // archived reference server and served as though Slack had declared them. A
 // producer that can only subtract makes that unrepresentable.
 //
@@ -54,7 +54,7 @@ const CANONICAL = "mcp-tools-list.canonical.json";
  */
 const UNEXPOSED: Record<string, string> = {
   slack_send_message_draft:
-    "cold (F-1330 gate 1): a draft lives in the Slack client's 'Drafts & Sent' pane and has no " +
+    "cold (gate 1): a draft lives in the Slack client's 'Drafts & Sent' pane and has no " +
     "Web API analog to back it. Registered in known-divergences/slack.mcp.yaml; reasoning in " +
     "docs/slack-mcp-unexposed-tools.md.",
 };

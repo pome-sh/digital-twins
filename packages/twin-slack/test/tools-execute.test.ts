@@ -1,17 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// Every tool Slack declares and this twin serves, driven through
-// `executeTool` with the arguments SLACK'S schema takes.
-//
-// The parameter names are the point. Before F-1330 this file called
-// `slack_post_message({channel_id, text})` and `slack_add_reaction({...,
-// timestamp, reaction})` — and passed, because the twin's validator was built
-// from the same fabricated declaration. `message`, `message_ts` and `emoji`
-// below are Slack's.
-//
-// This is a domain-level driver, so it is deliberately NOT the twin's coverage
-// story for MCP dispatch; `config/twin-endpoint-probes.json` calls all 18 over
-// the wire, and `npm run probe:twins` is what gates that.
+// Every tool Slack declares and this twin serves, driven through `executeTool` with
+// the arguments SLACK'S schema takes.
 
 import { describe, expect, it } from "vitest";
 import { openSlackTwinDatabase } from "../src/db.js";
@@ -42,7 +31,7 @@ describe("executeTool", () => {
       message: "parent",
     }) as { ts: string };
 
-    // The fold F-1330 landed: no slack_reply_to_thread, because Slack puts the
+    // The fold: no slack_reply_to_thread, because Slack puts the
     // reply on the send via thread_ts.
     const reply = run("slack_send_message", {
       channel_id: "C_GENERAL",
@@ -86,7 +75,7 @@ describe("executeTool", () => {
       content: string;
       section_id_mapping: Record<string, string>;
     };
-    // Both appends, not just the first — the silent drop F-1330 closed.
+    // Both appends, not just the first — the silent drop is closed.
     expect(read.content).toContain("Step two.");
     expect(read.content).toContain("Step three.");
     expect(Object.keys(read.section_id_mapping).length).toBe(1);
@@ -192,7 +181,7 @@ describe("executeTool", () => {
     expect(everything.messages.matches.length).toBe(1);
   });
 
-  it("accepts a live Slack argument the pre-F-1330 strictObject hard-rejected", () => {
+ it("accepts a live Slack argument the legacy strictObject hard-rejected", () => {
     // `response_format` is declared by Slack on five tools and modelled by
     // none of the twin's old schemas. Under z.strictObject this threw.
     const domain = fresh();

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The GitHub twin as a thin `@pome-sh/sdk` plugin (F-682). This manifest is
+// The GitHub twin as a thin `@pome-sh/sdk` plugin. This manifest is
 // pure declaration: domain factory, seed parser, tools, routes, and the
-// wire-frozen GitHub shapes (FDRS-711 / F-712) — error envelopes, auth pins,
+// wire-frozen GitHub shapes — error envelopes, auth pins,
 // healthz extras, the 501 unsupported envelope, the /_pome/access-control
-// catalog route, the FDRS-402 tool_call_id tape pin. All mechanism (HTTP
+// catalog route, the tool_call_id tape pin. All mechanism (HTTP
 // mount, auth, recorder + redaction, MCP dispatch, /_pome/*, admin gate,
 // db driver) lives in the engine.
 
@@ -60,7 +60,7 @@ function actorFromSession(session: SessionValue | undefined): string | undefined
   return typeof session?.login === "string" ? session.login : undefined;
 }
 
-// F-1325 — the tool table is the fixture. `deriveMcpToolTable` supplies every
+// The tool table is the fixture. `deriveMcpToolTable` supplies every
 // name, description and input schema (the twin-zod serialization emitted on
 // both list surfaces since before the port) from
 // `fixtures/mcp-tools-list.raw.json`, and refuses to build if the schemas in
@@ -103,13 +103,13 @@ export const githubTwinDefinition: TwinDefinition<GitHubCloneDatabase, ParsedGit
         domain.seed(seed, reportDelta);
         return { ok: true, repositories: seed.repositories.length };
       },
-      // F-1497: the admin-gate 403 body is BUILT HERE now, not defaulted in
+      // The admin-gate 403 body is BUILT HERE now, not defaulted in
       // `@pome-sh/sdk`. The gate is shared by all five twins, so its default
       // cannot carry GitHub's `documentation_url`/`status` leaves — and while
       // it defaulted, this twin's 403 said `documentation_url: ""`.
       //
       // The url is the GENERIC one on purpose. Real GitHub's measured 403s
-      // name the operation (3 of 3, F-1490), but `/admin/*` is a twin-only
+      // name the operation (3 of 3), but `/admin/*` is a twin-only
       // route with no GitHub operation behind it, which is the same reason
       // `/pulls/:n/diff` and `/pulls/:n/status` stay generic (divergence 32).
       forbidden: () => ({ status: 403, body: githubError("Forbidden", 403) }),
@@ -132,7 +132,7 @@ export const githubTwinDefinition: TwinDefinition<GitHubCloneDatabase, ParsedGit
     pomeRoutes: {
       "access-control": () => githubAccessControlPayload(),
     },
-    // FDRS-402 adapter-rich tape pin: x-pome-correlation-id persists as
+    // adapter-rich tape pin: x-pome-correlation-id persists as
     // tool_call_id on every recorded event (github's frozen tape shape).
     stampToolCallId: true,
     // Frozen JSON-RPC unknown-tool result text (the legacy /mcp/call surface
@@ -141,7 +141,7 @@ export const githubTwinDefinition: TwinDefinition<GitHubCloneDatabase, ParsedGit
     unsupported: () => unsupportedEnvelope,
     errorEnvelope: githubErrorEnvelope,
     auth: {
-      // F-712 pins (wire-frozen): Bearer-header only (no extra token
+      // Frozen pins (wire-frozen): Bearer-header only (no extra token
       // resolvers), raw bearer rejected (allowRawBearer=false), sid mismatch
       // → 401 {message:"Forbidden"}, and an expired JWT rendering as
       // "Bad credentials". The pre-port explicit "Token expired" branch was
@@ -149,7 +149,7 @@ export const githubTwinDefinition: TwinDefinition<GitHubCloneDatabase, ParsedGit
       // was ever reached, so the wire always said "Bad credentials"
       // (pre-ruled: deleting it is zero wire diff).
       //
-      // ── F-1497 changed two things about these bodies ────────────────────
+      // ── Two things changed about these bodies ──────────────────────────
       //
       // 1. They are built by `githubError` now instead of by hand, which is
       //    what gives them the `documentation_url` and `status` leaves real
@@ -157,7 +157,7 @@ export const githubTwinDefinition: TwinDefinition<GitHubCloneDatabase, ParsedGit
       //    `{"message":…,"documentation_url":"https://docs.github.com/rest","status":"401"}`.
       //    The url is GitHub's GENERIC one and MUST STAY generic — GitHub
       //    names no operation on a 401 because authentication fails before
-      //    dispatch (8 of 8 measured, F-1490), which is the half of
+      //    dispatch (8 of 8 measured), which is the half of
       //    divergence 32 that is a requirement rather than a gap. `githubError`
       //    defaults to exactly that url and this call passes no override.
       //

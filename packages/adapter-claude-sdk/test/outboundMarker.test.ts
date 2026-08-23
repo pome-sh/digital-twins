@@ -1,17 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1519. `scripts/smoke-examples.mjs` classifies REACHED-OUTBOUND on the
-// literal `POME_SMOKE_REACHED_OUTBOUND`, and three bundled examples
-// (`pr-summary-agent`, `pr-summary-review`, `triage-agent`) never print it
-// themselves — they get it from this package's `query()`, which is also the
-// only reason the smoke gate's marker-coverage guard passes them. Nothing on
-// this side of the boundary pinned that, so a refactor of the wrapper chain
-// would convert those three to permanent FAIL with the red landing in a
-// different repo directory from the change that caused it. This is that pin.
-//
-// It also fixes the literal and the env-var name here, in the package that
-// prints them: the smoke script owns its own copies (it cannot import from a
-// built workspace package), so a rename on either side has to red somewhere.
+// `scripts/smoke-examples.mjs` classifies REACHED-OUTBOUND on the literal
+// `POME_SMOKE_REACHED_OUTBOUND`, and three bundled examples (`pr-summary-agent`.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 

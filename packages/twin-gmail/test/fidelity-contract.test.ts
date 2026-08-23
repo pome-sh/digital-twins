@@ -1,18 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// State-shape parity for the declared check vocabulary (F-1128).
-//
-// SCOPE, deliberately narrow: the tool-list / fidelity.inventory.json / REST
-// rings already run for this twin through `scripts/fidelity-parity.ts`
-// (`npm run fidelity:parity -w @pome-sh/twin-gmail` in CI). Re-asserting them
-// here would be the second drift gate F-1128 was told not to build. What was
-// MISSING is the arm below: nothing checked that `exportGmailState()` still
-// carries the fields `check-state.ts` reads.
-//
-// That absence is exactly why pome-cloud's hand-maintained mirror of this shape
-// could drift for a milestone with nothing to notice. twin-slack added the same
-// arm in F-1126 and it caught a real field on its first run (`user` vs
-// `user_id`); this is the gmail half of that lesson.
+// State-shape parity for the declared check vocabulary.
 
 import { describe, expect, it } from "vitest";
 import { openGmailTwinDatabase } from "../src/db.js";

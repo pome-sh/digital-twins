@@ -20,10 +20,9 @@ import {
 
 /**
  * The tool table Slack serves. Every name, description, input schema and
- * annotation on the wire comes from this fixture; nothing below declares one
- * (F-1325).
+ * annotation on the wire comes from this fixture; nothing below declares one.
  *
- * Since F-1330 the fixture is SLACK'S — F-1329's live OAuth capture of
+ * The fixture is SLACK'S — the live OAuth capture of
  * `https://mcp.slack.com/mcp`, minus the one tool the heat ruling says this
  * twin does not expose. Before it, these were eleven names commit 6abec3c
  * copied out of `modelcontextprotocol/servers-archived/src/slack`; only three
@@ -38,7 +37,7 @@ export const slackToolFixture = loadMcpToolFixture({ raw: rawListing, meta: meta
  * How each tool's arguments are validated, keyed by the name the fixture
  * declares.
  *
- * `z.looseObject`, and that is the second half of the F-1330 fix. This table
+ * `z.looseObject`, and that is the second half of the fix. This table
  * used to be `z.strictObject`, which the old fixture projected to
  * `additionalProperties:false` — so a call that finally got the NAME right and
  * carried a real Slack parameter (`message`, `reply_broadcast`, `oldest`,

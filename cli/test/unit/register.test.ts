@@ -111,9 +111,8 @@ describe("runRegisterAgent", () => {
     });
     expect("agentId" in manifest).toBe(false);
     expect(JSON.stringify(manifest)).not.toContain("agt_");
-    // F-1393: the manifest declared framework: "langgraph"; AGENT_OK's response
-    // doesn't even carry a framework field, and it must not matter either way —
-    // the declared value survives untouched.
+    // The manifest declared framework: "langgraph"; AGENT_OK's response doesn't even
+    // carry a framework field, and it must not matter either way — the declared.
     expect((manifest.agent as Record<string, unknown>).framework).toBe("langgraph");
   });
 
@@ -235,7 +234,7 @@ describe("runRegisterAgent", () => {
     expect(errors.join("\n")).toContain("Enabled services: github, slack");
   });
 
-  it("sends the manifest's twins to POST /v1/agents when no --twins flag is given (F-926)", async () => {
+  it("sends the manifest's twins to POST /v1/agents when no --twins flag is given", async () => {
     await writeManifest({ agent: { slug: "gmail-retry-notify" }, twins: ["gmail"] });
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
@@ -286,15 +285,8 @@ describe("runRegisterAgent", () => {
   });
 });
 
-// F-1393 — `agent.framework` is the author's declaration, never the cloud's
-// echo. Before this fix, `register.ts` wrote `agent.framework ?? existingAgent
-// .framework` back into pome.json, so a manifest that never declared a
-// framework picked up whatever the control plane had on file for it —
-// historically a NOT-NULL column defaulted to "claude-agent-sdk" (F-1213).
-// These pin the round trip in both directions, and separately pin that a
-// cloud-returned framework — a real value OR the F-1213 `null` shape — is
-// never written into a manifest that omitted the field.
-describe("register: agent.framework is never echoed from the cloud (F-1393)", () => {
+// `agent.framework` is the author's declaration, never the cloud's echo.
+describe("register: agent.framework is never echoed from the cloud", () => {
   it("a manifest that omits agent.framework still omits it after register, even when the cloud returns none either (AGENT_OK)", async () => {
     await writeManifest({ agent: { slug: "triage-bot" } });
     vi.spyOn(globalThis, "fetch").mockResolvedValue(response(AGENT_OK));
@@ -330,7 +322,7 @@ describe("register: agent.framework is never echoed from the cloud (F-1393)", ()
     expect("framework" in agent).toBe(false);
   });
 
-  it("a manifest that omits agent.framework still omits it after register when the cloud reports it as null (F-1213 shape)", async () => {
+ it("a manifest that omits agent.framework still omits it after register when the cloud reports it as null", async () => {
     await writeManifest({ agent: { slug: "triage-bot" } });
     vi.spyOn(globalThis, "fetch").mockResolvedValue(response({ ...AGENT_OK, framework: null }));
 
@@ -447,7 +439,7 @@ describe("runRegisterAgent near-miss", () => {
   });
 });
 
-describe("slug-rename hint (F-861)", () => {
+describe("slug-rename hint", () => {
   const RENAMED = {
     ...AGENT_OK,
     slug: "pr-review-agent",

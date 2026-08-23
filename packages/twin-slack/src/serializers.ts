@@ -57,7 +57,7 @@ export function serializeWorkspace(row: WorkspaceRow) {
 
 export function serializeUserProfile(
   row: UserRow,
-  // Real Slack varies the profile field set by ENDPOINT (FDRS-473 Kind B):
+  // Real Slack varies the profile field set by ENDPOINT (Kind B):
   //  - users.list embeds the profile WITHOUT `email` (omit it there);
   //  - users.profile.get returns the bare profile WITHOUT `team` (omit it there).
   // users.info / lookupByEmail carry both. The flags let each caller match the
@@ -66,7 +66,7 @@ export function serializeUserProfile(
   opts: { omitEmail?: boolean; omitTeam?: boolean } = {}
 ) {
   const profile = safeJson(row.profile_json) as Record<string, unknown>;
-  // Static literal is anchored to the upstream Profile shape (FDRS-477). The
+  // Static literal is anchored to the upstream Profile shape. The
   // `...profile` spread and the conditional email/team keys are folded in
   // afterward: `team` is not an upstream Profile field (held out of the
   // satisfies object) and the spread is an open Record (untyped values), so
@@ -120,7 +120,7 @@ export function serializeUser(row: UserRow, opts: { include_locale?: boolean; om
     // The embedded profile carries `team` (both users.list and users.info) but
     // OMITS `email` on users.list — real Slack only returns the email on the
     // single-user reads (users.info / lookupByEmail), not in the list envelope
-    // (FDRS-473 Kind B). `omitProfileEmail` is set by the users.list caller.
+    // (Kind B). `omitProfileEmail` is set by the users.list caller.
     // serializeUserProfile returns Record<string, unknown> (its own `...profile`
     // spread is an open record); cast to the upstream Profile shape so the parent
     // `satisfies` stays exact without re-anchoring the nested record here.
@@ -191,7 +191,7 @@ export function serializeChannel(
   // never renamed (it only carries the key once a rename history exists). The twin
   // models no rename history, so it omits the key entirely rather than emitting an
   // empty array — a faithful subset, not an over-returned twin-only field that
-  // diffs as `field-added` against real Slack (FDRS-473 Kind B).
+  // diffs as `field-added` against real Slack (Kind B).
   if (opts.num_members !== undefined) out.num_members = opts.num_members;
   if (opts.is_member !== undefined) out.is_member = opts.is_member;
   if (opts.last_read !== undefined) out.last_read = opts.last_read;

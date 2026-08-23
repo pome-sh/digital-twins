@@ -1,37 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// `users.profile.set` takes `profile` as a JSON STRING *or* an object (F-1462).
-//
-// ── WHAT WAS MEASURED, AND AGAINST WHOM ────────────────────────────────────
-//
-// The twin declared `profile` as `z.string()` and ran `safeParseJson` over it,
-// so an object under `application/json` failed the route parse and the method
-// answered `{ok:false, error:"invalid_arguments"}` at HTTP 200 — the shape a
-// status-code-only check reads as success. F-1406's REST write leg hit it on its
-// first run against the booted twin and WORKED AROUND it by sending the string
-// form, which is why that row is green and nothing was fixed.
-//
-// Whether real Slack accepts the object was unknown and undocumented, so F-1462
-// refused to rule it from the docs. It was called on 2026-08-12 against the
-// `pome-twin-sandbox` workspace with a one-shot user token:
-//
-//   C  form-encoded + string profile   ok:true     (Slack's documented shape)
-//   B  application/json + string       ok:true     (so JSON bodies are fine here)
-//   A  application/json + OBJECT       ok:true     and status_text came back as
-//                                                  the value nested INSIDE the
-//                                                  object — applied, not merely
-//                                                  tolerated
-//
-// B is what makes A readable: without it, a refusal could have meant "Slack
-// takes no JSON body on this method", which is a different ticket. Slack accepts
-// BOTH forms, so the twin refusing one is a false FAILURE — an examinee's agent
-// that sends the natural JSON shape fails here and passes in production.
-//
-// ⚠️ THE STRING FORM IS NOT DEPRECATED BY THIS. Both are real; C and B both
-// answered `ok:true`. A fix that swapped one for the other would move the
-// divergence rather than close it, so every case below is asserted in both
-// shapes, and the assertions read the WRITTEN STATE back through
-// `users.profile.get` rather than trusting the echo.
+// `users.profile.set` takes `profile` as a JSON STRING *or* an object.
 import { beforeEach, describe, expect, it } from "vitest";
 import { createSlackTwinApp } from "../src/twin.js";
 import { openSlackTwinDatabase } from "../src/db.js";
@@ -90,9 +58,7 @@ describe("users.profile.set — `profile` as an object, the way Slack takes it",
   });
 
   it("still accepts the JSON-STRING profile — both forms are real", async () => {
-    // Slack answered ok:true to the string form on both transports. This is the
-    // half a "fix" that merely swapped the accepted type would have broken, and
-    // it is the form F-1406's leg has been sending all along.
+    // Slack answered ok:true to the string form on both transports.
     const app = freshApp();
 
     const set = await post(app, token, "/users.profile.set", {

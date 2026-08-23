@@ -297,7 +297,7 @@ export function conversationsHistory(domain: SlackDomain, args: {
     // Real Slack OMITS `response_metadata` on conversations.history when there is
     // no next page (it only carries the pagination cursor when hasMore); it does
     // NOT return an empty-cursor envelope here the way conversations.list does
-    // (FDRS-473 Kind B — conditional pagination matched per endpoint).
+    // (Kind B — conditional pagination matched per endpoint).
     ...(hasMore
       ? { response_metadata: { next_cursor: cursorEncode({ offset: offset + slice.length }) } }
       : {}),
@@ -356,7 +356,7 @@ export function conversationsReplies(domain: SlackDomain, args: {
     }),
     has_more: hasMore,
     // Real Slack OMITS `response_metadata` on conversations.replies when there is
-    // no next page (cursor present only when hasMore) — FDRS-473 Kind B.
+    // no next page (cursor present only when hasMore) — Kind B.
     ...(hasMore
       ? { response_metadata: { next_cursor: cursorEncode({ offset: offset + slice.length }) } }
       : {}),

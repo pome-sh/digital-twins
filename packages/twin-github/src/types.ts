@@ -8,8 +8,7 @@ import type { TwinDatabase } from "@pome-sh/sdk/db";
 
 export type { RecorderEvent } from "@pome-sh/wire";
 
-// The engine's driver wrapper is the only database surface a twin sees
-// (F-681/F-682): prepare/exec/pragma/transaction/close.
+// The engine's driver wrapper is the only database surface a twin sees: prepare/exec/pragma/transaction/close.
 export type GitHubCloneDatabase = TwinDatabase;
 
 export type GitHubStateSeed = {
@@ -31,7 +30,7 @@ export type SeedRepository = {
   default_branch?: string;
   collaborators?: string[];
   labels?: Array<{ name: string; color?: string; description?: string }>;
-  // F-1500 — `renamed_from` names the path this file was MOVED from on
+  // `renamed_from` names the path this file was MOVED from on
   // `branch`, and is the only way a seed can take a path away from a branch: a
   // seeded branch is created from the default branch and inherits every path,
   // and a plain entry can add or overwrite but never remove. `content` is
@@ -45,7 +44,7 @@ export type SeedRepository = {
   // `parseSeed` first, so the rule is checked whichever door a seed arrives
   // through.
   files?: Array<{ path: string; content?: string; branch?: string; renamed_from?: string }>;
-  // F-1421 — the five entities the twin serves but the seed used to strip.
+  // The five entities the twin serves but the seed used to strip.
   milestones?: Array<{
     number?: number;
     title: string;
@@ -103,7 +102,7 @@ export type SeedRepository = {
 
 /**
  * A conversation comment on an issue OR a pull request — one shape, because
- * they are one table and one route on GitHub too (F-1151).
+ * they are one table and one route on GitHub too.
  */
 export type SeedComment = {
   body: string;
@@ -229,7 +228,7 @@ export type PullRequestFileRow = {
   raw_url: string;
   contents_url: string;
   patch: string;
-  // F-1500 — the path this file was moved FROM, non-null exactly when `status`
+  // The path this file was moved FROM, non-null exactly when `status`
   // is `"renamed"`. GitHub's `diff-entry` carries `previous_filename` on that
   // status and omits the key on every other, which is why this is nullable
   // rather than defaulted to the file's own name: the serializer decides
@@ -281,7 +280,7 @@ export type ReleaseRow = {
   prerelease: 0 | 1;
   author_login: string;
   created_at: string;
-  /** F-1459 — GitHub's release `updated_at`. Equal to `created_at` on a release
+  /** GitHub's release `updated_at`. Equal to `created_at` on a release
    * that has never been edited, which is every release this twin serves: it has
    * no release-update route. */
   updated_at: string;

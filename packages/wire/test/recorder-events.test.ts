@@ -142,13 +142,9 @@ describe("recorderEventSchema", () => {
   });
 });
 
-// ── F-1125 ───────────────────────────────────────────────────────────────────
-// The two fields that make the S4 class expressible. Both are ADDITIVE and
-// optional: `twinHttpEventSchema` is the only gate into the cloud's tape
-// (`parseEventsJsonl` silently skips a row that fails it), so a required field
-// would drop every row an older CLI wrote — an empty tape, which for a negative
-// criterion is a free pass.
-describe("recorderEventSchema — F-1125 request_headers", () => {
+// ── request_headers and tool ───────────────────────────────────────────────── The
+// two fields that make the S4 class expressible.
+describe("recorderEventSchema — request_headers", () => {
   it("preserves recorded request headers", () => {
     const r = recorderEventSchema.parse({
       ...baseEvent,
@@ -160,7 +156,7 @@ describe("recorderEventSchema — F-1125 request_headers", () => {
     });
   });
 
-  it("parses a row that carries no request_headers (rows written before F-1125)", () => {
+ it("parses a row that carries no request_headers (rows written before)", () => {
     const r = recorderEventSchema.parse(baseEvent);
     expect(r.request_headers).toBeUndefined();
   });
@@ -172,7 +168,7 @@ describe("recorderEventSchema — F-1125 request_headers", () => {
   });
 });
 
-describe("recorderEventSchema — F-1125 tool", () => {
+describe("recorderEventSchema — tool", () => {
   it("preserves the twin action the call invoked", () => {
     const r = recorderEventSchema.parse({ ...baseEvent, tool: "create_commit_status" });
     expect(r.tool).toBe("create_commit_status");
@@ -183,7 +179,7 @@ describe("recorderEventSchema — F-1125 tool", () => {
     expect(r.tool).toBeNull();
   });
 
-  it("parses a row that carries no tool (rows written before F-1125)", () => {
+ it("parses a row that carries no tool (rows written before)", () => {
     const r = recorderEventSchema.parse(baseEvent);
     expect(r.tool).toBeUndefined();
   });

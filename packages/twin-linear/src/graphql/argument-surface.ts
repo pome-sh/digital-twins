@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1179 — twin-linear's GraphQL argument surface, projected from the schema
+// Twin-linear's GraphQL argument surface, projected from the schema
 // the twin executes against.
 //
 // This is the property the other four twins had to be rebuilt to reproduce: the
@@ -10,7 +10,7 @@
 // twin, and one that is in it cannot be refused, for the same structural reason
 // `declareRouteInputs` gives the HTTP twins.
 //
-// pome-cloud has read this since F-1173, through a committed projection of its
+// pome-cloud reads this through a committed projection of its
 // own regenerated from `graphql/schema.js`. This module exists so that all five
 // twins publish through ONE seam — `packages/twin-*/route-inputs.json` — rather
 // than four through a generated artifact and one through a bespoke fixture in

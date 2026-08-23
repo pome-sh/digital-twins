@@ -19,7 +19,7 @@
 // trusts the declaration and does NOT fetch those deps on install, so the
 // failure surfaces as ERR_MODULE_NOT_FOUND on the consumer's first import —
 // not as an install error. Hence this gate. See cli/scripts/assert-publishable.mjs
-// for the sibling guard this mirrors.
+// for the sibling guard this one mirrors.
 //
 // Runs as this package's `prepublishOnly`. Exits non-zero with the hotfix
 // path spelled out; `--quiet` suppresses the explanation (for callers that

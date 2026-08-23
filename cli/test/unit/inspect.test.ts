@@ -152,7 +152,7 @@ describe("readEventsJsonl", () => {
   });
 
   it("flags legacy rows that are missing the kind discriminator", async () => {
-    // Legacy row: shape matches pre-FDRS-398 recorderEventSchema (no `kind`).
+    // Legacy row: shape matches legacy recorderEventSchema (no `kind`).
     const legacy = {
       ts: "2026-05-01T00:00:00.000Z",
       run_id: "run_old",
@@ -311,7 +311,7 @@ describe("renderEvents", () => {
 });
 
 describe("LEGACY_EVENTS_MESSAGE", () => {
-  it("is the exact wording locked by FDRS-403", () => {
+ it("is the exact wording the contract locks", () => {
     // The exit-code-2 contract is the message + the code. If either drifts,
     // tooling that scripts pome inspect (CI gates, dashboards) breaks.
     expect(LEGACY_EVENTS_MESSAGE).toBe(

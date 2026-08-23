@@ -137,7 +137,7 @@ describe("Idempotency-Key middleware", () => {
     expect(res.status).toBe(200);
   });
 
-  it("FDRS-321 — dedupe cache hit emits a RecorderEvent with idempotency_dedupe=true and state_delta=null", async () => {
+  it("dedupe cache hit emits a RecorderEvent with idempotency_dedupe=true and state_delta=null", async () => {
     // Real Stripe replays the cached response verbatim on a dedupe hit. The
     // twin must still produce a recorder event so downstream tooling
     // (dashboard, correlator) sees the retry. The event carries

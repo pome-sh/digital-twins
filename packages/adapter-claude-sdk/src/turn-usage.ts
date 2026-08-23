@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// withTurnUsage (F-766) — stream wrapper that emits one `LlmTurnEvent` per
+// withTurnUsage — stream wrapper that emits one `LlmTurnEvent` per
 // assistant turn into the signals JSONL (see signals.ts for the single-writer
 // contract). It is the JSONL source-of-truth counterpart to the OTLP
 // `withGenAiSpans` lane (genai-spans.ts): both use the SAME turn detection —
-// one API turn, accumulated by `message.id` (F-994; see that file for why a
+// one API turn, accumulated by `message.id` (see that file for why a
 // turn is not an `assistant` message) — but this lane keeps the cache-read /
 // cache-creation counts and `finish_reasons` as distinct fields where the OTLP
 // lane folds the cache counts into one semconv input total, and it never
@@ -19,7 +19,7 @@
 // `session_id` are null in M1.
 //
 // `output_tokens` and `finish_reasons` come from the `message_delta` stream
-// event rather than the assistant message (F-998; see partial-messages.ts). The
+// event rather than the assistant message (see partial-messages.ts). The
 // assistant message's `output_tokens` is a `message_start` snapshot ~5x low, and
 // its `stop_reason` is null on every message the SDK emits — which is why this
 // lane's `finish_reasons` had always been null in practice.
@@ -83,7 +83,7 @@ export async function* withTurnUsage<T extends WithType>(
       event_id: newEventId(),
       // A turn is a root within events.jsonl. The run is not an event row —
       // it is the TRACE, so there is no `event_id` for a turn to point at.
-      // F-1200's ticket body said "pointing at the run"; the run has no row
+      // the ticket body said "pointing at the run"; the run has no row
       // to point at.
       parent_event_id: null,
       kind: "LlmTurnEvent",

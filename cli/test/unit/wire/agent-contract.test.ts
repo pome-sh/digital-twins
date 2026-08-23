@@ -1,12 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-818 — additive agent-identity fields on the /v1 wire (spec: F-804).
-// POST /v1/agents request gains slug/description/version/framework;
-// POST /v1/sessions gains agent_version (per-run override of the manifest's
-// agent.version); the agent response gains framework/description/version and
-// the resolver's created flag. Every addition is optional so (old CLI × new
-// cloud) and (new CLI × old cloud) both keep working — these tests pin the
-// tolerant-reader property alongside the new shapes.
+// Additive agent-identity fields on the /v1 wire.
 
 import { describe, expect, it } from "vitest";
 import {
@@ -15,8 +8,8 @@ import {
   createSessionRequestSchema,
 } from "../../../src/contract/index.js";
 
-describe("createAgentRequestSchema — manifest identity fields (F-818)", () => {
-  it("still accepts the pre-F-818 minimal payload", () => {
+describe("createAgentRequestSchema — manifest identity fields", () => {
+ it("still accepts the legacy minimal payload", () => {
     expect(createAgentRequestSchema.safeParse({ name: "PR Review Agent" }).success).toBe(true);
   });
 
@@ -45,7 +38,7 @@ describe("createAgentRequestSchema — manifest identity fields (F-818)", () => 
   });
 });
 
-describe("createSessionRequestSchema.agent_version (F-818)", () => {
+describe("createSessionRequestSchema.agent_version", () => {
   it("accepts an agent_version per-run override", () => {
     const parsed = createSessionRequestSchema.parse({
       twins: ["github"],
@@ -63,7 +56,7 @@ describe("createSessionRequestSchema.agent_version (F-818)", () => {
   });
 });
 
-describe("agentResponseSchema — resolver fields (F-818)", () => {
+describe("agentResponseSchema — resolver fields", () => {
   const base = {
     id: "agt_YRZsOPRGSaxiSKCNcXfaB",
     slug: "pr-review-agent",
@@ -71,7 +64,7 @@ describe("agentResponseSchema — resolver fields (F-818)", () => {
     judge_model: "google/gemini-2.5-flash",
   };
 
-  it("still accepts the pre-F-818 response (old cloud)", () => {
+ it("still accepts the legacy response (old cloud)", () => {
     const parsed = agentResponseSchema.parse(base);
     expect(parsed.created).toBeUndefined();
   });
@@ -100,15 +93,9 @@ describe("agentResponseSchema — resolver fields (F-818)", () => {
     expect(parsed.created).toBe(false);
   });
 
-  // F-1393 / pome-cloud F-1213 — the control plane's `agents.framework` column
-  // lost its NOT NULL DEFAULT 'claude-agent-sdk', and `toResponse` now emits
-  // `framework: row.framework ?? null` on EVERY response. Before this widening
-  // the schema was a bare `z.string().optional()`, so a literal `null` failed
-  // `safeParse` and `parseOkAgent` threw "POST /v1/agents returned an
-  // unexpected shape" — i.e. every `pome register agent` for an agent that
-  // never declared a framework would have hard-failed against a live F-1213
-  // cloud, and every `pome run` would have degraded to "running unattributed".
-  it("accepts framework: null — the F-1213 shape for 'never declared'", () => {
+  // The control plane's `agents.framework` column lost its NOT NULL DEFAULT
+  // 'claude-agent-sdk', and `toResponse` now emits `framework: row.framework ?? null`.
+ it("accepts framework: null — the shape for 'never declared'", () => {
     const parsed = agentResponseSchema.parse({
       ...base,
       framework: null,
@@ -121,10 +108,8 @@ describe("agentResponseSchema — resolver fields (F-818)", () => {
     expect(parsed.framework).toBeNull();
   });
 
-  // The three cloud answers stay three (D3): a declared value, `null` = the
-  // cloud says nothing was ever declared, and absent = the cloud did not
-  // answer at all (pre-F-820). Collapsing null into undefined here would put
-  // the milestone's exact bug back, one layer down.
+  // The three cloud answers stay three (D3): a declared value, `null` = the cloud says
+  // nothing was ever declared, and absent = the cloud did not answer at.
   it("keeps null (never declared) distinct from absent (cloud did not answer)", () => {
     expect(agentResponseSchema.parse({ ...base, framework: null }).framework).toBeNull();
     expect(agentResponseSchema.parse(base).framework).toBeUndefined();
@@ -140,7 +125,7 @@ describe("agentResponseSchema — resolver fields (F-818)", () => {
   });
 });
 
-describe("agentResponseSchema — slug-rename hint fields (F-861)", () => {
+describe("agentResponseSchema — slug-rename hint fields", () => {
   const base = {
     id: "agt_YRZsOPRGSaxiSKCNcXfaB",
     slug: "pr-review-agent",

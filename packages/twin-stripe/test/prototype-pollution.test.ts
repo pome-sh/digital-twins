@@ -1,16 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// Regression test for the form-encoded prototype-pollution primitive
-// caught by the FDRS-267 adversarial review (F2). A POST with a body
-// like `__proto__[polluted]=pwned&amount=1000&...` was walking
-// Object.prototype, polluting every later object in the same JS
-// process for the rest of the sandbox's lifetime.
-//
-// Fix lives in the shared bracket-form expander, `expandBrackets()` in
-// packages/sdk/src/route-inputs.ts — it drops any path that includes
-// `__proto__`, `constructor` or `prototype`, and the undeclared-input check
-// then refuses the dropped key. (F-1179 moved it out of this twin's own
-// `setDeep()`; the assertions below are unchanged and still pass.)
+// Regression test for the form-encoded prototype-pollution primitive caught by the
+// adversarial review (F2).
 import { afterEach, describe, expect, it } from "vitest";
 import { createStripeApp, withAuth } from "./_appHelper.js";
 

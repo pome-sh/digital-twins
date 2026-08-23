@@ -1,13 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1325 — the fixture is the tool table, not a document about it.
-//
-// The derivation is structural (`deriveMcpToolTable` throws on any 1:1
-// mismatch), but "structurally impossible" is a claim worth one round trip:
-// this suite drives the real `tools/list` surface and compares the answer to
-// the fixture field by field. It also re-derives the canonical bytes and
-// re-hashes the raw file from disk, which is the half of the load-time assert
-// a bundled twin cannot make for itself.
+// The fixture is the tool table, not a document about it.
 
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -77,19 +69,14 @@ describe("linear MCP tool fixture", () => {
   });
 
   it("declares a substrate that names the capture it projects, and proves it by digest", () => {
-    // Was `twin-authored-from-vendor-docs` until F-1480, and that test asserted
-    // the admission — `comparedToUpstream: never`, `contentOrigin: documentation`.
-    // The word had to move with the rows: a reader who saw `vendor-docs` over
-    // Linear's own descriptions would go looking for an authoring problem behind
-    // a file that no longer has one.
+    // Was `twin-authored-from-vendor-docs`, and that test asserted the admission —
+    // `comparedToUpstream: never`, `contentOrigin: documentation`.
     expect(meta.substrate).toBe("upstream-capture-projection");
     expect(meta.transcription).toBeUndefined();
     expect(meta.liveToolCount).toBe(22);
 
-    // The digest is the claim. `rawFileSha256` proves this file has not been
-    // hand-edited since it was derived; only `projection.sourceRawFileSha256`
-    // proves WHAT it was derived from, and re-pointing the producer at a stale
-    // or hand-edited golden would re-hash clean without it.
+    // The digest is the claim: only `projection.sourceRawFileSha256` proves WHAT
+    // this was derived from — a stale golden would re-hash clean without it.
     const upstreamRaw = read(join("..", "..", "..", "fixtures", "mcp-tools-list", "linear.raw.json"));
     expect(meta.projection?.sourceRawFileSha256).toBe(sha256(upstreamRaw));
     expect(meta.projection?.sourceFixture).toBe("fixtures/mcp-tools-list/linear.raw.json");
@@ -119,12 +106,8 @@ describe("linear MCP tool fixture", () => {
       expect(reason, name).toMatch(/out of modeled scope/);
     }
 
-    // EMPTY, and that is the strong form of the projection rather than an
-    // oversight: every row this twin serves is the capture's. twin-github needs a
-    // `carried` door because two of its tools are feature-flag-gated upstream and
-    // its flags-off capture cannot see them; nothing here is gated, so a non-empty
-    // carried set would mean a row we preferred rather than one Linear serves —
-    // exactly what F-1470 refused permanently.
+    // EMPTY, and that is the strong form of the projection rather than an oversight:
+    // every row this twin serves is the capture's.
     expect(meta.projection?.carried).toEqual({});
   });
 

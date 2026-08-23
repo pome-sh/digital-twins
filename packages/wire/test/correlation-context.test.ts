@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// Moved verbatim in behaviour from `packages/adapter-claude-sdk/test/als.test.ts`
-// by F-950 — the store is now wire's, so its guard is too. The isolation case is
-// the load-bearing one: it is the property that makes correlation race-proof
-// under concurrent tool calls, and the reason this is AsyncLocalStorage rather
-// than a module-level variable.
+// Moved verbatim in behaviour from `packages/adapter-claude-sdk/test/als.test.ts` —
+// the store is now wire's, so its guard is too.
 
 import { describe, expect, it } from "vitest";
 import {
@@ -55,8 +51,7 @@ describe("correlationContext", () => {
   });
 });
 
-// `withCorrelation` is the documented entry point a framework adapter calls
-// (F-950); the raw store above is the escape hatch. These cases pin the contract
+// `withCorrelation` is the documented entry point a framework adapter calls; the raw store above is the escape hatch. These cases pin the contract
 // the adapters are told to rely on.
 describe("withCorrelation", () => {
   it("sets the id for the duration of the callback", () => {

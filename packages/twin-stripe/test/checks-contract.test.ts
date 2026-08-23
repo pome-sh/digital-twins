@@ -1,12 +1,5 @@
-// The properties every declared check must hold, carried across from
-// twin-github and twin-slack when Stripe's vocabulary moved out of pome-cloud
-// (F-1127).
-//
-// These are load-bearing, not ceremony: D10 and D11 were both caught by the
-// mutant assertions, and F-1126 measured that a bare "the failing world returns
-// false" gate is satisfied by 11 of 13 GitHub checks against an EMPTY world.
-// They travel with the declaration so the twin, not its consumer, is where a bad
-// check is stopped.
+// The properties every declared check must hold, carried across from twin-github and
+// twin-slack when Stripe's vocabulary moved out of pome-cloud.
 
 import {
   checkNearMissPattern,
@@ -304,15 +297,6 @@ describe("declared vacuity mutants", () => {
 });
 
 // Every check that declines to name a failing world, WITH the reason.
-//
-// It is EMPTY, and that is the claim (F-1126). `HONEST_NULL_MUTANTS` above has
-// two unavoidable arguments — a selector-only slot, a closed set with no
-// guaranteed-false member. Neither transfers here: a world is a hand-written
-// fixture and every field of `CheckSubstrate` is hand-fillable. An entry in this
-// ledger is therefore an admission that a check may not be able to fail, which
-// is the thing the whole vocabulary exists to rule out.
-//
-// Keep it empty. If a future check needs a line, argue it in writing here.
 const HONEST_NULL_WORLDS: Record<string, string> = {};
 
 describe("declared discriminating worlds", () => {
@@ -399,10 +383,7 @@ describe("declared discriminating worlds", () => {
 
 describe("migrated sentences", () => {
   it("re-renders the corpus's already-bound Stripe criteria byte-identically", () => {
-    // Tasks 10 and 19, plus the x402 header criterion F-1125 bound. These bind
-    // TODAY through hand-written regexes in pome-cloud; if a template drifts, the
-    // corpus stops binding and the D6 arm goes red in pome-cloud instead of here
-    // — one repo too late, and after a release.
+    // Tasks 10 and 19, plus the bound x402 header criterion.
     expect(renderCheck(paymentIntentAmount, { amount: "10000" })).toBe(
       "A PaymentIntent exists with amount 10000",
     );
@@ -463,9 +444,8 @@ describe("migrated sentences", () => {
   });
 
   it("keeps the checks with no corpus user reachable, and declared anyway", () => {
-    // F-1075's precedent: a vocabulary is what an author may PICK from, not what
-    // the corpus happens to exercise. Under the discrimination gate a zero-user
-    // check still carries proof it can fail.
+    // the precedent: a vocabulary is what an author may PICK from, not what the corpus
+    // happens to exercise.
     expect(renderCheck(refundCount, { charge: "ch_test_200", count: "0" })).toBe(
       'The number of refunds on charge "ch_test_200" is 0',
     );
@@ -475,18 +455,7 @@ describe("migrated sentences", () => {
   });
 });
 
-// Every state-reading check that cites no path, WITH the reason (F-1197).
-//
-// EMPTY, and — like `HONEST_NULL_WORLDS` above — that is the claim. F-1197
-// opened by counting what could cite anything at all: 8 of 45 declared checks,
-// because only a `tape` check could fill `evidenceEventIds`. An optional field
-// with no gate behind it is how a number like that happens, so the field ships
-// with this gate and the ledger ships empty. The argument for the pointer
-// grammar, and for why a pointer addresses `final`, is in the sdk's
-// `check-state-path.ts`; this is only its per-twin enforcement.
-//
-// An entry here admits that a verdict renders as an inert row — indistinguishable,
-// to a reader, from a verdict with no evidence at all.
+// Every state-reading check that cites no path, WITH the reason.
 const HONEST_UNCITED_CHECKS: Record<string, string> = {};
 
 describe("declared state citations", () => {
@@ -541,26 +510,8 @@ describe("declared state citations", () => {
   });
 });
 
-// Which door stands between a redactor that eats a slot's literal and a wrong
-// verdict — one row per declared slot, MEASURED rather than argued (F-1157).
-//
-// The vocabulary of the values is in the sdk's `check-redaction.ts`. Only one of
-// them is a wrong verdict rather than a missing one — `vacuous_pass`, where the
-// check's OWN failing world starts passing once the literal is gone — and the
-// assertion below forbids it outright rather than ledgering it.
-//
-// Stripe's `false_fail` rows are all one shape: a status or type from a CLOSED
-// set (`succeeded`, `requires_action`, `payment_intent.succeeded`,
-// `invalid_request_error`) compared against the field the object carries. Every
-// one of those checks is POSITIVE, which is why masking the field marks a
-// correct agent down rather than blessing a wrong one — the direction that turns
-// a blind grader into a vacuous pass is the negative one, and stripe's single
-// negative check (`no-refund-on-charge`) declares its charge as the subject.
-//
-// The `abstains` rows are `resolveCharge`'s skip. Note that `{charge}` reads
-// `abstains` on the two refund checks and `declared_subject` on the third: same
-// slot, same literal, different door, because only on the third is the charge
-// the thing being ASSERTED about rather than selected with.
+// Which door stands between a redactor that eats a slot's literal and a wrong verdict
+// — one row per declared slot, MEASURED rather than argued.
 const REDACTION_GUARDS: Record<string, RedactionGuard> = {
   // Amounts are exported as integer minor units, never as the criterion's string.
   "stripe.payment-intent-amount · amount": "absent_from_world",

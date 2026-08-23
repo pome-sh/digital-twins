@@ -1,21 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// Read a `tools/call` payload off the TEXT content block (F-1480).
-//
-// Linear declares no `outputSchema` on any of its 58 tools, so since the fixture
-// became a projection of Linear's own table (`substrate:
-// upstream-capture-projection`) neither does this twin — and MCP only permits
-// `result.structuredContent` for a tool that declares one. The payload therefore
-// arrives as JSON text in `content[0]`, which is how twin-github and twin-slack
-// have always read it (`mcp-jsonrpc.test.ts` in both).
-//
-// This is the response-axis half of F-1480. It was cleared to land by a heat read
-// that came back zero on every customer surface: the 3 linear corpus tasks assert
-// twin STATE and never a response shape, no bundled example reads a linear
-// result, the repo's 3 `structuredContent` readers are github/slack and all fall
-// back defensively when it is absent, and 0 of 17 hosted saved tasks and 0 of the
-// 50 most recent hosted runs touch a linear tool. The only hard readers were the
-// tests this helper replaces.
+// Read a `tools/call` payload off the TEXT content block.
 
 import { expect } from "vitest";
 

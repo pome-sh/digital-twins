@@ -1,13 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-636 — `pome run -n k` flag wiring on the hosted path:
-//   - -n is an integer 1..20; invalid values are usage errors (exit 5)
-//     surfaced before the doctor gate ever runs;
-//   - -n is hosted-only: combining it with --local is a usage error;
-//   - the DEFAULT k comes from the scenario config's `runs` field (capped at
-//     20), which nothing consumed before this ticket;
-//   - k=1 (explicit -n 1, or the runs default) stays EXACTLY today's
-//     single-run path — no trial group, no group_id;
-//   - k>1 dispatches to runTrialGroup with the effective k.
+// `pome run -n k` flag wiring on the hosted path: - -n is an integer 1..20; invalid
+// values are usage errors (exit 5) surfaced before the doctor gate ever.
 
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -81,7 +74,7 @@ async function fixtureRepo(taskSource: string): Promise<string> {
   return dir;
 }
 
-describe("pome run -n (FDRS-636)", () => {
+describe("pome run -n", () => {
   const originalCwd = process.cwd();
   const originalExitCode = process.exitCode;
   let stderr: string[];

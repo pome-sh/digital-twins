@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The Slack twin's assertable check vocabulary (F-1126, milestone A3).
+// The Slack twin's assertable check vocabulary (milestone A3).
 //
 // These live HERE, next to the state they read, because the twin owns that
 // state's shape. pome-cloud imports this module from npm and adapts each
@@ -12,7 +12,7 @@
 // Slack goes first in A3 even though it moves the unbound-criterion count by
 // ZERO. It has a seed loader, no unbound criteria, and it is the home of the one
 // class A2b explicitly gave up — so it is the cheapest place to land the
-// discrimination gate, and F-1075/F-1077 already proved the reverse ordering
+// discrimination gate, and the reverse ordering was already proved
 // costs a milestone.
 //
 // This file is the ASSEMBLY. Declarations are grouped by what they assert about

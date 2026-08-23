@@ -25,7 +25,7 @@ export function sanitizeJsonString(raw: string, fallback: string): string {
 
 /**
  * `blocks` / `attachments`, which real Slack takes as a JSON STRING *or* as a
- * native ARRAY (F-1487). Stores the canonical JSON string either way.
+ * native ARRAY. Stores the canonical JSON string either way.
  *
  * ⚠️ THE PARSE FOLLOWS THE TYPE, AND THAT IS NOT STYLISTIC. Running
  * {@link sanitizeJsonString} unconditionally over an array is a category error,

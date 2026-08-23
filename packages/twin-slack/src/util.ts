@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Slack-domain helpers only (F-683): wall-clock audit stamps, Slack's
+// Slack-domain helpers only: wall-clock audit stamps, Slack's
 // form-or-JSON body parsing for the ENGINE-owned surfaces, pagination cursors,
 // and the Slack `ts` format. Request-id stamping moved to the engine's recorder
 // with the port; the stringly-typed arg coercions (`asString`, `asOptionalString`,
-// `asNumber`, `asBool`) went with F-1179 — route inputs are declared and parsed
+// `asNumber`, `asBool`) are gone — route inputs are declared and parsed
 // by `./route-inputs.ts` now, so nothing coerces a value picked out of an
 // undeclared bag.
 import type { Context } from "hono";

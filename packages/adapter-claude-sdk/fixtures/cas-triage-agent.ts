@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// FDRS-413 / F-766 — CAS-adapter triage agent fixture for the PR/FAQ
+// CAS-adapter triage agent fixture for the PR/FAQ
 // acceptance #2 e2e gate. Drives scenario 01 (acme/api #1) through the real
 // adapter surface (`withPome()` + wrapped `tool()`) so the resulting
 // events.jsonl carries all five signal kinds the acceptance criteria require:
 //
 //   - LlmCallEvent     — one TCP CONNECT through HTTPS_PROXY (the bench-style
-//                        path used by FDRS-405; the capture-server records the
+// path used ; the capture-server records the
 //                        tunnel regardless of upstream success)
 //   - TwinHttpEvent    — wrapped tool handler hits the twin while the ALS
 //                        scope is active, so the fetch hook injects
@@ -21,10 +21,10 @@
 //   - LlmTurnEvent     — the synthetic assistant message also carries a `usage`
 //                        block (incl. cache-read/cache-creation tokens), so
 //                        `withTurnUsage` writes one LlmTurnEvent per turn into
-//                        the signals sidechannel (F-766)
+//                        the signals sidechannel
 //
 // Using real adapter internals (rather than a fake-signals stub like the
-// FDRS-411 fixture) is what makes this the *acceptance #2* gate: the trace
+// fixture) is what makes this the *acceptance #2* gate: the trace
 // shape is produced by the package under test, not by a hand-rolled mock.
 //
 // Why a fixture rather than a real `query()` call: CI must be deterministic

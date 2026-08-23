@@ -20,13 +20,11 @@ const TWIN_AUTH_SECRET = "test-secret-32-chars-minimum-length";
 let cloudServer: ServerType | undefined;
 let receivedResult: unknown = null;
 let finalizeResponseOverrides: Record<string, unknown> = {};
-// F-768 — what `GET /_pome/events` serves. Default empty (the trivially-passing
-// tests); the hosted-signals-lane test seeds a real twin event so the
-// "not merged into events.jsonl" assertion has real content to exclude against.
+// What `GET /_pome/events` serves. Default empty (the trivially-passing tests); the
+// hosted-signals-lane test seeds a real twin event so the "not merged into.
 let eventsResponse: unknown[] = [];
-// F-768 — decompressed bodies the CLI PUT to the signed upload URLs, keyed by
-// blob kind ("events" / "signals"). The fake cloud gunzips on receipt (uploads
-// carry `content-encoding: gzip`).
+// Decompressed bodies the CLI PUT to the signed upload URLs, keyed by blob kind
+// ("events" / "signals").
 let uploadedBlobs: Record<string, string> = {};
 
 async function startFakeCloud(): Promise<number> {
@@ -62,11 +60,8 @@ async function startFakeCloud(): Promise<number> {
     })
   );
   app.get("/s/:sid/_pome/events", (c) => c.json(eventsResponse));
-  // F-768 — mint signed upload URLs that point back at this fake cloud's PUT
-  // sink so the runner's real upload lane (redact → gzip → PUT → thread key
-  // onto /finalize) executes end to end. events.jsonl and signals.jsonl are
-  // deliberately separate blobs under separate keys — the runner never merges
-  // adapter signals into the trace on the hosted path.
+  // Mint signed upload URLs that point back at this fake cloud's PUT sink so the
+  // runner's real upload lane (redact → gzip → PUT → thread key onto /finalize).
   app.post("/v1/sessions/:id/result-upload-url", (c) =>
     c.json({
       url: `http://127.0.0.1:${port}/_upload/events`,
@@ -119,10 +114,8 @@ describe("pome run --hosted (e2e via spawn)", () => {
     eventsResponse = [];
     uploadedBlobs = {};
     tmp = await mkdtemp(join(tmpdir(), "pome-e2e-"));
-    // FDRS-641 — `pome run` gates on the doctor preflight (config present,
-    // routing wired, egress floor; local twin boot is skipped on hosted
-    // runs). Make tmp a wired repo and spawn the CLI from it, matching what
-    // a real post-`pome install` project looks like.
+    // `pome run` gates on the doctor preflight (config present, routing wired, egress
+    // floor; local twin boot is skipped on hosted runs).
     await writeFile(
       join(tmp, "pome.json"),
       JSON.stringify({ agent: { slug: "e2e-agent" }, command: "true" }, null, 2),
@@ -269,14 +262,10 @@ describe("pome run --hosted (e2e via spawn)", () => {
     child.stderr.on("data", (d) => (stderr += d.toString()));
     const code = await new Promise<number>((res) => child.on("close", res));
 
-    // F-925 — `pome run` used to exit 0 here, a documented divergence from
-    // `pome eval` justified by pre-FDRS-618 cloud builds that emit no
-    // `criteria_results`. That compat lives in `scoreFromFinalizeResponse`
-    // (can_pass true when the field is absent), so the divergence was guarding
-    // a case its own helper already guarded. A run whose criterion never ran is
-    // not a green CI signal.
+    // `pome run` used to exit 0 here, a documented divergence from `pome eval`
+    // justified by legacy cloud builds that emit no `criteria_results`.
     expect(code, `stderr was:\n${stderr}`).toBe(1);
-    // F-932 — the label and the copy. "cannot pass" was a verdict about the
+    // The label and the copy. "cannot pass" was a verdict about the
     // AGENT for a gap in the GRADER.
     expect(stderr).toMatch(/INCOMPLETE Trivial/);
     expect(stderr).toContain("score: incomplete —");
@@ -284,13 +273,8 @@ describe("pome run --hosted (e2e via spawn)", () => {
     expect(stderr).not.toContain("cannot pass");
     expect(stderr).toContain("cloud score: 100/100");
 
-    // F-1195 — the bug this test guards: `verdict.json` used to write
-    // `score: 100, pass_threshold: 100, passed: false` with no denominator
-    // and no name for the third state, so a CI script trusting
-    // `score >= pass_threshold` read `true` on this exact run. Assert the
-    // artifact directly: `state` must name it `incomplete` (never `pass`,
-    // even though score >= pass_threshold), and the counts must show the one
-    // criterion was never evaluated.
+    // The bug this test guards: `verdict.json` used to write `score: 100,
+    // pass_threshold: 100, passed: false` with no denominator and no name for the third state.
     const v = await readVerdictArtifact(join(tmp, "runs", "scn", "ses_e2e"));
     expect(v).not.toBeNull();
     expect(v?.verdict.score).toBe(100);
@@ -304,12 +288,7 @@ describe("pome run --hosted (e2e via spawn)", () => {
     expect(v?.verdict.total).toBe(1);
   }, 90_000);
 
-  // F-1392 — the sibling of the INCOMPLETE test above. pome-cloud's F-1296
-  // excludes a criterion the seed already satisfied from the dashboard's
-  // abstention denominator (`isRunIncomplete` in
-  // apps/dashboard/src/lib/run-status.ts). Before this fix, the CLI counted
-  // this `skipped` result like any other abstention and printed INCOMPLETE /
-  // exit 1 on a run the dashboard renders PASS.
+  // The sibling of the INCOMPLETE test above.
   it("prints PASS and exits 0 when the only skipped criterion is pre-satisfied (already_true_in_seed)", async () => {
     // The wire shape exactly as pome-cloud serializes it: no `outcome` field
     // (`criterionResultSchema` has none on either side, and the CLI's
@@ -385,12 +364,8 @@ describe("pome run --hosted (e2e via spawn)", () => {
     expect(stderr).not.toMatch(/INCOMPLETE/);
     expect(stderr).not.toContain("score: incomplete —");
 
-    // F-1195 — this is the row the dashboard and the CLI have to agree on
-    // (`cross-surface-agreement.test.ts`'s "seed-excluded criterion beside
-    // three passes"). `verdict.json` must record the same `pass` the
-    // terminal just printed, and the counts must show the pre-satisfied
-    // criterion excluded from the denominator without being folded into
-    // `not_evaluated` (it reached a verdict — the seed already satisfied it).
+    // This is the row the dashboard and the CLI have to agree on
+    // (`cross-surface-agreement.test.ts`'s "seed-excluded criterion beside three passes").
     const v = await readVerdictArtifact(join(tmp, "runs", "scn", "ses_e2e"));
     expect(v).not.toBeNull();
     expect(v?.verdict.state).toBe("pass");
@@ -401,14 +376,8 @@ describe("pome run --hosted (e2e via spawn)", () => {
     expect(v?.verdict.total).toBe(2);
   }, 90_000);
 
-  // F-768 (M1 "Turn-usage into the main ledger") — the whole point of the
-  // LlmTurnEvent contract is that per-turn LLM usage, and specifically the
-  // cache-read/cache-creation token counts, reaches cloud. On the HOSTED lane
-  // that means the adapter's signals JSONL survives the runner's redact → gzip
-  // → PUT pipeline as its own `signals.jsonl` blob and its key is threaded onto
-  // /finalize — the runner never merges signals into the trace's events.jsonl.
-  // This drives one real `pome run --hosted` command and inspects the bytes the
-  // fake cloud actually received.
+  // M1 "Turn-usage into the main ledger" — the whole point of the LlmTurnEvent
+  // contract is that per-turn LLM usage, and specifically the cache-read/cache-creation.
   it("uploads LlmTurnEvent rows (cache tokens intact) as a separate signals.jsonl blob, threads signalsStorageKey to finalize, and never merges them into events.jsonl", async () => {
     // A real twin HTTP event so the uploaded events.jsonl has genuine content
     // to prove the turn rows are NOT merged into it.
@@ -548,13 +517,8 @@ describe("pome run --hosted (e2e via spawn)", () => {
       (receivedResult as Record<string, unknown>).signals_storage_key,
     ).toBe("team-tm_test/session-ses_e2e/signals.jsonl");
 
-    // The uploaded signals blob carries the real run's turn rows, cache token
-    // counts intact after the redact + gzip round trip. Every row must parse
-    // (the redactJsonl line filter must not have corrupted the JSONL) and be an
-    // LlmTurnEvent. F-771 — the ≤10s preflight probe appends its own turns to
-    // the same signals file first; the runner truncates that file before the
-    // real run, so the uploaded blob contains the real run's 2 turns ONLY
-    // (turn_index 0 and 1), never the preflight's duplicate pair.
+    // The uploaded signals blob carries the real run's turn rows, cache token counts
+    // intact after the redact + gzip round trip.
     expect(uploadedBlobs.signals, "signals.jsonl was not uploaded").toBeDefined();
     const signalRows = uploadedBlobs.signals
       .trim()

@@ -20,10 +20,7 @@ const base = `/s/${TEST_SID}`;
 describe("MCP tool contract", () => {
   it("lists and executes all 36 GitHub twin tools, in the capture's order", async () => {
     const app = createGitHubCloneApp();
-    // ORDER IS THE CAPTURE'S SINCE F-1468, not this twin's. The fixture is a
-    // projection of GitHub's `default` listing, so the sequence is whatever
-    // github-mcp-server registers — pinned here because a served listing whose
-    // order silently reshuffles is a diff nobody can read.
+    // ORDER IS THE CAPTURE'S, not this twin's.
     expect([...githubToolFixture.toolNames]).toEqual([
       "add_issue_comment",
       "add_reply_to_pull_request_comment",
@@ -73,9 +70,8 @@ describe("MCP tool contract", () => {
     await call(app, "search_users", { query: "alice" });
     await call(app, "get_file_contents", { owner: "acme", repo: "api", path: "README.md" });
     await call(app, "list_commits", { owner: "acme", repo: "api" });
-    // `branch` is required since F-1468 — GitHub declares it required on this
-    // tool and the twin took it as optional, which let an examinee write to a
-    // default branch it never named.
+    // `branch` is required since — GitHub declares it required on this tool and the
+    // twin took it as optional, which let an examinee write to a default branch.
     await call(app, "create_or_update_file", { owner: "acme", repo: "api", branch: "main", path: "contract.txt", message: "Add contract", content: "ok\n" });
     await call(app, "create_branch", { owner: "acme", repo: "api", branch: "contract" });
     await call(app, "push_files", { owner: "acme", repo: "api", branch: "contract", message: "Change", files: [{ path: "contract.txt", content: "changed\n" }] });
@@ -87,8 +83,7 @@ describe("MCP tool contract", () => {
     await call(app, "issue_write", { method: "create", owner: "acme", repo: "api", title: "Consolidated issue" });
     await call(app, "search_issues", { query: "500" });
     // GitHub's MCP enum is ["OPEN","CLOSED"] with no `all` member, and its own
-    // description says both are returned when the argument is absent — so
-    // "everything" is spelled by omission here, not by a value (F-1468).
+    // description says both are returned when the argument is absent — so "everything".
     await call(app, "list_issues", { owner: "acme", repo: "api" });
     await call(app, "add_issue_comment", { owner: "acme", repo: "api", issue_number: 1, body: "contract comment" });
     await call(app, "create_issue", { owner: "acme", repo: "api", title: "Contract issue" });
@@ -104,7 +99,7 @@ describe("MCP tool contract", () => {
     await call(app, "update_pull_request_branch", { owner: "acme", repo: "api", pull_number: pr.number });
     await call(app, "merge_pull_request", { owner: "acme", repo: "api", pull_number: pr.number });
 
-    // ===== v2 hot paths (FDRS-300) ======================================
+    // ===== v2 hot paths ======================================
     await call(app, "list_branches", { owner: "acme", repo: "api" });
     // Throwaway branch + file so delete_file has something to operate on.
     await call(app, "create_branch", { owner: "acme", repo: "api", branch: "scratch" });
@@ -118,9 +113,8 @@ describe("MCP tool contract", () => {
     await call(app, "create_or_update_file", { owner: "acme", repo: "api", branch: "feature-2", path: "feature.ts", message: "Add feature", content: "export const ok = true;\n" });
     const pr2 = await call(app, "create_pull_request", { owner: "acme", repo: "api", title: "Feature 2", head: "feature-2", base: "main" });
     await call(app, "update_pull_request", { owner: "acme", repo: "api", pull_number: pr2.number, title: "Feature 2 (updated)" });
-    // Inline review comments are a REST-only surface since F-1376 —
-    // `create_pull_request_review_comment` is not a tool GitHub declares — so the
-    // reply tool, which IS, is seeded through the REST door.
+    // Inline review comments are a REST-only surface since —
+    // `create_pull_request_review_comment` is not a tool GitHub declares — so the reply tool, which IS.
     const inline = await rest(app, "POST", `/repos/acme/api/pulls/${pr2.number}/comments`, { body: "Nit", path: "feature.ts", line: 1 });
     await call(app, "add_reply_to_pull_request_comment", { owner: "acme", repo: "api", pull_number: pr2.number, comment_id: inline.id, body: "Fixed" });
     // Releases: `create_release` is REST-only for the same reason, and the two
@@ -129,7 +123,7 @@ describe("MCP tool contract", () => {
     await call(app, "list_tags", { owner: "acme", repo: "api" });
     await call(app, "list_releases", { owner: "acme", repo: "api" });
     await call(app, "get_latest_release", { owner: "acme", repo: "api" });
-    // M5 hot gaps (F-735)
+    // M5 hot gaps
     await call(app, "search_commits", { query: "contract" });
     await call(app, "get_release_by_tag", { owner: "acme", repo: "api", tag: "v1.0.0" });
     await call(app, "get_tag", { owner: "acme", repo: "api", tag: "v1.0.0" });
@@ -148,7 +142,7 @@ describe("MCP tool contract", () => {
   });
 
   // `pullNumber` is not an alias on the consolidated readers — it is the spelling
-  // GitHub's own schema uses, and the only one they accept (F-1376).
+  // GitHub's own schema uses, and the only one they accept.
   it("takes GitHub's pullNumber spelling on the consolidated PR tools", async () => {
     const app = createGitHubCloneApp();
     await call(app, "create_branch", { owner: "acme", repo: "api", branch: "camel-read" });
@@ -169,10 +163,8 @@ describe("MCP tool contract", () => {
     expect(me.login).toBe("alice");
   });
 
-  // `add_collaborator` stopped being an MCP tool in F-1376 — GitHub declares no
-  // such tool — but the operation, and every guard on it, is unchanged on the
-  // REST door these now drive. The guard was never MCP-only: `routes.ts` runs the
-  // same `hasRepositoryPermission` check the tool dispatch used to.
+  // `add_collaborator` stopped being an MCP tool — GitHub declares no such tool — but
+  // the operation, and every guard on it, is unchanged on the REST door these.
   it("REST add_collaborator uses the authenticated token identity as inviter", async () => {
     const app = createGitHubCloneApp();
     const aliceToken = await signTestToken({ login: "alice" });

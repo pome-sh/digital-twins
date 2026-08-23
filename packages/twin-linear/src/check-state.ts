@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// How a declared check READS the exported Linear workspace (F-1129).
+// How a declared check READS the exported Linear workspace.
 //
 // `LinearStateExport` (`state.ts:4-27`) names the collections but types every
 // row `unknown[]`, so the row shapes still have to be modelled by hand here, as
@@ -116,7 +116,7 @@ export type Resolved<T> =
   | { found: T; path: string }
   | { missing: string; skip: boolean; searched?: string };
 
-/** The exported collections a pointer can address (F-1197). Named because seven
+/** The exported collections a pointer can address. Named because seven
  *  declarations reach for them. */
 export const ISSUES_PATH = statePath("issues");
 export const COMMENTS_PATH = statePath("comments");
@@ -126,7 +126,7 @@ export const USERS_PATH = statePath("users");
 
 /**
  * A pointer at `key` on the row `base` addresses, falling back to the row when
- * the export does not carry that key (F-1197).
+ * the export does not carry that key.
  *
  * The fallback is the whole point and it is not defensive padding. An UNSET
  * estimate and an ABSENT assignee are both real, common, and exactly the
@@ -141,7 +141,7 @@ export function fieldPath(base: string, row: object, key: string): string {
 
 /** The one place an unresolved selector becomes an outcome.
  *
- *  F-1197 — it also carries the citation, so the rule "a refusal names where it
+ *  It also carries the citation, so the rule "a refusal names where it
  *  looked" is written once rather than at fourteen call sites. */
 export function unresolved(r: { missing: string; skip: boolean; searched?: string }): CheckOutcome {
   const outcome: CheckOutcome = r.skip

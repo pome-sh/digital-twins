@@ -24,7 +24,7 @@ describe("pome inspect command", () => {
     await rm(tmp, { recursive: true, force: true });
   });
 
-  it("exits with code 2 and prints the legacy message on a pre-FDRS-398 events.jsonl", async () => {
+ it("exits with code 2 and prints the legacy message on a legacy events.jsonl", async () => {
     const legacy = {
       ts: "2026-05-01T00:00:00.000Z",
       run_id: "run_old",
@@ -115,7 +115,7 @@ describe("pome inspect command", () => {
 
     await createProgram().parseAsync(["node", "pome", "inspect", runDir]);
 
-    // FDRS-657 — inspect renders ONLY trace/audit content. It never prints a
+    // Inspect renders ONLY trace/audit content. It never prints a
     // verdict (there is no local score). Exit code stays unset (treated as 0).
     expect(process.exitCode).toBeUndefined();
     const out = logSpy.mock.calls.map((c) => String(c[0])).join("\n");

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// GitHub REST domain routes (F-682, F-1179).
+// GitHub REST domain routes.
 //
 // Every route is mounted FROM its own declaration in `./route-inputs.ts` — the
 // method and path are written down exactly once — and every handler receives its
@@ -51,13 +51,13 @@ export function registerGitHubRoutes(session: Hono, { domain, recorder }: RouteC
   /**
    * Mount one declared route.
    *
-   * `tool` is typed to `TAPE_ASSERTABLE_TOOLS` (F-1125), so a name outside the
+   * `tool` is typed to `TAPE_ASSERTABLE_TOOLS`, so a name outside the
    * set cannot be stamped and a set member with no stamped route is caught by
    * `test/tool-stamping.test.ts`. A `was never called` check is only as honest
    * as the doors the recorder watches, and the two halves drifting apart is how
    * it would quietly start lying.
    *
-   * F-1498 — every error this route raises carries the `documentation_url` real
+   * Every error this route raises carries the `documentation_url` real
    * GitHub puts on THIS operation, and it is attached here, once, for all 66
    * surfaces. The declaration's own `surface` string is the key, so a route
    * cannot be mounted under one operation and mapped under another; the two
@@ -120,7 +120,7 @@ export function registerGitHubRoutes(session: Hono, { domain, recorder }: RouteC
     ok(domain.getFileContents({ ...path, ref: query.ref }))
   );
   route(GITHUB_ROUTES.createOrUpdateFile, ({ path, body }, c) => {
-    // F-1460 — base64 in, on THIS door only. The MCP tools reach the same
+    // Base64 in, on THIS door only. The MCP tools reach the same
     // `domain.createOrUpdateFile` with plain text, which is what GitHub's own
     // MCP server sends it; see `rest-content.ts` for why the decode lives here
     // and not one level down.
@@ -129,7 +129,7 @@ export function registerGitHubRoutes(session: Hono, { domain, recorder }: RouteC
       domain.createOrUpdateFile({ ...path, ...body, content }, { actor: sessionLogin(c) }, onDelta)
     );
     // GitHub returns 201 Created when the file did not previously exist and 200
-    // OK when an existing file is updated (FDRS-596). The domain reports a
+    // OK when an existing file is updated. The domain reports a
     // `before: null` delta for an insert (documented convention in
     // shared-types' stateDeltaSchema).
     const status = delta !== null && delta.before === null ? 201 : 200;
@@ -160,7 +160,7 @@ export function registerGitHubRoutes(session: Hono, { domain, recorder }: RouteC
   route(GITHUB_ROUTES.listIssueComments, ({ path, query }) =>
     ok(domain.listIssueComments({ ...issueRef(path), ...query }))
   );
-  // Stamped (F-1521), so `` `add_issue_comment` was called `` can be asserted
+  // Stamped, so `` `add_issue_comment` was called `` can be asserted
   // about the ACTION rather than the transport: an examinee that comments over
   // this route satisfies the positive criterion exactly as one going through
   // `tools/call` does. Unstamped, that sentence would FAIL a correct agent for
@@ -258,7 +258,7 @@ export function registerGitHubRoutes(session: Hono, { domain, recorder }: RouteC
     return ok(value, true, delta);
   });
 
-  // ===== v2 hot paths (FDRS-300) =========================================
+  // ===== v2 hot paths =========================================
   // Cluster A — branches & files
   route(GITHUB_ROUTES.listBranches, ({ path, query }) =>
     ok(domain.listBranchesForRepo({ ...path, ...query }))

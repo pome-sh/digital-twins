@@ -16,7 +16,7 @@
 // also write a committed `scripts/validate-mcp.output.txt` snapshot, which
 // could never reproduce byte-for-byte — it embeds the ephemeral port this run
 // bound to — so a CI job that wrote it would rewrite a tracked file mid-job
-// (F-1472, same fix as twin-github's F-1354).
+// (same fix as twin-github's).
 
 import { serve } from "@hono/node-server";
 import { sign } from "hono/jwt";

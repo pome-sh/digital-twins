@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-634 — acceptance: all four doctor checks pass on a correctly wired
-// copy of agent-examples/triage-agent (the ticket's verification target). The
-// example's real source is copied as-is; only pome.config.json is added —
-// exactly what a user lands on after `pome install`.
+// Acceptance: all four doctor checks pass on a correctly wired copy of
+// agent-examples/triage-agent (the ticket's verification target).
 
 import { cp, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -10,7 +8,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { runDoctorChecks } from "../../src/doctor/checks.js";
 
-describe("pome doctor — wired triage-agent acceptance (FDRS-634)", () => {
+describe("pome doctor — wired triage-agent acceptance", () => {
   it("passes all four checks on a wired copy of agent-examples/triage-agent", async () => {
     const dir = await mkdtemp(join(tmpdir(), "pome-doctor-triage-"));
     const exampleSrc = new URL("../../../agent-examples/triage-agent/src/", import.meta.url).pathname;

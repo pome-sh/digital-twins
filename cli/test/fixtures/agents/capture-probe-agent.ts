@@ -1,11 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-399 test fixture: same scripted triage work as
-// examples/agents/scripted-triage-agent.ts, but after the triage call we open
-// one raw HTTP CONNECT through the runner-injected HTTP_PROXY to a TCP host
-// configured via POME_CAPTURE_TEST_TARGET="host:port". This deterministically
-// produces one `LlmCallEvent` in events.jsonl without needing a real
-// Anthropic call or a TLS upstream — the proxy treats CONNECT tunnels as
-// opaque regardless of inner bytes (proven by FDRS-406's integration test).
+// Test fixture: same scripted triage work as examples/agents/scripted-triage-agent.ts,
+// but after the triage call we open one raw HTTP CONNECT through the.
 
 import { createConnection } from "node:net";
 import { URL } from "node:url";

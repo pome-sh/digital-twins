@@ -16,7 +16,7 @@ export type CreateChargeInput = {
   amount: number;
   currency: string;
   balance_transaction_id?: string | null;
-  /** Card charges (F-731): the PM used and its serialized card details. */
+  /** Card charges: the PM used and its serialized card details. */
   payment_method_id?: string | null;
   payment_method_details_json?: string | null;
   /** Inherited from the PI so customer settlement reads can attribute it. */

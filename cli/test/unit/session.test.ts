@@ -283,7 +283,7 @@ describe("runSessionCreate secret output", () => {
   });
 });
 
-describe("runSessionStop (F-983)", () => {
+describe("runSessionStop", () => {
   beforeEach(() => {
     mocks.deleteSession.mockReset();
     mocks.resolveCredentials.mockResolvedValue({

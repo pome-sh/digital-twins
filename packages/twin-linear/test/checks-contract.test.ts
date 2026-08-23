@@ -1,13 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// The properties every declared check must hold, carried across from twin-slack
-// when Linear's vocabulary moved out of pome-cloud (F-1129).
-//
-// Load-bearing, not ceremony: D10 and D11 were both caught by the mutant
-// assertions in twin-github's copy of this file, and reverting a mutant to a
-// resolved selector left that suite green until the honest-null ledger existed.
-// They travel with the declaration so the twin, not its consumer, is where a
-// bad check is stopped.
+// The properties every declared check must hold, carried across from twin-slack when
+// Linear's vocabulary moved out of pome-cloud.
 
 import {
   checkNearMissPattern,
@@ -409,18 +402,7 @@ describe("state-shape parity", () => {
   });
 });
 
-// Every state-reading check that cites no path, WITH the reason (F-1197).
-//
-// EMPTY, and — like `HONEST_NULL_WORLDS` above — that is the claim. F-1197
-// opened by counting what could cite anything at all: 8 of 45 declared checks,
-// because only a `tape` check could fill `evidenceEventIds`. An optional field
-// with no gate behind it is how a number like that happens, so the field ships
-// with this gate and the ledger ships empty. The argument for the pointer
-// grammar, and for why a pointer addresses `final`, is in the sdk's
-// `check-state-path.ts`; this is only its per-twin enforcement.
-//
-// An entry here admits that a verdict renders as an inert row — indistinguishable,
-// to a reader, from a verdict with no evidence at all.
+// Every state-reading check that cites no path, WITH the reason.
 const HONEST_UNCITED_CHECKS: Record<string, string> = {};
 
 describe("declared state citations", () => {
@@ -475,24 +457,8 @@ describe("declared state citations", () => {
   });
 });
 
-// Which door stands between a redactor that eats a slot's literal and a wrong
-// verdict — one row per declared slot, MEASURED rather than argued (F-1157).
-//
-// The vocabulary of the values is in the sdk's `check-redaction.ts`. Only one of
-// them is a wrong verdict rather than a missing one — `vacuous_pass`, where the
-// check's OWN failing world starts passing once the literal is gone — and the
-// assertion below forbids it outright rather than ledgering it.
-//
-// Linear is the twin with the most `false_fail` rows, and they are one decision
-// rather than fourteen: `resolveIssue` and its team lookup return a real
-// `failed` where gmail's, slack's and stripe's selector misses return `skipped`.
-// That difference predates this gate and is deliberate — a Linear criterion
-// names an issue by TITLE, and a title that resolves to nothing is a claim about
-// the world an author can act on rather than a substrate the grader could not
-// read. It is worth knowing that the same choice means a redactor masking
-// `issues[].title` or a team key marks a correct agent down instead of dropping
-// the criterion. Counted here, per F-1157's second finding; not changed here,
-// because changing it moves every selector-miss verdict this twin produces.
+// Which door stands between a redactor that eats a slot's literal and a wrong verdict
+// — one row per declared slot, MEASURED rather than argued.
 const REDACTION_GUARDS: Record<string, RedactionGuard> = {
   "linear.issue-exists · title": "declared_subject",
   "linear.issue-exists · team": "false_fail",

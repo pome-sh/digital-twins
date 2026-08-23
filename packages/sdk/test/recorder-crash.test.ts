@@ -1,10 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-722 — crash-loss gate for the durable recorder (production path).
-// Spawns a child (via tsx) that records through createFileBackedRecorderStore
-// — the same twin-core store production twins / CLI harness use — then
-// SIGKILLs mid-run. Asserts the partial events.jsonl exists, parses with
-// twinHttpEventSchema, and lost at most the in-flight event.
+// Crash-loss gate for the durable recorder (production path).
 
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -27,7 +22,7 @@ afterEach(async () => {
   }
 });
 
-describe("durable recorder crash loss (F-722)", () => {
+describe("durable recorder crash loss", () => {
   it("kill -9 mid-run leaves a parseable partial tape losing at most one event", async () => {
     expect(existsSync(TSX_BIN), `tsx not found at ${TSX_BIN}`).toBe(true);
 

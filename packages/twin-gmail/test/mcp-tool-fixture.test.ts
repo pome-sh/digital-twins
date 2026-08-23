@@ -1,13 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1325 — the fixture is the tool table, not a document about it.
-//
-// The derivation is structural (`deriveMcpToolTable` throws on any 1:1
-// mismatch), but "structurally impossible" is a claim worth one round trip:
-// this suite drives the real `tools/list` surface and compares the answer to
-// the fixture field by field. It also re-derives the canonical bytes and
-// re-hashes the raw file from disk, which is the half of the load-time assert
-// a bundled twin cannot make for itself.
+// The fixture is the tool table, not a document about it.
 
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -85,10 +77,7 @@ describe("gmail MCP tool fixture", () => {
     expect(meta.endpoint).toBe("https://gmailmcp.googleapis.com/mcp/v1");
   });
 
-  // F-1400. The two halves below are what stops this fixture ageing in place
-  // again. It shipped for seventeen days as a 2026-07-20 read of an endpoint
-  // that had moved, and nothing in this repo related it to the golden beside
-  // it, so pome-cloud's lane reported 34 findings that were all one stale file.
+  // The two halves below are what stops this fixture ageing in place again.
   it("is the upstream golden in full — every tool, byte for byte, nothing withheld", () => {
     const golden = JSON.parse(
       readFileSync(

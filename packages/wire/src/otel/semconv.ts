@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * otel/semconv — pinned OpenTelemetry semantic-convention surface (M1.1 / FDRS-480).
+ * otel/semconv — pinned OpenTelemetry semantic-convention surface (M1.1).
  *
  * The ONE place an upstream spec change is absorbed. Every attribute name the
  * span mapper / shim reads is a constant here; the convention versions are
@@ -25,7 +25,7 @@
  *
  * This module is the canonical home of the pinned OTel convention surface;
  * pome-cloud consumes it as part of `@pome-sh/wire` (ownership
- * boundary settled at FDRS-653 — see `./index.ts`).
+ * boundary settled — see `./index.ts`).
  */
 
 // Pinned core (HTTP / url / server / error) convention version.
@@ -35,7 +35,7 @@ export type OtelCoreSemconvVersion = typeof OTEL_CORE_SEMCONV_VERSION;
 // Pinned GenAI convention/schema version. The GenAI surface is experimental and
 // versions ahead of core; `gen_ai.provider.name` is canonical at this version.
 //
-// MIGRATION NOTE (F-766): at core v1.42.0 the `gen_ai.*` conventions were split
+// MIGRATION NOTE: at core v1.42.0 the `gen_ai.*` conventions were split
 // OUT of `open-telemetry/semantic-conventions` into the dedicated
 // `open-telemetry/semantic-conventions-genai` repo, which has published ZERO
 // tagged releases so far. There is therefore no version tag to bump to for the

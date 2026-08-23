@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// REST routes #11-12 from FDRS-270.
+// REST routes #11-12.
 
 import type { Hono } from "hono";
 import type { StripeDomain } from "../domain/index.js";

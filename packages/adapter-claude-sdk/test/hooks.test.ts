@@ -1,8 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// FDRS-407 acceptance: every SDK hook fires a HookEvent row in M0 schema.
-// We invoke `buildPomeHooks()`'s callbacks directly with synthetic inputs —
-// no live SDK round-trip needed; the callback contract is the unit under test.
+// Acceptance: every SDK hook fires a HookEvent row in M0 schema.
 
 import { mkdtempSync, readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";

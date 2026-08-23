@@ -39,9 +39,8 @@ describe("state export", () => {
     });
   });
 
-  // F-1151 — the third comment surface on a pull request, and the one the twin
-  // could not record at all before: `add_issue_comment` on a PR number failed the
-  // `issue_comments` FK, so a summarising agent's only write path 404'd.
+  // The third comment surface on a pull request, and the one the twin could not record
+  // at all before: `add_issue_comment` on a PR number failed the `issue_comments`.
   it("exports a pull request's conversation comments separately from its reviews and inline comments", () => {
     const domain = new GitHubDomain(openGitHubCloneDatabase());
     domain.seed({
@@ -132,7 +131,7 @@ describe("state export", () => {
   });
 });
 
-describe("state export determinism (F-682)", () => {
+describe("state export determinism", () => {
   const previousSecret = process.env.TWIN_AUTH_SECRET;
   let token: string;
   beforeAll(async () => {

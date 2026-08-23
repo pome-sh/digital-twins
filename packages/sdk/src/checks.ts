@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The assertable check vocabulary (F-1073, milestone A2b).
+// The assertable check vocabulary (milestone A2b).
 //
 // Position 2: the author selects a typed check and the system RENDERS the
 // English. Binding cannot fail, because the sentence is what the check
@@ -48,7 +48,7 @@ export type CheckSubstrateKind = "final" | "seed+final" | "tape";
 export interface CheckParamType {
   readonly name: string;
   readonly pattern: string;
-  // A valid value for this slot, shown as an author-facing hint (F-1074).
+  // A valid value for this slot, shown as an author-facing hint.
   // `pattern` is a regex source; asking an author to satisfy one directly is
   // hostile. `defineCheck` asserts this against `pattern` at module load, so a
   // type whose own example is invalid cannot ship.
@@ -72,7 +72,7 @@ export const repoRef: CheckParamType = {
 // A slot whose value comes from a CLOSED set — an issue's `open`/`closed`, a
 // review's `APPROVED`/`CHANGES_REQUESTED`, a commit status's four states.
 //
-// F-1075. The legacy regexes spelled these inline as `(open|closed)`, which
+// The legacy regexes spelled these inline as `(open|closed)`, which
 // worked but put the closed set somewhere no authoring surface could read. As a
 // param type the set travels with the declaration: `pome checks` prints it, the
 // picker offers it, and a value outside it is a corrupted instance rather than
@@ -111,14 +111,14 @@ export interface CheckOutcome {
   // so the criterion leaves the score denominator instead of vacuously
   // passing a wrong agent.
   status?: "passed" | "failed" | "unmatched" | "skipped";
-  // F-1076 — the recorded calls this outcome asserted against, by
+  // The recorded calls this outcome asserted against, by
   // `TwinHttpEvent.event_id`. Only a `substrate: "tape"` check can fill it;
   // state-reading checks leave it absent, because their evidence is a path into
   // the state tree and this pointer does not model that.
   //
   // It exists because moving a tape predicate into a declaration would
-  // otherwise have DROPPED F-980's citations on the floor: the consuming
-  // engine's outcome type has carried this field since F-980, and a declaration
+  // otherwise have DROPPED the citations on the floor: the consuming
+  // engine's outcome type has carried this field, and a declaration
   // that could not express it would have been a silent downgrade sold as a
   // refactor.
   //
@@ -127,7 +127,7 @@ export interface CheckOutcome {
   // persists this into a jsonb row, and an empty affordance would have to be
   // special-cased by every reader of it.
   evidenceEventIds?: string[];
-  // F-1197 — where in the exported state tree this outcome LOOKED, as RFC 6901
+  // Where in the exported state tree this outcome LOOKED, as RFC 6901
   // JSON Pointers (`/repositories/0/issues/2/labels`). The state-substrate
   // sibling of `evidenceEventIds`, and the thing the comment above calls
   // impossible: state-reading checks left that pointer absent "because their
@@ -150,7 +150,7 @@ export interface CheckOutcome {
 // recorder-events) minus required-ness: every field is optional/nullable so a
 // malformed row can never crash a predicate.
 //
-// F-1125 closed the gap F-1076 documented here. `headers` used not to exist on
+// The gap documented here is closed. `headers` used not to exist on
 // the recorded event at all — not a narrowing a consumer could lift, but a
 // recorder that never captured them, which is why `The retry includes X-PAYMENT`
 // was unanswerable at any substrate width. It is `request_headers` now, and
@@ -161,7 +161,7 @@ export interface CheckOutcome {
 // It lives HERE, not in the consuming engine, for the same reason the
 // declarations do: the checks that read it are declared in twin packages, and a
 // consumer-side copy of this shape would drift the way the mirrored state shape
-// did before F-1075 deleted it — silently, surfacing only when a predicate
+// did before deleted it — silently, surfacing only when a predicate
 // reads a field the copy forgot.
 //
 // ORDER IS A CONTRACT. The consumer supplies these oldest-first, and a check
@@ -172,7 +172,7 @@ export interface CheckTapeEvent {
   method?: string | null;
   path?: string | null;
   request_body?: unknown;
-  // F-1125 — the request headers as recorded, keys lowercased by the runtime.
+  // The request headers as recorded, keys lowercased by the runtime.
   //
   // `undefined` is a THIRD world here and a check must not collapse it into the
   // other two: `{}` is "the call sent no headers", a present map missing a key is
@@ -187,7 +187,7 @@ export interface CheckTapeEvent {
   fidelity?: string | null;
   state_mutation?: boolean | null;
   error?: string | null;
-  // F-1125 — the twin ACTION this call invoked, or null when the surface that
+  // The twin ACTION this call invoked, or null when the surface that
   // served it declares none. Stamped identically by MCP dispatch and by a REST
   // route that performs the same action, which is what lets a check ask "was
   // this ever called" without knowing which transport the examinee chose.
@@ -197,7 +197,7 @@ export interface CheckTapeEvent {
   // check may name is generated from that commitment (see the GitHub twin's
   // `TAPE_ASSERTABLE_TOOLS`). `undefined` means the row predates the field.
   tool?: string | null;
-  // F-980 — the citable identity of this call. `event_id` rather than
+  // The citable identity of this call. `event_id` rather than
   // `request_id` because only `event_id` survives onto the OTLP span lane.
   event_id?: string | null;
 }
@@ -208,7 +208,7 @@ export interface CheckSubstrate<TState> {
   // consumer that forgets produces a named skip rather than a crash.
   seed: TState | null;
   final: TState;
-  // F-1076 — non-null whenever the declaration asked for "tape", already scoped
+  // Non-null whenever the declaration asked for "tape", already scoped
   // to this criterion's twin by the engine. Ordered oldest-first.
   //
   // Required key, nullable value, exactly like `seed`. An OPTIONAL key is one
@@ -224,7 +224,7 @@ export interface CheckSubstrate<TState> {
 // A check's own proof that it discriminates: one world where its assertion
 // holds, one where it does not.
 //
-// A PAIR, and the reason is measured rather than argued (F-1126). Every
+// A PAIR, and the reason is measured rather than argued. Every
 // state-reading check resolves its selector before it asserts, and a selector
 // miss returns a REAL failure rather than a skip — so 11 of GitHub's 13
 // declarations returned `passed: false` against `{ seed: {}, final: {} }`, a
@@ -232,7 +232,7 @@ export interface CheckSubstrate<TState> {
 // forces a world that actually resolves, and `probeDiscrimination`'s third arm
 // rejects a failing world whose reason is the one an empty world already gives.
 //
-// It is also not a new shape. F-1076 shipped it twice as a convention —
+// It is also not a new shape: it shipped twice as a convention —
 // `check-tape.test.ts`'s "THE FAILING WORLD" and, directly below it, the pair
 // asserting opposite verdicts against a byte-identical state. This promotes that
 // convention to a declaration with a gate behind it.
@@ -256,7 +256,7 @@ export interface CheckDefinition<TState, TArgs extends Record<string, string>> {
   // `<twin>.<what-it-asserts>`, unique across the twin's declarations. Reports
   // name the check a criterion bound to; a regex source is not a name.
   id: string;
-  // What the predicate ACTUALLY compares, in a sentence or two (F-1074).
+  // What the predicate ACTUALLY compares, in a sentence or two.
   //
   // REQUIRED, for the same reason `polarity` and `vacuityMutant` are: an
   // optional field is one every later declaration omits, and an authoring
@@ -271,11 +271,10 @@ export interface CheckDefinition<TState, TArgs extends Record<string, string>> {
   template: string;
   params: { [K in keyof TArgs]: CheckParamType };
   substrate: CheckSubstrateKind;
-  // Declared, never inferred from the English (F-1070). A function of the args
+  // Declared, never inferred from the English. A function of the args
   // because one template can carry both directions.
   polarity(args: TArgs): CheckPolarity;
-  // The literal this predicate compares against state, when it has one
-  // (F-1028). The engine runs it past the redaction pipeline BEFORE calling
+  // The literal this predicate compares against state, when it has one. The engine runs it past the redaction pipeline BEFORE calling
   // `evaluate`: a subject a redactor destroys can never appear in the
   // production state, so the predicate could not fire and the criterion must
   // be skipped rather than vacuously passed.
@@ -283,7 +282,7 @@ export interface CheckDefinition<TState, TArgs extends Record<string, string>> {
   // Omit — or return null — when the check asserts only on structure. That
   // means "nothing a redactor could silently delete", not "not audited yet".
   subject?(args: TArgs): string | null;
-  // F-1072, and note the shape: this returns mutated ARGS, not a mutated
+  // Note the shape: this returns mutated ARGS, not a mutated
   // sentence. The engine re-renders them.
   //
   // That shape is the point. The legacy interface had every rule write its
@@ -298,7 +297,7 @@ export interface CheckDefinition<TState, TArgs extends Record<string, string>> {
   // bill the check did not earn. Null is reported as `no_trigger`, never as
   // clean — an admitted blind spot beats a false clean bill.
   vacuityMutant(args: TArgs): TArgs | null;
-  // The worlds this check discriminates between (F-1126). Same required-ness as
+  // The worlds this check discriminates between. Same required-ness as
   // `description` and `vacuityMutant`, for the same reason: an optional field is
   // one every later declaration omits.
   //
@@ -363,7 +362,7 @@ export function defineCheck<TState, TParams extends Record<string, CheckParamTyp
       throw new Error(`check ${def.id}: declared param \`${declared}\` is not used by the template`);
     }
   }
-  // F-1074 — a param type whose own example violates its own pattern would put
+  // A param type whose own example violates its own pattern would put
   // an invalid value in front of an author as the suggested one.
   for (const [name, type] of Object.entries(def.params)) {
     const paramType = type as CheckParamType;
@@ -373,7 +372,7 @@ export function defineCheck<TState, TParams extends Record<string, CheckParamTyp
           `does not match its own pattern /${paramType.pattern}/`,
       );
     }
-    // F-1075 — the failure this prevents is silent and total. Every consumer
+    // The failure this prevents is silent and total. Every consumer
     // reads capture group i+1 as template slot i (`parseCheck` here,
     // `argsFromMatch` in the cloud's adapter); one extra group inside a param's
     // pattern shifts all of them, so each predicate is handed its neighbour's
@@ -432,7 +431,7 @@ export function checkPattern(def: CheckBindingShape): RegExp {
   return buildPattern(def.template, (index) => def.params[params[index]!]!.pattern);
 }
 
-// One implementation, called by BOTH the control plane and the CLI (F-1074).
+// One implementation, called by BOTH the control plane and the CLI.
 // They resolve declarations from independent npm pins and must be able to prove
 // they agree before an author writes a sentence; two implementations of "hash
 // the binding surface" would be the same two-representations-of-one-fact defect
@@ -441,7 +440,7 @@ export function checkPattern(def: CheckBindingShape): RegExp {
 //
 // `description` and `example` are deliberately NOT hashed. This digest gates an
 // author's write, and a prose edit changes no sentence. Neither is
-// `discriminatingWorlds` (F-1126) — a fixture is not part of the binding
+// `discriminatingWorlds` — a fixture is not part of the binding
 // surface, so adding the field skews no pin and a changed world moves no
 // sentence.
 export function checksDigest(defs: readonly CheckBindingShape[]): string {
@@ -481,9 +480,9 @@ export function parseCheck<TState, TArgs extends Record<string, string>>(
 }
 
 // Everything above DEFINES the grammar; the three modules below EXERCISE a
-// declaration written in it — do its declared worlds disagree (F-1126), does its
-// state citation resolve (F-1197), and what protects a slot the `subject` arm
-// never looks at when a redactor eats its literal (F-1157). Each split off when
+// declaration written in it — do its declared worlds disagree, does its
+// state citation resolve, and what protects a slot the `subject` arm
+// never looks at when a redactor eats its literal. Each split off when
 // this file reached the 500-LOC health limit, a fair reading of that seam. All
 // three are re-exported here so `@pome-sh/sdk/checks` keeps ONE import site:
 // consumers ask the vocabulary module about the vocabulary, and the split stays

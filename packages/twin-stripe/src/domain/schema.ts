@@ -152,7 +152,7 @@ CREATE INDEX IF NOT EXISTS idx_payment_methods_customer ON payment_methods(custo
 CREATE INDEX IF NOT EXISTS idx_payment_methods_created ON payment_methods(created);
 CREATE INDEX IF NOT EXISTS idx_payment_methods_account_id ON payment_methods(account_id);
 
--- F-734 billing tables (warm surfaces, shape tier): plain stored rows served
+-- Billing tables (warm surfaces, shape tier): plain stored rows served
 -- back in Stripe shape. No invoices table — invoices are reads-only and
 -- nothing in the twin mints one (loud shape divergence, see FIDELITY.md).
 
@@ -240,7 +240,7 @@ export function ensureStripeTables(db: TwinStripeDatabase) {
 // alters an existing table, so a DB file minted earlier (STRIPE_CLONE_DB
 // pointing at an old snapshot) needs the columns added in place.
 // Idempotent; exported so db.ts's migrate() patches old files even without
-// a domain constructor. F-731 added the card-mode columns; F-733 links
+// a domain constructor. The card-mode columns arrived later, and refunds link
 // refunds to their ledger entry.
 const MIGRATED_COLUMNS: Record<string, ReadonlyArray<[column: string, ddl: string]>> = {
   payment_intents: [

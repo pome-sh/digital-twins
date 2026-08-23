@@ -4,7 +4,7 @@
 // domain, recorder, runId)` registers the Stripe REST routes + the loud
 // /v1/* 501 catch-all on the given Hono router. The twin manifest
 // (../twin.ts) calls this from its `routes` registrar; MCP dispatch is the
-// engine's (`/mcp` is a reserved SDK prefix since F-681 — the tool registry
+// engine's (`/mcp` is a reserved SDK prefix since — the tool registry
 // in ../tools.ts drives it via the manifest).
 
 import type { Hono } from "hono";

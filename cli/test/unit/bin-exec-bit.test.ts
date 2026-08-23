@@ -1,11 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-666 — `npm pack` preserves file modes straight from disk, and a
-// global install's `pome` bin symlink points at dist/src/cli/main.js. tsc
-// emits 644, so without the build script's chmod the published CLI is
-// unresolvable on PATH (`npm i -g @pome-sh/cli` → `pome` not found until a
-// manual `chmod +x`). The npx path and project-local .bin shims exec via
-// node and never caught this. Guard the built artifact's mode here —
-// cli-ci runs `npm run build` before `npm test`, so dist/ exists in CI.
+// `npm pack` preserves file modes straight from disk, and a global install's `pome`
+// bin symlink points at dist/src/cli/main.js.
 
 import { existsSync, statSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -17,7 +12,7 @@ const BIN = resolve(
   "../../dist/src/cli/main.js",
 );
 
-describe("published bin exec bit (FDRS-666)", () => {
+describe("published bin exec bit", () => {
   // File modes are a POSIX concept and the publish packs on POSIX CI; skip
   // on Windows and on local checkouts that haven't built dist/ yet.
   it.skipIf(process.platform === "win32" || !existsSync(BIN))(

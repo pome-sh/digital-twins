@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// POST/GET /v1/refunds — FDRS-338 (M3a Lane B).
+// POST/GET /v1/refunds (M3a Lane B).
 //
 // `created()` carries the canonical state_delta { before: null, after: row }
 // through to respond(), which writes it into the recorder event. Idempotency

@@ -8,8 +8,7 @@ import type { TwinDatabase } from "@pome-sh/sdk/db";
 
 export type { RecorderEvent } from "@pome-sh/wire";
 
-// The engine's driver wrapper is the only database surface a twin sees
-// (F-681/F-683): prepare/exec/pragma/transaction/close.
+// The engine's driver wrapper is the only database surface a twin sees: prepare/exec/pragma/transaction/close.
 export type SlackTwinDatabase = TwinDatabase;
 
 export type SeedTeam = {
@@ -59,7 +58,7 @@ export type SeedEmoji = {
 };
 
 /**
- * A file present in the world before the agent touches it (F-1509).
+ * A file present in the world before the agent touches it.
  *
  * Until this existed the `files` table had exactly ONE writer — `filesUpload`,
  * a mutation — so every read of `files.list` / `files.info` against a freshly

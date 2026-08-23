@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-643 — the hosted client's bearer scheme: `pome demo` authenticates
-// upload-url + finalize with the trial's demo_token as `Authorization:
-// Bearer …` (the requireApiKeyOrSessionToken surface), never X-API-KEY.
+// The hosted client's bearer scheme: `pome demo` authenticates upload-url + finalize
+// with the trial's demo_token as `Authorization: Bearer …` (the requireApiKeyOrSessionToken.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createHostedClient } from "../../../src/hosted/client.js";
 import { HostedQuotaError } from "../../../src/hosted/errors.js";
@@ -17,7 +16,7 @@ function mockFetch(impl: typeof fetch) {
   return vi.spyOn(globalThis, "fetch").mockImplementation(impl as never);
 }
 
-describe("createHostedClient authScheme: bearer (FDRS-643)", () => {
+describe("createHostedClient authScheme: bearer", () => {
   it("sends Authorization: Bearer on finalize with the explicit 60s demo timeout config", async () => {
     mockFetch(async (url, init) => {
       expect(String(url)).toBe(`${BASE}/v1/sessions/ses_1/finalize`);

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Slack Web API domain routes (F-683, F-1179). Pure domain shape: every handler
+// Slack Web API domain routes. Pure domain shape: every handler
 // maps DECLARED inputs onto a SlackDomain call and wraps the result in the
 // Slack `{ok:true, ...}` envelope. The declaration in `./route-inputs.ts` is
 // both the mounted method/path and the only parse — a handler is handed the

@@ -5,7 +5,7 @@ import { nanoid, newGroupId } from "../../../src/demo/ids.js";
 // Mirror of pome-cloud lib/demo.ts isValidGroupId.
 const CLOUD_GROUP_ID_RE = /^[A-Za-z0-9_-]{6,64}$/;
 
-describe("demo trial-group ids (FDRS-643)", () => {
+describe("demo trial-group ids", () => {
   it("mints grp_ + 21 url-safe chars", () => {
     const id = newGroupId();
     expect(id).toMatch(/^grp_[\w-]{21}$/);

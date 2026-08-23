@@ -147,7 +147,7 @@ export function buildTools(config: TwinConfig) {
     },
   );
 
-  // Slack's own tool name and argument names (F-1330). This is the example's
+  // Slack's own tool name and argument names. This is the example's
   // tool over the Web API, not Slack's MCP server — but a name Slack has never
   // served teaches the wrong vocabulary, and `slack_post_message` was one.
   const slack_send_message = tool(

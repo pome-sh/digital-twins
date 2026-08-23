@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1179 — twin-linear's HTTP input surface.
+// Twin-linear's HTTP input surface.
 //
 // Linear's API layer is GraphQL, so this twin's input surface has two halves
 // that are read in two different ways, and only one of them belongs here.
@@ -21,7 +21,7 @@ import { z } from "zod";
 import { routeInputDeclarer, type RouteInputDeclaration } from "@pome-sh/sdk/route-inputs";
 
 /**
- * F-1372 — Linear ignores a request parameter it does not recognise on all six
+ * Linear ignores a request parameter it does not recognise on all six
  * of these routes, so this twin does too.
  *
  * Four of them are OAuth, where it is not even Linear's choice: RFC 6749 says
@@ -38,7 +38,7 @@ import { routeInputDeclarer, type RouteInputDeclaration } from "@pome-sh/sdk/rou
  * envelope key, and an unknown query-string key, each left Linear's answer
  * exactly as it was.
  *
- * F-1385 settled the one case that ruling did NOT cover. `extensions` is not an
+ * The one case that ruling did NOT cover is settled. `extensions` is not an
  * unknown key Linear happens to reject — it is a key Linear specifically
  * parses, so it is DECLARED below and answered by
  * `./graphql/persisted-query.ts` rather than left to this disposition. The
@@ -57,7 +57,7 @@ const VARIABLES_OBJECT = z.union([z.record(z.string(), z.unknown()), z.string()]
 
 /**
  * `extensions`, the envelope's fourth member — Apollo's automatic persisted
- * queries ride in it (F-1385).
+ * queries ride in it.
  *
  * Deliberately permissive rather than shaped, on BOTH surfaces. Linear answers
  * a differently-worded 400 for each way an `extensions` value can be wrong — a

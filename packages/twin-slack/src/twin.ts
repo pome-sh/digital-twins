@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The Slack twin as a thin `@pome-sh/sdk` plugin (F-683). This manifest is
+// The Slack twin as a thin `@pome-sh/sdk` plugin. This manifest is
 // pure declaration: domain factory, seed schema, tools, routes, and the
-// wire-frozen Slack shapes (FDRS-711 / F-712) — error envelopes, auth pins,
+// wire-frozen Slack shapes — error envelopes, auth pins,
 // healthz extras, the 501 unsupported envelope, the admin-gate 403 body.
 // All mechanism (HTTP mount, auth, recorder + redaction, MCP dispatch,
 // /_pome/*, admin gate, db driver) lives in the engine.
@@ -103,7 +103,7 @@ function slackErrorEnvelope(err: unknown): { status: number; body: unknown } {
   };
 }
 
-// F-1325 — the tool table is the fixture. `deriveMcpToolTable` supplies every
+// The tool table is the fixture. `deriveMcpToolTable` supplies every
 // name, description, input schema (the frozen draft-7
 // `additionalProperties:false` form) and annotation from
 // `fixtures/mcp-tools-list.raw.json`, and refuses to build if the schemas below
@@ -141,7 +141,7 @@ export const slackTwinDefinition: TwinDefinition<SlackTwinDatabase, SlackSeed, S
     return domain;
   },
   routes: registerSlackRoutes,
-  // Frozen slack body parsing (F-683 review pin): form-or-JSON on every
+  // Frozen slack body parsing (review pin): form-or-JSON on every
   // engine-owned surface — official Slack SDKs default to
   // application/x-www-form-urlencoded — and malformed JSON collapses to {}.
   bodyReader: (c) => parseFormOrJson(c),
@@ -185,7 +185,7 @@ export const slackTwinDefinition: TwinDefinition<SlackTwinDatabase, SlackSeed, S
   unsupported: () => unsupportedEnvelope,
   errorEnvelope: slackErrorEnvelope,
   auth: {
-    // F-712 pins: Bearer header + ?token= + form-body token; raw bearer
+    // Frozen pins: Bearer header + ?token= + form-body token; raw bearer
     // rejected (allowRawBearer default false); sid mismatch → 401
     // invalid_auth; expired vs invalid classified by the engine and
     // rendered through the envelope hook.
@@ -205,7 +205,7 @@ export const slackTwinDefinition: TwinDefinition<SlackTwinDatabase, SlackSeed, S
 export type CreateSlackTwinAppOptions = {
   db?: SlackTwinDatabase;
   /**
-   * Accepted for API compatibility with the pre-F-683 factory; the engine
+   * Accepted for API compatibility with the legacy factory; the engine
    * rebuilds the (stateless) SlackDomain from `db`, so callers that seeded
    * through their own instance see identical state.
    */

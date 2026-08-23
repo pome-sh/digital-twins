@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Customers domain — F-732 (M5 customer-management hot path).
+// Customers domain (M5 customer-management hot path).
 //
 // Stripe semantics carried here: metadata updates merge per-key (an empty
 // or null value unsets the key), DELETE is a soft delete that keeps the row

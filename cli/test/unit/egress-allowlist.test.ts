@@ -1,12 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-635 — unit tests for the egress floor's allowlist semantics.
-//
-// The floor is deny-by-default: only twin hosts + LLM provider hosts +
-// loopback may be CONNECTed to. The default provider set deliberately
-// mirrors `DEFAULT_AGENT_ENV_ALLOWLIST` in agentRunner.ts — a provider the
-// runner hands an API key for by default is a provider the floor lets the
-// agent dial by default. Everything else goes through the paired valves:
-// POME_AGENT_ENV_ALLOWLIST (key) + POME_EGRESS_ALLOW (host).
+// Unit tests for the egress floor's allowlist semantics.
 
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";

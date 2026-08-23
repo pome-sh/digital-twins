@@ -27,12 +27,12 @@ import { STRIPE_REFUND_REASONS } from "./upstream-types.js";
 /**
  * The tool table Stripe serves. Every name, description and input schema on
  * the wire comes from this fixture; the array below declares only how each
- * tool's arguments are validated (F-1325).
+ * tool's arguments are validated.
  *
  * Its substrate is `twin-code-transcription` — this listing was read off this
  * twin. There is nothing to compare it to: `@stripe/mcp` declares no tools of
  * its own and the live surface is a function of the caller's Restricted API
- * Key, so F-1326 recorded stripe as `not-captured` rather than inventing a
+ * Key, so stripe is recorded as `not-captured` rather than inventing a
  * deployment-invariant table.
  */
 export const stripeToolFixture = loadMcpToolFixture({ raw: rawListing, meta: metaListing });
@@ -164,7 +164,7 @@ export const toolArgumentSchemas = [
     schema: z.object({
       charge: z.string().min(1),
       amount: z.coerce.number().int().positive().optional(),
-      // F-1484 — Stripe's closed set, not a free string. `.optional()` is kept:
+      // Stripe's closed set, not a free string. `.optional()` is kept:
       // the vendor does not require the field, and narrowing the arity as well
       // as the value would refuse every refund the corpus actually makes.
       reason: z.enum(STRIPE_REFUND_REASONS).optional(),

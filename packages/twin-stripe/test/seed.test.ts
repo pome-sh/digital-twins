@@ -1,16 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// FDRS-364: the seed schema must accept payment_intents / charges / refunds /
-// balance_transactions so scenarios can establish prerequisite state before
-// the agent runs. Without this, scenario 14's `pi_test_200` + `ch_test_200`
-// seed block is silently dropped by zod (default strip mode), the agent has
-// no charge to refund, and the evaluator reports `state.refunds.length: 0`.
-//
-// The seed → DB → readback path mirrors what `/_pome/state` surfaces to the
-// cloud evaluator, so a green test here is the unit-level equivalent of
-// `pome run --hosted tasks/14-stripe-refund-retry.md` showing the seeded
-// rows in `state_initial.json`. The full live-flow check is cross-repo
-// (CLI at `cli/` + cloud + task file at `cli/tasks/`) and is verified separately.
+// The seed schema must accept payment_intents / charges / refunds /
+// balance_transactions so scenarios can establish prerequisite state before the agent runs.
 
 import { describe, expect, it } from "vitest";
 import { openTwinStripeDatabase } from "../src/db.js";
@@ -73,7 +63,7 @@ const SCENARIO_14_SEED = {
   refunds: [],
 } as const;
 
-describe("seed: payment_intents / charges / refunds / balance_transactions (FDRS-364)", () => {
+describe("seed: payment_intents / charges / refunds / balance_transactions", () => {
   it("parseSeed preserves the new top-level arrays (no silent strip)", () => {
     const parsed = parseSeed(SCENARIO_14_SEED) as {
       payment_intents?: Array<{ id: string }>;

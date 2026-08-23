@@ -1,26 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1422 — one row, one shape.
-//
-// `GET /repos/:o/:r/pulls/:n/comments` built its elements inline out of six
-// columns — `{id, path, body, user, created_at, updated_at}` — while `POST` to
-// the same route served the SAME ROW through `pullRequestReviewCommentJson`,
-// which carries `line`, `side`, `commit_id`, `pull_request_url` and the rest.
-// The write path validates `line` against the file's real line count and then
-// the read path dropped it. One row had two shapes depending on which verb you
-// used, and the read side was the lean one.
-//
-// It went unmeasured rather than unnoticed: the surface answered `[]` on every
-// seed anyone could write until F-1421 made a review comment seedable, and a
-// shape-diff returns before the per-element comparison when either side is
-// empty. The first real element on this surface is what makes the gap visible —
-// as a `field-removed` finding per omitted field, which on a `semantic`-tier
-// read surface is drift.
-//
-// The property under test is stated as the property, not as a field checklist:
-// the LIST element and the CREATE response are the same object for the same
-// comment. A checklist drifts the moment the serializer gains a field; this
-// does not.
+// One row, one shape. `GET /repos/:o/:r/pulls/:n/comments` built its elements inline
+// out of six columns — `{id, path, body, user, created_at, updated_at}`.
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createGitHubCloneApp } from "../src/twin.js";
@@ -41,12 +21,8 @@ afterAll(() => {
 
 const base = `/s/${TEST_SID}`;
 
-/**
- * `src/app.ts` exists on BOTH branches and the pull request changes it, so a
- * review comment resolves on either side: `RIGHT` against the four-line head,
- * `LEFT` against the three-line base. The one-line file F-1421's world uses
- * cannot express a wrong line at all — every line in it is line 1.
- */
+/** `src/app.ts` exists on BOTH branches and the pull request changes it, so a review
+ *  comment resolves on either side: `RIGHT` against the four-line head. */
 const BASE_APP_TS = "const a = 1;\nconst b = 2;\nconst c = 3;\n";
 const HEAD_APP_TS = "const a = 1;\nconst b = 22;\nconst c = 3;\nconst d = 4;\n";
 
@@ -117,7 +93,7 @@ async function req(
 const listComments = (app: ReturnType<typeof createGitHubCloneApp>) =>
   req(app, "GET", `/repos/acme/api/pulls/${PR}/comments`);
 
-describe("F-1422 — the review-comment LIST and CREATE serve one shape", () => {
+describe("the review-comment LIST and CREATE serve one shape", () => {
   it("serves the CREATE response's own field set back from the LIST, for the same comment", async () => {
     const app = appFor({ line: 2, side: "RIGHT" });
 
@@ -166,7 +142,7 @@ describe("F-1422 — the review-comment LIST and CREATE serve one shape", () => 
     const list = await listComments(app);
 
     expect(list.body[0]).toMatchObject({
-      // The named four (ticket F-1422).
+      // The named four.
       line: 2,
       side: "RIGHT",
       commit_id: head.body.commit.sha,
@@ -191,7 +167,7 @@ describe("F-1422 — the review-comment LIST and CREATE serve one shape", () => 
   });
 });
 
-describe("F-1422 — a wrong line is drift, not a field nobody reads", () => {
+describe("a wrong line is drift, not a field nobody reads", () => {
   // A field that is serialized but never COMPARED is the same defect one level
   // over: it publishes green whatever it holds. These two worlds differ in one
   // planted value and nothing else, so the served element has to move with it.

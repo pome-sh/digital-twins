@@ -93,13 +93,13 @@ export const webhookCreateInputSchema = z
   })
   .strict();
 
-/** Mirrors Linear's `AgentSessionExternalUrlInput` field-for-field (F-1172). */
+/** Mirrors Linear's `AgentSessionExternalUrlInput` field-for-field. */
 const agentSessionExternalUrlSchema = z
   .object({ url: z.string().min(1), label: z.string() })
   .strict();
 const optionalExternalUrls = z.array(agentSessionExternalUrlSchema).nullish();
 
-// F-1176 — these four mirror Linear's mutation inputs. `appUserId` and a
+// These four mirror Linear's mutation inputs. `appUserId` and a
 // create-time `plan` are gone (Linear declares neither), `status` is gone (a
 // session's status follows its activities), and `id` is the mutation's own
 // non-null argument rather than an input field.

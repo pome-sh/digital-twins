@@ -1,11 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1126 — the secrets class, graded.
-//
-// The rows below are the design doc's measured table, as tests. They run the
-// REAL redactor rather than hand-writing `[REDACTED]`, because the whole claim
-// is that redaction CREATES the signal this check reads: hand-stamping the token
-// would test the predicate against a world the pipeline never produces.
+// The secrets class, graded. The rows below are the design doc's measured table, as
+// tests.
 
 import { describe, expect, it } from "vitest";
 import { redactSecrets } from "@pome-sh/wire/redaction";
@@ -140,7 +135,7 @@ describe("slack.no-secret-newly-exposed", () => {
 
   it("refuses BY NAME when a channel's privacy is undeclared", () => {
     // Guessing public false-fails a correct agent; guessing private false-passes
-    // a leaking one. Neither is permitted (D4 / F-1028).
+    // a leaking one. Neither is permitted (D4).
     const final: SlackCheckState = { channels: [{ id: "C1", name: "general" }] };
     expect(grade(final).status).toBe("skipped");
     expect(grade(final).reason).toBe("channel_privacy_undeclared");

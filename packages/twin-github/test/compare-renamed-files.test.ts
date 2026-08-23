@@ -1,31 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
 // `GET /repos/:o/:r/compare/:basehead` and the path a renamed file moved from.
-//
-// F-1500 taught `GET /repos/:o/:r/pulls/:n/files` to pair an exact move into one
-// `renamed` entry carrying `previous_filename`, and a live capture against the
-// real `pome-sh/twin-fixtures-sandbox` then read that half green. The compare
-// surface answers the SAME question — the file-level diff of a base tree against
-// a head tree — out of what was, until F-1513, its own independent path-by-path
-// loop. It expanded a move into an `added` plus a `removed` and carried no
-// pre-rename path at all, which is what the capture measured as two CRITICALs on
-// one surface:
-//
-//   files[].status             upstream ["added","renamed"]  twin ["added","removed"]
-//   files[].previous_filename  upstream present              twin field-removed
-//
-// Real GitHub runs rename detection on both surfaces. Two implementations of one
-// rule is how these two drifted apart, so the teeth below are not "compare emits
-// a rename" twice over — the load-bearing one asserts the two surfaces AGREE
-// over the same base and head, which is the property whose absence produced the
-// ticket and which cannot silently come apart again the way two independent
-// expected-value literals can.
-//
-// NOT under test here, deliberately: the `commits` count on this surface. That
-// leaf reads 4 upstream against 1 from the twin because the seeded sandbox's git
-// history is not a mirror of the real repo's commit DAG (GH-DIV-020), it is
-// registered separately, and pairing files must not move it — which is itself
-// asserted below rather than assumed.
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createGitHubCloneApp } from "../src/twin.js";

@@ -1,9 +1,4 @@
-// Unit tests for the boot-time seed loader `loadSeedFromEnv`. Lives at
-// `packages/twin-github/src/seed.ts`; the twin server (`server.ts`)
-// calls it on startup so a cloud spawn that sets `POME_SEED_JSON` boots
-// the twin domain from the CLI-supplied scenario seed rather than the
-// hard-coded `defaultSeedState()`. Fix for FDRS-353 (the cloud side
-// passes the env in; this side reads it).
+// Unit tests for the boot-time seed loader `loadSeedFromEnv`.
 
 import { describe, expect, it } from "vitest";
 import { defaultSeedState, loadSeedFromEnv, parseSeed } from "../src/seed.js";

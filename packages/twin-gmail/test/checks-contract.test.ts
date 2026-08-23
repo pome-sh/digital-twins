@@ -1,10 +1,5 @@
-// The properties every declared check must hold, carried across from
-// twin-slack when Gmail's vocabulary moved out of pome-cloud (F-1128).
-//
-// These are load-bearing, not ceremony: D10 and D11 were both caught by the
-// mutant assertions, and reverting a mutant to a resolved selector left that
-// suite green until the honest-null ledger existed. They travel with the
-// declaration so the twin, not its consumer, is where a bad check is stopped.
+// The properties every declared check must hold, carried across from twin-slack when
+// Gmail's vocabulary moved out of pome-cloud.
 
 import {
   checkNearMissPattern,
@@ -276,13 +271,6 @@ describe("declared vacuity mutants", () => {
 });
 
 // Every check that declines to name a failing world, WITH the reason.
-//
-// It is EMPTY, and that is the claim (F-1126, carried forward). A world is a
-// hand-written fixture and every field of `CheckSubstrate` is hand-fillable, so
-// an entry in this ledger is an admission that a check may not be able to fail —
-// which is the thing the whole vocabulary exists to rule out.
-//
-// Keep it empty. If a future check needs a line, argue it in writing here.
 const HONEST_NULL_WORLDS: Record<string, string> = {};
 
 describe("declared discriminating worlds", () => {
@@ -410,18 +398,7 @@ describe("migrated sentences", () => {
   });
 });
 
-// Every state-reading check that cites no path, WITH the reason (F-1197).
-//
-// EMPTY, and — like `HONEST_NULL_WORLDS` above — that is the claim. F-1197
-// opened by counting what could cite anything at all: 8 of 45 declared checks,
-// because only a `tape` check could fill `evidenceEventIds`. An optional field
-// with no gate behind it is how a number like that happens, so the field ships
-// with this gate and the ledger ships empty. The argument for the pointer
-// grammar, and for why a pointer addresses `final`, is in the sdk's
-// `check-state-path.ts`; this is only its per-twin enforcement.
-//
-// An entry here admits that a verdict renders as an inert row — indistinguishable,
-// to a reader, from a verdict with no evidence at all.
+// Every state-reading check that cites no path, WITH the reason.
 const HONEST_UNCITED_CHECKS: Record<string, string> = {};
 
 describe("declared state citations", () => {
@@ -477,12 +454,8 @@ describe("declared state citations", () => {
 });
 
 describe("gmail.mailbox-label-count's two ways of not finding a mailbox", () => {
-  // F-1157. Both are a skip and neither is a wrong verdict, so this is entirely
-  // about the NAME a reader gets — which is the whole cost the ticket measured.
-  // `mailbox_not_found` sends whoever triages the row to
-  // `agent-examples/gmail-retry-notify/` looking for a seed that forgot to declare a
-  // mailbox; when a redactor ate the address instead, that seed is correct and
-  // the reader has been sent to the wrong repo.
+  // Both are a skip and neither is a wrong verdict, so this is entirely about the NAME
+  // a reader gets — which is the whole cost the ticket measured.
   const ARGS = { mailbox: "pome-agent@pome-twin.test", count: "5", label: "SENT" };
   const worldWithMailboxes = (mailboxes: { email: string }[]) =>
     finalWorld({
@@ -519,28 +492,8 @@ describe("gmail.mailbox-label-count's two ways of not finding a mailbox", () => 
   });
 });
 
-// Which door stands between a redactor that eats a slot's literal and a wrong
-// verdict — one row per declared slot, MEASURED rather than argued (F-1157).
-//
-// This twin is where the class was found. `gmail.mailbox-label-count` declares
-// `subject: ({ label }) => label`; `SENT` survives every redactor, so the
-// engine's redaction-survival arm waves the criterion through. The slot that
-// actually got eaten in production was `{mailbox}` —
-// `DEFAULT_REDACTION_CONFIG` masks `mailboxes[].email` — and that arm never
-// looks at it, by design: it reads the DECLARATION and never the state, which
-// is what makes the authoring door and the scoring door agree by construction.
-//
-// So the skip surfaced from inside `evaluate`, wearing a name chosen for a
-// different condition (`mailbox_not_found`, which reads as a seed that forgot to
-// declare a mailbox — and that seed declares it). Safe, but safe by that one
-// check's own guard, per check, with nothing measuring the class. `mailbox`
-// reading `abstains` below is that guard, now counted.
-//
-// The vocabulary of the values is in `check-redaction.ts`. The one that matters
-// is `vacuous_pass` — the check's own FAILING world starts passing with the
-// literal gone — and the assertion below forbids it outright rather than
-// ledgering it, because it is the one entry here that would be a wrong verdict
-// rather than a missing one.
+// Which door stands between a redactor that eats a slot's literal and a wrong verdict
+// — one row per declared slot, MEASURED rather than argued.
 const REDACTION_GUARDS: Record<string, RedactionGuard> = {
   // The message id SELECTS, and a selector miss is gmail's `missSkip`: the
   // criterion leaves the denominator rather than false-failing a correct agent.

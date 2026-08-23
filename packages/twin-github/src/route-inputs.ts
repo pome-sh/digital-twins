@@ -1,7 +1,7 @@
-// file-size: one declaration per REST surface, 66 of them, and `GITHUB_ROUTE_INPUTS` is the complete set the artifact emitter publishes — splitting the list across files would mean this twin's input surface no longer has a single place to read, which is the second-source-of-truth F-1179 exists to remove.
+// file-size: one declaration per REST surface, 66 of them, and `GITHUB_ROUTE_INPUTS` is the complete set the artifact emitter publishes — splitting the list across files would mean this twin's input surface no longer has a single place to read, which is the second source of truth these declarations exist to remove.
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1179 — every REST input the GitHub twin accepts, declared in the one place
+// Every REST input the GitHub twin accepts, declared in the one place
 // that validates it.
 //
 // Each entry below is BOTH the machine-readable input surface pome-cloud's
@@ -28,7 +28,7 @@ import {
 } from "@pome-sh/sdk/route-inputs";
 
 /**
- * F-1372 — GitHub accepts a query parameter it does not know and discards it,
+ * GitHub accepts a query parameter it does not know and discards it,
  * so this twin does too.
  *
  * Measured 2026-08-09 against `api.github.com`: ten surfaces across every shape
@@ -40,7 +40,7 @@ import {
  * did the same for an unknown top-level BODY key.
  * `docs/undeclared-route-inputs.md` carries the transcript.
  *
- * F-1179 shipped this twin refusing, which is the divergence that matters most:
+ * This twin used to refuse, which is the divergence that matters most:
  * an agent written against real GitHub sends a parameter this twin has not got
  * around to declaring, real GitHub serves it, the twin 4xx'd, and the exam
  * recorded a failure the agent did not commit. The declaration below does not
@@ -67,7 +67,7 @@ const pageQuery = {
  * `?state=`. Declared strictly: the retired `stateQuery()` helper mapped an
  * unrecognised value to `undefined`, so `?state=merged` silently listed
  * everything. An input the vendor rejects that we ignore is the exact failure
- * F-1179 exists to make impossible, so this is a 422 now.
+ * these declarations exist to make impossible, so this is a 422 now.
  */
 const stateFilter = z.enum(["open", "closed", "all"]).optional();
 
@@ -91,7 +91,7 @@ const commentBody = { body: z.string().min(1) };
 export const GITHUB_ROUTES = {
   // ----- search -----
   //
-  // GH-DECL-IN-001 / GH-DECL-IN-002 (F-1389) — all five take `q` and nothing but
+  // GH-DECL-IN-001 / GH-DECL-IN-002 — all five take `q` and nothing but
   // `q`. GitHub's search API has ONE scoping input and encodes every filter as a
   // qualifier inside it (`repo:octocat/hello-world`, `state:open`); its OpenAPI
   // declares `q, sort, order, per_page, page`. `/search/code`,
@@ -142,7 +142,7 @@ export const GITHUB_ROUTES = {
     method: "POST",
     path: "/user/repos",
     bodyEncoding: "json",
-    // F-1389 (GH-DECL-IN-003) — no `owner`. This surface creates a repository
+    // GH-DECL-IN — no `owner`. This surface creates a repository
     // for the AUTHENTICATED USER, which is its whole meaning;
     // `repos/create-for-authenticated-user` declares 23 body properties and
     // `owner` is not one. `routes.ts` passed the body straight to
@@ -196,12 +196,12 @@ export const GITHUB_ROUTES = {
       content: z.string(),
       branch: z.string().optional(),
       sha: z.string().optional(),
-      // F-1389 (GH-DECL-IN-005) — no `encoding`. GitHub declares `content` as
+      // GH-DECL-IN — no `encoding`. GitHub declares `content` as
       // "the new file content, using Base64 encoding" and takes no `encoding`
       // parameter: base64 is the only encoding this surface has. Undeclared
       // now, so github's measured disposition (`ignore`) discards it.
       //
-      // F-1460 closed the behavioural half too: `routes.ts` base64-decodes this
+      // The behavioural half is closed too: `routes.ts` base64-decodes this
       // field via `rest-content.ts`, and invalid base64 gets GitHub's own 422.
       // ⚠️ ON THIS DOOR ONLY — the MCP write tools take plain text, because
       // GitHub's MCP server does. Divergence 24 is retired; see FIDELITY.md

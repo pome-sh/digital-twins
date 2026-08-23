@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// What GitHub's declared checks can assert about an ISSUE (F-1075).
+// What GitHub's declared checks can assert about an ISSUE.
 //
 // Declarations only. The grammar rules they all obey are in `checks.ts`, which
 // assembles them; how the exported tree is read is in `check-state.ts`.
@@ -48,7 +48,7 @@ export const issueExists: Check<{ issue: string; repo: string }> = defineCheck({
     const found = resolveIssue(final, repo, issue);
     if ("missing" in found) return missOutcome(found);
     // The ISSUE itself, not a field on it — here the lookup is the assertion, so
-    // the row's own address is exactly what produced the verdict (F-1197).
+    // the row's own address is exactly what produced the verdict.
     return {
       passed: true,
       reason: `issue #${issue} exists in ${repo}`,

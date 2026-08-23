@@ -7,13 +7,8 @@ import { runTask } from "../../src/runner/runTask.js";
 import { captureServerForTests } from "../fixtures/captureServerForTests.js";
 import { inCli } from "../fixtures/cliDir.js";
 
-// F-689 remainder (D6/R1) — `writeRunArtifactsCore` writes EXACTLY six files
-// (asserted directly at the unit level in
-// test/unit/recorder/artifacts.test.ts). The full self-host `runTask()`
-// surface tested here also writes its own pre-existing, unrelated sidecars
-// (signals.jsonl for adapter signals, egress.jsonl for refused CONNECTs) —
-// so this e2e checks the REQUIRED six are present and the four deleted
-// correlation artifacts never come back, without over-claiming an exact set.
+// Per D6/R1, `writeRunArtifactsCore` writes EXACTLY six files (asserted directly at
+// the unit level in test/unit/recorder/artifacts.test.ts).
 const REQUIRED_RUN_DIR_FILES = [
   "events.jsonl",
   "meta.json",
@@ -29,9 +24,7 @@ const DELETED_RUN_DIR_FILES = [
   "state-diff.json",
 ];
 
-// FDRS-657 — self-host (`pome run` / `pome run --local`) is CAPTURE-ONLY. It
-// records the raw trace + state and NEVER scores, judges, or writes score.json.
-// A verdict comes only from the cloud (`pome eval`, or a hosted run).
+// Self-host (`pome run` / `pome run --local`) is CAPTURE-ONLY.
 describe("Pome scenario runner (capture-only)", () => {
   it(
     "captures a trace for the starter scenarios without scoring",
@@ -59,7 +52,7 @@ describe("Pome scenario runner (capture-only)", () => {
         for (const required of REQUIRED_RUN_DIR_FILES) {
           expect(entries.has(required)).toBe(true);
         }
-        // ...and the correlation artifacts F-689 deleted never come back.
+        // ...and the deleted correlation artifacts never come back.
         for (const deleted of DELETED_RUN_DIR_FILES) {
           expect(entries.has(deleted)).toBe(false);
         }

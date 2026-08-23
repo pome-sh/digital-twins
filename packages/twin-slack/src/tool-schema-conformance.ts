@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Does the twin validate the arguments Slack declares? (F-1330)
+// Does the twin validate the arguments Slack declares?
 //
 // `@pome-sh/sdk/mcp-tool-fixture` and zod only — same portability constraint as
 // `tools.ts`: pome-cloud's fidelity-watch loads twin tool tables under bun,
@@ -10,7 +10,7 @@ import { typeDisagreements } from "@pome-sh/sdk/mcp-tool-fixture";
 import { slackToolFixture, toolSchemas } from "./tools.js";
 
 /**
- * What replaced the frozen draft-7 projection (F-1330).
+ * What replaced the frozen draft-7 projection.
  *
  * While the fixture was a transcription of `tools.ts`, the two could be pinned
  * by BYTES: `z.toJSONSchema()` the validator, demand the fixture back. That
@@ -21,7 +21,7 @@ import { slackToolFixture, toolSchemas } from "./tools.js";
  * So the pin moves from bytes to argument surface, which is the thing an
  * examinee can actually collide with. For every tool, this reports:
  *
- *   - a key the validator knows that Slack does not declare — the F-1330
+ * - a key the validator knows that Slack does not declare — the
  *     defect in miniature, a parameter the twin invented;
  *   - a key Slack declares that the validator does not model — silently
  *     ignored today, which is survivable, but not silently;
@@ -67,7 +67,7 @@ export function toolSchemaConformance(): string[] {
       }
     }
 
-    // The TYPE of the keys both sides declare (F-1614). twin-github shipped a
+    // The TYPE of the keys both sides declare. twin-github shipped a
     // 422 on the array its own listing advertised for a year because the two
     // checks above see a key's PRESENCE and not its shape; this twin's
     // conformance had the same blind spot and asserts `[]`, so the gap would

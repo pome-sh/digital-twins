@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Embeddable surface for the vendored Stripe twin (FDRS-528): the pieces
+// Embeddable surface for the vendored Stripe twin: the pieces
 // the in-process runner needs to boot, seed, drive, and export state — not
-// the standalone server entrypoint. Since F-684 the twin assembles on the
+// the standalone server entrypoint. The twin assembles on the
 // @pome-sh/sdk engine via defineTwin() (./twin.ts).
 export { createStripeTwinDefinition, createTwinStripeApp, tthwSeconds } from "./twin.js";
 export type { CreateStripeTwinDefinitionOptions, CreateTwinStripeAppOptions } from "./twin.js";

@@ -1,16 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1176: `agent_activities` stopped carrying `type` / `body` and started
-// carrying Linear's `content`. Same reopening hazard F-1172 documented for
-// `agent_sessions`: `CREATE TABLE IF NOT EXISTS` is a no-op on a database that
-// already has the table, so a `LINEAR_TWIN_DB` file written before this change
-// would open clean on the old columns — and then answer `{}` for the content of
-// every activity it had ever recorded, which reads as an empty session rather
-// than as a schema mismatch.
-//
-// This builds a genuinely pre-content table — asserting its column set equals
-// the frozen pre-content list before going anywhere near the migration — and
-// then reopens it with the shipping code.
+// `agent_activities` stopped carrying `type` / `body` and started carrying Linear's
+// `content`.
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -96,7 +86,7 @@ async function seedPreContentDatabase(): Promise<{ path: string; sessionId: stri
   return { path, sessionId: session.id, appUserId: session.appUserId };
 }
 
-describe("a pre-content agent_activities table migrates on open (F-1176)", () => {
+describe("a pre-content agent_activities table migrates on open", () => {
   it("swaps type/body for content_json and signal instead of opening clean", async () => {
     const { path } = await seedPreContentDatabase();
 

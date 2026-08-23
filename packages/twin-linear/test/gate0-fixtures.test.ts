@@ -9,14 +9,8 @@ function readJson(rel: string) {
   return JSON.parse(readFileSync(join(root, rel), "utf8"));
 }
 
-/**
- * Frozen Linear MCP launch tool SET (Gate-1 Wave 4 — Gate 0 + delete_comment /
- * documents). Sorted, because since F-1480 the freeze is a set and not a
- * sequence: the fixture is a projection of Linear's own captured tools/list, so
- * the ORDER belongs to the capture and re-typing it here would pin this twin to
- * a sequence it does not choose. Which 22 tools ship is still ours, so that half
- * stays hand-written where a reviewer can see it move.
- */
+/** Frozen Linear MCP launch tool SET (Gate-1 Wave 4 — Gate 0 + delete_comment /
+ *  documents). */
 const LINEAR_LAUNCH_TOOLS = [
   "create_issue_label",
   "delete_comment",

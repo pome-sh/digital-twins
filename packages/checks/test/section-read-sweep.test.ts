@@ -1,69 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
 // THE SECTION-READ SWEEP — every section a shipped check's verdict reads, asked
 // whether the check's own two worlds have anything to say about it.
-//
-// ── The hole this fills ──────────────────────────────────────────────────────
-//
-// pome-cloud's `findVacuousStateSectionReaders` measures vacuity by SWAPPING and
-// then DELETING sections, and it derives its candidate sections from what
-// DIFFERS between a check's passing and failing worlds. That rule is what keeps
-// it from reporting every section a world carries for realism — but it also
-// means a section IDENTICAL in both worlds is never a candidate, so it is never
-// deleted, so a verdict that reads it vacuously is invisible to that instrument.
-// The detector's doc comment has said so since F-1160 rather than folding it
-// into a zero, and the review that named it described the shape as "a negative
-// check over two lists, only one of which the worlds populate".
-//
-// The honest fix is not a wider detector. A detector cannot invent the evidence
-// a declaration declined to author: with both worlds carrying the same value
-// there is no failing value to swap in and therefore no proof the verdict reads
-// the section at all. So the reach has to come from the side that KNOWS what the
-// predicate touched — here, in the repo where the worlds are written.
-//
-// ── How this reaches what the detector cannot ────────────────────────────────
-//
-// The detector INFERS what a verdict reads from what moves it. This file
-// OBSERVES it: `evaluate` is handed a recording view of the state tree, and
-// every top-level key the predicate asks for is on the record whether or not the
-// worlds disagree about its value. That is P2's evidence-dependency trick
-// (`p2-evidence-dependency.test.ts` in pome-cloud) applied to a declaration's
-// own worlds instead of to a corpus run — no seeds, no twins checkout, no
-// SQLite.
-//
-// Then, for the sections the two worlds AGREE on — precisely the set the
-// detector cannot make a candidate of — this runs the detector's own step 3:
-// delete the section from the passing world and re-evaluate. Still a bare
-// `passed` means the verdict claimed to read something whose absence it cannot
-// notice, on evidence the declaration never varied. That is the blind spot,
-// measured.
-//
-// ── Why an agreed-on section is usually FINE, and how that is discharged ─────
-//
-// Most agreed reads are SELECTORS and NARROWERS, not evidence, and both worlds
-// must carry them for the failing world to fail on the assertion rather than
-// through the selector — the degenerate arm `probeDiscrimination` rejects.
-// `slack.no-reaction-added` is the reviewer's shape exactly (a negative check
-// over `channels` and `reactions`, worlds moving only `reactions`), and deleting
-// `channels` returns `state_incomplete` because `resolveChannel` refuses. So the
-// discharge is MEASURED per check on every run, not asserted once: an agreed
-// read whose deletion moves the verdict off a bare pass is proven harmless, and
-// nothing has to be written down about it.
-//
-// What CANNOT be discharged by measurement is a section whose absence the twin
-// deliberately reads as a value — `exportBounds` absent means "this export
-// predates the cap", which is a statement about meaning that no probe can
-// derive. Those are named below with the twin comment that says so, and the
-// list is pinned in BOTH directions: an unexplained finding fails, and so does
-// an exemption that has stopped being needed.
-//
-// ── Both trees ──────────────────────────────────────────────────────────────
-//
-// `seed` as well as `final`, because the detector probes `final` only and a
-// `seed+final` check's seed is a section-read like any other. All four shipped
-// `seed+final` declarations carry a BYTE-IDENTICAL seed in both worlds, so every
-// seed read is an agreed read — and every one of them is discharged by
-// measurement today. That zero is measured here rather than assumed.
 
 import { describe, expect, it } from "vitest";
 
@@ -286,9 +223,8 @@ describe("the shipped declarations", () => {
     expect(SHIPPED_SWEEP.some((row) => row.id.includes(":seed."))).toBe(true);
   });
 
-  // The property F-1437 asks for, in the form it is actually true in: a section
-  // both worlds agree on is fine when the twin refuses (or fails) without it,
-  // and that is measured here per check rather than argued once.
+  // The property, in the form it is actually true in: a section both worlds agree on
+  // is fine when the twin refuses (or fails) without it, and that is measured.
   it("reads no agreed-on section vacuously, except where the twin declares absence a value", () => {
     const unexplained = blindSpots(SHIPPED_SWEEP).filter(
       (id) => !DECLARED_EXCEPTIONS.some((e) => exempts(id, e)),
@@ -326,12 +262,8 @@ describe("the shipped declarations", () => {
     ]);
   });
 
-  // The repair F-1437 actually made, pinned by its measured effect rather than
-  // by the fixture's shape. `gmail.message-has-label` built its user label as
-  // `userLabel(label, label)` — an id-equals-name shape only a SYSTEM label has —
-  // and with it `labelIdsFor`'s bare-display-name fallback answered the join on
-  // its own, so deleting `labels` left the verdict a bare pass. The minted id in
-  // the world is what puts that read on the record.
+  // The repair actually made, pinned by its measured effect rather than by the
+  // fixture's shape.
   it("proves gmail.message-has-label reads the labels its worlds agree on", () => {
     const row = SHIPPED_SWEEP.find((r) => r.id === "gmail.message-has-label:final.labels");
     expect(row).toBeDefined();
@@ -353,10 +285,8 @@ describe("the shipped declarations", () => {
 });
 
 // ── Teeth ───────────────────────────────────────────────────────────────────
-//
-// A sweep that only ever reports the current tree's answer is untested: it
-// cannot tell "nothing is wrong" from "I can no longer see". Every arm below
-// plants a declaration and asserts what the sweep does with it.
+// A sweep that only reports the current tree's answer cannot tell "nothing is
+// wrong" from "I can no longer see", so every arm plants a declaration.
 
 const anyWord: CheckParamType = {
   name: "needle",
@@ -404,11 +334,8 @@ const plant = (
   }) as unknown as AnyCheck;
 
 describe("the sweep itself", () => {
-  // THE DEFECT, in the shape F-1160's reviewer described it: a negative verdict
-  // over two lists, the worlds populating only one of them, and `?? []` on the
-  // other. `beta` is byte-identical in both worlds, so it is not a candidate for
-  // `findVacuousStateSectionReaders` and never gets deleted there — while an
-  // agent that DID put the needle in `beta` collects the point.
+  // THE DEFECT, in the shape the reviewer described it: a negative verdict over two
+  // lists, the worlds populating only one of them, and `?? []` on the other.
   it("names a section a negative verdict reads over two lists and the worlds agree on", () => {
     const vacuous = plant("plant.negative-two-lists", ({ needle }, { final }) => {
       if (final.alpha == null) return REFUSAL;

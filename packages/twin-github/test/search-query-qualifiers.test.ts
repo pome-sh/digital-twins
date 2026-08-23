@@ -1,35 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1389 — GitHub's search API takes ONE scoping input, `q`, and encodes every
-// filter as a qualifier inside it (`repo:octocat/hello-world`, `state:open`).
-// Its OpenAPI declares `q, sort, order, per_page, page` and nothing else.
-//
-// This twin used to take `?owner=`, `?repo=` and `?state=` as query parameters
-// on `/search/code`, `/search/commits` and `/search/issues` and scope by them
-// (GH-DECL-IN-001, GH-DECL-IN-002). Deleting those three declarations alone
-// would have been the smaller half of the fix, and on its own it would have
-// left the surface worse than it looks: `searchIssues` matched the WHOLE `q`
-// string as a case-insensitive substring, so an agent writing the request
-// GitHub actually documents —
-//
-//     GET /search/issues?q=idempotency repo:acme/api
-//
-// — got ZERO results here, because no issue's title or body contains that
-// literal string. The surface did not merely let a wrong scoping habit pass; it
-// PUNISHED the correct one. Both halves therefore land together: the qualifiers
-// are parsed out of `q` and scoped by, and the three query parameters are gone
-// from the declaration.
-//
-// Every assertion below compares a SET of results, never a count — the
-// discipline `list-state-default.test.ts` sets out and the reason for it: a
-// count matches for the wrong reason as easily as the right one. Results are
-// keyed by `full_name` AND number/path, because issue numbers are drawn from a
-// PER-REPO counter, so "issue #1" names three different issues in this world.
-//
-// The world seeds THREE repositories under three different owners, two of them
-// sharing the repository name `api`. Both facts are load-bearing: a `repo:`
-// scope has to be shown EXCLUDING the other repositories, and `repo:acme/api`
-// has to be shown resolving on the full name rather than on `api`.
+// GitHub's search API takes ONE scoping input, `q`, and encodes every filter as a
+// qualifier inside it (`repo:octocat/hello-world`, `state:open`).
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createGitHubCloneApp } from "../src/twin.js";
@@ -145,7 +116,7 @@ async function commits(query: string): Promise<string[]> {
 const ALL_IDEMPOTENCY_ISSUES = ["acme/api#1", "acme/api#2", "alice/tools#1", "globex/api#1"];
 const ACME_IDEMPOTENCY_ISSUES = ["acme/api#1", "acme/api#2"];
 
-describe("search `q` qualifiers (F-1389)", () => {
+describe("search `q` qualifiers", () => {
   describe("the request GitHub documents", () => {
     it("scopes `/search/issues` by `repo:` and excludes the other repositories", async () => {
       // THE case that returned zero before this ticket. It is stated against
@@ -236,12 +207,9 @@ describe("search `q` qualifiers (F-1389)", () => {
       expect(await issues("idempotency repo:acme/api state:closed")).toEqual(["acme/api#2"]);
     });
 
-    it("keeps NO open default when `state:` is absent (F-1427)", async () => {
+    it("keeps NO open default when `state:` is absent", async () => {
       // GitHub's search API has no `state=open` default — `is:open` is a query
-      // qualifier, not a default — so the closed issue must still be in the
-      // answer. F-1427 gave the three LIST routes an open default and
-      // deliberately left this surface without one; parsing `state:` as a
-      // qualifier must not quietly introduce one.
+      // qualifier, not a default — so the closed issue must still be in the answer.
       expect(await issues("idempotency repo:acme/api")).toContain("acme/api#2");
     });
 
@@ -265,24 +233,14 @@ describe("search `q` qualifiers (F-1389)", () => {
     });
 
     it("leaves the qualifiers GitHub has that this twin does not parse in the term", async () => {
-      // `in:`, `language:`, `path:` and the boolean operators are named in
-      // FIDELITY.md divergence 1 as unparsed. They are unparsed the same way
-      // `bogus:` is — left in the term — rather than dropped.
-      //
-      // ⚠️ `is:` USED TO BE ON THAT LIST AND IS NOT ANY MORE (F-791). It was the
-      // costliest member of it: `is:open` is GitHub's commonest issue qualifier,
-      // so leaving it in the term zeroed every query that carried one, and an
-      // agent that wrote the request GitHub documents was told nothing existed.
-      // It is parsed now, and the case below pins the new behaviour.
+      // `in:`, `language:`, `path:` and the boolean operators are named in FIDELITY.md
+      // divergence 1 as unparsed.
       expect(await code("idempotency language:ts")).toEqual([]);
     });
 
-    it("parses `is:` on `/search/issues`, where GitHub has it (F-791)", async () => {
-      // Measured against real GitHub 2026-08-21 on `cli/cli`: `is:open` and
-      // `state:open` answered the SAME 5 issues, and `is:issue` (21) + `is:pr`
-      // (16) partitioned the unscoped 37 exactly. So `is:open` is not a second
-      // filter with its own semantics — it is the spelling GitHub's own docs use
-      // for the one this surface already had.
+    it("parses `is:` on `/search/issues`, where GitHub has it", async () => {
+      // Measured 2026-08-21 on `cli/cli`: `is:open` ≡ `state:open` (same 5), and
+      // `is:issue` (21) + `is:pr` (16) partitioned the unscoped 37 exactly.
       expect(await issues("idempotency is:open")).toEqual(await issues("idempotency state:open"));
       expect(await issues("idempotency repo:acme/api is:closed")).toEqual(["acme/api#2"]);
       // `is:issue` is the identity here: this surface reads the issues table.
@@ -311,10 +269,8 @@ describe("search `q` qualifiers (F-1389)", () => {
   });
 
   describe("the three query parameters GitHub does not declare are gone", () => {
-    // github's measured undeclared disposition is `ignore` (F-1372), so these
-    // are discarded rather than refused: real GitHub answers 200 to a query
-    // parameter it does not know. The claim is therefore that the answer is
-    // UNCHANGED, not that the request is rejected.
+    // github's measured undeclared disposition is `ignore`, so these are discarded
+    // rather than refused: real GitHub answers 200 to a query parameter it does.
     const IGNORED = [
       { name: "?owner=", suffix: "&owner=acme" },
       { name: "?repo=", suffix: "&repo=api" },

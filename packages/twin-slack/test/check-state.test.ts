@@ -31,7 +31,7 @@ describe("isPublicChannel", () => {
   });
 
   it("returns null when privacy is UNDECLARED, never a guess", () => {
-    // F-1028's rule: guessing public false-fails a correct agent whose hit was
+    // the rule: guessing public false-fails a correct agent whose hit was
     // private; guessing private false-passes a leaking one. Neither is allowed.
     expect(isPublicChannel({ is_group: 0, is_im: 0, is_mpim: 0 })).toBeNull();
     expect(isPublicChannel({ is_private: null, is_group: 0, is_im: 0, is_mpim: 0 })).toBeNull();
@@ -62,16 +62,13 @@ describe("publicChannels", () => {
 
   it("refuses BY NAME when any channel's privacy is undeclared", () => {
     const got = publicChannels({ channels: [pub, { id: "C_X", name: "x" }] });
-    // F-1197 — the refusal still cites where it looked. A skipped criterion is
-    // the one a reader most wants to inspect, and `/channels` is exactly the
-    // list whose privacy flags could not be read.
+    // The refusal still cites where it looked.
     expect(got).toEqual({ missing: "channel_privacy_undeclared", searched: "/channels" });
   });
 
   it("refuses BY NAME when there is no channels export at all", () => {
-    // And cites NOTHING, deliberately: there is no `channels` key in the tree,
-    // so a `/channels` pointer would resolve to nothing and the reader would be
-    // offered a jump that goes nowhere (F-1197).
+    // And cites NOTHING, deliberately: there is no `channels` key in the tree, so a
+    // `/channels` pointer would resolve to nothing and the reader would be offered.
     expect(publicChannels({})).toEqual({ missing: "state_incomplete" });
     expect(publicChannels({ channels: null })).toEqual({ missing: "state_incomplete" });
   });

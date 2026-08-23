@@ -1,18 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1125 — every emission site captures headers, not just the engine's.
-//
-// The Stripe twin does not route all of its events through the engine's
-// `recorder.handle`: `routes/_helpers.ts respond()` builds them by hand, the
-// idempotency layer builds a second one for a dedupe replay, and the x402 gate
-// builds a third. Five hand-written sites across the repo means partial
-// adoption is the realistic failure, and it fails SILENTLY — a task author
-// reading `The retry includes X-PAYMENT` has no way to learn that the surface
-// they targeted was the one that never captured headers.
-//
-// So this asserts coverage over the WHOLE tape rather than per-site: exercise
-// the surfaces, then require every row to carry the field. A new emission site
-// that forgets it turns this red.
+// Every emission site captures headers, not just the engine's.
 
 import { describe, expect, it } from "vitest";
 import { createStripeApp, rest, callTool, type StripeTestApp } from "./_appHelper.js";

@@ -54,12 +54,8 @@ describe("insertCriterion", () => {
     expect(out).toContain("## Success Criteria\n\n- [code] X");
   });
 
-  // F-1134 — the first write into an empty section landed the criterion directly
-  // against the next heading. It parses either way, so this is cosmetic, but the
-  // very first file `pome checks add` touches is the one an author reads most
-  // carefully. Note the fixture: a section whose blank line is the ONLY thing
-  // between the two headings. A hand-written task file looks like this; the
-  // double-blank shape above already came out right.
+  // The first write into an empty section landed the criterion directly against the
+  // next heading.
   it("keeps a blank line between the criterion and the next heading", () => {
     const bare = "# T\n\n## Success Criteria\n\n## Config\n\n```yaml\ntwins: [github]\n```\n";
     expect(insertCriterion(bare, "- [code] X")).toBe(
@@ -80,15 +76,8 @@ describe("insertCriterion", () => {
     );
   });
 
-  // F-1299: CRITERION_RE mirrors parseTask's CRITERION_LINE_RE by design (see
-  // the comment above it) — it must recognise an always-scored marker as a
-  // criterion line too, or a new criterion would insert BEFORE an existing
-  // always-scored one instead of after it, exactly the same "line this regex
-  // doesn't recognise gets skipped" defect class the parser fix is about.
-  // The always-scored line has to be the LAST criterion for this to bite: with
-  // any plain criterion below it, the insertion point is identical whether or
-  // not CRITERION_RE recognises the keyword, and the test goes green against a
-  // regex that never learned it.
+  // CRITERION_RE mirrors parseTask's CRITERION_LINE_RE by design (see the comment
+  // above it) — it must recognise an always-scored marker as a criterion line.
   it("appends after an existing always-scored criterion, not before it", () => {
     const withAlwaysScored = TASK.replace(
       "- [model] The agent explains itself",
@@ -117,12 +106,8 @@ describe("insertCriterion", () => {
   });
 });
 
-// F-1443 — the shape of `cli/tasks/03-already-triaged.md`: a single-twin github
-// task whose criteria carry the F-1299 `always-scored` keyword. `pome checks add`
-// renders `- [code] <text>` — no keyword, and no tag unless the task is
-// multi-twin — so the rendered line never equals the stored one and the guard,
-// which compared raw source lines, appended a second graded copy of a check the
-// exam already scores.
+// The shape of `cli/tasks/03-already-triaged.md`: a single-twin github task whose
+// criteria carry the `always-scored` keyword.
 const TRIAGED = `# Task 03 — Already triaged
 
 ## Prompt
@@ -146,7 +131,7 @@ twins: [github]
  *  task: `- [code${tagged ? ":" + twin : ""}] ${renderCheck(picked, args)}`. */
 const RENDERED = "- [code] No new labels were created in `acme/api`";
 
-describe("insertCriterion duplicate guard reads criteria, not rendered lines (F-1443)", () => {
+describe("insertCriterion duplicate guard reads criteria, not rendered lines", () => {
   it("refuses `- [code] X` against a stored `- [code always-scored] X`", () => {
     // The keyword annotates HOW an existing check is scored, not WHAT it checks
     // (see `taskCriterionSchema.alwaysScored`), so the two lines are one check.

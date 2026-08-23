@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// F-1411 — moved out of evalResultCache.test.ts alongside the source split
-// (trialEvents.ts): loadTrialEvents shares no shape or helper with the
-// verdict.json artifact tests in that file.
+// Moved out of evalResultCache.test.ts alongside the source split (trialEvents.ts):
+// loadTrialEvents shares no shape or helper with the verdict.json artifact.
 
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";

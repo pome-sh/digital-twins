@@ -10,14 +10,14 @@
  * digital-twins: the CLI's terminal verdict and the `state` field of the
  * `verdict.json` a hosted run writes for CI to read.
  *
- * F-1399 collapsed the first two into one predicate inside pome-cloud's private
+ * The first two collapsed into one predicate inside pome-cloud's private
  * `packages/contract`, and they have not drifted since — they cannot, because
  * there is nothing left to drift from. Across the repo boundary the same defect
  * survived it: `cli/test/unit/hosted/cross-surface-agreement.test.ts` held a
  * hand-written TRANSCRIPTION of the predicate so it could assert the CLI and
  * the dashboard never split on "did this pass". A transcription is a parallel
  * copy with a longer feedback loop, and it went stale GREEN — passing while
- * asserting something false about the other repo — the moment F-1399 changed
+ * asserting something false about the other repo — the moment that changed
  * the original. Nothing detected that; it was caught because one person
  * happened to be holding both sides.
  *
@@ -26,12 +26,11 @@
  * `scripts/lint-no-cloud-imports.sh` denies the import by design (ADR-002); and
  * no CI check in digital-twins could diff the transcription against a private
  * source without a credential the public repo's guardrails exist to keep out.
- * So the predicate moved to the one package that ALREADY crosses this boundary
- * (F-1416): wire is published from digital-twins and consumed by pome-cloud,
+ * So the predicate moved to the one package that ALREADY crosses this boundary: wire is published from digital-twins and consumed by pome-cloud,
  * so both sides can import the same function and a change to it is a type error
  * or a red test on both sides rather than a silent pass on one.
  *
- * WHY IT IS WIRE'S TO CARRY, and why that does not loosen F-942. Everything
+ * WHY IT IS WIRE'S TO CARRY, and why that does not loosen the barrel rule. Everything
  * below reads exactly two fields of a `criteria_results` row — `skipped` and
  * `reason` — and returns a boolean. That row is a WIRE shape: it is what
  * /finalize puts on the wire and what both repos parse back. `reason` in
@@ -46,7 +45,7 @@
  * barrel — the call `correlation/` and `otel/fixtures` already make, for a
  * different reason. Theirs is load cost; this one is scope: the barrel is what
  * every twin, the sdk and the adapter import, none of them has a run to ask
- * about, and the barrel's F-942 doc is the thing that keeps control-plane
+ * about, and the barrel's own doc is the thing that keeps control-plane
  * vocabulary from creeping into them. `test/export-surface.test.ts` fails if any
  * symbol below appears on the root barrel.
  */
@@ -70,11 +69,11 @@ export const PRE_SATISFIED_REASON = "already_true_in_seed";
  *
  * `preSatisfied` is a SUBSET of `notEvaluated`, not a fourth bucket — a consumer
  * that adds `evaluated + notEvaluated` and expects `total` keeps working, and
- * one that ignores `preSatisfied` gets the pre-F-1296 arithmetic rather than a
+ * one that ignores `preSatisfied` gets the legacy arithmetic rather than a
  * wrong one. Structural rather than a shared class so the dashboard's
  * `CriteriaCounts` (which also carries `passed`) and the control plane's
  * `CriteriaTally` (which also carries `failed`) both satisfy it as they are —
- * and, since F-1416, so that this module can be published to a consumer whose
+ * and so that this module can be published to a consumer whose
  * classes wire has never heard of. A nominal type here would have dragged one
  * repo's vocabulary into the other; a structural one drags nothing.
  */
@@ -107,17 +106,17 @@ export interface CriteriaTallyLike {
  *    evaluated", and only the second is a finding — the same reading
  *    `score-merge.ts`'s `isFullyUnevaluated` settled on for `all_skipped`.
  *
- * 2. `notEvaluated - preSatisfied > 0` → incomplete (F-925, narrowed by
- *    F-1296). ANY criterion the grader could not reach makes the run neither
+ * 2. `notEvaluated - preSatisfied > 0` → incomplete, later narrowed.
+ *    ANY criterion the grader could not reach makes the run neither
  *    green nor red, because a score of 100 over a shrunken denominator is what
- *    "the check never ran" looks like. Subtracting `preSatisfied` is the F-1296
+ * "the check never ran" looks like. Subtracting `preSatisfied` is the
  *    exemption: a criterion excluded for having already been true in the seed
  *    is not an abstention — the grader DID reach a verdict, and the verdict is
  *    that the criterion tested nothing. Counting it would stamp the word on
  *    every correctly-scored dedup and injection run, which is how a reader
  *    learns to stop reading it.
  *
- * 3. `evaluated === 0` → incomplete (F-1399). Given clauses 1 and 2 this fires
+ * 3. `evaluated === 0` → incomplete. Given clauses 1 and 2 this fires
  *    for exactly ONE shape that clause 2 does not already catch: every
  *    criterion excluded as already true in the seed. (If `total > 0` and
  *    `evaluated === 0` then `notEvaluated === total`, so clause 2 is false only
@@ -163,16 +162,16 @@ export interface CriterionResultLike {
 /**
  * `criteria_results` → the counts `isIncompleteTally` reads.
  *
- * WHY THIS IS HERE AND NOT BESIDE ITS CALLERS. F-1399 merged the PREDICATE and
+ * WHY THIS IS HERE AND NOT BESIDE ITS CALLERS. Merging the PREDICATE
  * left the reduction written by hand on the dashboard, which was fine while the
- * dashboard was the only surface counting this column. F-1414 added two more:
+ * dashboard was the only surface counting this column. Two more arrived:
  * the MCP's `first_failure_viewed` and the control plane's prior-failure probe
  * both have a runs row in hand and must decide the same question about it. Three
  * hand-written copies of `if (skipped) { notEvaluated++; if (reason === …) }` is
  * the shape this file's header says will drift — and it drifts SILENTLY here,
  * because a copy that miscounts still returns a boolean and still looks like an
  * answer. So the reduction moved next to the predicate that consumes it, and
- * F-1416 carried the pair across the repo boundary together for the same
+ * The pair crossed the repo boundary together for the same
  * reason: separating them would have left one repo owning half the arithmetic.
  *
  * `criteria_results` and not `criteria_breakdown`: the two agree on this split

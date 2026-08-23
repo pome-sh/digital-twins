@@ -1,12 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-657 / F-692 / D9 — the no-eval-in-oss gate must (a) pass on the real
-// capture-only repo tree and (b) FAIL the moment a judge / matcher /
-// correlator import, path, or NAME is reintroduced anywhere in the scanned
-// surface (cli/src/**, cli/scripts/**, packages/**).
-//
-// Promoted alongside the gate itself: this test used to live against
-// `cli/scripts/no-eval-in-oss.mjs` scanning only `cli/`; it now exercises the
-// repo-root `scripts/no-eval-in-oss.mjs` scanning the whole OSS surface.
+// D9 — the no-eval-in-oss gate must (a) pass on the real capture-only repo tree and
+// (b) FAIL the moment a judge / matcher / correlator import, path, or NAME.
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";

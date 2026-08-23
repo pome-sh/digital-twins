@@ -7,5 +7,5 @@ export type FileChange = { path: string; content: string; delete?: boolean };
 
 // Mutation handlers receive an optional callback that yields the state_delta
 // captured around the underlying SQLite write. The default (no callback) is the
-// pre-FDRS-320 shape — domain tests and tools.ts ignore the delta channel.
+// legacy shape — domain tests and tools.ts ignore the delta channel.
 export type StateDeltaCallback = (delta: StateDelta) => void;

@@ -1,11 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// Fidelity contract (F-730): the structured inventory is the hub — it must
-// match the live tool list exactly, and the FIDELITY.md tables must match
-// the inventory 1:1 (tier included). This replaces the old soft "docs
-// mention the tool name" check, which could not see undocumented surfaces.
-// The slack-specific doc pins (tier vocabulary, required REST surfaces, ts
-// invariant, mutating tool set) stay.
+// Fidelity contract: the structured inventory is the hub — it must match the live tool
+// list exactly, and the FIDELITY.md tables must match the inventory.
 
 import { describe, expect, it } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
@@ -91,13 +86,9 @@ describe("FIDELITY.md contract", () => {
   });
 });
 
-// Heat discipline (F-736): every surface carries its ruled heat tier and the
-// exact target mapping from packages/sdk/ENDPOINT-TIERS.md holds — hot must
-// be semantic (F-736 filled the last hot gaps), cold must be unsupported,
-// and warm surfaces sitting above their shape target must each appear in
-// FIDELITY.md's tier-mismatch ledger (M5 additive-only ruling: visible in
-// the ledger, never demoted in code).
-describe("heat tiers (F-729 ruling, F-736 re-cut)", () => {
+// Heat discipline: every surface carries its ruled heat tier and the exact target
+// mapping from packages/sdk/ENDPOINT-TIERS.md holds — hot must be semantic.
+describe("heat tiers (heat ruling)", () => {
   const inventory = loadFidelityInventory(join(PKG_ROOT, "fidelity.inventory.json"));
   const surfaces = [...inventory.tools, ...inventory.rest];
 
@@ -124,7 +115,7 @@ describe("heat tiers (F-729 ruling, F-736 re-cut)", () => {
     }
   });
 
-  it("hot surfaces are all semantic (no open hot gaps after F-736)", () => {
+ it("hot surfaces are all semantic (no open hot gaps after the re-cut)", () => {
     const gaps = surfaces.filter((s) => s.heat === "hot" && s.fidelity !== "semantic");
     expect(gaps.map((s) => s.name)).toEqual([]);
   });
@@ -160,16 +151,7 @@ describe("heat tiers (F-729 ruling, F-736 re-cut)", () => {
 
 describe("state-shape parity", () => {
   // `check-state.ts` is a hand-written TOLERANT READER of raw SQLite rows —
-  // `exportState()` is a set of `SELECT *` dumps, so nothing makes the model and
-  // the export agree. The parity harness's three rings (live tool list,
-  // fidelity.inventory.json, scenario coverage) are all about the TOOL surface;
-  // this is the arm that was missing, and its absence is why pome-cloud's
-  // hand-maintained mirror of this shape could drift for a milestone with
-  // nothing to notice.
-  //
-  // It lives in the file that already runs rather than in a new gate, which is
-  // F-1126's instruction: reuse the parity harness, do not build a second drift
-  // gate.
+  // `exportState()` is a set of `SELECT *` dumps, so nothing makes the model and the.
   const exported = (): Record<string, unknown> => {
     const db = openSlackTwinDatabase(":memory:");
     const domain = new SlackDomain(db);

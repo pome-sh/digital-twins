@@ -52,7 +52,7 @@ const DEFAULT_SENDER = "pome-agent@pome-twin.test";
  *
  * A non-2xx (including the 429 this example's whole subject is about) is handed
  * BACK as a value instead of thrown, so the model can retry. That is deliberate
- * — and it is also why F-1152's gate reads the response status off the wire
+ * — and it is also why the gate reads the response status off the wire
  * rather than watching for a thrown error.
  */
 function createGmailClient(config: { restUrl: string; authToken?: string }) {
@@ -76,7 +76,7 @@ function createGmailClient(config: { restUrl: string; authToken?: string }) {
  * Build the tool table this agent hands the model.
  *
  * Exported and config-taking (rather than closing over module-level env) so a
- * gate can exercise every tool against a live twin without a model — F-1152. The
+ * gate can exercise every tool against a live twin without a model. The
  * sibling `pr-summary-*` examples shipped a `comment_on_pull_request` the GitHub
  * twin refused on every subject for as long as they existed, and neither older
  * example gate ever reaches a twin call.
@@ -117,7 +117,7 @@ async function main() {
   const modelSlug = (process.env.GMAIL_AGENT_MODEL ?? "anthropic/claude-opus-4-8").trim();
   const maxSteps = Number(process.env.GMAIL_AGENT_MAX_STEPS ?? 30);
 
-  // F-1519 — positive-evidence marker `scripts/smoke-examples.mjs` classifies
+  // Positive-evidence marker `scripts/smoke-examples.mjs` classifies
   // REACHED-OUTBOUND on, printed immediately before this example's first
   // outbound call (the Gmail twin's profile lookup, ahead of the model call).
   // This example has no @pome-sh dependency to emit it for free, so it is a
@@ -157,7 +157,7 @@ function buildMime({ from, to, subject, body }: { from: string; to: string; subj
 // padding, at the end and at most twice, so stripping every `=` is equivalent to
 // anchoring on the tail — and it drops the `/=+$/` that CodeQL flags as a
 // polynomial-ReDoS sink (`js/polynomial-redos`). The regex was harmless while
-// `buildTools` was module-private; exporting it for the F-1152 probe gate put a
+// `buildTools` was module-private; exporting it for the probe gate put a
 // caller-reachable path in front of it, which is what turned the alert on.
 function toBase64Url(s: string): string {
   return Buffer.from(s, "utf8").toString("base64").replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
@@ -176,14 +176,14 @@ function requiredEnv(name: string): string {
   return v;
 }
 
-// This block MUST stay at the bottom of the module (F-900): a launch above the
+// This block MUST stay at the bottom of the module: a launch above the
 // declarations it uses dies in the temporal dead zone, and `tsc` cannot see it.
 // Guarding the launch (rather than calling `main()` at top level) also keeps the
-// module importable, which is what lets F-1152's gate probe `buildTools`
+// module importable, which is what lets the gate probe `buildTools`
 // without running the agent.
 // NOT `import.meta.main`: that landed in Node 24.2 and this package's `engines`
 // allows `>=24`, so on 24.0/24.1 it is `undefined`, this guard is false, and
-// `npm start` prints nothing and exits 0 having run no agent at all (F-1481).
+// `npm start` prints nothing and exits 0 having run no agent at all.
 // Realpath'd on BOTH sides because node resolves symlinks before deriving
 // `import.meta.url`, so a bare `resolve` of argv[1] misses through a symlinked
 // checkout (a worktree, macOS's `/tmp`) in the same silent shape.

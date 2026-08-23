@@ -1,23 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// FDRS-478 (twin-stripe port of FDRS-476) — upstream-added-field coverage guard
-// (type-only; never run).
-//
-// File name ends in `.types.ts`, NOT `.test.ts`: it matches the tsconfig
-// `test/**/*.ts` include (so `npm run typecheck` checks it) but NOT vitest's
-// `*.test.ts` glob (so it is never executed as a test). The build tsconfig
-// excludes `test/`, so it never ships.
-//
-// For each anchored serializer, `<Name>_Allow` is the set of upstream fields the
-// twin DELIBERATELY does not emit. Each `AssertNoUncovered<...> = true` line fails
-// `tsc` — naming the field — the moment Stripe's official type (via the `stripe`
-// devDependency) gains a field the serializer neither emits nor lists in its
-// `_Allow` union. That forces an explicit cover-or-register decision in the
-// `stripe`-bump PR. When typecheck is green, every `_Allow` union is provably exact:
-// it equals the current real uncovered set.
-//
-// EDITING ANY `_Allow` UNION IS A CONSCIOUS FIDELITY DECISION — each entry is a
-// field the twin is on record as choosing not to emit.
+// Upstream-added-field coverage guard (twin-stripe port) (type-only; never run).
 import type Stripe from "stripe";
 import type { AssertNoUncovered, AssertSameMembers } from "../src/upstream-types.js";
 import { STRIPE_REFUND_REASONS } from "../src/upstream-types.js";
@@ -84,14 +66,8 @@ type Balance_Allow =
   | "refund_and_dispute_prefunding";
 const _cov_balanceJson: AssertNoUncovered<Balance, ReturnType<typeof balanceJson>, Balance_Allow> = true;
 
-// F-1484 — the one INPUT anchor. Unlike the lines above it has no `_Allow`
-// union, and that is the point: an accepted-value set has no legitimate
-// "deliberately not accepted" member. A twin that refuses a value Stripe takes
-// fails a call the vendor answers; one that takes a value Stripe refuses is the
-// false pass this closed. Both are errors, so both sides are exact.
-//
-// ⚠️ `RefundCreateParams.Reason`, NOT `Refund.Reason` — the response union adds
-// `expired_uncaptured_charge`, which Stripe generates and refuses on input.
+// The one INPUT anchor. Unlike the lines above it has no `_Allow` union, and that is
+// the point: an accepted-value set has no legitimate "deliberately not.
 const _cov_refundCreateReasons: AssertSameMembers<
   (typeof STRIPE_REFUND_REASONS)[number],
   Stripe.RefundCreateParams.Reason

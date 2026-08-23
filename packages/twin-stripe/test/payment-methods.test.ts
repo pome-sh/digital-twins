@@ -1,10 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// Payment methods — F-732 (M5 card-on-file chain, ruled F-729).
-// Semantic tier: create card PMs (test card numbers → brand/last4, PAN never
-// stored), retrieve, attach/detach lifecycle against customers (one-customer
-// rule, no reattach after detach, loud errors), the customer PM listing, and
-// attach/detach events.
+// Payment methods (M5 card-on-file chain, ruled hot).
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createStripeApp, rest, type StripeTestApp } from "./_appHelper.js";

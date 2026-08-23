@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
  * fidelity:parity for twin-linear — inventory MCP names must match the
- * tool-table fixture the served listing is derived from (F-1325), and every
+ * tool-table fixture the served listing is derived from, and every
  * graphql-surface.json operation must be listed in the inventory GraphQL rows.
  */
 import { readFileSync } from "node:fs";
@@ -34,7 +34,7 @@ const surface = JSON.parse(
 
 const failures: string[] = [];
 
-// F-1325 — the inventory is bound to the tool-table fixture, not to the code.
+// The inventory is bound to the tool-table fixture, not to the code.
 const fixtureToolNames = [...linearToolFixture.toolNames].sort();
 const inventoryToolNames = inventory.tools.map((tool) => tool.name).sort();
 

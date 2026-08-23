@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-656/657 — `pome eval` prints the CLOUD verdict (label + score line +
-// dashboard URL) to the terminal and writes NO score.json. The verdict is
-// ephemeral: it lives in the cloud, the CLI only echoes it.
+// `pome eval` prints the CLOUD verdict (label + score line + dashboard URL) to the
+// terminal and writes NO score.json.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { existsSync } from "node:fs";
@@ -99,7 +98,7 @@ async function writeRunDir(root: string): Promise<string> {
   return runDir;
 }
 
-describe("pome eval terminal output (FDRS-657)", () => {
+describe("pome eval terminal output", () => {
   let tmp: string;
   const originalExitCode = process.exitCode;
 

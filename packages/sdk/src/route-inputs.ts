@@ -1,7 +1,7 @@
 // file-size: one declaration mechanism, one parser, one derivation — splitting the three would let the derived declaration and the parser that enforces it live in separate files, which is the drift this module exists to make impossible.
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1179 — the route INPUT declaration, and the parser that is the same object.
+// The route INPUT declaration, and the parser that is the same object.
 //
 // # Why this exists
 //
@@ -47,7 +47,7 @@
 //
 // # What happens to an undeclared query or body key is the VENDOR's answer
 //
-// F-1179 shipped one answer for all five twins: refuse. F-1372 measured the
+// One answer shipped for all five twins: refuse. Then the vendors were measured on
 // vendors and found they disagree, so the answer moved to the twin
 // (`UndeclaredDisposition`, `routeInputDeclarer()`), with the measurements in
 // `docs/undeclared-route-inputs.md`. Neither disposition changes what a handler
@@ -138,7 +138,7 @@ export type BodyEncoding =
 
 /**
  * What a route does with a query key or a top-level body key its declaration
- * does not name (F-1372).
+ * does not name.
  *
  * This is a FIDELITY setting, so it is answered per twin from a measurement of
  * the vendor rather than chosen — `docs/undeclared-route-inputs.md` carries the
@@ -252,7 +252,7 @@ export interface RouteInputDeclaration<S extends RouteInputSpec = RouteInputSpec
    * What `parse()` does with an undeclared query or body key. Published on the
    * declaration so a twin's own suite can assert the disposition it was ruled
    * to have AND the behaviour that disposition implies — the reverted first
-   * attempt at F-1372 moved the source and left the tests behind.
+   * attempt moved the source and left the tests behind.
    */
   readonly undeclared: UndeclaredDisposition;
   /** Every input, sorted by location then name. Derived, never written. */
@@ -486,7 +486,7 @@ export function declareRouteInputs<const S extends RouteInputSpec>(
 }
 
 /**
- * Bind `declareRouteInputs` to one twin's ruling on undeclared input (F-1372).
+ * Bind `declareRouteInputs` to one twin's ruling on undeclared input.
  *
  * A twin calls this ONCE, at the top of its declarations module, and every
  * declaration below inherits the disposition. That is the whole point: the
@@ -508,7 +508,7 @@ export function routeInputDeclarer(
       throw new Error(
         `route-inputs: ${spec.method} ${spec.path} sets undeclared: '${spec.undeclared}' on its ` +
           `own spec, but its twin already rules '${undeclared}' for every route — ` +
-          `the disposition is one ruling per twin (F-1372)`
+          `the disposition is one ruling per twin`
       );
     }
     return declareRouteInputs({ ...spec, undeclared });

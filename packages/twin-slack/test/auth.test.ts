@@ -7,8 +7,8 @@ import { SlackDomain } from "../src/domain/index.js";
 import { defaultSeedState } from "../src/seed.js";
 import { signTestToken, TEST_AUTH_SECRET, TEST_SID } from "./_authHelper.js";
 
-// Token minting goes through the engine (F-712 row 10): the per-twin
-// signSlackProviderToken died with the F-683 port.
+// Token minting goes through the engine: the per-twin
+// signSlackProviderToken died with the port.
 const SLACK_TOKEN_SPEC = { provider: "slack", prefixes: ["xoxb-pome-", "xoxp-pome-"] } as const;
 function signSlackProviderToken(
   sid: string,

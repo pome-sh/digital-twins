@@ -1,12 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-399 — unit tests for the capture-server child-process helper used by
-// `pome run` to spawn `pome capture-server` as a child before invoking the
-// agent.
-//
-// We avoid coupling to the real CLI build state by pointing the helper at a
-// stub binary (a `node -e "..."` one-liner) that mimics the contract the real
-// `pome capture-server` honors: print "listening on 127.0.0.1:<port> …" to
-// stderr on boot, exit 0 on SIGTERM.
+// Unit tests for the capture-server child-process helper used by `pome run` to spawn
+// `pome capture-server` as a child before invoking the agent.
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

@@ -1,22 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-636 — pure terminal rendering for `pome run -n k` trial groups,
-// matching the design-of-record (CLI moments.dc.html moment 04):
-//
-//   -n sets how many isolated trials to run · the agent command comes from pome.config.json
-//   provisioning 5 isolated github twins … ready
-//   spawning agent <cmd> · from pome.config.json …
-//   trial 1  ✓  100      14.3s
-//   trial 3  ✗  58       15.9s  <failing criteria summary>
-//   trial 5  ⚠  errored         <reason> — excluded
-//   ─────
-//   2 of 4 passed · 1 errored, excluded from the fraction
-//   <failing-criterion phrase> failed in 2 of 4 — start there
-//   full trace, per-criterion diffs, and the trial spread:
-//   → <reliability page url>
-//
-// Trial verdicts are NUMERIC SCORES (not words — that vocabulary belongs to
-// `pome demo`); errored rows show no duration and are excluded from the
-// fraction's denominator.
+// Pure terminal rendering for `pome run -n k` trial groups, matching the
+// design-of-record (CLI moments.dc.html moment 04): -n sets how many isolated trials.
 
 import { describe, expect, it } from "vitest";
 import {
@@ -55,7 +39,7 @@ describe("group header lines (moment 04)", () => {
     );
   });
 
-  // FDRS-663 — the quota bound is named honestly, never silently absorbed.
+  // The quota bound is named honestly, never silently absorbed.
   it("names the plan-concurrency bound when the quota bounded the upfront mint", () => {
     expect(provisioningLine(5, ["github"], 3)).toBe(
       "provisioning 3 isolated github twins … ready (plan concurrency 3 — 5 trials reuse slots as they finish)",
@@ -189,14 +173,8 @@ describe("failure aggregation helpers", () => {
   });
 });
 
-// ── F-925's CLI half ─────────────────────────────────────────────────────────
-//
-// A trial that could not be fully graded leaves the fraction — out of BOTH
-// numerator and denominator — and is always printed. Before this, the group
-// read `passed: result.exitCode === 0`, and `pome run` exited by raw score, so
-// a 100/100 trial with 3 of 4 criteria skipped counted as a clean pass.
-//
-// Same shape the cloud shipped in F-925: never a `4 of 5`.
+// ── the CLI half ───────────────────────────────────────────────────────────── A
+// trial that could not be fully graded leaves the fraction — out of BOTH.
 const incomplete = (score: number, seconds: number): TrialRow => ({
   kind: "completed",
   score,
@@ -204,7 +182,7 @@ const incomplete = (score: number, seconds: number): TrialRow => ({
   seconds,
 });
 
-describe("groupSummaryLines — incomplete trials leave the fraction (F-925)", () => {
+describe("groupSummaryLines — incomplete trials leave the fraction", () => {
   const url = "https://app.pome.sh/runs/task/18-fabricate-green-ci";
 
   it("counts 3 of 4, not 3 of 5 and not 4 of 5", () => {
@@ -246,7 +224,7 @@ describe("groupSummaryLines — incomplete trials leave the fraction (F-925)", (
   });
 });
 
-describe("trialRowLine — the incomplete trial is not visually a pass (F-925)", () => {
+describe("trialRowLine — the incomplete trial is not visually a pass", () => {
   it("marks it with a dash, distinct from both ✓ and ✗", () => {
     const line = trialRowLine(5, incomplete(100, 11.2));
     expect(line).toContain("–");
@@ -259,7 +237,7 @@ describe("trialRowLine — the incomplete trial is not visually a pass (F-925)",
   });
 });
 
-describe("groupExitCode — an ungradable trial cannot buy a green group (F-925)", () => {
+describe("groupExitCode — an ungradable trial cannot buy a green group", () => {
   it("is 1 when a completed trial was incomplete, even if every graded one passed", () => {
     expect(
       groupExitCode([completed(100, "pass", 1), incomplete(100, 2)]),

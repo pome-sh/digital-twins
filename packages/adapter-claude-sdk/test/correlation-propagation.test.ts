@@ -1,24 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// Regression test for FDRS-322's silent-failure mode. The bug: ALS context
-// could be lost across chained `await` boundaries inside a tool handler,
-// causing `x-pome-correlation-id` to land on outgoing twin requests as
-// `null` (or absent) instead of the handler's `tool_call_id`. Earlier tests
-// asserted only "header present", which masked the regression.
-//
-// F-950 moved the store and the fetch patch to `@pome-sh/wire/correlation`, so
-// this file is now the COMPOSITION guard: it drives the real Claude `tool()`
-// wrapper and `withPome()`, and asserts the guarantee still holds end to end
-// across the package boundary. Wire's own `test/correlation-fetch.test.ts` and
-// `test/correlation-context.test.ts` pin the neutral core in isolation; neither
-// of those would catch an adapter that forgot to open the scope.
-//
-// This test fails LOUDLY by:
-//   1. Capturing the live tool_call_id from ALS at handler entry.
-//   2. Forcing two microtask hops (chained awaits).
-//   3. Issuing a fetch() to an allowlisted twin host.
-//   4. Asserting exact equality between the captured id and the outgoing
-//      header value — any drift, loss, or `undefined` flunks the test.
+// Regression test for the silent-failure mode.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -73,7 +54,7 @@ afterEach(async () => {
   }
 });
 
-describe("ALS propagation across chained awaits (FDRS-322 regression)", () => {
+describe("ALS propagation across chained awaits", () => {
   it("outgoing fetch carries the SAME tool_call_id that the handler read at entry — survives two microtask hops", async () => {
     const { withPome, tool } = await import("../src/index.js");
     const { currentToolCallId } = await import("@pome-sh/wire/correlation");

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The fixture worlds GitHub's declarations name (F-1126).
+// The fixture worlds GitHub's declarations name.
 //
 // Fixtures only — no assertions live here. They sit in `src/` rather than
 // `test/` because `discriminatingWorlds` is a DECLARED field: pome-cloud and the

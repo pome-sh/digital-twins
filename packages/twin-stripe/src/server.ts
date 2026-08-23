@@ -16,7 +16,7 @@ const port = Number(process.env.PORT ?? process.env.STRIPE_CLONE_PORT ?? 3333);
 const host = process.env.STRIPE_CLONE_HOST ?? "127.0.0.1";
 const dbPath = process.env.STRIPE_CLONE_DB ?? ".stripe_clone/stripe.db";
 
-// F-708: an env-injected TWIN_AUTH_SECRET always wins; a non-loopback bind
+// An env-injected TWIN_AUTH_SECRET always wins; a non-loopback bind
 // with no env self-generates a secret and persists it at the compose-era
 // contract location (.pome-data/stripe/secret). The engine's serve() runs
 // the same guard; calling it here first keeps a failed boot from touching
@@ -25,10 +25,10 @@ ensureTwinAuthSecret("stripe", host);
 
 const startedAtMs = Date.now();
 const db = openTwinStripeDatabase(dbPath);
-// POME_SEED_JSON (FDRS-353) is strict-parsed: a malformed cloud seed fails
+// POME_SEED_JSON is strict-parsed: a malformed cloud seed fails
 // the boot loudly instead of silently serving the default world. The
 // engine's seed path installs `failure_injection` rules into the same store
-// the session middleware reads (FDRS-369) — scenario 14's lost-response 402
+// the session middleware reads — scenario 14's lost-response 402
 // fires on the hosted path.
 const seed = process.env.STRIPE_CLONE_NO_SEED === "1" ? undefined : loadSeedFromEnv();
 
@@ -41,7 +41,7 @@ const definition = createStripeTwinDefinition({
 
 await serve(definition, {
   // Pre-port D-ENG-10 recorder bound: 10k events, drop-oldest, real counter.
-  // F-698: durable when POME_RECORDER_EVENTS_PATH is set (same cap).
+  // Durable when POME_RECORDER_EVENTS_PATH is set (same cap).
   recorder: resolveRecorderStore({ maxEvents: 10_000 }),
   port,
   hostname: host,

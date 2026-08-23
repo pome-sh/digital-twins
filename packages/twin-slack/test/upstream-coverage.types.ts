@@ -1,30 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// FDRS-477 — upstream-added-field coverage guard (type-only; never run).
-// Mirrors twin-github/test/upstream-coverage.types.ts (FDRS-475/476).
-//
-// File name ends in `.types.ts`, NOT `.test.ts`: it matches the tsconfig
-// `test/**/*.ts` include (so `npm run typecheck` checks it) but NOT vitest's
-// `*.test.ts` glob (so it is never executed as a test). The build tsconfig
-// excludes `test/`, so it never ships.
-//
-// For each anchored serializer, `<Name>_Allow` is the set of upstream fields
-// the twin DELIBERATELY does not emit. Each `AssertNoUncovered<...> = true`
-// line fails `tsc` — naming the field — the moment @slack/web-api's official
-// type gains a field the serializer neither emits nor lists in its `_Allow`
-// union. That forces an explicit cover-or-register decision in the @slack
-// bump PR.
-//
-// NOTE: serializeUserProfile and serializeMessage carry their `satisfies`
-// anchor on a literal but return a `Record<string, unknown>` accumulator
-// (an open `...profile` spread / imperative icons-merge respectively). Their
-// `ReturnType` is therefore `Record<string, unknown>`, so AssertNoUncovered is
-// vacuously satisfied for them; the field-name guard for those two comes from
-// the `satisfies` clause on their literal, not from the assert below. The
-// `_Allow` unions are still recorded for documentation.
-//
-// EDITING ANY `_Allow` UNION IS A CONSCIOUS FIDELITY DECISION — each entry is a
-// field the twin is on record as choosing not to emit.
+// Upstream-added-field coverage guard (type-only; never run).
 import type { AssertNoUncovered } from "../src/upstream-types.js";
 import type {
   SlackBookmark,

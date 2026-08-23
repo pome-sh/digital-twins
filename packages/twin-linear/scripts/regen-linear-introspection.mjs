@@ -2,7 +2,7 @@
 /**
  * Refresh `fixtures/linear-introspection.json` — the committed slice of Linear's
  * real GraphQL introspection that `test/linear-schema-subset.test.ts` checks the
- * twin's SDL against (F-1172).
+ * twin's SDL against.
  *
  * WHY A SLICE. Linear's full introspection response is ~1.5 MB and 1,100+ types.
  * The guard only needs the types the twin claims to emulate, so this vendors
@@ -31,8 +31,8 @@ const LINEAR_GRAPHQL_URL = "https://api.linear.app/graphql";
  * (and re-run) when the twin starts emulating another Linear type.
  *
  * SCOPE — this covers the agent-session family on BOTH sides of the wire since
- * F-1176: the output types, the enums, and every mutation input the twin
- * declares for them. F-1172 covered the output type only, and said so here;
+ * The output types, the enums, and every mutation input the twin
+ * declares for them. The first pass covered the output type only, and said so here;
  * that carve-out is gone because the inputs were reconciled rather than
  * registered.
  *

@@ -37,7 +37,7 @@ const parent = (await tool("slack_send_message", {
 console.log(`posted parent ts=${parent.ts}`);
 
 // 3. Reply twice in the thread — same tool, with thread_ts. Slack has no
-// separate thread-reply tool, and neither does this twin (F-1330).
+// separate thread-reply tool, and neither does this twin.
 await tool("slack_send_message", {
   channel_id: general.id,
   thread_ts: parent.ts,

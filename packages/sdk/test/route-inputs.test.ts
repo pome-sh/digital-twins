@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1179 — the declaration mechanism itself. The per-twin suites drive real
-// routes; this one pins the properties every one of them relies on.
+// The declaration mechanism itself. The per-twin suites drive real routes; this one
+// pins the properties every one of them relies on.
 
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -165,7 +164,7 @@ describe("parse — undeclared input, under the default disposition", () => {
   });
 });
 
-// ─── F-1372 ──────────────────────────────────────────────────────────────────
+// ─── undeclared-input disposition ────────────────────────────────────────────
 
 describe("parse — `undeclared: 'ignore'`, the disposition a twin opts into", () => {
   // GitHub and Slack are ruled `ignore` because that is what they were measured
@@ -197,10 +196,7 @@ describe("parse — `undeclared: 'ignore'`, the disposition a twin opts into", (
   });
 
   it("still rejects a DECLARED input whose value is wrong", async () => {
-    // The disposition governs names the declaration does not have, and nothing
-    // else. A twin that ignored its own schemas would answer 200 to
-    // `?state=merged` and silently list everything — the bug F-1179's
-    // `stateFilter` was tightened to kill.
+    // The disposition governs names the declaration does not have, and nothing else.
     await expect(
       read.parse(request({ url: "http://t/x?state=merged", params: { owner: "o", repo: "r" } }))
     ).rejects.toBeInstanceOf(z.ZodError);

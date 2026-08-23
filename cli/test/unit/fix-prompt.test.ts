@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-657 — `pome fix-prompt` is CAPTURE-ONLY: it assembles a paste-into-IDE
-// prompt from the raw trace + the task's criteria, with NO LLM/judge call
-// and NO network. This test asserts the prompt content and that no fetch is
-// attempted.
+// `pome fix-prompt` is CAPTURE-ONLY: it assembles a paste-into-IDE prompt from the raw
+// trace + the task's criteria, with NO LLM/judge call and NO network.
 
 import { describe, it, expect, vi } from "vitest";
 import { buildFixPrompt, buildFixUserPrompt } from "../../src/fix-prompt/index.js";

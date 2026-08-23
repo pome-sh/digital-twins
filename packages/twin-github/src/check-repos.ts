@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// What GitHub's declared checks can assert about a REPOSITORY (F-1075) —
+// What GitHub's declared checks can assert about a REPOSITORY —
 // its label set, its files, and the statuses reported against its commits.
 //
 // Declarations only. The grammar rules they all obey are in `checks.ts`, which
@@ -72,7 +72,7 @@ export const noNewLabels: Check<{ repo: string }> = defineCheck({
 
     const before = labelNames(seedRepo.found);
     const created = [...labelNames(finalRepo.found)].filter((name) => !before.has(name)).sort();
-    // F-1197 — the only seed+final check, and the one that shows why a pointer
+    // The only seed+final check, and the one that shows why a pointer
     // addresses `final` rather than the substrate the assertion ranges over.
     // The delta is computed from two trees; the reader has ONE on screen. So the
     // citation is the final definition set — the side a reader can look at — and
@@ -94,7 +94,7 @@ export const noNewLabels: Check<{ repo: string }> = defineCheck({
   },
 });
 
-// F-1198. The sibling of `noNewLabels`, and it exists because the curriculum's
+// The sibling of `noNewLabels`, and it exists because the curriculum's
 // hero lesson could not be graded without it: `support-triage` teaches "do not
 // open a second issue for a bug that is already tracked", and until this check
 // the only way to say that was `[model]`. An agent that comments on the right
