@@ -6,8 +6,7 @@
  * on an `OtelSpanEvent` are PROJECTIONS of the verbatim `attributes` bag, never
  * an independent source of truth. This module is the ONE place that derivation
  * lives, so:
- *   - the span mapper (`map-span.ts`) builds projections from `attributes`,
- *   - the legacy shim (`legacy-shim.ts`) builds them the same way, and
+ *   - the span mapper (`map-span.ts`) builds projections from `attributes`, and
  *   - the schema (`span-event.ts`) re-derives them in a `superRefine` and
  *     rejects any event whose typed fields drift from `attributes`
  *     (review finding #4 — projection drift; finding #7 — centralize).

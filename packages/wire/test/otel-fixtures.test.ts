@@ -7,18 +7,15 @@ import {
   getAllSpanInputs,
   getEmitterFixtures,
   getExternalApiFixtures,
-  getLegacyFixtureByName,
-  getLegacyFixtures,
   getTraceFixtures,
 } from "../src/otel/fixtures/index.js";
-import { EMITTER_FIXTURES, LEGACY_FIXTURES, TRACE_FIXTURES } from "../src/otel/fixtures/data.js";
+import { EMITTER_FIXTURES, TRACE_FIXTURES } from "../src/otel/fixtures/data.js";
 
-// Meta-test: the corpus is the single source of truth for M1.2 + M2–M6, so it
+// Meta-test: the corpus is the single source of truth for M2–M6, so it
 // must stay conformant to the M1.1 schema and structurally sound.
 
 describe("corpus coverage (acceptance criteria)", () => {
-  it("has legacy ×3, real emitter ×3, ≥2 multi-span traces, ≥1 external-API span", () => {
-    expect(getLegacyFixtures()).toHaveLength(3);
+  it("has real emitter ×3, ≥2 multi-span traces, ≥1 external-API span", () => {
     expect(getEmitterFixtures()).toHaveLength(3);
     expect(getTraceFixtures().length).toBeGreaterThanOrEqual(2);
     expect(getExternalApiFixtures().length).toBeGreaterThanOrEqual(1);
@@ -44,11 +41,10 @@ describe("corpus coverage (acceptance criteria)", () => {
 
 describe("the exported corpus is deep-frozen (immutable shared state)", () => {
   it("freezes every fixture family and nested object", () => {
-    expect(Object.isFrozen(LEGACY_FIXTURES)).toBe(true);
     expect(Object.isFrozen(EMITTER_FIXTURES)).toBe(true);
     expect(Object.isFrozen(TRACE_FIXTURES)).toBe(true);
     expect(Object.isFrozen(EMITTER_FIXTURES[0]!.span.attributes)).toBe(true);
-    expect(Object.isFrozen(LEGACY_FIXTURES[0]!.expected)).toBe(true);
+    expect(Object.isFrozen(TRACE_FIXTURES[0]!.spans[0]!.attributes)).toBe(true);
   });
 
   it("rejects mutation attempts (frozen, in module scope)", () => {
@@ -134,28 +130,5 @@ describe("multi-span sub-agent trace structure", () => {
         }
       }
     }
-  });
-});
-
-describe("frozen legacy expected spans are valid M1.1 spans", () => {
-  for (const fixture of getLegacyFixtures()) {
-    it(`expected span for ${fixture.name} parses + preserves the record losslessly`, () => {
-      expect(otelSpanEventSchema.safeParse(fixture.expected).success).toBe(true);
-      const recordJson = fixture.expected.attributes["pome.legacy.record_json"];
-      expect(typeof recordJson).toBe("string");
-      expect(JSON.parse(recordJson as string)).toEqual(fixture.legacy);
-    });
-  }
-});
-
-describe("getLegacyFixtureByName", () => {
-  it("returns a fixture by its stable name", () => {
-    expect(getLegacyFixtureByName("twin-http/github-create-issue").name).toBe(
-      "twin-http/github-create-issue",
-    );
-  });
-
-  it("throws on an unknown name", () => {
-    expect(() => getLegacyFixtureByName("nope")).toThrow(/unknown legacy fixture/);
   });
 });

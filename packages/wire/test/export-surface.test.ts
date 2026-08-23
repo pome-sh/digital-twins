@@ -4,9 +4,10 @@
 // `@pome-sh/shared-types` guard (F-754, then F-1201). F-942 split that barrel
 // three ways; this file keeps the SAME argument for the trace surface, and
 // `cli/test/unit/wire/export-surface.test.ts` keeps it for the cloud
-// control-plane clusters. Between them they still name every symbol the old
-// 145-value / 68-type snapshot named, so the split is auditable as a partition
-// rather than as a loosening.
+// control-plane clusters. Between them they name every symbol the old
+// 145-value / 68-type snapshot named except the seven the legacy-shim removal
+// (F-1582) deleted outright, so the split stays auditable as a partition minus a
+// recorded deletion rather than as a loosening.
 //
 // Consumers (the CLI, the sdk, the adapter, all five twins) import runtime
 // values by name from this barrel. If a re-export is dropped, renamed, or
@@ -73,9 +74,6 @@ const EXPECTED_EXPORTS = [
   "HTTP_REQUEST_METHOD",
   "HTTP_RESPONSE_STATUS_CODE",
   "KNOWN_TWIN_IDS",
-  "LEGACY_ATTR_NAMESPACE",
-  "LEGACY_ID_PREFIX",
-  "LEGACY_SHIM_SEMCONV_VERSION",
   "OPENINFERENCE_LLM_MODEL_NAME",
   "OPENINFERENCE_LLM_PROVIDER",
   "OPENINFERENCE_LLM_SYSTEM",
@@ -116,8 +114,6 @@ const EXPECTED_EXPORTS = [
   "recorderFidelitySchema",
   "redactEvent",
   "redactSecrets",
-  "shimLegacyEventToSpan",
-  "shimmableLegacyEventSchema",
   "stateDeltaSchema",
   "subagentSpawnEventSchema",
   "toolResultEventSchema",
@@ -159,7 +155,6 @@ describe("barrel re-export identity (leaf and barrel are the same object)", () =
     expect(api.otelEventSchema).toBe(otel.otelEventSchema);
     expect(api.otelSpanEventSchema).toBe(otel.otelSpanEventSchema);
     expect(api.mapOtelSpanToEvent).toBe(otel.mapOtelSpanToEvent);
-    expect(api.shimLegacyEventToSpan).toBe(otel.shimLegacyEventToSpan);
   });
 
   it("re-exports the redactors from redaction.ts", async () => {

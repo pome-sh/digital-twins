@@ -3,7 +3,7 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { eventSchema, shimLegacyEventToSpan } from "../../../src/types/shared.js";
+import { eventSchema } from "../../../src/types/shared.js";
 import {
   mergeAdapterSignalsIntoEvents,
   resolveTwinHttpParents,
@@ -350,11 +350,10 @@ describe("resolveTwinHttpParents", () => {
 
 // F-1200 acceptance. The ticket's observable is "one tree: run → turn → tool →
 // twin HTTP", and the thing that made it impossible was structural: every twin
-// row carried a null parent, so `legacy-shim` derived `parent_span_id: null`
-// and every twin span was a root with nothing to attach to. This walks the
+// row carried a null parent, so the two trees were unstitchable. This walks the
 // whole chain on real shapes rather than asserting the join in isolation.
 describe("F-1200 acceptance: a twin call sits inside the tool that made it", () => {
-  it("merged tape → shim → a span parented at the tool's span", async () => {
+  it("merged tape → the twin row is parented at the tool that caused it", async () => {
     const dir = await workspace();
     const eventsPath = join(dir, "events.jsonl");
     const signalsPath = join(dir, "signals.jsonl");
@@ -411,16 +410,8 @@ describe("F-1200 acceptance: a twin call sits inside the tool that made it", () 
 
     const twin = rows.find((r) => r.kind === "TwinHttpEvent");
     const tool = rows.find((r) => r.kind === "ToolUseEvent");
-    expect(twin?.parent_event_id).toBe("evt_tool_1");
-
-    // And the whole point of fixing the parent rather than adding trace_id /
-    // span_id: the shim now produces a correctly-parented span for free.
-    const twinSpan = shimLegacyEventToSpan(twin);
-    const toolSpan = shimLegacyEventToSpan(tool, { run_id: "run_accept" });
-
-    expect(twinSpan.parent_span_id).toBe(toolSpan.span_id);
-    expect(twinSpan.trace_id).toBe(toolSpan.trace_id);
     // Before F-1200 this was null, which is what made the two trees unstitchable.
-    expect(twinSpan.parent_span_id).not.toBeNull();
+    expect(tool?.event_id).toBe("evt_tool_1");
+    expect(twin?.parent_event_id).toBe("evt_tool_1");
   });
 });
