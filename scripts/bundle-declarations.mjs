@@ -15,10 +15,10 @@
 //
 // It lived at `packages/checks/scripts/` while `@pome-sh/checks` was the only
 // bundling package with re-export-only sources. `@pome-sh/sandbox-domains`
-// (F-1526) is the second, and the algorithm below is entirely
+// is the second, and the algorithm below is entirely
 // package-agnostic — it reads the caller's `dist/` and resolves specifiers
 // through the OWNING package's `exports` map. Copying ~300 lines into a second
-// package would be the F-1135 shape `scripts/ci/publish-relevance.mjs` argues
+// package would be the hand-maintained shape `scripts/ci/publish-relevance.mjs` argues
 // against in its own header: one copy goes stale while both still look like
 // they are doing the job, and here the stale one ships broken `.d.ts` to a
 // cross-repo consumer. Both packages' entries in `publish-relevance.mjs` name

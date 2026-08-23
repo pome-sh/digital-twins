@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1511 — THE NUMBER IS WRITTEN HERE, ON `main`, AFTER THE MERGE.
+// THE NUMBER IS WRITTEN HERE, ON `main`, AFTER THE MERGE.
 //
 // Every twins PR used to hand-write the shared version line, so every merge
 // invalidated every open PR that had pinned a consumed number — silently
@@ -241,7 +241,7 @@ export function planAllocations({ root = resolve(HERE, "../.."), date = today(),
     });
   }
 
-  // F-1520 — an example that pins a `@pome-sh/*` package from the registry
+  // An example that pins a `@pome-sh/*` package from the registry
   // (today only `agent-examples/support-triage`) must never fall out of sync with
   // that sibling's published version: two incidents (adapter 0.3.4 and 0.3.6,
   // both 2026-08-13) each reddened `check-example-pins-published.mjs` until a
@@ -323,7 +323,7 @@ function commitMessage(allocations, repins, head) {
     subject,
     "",
     ...allocations.map((a) => `- ${a.name} ${a.from} → ${a.to} (${a.level}, ${a.reason})`),
-    ...repins.map((r) => `- agent-examples/${r.example} ${r.dep} ${r.from} → ${r.to} (published pin re-pin, F-1520)`),
+    ...repins.map((r) => `- agent-examples/${r.example} ${r.dep} ${r.from} → ${r.to} (published pin re-pin)`),
     "",
     `Allocated from ${head.slice(0, 8)} by .github/workflows/allocate-version.yml.`,
     "The version number is written here, after the merge, and never in a PR.",
@@ -372,7 +372,7 @@ export function main(argv = process.argv.slice(2)) {
     if (a.relevantFiles.length > 10) console.log(`    … ${a.relevantFiles.length - 10} more`);
   }
   for (const r of plan.repins) {
-    console.log(`agent-examples/${r.example}: ${r.dep} ${r.from} → ${r.to}  (published pin drift, F-1520)`);
+    console.log(`agent-examples/${r.example}: ${r.dep} ${r.from} → ${r.to}  (published pin drift)`);
   }
 
   const planOut = flagValue("--plan-out");
@@ -400,7 +400,7 @@ export function main(argv = process.argv.slice(2)) {
 // Realpath'd on both sides — node resolves symlinks before deriving
 // `import.meta.url`, so a bare `pathToFileURL()` of argv[1] misses through a
 // symlinked checkout (a worktree, or macOS's symlinked `/tmp`) in the same
-// silent shape (F-1488), and a guard miss while invoked as this file throws
+// silent shape, and a guard miss while invoked as this file throws
 // rather than exits 0.
 const SELF = realpathSync(fileURLToPath(import.meta.url));
 const ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";

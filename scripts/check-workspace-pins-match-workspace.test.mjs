@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Regression suite for `check-workspace-pins-match-workspace.mjs` (F-1126,
-// extended to `cli/` under F-1231).
+// Regression suite for `check-workspace-pins-match-workspace.mjs`, extended to
+// cover `cli/`.
 //
-// F-1231 investigated a 2026-08-03 failure where the CLI's build typechecked
+// A 2026-08-03 failure was investigated where the CLI's build typechecked
 // against a `@pome-sh/shared-types` version behind what `packages/` (and its
 // own source) actually used — a pin that had drifted out from under it. That
 // specific architecture (`cli-ci.yml`, `use-local-pome-tarballs.mjs`, an exact
@@ -24,7 +24,7 @@
 // The failure class through `agent-examples/*`'s deliberately-published pins is a
 // different rule (needs the registry, tolerates a pin equal to a version that
 // simply has not published yet) and is NOT this suite's subject — see
-// `scripts/check-example-pins-published.mjs` (F-1483) and its own regression
+// `scripts/check-example-pins-published.mjs` and its own regression
 // suite, wired from `scripts/gate-examples.mjs`.
 
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
@@ -125,9 +125,9 @@ expectGate(
   "green",
 );
 
-// 3. The original F-1126 shape: a packages/* sibling pins a stale exact version.
+// 3. The original shape: a packages/* sibling pins a stale exact version.
 expectGate(
-  "3. packages/* pin behind the workspace sibling reds (F-1126's own case)",
+  "3. packages/* pin behind the workspace sibling reds (the original case)",
   fixture({
     sdk: { name: "@pome-sh/sdk", version: "0.9.0" },
     "twin-slack": {
@@ -140,14 +140,14 @@ expectGate(
   ["packages/twin-slack", "0.5.1", "0.9.0"],
 );
 
-// 4. The F-1231 regression this file exists for: `cli/package.json` pins an
+// 4. The cli regression this file exists for: `cli/package.json` pins an
 // exact, stale version of a sibling instead of "*" — the exact shape #239
 // deleted from `cli/` and that this gate's `packages/`-only scan could not see
 // come back. `@pome-sh/wire`'s workspace version carries `parent_event_id`
-// (0.14.0); a cli pinned to the pre-F-1200 line (0.13.x) is the 2026-08-03
+// (0.14.0); a cli pinned to the older vocabulary line (0.13.x) is the 2026-08-03
 // incident's own version numbers.
 expectGate(
-  "4. cli/package.json reintroducing a stale exact pin reds (the F-1231 regression)",
+  "4. cli/package.json reintroducing a stale exact pin reds (the cli regression)",
   fixture(
     { wire: { name: "@pome-sh/wire", version: "0.14.0" } },
     { name: "@pome-sh/cli", version: "0.23.19", devDependencies: { "@pome-sh/wire": "0.13.4" } },

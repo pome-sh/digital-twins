@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1152 probe driver — the child half of scripts/probe-example-tools.mjs.
+// Probe driver — the child half of scripts/probe-example-tools.mjs.
 //
 // Runs INSIDE one example's dependency tree (under that example's own `tsx`
 // when it has one, so a `.ts` tool table and its zod / `file:`-linked adapter

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Reusable body of the black-box twin runtime-contract suite (FDRS-711).
-// Extracted verbatim from contract.test.mjs (FDRS-681) so the same frozen
+// Reusable body of the black-box twin runtime-contract suite.
+// Extracted verbatim from contract.test.mjs so the same frozen
 // assertions can run against any built twin artifact AND the sdk-booted
 // proof entry (contract/sdk-boot.test.mjs). Changing any asserted status or
 // shape here is a contract change: update CONTRACT.md in the same PR and
@@ -26,10 +26,10 @@ export const PER_TWIN = {
     sessionHealthz: { status: 200 },
     // github validates seeds: a garbage body is a 422 GitHub validation error.
     adminSeedGarbage: { status: 422, check: (b) => b.message === "Validation Failed" },
-    // F-1497 CONTRACT CHANGE: `noAuth` sends NO Authorization header, and real
+    // CONTRACT CHANGE: `noAuth` sends NO Authorization header, and real
     // GitHub answers that with `Requires authentication` — `Bad credentials`
     // is what it answers a bad token. Measured live 2026-08-13 on `GET /user`,
-    // both ways. The twin collapsed the two until F-1497; CONTRACT.md's auth
+    // both ways. The twin used to collapse the two; CONTRACT.md's auth
     // table moved with this line. No pome-cloud consumer reads either string
     // (searched: zero hits for "Bad credentials" in that repo).
     noAuth: {
@@ -51,7 +51,7 @@ export const PER_TWIN = {
     expired: { status: 401, check: (b) => b.message === "Bad credentials" },
     rawToken: { status: 401 },
     mcpCallUnknown: { status: 422, check: (b) => b.message === "Validation Failed" },
-    // Body-parsing corners (F-683 review pins, probed 2026-07-08): github is
+    // Body-parsing corners (review pins, probed 2026-07-08): github is
     // strict JSON everywhere — form-encoded and malformed bodies answer the
     // GitHub wire error; {name}/{params} aliases are not accepted.
     aliasTool: "list_repos",
@@ -77,7 +77,7 @@ export const PER_TWIN = {
     expired: { status: 401, check: (b) => b.error === "token_expired" },
     rawToken: { status: 401 },
     mcpCallUnknown: { status: 404, check: (b) => b.error === "unknown_tool" },
-    // Body-parsing corners (F-683 review pins; probed 2026-07-08 against the
+    // Body-parsing corners (review pins; probed 2026-07-08 against the
     // pre-port 3cd86eb build): slack parses form-or-JSON tolerantly on every
     // surface (official Slack SDKs default to form-urlencoded; malformed JSON
     // collapses to {}), accepts the {name}/{params} alias keys, a body naming
@@ -111,10 +111,11 @@ export const PER_TWIN = {
     // stripe is the only twin answering a sid mismatch with 403 (not 401).
     wrongSid: { status: 403, check: (b) => b.error?.code === "forbidden" },
     expired: { status: 401, check: (b) => b.error?.code === "unauthorized" },
-    // stripe accepts a prefix-less bearer (raw JWT) today — FDRS-712 row 4.
+    // stripe accepts a prefix-less bearer (raw JWT) today — the raw-bearer row
+    // of CONTRACT.md's per-twin frozen differences.
     rawToken: { status: 200 },
     mcpCallUnknown: { status: 400, check: (b) => b.error?.code === "tool_unknown" },
-    // Body-parsing corners (F-683 review pins, probed on the pre-port twin):
+    // Body-parsing corners (review pins, probed on the pre-port twin):
     // stripe reads form-or-JSON (malformed JSON collapses to {}), rejects the
     // alias keys with its parameter_invalid envelope, and dispatches
     // form-encoded legacy /mcp/call bodies.
@@ -260,7 +261,7 @@ function checkBody(expectation, body, label) {
 }
 
 /**
- * F-1497 — what each vendor actually puts on an auth-refusal envelope, and the
+ * What each vendor actually puts on an auth-refusal envelope, and the
  * 403 body the twin's admin gate must answer with.
  *
  * ── HOW THIS WAS OBTAINED ─────────────────────────────────────────────────
@@ -275,11 +276,11 @@ function checkBody(expectation, body, label) {
  * ⚠️ ONE of the five sends `documentation_url`. GitHub. The other four send no
  * such key anywhere in the body, which is why `docsUrl: null` below is an
  * assertion and not a "not measured" — it says the twin must not invent one.
- * Before F-1497 all five COULD, because the 401/403 defaults in `@pome-sh/sdk`
+ * All five used to, because the 401/403 defaults in `@pome-sh/sdk`
  * carried `documentation_url: ""`, and gmail + linear were reaching that
  * default on their admin 403.
  *
- * The `docsUrl` github does send is the GENERIC one on every 401 (8/8, F-1490)
+ * The `docsUrl` github does send is the GENERIC one on every 401 (8/8)
  * — authentication fails before dispatch, so there is no operation to name, and
  * the twin's admin route is twin-only for the same reason.
  */
@@ -337,7 +338,7 @@ function collectDocumentationUrls(value, found = []) {
 }
 
 /**
- * The cross-twin half of F-1497: a twin may carry its OWN vendor's
+ * The cross-twin half of the auth contract: a twin may carry its OWN vendor's
  * `documentation_url` and no other twin's, and a twin whose vendor sends none
  * must send none — not `""`, not a nested one, not GitHub's.
  *
@@ -486,7 +487,7 @@ export function contractSuite(twin, exp, label = twin.name) {
       });
       assert.equal(raw.status, exp.rawToken.status, "raw (prefix-less) bearer behavior is frozen per twin");
 
-      // F-1497 — the same four refusals, read for ONE leaf across all five
+      // The same four refusals, read for ONE leaf across all five
       // twins: `documentation_url` is GitHub's key and only GitHub's vendor
       // sends it. This ran green while every twin was emitting
       // `documentation_url: ""` from the shared SDK default, which is exactly
@@ -605,7 +606,7 @@ export function adminGateCase(twin, label = twin.name) {
       const wrong = await req(t.base, "/admin/reset", { method: "POST", headers: { "X-Admin-Token": "nope" } });
       assert.equal(wrong.status, 403);
 
-      // F-1497 — the BODY, not just the status. This gate lives in
+      // The BODY, not just the status. This gate lives in
       // `@pome-sh/sdk` and is shared by all five twins, so its default could
       // never be vendor-shaped: it answered github's
       // `{message:"Forbidden", documentation_url:""}` on every twin that had
@@ -631,7 +632,7 @@ export function adminGateCase(twin, label = twin.name) {
 }
 
 /**
- * F-708 boot-secret contract: a non-loopback bind with no env-injected
+ * Boot-secret contract: a non-loopback bind with no env-injected
  * TWIN_AUTH_SECRET self-generates a 32-byte hex secret, persists it at the
  * compose-era location (POME_TWIN_DATA_DIR overrides `.pome-data/<twin>`),
  * prints it once to stdout, and reuses it on reboot. An env-injected secret

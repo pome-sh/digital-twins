@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Regression coverage for scripts/capture-mcp-tools-list.mjs (F-1326).
+// Regression coverage for scripts/capture-mcp-tools-list.mjs.
 //
 // No network, no `go`, no clone: every case here drives the producer through
 // its injected `readSubstrate` seam, or through `--offline`, which re-derives
@@ -9,7 +9,7 @@
 // fixture of the upstream response — a second copy of the same bytes under
 // scripts/fixtures/ would be one more thing to drift.
 //
-// The block that matters most is "the guard fires" (F-1170): a --check that
+// The block that matters most is "the guard fires": a --check that
 // has never been watched go red is not a guard. Each of the four ways a
 // golden can be wrong — edited raw, edited canonical, edited meta provenance,
 // hand-typed sha — gets its own red here.
@@ -76,11 +76,12 @@ function sandbox() {
 /**
  * A sandbox whose source table carries one SYNTHETIC uncaptured twin.
  *
- * F-1329 captured the last three deferred twins, so `sources.twins` now has no
+ * The last three deferred twins are captured, so `sources.twins` now has no
  * `capture: false` row at all. The guards below cover the not-captured path —
  * the recorded-reason gate and the declared-configuration round-trip — and if
  * they simply iterated the real table they would now iterate NOTHING and report
- * the same green as a satisfied guard. That is this repo's F-1170 rule, and the
+ * the same green as a satisfied guard. That is this repo's vacuous-green rule,
+ * and the
  * fix is a fixture rather than a weakened assertion: the behaviour is still
  * reachable the moment a sixth twin is added deferred, so it stays tested.
  */
@@ -97,9 +98,9 @@ function sandboxWithDeferredTwin() {
     method: "tools/list",
     protocol: "JSON-RPC 2.0 over HTTP",
     protocolVersion: "2025-06-18",
-    authTokenEnv: "F1329_DEFERRED_PROBE_TOKEN",
+    authTokenEnv: "DEFERRED_PROBE_TOKEN",
     reason: "OAuth-gated, and nobody has minted a grant for this fixture.",
-    deferredTo: "F-1329",
+    deferredTo: "a follow-up capture errand",
     configuration: { auth: "bearer", requestHeaders: { "content-type": "application/json" } },
   };
   const { twin: _omit, ...declared } = source;
@@ -111,7 +112,7 @@ function sandboxWithDeferredTwin() {
 }
 
 // ── the declared source table ───────────────────────────────────────────────
-// F-1117's shape: adding a twin is a data edit, never a new `case:`. The gate
+// Adding a twin is a data edit, never a new `case:`. The gate
 // on that is that nothing in the producer enumerates twin ids.
 {
   const sources = loadSources({ repoRoot: ROOT });
@@ -135,7 +136,7 @@ function sandboxWithDeferredTwin() {
   // some other broken shape would still pass an absence check). The absence
   // of a bare `import.meta.main` ANYWHERE under scripts/**/contract/** —
   // including in this file — is asserted repo-wide by
-  // scripts/lint-no-bare-import-meta-main.mjs (F-1481), which subsumes what
+  // scripts/lint-no-bare-import-meta-main.mjs, which subsumes what
   // used to be a second, narrower copy of that same assertion here: two
   // checks asserting one property in different places is the shape D5 warns
   // about, and the repo-wide one covers strictly more (every file, not just
@@ -143,7 +144,7 @@ function sandboxWithDeferredTwin() {
   //
   // Two independent, ORDER-INDEPENDENT assertions, one per side. The single
   // regex these replace was `/process\.argv\[1\][\s\S]{0,120}import\.meta\.url/`,
-  // which encodes source ORDER rather than the guard: F-1488 rewrote this guard
+  // which encodes source ORDER rather than the guard: this guard was rewritten
   // into the sanctioned realpath-both-sides form, which declares the
   // `import.meta.url` const first, and the old regex failed on a guard that had
   // just been made strictly STRONGER.
@@ -222,10 +223,10 @@ function sandboxWithDeferredTwin() {
   );
 }
 
-// ── F-1329 adds a token, not an adapter ─────────────────────────────────────
+// ── A credential adds a token, not an adapter ───────────────────────────────
 // live-wire-oauth and live-wire-unauth must resolve to the SAME reader. If they
-// ever diverge, "F-1329 adds a token" stops being true and nobody finds out
-// until F-1329.
+// ever diverge, "a token, not an adapter" stops being true and nobody finds out
+// until the next credentialed capture.
 {
   assert(
     adapterFor("live-wire-oauth").read === adapterFor("live-wire-unauth").read,
@@ -237,10 +238,10 @@ function sandboxWithDeferredTwin() {
         twin: "acme",
         endpoint: "https://example.invalid/mcp",
         substrate: "live-wire-oauth",
-        authTokenEnv: "F1326_TOKEN_THAT_IS_NOT_SET",
+        authTokenEnv: "TOKEN_THAT_IS_NOT_SET",
         configuration: { auth: "bearer" },
       }),
-    "F1326_TOKEN_THAT_IS_NOT_SET",
+    "TOKEN_THAT_IS_NOT_SET",
     "the oauth reader refuses to fall back to an unauthenticated request"
   );
 }
@@ -325,7 +326,7 @@ function sandboxWithDeferredTwin() {
   assert(code === 0, "`--check --offline` is green against the committed goldens");
 }
 
-// ── the guard fires (F-1170) ────────────────────────────────────────────────
+// ── the guard fires ─────────────────────────────────────────────────────────
 // Four independent edits, four reds, and nothing written back.
 {
   const sources = loadSources({ repoRoot: ROOT });
@@ -402,7 +403,7 @@ function sandboxWithDeferredTwin() {
     rmSync(dir, { recursive: true, force: true });
   }
 
-  // 7. the DEFERRED twins' declared configuration is the thing F-1329's
+  // 7. the DEFERRED twins' declared configuration is the thing a credentialed
   //    capture will assume, so it has to be recorded and gated exactly like a
   //    captured twin's. Without this, someone could change which header
   //    Slack's future capture sends, or which env var holds its token, and
@@ -510,7 +511,7 @@ function sandboxWithDeferredTwin() {
   rmSync(dir, { recursive: true, force: true });
 }
 
-// ── --offline WRITES the re-derivation, and cannot forge a capture (F-1394) ──
+// ── --offline WRITES the re-derivation, and cannot forge a capture ───────────
 //
 // The mode exists because `configuration` is prose about a capture that is
 // copied into two derived files, and three of the five sources sit behind
@@ -579,7 +580,7 @@ function sandboxWithDeferredTwin() {
 }
 {
   // An undated golden cannot be re-derived either: `today` belongs to a run
-  // that read a substrate, and stamping it here would reset F-1328's staleness
+  // that read a substrate, and stamping it here would reset any staleness
   // clock without anybody having contacted the vendor.
   const dir = sandbox();
   const sources = loadSources({ repoRoot: dir });
@@ -598,7 +599,7 @@ function sandboxWithDeferredTwin() {
   rmSync(dir, { recursive: true, force: true });
 }
 
-// ── every capturable source states what its capture COVERS (F-1394) ─────────
+// ── every capturable source states what its capture COVERS ──────────────────
 //
 // The field is required at load, beside `configuration` itself. linear's golden
 // was captured under a read-only grant, declared no completeness class, and
@@ -666,8 +667,8 @@ function sandboxWithDeferredTwin() {
   }
 }
 
-// ── a deferred oauth row is CAPTURE-READY, not merely declared (F-1329) ──────
-// The whole content of "F-1329 adds a token, not an adapter" is that the errand
+// ── a deferred oauth row is CAPTURE-READY, not merely declared ───────────────
+// The whole content of "a token, not an adapter" is that the errand
 // is one env var away. It was not: slack and linear declared no
 // `protocolVersion`, which `loadSources` requires on every capturable source, so
 // flipping `capture` threw `must declare protocolVersion` before opening a
@@ -679,7 +680,7 @@ function sandboxWithDeferredTwin() {
 // mid-errand.
 {
   const table = JSON.parse(readFileSync(join(ROOT, "config/mcp-capture-sources.json"), "utf8"));
-  // Every oauth row, captured or deferred. F-1329 captured all three, so keying
+  // Every oauth row, captured or deferred. All three are captured, so keying
   // this on `!row.capture` would now select NOTHING and report the same green as
   // a satisfied guard — the shape the flip-throws bug hid behind in the first
   // place. The durable invariant is the one that made the flip safe: an oauth
@@ -710,7 +711,7 @@ function sandboxWithDeferredTwin() {
     try {
       loadSources({ table: flipped });
     } catch (err) {
-      assert(false, `${twin}: flipping \`capture\` must not throw — F-1329 is a token, not a schema edit (${err.message})`);
+      assert(false, `${twin}: flipping \`capture\` must not throw — a credential is a token, not a schema edit (${err.message})`);
     }
   }
 }
@@ -718,7 +719,7 @@ function sandboxWithDeferredTwin() {
 // ── the recorded refusal is RETIRED by the capture that supersedes it ────────
 // pome-cloud's `loadUpstreamMcpGolden` resolves `<twin>.status.json` FIRST and
 // never looks at the raw/meta beside it. Nothing used to delete that file, so
-// F-1329's first credentialed capture would have committed a real golden while
+// The first credentialed capture would have committed a real golden while
 // the lane went on publishing "401 missing_token" — the errand landing and
 // reading as though it had not, with nothing red anywhere.
 {
@@ -765,15 +766,15 @@ function sandboxWithDeferredTwin() {
   }
 }
 
-// ── SET-BUT-BLANK is not UNSET (F-1184) ─────────────────────────────────────
-// F-1184: a value blanked in the secret store must not reach a runner and read
+// ── SET-BUT-BLANK is not UNSET ──────────────────────────────────────────────
+// A value blanked in the secret store must not reach a runner and read
 // as "no credential configured" — the operator who blanked it and the operator
 // who never set it need different instructions. `if (!token)` said "is not set"
 // for both, and let whitespace through entirely: `Bearer    ` went on the wire
 // and came back as the VENDOR's 401, which reads as a bad token and sends
 // whoever just minted one back through the OAuth flow.
 {
-  const ENV = "F1329_BLANK_PROBE";
+  const ENV = "BLANK_PROBE";
   const source = {
     twin: "acme",
     endpoint: "https://example.invalid/mcp",
@@ -794,7 +795,7 @@ function sandboxWithDeferredTwin() {
   delete process.env[ENV];
 }
 
-// ── the Streamable HTTP transport may frame the answer as SSE (F-1329) ──────
+// ── the Streamable HTTP transport may frame the answer as SSE ───────────────
 // MCP lets a server answer a POST with either a JSON body or an SSE stream, and
 // both are correct. Measured 2026-08-09: gmail, slack and stripe answer
 // application/json; LINEAR answers SSE. Before this, `JSON.parse` on the wire

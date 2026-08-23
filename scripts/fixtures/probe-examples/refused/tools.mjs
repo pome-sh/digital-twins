@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The F-1152 incident in miniature, for scripts/probe-example-tools.test.mjs.
+// The probe incident in miniature, for scripts/probe-example-tools.test.mjs.
 //
 // `comment_on_issue` wraps `add_issue_comment` at a number that has no issue
 // behind it — this fixture's seed carries `issues: []`, exactly as all four of

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// no-catch-and-continue gate (F-745 / D4) — §3.A code-health, SDK ENGINE ONLY.
+// no-catch-and-continue gate (D4) — §3.A code-health, SDK ENGINE ONLY.
 //
 // `packages/sdk` is the twin engine: the recorder, auth, MCP JSON-RPC, and
 // server plumbing every hosted twin runs on. A `catch` that logs-and-continues
@@ -22,7 +22,7 @@
 // out of the block and keeps going as if nothing broke. That is the exact bug
 // class this gate forbids.
 //
-// ALLOWLIST (D4) — target EMPTY, currently TWO entries. F-745's plan assumed
+// ALLOWLIST (D4) — target EMPTY, currently TWO entries. The original plan assumed
 // every engine catch would satisfy the rule literally; two do not, because they
 // handle the error by ASSIGNING an explicit error result to an outer-scoped
 // variable and FALLING THROUGH to a single shared record()/return below the
@@ -552,7 +552,7 @@ function stripCommentsAndLiterals(src) {
 // Run as a script (not when imported by the test). Realpath'd on both
 // sides — node resolves symlinks before deriving `import.meta.url`, so a
 // bare `resolve()` of argv[1] misses through a symlinked checkout (a
-// worktree, or macOS's symlinked `/tmp`) in the same silent shape (F-1488),
+// worktree, or macOS's symlinked `/tmp`) in the same silent shape,
 // and a guard miss while invoked as this file throws rather than exits 0.
 const SELF = realpathSync(fileURLToPath(import.meta.url));
 const ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";

@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Regression coverage for scripts/ci/fetch-pinned-release.sh and
-// scripts/ci/assert-hardened-cdn-fetches.mjs (F-1489).
+// scripts/ci/assert-hardened-cdn-fetches.mjs.
 //
 // Two halves, and the second is the one that matters. A gate that has only
 // ever reported "all clear" on the tree it shipped with is a gate nobody has
-// seen fail — the F-1230 grep-based coverage check was defeated three separate
+// seen fail — an earlier grep-based coverage check was defeated three separate
 // times by shapes its author was sure it caught. So every rule here is
 // exercised against a PLANTED violation in a scratch `.github/workflows` tree
 // and asserted to red, by name:
@@ -14,8 +14,8 @@
 //   - a `run:` block curling a release CDN outside the hardened helper
 //   - a fetch whose target the resolver cannot work out (must red, not pass)
 //   - a `run:` block writing to a container registry outside the hardened push
-//     helper (F-1530), and a registry READ that must NOT red
-//   - a `run:` block invoking cosign outside the hardened sign helper (F-1534),
+//     helper, and a registry READ that must NOT red
+//   - a `run:` block invoking cosign outside the hardened sign helper,
 //     the READ subcommands included — unlike shape (c), a failed read here
 //     happens AFTER publication
 //   - a `uses:` action with no row in the classification table
@@ -32,10 +32,10 @@
 // runs against a local server that 503s on demand: retry-then-succeed,
 // exhaustion failing closed with the CDN HOST in the message, and a good
 // download with a wrong sha256 still refused. `push-scanned-image.sh` runs
-// against a fake `docker` that reproduces F-1530's GHCR answer — every layer
+// against a fake `docker` that reproduces the observed GHCR answer — every layer
 // `Pushed`, then `unknown blob` — and, separately, a push that exits 0 while
 // the manifest is never committed. `sign-image-digests.sh` runs against a fake
-// `cosign` that reproduces F-1534's — `DENIED: denied` off the GHCR token
+// `cosign` that reproduces the signing failure — `DENIED: denied` off the GHCR token
 // endpoint, injectable per subcommand, so the case that actually happened (both
 // tags pushed, signed and attested, dead on `verify-attestation`'s READ) is a
 // fixture rather than a paragraph.
@@ -147,7 +147,7 @@ const TABLE = {
 // ---------------------------------------------------------------------------
 
 // PLANTED FAILURE — a raw curl at a release CDN. This is the shape the two
-// hand-copied install loops had before F-1489, and the shape a third copy
+// hand-copied install loops had before the ladder landed, and the shape a third copy
 // would have.
 withScratchRoot(
   {
@@ -220,11 +220,11 @@ assert(findFetchesInScript("wget https://x.example/y").length === 1, "wget count
 assert(findFetchesInScript("gh release download v1 -R o/r").length === 1, "gh release download counts");
 
 // ---------------------------------------------------------------------------
-// Shape (c): registry WRITES in `run:` blocks (F-1530).
+// Shape (c): registry WRITES in `run:` blocks.
 //
 // `Push scanned image` was one bare `docker push` with no retry, sitting
-// between two `uses:` installs that had both been given three-attempt ladders
-// (F-1489, F-1494). On 2026-08-14 GHCR answered `unknown blob` after every
+// between two `uses:` installs that had both been given three-attempt ladders.
+// On 2026-08-14 GHCR answered `unknown blob` after every
 // layer had reported `Pushed`, the stripe leg died, and `stripe-bbf27bf` did
 // not exist — which failed four consecutive twin-snapshot-verify runs and
 // opened pome-cloud#752, because nothing re-ran that step for four days.
@@ -302,7 +302,7 @@ assert(findRegistryWritesInScript("echo 'docker pushes images'").length === 0, "
 assert(findRegistryWritesInScript("docker push ghcr.io/o/r:v1").length === 1, "a bare push counts");
 
 // ---------------------------------------------------------------------------
-// Shape (d): cosign calls in `run:` blocks (F-1534).
+// Shape (d): cosign calls in `run:` blocks.
 //
 // With shapes (a) and (c) closed, the sign/attest/verify step was the last
 // unretried GHCR interaction on the publish path — a single step at
@@ -314,7 +314,7 @@ assert(findRegistryWritesInScript("docker push ghcr.io/o/r:v1").length === 1, "a
 // ---------------------------------------------------------------------------
 
 // PLANTED FAILURE — the WRITE half, inline. This is the shape the sign step
-// had before F-1534.
+// had before the signing leg was hardened.
 withScratchRoot(
   {
     "planted.yml": wf(`      - name: Sign pushed image digests
@@ -448,7 +448,7 @@ assert(findTableDefects(loadTable(), new Map()).length === 0, "scripts/ci/cdn-fe
 // Shape (b): the repeated-attempt group.
 // ---------------------------------------------------------------------------
 
-assert(MIN_ATTEMPTS === 3, "the F-1494 pattern is 2 escapable attempts + 1 fatal one");
+assert(MIN_ATTEMPTS === 3, "the retry pattern is 2 escapable attempts + 1 fatal one");
 
 // PLANTED FAILURE — the exact state twin-image.yml's syft step was in.
 withScratchRoot(
@@ -596,7 +596,7 @@ mainThrows(
 );
 
 // And for shape (d): with the sign step deleted rather than hardened, the
-// signing half checked nothing. This is the guard that keeps F-1534's fix from
+// signing half checked nothing. This is the guard that keeps that fix from
 // being quietly reverted into a green gate.
 mainThrows(
   {
@@ -678,7 +678,7 @@ await new Promise((r) => server.listen(0, "127.0.0.1", r));
 const base = `http://127.0.0.1:${server.address().port}`;
 
 try {
-  // A transient 5xx cannot fail the fetch on the first attempt — F-1489's
+  // A transient 5xx cannot fail the fetch on the first attempt — the ladder's
   // first done-when, measured rather than asserted in a comment.
   const flaky = await runHelper(`${base}/flaky`, GOOD_SHA);
   assert(flaky.status === 0, `two 503s then a 200 must succeed, got ${flaky.status}\n${flaky.stderr}`);
@@ -714,7 +714,7 @@ try {
 }
 
 // ---------------------------------------------------------------------------
-// scripts/ci/push-scanned-image.sh itself (F-1530).
+// scripts/ci/push-scanned-image.sh itself.
 //
 // Driven against a fake `docker` on PATH rather than a real registry: the
 // failure to reproduce is GHCR accepting every layer and then refusing the
@@ -739,7 +739,7 @@ if [ "\${1:-}" = "push" ]; then
   echo "$tag" >> "\${state}/pushes"
   echo "5f70bf18a086: Pushed"
   if take "\${state}/pushfail_\${slug}"; then
-    # F-1530's answer from GHCR: every layer reports Pushed, then the manifest
+    # The observed answer from GHCR: every layer reports Pushed, then the manifest
     # PUT is refused because the registry cannot see a blob it just accepted.
     echo "unknown blob" >&2
     exit 1
@@ -756,7 +756,7 @@ if [ "\${1:-}" = "buildx" ] && [ "\${2:-}" = "imagetools" ] && [ "\${3:-}" = "in
   slug="\${tag//[^A-Za-z0-9]/_}"
   echo "$tag" >> "\${state}/inspects"
   # A degraded GHCR refuses the manifest READ as readily as the manifest PUT —
-  # F-1534's \`DENIED: denied\` off the token endpoint arrives here too. Only the
+  # A \`DENIED: denied\` off the token endpoint arrives here too. Only the
   # sign suite below sets this budget; the push cases above leave it unset,
   # where \`take\` on a missing file is a no-op.
   if take "\${state}/inspectfail_\${slug}"; then
@@ -843,7 +843,7 @@ function runPush(tags, plan = {}, { attempts = 3 } = {}) {
 
 // The PRODUCTION retry budget, pinned. Every other case here passes its own
 // `attempts`, so on its own this suite would stay green with the default
-// silently cut to 1 — which is the state F-1530 was reporting. Measured by
+// silently cut to 1 — which is the state the incident was reporting. Measured by
 // leaving the knob unset: four faults must be survivable and the fifth must not.
 {
   const survives = await runPush(PER_COMMIT, { [PER_COMMIT]: { pushFailures: 4 } }, { attempts: null });
@@ -854,7 +854,7 @@ function runPush(tags, plan = {}, { attempts = 3 } = {}) {
   assert(exhausts.stderr.includes("after 5 attempts"), `expected a 5-attempt budget, got: ${exhausts.stderr}`);
 }
 
-// F-1530's first done-when, measured rather than asserted in a comment: a
+// The first done-when, measured rather than asserted in a comment: a
 // single `unknown blob` no longer fails the leg.
 {
   const flaky = await runPush(`${ROLLING}\n${PER_COMMIT}`, { [PER_COMMIT]: { pushFailures: 1 } });
@@ -908,7 +908,7 @@ function runPush(tags, plan = {}, { attempts = 3 } = {}) {
   );
 }
 
-// F-1530's second done-when. A registry that never commits fails the step, by
+// The second done-when. A registry that never commits fails the step, by
 // name — and the per-commit tag pome-cloud resolves is left absent, which is
 // the "reports not found rather than resolving a partial manifest" half.
 {
@@ -987,7 +987,7 @@ for (const [label, tags] of [
 }
 
 // ---------------------------------------------------------------------------
-// scripts/ci/sign-image-digests.sh itself (F-1534).
+// scripts/ci/sign-image-digests.sh itself.
 //
 // Driven against a fake `cosign` alongside the fake `docker` above. The fault
 // to reproduce is a registry that authenticates fine for one call and answers
@@ -1118,7 +1118,7 @@ const opsFor = (calls, ref) => calls.filter((c) => c.endsWith(` ${ref}`)).map((c
   }
 }
 
-// F-1534's first done-when, one case per GHCR interaction the script makes. A
+// The signing leg's first done-when, one case per GHCR interaction the script makes. A
 // `DENIED` on ANY of them is the registry being degraded, not a verdict about
 // the artifact, so none may fail the leg on the first answer.
 for (const op of SIGN_OPS) {
@@ -1133,7 +1133,7 @@ for (const op of SIGN_OPS) {
   // `::warning::`: the retry itself warns before sleeping, so a bare
   // `/::warning::/` stays green with the succeeded-late notice deleted — and
   // that notice is the whole signal that GHCR is degrading before the day it
-  // is total, which is how F-1530 went unnoticed for four days.
+  // is total, which is how the incident went unnoticed for four days.
   assert(
     `${flaky.stdout}${flaky.stderr}`.includes("landed only on attempt 2"),
     `a flaky-but-passing \`cosign ${op}\` must SAY so, got: ${flaky.stdout}${flaky.stderr}`,
@@ -1149,7 +1149,7 @@ for (const op of SIGN_OPS) {
   assert(flaky.inspects.length === 2, `the digest read must be retried, got ${flaky.inspects.join(", ")}`);
 }
 
-// F-1534's second done-when. Exhaustion still fails closed — but by the time
+// The signing leg's second done-when. Exhaustion still fails closed — but by the time
 // anything here fails, push-scanned-image.sh has already published every tag,
 // so the message has to say which operation ran out, on which ref, and what
 // state that leaves public. `##[error]The process failed with exit code 1` is

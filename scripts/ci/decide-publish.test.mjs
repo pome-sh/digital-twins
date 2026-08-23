@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Regression coverage for scripts/ci/decide-publish.sh (F-949).
+ * Regression coverage for scripts/ci/decide-publish.sh.
  *
  * Mocks `npm` on PATH so every registry answer is exercised without a network:
  * unpublished (E404 ⇒ publish from a 0.0.0 baseline), unchanged (skip), ahead

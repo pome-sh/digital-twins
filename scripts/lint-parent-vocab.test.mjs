@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Regression suite for `lint-parent-vocab.mjs` (F-1200).
+// Regression suite for `lint-parent-vocab.mjs`.
 //
 // Case 2 is the reason this file exists: the first version of the gate stripped
 // string literals before scanning, so `{ "parent_id": null }` emitted the
 // forbidden field with the gate still green. A gate that cannot fail is worse
-// than no gate, because it reads as coverage — the same lesson F-1201 learned
+// than no gate, because it reads as coverage — the same lesson the fixture corpus taught
 // about the trace contract. Each case builds a throwaway source tree and runs
 // the real script against it.
 

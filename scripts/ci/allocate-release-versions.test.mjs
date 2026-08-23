@@ -84,7 +84,7 @@ function repo() {
 }
 
 /**
- * F-1520 — `repo()` has no root `package.json`/`agent-examples/`, so `planExample
+ * `repo()` has no root `package.json`/`agent-examples/`, so `planExample
  * Repins` is a no-op against it (proven in "the repin path is a no-op" below).
  * This adds the shape it needs: a root `workspaces` field naming
  * `ADAPTER.manifest`'s directory, and `agent-examples/support-triage` pinning the
@@ -471,7 +471,7 @@ console.log("the script's own surface");
   }
 }
 
-console.log("F-1520 — the repin path is a no-op without agent-examples/");
+console.log("repin — a no-op without agent-examples/");
 {
   const dir = repo();
   try {
@@ -484,7 +484,7 @@ console.log("F-1520 — the repin path is a no-op without agent-examples/");
   }
 }
 
-console.log("F-1520 — a broken example can never block a version allocation");
+console.log("repin — a broken example can never block a version allocation");
 {
   const dir = repo();
   try {
@@ -514,7 +514,7 @@ console.log("F-1520 — a broken example can never block a version allocation");
   }
 }
 
-console.log("F-1520 — a drifted pin against an already-published sibling is repinned");
+console.log("repin — a drifted pin against an already-published sibling is repinned");
 {
   const dir = repo();
   try {
@@ -545,7 +545,7 @@ console.log("F-1520 — a drifted pin against an already-published sibling is re
   }
 }
 
-console.log("F-1520 — the version THIS run allocates is never repinned to in the same run");
+console.log("repin — the version THIS run allocates is never repinned to in the same run");
 {
   const dir = repo();
   try {
@@ -581,7 +581,7 @@ console.log("F-1520 — the version THIS run allocates is never repinned to in t
   }
 }
 
-console.log("F-1520 — replays the two real incidents (adapter 0.3.4 and 0.3.6, both 2026-08-13)");
+console.log("repin — replays the two real incidents (adapter 0.3.4 and 0.3.6, both 2026-08-13)");
 for (const { from, to } of [
   { from: "0.3.3", to: "0.3.4" }, // #395
   { from: "0.3.5", to: "0.3.6" }, // #425

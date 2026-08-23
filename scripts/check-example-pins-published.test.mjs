@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Regression suite for `check-example-pins-published.mjs` (F-1483). Pure
+// Regression suite for `check-example-pins-published.mjs`. Pure
 // functions, no network and no `npm ci` needed: `checkExamplePinsPublished`
 // takes an injected `npmView`, and `discoverExampleSiblingDeps` runs against
 // a throwaway fixture tree built the same way
@@ -326,7 +326,7 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
   }
 }
 
-// F-1520 — planExampleRepins is the write-side of this same gate: a pin that
+// PlanExampleRepins is the write-side of this same gate: a pin that
 // this file's own `violations` classifier already calls drifted-against-a-
 // published-sibling is exactly the set safe to rewrite automatically.
 {

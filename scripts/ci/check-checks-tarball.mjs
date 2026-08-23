@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Release gate for @pome-sh/checks' tarball (F-1308).
+// Release gate for @pome-sh/checks' tarball.
 //
 // This package exists for exactly one reason: pome-cloud grades every `[code]`
 // criterion out of these declarations, and it lives in a different repository.
@@ -23,7 +23,7 @@
 //      this is the assertion that keeps it that way.
 //   4. Bundling zod would be worse than a 404, because it succeeds: two copies
 //      of zod means two schema identities, `instanceof` fails and parsed results
-//      stop being interchangeable. That is the F-942 bug that dissolved
+//      stop being interchangeable. That is the bug that dissolved
 //      `@pome-sh/shared-types`, and nothing at runtime announces it.
 //   5. Bundling the twin ENGINE (hono, node:sqlite, @hono/node-server) would
 //      mean a "declarations only" package shipping an HTTP server and a database
@@ -163,7 +163,7 @@ if (manifest.peerDependencies?.zod === undefined) {
   failures.push(
     "packages/checks/package.json must declare `zod` as a peerDependency.\n" +
       "    The seed schemas and `defineCheck` are zod values. A bundled or duplicated zod means\n" +
-      "    two schema identities in the consumer's process (F-942) — and unlike a 404, it works\n" +
+      "    two schema identities in the consumer's process — and unlike a 404, it works\n" +
       "    just well enough to be found later.",
   );
 }
@@ -288,7 +288,7 @@ function auditTarball() {
       failures.push(
         "zod appears to be INLINED into the tarball rather than left external:\n" +
           zodInlined.map((file) => `      - ${file}`).join("\n") +
-          "\n    Two zod copies means two schema identities in the consumer's process (F-942).",
+          "\n    Two zod copies means two schema identities in the consumer's process.",
       );
     }
     const importsZod = [...sources.values()].some((text) => /from\s*['"]zod['"]/.test(text));

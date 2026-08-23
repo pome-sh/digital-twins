@@ -5,7 +5,7 @@
 // The bundled `agent-examples/*` projects are standalone npm packages (each with its
 // own lockfile), NOT workspaces, so neither the root `npm run typecheck` nor the
 // root `npm test` covers them. That gap is how a zod-4 / Claude Agent SDK
-// `tool()` typing regression sat latent until F-866.
+// `tool()` typing regression sat latent until this gate existed.
 //
 // The same gap had swallowed the examples' own TESTS for as long as they have
 // existed. Four examples declare `"test": "vitest run"` and 49 test cases across
@@ -33,7 +33,7 @@
 // standalone-fetchable via `npx degit`, which copies that subtree and nothing
 // above it, so a `file:` path out of the tree breaks its `npm install`. So this
 // gate typechecks that example against the registry artifact, NOT against the
-// adapter source next to it — and nothing compared the two until F-1483. It had
+// adapter source next to it — and nothing compared the two until this gate. It had
 // drifted twice already (#308 off 0.2.5, then 0.3.1 against a workspace 0.3.3,
 // which also dragged the retired `@pome-sh/shared-types` back into the
 // example's install graph as 0.3.1's declared runtime dep) before anything
@@ -130,7 +130,7 @@ if (failures.length > 0) {
   console.log(`\nAll ${examples.length} examples typechecked and tested clean.`);
 }
 
-// F-1483 — confirm each bundled example's exact `@pome-sh/*` pin still equals
+// Confirm each bundled example's exact `@pome-sh/*` pin still equals
 // the sibling workspace version wherever that version is published.
 //
 // Deliberately NOT behind the typecheck exit above. It used to be, and that

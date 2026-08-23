@@ -98,7 +98,7 @@ if (leakedInternal.length > 0) {
   console.error(
     "They are not installable by an end user: the sdk and the twins are `private: true`\n" +
       "and on no registry at all, and `@pome-sh/wire` is published only to GitHub Packages,\n" +
-      "which answers 401 without a GitHub token (F-949). All of them are inlined by the\n" +
+      "which answers 401 without a GitHub token. All of them are inlined by the\n" +
       "bundler instead — remove the dependency, do not publish it.",
   );
   process.exit(1);

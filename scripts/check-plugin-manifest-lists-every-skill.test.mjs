@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Regression suite for `check-plugin-manifest-lists-every-skill.mjs` (F-1226).
+// Regression suite for `check-plugin-manifest-lists-every-skill.mjs`.
 //
 // Case 2 is the reason this file exists: the drift the gate is built for is a
 // NEW skill nobody adds to the manifest, and a gate that only checked "every

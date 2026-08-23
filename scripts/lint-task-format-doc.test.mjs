@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Regression suite for `lint-task-format-doc.mjs` (F-1299).
+// Regression suite for `lint-task-format-doc.mjs`.
 //
 // Cases 3 and 4 are why this file exists rather than a "it went green once"
 // note. The gate reads its two subjects out of two files by regex, and the
@@ -29,7 +29,7 @@ const doc = (grammar) =>
   `\`\`\`\n${grammar}\n\`\`\`\n\nThat is: a \`-\` or \`*\` bullet, …\n`;
 
 const parser = (grammar) =>
-  `// Criterion marker grammar (F-778).\nconst CRITERION_LINE_RE =\n  ${grammar};\n`;
+  `// Criterion marker grammar.\nconst CRITERION_LINE_RE =\n  ${grammar};\n`;
 
 function runAgainst({ doc: docText, parser: parserText }) {
   const root = mkdtempSync(join(tmpdir(), "task-format-doc-"));

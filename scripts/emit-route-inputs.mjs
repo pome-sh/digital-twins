@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1179 — publish each twin's route input surface as a committed artifact.
+// Publish each twin's route input surface as a committed artifact.
 //
 // pome-cloud's declared-fidelity lane compares what a vendor declares it
 // accepts against what our twin accepts. It reads this repo through the
@@ -52,7 +52,7 @@ const TWINS = [
     // twin-linear's API layer is GraphQL: its operation ARGUMENTS come from the
     // executable schema it serves, not from an HTTP route declaration. Both
     // halves publish through this one artifact so pome-cloud has one seam for
-    // five twins rather than four plus a bespoke fixture of its own (F-1173).
+    // five twins rather than four plus a bespoke fixture of its own.
     graphql: {
       module: "dist/src/graphql/argument-surface.js",
       exportName: "linearGraphqlArgumentSurfaces",

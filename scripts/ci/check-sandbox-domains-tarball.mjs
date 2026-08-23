@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Release gate for @pome-sh/sandbox-domains' tarball (F-1526).
+// Release gate for @pome-sh/sandbox-domains' tarball.
 //
 // This package exists for one reason: pome-cloud boots the twin domain layer
 // IN-PROCESS as its grading/authoring runtime (`lib/twin-state.ts`), and
@@ -70,7 +70,7 @@ const PACKAGE_DIRECTORY = join(ROOT, "packages", "sandbox-domains");
 const MANIFEST_PATH = join(PACKAGE_DIRECTORY, "package.json");
 
 /**
- * The export spec of F-1526, measured from pome-cloud's own imports rather than
+ * The export spec, measured from pome-cloud's own imports rather than
  * designed fresh: `apps/control-plane/src/lib/twin-state.ts`,
  * `checks-package-drift.test.ts`, `lib/twin-tape-pull.ts` and
  * `apps/mcp/src/lib/capture.ts`. A subpath that stops exporting one of these
@@ -245,7 +245,7 @@ if (manifest.peerDependencies?.zod === undefined) {
     "packages/sandbox-domains/package.json must declare `zod` as a peerDependency.\n" +
       "    The seed schemas are zod values and pome-cloud hands `parseSeed` a seed it built with\n" +
       "    its OWN zod. A bundled or duplicated zod means two schema identities in the consumer's\n" +
-      "    process (F-942) — and unlike a 404, it works just well enough to be found later.",
+      "    process — and unlike a 404, it works just well enough to be found later.",
   );
 }
 
@@ -289,7 +289,7 @@ for (const subpath of Object.keys(REQUIRED_EXPORTS)) {
   if (manifest.exports?.[subpath] === undefined) {
     failures.push(
       `packages/sandbox-domains/package.json has no \`exports\` entry for "${subpath}", which\n` +
-        `    F-1526's export spec requires (pome-cloud imports ${REQUIRED_EXPORTS[subpath].join(", ")} from it).`,
+        `    the export spec requires (pome-cloud imports ${REQUIRED_EXPORTS[subpath].join(", ")} from it).`,
     );
   }
 }
@@ -492,7 +492,7 @@ function auditTarball() {
       failures.push(
         "zod appears to be INLINED into the tarball rather than left external:\n" +
           zodInlined.map((file) => `      - ${relative(packageRoot, file)}`).join("\n") +
-          "\n    Two zod copies means two schema identities in the consumer's process (F-942).",
+          "\n    Two zod copies means two schema identities in the consumer's process.",
       );
     }
     const importsZod = [...sources.values()].some((text) => /from\s*['"]zod['"]/.test(text));
@@ -517,7 +517,7 @@ function auditTarball() {
       const absent = symbols.filter((symbol) => !new RegExp(`\\b${symbol}\\b`).test(text));
       if (absent.length > 0) {
         failures.push(
-          `${subpath} (${file}) does not export ${absent.join(", ")}, which F-1526's export spec\n` +
+          `${subpath} (${file}) does not export ${absent.join(", ")}, which the export spec\n` +
             "    requires because pome-cloud imports them from it.",
         );
       }

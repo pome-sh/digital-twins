@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Zero-dependency helpers for the black-box twin contract suite (FDRS-711).
+// Zero-dependency helpers for the black-box twin contract suite.
 // Plain node:child_process + node:crypto + global fetch, so the same suite
 // can run against any built twin artifact — the workspace dist today, a
-// cloud-built snapshot tomorrow (FDRS-714) — without installing this repo's
+// cloud-built snapshot tomorrow — without installing this repo's
 // dependencies. The wire format is the contract, not a library.
 
 import { spawn } from "node:child_process";
@@ -25,7 +25,7 @@ const ALL_TWINS = [
   { name: "linear", pkg: "packages/twin-linear", dbEnv: "LINEAR_TWIN_DB", hostEnv: "LINEAR_TWIN_HOST" },
 ];
 
-// FDRS-714: the suite can target an external built twin — e.g. a cloud-built
+// The suite can target an external built twin — e.g. a cloud-built
 // Vercel Sandbox — instead of this repo's workspace dists. CONTRACT_TWIN_ONLY
 // narrows the run to one twin; CONTRACT_TWIN_PKG_ROOT (absolute path) replaces
 // the repo-relative package root as the spawn cwd, and only makes sense
@@ -67,8 +67,8 @@ export async function freePort() {
 }
 
 // A twin descriptor may carry an `entry` (repo-root-relative) to boot an
-// alternate server entry — used by the sdk-boot proof suite (FDRS-681) and
-// the CLI front-door suite (F-709), which also appends `args` (e.g.
+// alternate server entry — used by the sdk-boot proof suite and
+// the CLI front-door suite, which also appends `args` (e.g.
 // `twin start github`). Default is the contract's own `dist/src/server.js`.
 function entryArgs(twin) {
   if (twin.entry && TWIN_PKG_ROOT_OVERRIDE) {
@@ -80,8 +80,8 @@ function entryArgs(twin) {
 }
 
 // Package root the twin is spawned from: the repo-relative workspace dist by
-// default, or CONTRACT_TWIN_PKG_ROOT when the suite targets an external built
-// twin (FDRS-714).
+// default, or CONTRACT_TWIN_PKG_ROOT when the suite targets an external
+// built twin.
 function twinCwd(twin) {
   return TWIN_PKG_ROOT_OVERRIDE ?? path.join(REPO_ROOT, twin.pkg);
 }

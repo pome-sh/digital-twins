@@ -52,7 +52,7 @@ compare(
   "cli/src/twin/registry.ts TWIN_NAME_LIST",
   quotedArray("cli/src/twin/registry.ts", "TWIN_NAME_LIST"),
 );
-// F-1308 — `@pome-sh/checks` carries every twin's grading vocabulary to
+// `@pome-sh/checks` carries every twin's grading vocabulary to
 // pome-cloud, and its barrel names the five twins explicitly (five `export`
 // blocks and a keyed `TWIN_CHECKS` record; there is no way to derive them, since
 // each twin's array has a different element type). A sixth twin missing here
@@ -63,7 +63,7 @@ compare(
   "packages/checks/src/index.ts CHECKS_TWIN_NAMES",
   quotedArray("packages/checks/src/index.ts", "CHECKS_TWIN_NAMES"),
 );
-// F-1526 — `@pome-sh/sandbox-domains` carries the other half to the same
+// `@pome-sh/sandbox-domains` carries the other half to the same
 // consumer: the in-process domain runtime `lib/twin-state.ts` boots. Same seam,
 // same failure shape as the line above and one step worse — a sixth twin missing
 // here compiles, and its criteria do not merely fail to bind, they bind against

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Regression coverage for scripts/ci/assert-allocate-token-path.mjs (F-1511).
+ * Regression coverage for scripts/ci/assert-allocate-token-path.mjs.
  *
  * Every case below MUTATES THE REAL `allocate-version.yml` rather than a
  * hand-written sample, because the claim under test is about the file that ships:

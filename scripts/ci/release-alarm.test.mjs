@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Regression coverage for scripts/ci/release-alarm.mjs (F-1350).
+ * Regression coverage for scripts/ci/release-alarm.mjs.
  *
  * Both directions are asserted, and the silent one matters more. An alarm that
  * fires on a healthy release gets muted, and a muted alarm is exactly the state
@@ -49,7 +49,7 @@ const minutesAgo = (m) => new Date(NOW - m * 60_000).toISOString();
 
 /**
  * A CHANGELOG with nothing pending, for every published package — the state
- * every allocation leaves behind (F-1511). `pending` names packages that get an
+ * every allocation leaves behind. `pending` names packages that get an
  * `## Unreleased` section instead, which is the state a dead allocator leaves.
  */
 function writeChangelogs(dir, pending = {}) {
@@ -258,7 +258,7 @@ console.log("BEHIND — main is below the registry, so the next merge fails its 
   check_("no UNPUBLISHED for the same package", !kinds(r).includes("UNPUBLISHED"));
 }
 
-console.log("NEVER_RAN — a push to main that triggered nothing (the F-1180 silence)");
+console.log("NEVER_RAN — a push to main that triggered nothing (the release silence)");
 {
   const r = run({
     head: { sha: HEAD_SHA, ageMin: 600 },
@@ -290,7 +290,7 @@ console.log("FAILED — a broken release path with nothing owed");
   check_("a skipped run does not", !kinds(run({ runs: [{ ageMin: 200, conclusion: "skipped" }] })).includes("FAILED"));
 }
 
-console.log("UNALLOCATED — a number nobody wrote (F-1511)");
+console.log("UNALLOCATED — a number nobody wrote");
 {
   // The state a broken or unconfigured allocate-version.yml leaves: main carries
   // the words and not the number, main and the registry agree on the OLD version,
@@ -384,7 +384,7 @@ console.log("2026-08-06, replayed");
     }
     // Backfill any target the YAML names that the caller did not — `parseTargets`
     // hard-fails on a manifest that does not exist, so a hand-written map has to
-    // be re-edited every time release.yml gains a package. It was, once: F-1526's
+    // be re-edited every time release.yml gains a package. It was, once: a new
     // fifth target broke the replay below, which passes the REAL release.yml
     // against a four-entry map. The versions are what each replay is about, so
     // callers still name those; the rest only need to exist, and matching
@@ -397,7 +397,7 @@ console.log("2026-08-06, replayed");
     }
     // Today's CHANGELOGs even in a historical fixture: the allocation leg's
     // subject is the tree the alarm is checked out in, and the replay below is
-    // about the registry and the run list, not about F-1511's contract.
+    // about the registry and the run list, not about the allocation contract.
     writeChangelogs(dir);
     return dir;
   }
@@ -498,7 +498,7 @@ console.log("2026-08-06, replayed");
     // Anything this replay does not name is a package that did not exist on
     // 2026-08-06 and is answered in sync with the version `historical` backfilled
     // — the same `?? { version: "1.0.0" }` fallback `registryStub` uses. Without
-    // it the fifth target (F-1526) reads `undefined` and this replay reds over a
+    // it the fifth target reads `undefined` and this replay reds over a
     // package it is not about, which is the trap the fixture backfill above
     // exists to close on the other side.
     readVersion: (name, registry) =>

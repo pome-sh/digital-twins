@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Release gate for @pome-sh/wire's own tarball (F-949).
+// Release gate for @pome-sh/wire's own tarball.
 //
 // `scripts/clean-room-pack-test.mjs` audits the two npmjs tarballs — it asserts
 // they carry NO `@pome-sh/*` dependency, which is the assertion that keeps wire
 // inlined rather than installed. It says nothing about wire's own tarball,
-// because until F-949 wire had no tarball: it was `private: true` and reached
+// because wire used to have no tarball: it was `private: true` and reached
 // users only as bytes inside the CLI's and the adapter's `dist/`.
 //
 // Now it is also published to GitHub Packages for cross-repo consumers
@@ -148,7 +148,7 @@ function auditTarball() {
     // emitted `.js.map` would be a dangling map with no `sourcesContent`.
     // `files` excludes them (`!dist/**/*.map`). clean-room-pack-test.mjs
     // already treats a dangling map in a published tarball as a hard failure
-    // for the other two packages (F-943); wire holds to the same rule.
+    // for the other two packages; wire holds to the same rule.
     const sourcemaps = [...shipped].filter((path) => path.endsWith(".map"));
     if (sourcemaps.length > 0) {
       failures.push(

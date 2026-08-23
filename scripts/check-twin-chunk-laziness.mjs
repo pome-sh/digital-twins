@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// The gate that makes "each twin is a lazily-loaded chunk" a fact instead of a
-// comment (F-1306).
+// The gate that makes "each twin is a lazily-loaded chunk" a fact rather than
+// a comment.
 //
 // `cli/tsup.config.ts` and `cli/src/twin/registry.ts` both claim it, and
 // CHANGELOG 0.21.0 shipped it as a headline. It was false for three of the five

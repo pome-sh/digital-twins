@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1302 — every shipped task declares which POPULATION it belongs to.
+// Every shipped task declares which POPULATION it belongs to.
 //
 // The corpus holds two kinds of file under one heading, and until now nothing
 // in either repo could tell them apart:
@@ -35,7 +35,7 @@
 // comment but the per-corpus task counts pinned cloud-side, which go red the
 // moment the two disagree.
 //
-// THE SUBTREE, not just the direct children — F-1300's walker gap, picked up
+// THE SUBTREE, not just the direct children — the walker gap, picked up
 // here because both walkers were being written anyway. The rule used to be
 // "directly inside a directory named `tasks`", so `tasks/<topic>/x.md` was
 // invisible: a task could leave the corpus by being filed one directory deeper,
@@ -133,7 +133,7 @@ function main() {
     console.error(
       `No task files found under ${CORPORA.join(", ")}. Refusing to pass a zero-file scan: ` +
         `a corpus that stopped being found reads exactly like a corpus with nothing wrong ` +
-        `in it (F-989).`,
+        `in it.`,
     );
     process.exit(1);
   }
@@ -185,7 +185,7 @@ function main() {
 // is satisfied by any file of that name anywhere on disk, weaker even than
 // an unresolved full-path compare. Realpath'd on both sides instead — node
 // resolves symlinks before deriving `import.meta.url`, so a bare compare
-// misses through a symlinked checkout (F-1488) — and a guard miss while
+// misses through a symlinked checkout — and a guard miss while
 // invoked as this file throws rather than exits 0.
 const SELF = realpathSync(fileURLToPath(import.meta.url));
 const ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";

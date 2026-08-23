@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1200 — no emitter may write a bare `parent_id`.
+// No emitter may write a bare `parent_id`.
 //
 // `parent_id` used to mean four different things depending on which of five
 // writers produced the row: a spawning `event_id` (wrapQuery), a raw SDK
@@ -100,7 +100,7 @@ for (const pattern of ROOTS) {
 }
 
 if (violations.length > 0) {
-  console.error("parent-vocab gate failed (F-1200): a bare `parent_id` in emitter source.\n");
+  console.error("parent-vocab gate failed: a bare `parent_id` in emitter source.\n");
   for (const v of violations) console.error(`  ${v}`);
   console.error(
     "\n`parent_id` meant four different things and is no longer written by anything.\n" +

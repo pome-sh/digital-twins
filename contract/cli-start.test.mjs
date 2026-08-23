@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// CLI front-door contract suite (F-709). Runs the same frozen FDRS-711
+// CLI front-door contract suite. Runs the same frozen
 // assertions against twins started via `pome twin start <twin>` — the
 // docker-free quickstart path — instead of the packaged boot entries. The
 // CLI boots the twins in-process (cli/src/twin/twinHarness.ts) from its
@@ -11,11 +11,11 @@
 // `npm run build`) — NOT chained by the root `test:contract` script
 // (contract/run.mjs only builds its own five packages: wire, sdk, twin-*).
 // ci.yml's heavy job runs this file as its own step, after the earlier
-// root-wide `npm run build` already built cli/ (F-1353). Run locally with
+// root-wide `npm run build` already built cli/. Run locally with
 // `node --test contract/cli-start.test.mjs`.
 //
 // bootGuardCase is deliberately absent: `pome twin start` binds loopback
-// only, so the F-708 non-loopback self-generation guard lives with the
+// only, so the non-loopback self-generation guard lives with the
 // packaged entries (contract.test.mjs). The CLI's read side of the secret
 // contract (env wins → persisted `.pome-data/<twin>/secret` → ephemeral)
 // is covered by the CLI's own unit + e2e suites.

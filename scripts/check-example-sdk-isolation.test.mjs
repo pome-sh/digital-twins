@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Regression coverage for scripts/check-example-sdk-isolation.mjs (F-1295).
+// Regression coverage for scripts/check-example-sdk-isolation.mjs.
 //
 // The gate's own failure mode is the one it exists to prevent: a checker that
 // silently classifies nothing prints the same "no findings" as a repo that is
@@ -50,7 +50,7 @@ const OPEN_DOORS = {
     source: `${IMPORT_LINE}\nawait query({ prompt: "go", options: { maxTurns: 5 } });`,
     missing: ["settingSources", "tools"],
   },
-  "tools set, settingSources omitted — the F-1295 incident itself": {
+  "tools set, settingSources omitted — the incident itself": {
     source: `${IMPORT_LINE}\nawait query({ prompt: "go", options: { tools: [] } });`,
     missing: ["settingSources"],
   },
@@ -222,7 +222,7 @@ for (const [label, source] of Object.entries(NOT_SUBJECTS)) {
   assert(scan.silentExamples.length === 0, `every bundled SDK example calls query() (got ${JSON.stringify(scan.silentExamples)})`);
   assert(
     JSON.stringify(REQUIRED_OPTIONS) === JSON.stringify(["tools", "settingSources"]),
-    "the gate requires exactly the two doors F-1295 is about",
+    "the gate requires exactly the two doors this gate is about",
   );
 }
 

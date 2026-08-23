@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1126 — fail CI when one `packages/*` package's `@pome-sh/*` pin disagrees
+// Fail CI when one `packages/*` package's `@pome-sh/*` pin disagrees
 // with the version of the sibling it names. Dependency-free and offline: it
 // reads JSON only, so it runs in ci.yml's cheap gate block before `npm ci`.
 //
@@ -19,11 +19,11 @@
 // passed against a five-month-old sdk. `twin-github`, whose pin matched, had no
 // nested copy at all. Nothing compared the two.
 //
-// It surfaced only when F-1126 imported `@pome-sh/sdk/checks`, a subpath 0.5.1
+// It surfaced only when a caller imported `@pome-sh/sdk/checks`, a subpath 0.5.1
 // does not export. A change that had merely CHANGED behaviour rather than added
 // an export would have been tested against the wrong artifact in silence.
 //
-// This is the sibling of `check-cli-pins-match-workspace.mjs` (F-1135), which
+// This is the sibling of `check-cli-pins-match-workspace.mjs`, which
 // made the same argument for `cli/`. That file and
 // `scripts/use-local-pome-tarballs.mjs` went in `6369379` (#237), and
 // `cli-ci.yml` / `cli-release.yml` in `a3c9441` (#239) — one restructure over
@@ -31,7 +31,7 @@
 // `@pome-sh/*` dep in `cli/package.json` became a workspace-resolved `"*"`,
 // precisely because an exact pin there had drifted (`shared-types@0.12.0`
 // against a local `0.12.2`, two zod schema identities at one runtime — the same
-// shape F-1126 above catches in `packages/`). `cli/` itself is not a sibling
+// shape described above catches in `packages/`). `cli/` itself is not a sibling
 // anything else pins against, so it was never in this script's `packages/`
 // scan — but nothing stopped `cli/package.json` from reintroducing the exact pin
 // that restructure deleted. This scan now covers it too, so that regression is
@@ -51,7 +51,7 @@
 // reintroduce an exact version pin between them"), which admits no exact pin at
 // all. Every internal pin in the tree is `"*"` today, so the tolerance is unused;
 // tightening the gate onto the prose rule would delete the version-comparison
-// branch below entirely. That is F-1126's contract to change, not F-1231's.
+// branch below entirely. That is the packages-sibling contract to change, not this one.
 
 import { globSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -68,7 +68,7 @@ const SCOPE = "@pome-sh/";
 // pair silently stops covering its subject the moment root grows a glob or the
 // CLI moves directory — which it has done twice (#237, #239). An empty result
 // throws rather than reporting a pass over nothing.
-// Shared with `scripts/check-example-pins-published.mjs` (F-1483): that gate
+// Shared with `scripts/check-example-pins-published.mjs`: that gate
 // needs the same sibling-name → workspace-version map to know which
 // `agent-examples/*` pins have a sibling to compare against, and duplicating this
 // walk would let the two derivations disagree about what a "sibling" is.
@@ -147,7 +147,7 @@ export function findPinViolations(repoRoot) {
 // Realpath'd on both sides — node resolves symlinks before deriving
 // `import.meta.url`, so a bare `pathToFileURL(resolve(...))` of argv[1]
 // misses through a symlinked checkout (a worktree, or macOS's symlinked
-// `/tmp`) in the same silent shape (F-1488), and a guard miss while invoked
+// `/tmp`) in the same silent shape, and a guard miss while invoked
 // as this file throws rather than exits 0.
 const SELF = realpathSync(fileURLToPath(import.meta.url));
 const ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";

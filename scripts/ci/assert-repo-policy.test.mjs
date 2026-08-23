@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Offline regression coverage for scripts/ci/assert-repo-policy.sh (F-696).
- * F-1212 — the script now reads GET /repos/{owner}/{repo}/rules/branches/{branch}
+ * Offline regression coverage for scripts/ci/assert-repo-policy.sh.
+ * The script now reads GET /repos/{owner}/{repo}/rules/branches/{branch}
  * (metadata-scoped GITHUB_TOKEN, no PAT) instead of the legacy admin-scoped
  * .../protection + .../rulesets pair. Feeds fixture rules JSON (no live API).
  *
@@ -119,7 +119,7 @@ function main() {
   }
 
   {
-    // Missing deletion rule (F-1517: branch-deletion protection) must hard-fail,
+    // Missing deletion rule (branch-deletion protection) must hard-fail,
     // naming the policy — this is the red proof that the ruleset actually needs
     // the rule, not just that the script mentions it.
     const r = runAssert(baseRules().filter((rule) => rule.type !== "deletion"));
@@ -341,7 +341,7 @@ function main() {
 
   {
     // Green runs must name what is NOT watched live, so a reader is never
-    // told coverage is total. F-1517: deletion is now asserted live (the
+    // told coverage is total. Deletion is now asserted live (the
     // ruleset carries the rule), so bypass_actors is the only named gap and
     // the NOT-verified line must no longer mention deletion.
     const r = runAssert(baseRules());
@@ -362,7 +362,7 @@ function main() {
     assert(!/administration:\s*read/.test(y), "GITHUB_TOKEN cannot use administration scope");
     assert(
       !/secrets\.REPO_POLICY_TOKEN/.test(y),
-      "repo-policy must not read the REPO_POLICY_TOKEN secret anymore (F-1212)",
+      "repo-policy must not read the REPO_POLICY_TOKEN secret anymore",
     );
     assert(
       /assert-repo-policy\.test\.mjs/.test(y),
