@@ -1,6 +1,6 @@
 # @pome-sh/sandbox-domains
 
-## Unreleased (patch)
+## 0.2.10 — 2026-08-23
 
 **No consumer-visible change.** Internal tracker ids were removed from comments
 in the shared declaration bundler (`scripts/bundle-declarations.mjs`) and the CI

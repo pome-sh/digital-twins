@@ -1,6 +1,6 @@
 # @pome-sh/checks
 
-## Unreleased (patch)
+## 0.3.4 — 2026-08-23
 
 **No consumer-visible change.** Internal tracker ids were removed from comments
 in the shared declaration bundler (`scripts/bundle-declarations.mjs`) and the CI
