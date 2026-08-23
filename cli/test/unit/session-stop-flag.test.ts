@@ -1,10 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// F-983 — pins `pome session stop`'s `--discard` flag wiring in
-// cli/src/cli/main.ts. If the option name ever drifted, the user's only
-// escape hatch from the ungraded-session guard would die silently (a bare
-// `pome session stop <id>` would forever look identical to a confirmed
-// discard). Same build-the-program-and-parseAsync pattern as
-// run-n-flag.test.ts.
+// Pins `pome session stop`'s `--discard` flag wiring in cli/src/cli/main.ts.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -23,7 +18,7 @@ vi.mock("../../src/cli/session.js", async (importOriginal) => {
 
 import { createProgram } from "../../src/cli/main.js";
 
-describe("pome session stop --discard wiring (F-983)", () => {
+describe("pome session stop --discard wiring", () => {
   const originalExitCode = process.exitCode;
 
   beforeEach(() => {

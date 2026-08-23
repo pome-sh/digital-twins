@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// What GitHub's declared checks can assert about a PULL REQUEST (F-1075).
+// What GitHub's declared checks can assert about a PULL REQUEST.
 //
 // Declarations only. The grammar rules they all obey are in `checks.ts`, which
 // assembles them; how the exported tree is read is in `check-state.ts`.
@@ -101,11 +101,11 @@ export const pullRequestStateCheck: Check<{ pr: string; repo: string; state: str
   },
 });
 
-// F-1151 — the fourteenth declaration, and the one whose whole difficulty was
+// The fourteenth declaration, and the one whose whole difficulty was
 // deciding WHICH question it answers.
 //
 // Three things on a pull request can be called "a comment", the twin exports all
-// three separately, and F-1075 declined to bind this sentence rather than guess
+// three separately, and binding this sentence was declined rather than guess
 // between them:
 //
 //   1. a CONVERSATION comment — `pull_requests[].comments[]`  ← this check

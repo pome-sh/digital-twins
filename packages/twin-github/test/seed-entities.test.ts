@@ -1,34 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1421 — the five entities twin-github SERVES but its seed could not express:
-// milestones, tags, releases, issue comments and pull-request review comments.
-// `seedSchema` had no field for any of them and zod strips unknown keys, so a
-// seed naming one reached the domain as nothing at all and `GET /milestones`,
-// `/tags`, `/releases`, `/issues/:n/comments` and `/pulls/:n/comments` could
-// only ever answer `[]`.
-//
-// That is invisible to a shape-diff rather than merely wrong: the diff engine
-// returns before the per-element shape union when EITHER side is empty, so
-// `[] vs []` compares zero elements and publishes green, and `[1] vs []`
-// compares zero elements and publishes an array-length red. Only a seeded
-// element gets a real comparison.
-//
-// The two surfaces that were already reachable — a PR's reviews and an issue
-// the seed closes — are asserted here beside the five, because the unit this
-// ticket is measured in is the seven-surface set.
-//
-// EVERY assertion below runs against two worlds that differ only in the value
-// the seed plants. Asserting "the array came back non-empty" would repeat the
-// original mistake one level up: it passes against a twin answering a constant.
-// Asserting the planted value AND that the other world answers differently is
-// what makes the element load-bearing — a wrong value in it produces drift.
-//
-// The world is shaped like pome-cloud's `FIDELITY_SEED` (acme/api, issues #1
-// and #2, PR #3 off `feature`) so this doubles as a rehearsal of the seed the
-// fidelity watch will run. Note the trap it encodes: issues and pull requests
-// draw numbers from ONE per-repo counter, so the closed issue is issue #2
-// flipped rather than a third issue — a third would move the PR to #4 and break
-// every `/pulls/3/...` handle downstream.
+// The five entities twin-github SERVES but its seed could not express: milestones,
+// tags, releases, issue comments and pull-request review comments.
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { openGitHubCloneDatabase } from "../src/db.js";
@@ -226,7 +198,7 @@ const SURFACES: Array<{
   }
 ];
 
-describe("F-1421 — seeded surfaces serve an element a diff can compare", () => {
+describe("seeded surfaces serve an element a diff can compare", () => {
   it.each(SURFACES)(
     "$id serves the value THIS seed planted, and a different seed a different one",
     async ({ path, planted, served }) => {
@@ -250,7 +222,7 @@ describe("F-1421 — seeded surfaces serve an element a diff can compare", () =>
   );
 });
 
-describe("F-1421 — a seeded element is a whole GitHub object, not a stub", () => {
+describe("a seeded element is a whole GitHub object, not a stub", () => {
   it("serves the seeded milestone with every field the seed set", async () => {
     const { body } = await get(appFor(WORLD_A), "/repos/acme/api/milestones");
     expect(body).toHaveLength(1);
@@ -310,13 +282,8 @@ describe("F-1421 — a seeded element is a whole GitHub object, not a stub", () 
   it("serves the seeded review comment anchored to the file the seed named", async () => {
     const { body } = await get(appFor(WORLD_A), "/repos/acme/api/pulls/3/comments");
     expect(body).toHaveLength(1);
-    // F-1422 closed the gap this assertion used to record: the LIST served six
-    // columns of a row whose `line`, `side` and `commit_id` the CREATE on the
-    // same route already served. Both verbs now go through
-    // `pullRequestReviewCommentJson`, so the anchor the seed planted is
-    // readable from the surface the fidelity lane measures — asserted here on
-    // the seeded element, and as the shared-shape property itself in
-    // `review-comment-list-shape.test.ts`.
+    // The gap this assertion used to record is closed: the LIST served six columns of
+    // a row whose `line`, `side` and `commit_id` the CREATE on the same route.
     expect(body[0]).toMatchObject({
       body: WORLD_A.reviewCommentBody,
       path: "src/feature.ts",
@@ -351,7 +318,7 @@ describe("F-1421 — a seeded element is a whole GitHub object, not a stub", () 
   });
 });
 
-describe("F-1421 — the release surfaces that had no seedable state", () => {
+describe("the release surfaces that had no seedable state", () => {
   // `releases/latest` and `releases/tags/:tag` were registered exceptions in
   // pome-cloud's L1 coverage list, reason: "the seed schema cannot seed a
   // release". Both now answer 200 from a seed, so those two exceptions are
@@ -376,25 +343,8 @@ describe("F-1421 — the release surfaces that had no seedable state", () => {
     expect(body.map((tag: { name: string }) => tag.name)).toEqual([WORLD_A.tagName]);
   });
 
-  // F-1533 — the three release surfaces serve one object, so a leaf missing
-  // from ONE of them is the whole defect. Asserted per surface rather than on
-  // `releaseJson` directly, because a serializer-level test passes while a
-  // route serves something else, and it is the ROUTE that the declared lane
-  // measures (`topLevelKeys(body[0])` of the committed capture).
-  //
-  // Neither existing guard catches an omission here, which is why this test is
-  // written by hand:
-  //   - `satisfies DeepPartial<Release>` permits omitting any field. That is
-  //     the point of the anchor — it encodes "faithful SUBSET" — so it fires on
-  //     a wrong name or a wrong type and never on a missing one.
-  //   - `AssertNoUncovered` in upstream-coverage.types.ts is one-directional:
-  //     it reds on an upstream field that is neither emitted nor listed in
-  //     `Release_Allow`, and `immutable` was listed. (So was `updated_at`, long
-  //     after F-1459 emitted it — a dead allowance the assertion cannot see.)
-  //
-  // The whole reason this is one test over three surfaces: F-1459 fixed the
-  // same serializer for `updated_at` and left no test behind, so the next leaf
-  // to go missing had nothing to fail against.
+  // The three release surfaces serve one object, so a leaf missing from ONE of them is
+  // the whole defect.
   const RELEASE_SURFACES: Array<{ id: string; path: string; element: (body: any) => any }> = [
     { id: "GET /releases", path: "/repos/acme/api/releases", element: (body) => body[0] },
     { id: "GET /releases/latest", path: "/repos/acme/api/releases/latest", element: (body) => body },
@@ -421,9 +371,7 @@ describe("F-1421 — the release surfaces that had no seedable state", () => {
     expect(release.immutable).toBe(false);
   });
 
-  // The leaf F-1459 added, retro-covered by the same property. It had no test
-  // either, and it is one `git revert` away from being the next silent
-  // omission on exactly these three surfaces.
+  // The added leaf, retro-covered by the same property.
   it.each(RELEASE_SURFACES)("serves `updated_at` on $id", async ({ path, element }) => {
     const release = element((await get(appFor(WORLD_A), path)).body);
     expect(release).toHaveProperty("updated_at");
@@ -438,7 +386,7 @@ describe("F-1421 — the release surfaces that had no seedable state", () => {
   });
 });
 
-describe("F-1421 — the schema keeps the keys it used to strip", () => {
+describe("the schema keeps the keys it used to strip", () => {
   it("carries all five entity types through parseSeed", () => {
     const parsed = parseSeed(world(WORLD_A));
     const repo = parsed.repositories[0]!;
@@ -451,9 +399,8 @@ describe("F-1421 — the schema keeps the keys it used to strip", () => {
   });
 
   it("keeps a pull request's conversation comments apart from its review comments", async () => {
-    // Three things a reader could call "a comment on the PR" (F-1151), and the
-    // seed can now express all three separately: the review verdict's prose,
-    // the inline comment, and the timeline.
+    // Three things a reader could call "a comment on the PR", and the seed can now
+    // express all three separately: the review verdict's prose, the inline comment.
     const seed = world(WORLD_A);
     seed.repositories[0]!.pull_requests![0]!.comments = [
       { body: "Rebased onto main.", author: "alice" }
@@ -486,7 +433,7 @@ describe("F-1421 — the schema keeps the keys it used to strip", () => {
   });
 });
 
-describe("F-1421 — how the new entities are numbered, scoped and reseeded", () => {
+describe("how the new entities are numbered, scoped and reseeded", () => {
   it("honors milestone numbers the seed pins, in whatever order it pins them", () => {
     // The identity case (`number: 1` first) never exercises the renumber, so
     // this one asks for numbers `nextMilestoneNumber` would not have handed out.

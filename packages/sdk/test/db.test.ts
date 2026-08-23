@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// Engine db driver wrapper tests (F-681). Twins open SQLite through this
-// wrapper only — `open` + pragmas + a same-shape `transaction()` helper — so
-// the M2 node:sqlite swap (F-703) is a one-file change in the engine.
+// Engine db driver wrapper tests. Twins open SQLite through this wrapper only — `open`
+// + pragmas + a same-shape `transaction()` helper — so the M2 node:sqlite.
 import { mkdtempSync, rmSync, existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
@@ -24,7 +22,7 @@ function withDb<T>(fn: (db: TwinDatabase) => T, path = ":memory:"): T {
   }
 }
 
-describe("driver (F-703)", () => {
+describe("driver", () => {
   it("is backed by node:sqlite — better-sqlite3 never enters the module cache", () => {
     withDb((db) => {
       db.exec("CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT NOT NULL)");
@@ -103,8 +101,8 @@ describe("openTwinDatabase", () => {
   });
 });
 
-describe("statement run() result (F-682)", () => {
-  it("reports changes and lastInsertRowid — the shape node:sqlite also returns (F-703)", () => {
+describe("statement run() result", () => {
+  it("reports changes and lastInsertRowid — the shape node:sqlite also returns", () => {
     withDb((db) => {
       db.exec("CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT NOT NULL)");
       const inserted = db.prepare("INSERT INTO t (name) VALUES (?)").run("a");
@@ -170,7 +168,7 @@ describe("transaction()", () => {
     });
   });
 
-  it("exposes the .immediate variant (BEGIN IMMEDIATE) github's domain runs mutations under (F-682)", () => {
+  it("exposes the .immediate variant (BEGIN IMMEDIATE) github's domain runs mutations under", () => {
     withDb((db) => {
       db.exec("CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT NOT NULL)");
       const insert = db.transaction((name: string) => {

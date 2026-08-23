@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// Engine redaction tests (F-681). Redaction lives HERE, in the engine —
-// per-twin recorders must not need their own copy for the tape to be safe
-// (the §5.2 class of bug: one twin redacts, another doesn't).
+// Engine redaction tests. Redaction lives HERE, in the engine — per-twin recorders
+// must not need their own copy for the tape to be safe (the §5.2 class of.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "../src/server.js";
 import { createRecorderHandle, createRecorderStore } from "../src/recorder.js";
@@ -87,11 +85,9 @@ describe("redactSecrets", () => {
   });
 });
 
-// F-716 boundary pinning. These tests freeze the exact JWT / PEM scrub
-// behavior of the pre-F-716 backtracking regexes: they were run green against
-// the old patterns before the linear-time rewrite landed, and must stay green
-// after. Any diff here is a redaction behavior change, not a refactor.
-describe("redactSecrets — F-716 JWT scrub boundary pinning", () => {
+// Boundary pinning. These tests freeze the exact JWT / PEM scrub behavior of the
+// legacy backtracking regexes: they were run green against the old patterns.
+describe("redactSecrets — JWT scrub boundary pinning", () => {
   it("redacts a JWT glued mid-base64url-run from the eyJ onward", () => {
     expect(redactSecrets("AAAAeyJab.cd.ef")).toBe("AAAA[REDACTED]");
   });
@@ -127,7 +123,7 @@ describe("redactSecrets — F-716 JWT scrub boundary pinning", () => {
   });
 });
 
-describe("redactSecrets — F-716 PEM scrub boundary pinning", () => {
+describe("redactSecrets — PEM scrub boundary pinning", () => {
   it("redacts a complete block as one unit", () => {
     expect(redactSecrets("-----BEGIN PRIVATE KEY-----\nMIIB\n-----END PRIVATE KEY-----")).toBe(
       "[REDACTED]",
@@ -175,8 +171,8 @@ describe("redactSecrets — F-716 PEM scrub boundary pinning", () => {
   });
 });
 
-describe("redactSecrets — F-716 differential fuzz vs the legacy patterns", () => {
-  // The exact pre-F-716 scrub pipeline, kept verbatim as the behavior oracle.
+describe("redactSecrets — differential fuzz vs the legacy patterns", () => {
+  // The exact legacy scrub pipeline, kept verbatim as the behavior oracle.
   // Only run on short fuzz strings, where its quadratic worst case is harmless.
   const LEGACY_SCRUB_PATTERNS: RegExp[] = [
     /redaction_fixture_secret_[A-Za-z0-9_-]{8,}/g,
@@ -236,10 +232,9 @@ describe("redactSecrets — F-716 differential fuzz vs the legacy patterns", () 
   });
 });
 
-describe("redactSecrets — F-716 adversarial inputs stay linear", () => {
-  // Both inputs drive the pre-F-716 regexes into quadratic backtracking
-  // (minutes of CPU); the linear scanners handle them in milliseconds. The
-  // 1s bound leaves two orders of magnitude of CI headroom.
+describe("redactSecrets — adversarial inputs stay linear", () => {
+  // Both inputs drive the legacy regexes into quadratic backtracking (minutes of CPU);
+  // the linear scanners handle them in milliseconds.
   it("survives a 150 KB dotless eyJ run", () => {
     const input = "eyJ".repeat(50_000);
     const started = performance.now();
@@ -255,9 +250,7 @@ describe("redactSecrets — F-716 adversarial inputs stay linear", () => {
   });
 });
 
-// Provider secret shapes previously guarded by the per-twin mirror copies
-// (FDRS-588 / FDRS-608). The stripe copy died in F-684; its distinctive
-// cases live here so engine-level coverage can't regress them.
+// Provider secret shapes previously guarded by the per-twin mirror copies.
 describe("redactSecrets — stripe provider shapes (ex twin-stripe mirror)", () => {
   it("redacts the 12-char-body Stripe seed key sk_test_pome_default", () => {
     const key = "sk_test_pome_default";
@@ -296,7 +289,7 @@ describe("redactSecrets — stripe provider shapes (ex twin-stripe mirror)", () 
   });
 });
 
-// Slack-shape coverage lives HERE (F-683): the twin-slack package no longer
+// Slack-shape coverage lives HERE: the twin-slack package no longer
 // carries a redaction mirror or its own copy of these assertions.
 describe("slack token / webhook shapes", () => {
   it("scrubs bot and user session tokens (xoxb-/xoxp-)", () => {
@@ -335,7 +328,7 @@ describe("slack token / webhook shapes", () => {
   });
 });
 
-// GitHub-mirror coverage lives HERE (F-682): the twin-github package no
+// GitHub-mirror coverage lives HERE: the twin-github package no
 // longer carries a redaction mirror or its own copy of these assertions.
 describe("github-mirror provider secret shapes", () => {
   it("redacts the 12-char body Stripe seed key sk_test_pome_default", () => {
@@ -428,16 +421,9 @@ describe("recorder redacts every emitted event", () => {
   });
 });
 
-// F-1125. `request_headers` is recorded WHOLESALE — no allowlist — so the
-// safety of the whole field rests on the engine's unconditional redaction. Both
-// directions are load-bearing and each has its own failure mode:
-//
-//   - a credential that SURVIVES is a leak the twin cannot see;
-//   - a subject that DIES is a criterion that can never fire. `X-PAYMENT` is
-//     base64(JSON), so its value always begins `eyJ` — one character class away
-//     from the JWT scrubber. It survives only because base64 carries no `.`,
-//     which is a property of `scrubJwts` this test pins rather than assumes.
-describe("recorded request headers — F-1125 redaction boundary", () => {
+// `request_headers` is recorded WHOLESALE — no allowlist — so the safety of the whole
+// field rests on the engine's unconditional redaction.
+describe("recorded request headers — redaction boundary", () => {
   const xPayment = Buffer.from(
     JSON.stringify({
       x402Version: 1,

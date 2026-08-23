@@ -1,26 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1201 — the event-kind corpus (the wire half of the former
-// shared-types `v1-fixture-parity.test.ts`; the session/run/plan/usage half
-// moved with its schemas to `cli/test/unit/wire/v1-fixture-parity.test.ts`).
-//
-// `test/fixtures/v1/event/<Kind>/` is the only place a member of the event union
-// is described by a wire payload rather than by its own schema. Before F-1201
-// the corpus was 18 session/run/plan shapes and nothing else, so M1 shipped
-// `LlmTurnEvent` with no fixture anywhere while `check:trace-contract` stayed
-// green — it compared bytes that could not move.
-//
-// The requirement is stated twice, deliberately in two different languages:
-//
-//   - `scripts/emit-trace-contract.mjs` enumerates the union FROM ZOD at emit
-//     time and refuses to emit when a member has no fixture. That is the CI gate.
-//   - `EVENT_KINDS_NEEDING_A_FIXTURE` states the same list to the TYPE checker.
-//     It is keyed by `OtelEvent["kind"]`, so adding or renaming a union member
-//     fails `npm run typecheck` until this map moves with it.
-//
-// Neither derivation can see the other's input, and the first test below asserts
-// they agree — so a bug in the zod walk surfaces as a disagreement rather than
-// as a quietly shorter list of required kinds.
+// The event-kind corpus (the wire half of the former shared-types
+// `v1-fixture-parity.test.ts`; the session/run/plan/usage half moved with its schemas to.
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -58,7 +38,7 @@ function readEventCorpus(): { kindDir: string; file: string; row: unknown }[] {
     );
 }
 
-describe("/v1 event-kind corpus (F-1201)", () => {
+describe("/v1 event-kind corpus", () => {
   const corpus = readEventCorpus();
   const kinds = Object.keys(EVENT_KINDS_NEEDING_A_FIXTURE);
 

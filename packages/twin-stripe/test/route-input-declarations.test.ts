@@ -1,10 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1179 — the two properties the declared input surface has to keep.
-//
-// Both are driven over the real HTTP surface of a booted twin rather than
-// against `declaration.parse()` in isolation: the claim is not "the parser
-// refuses this", it is "no handler in this twin can see it".
+// The two properties the declared input surface has to keep.
 
 import type { Hono } from "hono";
 import { describe, expect, it } from "vitest";
@@ -17,17 +12,8 @@ import { createStripeApp, rest } from "./_appHelper.js";
 /** A name no Stripe surface has ever accepted, in either location. */
 const PROBE = "pome_undeclared_probe";
 
-/**
- * F-1372's ruling for this twin: Stripe publishes `parameter_unknown` — "The
- * request contains one or more unexpected parameters. Remove these and try
- * again." — so the strict default F-1179 shipped is what Stripe does, and it
- * stays. The error code asserted below is Stripe's own word for it.
- *
- * Pinned as a literal rather than read off the declarations: a flip in
- * `src/route-inputs.ts` has to come here to be sanctioned, which is the half
- * the reverted first attempt at F-1372 skipped. See
- * `docs/undeclared-route-inputs.md`.
- */
+/** the ruling for this twin: Stripe publishes `parameter_unknown` — "The request
+ *  contains one or more unexpected parameters. */
 const RULED: UndeclaredDisposition = "refuse";
 
 /** The router pattern with a stand-in for every `:param`. */
@@ -41,7 +27,7 @@ describe("declared route inputs", () => {
     const dissenting = STRIPE_ROUTE_INPUTS.filter((d) => d.undeclared !== RULED).map(
       (d) => `${d.surface} is '${d.undeclared}'`
     );
-    expect(dissenting, `these routes disagree with the twin's F-1372 ruling ('${RULED}')`).toEqual(
+    expect(dissenting, `these routes disagree with the twin's heat ruling ('${RULED}')`).toEqual(
       []
     );
   });

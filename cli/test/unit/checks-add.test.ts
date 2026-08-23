@@ -8,10 +8,7 @@ import { handshake, runChecksAddCommand } from "../../src/cli/checks-add.js";
 import { checksFor, localDigest, pinnedVersion } from "../../src/cli/checks.js";
 import { twinWithoutChecks } from "./_noVocabularyTwin.js";
 
-// The menu position of the check these tests pick. Derived, never hard-coded:
-// the vocabulary is a CLOSED SET THAT GROWS — F-1075 took github from 1 check
-// to 11 and A3 will widen the other twins — so a literal "1" here asserts the
-// size of the set rather than the behaviour of the picker.
+// The menu position of the check these tests pick.
 const PICK = String(
   checksFor("github").findIndex((check) => check.id === "github.no-new-labels") + 1,
 );
@@ -69,7 +66,7 @@ function mirrorOfLocal(twin: string) {
   }));
 }
 
-/** The bullet list the refusal renders. The F-1137 defect was that this came back
+/** The bullet list the refusal renders. The defect was that this came back
  *  empty while the refusal claimed to name what moved. */
 function bulletsIn(message: string): string[] {
   return message
@@ -217,11 +214,8 @@ describe("the digest handshake", () => {
     expect(result.message).toContain("@pome-sh/cli@latest");
   });
 
-  // F-1137 — the refusal is correct, but it used to build its bullet list from
-  // `id` and `template` while `checksDigest` hashes `id`, `substrate` and the
-  // COMPILED pattern. A skew in either of the two it did not compare refused with
-  // an empty bullet list: a named refusal that names nothing, in exactly the
-  // situation the digest was widened to catch.
+  // The refusal is correct, but it used to build its bullet list from `id` and
+  // `template` while `checksDigest` hashes `id`, `substrate` and the COMPILED pattern.
   it("names the check and both substrates when only the substrate moved", async () => {
     const result = await handshake("github", async (twin) => ({
       twin,
@@ -391,10 +385,8 @@ describe("pome checks add — interactive", () => {
   });
 });
 
-// F-1134 — the write path is the only place a local-only author is standing when
-// the file is in front of them, so it is where the whole block gets audited.
-// WARN, never refuse: an unrelated pre-existing line is not a reason to decline
-// an append, and a tool that refuses is a tool people stop using.
+// The write path is the only place a local-only author is standing when the file is in
+// front of them, so it is where the whole block gets audited.
 describe("pome checks add — auditing the block it writes into", () => {
   const HAND_EDITED = "No new labels were ever created in `acme/api`";
 

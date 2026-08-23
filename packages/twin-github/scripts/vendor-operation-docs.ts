@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1498 — vendor GitHub's per-operation `documentation_url` as a committed
+// Vendor GitHub's per-operation `documentation_url` as a committed
 // artifact, the way `fixtures/mcp-tools-list.raw.json` vendors its tool table.
 //
 //   npx tsx scripts/vendor-operation-docs.ts --fetch     # write, downloading the spec

@@ -47,7 +47,7 @@ export function inferStateType(name: string): LinearWorkflowStateType {
   return "unstarted";
 }
 
-/** Linear's AgentSessionStatus members, verbatim (F-1172). */
+/** Linear's AgentSessionStatus members, verbatim. */
 export const AGENT_SESSION_STATUSES: LinearAgentSessionStatus[] = [
   "pending",
   "active",
@@ -62,7 +62,7 @@ export const AGENT_SESSION_STATUSES: LinearAgentSessionStatus[] = [
  * unmigrated database, not bad caller input — and left unchecked it dies at
  * GraphQL enum serialisation (`Enum "AgentSessionStatus" cannot represent
  * value: "canceled"`), which names neither the row nor the cause. Fail at the
- * boundary where the message can (F-1172).
+ * boundary where the message can.
  */
 export function readSessionStatus(value: string): LinearAgentSessionStatus {
   if (!AGENT_SESSION_STATUSES.includes(value as LinearAgentSessionStatus)) {
@@ -70,7 +70,7 @@ export function readSessionStatus(value: string): LinearAgentSessionStatus {
       500,
       "INTERNAL_SERVER_ERROR",
       `Stored agent session status "${value}" is not one of Linear's AgentSessionStatus members ` +
-        `(${AGENT_SESSION_STATUSES.join(", ")}). This database predates the F-1172 rename and was not migrated.`
+        `(${AGENT_SESSION_STATUSES.join(", ")}). This database predates the rename and was not migrated.`
     );
   }
   return value as LinearAgentSessionStatus;
@@ -81,7 +81,7 @@ export function readSessionStatus(value: string): LinearAgentSessionStatus {
  * `AgentActivity.user: User!`, and `agent_activities.user_id` is nullable only
  * because its foreign key is `ON DELETE SET NULL` — nothing in the twin writes
  * a null. Same reasoning as `readSessionStatus`: fail here, naming the row,
- * rather than at GraphQL non-null serialisation, which names neither (F-1176).
+ * rather than at GraphQL non-null serialisation, which names neither.
  */
 export function readActivityUserId(activityId: string, value: string | null): string {
   if (!value) {
@@ -95,12 +95,12 @@ export function readActivityUserId(activityId: string, value: string | null): st
   return value;
 }
 
-/** Linear's AgentActivitySignal members, verbatim (F-1176). */
+/** Linear's AgentActivitySignal members, verbatim. */
 export const AGENT_ACTIVITY_SIGNALS = ["stop", "continue", "auth", "select"] as const satisfies
   readonly LinearAgentActivitySignal[];
 
 /**
- * THE ONE INVENTED THING IN F-1176 — how an activity moves the session.
+ * THE ONE INVENTED THING — how an activity moves the session.
  *
  * Upstream, `agentSessionUpdate` has no `status` field at all: Linear's agent
  * guide says session state "is updated automatically based on the agent's

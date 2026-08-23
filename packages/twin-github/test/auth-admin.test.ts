@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// Admin-gate coverage for twin-github (F-682): the gate MECHANISM (token
-// mode, loopback socket check, production fail-closed) is the engine's and
-// is covered by the sdk + contract suites; what this file pins is the
-// github-shaped 403 {message: "Forbidden"} envelope — the gate's default —
-// rendered through the real app.
+// Admin-gate coverage for twin-github: the gate MECHANISM (token mode, loopback socket
+// check, production fail-closed) is the engine's and is covered by the.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createGitHubCloneApp } from "../src/twin.js";
 

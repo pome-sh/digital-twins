@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * otel/map-span — pure OTel span → `OtelSpanEvent` mapping (M1.1 / FDRS-480).
+ * otel/map-span — pure OTel span → `OtelSpanEvent` mapping (M1.1).
  *
  * Deterministic: same input → byte-identical event, every run. Has no clock,
  * no randomness; `ts` is derived from the span's start time.

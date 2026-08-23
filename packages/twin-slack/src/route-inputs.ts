@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1179 — every input every Slack Web-API route accepts, as the schemas that
+// Every input every Slack Web-API route accepts, as the schemas that
 // validate it. `routes.ts` mounts these and its handlers see nothing else.
 //
 // # Slack's two surfaces per read method
@@ -12,7 +12,7 @@
 //
 // # Where an argument is declared, and why that is a decision
 //
-// The pre-F-1179 handler read `{...c.req.query(), ...body}` — query OR body,
+// The legacy handler read `{...c.req.query(), ...body}` — query OR body,
 // body wins, on every method. The mechanism refuses one name declared in two
 // locations (a name in two places makes the published surface ambiguous), so
 // "either location" is not expressible. What is declared instead is what Slack
@@ -61,7 +61,7 @@ import {
 } from "@pome-sh/sdk/route-inputs";
 
 /**
- * F-1372 — Slack accepts an argument it does not know and gets on with the
+ * Slack accepts an argument it does not know and gets on with the
  * call, so this twin does too.
  *
  * Measured 2026-08-09 against `slack.com/api`: `api.test` — the one Web API
@@ -164,11 +164,11 @@ const zeroIfAbsent = (): z.ZodType<number> => integerInput().default(0);
 const opaque = (): z.ZodType<unknown> => z.unknown().optional();
 
 /**
- * `users.profile.set`'s `profile`, which real Slack takes in TWO shapes (F-1462).
+ * `users.profile.set`'s `profile`, which real Slack takes in TWO shapes.
  *
  * Slack documents the JSON-STRING form, which is what form encoding forces, and
  * it also accepts a bare OBJECT when the request body is `application/json`.
- * That second half is documented nowhere and this twin refused it until F-1462
+ * That second half is documented nowhere and this twin refused it until
  * called `users.profile.set` on the sandbox workspace and measured all three
  * combinations — form+string, json+string and json+object all answered `ok:true`,
  * and the object's fields were APPLIED, not merely tolerated. An examinee that
@@ -188,13 +188,13 @@ const jsonStringOrObject = (): z.ZodType<string | Record<string, unknown> | unde
 
 /**
  * `blocks` / `attachments` on the three chat writes, which real Slack takes in
- * TWO shapes (F-1487) — the same question F-1462 asked of `profile`, asked
+ * TWO shapes — the same question asked of `profile`, asked
  * again rather than inherited.
  *
  * Slack documents the JSON-STRING form, which is what form encoding forces, and
  * it also accepts a native ARRAY when the body is `application/json`. That
  * second half is documented nowhere and this twin refused it on all five
- * declarations until F-1487 called every one of them on the sandbox workspace
+ * declarations until called every one of them on the sandbox workspace
  * (2026-08-12) and measured all three combinations per field — form+string,
  * json+string and json+array all answered `ok:true`, and each array's contents
  * came back inside `message.blocks` / `message.attachments`, so they were
@@ -202,9 +202,9 @@ const jsonStringOrObject = (): z.ZodType<string | Record<string, unknown> | unde
  * shape — which is what an SDK produces — used to fail here and pass in
  * production.
  *
- * ⚠️ NOTHING HERE IS GENERALISED FROM F-1462. `profile` is an object on a
+ * ⚠️ NOTHING HERE IS GENERALISED FROM `profile`, which is an object on a
  * profile method; these are arrays on three messaging methods with different
- * validators behind them, and assuming they agree is the exact error F-1462 was
+ * validators behind them, and assuming they agree is the exact error that was
  * opened to prevent. They were called separately and they happen to agree.
  *
  * ⚠️ IT IS A UNION, NOT A SWAP, and the element type is not `z.unknown()`. The
@@ -315,7 +315,7 @@ export const SLACK_READS = {
 
   teamInfo: slackRead("/team.info", { team: absentIfEmpty() }),
 
-  // `domain.emojiList` reads no argument at all, and the pre-F-1179 handler
+  // `domain.emojiList` reads no argument at all, and the legacy handler
   // forwarded the whole merged bag — the silent hole this ticket exists to
   // close. `include_categories` is what Slack's `emoji.list` declares beyond
   // `token`, so that is the surface, and an unnamed argument is now refused.
@@ -432,7 +432,7 @@ export const SLACK_WRITES = {
   }),
 
   filesUpload: slackWrite("/files.upload", {
-    // F-1389 (SLACK-DECL-IN-003) — `channels` (plural, comma-separated) only.
+    // SLACK-DECL-IN-003 — `channels` (plural, comma-separated) only.
     // Slack has never documented a singular `channel` here, and the vendored
     // `slack_web_openapi_v2` snapshot agrees: it declares `channels` and eight
     // other real arguments, so it is not thin on this method. An upload

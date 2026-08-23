@@ -100,7 +100,7 @@ function parseCredentialsJson(raw: string): PomeCredentials | null {
 }
 
 /**
- * Mint a fresh hosted slack twin sandbox. Flat seed first (FDRS-365 rejected
+ * Mint a fresh hosted slack twin sandbox. Flat seed first (the wrapped shape is rejected
  * the wrapped `{slack:{seed}}` envelope for scenario files and the cloud
  * matches); retry wrapped on a 4xx just in case the contracts diverge.
  */

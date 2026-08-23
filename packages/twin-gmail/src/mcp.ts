@@ -69,7 +69,7 @@ type ToolImplementation = {
  * The tool table Gmail serves, and its provenance. `loadMcpToolFixture`
  * throws at module load if `mcp-tools-list.raw.json` no longer hashes to the
  * sha its meta declares, so an edited oracle cannot quietly become the new
- * truth (F-1325).
+ * truth.
  */
 export const gmailToolFixture = loadMcpToolFixture({
   raw: rawListing,
@@ -176,7 +176,7 @@ const implementations: Record<ToolName, ToolImplementation> = {
         // `threads` above is the PAGE; this is the whole match set, which is
         // why the count is exact rather than an estimate. Google documents the
         // field as a lower bound, so an exact count satisfies the contract —
-        // and the advertised type is int64-as-STRING, not a number (F-1417).
+        // and the advertised type is int64-as-STRING, not a number.
         // Unconditional: it is the answer to "how many matched", and 0 matches
         // is an answer. Emitting it only when non-zero would make an absent
         // field mean two different things.
@@ -213,7 +213,7 @@ const implementations: Record<ToolName, ToolImplementation> = {
     // takes no page arguments and offers no nextPageToken back. The July
     // listing this twin used to serve said "all user-defined labels", which is
     // what `listUserLabels` returns and what this handler used to call; the
-    // widening is Google's and F-1400 is the twin following it.
+    // widening is Google's and the twin follows it.
     handler: (domain, _args, ctx) => ({
       labels: domain.labels(identityFromSession(ctx.session).email).map(labelResult),
     }),
@@ -373,7 +373,7 @@ function messageResult(
     sender: message.from,
     toRecipients: message.to,
     ccRecipients: message.cc,
-    // F-1400: the adopted listing declares it on Message, so it is served
+    // The adopted listing declares it on Message, so it is served
     // wherever the other two recipient lists are — `get_message`, `get_thread`
     // and the threads `search_threads` nests.
     bccRecipients: message.bcc,
@@ -410,7 +410,7 @@ function labelResult(label: LabelResource) {
     labelId: label.id,
     name: label.name,
     ...(Object.keys(color).length > 0 ? { color } : {}),
-    // F-1400: the August listing declares the message counters beside the
+    // The August listing declares the message counters beside the
     // thread ones. The domain has counted both all along — the REST
     // serializer already published all four — so this was a projection that
     // dropped two fields, not a measurement the twin could not make.

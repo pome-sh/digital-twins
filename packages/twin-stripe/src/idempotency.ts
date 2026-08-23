@@ -34,12 +34,12 @@ const HANDLER_RESULT_KEY = "twinStripeHandlerResult";
  *
  * The response sitting on `c.res` is not always the handler's. `after_handler`
  * failure injection substitutes status + body to model "the server processed it
- * but response delivery to the client failed" (FDRS-339), and it substitutes
+ * but response delivery to the client failed", and it substitutes
  * INSIDE the handler, which is inside this middleware. So the cache used to see
  * the injected 402, decline it under the 4xx rule below, and store nothing —
  * dropping the record real Stripe writes in exactly that situation, which is the
  * entire reason `Idempotency-Key` exists. The retry then re-executed and the
- * refund landed twice (F-1138).
+ * refund landed twice.
  *
  * Only `respond()` parks a result. Routes that answer with a bare `c.json` (the
  * x402 legs, test endpoints) park nothing and `c.res` remains the truth.
@@ -266,7 +266,7 @@ function recordDedupeEvent(
     method: c.req.method,
     path: new URL(c.req.url).pathname,
     request_body: rawBody === "" ? null : rawBody,
-    // F-1125 — the replay's own headers, which is where `Idempotency-Key`
+    // The replay's own headers, which is where `Idempotency-Key`
     // lives. Recording the dedupe outcome while hiding the key that caused it
     // would leave the reason unreadable on the one row that is about it.
     request_headers: recordedRequestHeaders(c),

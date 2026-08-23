@@ -1,33 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// F-1498 — `documentation_url` names the operation the caller asked for, and
-// stays generic exactly where real GitHub stays generic.
-//
-// ── THE MEASUREMENT THIS FILE PINS ────────────────────────────────────────
-//
-// Probed live against `api.github.com` on 2026-08-12 (F-1490's transcript).
-// **45 of 59** error responses named the operation
-// (`https://docs.github.com/rest/repos/contents#create-or-update-file-contents`
-// and so on) and **14 of 59** did not. The 14 are not noise, and they are why
-// "name the operation everywhere" is not the fix:
-//
-//   | class                    | count | GitHub's documentation_url |
-//   |--------------------------|-------|----------------------------|
-//   | routed + authenticated   | 45    | operation-specific         |
-//   | every 401                | 8/8   | generic — auth fails before dispatch |
-//   | unrouted paths           | 4/4   | generic — nothing to name   |
-//   | `GET /users/:username`   | 2/2   | generic — a GitHub one-off  |
-//
-// So this file has two halves, and the second is load-bearing: the twin was
-// already accidentally right on the 401s and the 501 catch-all, and a fix that
-// stamped an operation there would be a NEW divergence pointing the other way.
-//
-// ⚠️ THE URLS BELOW ARE NOT TYPED FROM THE DOCS SITE. Every literal is
-// `externalDocs.url` out of GitHub's published OpenAPI description
-// (`github/rest-api-description@dd98388`, OpenAPI 3.0.3, `info.version` 1.1.4),
-// vendored into `fixtures/operation-docs.raw.json` by
-// `scripts/vendor-operation-docs.ts`. They are written out literally HERE, and
-// read from the artifact in the sweep below, on purpose: a test that only ever
-// compares the wire to the artifact agrees with itself about what GitHub says.
+// `documentation_url` names the operation the caller asked for, and stays generic
+// exactly where real GitHub stays generic.
 
 import { describe, expect, it } from "vitest";
 import { createGitHubCloneApp } from "../src/twin.js";
@@ -78,8 +51,8 @@ async function mcp(tool: string, args: unknown, app = createGitHubCloneApp()) {
 
 const docUrl = (body: Record<string, unknown>) => body.documentation_url;
 
-describe("F-1498 — a routed, authenticated error names its operation", () => {
-  it("404 on GET /repos/:owner/:repo — the exact case F-1490 pinned as generic", async () => {
+describe("a routed, authenticated error names its operation", () => {
+ it("404 on GET /repos/:owner/:repo — the exact case pinned as generic", async () => {
     const got = await rest("GET", "/repos/acme/nope");
     expect(got.status).toBe(404);
     expect(got.body).toEqual({
@@ -114,7 +87,7 @@ describe("F-1498 — a routed, authenticated error names its operation", () => {
     });
   });
 
-  it("does not overwrite a url the throw site already knew (F-1491's 409)", async () => {
+ it("does not overwrite a url the throw site already knew (the 409)", async () => {
     const app = createGitHubCloneApp();
     const token = await signTestToken();
     const put = (body: unknown) =>
@@ -158,7 +131,7 @@ describe("F-1498 — a routed, authenticated error names its operation", () => {
   });
 });
 
-describe("F-1498 — the three classes GitHub answers GENERICALLY stay generic", () => {
+describe("the three classes GitHub answers GENERICALLY stay generic", () => {
   it("a 401 names no operation — authentication fails before dispatch (8/8 measured)", async () => {
     const app = createGitHubCloneApp();
     const got = await app.request(`${base}/repos/acme/api`, {
@@ -167,13 +140,6 @@ describe("F-1498 — the three classes GitHub answers GENERICALLY stay generic",
     expect(got.status).toBe(401);
 
     // ⚠️ THE URL MOVED FROM `""` TO `GENERIC`, AND THE ASSERTION DID NOT SOFTEN.
-    // The empty string was divergence 31's gap — a leaf GitHub fills that this
-    // twin left blank — and F-1497 closed it by building this body through
-    // `githubError` instead of by hand. What F-1498 pinned here is untouched and
-    // is the reason both tickets could land: GitHub answers a 401 with the
-    // GENERIC url, never an operation-specific one, so `…#get-a-repository`
-    // would be a new divergence pointing the other way. Whole body, so a fix
-    // that filled the url by dropping `message` or `status` still reds.
     const body = (await got.json()) as Record<string, unknown>;
     expect(body).toEqual({
       message: "Bad credentials",
@@ -184,9 +150,7 @@ describe("F-1498 — the three classes GitHub answers GENERICALLY stay generic",
   });
 
   it("a 401 with NO Authorization header is generic too, and says the other thing", async () => {
-    // GitHub's 8/8 generic 401s include the header-less probes. F-1497 split the
-    // message (`Requires authentication` vs `Bad credentials`) — the split must
-    // not drag an operation url onto either leg.
+    // GitHub's 8/8 generic 401s include the header-less probes.
     const app = createGitHubCloneApp();
     const got = await app.request(`${base}/repos/acme/api`);
     expect(got.status).toBe(401);
@@ -218,7 +182,7 @@ describe("F-1498 — the three classes GitHub answers GENERICALLY stay generic",
   });
 });
 
-describe("F-1498 — the MCP door, decided per tool", () => {
+describe("the MCP door, decided per tool", () => {
   it("a single-operation tool answers its operation's url", async () => {
     const got = await mcp("get_file_contents", { owner: "acme", repo: "nope", path: "README.md" });
     expect(got.status).toBe(404);
@@ -232,7 +196,7 @@ describe("F-1498 — the MCP door, decided per tool", () => {
     expect(
       docUrl((await mcp("pull_request_read", { method: "get_reviews", owner: "acme", repo: "nope", pullNumber: 1 })).body)
     ).toBe("https://docs.github.com/rest/pulls/reviews#list-reviews-for-a-pull-request");
-    // A PR's conversation is issue comments (F-1151), and so is its url.
+    // A PR's conversation is issue comments, and so is its url.
     expect(
       docUrl((await mcp("pull_request_read", { method: "get_comments", owner: "acme", repo: "nope", pullNumber: 1 })).body)
     ).toBe("https://docs.github.com/rest/issues/comments#list-issue-comments");
@@ -316,7 +280,7 @@ describe("F-1498 — the MCP door, decided per tool", () => {
   });
 });
 
-describe("F-1498 — the vendored artifact's gate", () => {
+describe("the vendored artifact's gate", () => {
   const surfaces = GITHUB_ROUTE_INPUTS.map((declaration) => declaration.surface);
   const toolMethods: Record<string, readonly string[] | undefined> = Object.fromEntries(
     toolArgumentSchemas.map((tool) => {

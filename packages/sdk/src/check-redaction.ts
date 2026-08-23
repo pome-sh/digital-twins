@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // What protects a criterion whose redaction-destroyed literal is NOT its
-// declared `subject` (F-1157).
+// declared `subject`.
 //
 // `subject` closes the DETECTABLE half of this class, and closes it at the
 // door: the consuming engine renders the declared subject, runs it past the
@@ -41,7 +41,7 @@
 // arm carries the OTHER cost: a check that starts refusing (`abstains`) drops a
 // criterion out of the denominator, and one that starts really failing
 // (`false_fail`) marks a correct agent down for the grader's blindness. Neither
-// is the defect the gate forbids, but a class nobody counted is how F-1157
+// is the defect the gate forbids, but a class nobody counted is how the
 // happened, so both are named and both are ledgered.
 //
 //   declared_subject       the engine already refuses at the door; `evaluate` is
@@ -87,7 +87,7 @@
 //    check that reads `(final.reactions ?? []).some(…)` and scores a negative
 //    criterion `passed` over an export carrying no `reactions` at all is
 //    invisible here — and that is a live defect, not a hypothetical
-//    (`slack.no-reaction-added`, F-1159, guarded in the consuming engine's
+//    (`slack.no-reaction-added`, guarded in the consuming engine's
 //    `STATE_SECTION_GUARDS` while its state lives in twin-slack). It is the same
 //    direction of failure as `vacuous_pass` and a different axis of cause, so it
 //    has its own instrument: the engine's `findVacuousStateSectionReaders`,

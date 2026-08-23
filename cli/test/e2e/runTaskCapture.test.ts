@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-399 — E2E test that `pome run` (via `runTask`) spawns the
-// capture-server child, routes the agent's outbound traffic through it
-// via HTTPS_PROXY, and ends up with both LlmCallEvent (proxy-captured)
-// and TwinHttpEvent (twin traffic, NO_PROXY bypass) rows in events.jsonl —
-// with no orphan capture-server process after the run.
+// E2E test that `pome run` (via `runTask`) spawns the capture-server child, routes the
+// agent's outbound traffic through it via HTTPS_PROXY, and ends up with.
 
 import { mkdtemp, readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
@@ -32,7 +29,7 @@ function appendAllowlist(existing: string | undefined, name: string): string {
   return [...values].join(",");
 }
 
-describe("runTask — capture-server wiring (FDRS-399)", () => {
+describe("runTask — capture-server wiring", () => {
   let echoPort = 0;
   let echoCloser: (() => Promise<void>) | null = null;
 

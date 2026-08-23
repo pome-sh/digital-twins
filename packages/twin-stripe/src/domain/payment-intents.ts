@@ -1,8 +1,8 @@
-// file-size: the PI state machine intentionally keeps both rails (x402 crypto + F-731 card) on one CAS core, plus the listPaginated helper every sibling domain imports.
+// file-size: the PI state machine intentionally keeps both rails (x402 crypto + card) on one CAS core, plus the listPaginated helper every sibling domain imports.
 // SPDX-License-Identifier: Apache-2.0
 //
 // PaymentIntent state machine + CAS, owned by AGENT-B.
-// Two rails: x402 crypto-deposit PIs (v1) and card PIs (F-731).
+// Two rails: x402 crypto-deposit PIs (v1) and card PIs.
 //
 // Crypto rail (x402):
 //
@@ -20,7 +20,7 @@
 //         ▼  (simulate_crypto_deposit, leg 2 — synchronous)
 //      succeeded                  ← terminal
 //
-// Card rail (F-731):
+// Card rail:
 //
 //      create (payment_method_types: ["card"])
 //         │ no payment_method            │ payment_method
@@ -317,7 +317,7 @@ export class PaymentIntentsDomain {
     });
   }
 
-  // ---------- update (POST /v1/payment_intents/:id, F-731) ----------
+  // ---------- update (POST /v1/payment_intents/:id) ----------
 
   /**
    * Update a non-terminal PI. Metadata merges per-key (empty/null unsets,
@@ -553,7 +553,7 @@ export class PaymentIntentsDomain {
 
 // ---------- helpers used by routes/serializers too ----------
 
-/** Parsed payment_method_types for a PI row (["crypto"] fallback, pre-F-731 rows). */
+/** Parsed payment_method_types for a PI row (["crypto"] fallback, legacy rows). */
 export function piTypes(pi: PIRow): string[] {
   try {
     const parsed = JSON.parse(pi.payment_method_types_json) as unknown;

@@ -8,7 +8,7 @@
 // header injection but still wires ALS + signals fallback noop.
 //
 // The fetch hook itself is framework-agnostic and lives in
-// `@pome-sh/wire/correlation` (F-950); what is Claude-adapter-specific here is
+// `@pome-sh/wire/correlation`; what is Claude-adapter-specific here is
 // only the one-call `withPome()` contract and the `POME_*` env conventions the
 // CLI runner injects.
 

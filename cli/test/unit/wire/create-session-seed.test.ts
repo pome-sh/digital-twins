@@ -1,25 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// FDRS-580 / ADR-015 — the `seed` override on createSessionRequestSchema is a
-// PERMISSIVE, shape-blind boundary. The twin pod (`parseSeed`) is the sole
-// authority on the seed's domain shape; the create-session boundary keeps only
-// the one invariant that is genuinely its business — "the seed is a JSON
-// object" — and forwards every domain field verbatim. A field the boundary has
-// never been taught about is the twin's to validate, not the boundary's to
-// strip (the empty-repo bug class: D1 / pome-cloud#175).
-//
-// Ported from pome-cloud at FDRS-653 alongside the full-world
-// githubSeedStateSchema.
+// ADR-015 — the `seed` override on createSessionRequestSchema is a PERMISSIVE,
+// shape-blind boundary.
 
 import { describe, expect, it } from "vitest";
 import { createSessionRequestSchema, githubSeedStateSchema } from "../../../src/contract/index.js";
 
-describe("createSessionRequestSchema.seed — permissive boundary (FDRS-580, ADR-015)", () => {
+describe("createSessionRequestSchema.seed — permissive boundary (ADR-015)", () => {
   it("forwards unknown / future seed fields verbatim instead of stripping them", () => {
-    // A seed carrying fields no schema models, at both the top level and
-    // nested under repositories[]. Under the old narrow union these were
-    // silently zod-stripped (and defaults injected); under the permissive
-    // boundary the object must survive byte-for-byte.
+    // A seed carrying fields no schema models, top level and nested. The old
+    // narrow union zod-stripped them; the permissive boundary must not.
     const seed = {
       users: [{ login: "alice", type: "User", name: "Alice" }],
       repositories: [
@@ -69,7 +58,7 @@ describe("createSessionRequestSchema.seed — permissive boundary (FDRS-580, ADR
   });
 });
 
-describe("githubSeedStateSchema — full GitHub world (ported from pome-cloud, FDRS-653)", () => {
+describe("githubSeedStateSchema — full GitHub world (ported from pome-cloud)", () => {
   it("models users / default_branch / files / pull_requests with reviews + statuses", () => {
     const parsed = githubSeedStateSchema.parse({
       users: [{ login: "alice" }],

@@ -133,7 +133,7 @@ const SYSTEM = [
  * named `foo.github.io` — so the slug is anchored with a trailing `\b`: the
  * match backtracks off any trailing `.` or `-` to land on the last word
  * character, keeping interior dots and dropping the sentence's period. Without
- * it every GitHub call went to `orders-service.` and 404'd (F-1207).
+ * it every GitHub call went to `orders-service.` and 404'd.
  *
  * A prompt can contain more than one slug-shaped substring — "triage/summarize
  * the open items in acme/api" reads as two matches, and the first one is not
@@ -186,7 +186,7 @@ export function parseRepo(task: string): { owner: string; repo: string } {
 // is only safe where the caller CHECKS it, and these two readers did not: a
 // refused `list_open_pull_requests` fell through `Array.isArray` to `[]`, which
 // reads as "the repository has no open pull requests", so the graph decided
-// nothing, reported nothing, and exited 0. That is F-1478's own subject
+// nothing, reported nothing, and exited 0. That is the smoke gate's own subject
 // (measured: `{"decisions":[],"reports":[]}`, exit 0, gate said OK).
 //
 // A refused READ is not an empty result — it is the absence of the evidence

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
  * otel/nano — uint64 decimal-string arithmetic + nanosecond↔ISO conversion
- * (M1.1 / FDRS-480).
+ * (M1.1).
  *
  * OTLP encodes `*_unix_nano` timestamps as uint64 decimal STRINGS because the
  * values exceed Number.MAX_SAFE_INTEGER. These helpers validate and compare

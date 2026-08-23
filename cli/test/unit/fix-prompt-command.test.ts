@@ -1,18 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-644 — `pome fix-prompt` command surface:
-//   - legacy 2-arg form (<events.jsonl> <task.md>) is unchanged;
-//   - an events.jsonl target without a task file is a usage error (exit 5);
-//   - a second argument with a dir target is a usage error (exit 5);
-//   - 0-arg reads ./runs and emits the latest FAILED run set's grouped
-//     prompt; all-green roots print "nothing to fix" (exit 0); empty roots
-//     are a usage error (exit 5);
-//   - a trial run dir targets that set.
-//
-// F-1404 — a root whose only non-passing run set is INCOMPLETE (no trial
-// genuinely failed; something was never graded) is a THIRD outcome, distinct
-// from both "route it to fix-prompt as an agent defect" and "all passed":
-// see "an incomplete-only root ..." below. `groupRunSets`'s `outcome` is the
-// one computation both the routing decision and this wording read.
+// `pome fix-prompt` command surface: - legacy 2-arg form (<events.jsonl> <task.md>) is
+// unchanged; - an events.jsonl target without a task file is a usage.
 
 import { mkdir, mkdtemp, realpath, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -75,7 +63,7 @@ async function writeTrial(
   await writeFile(join(runDir, "events.jsonl"), EVENT, "utf8");
 }
 
-describe("pome fix-prompt command (FDRS-644)", () => {
+describe("pome fix-prompt command", () => {
   const originalCwd = process.cwd();
   const originalExitCode = process.exitCode;
   let stdout: string[];
@@ -177,11 +165,8 @@ describe("pome fix-prompt command (FDRS-644)", () => {
     expect(stderr.join("\n")).toContain("Nothing to fix");
   });
 
-  // F-1404 — the ticket's own reproduction: a root whose only non-passing
-  // run set is INCOMPLETE (a criterion was never graded, nothing genuinely
-  // failed). This must be neither routed to fix-prompt as an agent defect
-  // (the original defect) nor reported as "all passed" (the reversed
-  // defect a naive `state === "fail"` flip would produce).
+  // The ticket's own reproduction: a root whose only non-passing run set is INCOMPLETE
+  // (a criterion was never graded, nothing genuinely failed).
   it("an incomplete-only root names the gap distinctly (exit 1, no prompt, not 'all passed')", async () => {
     const dir = await mkdtemp(join(tmpdir(), "fixcmd-incomplete-"));
     await writeTrial(dir, "ses_1", {
@@ -225,12 +210,7 @@ describe("pome fix-prompt command (FDRS-644)", () => {
     expect(err).toContain("task scn");
   });
 
-  // F-1404 — the understating twin of the original defect. A trial's `state`
-  // is "incomplete" for ANY ungraded criterion (`scoreStatus`'s A5 guard), so
-  // an incomplete set can still hold criteria the judge DID grade and DID
-  // fail. Telling the user "a grading gap, not an agent defect" over those
-  // would state more than was checked in the opposite direction — and would
-  // silently bin real judge reasons.
+  // The understating twin of the original defect.
   it("an incomplete set holding GRADED failures says so instead of calling it only a grading gap", async () => {
     const dir = await mkdtemp(join(tmpdir(), "fixcmd-incomplete-failed-"));
     await writeTrial(dir, "ses_1", {
@@ -288,11 +268,8 @@ describe("pome fix-prompt command (FDRS-644)", () => {
     expect(stderr.join("\n")).toContain("No finalized run sets");
   });
 
-  // F-1195 — a verdict.json this CLI can't read must never render as an
-  // absence. Both halves are pinned: the root that holds ONLY stale files
-  // must not read like an empty `runs/`, and the root that holds stale files
-  // BESIDE readable ones must say so even though it has a prompt to print.
-  describe("a verdict.json at another artifact version is a named skip (F-1195)", () => {
+  // A verdict.json this CLI can't read must never render as an absence.
+  describe("a verdict.json at another artifact version is a named skip", () => {
     async function writeStaleTrial(root: string, sid: string): Promise<void> {
       const runDir = join(root, "runs", "scn", sid);
       await mkdir(runDir, { recursive: true });
@@ -352,12 +329,9 @@ describe("pome fix-prompt command (FDRS-644)", () => {
     });
   });
 
-  // F-1411 — a verdict.json that EXISTS but is damaged (truncated,
-  // hand-edited, or an unexpected `state`) is a different fact from a
-  // stale-version file (an older CLI wrote that one correctly) and gets its
-  // own line, naming the path — never folded into the stale-version count,
-  // "no finalized run sets", or silently dropped.
-  describe("a corrupt current-version verdict.json is a named skip that points at the path (F-1411)", () => {
+  // A verdict.json that EXISTS but is damaged (truncated, hand-edited, or an
+  // unexpected `state`) is a different fact from a stale-version file (an older CLI.
+  describe("a corrupt current-version verdict.json is a named skip that points at the path", () => {
     async function writeCorruptTrial(root: string, sid: string): Promise<string> {
       const runDir = join(root, "runs", "scn", sid);
       await mkdir(runDir, { recursive: true });

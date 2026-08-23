@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-399 — `writeRunArtifactsCore` must append to events.jsonl so rows
-// written by the capture-server child during a run are preserved alongside
-// the recorder's twin-traffic rows. Pre-FDRS-399 the function truncated.
+// `writeRunArtifactsCore` must append to events.jsonl so rows written by the
+// capture-server child during a run are preserved alongside the recorder's twin-traffic.
 
 import { mkdtemp, readdir, readFile, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -13,7 +12,7 @@ import type { Task } from "../../../src/task/taskSchema.js";
 function fakeTask(): Task {
   return {
     slug: "fdrs-399-artifacts-test",
-    title: "FDRS-399 artifacts test",
+    title: "artifacts test",
     prompt: "noop",
     seedState: { repositories: [] },
     config: {
@@ -91,7 +90,7 @@ describe("writeRunArtifactsCore — events.jsonl", () => {
     expect(twinRow).toBeDefined();
   });
 
-  it("does not duplicate TwinHttpEvent rows already streamed by the durable recorder (F-698)", async () => {
+  it("does not duplicate TwinHttpEvent rows already streamed by the durable recorder", async () => {
     const root = await mkdtemp(join(tmpdir(), "pome-art-"));
     const scenario = fakeTask();
     const runId = "run_durable_dedupe";
@@ -162,7 +161,7 @@ describe("writeRunArtifactsCore — events.jsonl", () => {
     expect(JSON.parse(lines[0]!).event_id).toBe("req_streamed_1");
   });
 
-  it("does not treat non-TwinHttpEvent request_id as a streamed twin event (F-698)", async () => {
+  it("does not treat non-TwinHttpEvent request_id as a streamed twin event", async () => {
     const root = await mkdtemp(join(tmpdir(), "pome-art-"));
     const scenario = fakeTask();
     const runId = "run_cross_kind_dedupe";
@@ -234,10 +233,9 @@ describe("writeRunArtifactsCore — events.jsonl", () => {
   });
 });
 
-// F-689 remainder (D6) — the run dir contains EXACTLY six files; the
-// intermediate correlation artifacts (tool_calls.jsonl, state-before.json,
-// state-after.json, state-diff.json) are gone for good.
-describe("writeRunArtifactsCore — file-set contract (F-689 / D6)", () => {
+// Per D6, the run dir contains EXACTLY six files; the intermediate correlation
+// artifacts (tool_calls.jsonl, state-before.json, state-after.json, state-diff.json).
+describe("writeRunArtifactsCore — file-set contract (D6)", () => {
   it("writes exactly meta.json, events.jsonl, state_initial.json, state_final.json, stdout.txt, stderr.log", async () => {
     const root = await mkdtemp(join(tmpdir(), "pome-art-"));
     const scenario = fakeTask();
@@ -302,7 +300,7 @@ describe("writeRunArtifactsCore — file-set contract (F-689 / D6)", () => {
     expect(meta.twin_versions.github).toMatch(/^\d+\.\d+\.\d+/);
   });
 
-  it("latest.json names the task under `task`, never `scenario` (F-933)", async () => {
+  it("latest.json names the task under `task`, never `scenario`", async () => {
     const root = await mkdtemp(join(tmpdir(), "pome-art-"));
     const task = fakeTask();
     const runId = "run_test_latest";

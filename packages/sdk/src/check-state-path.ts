@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Where a state-reading check LOOKED (F-1197).
+// Where a state-reading check LOOKED.
 //
-// `evidenceEventIds` (F-980/F-1076) answers "which recorded call produced this
+// `evidenceEventIds` answers "which recorded call produced this
 // verdict", and only a `substrate: "tape"` check can fill it. That left 37 of
 // the 45 declared checks citing nothing at all — not a call, not a state path,
 // nothing a report could turn into an affordance. This module is the other
@@ -25,7 +25,7 @@
 //      no "the array moved by one" — so a consumer can ask a total question
 //      (`resolveStatePath`) and get a total answer. That is exactly what
 //      `apps/dashboard/src/lib/criterion-evidence.ts` needs to decide between
-//      rendering an affordance and rendering none: F-980's rule is that a row
+//      rendering an affordance and rendering none: the rule is that a row
 //      never advertises a jump that then does nothing, and a pointer language
 //      with a maybe in it cannot honour that rule.
 //   2. It is somebody else's spec. A hand-rolled `repositories[0].issues[2]`
@@ -155,9 +155,9 @@ export function resolveStatePath(
 // ─── The gate ────────────────────────────────────────────────────────────────
 //
 // A field nobody fills is worse than no field: it advertises a capability the
-// report cannot use, and the measurement that opened F-1197 (8 of 45) is exactly
+// report cannot use, and the opening measurement (8 of 45) is exactly
 // what an unfilled optional field looks like from the outside. So the citation
-// gets the same treatment `discriminatingWorlds` got in F-1126 — a probe here, a
+// gets the same treatment `discriminatingWorlds` got — a probe here, a
 // ledgered assertion in each twin's contract test, and a null that costs
 // something to admit.
 //

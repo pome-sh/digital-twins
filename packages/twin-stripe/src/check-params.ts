@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The typed slots Stripe's declared checks fill (F-1127).
+// The typed slots Stripe's declared checks fill.
 //
 // They live in the twin, not the sdk, for the same reason the declarations do:
 // the twin owns what a Stripe charge id, PaymentIntent status or event type may

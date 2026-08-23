@@ -29,7 +29,7 @@ export function getAgentSession(domain: LinearDomain, ref: string): LinearAgentS
 }
 
 /**
- * `appUserId` is deliberately NOT on the wire (F-1176) — Linear's
+ * `appUserId` is deliberately NOT on the wire — Linear's
  * `AgentSessionCreateOnIssue` declares `issueId`, `externalLink` and
  * `externalUrls`, and nothing else. It stays here because the twin's OWN
  * delegate and mention paths create sessions for a named app user, which is
@@ -49,7 +49,7 @@ export type AgentSessionOnCommentInput = {
 
 /**
  * No `status`. Upstream `AgentSessionUpdateInput` has no such field: a session's
- * status follows the activities its agent emits (F-1176). See
+ * status follows the activities its agent emits. See
  * `AGENT_ACTIVITY_SESSION_STATUS`.
  */
 export type AgentSessionPatch = {
@@ -152,7 +152,7 @@ export function updateAgentSession(
   // Nullable fields are tri-state: `undefined` (absent, or explicitly passed as undefined)
   // means "leave alone", `null` means "clear". Never test presence with `in` here — callers
   // build this patch as an object literal with every key present, so `in` would clear
-  // every field the caller did not mention (F-1166).
+  // every field the caller did not mention.
   domain.db
     .prepare(
       `UPDATE agent_sessions SET
@@ -197,7 +197,7 @@ export async function createAgentActivity(
     )
     .run(id, session.id, viewer.id, JSON.stringify(content), signal, ephemeral ? 1 : 0, now, now);
   // The session follows the activity — upstream has no other way to move it,
-  // and no `status` on `agentSessionUpdate` to do it by hand (F-1176).
+  // and no `status` on `agentSessionUpdate` to do it by hand.
   const status = AGENT_ACTIVITY_SESSION_STATUS[content.type];
   domain.db
     .prepare("UPDATE agent_sessions SET status = ?, updated_at = ? WHERE id = ?")

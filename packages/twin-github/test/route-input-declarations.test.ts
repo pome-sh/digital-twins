@@ -1,24 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1179 / F-1372 — the twin's declared route input surface, driven over the
-// real HTTP wire.
-//
-// The assertions here are about failure modes the declaration mechanism exists
-// to make structurally impossible, not about any one route:
-//
-//   1. Every declaration carries the disposition F-1372 ruled for THIS twin.
-//      Pinned as a literal below, because the point of the pin is to be the
-//      thing that goes red when `src/route-inputs.ts` changes its mind — a test
-//      that read the disposition off the source and asserted whatever it found
-//      would go green on a flip nobody sanctioned.
-//   2. That disposition is what the wire does. Probed through `app.request`
-//      rather than `declaration.parse` in isolation, because "the parser does
-//      this" and "the twin answers this" are different claims and only the
-//      second one is what an agent meets.
-//   3. The declared set and the registered set are the same set. The method and
-//      path cannot drift (the route is mounted FROM the declaration), but
-//      EXISTENCE can — a route registered without a declaration would be a hole
-//      in the published surface with every other check green.
+// The twin's declared route input surface, driven over the real HTTP wire.
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Hono } from "hono";
@@ -49,13 +30,8 @@ const base = `/s/${TEST_SID}`;
 /** A query/body key no GitHub surface has ever declared. */
 const PROBE = "pome_undeclared_probe";
 
-/**
- * F-1372's ruling for this twin: real GitHub answers an unknown query parameter
- * and an unknown top-level body key exactly as it answers the request without
- * them — measured over ten surfaces on 2026-08-09, bodies hashed — so the twin
- * discards them too rather than 4xx'ing an agent GitHub would have served
- * (`docs/undeclared-route-inputs.md`).
- */
+/** the ruling for this twin: real GitHub answers an unknown query parameter and an
+ *  unknown top-level body key exactly as it answers the request without them. */
 const RULED: UndeclaredDisposition = "ignore";
 
 /**
@@ -118,7 +94,7 @@ async function probe(
   return { status: response.status, text: await response.text() };
 }
 
-describe("declared route inputs (F-1179, F-1372)", () => {
+describe("declared route inputs", () => {
   it("is ruled `ignore` on undeclared input, on every route", () => {
     expect(GITHUB_ROUTE_INPUTS.length).toBeGreaterThan(0);
     const dissenting = GITHUB_ROUTE_INPUTS.filter((d) => d.undeclared !== RULED).map(
@@ -129,7 +105,7 @@ describe("declared route inputs (F-1179, F-1372)", () => {
     // publish an input surface whose meaning changed depending which route you
     // asked. `routeInputDeclarer()` is what makes this hold by construction;
     // this is the assertion that it still does.
-    expect(dissenting, `these routes disagree with the twin's F-1372 ruling ('${RULED}')`).toEqual(
+    expect(dissenting, `these routes disagree with the twin's heat ruling ('${RULED}')`).toEqual(
       []
     );
   });

@@ -19,7 +19,7 @@ afterAll(() => {
 
 const base = `/s/${TEST_SID}`;
 
-/** F-1460 — `PUT /contents/*` takes base64, the way GitHub's does. */
+/** `PUT /contents/*` takes base64, the way GitHub's does. */
 const b64 = (text: string) => Buffer.from(text, "utf8").toString("base64");
 
 function setupApp() {
@@ -256,11 +256,8 @@ describe("recorder state_delta — multi-row mutation views", () => {
 });
 
 describe("recorder state_delta — v2 hot-path mutations", () => {
-  // Was `create_milestone` until F-1376 dropped it from the tool table (GitHub
-  // declares no milestone MCP tool). The claim under test is about the MCP door's
-  // state_delta recording, not about milestones, so it moved to a mutating tool
-  // GitHub does declare. `POST /repos/:owner/:repo/milestones` still records its
-  // own delta — `v2-hot-paths-rest.test.ts` covers that door.
+  // Was `create_milestone` until dropped it from the tool table (GitHub declares no
+  // milestone MCP tool).
   it("MCP issue_write records the mutating tool state_delta", async () => {
     const { app, recorder } = setupApp();
     const args = { method: "create", owner: "acme", repo: "api", title: "mcp issue" };

@@ -97,7 +97,7 @@ export function createIssue(domain: GitHubDomain, input: { owner: string; repo: 
 
 /**
  * How a label filter matches, because real GitHub's two doors DISAGREE and both
- * are right (F-1614). This is the same shape of fact as F-1460's `content`, and
+ * are right. This is the same shape of fact as the `content`, and
  * it is resolved the same way: the disagreement lives at the boundary, and the
  * domain is TOLD which semantics it was handed rather than sniffing the type.
  *
@@ -134,7 +134,7 @@ function labelFilter(labels: string | LabelFilter | undefined): LabelFilter | un
 export function listIssues(domain: GitHubDomain, input: { owner: string; repo: string; state?: "open" | "closed" | "all"; labels?: string | LabelFilter; assignee?: string } & PageOptions) {
   const repo = domain.requireRepo(input.owner, input.repo);
   let rows = domain.listIssuesRows(repo.id);
-  // Real GitHub defaults this route to `state=open` (F-1427). The filter used to
+  // Real GitHub defaults this route to `state=open`. The filter used to
   // apply only when `state` was PRESENT, so a caller who sent none — the common
   // case — got closed issues too. Invisible while every seeded issue was open;
   // the moment pome-cloud's fidelity seed closed one it showed up as `[].state`
@@ -207,7 +207,7 @@ export function updateIssue(domain: GitHubDomain, input: { owner: string; repo: 
 
 export function addIssueComment(domain: GitHubDomain, input: { owner: string; repo: string; issue_number: number; body: string }, onDelta?: StateDeltaCallback) {
   const repo = domain.requireRepo(input.owner, input.repo);
-  // Issue OR pull request (F-1151) — see `requireCommentTarget`. Resolved once,
+  // Issue OR pull request — see `requireCommentTarget`. Resolved once,
   // outside the transaction's return value, because the serializer below needs
   // the kind too.
   let target: "issue" | "pull_request" = "issue";
@@ -233,7 +233,7 @@ export function addIssueComment(domain: GitHubDomain, input: { owner: string; re
 
 export function listIssueComments(domain: GitHubDomain, input: { owner: string; repo: string; issue_number: number } & PageOptions) {
   const repo = domain.requireRepo(input.owner, input.repo);
-  // Reads the same targets the write path accepts (F-1151). Widening only the
+  // Reads the same targets the write path accepts. Widening only the
   // POST would let an agent leave a comment it could not then read back.
   const target = domain.requireCommentTarget(repo.id, input.issue_number);
   const rows = domain.listIssueCommentRows(repo.id, input.issue_number);
@@ -330,7 +330,7 @@ export function updateIssueComment(domain: GitHubDomain, input: { owner: string;
   domain.audit("update_issue_comment", repo.full_name, input);
   onDelta?.({ before, after: issueCommentState(comment, repo) });
   // Addressed by comment id, so the kind has to be looked up from the row rather
-  // than taken from the request (F-1151). `commentTargetKind` — not the throwing
+  // than taken from the request. `commentTargetKind` — not the throwing
   // form: the comment exists, so an unresolvable target is a corrupt row, and
   // 404ing an update that already succeeded would be the worse answer.
   return issueCommentJson(comment, repo, domain.commentTargetKind(repo.id, comment.issue_number) ?? "issue");
@@ -356,7 +356,7 @@ export function deleteIssueComment(domain: GitHubDomain, input: { owner: string;
 export function listMilestones(domain: GitHubDomain, input: { owner: string; repo: string; state?: "open" | "closed" | "all" } & PageOptions) {
   const repo = domain.requireRepo(input.owner, input.repo);
   let rows = domain.db.prepare("SELECT * FROM milestones WHERE repo_id = ? ORDER BY number ASC").all(repo.id) as MilestoneRow[];
-  // `state=open` by default, as on real GitHub (F-1427). pome-cloud's upstream
+  // `state=open` by default, as on real GitHub. pome-cloud's upstream
   // seeder had already met this one and worked around it in the SEED rather than
   // the twin — its milestone is kept open on purpose, commented "GitHub defaults
   // that list to `state=open` — a closed milestone would leave the golden empty

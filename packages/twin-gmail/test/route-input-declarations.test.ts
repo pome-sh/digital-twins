@@ -1,19 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1179 — the Gmail twin's declared route input surface, driven over the real
-// HTTP wire.
-//
-// Both assertions are about the two failure modes the declaration mechanism
-// exists to make structurally impossible, not about any one route:
-//
-//   1. A handler can never see an input its declaration does not name. Probed
-//      through `app.request` rather than `declaration.parse` in isolation,
-//      because "the parser refuses it" and "the handler cannot see it" are
-//      different claims and only the second one matters.
-//   2. The declared set and the registered set are the same set. Method and
-//      path cannot drift (the route is mounted FROM the declaration), but
-//      EXISTENCE can — a route registered without a declaration would be a hole
-//      in the published surface with every other check green.
+// The Gmail twin's declared route input surface, driven over the real HTTP wire.
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Hono } from "hono";
@@ -59,17 +45,8 @@ function boot(): Hono {
 /** A query/body key no Gmail surface has ever declared. */
 const PROBE = "pome_undeclared_probe";
 
-/**
- * F-1372's ruling for this twin: Gmail is served through Google's gRPC
- * transcoder, which binds each query parameter to a field of the request proto
- * and answers 400 `INVALID_ARGUMENT` for one that maps to no field — so the
- * strict default F-1179 shipped is what Gmail does, and it stays.
- *
- * Pinned as a literal rather than read off the declarations: a flip in
- * `src/route-inputs.ts` has to come here to be sanctioned, which is the half
- * the reverted first attempt at F-1372 skipped. See
- * `docs/undeclared-route-inputs.md`.
- */
+/** the ruling for this twin: Gmail is served through Google's gRPC transcoder, which
+ *  binds each query parameter to a field of the request proto and answers. */
 const RULED: UndeclaredDisposition = "refuse";
 
 /**
@@ -158,13 +135,13 @@ async function probe(
   return { status: response.status, message: parsed?.error?.message ?? "" };
 }
 
-describe("declared route inputs (F-1179, F-1372)", () => {
+describe("declared route inputs", () => {
   it("is ruled `refuse` on undeclared input, on every route", () => {
     expect(GMAIL_ROUTE_INPUTS.length).toBeGreaterThan(0);
     const dissenting = GMAIL_ROUTE_INPUTS.filter((d) => d.undeclared !== RULED).map(
       (d) => `${d.surface} is '${d.undeclared}'`
     );
-    expect(dissenting, `these routes disagree with the twin's F-1372 ruling ('${RULED}')`).toEqual(
+    expect(dissenting, `these routes disagree with the twin's heat ruling ('${RULED}')`).toEqual(
       []
     );
   });

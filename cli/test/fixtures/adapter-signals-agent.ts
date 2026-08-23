@@ -1,14 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// FDRS-411 e2e fixture. Mimics what `@pome-sh/adapter-claude-sdk`'s
-// `withPome()` does for the parts FDRS-411 cares about:
-//   1. honors `POME_PREFLIGHT=1` and exits 0
-//   2. on the real run, appends two M0 HookEvent rows to
-//      `POME_ADAPTER_SIGNALS_PATH` then triages the issue against the twin
-//      so the scenario passes deterministically.
-//
-// Using a hand-rolled fixture avoids spinning up the real Anthropic SDK in
-// CI. The full CAS-adapter happy path is covered by FDRS-413.
+// E2E fixture. Mimics what `@pome-sh/adapter-claude-sdk`'s `withPome()` does for the
+// parts this test cares about: 1.
 
 import { appendFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";

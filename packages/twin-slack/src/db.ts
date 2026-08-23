@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Slack twin schema — DDL + reset only (domain). The sqlite driver and the
-// pome pragma set live in the engine (`openTwinDatabase`, F-681); twins
+// pome pragma set live in the engine (`openTwinDatabase`); twins
 // never import a sqlite driver directly.
 import { openTwinDatabase } from "@pome-sh/sdk";
 import type { SlackTwinDatabase } from "./types.js";

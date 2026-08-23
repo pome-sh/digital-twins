@@ -1,9 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// The "exactly one of N parallel writers wins" concurrency test (FDRS-270 / D-ENG-3).
-// This is the load-bearing assertion for AGENT-B's CAS implementation. If it fails,
-// the state machine has a race that will silently double-debit the
-// balance and double-fire `payment_intent.succeeded` in production.
+// The "exactly one of N parallel writers wins" concurrency test (D-ENG-3).
 
 import { describe, expect, it } from "vitest";
 import { createStripeApp, rest } from "./_appHelper.js";

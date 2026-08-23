@@ -1,11 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-634 — unit tests for the doctor's static routing scan.
-//
-// The scan is the named-cause half of the routing check: it finds hardcoded
-// production API hosts (file:line) that would bypass the POME_*_REST_URL env
-// contract, and collects positive wiring evidence (env-var reads / adapter
-// import). The dynamic half — requests observably reaching the twin — is
-// what `pome run`'s trace records; doctor stays fast and LLM-free.
+// Unit tests for the doctor's static routing scan.
 
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";

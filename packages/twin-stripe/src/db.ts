@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Stripe twin schema — DDL + reset only (domain). The sqlite driver and the
-// pome pragma set live in the engine (`openTwinDatabase`, F-681); twins
+// pome pragma set live in the engine (`openTwinDatabase`); twins
 // never import a sqlite driver directly.
 //
 // All tables are created up front so domain modules do not need to migrate.
@@ -166,7 +166,7 @@ export function migrate(db: TwinStripeDatabase) {
 
 export function resetDatabase(db: TwinStripeDatabase) {
   // MIGRATION_SQL doesn't create every Stripe domain table (refunds,
-  // customers, payment_methods, and the F-734 billing tables come from
+  // customers, payment_methods, and the billing tables come from
   // ensureStripeTables via domain constructors / applySeed) — ensure them
   // so reset is safe on a db that hasn't constructed a domain yet.
   ensureStripeTables(db);

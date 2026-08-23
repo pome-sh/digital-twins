@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// Full-surface integration: mock @anthropic-ai/claude-agent-sdk, then drive
-// the package's public API the way a user would (withPome + tool + query).
-// FDRS-407 acceptance: hooks merged into query options emit HookEvent rows;
-// tool handlers still set ALS for the x-pome-correlation-id header.
+// Full-surface integration: mock @anthropic-ai/claude-agent-sdk, then drive the
+// package's public API the way a user would (withPome + tool + query).
 
 import { mkdtempSync, readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -288,12 +285,9 @@ describe("end-to-end: withPome + tool + query", () => {
   });
 });
 
-// F-998. The adapter turns `includePartialMessages` on behind the agent
-// author's back to reach the only authoritative per-turn output-token count the
-// SDK emits (`message_delta`). The price of that is a stream the author never
-// asked for, so everything the flag adds is filtered back out before it reaches
-// their `for await` loop.
-describe("F-998: includePartialMessages injection is invisible to the caller", () => {
+// The adapter turns `includePartialMessages` on behind the agent author's back to
+// reach the only authoritative per-turn output-token count the SDK emits.
+describe("includePartialMessages injection is invisible to the caller", () => {
   // One API turn as the CLI actually lays it out: the flag-gated artifacts
   // interleaved with the messages an author sees today.
   function buildTape() {

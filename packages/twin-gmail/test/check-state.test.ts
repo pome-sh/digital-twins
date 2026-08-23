@@ -1,7 +1,4 @@
-// How a declared check reads the exported Gmail mailbox (F-1128).
-//
-// These are the shapes that produce a WRONG VERDICT if read naively, so each
-// case names the verdict it prevents rather than the field it touches.
+// How a declared check reads the exported Gmail mailbox.
 
 import { describe, expect, it } from "vitest";
 import {
@@ -49,7 +46,7 @@ describe("resolveMessage", () => {
   it("says message_not_found when the collection is present but the id is not", () => {
     expect(resolveMessage(state(), "msg_ghost")).toEqual({
       missing: 'message_not_found ("msg_ghost")',
-      // F-1197 — the refusal names the collection it scanned, so a reader can
+      // The refusal names the collection it scanned, so a reader can
       // open it and see the id is genuinely not there.
       searched: "/messages",
     });
@@ -118,7 +115,7 @@ describe("labelIdsFor", () => {
 describe("messageCarriesLabel", () => {
   it("reads the join, not a nested field", () => {
     // The path is the JOIN TABLE, not a row in it: the answer is a boolean this
-    // function computes, and the tree holds no such value (F-1197).
+    // function computes, and the tree holds no such value.
     expect(messageCarriesLabel(state(), "msg_support", "INBOX")).toEqual({
       found: true,
       path: "/messageLabels",
@@ -212,15 +209,7 @@ describe("isTruncated", () => {
   });
 });
 
-// F-1441 — the F-1159 class, found live in twin-gmail on the worst possible
-// criterion. `gmail.mailbox-label-count`'s polarity flips NEGATIVE at count 0,
-// so a vacuous pass hands a point to an agent that did the forbidden thing.
-//
-// The mechanism is that a USER label's minted id differs from its display name
-// by construction — the default seed ships `{ id: "Label_follow_up", name:
-// "Follow Up" }`. With `labels` absent, `labelIdsFor` degrades to the bare
-// display name, no `messageLabels` row carries it, the total is 0, and
-// `0 === 0` passes over an export in which the agent DID apply the label.
+// The absent-section class, found live in twin-gmail on the worst possible criterion.
 describe("gmail.mailbox-label-count refuses what it cannot see", () => {
   const args = { mailbox: MB, count: "0", label: "Follow Up" };
 
@@ -245,9 +234,7 @@ describe("gmail.mailbox-label-count refuses what it cannot see", () => {
   });
 
   it("SKIPS on an absent labels section rather than scoring the prohibition", () => {
-    // THE DEFECT. Before F-1441 this returned
-    // {passed:true, reason:'... has 0 message(s) labeled Follow Up (wanted 0)'}
-    // over an export whose messageLabels row says otherwise.
+    // THE DEFECT. This used to return {passed:true, reason:'...
     const outcome = mailboxLabelCount.evaluate(args, {
       seed: null,
       tape: null,

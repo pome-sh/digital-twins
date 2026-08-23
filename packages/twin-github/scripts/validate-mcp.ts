@@ -9,7 +9,7 @@
 //   1. Verifies tools/list returns the catalog `githubToolFixture` derives from
 //      the captured upstream listing — count and names, both directions —
 //      through real JSON-RPC framing (i.e. through the wire, not from internal
-//      state). The size is never written down here: it moved 65 → 36 (F-1376)
+//      state). The size is never written down here: it moved 65 → 36
 //      while a hardcoded `65` in this file went on claiming otherwise.
 //   2. Verifies a strict-read tools/call against a seeded PR.
 //   3. Calls the same tool via the legacy `/mcp/call` REST shim and diffs
@@ -17,7 +17,7 @@
 //
 // Prints the entire validation output to stdout (captured by CI); it used to
 // also write a committed `scripts/validate-mcp.output.txt` snapshot, which
-// could silently disagree with a re-run of this same script and did (F-1354).
+// could silently disagree with a re-run of this same script and did.
 
 import { serve } from "@hono/node-server";
 import { sign } from "hono/jwt";
@@ -159,7 +159,7 @@ async function main() {
     record(pretty(listResult.tools));
 
     // ── tools/call (strict read against the seeded PR) ─────────────────
-    // `get_pull_request` was consolidated into `pull_request_read` (F-1376),
+    // `get_pull_request` was consolidated into `pull_request_read`,
     // replacing the seven `get_pull_request*` tools GitHub no longer declares.
     section("tools/call pull_request_read (strict read against seeded fixture)");
     const callResult = await client.callTool({

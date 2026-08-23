@@ -1,15 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// The state readers Stripe's declared checks resolve through (F-1127).
-//
-// `checks-contract.test.ts` proves each declaration discriminates between the
-// two worlds it names. That says nothing about the THIRD outcome — the one a
-// resolver reaches when it cannot answer — and that outcome is where a wrong
-// verdict actually comes from: a negative criterion handed a free pass because
-// the charge it names was never in the export.
-//
-// So these test the reader directly, at the boundaries the fixtures deliberately
-// avoid.
+// The state readers Stripe's declared checks resolve through.
 
 import { describe, expect, it } from "vitest";
 import { refundsOnCharge, resolveCharge, type StripeCheckState } from "../src/check-state.js";
@@ -60,7 +50,7 @@ describe("refundsOnCharge", () => {
     // `ch_x` — that is a clean bill issued over state nobody has.
     expect(refundsOnCharge(stripeState({ charges: [] }), "ch_test_200")).toEqual({
       missing: 'charge_not_found ("ch_test_200")',
-      // F-1197 — the refusal names the collection it scanned, so a reader can
+      // The refusal names the collection it scanned, so a reader can
       // open it and see the id is genuinely not in it.
       searched: "/charges",
     });
@@ -75,7 +65,7 @@ describe("refundsOnCharge", () => {
     // A real answer, deliberately distinct from either skip above.
     const state = stripeState({ charges: [charge({ id: "ch_test_200" })], refunds: [] });
     // The path is the refunds COLLECTION, not a row: the filtered per-charge
-    // list exists nowhere in the tree to point at (F-1197).
+    // list exists nowhere in the tree to point at.
     expect(refundsOnCharge(state, "ch_test_200")).toEqual({ found: [], path: "/refunds" });
   });
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Unit tests for the shared upload/finalize helpers (FDRS-656 review fixes).
+// Unit tests for the shared upload/finalize helpers.
 
 import { gunzipSync } from "node:zlib";
 import { describe, it, expect, vi, afterEach } from "vitest";
@@ -13,7 +13,7 @@ import { scoreStatus } from "../../../src/hosted/evalResultView.js";
 import { HostedOrchError } from "../../../src/hosted/errors.js";
 import { finalizeResponseSchema, type FinalizeResponse } from "../../../src/contract/index.js";
 
-describe("redactJsonl (FDRS-656 review)", () => {
+describe("redactJsonl", () => {
   it("drops whitespace-only lines so validation and upload agree on row counts", () => {
     // validateJsonl trims lines before parsing, so a " " line passes
     // validation — it must never reach cloud as a non-JSON row.
@@ -173,13 +173,8 @@ describe("uploadRunBlobs — meta.json (D18.1)", () => {
   });
 });
 
-// F-1392 — pome-cloud's F-1296 moved a seed-pre-satisfied criterion out of
-// the dashboard's abstention denominator (`isRunIncomplete` in
-// apps/dashboard/src/lib/run-status.ts: `notEvaluated - preSatisfied > 0`).
-// The CLI never learned: `scoreFromFinalizeResponse` counted every `skipped`
-// result with no exemption, so a run the dashboard renders PASS came out
-// `can_pass: false` → `incomplete` → exit 1 in CI. These tests pin the fix
-// AND its narrowness: only the one named reason is exempt.
+// Pome-cloud moved a seed-pre-satisfied criterion out of the dashboard's abstention
+// denominator (`isRunIncomplete` in apps/dashboard/src/lib/run-status.ts:
 function finalizeResponse(
   criteria_results: FinalizeResponse["criteria_results"],
   score = 100,
@@ -192,7 +187,7 @@ function finalizeResponse(
   };
 }
 
-describe("scoreFromFinalizeResponse — the seed-pre-satisfied exemption (F-1392)", () => {
+describe("scoreFromFinalizeResponse — the seed-pre-satisfied exemption", () => {
   it("yields can_pass: true and scoreStatus 'pass' when the only non-passing criterion is pre-satisfied", () => {
     const finalized = finalizeResponse([
       {
@@ -273,19 +268,8 @@ describe("scoreFromFinalizeResponse — the seed-pre-satisfied exemption (F-1392
   });
 
   it("cannot see an `errored` criterion at all — `outcome` does not survive the wire", () => {
-    // F-1392 review: a fixture that sets `outcome: "errored"` only typechecks
-    // through a cast, and a cast in a fixture is usually a fixture describing
-    // a state the system cannot produce. This is that case, pinned rather
-    // than cast past. `outcome` is `evalResultView`'s own additive
-    // discriminator (FDRS-591/611); neither this repo's
-    // `criterionResultSchema` nor pome-cloud's carries it, and
-    // `finalizeResponseSchema` is a tolerant reader that STRIPS unknown keys,
-    // so a cloud emitting `outcome` today would have it dropped before
-    // `scoreFromFinalizeResponse` ever saw it. `errored` is therefore always
-    // 0 on the hosted path, and the `errored` term in `can_pass` is a guard
-    // for a producer that does not exist yet — not a branch a wire fixture
-    // can exercise. If this test ever goes red, the wire grew the field and
-    // the errored path became real.
+    // Review: a fixture that sets `outcome: "errored"` only typechecks through a cast,
+    // and a cast in a fixture is usually a fixture describing a state the system.
     const parsed = finalizeResponseSchema.parse({
       run_id: "run_x",
       score: 100,
@@ -320,16 +304,8 @@ describe("scoreFromFinalizeResponse — the seed-pre-satisfied exemption (F-1392
   });
 
   it("a run with ONLY pre-satisfied criteria and nothing else evaluated is still incomplete (nothing was actually graded)", () => {
-    // total_required stays 0 and can_pass stays false — the pre-existing A5
-    // guard (`totalRequired > 0`) is untouched by this exemption. F-1392
-    // narrows what counts as an ABSTENTION; it does not relax the older rule
-    // that a run with nothing passed or failed at all cannot pass regardless.
-    //
-    // The dashboard reads this shape `incomplete` too since F-1399; it used
-    // to render FAILED at 0/100, which is the claim this comment carried
-    // until F-1413 caught it going false. That agreement is checked rather
-    // than restated: the whole table, including this row, is in
-    // `cross-surface-agreement.test.ts`.
+    // total_required stays 0 and can_pass stays false — the pre-existing A5 guard
+    // (`totalRequired > 0`) is untouched by this exemption.
     const finalized = finalizeResponse([
       {
         criterion: { type: "code", text: "github.no-new-issues" },
@@ -345,7 +321,7 @@ describe("scoreFromFinalizeResponse — the seed-pre-satisfied exemption (F-1392
     expect(scoreStatus(score, 100)).toBe("incomplete");
   });
 
-  it("keeps the FDRS-618 compat: no criteria_results at all still means can_pass true", () => {
+ it("keeps the compat: no criteria_results at all still means can_pass true", () => {
     const finalized: FinalizeResponse = {
       run_id: "run_x",
       score: 100,

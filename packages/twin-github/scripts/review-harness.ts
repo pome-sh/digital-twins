@@ -136,7 +136,7 @@ const filePath = "claude-agent.txt";
 // at an already-running one — this script used to assume a human had already
 // run `npm run dev` in another terminal (README's two-terminal flow still
 // works: an explicit GITHUB_MCP_URL skips the self-boot), which is exactly
-// why nothing ran it in CI (F-1472).
+// why nothing ran it in CI.
 let ownedServer: { close: () => void } | undefined;
 
 if (target === "local") {
@@ -168,7 +168,7 @@ if (target === "local") {
     // collaborator, and mergePullRequest's permission check reads the
     // session's login to look that collaborator up — an unset login always
     // 403s "must have push access", on the repo this run just created and
-    // owns. Never caught before because nothing ran this script (F-1472).
+    // owns. Never caught before because nothing ran this script.
     { sid, team_id: "tm_review", login: "pome-agent", exp: Math.floor(Date.now() / 1000) + 3600 },
     secret
   );

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The Stripe twin as a thin `@pome-sh/sdk` plugin (F-684). This manifest is
+// The Stripe twin as a thin `@pome-sh/sdk` plugin. This manifest is
 // pure declaration: domain factory, seed schema, tools, routes, and the
-// wire-frozen Stripe shapes (FDRS-711 / F-712) — errors.ts envelopes, the
+// wire-frozen Stripe shapes — errors.ts envelopes, the
 // liberal-bearer + 403-sid-mismatch + root-/v1/*-mount auth pins, healthz
 // extras (fidelity + tthw_seconds), the 501 unsupported envelope, the
 // admin-gate 403 body. All mechanism (HTTP mount, auth, recorder +
@@ -48,7 +48,7 @@ import type { SeedState, TwinStripeDatabase } from "./types.js";
 /**
  * Real Stripe's answer to a request with no `Authorization` header at all,
  * transcribed verbatim from a live 401 on `GET https://api.stripe.com/v1/customers`
- * (2026-08-13, F-1497 — a read with no body, so nothing was created or charged).
+ * (2026-08-13 — a read with no body, so nothing was created or charged).
  * Used by `auth.unauthorized`'s `no_token` leg below.
  */
 const NO_API_KEY_MESSAGE =
@@ -91,7 +91,7 @@ function zodIssues(err: unknown): Array<{ path: ReadonlyArray<PropertyKey>; mess
  */
 function stripeErrorEnvelope(err: unknown): { status: number; body: unknown } {
   // Engine tool dispatch throws UnknownToolError; frozen stripe wire is
-  // 400 `tool_unknown` (github 422, slack 404 — per-twin, FDRS-711).
+  // 400 `tool_unknown` (github 422, slack 404 — per-twin).
   if (err instanceof UnknownToolError) {
     return stripeError("invalid_request_error", "tool_unknown", `No such MCP tool: '${err.tool}'.`, {
       param: "tool",
@@ -119,7 +119,7 @@ function stripeErrorEnvelope(err: unknown): { status: number; body: unknown } {
   );
 }
 
-// F-1325 — the tool table is the fixture. `deriveMcpToolTable` supplies every
+// The tool table is the fixture. `deriveMcpToolTable` supplies every
 // name, description and input schema (the frozen z.toJSONSchema projection,
 // {} fallback and all) from `fixtures/mcp-tools-list.raw.json`, and refuses to
 // build if the schemas in tools.ts and the fixture disagree in either
@@ -162,7 +162,7 @@ export function createStripeTwinDefinition(
   const { db } = opts;
   const startedAtMs = opts.startedAtMs ?? Date.now();
   // Per-app rule store: /admin/seed installs `failure_injection` rules into
-  // the same store the session middleware reads (FDRS-369).
+  // the same store the session middleware reads.
   const failureInjection = createFailureInjectionStore();
 
   return defineTwin<TwinStripeDatabase, SeedState, StripeDomain>({
@@ -190,7 +190,7 @@ export function createStripeTwinDefinition(
     // Session-wide middleware (the pre-port `session.use("*")` position):
     // mounted by the engine BEFORE its MCP routes, so failure injection and
     // idempotency cover /mcp, /mcp/call, /mcp/tools/:name exactly as the
-    // pre-port chassis did (F-684 review pin: an Idempotency-Key'd MCP
+    // pre-port chassis did (review pin: an Idempotency-Key'd MCP
     // create must replay, and injected rules on MCP paths must fire).
     middleware: (app, ctx) => {
       // Failure injection MUST run before idempotency so a configured
@@ -202,7 +202,7 @@ export function createStripeTwinDefinition(
       // substitutes inside the handler, so the idempotency layer reads the
       // HANDLER's status + body off the context (`setHandlerResult`) and caches
       // the real 200 — which is the record real Stripe writes when response
-      // delivery fails, and dropping it double-refunded the retry (F-1138).
+      // delivery fails, and dropping it double-refunded the retry.
       app.use("*", failureInjectionMiddleware(failureInjection, {
         recorder: ctx.recorder,
         runId: ctx.runId,
@@ -210,7 +210,7 @@ export function createStripeTwinDefinition(
       }));
       app.use("*", idempotencyMiddleware(db, ctx.recorder, ctx.runId));
     },
-    // Frozen pre-port body parsing on the engine-owned surfaces (F-684
+    // Frozen pre-port body parsing on the engine-owned surfaces (review
     // review pin). Two pre-port readers existed: /admin/seed was strict
     // JSON with a null fallback (null → default seed via the schema
     // preprocess below), while the MCP dispatch surfaces used
@@ -270,7 +270,7 @@ export function createStripeTwinDefinition(
         };
       },
       // Frozen tape shape: stripe's pre-port recorder never saw admin
-      // traffic — /admin/reset|seed emit no events (F-684 review pin).
+      // traffic — /admin/reset|seed emit no events (review pin).
       recorded: false,
       // Frozen stripe admin-gate 403 body.
       forbidden: () => forbidden("Forbidden"),
@@ -296,7 +296,7 @@ export function createStripeTwinDefinition(
     unsupported: () => unsupported(),
     errorEnvelope: stripeErrorEnvelope,
     auth: {
-      // F-712 pins: liberal bearer parsing ON (raw token + case-insensitive
+      // Frozen pins: liberal bearer parsing ON (raw token + case-insensitive
       // "bearer"); sid mismatch → 403; api_keys table lookup ahead of
       // provider-shaped verify + JWT; no path sid required (root mount);
       // expired-vs-invalid classified by the engine and rendered through
@@ -319,7 +319,7 @@ export function createStripeTwinDefinition(
         // answer "Invalid API Key provided." (pre-port terminal branch);
         // JWT-shaped failures answer "Bad credentials" / "Token expired".
         //
-        // F-1497 added the `no_token` leg. Real Stripe was probed live on
+        // The `no_token` leg was added. Real Stripe was probed live on
         // 2026-08-13 (`GET /v1/customers`, no request body, nothing created)
         // and it DOES distinguish a bad key from a missing one — both 401,
         // both `{"error":{"message":…,"type":"invalid_request_error"}}`, but
@@ -329,11 +329,11 @@ export function createStripeTwinDefinition(
         //   no key      "You did not provide an API key. …"  ← the constant below
         //
         // This twin answered the JWT branch's "Bad credentials" — GitHub's
-        // string — to a keyless request. That is the leak F-1497 exists to
+        // string — to a keyless request. That is the leak this exists to
         // stop, and it was reachable from every `/v1/*` path.
         //
         // ⚠️ NO `documentation_url` AND NO TOP-LEVEL `status` on either body.
-        // Stripe sends neither, so the leaves F-1497 added to twin-github must
+        // Stripe sends neither, so the leaves twin-github carries must
         // not appear here. (`stripeError` can emit a `doc_url`; auth does not
         // pass one, and must not start.)
         const message =

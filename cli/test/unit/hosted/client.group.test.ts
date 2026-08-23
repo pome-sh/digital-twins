@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-636 — hosted-client wire contract for trial groups:
-//   - POST /v1/sessions carries `group_id` + `idempotency_key` when the
-//     caller supplies them (shared-types 0.6.0 adds the field server-side;
-//     an older cloud silently strips it, so sending is always safe);
-//   - POST /v1/sessions/:id/abandon marks an errored trial failed NOW with a
-//     short machine error_code (contract: pome-cloud routes/abandon.ts).
+// Hosted-client wire contract for trial groups: - POST /v1/sessions carries `group_id`
+// + `idempotency_key` when the caller supplies them (shared-types 0.6.0.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createHostedClient } from "../../../src/hosted/client.js";
@@ -31,7 +27,7 @@ const SESSION_RESPONSE = JSON.stringify({
   per_twin: {},
 });
 
-describe("HostedClient.createSession — group fields (FDRS-636)", () => {
+describe("HostedClient.createSession — group fields", () => {
   it("forwards group_id and idempotency_key on the mint body", async () => {
     mockFetch(async (_url, init) => {
       const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
@@ -61,7 +57,7 @@ describe("HostedClient.createSession — group fields (FDRS-636)", () => {
   });
 });
 
-describe("HostedClient.abandonSession (FDRS-636)", () => {
+describe("HostedClient.abandonSession", () => {
   it("POSTs {error_code} to /v1/sessions/:id/abandon with the same auth surface as finalize", async () => {
     mockFetch(async (url, init) => {
       expect(String(url)).toBe(`${BASE}/v1/sessions/ses_abc/abandon`);

@@ -61,7 +61,7 @@ async function main() {
   try {
     const model = await resolveModel(modelSlug);
     const graph = buildGraph(model, { ghUrl, ghToken, slackUrl: slackUrl!, slackToken }, slackChannel);
-    // F-1519 — positive-evidence marker `scripts/smoke-examples.mjs` classifies
+    // Positive-evidence marker `scripts/smoke-examples.mjs` classifies
     // REACHED-OUTBOUND on, printed immediately before this example's first
     // outbound call (the graph's `intake` node calls the GitHub twin before
     // the model is ever invoked). This example has no @pome-sh dependency to

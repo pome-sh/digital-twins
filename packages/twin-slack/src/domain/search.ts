@@ -44,7 +44,7 @@ export function searchMessages(domain: SlackDomain,
     sort_dir?: string;
     highlight?: boolean;
     /**
-     * Which conversations may match (F-1330). Slack's MCP server splits this
+     * Which conversations may match. Slack's MCP server splits this
      * one Web API method into two tools that differ on exactly this axis —
      * `slack_search_public` sees public channels only, and
      * `slack_search_public_and_private` also sees private channels, DMs and

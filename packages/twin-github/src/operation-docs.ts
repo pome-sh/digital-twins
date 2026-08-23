@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1498 — which GitHub operation each door of this twin stands for, and the
+// Which GitHub operation each door of this twin stands for, and the
 // `documentation_url` real GitHub puts on that operation's errors.
 //
 // ── WHY THIS IS A LOOKUP AND NOT A THROW-SITE CONSTANT ──────────────────────
 //
 // Real GitHub is operation-specific on 45 of 59 measured error responses
-// (F-1490's transcript). This twin could not follow, because the SDK's hook is
+// (the transcript). This twin could not follow, because the SDK's hook is
 // `errorEnvelope?: (err: unknown) => {status, body}` — the error and nothing
 // else — while the right url depends on WHICH DOOR was knocked on: `notFound()`
 // raised inside `domain.requireRepo()` is reachable from ~40 REST routes and

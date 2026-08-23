@@ -15,7 +15,7 @@
 // text, tool_use), and every one of them repeats the SAME `usage` object. So we
 // accumulate by `message.id` and emit a single span when the turn closes — on
 // the next turn, on `result`, or on stream end. Emitting per message would
-// multiply the turn's cache-token counts by its content-block count (F-994: a
+// multiply the turn's cache-token counts by its content-block count (a
 // live 5-turn run over-reported its input total by 79%).
 //
 // The id check is deliberately against the turn being accumulated rather than
@@ -27,7 +27,7 @@
 // assistant message carries a `message_start` snapshot, ~5x low — so it comes
 // from the `message_delta` stream event via MessageDeltaTracker, with the
 // snapshot kept only as a fallback for a stream that ended before its delta
-// (F-998; see partial-messages.ts for how those events are obtained and hidden
+// (see partial-messages.ts for how those events are obtained and hidden
 // again).
 //
 // On the terminal `result` message we `await flushPomeTelemetry()` BEFORE

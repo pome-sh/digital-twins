@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Refunds domain — FDRS-338 (M3a Lane B).
+// Refunds domain (M3a Lane B).
 //
 // `create()` runs INSERT refund + UPDATE charges.amount_refunded in a single
 // better-sqlite3 transaction so a partial failure between legs can never
@@ -72,7 +72,7 @@ export class RefundsDomain {
 
     const tx = this.db.transaction((): CreateRefundResult => {
       const charge = this.requireCharge(accountId, input.charge);
-      // F-731 mints `failed` charges for declined card attempts; real
+      // The card rail mints `failed` charges for declined attempts; real
       // Stripe refuses to refund a charge that never captured.
       if (charge.status !== "succeeded") {
         throw new TwinError(

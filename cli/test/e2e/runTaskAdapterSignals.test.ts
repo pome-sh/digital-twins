@@ -8,11 +8,8 @@ import { runTask } from "../../src/runner/runTask.js";
 import { captureServerForTests } from "../fixtures/captureServerForTests.js";
 import { inCli } from "../fixtures/cliDir.js";
 
-// FDRS-411 e2e: a fake CAS-style adapter agent writes M0 HookEvent rows to
-// POME_ADAPTER_SIGNALS_PATH. The runner must (a) inject that env var
-// pointing at <runDir>/signals.jsonl, (b) leave signals.jsonl populated
-// post-run, and (c) merge those rows into events.jsonl so the merged file
-// is the canonical view for downstream consumers.
+// E2E: a fake CAS-style adapter agent writes M0 HookEvent rows to
+// POME_ADAPTER_SIGNALS_PATH.
 describe("runTask + POME_ADAPTER_SIGNALS_PATH", () => {
   it(
     "injects POME_ADAPTER_SIGNALS_PATH and merges signals.jsonl into events.jsonl",

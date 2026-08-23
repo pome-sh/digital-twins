@@ -175,7 +175,7 @@ async function handleToolsCall<TDb, TSeed, TDomain>(
 
   if (!tool) {
     const envelope = projectError(new UnknownToolError(name));
-    // The unknown-tool result body is frozen per twin (F-682): github pins
+    // The unknown-tool result body is frozen per twin: github pins
     // its pre-port `{message: "Unknown tool: <name>"}` text while the
     // legacy /mcp/call surface keeps the envelope projection.
     const body = deps.definition.mcpUnknownTool ? deps.definition.mcpUnknownTool(name) : envelope.body;
@@ -251,7 +251,7 @@ function buildEventCore<TDb, TSeed, TDomain>(
   }
 ) {
   const requestId = `req_${randomUUID()}`;
-  // Same stamping as recorder.ts emit() — see the comment there (F-683).
+  // Same stamping as recorder.ts emit() — see the comment there.
   const stepId = c.req.header("x-pome-scenario-step-id") ?? null;
   const correlationHeader = c.req.header("x-pome-correlation-id") ?? null;
   return {
@@ -263,13 +263,13 @@ function buildEventCore<TDb, TSeed, TDomain>(
     task_step_id: stepId,
     scenario_step_id: stepId,
     step_id: null,
-    // FDRS-402 adapter-rich path — per-twin pin, see recorder.ts (F-682).
+    // adapter-rich path — per-twin pin, see recorder.ts.
     tool_call_id: deps.definition.stampToolCallId ? correlationHeader : null,
     method: c.req.method,
     path: new URL(c.req.url).pathname,
     request_body: fields.requestBody,
     request_headers: recordedRequestHeaders(c),
-    // F-1125 — the whole reason the field exists. This surface is where the
+    // The whole reason the field exists. This surface is where the
     // tool name used to be reachable only by digging it out of `request_body`
     // on a `/mcp` path; a check that had to do that was reverse-engineering
     // transport, and getting it wrong false-passes a negative criterion.

@@ -56,9 +56,8 @@ import {
  * The tool table Linear serves, and its provenance. The substrate is
  * `twin-authored-from-vendor-docs`: the NAMES come from Linear's published MCP
  * launch documentation and the schemas are twin-owned, which the fixture's own
- * notes had always admitted while its `source` field read like a capture
- * (F-1325). Re-sourcing it from `https://mcp.linear.app/mcp` needs an OAuth
- * token and is F-1329's.
+ * notes had always admitted while its `source` field read like a capture. Re-sourcing it from `https://mcp.linear.app/mcp` needs an OAuth
+ * token.
  */
 export const linearToolFixture = loadMcpToolFixture({
   raw: rawListing,
@@ -543,7 +542,7 @@ const boundImplementations = Object.fromEntries(
 /**
  * The tool names this twin has a handler for, independent of any fixture.
  *
- * Exported for `scripts/adopt-upstream-mcp-fixture.ts` (F-1470), which has to
+ * Exported for `scripts/adopt-upstream-mcp-fixture.ts`, which has to
  * check a projection against the implementations BEFORE writing it — the 1:1
  * assertion `deriveMcpToolTable` makes below runs on the file the script already
  * wrote, so a mismatch there is a broken build where here it is a refusal.

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // What Stripe's declared checks can assert about the RUN — the recorded call
-// tape rather than the exported end state (F-1127).
+// tape rather than the exported end state.
 //
 // Four checks, and every one of them exists because the final state cannot
 // answer the question:
@@ -44,7 +44,7 @@ const TAPE_MISSING = { passed: false, status: "skipped" as const, reason: "tape_
 
 /** The recorded ids backing an outcome, minus the rows that carry none. Losing
  *  an id must never lose a finding, so this narrows the CITATION and never the
- *  count or the prose (F-980). */
+ *  count or the prose. */
 function citations(events: readonly CheckTapeEvent[]): string[] {
   return events
     .map((event) => event.event_id)
@@ -331,7 +331,7 @@ export const x402RetryIncludesPayment: Check<Record<string, never>> = defineChec
   evaluate(_args, { tape }) {
     if (tape === null) return TAPE_MISSING;
 
-    // A tape recorded before F-1125 carries no headers at all, and this turns
+    // A tape recorded before carries no headers at all, and this turns
     // entirely on one. "No row had X-PAYMENT" and "no row COULD have had it" are
     // the same absence, so answering would be inventing a verdict — and because
     // this criterion is POSITIVE, the invented verdict fails a correct agent.

@@ -11,7 +11,7 @@
 // mean each twin lands in its own lazily-loaded chunk: `pome twin start github`
 // never parses the other four twins or their SQLite schemas.
 //
-// Necessary but NOT sufficient, which is why F-1306 exists: splitting can only
+// Necessary but NOT sufficient: splitting can only
 // defer what nothing on the startup path statically imports, and five modules
 // under `src/task/` imported three twins' package roots for a zod seed schema.
 // Both settings were doing their job and the claim was still false —
@@ -41,7 +41,7 @@ const pkg = JSON.parse(readFileSync(resolve(CLI_ROOT, "package.json"), "utf8")) 
 const BIN_ENTRY = resolve(CLI_ROOT, "dist/src/cli/main.js");
 
 /**
- * FDRS-666 — `npm pack` preserves file modes straight from disk and a global
+ * `npm pack` preserves file modes straight from disk and a global
  * install's `pome` symlink points at this file, so a 644 bin means `pome` is
  * not found on PATH until the user chmods it by hand. tsup already adds the
  * shebang and the exec bit for entries named in `bin`; assert both rather than

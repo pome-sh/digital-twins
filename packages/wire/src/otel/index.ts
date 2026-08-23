@@ -5,12 +5,12 @@
  * Barrel re-export. The golden-fixture corpus under `./fixtures/` is a
  * test/dev artifact and is intentionally NOT re-exported from the public barrel.
  *
- * OWNERSHIP BOUNDARY (settled at FDRS-653; supersedes the earlier
+ * OWNERSHIP BOUNDARY (settled; supersedes the earlier
  * "pome-cloud mirrors this directory verbatim" claim, which no longer held):
  *   - FORMAT schemas are canonical HERE, in `pome-sh/pome-twins`
  *     `@pome-sh/shared-types` v0.5.0+ (now `@pome-sh/wire`): `span-event`, `event-schema`,
  *     `semconv`, `nano`, `project`, `map-span`, and the
- *     `fixtures/` corpus. pome-cloud CONSUMES this surface (FDRS-654 swaps it
+ * `fixtures/` corpus. pome-cloud CONSUMES this surface (the consumer swap it
  *     onto the published package); it does not fork it.
  *   - INGEST-side utilities are cloud-owned consumers and intentionally do NOT
  *     live here: OTLP wire decoding (`decode-otlp.ts`), redaction/allowlist

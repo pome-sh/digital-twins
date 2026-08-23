@@ -1,17 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1125 — what the x402 flow leaves on the recorder tape.
-//
-// The criterion this exists for is task 13's `The retry includes X-PAYMENT and
-// returns 200`. It reads the tape, so the tape has to carry two things the
-// recorder never captured: the request headers, and — first — the x402 requests
-// at all. `registerX402Routes` mounted the protected resource as a BARE Hono
-// handler and answered the 402 leg from inside the middleware, so neither leg
-// reached the recorder: `state_final.json` is byte-identical whether the agent
-// paid, failed to pay, or never tried, and the tape was empty.
-//
-// A negative verdict over an empty tape is the free pass D4 forbids, which is
-// why both legs are asserted here rather than only the paying one.
+// What the x402 flow leaves on the recorder tape.
 
 // x402 mints and settles its PaymentIntent by calling the twin's OWN REST API
 // over the network, so `app.request()` cannot serve it — the middleware's

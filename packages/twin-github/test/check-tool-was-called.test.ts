@@ -1,30 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1338 — `` `<tool>` was called ``, the vocabulary's first positive tape
-// assertion on github.
-//
-// Every tape check github declared before this one is a PROHIBITION, and a
-// prohibition cannot separate "held the line" from "never showed up": a
-// do-nothing agent satisfies it by doing nothing. That is what this file has to
-// prove, so the load-bearing test is not the happy path — it is `[]`, the empty
-// tape, which MUST reach a real `failed` rather than a skip. Soften that one and
-// the whole check stops doing the only job it was added for.
-//
-// The other three that matter are all about what the recorder's `tool` field
-// MEANS, and each is the mirror image of a `check-tool-never-called.test.ts`
-// case rather than a copy of it:
-//
-//   * both doors  — the field names the ACTION, so a REST call satisfies the
-//                   assertion exactly as an MCP `tools/call` does
-//   * the slot    — typed to `TAPE_ASSERTABLE_TOOLS`, so a positive criterion
-//                   cannot name an action whose REST route is unstamped. On the
-//                   negative sibling that narrowing prevents a false PASS; here
-//                   it prevents a false FAIL, and it is the same missing fact
-//                   (F-1342)
-//   * `undefined` — a recording that predates the field is refused BY NAME. The
-//                   negative sibling can read an absent `tool` as "not a match"
-//                   and stay safe; a positive check reading it the same way
-//                   fails a correct agent for the age of the recording
+// `` `<tool>` was called ``, the vocabulary's first positive tape assertion on github.
 
 import { describe, expect, it } from "vitest";
 import type { CheckTapeEvent } from "@pome-sh/sdk/checks";
@@ -72,23 +47,13 @@ describe("github.tool-was-called — grammar", () => {
 
   it("refuses to bind an action the recorder does not stamp on both doors", () => {
     // The SAME narrowing the negative sibling carries, and it is here for the
-    // mirror-image reason (F-1342). `merge_pull_request` and `add_issue_labels`
-    // are real tools whose REST route is unstamped, so a positive criterion
-    // naming one would answer "never called" over a run that performed it by
-    // REST — a correct agent marked down. Better an unbound sentence, visible in
-    // the corpus, than a bound one that lies.
-    //
-    // These two are F-1342's own named blockers, and they are the subjects here
-    // because they are the ones that stay unstamped. `add_issue_comment` used to
-    // stand in this line and now binds (F-1521): M0's slice needed that one
-    // sentence, so its route was stamped and its probe paid for, which is the
-    // only way into this set. The rest of the sweep is still F-1342's.
+    // mirror-image reason.
     expect(parseCheck(toolWasCalled, "`merge_pull_request` was called")).toBeNull();
     expect(parseCheck(toolWasCalled, "`add_issue_labels` was called")).toBeNull();
     expect(checkPattern(toolWasCalled).test("`no_such_tool` was called")).toBe(false);
   });
 
-  it("binds the slice's sentence, `add_issue_comment` was called (F-1521)", () => {
+  it("binds the slice's sentence, `add_issue_comment` was called", () => {
     // Named rather than left to the loop below, because this is the one sentence
     // M0's slice task asserts and "it binds" is that milestone's Done-when. The
     // loop proves the SET and the slot agree; this proves the set contains the
@@ -108,9 +73,8 @@ describe("github.tool-was-called — grammar", () => {
   });
 
   it("takes its slot from TAPE_ASSERTABLE_TOOLS rather than a second list", () => {
-    // The settlement F-1338 owes F-1342, asserted rather than argued: ONE set
-    // gates both directions, so stamping a route widens the positive and the
-    // negative check together and neither can drift onto its own enumeration.
+    // The settlement between the two, asserted rather than argued: ONE set gates both
+    // directions, so stamping a route widens the positive and the negative check.
     for (const tool of TAPE_ASSERTABLE_TOOLS) {
       expect(parseCheck(toolWasCalled, `\`${tool}\` was called`)).toEqual({ tool });
       expect(parseCheck(toolNeverCalled, `\`${tool}\` was never called`)).toEqual({ tool });
@@ -132,9 +96,7 @@ describe("github.tool-was-called — grammar", () => {
   });
 
   it("declares the tape substrate and a POSITIVE polarity", () => {
-    // The declared direction, not one inferred from the English (F-1070). It is
-    // what tells the discrimination gate this criterion must FAIL on the seed —
-    // which is the null-agent property this whole check exists for.
+    // The declared direction, not one inferred from the English.
     expect(toolWasCalled.substrate).toBe("tape");
     expect(toolWasCalled.polarity({ tool: "create_commit_status" })).toBe("positive");
     expect(toolNeverCalled.polarity({ tool: "create_commit_status" })).toBe("negative");
@@ -143,11 +105,8 @@ describe("github.tool-was-called — grammar", () => {
 
 describe("github.tool-was-called — the null agent", () => {
   it("THE FAILING WORLD — an EMPTY tape fails, and is not softened into a skip", () => {
-    // The reason this check exists. An agent that did nothing produced no calls;
-    // a prohibition would congratulate it. `[]` is a real world — "the agent
-    // called nothing" — and must reach a real `failed`, because a `skipped`
-    // would drop the criterion out of the denominator and hand the null agent
-    // its score back.
+    // `[]` is a real world — "the agent called nothing" — and must reach a real
+    // `failed`: a `skipped` drops the criterion and hands the null agent its score.
     const outcome = run("create_commit_status", []);
     expect(outcome.passed).toBe(false);
     expect(outcome.status).toBeUndefined();
@@ -264,11 +223,7 @@ describe("github.tool-was-called — verdicts", () => {
   });
 
   it("refuses BY NAME on a recording made before the `tool` field existed", () => {
-    // `undefined` is a THIRD world and this is the check that cannot collapse
-    // it. Rows written before F-1125 carry no `tool` at all, so "no row named
-    // this action" and "no row COULD have named it" are the same absence — and
-    // for a POSITIVE criterion the invented verdict marks a correct agent down.
-    // Same shape as `stripe.x402-retry-includes-payment`'s `headers_not_recorded`.
+    // `undefined` is a THIRD world and this is the check that cannot collapse it.
     const outcome = run("create_commit_status", [
       call({ tool: undefined }),
       call({ tool: undefined, path: "/repos/acme/api/issues" }),

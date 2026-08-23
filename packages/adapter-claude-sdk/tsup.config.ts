@@ -2,7 +2,7 @@
 //
 // The adapter is the second of the two packages published to npm. It bundles
 // its internal `@pome-sh/*` dependency — the wire types + redaction helpers —
-// via `noExternal`. `@pome-sh/wire` IS published (F-949), but to GitHub
+// via `noExternal`. `@pome-sh/wire` IS published, but to GitHub
 // Packages, which requires a GitHub token even to read; declaring it as a real
 // dependency would 401 on an end user's `npm i`. Bundling is what keeps wire out
 // of their install graph, so `noExternal` must stay.

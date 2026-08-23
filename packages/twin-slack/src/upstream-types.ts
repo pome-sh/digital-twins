@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Spec contract for shape fidelity (FDRS-477; mirrors twin-github FDRS-475/476).
+// Spec contract for shape fidelity (mirrors twin-github).
 //
 // This shim anchors the twin's response serializers to Slack's official
 // response types (`@slack/web-api`). The serializers are expected to emit a
@@ -44,7 +44,7 @@ export type DeepPartial<T> = T extends (infer U)[]
     ? { [K in keyof T]?: DeepPartial<T[K]> }
     : T;
 
-// Upstream-added-field guard (mirrors twin-github FDRS-476).
+// Upstream-added-field guard (mirrors twin-github).
 // Uncovered = upstream keys the serializer neither emits nor registers as a
 // deliberate omission. When that set is empty the assertion is `true`; when it
 // is non-empty the type becomes an error-carrying object whose member type

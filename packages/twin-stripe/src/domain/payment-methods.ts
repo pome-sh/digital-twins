@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Payment methods domain — F-732 (M5 card-on-file chain).
+// Payment methods domain (M5 card-on-file chain).
 //
-// Card-only in this milestone (card PIs land in F-731). The PAN is never
+// Card-only in this milestone. The PAN is never
 // stored: creation derives brand/last4/fingerprint and drops the number.
 // Attach/detach carries Stripe's lifecycle rules — one customer per PM,
 // and a detached PM can never be reattached.
@@ -211,7 +211,7 @@ export class PaymentMethodsDomain {
   }
 }
 
-// ---------- magic test cards (F-731 decline/retry chain) ----------
+// ---------- magic test cards (decline/retry chain) ----------
 //
 // Stripe's published test numbers that succeed at PM creation but decline
 // at confirm time. The PAN is never stored, so the behavior is keyed by

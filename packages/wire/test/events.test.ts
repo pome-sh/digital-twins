@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// Tests for the unified events.jsonl discriminated-union schema introduced by
-// FDRS-398. The legacy single-shape `recorderEventSchema` is tested separately
-// in `recorder-events.test.ts`; this file covers the new union, its variants,
-// and the `isLegacyEventRow` detector that lets readers tell the two on-disk
-// shapes apart during the v1 rollout.
+// Tests for the unified events.jsonl discriminated-union schema introduced by The
+// legacy single-shape `recorderEventSchema` is tested separately in `recorder-events.test.ts`.
 import { describe, expect, it } from "vitest";
 import {
   eventSchema,
@@ -176,15 +172,8 @@ describe("twinHttpEventSchema", () => {
     expect(() => twinHttpEventSchema.parse(rest)).toThrow();
   });
 
-  // F-1200 relaxed this. Both parent keys are optional at the object schema so
-  // the tolerant reader can run at all: `parent_event_id` cannot be required
-  // (a shipped 0.13.0 row does not carry it) and `parent_id` cannot be either
-  // (a new-vocab row does not carry it). The "writers emit it explicitly"
-  // discipline this test used to hold moved to the `lint:parent-vocab` CI gate
-  // and to the fixture corpus, which are the places that can actually see a
-  // writer. Tolerating here is the same trade `request_headers` documents in
-  // recorder-events.ts: this schema is the only gate into the cloud's tape and
-  // a row that fails it is dropped SILENTLY.
+  // Both parent keys are optional at the object schema so the tolerant reader can run
+  // at all: `parent_event_id` cannot be required (a shipped 0.13.0 row does.
   it("accepts a row carrying neither parent key, settling parent_event_id to null", () => {
     const { parent_id: _omit, ...rest } = twinHttpFixture;
     expect(twinHttpEventSchema.parse(rest).parent_event_id).toBeUndefined();
@@ -192,16 +181,9 @@ describe("twinHttpEventSchema", () => {
   });
 });
 
-// F-1200 — `parent_id` meant four different things across five writers, so the
-// canonical spelling is now `parent_event_id` ("the spawning row's event_id")
-// and the hook writer's raw SDK id moved to `causing_tool_use_id`.
-//
-// `parent_id` stays in the schema as the pre-F-1200 spelling for the same
-// reason `scenario_step_id` does (FDRS-653): every shipped 0.13.0 emitter
-// writes it, and this shape is the only gate into the cloud's tape — a row
-// that fails to parse is dropped SILENTLY, so a stored recording arriving as
-// an empty tape would be far worse than a duplicated key.
-describe("parent vocab tolerant reader (F-1200)", () => {
+// `parent_id` meant four different things across five writers, so the canonical
+// spelling is now `parent_event_id` ("the spawning row's event_id") and the.
+describe("parent vocab tolerant reader", () => {
   it("populates parent_event_id from a legacy row that only wrote parent_id", () => {
     const r = eventSchema.parse({ ...twinHttpFixture, parent_id: "evt_tool_1" });
     expect(r.parent_event_id).toBe("evt_tool_1");
@@ -209,7 +191,7 @@ describe("parent vocab tolerant reader (F-1200)", () => {
 
   it("preserves the legacy parent_id as-sent (additive normalization)", () => {
     const r = eventSchema.parse({ ...twinHttpFixture, parent_id: "evt_tool_1" });
-    // A re-serialized row must still parse under a pre-F-1200 reader.
+    // A re-serialized row must still parse under a legacy reader.
     expect(r.parent_id).toBe("evt_tool_1");
   });
 

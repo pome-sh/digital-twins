@@ -1,19 +1,5 @@
 #!/usr/bin/env node
-/**
- * Regression coverage for scripts/emit-trace-contract.mjs (F-1201).
- *
- * The gate's whole job is to make "a new event kind ships with no fixture" fail
- * loudly, so the cases below are written from that scenario. Case 2 IS the
- * ticket's Done-when observable, expressed at the seam: a kind list with a
- * member the corpus does not cover must throw, naming the kind and the fixture
- * path that would satisfy it.
- *
- * The pure helpers are exercised directly (a synthetic union member cannot be
- * declared in a fixture tree — the union is real source), and the CLI is
- * exercised by spawning it against throwaway package roots via `--root`. The
- * last case asserts the gate is actually wired into ci.yml: a gate nothing runs
- * is the failure mode this ticket exists to prevent.
- */
+/** Regression coverage for scripts/emit-trace-contract.mjs. */
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -84,10 +70,7 @@ function main() {
     PACKAGE_ROOT,
   );
 
-  // 1 — the union really is enumerated from zod, not typed out. The eight
-  // members below are the ones on `main` at F-1201; the assertion that matters
-  // is that they arrive from `otelEventSchema` and include BOTH arms of it —
-  // the seven legacy kinds and the OTel one.
+  // 1 — the union really is enumerated from zod, not typed out.
   {
     assert(kinds.length >= 8, `expected the full union, got ${kinds.length}: ${kinds}`);
     for (const kind of ["TwinHttpEvent", "LlmTurnEvent", "OtelSpanEvent"]) {
@@ -95,10 +78,8 @@ function main() {
     }
   }
 
-  // 2 — THE DONE-WHEN OBSERVABLE. A member of the union with no fixture fails,
-  // naming the kind and the path that would satisfy it. This is the case that
-  // was impossible before F-1201: the old script never read the union, so the
-  // emitted JSON did not move and `--check` was green by construction.
+  // 2 — THE DONE-WHEN OBSERVABLE. A member of the union with no fixture fails, naming
+  // the kind and the path that would satisfy it.
   {
     const message = expectThrows(
       () => auditEventFixtures([...kinds, "GhostEvent"], fixtures),
@@ -155,9 +136,7 @@ function main() {
   // than returning the kinds it did recognize. A short list is a gate that
   // quietly stops requiring fixtures for whatever it walked past.
   {
-    // F-942: `planTierSchema` was the stand-in here until it left with the
-    // cloud contract. `twinIdSchema` is the same argument — an enum node, not a
-    // union/pipe/object — and it is one this package still owns.
+    // `planTierSchema` was the stand-in here until it left with the cloud contract.
     expectThrows(() => unionKinds(api.twinIdSchema, "twinIdSchema"), "unhandled zod node");
     expectThrows(() => unionKinds({ def: { type: "object", shape: {} } }, "noKind"), "no literal");
   }

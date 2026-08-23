@@ -1,20 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// The published surface is a CONTRACT with a cross-repo consumer, and the way
-// it breaks is not a build error. pome-cloud's `lib/twin-state.ts` boots these
-// domains in-process; a renamed or dropped export compiles fine on both sides
-// of this repo and dies as `undefined is not a constructor` on the grader — or
-// worse, `checks-package-drift.test.ts` goes red with no legal move, which is
-// the wall F-1524 exists to take down. So this file pins the surface by NAME
-// rather than trusting `export *`.
-//
-// It deliberately does NOT re-assert every check id: each twin's own
-// `checks-contract.test.ts` owns the per-twin vocabulary and
-// `packages/checks/test/surface.test.ts` owns the vocabulary package's shape.
-// What it pins is exactly F-1526's export spec — the table measured from
-// pome-cloud's own imports — plus the one property that makes this package
-// worth publishing at all: its `*_CHECKS` tuples are the SAME objects
-// `@pome-sh/checks` serves, because both are cut from the same `main` commit.
+// The published surface is a CONTRACT with a cross-repo consumer, and the way it
+// breaks is not a build error.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import * as z from "zod";
@@ -31,16 +17,8 @@ const CANONICAL_TWINS: readonly string[] = JSON.parse(
   readFileSync(new URL("../../../config/first-party-twins.json", import.meta.url), "utf8"),
 ).twins;
 
-/**
- * F-1526's export spec, verbatim. Measured 2026-08-13 from pome-cloud at
- * `287755c0`: `apps/control-plane/src/lib/twin-state.ts:58-84`,
- * `checks-package-drift.test.ts`, `lib/twin-tape-pull.ts`, and
- * `apps/mcp/src/lib/capture.ts`.
- *
- * `scripts/ci/check-sandbox-domains-tarball.mjs` asserts the same table against the
- * PACKED bytes. Both, on purpose: this one fails in the PR that breaks it with a
- * readable diff, that one fails before a broken tarball reaches the registry.
- */
+/** the export spec, verbatim. Measured 2026-08-13 from pome-cloud at `287755c0`:
+ *  `apps/control-plane/src/lib/twin-state.ts:58-84`, `checks-package-drift.test.ts`. */
 const EXPORT_SPEC = {
   github: ["GitHubDomain", "openGitHubCloneDatabase", "parseSeed", "GITHUB_CHECKS"],
   gmail: ["GmailDomain", "openGmailTwinDatabase", "parseSeed", "GMAIL_CHECKS"],
@@ -74,7 +52,7 @@ describe("the export spec measured from pome-cloud", () => {
   }
 
   // The entry that retires the last frozen `@pome-sh/sdk@0.11.1` pin in BOTH
-  // pome-cloud manifests (F-1527, step 2).
+  // pome-cloud manifests (step 2).
   it("./server exports toTwinHttpEventRow", () => {
     expect(typeof server.toTwinHttpEventRow).toBe("function");
   });
@@ -175,15 +153,6 @@ describe("the vocabulary is shared with @pome-sh/checks, not copied", () => {
 
 // The property the `zod` PEER dependency exists to guarantee, asserted from the
 // consumer's side of it.
-//
-// This file imports zod itself, exactly as pome-cloud does, and the schemas the
-// package hands back must be values of THAT zod — not of a second copy bundled
-// inside the tarball. Two zod copies is the F-942 bug: `instanceof` starts
-// failing and `.parse()` results stop being interchangeable, and nothing at
-// runtime announces it, which is why it needs an assertion rather than a
-// convention. `check-sandbox-domains-tarball.mjs` covers the other half (zod is
-// never inlined into the shipped bytes); this covers the half a tarball scan
-// cannot see, which is that the objects are the same IDENTITY at run time.
 describe("zod is the consumer's, not a bundled copy", () => {
   it("hands back schemas the importing module's own zod recognises", () => {
     expect(github.seedSchema).toBeInstanceOf(z.ZodType);

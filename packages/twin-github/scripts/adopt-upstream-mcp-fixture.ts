@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Derive `fixtures/mcp-tools-list.{raw,meta,canonical}.json` from the upstream
-// golden at `fixtures/mcp-tools-list/github.*` (F-1468).
+// golden at `fixtures/mcp-tools-list/github.*`.
 //
 // ── WHAT THIS REPLACED, AND WHY ──────────────────────────────────────────────
 //
@@ -9,7 +9,7 @@
 // the substrate was `twin-code-transcription`, the descriptions were ours, and
 // every `inputSchema` was `z.toJSONSchema()` of the twin's own validator. That
 // made twin-github the last twin serving a table read off itself — slack and
-// gmail have served the vendor's capture since F-1330 and F-1400 — and
+// gmail have served the vendor's capture for longer — and
 // pome-cloud's MCP lane priced the difference at 577 findings across 34 tools,
 // against slack's 0.
 //
@@ -45,7 +45,7 @@
 // `api.githubcopilot.com/mcp/` actually gets. So those two rows cannot come from
 // the capture and cannot be dropped either: dropping them would stop the twin
 // serving a tool GitHub answers for any client that sets `X-MCP-Features`, which
-// is F-1330's defect reached from the other side.
+// is the defect reached from the other side.
 //
 // So `CARRIED` is a second, narrower door, and it is fenced the same way
 // `DROPPED` is:
@@ -84,7 +84,7 @@ const PRODUCER =
 
 /**
  * Tools GitHub's `default` toolset declares that this twin does not model, and
- * why. F-1468's scope ruling; each one is also registered in pome-cloud's
+ * why. the scope ruling; each one is also registered in pome-cloud's
  * `known-divergences/github.mcp.yaml` against `mcp-tool-upstream-only`, and the
  * per-tool reasoning is `docs/github-mcp-unmodelled-tools.md`.
  *

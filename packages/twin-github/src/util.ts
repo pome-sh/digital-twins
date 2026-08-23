@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// GitHub-domain helpers only (F-682): timestamps, sha fabrication, content
+// GitHub-domain helpers only: timestamps, sha fabrication, content
 // encoding, pagination, diff-stat counting. Request-id stamping moved to
 // the engine's recorder with the port.
 import { createHash, randomUUID } from "node:crypto";
@@ -52,7 +52,7 @@ export function paginate<T>(items: T[], page = 1, perPage = 30) {
 }
 
 /**
- * F-1500 — pair the paths a diff dropped with the paths it gained, so a moved
+ * Pair the paths a diff dropped with the paths it gained, so a moved
  * file reads as one `renamed` entry carrying `previous_filename` instead of a
  * removal plus an addition. Returns head path -> the base path it moved from.
  *
@@ -92,13 +92,13 @@ export function detectRenames(
 export type DiffTree = Map<string, { content: string; sha: string }>;
 
 /**
- * F-1513 — the ONE derivation of GitHub's `diff-entry` rows from a pair of file
+ * The ONE derivation of GitHub's `diff-entry` rows from a pair of file
  * trees, serving both `GET /repos/:o/:r/pulls/:n/files` and
  * `GET /repos/:o/:r/compare/:basehead`.
  *
  * The two surfaces ask the same question of two different pairs of trees — the
  * pull's two branch file tables, the compare's two commit snapshots — and until
- * this they answered it with two independent path-by-path loops. F-1500 taught
+ * this they answered it with two independent path-by-path loops. Now
  * the pull loop to pair a move; the compare loop kept expanding one into an
  * `added` plus a `removed` carrying no `previous_filename` at all, and a live
  * capture against the real sandbox read `["added","renamed"]` upstream against
@@ -115,7 +115,7 @@ export function diffFileRows(
   urls: (path: string) => { blob_url: string; raw_url: string; contents_url: string }
 ): PullRequestFileRow[] {
   const paths = [...new Set([...base.keys(), ...head.keys()])].sort();
-  // F-1500 — which base-only path each head-only path MOVED from, keyed by the
+  // Which base-only path each head-only path MOVED from, keyed by the
   // head path. Resolved before the row loop so the removed side can be skipped
   // in the same pass that emits the renamed row.
   const renames = detectRenames(

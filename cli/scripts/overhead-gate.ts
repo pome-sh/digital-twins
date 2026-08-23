@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-405 / F-728 — `agent-trace-overhead-gate`. Runs `pome run` against the
+// `agent-trace-overhead-gate`. Runs `pome run` against the
 // bundled triage scenario in A/B pairs — capture-server proxy enabled
 // (default) vs `--no-capture` — accumulating N per-call latency samples from
 // each run's agent stdout. Fails when p99(with − without) exceeds the 5ms
@@ -30,7 +30,7 @@ import {
 } from "./overhead-stats.js";
 import { resolveTsxBin } from "./lib/resolve-tsx.js";
 
-// F-728 — N default raised 100 → 1000: at N=100 the nearest-rank p99 is the
+// N default raised 100 → 1000: at N=100 the nearest-rank p99 is the
 // second-largest sample, so one OS scheduling stall in either run's tail
 // flipped the verdict on shared runners. At N=1000 the p99 sits 10 ranks off
 // the max. Samples are local TCP connects, so the extra 900 cost ~1–2s/run.
@@ -59,12 +59,12 @@ const CLI_ROOT = process.cwd();
 // deny-by-default egress floor refuses, killing the agent preflight (exit 3).
 const TSX_BIN = resolveTsxBin(import.meta.url);
 
-// FDRS-641 — `pome run` now hard-gates on the doctor wiring checks (config →
+// `pome run` now hard-gates on the doctor wiring checks (config →
 // twin → routing → egress) with no --force. This synthetic benchmark used to
-// run in a bare `cli/` with no manifest, so post-FDRS-641 it dies at the config
+// run in a bare `cli/` with no manifest, so it dies at the config
 // check before spawning the agent. We can't (and shouldn't) bypass the gate, so
 // instead we run `pome run` from a throwaway directory that holds a valid
-// pome.json manifest (F-819) plus a wiring-marker source that reads
+// pome.json manifest plus a wiring-marker source that reads
 // POME_GITHUB_REST_URL — exactly what doctor's routing scan wants and nothing
 // that trips its hardcoded-host detection. The twin/egress checks pass against
 // the local github twin + deny-by-default floor the run already uses.
@@ -77,7 +77,7 @@ async function makeDoctorScaffold(): Promise<string> {
   await writeFile(
     join(dir, "agent.ts"),
     [
-      "// FDRS-641 doctor wiring marker. The benchmark's real agent is passed",
+      "// Doctor wiring marker. The benchmark's real agent is passed",
       "// via --agent; this file exists only so `pome doctor`'s routing scan",
       "// finds a POME_*_REST_URL read (and no hardcoded host) in the config dir.",
       "const baseUrl = process.env.POME_GITHUB_REST_URL;",
@@ -124,7 +124,7 @@ async function main(): Promise<void> {
   console.log(`[overhead-gate] N=${N} budget=${BUDGET_MS}ms target=${target}`);
 
   try {
-    // F-728 (supersedes the FDRS-405 retry loop) — the gate metric is a
+    // Supersedes the old retry loop — the gate metric is a
     // difference of two tail percentiles from two separate short runs. The
     // TRUE proxy overhead is ~1ms, but shared-runner noise flipped the
     // verdict near the 5ms budget (PR #99: 5.160ms and 5.442ms on unchanged
@@ -250,7 +250,7 @@ async function runPome(input: { noCapture: boolean; target: string; scaffold: st
   };
   // OVERHEAD_BENCH_N must be allowlisted explicitly or `pome run`'s agent-env
   // filter strips it and the agent silently falls back to its own default —
-  // invisible while both defaults were 100 (F-728 raised the orchestrator's).
+  // invisible while both defaults were 100 (the orchestrator's was raised).
   env.POME_AGENT_ENV_ALLOWLIST = appendAllowlist(
     process.env.POME_AGENT_ENV_ALLOWLIST,
     "POME_CAPTURE_TEST_TARGET",
@@ -261,7 +261,7 @@ async function runPome(input: { noCapture: boolean; target: string; scaffold: st
   // creds in macOS Keychain doesn't accidentally trigger a hosted run.
   env.POME_CLI_DISABLE_KEYCHAIN = "1";
 
-  // cwd = scaffold dir so `pome run`'s FDRS-641 doctor preflight finds the
+  // cwd = scaffold dir so `pome run`'s doctor preflight finds the
   // scaffolded pome.json manifest + wiring marker (and passes).
   const { stdout, stderr, exitCode } = await runChild(pomeExec, args, env, input.scaffold);
   if (exitCode !== 0) {

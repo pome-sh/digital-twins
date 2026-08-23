@@ -1,28 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// `create_refund.reason` takes Stripe's closed set, at both doors (F-1484).
-//
-// ── THE FALSE PASS THIS CLOSES ─────────────────────────────────────────────
-//
-// The twin declared `reason` as a free string on both surfaces — `z.string()`
-// on the MCP tool and `z.string().nullish()` on `POST /v1/refunds` — while
-// Stripe declares exactly `["duplicate","fraudulent","requested_by_customer"]`
-// on both. So `reason: "customer_was_rude"` created a refund here and would
-// have been 400'd by Stripe, and an examinee that made that call was graded as
-// having succeeded. F-1469 registered it as the ONE `[COVERAGE GAP]` in
-// `stripe.mcp.yaml` (`STRIPE-MCP-014`) rather than fixing it inline, because
-// narrowing an accepted value is a tightening and F-1330's discipline puts a
-// tightening behind a corpus heat reading. That read came back zero.
-//
-// ── WHY THE ASSERTIONS GO THROUGH THE TWIN AND COUNT ROWS ──────────────────
-//
-// A schema-shaped test — "does `safeParse` reject it?" — passes on a twin whose
-// route never runs that schema. The MCP door and the REST door reach
-// `domain.createRefund` by two independent paths (`executeTool` parses with the
-// tool's zod; `declaredRoute` parses with `CREATE_REFUND_BODY`), so tightening
-// one proves nothing about the other. Every refusal below is therefore checked
-// against the refund LIST as well as the status code: a 400 that still wrote a
-// row is the failure mode a status-only assertion cannot see.
+// `create_refund.reason` takes Stripe's closed set, at both doors.
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";

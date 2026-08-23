@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// fidelity:parity — declarative parity scenario for twin-slack (F-730).
+// fidelity:parity — declarative parity scenario for twin-slack.
 // The runner lives in @pome-sh/sdk/parity; this file is scenario data only:
 // an ordered, stateful chain (post → thread → reaction → reads) that
 // exercises every MCP tool in fidelity.inventory.json against the seeded
@@ -40,7 +40,7 @@ const steps: ParityStep[] = [
     },
   },
   // No slack_reply_to_thread step: Slack folds the thread reply into the send
-  // via thread_ts, and so does this twin since F-1330.
+  // via thread_ts, and so does this twin.
   {
     tool: "slack_send_message",
     arguments: (state) => ({
@@ -116,7 +116,7 @@ const steps: ParityStep[] = [
     },
   },
   { tool: "slack_search_emojis", arguments: { query: "pome" } },
-  // Canvases: create, edit, read back. The read is the tool F-1330 had to
+  // Canvases: create, edit, read back. The read is the tool the adoption had to
   // implement rather than wire — there was no canvas read in the domain.
   {
     tool: "slack_create_canvas",
@@ -175,7 +175,7 @@ await runParityCli({
   },
   restProbes: [
     { surface: "unsupported-rest", method: "POST", path: "/admin.conversations.search", status: 501, expectUnsupportedEnvelope: true },
-    // Named cold rows (F-729 ruling / F-736): the loud 501 is part of the contract.
+    // Named cold rows: the loud 501 is part of the contract.
     { surface: "cold:chat.postEphemeral", method: "POST", path: "/chat.postEphemeral", status: 501, expectUnsupportedEnvelope: true },
     { surface: "cold:files.getUploadURLExternal", method: "GET", path: "/files.getUploadURLExternal", status: 501, expectUnsupportedEnvelope: true },
     { surface: "cold:usergroups.list", method: "GET", path: "/usergroups.list", status: 501, expectUnsupportedEnvelope: true },

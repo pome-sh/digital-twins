@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-643 — demo-mode egress valve: the POME_API_BASE host joins the
-// deny-by-default floor's allowlist so the bundled agent's gateway CONNECTs
-// aren't refused, without opening anything else.
+// Demo-mode egress valve: the POME_API_BASE host joins the deny-by-default floor's
+// allowlist so the bundled agent's gateway CONNECTs aren't refused, without.
 import { describe, expect, it } from "vitest";
 import {
   buildEgressAllowlist,
   isHostAllowed,
 } from "../../../src/capture-server/egress.js";
 
-describe("buildEgressAllowlist extraHosts (FDRS-643)", () => {
+describe("buildEgressAllowlist extraHosts", () => {
   it("adds the demo gateway host on top of the default provider set", () => {
     const allow = buildEgressAllowlist({}, { extraHosts: ["api.pome.sh"] });
     expect(allow).toContain("api.pome.sh");

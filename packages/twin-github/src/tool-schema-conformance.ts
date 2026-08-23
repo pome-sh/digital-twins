@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Does the twin ACCEPT the arguments GitHub declares? (F-1468)
+// Does the twin ACCEPT the arguments GitHub declares?
 //
 // `@pome-sh/sdk/mcp-tool-fixture` and zod only — same portability constraint as
 // `tools.ts`: pome-cloud's fidelity-watch loads twin tool tables under bun,
@@ -8,7 +8,7 @@
 //
 // ── WHY ADOPTING GITHUB'S LISTING CREATED THE NEED FOR THIS ──────────────────
 //
-// Before F-1468 the fixture was a projection of the validators, so the two
+// The fixture used to be a projection of the validators, so the two
 // could not disagree: `regenerate-mcp-tool-fixture.ts` derived every
 // `inputSchema` with `z.toJSONSchema()` and a test demanded the bytes back.
 // That is no longer possible and should not be — the fixture is GitHub's now,
@@ -18,7 +18,7 @@
 // would be the worse trade. What a twin ADVERTISES and what it ACCEPTS are two
 // different documents the moment they stop being generated from each other, and
 // an examinee only ever collides with the second. So the pin moves from bytes to
-// argument surface, exactly as F-1330 moved twin-slack's.
+// argument surface, exactly as twin-slack's moved.
 //
 // For every tool this reports:
 //
@@ -29,19 +29,19 @@
 //   - a required-set disagreement in either direction — the twin refusing a
 //     call GitHub accepts, or accepting one GitHub refuses;
 //   - a TYPE disagreement on a key both sides declare — the twin validating a
-//     string where GitHub declares an array of them (F-1614);
+//     string where GitHub declares an array of them;
 //   - a validator that rejects an unknown key where GitHub's schema declares no
 //     `additionalProperties`.
 //
 // ── WHY THIS RETURNS A RESIDUE AND SLACK'S RETURNS `[]` ─────────────────────
 //
-// twin-slack's conformance is empty: F-1330 moved its validators onto Slack's
+// twin-slack's conformance is empty: its validators moved onto Slack's
 // argument surface in the same change that adopted the fixture. twin-github's
 // is NOT, and the reason is that closing an entry here usually TIGHTENS what the
 // twin accepts, which breaks every task written against it as it is. Those go
 // with a corpus heat reading and their migrations.
 //
-// That reading ran (F-1468): three tightenings were measured against the corpus,
+// That reading ran: three tightenings were measured against the corpus,
 // the bundled examples, the hosted saved tasks and the hosted runs, and the ones
 // with zero heat landed — `query` required on the five search tools, `branch`
 // required on the two file writers, `list_issues.state` on GitHub's
@@ -97,7 +97,7 @@ export function toolSchemaConformance(): string[] {
       }
     }
 
-    // ── AND THE TYPE OF THE KEYS BOTH SIDES HAVE (F-1614) ───────────────────
+    // ── AND THE TYPE OF THE KEYS BOTH SIDES HAVE ───────────────────
     //
     // The three checks above are about a key's PRESENCE and its requiredness,
     // and for a year that was the whole comparison. It is not enough, and the
@@ -120,7 +120,7 @@ export function toolSchemaConformance(): string[] {
     // ── REQUIRED-NESS IS PROBED, NOT PROJECTED ──────────────────────────────
     //
     // This compared `projected.required` against `upstream.required` until
-    // F-1468's tightening, and that comparison could not see the answer. Four of
+    // the tightening, and that comparison could not see the answer. Four of
     // the five search tools take a query under either of two spellings
     // (`query`/`q`), so requiring one is a `.refine()` on the object — and a
     // refine does not appear in `z.toJSONSchema()`'s `required` array at all.
@@ -153,7 +153,7 @@ export function toolSchemaConformance(): string[] {
     // rejection when the validator is `z.strictObject`, and this check has to
     // ask the validator rather than read the projection — which is the whole
     // reason the fixture's own `additionalProperties: false` was never evidence
-    // of anything before F-1468 removed it.
+    // of anything before removed it.
     if (upstream.additionalProperties === undefined && !schema.safeParse(unknownKeyProbe(upstream)).success) {
       const withoutUnknown = schema.safeParse(knownKeyProbe(upstream));
       if (withoutUnknown.success) {

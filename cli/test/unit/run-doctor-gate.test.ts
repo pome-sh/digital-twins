@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-641 — `pome run` gates on the doctor preflight: a repo failing any
-// doctor check refuses to spawn the agent (before any twin/session is
-// provisioned), prints the doctor output, and exits non-zero. There is no
-// --force / --skip-checks escape — "pome will not run trials against a
-// live API."
+// `pome run` gates on the doctor preflight: a repo failing any doctor check refuses to
+// spawn the agent (before any twin/session is provisioned), prints the.
 
 import { cp, mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -28,7 +25,7 @@ async function fixtureRepo(agentSource: string): Promise<string> {
   return dir;
 }
 
-describe("pome run — doctor preflight gate (FDRS-641)", () => {
+describe("pome run — doctor preflight gate", () => {
   const originalCwd = process.cwd();
   const originalExitCode = process.exitCode;
   let stderr: string[];

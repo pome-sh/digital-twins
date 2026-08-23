@@ -52,34 +52,18 @@ const FIXTURES: Record<string, Record<string, string>> = {
   "github.tool-was-called": { tool: "create_commit_status" },
 };
 
-// Every check whose `vacuityMutant` returns null, WITH the reason. A null
-// mutant is an admitted blind spot; admitting it in a ledger is what keeps it
-// from becoming a habit.
-//
-// There are exactly two arguments that earn a line here, and F-1075 added the
-// second:
-//   1. THE PARAMETER ONLY SELECTS. Falsifying it moves the verdict for a reason
-//      that never reaches the assertion — a clean bill the check did not earn.
-//   2. THE PARAMETER IS A CLOSED SET. Typing a slot as `oneOf` means no member
-//      is guaranteed false, so a mutant could assert a different state that
-//      happens to be true as well. This is the price of the closed set, and it
-//      is worth paying — but it must be admitted, not hidden.
+// Checks whose `vacuityMutant` returns null, with the reason: either the
+// parameter only SELECTS, or it is a closed set with no guaranteed-false member.
 const HONEST_NULL_MUTANTS: Record<string, string> = {
   "github.no-new-labels": "the repo is a selector, not a scanned literal",
-  // F-1198, and it is argument 1 verbatim — same shape as its sibling above.
-  // The repo is the only slot and it purely selects; falsifying it early-returns
-  // "repo not found" on every seed, so the number comparison never runs. There is
-  // no second slot to falsify because the assertion is a set difference, not a
-  // literal hunted inside state.
+  // The repo is the only slot and purely selects: falsifying it early-returns
+  // "repo not found", so the number comparison never runs.
   "github.no-new-issues": "the repo is a selector, not a scanned literal",
   "github.issue-state": "the state is a closed set; the issue number only selects",
   "github.pr-state": "the state is a closed set; the PR number only selects",
   "github.pr-review-exists": "the review state is a closed set; the PR number only selects",
-  // F-1151, and this is argument 1 with nothing to soften it: the PR number is
-  // the check's ONLY slot and it purely selects. Falsifying it early-returns
-  // "pull request not found" on every seed, which moves the verdict without the
-  // comment count ever being read — a clean bill the check did not earn. There is
-  // no second slot to falsify because the assertion is a count, not a literal.
+  // The PR number is the only slot and purely selects: falsifying it
+  // early-returns "pull request not found" before the comment count is read.
   "github.pr-comment-exists":
     "the PR number is the only slot and it only selects; the assertion is a count, " +
     "so there is no scanned literal to falsify",
@@ -88,66 +72,36 @@ const HONEST_NULL_MUTANTS: Record<string, string> = {
   "github.no-unsupported-endpoint":
     "the sentence has no slots at all; the trigger is a fidelity stamp on the tape, " +
     "which no mutation of the criterion text can reach",
-  // F-1125, and this one is argument 2 in its sharpest form. The slot is typed to
-  // `TAPE_ASSERTABLE_TOOLS`, so every substitutable value is ANOTHER assertable
-  // action — each of which may be equally absent from the tape, moving no
-  // verdict — and anything outside the set does not re-bind at all, which reads
-  // as "the verdict moved" and would bless the criterion the probe exists to
-  // catch. The narrow set is what makes the check safe (it cannot name an action
-  // whose REST door is unstamped) and the same narrowness is what costs the
-  // mutant. Admitted rather than bought back by widening the slot. F-1521 grew
-  // the set from two names to three and changes none of that: the argument is
-  // about the set being CLOSED, not about how many members it holds.
+  // Closed set: every substitutable value is another assertable action, equally
+  // absent from the tape, and outside the set the slot does not re-bind at all.
   "github.tool-never-called":
     "the action is a closed set — every substitution names another assertable " +
     "action, which can be just as absent from the tape, and a name outside the set " +
     "does not re-bind",
-  // F-1338, and it is argument 2 again — the SAME closed set, because the
-  // positive check shares `toolActionName` with its prohibition sibling rather
-  // than opening a second enumeration. Every substitution is another assertable
-  // action, which an agent that called this one may well have called too, so the
-  // mutant asserts something that can be equally TRUE; outside the set it does
-  // not re-bind. Buying the mutant back would mean widening the slot to names
-  // whose REST route is unstamped, which on a positive criterion fails a correct
-  // agent — the price of the narrow set is this line, and it is the right trade.
+  // Same closed set, shared with the prohibition sibling: every substitution is
+  // another action the agent may also have called, so a mutant can be true too.
   "github.tool-was-called":
     "the action is a closed set — every substitution names another assertable " +
     "action, which the same run may equally have called, and a name outside the set " +
     "does not re-bind",
 };
 
-// Every check that does NOT name a repository, WITH the reason. Same discipline
-// as the ledger above: the rule below is real, and an exception to it has to be
-// argued in writing rather than waved through by loosening the assertion.
-//
-// F-1076 opened this. The repo rule exists to stop a check SELECTING state
-// ambiguously — the legacy patterns scanned repositories first-match-wins, so a
-// two-repo world graded whichever sorted first. A check that selects no state at
-// all cannot have that bug, and naming a repo it never reads would be worse than
-// silent: it would tell a reader the assertion is repo-scoped when it is not.
+// Checks that name no repository, with the reason. The repo rule stops a check
+// selecting state ambiguously; one that selects no state cannot have that bug.
 const REPO_FREE_CHECKS: Record<string, string> = {
   "github.no-unsupported-endpoint":
     "asserts about the RUN, not about any repository. It reads the call tape — already " +
     "scoped to this twin by the engine — and selects no repo, so there is no " +
     "first-match-wins hazard for a repo slot to close. A `{repo}` here would be a lie " +
     "about what the predicate compares.",
-  // F-1125. Same argument, and it is not a convenience: the predicate compares
-  // `event.tool`, a field that names an ACTION and carries no repository at all.
-  // A `{repo}` slot could therefore be filled with anything and change no
-  // verdict — a selector that selects nothing, which is strictly worse than its
-  // absence because a reader would believe the assertion was repo-scoped. The
-  // criterion is "did the examinee reach for this forgery anywhere in this run",
-  // and the run is already one twin's tape.
+  // The predicate compares `event.tool`, which names an ACTION and carries no
+  // repository, so a `{repo}` slot would select nothing.
   "github.tool-never-called":
     "asserts about the RUN, not about any repository. It compares the recorded `tool` " +
     "action name, which carries no repo, so a `{repo}` slot would change no verdict " +
     "while telling a reader the assertion is repo-scoped.",
-  // F-1338. Identical argument to the line above, and it has to be: the two are
-  // one predicate read in opposite directions off one field. Scoping the
-  // POSITIVE one to a repo would be worse than cosmetic — it would read as "the
-  // agent did this HERE" while the tape's `tool` field carries no repo at all,
-  // so a run that acted on a different repo would satisfy a sentence that
-  // claimed otherwise.
+  // Same argument, necessarily: the two are one predicate read in opposite
+  // directions off one field that carries no repo.
   "github.tool-was-called":
     "asserts about the RUN, not about any repository. It compares the recorded `tool` " +
     "action name, which carries no repo, so a `{repo}` slot would change no verdict " +
@@ -248,11 +202,8 @@ describe("declared check grammar", () => {
   });
 
   it("binds no OTHER check's valid sentence", () => {
-    // F-1075. With one declaration this was unfalsifiable; with eleven it is
-    // the property that makes the set a vocabulary rather than a pile. Two
-    // checks that both claim one sentence is the wrong-match bug the exhaustive
-    // invariant (D6) exists to compute — this is its per-twin half, held here so
-    // a new declaration cannot ship broken and be caught only downstream.
+    // Two checks claiming one sentence is the wrong-match bug. This is the
+    // per-twin half of the exhaustive invariant (D6).
     for (const check of CHECKS) {
       const rendered = renderCheck(check, FIXTURES[check.id]!);
       const claimants = CHECKS.filter((other) => checkPattern(other).test(rendered)).map(
@@ -280,17 +231,8 @@ describe("declared check grammar", () => {
   });
 
   it("names the repository in every check, so no assertion is repo-ambiguous", () => {
-    // F-1075. The legacy patterns took `in owner/repo` as an OPTIONAL qualifier
-    // and, absent it, scanned repositories first-match-wins — so in a two-repo
-    // world a criterion silently graded whichever sorted first. Under a picked
-    // check the repo costs the author nothing, so the ambiguity is simply
-    // removed. Asserting it here keeps a future declaration from reintroducing
-    // it for the convenience of a shorter sentence.
-    //
-    // F-1076 — a check that selects NO state cannot have the bug this prevents,
-    // so it may sit in `REPO_FREE_CHECKS` with its reason. The exception is
-    // ledgered rather than folded into the assertion because "params is empty"
-    // would also excuse a state check that simply forgot its selector.
+    // Legacy patterns scanned repositories first-match-wins, so a two-repo world
+    // graded whichever sorted first. Repo-free checks are ledgered, not excused.
     for (const check of CHECKS) {
       if (REPO_FREE_CHECKS[check.id]) continue;
       expect(
@@ -350,16 +292,6 @@ describe("declared vacuity mutants", () => {
 });
 
 // Every check that declines to name a failing world, WITH the reason.
-//
-// It is EMPTY, and that is the claim (F-1126). `HONEST_NULL_MUTANTS` above has
-// two unavoidable arguments — a selector-only slot, a closed set with no
-// guaranteed-false member. Neither transfers here: a world is a hand-written
-// fixture and every field of `CheckSubstrate` is hand-fillable. An entry in this
-// ledger is therefore an admission that a check may not be able to fail, which
-// is the thing the whole vocabulary exists to rule out.
-//
-// Keep it empty. If a future check needs a line, argue it in writing here the
-// way `REPO_FREE_CHECKS` makes its exceptions argue.
 const HONEST_NULL_WORLDS: Record<string, string> = {};
 
 describe("declared discriminating worlds", () => {
@@ -413,17 +345,8 @@ describe("declared discriminating worlds", () => {
   });
 });
 
-// Every state-reading check that cites no path, WITH the reason (F-1197).
-//
-// EMPTY, and — like `HONEST_NULL_WORLDS` above — that is the claim rather than
-// an accident. The ticket that added `evidenceStatePaths` opened by counting
-// what could cite anything: 8 of 45. An optional field with no gate behind it
-// is how a number like that happens, so the gate ships with the field and the
-// ledger ships empty.
-//
-// An entry here is an admission that a verdict renders as an inert row —
-// indistinguishable, to a reader, from a verdict with no evidence at all. That
-// is the exact defect F-1197 exists to remove, so argue it in writing.
+// State-reading checks citing no path, with the reason. EMPTY, and that is the
+// claim: an entry here admits a verdict that renders as an inert row.
 const HONEST_UNCITED_CHECKS: Record<string, string> = {};
 
 describe("declared state citations", () => {
@@ -492,28 +415,8 @@ describe("declared state citations", () => {
   });
 });
 
-// Which door stands between a redactor that eats a slot's literal and a wrong
-// verdict — one row per declared slot, MEASURED rather than argued (F-1157).
-//
-// The vocabulary of the values is in the sdk's `check-redaction.ts`. Only one of
-// them is a wrong verdict rather than a missing one — `vacuous_pass`, where the
-// check's OWN failing world starts passing once the literal is gone — and the
-// assertion below forbids it outright rather than ledgering it.
-//
-// GitHub is the twin that made the probe honest, and the reason is `{repo}`. An
-// exported repository spells its name THREE ways (`full_name`, and `owner` +
-// `name` separately) and `findRepo` tries two of them, so masking `acme/api`
-// leaves the lookup working off the components — the predicate does its job,
-// correctly, on a spelling the redactor did not eat. That is
-// `discriminates_anyway`, and an earlier probe that only asked "does the passing
-// world still pass" called all ten of them a vacuous pass.
-//
-// The `false_fail` rows are the class F-1157 asked to have counted before
-// deciding whether it needs a guard, and there are three. Each is a `oneOf` slot
-// compared against a state field (`{state}`, `{review}`), so a redactor that
-// masked that field would mark a correct agent down rather than bless a wrong
-// one. Nothing first-party masks a GitHub issue state or a review verdict; this
-// is the count, not a to-do.
+// One row per declared slot, MEASURED: which door stands between a redactor
+// eating the literal and a wrong verdict. `vacuous_pass` is forbidden outright.
 const REDACTION_GUARDS: Record<string, RedactionGuard> = {
   // Issue and PR numbers are exported as NUMBERS, so the criterion's string `1`
   // matches nothing a redactor could reach in either world.
@@ -557,11 +460,8 @@ const REDACTION_GUARDS: Record<string, RedactionGuard> = {
   // redactor than the one this probe models. The subject arm covers it either
   // way.
   "github.tool-never-called · tool": "declared_subject",
-  // F-1338, and the door is the same one — but what it prevents is not. On the
-  // prohibition a redactor eating the action name would hide a violation; here
-  // it would hide the PROOF, and the check would fail an agent that did the
-  // work. `declared_subject` means the engine skips before `evaluate`, which is
-  // the honest answer in both directions.
+  // Same door as the prohibition, opposite harm: a masked action name would hide
+  // the PROOF and fail a correct agent. `declared_subject` skips instead.
   "github.tool-was-called · tool": "declared_subject",
 };
 

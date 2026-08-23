@@ -15,7 +15,7 @@ const port = Number(process.env.PORT ?? process.env.GITHUB_CLONE_PORT ?? 3333);
 const host = process.env.GITHUB_CLONE_HOST ?? "127.0.0.1";
 const dbPath = process.env.GITHUB_CLONE_DB ?? ".github_clone/github.db";
 
-// F-708: an env-injected TWIN_AUTH_SECRET always wins; a non-loopback bind
+// An env-injected TWIN_AUTH_SECRET always wins; a non-loopback bind
 // with no env self-generates a secret and persists it at the compose-era
 // contract location (.pome-data/github/secret). The engine's serve() runs
 // the same guard; calling it here first keeps a failed boot from touching
@@ -23,11 +23,11 @@ const dbPath = process.env.GITHUB_CLONE_DB ?? ".github_clone/github.db";
 ensureTwinAuthSecret("github", host);
 
 const db = openGitHubCloneDatabase(dbPath);
-// POME_SEED_JSON (FDRS-353) is strict-parsed: a malformed cloud seed fails
+// POME_SEED_JSON is strict-parsed: a malformed cloud seed fails
 // the boot loudly instead of silently serving the default world.
 const seed = process.env.GITHUB_CLONE_NO_SEED === "1" ? undefined : loadSeedFromEnv();
 
-// F-698: when POME_RECORDER_EVENTS_PATH is set, createApp/serve resolves a
+// When POME_RECORDER_EVENTS_PATH is set, createApp/serve resolves a
 // durable file-backed store (twin-core transport). Otherwise heap-only.
 await serve(githubTwinDefinition, {
   port,

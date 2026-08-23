@@ -1,15 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1179 / F-1372 — the twin's published input surface, driven over real HTTP.
-//
-// The properties here are the ones nothing else can see. `app.test.ts` and
-// friends prove the endpoints WORK; these prove that the declaration is the
-// only way IN (an argument it does not name never reaches a handler, whatever
-// the twin answers the caller), that the twin answers such an argument the way
-// F-1372 ruled Slack answers it, and that the declarations cover every route
-// that exists. A hole in the last one would leave `route-inputs.json` an
-// incomplete list that pome-cloud's lane still compares — a pass nobody
-// measured.
+// The twin's published input surface, driven over real HTTP.
 
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Hono } from "hono";
@@ -26,13 +16,8 @@ import { signTestToken, TEST_AUTH_SECRET, TEST_SID, withAuth } from "./_authHelp
 /** A query/body key no Slack method declares, and no vendor ever will. */
 const PROBE = "pome_undeclared_probe";
 
-/**
- * F-1372's ruling for this twin: `api.test` — the one Web API method that
- * answers without a token — accepted `pome_undeclared_probe` as a GET query key
- * and as a POST form field and echoed it back under `ok:true` (measured
- * 2026-08-09), and Slack's error vocabulary has no code for an argument it does
- * not know. So the twin discards it (`docs/undeclared-route-inputs.md`).
- */
+/** the ruling for this twin: `api.test` — the one Web API method that answers without
+ *  a token — accepted `pome_undeclared_probe` as a GET query key and as. */
 const RULED: UndeclaredDisposition = "ignore";
 
 beforeAll(() => {
@@ -82,7 +67,7 @@ describe("declared route inputs", () => {
     // One ruling per twin: `token` rides on all 62 surfaces, so a route
     // answering differently from its neighbours would make "does Slack mind an
     // extra field" depend on which method you called.
-    expect(dissenting, `these routes disagree with the twin's F-1372 ruling ('${RULED}')`).toEqual(
+    expect(dissenting, `these routes disagree with the twin's heat ruling ('${RULED}')`).toEqual(
       []
     );
   });

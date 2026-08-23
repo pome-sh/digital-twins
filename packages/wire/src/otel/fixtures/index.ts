@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
  * otel/fixtures — typed accessor for the golden-fixture conformance corpus
- * (M1.3 / FDRS-482).
+ * (M1.3).
  *
  * Stable import path for every consuming milestone (M2–M6):
  *

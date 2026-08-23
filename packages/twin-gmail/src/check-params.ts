@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The typed slots Gmail's declared checks fill (F-1128).
+// The typed slots Gmail's declared checks fill.
 //
 // They live in the twin, not the sdk, for the same reason the declarations do:
 // the twin owns what a Gmail message id or label name may look like. Every

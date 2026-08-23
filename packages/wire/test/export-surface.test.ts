@@ -1,25 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
 // Export-surface guard for @pome-sh/wire — the wire half of the former
-// `@pome-sh/shared-types` guard (F-754, then F-1201). F-942 split that barrel
-// three ways; this file keeps the SAME argument for the trace surface, and
-// `cli/test/unit/wire/export-surface.test.ts` keeps it for the cloud
-// control-plane clusters. Between them they name every symbol the old
-// 145-value / 68-type snapshot named except the seven the legacy-shim removal
-// (F-1582) deleted outright, so the split stays auditable as a partition minus a
-// recorded deletion rather than as a loosening.
-//
-// Consumers (the CLI, the sdk, the adapter, all five twins) import runtime
-// values by name from this barrel. If a re-export is dropped, renamed, or
-// shadowed by an `export *` collision, the sorted key list below drifts and this
-// test fails loud.
-//
-// The type-only import is the TYPE half: `Object.keys` sees runtime values only,
-// so a dropped `export type` would pass the runtime snapshot silently. It is
-// enforced when `npm run typecheck` compiles this test. Note the scope: it
-// catches a kind that DISAPPEARS or is RENAMED. A kind that is ADDED is the
-// fixture gate's job (`scripts/emit-trace-contract.mjs`), because no tuple can
-// require a payload.
+// `@pome-sh/shared-types` guard.
 
 import { describe, expect, it } from "vitest";
 import * as api from "../src/index.js";
@@ -125,7 +106,7 @@ const EXPECTED_EXPORTS = [
   "w3cTraceIdSchema",
 ] as const;
 
-describe("@pome-sh/wire barrel export surface (F-942)", () => {
+describe("@pome-sh/wire barrel export surface", () => {
   it("re-exports exactly the wire trace surface", () => {
     expect(Object.keys(api).sort()).toEqual([...EXPECTED_EXPORTS]);
   });
@@ -164,18 +145,9 @@ describe("barrel re-export identity (leaf and barrel are the same object)", () =
   });
 });
 
-// F-950. `correlation/` is a SUBPATH-ONLY surface (`@pome-sh/wire/correlation`),
-// the same call `otel/fixtures` makes. Importing it constructs an
-// AsyncLocalStorage and pulls in `node:async_hooks` + `node:crypto`; the five
-// twins, the sdk and the CLI all import the root barrel and none of them is the
-// agent side of this protocol, so only a framework adapter should pay for it.
-//
-// The root-barrel snapshot above is already the guard against a leak — an
-// `export * from "./correlation/index.js"` added to `src/index.ts` would fail
-// it. These cases are the other half: the subpath's own surface, which a future
-// Vercel AI SDK / LangGraph adapter imports by name and which must not drift
-// silently.
-describe("@pome-sh/wire/correlation subpath surface (F-950)", () => {
+// `correlation/` is a SUBPATH-ONLY surface (`@pome-sh/wire/correlation`), the same
+// call `otel/fixtures` makes.
+describe("@pome-sh/wire/correlation subpath surface", () => {
   const EXPECTED_CORRELATION_EXPORTS = [
     "CORRELATION_HEADER",
     "correlationContext",
@@ -217,16 +189,9 @@ describe("@pome-sh/wire/correlation subpath surface (F-950)", () => {
   });
 });
 
-// F-1416. `run-completeness/` is the THIRD subpath-only surface, and the one
-// whose absence from the root barrel is load-bearing rather than economical:
-// the barrel's own doc says nothing on it knows about runs, the five twins /
-// the sdk / the adapter all import the barrel and none of them has a run to ask
-// about, and this block is what turns that sentence into a check. The four
-// symbols below are also the ONE copy of a predicate two repositories call, so
-// a rename here is a breaking change for pome-cloud's dashboard and control
-// plane — which is exactly the coupling F-1416 wanted, replacing a transcribed
-// copy that could go stale green with an import that cannot.
-describe("@pome-sh/wire/run-completeness subpath surface (F-1416)", () => {
+// `run-completeness/` is the THIRD subpath-only surface, and the one whose absence
+// from the root barrel is load-bearing rather than economical: the barrel's.
+describe("@pome-sh/wire/run-completeness subpath surface", () => {
   const EXPECTED_RUN_COMPLETENESS_EXPORTS = [
     "PRE_SATISFIED_REASON",
     "isIncompleteTally",
@@ -238,7 +203,7 @@ describe("@pome-sh/wire/run-completeness subpath surface (F-1416)", () => {
     expect(Object.keys(runCompleteness).sort()).toEqual([...EXPECTED_RUN_COMPLETENESS_EXPORTS]);
   });
 
-  it("stays off the root barrel — the F-942 claim, checked", async () => {
+ it("stays off the root barrel — the claim, checked", async () => {
     for (const name of EXPECTED_RUN_COMPLETENESS_EXPORTS) {
       expect(Object.keys(api)).not.toContain(name);
     }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // What GitHub's declared checks can assert about the RUN — the recorded call
-// tape rather than the exported end state (F-1076, settling D1's open half).
+// tape rather than the exported end state (settling D1's open half).
 //
 // Why this class has to exist at all: an unsupported call leaves NO STATE
 // TRACE. The twin answers 501 and mutates nothing, so `state_final.json` is
@@ -10,7 +10,7 @@
 // event instead, and that stamp is the only place the fact survives.
 //
 // This check was a hand-written regex in pome-cloud until now. It stayed behind
-// when F-1075 moved the other ten, for one reason: whether a declaration MAY
+// when the other ten moved, for one reason: whether a declaration MAY
 // read the tape was D1's open half, and declaring a substrate nothing supplied
 // would have been a promise with no engine behind it.
 //
@@ -26,7 +26,7 @@ import { TAPE_ASSERTABLE_TOOLS } from "./tape-assertable-tools.js";
 
 /** The recorded ids backing an outcome, minus the rows that carry none. Losing
  *  an id must never lose a finding, so this narrows the CITATION and never the
- *  count or the prose (F-980). */
+ *  count or the prose. */
 function citations(events: readonly CheckTapeEvent[]): string[] {
   return events
     .map((event) => event.event_id)
@@ -84,7 +84,7 @@ export const noUnsupportedEndpoint: Check<Record<string, never>> = defineCheck({
 
     const unsupported = tape.filter((event) => event.fidelity === "unsupported");
     if (unsupported.length === 0) {
-      // No evidence on the pass branch (F-980). This asserts a NEGATIVE over the
+      // No evidence on the pass branch. This asserts a NEGATIVE over the
       // whole tape — "none of these calls was unsupported" — and a negative over
       // an empty set has no single call to point at. Citing all N inspected
       // calls would be a copy of the trace, not evidence.
@@ -106,9 +106,9 @@ export const noUnsupportedEndpoint: Check<Record<string, never>> = defineCheck({
   },
 });
 
-// F-1125 — the two phrases F-1076 deferred.
+// The two deferred phrases.
 //
-// F-1076 added the tape substrate and deliberately did NOT take these, because
+// The tape substrate deliberately did NOT take these, because
 // what was missing was data rather than access: the phrases name MCP TOOL names
 // while the tape recorded HTTP transport. Over MCP the name arrived inside the
 // request body of a `/mcp` path; over REST the same action arrived as
@@ -194,7 +194,7 @@ export const toolNeverCalled: Check<{ tool: string }> = defineCheck({
   },
 });
 
-// F-1338 — the vocabulary's first POSITIVE tape assertion on github, and the
+// The vocabulary's first POSITIVE tape assertion on github, and the
 // reason it had to be first.
 //
 // Every tape check above is a prohibition, and a prohibition cannot separate
@@ -205,7 +205,7 @@ export const toolNeverCalled: Check<{ tool: string }> = defineCheck({
 //
 // ── The stamping invariant runs in BOTH directions, and it is ONE invariant ──
 //
-// F-1342 owns the set. This check does not open a second one, and the slot type
+// The sweep owns the set. This check does not open a second one, and the slot type
 // is shared verbatim with `toolNeverCalled` rather than restated, because a
 // criterion naming an action whose REST route is unstamped is wrong both ways
 // for the identical missing fact — the recorder stamps `tool: null` on that
@@ -224,9 +224,9 @@ export const toolNeverCalled: Check<{ tool: string }> = defineCheck({
 // the one that drifts.
 //
 // That day has since come once, and it came from THIS side of the invariant:
-// F-1521 stamped `add_issue_comment`'s REST route so M0's slice could assert its
+// `add_issue_comment`'s REST route is stamped so M0's slice can assert its
 // comment on the tape, and `` `add_issue_comment` was never called `` widened in
-// the same edit without anyone touching it. One name, not the sweep — F-1342
+// the same edit without anyone touching it. One name, not the sweep — that
 // still owns the remaining ~37, and `merge_pull_request` and `add_issue_labels`
 // still correctly refuse to bind in either direction.
 //
@@ -238,7 +238,7 @@ export const toolNeverCalled: Check<{ tool: string }> = defineCheck({
 //      — and it is precisely the null agent this check exists to score at 0.
 //      Softening it to a skip would take the criterion out of the denominator
 //      and hand that agent its score back.
-//   2. `undefined` MUST SKIP. A recording made before F-1125 carries no `tool`
+// 2. `undefined` MUST SKIP. A recording made before carries no `tool`
 //      on any row. `toolNeverCalled` can read that absence as "not a match" and
 //      stay safe; reading it the same way here answers "never called" over a
 //      recording that never carried the evidence, which fails a correct agent
@@ -246,7 +246,7 @@ export const toolNeverCalled: Check<{ tool: string }> = defineCheck({
 //      `stripe.x402-retry-includes-payment` names `headers_not_recorded`.
 //   3. THE CITATIONS SWAP SIDES. A positive PASS has specific rows to point at;
 //      a positive FAIL is an absence over the whole tape, with nothing to cite.
-//      Exactly the inverse of the prohibition above (F-980).
+//      Exactly the inverse of the prohibition above.
 export const toolWasCalled: Check<{ tool: string }> = defineCheck({
   id: "github.tool-was-called",
   description:
@@ -263,7 +263,7 @@ export const toolWasCalled: Check<{ tool: string }> = defineCheck({
   params: { tool: toolActionName },
   substrate: "tape",
   // Nothing in the seed can satisfy it and only the examinee acting can, which
-  // is the whole property: declared, never inferred from the English (F-1070).
+  // is the whole property: declared, never inferred from the English.
   polarity: () => "positive",
   // The action name IS a caller-supplied literal hunted for in a substrate, so
   // it is declared — and the engine's door-side skip matters MORE here than on
@@ -311,7 +311,7 @@ export const toolWasCalled: Check<{ tool: string }> = defineCheck({
     // (`tool-stamping.test.ts` asserts `[null]` for a plain read), and
     // `twinHttpEventSchema` types the field `.nullable().optional()` — so a
     // consumer that persisted or re-serialised the tape by DROPPING null-valued
-    // keys would make every read-only run look like a pre-F-1125 recording, and
+    // keys would make every read-only run look like a legacy recording, and
     // this check would SKIP the null agent instead of failing it. That is the
     // one outcome this whole declaration exists to prevent, and a skip does not
     // announce itself the way a wrong verdict does. The test below the fold

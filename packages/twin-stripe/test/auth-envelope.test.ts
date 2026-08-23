@@ -1,36 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// F-1497 — twin-stripe's auth-refusal envelopes, measured against Stripe.
-//
-// ── THE MEASUREMENT THIS FILE PINS ────────────────────────────────────────
-//
-// `GET https://api.stripe.com/v1/customers`, probed live on 2026-08-13, twice:
-// once with `Authorization: Bearer <deliberately invalid>` and once with no
-// `Authorization` header at all. A read with no request body — nothing was
-// created, nothing was charged.
-//
-//   BAD KEY → HTTP 401
-//   {"error":{"message":"Invalid API Key provided: f1497-in******************oken",
-//             "type":"invalid_request_error"}}
-//
-//   NO Authorization HEADER → HTTP 401
-//   {"error":{"message":"You did not provide an API key. You need to provide your API key in the Authorization header, using Bearer auth (e.g. 'Authorization: Bearer YOUR_SECRET_KEY'). See https://stripe.com/docs/api#authentication for details, or we can help at https://support.stripe.com/.",
-//             "type":"invalid_request_error"}}
-//
-// Two readings:
-//
-// 1. **Stripe DISTINGUISHES a bad key from a missing one.** This twin answered
-//    `Bad credentials` — GitHub's string, reachable from every `/v1/*` path —
-//    to a keyless request until F-1497.
-// 2. **Stripe sends NO `documentation_url` and NO top-level `status`.** The
-//    leaves F-1497 added to twin-github must not appear here. `stripeError`
-//    can emit a `doc_url`; the auth path passes none, and must not start.
-//
-// ⚠️ TWO MEASURED DIFFERENCES DELIBERATELY LEFT ALONE, both outside F-1497's
-// envelope-leaf scope and both already frozen by CONTRACT.md's auth table:
-// this twin's body carries an `error.code` (`"unauthorized"`) that real Stripe
-// does not send on a 401, and its bad-key message does not echo the redacted
-// key. Neither is a `documentation_url` or a `status` leaf. They are called out
-// here so this file does not read as a claim of byte fidelity it does not make.
+// Twin-stripe's auth-refusal envelopes, measured against Stripe.
 import { afterAll, describe, expect, it } from "vitest";
 import { createTwinStripeApp } from "../src/twin.js";
 import { TEST_AUTH_SECRET, TEST_SID, signTestToken, withAuth } from "./_authHelper.js";
@@ -54,11 +23,10 @@ async function refuse(init: RequestInit = {}) {
   return { status: response.status, body: (await response.json()) as Record<string, unknown> };
 }
 
-describe("F-1497 — stripe tells a missing API key from a bad one", () => {
+describe("stripe tells a missing API key from a bad one", () => {
   it("NO Authorization header answers Stripe's did-not-provide message, whole body", async () => {
-    // The fix. Before F-1497 the `no_token` classification fell through to the
-    // JWT branch's `Bad credentials`, which is GitHub's string on a Stripe
-    // twin, and it was reachable from every `/v1/*` path with a bare curl.
+    // The fix. The `no_token` classification used to fall through to the JWT branch's
+    // `Bad credentials`, which is GitHub's string on a Stripe twin, and it was.
     const got = await refuse();
 
     expect(got.status).toBe(401);
@@ -73,7 +41,7 @@ describe("F-1497 — stripe tells a missing API key from a bad one", () => {
   });
 
   it("an api-key-shaped bearer that resolves nowhere still says Invalid API Key provided.", async () => {
-    // The frozen pre-port branch, unchanged by F-1497 and asserted whole so the
+    // The frozen pre-port branch, unchanged and asserted whole so the
     // new `no_token` leg cannot have swallowed it.
     const got = await refuse(withAuth("sk_test_pome_definitely_not_minted"));
 
@@ -88,9 +56,8 @@ describe("F-1497 — stripe tells a missing API key from a bad one", () => {
   });
 
   it("a JWT-shaped bearer that verifies nowhere still says Bad credentials", async () => {
-    // Also frozen, and NOT a leak: this branch is the twin's own JWT auth,
-    // which real Stripe has no counterpart for. What F-1497 fixed is that a
-    // request carrying NO credential at all used to land here.
+    // Also frozen, and NOT a leak: this branch is the twin's own JWT auth, which real
+    // Stripe has no counterpart for.
     const got = await refuse(withAuth("aaa.bbb.ccc"));
 
     expect(got.status).toBe(401);
@@ -113,9 +80,8 @@ describe("F-1497 — stripe tells a missing API key from a bad one", () => {
   });
 
   it("a sid mismatch is still the frozen 403, not a 401", async () => {
-    // stripe is the only twin answering a sid mismatch with 403 (CONTRACT.md),
-    // and F-1497 did not touch it. Asserted here so the `unauthorized` rewrite
-    // above cannot have quietly re-routed it.
+    // stripe is the only twin answering a sid mismatch with 403 (CONTRACT.md), and the
+    // auth fix did not touch it.
     const token = await signTestToken({ sid: "somebody-else" });
     const response = await createTwinStripeApp().request(`/s/${TEST_SID}/v1/customers`, withAuth(token));
 
@@ -130,7 +96,7 @@ describe("F-1497 — stripe tells a missing API key from a bad one", () => {
   });
 });
 
-describe("F-1497 — the leaves Stripe does NOT send, pinned as absences", () => {
+describe("the leaves Stripe does NOT send, pinned as absences", () => {
   it("no `documentation_url` and no top-level `status` on any refusal", async () => {
     process.env.TWIN_ADMIN_TOKEN = "f1497-stripe-admin-token";
     const forbidden = await createTwinStripeApp().request("/admin/reset", { method: "POST" });

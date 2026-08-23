@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The GitHub twin's assertable check vocabulary (F-1073, widened in F-1075).
+// The GitHub twin's assertable check vocabulary.
 //
 // These live HERE, next to the state they read, because the twin owns that
 // state's shape. pome-cloud imports this module from npm and adapts each
@@ -13,7 +13,7 @@
 // `check-repos.ts` — with the typed slots in `check-params.ts` and the reading
 // of the exported tree in `check-state.ts`.
 //
-// F-1075 moved the remaining ten GitHub predicates here from
+// The remaining ten GitHub predicates moved here from
 // `apps/control-plane/.../deterministic/github.ts`, where they were regexes.
 // Three things changed in the move, and each is load-bearing:
 //
@@ -37,7 +37,7 @@
 //      more than one word order. Nothing renders the second one now, so it is
 //      retired rather than ported.
 //
-// F-1076 brought the last one home. `No unsupported endpoint was called` reads
+// The last one came home. `No unsupported endpoint was called` reads
 // the call TAPE, and until D1's open half was settled there was no substrate to
 // declare — the promise would have had no engine behind it. There is one now:
 // `check-tape.ts` holds the declaration, and the consuming engine REFUSES to
@@ -101,7 +101,7 @@ export const GITHUB_CHECKS = [
   // that assert about the RUN rather than the world it left behind.
   noUnsupportedEndpoint,
   toolNeverCalled,
-  // F-1338. Adjacent to its prohibition for the reason the two repo-scoped
+  // Adjacent to its prohibition for the reason the two repo-scoped
   // deltas sit together above: an author reaching for one usually wants to see
   // the other, and these two are the same predicate read in opposite
   // directions off one closed set of actions. It is appended rather than

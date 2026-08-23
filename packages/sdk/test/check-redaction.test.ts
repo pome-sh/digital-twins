@@ -1,19 +1,5 @@
-// What protects a criterion whose redaction-destroyed literal is not its
-// declared `subject` (F-1157).
-//
-// These are properties of the PROBE, not of any twin's vocabulary — the
-// per-twin gate ("no declared slot, on any check, lets a destroyed literal turn
-// the check's own failing world into a pass") lives in each
-// `checks-contract.test.ts`, where the declarations actually ship.
-//
-// The one that is load-bearing rather than ceremony is the guard-fires case
-// below. A gate that has never been seen to go red is a gate nobody can tell
-// from a gate that cannot: the first version of this probe asked only whether
-// the PASSING world still passed, which is a question that world answers `true`
-// by construction, and it reported ten of twin-github's `{repo}` slots as
-// vacuous passes when `findRepo` had simply matched on `owner`/`name`. Both
-// halves of that story are pinned here — the check that really does go vacuous,
-// and the one that only looks like it.
+// What protects a criterion whose redaction-destroyed literal is not its declared
+// `subject`.
 
 import { describe, expect, it } from "vitest";
 import { defineCheck, VACUITY_SENTINEL, type CheckParamType } from "../src/checks.js";

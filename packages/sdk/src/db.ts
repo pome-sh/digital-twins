@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Engine SQLite driver wrapper (F-681), backed by node:sqlite since F-703 —
+// Engine SQLite driver wrapper, backed by node:sqlite since —
 // zero native deps, no compiler toolchain at install. Twins never import a
 // sqlite driver directly — they call `openTwinDatabase()` and consume the
 // `TwinDatabase` interface below. The interface keeps better-sqlite3's shape
@@ -140,7 +140,7 @@ class NodeSqliteTwinDatabase implements TwinDatabase {
  * Open a twin database with the pome pragma set applied:
  * `busy_timeout = 5000`, `journal_mode = WAL` (file-backed), and
  * `foreign_keys = ON` — the exact pragmas every twin's hand-rolled db.ts
- * applied before F-681 centralized them.
+ * applied before centralized them.
  */
 export function openTwinDatabase(
   path = ":memory:",

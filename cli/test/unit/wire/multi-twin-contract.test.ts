@@ -40,7 +40,7 @@ describe("criterionSchema.twin (run.ts) — rides the D/P→code/model transform
   });
 });
 
-describe("criterionDefSchema.kind (rest.ts) — tolerant reader, canonical output (F-778)", () => {
+describe("criterionDefSchema.kind (rest.ts) — tolerant reader, canonical output", () => {
   it("passes canonical code/model kinds through unchanged", () => {
     expect(criterionDefSchema.parse({ id: "c1", text: "t", kind: "code", twin: "stripe" }))
       .toEqual({ id: "c1", text: "t", kind: "code", twin: "stripe" });
@@ -187,7 +187,7 @@ describe("finalizeRequestSchema.per_twin_state_keys (finalize-shapes.ts) — LIV
   it("parses without per_twin_state_keys (single-twin / older CLI)", () => {
     const parsed = finalizeRequestSchema.parse(base);
     expect(parsed.per_twin_state_keys).toBeUndefined();
-    // Legacy D/P wire kinds normalize at the finalize boundary too (F-778).
+    // Legacy D/P wire kinds normalize at the finalize boundary too.
     expect(parsed.criteria).toEqual([{ id: "c1", text: "PR merged", kind: "code", twin: "github" }]);
   });
 

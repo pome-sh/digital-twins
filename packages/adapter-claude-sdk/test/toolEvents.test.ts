@@ -232,7 +232,7 @@ describe("withToolEvents", () => {
     expect(existsSync(signalsPath)).toBe(false);
   });
 
-  it("FDRS-409 ticket acceptance: 1 parent tool_use + 2 child assistant messages emits 1 SubagentSpawnEvent and chains child events via parent_event_id", async () => {
+ it("acceptance: 1 parent tool_use + 2 child assistant messages emits 1 SubagentSpawnEvent and chains child events via parent_event_id", async () => {
     const messages: FakeMsg[] = [
       // Parent agent fires the spawning tool_use (e.g. Task tool).
       {
@@ -343,10 +343,8 @@ describe("withToolEvents", () => {
   });
 });
 
-// F-998. The adapter injects `includePartialMessages` for the token lanes, and
-// a subagent's stream events carry a `parent_tool_use_id` — enough to mint a
-// SubagentSpawnEvent on their own. This lane reads content blocks, which
-// partial messages do not carry, so the emitted rows must not move.
+// The adapter injects `includePartialMessages` for the token lanes, and a subagent's
+// stream events carry a `parent_tool_use_id` — enough to mint a SubagentSpawnEvent.
 describe("withToolEvents → injected partial messages emit nothing", () => {
   it("ignores stream events and the status ping, including subagent ones", async () => {
     const messages = [

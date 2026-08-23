@@ -1,9 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// Engine auth option tests (F-681, spec = F-712 [DECISION] rows 2–9).
-// Mechanism lives in the engine; each twin's intended differences are
-// explicit `defineTwin()` auth options, never forks. Each row's pinned
-// behavior is exercised here with the real middleware on a real Hono app.
+// Engine auth option tests (spec = the [DECISION] rows 2–9).
 import { Hono } from "hono";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -63,15 +59,9 @@ describe("unauthorized(kind) envelope hook (rows 2 + 6)", () => {
     expect(await res.json()).toEqual({ ok: false, error: "token_expired" });
   });
 
-  it("defaults to a VENDOR-NEUTRAL envelope, expired included — no documentation_url (F-1497)", async () => {
+  it("defaults to a VENDOR-NEUTRAL envelope, expired included — no documentation_url", async () => {
     // ⚠️ THE ABSENT KEY IS THE ASSERTION. This default used to send
-    // `documentation_url: ""` — GitHub's key, with a value GitHub never sends —
-    // and `toEqual` is what makes its removal visible: an extra leaf fails.
-    // Five vendors were probed live on 2026-08-13 (F-1497) and only GitHub has
-    // that key at all, so a default shared by all five cannot carry it. Every
-    // first-party twin declares its own `unauthorized`, which is why this
-    // default reaches no shipped wire — see `auth-envelope-per-twin.test.ts`,
-    // which proves that rather than assuming it.
+    // `documentation_url: ""` — GitHub's key, with a value GitHub never sends — and `toEqual` is.
     const expired = await signTestToken({ expSeconds: -60 });
     const res = await sessionApp().request(path, withAuth(expired));
     expect(res.status).toBe(401);
@@ -100,7 +90,7 @@ describe("raw bearer pin (row 4)", () => {
 });
 
 describe("sid mismatch pin (row 5)", () => {
-  it("defaults to the 401 Forbidden envelope, with no documentation_url (F-1497)", async () => {
+  it("defaults to the 401 Forbidden envelope, with no documentation_url", async () => {
     const other = await signTestToken({ sid: "other-sid" });
     const res = await sessionApp().request(path, withAuth(other));
     expect(res.status).toBe(401);

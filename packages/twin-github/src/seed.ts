@@ -29,7 +29,7 @@ export const seedSchema = z.object({
           })
         )
         .default([]),
-      // F-1500 — `renamed_from` is how a seed expresses a MOVE, and with it the
+      // `renamed_from` is how a seed expresses a MOVE, and with it the
       // `status: "renamed"` the row type has always declared and no world could
       // reach. A seeded branch is created from the default branch and inherits
       // every path, and a plain `files[]` entry can only add or overwrite, so
@@ -81,7 +81,7 @@ export const seedSchema = z.object({
             })
         )
         .default([]),
-      // F-1421 — milestones, tags and releases are repository-level entities the
+      // Milestones, tags and releases are repository-level entities the
       // twin already SERVES (`GET /milestones`, `/tags`, `/releases`,
       // `/releases/latest`, `/releases/tags/:tag`) and the seed could not
       // express. Zod strips unknown keys, so a seed naming one reached the
@@ -141,7 +141,7 @@ export const seedSchema = z.object({
             labels: z.array(z.string().min(1)).default([]),
             assignees: z.array(z.string().min(1)).default([]),
             // The issue's conversation timeline, served at
-            // `GET /repos/:o/:r/issues/:n/comments` (F-1421). `author` is
+            // `GET /repos/:o/:r/issues/:n/comments`. `author` is
             // seeded honestly rather than taken from the write path, which
             // stamps every comment `pome-agent`: a world in which the agent
             // under test wrote every comment on the issue it is being asked to
@@ -190,9 +190,9 @@ export const seedSchema = z.object({
                 })
               )
               .default([]),
-            // F-1421 — the PR's CONVERSATION timeline. Same table, same route
+            // The PR's CONVERSATION timeline. Same table, same route
             // and same number space as an issue's comments, because GitHub
-            // models a pull request as an issue (F-1151). This is the third
+            // models a pull request as an issue. This is the third
             // thing a reader could call "a comment on the PR" and the seed
             // keeps all three apart: `reviews[].body` is the prose on a review
             // verdict, `review_comments[]` below is anchored to a file and
@@ -205,7 +205,7 @@ export const seedSchema = z.object({
                 })
               )
               .default([]),
-            // F-1421 — inline review comments, served at
+            // Inline review comments, served at
             // `GET /repos/:o/:r/pulls/:n/comments`. Seeded through the domain's
             // own write path, so `path` must name a file the PR changes and
             // `line` must exist in it: a seeded review comment is one
@@ -275,7 +275,7 @@ function normalizeLegacyIssueAssignee(issue: unknown): unknown {
 
 /**
  * Boot-time seed loader: prefer `POME_SEED_JSON` env (set by the cloud
- * control-plane from the CLI-supplied scenario seed; see FDRS-353) and
+ * control-plane from the CLI-supplied scenario seed; ) and
  * fall back to `defaultSeedState()` when the env is absent. Throws on
  * malformed JSON or schema-invalid seed, so a misconfigured cloud
  * deploy fails the twin server's healthz instead of silently booting

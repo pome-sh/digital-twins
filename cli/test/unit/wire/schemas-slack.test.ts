@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// Slack twin seed / credential surface. Ported from pome-cloud at FDRS-653 —
-// the slack schemas already lived here; this brings over the coverage.
+// Slack twin seed / credential surface. Ported from pome-cloud — the slack schemas
+// already lived here; this brings over the coverage.
 import { describe, expect, it } from "vitest";
 
 import {
@@ -41,9 +40,8 @@ describe("slackSeedStateSchema", () => {
     expect(parsed.success).toBe(false);
   });
 
-  // F-1509 — the seed vocabulary the hosted contract has to speak for a scenario
-  // to declare a file. The twin's own `seedSchema` is the strict authority; this
-  // schema has to accept the same shape or the cloud strips the key on the way in.
+  // The seed vocabulary the hosted contract has to speak for a scenario to declare a
+  // file.
   it("accepts a files key with handles for user and channels", () => {
     const parsed = slackSeedStateSchema.safeParse({
       channels: [{ name: "general" }],
@@ -63,7 +61,7 @@ describe("slackSeedStateSchema", () => {
     expect(parsed.success && parsed.data.files[0]!.filetype).toBe("markdown");
   });
 
-  it("defaults files to an empty array, so every pre-F-1509 seed is unchanged", () => {
+ it("defaults files to an empty array, so every legacy seed is unchanged", () => {
     const parsed = slackSeedStateSchema.safeParse({ channels: [{ name: "general" }] });
     expect(parsed.success && parsed.data.files).toEqual([]);
   });

@@ -64,10 +64,8 @@ describe("GitHubDomain edge cases", () => {
         message: "Unsafe stale update",
         content: "lost update\n"
       })
-      // F-1491 — GitHub's own two answers, which are DIFFERENT from each other:
-      // omitting `sha` is a 422 naming the field, sending a wrong one is a 409
-      // naming the path. Before F-1491 both said "Validation Failed", so this
-      // test could not tell the two failure modes apart.
+      // GitHub's own two answers, which are DIFFERENT from each other: omitting `sha`
+      // is a 422 naming the field, sending a wrong one is a 409 naming the path.
     ).toThrow('"sha" wasn\'t supplied.');
     expect(() =>
       domain.createOrUpdateFile({
@@ -122,9 +120,8 @@ describe("GitHubDomain edge cases", () => {
     expect(domain.getIssue({ owner: "acme", repo: "api", issue_number: 1 }).comments).toBe(1);
   });
 
-  // F-1151 — the issue-comment endpoints address an issue OR a pull request,
-  // because real GitHub models every PR as an issue and documents these routes as
-  // the way to comment on one.
+  // The issue-comment endpoints address an issue OR a pull request, because real
+  // GitHub models every PR as an issue and documents these routes as the way to.
   describe("comments on a pull request", () => {
     const seeded = () => {
       const domain = new GitHubDomain(openGitHubCloneDatabase());
@@ -322,7 +319,7 @@ describe("GitHubDomain edge cases", () => {
     expect(() => domain.mergePullRequest({ owner: "acme", repo: "api", pull_number: pr.number })).toThrow("Pull request is closed");
   });
 
-  it("pins updatePullRequestBranch as a semantic merge of base into head (F-735)", () => {
+  it("pins updatePullRequestBranch as a semantic merge of base into head", () => {
     const domain = new GitHubDomain(openGitHubCloneDatabase());
     domain.seed();
 

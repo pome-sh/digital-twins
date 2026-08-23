@@ -1,22 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// FDRS-476 (phase 2 of FDRS-475) — upstream-added-field coverage guard (type-only; never run).
-//
-// File name ends in `.types.ts`, NOT `.test.ts`: it matches the tsconfig
-// `test/**/*.ts` include (so `npm run typecheck` checks it) but NOT vitest's
-// `*.test.ts` glob (so it is never executed as a test). The build tsconfig
-// excludes `test/`, so it never ships.
-//
-// For each anchored serializer, `<Name>_Allow` is the set of upstream fields
-// the twin DELIBERATELY does not emit. Each `AssertNoUncovered<...> = true`
-// line fails `tsc` — naming the field — the moment GitHub's official type
-// (via @octokit/openapi-types) gains a field the serializer neither emits nor
-// lists in its `_Allow` union. That forces an explicit cover-or-register
-// decision in the @octokit-bump PR. When typecheck is green, every `_Allow`
-// union is provably exact: it equals the current real uncovered set.
-//
-// EDITING ANY `_Allow` UNION IS A CONSCIOUS FIDELITY DECISION — each entry is a
-// field the twin is on record as choosing not to emit.
+// Upstream-added-field coverage guard (type-only; never run).
 import type { AssertNoUncovered } from "../src/upstream-types.js";
 import type {
   AuthenticatedUser,
@@ -145,12 +128,8 @@ type PullRequestList_Allow =
   | "deletions" | "changed_files";
 const _cov_pullRequestListJson: AssertNoUncovered<PullRequestSimple, ReturnType<typeof pullRequestListJson>, PullRequestList_Allow> = true;
 
-// F-1500 — `previous_filename` used to sit here. It is served now: the branch
-// diff detects an exact move and `pullRequestFileJson` emits the pre-rename path
-// on `status: "renamed"`, which is the only status GitHub sends it on. Leaving
-// the allowance behind would put the twin on record as still choosing to omit a
-// field it emits — and would stop this guard from failing if the emit were ever
-// dropped again.
+// `previous_filename` used to sit here. It is served now: the branch diff detects an
+// exact move and `pullRequestFileJson` emits the pre-rename path on `status:
 type PullRequestFile_Allow = never;
 const _cov_pullRequestFileJson: AssertNoUncovered<DiffEntry, ReturnType<typeof pullRequestFileJson>, PullRequestFile_Allow> = true;
 
@@ -169,13 +148,8 @@ const _cov_milestoneJson: AssertNoUncovered<Milestone, ReturnType<typeof milesto
 type Tag_Allow = never;
 const _cov_tagJson: AssertNoUncovered<Tag, ReturnType<typeof tagJson>, Tag_Allow> = true;
 
-// F-1533 dropped `immutable` (now emitted) and, with it, `updated_at` — which
-// F-1459 emitted and left listed here. A stale entry is invisible to the
-// assertion below: `AssertNoUncovered` is one-directional, reddening on an
-// upstream field that is neither emitted nor allowed, never on an allowance
-// with nothing behind it. So the header's claim that a green typecheck makes
-// every `_Allow` union "provably exact" holds in one direction only; keeping
-// these two would have read as two deliberate omissions that were not.
+// `immutable` was dropped (it is now emitted) and, with it, `updated_at` — emitted but
+// left listed here.
 type Release_Allow =
   | "reactions" | "body_html" | "body_text"
   | "mentions_count" | "discussion_url";

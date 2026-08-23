@@ -1,12 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1325 — the shared MCP tool-table fixture loader.
-//
-// The point of the loader is that a tool name a twin serves cannot be typed
-// into TypeScript: it comes from a fixture whose provenance is declared and
-// whose bytes are hash-locked. These tests pin the three ways that guarantee
-// can be hollowed out — an unhashed raw file, an undeclared provenance, and a
-// code table that disagrees with the fixture in either direction.
+// The shared MCP tool-table fixture loader.
 
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";

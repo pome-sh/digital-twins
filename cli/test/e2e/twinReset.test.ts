@@ -1,14 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// F-948 DX audit regression — `pome twin reset` hardcoded its own supported-
-// twin set (`new Set(["github", "slack", "stripe", "gmail"])`) instead of
-// deriving it from `TWIN_NAME_LIST`, the single source of truth the registry
-// refactor introduced specifically so a new twin can't silently fall out of
-// sync (see registry.ts's own header comment). Linear shipped as a full
-// first-party twin but `pome twin reset linear` rejected it as "Unknown
-// twin", even though `pome twin start linear` worked fine. This test locks
-// `twin reset` to accept every twin in TWIN_NAME_LIST, and locks the
-// unknown-twin error text (for both `twin start` and `twin reset`) to list
-// all five names.
+// DX audit regression — `pome twin reset` hardcoded its own supported- twin set (`new
+// Set(["github", "slack", "stripe", "gmail"])`) instead of deriving it.
 
 import { spawn } from "node:child_process";
 import { mkdtemp } from "node:fs/promises";

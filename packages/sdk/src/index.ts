@@ -18,7 +18,7 @@ export { recorderEventSchema, recorderFidelitySchema };
 export type { RecorderEvent, RecorderFidelity, TwinId };
 
 export { openTwinDatabase } from "./db.js";
-// F-1325 — a twin's MCP tool table is derived from a hash-locked fixture with
+// A twin's MCP tool table is derived from a hash-locked fixture with
 // declared provenance, never hand-written in TypeScript.
 export {
   canonicalMcpToolSchema,
@@ -61,7 +61,7 @@ export interface ToolFidelityMetadata {
  * (JSON-RPC `tools/call`, legacy `/mcp/tools/:name` + `/mcp/call`). Carries
  * the authenticated session (actor identity) and a `reportDelta` sink so
  * MCP-dispatched mutations surface `state_delta` on the recorded event —
- * the two facilities the per-twin mcp.ts modules had before F-683.
+ * the two facilities the per-twin mcp.ts modules had before.
  */
 export interface ToolCallContext {
   /** The session set by the engine's bearerAuth for this request. */
@@ -176,12 +176,12 @@ export interface RecorderHandle {
   /** Events dropped by a bounded store (0 for the default unbounded store). */
   dropped(): number;
   /**
-   * Durability barrier (F-720). Forwards to the backing `RecorderStore.flush`
+   * Durability barrier. Forwards to the backing `RecorderStore.flush`
    * when present. Await before upload/finalize when using a durable store.
    */
   flush(): Promise<void>;
   /**
-   * Flush + release the backing store (F-720). Idempotent.
+   * Flush + release the backing store. Idempotent.
    */
   close(): Promise<void>;
   /**
@@ -197,7 +197,7 @@ export interface RecorderHandle {
       /** Per-surface error projection override (admin routes have their own frozen envelope on some twins). */
       errorEnvelope?: (err: unknown) => { status: number; body: unknown };
       /**
-       * F-1125 — the twin ACTION this route performs, recorded as
+       * The twin ACTION this route performs, recorded as
        * `RecorderEvent.tool` (see its doc for what the field means and why a
        * REST route left undeclared answers "never" for a call that happened).
        * Use the matching MCP tool's name; omit when there is no counterpart.
@@ -213,7 +213,7 @@ export interface AdminHandlers<TDomain = unknown, TSeed = unknown> {
   /**
    * Implements POST /admin/reset. `reportDelta` records the row-level
    * before/after as the admin event's `state_delta` (github's frozen tape
-   * records the seed delta on admin mutations, F-682).
+   * records the seed delta on admin mutations).
    */
   reset?: (ctx: {
     domain: TDomain;
@@ -268,7 +268,7 @@ export interface TwinDefinition<
    * the route returns a 501 envelope so consumers fail loudly instead of
    * silently reading an empty state. `session` is the bearer-resolved
    * session for the request, so account-scoped twins (stripe) can export
-   * only the calling session's slice (F-684).
+   * only the calling session's slice.
    */
   state?: (ctx: {
     domain: TDomain;
@@ -332,7 +332,7 @@ export interface TwinDefinition<
    */
   middleware?: RouteRegistrar<TDomain>;
   /**
-   * Legacy `POST /mcp/call` dispatch pins (F-683 review): slack's frozen
+   * Legacy `POST /mcp/call` dispatch pins (review): slack's frozen
    * surface accepts `{name}`/`{params}` as aliases of `{tool}`/`{arguments}`
    * and answers a body naming no tool with its own envelope instead of the
    * strict-parse error.
@@ -360,7 +360,7 @@ export interface TwinDefinition<
    */
   pomeRoutes?: Record<string, (ctx: { domain: TDomain }) => unknown | Promise<unknown>>;
   /**
-   * FDRS-402 adapter-rich stamping pin: when true, every recorded event
+   * adapter-rich stamping pin: when true, every recorded event
    * persists the incoming `x-pome-correlation-id` header as `tool_call_id`
    * (github's frozen tape shape). Defaults to false — slack's frozen tape
    * stamps null. Flipping a twin is a deliberate tape-shape change.
@@ -391,7 +391,7 @@ export interface TwinDefinition<
    */
   mountSessionAtRoot?: boolean;
   /**
-   * Per-twin auth declarations (F-712): token shape, error envelopes, extra
+   * Per-twin auth declarations: token shape, error envelopes, extra
    * token locations, raw-bearer / sid-mismatch pins, credential lookup.
    * Mechanism lives in the engine's `bearerAuth`; this is pure shape.
    */

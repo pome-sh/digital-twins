@@ -1,16 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
-// F-893 — `pome install` is retired to a redirect. It no longer resolves
-// credentials, detects a coding agent, stages a diff, or runs doctor; it just
-// prints the Gen-2 wiring path and exits 0. The command tolerates the old flags
-// (`--interactive`, `--api-url …`) so stale invocations still land on the
-// redirect instead of erroring on a removed option.
+// `pome install` is retired to a redirect.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { runInstall } from "../../src/cli/install.js";
 import { createProgram } from "../../src/cli/main.js";
 
-describe("pome install (F-893 redirect)", () => {
+describe("pome install", () => {
   let errSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
@@ -34,7 +30,7 @@ describe("pome install (F-893 redirect)", () => {
     expect(out).toContain("retired");
     // Both Gen-2 install steps are named.
     expect(out).toContain("claude mcp add --transport http pome https://mcp.pome.sh/mcp");
-    // F-1226: the bare form drops the reader on a picker with nothing ticked and
+    // The bare form drops the reader on a picker with nothing ticked and
     // the coach only works as a set, so the install-all flag is part of the copy.
     expect(out).toContain("npx skills add pome-sh/digital-twins --skill '*'");
     // Points at the intake / REST-launch preflight as the next step.

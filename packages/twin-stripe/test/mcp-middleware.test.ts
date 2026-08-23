@@ -1,11 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-684 review pins: the pre-port chassis ran failure-injection and
-// idempotency session-wide (session.use("*")) BEFORE the MCP routes were
-// mounted, so both cover legacy MCP dispatch. The port initially lost that
-// (user routes mount after the engine MCP routes): an Idempotency-Key'd
-// /mcp/call create minted duplicate PaymentIntents and injected rules on
-// /mcp/* paths never fired. These tests pin the restored behavior.
+// Review pins: the pre-port chassis ran failure-injection and idempotency session-wide
+// (session.use("*")) BEFORE the MCP routes were mounted, so both cover.
 import { beforeAll, afterAll, describe, expect, it } from "vitest";
 import { createTwinStripeApp } from "../src/twin.js";
 import { TEST_AUTH_SECRET, signTestToken } from "./_authHelper.js";

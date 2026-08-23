@@ -2,20 +2,20 @@
 //
 // `@pome-sh/checks` is the third npmjs-published package, and the only one whose
 // entire reason to exist is a CROSS-REPO consumer: pome-cloud grades every
-// `[code]` criterion out of these declarations (F-1308).
+// `[code]` criterion out of these declarations.
 //
 // ── Why it bundles instead of depending ──────────────────────────────────────
 //
 // The declarations live in `packages/twin-*/src/check-*.ts` and
 // `packages/sdk/src/checks.ts`, and those packages are `private: true` and stay
 // that way — commit 6369379 privatised them to fix a real bug (two zod schema
-// identities for one wire type, F-942) and F-1308 is explicit that it is not
+// identities for one wire type) and that is explicit about not being
 // being reversed. So this package cannot DEPEND on them; it inlines their
 // compiled output via `noExternal`, exactly as `@pome-sh/cli` and
 // `@pome-sh/adapter-claude-sdk` already do.
 //
 // That also settles a pin question with no good answer. AGENTS.md forbids exact
-// `@pome-sh/*` pins between internal packages (the F-942 rule); `"*"` in a
+// `@pome-sh/*` pins between internal packages (the rule); `"*"` in a
 // PUBLISHED manifest is unbounded at the consumer's install time; and `^0.x` is
 // rejected by `scripts/check-workspace-pins-match-workspace.mjs`. Bundling means
 // there is no pin to pick, because the published `package.json` declares zero
@@ -27,7 +27,7 @@
 // zod is a `peerDependency`, never bundled. The seed schemas and `defineCheck`
 // are zod values, and pome-cloud parses seeds it built with its OWN zod. Two
 // copies of zod means two schema identities — `instanceof` fails, `.parse()`
-// results stop being interchangeable — which is precisely the F-942 bug that
+// results stop being interchangeable — which is precisely the bug that
 // dissolved `@pome-sh/shared-types`. A peer dependency is what guarantees the
 // consumer's graph holds exactly one zod.
 //

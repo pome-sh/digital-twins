@@ -112,26 +112,8 @@ describe("state export", () => {
     expect(state.channels[0]!.id).toBe("C_HELP");
   });
 
-  // F-1159 — the premise the reactions guard rests on, made falsifiable.
-  //
-  // `slack.no-reaction-added` refuses (`state_incomplete`) when the export
-  // carries no `reactions` key, because absent is not the same as none. That is
-  // only SAFE while a zero-reaction workspace still emits `reactions: []`: the
-  // day this export starts omitting empty collections, every one of those
-  // criteria stops being graded and silently leaves the denominator on runs
-  // where the agent behaved perfectly — a false SKIP replacing a false pass,
-  // just as quiet and rather harder to notice.
-  //
-  // `exportState()` runs `SELECT * FROM reactions` unconditionally today, so the
-  // guard's trigger is unreachable on a whole export.
-  //
-  // `fidelity-contract.test.ts` already asserts the KEY survives, but it asks
-  // the domain method directly and only that the property exists. Two gaps this
-  // closes: the value must be `[]` rather than any present-but-falsy stand-in,
-  // and the question is asked of `/_pome/state` — the surface pome-cloud
-  // actually reads — so the SDK's state pipeline sits inside the assertion
-  // instead of beside it.
-  it("a zero-reaction workspace exports `reactions: []`, never an absent key (F-1159)", async () => {
+  // The premise the reactions guard rests on, made falsifiable.
+  it("a zero-reaction workspace exports `reactions: []`, never an absent key", async () => {
     const a = build();
     const token = await signTestToken();
     const state = (await (

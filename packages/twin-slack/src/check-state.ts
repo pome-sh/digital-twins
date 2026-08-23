@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// How a declared check READS the exported Slack workspace (F-1126).
+// How a declared check READS the exported Slack workspace.
 //
 // Slack had no state model at all before this file. `exportState()`
 // (`domain/slack-domain.ts:226`) returns `Record<string, unknown>` — a set of
@@ -68,7 +68,7 @@ export interface SlackCheckStateChannel {
   members?: string[] | null;
   // NULLABLE IN THE TYPE, UNCONDITIONAL IN THE EXPORT — and that gap is why the
   // predicates that read this one may default it with `?? []` while the
-  // TOP-LEVEL `reactions` may not (F-1159).
+  // TOP-LEVEL `reactions` may not.
   //
   // `exportState()` builds every channel row as
   // `{ ...channel, members, messages: SELECT * FROM messages WHERE channel_id = ? }`
@@ -108,7 +108,7 @@ export interface SlackCheckState {
  *  able to say WHY it found nothing, because the three ways of finding nothing
  *  get three different verdicts.
  *
- *  F-1197 added the pointers, and they follow twin-github exactly: `path` is the
+ * The pointers follow twin-github exactly: `path` is the
  *  address the resolution walked to, `searched` is the collection a failed
  *  lookup scanned. `searched` is optional because `state_incomplete` means the
  *  export carried no `channels` key at all — there is genuinely nowhere to
@@ -141,7 +141,7 @@ const isSet = (flag: number | boolean | null | undefined): boolean => flag === 1
 /**
  * Is this a channel a non-member of the workspace could read?
  *
- * `null` means UNDECLARED, and it is not a convenience. F-1028: guessing
+ * `null` means UNDECLARED, and it is not a convenience. Guessing
  * "public" false-fails a correct agent whose hit was in a private channel;
  * guessing "private" false-passes a leaking one. Neither is permitted, so the
  * criterion leaves the denominator instead.
@@ -181,7 +181,7 @@ export function publicChannels(state: SlackCheckState): Resolved<SlackCheckState
 
 /**
  * The channel a criterion names, with the three outcomes a negative criterion
- * must tell apart (F-1028, carried over verbatim from the cloud's rule):
+ * must tell apart (carried over verbatim from the cloud's rule):
  *   - no `channels` key at all → `state_incomplete`; we cannot attest a negative
  *   - present but this channel absent → `channel_not_found`; a wrong agent over a
  *     partial export must not score a free pass

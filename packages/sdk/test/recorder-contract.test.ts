@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-720 — recorder write-through contract tests.
-// Covers in-memory + file-backed stores: acceptance, flush/close, redaction
-// before persistence, and canonical RecorderEvent NDJSON rows.
+// Recorder write-through contract tests. Covers in-memory + file-backed stores:
+// acceptance, flush/close, redaction before persistence, and canonical RecorderEvent.
 
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -108,10 +106,10 @@ async function assertStoreContract(store: RecorderStore, opts?: { path?: string 
   }
 }
 
-describe("recorder write-through contract (F-720)", () => {
+describe("recorder write-through contract", () => {
   it("documents twin-core home as packages/sdk (no packages/twin-core)", () => {
     // Structural pin: this module *is* the twin-core recorder. Import path
-    // stays @pome-sh/sdk — F-681 did not create packages/twin-core.
+    // stays @pome-sh/sdk did not create packages/twin-core.
     expect(createRecorderStore).toBeTypeOf("function");
     expect(createFileBackedRecorderStore).toBeTypeOf("function");
   });
@@ -270,7 +268,7 @@ describe("recorder write-through contract (F-720)", () => {
     } as RecorderEvent);
     expect(already.kind).toBe("TwinHttpEvent");
     expect(already.event_id).toBe("req_ok");
-    // Fed a pre-F-1200 row on purpose: the wrapper emits the canonical
+    // Fed a legacy row on purpose: the wrapper emits the canonical
     // spelling regardless of which one the caller handed it.
     expect(already.parent_event_id).toBeNull();
   });

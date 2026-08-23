@@ -1,4 +1,4 @@
-// file-size: one serializer per Stripe resource the twin emits — splitting the anchored emitters would scatter the FDRS-478 shape-anchor discipline across modules.
+// file-size: one serializer per Stripe resource the twin emits — splitting the anchored emitters would scatter the shape-anchor discipline across modules.
 // SPDX-License-Identifier: Apache-2.0
 //
 // Row → Stripe-shape JSON serializers. Owned by AGENT-B.
@@ -50,7 +50,7 @@ export function paymentIntentJson(row: PIRow) {
   //   • wire-version delta (ST-DIV-015): the twin still emits `invoice` (faithful
   //     to wire apiVersion 2026-03-04.preview); the anchor library stripe@22.2.0
   //     (2026-05-27.dahlia) DROPPED `invoice` from PaymentIntent.
-  // Card PIs (F-731) carry Stripe's default card options instead of the
+  // Card PIs carry Stripe's default card options instead of the
   // crypto rail. piTypes is the one rail predicate (domain uses it too).
   const types = piTypes(row);
   const wireLift: {
@@ -88,7 +88,7 @@ export function paymentIntentJson(row: PIRow) {
     cancellation_reason: null,
     // Twin row columns carry the literal Stripe values; the row type is a free
     // `string`. Narrow to the upstream literal union for the type anchor only
-    // (FDRS-454: the twin faithfully emits a real upstream value), runtime unchanged.
+    // (the twin faithfully emits a real upstream value), runtime unchanged.
     capture_method: row.capture_method as PaymentIntent["capture_method"],
     client_secret: row.client_secret,
     confirmation_method: row.confirmation_method as PaymentIntent["confirmation_method"],
@@ -96,9 +96,9 @@ export function paymentIntentJson(row: PIRow) {
     currency: row.currency,
     customer: row.customer_id,
     description: null,
-    // Card declines (F-731): the last failed attempt, parsed from the row.
+    // Card declines: the last failed attempt, parsed from the row.
     // The stored blob is Stripe's LastPaymentError shape; narrow for the
-    // type anchor only (FDRS-454), runtime unchanged.
+    // type anchor only, runtime unchanged.
     last_payment_error: parseJson(
       row.last_payment_error_json,
       null
@@ -132,15 +132,14 @@ export function chargeJson(row: ChargeRow) {
   // divergent field is allowed while every directly-written field stays checked.
   const wireLift: { invoice: string | null } = { invoice: null };
   const failed = row.status === "failed";
-  // Card charges (F-731) store their PM details at mint time; crypto
+  // Card charges store their PM details at mint time; crypto
   // charges keep the x402 deposit rail shape.
   const paymentMethodDetails = parseJson(row.payment_method_details_json, {
     type: "crypto",
     crypto: {
       // Upstream `Charge.PaymentMethodDetails.Crypto.{buyer_address,transaction_hash}`
       // are `string | undefined`; the twin surfaces `null` pre-settlement (no
-      // on-chain tx yet). Narrow the pre-resolution null for the type anchor only
-      // (FDRS-454), runtime value (null) unchanged.
+      // on-chain tx yet). Narrow the pre-resolution null for the type anchor only, runtime value (null) unchanged.
       buyer_address: null as unknown as string | undefined,
       network: "base",
       token_currency: "usdc",
@@ -172,7 +171,7 @@ export function chargeJson(row: ChargeRow) {
     disputed: false,
     failure_balance_transaction: null,
     // Twin failure columns carry Stripe's literal decline codes; the row
-    // type is a free `string`. Narrow for the type anchor only (FDRS-454).
+    // type is a free `string`. Narrow for the type anchor only.
     failure_code: row.failure_code as Charge["failure_code"],
     failure_message: row.failure_message,
     fraud_details: {},
@@ -198,7 +197,7 @@ export function chargeJson(row: ChargeRow) {
     payment_intent: row.payment_intent_id,
     payment_method: row.payment_method_id,
     // Stored blob is spec-faithful (built from the PM row at mint time);
-    // narrow for the type anchor only (FDRS-454).
+    // narrow for the type anchor only.
     payment_method_details: paymentMethodDetails as Charge["payment_method_details"],
     receipt_email: null,
     receipt_number: null,
@@ -230,7 +229,7 @@ export function refundJson(row: RefundRow) {
     metadata: {},
     payment_intent: row.payment_intent_id,
     // Twin row `reason` is a free `string`; upstream `Refund.Reason` is a literal
-    // union. Narrow for the type anchor only (FDRS-454), runtime unchanged.
+    // union. Narrow for the type anchor only, runtime unchanged.
     reason: row.reason as Refund["reason"],
     receipt_number: null,
     source_transfer_reversal: null,
@@ -313,7 +312,7 @@ export function paymentMethodJson(row: PaymentMethodRow) {
     livemode: false,
     metadata: {},
     // Twin row `type` is a free `string`; upstream `PaymentMethod.type` is a
-    // literal union. Narrow for the type anchor only (FDRS-454), runtime
+    // literal union. Narrow for the type anchor only, runtime
     // value ("card") unchanged.
     type: row.type as PaymentMethod["type"],
   } satisfies DeepPartial<PaymentMethod>;
@@ -337,7 +336,7 @@ export function balanceTransactionJson(row: BalanceTxRow) {
     status: row.status,
     // Upstream `BalanceTransaction.Type` is a literal union; the twin's ledger
     // `type` column is a free `string` (carries the x402 deposit categories).
-    // Narrow for the type anchor only (FDRS-454), runtime value unchanged.
+    // Narrow for the type anchor only, runtime value unchanged.
     type: row.type as BalanceTransaction["type"],
   } satisfies DeepPartial<BalanceTransaction>;
 }
@@ -351,7 +350,7 @@ export function eventJson(row: EventRow) {
     created: row.created,
     // LIFT (ST-DIV-014): the twin stores the event payload as an opaque parsed
     // JSON blob (`data.object: unknown`); upstream `Event.Data.object` is a typed
-    // resource union. Narrow for the type anchor only (FDRS-454), runtime unchanged.
+    // resource union. Narrow for the type anchor only, runtime unchanged.
     data: parsedData as StripeEvent["data"],
     livemode: Boolean(row.livemode),
     pending_webhooks: 0,
@@ -360,12 +359,12 @@ export function eventJson(row: EventRow) {
       idempotency_key: row.request_idempotency_key,
     },
     // LIFT (ST-DIV-014): twin emits a free `string`; official `EventBase.type`
-    // is the `Event.Type` literal union. Narrow for the anchor only (FDRS-454).
+    // is the `Event.Type` literal union. Narrow for the anchor only.
     type: row.type as StripeEvent["type"],
   } satisfies DeepPartial<StripeEvent>;
 }
 
-// ---------- Billing serializers (F-734, shape tier) ----------
+// ---------- Billing serializers (shape tier) ----------
 //
 // Faithful subsets served off stored rows — the anchor is the entire shape
 // check here; there is no semantic machine behind these objects (no events,
@@ -399,7 +398,7 @@ export function priceJson(row: PriceRow) {
     ? {
         // Twin row `recurring_interval` is a free `string`; upstream
         // `Price.Recurring.interval` is a literal union. Narrow for the type
-        // anchor only (FDRS-454), runtime unchanged.
+        // anchor only, runtime unchanged.
         interval: row.recurring_interval as PriceRecurring["interval"],
         interval_count: row.recurring_interval_count ?? 1,
         meter: null,

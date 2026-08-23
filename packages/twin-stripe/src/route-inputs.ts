@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1179 — every REST input this twin accepts, declared where it is validated.
+// Every REST input this twin accepts, declared where it is validated.
 //
 // Nothing here describes the parse; each entry IS the parse. `declaredRoute()`
 // (routes/_helpers.ts) mounts a handler at the method and path its declaration
@@ -26,7 +26,7 @@ import {
 import { STRIPE_REFUND_REASONS } from "./upstream-types.js";
 
 /**
- * F-1372 — Stripe refuses a parameter it does not know, so the strict default
+ * Stripe refuses a parameter it does not know, so the strict default
  * is affirmed here rather than merely inherited.
  *
  * Stripe's published error-code reference carries `parameter_unknown`: "The
@@ -108,7 +108,7 @@ const CONFIRM_PAYMENT_INTENT_BODY = { payment_method: z.string().optional() } as
  * own `parameter_invalid_integer`. Narrowing it in the declaration would swap
  * that for the generic `parameter_invalid`.
  *
- * `reason` is the opposite call, and F-1484 is why. Stripe's `PostRefunds`
+ * `reason` is the opposite call, and here is why. Stripe's `PostRefunds`
  * declares it as a CLOSED set — `["duplicate","fraudulent",
  * "requested_by_customer"]`, the same three its MCP `create_refund` declares —
  * so a free string here is a request real Stripe answers 400 and this twin
@@ -294,7 +294,7 @@ export const STRIPE_ROUTES = {
     body: CUSTOMER_FIELDS_BODY,
   }),
 
-  // F-1389 (ST-DECL-IN-001) — NOT `LIST_QUERY`. This is the one list surface
+  // ST-DECL-IN — NOT `LIST_QUERY`. This is the one list surface
   // that does not take `created`: `GetCustomersCustomerPaymentMethods` declares
   // `allow_redisplay, ending_before, expand, limit, starting_after, type` and
   // nothing else, and Stripe's measured disposition is `refuse` — it publishes

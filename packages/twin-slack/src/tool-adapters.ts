@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Where Slack's MCP tools do not line up 1:1 with this twin's Web API (F-1330).
+// Where Slack's MCP tools do not line up 1:1 with this twin's Web API.
 //
 // Kept out of `tools.ts` so the dispatch there stays one case per tool: every
 // function here exists because Slack's tool takes an argument the Web API
@@ -9,7 +9,7 @@
 // Three of Slack's tools take a REQUIRED `query` over a Web API method that has
 // no query at all — `slack_search_channels` and `slack_search_users` sit over
 // `conversations.list` and `users.list`, and `slack_search_emojis` over
-// `emoji.list`. That is the behaviour change F-1330 names: the old
+// `emoji.list`. That is the behaviour change: the old
 // `slack_list_channels` and `slack_get_users` took no query and returned
 // everything.
 //

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-634 — the doctor's terminal rendering, per `CLI moments.dc.html`
-// moment 03: check lines, then (on failure) exactly one cause/fix card and
-// the two closing warning lines.
+// The doctor's terminal rendering, per `CLI moments.dc.html` moment 03: check lines,
+// then (on failure) exactly one cause/fix card and the two closing warning.
 
 import { describe, expect, it } from "vitest";
 import { renderDoctorReport } from "../../../src/doctor/render.js";
@@ -27,7 +26,7 @@ describe("renderDoctorReport", () => {
     expect(text).not.toContain("your agent would hit production");
   });
 
-  it("omits the preflight pass-note by default, but appends it when passNote is set (F-906)", () => {
+  it("omits the preflight pass-note by default, but appends it when passNote is set", () => {
     const report: DoctorReport = {
       ok: true,
       checks: [

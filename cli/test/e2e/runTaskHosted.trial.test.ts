@@ -1,17 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-636 — runTaskHosted's trial seams against a fake cloud:
-//
-//   - `premintedSession` skips the runner's own POST /v1/sessions (trial
-//     groups mint all k upfront) while the `finally` teardown still DELETEs
-//     the trial's own session;
-//   - `abandonOnFailure` turns agent failures (preflight fail / timeout /
-//     non-zero exit) and machinery crashes into POST /:id/abandon with a
-//     machine error_code + a thrown HostedTrialError — an errored trial
-//     must NEVER produce a judged run row (no /finalize);
-//   - the abandon lands BEFORE the teardown DELETE, so error_code is
-//     recorded while the session row is still open;
-//   - default mode (no flag) keeps today's behavior: agent timeout still
-//     finalizes (covered by runTaskHosted.test.ts, re-asserted here).
+// RunTaskHosted's trial seams against a fake cloud: - `premintedSession` skips the
+// runner's own POST /v1/sessions (trial groups mint all k upfront) while.
 
 import { describe, it, expect, afterEach } from "vitest";
 import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -149,7 +138,7 @@ async function premintedFor(port: number): Promise<CreateSessionResponse> {
   };
 }
 
-describe("runTaskHosted trial seams (FDRS-636)", () => {
+describe("runTaskHosted trial seams", () => {
   let cloud: FakeCloud | undefined;
   let tmp: string | undefined;
 
@@ -186,7 +175,7 @@ describe("runTaskHosted trial seams (FDRS-636)", () => {
     expect(cloud.mintCalls()).toBe(0); // the group minted upfront
     expect(cloud.finalizeCalls()).toBe(1);
     expect(cloud.deletes()).toEqual([SESSION_ID]);
-    // FDRS-636 — the runner reports the trial duration for the verdict table.
+    // The runner reports the trial duration for the verdict table.
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
   });
 
@@ -219,7 +208,7 @@ describe("runTaskHosted trial seams (FDRS-636)", () => {
     expect(cloud.lifecycle()).toEqual(["abandon", "delete"]);
   });
 
-  it("abandonOnFailure + preflight failure → abandon(preflight_failed), no finalize; reason names the stderr tail and forensics land in artifactsDir (FDRS-667)", async () => {
+  it("abandonOnFailure + preflight failure → abandon(preflight_failed), no finalize; reason names the stderr tail and forensics land in artifactsDir", async () => {
     cloud = await startFakeCloud();
     const path = await taskPath(SCENARIO);
     // Mimics the first-publish e2e: the example's preflight throws its named
@@ -247,7 +236,7 @@ describe("runTaskHosted trial seams (FDRS-636)", () => {
     expect(cloud.finalizeCalls()).toBe(0);
     expect(cloud.abandonBodies()).toEqual([{ error_code: "preflight_failed" }]);
 
-    // FDRS-667 — an abandoned trial still writes stdout.txt/stderr.log where
+    // An abandoned trial still writes stdout.txt/stderr.log where
     // a completed trial's artifacts would go, so `runs/` is never empty.
     const files = await readdir(join(tmp!, "runs"), { recursive: true });
     const stderrLog = files.find((f) => String(f).endsWith("stderr.log"));
@@ -257,7 +246,7 @@ describe("runTaskHosted trial seams (FDRS-636)", () => {
     ).toContain("twin not reachable at http://127.0.0.1:3333/healthz");
   });
 
-  it("injects POME_TWIN_BASE_URL = session twin_url so loopback-fallback agents pass hosted preflight (FDRS-667)", async () => {
+  it("injects POME_TWIN_BASE_URL = session twin_url so loopback-fallback agents pass hosted preflight", async () => {
     cloud = await startFakeCloud();
     const path = await taskPath(SCENARIO);
     const expected = `http://127.0.0.1:${cloud.port}/s/${SESSION_ID}`;

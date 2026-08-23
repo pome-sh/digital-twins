@@ -585,13 +585,7 @@ describe("MCP page tokens", () => {
   });
 });
 
-// F-1400 — the listing is Google's, so every claim in it is a claim about this
-// twin. These are the three the August capture added that the handlers did not
-// answer: adopting the bytes without them would advertise capabilities the twin
-// does not have, which is the failure F-1330 exists to prevent reached from the
-// other side. The two shape tests read the ADVERTISED property set out of the
-// fixture rather than listing fields by hand, so the next field Google adds is
-// a red here and not a silent absence.
+// The listing is Google's, so every claim in it is a claim about this twin.
 describe("the adopted listing's claims are behaviours", () => {
   function fixtureTool(name: string) {
     const tool = canonicalListing.result.tools.find((entry) => entry.name === name);
@@ -718,10 +712,8 @@ describe("the adopted listing's claims are behaviours", () => {
   });
 
   it("answers every field the search_threads root advertises, resultCountEstimate included", async () => {
-    // Read out of the fixture rather than named here (F-1400's pattern): if
-    // Google adds a fourth root field, this reds instead of the twin quietly
-    // never serving it. Naming `resultCountEstimate` in the assertion would
-    // close exactly one gap and leave the class open.
+    // Read out of the fixture rather than named here (the pattern): if Google adds a
+    // fourth root field, this reds instead of the twin quietly never serving it.
     expect(advertisedFields("search_threads")).toContain("resultCountEstimate");
 
     // Two threads, because this file's `seed()` has exactly one: with a single
@@ -775,8 +767,7 @@ describe("the adopted listing's claims are behaviours", () => {
 
   it("reports a zero match count rather than omitting the field", async () => {
     // 0 is an answer to "how many matched". If the field were emitted only when
-    // non-zero, an absent field would mean both "no matches" and "this twin
-    // does not serve it" — which is the gap F-1417 closed.
+    // non-zero, an absent field would mean both "no matches" and "this twin does not.
     const app = createGmailTwinApp({ seed: fullyPopulatedSeed() });
     const none = await call(app, 1, "search_threads", { query: "is:unread from:nobody@example.invalid" });
     expect(none.result.isError).toBe(false);

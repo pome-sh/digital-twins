@@ -1,15 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1159 — the reactions absence guard, at the twin whose state it reads.
-//
-// `slack.no-reaction-added` filters the top-level `reactions` list with
-// `(final.reactions ?? []).some(…)`. An export carrying no `reactions`
-// collection at all used to filter to zero rows and score this NEGATIVE
-// criterion `passed` — an agent that really added the reaction still collected
-// the point. `checks-contract.test.ts`'s redaction-survival ledger names the
-// shape; this is the executable proof, matching twin-github's
-// `pull.reviews == null` / `pull.comments == null` skips: absent is not the
-// same as none.
+// The reactions absence guard, at the twin whose state it reads.
 
 import { describe, expect, it } from "vitest";
 import { noReactionAdded } from "../src/check-messages.js";
@@ -38,11 +28,8 @@ describe("slack.no-reaction-added", () => {
   });
 
   it("SKIPS on an absent reactions section — absent is not the same as none", () => {
-    // The defect F-1159 closes. `?? []` used to read a missing `reactions`
-    // collection the same as an empty one, so a negative criterion scored a
-    // free pass over a world it never actually observed. It must refuse
-    // instead, the way twin-github's `pull.reviews == null` and
-    // `pull.comments == null` do.
+    // `?? []` used to read a missing `reactions` collection the same as an empty one,
+    // so a negative criterion scored a free pass over a world it never actually.
     const final: SlackCheckState = { channels: [publicChannel("general")] };
     const outcome = noReactionAdded.evaluate(args, { seed: null, tape: null, final });
     expect(outcome.passed).toBe(false);

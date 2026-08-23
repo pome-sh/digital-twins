@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-643 — the bundled demo agent's tool loop, driven by a scripted stub
-// gateway (validating the strict demo-llm schema on every call) against a
-// stub twin capturing the REST calls the three tools make.
+// The bundled demo agent's tool loop, driven by a scripted stub gateway (validating
+// the strict demo-llm schema on every call) against a stub twin capturing.
 import { createServer, type Server } from "node:http";
 import { afterEach, describe, expect, it } from "vitest";
 import { runDemoAgent, type DemoAgentEnv } from "../../../src/demo/agent.js";
@@ -131,7 +130,7 @@ function collectIo(): { io: { log: (l: string) => void; error: (l: string) => vo
   };
 }
 
-describe("runDemoAgent (FDRS-643 tool loop)", () => {
+describe("runDemoAgent (tool loop)", () => {
   it("runs list → act → finish, executing tools against the twin, and exits 0", async () => {
     const gateway = stubGateway([
       {

@@ -1,13 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1325 — the fixture is the tool table, not a document about it.
-//
-// The derivation is structural (`deriveMcpToolTable` throws on any 1:1
-// mismatch), but "structurally impossible" is a claim worth one round trip:
-// this suite drives the real `tools/list` surface and compares the answer to
-// the fixture field by field. It also re-derives the canonical bytes and
-// re-hashes the raw file from disk, which is the half of the load-time assert
-// a bundled twin cannot make for itself.
+// The fixture is the tool table, not a document about it.
 
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -74,10 +66,8 @@ describe("slack MCP tool fixture", () => {
   });
 
   it("declares the live OAuth capture as its substrate, not a transcription", () => {
-    // F-1330. While this said `twin-code-transcription` it was telling the
-    // truth: nobody had read Slack's tools/list, and eight of the eleven names
-    // served existed on no Slack deployment. F-1329's grant is what made a
-    // capture possible, and this is the twin adopting it.
+    // While this said `twin-code-transcription` it was telling the truth: nobody had
+    // read Slack's tools/list, and eight of the eleven names served existed on.
     expect(meta.substrate).toBe("live-wire-oauth");
     expect(meta.endpoint).toBe("https://mcp.slack.com/mcp");
     expect(meta.transcription).toBeUndefined();

@@ -1,21 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// Engine gaps surfaced by the F-684 stripe port (the largest twin, and the
-// only one with a root SDK-compat mount). Written test-first per the pilot
-// rule: gaps are fixed in the engine, never by re-adding per-twin harness
-// code.
-//
-//   1. `mountSessionAtRoot` — stripe's frozen F3 surface: the same session
-//      router answers at the root path (`/v1/*`), bearer alone resolves the
-//      session (auth `requirePathSid: false`), root `/healthz` + `/admin/*`
-//      stay first-match, and unknown root paths hit the twin's 401 auth wall.
-//   2. `sessionHealthz: false` — stripe has NO per-session /healthz (frozen
-//      per-twin difference: the path falls to the 501 catch-all).
-//   3. `state` hook receives the authenticated session — stripe's state
-//      export is account-scoped (`domain.exportState(session.account_id)`).
-//   4. `pomeHealth` extras hook — stripe's frozen `/s/:sid/_pome/health`
-//      shape carries implementation/tthw_seconds/runtime/recorder extras
-//      instead of the engine default `{version, fidelity}`.
+// Engine gaps surfaced by the stripe port (the largest twin, and the only one with a
+// root SDK-compat mount).
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -82,7 +67,7 @@ function rootMountTwin() {
   });
 }
 
-describe("mountSessionAtRoot (F-684 gap 1)", () => {
+describe("mountSessionAtRoot (gap 1)", () => {
   it("serves the same session routes at the root path with bearer-only auth", async () => {
     const app = createApp(rootMountTwin());
     const viaSid = await app.request(`/s/${TEST_SID}/v1/things`, withAuth(token));
@@ -122,7 +107,7 @@ describe("mountSessionAtRoot (F-684 gap 1)", () => {
   });
 });
 
-describe("sessionHealthz: false (F-684 gap 2)", () => {
+describe("sessionHealthz: false (gap 2)", () => {
   it("GET /s/:sid/healthz falls to the 501 unsupported catch-all", async () => {
     const app = createApp(rootMountTwin());
     const res = await app.request(`/s/${TEST_SID}/healthz`, withAuth(token));
@@ -145,7 +130,7 @@ describe("sessionHealthz: false (F-684 gap 2)", () => {
   });
 });
 
-describe("state hook receives the session (F-684 gap 3)", () => {
+describe("state hook receives the session (gap 3)", () => {
   it("passes the bearer-resolved session so state can be account-scoped", async () => {
     const app = createApp(rootMountTwin());
     const res = await app.request(`/s/${TEST_SID}/_pome/state`, withAuth(token));
@@ -155,7 +140,7 @@ describe("state hook receives the session (F-684 gap 3)", () => {
   });
 });
 
-describe("pomeHealth extras hook (F-684 gap 4)", () => {
+describe("pomeHealth extras hook (gap 4)", () => {
   it("overrides the default {version, fidelity} extras and can read the recorder", async () => {
     const app = createApp(rootMountTwin());
     // Generate one recorded event first so the recorder count is non-zero.

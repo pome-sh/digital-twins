@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Spec contract for shape fidelity (FDRS-475).
+// Spec contract for shape fidelity.
 //
 // This shim anchors the twin's response serializers to GitHub's
 // official OpenAPI types (`@octokit/openapi-types`). The serializers are
@@ -10,7 +10,7 @@
 // type-level guard rail — runtime behavior is unchanged.
 import type { components } from "@octokit/openapi-types";
 
-// F-1178 — GitHub shipped stacked pull requests. The vendored REST description
+// GitHub shipped stacked pull requests. The vendored REST description
 // gained `pull-request.stack` and `pull-request-simple.stack` on 2026-08-02
 // (`pome-sh/openapi-spec-mcp` commit `f0d07e7`, `specs/github.json` blob
 // `af4eeae`; both absent at `a8f0142`, 2026-07-31), each `$ref`ing one new
@@ -42,7 +42,7 @@ export type PullRequest = components["schemas"]["pull-request"] & { stack?: Pull
 export type Repository = components["schemas"]["repository"];
 export type SimpleUser = components["schemas"]["simple-user"];
 
-// Group A (issues + meta) and Group B (PR sub-resources) anchors (FDRS-475).
+// Group A (issues + meta) and Group B (PR sub-resources) anchors.
 export type Issue = components["schemas"]["issue"];
 export type IssueComment = components["schemas"]["issue-comment"];
 export type Label = components["schemas"]["label"];
@@ -52,7 +52,7 @@ export type DiffEntry = components["schemas"]["diff-entry"];
 export type ReviewComment = components["schemas"]["review-comment"];
 export type CommitComparison = components["schemas"]["commit-comparison"];
 
-// Group C (commits + content + tags) anchors (FDRS-475).
+// Group C (commits + content + tags) anchors.
 export type Commit = components["schemas"]["commit"];
 export type ShortBranch = components["schemas"]["short-branch"];
 export type ContentFile = components["schemas"]["content-file"];
@@ -64,7 +64,7 @@ export type Tag = components["schemas"]["tag"];
 // commit schema), so it anchors against the same alias.
 export type CommitWithFiles = Commit;
 
-// Group D (statuses + checks + releases + viewer) anchors (FDRS-475).
+// Group D (statuses + checks + releases + viewer) anchors.
 export type Status = components["schemas"]["status"];
 export type CombinedStatus = components["schemas"]["combined-commit-status"];
 export type CheckRun = components["schemas"]["check-run"];
@@ -90,7 +90,7 @@ export type DeepPartial<T> = T extends (infer U)[]
     ? { [K in keyof T]?: DeepPartial<T[K]> }
     : T;
 
-// FDRS-476 (phase 2 of FDRS-475) — upstream-added-field guard.
+// Upstream-added-field guard.
 // Uncovered = upstream keys the serializer neither emits nor registers as a
 // deliberate omission. When that set is empty the assertion is `true`; when it
 // is non-empty the type becomes an error-carrying object whose member type

@@ -3,12 +3,12 @@
 //
 // Emits trace-contract.json — the machine-readable descriptor that ships inside
 // the published package. Default mode writes the file; `--check` fails when the
-// committed file is missing or stale, AND (F-1201) when a member of the event
+// committed file is missing or stale, AND when a member of the event
 // union has no fixture.
 //
-// WHY THE EVENT-KIND HALF EXISTS — F-1201.
+// WHY THE EVENT-KIND HALF EXISTS.
 //
-// Until F-1201 this script built the contract from three parts, none of which
+// This script used to build the contract from three parts, none of which
 // ever read the schema: a hardcoded four-string `canonicalSchemas` literal, a
 // directory walk of `test/fixtures/v1/**.json`, and five subpath strings.
 // Adding a member to `eventSchema` therefore changed the emitted JSON *not at
@@ -61,7 +61,7 @@ registerHooks({
 // WHICH schemas are the contract, a question no introspection can answer — but
 // no longer an unchecked one: `assertCanonicalSchemas` proves each is really on
 // the barrel, so a rename cannot leave a dangling name here.
-// F-942 — `runSchema` left this list with `run.ts`: the completed-run row is the
+// `runSchema` left this list with `run.ts`: the completed-run row is the
 // cloud control-plane's shape, not the wire trace surface, and it now lives in
 // `cli/src/contract/run.ts`. What remains is exactly what @pome-sh/wire owns.
 export const CANONICAL_SCHEMAS = [
@@ -97,7 +97,7 @@ const toPosix = (p) => p.replaceAll("\\", "/");
  * `otelSpanEventSchema` arrives here as an object like any other.
  *
  * Anything else throws. Returning a partial list on an unrecognized node is the
- * failure mode F-1201 exists to remove.
+ * failure mode this half exists to remove.
  */
 export function unionKinds(schema, path = "otelEventSchema") {
   const kinds = collectKinds(schema, path, []);
@@ -214,7 +214,7 @@ export function auditEventFixtures(kinds, fixtures) {
 
   if (problems.length > 0) {
     throw new Error(
-      `trace-contract.json event-fixture coverage failed (F-1201):\n- ${problems.join("\n- ")}`,
+      `trace-contract.json event-fixture coverage failed:\n- ${problems.join("\n- ")}`,
     );
   }
 
@@ -234,13 +234,13 @@ export function buildContract({ pkg, eventKinds, fixtures }) {
       recorderEvents: "@pome-sh/wire/recorder-events",
       otel: "@pome-sh/wire/otel",
       redaction: "@pome-sh/wire/redaction",
-      // F-950. `otel/fixtures` is deliberately absent from this map — it is a
+      // `otel/fixtures` is deliberately absent from this map — it is a
       // test/dev artifact, not part of the contract a consumer codes against.
       // `correlation` is: it is the agent-side half of the
       // `x-pome-correlation-id` protocol whose recorder side these event
       // schemas describe.
       correlation: "@pome-sh/wire/correlation",
-      // F-1416. Present for the same reason `correlation` is: it is a surface a
+      // Present for the same reason `correlation` is: it is a surface a
       // consumer codes against, not a test artifact. pome-cloud's dashboard and
       // control plane import it to answer "does this finished run have a
       // verdict to state?" over the `criteria_results` rows these schemas put
@@ -304,7 +304,7 @@ async function main() {
 // Realpath'd on both sides — node resolves symlinks before deriving
 // `import.meta.url`, so a bare `pathToFileURL()` of argv[1] (with no
 // realpath) misses through a symlinked checkout (a worktree, or macOS's
-// symlinked `/tmp`) in the same silent shape (F-1488), and a guard miss
+// symlinked `/tmp`) in the same silent shape, and a guard miss
 // while invoked as this file throws rather than exits 0.
 const SELF = realpathSync(fileURLToPath(import.meta.url));
 const ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";

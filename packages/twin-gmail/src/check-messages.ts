@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// What Gmail's declared checks can assert about MESSAGES (F-1128).
+// What Gmail's declared checks can assert about MESSAGES.
 //
 // All three read the exported end state. Note what is NOT here and cannot be:
 // message bodies are digested out of `/_pome/state` unconditionally
@@ -158,8 +158,8 @@ export const mailboxLabelCount: Check<{ mailbox: string; count: string; label: s
     },
     evaluate({ mailbox, count, label }, { final }) {
       const wanted = Number(count);
-      // `labels` is guarded alongside the other two (F-1441). Without it this
-      // check was a live instance of the F-1159 class, and on the worst
+      // `labels` is guarded alongside the other two. Without it this
+      // check was a live instance of the class, and on the worst
       // possible criterion: polarity flips NEGATIVE at count 0, so a vacuous
       // pass scores a point for an agent that did the forbidden thing.
       //
@@ -190,8 +190,7 @@ export const mailboxLabelCount: Check<{ mailbox: string; count: string; label: s
         final.mailboxes != null &&
         !final.mailboxes.some((mb) => (mb.email ?? "").toLowerCase() === mailbox.toLowerCase())
       ) {
-        // TWO ways to not find it, and only one of them is a seed defect
-        // (F-1157). `DEFAULT_REDACTION_CONFIG` — the strictest team, and what a
+        // TWO ways to not find it, and only one of them is a seed defect. `DEFAULT_REDACTION_CONFIG` — the strictest team, and what a
         // corpus is deliberately measured against — masks `mailboxes[].email`,
         // which leaves the ROW in place with the address replaced: the mailbox
         // is in the export and simply unreadable. Reporting that as
@@ -284,7 +283,7 @@ export const oneMessagePerRecipient: Check<{ label: string; count: string }> = d
   },
   evaluate({ label, count }, { final }) {
     const wanted = parseCount(count);
-    // The second `labelIdsFor` consumer, guarded on the same terms (F-1441).
+    // The second `labelIdsFor` consumer, guarded on the same terms.
     // This one's polarity is positive and it fails closed today, so an absent
     // `labels` section costs the agent a point rather than gifting one — but
     // safe-by-polarity is exactly how this class survives review, and the

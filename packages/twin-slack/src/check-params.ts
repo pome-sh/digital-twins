@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The typed slots Slack's declared checks fill (F-1126).
+// The typed slots Slack's declared checks fill.
 //
 // They live in the twin, not the sdk, for the same reason the declarations do:
 // the twin owns what a Slack channel name or emoji name may look like. Every

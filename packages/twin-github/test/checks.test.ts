@@ -151,12 +151,8 @@ describe("github.no-new-labels — predicate", () => {
   });
 });
 
-// F-1198 — the sibling. It exists because `support-triage` teaches "do not open
-// a duplicate" and, until it, the only way to grade that was `[model]`. The
-// tests below are its counterpart to the block above, plus the two that are
-// specific to issues rather than labels: the duplicate-with-the-same-title case
-// (which is why the comparison is on numbers) and the case where the examinee
-// does the RIGHT thing to a seeded issue.
+// The sibling. It exists because `support-triage` teaches "do not open a duplicate"
+// and, until it, the only way to grade that was `[model]`.
 describe("github.no-new-issues — declaration", () => {
   it("renders the sentence an author will pick", () => {
     expect(renderCheck(noNewIssues, ARGS)).toBe("No new issues were created in `acme/api`");

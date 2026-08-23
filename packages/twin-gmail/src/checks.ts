@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The Gmail twin's assertable check vocabulary (F-1128, milestone A3).
+// The Gmail twin's assertable check vocabulary (milestone A3).
 //
 // These live HERE, next to the state they read, because the twin owns that
 // state's shape. pome-cloud imports this module from npm and adapts each

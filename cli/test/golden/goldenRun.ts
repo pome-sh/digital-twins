@@ -1,42 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// The golden-scenario harness (F-646) — a run whose correctness is known by
-// CONSTRUCTION, pushed through the real evaluator path.
-//
-// WHAT MAKES IT GOLDEN. Nothing here decides what "correct" means. A fixture
-// agent is a deterministic script that performs a fixed list of `tools/call`s
-// against the real twins; whether that list satisfies the task is then answered
-// by the same three modules a real run answers it with — the task parser, the
-// criterion binder, and the check declaration's own `evaluate`. So a defect in
-// any of them moves the answer for a run whose answer is not in question, which
-// is the whole point: individual silent-scoring bugs were fixed one at a time
-// and the class could regress freely.
-//
-// NO MODEL, NO NETWORK, NO SOCKET. The fixture agent is a script (there is no
-// model anywhere in this file or its callers), the twins are booted in-process
-// through `bootTwin` — the same registry entry `pome run` boots — and every call
-// goes through `app.request`, so nothing binds a port. That is what makes the
-// gate cheap enough to be always-on, and flake-proof enough to be believed.
-//
-// WHAT IS REAL AND WHAT IS NOT. Real: the task file (parsed by `parseTaskFile`,
-// including its `## Seed State`), the twins and their routes, the recorder tape,
-// `exportState()`, `bindCriterion`, and each check's declared `evaluate`. Not
-// real: the aggregation at the bottom of this file. Evaluation is the product
-// and the ENGINE lives in pome-cloud (`scripts/no-eval-in-oss.mjs` keeps it out
-// of the OSS surface) — what is reachable here is the predicate layer, which is
-// exactly the layer the bugs this gate exists for live in. The eleven lines of
-// ratio arithmetic below are the gate's own assertion apparatus, not a scorer:
-// they live under `test/`, are exported to nothing, and `gradedCount` is
-// asserted by the caller precisely so a satisfaction of 0 can never be reached
-// by an empty denominator.
-//
-// SUBSTRATES ARE SUPPLIED PER DECLARATION, never "everything we happen to
-// have". A check that asks for `seed+final` gets the seed; one that asks for
-// `tape` gets the tape; anything else gets `null` and must return a NAMED skip
-// rather than read a hole. That is the engine's documented contract
-// (`CheckSubstrate` in `@pome-sh/sdk/checks`), and honouring it is what makes
-// this harness a place a future tape criterion can simply land in — the tape is
-// already captured and already scoped per twin.
+// The golden-scenario harness — a run whose correctness is known by CONSTRUCTION,
+// pushed through the real evaluator path.
 
 import { randomBytes } from "node:crypto";
 import { sign } from "hono/jwt";

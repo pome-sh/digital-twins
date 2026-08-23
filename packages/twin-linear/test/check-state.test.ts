@@ -1,12 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// The four outcomes of resolving a Linear issue by title (F-1129).
-//
-// twin-github's resolvers always FAIL on a miss and twin-slack's always SKIP.
-// Linear needs both from the same resolver, and this file is where that
-// distinction is pinned: a miss inside a TRUNCATED export is evidence of a
-// partial snapshot, while a miss in a complete one is evidence about the
-// examinee. Getting it backwards hands a do-nothing agent a pass on task 26.
+// The four outcomes of resolving a Linear issue by title.
 
 import { describe, expect, it } from "vitest";
 import {
@@ -151,9 +144,7 @@ describe("resolveIssue — the four outcomes", () => {
 
 describe("the indirect joins", () => {
   it("resolves the workflow state NAME through stateId, team-scoped", () => {
-    // F-1197 — and the path points at the CATALOG ROW's name, not at the issue.
-    // The issue carries only an opaque `stateId`; the readable half of trap 1's
-    // join is over here.
+    // And the path points at the CATALOG ROW's name, not at the issue.
     expect(resolveWorkflowStateName(world(), issueIn(world()))).toEqual({
       found: "In Progress",
       path: "/workflowStates/0/name",

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The Stripe twin's assertable check vocabulary (F-1127, milestone A3).
+// The Stripe twin's assertable check vocabulary (milestone A3).
 //
 // These live HERE, next to the state they read, because the twin owns that
 // state's shape. pome-cloud imports this module from npm and adapts each
@@ -59,12 +59,11 @@
 //     transaction. CRITICAL: …
 //     → The number of refunds on charge "ch_test_200" is 1
 //     Prose, a JavaScript expression, and a prediction about the examinee that
-//     is FALSE in this twin (F-1138). All three go.
+//     is FALSE in this twin. All three go.
 //
 // Two re-render byte-identically and were already bound, by legacy rules this
 // milestone replaces: `No refund was attempted on charge "ch_test_200"` (task
-// 19, F-1076) and `The retry includes X-PAYMENT and returns 200` (task 13,
-// F-1125).
+// 19) and `The retry includes X-PAYMENT and returns 200` (task 13).
 //
 // This file is the ASSEMBLY. Declarations are grouped by what they assert about
 // — `check-payments.ts`, `check-refunds.ts`, `check-tape.ts` — with typed slots

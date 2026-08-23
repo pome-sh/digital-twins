@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Shared admin-endpoint gate (FDRS-587 / FDRS-616). First-party twins import
+// Shared admin-endpoint gate. First-party twins import
 // this through `@pome-sh/sdk/server`; do not copy this file into a twin package.
 //
 // Tiered policy (semantics unchanged from the per-twin copies it replaces):
@@ -51,7 +51,7 @@ export function setClientIp(c: Context, ip: string): void {
 }
 
 /**
- * Runtime-neutral client-IP accessor (FDRS-587). Resolution order:
+ * Runtime-neutral client-IP accessor. Resolution order:
  *   1. Explicit override set via setClientIp() (alternate bridges / tests).
  *   2. The node serving bridge's official getConnInfo helper.
  *   3. undefined — no live socket (e.g. app.request() in-process tests).
@@ -88,7 +88,7 @@ export interface AdminGateOptions {
  * Last-resort 403 for a twin that declares no `admin.forbidden`.
  *
  * ⚠️ NO `documentation_url` HERE EITHER, and for the reason spelled out on
- * `auth.ts`'s `defaultUnauthorized` (F-1497): the key it used to send —
+ * `auth.ts`'s `defaultUnauthorized`: the key it used to send —
  * `documentation_url: ""` — belongs to GitHub's envelope, and of the five
  * vendors probed live on 2026-08-13 only GitHub has it. This gate is shared by
  * all five twins, so anything vendor-specific here is a claim four of them do
@@ -100,7 +100,7 @@ function defaultForbidden(): Response {
 }
 
 /**
- * Admin endpoint protection shared by every twin (FDRS-616). Each twin's
+ * Admin endpoint protection shared by every twin. Each twin's
  * auth.ts wraps this with its own `forbidden` envelope. Semantics are
  * identical to the per-twin requireAdminAuth() copies this replaces.
  */

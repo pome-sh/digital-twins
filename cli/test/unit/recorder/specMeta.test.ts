@@ -1,18 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// meta.json version-reporting regression suite (D18.1 / F-689, D10).
-//
-// CRITICAL CONTRACT: pome-cloud's ingest reads `meta.json.twin_versions` to
-// validate a run and to attribute its captured behavior to the exact twin build
-// that produced it. The old implementation resolved those versions at runtime
-// through `createRequire(...).resolve("@pome-sh/twin-<id>")`; that was replaced
-// by a build-time inline in each `TWIN_REGISTRY` entry so it survives bundling.
-//
-// If that swap regressed, nothing throws — cloud just silently records wrong or
-// missing provenance for every run. So these tests assert the OUTPUT against an
-// independent source of truth: the twin packages' own package.json files, read
-// off disk here. The reported values must stay identical to what runtime
-// resolution produced.
+// meta.json version-reporting regression suite (D18.1, D10).
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";

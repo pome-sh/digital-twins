@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The adapter's re-export of the one correlation symbol that is part of its
-// PUBLIC surface. F-950 moved the correlation core to
+// PUBLIC surface. The correlation core lives in
 // `@pome-sh/wire/correlation`; `CORRELATION_HEADER` stays exported from
 // `@pome-sh/adapter-claude-sdk` because consumers already import it (the
 // clean-room pack test compiles a consumer that does).
@@ -12,7 +12,7 @@
 // straight from the barrel therefore emits a literal
 // `export { CORRELATION_HEADER } from '@pome-sh/wire/correlation'` into
 // `dist/index.d.ts` — a specifier that resolves nowhere for a consumer. Wire is
-// published (F-949), but to GitHub Packages, which requires a GitHub token even
+// published, but to GitHub Packages, which requires a GitHub token even
 // to read: an end user resolving that specifier gets a 401, not a package. So
 // the conclusion is unchanged and this file is still required. The JS is fine
 // (inlined), so

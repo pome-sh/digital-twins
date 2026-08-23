@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The fixture worlds Stripe's declarations name (F-1127).
+// The fixture worlds Stripe's declarations name.
 //
 // In `src/` rather than `test/` for the same reason twin-github's and
 // twin-slack's are: `discriminatingWorlds` is a DECLARED field read from npm by
@@ -137,7 +137,7 @@ export function call(overrides: Partial<CheckTapeEvent> = {}): CheckTapeEvent {
 }
 
 /** One recorded x402 leg. `request_headers` is always PRESENT — an absent map
- *  is the third world `CheckTapeEvent` documents (a recording predating F-1125),
+ * is the third world `CheckTapeEvent` documents (a recording predating the field),
  *  and a fixture that leaves it out tests the pre-header past rather than the
  *  assertion. */
 export function x402Leg(overrides: Partial<CheckTapeEvent> = {}): CheckTapeEvent {

@@ -1,11 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// Failure injection (FDRS-339), graduated from twin-stripe into the engine
-// by the F-684 port ruling: the rule store + middleware are a generic twin
-// capability (any twin can model "the provider failed on attempt N"), only
-// the rule *payloads* (error envelopes) are twin-domain. Wire behavior is
-// pinned by packages/twin-stripe/test/failure-injection.test.ts — this file
-// covers the mechanism in isolation.
+// Failure injection, graduated from twin-stripe into the engine by the port ruling:
+// the rule store + middleware are a generic twin capability (any twin can.
 
 import { describe, expect, it } from "vitest";
 import { Hono } from "hono";
@@ -120,10 +115,8 @@ describe("failureInjectionMiddleware", () => {
     });
   });
 
-  // F-1125 — the injected event is hand-built, so it is exactly the kind of
-  // site left behind when a field is added to the row. An injected fault that
-  // recorded no headers would make the injected call the one row on the tape a
-  // header-reading check cannot see.
+  // The injected event is hand-built, so it is exactly the kind of site left behind
+  // when a field is added to the row.
   it("before_handler: records the injected call's request headers", async () => {
     const events: RecorderEvent[] = [];
     const { app } = buildApp("before_handler", events);

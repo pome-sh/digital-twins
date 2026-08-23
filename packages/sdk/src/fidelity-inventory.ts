@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Structured fidelity inventory (F-730). Each twin ships a machine-readable
+// Structured fidelity inventory. Each twin ships a machine-readable
 // surface list — `fidelity.inventory.json` — carrying, per MCP tool and REST
 // surface, the heat tier (how deep the endpoint SHOULD be, ruled by the
-// F-729 rubric) orthogonal to the fidelity tier (how deep it IS, per
+// heat rubric) orthogonal to the fidelity tier (how deep it IS, per
 // `fidelityTierSchema`), plus a justification for the classification.
 //
 // The FIDELITY doc tables are 1:1-linted against this inventory instead of
@@ -13,7 +13,7 @@
 // gaps and fails loudly once the docs catch up, so a declaration can never
 // outlive the drift it describes.
 //
-// That lint compares two DOCUMENTS. `lintFidelityRestRoutes` (F-1368) is the
+// That lint compares two DOCUMENTS. `lintFidelityRestRoutes` is the
 // arm that compares the `rest` half to the code: the routes the twin actually
 // registers, in both directions, so a route can no longer be added or removed
 // with the inventory staying green.
@@ -35,7 +35,7 @@ export const fidelitySurfaceSchema = z.strictObject({
 export type FidelitySurface = z.infer<typeof fidelitySurfaceSchema>;
 
 /**
- * Why a `rest` row stands for none of the routes the twin registers (F-1368).
+ * Why a `rest` row stands for none of the routes the twin registers.
  *
  * Both kinds are real rows about real behaviour — they are simply not answered
  * by a route in the twin's own declared set, so the 1:1 comparison has to be
@@ -73,7 +73,7 @@ export const fidelityRestSurfaceSchema = fidelitySurfaceSchema.extend({
    * them) this row accounts for. Omitted means the row's own `name` IS the
    * surface, which is the common case. Never a list of DIFFERENT vendor
    * endpoints: an umbrella row hides every surface under it from the count,
-   * which is the failure F-1368 is about.
+   * which is the failure this guards against.
    */
   routes: z.array(z.string().min(1)).min(1).optional(),
   unregistered: fidelityUnregisteredSchema.optional(),
@@ -305,7 +305,7 @@ export function lintFidelityInventory(
 // ─── Lint: rest rows ⇔ the routes the twin really registers ──────────────────
 
 /**
- * 1:1-lint the `rest` rows against the twin's own route surfaces (F-1368).
+ * 1:1-lint the `rest` rows against the twin's own route surfaces.
  *
  * `lintFidelityInventory` above diffs the inventory against the FIDELITY doc
  * tables, so the two documents agree with each other — and neither is compared
@@ -316,7 +316,7 @@ export function lintFidelityInventory(
  *
  * `registered` is the twin's route surfaces (`"<METHOD> <path>"`), which for
  * every twin is `<TWIN>_ROUTE_INPUTS.map((d) => d.surface)` — the declarations
- * the routes are literally mounted FROM (F-1179), pinned equal to the
+ * the routes are literally mounted FROM, pinned equal to the
  * registrar's calls and to the booted app's table by each twin's own
  * `route-input-declarations.test.ts`.
  *

@@ -6,7 +6,7 @@ import { SlackDomain } from "../src/domain/index.js";
 import { defaultSeedState } from "../src/seed.js";
 import { signTestToken, TEST_AUTH_SECRET, TEST_SID, withAuth } from "./_authHelper.js";
 
-// Provider-token minting goes through the engine (F-712 row 10).
+// Provider-token minting goes through the engine.
 const SLACK_TOKEN_SPEC = { provider: "slack", prefixes: ["xoxb-pome-", "xoxp-pome-"] } as const;
 function signSlackProviderToken(sid: string, secret: string, prefix: "xoxb" | "xoxp" = "xoxb") {
   return mintProviderToken(SLACK_TOKEN_SPEC, { sid, secret, prefix: `${prefix}-pome-` });

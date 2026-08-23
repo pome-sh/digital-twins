@@ -82,7 +82,7 @@ describe("redactEvent — regex scrubs in string values", () => {
   });
 });
 
-describe("redactEvent — provider secret shapes (FDRS-588 / FDRS-608)", () => {
+describe("redactEvent — provider secret shapes", () => {
   it("redacts the 12-char body Stripe seed key sk_test_pome_default", () => {
     const key = "sk_test_pome_default";
     const out = redactEvent({ note: `stripe secret ${key} here` }) as { note: string };
@@ -154,11 +154,9 @@ describe("redactEvent — provider secret shapes (FDRS-588 / FDRS-608)", () => {
   });
 });
 
-// F-716 boundary pinning. These tests freeze the exact JWT / PEM scrub
-// behavior of the pre-F-716 backtracking regexes: they were run green against
-// the old patterns before the linear-time rewrite landed, and must stay green
-// after. Any diff here is a redaction behavior change, not a refactor.
-describe("redactEvent — F-716 JWT scrub boundary pinning", () => {
+// Boundary pinning. These tests freeze the exact JWT / PEM scrub behavior of the
+// legacy backtracking regexes: they were run green against the old patterns.
+describe("redactEvent — JWT scrub boundary pinning", () => {
   it("redacts a JWT glued mid-base64url-run from the eyJ onward", () => {
     expect(redactEvent({ v: "AAAAeyJab.cd.ef" })).toEqual({ v: "AAAA[REDACTED]" });
   });
@@ -196,7 +194,7 @@ describe("redactEvent — F-716 JWT scrub boundary pinning", () => {
   });
 });
 
-describe("redactEvent — F-716 PEM scrub boundary pinning", () => {
+describe("redactEvent — PEM scrub boundary pinning", () => {
   it("redacts a complete block as one unit", () => {
     expect(
       redactEvent({ v: "-----BEGIN PRIVATE KEY-----\nMIIB\n-----END PRIVATE KEY-----" }),
@@ -258,8 +256,8 @@ describe("redactEvent — F-716 PEM scrub boundary pinning", () => {
   });
 });
 
-describe("redactEvent — F-716 differential fuzz vs the legacy patterns", () => {
-  // The exact pre-F-716 scrub pipeline, kept verbatim as the behavior oracle.
+describe("redactEvent — differential fuzz vs the legacy patterns", () => {
+  // The exact legacy scrub pipeline, kept verbatim as the behavior oracle.
   // Only run on short fuzz strings, where its quadratic worst case is harmless.
   const LEGACY_SCRUB_PATTERNS: RegExp[] = [
     /redaction_fixture_secret_[A-Za-z0-9_-]{8,}/g,
@@ -319,10 +317,9 @@ describe("redactEvent — F-716 differential fuzz vs the legacy patterns", () =>
   });
 });
 
-describe("redactEvent — F-716 adversarial inputs stay linear", () => {
-  // Both inputs drive the pre-F-716 regexes into quadratic backtracking
-  // (minutes of CPU); the linear scanners handle them in milliseconds. The
-  // 1s bound leaves two orders of magnitude of CI headroom.
+describe("redactEvent — adversarial inputs stay linear", () => {
+  // Both inputs drive the legacy regexes into quadratic backtracking (minutes of CPU);
+  // the linear scanners handle them in milliseconds.
   it("survives a 150 KB dotless eyJ run", () => {
     const input = "eyJ".repeat(50_000);
     const started = performance.now();

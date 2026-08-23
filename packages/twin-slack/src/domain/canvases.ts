@@ -5,7 +5,7 @@
 // whole-document ops (insert_after/before → append; section replace → full
 // replace; section delete → no-op). Matches warm × shape target.
 //
-// F-1330 added the read half, because Slack declares `slack_read_canvas` and
+// The read half was added, because Slack declares `slack_read_canvas` and
 // this module had create/edit/delete only, and made `canvasesEdit` apply every
 // operation in its `changes` array rather than just the first.
 
@@ -71,7 +71,7 @@ export function canvasesCreate(
 }
 
 /**
- * Read a canvas (F-1330). Slack's `slack_read_canvas` returns the document's
+ * Read a canvas. Slack's `slack_read_canvas` returns the document's
  * markdown plus a `section_id_mapping` an agent feeds back into
  * `slack_update_canvas`.
  *
@@ -124,7 +124,7 @@ export function canvasesEdit(
   // `canvases.edit` and `slack_update_canvas` document ("applied atomically
   // against a single document snapshot", max 100). Applying only the first and
   // answering ok was a silent drop: an agent batching three edits was told all
-  // three landed (F-1330).
+  // three landed.
   let next = { title: before!.title, markdown: before!.markdown };
   for (const change of changes) {
     next = applyChange({ ...before!, ...next }, change);

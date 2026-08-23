@@ -99,7 +99,7 @@ export type {
 
 // The tape-row wrapper, re-exported from the barrel as well as from `./server`
 // so a consumer replacing a frozen `@pome-sh/sdk` import has one specifier to
-// move to rather than two (F-1527 retires that pin in both pome-cloud
+// move to rather than two (a follow-up retires that pin in both pome-cloud
 // manifests).
 export { toTwinHttpEventRow } from "./server.js";
 export type { RecorderEvent } from "./server.js";

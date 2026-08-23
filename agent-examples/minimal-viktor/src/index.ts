@@ -61,13 +61,13 @@ function buildSystem(slackChannel: string) {
  * hit an unsupported route.
  *
  * Exported and config-taking (rather than closing over module-level env) so a
- * gate can exercise every tool against a live twin without a model — F-1152. The
+ * gate can exercise every tool against a live twin without a model. The
  * config field names match `agent-examples/minimal-viktor-langgraph`'s `TwinConfig` so
  * the two viktor examples read the same.
  *
  * `twinFetch()` hands a non-2xx BACK to the model instead of throwing, so it can
  * react and a single failed call doesn't abort the whole run. That is deliberate
- * — and it is also why F-1152's gate reads the response status off the wire
+ * — and it is also why the gate reads the response status off the wire
  * rather than watching for a thrown error.
  */
 export function buildTools(config: {
@@ -153,7 +153,7 @@ export function buildTools(config: {
       execute: ({ owner, repo, number, body }) =>
         gh(`/repos/${owner}/${repo}/pulls/${number}/reviews`, "POST", { event: "REQUEST_CHANGES", body }),
     }),
-    // Named and shaped after Slack's own MCP tools (F-1330), even though these
+    // Named and shaped after Slack's own MCP tools, even though these
     // are this example's own tools over the Web API rather than Slack's MCP
     // server. `slack_post_message` and `slack_list_channels` were neither: they
     // came from an archived reference server, and an agent that learned them
@@ -194,7 +194,7 @@ async function main() {
   const telemetry = initTelemetry();
   const model = await resolveModel(modelSlug);
   try {
-    // F-1519 — positive-evidence marker `scripts/smoke-examples.mjs` classifies
+    // Positive-evidence marker `scripts/smoke-examples.mjs` classifies
     // REACHED-OUTBOUND on, printed immediately before this example's first
     // outbound (model) call. This example has no @pome-sh dependency to emit
     // it for free, so it is a literal print, gated so real users never see it.
@@ -260,14 +260,14 @@ function requiredEnv(name: string): string {
   return v;
 }
 
-// This block MUST stay at the bottom of the module (F-900): a launch above the
+// This block MUST stay at the bottom of the module: a launch above the
 // declarations it uses dies in the temporal dead zone, and `tsc` cannot see it.
 // Guarding the launch (rather than calling `main()` at top level) also keeps the
-// module importable, which is what lets F-1152's gate probe `buildTools`
+// module importable, which is what lets the gate probe `buildTools`
 // without running the agent.
 // NOT `import.meta.main`: that landed in Node 24.2 and this package's `engines`
 // allows `>=24`, so on 24.0/24.1 it is `undefined`, this guard is false, and
-// `npm start` prints nothing and exits 0 having run no agent at all (F-1481).
+// `npm start` prints nothing and exits 0 having run no agent at all.
 // Realpath'd on BOTH sides because node resolves symlinks before deriving
 // `import.meta.url`, so a bare `resolve` of argv[1] misses through a symlinked
 // checkout (a worktree, macOS's `/tmp`) in the same silent shape.

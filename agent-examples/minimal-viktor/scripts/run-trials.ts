@@ -167,7 +167,7 @@ async function main() {
 // Realpath'd on both sides — a bare `fileURLToPath(import.meta.url) ===
 // process.argv[1]` compare has no resolve() at all, so it also misses on an
 // unnormalized relative argv0 as well as through a symlinked checkout
-// (F-1488), and a guard miss while invoked as this file throws rather than
+// and a guard miss while invoked as this file throws rather than
 // exits 0.
 const SELF = realpathSync(fileURLToPath(import.meta.url));
 const ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";

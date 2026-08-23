@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// Test bootstrap. Since F-684 the twin assembles on the @pome-sh/sdk engine
-// via `createTwinStripeApp` (src/twin.ts) — auth, recorder + redaction, MCP
-// dispatch, /_pome/*, admin gate, and failure injection are the engine's;
-// the helper only opens a db, seeds the default world, and hands back a
-// domain handle over the same db for direct assertions.
+// Test bootstrap. The twin assembles on the @pome-sh/sdk engine via
+// `createTwinStripeApp` (src/twin.ts) — auth, recorder + redaction, MCP dispatch, /_pome/*.
 import { createTwinStripeApp } from "../src/twin.js";
 import { openTwinStripeDatabase } from "../src/db.js";
 import { StripeDomain } from "../src/domain/index.js";

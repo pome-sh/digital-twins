@@ -1,17 +1,5 @@
-// The pointer grammar `CheckOutcome.evidenceStatePaths` is written in (F-1197).
-//
-// These are properties of the LANGUAGE, not of any twin's vocabulary — the
-// per-twin gate ("every state-reading check cites a pointer that resolves in
-// its own passing world") lives in each twin's `checks-contract.test.ts`, where
-// the declarations actually ship.
-//
-// Two things here are load-bearing rather than ceremony, and both are about the
-// consumer's ability to ask a TOTAL question:
-//   - a pointer at a field holding `null` must resolve, or a reader cannot tell
-//     "the check looked at an empty label set" from "the check looked nowhere";
-//   - a pointer at anything absent must NOT resolve, or the dashboard renders an
-//     affordance that advertises a jump and then does nothing — the one failure
-//     mode F-980 wrote its degradation rule to prevent.
+// Properties of the pointer GRAMMAR (`CheckOutcome.evidenceStatePaths`), not of
+// any twin's vocabulary — the per-twin gate lives in each `checks-contract`.
 
 import { describe, expect, it } from "vitest";
 import { childStatePath, resolveStatePath, statePath } from "../src/check-state-path.js";

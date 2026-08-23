@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * otel/span-event — the `OtelSpanEvent` Zod schema (M1.1 / FDRS-480).
+ * otel/span-event — the `OtelSpanEvent` Zod schema (M1.1).
  *
  * The canonical internal representation of a single OpenTelemetry span, mapped
  * onto Pome's event union. From M1 on, OTel spans are the canonical model;
@@ -83,7 +83,7 @@ const otelSpanEventObjectSchema = z.object({
   // ── shared event-union base (mirrors `eventBaseShape` in recorder-events.ts) ─
   ts: z.string().datetime(),
   event_id: canonicalSpanIdSchema,
-  // F-1200 — `parent_event_id` replaces `parent_id`. For THIS kind the field is
+  // `parent_event_id` replaces `parent_id`. For THIS kind the field is
   // fully redundant with `parent_span_id` (the invariant below pins them
   // equal), so the tolerant read needs no `parent_id` lookup at all: a row
   // written under either spelling normalizes to the same value, derived from

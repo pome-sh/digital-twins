@@ -478,7 +478,7 @@ describe("HostedClient.finalize", () => {
   });
 
   it("polls a 202 accepted response through queued/running/completed with tenant auth", async () => {
-    // F-700 returns a same-origin relative status_url.
+    // The async path returns a same-origin relative status_url.
     const statusPath = `/v1/sessions/ses_abc/evaluation`;
     const statusUrl = `${BASE}${statusPath}`;
     const responses = [
@@ -1446,7 +1446,7 @@ describe("HostedClient.deleteSession", () => {
   });
 });
 
-describe("HostedClient.deleteSession discard guard (F-983)", () => {
+describe("HostedClient.deleteSession discard guard", () => {
   const SID = "ses_guard";
   const TOKEN = "dsc_abcdefghijklmnopqrstuvwxyz012345";
 
@@ -1553,11 +1553,8 @@ describe("HostedClient.deleteSession discard guard (F-983)", () => {
     await expect(client.deleteSession(SID, true)).resolves.toBeUndefined();
   });
 
-  // A 409 that DECLARES reason=ungraded_session but hands back no usable
-  // token cannot be replayed and was not honoured — resolving would tell the
-  // caller the session stopped when it did not, which is the exact silent
-  // destruction F-983 closes. It is not HostedDiscardRefusedError either:
-  // with no token to replay, that type would be a lie.
+  // A 409 that DECLARES reason=ungraded_session but hands back no usable token cannot
+  // be replayed and was not honoured — resolving would tell the caller the.
   function malformedRefusal(details: Record<string, unknown>) {
     return new Response(
       JSON.stringify({
@@ -1635,15 +1632,13 @@ describe("HostedClient.deleteSession discard guard (F-983)", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FDRS-643 live-run regressions (first real cloud round-trip, 2026-07-05)
-// ─────────────────────────────────────────────────────────────────────────────
+// Live-run regressions (first real cloud round-trip, 2026-07-05)
+// ─────────────────────────────────────────────────────────────────────────────.
 
-describe("FDRS-643 live-run regressions", () => {
-  it("parses a finalize response whose criteria_results use the code/model vocabulary (post-W3 cloud)", async () => {
-    // The cloud judge emits the unified vocabulary (criterion.type
-    // "code"/"model") since shared-types 0.5.0; the response reader must
-    // tolerate BOTH vocabularies (found live: every demo trial errored
-    // "unexpected response shape: invalid_union").
+describe("live-run regressions", () => {
+  it("parses a finalize response whose criteria_results use the code/model vocabulary", async () => {
+    // The cloud judge emits `criterion.type` "code"/"model", so the reader must
+    // tolerate BOTH vocabularies — found live, every demo trial errored.
     mockFetch(async () =>
       new Response(
         JSON.stringify({

@@ -16,13 +16,7 @@ describe("github access-control catalog", () => {
     );
   });
 
-  // 57 since F-1376 added the five consolidated MCP tools GitHub declares. The
-  // count GREW while the tool table shrank, and that is the point: `tool` is the
-  // policy key a builder's allow/deny is stored against, so a REST operation
-  // whose MCP tool GitHub does not declare keeps its entry, and the consolidated
-  // tool that now reaches the same domain call gets one of its own. Dropping the
-  // first would un-gate a live surface; omitting the second would let an agent
-  // walk around a denial by spelling the call the way GitHub spells it.
+  // 57 since added the five consolidated MCP tools GitHub declares.
   it("covers 57 endpoints (30 v1 + 27 v2)", () => {
     expect(GITHUB_ACCESS_CONTROL_CATALOG.endpoints).toHaveLength(57);
     expect(GITHUB_ACCESS_CONTROL_CATALOG.endpoints.filter((e) => e.v2)).toHaveLength(27);

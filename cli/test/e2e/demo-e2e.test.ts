@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-643 — `pome demo` end-to-end against a STUB cloud: real runTask
-// (in-process github twin + real capture-server child), the REAL bundled
-// demo agent spawned as `npx tsx src/cli/main.ts demo-agent`, and a scripted
-// control plane serving mint / gateway (strict-schema-validated) /
-// presigned uploads / finalize. Everything short of the real cloud + a real
-// model — the founder's Phase G live run covers those.
+// `pome demo` end-to-end against a STUB cloud: real runTask (in-process github twin +
+// real capture-server child), the REAL bundled demo agent spawned as.
 import { createServer, type Server } from "node:http";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -206,7 +202,7 @@ afterAll(async () => {
   }
 });
 
-describe("pome demo end-to-end against a stub cloud (FDRS-643)", () => {
+describe("pome demo end-to-end against a stub cloud", () => {
   it("mint → real capture path + real demo agent → upload → finalize → verdict lines + preview link", async () => {
     cloud = await startStubCloud();
     const artifactsDir = await mkdtemp(join(tmpdir(), "pome-demo-e2e-"));

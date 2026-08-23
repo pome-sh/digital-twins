@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Shared fidelity:parity runner (F-730). One engine-level runner; each twin
+// Shared fidelity:parity runner. One engine-level runner; each twin
 // supplies declarative scenario data — an ordered, stateful chain of MCP
 // calls with cross-call captures (a PR number, a charge id, a message ts) —
 // plus its structured fidelity inventory. No per-twin runner copies (M1
@@ -8,7 +8,7 @@
 //
 // The runner asserts three rings agree before it reports green:
 //   1. the tool-table fixture (`fixtures/mcp-tools-list.raw.json`, the
-//      hash-locked declaration each twin derives its listing from — F-1325)
+// hash-locked declaration each twin derives its listing from)
 //   2. fidelity.inventory.json tools (the machine-readable inventory)
 //   3. scenario step coverage (every inventory tool exercised)
 // and that every step answers its expected status through the frozen
@@ -31,7 +31,7 @@ export interface ParityStep {
    */
   tool?: string;
   /**
-   * Build state over REST instead of calling a tool (F-1376).
+   * Build state over REST instead of calling a tool.
    *
    * Some inventory tools only answer once something exists, and the write that
    * creates it is not always a tool: twin-github's three release readers are
@@ -84,7 +84,7 @@ export interface RunParityOptions {
   inventory: FidelityInventory;
   /**
    * Tool names from the twin's `mcp-tools-list` fixture — the declaration the
-   * served listing is derived from (F-1325). NOT read off the code table: the
+   * served listing is derived from. NOT read off the code table: the
    * inventory must be bound to the fixture, or the hand-written surface
    * survives as a second source of truth.
    */

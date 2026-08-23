@@ -43,22 +43,15 @@ describe("pome init --sdk", () => {
     const cfg = JSON.parse(readFileSync("pome.json", "utf8")) as {
       agent: { framework?: string }; command?: string;
     };
-    // F-1393: the value written is the FRAMEWORK label, not the `--sdk` flag
-    // name. `claude` (the flag) is not a framework the CLI knows; writing it
-    // through made `pome register agent` warn "Unknown agent.framework" about
-    // a manifest the CLI itself had just written, and badged the run `claude`
-    // where every bundled Claude Agent SDK example reads `claude-agent-sdk`.
+    // The value written is the FRAMEWORK label, not the `--sdk` flag name.
     expect(cfg.agent.framework).toBe("claude-agent-sdk");
     expect(cfg.command).toBe(
       "npx tsx examples/agents/claude-sdk-agent.ts",
     );
   });
 
-  // F-1393 (D3, "no surface states more than it checked") — the scaffold must
-  // derive its framework label from `frameworks.ts`, the CLI's own vocabulary,
-  // rather than keeping a parallel copy that drifts. This fails the moment a
-  // new `--sdk` writes a label `warnUnknownFramework` would then complain
-  // about, which is the exact self-contradiction that shipped as `claude`.
+  // D3, "no surface states more than it checked" — the scaffold must derive its
+  // framework label from `frameworks.ts`, the CLI's own vocabulary, rather than.
   it("writes a framework label the CLI's own did-you-mean recognizes", async () => {
     const projectDir = await mkdtemp(join(tmpdir(), "pome-init-sdk-known-"));
     tempDirs.push(projectDir);
@@ -134,7 +127,7 @@ describe("pome init --sdk", () => {
     const cfg = JSON.parse(readFileSync("pome.json", "utf8")) as {
       agent: { framework?: string }; command?: string;
     };
-    // F-1393: "never declared" must stay declarable — plain `pome init` has no
+    // "never declared" must stay declarable — plain `pome init` has no
     // framework to state, so the key is ABSENT, not present-and-guessed.
     expect("framework" in cfg.agent).toBe(false);
     expect(cfg.command).toBe(

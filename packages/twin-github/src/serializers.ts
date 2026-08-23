@@ -200,7 +200,7 @@ export function repoJson(repo: RepoRow) {
   // `parent` is NOT a field of the upstream `repository` schema (it lives on the
   // richer `full-repository` schema). The twin intentionally emits a minimal
   // hypermedia parent reference — `{ full_name }` — rather than a full nested
-  // repository object (FDRS-451 hypermedia subset exemption). Held outside the
+  // repository object (hypermedia subset exemption). Held outside the
   // `satisfies` anchor so the rest of the literal stays strictly spec-checked,
   // then re-attached via a typed spread; the cast documents the deliberate
   // divergence without weakening any other field's guard.
@@ -239,7 +239,7 @@ export function branchJson(branch: BranchRow, repo: RepoRow) {
       // Upstream `commit.url` is a required non-null string; the twin surfaces
       // null in the pre-resolution state (no commit seeded yet). Intentional
       // twin behavior — narrow the null away for the type anchor only
-      // (FDRS-454: a faithful twin may surface a pre-resolution null), runtime
+      // (a faithful twin may surface a pre-resolution null), runtime
       // value unchanged.
       url: (branch.head_sha ? `https://api.github.com/repos/${repo.full_name}/commits/${branch.head_sha}` : null) as string
     },
@@ -315,13 +315,13 @@ export function contentDirectoryEntryJson(path: string, repo: RepoRow, branch: s
     // entry the twin has no git blob to point at; rather than emit `git_url: null`
     // (a string→null type-changed against real GitHub's blob URL on files), omit the
     // key entirely on directories so the field-removed direction is covered by the
-    // categorical hypermedia exemption (FDRS-451) — a faithful twin returning a
-    // SUBSET of GitHub's link relations, not drift (FDRS-454).
+    // categorical hypermedia exemption — a faithful twin returning a
+    // SUBSET of GitHub's link relations, not drift.
     ...(isFile ? { git_url: `https://api.github.com/repos/${repo.full_name}/git/blobs/${file!.sha}` } : {}),
     html_url: `https://github.com/${repo.full_name}/${isFile ? "blob" : "tree"}/${branch}/${path}`,
     download_url: isFile ? `https://raw.githubusercontent.com/${repo.full_name}/${branch}/${path}` : null
     // `_links` is intentionally omitted — the categorical hypermedia subset
-    // exemption (FDRS-451); DeepPartial makes it optional so omission is legal.
+    // exemption; DeepPartial makes it optional so omission is legal.
     // The upstream `content-directory` schema is an ARRAY of entries; this
     // serializer emits one entry, so it anchors against the element type.
   } satisfies DeepPartial<ContentDirectoryEntry>[number];
@@ -363,7 +363,7 @@ export function issueJson(issue: IssueRow, repo: RepoRow, labels: LabelRow[] = [
   } satisfies DeepPartial<Issue>;
 }
 
-// `target` is what the comment hangs off (F-1151). Only `html_url` turns on it,
+// `target` is what the comment hangs off. Only `html_url` turns on it,
 // and it does so the way GitHub's does: a comment on a pull request is browsed at
 // `/pull/N`, while `issue_url` stays `/repos/:o/:r/issues/N` for BOTH — GitHub
 // keeps that one on the issues path even for a PR, because a PR is an issue.
@@ -418,7 +418,7 @@ function pullRequestSimpleJson(pr: PullRequestRow, baseRepo: RepoRow, headRepo: 
       ref: pr.head_ref,
       // Upstream merge-base `sha` is a non-null string; the twin emits null when
       // the head SHA is unresolved (no commits seeded yet). Intentional twin
-      // behavior — narrow the null away for the type anchor only (FDRS-454:
+      // behavior — narrow the null away for the type anchor only (
       // faithful twin may surface a pre-resolution null), runtime value unchanged.
       sha: headSha as string,
       repo: repoJson(headRepo),
@@ -475,7 +475,7 @@ export function pullRequestFileJson(file: PullRequestFileRow) {
     raw_url: file.raw_url,
     contents_url: file.contents_url,
     patch: file.patch,
-    // F-1500 — GitHub sends `previous_filename` exactly when `status` is
+    // GitHub sends `previous_filename` exactly when `status` is
     // `"renamed"` and omits the KEY otherwise, so this is a conditional spread
     // rather than a `null`: emitting `previous_filename: null` on an added file
     // would trade a missing-field divergence for a type-changed one and have
@@ -536,7 +536,7 @@ export function combinedStatusJson(repo: RepoRow, sha: string, statuses: CommitS
   } satisfies DeepPartial<CombinedStatus>;
 }
 
-// ----- v2 hot-path serializers (FDRS-300) --------------------------------
+// ----- v2 hot-path serializers --------------------------------
 
 export function milestoneJson(milestone: MilestoneRow, repo: RepoRow, openIssues = 0, closedIssues = 0) {
   return {
@@ -599,7 +599,7 @@ export function releaseJson(release: ReleaseRow, repo: RepoRow) {
     prerelease: Boolean(release.prerelease),
     author: userJson(release.author_login),
     created_at: release.created_at,
-    // F-1459 — real GitHub returns this on every release; the twin used to omit
+    // Real GitHub returns this on every release; the twin used to omit
     // the key, which read as `field-removed` on all three release surfaces.
     // Falls back to `created_at` for a row written before the column existed.
     updated_at: release.updated_at || release.created_at,
@@ -611,8 +611,8 @@ export function releaseJson(release: ReleaseRow, repo: RepoRow) {
     tarball_url: `https://api.github.com/repos/${repo.full_name}/tarball/${release.tag_name}`,
     zipball_url: `https://api.github.com/repos/${repo.full_name}/zipball/${release.tag_name}`,
     assets: [],
-    // F-1533 — the last leaf real GitHub sends on all three release surfaces
-    // that this twin did not. Same shape of fix as `updated_at` above (F-1459),
+    // The last leaf real GitHub sends on all three release surfaces
+    // that this twin did not. Same shape of fix as `updated_at` above,
     // and the same reason it went unnoticed: `satisfies DeepPartial<Release>`
     // encodes "faithful SUBSET", so it cannot see an omission.
     //
@@ -620,7 +620,7 @@ export function releaseJson(release: ReleaseRow, repo: RepoRow) {
     // immutable-release feature and has no route that could enable one — no
     // `PUT /repos/:o/:r/immutable-releases`, nothing on the seed — so every
     // release in every reachable twin state IS mutable. That is what separates
-    // this from the nine sibling fields F-1504 registered rather than fixed:
+    // this from the nine sibling fields registered rather than fixed:
     // stating `false` invents no model.
     //
     // Not a column. A stored value would be a second source of truth for a
@@ -661,7 +661,7 @@ export function checkRunJson(run: CheckRunRow, repo: RepoRow) {
     // conclusion vocabulary including `"stale"`, but the pinned
     // @octokit/openapi-types version's `check-run.conclusion` enum predates
     // `"stale"`. The twin faithfully emits a real upstream value; narrow it to
-    // the schema's declared union for the type anchor only (FDRS-454: twin
+    // the schema's declared union for the type anchor only (twin
     // tracks live GitHub, not a lagging spec snapshot), runtime value unchanged.
     conclusion: run.conclusion as CheckRun["conclusion"],
     started_at: run.started_at,
@@ -708,12 +708,12 @@ export function pullRequestReviewCommentJson(comment: PullRequestReviewCommentRo
     // nullable (`number | null`); all the sibling line/position fields below
     // are non-null in the schema. The twin's row column is `number | null`, so
     // for the non-null schema fields we narrow the row's pre-resolution null
-    // away for the type anchor only (FDRS-454: a faithful twin may surface a
+    // away for the type anchor only (a faithful twin may surface a
     // pre-resolution null on a not-yet-positioned comment), runtime unchanged.
     position: comment.line,
     original_position: comment.line as number,
     // `commit_sha` row column is `string | null`; schema commit ids are
-    // non-null strings (FDRS-454 pre-resolution null narrow).
+    // non-null strings (pre-resolution null narrow).
     commit_id: comment.commit_sha as string,
     original_commit_id: comment.commit_sha as string,
     in_reply_to_id: comment.in_reply_to_id as number,

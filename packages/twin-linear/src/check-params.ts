@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The typed slots Linear's declared checks fill (F-1129).
+// The typed slots Linear's declared checks fill.
 //
 // They live in the twin, not the sdk, for the same reason the declarations do:
 // the twin owns what a Linear team key or workflow state name may look like.

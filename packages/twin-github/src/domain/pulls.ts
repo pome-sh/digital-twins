@@ -113,7 +113,7 @@ export function listPullRequests(domain: GitHubDomain, input: { owner: string; r
   const repo = domain.requireRepo(input.owner, input.repo);
   const all = domain.listPullRequestRows(repo.id);
   let rows = all;
-  // `state=open` by default, as on real GitHub (F-1427). Same missing default
+  // `state=open` by default, as on real GitHub. Same missing default
   // the issue list had, hidden the same way: every seeded pull request was open,
   // so "all" and "open" named one set. `all` below is deliberately the UNFILTERED
   // rows — see the note on the stack read.
@@ -121,7 +121,7 @@ export function listPullRequests(domain: GitHubDomain, input: { owner: string; r
   if (state !== "all") rows = rows.filter((pr) => pr.state === state);
   // `all`, not `rows`: a PR's stack is a fact about the whole repo, so the state
   // filter and the page must not change it. Reading it once here is also what
-  // keeps serializing a page of N from re-reading the table N times (F-1178).
+  // keeps serializing a page of N from re-reading the table N times.
   return paginate(rows, input.page, input.per_page ?? input.perPage).map((pr) => domain.serializePullSimple(pr, all));
 }
 
@@ -177,7 +177,7 @@ export function getPullRequestComments(domain: GitHubDomain, input: { owner: str
   const repo = domain.requireRepo(input.owner, input.repo);
   domain.requirePullRequest(repo.id, input.pull_number);
   const rows = domain.listPullRequestReviewCommentRows(repo.id, input.pull_number);
-  // F-1422 — the same serializer `POST` to this route uses. It built its
+  // The same serializer `POST` to this route uses. It built its
   // elements inline out of six columns while the row already held `line`,
   // `side` and `commit_sha`, all validated on the way in: one row, two shapes,
   // and the read side was the lean one. Real GitHub serves the `review-comment`
@@ -189,10 +189,10 @@ export function getPullRequestComments(domain: GitHubDomain, input: { owner: str
 }
 
 
-// F-1423 — the PR's CONVERSATION timeline, the other half of the pair above.
+// The PR's CONVERSATION timeline, the other half of the pair above.
 // It reads `issue_comments` keyed on the PR's own number, because GitHub models
 // a pull request as an issue and puts both entities' conversations in one table
-// and behind one route (F-1151).
+// and behind one route.
 //
 // This is deliberately not `issues.listIssueComments` called with the pull
 // number, even though that reads the same rows through the same serializer.
@@ -270,7 +270,7 @@ export function updatePullRequestBranch(domain: GitHubDomain, input: { owner: st
     const headBranch = domain.requireBranch(headRepo.id, pr.head_ref);
     if (input.expected_head_sha && headBranch.head_sha !== input.expected_head_sha) conflict("Head SHA did not match");
     const baseBranch = domain.requireBranch(repo.id, pr.base_ref);
-    // Semantic merge (F-735): merge base into head with a real merge commit
+    // Semantic merge: merge base into head with a real merge commit
     // instead of resetting the head pointer to the base head. No-op when the
     // head branch already contains the base head (GitHub returns 422 there;
     // documented deviation).

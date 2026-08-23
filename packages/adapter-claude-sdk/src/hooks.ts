@@ -2,9 +2,9 @@
 //
 // Pome hook handlers — one read-only `HookEvent` emitter per SDK hook event.
 //
-// FDRS-407: hooks are uniform metadata writers. They observe; never mutate
+// Hooks are uniform metadata writers. They observe; never mutate
 // the event the SDK passes them. ToolUseEvent / ToolResultEvent payloads are
-// emitted from the message-stream wrapper (FDRS-408), not from PreToolUse /
+// emitted from the message-stream wrapper, not from PreToolUse /
 // PostToolUse hooks — this keeps `HookEvent` thin (audit trail) and lets the
 // payload-bearing rows carry full inputs/outputs.
 //
@@ -49,14 +49,14 @@ export function buildPomeHooks(): Partial<Record<HookEvent, HookCallbackMatcher[
             // hook payloads like PostToolUseFailure / PermissionDenied /
             // etc.), else null.
             //
-            // F-1200: this is a raw SDK `tool_use_id`, NOT a spawning
-            // `event_id`, and before F-1200 it was written to `parent_id` —
+            // This is a raw SDK `tool_use_id`, NOT a spawning
+            // `event_id`, and before it was written to `parent_id` —
             // one of the four different things that field meant. A hook fires
             // *because of* a tool call but is not spawned by its row, and the
             // adapter has no `event_id` for that call at hook time, so the
             // hook stays rootless: `parent_event_id` is null. Per the M0
             // schema a null parent is valid — the downstream correlator
-            // (FDRS-412) does ts-ordered insertion without requiring parent
+            // does ts-ordered insertion without requiring parent
             // links on every row.
             const causing_tool_use_id = toolUseID ?? readToolUseId(input) ?? null;
             writeHookEvent({

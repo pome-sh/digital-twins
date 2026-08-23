@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-405 — pin the overhead-gate math. The orchestrator is process-driven
-// and slow to exercise end-to-end; these tests cover the parts that matter
-// (sample parsing, percentile picking, p99 delta) without a `pome run`.
+// Pin the overhead-gate math. The orchestrator is process-driven and slow to exercise
+// end-to-end; these tests cover the parts that matter (sample parsing.
 
 import { describe, expect, it } from "vitest";
 import {
@@ -117,9 +116,7 @@ describe("overhead-stats", () => {
     });
   });
 
-  // F-728 fixtures. `quiet` mimics a healthy runner: tight distribution around
-  // ~1ms. `noisy` mimics a shared runner with a loaded neighbor: same body,
-  // but a few percent of samples stalled by the scheduler.
+  // Fixtures. `quiet` mimics a healthy runner: tight distribution around ~1ms.
   const quietRun = (offsetMs = 0): number[] =>
     Array.from({ length: 1000 }, (_, i) => offsetMs + 0.8 + (i % 100) * 0.005);
   const noisyRun = (offsetMs = 0, stallEvery = 40, stallMs = 6): number[] =>

@@ -1,12 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// FDRS-321 — recorder must emit canonical state_delta { before, after } on
-// every mutation path, not just refunds. Mirrors twin-github's
-// recorder-state-delta.test.ts (FDRS-320) but for Stripe domain mutations.
-//
-// Refunds are already covered by refunds.test.ts.
-// Idempotency dedupe is covered by idempotency.test.ts.
-// This file covers: PI create, PI confirm, PI cancel, crypto-deposit settle.
+// Recorder must emit canonical state_delta { before, after } on every mutation path,
+// not just refunds.
 
 import { describe, expect, it } from "vitest";
 import { createStripeApp, rest, type StripeTestApp } from "./_appHelper.js";
