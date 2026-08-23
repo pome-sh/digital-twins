@@ -4,6 +4,11 @@ SPDX-License-Identifier: Apache-2.0
 
 # @pome-sh/wire — CHANGELOG
 
+## Unreleased (patch)
+
+**No consumer-visible change.** Internal tracker ids were removed from this
+package's README. Documentation prose only; every export is unchanged.
+
 ## 0.3.0 — 2026-08-23
 
 **BREAKING — the legacy event → span shim is removed.** `src/otel/legacy-shim.ts`

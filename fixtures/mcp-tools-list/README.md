@@ -3,7 +3,7 @@
 What the **vendor** serves, frozen. Produced by `scripts/capture-mcp-tools-list.mjs` from the
 declared source table in [`config/mcp-capture-sources.json`](../../config/mcp-capture-sources.json).
 Nothing here is hand-written, and nothing here is a fact about a pome twin — these files are the
-other side of the comparison the staleness lane makes.
+other side of the comparison the twin-vs-golden divergence lane makes.
 
 ```bash
 node scripts/capture-mcp-tools-list.mjs                 # re-capture and write
@@ -14,7 +14,8 @@ node scripts/capture-mcp-tools-list.mjs --twin <id>     # one twin
 ```
 
 The producer is **not** on a cron. Refresh it deliberately and read the diff: a change in these
-bytes is a change in what the vendor serves. There is no staleness alarm over them yet.
+bytes is a change in what the vendor serves. A staleness alarm over them is
+planned but not yet built.
 
 `--offline` without `--check` is the one mode that writes without reading a vendor, and it exists
 for `configuration`. That block is prose ABOUT a capture and is copied verbatim into
@@ -29,7 +30,7 @@ rather than stamped, so a re-derivation can never make an old reading look like 
 ## Per twin
 
 All five are captured; the two `status.json` files once written for slack and linear were retired
-by later captures, and stripe's by the same errand.
+by later captures, and stripe's by the same round of captures.
 
 | twin | substrate | completeness | what was read |
 | --- | --- | --- | --- |
@@ -52,12 +53,13 @@ not at all.
 
 ### linear: the scope set is not invariant, and here is the number
 
-This golden was captured under a grant limited to
-`read`, so it held 36 tools and not one write. The gate then named six write tools twin-linear
+The FIRST capture of this golden was taken under a grant limited to `read`, so
+it held 36 tools and not one write. The gate then named six write tools twin-linear
 serves — `save_issue`, `save_comment`, `delete_comment`, `create_issue_label`, `save_project`,
 `save_document` — as tools the twin had invented, when `mcp.linear.app` serves all six.
-A re-capture settled the invariance question
-by measurement rather than argument. Same endpoint, same day:
+A later re-capture — the one committed here, under a `read write` grant —
+settled the invariance question by measurement rather than argument. Same
+endpoint, same day:
 
 | grant | tools |
 | --- | --- |
@@ -81,7 +83,7 @@ a red rather than a silent divergence.
 
 That gate is the thing that was missing. The twin shipped a 2026-07-20 read for seventeen days while
 this file moved to 2026-08-06; nothing in CI related them, the twin's own sha stayed green because a
-stale capture is internally consistent, and the staleness lane reported 34 findings across 11 tools that
+stale capture is internally consistent, and the divergence lane reported 34 findings across 11 tools that
 were all one file's date. Adopting the newer bytes was a capability change, not a text change —
 `Message.bccRecipients`, `Label.messagesTotal`/`messagesUnread`, and a `list_labels` that returns all
 labels and takes no page arguments — so the handlers moved in the same commit.

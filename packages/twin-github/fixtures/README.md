@@ -42,7 +42,7 @@ off GitHub. Nothing here has ever been compared to what
 (`fixtures/mcp-tools-list/github.canonical.json`, at the repo root) records 44
 tools for the `default` toolset that `agent-examples/support-triage` actually points
 at. That gap is real and this fixture does not close it: reporting divergence
-between the two is the staleness lane's job, and the change that moved where
+between the two is the divergence lane's job, and the change that moved where
 this twin's table lives did not change what is in it. Every byte this twin
 serves is identical before and after it.
 

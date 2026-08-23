@@ -44,7 +44,7 @@ tools it called matched were the 2 Google had left byte-identical.
 `Message.bccRecipients`, `Label.messagesTotal`/`messagesUnread`, and a `list_labels` that returns ALL
 labels (the July prose said "all user-defined") taking no page arguments at all. Serving those words
 over the old handlers would advertise three capabilities the twin does not have, which is the
-false-capability shape a vendored listing exists to stop, arrived at
+false-capability shape the adopt-then-move-handlers rule exists to stop, arrived at
 from the other direction. `test/mcp.test.ts` holds the handlers to the listing, reading the advertised
 property set out of the fixture rather than naming fields, so the next field Google adds is a red here
 and not a silent absence.

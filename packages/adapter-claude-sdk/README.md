@@ -67,7 +67,7 @@ event the SDK passes them.
 
 Rationale for choosing global `fetch` replacement (with ALS gating + host
 allowlist) over a `pomeFetch` helper, sidechannel-only correlation, or
-side-effect import is recorded in this repository's git history.
+side-effect import is not restated here.
 
 ### Where the correlation core lives
 

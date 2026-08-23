@@ -140,9 +140,8 @@ anything — used purely as a probe arena. Discipline:
 - **Mutation hole**: one mutating call (POST/PUT/DELETE, or an MCP tool with
   side effects) and the live state is no longer the seed. `stop_session` —
   today that succeeds outright; once the platform-side ungraded-session guard is
-  live it
-  may instead refuse and hand back a `discard_token` to confirm (see below) —
-  then `run_task` again and continue on the fresh session. Never report
+  live it may instead refuse and hand back a `discard_token` to confirm (see
+  below) — then `run_task` again and continue on the fresh session. Never report
   findings from a dirtied session as seed facts.
 - **Reset = discard + re-mint.** `stop_session` ends a probe session without
   evaluating — for probes that is exactly right (there is no evidence worth

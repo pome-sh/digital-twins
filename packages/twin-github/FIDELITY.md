@@ -436,11 +436,12 @@ always 32's, and 32 now names the twin-only 401/403 surfaces explicitly.
     INFO, not drift, and flagged as a genuine twin-fidelity gap for follow-up.
 
     **Narrowed: the COMMENT routes now honour the rule.**
-    `GET|POST /repos/:o/:r/issues/:number/comments` accept a pull-request number, which is
-    how real GitHub documents commenting on a PR's conversation. They used not to
-    — `issue_comments` carried a foreign key to `issues(repo_id, number)` and a PR
-    has no row there, so every PR comment failed the constraint and the route answered
-    `404 Issue not found`. That was this bullet's write-side face, and it was recorded
+    `GET|POST /repos/:o/:r/issues/:number/comments` accept a pull-request number,
+    which is how real GitHub documents commenting on a PR's conversation. They did
+    not always: `issue_comments` carried a foreign key to `issues(repo_id, number)`
+    and a PR has no row there, so every PR comment failed the constraint and the
+    route answered `404 Issue not found`. That was this bullet's write-side face,
+    and it was recorded
     nowhere: the matrix listed the route as `hot`/`semantic` with no caveat, and the only
     comment tool the bundled `pr-summary-*` examples expose 404'd on every run. What
     remains open is the READ half above — the `/issues` COLLECTION still lists issues
@@ -670,7 +671,8 @@ always 32's, and 32 now names the twin-only 401/403 surfaces explicitly.
     ⚠️ **This residual is UNMEASURED, and deliberately not fixed.** No lane has
     ever compared this twin's MCP error envelope to `api.githubcopilot.com/mcp/`,
     so picking one of the three legs would invent a divergence in the direction
-    this divergence exists to close. It stays generic until somebody measures it.
+    the operation-url work exists to close. It stays generic until somebody
+    measures it.
 
     **The genericness is a REQUIREMENT on three classes, not a gap**, and that
     is the half of this entry that must not be "fixed": GitHub itself sends the

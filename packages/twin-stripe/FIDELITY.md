@@ -283,11 +283,10 @@ not exposed at the root mount — those remain at `/s/:sid/_pome/*` and
    `currency_not_supported`. (Real Stripe accepts many currencies but
    x402's USD-priced/USDC-paid model is the v1 wedge; card PIs keep the
    same restriction.)
-2. **`payment_method_types` restricted to exactly `["crypto"]` or `["card"]`**
-   Multi-type lists and other types return a
-   loud 400. Card attempts settle synchronously with no 3DS /
-   `requires_action` step; declines are driven by Stripe's magic test PMs
-   (`4000000000000002` generic_decline, `4000000000009995`
+2. **`payment_method_types` restricted to exactly `["crypto"]` or `["card"]`.**
+   Multi-type lists and other types return a loud 400. Card attempts settle
+   synchronously with no 3DS / `requires_action` step; declines are driven by
+   Stripe's magic test PMs (`4000000000000002` generic_decline, `4000000000009995`
    insufficient_funds, `4000000000000069` expired_card, `4000000000000127`
    incorrect_cvc — the decline is keyed off the stored card fingerprint,
    the PAN is never persisted). A declined confirm answers 402 with a
@@ -361,8 +360,8 @@ not exposed at the root mount — those remain at `/s/:sid/_pome/*` and
     emits **no events** and mints **no invoices**; real Stripe emits
     `product.created` etc. and invoices a new subscription immediately.
     `GET /v1/invoices` is therefore always the empty list and
-    `GET /v1/invoices/:id` always 404s (invoice writes are unlisted-cold per
-    ruling point 2). Subscription items omit `current_period_start/end` —
+    `GET /v1/invoices/:id` always 404s (invoice writes are unlisted-cold per the
+    same heat ruling). Subscription items omit `current_period_start/end` —
     the shape tier carries no billing-cycle arithmetic, so no period is
     fabricated. Cancellation is an immediate status flip with no proration.
 
@@ -447,9 +446,9 @@ against nothing would render as a match nobody measured.
 **Stripe refuses a parameter it does not know, so the strict default stays.**
 Stripe's published error-code reference carries `parameter_unknown` — "The
 request contains one or more unexpected parameters. Remove these and try again."
-This twin has been speaking Stripe's own word for it all along, without anyone
-checking: `routes/errors.ts` already renders `UndeclaredInputError` as
-`parameter_unknown`.
+This twin has been speaking Stripe's own word for it since the route-input
+declarations landed, without anyone checking: `routes/errors.ts` already renders
+`UndeclaredInputError` as `parameter_unknown`.
 
 Affirmed on published behaviour rather than measured directly: Stripe answers
 401 to a keyless request before it looks at a parameter, so reaching the

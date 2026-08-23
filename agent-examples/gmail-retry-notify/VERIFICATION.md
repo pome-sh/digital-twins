@@ -35,11 +35,12 @@ the hosted Gmail twin + hosted evals via `pome run tasks/01-throttled-send.md -n
 
 1. **Cloud: no gmail/linear deterministic evaluator** — `[code]` criteria on the
    newly hosted twins are silently skipped and the run still shows ✓100
-   (fail-open presentation). Both the evaluator and loud skip surfacing are tracked.
+   (fail-open presentation). Neither the evaluator nor the loud skip surfacing
+   exists yet.
 2. **Baseline is prompt-layer** — `RETRY_RULE_V1` is an instruction, and a
    strong model ignores it and retries anyway (2/3 green). Per the M4b quality
    bar (ratified 2026-07-24) the red flaw must move into code/harness (e.g. the
-   send wrapper swallows 429 / caps attempts at 1). Reworked since.
+   send wrapper swallows 429 / caps attempts at 1). The rework is tracked separately.
 3. **`pome register agent` ignored manifest `twins`** — enabled services came up
    `github` only; gmail was merged in via a direct `POST /v1/agents`.
 

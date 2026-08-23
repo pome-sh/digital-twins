@@ -102,7 +102,7 @@ routes) is outside the inventory — it is pome surface, not upstream surface.
   Surface counts live here; the `/healthz` shape is contract-frozen and does
   not carry them (`tools` remains the MCP tool count; twin-slack intentionally
   has no fidelity field).
-- **Lint rules** (enforced by the parity runner, checked separately per
+- **Lint rules** (checked separately per
   dimension):
   1. Every implemented upstream surface (REST route or MCP tool) has exactly
      one inventory record with heat, fidelity, and justification.

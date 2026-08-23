@@ -14,7 +14,7 @@ two together — see [Why the schemas are not byte-pinned](#why-the-schemas-are-
 
 **Slack's.** `mcp-tools-list.raw.json` is
 [`fixtures/mcp-tools-list/slack.raw.json`](../../../fixtures/mcp-tools-list/) —
-A live OAuth capture of `https://mcp.slack.com/mcp`, taken 2026-08-10
+a live OAuth capture of `https://mcp.slack.com/mcp`, taken 2026-08-10
 under a token carrying all 30 scopes the server advertises — minus the one tool
 this twin does not expose. Every surviving name, description, `inputSchema` and
 annotation is the vendor's, byte for byte.
@@ -101,6 +101,5 @@ raw file and `loadMcpToolFixture` refuses to boot the twin if the two disagree,
 and `--check` diffs all three files against the golden.
 
 A refresh that changes tool names is a change to what this twin serves, and
-needs the same thing the Slack table needed: a ruling that says so, the corpus
-migrated
-in the same batch, and `FIDELITY.md` re-cut.
+needs the same thing the 2026-08-10 adoption needed: a ruling that says so, the
+corpus migrated in the same batch, and `FIDELITY.md` re-cut.

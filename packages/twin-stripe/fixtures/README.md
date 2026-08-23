@@ -20,7 +20,7 @@ it stays true — but it no longer means nothing has ever been compared to it.
 There is now something to compare it to, and the overlap is thin for a reason.
 A golden was captured live off `https://mcp.stripe.com` on 2026-08-10
 (`fixtures/mcp-tools-list/stripe.meta.json` — `live-wire-oauth`, 11 tools), and
-This table was read against it: of the 36 union names exactly **1 is
+this table was read against it: of the 36 union names exactly **1 is
 shared** (`create_refund`), `twin_only=25`, `upstream_only=10`.
 
 One of 36 is the honest measurement, not a failed comparison. `@stripe/mcp` is

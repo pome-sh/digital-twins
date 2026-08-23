@@ -235,7 +235,7 @@ enumeration behind it, and enumerations are never complete.
 
 ---
 
-## The two follow-up measurements the re-cut asked for (2026-08-05)
+## The two follow-up measurements the 2026-08-04 result asked for (2026-08-05)
 
 The 2026-08-04 numbers above said the baseline is green and named two routes.
 They left two questions open, and both were answered by measurement before any
