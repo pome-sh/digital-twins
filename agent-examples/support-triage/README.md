@@ -107,9 +107,10 @@ fail, so it measures nothing, and on a failing run it was worth a free 20 points
 Removing it widened the gap (a routed-to-#47 run went 40 → 25) and took the last
 non-deterministic thing out of the verdict.
 
-Two criteria (`issues/47`, `no-new-issues`) already hold on the seed, so under
-F-1296 they leave the denominator on a run that respects them and are **counted
-as failures** on a run that breaks them. That asymmetry is deliberate and is what
+Two criteria (`issues/47`, `no-new-issues`) already hold on the seed. The
+grader excludes a seed-true criterion from the denominator **only when it also
+holds at finish**, so on a run that respects them they drop out, and on a run
+that breaks them they are **counted as failures**. That asymmetry is deliberate and is what
 keeps a do-nothing agent at 0 — see `VERIFICATION.md` before adding an
 `always-scored` marker to either.
 
@@ -224,8 +225,8 @@ see the table below.
 > **Two earlier tables are superseded**, and both are kept in
 > [`VERIFICATION.md`](./VERIFICATION.md) because why they were wrong is the
 > durable part. The 2026-08-21 set was taken through two twin defects — a
-> `list_issues` 422 on the array its own MCP schema declares (F-1614) and a
-> whole-string `search_issues` match returning empty (F-791) — which manufactured
+> `list_issues` 422 on the array its own MCP schema declares, and a
+> whole-string `search_issues` match returning empty — which manufactured
 > failures the agent did not commit. The 2026-08-22 set is clean but was scored
 > with the sixth, `[model]` criterion still in the denominator, so its numbers
 > are 15 points higher on a failing run than they would be today.
@@ -353,9 +354,8 @@ to climb through.
 ### Why this task has no judge in it
 
 The five `[code]` criteria are deterministic and, on this task, settled: the
-restraint half that used to be missing landed as `github.no-new-issues`
-([F-1198](https://linear.app/pome-sh/issue/F-1198)) and the wrong-value guard as
-`slack.no-message-containing`. All five bind, and all five were graded in every
+restraint half that used to be missing landed as `github.no-new-issues`, and the
+wrong-value guard as `slack.no-message-containing`. All five bind, and all five were graded in every
 trial reported on this page.
 
 There used to be a sixth, `[model]` criterion, and **two independent things were
@@ -377,8 +377,7 @@ created an issue and added no comment, the judge twice substituted the new
 issue's body and PASSED, once correctly said the premise was unmet and FAILED.
 **20 points of variance from the grader alone**, on a task whose `passThreshold`
 is 100. `[code]` has a settled contract for the absent-subject case
-(`NOT EVALUATED`); `[model]` has none. Tracked as
-[F-1615](https://linear.app/pome-sh/issue/F-1615).
+(`NOT EVALUATED`); `[model]` has none, and that gap is open.
 
 Note that these pull in opposite directions, which is why fixing the wording
 would not have been enough: binding the criterion to #23 would make it able to
@@ -410,10 +409,10 @@ via env), it works the task over MCP, and exits when done.
 > | search-first rule deleted from the prompt | 100 × 5 — **5/5** |
 >
 > The last row is why the prompt is not the lever either. The re-cut moved the
-> difficulty into the seeded world (2026-08-21) and its prediction is committed
-> in [`VERIFICATION.md`](./VERIFICATION.md) **ahead of the run**. Until that run
-> is taken, treat this as a working local examinee with a **designed but
-> unmeasured** lesson — [F-1292](https://linear.app/pome-sh/issue/F-1292).
+> difficulty into the seeded world (2026-08-21), its prediction was committed in
+> [`VERIFICATION.md`](./VERIFICATION.md) **ahead of the run**, and the run has
+> since been taken on both arms — 0/5 → 5/5. The lesson is measured, not
+> designed.
 
 ### Telemetry
 

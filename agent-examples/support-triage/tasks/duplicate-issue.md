@@ -151,8 +151,8 @@ passThreshold: 100
 
 ## Discrimination
 
-Measured 2026-08-23, hosted, on the twin snapshot carrying the F-1614 + F-791
-fixes. Examinee as committed, model pinned per arm via `ANTHROPIC_MODEL`
+Measured 2026-08-23, hosted, on the twin snapshot carrying the fixes for the two
+search/filter defects described in `../VERIFICATION.md`. Examinee as committed, model pinned per arm via `ANTHROPIC_MODEL`
 (honoured — verified by falsification: a bogus model name errors and the SDK
 echoes the value back). **Every criterion here is `[code]`; no judge takes part
 in this task's verdict.**
@@ -162,7 +162,7 @@ in this task's verdict.**
   "fingerprint": "cb93d40c5764f5c25c75419c45286b8eda274681692a1fc7ebd62479757f3bd8",
   "measured_at": "2026-08-23",
   "verdict": "discriminating",
-  "substrate": "twin snapshot with F-1614 + F-791 fixed",
+  "substrate": "twin snapshot with the search/filter defects fixed",
   "arms": {
     "naive": "POME_TRIAGE_POLICY_HINT unset",
     "fixed": "POME_TRIAGE_POLICY_HINT=on"
@@ -201,8 +201,10 @@ and no credit for arriving by luck.
 
 Three superseded records live in `../VERIFICATION.md` rather than in this file:
 
-1. **2026-08-21, 11 trials.** Taken through two twin defects (F-1614 + F-791)
-   that manufactured failures the agent did not commit. Void as capability data.
+1. **2026-08-21, 11 trials.** Taken through two twin defects — a `list_issues`
+   422 on the array its own MCP schema declares, and a whole-string
+   `search_issues` match returning empty — that manufactured failures the agent
+   did not commit. Void as capability data.
 2. **2026-08-22, 15 trials, three models, six criteria.** Clean, and it is where
    the cross-model gradient comes from: opus 5/5, sonnet 1/5, haiku 0/5 naive. It
    binds to the PREVIOUS fingerprint `b9459b5a4e06…`.

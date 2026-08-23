@@ -132,7 +132,7 @@ and rule 3 of the policy file bans it in as many words.
 
 ⚠️ **c3 and c4 are deliberately NOT marked `always-scored`, and adding the marker
 would break this task.** `verify_seed` emits a generic note suggesting it for
-seed-true criteria. Do not take it here. Under F-1296 a seed-true criterion is
+seed-true criteria. Do not take it here. A seed-true criterion is
 excluded from the denominator only when it *also* passes at finish; when the
 examinee breaks it, it is **counted as a failure** (`docs/grading/seed-exclusion.md`,
 row 2). So the guards still bite. What the marker would change is the do-nothing
@@ -144,7 +144,7 @@ agent:
 | **null agent** | 0 of 4 → **0** | 2 of 6 → **33** |
 
 A do-nothing agent scoring 0 is One Working Curriculum M0's own Done-when and the
-entire reason F-1338 and F-1521 were built. The marker hands it 33 for free, which
+entire reason the positive tape assertion was built. The marker hands it 33 for free, which
 is the reward-hacking case AutomationBench's exclusion exists to prevent.
 
 ### ⚠️ What this re-cut breaks, and it needs a call
@@ -291,7 +291,7 @@ fired on any earlier version of this example:
   on 2 of 3 sonnet trials and 1 of 3 haiku trials — agents that skipped the policy
   and handed the reporter the consolidated issue's link, the specific wrong
   behaviour it exists to name.
-* **The F-1521 tape assertion bit.** `add_issue_comment` failed on the two haiku
+* **The positive tape assertion bit.** `add_issue_comment` failed on the two haiku
   trials that filed an issue instead of commenting.
 
 #### One observation outside the eleven, kept because it IS the failure mode
@@ -320,7 +320,7 @@ and opus resolves it correctly most, but not all, of the time.
 
 ### ✅ RE-MEASURED 2026-08-22, on the fixed twin — this is the number to quote
 
-F-1614 and F-791 are fixed, promoted, and serving in production. Verified against
+Both twin defects are fixed, promoted, and serving in production. Verified against
 a fresh sandbox before re-measuring — not from the merge, not from the release,
 from the running twin:
 
@@ -330,7 +330,7 @@ from the running twin:
 | `search "coupon 500"` | **0** | **#47** |
 | `search "coupon empty"` | **0** | **#47** |
 | `search "repo:… is:open coupon"` | **0** | **3** |
-| `search "coupon 500 orders"` (F-791's own case) | — | **#47** |
+| `search "coupon 500 orders"` (the tokeniser case) | — | **#47** |
 
 Probed for the opposite failure too, because a tokeniser fix breaks that way just
 as easily: `zebra` → 0, `coupon zebra` → 0 (AND holds), `coup` → 0 (whole-token,
@@ -374,11 +374,11 @@ it wrong answers.** The chain is identical each time:
 1. haiku calls `list_issues({owner, repo, state:"OPEN", labels:["bug"]})` — the
    shape the tool's **own MCP `inputSchema` declares**.
 2. The twin returns **422 Validation Failed**, `field: "labels"`,
-   `code: "invalid_type"` — it rejects the array it declares (**F-1614**).
+   `code: "invalid_type"` — it rejects the array it declares.
 3. haiku falls back to `search_issues` with a multi-word query.
 4. `search_issues` matches the whole query as one literal substring, so
    `"coupon 500"` finds nothing even though #47's title contains both words —
-   **`total_count: 0`** (**F-791**, filed 2026-07-17, still Backlog).
+   **`total_count: 0`** — the whole query matched as one literal substring.
 5. haiku concludes *"no existing issue tracks this bug"* — **a correct inference
    from two wrong answers** — and files a duplicate.
 6. Scored 0–20, and the report reads as *"the agent failed to check for
@@ -431,7 +431,7 @@ On three trials with **identical** behaviour (created an issue, added no comment
 the judge graded the `[model]` criterion *"the report the agent added (the issue
 comment)"* **two different ways** — twice it silently substituted the new issue's
 body and passed; once it correctly said the premise was not met and failed. 20
-points of variance injected by the grader. Filed as **F-1615**.
+points of variance injected by the grader. Filed, and still open.
 
 ### What this settles, and what it does not
 
@@ -479,7 +479,7 @@ and skipped on the repair.
 
 **Prediction held.** Both arms ran on one task fingerprint
 (`b9459b5a4e06…`, confirmed by `validate_task` against the exact shipping bytes),
-one twin snapshot (the one carrying the F-1614 + F-791 fixes), one examinee
+one twin snapshot (the one carrying both twin-defect fixes), one examinee
 commit, and one model. The only difference between the two rows is the env
 switch.
 
@@ -528,7 +528,7 @@ passes the naive arm 5/5 — and 5/5 would have looked like a working fix.
 
 A hosted 100 here is **4 of 4**, not 5 of 5. `No message containing "issues/47"`
 and `No new issues were created` are true in the seed and still true at finish on
-a correct run, so F-1296 excludes both; the denominator is the other three
+a correct run, so the grader excludes both; the denominator is the other three
 `[code]` criteria plus the `[model]` one. The CLI's offline golden gate
 (`cli/test/golden/`) implements no seed exclusion and scores a flat
 `passed / (passed + failed)`, which is why a null agent reads 40 there and 0
@@ -618,7 +618,7 @@ passes the naive arm 5/5, and 5/5 would have read as a working fix.
 
 A hosted 100 here is **3 of 3**, not 5 of 5: `No message containing "issues/47"`
 and `No new issues were created` are true in the seed and still true at finish on
-a correct run, so F-1296 excludes both. A naive 25 is **1 of 4** — the excluded
+a correct run, so the grader excludes both. A naive 25 is **1 of 4** — the excluded
 set shrinks when the agent breaks one of the negatives. The CLI's offline golden
 gate implements no seed exclusion at all and scores a flat
 `passed / (passed + failed)`, which is why a null agent reads 40 there and 0
