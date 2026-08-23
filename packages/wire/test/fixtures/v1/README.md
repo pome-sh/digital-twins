@@ -1,4 +1,4 @@
-# /v1 event-row fixture corpus (FDRS-613, F-1201)
+# /v1 event-row fixture corpus
 
 A framework-agnostic JSON corpus of representative `events.jsonl` rows — the wire
 payloads for `@pome-sh/wire`'s event union. `pome-sh/pome-twins` is the canonical
@@ -6,7 +6,7 @@ home. Cloud consumers validate against the contract; they no longer mirror this
 source tree as a second owner.
 
 The session / run / plan / usage half of the old corpus moved with its schemas to
-`cli/test/fixtures/contract/v1/` in F-942.
+`cli/test/fixtures/contract/v1/`.
 
 ## Layout — one directory per event kind
 
@@ -25,7 +25,7 @@ Adding a member to the union without adding a fixture is a build failure:
 
 ```
 $ npm run emit:trace-contract -w @pome-sh/wire
-trace-contract.json event-fixture coverage failed (F-1201):
+trace-contract.json event-fixture coverage failed:
 - no fixture for event kind(s): MyNewEvent.
 ```
 
@@ -36,7 +36,7 @@ coverage requirement cannot be satisfied by a stale list. Both `emit` and
 same failure from the other side: the old directory now describes a member the
 union does not have, and that is rejected too.
 
-Before F-1201 this corpus was 18 session/run/plan shapes and nothing else. The
+This corpus was once 18 session/run/plan shapes and nothing else. The
 contract carried zero event-kind entries, and `check:trace-contract` compared
 bytes that no schema change could move — which is how M1 shipped `LlmTurnEvent`
 with no fixture anywhere and CI stayed green.

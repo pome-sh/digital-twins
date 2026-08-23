@@ -1,9 +1,9 @@
-# Upstream MCP `tools/list` goldens (F-1326)
+# Upstream MCP `tools/list` goldens
 
 What the **vendor** serves, frozen. Produced by `scripts/capture-mcp-tools-list.mjs` from the
 declared source table in [`config/mcp-capture-sources.json`](../../config/mcp-capture-sources.json).
 Nothing here is hand-written, and nothing here is a fact about a pome twin — these files are the
-other side of the comparison F-1325's lane makes.
+other side of the comparison the twin-vs-golden divergence lane makes.
 
 ```bash
 node scripts/capture-mcp-tools-list.mjs                 # re-capture and write
@@ -14,10 +14,11 @@ node scripts/capture-mcp-tools-list.mjs --twin <id>     # one twin
 ```
 
 The producer is **not** on a cron. Refresh it deliberately and read the diff: a change in these
-bytes is a change in what the vendor serves. The staleness alarm over them is F-1328.
+bytes is a change in what the vendor serves. A staleness alarm over them is
+planned but not yet built.
 
 `--offline` without `--check` is the one mode that writes without reading a vendor, and it exists
-for `configuration` (F-1394). That block is prose ABOUT a capture and is copied verbatim into
+for `configuration`. That block is prose ABOUT a capture and is copied verbatim into
 `meta.json` and `canonical.json`, so a sentence added to the source table moves two golden files —
 and three of the five sources are behind one-shot OAuth grants that are minted, used once and
 revoked. Without this mode, correcting a sentence about slack's golden would mean minting a fresh
@@ -28,8 +29,8 @@ rather than stamped, so a re-derivation can never make an old reading look like 
 
 ## Per twin
 
-All five are captured; the two `status.json` files F-1326 wrote for slack and linear were retired
-by [F-1329](https://linear.app/pome-sh/issue/F-1329)'s captures, and stripe's by the same errand.
+All five are captured; the two `status.json` files once written for slack and linear were retired
+by later captures, and stripe's by the same round of captures.
 
 | twin | substrate | completeness | what was read |
 | --- | --- | --- | --- |
@@ -52,12 +53,13 @@ not at all.
 
 ### linear: the scope set is not invariant, and here is the number
 
-[F-1329](https://linear.app/pome-sh/issue/F-1329) captured this golden under a grant limited to
-`read`, so it held 36 tools and not one write. The gate then named six write tools twin-linear
+The FIRST capture of this golden was taken under a grant limited to `read`, so
+it held 36 tools and not one write. The gate then named six write tools twin-linear
 serves — `save_issue`, `save_comment`, `delete_comment`, `create_issue_label`, `save_project`,
 `save_document` — as tools the twin had invented, when `mcp.linear.app` serves all six.
-[F-1394](https://linear.app/pome-sh/issue/F-1394) re-captured it and settled the invariance question
-by measurement rather than argument. Same endpoint, same day:
+A later re-capture — the one committed here, under a `read write` grant —
+settled the invariance question by measurement rather than argument. Same
+endpoint, same day:
 
 | grant | tools |
 | --- | --- |
@@ -73,7 +75,7 @@ permission question; it decided what the listing CONTAINED.
 ## gmail: the second tools/list in this repo is now these bytes
 
 [`packages/twin-gmail/fixtures/mcp-tools-list.*`](../../packages/twin-gmail/fixtures/) used to be a
-separate frozen oracle. Since [F-1400](https://linear.app/pome-sh/issue/F-1400) its `raw.json` is
+separate frozen oracle. Its `raw.json` is now
 `gmail.raw.json` **byte for byte** — same `rawFileSha256`, nothing subtracted — adopted by
 `packages/twin-gmail/scripts/adopt-upstream-mcp-fixture.ts` and diffed in CI by
 `npm run gate:mcp-fixture -w @pome-sh/twin-gmail`. Refreshing this golden without re-adopting is now
@@ -81,7 +83,7 @@ a red rather than a silent divergence.
 
 That gate is the thing that was missing. The twin shipped a 2026-07-20 read for seventeen days while
 this file moved to 2026-08-06; nothing in CI related them, the twin's own sha stayed green because a
-stale capture is internally consistent, and F-1325's lane reported 34 findings across 11 tools that
+stale capture is internally consistent, and the divergence lane reported 34 findings across 11 tools that
 were all one file's date. Adopting the newer bytes was a capability change, not a text change —
 `Message.bccRecipients`, `Label.messagesTotal`/`messagesUnread`, and a `list_labels` that returns all
 labels and takes no page arguments — so the handlers moved in the same commit.
@@ -106,8 +108,8 @@ is the golden MINUS that entry and the two shas differ by construction. gmail wi
 `api.githubcopilot.com/mcp/` — the URL `agent-examples/support-triage` actually declares — serves the
 `default` toolset, **not** every toolset. Measured at the pinned commit: `default` is 44 tools,
 `all` is 85. An adapter that read the Go source naively would take the union and report 41 coverage
-gaps for tools no examinee of ours can call. F-1179: a lane reporting divergence that is not real is
-worse than one honestly reporting `not-compared`.
+gaps for tools no examinee of ours can call. A lane reporting divergence that is
+not real is worse than one honestly reporting `not-compared`.
 
 The one place the capture is knowingly incomplete is recorded in
 `github.meta.json` → `configuration.knownRemoteOnlyToolsNotInCapture`: the remote deployment adds

@@ -27,7 +27,7 @@ Emulate’s Linear package may be used as a **coverage checklist**. It is **neve
 | OAuth actor | user vs app | Seed `oauth_apps[].actor` authoritative |
 | Webhook headers | `Linear-Delivery`, `Linear-Event`, optional `Linear-Signature` | Emitted on mutation dispatch |
 | Agent sessions | Subset for local agent tests | GraphQL-only create/update/activity (not in MCP launch set) |
-| Agent session status | Follows the agent's emitted activities; Linear publishes no table | Twin-owned mapping — see “Agent session status” below (F-1176) |
+| Agent session status | Follows the agent's emitted activities; Linear publishes no table | Twin-owned mapping — see “Agent session status” below |
 | MCP documents tools | Full parent set incl. initiative | Gate-1: project/team/issue/cycle parents only |
 | MCP tool count | ~50+ live tools | Frozen 22-tool Gate-1 subset |
 
@@ -43,7 +43,7 @@ These are intentional twin divergences — not silent stubs:
 | `agentActivityCreate` with `content.type: prompt` | Prompted session event | Emits `AgentSessionEvent` / `prompted`, carrying the status the activity just produced |
 | Issue / comment CRUD | Issue / Comment webhooks | Emitted (create/update/remove/archive) |
 
-## Agent session status — the one invented behaviour (F-1176)
+## Agent session status — the one invented behaviour
 
 The agent-session mutation inputs are Linear's, field for field, and
 [`test/linear-schema-subset.test.ts`](test/linear-schema-subset.test.ts) guards
@@ -73,7 +73,7 @@ mapping. It lives in exactly one place —
 
 ### Scalar-level gaps left open on the same surface
 
-The subset guard is name-based by F-1172's design, so these pass it. They are
+The subset guard is name-based by design, so these pass it. They are
 open, not fixed, and closing them is separate work:
 
 | Field | Linear | Twin |

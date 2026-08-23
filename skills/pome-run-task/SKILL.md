@@ -62,7 +62,7 @@ version that moves on its own would split one exam into two run-sets of one.
   `passThreshold` (default 100%).
 - **`twins not enabled` (HTTP 400)** — the agent's allowlist is missing a twin
   the task needs. Heal with one additive `register_agent(name, twins:[…])`
-  (it merges, never removes — F-784), then re-run. Do not re-intake the scope.
+  (it merges, never removes), then re-run. Do not re-intake the scope.
 - Everything the examinee needs is inside `examinee_launch`. Read the **Runtime**
   line from the intake report (or `examinee_launch.transport`) to pick the
   launcher below.

@@ -58,7 +58,7 @@ It exists because that vocabulary used to live in a package called
 `@pome-sh/shared-types`, which drifted: internal consumers pinned an *exact*
 version against each other, the pins fell out of sync, and npm ended up
 installing two copies of the same Zod schemas at one runtime (two schema
-identities that were supposed to be identical — F-942). `@pome-sh/shared-types`
+identities that were supposed to be identical). `@pome-sh/shared-types`
 was dissolved: the trace-wire half became `@pome-sh/wire`, and the
 control-plane half (sessions, tasks, runs, the `/v1` REST surface, error
 envelopes, the `pome.json` manifest — none of which is a *trace* shape) moved
@@ -108,9 +108,9 @@ twin's `check-*.ts` vocabulary and seed contract, plus the check DSL from
 One package, one version line, zero `@pome-sh/*` runtime dependencies.
 
 It exists because the twins are `private: true` and pome-cloud grades every
-`[code]` criterion out of these declarations from a **different repository**
-(F-1308). Privatising the twins fixed a real bug — two zod schema identities for
-one wire type (F-942) — but it also meant a corrected check declaration could
+`[code]` criterion out of these declarations from a **different repository**.
+Privatising the twins fixed a real bug — two zod schema identities for
+one wire type — but it also meant a corrected check declaration could
 never reach the thing that grades with it. Publishing the declaration layer on
 its own restores that path without reversing the fix.
 
@@ -118,7 +118,7 @@ Two properties are load-bearing and gated by
 [`scripts/ci/check-checks-tarball.mjs`](../scripts/ci/check-checks-tarball.mjs):
 
 - **zod is a `peerDependency`, never bundled.** The seed schemas are zod values;
-  two copies means two schema identities, which is F-942 again in a new package.
+  two copies means two schema identities — the same bug in a new package.
 - **the twin engine is not inlined.** `twin-stripe`'s seed needs one zod schema
   that `@pome-sh/sdk/server` also re-exports, and importing that barrel pulls
   hono, `hono/jwt` and `node:sqlite` — 14 runtime modules — into a package whose
@@ -127,8 +127,8 @@ Two properties are load-bearing and gated by
 
 `applySeed` and `loadSeedFromEnv` are deliberately not re-exported here: they
 write SQLite rows and read `process.env`. The *standalone twin server*'s channel
-is GHCR and stays GHCR; what travels by npm is the vocabulary and — since
-F-1526 — the domain layer beside it.
+is GHCR and stays GHCR; what travels by npm is the vocabulary and the domain
+layer beside it.
 
 ## `@pome-sh/sandbox-domains` — the runtime the vocabulary describes
 
@@ -138,10 +138,10 @@ declarations above, it boots the twin domain layer in-process to evaluate them
 against real state, and `checks-package-drift.test.ts` demands the two agree on
 an identical binding surface per twin, with no allowlist.
 
-F-1308 gave the declarations a lane and left the runtime frozen at its last
-pre-privatisation publish. So when the vocabulary widened (F-1338), the
+Publishing the declarations gave them a lane and left the runtime frozen at its
+last pre-privatisation publish. So when the vocabulary widened, the
 vocabulary leg could move and the runtime leg structurally could not: the gate
-went red with no legal move available, which is the wall F-1524 recorded. Same
+went red with no legal move available. Same
 build shape as checks — tsup, `noExternal`, `splitting: true`, zod as a peer,
 zero `@pome-sh/*` runtime dependencies — so both publish from the same commit on
 the same allocator run and agree by construction.
@@ -171,10 +171,10 @@ ever.
 
 | Directory | Workspace name | Role | Published? |
 | --- | --- | --- | --- |
-| [`checks/`](./checks/) | `@pome-sh/checks` | Grading vocabulary — the five twins' check declarations, seed schemas and default seeds, plus the check DSL | **Yes** — npm, for pome-cloud (F-1308) |
-| [`sandbox-domains/`](./sandbox-domains/) | `@pome-sh/sandbox-domains` | Grading runtime — the five twins' domain objects, SQLite openers and seed parsers, plus the tape-row wrapper | **Yes** — npm, for pome-cloud (F-1526) |
+| [`checks/`](./checks/) | `@pome-sh/checks` | Grading vocabulary — the five twins' check declarations, seed schemas and default seeds, plus the check DSL | **Yes** — npm, for pome-cloud |
+| [`sandbox-domains/`](./sandbox-domains/) | `@pome-sh/sandbox-domains` | Grading runtime — the five twins' domain objects, SQLite openers and seed parsers, plus the tape-row wrapper | **Yes** — npm, for pome-cloud |
 | [`sdk/`](./sdk/) | `@pome-sh/sdk` | Twin engine — HTTP mount, auth, recorder, MCP dispatch, SQLite | No — bundled into `@pome-sh/cli` and `@pome-sh/sandbox-domains` |
-| [`wire/`](./wire/) | `@pome-sh/wire` | Trace surface — recorder-events, redaction, OTel schemas | **Both** — bundled into `@pome-sh/cli` and `@pome-sh/adapter-claude-sdk`, *and* published to GitHub Packages (`npm.pkg.github.com`) for pome-cloud (F-949) |
+| [`wire/`](./wire/) | `@pome-sh/wire` | Trace surface — recorder-events, redaction, OTel schemas | **Both** — bundled into `@pome-sh/cli` and `@pome-sh/adapter-claude-sdk`, *and* published to GitHub Packages (`npm.pkg.github.com`) for pome-cloud |
 | [`twin-github/`](./twin-github/), `twin-stripe/`, `twin-slack/`, `twin-gmail/`, `twin-linear/` | `@pome-sh/twin-*` | The five digital twins | No — bundled into `@pome-sh/cli`, `@pome-sh/checks` (declarations) and `@pome-sh/sandbox-domains` (domain layer); also published as signed GHCR container images for pome-cloud |
 | [`adapter-claude-sdk/`](./adapter-claude-sdk/) | `@pome-sh/adapter-claude-sdk` | Claude Agent SDK adapter for user agent code | **Yes** — npm |
 

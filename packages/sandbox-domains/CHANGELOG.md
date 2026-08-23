@@ -1,5 +1,13 @@
 # @pome-sh/sandbox-domains
 
+## Unreleased (patch)
+
+**No consumer-visible change.** Internal tracker ids were removed from the
+package READMEs, `packages/sdk/ENDPOINT-TIERS.md` and the twins' fixture
+READMEs. Documentation prose only: no tool, schema, status code, response body
+or shipped artifact moved. Listed only because those files sit under a path the
+next release carries.
+
 ## 0.2.8 — 2026-08-22
 
 **No consumer-visible change.** The repo's top-level `examples/` directory is now

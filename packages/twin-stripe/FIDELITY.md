@@ -17,9 +17,9 @@ Each REST route and MCP tool is classified into one of three tiers:
   arithmetic, idempotency-key dedupe, and the rest behave the way agents
   expect when they call real Stripe.
 - **`shape`** — the response shape is faithful (compile-anchored against
-  the official `stripe` types, FDRS-478) but the underlying behavior is
+  the official `stripe` types) but the underlying behavior is
   deliberately not semantic. The billing surfaces (products, prices,
-  subscriptions, invoice reads — F-734, ruled warm by F-729) sit here:
+  subscriptions, invoice reads — all ruled warm) sit here:
   stored rows served back in Stripe shape, with referential 404s, but no
   events emitted, no invoices minted, no billing-cycle arithmetic.
 - **`unsupported`** — not implemented. The clone returns a loud 501
@@ -48,33 +48,33 @@ in the package README. Changing any of those is a breaking change for
 
 | Route | Heat | Tier | Tests | Notes |
 | --- | --- | --- | --- | --- |
-| `POST /s/:sid/v1/payment_intents` | hot | semantic | `pi.test.ts`, `pi-card.test.ts`, `tools.test.ts` | Two rails (F-731): crypto deposit mode (deterministic Base USDC deposit address, starts at `requires_action`) and card (starts at `requires_payment_method`, or `requires_confirmation` with a `payment_method`; `confirm: true` runs the one-shot attempt). |
+| `POST /s/:sid/v1/payment_intents` | hot | semantic | `pi.test.ts`, `pi-card.test.ts`, `tools.test.ts` | Two rails: crypto deposit mode (deterministic Base USDC deposit address, starts at `requires_action`) and card (starts at `requires_payment_method`, or `requires_confirmation` with a `payment_method`; `confirm: true` runs the one-shot attempt). |
 | `GET /s/:sid/v1/payment_intents/:id` | hot | semantic | `pi.test.ts`, `pi-card.test.ts` | Card PIs surface `last_payment_error` after a declined attempt. |
 | `GET /s/:sid/v1/payment_intents` | hot | semantic | `pi.test.ts` | Cursor pagination on `(created, id)` via `starting_after` / `ending_before` (matches Stripe's cursor model). |
-| `POST /s/:sid/v1/payment_intents/:id/confirm` | hot | semantic | `pi.test.ts`, `pi-card.test.ts` | Card PIs (F-731): synchronous attempt — success mints charge + balance txn + events; magic test PMs decline with a 402 `card_error` embedding the post-attempt PI. Crypto PIs: idempotent no-op. CAS picks exactly one winner among parallel confirms. |
-| `POST /s/:sid/v1/payment_intents/:id` | hot | semantic | `pi-card.test.ts` | Update (F-731, ruled in scope by F-729 point 1) — the retry-with-new-PM step. Metadata merges per-key; attaching a PM moves `requires_payment_method → requires_confirmation`. Refused once terminal. |
+| `POST /s/:sid/v1/payment_intents/:id/confirm` | hot | semantic | `pi.test.ts`, `pi-card.test.ts` | Card PIs: synchronous attempt — success mints charge + balance txn + events; magic test PMs decline with a 402 `card_error` embedding the post-attempt PI. Crypto PIs: idempotent no-op. CAS picks exactly one winner among parallel confirms. |
+| `POST /s/:sid/v1/payment_intents/:id` | hot | semantic | `pi-card.test.ts` | Update (ruled in scope) — the retry-with-new-PM step. Metadata merges per-key; attaching a PM moves `requires_payment_method → requires_confirmation`. Refused once terminal. |
 | `POST /s/:sid/v1/payment_intents/:id/cancel` | hot | semantic | `pi.test.ts`, `pi-card.test.ts` | CAS-on-status; refused once `succeeded`. |
 | `POST /s/:sid/v1/test_helpers/payment_intents/:id/simulate_crypto_deposit` | hot | semantic | `pi.test.ts`, `pi-concurrency.test.ts`, `events.test.ts` | The x402 settlement entry point. CAS `requires_action → processing → succeeded`; mints charge + balance txn + 5 events synchronously. |
 | `GET /s/:sid/v1/charges/:id` | hot | semantic | `charges.test.ts` | Latest charge of a settled PI. |
 | `GET /s/:sid/v1/charges` | hot | semantic | `charges.test.ts` | Filter by `payment_intent`, `customer`. |
-| `POST /s/:sid/v1/refunds` | hot | semantic | `refunds.test.ts`, `refund-abuse-trap.test.ts` | F-733 (heat: hot, ruled F-729). Full or partial; `amount` defaults to the remaining refundable. Refuses over-refunds (`charge_already_refunded`) and failed charges (`charge_not_refundable`). Mints a negative `refund`-type balance transaction and emits `charge.refunded` + `refund.created` in the same transaction. |
+| `POST /s/:sid/v1/refunds` | hot | semantic | `refunds.test.ts`, `refund-abuse-trap.test.ts` | Heat: hot. Full or partial; `amount` defaults to the remaining refundable. Refuses over-refunds (`charge_already_refunded`) and failed charges (`charge_not_refundable`). Mints a negative `refund`-type balance transaction and emits `charge.refunded` + `refund.created` in the same transaction. |
 | `GET /s/:sid/v1/refunds/:id` | hot | semantic | `refunds.test.ts` | |
 | `GET /s/:sid/v1/refunds` | hot | semantic | `refunds.test.ts` | Filter by `charge`, `payment_intent`. Omits the legacy `count` field (divergence #9). |
 | `GET /s/:sid/v1/balance` | hot | semantic | `balance.test.ts` | Available + pending; updated as PIs settle. |
 | `GET /s/:sid/v1/balance_transactions` | hot | semantic | `balance.test.ts` | Ledger entries. |
 | `GET /s/:sid/v1/events/:id` | hot | semantic | `events.test.ts` | |
 | `GET /s/:sid/v1/events` | hot | semantic | `events.test.ts` | Filter by `type`, `created`. **No webhook delivery in v1** — agents poll this. |
-| `POST /s/:sid/v1/customers` | hot | semantic | `customers.test.ts` | F-732 (heat: hot, ruled F-729). Every field optional, like real Stripe. Emits `customer.created`. |
+| `POST /s/:sid/v1/customers` | hot | semantic | `customers.test.ts` | Heat: hot. Every field optional, like real Stripe. Emits `customer.created`. |
 | `GET /s/:sid/v1/customers/:id` | hot | semantic | `customers.test.ts` | Deleted customers serve the `{deleted: true}` stub, like real Stripe. |
 | `GET /s/:sid/v1/customers` | hot | semantic | `customers.test.ts` | Cursor pagination on `(created, id)`; `email` filter; deleted rows excluded. |
 | `POST /s/:sid/v1/customers/:id` | hot | semantic | `customers.test.ts` | Update. Metadata merges per-key; an empty value unsets the key (Stripe's metadata contract). |
 | `DELETE /s/:sid/v1/customers/:id` | hot | semantic | `customers.test.ts` | Soft delete; detaches the customer's payment methods in the same transaction. Idempotent. |
 | `GET /s/:sid/v1/customers/:id/payment_methods` | hot | semantic | `payment-methods.test.ts` | The hot card-on-file read. `type` filter. 404 for deleted customers. |
-| `POST /s/:sid/v1/payment_methods` | hot | semantic | `payment-methods.test.ts` | Card only (F-731 adds card PIs). Test card numbers → brand/last4; Luhn + expiry `card_error`s; PAN never stored. |
-| `GET /s/:sid/v1/payment_methods/:id` | hot | semantic | `payment-methods.test.ts` | Top-level `GET /v1/payment_methods` (list) stays loud 501 per the F-729 ruling. |
+| `POST /s/:sid/v1/payment_methods` | hot | semantic | `payment-methods.test.ts` | Card only. Test card numbers → brand/last4; Luhn + expiry `card_error`s; PAN never stored. |
+| `GET /s/:sid/v1/payment_methods/:id` | hot | semantic | `payment-methods.test.ts` | Top-level `GET /v1/payment_methods` (list) stays loud 501 per the heat ruling. |
 | `POST /s/:sid/v1/payment_methods/:id/attach` | hot | semantic | `payment-methods.test.ts` | One customer per PM; a previously-detached PM can never be reattached. Emits `payment_method.attached`. |
 | `POST /s/:sid/v1/payment_methods/:id/detach` | hot | semantic | `payment-methods.test.ts` | Emits `payment_method.detached`. |
-| `POST /s/:sid/v1/products` | warm | shape | `billing-shape.test.ts` | F-734 (heat: warm, ruled F-729). `name` required; unknown params accepted-and-ignored per the twin's v1 policy. Product/price updates stay unlisted-cold (501). |
+| `POST /s/:sid/v1/products` | warm | shape | `billing-shape.test.ts` | Heat: warm. `name` required; unknown params accepted-and-ignored per the twin's v1 policy. Product/price updates stay unlisted-cold (501). |
 | `GET /s/:sid/v1/products/:id` | warm | shape | `billing-shape.test.ts` | 404 `resource_missing` for unknown ids. |
 | `GET /s/:sid/v1/products` | warm | shape | `billing-shape.test.ts` | Cursor pagination on `(created, id)`; `active` filter. |
 | `POST /s/:sid/v1/prices` | warm | shape | `billing-shape.test.ts` | `currency` + `product` required; the product must exist (referential 404). `recurring.interval` makes it a `recurring` price, otherwise `one_time`. |
@@ -85,12 +85,12 @@ in the package README. Changing any of those is a breaking change for
 | `GET /s/:sid/v1/subscriptions` | warm | shape | `billing-shape.test.ts` | Excludes canceled by default; `status=canceled` selects them, `status=all` lifts the filter; `customer` filter. |
 | `POST /s/:sid/v1/subscriptions/:id` | warm | shape | `billing-shape.test.ts` | Update: metadata merges per-key (empty value unsets), `cancel_at_period_end` flips. Canceled subscriptions accept metadata-only updates and refuse everything else, like real Stripe. |
 | `DELETE /s/:sid/v1/subscriptions/:id` | warm | shape | `billing-shape.test.ts` | Immediate cancel: `status → canceled`, `canceled_at`/`ended_at` stamped. Idempotent; no proration, no final invoice (shape tier). |
-| `GET /s/:sid/v1/invoices/:id` | warm | shape | `billing-shape.test.ts` | Always 404 `resource_missing`: invoices are reads-only (F-729 ruling point 2) and nothing in the twin mints one. |
+| `GET /s/:sid/v1/invoices/:id` | warm | shape | `billing-shape.test.ts` | Always 404 `resource_missing`: invoices are reads-only and nothing in the twin mints one. |
 | `GET /s/:sid/v1/invoices` | warm | shape | `billing-shape.test.ts` | Always the empty Stripe list envelope — see the invoice note under Known divergences. |
 
 ### Named cold surfaces (loud 501, test-backed)
 
-Per the F-729 ruling these families are cold — outside the twin's
+Per the heat ruling these families are cold — outside the twin's
 machine-payments product scope — but agents plausibly probe them, so the
 501 is documented here and pinned by `unsupported.test.ts` (and the
 `fidelity:parity` 501 probe for checkout sessions):
@@ -99,7 +99,7 @@ machine-payments product scope — but agents plausibly probe them, so the
 | --- | --- | --- | --- | --- |
 | `ALL /s/:sid/v1/checkout/sessions*` | cold | unsupported | `unsupported.test.ts` | PS: human-redirect flow. |
 | `ALL /s/:sid/v1/payment_links*` | cold | unsupported | `unsupported.test.ts` | PS: human-redirect flow. |
-| `ALL /s/:sid/v1/setup_intents*` | cold | unsupported | `unsupported.test.ts` | PS: card-on-file is modeled via direct PM attach (F-732). |
+| `ALL /s/:sid/v1/setup_intents*` | cold | unsupported | `unsupported.test.ts` | PS: card-on-file is modeled via direct PM attach. |
 | `ALL /s/:sid/v1/webhook_endpoints*` | cold | unsupported | `unsupported.test.ts` | PS: no webhook delivery loop in v1 (divergence #5); agents poll `GET /v1/events`. |
 
 Anything else under `/v1/*` (`/v1/shared_payment/*`, `/v1/profiles`,
@@ -163,12 +163,12 @@ arguments as the body). Coverage in `tools.test.ts`.
 
 The tables above are 1:1-linted against the structured inventory
 [`fidelity.inventory.json`](fidelity.inventory.json) (which also carries the
-hot/warm/cold heat tier per F-729) by `test/fidelity-contract.test.ts`, and
-`npm run fidelity:parity` (shared runner in `@pome-sh/sdk/parity`, F-730)
+hot/warm/cold heat tier) by `test/fidelity-contract.test.ts`, and
+`npm run fidelity:parity` (shared runner in `@pome-sh/sdk/parity`)
 exercises every inventoried tool end-to-end. Known gaps between code and
 these tables must be declared in the inventory's `doc_drift` with their
 owning ticket, and the lint fails the moment the docs catch up. None are
-declared today — F-733 reconciled the refunds chain, the last such gap.
+declared today — the refunds chain was the last such gap, and it is reconciled.
 
 ## x402 middleware (`src/x402.ts`)
 
@@ -210,7 +210,7 @@ plus the `examples/buyer-agent/` end-to-end demo against a running twin.
   against a fresh handler invocation (matches real Stripe, which
   re-executes on 4xx for client errors).
 - **Idempotency-Key under an injected lost response**
-  (`after-handler-idempotency.test.ts`, F-1138): the status the rule
+  (`after-handler-idempotency.test.ts`): the status the rule
   above reads is the one the HANDLER answered, not the one on the wire.
   An `after_handler` failure-injection rule delivers its configured 4xx
   while the mutation stays committed, and real Stripe writes the
@@ -283,11 +283,10 @@ not exposed at the root mount — those remain at `/s/:sid/_pome/*` and
    `currency_not_supported`. (Real Stripe accepts many currencies but
    x402's USD-priced/USDC-paid model is the v1 wedge; card PIs keep the
    same restriction.)
-2. **`payment_method_types` restricted to exactly `["crypto"]` or `["card"]`**
-   (F-731 added the card rail). Multi-type lists and other types return a
-   loud 400. Card attempts settle synchronously with no 3DS /
-   `requires_action` step; declines are driven by Stripe's magic test PMs
-   (`4000000000000002` generic_decline, `4000000000009995`
+2. **`payment_method_types` restricted to exactly `["crypto"]` or `["card"]`.**
+   Multi-type lists and other types return a loud 400. Card attempts settle
+   synchronously with no 3DS / `requires_action` step; declines are driven by
+   Stripe's magic test PMs (`4000000000000002` generic_decline, `4000000000009995`
    insufficient_funds, `4000000000000069` expired_card, `4000000000000127`
    incorrect_cvc — the decline is keyed off the stored card fingerprint,
    the PAN is never persisted). A declined confirm answers 402 with a
@@ -307,7 +306,7 @@ not exposed at the root mount — those remain at `/s/:sid/_pome/*` and
    simulation.
 8. **`confirm_payment_intent` is a no-op for crypto PIs only** (the
    deposit-mode state machine doesn't need a separate confirm step).
-   Card confirms are real synchronous attempts (F-731) — and unlike the
+   Card confirms are real synchronous attempts — and unlike the
    crypto no-op, re-confirming a settled card PI is refused with
    `payment_intent_unexpected_state`.
 9. **`/v1/refunds` omits the legacy `count` field**. Real Stripe's
@@ -331,7 +330,7 @@ not exposed at the root mount — those remain at `/s/:sid/_pome/*` and
     `deposit_options.networks: ["base"]`) on every PaymentIntent. The official
     `stripe@22.2.0` `PaymentMethodOptions.Crypto` type has only `setup_future_usage`;
     `mode` / `deposit_options` are x402 extension fields the twin adds. They are
-    lifted past the compile-time shape anchor (FDRS-478) via a named-variable spread
+    lifted past the compile-time shape anchor via a named-variable spread
     so the rest of the PaymentIntent stays strictly shape-checked.
 13. **PaymentIntent `next_action` carries the x402 crypto deposit instruction blob**.
     A `requires_action` PaymentIntent surfaces `next_action` as the deterministic
@@ -345,24 +344,24 @@ not exposed at the root mount — those remain at `/s/:sid/_pome/*` and
     not the giant `Stripe.Event` discriminated union. `type` (twin emits a free
     `string`; upstream is the `Event.Type` literal union) and `data` (twin stores an
     opaque parsed JSON blob; upstream `Event.Data.object` is a typed resource union)
-    are narrowed for the type anchor only (FDRS-454); runtime values unchanged.
+    are narrowed for the type anchor only; runtime values unchanged.
 15. **Compile anchor pins `stripe@22.2.0` (dahlia), decoupled from the `2026-03-04.preview` wire version**.
-    The compile-time shape anchor (FDRS-478) pins the official `stripe` library at
+    The compile-time shape anchor pins the official `stripe` library at
     `22.2.0` (apiVersion 2026-05-27.dahlia), intentionally DECOUPLED from the wire
     apiVersion the twin serves (`2026-03-04.preview`). The anchor guards SHAPE only;
     the wire version is tracked by this page + live capture. Concretely, the dahlia
     types dropped the top-level `invoice` field from PaymentIntent and Charge, which
     the twin still emits faithfully to its preview wire version (lifted past the
-    anchor). Bumping `stripe` re-runs the anchor — the FDRS-476 bump → tsc →
+    anchor). Bumping `stripe` re-runs the anchor — the bump → tsc →
     cover-or-register loop — surfacing every upstream shape change by name.
 
 16. **Billing surfaces are shape tier — no billing machine behind them**
-    (F-734, ruled warm by F-729). Creating a product / price / subscription
+    (ruled warm). Creating a product / price / subscription
     emits **no events** and mints **no invoices**; real Stripe emits
     `product.created` etc. and invoices a new subscription immediately.
     `GET /v1/invoices` is therefore always the empty list and
-    `GET /v1/invoices/:id` always 404s (invoice writes are unlisted-cold per
-    ruling point 2). Subscription items omit `current_period_start/end` —
+    `GET /v1/invoices/:id` always 404s (invoice writes are unlisted-cold per the
+    same heat ruling). Subscription items omit `current_period_start/end` —
     the shape tier carries no billing-cycle arithmetic, so no period is
     fabricated. Cancellation is an immediate status flip with no proration.
 
@@ -373,20 +372,20 @@ not exposed at the root mount — those remain at `/s/:sid/_pome/*` and
     until the 2026-08-11 re-baseline, when both were empty and the comparison
     bound nothing at all. The count is accepted in pome-cloud's registry; the
     per-object shape is still compared, so a wrong `object`, a wrong `status` or
-    a changed leaf type still drifts. F-1434.
+    a changed leaf type still drifts.
 
 18. **`/v1/charges` row count is the empty seeded world against a live test
     account.** Same class as bullet 17 on the charges list. The PII redaction
     pass masks free-text leaves by VALUE only — it never changes a key set, an
     array length or a leaf type — so accepting the count here does not compound
-    with it. F-1434.
+    with it.
 
 19. **`/v1/balance_transactions` row count is the empty seeded world against a
     live test account.** Same class as bullet 17, and the clearest illustration
     of why seeding the upstream to match the twin is not a maintainable answer:
     balance transactions are minted by Stripe as a side effect of charge
     activity rather than created directly, so this surface would drift again on
-    an account emptied today. F-1434.
+    an account emptied today.
 
 > Pagination is **not** a divergence: `GET /v1/payment_intents` (and the
 > other list surfaces) use real cursor pagination keyed on `(created, id)`
@@ -401,13 +400,13 @@ npm run fidelity:parity # every inventoried MCP tool end-to-end
 npm run typecheck
 ```
 
-## Declared input surface (F-1179)
+## Declared input surface
 
 Fidelity is not only about what a surface *answers*; it is also about what it
 *accepts*. An agent can call this twin with a parameter the real vendor rejects,
 or omit one the vendor requires, and the response shape can be identical either
 way — so the output comparison cannot see it. That is the same class of gap as
-F-1166, which was only caught because a write round-trip happened to read back a
+the one caught only because a write round-trip happened to read back a
 field nobody had mentioned.
 
 So each route declares its inputs, and **the declaration is the thing the handler
@@ -442,14 +441,14 @@ two-way comparison — and makes `missingRequired` live. Surfaces with no declar
 inputs are omitted rather than published with an empty list: comparing nothing
 against nothing would render as a match nobody measured.
 
-### Undeclared inputs: `refuse` (F-1372, affirmed)
+### Undeclared inputs: `refuse` (affirmed)
 
 **Stripe refuses a parameter it does not know, so the strict default stays.**
 Stripe's published error-code reference carries `parameter_unknown` — "The
 request contains one or more unexpected parameters. Remove these and try again."
-This twin has been speaking Stripe's own word for it since F-1179 without anyone
-checking: `routes/errors.ts` already renders `UndeclaredInputError` as
-`parameter_unknown`.
+This twin has been speaking Stripe's own word for it since the route-input
+declarations landed, without anyone checking: `routes/errors.ts` already renders
+`UndeclaredInputError` as `parameter_unknown`.
 
 Affirmed on published behaviour rather than measured directly: Stripe answers
 401 to a keyless request before it looks at a parameter, so reaching the

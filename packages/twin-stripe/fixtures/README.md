@@ -2,7 +2,7 @@
 
 | Path | Role |
 | --- | --- |
-| `mcp-tools-list.raw.json` | The 26-tool MCP listing, verbatim. **This file IS the tool table** — `src/tools.ts` derives it (F-1325) |
+| `mcp-tools-list.raw.json` | The 26-tool MCP listing, verbatim. **This file IS the tool table** — `src/tools.ts` derives it |
 | `mcp-tools-list.meta.json` | The provenance contract: substrate, endpoint, protocol version, capture date, `rawFileSha256` |
 | `mcp-tools-list.canonical.json` | The same listing re-derived with its provenance attached and readable whitespace |
 
@@ -20,7 +20,7 @@ it stays true — but it no longer means nothing has ever been compared to it.
 There is now something to compare it to, and the overlap is thin for a reason.
 A golden was captured live off `https://mcp.stripe.com` on 2026-08-10
 (`fixtures/mcp-tools-list/stripe.meta.json` — `live-wire-oauth`, 11 tools), and
-F-1469 read this table against it: of the 36 union names exactly **1 is
+this table was read against it: of the 36 union names exactly **1 is
 shared** (`create_refund`), `twin_only=25`, `upstream_only=10`.
 
 One of 36 is the honest measurement, not a failed comparison. `@stripe/mcp` is
@@ -31,7 +31,7 @@ direction `BOTH`. A name this twin serves that the golden lacks is therefore
 not evidence Stripe lacks it. A consumer must read the 25 as `not-compared`,
 never as twin-only divergence and never as full coverage.
 
-The one compared name is load-bearing: F-1484 narrowed `create_refund.reason`
+The one compared name is load-bearing: `create_refund.reason` was narrowed
 to the enum that golden carries.
 
 Refresh these bytes only with a ruling that says what the twin should serve.

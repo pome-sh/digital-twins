@@ -33,4 +33,4 @@ The fixture matrix (fully-covered / partially-covered / zero-coverage agent YAML
 the kept e2e transcripts from running it live are historical evidence and stay in the
 pome-cloud repo (`apps/docs/docs/skills/pome-intake/{fixtures,e2e}/`). Every report
 carries the standing D9 (memory snapshot-clone, never attach) and D10 (closed-book:
-`web_search`/`web_fetch` disabled, F-770) warnings.
+`web_search`/`web_fetch` disabled) warnings.

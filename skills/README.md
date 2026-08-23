@@ -40,25 +40,25 @@ claude mcp add --transport http pome https://mcp.pome.sh/mcp
 | [`pome-run-task`](./pome-run-task/SKILL.md) | Skill 4 — run the exam, finalize from the live tape, narrate the report |
 
 Tool names cited in these skills are verbatim from the frozen Pome control MCP
-contract v1.0 (F-851). Tasks authored here are saved into **your team's**
+contract v1.0. Tasks authored here are saved into **your team's**
 catalog via `save_task` on first use — there is no cross-team task library.
 
 ## Source of truth
 
 This directory in `pome-sh/digital-twins` is the canonical home of the coach
-skill set (decided 2026-07-22, F-850); it versions with the repo. Copies
+skill set (decided 2026-07-22); it versions with the repo. Copies
 elsewhere (e.g. the pome-cloud docs site) are mirrors or pointers. Historical
 test evidence (fixtures, kept e2e transcripts) stays in the pome-cloud repo
 under `docs/agents/skill-evidence/` — deliberately *outside* `apps/docs/`, because
 Mintlify publishes every markdown file under that root whether or not the nav
 lists it, so evidence parked there rendered as public pages on `docs.pome.sh`
-(moved 2026-07-27, F-996 follow-up). Each directory there is named for what the
+(moved 2026-07-27). Each directory there is named for what the
 skill was called when its evidence was produced, so two keep pre-rename names.
 
 The Gen-1 CLI-era skills `pome-setup` / `pome-test` (once installed by the
-`pome skills install` command, and injected by `pome install`) were **retired at
-F-859 (M2)** as redirect tombstones pointing here, then **removed outright at
-F-893**: the `pome skills` command is gone, `pome install` now just prints the
+`pome skills install` command, and injected by `pome install`) were **retired in
+M2** as redirect tombstones pointing here, then **removed outright**: the
+`pome skills` command is gone, `pome install` now just prints the
 Gen-2 wiring path (`pome-setup` → `pome-intake` + the REST-launch preflight;
 `pome-test` → `pome-run-task`).
 Their rescue-worthy assets landed here — the `pome doctor` preflight and the
@@ -68,4 +68,4 @@ and the 0–5 CI exit-code contract in [`cli/README.md`](../cli/README.md). The
 `skills` CLI does not pick the tombstones up — only this top-level `skills/`
 directory is a standard discovery location — and the [`pome`](./pome/SKILL.md)
 router owns Gen-1's shared trigger phrases so the two generations never collide
-on an entry point (F-801).
+on an entry point.

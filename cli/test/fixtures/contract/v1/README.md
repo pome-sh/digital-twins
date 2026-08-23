@@ -1,11 +1,11 @@
-# /v1 control-plane fixture corpus (FDRS-613)
+# /v1 control-plane fixture corpus
 
 A framework-agnostic JSON corpus of representative `/v1` REST payloads and stored
 rows. `pome-sh/pome-twins` is the canonical home for these fixtures and for the
 schemas that parse them (`cli/src/contract/`). Cloud consumers validate against
 the contract; they no longer mirror this source tree as a second owner.
 
-Split out of `packages/shared-types/test/fixtures/v1/` in F-942. The
+Split out of `packages/shared-types/test/fixtures/v1/`. The
 `events.jsonl` row half stayed with its schemas in
 `packages/wire/test/fixtures/v1/event/`.
 
@@ -16,17 +16,17 @@ One directory per `/v1` schema. The directory name is the schema key:
 ```
 planTier/                        → planTierSchema
 createSessionRequest/            → createSessionRequestSchema  (POST /v1/sessions; 0.3.0-era scenario_* vocab)
-createSessionRequestTaskVocab/   → createSessionRequestSchema  (W3 task_* vocab, FDRS-653)
+createSessionRequestTaskVocab/   → createSessionRequestSchema  (task_* vocab)
 createSessionResponse/           → createSessionResponseSchema (POST /v1/sessions)
 usage/                           → usageResponseSchema         (GET  /v1/usage)
 run/                             → runSchema                   (Run row; 0.3.0-era scenario_* vocab)
-runTaskVocab/                    → runSchema                   (W3 task_* vocab, FDRS-653)
+runTaskVocab/                    → runSchema                   (task_* vocab)
 ```
 
 Each `*.json` file is a single wire value: an object, or (for `planTier`) a bare
 JSON string. Every fixture MUST parse successfully under the mapped schema.
 
-## The two vocabularies (FDRS-653)
+## The two vocabularies
 
 Shared-types 0.5.0 renamed everything "scenario" to "task" on the wire (and
 criterion kinds `D`/`P` to `code`/`model`) behind a tolerant reader. The original

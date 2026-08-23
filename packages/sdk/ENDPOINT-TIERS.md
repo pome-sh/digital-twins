@@ -2,7 +2,7 @@
 
 Engine-level rubric for every Pome twin. Each twin's `FIDELITY.md` references
 this page; per-twin tier rulings are recorded as `[DECISION]` comments on the
-milestone's H-gate ticket (M5: F-729).
+milestone's heat-gate ticket.
 
 ## Two orthogonal dimensions
 
@@ -97,12 +97,12 @@ routes) is outside the inventory — it is pome surface, not upstream surface.
 
 - **`FIDELITY.md`** — each twin's tables gain a `Heat` column next to the
   existing fidelity `Tier` column, plus a `## Tier-mismatch ledger` section.
-- **Structured inventory** (owned by F-730) — one machine-readable record per
+- **Structured inventory** — one machine-readable record per
   surface: `{ surface, kind: rest|mcp, heat, fidelity, justification }`.
   Surface counts live here; the `/healthz` shape is contract-frozen and does
   not carry them (`tools` remains the MCP tool count; twin-slack intentionally
   has no fidelity field).
-- **Lint rules** (enforced by the F-730 runner, checked separately per
+- **Lint rules** (checked separately per
   dimension):
   1. Every implemented upstream surface (REST route or MCP tool) has exactly
      one inventory record with heat, fidelity, and justification.

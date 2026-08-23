@@ -73,9 +73,8 @@ turn rather than under the specific tool call that issued it. That is not the
 cloud guessing — the composer joins on a per-tool-call correlation id, and today
 only the Claude adapter injects one (`x-pome-correlation-id`); with no join key
 it falls back to the enclosing turn rather than inventing an edge. Extracting
-that layer for LangGraph and the Vercel AI SDK is
-[F-950](https://linear.app/pome-sh/issue/F-950). Nothing about grading depends on
-it: the criteria read the twins' final state, not the tree.
+that layer for LangGraph and the Vercel AI SDK is not done yet. Nothing about
+grading depends on it: the criteria read the twins' final state, not the tree.
 
 ## What Viktor does
 
@@ -189,11 +188,10 @@ columns = trials*, and the two Slack rows read `0/3` while every other row reads
 > Two notes on that trace, neither of which touches the verdict or the state
 > panel. **Row order:** on `app.pome.sh` today the rows do not read in execution
 > order (`decide` can render after `report`) — the timeline bars beside them do,
-> so read those. That is fixed on `main` by F-1281 and is waiting on a release
+> so read those. That is fixed on `main` and is waiting on a release
 > tag, not on a fix. **Nesting depth:** twin HTTP rows sit under the enclosing
 > LLM turn rather than under the tool that issued them, because only the Claude
-> adapter injects the per-tool-call correlation id the composer joins on
-> ([F-950](https://linear.app/pome-sh/issue/F-950)).
+> adapter injects the per-tool-call correlation id the composer joins on.
 
 ### The fix
 

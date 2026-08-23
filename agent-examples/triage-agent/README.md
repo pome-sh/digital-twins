@@ -246,7 +246,7 @@ until the baseline is reliably red again — never weaken the *flaw mechanism*
 Update the `verified red:` stamp above and in the task config when you re-check.
 
 The pivot criterion is temporarily `[model]` because the GitHub evaluator has no
-issue-state predicate yet. When **F-927** lands (issue-state predicate), it flips
+issue-state predicate yet. When that predicate lands, it flips
 to a deterministic `[code]` check — **do not change the criterion before then**.
 
 ## Configuration
@@ -287,5 +287,4 @@ prints on startup:
 
 So don't trust the value you passed; trust the `model:` line, which reports what
 the SDK actually resolved (it's the same `message.model` that feeds the
-dashboard's gen_ai spans). This is the resolution for
-[F-928](https://linear.app/pome-sh/issue/F-928).
+dashboard's gen_ai spans).

@@ -2,10 +2,10 @@
 
 | Path | Role |
 | --- | --- |
-| `mcp-tools-list.raw.json` | The 65-tool MCP listing, verbatim. **This file IS the tool table** — `src/tools.ts` derives it (F-1325) |
+| `mcp-tools-list.raw.json` | The 65-tool MCP listing, verbatim. **This file IS the tool table** — `src/tools.ts` derives it |
 | `mcp-tools-list.meta.json` | The provenance contract: substrate, endpoint, protocol version, capture date, `rawFileSha256` |
 | `mcp-tools-list.canonical.json` | The same listing re-derived with its provenance attached and readable whitespace |
-| `operation-docs.raw.json` | Which GitHub operation each of the twin's 66 REST surfaces and 36 MCP tools stands for, and the `documentation_url` GitHub puts on that operation's errors (F-1498) |
+| `operation-docs.raw.json` | Which GitHub operation each of the twin's 66 REST surfaces and 36 MCP tools stands for, and the `documentation_url` GitHub puts on that operation's errors |
 | `operation-docs.meta.json` | Its provenance: the pinned `github/rest-api-description` commit and spec SHA-256, `rawFileSha256`, and the reason for every door that names no operation |
 
 ## `operation-docs.*` — a slice, not a dump
@@ -38,13 +38,13 @@ Its substrate is `twin-code-transcription`: it was read off **this twin**, not
 off GitHub. Nothing here has ever been compared to what
 `api.githubcopilot.com/mcp/` serves.
 
-**The 65 is deliberate.** F-1326's upstream golden
+**The 65 is deliberate.** The upstream golden
 (`fixtures/mcp-tools-list/github.canonical.json`, at the repo root) records 44
 tools for the `default` toolset that `agent-examples/support-triage` actually points
 at. That gap is real and this fixture does not close it: reporting divergence
-between the two is F-1327's job, and F-1325 changed where this twin's table
-lives, not what is in it. Every byte this twin serves is identical before and
-after it.
+between the two is the divergence lane's job, and the change that moved where
+this twin's table lives did not change what is in it. Every byte this twin
+serves is identical before and after it.
 
 Refresh these bytes only with a ruling that says what the twin should serve.
 `mcp-tools-list.meta.json` carries the sha of the raw file, and

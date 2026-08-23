@@ -4,12 +4,12 @@ description: Entry point for testing an agent with Pome — routes to the right 
 ---
 
 <!--
-Naming decision (F-801, 2026-07-22): this router is named `pome`, NOT
+Naming decision (2026-07-22): this router is named `pome`, NOT
 `pome-test`. The Gen-1 skill that the retired `pome skills install` command
 seeded may still occupy `pome-test` in users' skills directories, so a Gen-2
 skill with the same name would collide for anyone who has Gen-1. Gen-1
-`pome-setup` / `pome-test` were retired at F-859 (M2) to tombstones that
-redirect here, then removed from the CLI at F-893; this router owns the shared
+`pome-setup` / `pome-test` were retired in M2 to tombstones that
+redirect here, then removed from the CLI; this router owns the shared
 trigger phrases so the two generations never claim the same entry point.
 -->
 
@@ -36,7 +36,7 @@ browser): `claude mcp add --transport http pome https://mcp.pome.sh/mcp`.
 | A drafted task, first run coming up ("is my seed right?") | `pome-verify-seed` — fair-exam triage before anything runs |
 | A verified task to execute ("run my tasks", "how did my agent do?") | `pome-run-task` — mint, launch, `finalize_run` on idle, narrate `get_report` |
 
-**Registered but untested (the F-891 cold start).** Detect it locally first, so
+**Registered but untested (the cold start).** Detect it locally first, so
 the route resolves even before the MCP is connected: a `pome.json` at the repo
 root whose `tasks` dir holds no `.md`, and — when the MCP is up — an empty
 `list_tasks`. Both empty → the builder has an agent but no first task →
@@ -70,11 +70,11 @@ verbatim.** Do not substitute the MCP `register_agent` "because it's the same
 registration" — it is not. Registering a local repo agent through the MCP alone
 leaves `.pome/link.json` unpopulated and the transport wrong, and a second
 `pome register agent` is then needed to repair both (the 2026-07-24 cold-walk
-regression, F-903).
+regression).
 
 Once an agent is registered, `register_agent(name, twins:[…])` from the run path
 is still the right call for **additive twin enablement** on an
-already-registered agent — it merges the allowlist (F-784), it is not a fresh
+already-registered agent — it merges the allowlist, it is not a fresh
 registration.
 
 ## This is not the CLI

@@ -1,6 +1,6 @@
 # Twin Runtime Contract
 
-**Version 1.6.0** — the runtime dependency arrangement is `packages/wire` **with its built `dist/`**, 2026-08-05 (F-942); recorder tape gains `request_headers` + `tool`, and the stripe x402 legs are recorded at all, 2026-07-29 (F-1125); Gmail named fault seeds added 2026-07-24 (F-917); Linear contract added 2026-07-21; Gmail contract added 2026-07-20; boot-secret self-generation added 2026-07-10 (F-708). Verified by the black-box suite in [`contract/`](./contract/).
+**Version 1.6.0** — the runtime dependency arrangement is `packages/wire` **with its built `dist/`**, 2026-08-05; recorder tape gains `request_headers` + `tool`, and the stripe x402 legs are recorded at all, 2026-07-29; Gmail named fault seeds added 2026-07-24; Linear contract added 2026-07-21; Gmail contract added 2026-07-20; boot-secret self-generation added 2026-07-10. Verified by the black-box suite in [`contract/`](./contract/).
 
 > **1.6.0 is a one-bullet change.** Only the *runtime dependency arrangement* bullet below moved: the twins now resolve their wire types from `packages/wire/dist` instead of `packages/shared-types/src` + its in-place runtime JS. Every other item in this document — each twin's entry point, env surface, HTTP status codes, response bodies, headers, recorder tape shape — is byte-identical in behavior. The contract suite in [`contract/`](./contract/) is unchanged apart from a build-prerequisite comment.
 
@@ -10,8 +10,8 @@ This document enumerates everything pome-cloud (and the pome CLI) may rely on wh
 
 - Entry point: `node dist/src/server.js` with **cwd = the twin package root** (`packages/twin-<name>`).
 - `GET /healthz` answers **200 within 3 seconds** of spawn.
-- Boot secret (F-708): an env-injected `TWIN_AUTH_SECRET` **always wins** — pome-cloud injects per-tenant secrets and the twin never self-generates when the variable is set (empty counts as unset). On a non-loopback bind host with no env secret, the twin **self-generates** a 32-byte hex secret, persists it at the compose-era location `.pome-data/<twin>/secret` (cwd-relative; `POME_TWIN_DATA_DIR` overrides the directory), prints it **once** to stdout, and reuses the persisted secret on subsequent boots. If the secret can be neither read nor generated, the twin still **refuses to boot** (exit code ≠ 0; the error names the variable). Loopback binds keep the dev-fallback path.
-- Runtime dependency arrangement (**changed in 1.6.0**, F-942): hoisted `node_modules` + `packages/wire` **with its built `dist/`** + `packages/sdk` **with its built `dist/`** (the twins are engine plugins since F-682/683/684; the runtime image ships both so the hoisted workspace symlinks resolve) — `npm run build -w @pome-sh/wire` and `npm run build -w @pome-sh/sdk`. `@pome-sh/wire` resolves through `exports` to `./dist/index.js`, so a plain-`node` boot loads ordinary compiled JS and no longer depends on type stripping. Until 1.5.0 this bullet named `packages/shared-types` **with its compiled runtime JS**: that package exported `./src/index.ts` and `build:runtime` emitted `.js` in place beside each `.ts` so the NodeNext `.js` specifiers would resolve, which required **Node ≥ 22.18** type stripping at runtime. Both requirements are gone. The GHCR runtime image ships `node:24`; the Dockerfiles are the reference implementation of this arrangement.
+- Boot secret: an env-injected `TWIN_AUTH_SECRET` **always wins** — pome-cloud injects per-tenant secrets and the twin never self-generates when the variable is set (empty counts as unset). On a non-loopback bind host with no env secret, the twin **self-generates** a 32-byte hex secret, persists it at the compose-era location `.pome-data/<twin>/secret` (cwd-relative; `POME_TWIN_DATA_DIR` overrides the directory), prints it **once** to stdout, and reuses the persisted secret on subsequent boots. If the secret can be neither read nor generated, the twin still **refuses to boot** (exit code ≠ 0; the error names the variable). Loopback binds keep the dev-fallback path.
+- Runtime dependency arrangement (**changed in 1.6.0**): hoisted `node_modules` + `packages/wire` **with its built `dist/`** + `packages/sdk` **with its built `dist/`** (the twins are engine plugins; the runtime image ships both so the hoisted workspace symlinks resolve) — `npm run build -w @pome-sh/wire` and `npm run build -w @pome-sh/sdk`. `@pome-sh/wire` resolves through `exports` to `./dist/index.js`, so a plain-`node` boot loads ordinary compiled JS and no longer depends on type stripping. Until 1.5.0 this bullet named `packages/shared-types` **with its compiled runtime JS**: that package exported `./src/index.ts` and `build:runtime` emitted `.js` in place beside each `.ts` so the NodeNext `.js` specifiers would resolve, which required **Node ≥ 22.18** type stripping at runtime. Both requirements are gone. The GHCR runtime image ships `node:24`; the Dockerfiles are the reference implementation of this arrangement.
 
 ## Environment surface
 
@@ -21,8 +21,8 @@ This document enumerates everything pome-cloud (and the pome CLI) may rely on wh
 | `GITHUB_CLONE_HOST` / `SLACK_CLONE_HOST` / `STRIPE_CLONE_HOST` / `GMAIL_TWIN_HOST` / `LINEAR_TWIN_HOST` | bind host | `127.0.0.1` |
 | `GITHUB_CLONE_DB` / `SLACK_CLONE_DB` / `STRIPE_CLONE_DB` / `GMAIL_TWIN_DB` / `LINEAR_TWIN_DB` | SQLite path or `:memory:` | twin-specific data path |
 | `<TWIN>_CLONE_NO_SEED=1` | skip the default seed at boot | seed applied |
-| `POME_SEED_JSON` | cloud-supplied seed applied at boot (FDRS-353) | default seed |
-| `TWIN_AUTH_SECRET` | HS256 secret for session JWTs + provider-shaped tokens; env always wins | dev-only fallback on loopback; self-generated + persisted on non-loopback hosts (F-708); **required** in production |
+| `POME_SEED_JSON` | cloud-supplied seed applied at boot | default seed |
+| `TWIN_AUTH_SECRET` | HS256 secret for session JWTs + provider-shaped tokens; env always wins | dev-only fallback on loopback; self-generated + persisted on non-loopback hosts; **required** in production |
 | `POME_TWIN_DATA_DIR` | directory for the twin's persisted boot secret (`<dir>/secret`) | `.pome-data/<twin>` relative to cwd |
 | `TWIN_ADMIN_TOKEN` | switches `/admin/*` to `X-Admin-Token` auth (timing-safe compare) | loopback-only socket check |
 | `POME_RUN_ID` | recorder run id stamped on events | `"spawn"` |
@@ -39,14 +39,14 @@ This document enumerates everything pome-cloud (and the pome CLI) may rely on wh
 - Session mount `/s/:sid/*` — bearer JWT, HS256 over `TWIN_AUTH_SECRET`, claims `{sid, team_id, exp, …}`; the `sid` claim must equal the path `:sid`. Provider-shaped tokens (`ghp_/github_pat_pome_*`, `xox[bp]-pome-*`, `sk_test_pome_*`) are also accepted per twin.
 - `GET /s/:sid/_pome/health` → 200 `{ok: true, twin, …}`.
 - `GET /s/:sid/_pome/state` → 200 JSON object — the redacted state export that feeds cloud-side `[code]` scoring.
-- `GET /s/:sid/_pome/events` → 200 JSON array — the recorder tape fetched at end of run. Row shape is `@pome-sh/wire` `recorderEventSchema`. Two fields are additive as of F-1125 and a reader must treat ABSENT as "this recording predates the field", never as a value: `request_headers` (the request headers as received, keys lowercased, already redacted — `authorization` / `cookie` / `x-api-key` arrive as `[REDACTED]`) and `tool` (the twin ACTION the call invoked — stamped identically for an MCP `tools/call` and for a REST route that performs the same action; `null` means the serving surface declares no action, **not** that no action happened).
+- `GET /s/:sid/_pome/events` → 200 JSON array — the recorder tape fetched at end of run. Row shape is `@pome-sh/wire` `recorderEventSchema`. Two fields are additive and a reader must treat ABSENT as "this recording predates the field", never as a value: `request_headers` (the request headers as received, keys lowercased, already redacted — `authorization` / `cookie` / `x-api-key` arrive as `[REDACTED]`) and `tool` (the twin ACTION the call invoked — stamped identically for an MCP `tools/call` and for a REST route that performs the same action; `null` means the serving surface declares no action, **not** that no action happened).
 - MCP: `GET /s/:sid/mcp/tools` → `{tools: […]}`; `POST /s/:sid/mcp` (streamable-HTTP JSON-RPC, stateless — `GET`/`DELETE` answer 405); legacy `POST /s/:sid/mcp/tools/:name` and `POST /s/:sid/mcp/call` (`{tool, arguments}`).
 - Reserved prefixes: `/_pome/*` and `/mcp/*` under the session mount belong to the platform (OQ-B6); domain routes must not shadow them.
 - Unknown **session** routes → **501** loud-unsupported envelope advertising `fidelity: "unsupported"` and the supported surfaces.
 
 ## Per-twin frozen differences (as observed 2026-07-07)
 
-Several rows are under active ruling in FDRS-712. They are frozen **as-is**: changing them later is a deliberate contract change, never a port side effect.
+Several rows are under active ruling. They are frozen **as-is**: changing them later is a deliberate contract change, never a port side effect.
 
 | Surface | github | slack | stripe |
 |---|---|---|---|
@@ -65,7 +65,7 @@ Several rows are under active ruling in FDRS-712. They are frozen **as-is**: cha
 | root `/v1/*` SDK-compat mount (no path sid; bearer alone) | — | — | yes |
 | extra session routes | `/_pome/access-control` | — | — |
 
-**The four auth rows moved in F-1497, and only for github and stripe.** Each
+**The four auth rows moved, and only for github and stripe.** Each
 vendor's 401 was probed live on 2026-08-13 with a deliberately invalid bearer
 and with no `Authorization` header at all, and the answer is that they share no
 envelope: github sends `documentation_url` (always the generic
@@ -78,7 +78,7 @@ neither; stripe answers `{error:{message,type}}` with neither. So the `no` and
 `@pome-sh/sdk` stopped carrying github's `documentation_url` key. gmail and
 linear are the same story and are covered by their own FIDELITY.md.
 
-### Body-parsing and tape corners (pinned 2026-07-08, F-683 review)
+### Body-parsing and tape corners (pinned 2026-07-08)
 
 Probed against the pre-engine builds (`3cd86eb`); the contract suite asserts every row.
 
@@ -92,7 +92,7 @@ Probed against the pre-engine builds (`3cd86eb`); the contract suite asserts eve
 | `GET /s/:sid/_pome/health` exact keys | `ok, twin, implementation, fidelity, runtime` | `ok, twin` | `ok, twin, implementation, fidelity, runtime, tthw_seconds, recorder` |
 | `/_pome/state` fetches on the recorder tape | never | never | never |
 | `/admin/seed` on the recorder tape | recorded, `state_delta: null` | recorded, `state_delta: null` | not recorded |
-| `GET /x402/protected-resource` on the recorder tape | — | — | **both legs recorded** (F-1125): the 402 challenge and the paid retry, `state_mutation: false` on each. Was neither before — the payment middleware answered the challenge itself and the resource was a bare handler, so an unpaid attempt left no trace anywhere. The middleware's own settlement calls stay separate rows with their own deltas. |
+| `GET /x402/protected-resource` on the recorder tape | — | — | **both legs recorded**: the 402 challenge and the paid retry, `state_mutation: false` on each. Was neither before — the payment middleware answered the challenge itself and the resource was a bare handler, so an unpaid attempt left no trace anywhere. The middleware's own settlement calls stay separate rows with their own deltas. |
 
 ### Gmail 1.2.0 pins
 
@@ -122,7 +122,7 @@ Probed against the pre-engine builds (`3cd86eb`); the contract suite asserts eve
   calls succeed, the next `throttleFor` return **429 `RESOURCE_EXHAUSTED`**
   (retry hint in the body; **no `Retry-After` header**), then calls recover. The
   counter is per twin instance and cleared by `POST /admin/reset`. The default
-  seed carries no faults, so default behavior is unchanged (additive; F-917).
+  seed carries no faults, so default behavior is unchanged (additive).
 
 ### Linear 1.3.0 pins
 
@@ -158,4 +158,4 @@ Probed against the pre-engine builds (`3cd86eb`); the contract suite asserts eve
 npm run test:contract
 ```
 
-builds `@pome-sh/wire` + the sdk + all five first-party twins, then runs `node --test` over every `contract/*.test.mjs` file it discovers — no file list to fall off (F-1353). The one exception is `contract/cli-start.test.mjs`, which needs a built `cli/` this runner does not build; ci.yml runs it as its own step. The suite is dependency-free (node:test, global fetch, node:crypto) so the same file can be pointed at any built twin artifact — including a cloud-built snapshot (FDRS-714).
+builds `@pome-sh/wire` + the sdk + all five first-party twins, then runs `node --test` over every `contract/*.test.mjs` file it discovers — no file list to fall off. The one exception is `contract/cli-start.test.mjs`, which needs a built `cli/` this runner does not build; ci.yml runs it as its own step. The suite is dependency-free (node:test, global fetch, node:crypto) so the same file can be pointed at any built twin artifact — including a cloud-built snapshot.

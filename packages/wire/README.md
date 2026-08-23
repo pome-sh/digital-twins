@@ -29,7 +29,7 @@ neither:
 
 Sessions, tasks, runs, the `/v1` REST surface, error envelopes and the
 `pome.json` manifest are the cloud control-plane contract, not the wire trace
-surface. They live in [`cli/src/contract/`](../../cli/src/contract) (F-942).
+surface. They live in [`cli/src/contract/`](../../cli/src/contract).
 GitHub's sandbox access-control catalog lives in
 [`packages/twin-github/src/access-control.ts`](../twin-github/src/access-control.ts),
 next to the tools it describes.
@@ -49,8 +49,8 @@ Subpath exports: `recorder-events`, `otel`, `otel/fixtures`, `redaction`, and
 
 ## `@pome-sh/wire/correlation`
 
-The agent-side half of tool-call correlation, with no agent framework in it
-(F-950). A twin records one `TwinHttpEvent` per inbound request; for that row to
+The agent-side half of tool-call correlation, with no agent framework in it.
+A twin records one `TwinHttpEvent` per inbound request; for that row to
 name the tool call that caused it, the agent side has to stamp the id on an
 outgoing header. This module is that mechanism: an `AsyncLocalStorage` store —
 which is what makes it race-proof when several tool calls run concurrently — plus

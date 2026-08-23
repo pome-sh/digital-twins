@@ -10,6 +10,14 @@ write a version number here or in `package.json`. Released
 entries are insertions only: a correction is the next entry, naming the one it
 corrects.
 
+## Unreleased (patch)
+
+**No consumer-visible change.** Internal tracker ids were removed from the
+markdown this package ships — the packaged `demo` task, the bundled task corpus
+under `tasks/`, and the `/v1` fixture-corpus README. Prose only: no task prompt,
+criterion, seed or schema changed. Listed only because those files sit under a
+path the next release carries.
+
 ## 0.26.7 — 2026-08-23
 
 **No consumer-visible change.** `@pome-sh/wire` dropped its legacy event → span
