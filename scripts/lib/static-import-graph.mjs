@@ -3,7 +3,7 @@
 // The static import graph of this repo's TypeScript sources, read from the
 // sources themselves.
 //
-// Extracted from `check-twin-chunk-laziness.mjs` (F-1306) when a second gate
+// Extracted from `check-twin-chunk-laziness.mjs` when a second gate
 // needed the same walk: `check-twin-leaf-portability.mjs` asks which twin
 // modules can still be loaded by a runtime without `node:sqlite`. Both ask a
 // reachability question about the same graph, and two hand-rolled copies of an

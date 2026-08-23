@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1305 declared-endpoint probe gate.
+// Declared-endpoint probe gate.
 //
-// `scripts/probe-example-tools.mjs` (F-1152) asks: does every tool a bundled
+// `scripts/probe-example-tools.mjs` asks: does every tool a bundled
 // EXAMPLE registers get answered by its twin? That gate's subject is the
 // example. Its reach over the twins is whatever seven examples happen to
 // expose — measured on `51b5efe`, its 43 probes reach 9 of the 137 tools the
@@ -20,7 +20,7 @@
 //    `{owner, repo, pull_number}` for `merge_pull_request` out of a JSON
 //    Schema — the arguments are a fact about the seeded world, not about the
 //    tool. So `config/twin-endpoint-probes.json` declares arguments and this
-//    gate declares the SET, from `tools/list`. The rot F-989 and F-1130
+//    gate declares the SET, from `tools/list`. The rot we
 //    produced twice — a hand-kept list that stops covering its subject while
 //    the gate reading the list stays green — cannot recur here, because the
 //    gate never reads the manifest to learn what exists.
@@ -30,12 +30,12 @@
 //    `result.isError` (`packages/sdk/src/mcp-jsonrpc.ts`), so the transport
 //    status is 200 on exactly the failure this gate exists to catch — the same
 //    shape of blindness as the examples swallowing a 4xx into
-//    `{ok: false, status}`, which is what F-1152's fetch hook was built to see
+//    `{ok: false, status}`, which is what the probe's fetch hook was built to see
 //    past. The recorder row the twin writes for its own call carries the real
 //    status, the twin's error text, and the METHOD + PATH, which is what lets a
 //    red name the route instead of naming the gate.
 //
-// 3. A STEP MAY BE A SETUP CALL RATHER THAN A PROBE (F-1376). Some declared
+// 3. A STEP MAY BE A SETUP CALL RATHER THAN A PROBE. Some declared
 //    tools only answer once something exists, and the write that creates it is
 //    not always a tool. twin-github's three release readers are the case: GitHub
 //    declares no `create_release` MCP tool, so the twin does not serve one, but
@@ -415,7 +415,7 @@ export async function runGate(opts = {}) {
 
   // A manifest declaring zero twins would otherwise fall straight through the
   // loop below to "0 findings, exit 0" — the exact "probed nothing but exited
-  // 0" shape this gate exists to prevent, just moved one file over (F-1481).
+  // 0" shape this gate exists to prevent, just moved one file over.
   if (ids.length === 0) {
     throw new Error(`${manifestPath} declares zero twins — refusing to report a pass having probed nothing`);
   }
@@ -457,11 +457,11 @@ export async function runGate(opts = {}) {
 // Realpath'd on both sides, never bare `import.meta.main`: that property
 // landed in Node 24.2, root `engines` allows `>=24`, and on 24.0.0/24.0.1/
 // 24.0.2/24.1.0 it is `undefined` — the guard is false, `runGate()` never
-// runs, and the script exits 0 having probed nothing (F-1481). Node resolves
+// runs, and the script exits 0 having probed nothing. Node resolves
 // symlinks before deriving `import.meta.url`, so realpathing only one side
 // misses through a symlinked checkout (a worktree, or macOS's symlinked
-// `/tmp`) in the same silent shape — the mistake F-1353's first fix made and
-// F-1481 revisits. A guard miss while invoked AS this file throws rather than
+// `/tmp`) in the same silent shape — the mistake an earlier fix made and the
+// entry-guard lint revisits. A guard miss while invoked AS this file throws rather than
 // exits 0.
 const SELF = realpathSync(fileURLToPath(import.meta.url));
 const ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";

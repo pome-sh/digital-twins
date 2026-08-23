@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Regression suite for `check-twin-chunk-laziness.mjs` (F-1306).
+// Regression suite for `check-twin-chunk-laziness.mjs`.
 //
 // The gate exists because a laziness claim went five releases without anyone
 // checking it, so the thing most worth proving is that this gate CAN go red —
@@ -94,7 +94,7 @@ check("2. a direct package-root import is red", {
   contains: "package root",
 });
 
-check("3. an INDIRECT root import two CLI modules deep is red (the F-1306 shape)", {
+check("3. an INDIRECT root import two CLI modules deep is red (the original shape)", {
   files: {
     [MAIN]: `${CHECKS_IMPORT}import { parseTask } from "../task/parseTask.js";\nvoid parseTask;\n`,
     "cli/src/task/parseTask.ts": `import { schema } from "./taskSchema.js";\nexport const parseTask = () => schema;\n`,

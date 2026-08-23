@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Regression coverage for scripts/ci/wait-for-workflow.sh (F-696).
+ * Regression coverage for scripts/ci/wait-for-workflow.sh.
  * Mocks curl on PATH and asserts success / failure / newest-run selection /
  * in-progress polling / timeout / cancelled. Also asserts twin-image.yml waits
  * on ci.yml, and on secret-scan.yml only where a run exists to wait for.

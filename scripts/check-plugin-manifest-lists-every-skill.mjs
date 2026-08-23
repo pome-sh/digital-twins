@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1226 — `.claude-plugin/plugin.json` must list every skill under `skills/`.
+// `.claude-plugin/plugin.json` must list every skill under `skills/`.
 //
 // What the manifest buys: the `skills` CLI reads it (README → "Plugin Manifest
 // Discovery") and groups the skills it names under one collapsible row. That
 // row carries its own radio, so `npx skills add pome-sh/digital-twins` opens
 // with the cursor already on "Pome Coach" and one space selects all six. The
 // flat list it renders without a manifest starts with nothing ticked and the
-// cursor on the first skill, which is how F-1226 was filed: a user takes the
+// cursor on the first skill, which is how the bug was filed: a user takes the
 // screen literally, installs one skill, and the coach dead-ends routing into a
 // skill that is not there.
 //
@@ -88,7 +88,7 @@ export async function check(repoRoot) {
 // Run as a script, not when imported by the regression test. Realpath'd on
 // both sides — a bare `resolve()` of argv[1] (with no realpath) misses
 // through a symlinked checkout (a worktree, or macOS's symlinked `/tmp`) in
-// the same silent shape F-1488 found in nine sibling gates, and a guard miss
+// the same silent shape found in nine sibling gates, and a guard miss
 // while invoked as this file throws rather than exits 0.
 const SELF = realpathSync(fileURLToPath(import.meta.url));
 const ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";

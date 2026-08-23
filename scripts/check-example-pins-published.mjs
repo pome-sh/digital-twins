@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1483 — `agent-examples/*` pins a PUBLISHED `@pome-sh/*` version on purpose
+// `agent-examples/*` pins a PUBLISHED `@pome-sh/*` version on purpose
 // (`agent-examples/support-triage` documents why in `gate-examples.mjs`'s
 // header: it is `npx degit`-fetchable as a standalone subtree, so a `file:`
 // link out of its own directory would break its `npm install`). Nothing
 // watched that pin drift out from under the sibling workspace version twice
 // (#308 off 0.2.5, then off 0.3.1 — the second time dragging the retired
 // `@pome-sh/shared-types` back into the example's install graph as a runtime
-// dependency, F-942 instantiated in the one example that exists to demonstrate
+// dependency — two schema identities in one process, in the one example that
+// exists to demonstrate
 // a correctly-joined trace).
 //
 // `check-workspace-pins-match-workspace.mjs` cannot own this: it runs OFFLINE
@@ -134,7 +135,7 @@ export function discoverExampleSiblingDeps(repoRoot) {
  * conservative side, and the same side a 401 or a 5xx lands on.
  *
  * `--prefer-online` forces npm's staleness check instead of accepting a cached
- * packument, and it is load-bearing on the write side (F-1520): both the workflow
+ * packument, and it is load-bearing on the write side: both the workflow
  * that calls this and the one that publishes restore npm's HTTP cache via
  * `setup-node`'s `cache: npm`, keyed on the root lockfile — which a release
  * commit changes, so the run immediately BEFORE a publish takes the miss and
@@ -222,7 +223,7 @@ export function checkExamplePinsPublished(pins, npmView = defaultNpmView) {
 const writeSideNpmView = (name, version) => defaultNpmView(name, version, { attempts: 1 });
 
 /**
- * F-1520 — the write-side of this gate's own read-side logic. `checkExample
+ * The write-side of this gate's own read-side logic. `checkExample
  * PinsPublished`'s `violations` ARE, by construction, the only pins safe to
  * rewrite automatically: the sibling is confirmed PUBLISHED (an `npm view`
  * that just returned a real answer), so `npm install --package-lock-only`
@@ -292,7 +293,7 @@ export function planExampleRepins(repoRoot, npmView = writeSideNpmView) {
       // `overrides`, or in a second install field) — a repo-wide release outage
       // caused by the thing meant to remove a one-line PR. Skip this one pin
       // instead: `reportExamplePinParity` still reds on it, so it cannot go
-      // silent, and a human re-pins it the way they did before F-1520.
+      // silent, and a human re-pins it the way they did before the repin path existed.
       console.warn(
         `::warning::${manifestRelPath}: expected exactly one \`"${v.dep}": "${v.pin}"\`, found ${occurrences} — ` +
           "refusing to guess which one is the pin, so it is NOT re-pinned automatically. " +

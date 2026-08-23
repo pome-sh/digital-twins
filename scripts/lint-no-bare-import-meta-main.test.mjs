@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Regression coverage for scripts/lint-no-bare-import-meta-main.mjs
-// (F-1481, extended by F-1488 for the realpath-both-sides entry-guard shape).
+// (extended for the realpath-both-sides entry-guard shape).
 
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
@@ -59,7 +59,7 @@ for (const [label, source] of Object.entries(REAL_SHAPES)) {
   assert(hits.length > 0, `a real import.meta.main reference is caught: ${label} (source: ${JSON.stringify(source)})`);
 }
 
-// The live instances F-1481's first cut could not see were `.ts`, so the parser
+// The live instances the first cut could not see were `.ts`, so the parser
 // must read TypeScript syntax — not merely "not crash" on it. A JS-only parser
 // fails on the type annotations here and would report the file as unparseable
 // (or as clean), which is the silent skip this gate exists to prevent.
@@ -102,7 +102,7 @@ for (const [label, source] of Object.entries(FALSE_POSITIVES)) {
   assert(hits.length === 1, `a real reference is caught even alongside comment/string mentions (got ${hits.length})`);
 }
 
-// ── findEntryGuardRealpathGaps: the F-1488 shapes, each its own verdict ─────
+// ── findEntryGuardRealpathGaps: the realpath shapes, each its own verdict ───
 // The sanctioned replacement for bare `import.meta.main` — comparing
 // `process.argv[1]` against `import.meta.url` — has its own silent-skip shape
 // when either side is not realpath'd. Node resolves symlinks before deriving
@@ -275,7 +275,7 @@ for (const [label, source] of Object.entries(GUARD_GAP_CLEAN_CASES)) {
 }
 
 // ── the scan roots cannot silently narrow ──────────────────────────────────
-// F-1481's own history is the argument for this assertion: F-1353 fixed
+// This gate's own history is the argument for this assertion: one fix landed for
 // `contract/run.mjs`, the same bug survived ten lines away under `scripts/`,
 // and this gate's first cut then covered only those two roots while six live
 // instances sat in `agent-examples/*/src/*.ts`. A root dropping out of the walk must
@@ -289,7 +289,7 @@ for (const [label, source] of Object.entries(GUARD_GAP_CLEAN_CASES)) {
   const all = [...byRoot.values()].flat();
   assert(
     all.some((f) => /(^|\/)agent-examples\/[^/]+\/src\/index\.ts$/.test(f)),
-    "a bundled example's entry module is in scope — the six live F-1481 instances were exactly these files"
+    "a bundled example's entry module is in scope — the six live instances were exactly these files"
   );
   assert(all.some((f) => f.includes("/cli/src/")), "cli/src is in scope");
   assert(!all.some((f) => f.includes("node_modules")), "the walk never descends into node_modules");
@@ -400,7 +400,7 @@ for (const [label, source] of Object.entries(GUARD_GAP_CLEAN_CASES)) {
   }
 }
 
-// ── scanRepo: F-1488 break-on-purpose, one scratch file per shape ─────────
+// ── scanRepo: realpath break-on-purpose, one scratch file per shape ───────
 // The ticket's own break-on-purpose matrix: a one-sided-realpath guard, a
 // no-realpath guard, and a basename guard added to a scratch script each red
 // naming that exact file; a correct both-sides-realpath'd guard next to them
@@ -455,8 +455,8 @@ for (const [label, source] of Object.entries(GUARD_GAP_CLEAN_CASES)) {
 // ── the shipped repo is clean ────────────────────────────────────────────
 // The regression that matters most: what would have caught
 // scripts/probe-twin-endpoints.mjs and the six examples shipping a bare
-// guard (F-1481), and the ten entry-guard-realpath instances plus the two
-// basename ones (F-1488).
+// guard, and the ten entry-guard-realpath instances plus the two
+// basename ones.
 {
   const { filesScanned, findings, unparseable, guardGaps, guardRelations } = scanRepo(ROOT);
   assert(filesScanned > 0, "the real scan covers at least one file");
@@ -470,7 +470,7 @@ for (const [label, source] of Object.entries(GUARD_GAP_CLEAN_CASES)) {
   // exists. `guardGaps.length === 0` over the real repo is satisfied both by
   // "every guard realpaths both sides" and by "the classifier recognized no
   // guard at all", and the second is how two floors in this milestone shipped
-  // dead. The repo has one guard per runnable script; the twelve F-1488 fixed
+  // dead. The repo has one guard per runnable script; the twelve that were fixed
   // ones alone put the count above 12, so a bound well under the real number
   // reds on a classifier going blind without reding on someone deleting a
   // script.

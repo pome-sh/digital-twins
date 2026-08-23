@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-900 example-launch smoke. `tsc` cannot see a temporal-dead-zone crash:
-// F-866's examples typecheck gate was green while every real launch of
+// Example-launch smoke. `tsc` cannot see a temporal-dead-zone crash: the
+// examples typecheck gate was green while every real launch of
 // `agent-examples/triage-agent` died at startup with
 //   ReferenceError: Cannot access 'TwinMcpClient' before initialization
 // because the top-level `await main()` ran before the `class TwinMcpClient`
@@ -13,7 +13,7 @@
 // `main()` runs past the point where a launch-above-class TDZ would fire — and
 // fails if the module crashes on load with a TDZ ReferenceError.
 //
-// F-1478: for as long as this gate existed, an exit *inside* SETTLE_MS was
+// For as long as this gate existed, an exit *inside* SETTLE_MS was
 // unconditionally treated as OK, on the theory that a benign network/auth
 // failure (no live twin, no real model key in CI) is expected and must not be
 // a false red. That theory is right, but the implementation never checked it —
@@ -31,8 +31,8 @@
 //     during module evaluation, well under this window, so surviving it is
 //     real evidence, not silence.
 //   - exits before the settle with the TDZ signature in its output → FAIL,
-//     unconditionally. This is F-900's actual subject and must never become a
-//     skip or a pass no matter what else changes here.
+//     unconditionally. This is the crash this gate exists to catch, and must
+//     never become a skip or a pass no matter what else changes here.
 //   - exits before the settle WITHOUT the TDZ signature → only a network/auth
 //     failure this gate's own SMOKE_ENV deliberately manufactures (dead twin
 //     endpoints, invalid model keys) excuses this. That is asserted by
@@ -53,7 +53,7 @@
 // for what it does not (that the work was correct — `probe:examples` and the
 // scenario suites are the gates for that).
 //
-// F-1486: the REACHED-OUTBOUND leg above is the only thing any environment
+// The REACHED-OUTBOUND leg above is the only thing any environment
 // ever proves, because CI has no credentials and 0 of 8 examples are ever
 // "still running at the settle" here. `SMOKE_EXAMPLES_LIVE=1` switches this
 // same gate — same classifier, same discovery, same output-tail printing —
@@ -68,7 +68,7 @@
 // least one example was alive at the settle for real, naming what it
 // expected when it was not.
 //
-// F-1519: REACHED-OUTBOUND above was decided by matching the FAILURE TEXT
+// REACHED-OUTBOUND above was decided by matching the FAILURE TEXT
 // against BENIGN_FAILURE_SIGNATURES — an archaeology problem, not a proof.
 // `@anthropic-ai/claude-agent-sdk@0.3.221`'s query() picks between two error
 // shapes on a field (`lastErrorResultText`) set by a race between its own
@@ -81,7 +81,7 @@
 // the re-run was "8 of 8". No regex over the error text can be made
 // deterministic against a race that lives inside a dependency's internals,
 // and widening the signatures to catch "process exited with code" would
-// convert every pre-wiring crash into a pass — the exact defect F-1478
+// convert every pre-wiring crash into a pass — the exact defect this gate
 // already fixed once, reintroduced through the back door.
 //
 // The fix: classify on POSITIVE EVIDENCE THE EXAMPLE ITSELF EMITS, not on
@@ -147,11 +147,11 @@ const examplesDir = join(repoRoot, "agent-examples");
 export const SETTLE_MS = 5000;
 
 // The V8 message for accessing a `let`/`const`/`class` binding in its temporal
-// dead zone. This is the exact crash F-900 fixed and F-866's tsc gate missed.
+// dead zone. This is the exact crash the tsc gate missed.
 // A TDZ crash is a hard failure regardless of exit code or timing.
 export const TDZ_SIGNATURE = /(?:Cannot access '[^']+' before initialization|before initialization)/;
 
-// F-1519 — the positive-evidence marker. A fixed literal every example prints
+// The positive-evidence marker. A fixed literal every example prints
 // to stderr, synchronously, immediately before its first outbound (twin or
 // model) call — see the file header for why this replaced error-text
 // matching as the thing REACHED-OUTBOUND is decided on. Gated behind
@@ -196,14 +196,14 @@ const BENIGN_FAILURE_SIGNATURES = [
   ],
 ];
 
-// F-1519 — the marker proves the process REACHED its outbound call site; it
+// The marker proves the process REACHED its outbound call site; it
 // cannot prove a socket was ever written. Two crash classes were MEASURED to
 // print the marker and then die before any network syscall: the Agent SDK
 // failing to resolve the `claude` binary (`native binary not found at …` —
 // pure config, no request) and a malformed twin URL (`ERR_INVALID_URL`, thrown
 // by fetch while parsing, after the marker line). Both FAILED under the old
 // text classifier and would silently become passes on the marker alone —
-// F-1478's "a crash before real work reads as success" through the back door,
+// "a crash before real work reads as success" through the back door,
 // with the `claude` binary going unresolvable in CI converting all four
 // adapter-backed examples at once.
 //
@@ -241,7 +241,7 @@ function matchBenignFailure(output) {
 // of the eight (`gmail-retry-notify`, `merge-agent`, `minimal-viktor`,
 // `minimal-viktor-langgraph`) call `requiredEnv("POME_TASK")` and throw at
 // startup without it. It therefore applies on BOTH legs, and keeping it out of
-// SMOKE_DEAD_WIRING below is load-bearing: F-1486's first cut overlaid nothing
+// SMOKE_DEAD_WIRING below is load-bearing: the first cut of the live leg overlaid nothing
 // at all in LIVE mode, so those four died on `Error: POME_TASK is required`
 // and the gate classified them FAIL with "returned without evidence it did any
 // real work" — i.e. the credentialed nightly would have redded 4 of 8 on its
@@ -250,7 +250,7 @@ function matchBenignFailure(output) {
 // non-diagnosable red that trains a reader to ignore the alarm.
 const SMOKE_TASK = "Smoke run: triage/summarize the open items in acme/api.";
 
-// F-1486 — settings the credentialed leg supplies only when the caller has NOT.
+// Settings the credentialed leg supplies only when the caller has NOT.
 // Neither is a credential and neither is dead wiring: together they are what
 // decides whether a launched example has anything to do and whether it can
 // reach a model with the ONE secret this leg asks a human to provision. Both
@@ -288,10 +288,10 @@ const SMOKE_DEAD_WIRING = {
   POME_SLACK_REST_URL: "http://127.0.0.1:59321",
   // support-triage resolves BOTH twins' MCP URLs in resolveTwinWiring() before it
   // touches anything else, and throws naming every missing var. Without this the
-  // example this gate was extended to cover (F-1290) died in env resolution and
+  // example this gate was extended to cover died in env resolution and
   // the gate still printed OK — it proved the module evaluates and nothing more,
   // never reaching examineeOptions() or query(), which is where a launch-above-
-  // declaration TDZ of the F-900 shape would actually fire.
+  // declaration TDZ this gate exists to catch would actually fire.
   POME_SLACK_MCP_URL: "http://127.0.0.1:59321/s/smoke/mcp",
   POME_GMAIL_REST_URL: "http://127.0.0.1:59321",
   // triage-agent / pr-summary-* accept a pre-minted bearer token verbatim, so
@@ -316,7 +316,7 @@ export function launchEnv(baseEnv, live) {
   // exists to get off of. SMOKE_LIVE_DEFAULTS fill only what the caller left
   // unset — a caller-supplied value always wins, and a BLANK one counts as
   // unset so `requiredEnv`'s own trim-check never receives "".
-  // PR leg: unchanged from before F-1486 — the overlay wins unconditionally,
+  // PR leg: unchanged from before the live leg existed — the overlay wins unconditionally,
   // including the fake AI_GATEWAY_API_KEY that makes alibaba/* resolve there.
   const env = live
     ? { ...baseEnv }
@@ -327,14 +327,14 @@ export function launchEnv(baseEnv, live) {
     }
   }
   delete env.POME_PREFLIGHT; // ensure the real launch path, not the early return
-  // F-1519 — tells every example (directly, or via @pome-sh/adapter-claude-sdk's
+  // Tells every example (directly, or via @pome-sh/adapter-claude-sdk's
   // query()) to print OUTBOUND_MARKER before its first outbound call. Neither a
   // credential nor wiring, so it applies unconditionally on both legs.
   env[MARK_OUTBOUND_ENV] = "1";
   return env;
 }
 
-// F-1486 — the credentialed leg switch. Read once at module load (same as
+// The credentialed leg switch. Read once at module load (same as
 // SETTLE_MS/TDZ_SIGNATURE above) so both smokeOne() and main() agree on it
 // for the life of one process; the regression suite drives the exported pure
 // functions below directly rather than re-triggering this env read.
@@ -354,7 +354,7 @@ export function resolveLiveFlag(value) {
       `value "1" (unset or "" means the uncredentialed PR leg). Refusing to run: treating an ` +
       `unrecognised value as "not live" would silently run the PR leg — dead loopback ports, no ` +
       `credential check, no alive-at-settle floor — and report success, which is the exact ` +
-      `"proves nothing but looks like it does" failure this leg exists to prevent (F-1486).`,
+      `"proves nothing but looks like it does" failure this leg exists to prevent.`,
   };
 }
 
@@ -382,7 +382,7 @@ export const LIVE_REQUIRED_ENV = ["ANTHROPIC_API_KEY", "POME_AUTH_TOKEN"];
 // `!env[name]` alone is not enough. GitHub Actions substitutes an unset secret
 // as the EMPTY STRING rather than leaving the var absent (falsy, so caught), but
 // a secret whose stored value is blank-but-not-empty — a stray space or newline
-// pasted into the secret box, the shape F-1187/F-1184 found blank in Infisical —
+// pasted into the secret box, the shape we have found blank in Infisical —
 // is TRUTHY and would sail through, leaving the leg to launch every example with
 // a whitespace API key and report the resulting per-example crashes as "the
 // example is broken" instead of "the credential is blank". Trim, so present-but-
@@ -391,7 +391,7 @@ export function missingLiveEnv(env = process.env) {
   return LIVE_REQUIRED_ENV.filter((name) => !env[name]?.trim());
 }
 
-// The floor F-1486 asks for: on the credentialed leg, at least one example
+// The floor the credentialed leg asks for: at least one example
 // must be alive at the settle — zero-alive is the exact fact no environment
 // currently asserts. Deliberately >= 1, not a hardcoded count of examples or
 // a fraction of `total`: a literal tied to `total` is the milestone's own
@@ -417,7 +417,7 @@ export function assertAliveFloor({ live, okCount, total }) {
   };
 }
 
-// F-1518 — the counted-numerator property. `classifyLaunch()` already gives
+// The counted-numerator property. `classifyLaunch()` already gives
 // every launch one of three named, counted outcomes (ok / reached / fail); the
 // gap this closes is a DIFFERENT failure mode, one level up: an example that
 // never reaches `classifyLaunch()` at all and so never lands in any of the
@@ -460,7 +460,7 @@ export function discoverExamples(dir = examplesDir) {
   return found;
 }
 
-// F-1519 — asserts the PROPERTY, not the instance list: every discovered
+// Asserts the PROPERTY, not the instance list: every discovered
 // example must have SOME route to printing OUTBOUND_MARKER before its first
 // outbound call, or classifyLaunch()'s fail-closed rule means it can never
 // report "reached" again — silently, with nothing pointing at why. A
@@ -535,7 +535,7 @@ function sourceContainsMarker(srcDir) {
 // guards, and got far enough to open an outbound twin/model call) and printed
 // distinctly from "ok", which is the strictly stronger evidence.
 //
-// F-1519 — "reached" now hinges on OUTBOUND_MARKER being present in the
+// "reached" now hinges on OUTBOUND_MARKER being present in the
 // captured output, never on matching the failure TEXT. BENIGN_FAILURE_SIGNATURES
 // still runs, but only to decorate a marker-backed verdict with a human-readable
 // reason; a match there with no marker present classifies as FAIL, exactly like
@@ -577,7 +577,7 @@ export function classifyLaunch({ output, stillRunningAtSettle, exitCode, signal,
           `${how} after emitting ${OUTBOUND_MARKER}, but ${vetoed} — the marker proves the process ` +
           `reached its outbound call SITE, not that a call left it, and this crash's own error code ` +
           `says none did. Fix the wiring/config it names; a pre-outbound crash must not read as ` +
-          `REACHED-OUTBOUND (F-1519).`,
+          `REACHED-OUTBOUND.`,
       };
     }
     return {
@@ -596,8 +596,8 @@ export function classifyLaunch({ output, stillRunningAtSettle, exitCode, signal,
     // SMOKE_ENV's twin/model wiring cannot succeed on the PR leg — dead
     // loopback ports, invalid keys — so reaching the marker and still exiting
     // 0 means the failure was swallowed, not that the run actually worked.
-    // F-1478's defect verbatim, just proven by the marker instead of guessed
-    // from failure text.
+    // The defect this gate exists to prevent, verbatim — just proven by the
+    // marker instead of guessed from failure text.
     return {
       status: "fail",
       reason:
@@ -606,7 +606,7 @@ export function classifyLaunch({ output, stillRunningAtSettle, exitCode, signal,
         `was swallowed instead of propagated. Propagate it so the process exits non-zero.`,
     };
   }
-  // F-1486 — the third possibility exists ONLY on the credentialed leg, and the
+  // The third possibility exists ONLY on the credentialed leg, and the
   // reader has to be told about it or the first real nightly red is a mystery.
   // OK is "still alive at the settle", so with real twins and a real key a
   // GENUINELY CORRECT example that answers fast — the twin's default seed does
@@ -724,7 +724,7 @@ function smokeOne(name) {
 // without re-triggering a real launch of all eight examples. Realpath'd on
 // both sides (not `import.meta.main`: that landed in Node 24.2, root
 // `engines` allows `>=24`, and `undefined` there makes the guard false and
-// this file exit 0 having smoked nothing — same shape F-1353 fixed in
+// this file exit 0 having smoked nothing — the same shape fixed in
 // contract/run.mjs), and a guard miss while invoked as this file throws
 // rather than exits 0.
 const SELF = realpathSync(fileURLToPath(import.meta.url));
@@ -740,7 +740,7 @@ if (invokedDirectly) {
 }
 
 async function main() {
-  // F-1486 — fail closed, before anything launches. A credentialed leg
+  // Fail closed, before anything launches. A credentialed leg
   // missing a secret must never silently become a second uncredentialed
   // REACHED-OUTBOUND run that reports success; it must red, naming exactly
   // what is absent.
@@ -756,7 +756,7 @@ async function main() {
     if (missing.length > 0) {
       console.error(
         `SMOKE_EXAMPLES_LIVE=1 but missing required credential(s): ${missing.join(", ")}. ` +
-          `This is the credentialed leg (F-1486) — it must not fall back to SMOKE_ENV's dead ` +
+          `This is the credentialed leg — it must not fall back to SMOKE_ENV's dead ` +
           `loopback ports and invalid keys, which would report REACHED-OUTBOUND and pass while ` +
           `proving nothing. Provision the missing secret(s)/twin wiring before retrying.`,
       );
@@ -772,7 +772,7 @@ async function main() {
     process.exit(1);
   }
 
-  // F-1519 — before anything launches: every discovered example must have a
+  // Before anything launches: every discovered example must have a
   // route to the positive-evidence marker, or a run that never sees it is
   // indistinguishable from an example that was simply never wired for it.
   const markerCoverage = assertEveryExampleEmitsMarker(examplesDir, examples);
@@ -821,7 +821,7 @@ async function main() {
     }
   }
 
-  // F-1518 — the reported set is DERIVED from the three verdict buckets, never
+  // The reported set is DERIVED from the three verdict buckets, never
   // tracked alongside them. A separate `reportedNames.push(name)` next to the
   // `await` would mark a name reported before the ok/reached/fail dispatch had
   // put it anywhere, so the next silent-drop bug — a `continue` added inside
@@ -852,7 +852,7 @@ async function main() {
           failures.map((f) => `${f.name} (${f.reason})`).join("; "),
       );
     }
-    // F-1518 — a missing verdict is reported and reds independently of
+    // A missing verdict is reported and reds independently of
     // `failures`: it is a defect in THIS SCRIPT's own bookkeeping, not in the
     // example, and folding it into "Examples that crash on launch" above
     // would misname the fault.

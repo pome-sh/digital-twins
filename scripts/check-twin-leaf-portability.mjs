@@ -13,7 +13,7 @@
 // driver on the module-load path of a file whose own dependencies are zod and
 // a JSON fixture.
 //
-// That is exactly what F-1325 did. It moved every twin's tool table onto a
+// That is exactly what the fixture move did: every twin's tool table sits on a
 // shared, dependency-free loader — `packages/sdk/src/mcp-tool-fixture.ts`, no
 // imports at all — and each twin reached it through the barrel. The twins'
 // own suites run on Node, where `node:sqlite` exists, so all of them stayed
@@ -25,7 +25,7 @@
 //
 //   No module in ENTRIES may statically reach a builtin that non-Node runtimes
 //   do not implement. ENTRIES is every twin's MCP tool table (found by looking
-//   for the F-1325 loader call, so a new twin is covered with no hand edit)
+//   for the fixture loader call, so a new twin is covered with no hand edit)
 //   plus CROSS_RUNTIME_LEAVES, the named modules pome-cloud imports directly.
 //
 // A twin's SERVER is deliberately out of scope: `src/index.ts`, `src/db.ts` and
@@ -82,7 +82,7 @@ const CROSS_RUNTIME_LEAVES = [
   "packages/twin-linear/src/graphql/schema.ts",
 ];
 
-/** The F-1325 loader call. A module that makes it IS a twin's MCP tool table,
+/** The fixture loader call. A module that makes it IS a twin's MCP tool table,
  *  whatever the file is named (`tools.ts` on github/slack/stripe, `mcp.ts` on
  *  gmail/linear). */
 const TOOL_TABLE_MARKER = "loadMcpToolFixture(";
@@ -136,7 +136,7 @@ for (const dir of TWIN_DIRS) {
 
 if (twinsWithNoToolTable.length > 0) {
   // The cheap way to pass a reachability gate is to remove the thing it walks.
-  // Every first-party twin derives its tool table from a fixture (F-1325); a
+  // Every first-party twin derives its tool table from a fixture; a
   // twin that no longer calls the loader has either regressed to a hand-written
   // table or renamed the loader, and either way this gate just stopped checking
   // it.
@@ -146,7 +146,7 @@ if (twinsWithNoToolTable.length > 0) {
   );
   for (const dir of twinsWithNoToolTable) console.error(`  packages/${dir}`);
   console.error(
-    "\nEvery twin derives its MCP tool table from a fixture (F-1325). Restore the\n" +
+    "\nEvery twin derives its MCP tool table from a fixture. Restore the\n" +
       "loader call, or update TOOL_TABLE_MARKER in this script if the loader was renamed.\n",
   );
   process.exit(1);
@@ -211,7 +211,7 @@ if (violations.length > 0) {
     "The usual cause is an import of the `@pome-sh/sdk` ROOT barrel for a value a leaf\n" +
       "subpath already exports: the barrel re-exports `openTwinDatabase`, which is\n" +
       "`node:sqlite`. Import the leaf instead — `@pome-sh/sdk/mcp-tool-fixture` for the\n" +
-      "F-1325 tool-table loader, `@pome-sh/sdk/db` for the database types. Types are\n" +
+      "tool-table loader, `@pome-sh/sdk/db` for the database types. Types are\n" +
       "free either way: `import type` is erased and this gate ignores it.\n",
   );
   process.exit(1);

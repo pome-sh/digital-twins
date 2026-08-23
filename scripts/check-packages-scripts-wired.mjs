@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1472 — closes the class F-1354 found one instance of: a `packages/*` npm
+// Closes a class we found one instance of: a `packages/*` npm
 // script that names itself a check (`validate:mcp`) declared in a
 // package.json and invoked by NOTHING. It went red for weeks with no
 // verdict, and no verdict reads exactly like a pass.
@@ -19,9 +19,9 @@
 //
 // Anything else fails this gate by name.
 //
-// This gate started life (F-1472) as an allowlist of check-NAME prefixes
+// This gate started life as an allowlist of check-NAME prefixes
 // (`validate:*`, `check:*`, `lint:*`, `gate:*`, `test:*`, `assert:*`) — the
-// vocabulary F-1472 specified. That vocabulary could not see
+// vocabulary originally specified. That vocabulary could not see
 // `verify:cloud-token`, a real check that had also never run, and the audit
 // found it by hand instead. A prefix list of what counts as a check is itself
 // a hand-maintained list, which is the exact shape D5 names as the bug: it
@@ -50,7 +50,7 @@
 //
 // Usage: node scripts/check-packages-scripts-wired.mjs
 //
-// F-1476 — `cli/` extension. F-1472 scoped this gate to `packages/*`; `cli/`
+// The `cli/` extension. This gate was first scoped to `packages/*`; `cli/`
 // is a root workspace member too (AGENTS.md) and had the identical shape:
 // `gate:no-eval`, `gate:no-native`, `gate:recorder-overhead` and `test:e2e`
 // declared, only `check:manifest-schema` reached. Same total partition, same
@@ -59,7 +59,7 @@
 //
 // `cli/` also has raw executable files under `cli/scripts/*` that are not
 // declared as ANY npm script. The motivating instance was
-// `cli/scripts/make-unwired-fixture.mjs` (deleted by F-1476, so do not go
+// `cli/scripts/make-unwired-fixture.mjs` (since deleted, so do not go
 // looking for it): broken on `main` — a stale exact-text replacement threw
 // before it did anything — reached by nothing, and invisible to a denominator
 // built only from npm SCRIPT NAMES. So `cli/`'s denominator is the union of
@@ -83,7 +83,7 @@
 // scripts/overhead-gate.ts` — is a real, running check that this gate reds
 // anyway, by name, saying "no workflow reaches it". Verified by hand against
 // that exact shape. Three of `agent-trace-overhead-gate.yml`'s steps were
-// written that way and F-1476 converted all three to `npm run <name> -w
+// written that way and all three were converted to `npm run <name> -w
 // @pome-sh/cli` rather than teach the gate a second wiring shape, because one
 // detection mechanism is the whole reason the marker path can be trusted.
 // The cost is real and is accepted deliberately: the NEXT person who adds a
@@ -121,7 +121,7 @@ const ROOT = process.cwd();
  * far less load-bearing list than the check-name PREFIX vocabulary it replaced
  * — nine exact names that already exist in every package, versus an open set of
  * every prefix someone might invent for a new check — but it is not zero. The
- * set is shared by `packages/*` and `cli/` (F-1476 widened the denominator to
+ * set is shared by `packages/*` and `cli/` (the denominator was widened to
  * both), so adding `pome` for `cli/`'s sake also exempts that exact name in a
  * `packages/*` member; same accepted residual, one more name.
  */
@@ -207,7 +207,7 @@ export function findCheckScripts(root) {
 }
 
 /**
- * F-1476 — the same enumeration as `findCheckScripts`, for `cli/`'s own
+ * The same enumeration as `findCheckScripts`, for `cli/`'s own
  * `package.json` instead of every `packages/*` member. `cli/` is a single
  * root workspace member (AGENTS.md), not a directory of them, so this reads
  * one file rather than looping a directory. Returns `[]` if `cli/package.json`
@@ -274,7 +274,7 @@ export function isWired(entry, corpus) {
   // `(?![\w:.-])`, never `\b`: `-` and `:` are non-word characters, so `\b`
   // after `gate:mcp` matches inside `gate:mcp-fixture`. A package declaring
   // both would have had the longer script's real CI line certify the shorter
-  // one as wired while nothing ran it — the F-1354 shape, produced by the gate
+  // one as wired while nothing ran it — the original shape, produced by the gate
   // meant to catch it. Same guard on the package name, so `@pome-sh/twin-slack`
   // is not wired by a line naming `@pome-sh/twin-slack-legacy`.
   const nameEnd = "(?![\\w:.-])";
@@ -386,13 +386,13 @@ export function invokedFile(entry, root) {
   // Whole-token, never a substring. Unanchored, `[\w./-]+\.(?:ts|mjs|js|sh)`
   // matches `tsconfig.js` INSIDE the literal `tsconfig.json`, so
   // `tsx --tsconfig tsconfig.json scripts/x.ts` resolved to a config file
-  // instead of the script. Under F-1472 that only cost a missed exemption
-  // marker; under F-1476 it also keeps the real script out of
+  // instead of the script. Under the narrow scope that only cost a missed
+  // exemption marker; under the widened one it also keeps the real script out of
   // `invokedByScript`, so the file reds as an orphan with a diagnosis
   // pointing at the wrong file entirely.
   const fileMatch = entry.command.match(/(?:^|\s)([\w./-]+\.(?:ts|mts|cts|tsx|mjs|cjs|js|sh))(?=\s|$)/);
   if (!fileMatch) return null;
-  // F-1476 — `cli/` is a single workspace member at `cli/`, not one of many
+  // `cli/` is a single workspace member at `cli/`, not one of many
   // under `packages/<name>`, so it resolves against a different base.
   const pkgRoot = entry.pkgKind === "cli" ? resolve(root, "cli") : resolve(root, "packages", entry.pkgDir);
   const scriptPath = resolve(pkgRoot, fileMatch[1]);
@@ -403,7 +403,7 @@ export function invokedFile(entry, root) {
 /**
  * Reads the `pome:unwired-ok(<name>): <reason>` marker straight out of a
  * file's own bytes, shared by both the script-command path
- * (`findExemptionReason`, below) and the raw-file path (F-1476's
+ * (`findExemptionReason`, below) and the raw-file path (the
  * `cli/scripts/**` entries, which have no command to derive a file from —
  * the file IS the entry).
  */
@@ -475,7 +475,7 @@ function resolveRelativeImport(fromFile, specifier) {
 }
 
 /**
- * F-1476 — every file under `cli/scripts/**` that is neither the invoked
+ * Every file under `cli/scripts/**` that is neither the invoked
  * file of a declared `cli/package.json` script (any of them, including
  * LIFECYCLE ones — `prepublishOnly` reaching `assert-publishable.mjs` counts
  * as reached) nor imported by a sibling file in the same tree. What is left
@@ -539,7 +539,7 @@ export function findCliOrphanFileEntries(root) {
 }
 
 export function run(root) {
-  // F-1476 — cli/'s own non-lifecycle scripts join packages/*'s in ONE array,
+  // Cli/'s own non-lifecycle scripts join packages/*'s in ONE array,
   // so the derived write/--check coverage below (same `pkgDir`, same command
   // shape) applies to cli/'s `emit:manifest-schema`/`check:manifest-schema`
   // pair with no new code — it is the identical shape three packages/* pairs
@@ -627,7 +627,7 @@ export function run(root) {
     failures.push(entry);
   }
 
-  // F-1476 — cli/scripts/** files nothing declares as a script at all
+  // Cli/scripts/** files nothing declares as a script at all
   // (the deleted make-unwired-fixture.mjs's shape). No script name exists for these, so
   // the only way to clear one is the marker, read straight from the file.
   for (const entry of fileEntries) {

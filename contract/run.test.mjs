@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Regression for F-1353: contract/run.mjs must discover every *.test.mjs file
+// Regression: contract/run.mjs must discover every *.test.mjs file
 // under contract/ instead of hand-listing them. The three fixture-directory
 // cases pin the discovery mechanism itself; the last case proves it against
 // the real contract/ directory by recomputing the expectation from an
@@ -70,7 +70,7 @@ test("real contract/ directory matches an independent readdir scan, minus the do
 // (discovered by run.mjs) ∪ (invoked by a named ci.yml step) provably TOTAL
 // over contract/*.test.mjs, so a second cli-dependent contract test cannot be
 // excluded from the runner without a workflow step that runs it — the drift
-// F-1353 found, where two lists each assumed the other covered the file. The
+// we found, where two lists each assumed the other covered the file. The
 // second reds if the runner's `node --test` argv goes back to literal paths,
 // which the discoverTestFiles() cases above would stay green through: they
 // test the helper, not what the pipeline actually invokes.
@@ -80,7 +80,7 @@ const REPO_ROOT = path.resolve(CONTRACT_DIR, "..");
 
 test("every contract/*.test.mjs file is run by the runner or by a named ci.yml step", () => {
   // Only lines where the COMMAND starts with `node --test` count: a comment
-  // naming the file is not a step that runs it (ci.yml's own F-1353 note names
+  // naming the file is not a step that runs it (ci.yml's own note names
   // cli-start.test.mjs in prose), and neither is a `name:` or an `echo`. Then
   // whole-token matching, not a RegExp built from a filename — a path is not a
   // pattern, and `foo.test.mjs` as a regex also matches `fooXtest.mjs`.

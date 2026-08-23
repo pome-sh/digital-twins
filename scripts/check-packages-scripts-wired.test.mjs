@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Regression suite for `check-packages-scripts-wired.mjs` (F-1472).
+// Regression suite for `check-packages-scripts-wired.mjs`.
 //
-// The motivating bug (F-1354) was a `packages/*` script named like a check
+// The motivating bug was a `packages/*` script named like a check
 // that sat unreachable for weeks with no verdict. The thing most worth
 // proving here is that this gate CAN go red on that exact shape — a fresh
 // `check:foo` with no caller — and that it can also go GREEN correctly: on a
@@ -216,7 +216,7 @@ check(
 // Case 13 (break-on-purpose): a longer script's real CI line must not certify
 // a shorter prefix-named one. `\b` after `gate:mcp` matches inside
 // `gate:mcp-fixture` because `-` is a non-word character, so the gate meant to
-// catch F-1354's shape would have produced it.
+// catch the original shape would have produced it.
 check(
   "a prefix-named sibling is not wired by the longer script's line",
   {
@@ -354,7 +354,7 @@ for (const [label, line] of [
   );
 }
 
-// Cases 25+ (F-1476): the cli/ extension. cli/ is a single workspace member
+// Cases 25+: the cli/ extension. cli/ is a single workspace member
 // at `cli/`, not a directory of many under `packages/*`, so it needs its own
 // coverage — same mechanisms, different base path.
 
@@ -407,7 +407,7 @@ check(
   { expect: "green" }
 );
 
-// Case 29 (F-1476's motivating find): a raw cli/scripts/ file declared by NO
+// Case 29 (the motivating find): a raw cli/scripts/ file declared by NO
 // package.json script at all — make-unwired-fixture.mjs's exact shape — has
 // no script name for the npm-run regex to find, so it reds by its own path.
 check(

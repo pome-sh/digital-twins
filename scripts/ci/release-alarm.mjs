@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1350 — a failed release must reach a human without a human going looking.
+// A failed release must reach a human without a human going looking.
 //
 // On 2026-08-06 four consecutive push-triggered `release.yml` runs failed over
 // eleven hours (00:42, 01:26, 10:41, 11:28 UTC). Nothing fired. `release.yml`
@@ -9,7 +9,7 @@
 // — so a publish that died is indistinguishable from a merge that owed no
 // publish. The first signal was a human noticing two packages missing from npm,
 // and the recovery was that human dispatching the workflow by hand. Two of
-// those four runs were the merges of F-1308 and F-949's wire work: the packages
+// those four runs were the merges of the declaration-lane and wire work: the packages
 // the grading vocabulary now depends on, reporting themselves as merged while
 // publishing nothing.
 //
@@ -19,7 +19,7 @@
 // gave before it was deleted alongside the Changesets flow it watched
 // (`a3c9441`, "replace two release systems with one"). Deleting it with its
 // subject was right; not replacing it was the gap. An `if: failure()` step
-// inside `release.yml` cannot see the silence that bit F-1180: a release
+// inside `release.yml` cannot see the silence this alarm exists for: a release
 // workflow that never triggers at all takes an embedded check down with it.
 //
 // ── What it asserts ──────────────────────────────────────────────────────────
@@ -33,7 +33,7 @@
 // broken anyway, which the outcome check cannot see until the next bump.
 //
 //   UNALLOCATED — main carries a pending `## Unreleased` entry that no
-//                 allocation consumed (F-1511). The version number is written on
+//                 allocation consumed. The version number is written on
 //                 main after the merge by allocate-version.yml, so a broken or
 //                 unconfigured allocator produces a state the outcome check
 //                 CANNOT see: main declares the old version, the registry serves
@@ -48,7 +48,7 @@
 //                 decide-publish.sh armed to hard-fail the whole lane on the
 //                 next merge, taking that merge's unrelated publishes with it.
 //   NEVER_RAN   — main's HEAD has no `release.yml` run at all and is past the
-//                 grace window. The F-1180 silence: a push to main that
+//                 grace window. The silence: a push to main that
 //                 triggered nothing (a bot pushing with the ambient
 //                 GITHUB_TOKEN cannot trigger workflows), or Actions disabled.
 //   STUCK       — a run has been queued/in_progress past the stuck window.
@@ -275,7 +275,7 @@ function inspectReleaseRuns({ repo, head, runs, now, graceMinutes, stuckMinutes 
 }
 
 /**
- * The allocation leg (F-1511): is anything still WAITING for a number?
+ * The allocation leg: is anything still WAITING for a number?
  *
  * A pending `## Unreleased` entry on main is transient by construction —
  * allocate-version.yml consumes it on the push that created it — so one still
@@ -481,7 +481,7 @@ export function main(argv = process.argv.slice(2)) {
 // Realpath'd on both sides — node resolves symlinks before deriving
 // `import.meta.url`, so a bare `pathToFileURL()` of argv[1] (with no
 // realpath) misses through a symlinked checkout (a worktree, or macOS's
-// symlinked `/tmp`) in the same silent shape (F-1488), and a guard miss
+// symlinked `/tmp`) in the same silent shape, and a guard miss
 // while invoked as this file throws rather than exits 0.
 const SELF = realpathSync(fileURLToPath(import.meta.url));
 const ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";

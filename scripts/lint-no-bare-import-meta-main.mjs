@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1481: a bare `import.meta.main` entry guard is false on Node 24.0.0,
+// A bare `import.meta.main` entry guard is false on Node 24.0.0,
 // 24.0.1, 24.0.2 and 24.1.0 — the property landed in 24.2, root `engines`
 // allows `>=24`, so on those versions it silently reads `undefined` and a
 // guard built on it exits 0 having done nothing. `scripts/probe-twin-endpoints.mjs`
@@ -36,7 +36,7 @@
 // the exact shape this milestone (D5) targets: it stops covering its subject
 // the day a file is added and nothing notices.
 //
-// F-1488 extends this same walk with a second, related check rather than
+// The realpath check extends this same walk with a second, related check rather than
 // building a separate scanner: the SANCTIONED replacement for bare
 // `import.meta.main` — comparing `process.argv[1]` against `import.meta.url`
 // — has its own silent-skip shape when neither side (or only one side) is
@@ -67,7 +67,7 @@ const SOURCE_EXTENSIONS = new Set([".mjs", ".js", ".cjs", ".ts", ".mts", ".cts",
 // Every root that ships an entry point. This is `scripts/no-eval-in-oss.mjs`'s
 // root list plus `contract/` and `agent-examples/` — the two the narrower first cut
 // of this gate covered (`scripts`, `contract`) left the class open one
-// directory over, which is precisely how F-1481 itself happened: F-1353 fixed
+// directory over, which is precisely how this gate's own gap happened: one fix landed
 // `contract/run.mjs` and the same bug survived ten lines from `probe:examples`.
 // `agent-examples/` is load-bearing, not defensive: six examples were live instances.
 const SCAN_ROOTS = ["scripts", "contract", "cli/src", "cli/scripts", "packages", "agent-examples"];
@@ -76,9 +76,9 @@ const SCAN_ROOTS = ["scripts", "contract", "cli/src", "cli/scripts", "packages",
 // ~740 and parses third-party CJS, which reds spuriously.
 const PRUNED_DIRS = new Set(["node_modules", "dist", "build", ".git", "coverage", ".turbo", ".next"]);
 
-// The floor on how many entry-guard comparisons the F-1488 half must CLASSIFY
+// The floor on how many entry-guard comparisons the realpath half must CLASSIFY
 // before its "no gaps" verdict means anything. See the runner at the bottom of
-// this file. 12 is F-1488's own instance count, against 27 actually present.
+// this file. 12 is the instance count that motivated it, against 27 actually present.
 const MIN_ENTRY_GUARD_RELATIONS = 12;
 
 /**
@@ -220,7 +220,7 @@ export function findBareImportMetaMain(source, fileName = "input.mjs") {
  * `filename` and `dirname` are in here alongside `url` because Node ships all
  * three (they landed in 21.2), they are all derived AFTER symlink resolution,
  * and a guard comparing an unresolved argv0 against `import.meta.filename` has
- * exactly the F-1488 bug in a spelling the `url`-only check would call clean. */
+ * exactly the realpath bug in a spelling the `url`-only check would call clean. */
 const IMPORT_META_SELF_PATH_PROPS = new Set(["url", "filename", "dirname"]);
 function isImportMetaUrlNode(node) {
   return (
@@ -399,7 +399,7 @@ const EQUALITY_OPERATORS = new Set([
  *     file of that name anywhere on disk — it does not need a symlink to be
  *     wrong.
  *   "one-sided-realpath"  — exactly one side is wrapped in `realpathSync`.
- *     The narrow silent skip F-1353's first fix traded a wide one for: still
+ *     The narrow silent skip an earlier fix traded a wide one for: still
  *     defeated by a symlinked checkout, just through a smaller set of paths.
  *   "no-realpath"         — neither side is wrapped in `realpathSync` (this
  *     covers a bare compare, a `resolve()`-only compare, and a
@@ -492,7 +492,7 @@ export function parseErrorsIn(source, fileName) {
 /**
  * Scan every discovered file. Returns real `import.meta.main` references
  * (`findings`), entry guards that do not realpath both sides (`guardGaps`,
- * F-1488) and unparseable files (`unparseable`) SEPARATELY — a syntax error
+ * the realpath check) and unparseable files (`unparseable`) SEPARATELY — a syntax error
  * is not a broken entry guard, and reporting it as one sends the reader
  * looking for a guard that does not exist.
  */
@@ -541,7 +541,7 @@ export function scanRepo(repoRoot = REPO_ROOT, roots = SCAN_ROOTS) {
 // Realpath'd on both sides, never bare `import.meta.main` — this file is one
 // of the files it would scan, and using the property it forbids to guard its
 // own entry would be a fine irony but a broken gate. A guard miss while
-// invoked as this file throws rather than exits 0 (F-1481, same shape as
+// invoked as this file throws rather than exits 0 (same shape as
 // contract/run.mjs and scripts/smoke-examples.mjs).
 const SELF = realpathSync(fileURLToPath(import.meta.url));
 const ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";
@@ -581,14 +581,14 @@ if (invokedDirectly) {
     console.error(
       "\nNode resolves symlinks before deriving `import.meta.url`, so a guard missing realpathSync on either " +
         "side disagrees with argv0 through any symlinked invocation (a `git worktree`, or macOS's symlinked " +
-        "`/tmp`) and falls false, reading as a pass having checked nothing (F-1488). A `basename()` compare " +
+        "`/tmp`) and falls false, reading as a pass having checked nothing. A `basename()` compare " +
         "is weaker still — satisfied by any file of that name anywhere on disk, no symlink required. Realpath " +
         "BOTH sides: `realpathSync(resolve(process.argv[1]))` vs. `realpathSync(fileURLToPath(import.meta.url))`, " +
         "and throw rather than exit 0 on a guard miss while invoked as the file itself " +
         "(see contract/run.mjs or scripts/no-eval-in-oss.mjs)."
     );
   }
-  // The floor on the F-1488 half, and the counterpart to the per-root
+  // The floor on the realpath half, and the counterpart to the per-root
   // file-count floor inside scanRepo. An empty `guardGaps` is ambiguous on its
   // own: it means "every entry guard realpaths both sides" OR "the walk
   // recognized no entry guard at all", and only the first is a pass. The
@@ -600,7 +600,7 @@ if (invokedDirectly) {
   // `import.meta.url` inline; the other 26 are found through the
   // single-assignment alias deref, so a regression that broke only the deref
   // would leave the count at 1 and a `> 0` floor would still print a pass —
-  // the same vacuous pass one step down. The bound is the F-1488 instance
+  // the same vacuous pass one step down. The bound is the measured instance
   // count (12) against 27 actual, so it reds on a classifier regression
   // without reding on someone legitimately deleting a script.
   if (guardRelations < MIN_ENTRY_GUARD_RELATIONS) {
@@ -608,7 +608,7 @@ if (invokedDirectly) {
       `\nThe entry-guard check classified only ${guardRelations} argv[1]-vs-import.meta.url relation(s) across ` +
         `${filesScanned} file(s), below the floor of ${MIN_ENTRY_GUARD_RELATIONS}. Every runnable script in this ` +
         "repo has such a guard, so this is the checker having gone (partly) blind, not the repo being clean — " +
-        "refusing to report a pass (F-1488). If scripts were genuinely removed, lower the floor deliberately."
+        "refusing to report a pass. If scripts were genuinely removed, lower the floor deliberately."
     );
   }
   if (

@@ -3,7 +3,7 @@
 //
 // Clean-room release gate for the four npmjs-published packages. (`@pome-sh/wire`
 // is also published, but to GitHub Packages for cross-repo consumers, and is
-// audited separately by scripts/ci/check-wire-tarball.mjs — F-949. What matters
+// audited separately by scripts/ci/check-wire-tarball.mjs. What matters
 // HERE is the assertion below that neither npm tarball declares an `@pome-sh/*`
 // dependency: that is what keeps wire inlined rather than installed, and it must
 // keep holding now that wire is resolvable-but-401 rather than nonexistent.)
@@ -15,7 +15,7 @@
 // shipped none, npm trusted the declaration and skipped fetching them, the
 // install reported success, and the CLI died on its first command.
 //
-// Both packages also get a files-field tarball audit (F-943): the real `tar`
+// Both packages also get a files-field tarball audit: the real `tar`
 // listing is grepped for dangling `.map` files and a compiled `dist/examples/`
 // directory. tsup's `sourcemap: false` / `clean: true` config should already
 // make both impossible, but that was previously an unverified claim about the
@@ -112,7 +112,7 @@ function assertNoHardLinks(tarball) {
   }
 }
 
-// F-943 tarball-files-field audit: `npm pack` respects each package's `files`
+// Tarball-files-field audit: `npm pack` respects each package's `files`
 // field, but nothing previously asserted WHAT actually lands in the tgz.
 // tsup's `sourcemap: false` / `clean: true` config (Lane D) means a stray
 // `.map` or a leftover `dist/examples/` from a prior build shouldn't be
@@ -497,7 +497,7 @@ const twin: ChecksTwinName = CHECKS_TWIN_NAMES[0];
 const everyTwin: readonly unknown[] = TWIN_CHECKS[twin];
 
 // The seed schema must be a zod schema built from the CONSUMER's zod, or
-// composition fails at the boundary (F-942, two schema identities).
+// composition fails at the boundary (two schema identities).
 const composed = z.object({ seed: githubSeedSchema });
 const parsed = parseGitHubSeed(defaultGitHubSeed());
 const alsoParsed = parseSeed(defaultGitHubSeed());
@@ -550,7 +550,7 @@ console.log("  ✓ consumer file typechecks against the shipped declarations (sk
 
 // ── @pome-sh/sandbox-domains ───────────────────────────────────────────────────
 //
-// The grading RUNTIME (F-1526), and the one published package where "the import
+// The grading RUNTIME, and the one published package where "the import
 // resolves" is genuinely not enough: pome-cloud does not just read these
 // exports, it CONSTRUCTS them — opens a SQLite database, builds a domain over
 // it, and parses a seed through it. A tarball whose `open*Database` resolves and

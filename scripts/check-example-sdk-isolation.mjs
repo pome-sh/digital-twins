@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1295: a bundled Claude-Agent-SDK example whose `query()` options omit
+// A bundled Claude-Agent-SDK example whose `query()` options omit
 // `tools` or `settingSources` is not isolated, however carefully its comments
 // say it is.
 //
@@ -10,7 +10,7 @@
 //   options.tools           the BUILT-IN base set (Bash, Read, Grep, WebFetch,
 //                           …). `[]` replaces the set, so it is complete by
 //                           construction. Closed for the hero example by
-//                           F-1292.
+//                           the denial-enumeration finding.
 //   options.settingSources  FILESYSTEM settings — user (~/.claude/settings.json),
 //                           project (.claude/settings.json) and local
 //                           (.claude/settings.local.json), INCLUDING the
@@ -19,7 +19,7 @@
 //                           (matches CLI defaults). Pass [] to disable
 //                           filesystem settings (SDK isolation mode)."
 //
-// Measured 2026-08-05 (F-1295): a hosted `claude-haiku-4-5` trial of
+// Measured 2026-08-05: a hosted `claude-haiku-4-5` trial of
 // support-triage-dedup, launched from a developer shell with `options.tools: []`
 // ALREADY SET, called `mcp__plugin_slack_slack__slack_search_channels`,
 // `…__slack_search_public` and `…__slack_list_channel_members` — it searched the
@@ -36,7 +36,7 @@
 // lines above the options object it was deleted from, which is the single most
 // likely way this regresses.
 //
-// [DECISION] F-1295 — central AND per-example, and the central half is NOT here.
+// [DECISION] central AND per-example, and the central half is NOT here.
 // Per-example options are what this gate enforces, and they are load-bearing on
 // their own: `agent-examples/support-triage` is `npx degit`-fetchable as a standalone
 // subtree, so the options a reader copies out must carry the isolation with
@@ -44,12 +44,12 @@
 // — the one in-process chokepoint EVERY bundled example already routes through,
 // and the only one that holds for all three launchers (`pome run`, the coach's
 // `run_task` local-subprocess spawn, and a plain `npm start`). Deliberately not
-// the `pome run` path itself: the measured F-1295 trial was launched from a
+// the `pome run` path itself: the measured trial was launched from a
 // developer shell by the coach, so a CLI-side clamp would not have caught the
 // very incident this ticket is about, and the obvious mechanism there
 // (`CLAUDE_CONFIG_DIR` at an empty dir, which the SDK does honor) also holds
 // `.credentials.json` — it would break subscription auth under `pome run`, the
-// thing FDRS-667 fixed. The adapter change is a behavior change to a PUBLISHED
+// thing an earlier fix addressed. The adapter change is a behavior change to a PUBLISHED
 // package's documented drop-in contract, so it is its own ticket with its own
 // version bump; this gate is what keeps the class closed until then, and stays
 // useful after, because the adapter cannot fix an example someone copies out.
@@ -445,7 +445,7 @@ const REASONS = {
 };
 
 // Realpath'd on both sides, and throws rather than exits 0 on a guard miss
-// (F-1481 / F-1488) — a gate whose own entry guard silently falls false is the
+// — a gate whose own entry guard silently falls false is the
 // failure it exists to catch.
 const SELF = realpathSync(fileURLToPath(import.meta.url));
 const ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";
@@ -485,7 +485,7 @@ if (invokedDirectly) {
     console.error(
       "\n`options.tools` and `options.settingSources` close DIFFERENT doors. `tools: []` replaces the built-in " +
         "base set (Bash, Read, WebFetch, …); `settingSources: []` disables filesystem settings — user, project " +
-        "and local — INCLUDING the developer's Claude Code plugin MCP servers. Measured 2026-08-05 (F-1295): a " +
+        "and local — INCLUDING the developer's Claude Code plugin MCP servers. Measured 2026-08-05: a " +
         "trial with `tools: []` already set searched the developer's real Slack workspace, made zero twin calls, " +
         "and would have scored as a triage failure. Set BOTH on every `query()` in a bundled example.",
     );

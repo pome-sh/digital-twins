@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1471 — the guard that keeps F-1230's alarm coverage true. F-1230 wired
+// The guard that keeps alarm coverage true. The alarm wiring covers
 // every scheduled workflow that exists TODAY to the reusable alarm; nothing
 // stopped a thirteenth from landing next month with no alarm at all, and
 // nothing stopped a wired-but-broken alarm (a typo'd `uses:` target, a
@@ -19,7 +19,7 @@
 // Right side (does a given workflow reach the alarm) parses PER JOB BLOCK,
 // anchored on both ends by indentation, rather than grepping lines — a
 // grep-based version of this exact check was defeated three separate times
-// during F-1230's own review, by a commented-out step, a
+// during its own review, by a commented-out step, a
 // `continue-on-error: true`, and a step-level `if:`. Comments are already
 // stripped before any of this runs (list-scheduled-workflows.mjs's
 // workflowLines()), so a commented-out job simply is not there to find.
@@ -38,7 +38,7 @@
 //     schedule-alarm.yml's OWN filing job requests — the alarm exists, runs,
 //     and either dies with a 403 at `gh issue create` or is refused by
 //     GitHub before it starts, which is the exact "fired, failed, told
-//     nobody" outcome F-1230 exists to prevent.
+//     nobody" outcome the alarm exists to prevent.
 //   - schedule-alarm.yml's own filing job not resolving `issues: write`. The
 //     caller's grant is a CEILING, not the effective set: a reusable
 //     workflow's own `permissions:` can only narrow what the caller handed
