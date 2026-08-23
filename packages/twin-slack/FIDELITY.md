@@ -26,9 +26,8 @@ other is **heat** ("how deep it *should* be", `hot`/`warm`/`cold`, ruled per
 milestone). The engine-level rubric — tier criteria, target mapping, gap and
 tier-mismatch semantics — lives at
 [`packages/sdk/ENDPOINT-TIERS.md`](../sdk/ENDPOINT-TIERS.md). The `Tier`
-column below means fidelity; the `Heat` column carries the twin-slack ruling
-(F-729 `[DECISION]`, 2026-07-11, implemented by F-736). Where ruled heat is
-below current fidelity, the surface is listed in the
+column below means fidelity; the `Heat` column carries the twin-slack heat
+ruling (2026-07-11). Where ruled heat is below current fidelity, the surface is listed in the
 [tier-mismatch ledger](#tier-mismatch-ledger); ruled-but-unimplemented warm
 surfaces and named cold surfaces live in
 [their own table](#ruled-gaps-and-named-cold-surfaces).
@@ -69,12 +68,12 @@ in the package README. Changing any of those is a breaking change for
 
 The visible MCP tool count is pinned at 18 in `test/mcp-contract.test.ts`,
 and the names, required fields and mutating set are Slack's own — read off
-F-1329's live OAuth capture of `https://mcp.slack.com/mcp` and adopted by
-F-1330. `fixtures/mcp-tools-list.raw.json` is that capture minus the one tool
+a live OAuth capture of `https://mcp.slack.com/mcp`.
+`fixtures/mcp-tools-list.raw.json` is that capture minus the one tool
 ruled unexposed, produced by a script that can only subtract; the contract test
 additionally asserts that the eight names commit `6abec3c` invented are served
 by nothing. No `inputSchema` declares `additionalProperties`, because none of
-Slack's does — the pre-F-1330 `additionalProperties:false` hard-rejected calls
+Slack's does — the earlier `additionalProperties:false` hard-rejected calls
 that got the name right and carried a real Slack parameter. Any drift breaks the
 contract test loudly.
 
@@ -108,10 +107,10 @@ so the MCP divergence lane reads a decision rather than an omission.
 | `users.profile.set` | warm | semantic | `domain.test.ts`, `app-routes.test.ts` | Warm-ruled (no vendor MCP write): see the tier-mismatch ledger. |
 | `pins.add` / `remove` / `list` | warm | semantic | `domain.test.ts`, `app-routes.test.ts` | `already_pinned` / `no_pin` codes; SQL constraint-mapped on race. Warm-ruled: see the tier-mismatch ledger. |
 | `search.messages` | hot | semantic | `domain.test.ts`, `performance.test.ts` | Substring (LIKE-based) match; query syntax is intentionally smaller than real Slack search. |
-| `files.upload` / `info` / `list` / `delete` | warm | shape | `domain.test.ts`, `app-routes.test.ts`, `seed-files.test.ts` | Metadata-only; no binary storage. URL fields point to deterministic `pome-twin-files.slack.com` hosts. Since F-1509 the seed's `files` key can plant rows, so these read on a populated table without a prior upload; the file object's leaf set is divergence #24. Shape is at the warm target (SL5). |
+| `files.upload` / `info` / `list` / `delete` | warm | shape | `domain.test.ts`, `app-routes.test.ts`, `seed-files.test.ts` | Metadata-only; no binary storage. URL fields point to deterministic `pome-twin-files.slack.com` hosts. The seed's `files` key can plant rows, so these read on a populated table without a prior upload; the file object's leaf set is divergence #24. Shape is at the warm target (SL5). |
 | `bookmarks.add` / `remove` / `list` | warm | semantic | `domain.test.ts`, `app-routes.test.ts` | `link` type accepted; other bookmark types are unsupported per real Slack 2024 changelog. Warm-ruled: see the tier-mismatch ledger. |
 | `team.info` | warm | semantic | `app-routes.test.ts` | Returns workspace metadata; enterprise fields are NULL for non-Enterprise twins. Warm-ruled context read: see the tier-mismatch ledger. |
-| `canvases.create` / `canvases.edit` / `canvases.delete` | warm | shape | `domain-wave3.test.ts`, `app-routes.test.ts` | Wave 3 (SL3). Markdown title/content persistence; section_id-relative edits are coarse whole-document ops (shape at warm target). Since F-1330 `edit` applies every operation in `changes`, in order, against one snapshot — it used to apply the first and answer ok for the rest. Reading a canvas is MCP-only (`slack_read_canvas`); real Slack reads one over `files.info`, which this twin backs from a separate table. |
+| `canvases.create` / `canvases.edit` / `canvases.delete` | warm | shape | `domain-wave3.test.ts`, `app-routes.test.ts` | Wave 3 (SL3). Markdown title/content persistence; section_id-relative edits are coarse whole-document ops (shape at warm target). `edit` applies every operation in `changes`, in order, against one snapshot. Reading a canvas is MCP-only (`slack_read_canvas`); real Slack reads one over `files.info`, which this twin backs from a separate table. |
 | `conversations.setTopic` / `conversations.setPurpose` | warm | semantic | `domain-wave3.test.ts`, `domain-conversations.test.ts` | Wave 3 (SL4). Membership required; `too_long` at 250 chars; IM/MPIM → `method_not_supported_for_channel_type`. Warm-ruled: see the tier-mismatch ledger. |
 | `emoji.list` | warm | semantic | `domain-wave3.test.ts`, `app-routes.test.ts` | Wave 3 (SL4). Seeded custom emoji map; `alias:` protocol preserved. Warm-ruled: see the tier-mismatch ledger. |
 
@@ -122,12 +121,12 @@ rest of the upstream API is implicitly cold via the catch-all.
 
 ## Ruled gaps and named cold surfaces
 
-Per the F-729 twin-slack ruling, the hot and warm sets are exhaustive. Wave 3
+Per the twin-slack heat ruling, the hot and warm sets are exhaustive. Wave 3
 filled the remaining warm gaps (SL3 canvases, SL4 topic/purpose + emoji.list).
 Named cold rows document the loud 501 for surfaces agents plausibly probe.
 Message drafts are deliberately absent: a client-UI concept with no Web API
 analog to name a row for (PS). Slack's MCP server does declare a
-`slack_send_message_draft` tool, and since F-1330 that absence is registered
+`slack_send_message_draft` tool, and that absence is registered
 rather than silent — see the MCP tools section above.
 
 | Endpoint | Heat | Tier | Notes |
@@ -143,29 +142,29 @@ rather than silent — see the MCP tools section above.
 Surfaces whose ruled heat is **warm** but whose measured fidelity is
 `semantic` — implementation deeper than the ruling demands. Per the M5
 additive-only project `[DECISION]` (2026-07-11), nothing here is demoted in
-code this milestone (the Twin Fidelity Watch launch gate F-440 is counting
+code this milestone (the Twin Fidelity Watch launch gate is counting
 consecutive green runs); each entry becomes a demotion-review follow-up
 ticket after that gate closes. The ledger makes over-investment visible; it
 does not trigger removals.
 
 | Surface | Heat | Fidelity today | Target | Why it stays for now |
 | --- | --- | --- | --- | --- |
-| `reactions.remove` | warm | semantic | shape | Undo step; F-440 additive-only window. |
-| `conversations.leave` | warm | semantic | shape | Rare cleanup chain; F-440 additive-only window. |
-| `conversations.kick` | warm | semantic | shape | Rare moderation chain; F-440 additive-only window. |
-| `conversations.archive` | warm | semantic | shape | Rare cleanup chain; F-440 additive-only window. |
-| `users.profile.set` | warm | semantic | shape | Plausible set-own-status chain, no vendor write tool; F-440 additive-only window. |
-| `pins.add` | warm | semantic | shape | Occasional chain, absent from the vendor server; F-440 additive-only window. |
-| `pins.remove` | warm | semantic | shape | Occasional chain, absent from the vendor server; F-440 additive-only window. |
-| `pins.list` | warm | semantic | shape | Occasional chain, absent from the vendor server; F-440 additive-only window. |
-| `bookmarks.add` | warm | semantic | shape | Occasional chain, absent from the vendor server; F-440 additive-only window. |
-| `bookmarks.remove` | warm | semantic | shape | Occasional chain, absent from the vendor server; F-440 additive-only window. |
-| `bookmarks.list` | warm | semantic | shape | Occasional chain, absent from the vendor server; F-440 additive-only window. |
-| `team.info` | warm | semantic | shape | Context read adjacent to hot chains; F-440 additive-only window. |
-| `conversations.setTopic` | warm | semantic | shape | Classic agent task; Wave 3 fill above warm shape target; F-440 additive-only window. |
-| `conversations.setPurpose` | warm | semantic | shape | Topic sibling; Wave 3 fill above warm shape target; F-440 additive-only window. |
-| `emoji.list` | warm | semantic | shape | Vendor emoji-search adjacency; Wave 3 fill above warm shape target; F-440 additive-only window. |
-| `slack_search_emojis` | warm | semantic | shape | The MCP tool F-1330 wired over `emoji.list`; inherits its depth, so it inherits its mismatch. F-440 additive-only window. |
+| `reactions.remove` | warm | semantic | shape | Undo step; additive-only window. |
+| `conversations.leave` | warm | semantic | shape | Rare cleanup chain; additive-only window. |
+| `conversations.kick` | warm | semantic | shape | Rare moderation chain; additive-only window. |
+| `conversations.archive` | warm | semantic | shape | Rare cleanup chain; additive-only window. |
+| `users.profile.set` | warm | semantic | shape | Plausible set-own-status chain, no vendor write tool; additive-only window. |
+| `pins.add` | warm | semantic | shape | Occasional chain, absent from the vendor server; additive-only window. |
+| `pins.remove` | warm | semantic | shape | Occasional chain, absent from the vendor server; additive-only window. |
+| `pins.list` | warm | semantic | shape | Occasional chain, absent from the vendor server; additive-only window. |
+| `bookmarks.add` | warm | semantic | shape | Occasional chain, absent from the vendor server; additive-only window. |
+| `bookmarks.remove` | warm | semantic | shape | Occasional chain, absent from the vendor server; additive-only window. |
+| `bookmarks.list` | warm | semantic | shape | Occasional chain, absent from the vendor server; additive-only window. |
+| `team.info` | warm | semantic | shape | Context read adjacent to hot chains; additive-only window. |
+| `conversations.setTopic` | warm | semantic | shape | Classic agent task; Wave 3 fill above warm shape target; additive-only window. |
+| `conversations.setPurpose` | warm | semantic | shape | Topic sibling; Wave 3 fill above warm shape target; additive-only window. |
+| `emoji.list` | warm | semantic | shape | Vendor emoji-search adjacency; Wave 3 fill above warm shape target; additive-only window. |
+| `slack_search_emojis` | warm | semantic | shape | The MCP tool wired over `emoji.list`; inherits its depth, so it inherits its mismatch. Additive-only window. |
 
 ## Fidelity-watch coverage (status.pome.sh)
 
@@ -173,17 +172,17 @@ The daily watchdog reports twin-slack at **19 of 45 semantic surfaces**, 26 roll
 out. The number is built from source, never hand-typed
 (the Twin Fidelity Watch in pome-cloud); here is exactly what it counts.
 
-> **Denominator reconcile deferred (SL5).** The 45 predates the F-736 re-cut:
+> **Denominator reconcile deferred (SL5).** The 45 predates the heat re-cut:
 > it counts `files.info` / `files.list` / `files.delete` as semantic (the
 > table above rules them shape ×4 — the table wins) and does not yet include
-> the three F-736 MCP read tools (`slack_get_reactions`,
+> the three newer MCP read tools (`slack_get_reactions`,
 > `slack_list_channel_members`, and the search tool then called
-> `slack_search_messages`). It also predates F-1330, which took the tool table
+> `slack_search_messages`). It also predates the tool-table re-cut
 > from 11 fabricated names to Slack's 18 — so every MCP name in the
 > denominator below is stale, not just the count. Reconciling
 > pome-cloud's `sandboxes/slack/surfaces.ts` is deliberately deferred until
-> the F-440 launch gate finishes its consecutive-green count (additive-only
-> collision), tracked by F-737.
+> the launch gate finishes its consecutive-green count (additive-only
+> collision).
 
 - **Denominator (45)** — the full semantic surface inventory: 8 MCP tools + 37
   semantic REST methods (`files.upload` is shape-tier, excluded). MCP tools and
@@ -197,7 +196,7 @@ out. The number is built from source, never hand-typed
     upstream golden). `conversations.info` and `conversations.history` are each
     captured under two scenarios (public/private channel, empty/non-empty history),
     so the table shows 18 read rows but 16 distinct methods.
-  - **3 mutating MCP tools** (the two names F-1330 folded into
+  - **3 mutating MCP tools** (the two names folded into
     `slack_send_message`, plus `slack_add_reaction`), write round-tripped
     against the seeded twin **oracle**
     (L2). This is L2-vs-oracle, **not** L1-vs-real-Slack — the daily cron does no
@@ -214,7 +213,7 @@ out. The number is built from source, never hand-typed
 Each bullet has exactly one structured entry in the Twin Fidelity Watch's
 `known-divergences/slack.yaml` (in pome-cloud)
 (the `SL-DIV-NNN` machine mirror, enforced 1:1 by the fidelity lint, D9). The
-read-subset / accepted-divergence bullets (9–15) were derived from the FDRS-473
+read-subset / accepted-divergence bullets (9–15) were derived from the
 real-Slack L1 reconciliation: the twin capture diffed against the committed
 real-Slack golden, then triaged into upstream-only leaves the twin faithfully
 omits (read_subset) and genuine identity / controlled-sandbox differences the
@@ -293,12 +292,13 @@ _Accepted divergences (identity / controlled-sandbox):_
 _Shape-anchoring divergences (compile-time anchor to `@slack/web-api`):_
 
 16. **Serializers are anchored to `@slack/web-api`, a source that lags real Slack on some fields.**
-    The shape anchor (`src/upstream-types.ts`, FDRS-477) is the SDK's published
+    The shape anchor (`src/upstream-types.ts`) is the SDK's published
     response types, not real Slack's live wire format. The SDK trails Slack on some
     leaves (un-typed fresh fields, removed-but-still-served legacy fields), so a
     twin field the SDK does not type still surfaces as an emitted-not-in-upstream
     divergence even when real Slack returns it. The anchor is a compile-time subset
-    guard, not a fidelity oracle — live capture (the FDRS-473 golden) outranks it.
+    guard, not a fidelity oracle — live capture (the real-Slack golden) outranks
+    it.
 17. **`serializePin` is left to live capture — `@slack/web-api`'s pin type is too thin.**
     `PinsListResponse.Item` models only `{comment, created, created_by, file, type}`:
     it has NO `message` and NO `channel`. The twin emits a MESSAGE pin
@@ -329,7 +329,7 @@ _Shape-anchoring divergences (compile-time anchor to `@slack/web-api`):_
     those two numbers can only ever agree by coincidence — and they did, until
     the 2026-08-11 re-baseline removed the coincidence. The COUNT is accepted in
     pome-cloud's registry and the per-member SHAPE is still compared; the same
-    reasoning already covers `conversations.members`. F-1434.
+    reasoning already covers `conversations.members`.
 
 23. **A plain-text message carries no `blocks` key; real Slack synthesises a `rich_text` block.**
     `serializeMessage` folds `blocks` into the message object only when the
@@ -339,10 +339,9 @@ _Shape-anchoring divergences (compile-time anchor to `@slack/web-api`):_
     all. Real Slack BUILDS one instead. Measured live against
     `pome-twin-sandbox` on 2026-08-13: a text-only write returns a synthesised
     `rich_text` → `rich_text_section` block on `chat.postMessage`, `chat.update`
-    AND `chat.scheduleMessage` — all three called separately, because F-1487
-    established that these three validate independently, so one result does not
-    generalise — and it PERSISTS into `conversations.history` with the same
-    structure and a re-minted `block_id`. When the caller DOES send `blocks` no
+    AND `chat.scheduleMessage` — all three called separately, because these three
+    validate independently, so one result does not generalise — and it PERSISTS
+    into `conversations.history` with the same structure and a re-minted `block_id`. When the caller DOES send `blocks` no
     `rich_text` is added and only the caller's own block comes back, so the
     divergence is strictly the no-blocks case. NOT imitated, and that is the
     ruling rather than the cheap option: the synthesis is a PARSER, not a
@@ -356,7 +355,7 @@ _Shape-anchoring divergences (compile-time anchor to `@slack/web-api`):_
     plausible-but-wrong block an agent mis-parses with confidence, which is
     strictly harder to detect than an honest absent key. The no-blocks case is
     asserted from pome-cloud by `sandboxes/slack/rest-writes.ts`, which until
-    this entry only ever asserted the block text it SENT. F-1496.
+    this entry only ever asserted the block text it SENT.
 
 24. **File objects omit thumbnail, collaborative-edit, per-file-ACL and
     Slack-AI metadata.** `serializeFile` emits 27 leaves; the file real Slack
@@ -382,7 +381,7 @@ _Shape-anchoring divergences (compile-time anchor to `@slack/web-api`):_
     omits is INFO, not drift. Measured 2026-08-13 against
     `pome-twin-sandbox`; unmeasurable before that, because the twin served
     `files: []` and the diff engine compares NO elements when either array side
-    is empty. F-1509.
+    is empty.
 
 25. **A canvas is a FILE to real Slack and a separate entity here, so
     `files.list` does not enumerate canvases.** Real Slack stores a canvas in the
@@ -401,12 +400,12 @@ _Shape-anchoring divergences (compile-time anchor to `@slack/web-api`):_
     and a criterion that silently starts seeing one more entity is the failure
     mode a twin change must not ship as a side effect. Registered as the fact it
     is; imitating it is its own decision, with its own re-verification of the
-    task corpus. F-1509.
+    task corpus.
 
 ## Shape anchoring (compile-time, `@slack/web-api@7.16.0`)
 
 The serializers are pinned to Slack's official response types at compile time
-(`src/upstream-types.ts`, FDRS-477; mirrors twin-github FDRS-475/476). Each
+(`src/upstream-types.ts`; mirrors twin-github's anchor). Each
 serializer's literal `satisfies DeepPartial<Slack…>`, so a wrong-named or
 mistyped field is a COMPILE error while omitting a field stays legal (the twin
 is a faithful subset). The anchor target is `@slack/web-api@7.16.0`.
@@ -422,7 +421,7 @@ nullable columns), the value is cast to the upstream leaf type; twin-only fields
 
 **Left to live capture (1 serializer).** `serializePin` is unanchored: the SDK's
 `PinsListResponse.Item` is too thin to model a message pin (bullet 17), so it is
-verified against the FDRS-473 real-Slack golden instead of the type.
+verified against the real-Slack golden instead of the type.
 
 **Inverse weighting (live capture > anchor on Slack).** The `@slack/web-api`
 types are a published SDK artifact that lags the live API, so they are a weaker
@@ -440,27 +439,27 @@ npm run typecheck                       # zero TS errors
 npx vitest run --project twin-slack     # all tests pass
 npm run test:coverage -w @pome-sh/twin-slack  # ≥ 90% lines, ≥ 90% funcs
 npm run validate:mcp                    # JSON-RPC SDK round-trip
-npm run fidelity:parity                 # every MCP tool through /mcp/call (F-730)
+npm run fidelity:parity                 # every MCP tool through /mcp/call
 TWIN_AUTH_SECRET=dev SLACK_DETERMINISTIC_TS=1 npm run smoke
 npm run verify:cloud-token              # cloud xoxb-pome-* token validates
 ```
 
 The tables above are 1:1-linted against the structured inventory
 [`fidelity.inventory.json`](fidelity.inventory.json) (which also carries the
-hot/warm/cold heat tier per F-729) by `test/fidelity-contract.test.ts`; the
+hot/warm/cold heat tier) by `test/fidelity-contract.test.ts`; the
 same test enforces the heat discipline (no unclassified surfaces, hot ⇒
 semantic, cold ⇒ unsupported, and the tier-mismatch ledger exactly matching
 the warm-above-target set). The shared parity runner (`@pome-sh/sdk/parity`)
 asserts the same inventory matches the live tool list and that a declarative
 scenario exercises every tool.
 
-## Declared input surface (F-1179)
+## Declared input surface
 
 Fidelity is not only about what a surface *answers*; it is also about what it
 *accepts*. An agent can call this twin with a parameter the real vendor rejects,
 or omit one the vendor requires, and the response shape can be identical either
 way — so the output comparison cannot see it. That is the same class of gap as
-F-1166, which was only caught because a write round-trip happened to read back a
+the one caught only because a write round-trip happened to read back a
 field nobody had mentioned.
 
 So each route declares its inputs, and **the declaration is the thing the handler
@@ -482,8 +481,8 @@ the handler.
 This twin had no zod at all: every handler took a merged query+body bag from `readArgs(c)` and
 picked fields out of it by name (`asString(args.channel)`), so the input names existed only as
 property accesses. `/emoji.list` forwarded the whole bag to the domain untouched — the silent
-hole F-1179 names. Slack mounts its reads on GET and POST both, so 44 endpoints are 62
-declared surfaces; arguments are declared as `query` on GET and as `body` on POST, which is
+hole this section closes. Slack mounts its reads on GET and POST both, so 44
+endpoints are 62 declared surfaces; arguments are declared as `query` on GET and as `body` on POST, which is
 what Slack's own documentation describes and what every client does. `token` is declared on
 all 62 because the engine's query and form token resolvers both accept it.
 
@@ -497,7 +496,7 @@ two-way comparison — and makes `missingRequired` live. Surfaces with no declar
 inputs are omitted rather than published with an empty list: comparing nothing
 against nothing would render as a match nobody measured.
 
-### Undeclared inputs: `ignore` (F-1372)
+### Undeclared inputs: `ignore`
 
 **Slack accepts an argument it does not know and gets on with the call, so this
 twin discards it too.** Measured 2026-08-09: `api.test` — the one Web API method

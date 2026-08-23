@@ -101,5 +101,5 @@ It **does** need re-verifying after a **twin-snapshot rebuild**. The `[code]`
 criteria read the Slack twin's final state, and a snapshot that cannot express
 what the pinned vocabulary reads turns a real verdict into an abstention — which
 now surfaces as `NOT EVALUATED` and an `INCOMPLETE` run rather than a silent
-pass. The stamp above was measured after F-1147 rebuilt all five twin images; any
+pass. The stamp above was measured after all five twin images were rebuilt; any
 stamp recorded before 2026-08-03 was measured against a different set.

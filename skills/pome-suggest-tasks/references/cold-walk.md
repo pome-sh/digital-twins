@@ -5,7 +5,7 @@ what the coach does · expected artifact**. The two human checkpoints are marked
 ⚑; every other step is automatic on the happy path. A step stops for the builder
 ONLY on the failure named in its row — no founder rescue otherwise (Done-when #3).
 
-1. **Registration** (upstream — F-858, not this skill)
+1. **Registration** (upstream — not this skill)
    - Input: a foreign repo with the agent's code.
    - Coach: confirm the agent is registered via the **CLI** — a local repo, so
      `pome register agent`, **not** MCP `register_agent` (see the pome router's

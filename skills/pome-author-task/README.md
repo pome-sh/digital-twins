@@ -18,7 +18,7 @@ what you see is what ships.
 ```
 pome-author-task/
 ├── SKILL.md                  # the skill (frontmatter + instructions, <100 lines)
-├── references/task-format.md # the task-markdown grammar (F-774), linked one level deep
+├── references/task-format.md # the task-markdown grammar, linked one level deep
 └── README.md                 # this file
 ```
 
@@ -38,7 +38,7 @@ https://mcp.pome.sh/mcp`) so the `list_tasks` / `validate_task` /
 
 ## The authoring loop
 
-1. **Library-first** (the Skill 3 reuse module, F-781) — `list_tasks`,
+1. **Library-first** (the Skill 3 reuse module) — `list_tasks`,
    adapt the nearest match: rebuild the draft from the coach view (there is no
    get-task tool; a `has_seed_state` task needs a fresh seed — the view
    never returns one), check the intended name for collisions, save-as-new
@@ -58,5 +58,5 @@ https://mcp.pome.sh/mcp`) so the `list_tasks` / `validate_task` /
 ## Test evidence
 
 The kept e2e transcripts (the A1 live authoring check and the A2 library-reuse
-check, F-781) are historical evidence and stay in the pome-cloud repo
+check) are historical evidence and stay in the pome-cloud repo
 (`apps/docs/docs/skills/`).

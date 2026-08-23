@@ -116,7 +116,7 @@ run the snapshot is graded as evidence: "did it record what it should?"
 ⚠ D10 — closed-book exam: web_search and web_fetch are disabled on the
 examinee. They egress through Anthropic infra past the network clamp — an
 untaped exfiltration channel during injection tests, and live internet content
-would contradict the seeded world. (F-770)
+would contradict the seeded world.
 
 Next: author tasks against the covered twins (Skill 1). At run time the
 launch path forks on the Runtime line above: Claude managed agent → Anthropic's

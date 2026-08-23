@@ -168,7 +168,7 @@ Unknown config keys are silently stripped, not rejected. `## Config` is
 therefore mandatory: `twins` has no default, so a task with no config section
 fails validation with `config.twins must list at least one twin`.
 
-`twins` was optional before F-895 and defaulted to `["github"]`. Tasks SAVED
+`twins` was once optional and defaulted to `["github"]`. Tasks SAVED
 under that default are still readable — the cloud restores the historical
 default when it parses persisted source, so an old catalog row keeps running
 unchanged. Authoring is what got strict: `validate_task` and `save_task` reject

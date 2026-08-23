@@ -12,7 +12,7 @@ one **chosen** candidate task by reading what the agent actually does and
 proposing grounded candidates. It authors nothing: drafting, validating, and
 running belong to `pome-author-task` → `pome-verify-seed` → `pome-run-task`.
 
-Runs after registration (F-858), before Skill 1. If there is **no** `pome.json`,
+Runs after registration, before Skill 1. If there is **no** `pome.json`,
 the agent is not registered yet — route back to the entry path, do not improvise
 a registration here.
 

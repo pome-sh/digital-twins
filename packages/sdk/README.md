@@ -31,13 +31,13 @@ fidelity tiers are defined in [`ENDPOINT-TIERS.md`](./ENDPOINT-TIERS.md).
 ## Recorder (twin-core home)
 
 The trace recorder lives in this package (`packages/sdk/src/recorder.ts`).
-There is no separate `packages/twin-core` — F-681 folded twin-core into
+There is no separate `packages/twin-core` — twin-core was folded into
 `@pome-sh/sdk`. Default boot uses an in-memory store; set
 `POME_RECORDER_EVENTS_PATH` to enable durable write-through (`flush` /
 `close`, TwinHttpEvent NDJSON). Redaction always runs in the handle *before*
 `store.record()`, including for custom stores.
 
-**Architecture (F-698 / §9 Q3):** recorder *transport* belongs in twin-core
+**Architecture:** recorder *transport* belongs in twin-core
 (`@pome-sh/sdk`). Twins inherit durability via `resolveRecorderStore()` /
 `POME_RECORDER_EVENTS_PATH`; the self-host CLI harness passes the run's
 `events.jsonl` path into the same store. Disk rows are already

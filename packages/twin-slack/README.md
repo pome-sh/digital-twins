@@ -60,7 +60,7 @@ The default seed creates:
 
 A seed may also plant files, so `files.list` / `files.info` /
 `slack_read_file` have something to read before the agent uploads anything
-(F-1509 — until that key existed `files.upload` was the table's only writer):
+(before that key existed, `files.upload` was the table's only writer):
 
 ```json
 {
@@ -125,7 +125,7 @@ path's `:sid`.
 ### Visible MCP tools
 
 The names, arguments and descriptions are Slack's own — `fixtures/mcp-tools-list.raw.json`
-is F-1329's live capture of `https://mcp.slack.com/mcp`, adopted by F-1330. See
+is a live capture of `https://mcp.slack.com/mcp`. See
 [FIDELITY.md](FIDELITY.md#mcp-tools) for the per-tool fidelity and deviations.
 
 | Tool | Inputs | Description |

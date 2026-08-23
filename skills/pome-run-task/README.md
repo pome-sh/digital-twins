@@ -24,8 +24,7 @@ change: one new launcher file + the contract emitting that platform's
 `examinee_launch` policy — never a pipeline rewrite. Launch **policy**
 (`always_allow`, closed-book web tools, memory snapshot-clone, the network clamp)
 is owned by `examinee_launch`; the skill executes the spec and never restates it
-in prose (prose drifts — F-787 is what that costs). ADR-018
-(examinee-runtime abstraction) lives in the pome-cloud repo
+in prose (prose drifts). ADR-018 (examinee-runtime abstraction) lives in the pome-cloud repo
 (`docs/decisions/018-examinee-runtime-abstraction.md`).
 
 ## Layout
@@ -55,7 +54,7 @@ npx skills add pome-sh/digital-twins --skill '*'
 Requires the Pome control MCP connection (`claude mcp add --transport http pome
 https://mcp.pome.sh/mcp`) so the `run_task` / `finalize_run` / `get_report` /
 `register_agent` / `list_runs` tools resolve, and — for a managed-agent examinee
-— `ant` authenticated (`ant auth login`, F-782).
+— `ant` authenticated (`ant auth login`).
 
 ## The run loop
 
@@ -68,7 +67,7 @@ https://mcp.pome.sh/mcp`) so the `run_task` / `finalize_run` / `get_report` /
    trials aggregate as one exam (a post-fix rerun opens a new group, bumps the
    version, and links back — see step 5); for a `runs: N` task use
    `run_trials(n, task_id, agent_version, group_id)`, the batch form. Heal a
-   `twins not enabled` 400 with one additive `register_agent` (F-784).
+   `twins not enabled` 400 with one additive `register_agent`.
 2. **Launch** — dispatch on the Runtime line: managed agent → `ant`
    (`references/launch-managed-agent.md`); anything else → REST
    (`references/launch-rest.md`). The launcher assembles from `examinee_launch`,

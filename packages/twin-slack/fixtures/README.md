@@ -2,7 +2,7 @@
 
 | Path | Role |
 | --- | --- |
-| `mcp-tools-list.raw.json` | The 18-tool MCP listing, verbatim. **This file IS the tool table** — `src/tools.ts` derives it (F-1325) |
+| `mcp-tools-list.raw.json` | The 18-tool MCP listing, verbatim. **This file IS the tool table** — `src/tools.ts` derives it |
 | `mcp-tools-list.meta.json` | The provenance contract: substrate, endpoint, protocol version, capture date, `rawFileSha256` |
 | `mcp-tools-list.canonical.json` | The same listing re-derived with its provenance attached and readable whitespace |
 
@@ -14,7 +14,7 @@ two together — see [Why the schemas are not byte-pinned](#why-the-schemas-are-
 
 **Slack's.** `mcp-tools-list.raw.json` is
 [`fixtures/mcp-tools-list/slack.raw.json`](../../../fixtures/mcp-tools-list/) —
-F-1329's live OAuth capture of `https://mcp.slack.com/mcp`, taken 2026-08-10
+A live OAuth capture of `https://mcp.slack.com/mcp`, taken 2026-08-10
 under a token carrying all 30 scopes the server advertises — minus the one tool
 this twin does not expose. Every surviving name, description, `inputSchema` and
 annotation is the vendor's, byte for byte.
@@ -34,7 +34,7 @@ not serve. That constraint is the point — see below.
 
 ### What it used to be
 
-Until F-1330 this file was a transcription of `src/tools.ts`: eleven names
+This file was once a transcription of `src/tools.ts`: eleven names
 commit [`6abec3c`](https://github.com/pome-sh/digital-twins/commit/6abec3c)
 copied out of `modelcontextprotocol/servers-archived/src/slack`, an archived
 reference server. **Three of them existed at Slack**, and even those three took
@@ -95,11 +95,12 @@ schema permits. `test/mcp-contract.test.ts` demands it be empty.
 
 ## Refreshing against a newer capture
 
-Re-run F-1326's producer to refresh the upstream golden, then re-run the adopt
+Re-run the upstream-golden producer to refresh it, then re-run the adopt
 script. Both steps are gated: `mcp-tools-list.meta.json` carries the sha of the
 raw file and `loadMcpToolFixture` refuses to boot the twin if the two disagree,
 and `--check` diffs all three files against the golden.
 
 A refresh that changes tool names is a change to what this twin serves, and
-needs the same thing F-1330 needed: a ruling that says so, the corpus migrated
+needs the same thing the Slack table needed: a ruling that says so, the corpus
+migrated
 in the same batch, and `FIDELITY.md` re-cut.

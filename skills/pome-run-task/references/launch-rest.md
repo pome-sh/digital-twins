@@ -51,7 +51,7 @@ four above. Only once the wiring is green do you map the spec and launch.
 | `initial_events` | feed them to the process verbatim if it is an ambient/deployment-kickoff agent |
 
 There is no `mcp_permission_policy` concern on this path — REST has no
-tool-confirmation handshake, so the F-787 deadlock does not apply.
+tool-confirmation handshake, so the confirmation deadlock does not apply.
 
 ## Run and detect idle
 

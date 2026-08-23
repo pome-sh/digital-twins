@@ -61,22 +61,22 @@ matches on each bullet's bold title and never on its number.
 
 Unlike the other four twins' lists, every bullet below was **measured, not read
 off the twin's source**. For bullets 1–7 the upstream half is a real
-human-attended capture against a throwaway Gmail mailbox on 2026-08-11 (F-1377),
+human-attended capture against a throwaway Gmail mailbox on 2026-08-11,
 committed as `sandboxes/gmail/fixtures/upstream-golden.json` in pome-cloud; the
 twin half is the twin's own answer to the same 14 L1 read surfaces. So
 `verified_against_upstream_at` carries a real date on all of them rather than the
 honest `null` the unmeasured registries carry.
 
-**Bullets 1–7 are registered pending triage (F-1463), which is a disposition and
+**Bullets 1–7 are registered pending triage, which is a disposition and
 not a verdict.** Registration is what stops an unregistered divergence reporting
 as new drift every day; it does not say the twin is right. Which of these get a
 real twin fix — bullets 1 and 2 are the substantial candidates, since an agent
 that walks `payload.parts` for an HTML body or reads `Received` / `DKIM-Signature`
-to make a decision sees a structurally different object here than in Gmail — is a
-later ruling on F-1463. Each fix deletes its entry and its bullet together.
+to make a decision sees a structurally different object here than in Gmail — is
+a later ruling. Each fix deletes its entry and its bullet together.
 
 **Bullet 8 is not part of that batch and has a different provenance.** It came
-from F-1497's own live probe on 2026-08-13 — an unauthenticated 401 on
+from a live probe on 2026-08-13 — an unauthenticated 401 on
 `users.getProfile`, which needs no capture and no credential — and it is the
 residue of a fix rather than a triage item: the rest of what that probe measured
 was closed in the same window.
@@ -132,8 +132,8 @@ was closed in the same window.
    return, are the twin-adds direction and are informational, not drift.
 
 8. **The missing-credential 401 omits Gmail's `details[]`, which names the
-   backend method.** Measured live against `gmail.googleapis.com` on 2026-08-13
-   (F-1497), `GET /gmail/v1/users/me/profile` with no `Authorization` header at
+   backend method.** Measured live against `gmail.googleapis.com` on
+   2026-08-13, `GET /gmail/v1/users/me/profile` with no `Authorization` header at
    all. Google's body carries, alongside the `error.code` / `message` /
    `errors[]` / `status` this twin does reproduce, a fifth key:
 
@@ -153,7 +153,7 @@ was closed in the same window.
    itself be the divergence. Closing it properly means teaching the auth layer
    the route table, which is a change to the shared engine and not to this twin.
 
-   The rest of F-1497's gmail measurement was **fixed, not registered**: the twin
+   The rest of that probe's measurement was **fixed, not registered**: the twin
    now tells a missing credential (`Login Required.` / `reason: "required"`) from
    an invalid one (`Invalid Credentials` / `reason: "authError"`) where it used
    to send the invalid body for both, carries Google's full `Expected OAuth 2 …`
@@ -164,13 +164,13 @@ was closed in the same window.
    Pinned by `test/auth-envelope.test.ts`, whose last assertion reads the
    *absence* of `details` on purpose, so this stays legible as a gap.
 
-## Declared input surface (F-1179)
+## Declared input surface
 
 Fidelity is not only about what a surface *answers*; it is also about what it
 *accepts*. An agent can call this twin with a parameter the real vendor rejects,
 or omit one the vendor requires, and the response shape can be identical either
 way — so the output comparison cannot see it. That is the same class of gap as
-F-1166, which was only caught because a write round-trip happened to read back a
+the one caught only because a write round-trip happened to read back a
 field nobody had mentioned.
 
 So each route declares its inputs, and **the declaration is the thing the handler
@@ -211,7 +211,7 @@ two-way comparison — and makes `missingRequired` live. Surfaces with no declar
 inputs are omitted rather than published with an empty list: comparing nothing
 against nothing would render as a match nobody measured.
 
-### Undeclared inputs: `refuse` (F-1372, affirmed)
+### Undeclared inputs: `refuse` (affirmed)
 
 **Gmail refuses a query parameter it does not know, so the strict default
 stays.** Gmail is served through Google's HTTP-to-gRPC transcoder — the 401 it

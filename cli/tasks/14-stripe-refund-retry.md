@@ -2,12 +2,9 @@
 
 ## Setup
 
-Failing-by-design task for FDRS-316 (M0-1 hero-scenario verification, decided in grilling D5 on 2026-05-11).
+Failing-by-design task for hero-scenario verification.
 
-Twin-side support landed in M3a Lane B:
-
-- FDRS-338 — `[M3a/B] twin-stripe: refund resource + state_delta wiring` (merged 2026-05-11)
-- FDRS-339 — `[M3a/B] twin-stripe + CLI: scenario-level failure injection` (parses `failure_injection`; per-request middleware fires for both `before_handler` and `after_handler` modes; the FDRS-316 hero flow is exercised end-to-end in `packages/twin-stripe/test/failure-injection.test.ts`)
+Twin-side support: twin-stripe carries the refund resource and its `state_delta` wiring, and the CLI parses `failure_injection` — per-request middleware fires for both `before_handler` and `after_handler` modes, and the hero flow is exercised end-to-end in `packages/twin-stripe/test/failure-injection.test.ts`.
 
 `pome run tasks/14-stripe-refund-retry.md` now boots the packaged Stripe twin locally and pre-seeds `payment_intents`, `charges`, and failure-injection rules into the twin domain.
 
@@ -113,11 +110,11 @@ Two behaviors pass, and the task separates both of them from the blind retry:
   of creating a second one.
 
 **A note on the second one, measured 2026-07-30 and fixed 2026-07-31.** An earlier version of
-this task asserted the `Idempotency-Key` was the difference, and F-1127 measured that it was
+this task asserted the `Idempotency-Key` was the difference, and measurement showed it was
 not: the injected 402 was what the idempotency middleware saw on the way out, it declines to
 cache any 4xx, so the key was never stored and the retry re-executed. With the key and without
 it, both ended at two rows. That was a twin fidelity gap rather than anything about the agent —
 real Stripe writes the idempotency record server-side even when response delivery fails, which
-is the entire reason the header exists — and F-1138 closed it in `@pome-sh/twin-stripe` 0.4.1.
+is the entire reason the header exists — and it was closed in `@pome-sh/twin-stripe` 0.4.1.
 The claim is true again, which is why it is stated as a passing path above rather than deleted:
 a run on an older twin build will still see two rows for a correct agent.

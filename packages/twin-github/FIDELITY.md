@@ -25,9 +25,8 @@ other is **heat** ("how deep it *should* be", `hot`/`warm`/`cold`, ruled per
 milestone). The engine-level rubric — tier criteria, target mapping, gap and
 tier-mismatch semantics — lives at
 [`packages/sdk/ENDPOINT-TIERS.md`](../sdk/ENDPOINT-TIERS.md). The `Tier`
-column below means fidelity; the `Heat` column carries the F-729 ruling
-(2026-07-11, list 2/3 + `[DECISION]` on that ticket), with per-surface
-evidence recorded in [`fidelity.inventory.json`](fidelity.inventory.json).
+column below means fidelity; the `Heat` column carries the heat ruling
+(2026-07-11), with per-surface evidence recorded in [`fidelity.inventory.json`](fidelity.inventory.json).
 Surfaces where the two dimensions disagree are tracked in the
 [tier-mismatch ledger](#tier-mismatch-ledger) (fidelity above target) or as
 explicitly deferred hot gaps (fidelity below target).
@@ -57,12 +56,12 @@ in the package README. Changing any of those is a breaking change for
 | `create_or_update_file` | SQLite files/commits | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts` | Requires `sha` for updates to preserve optimistic locking. |
 | `create_branch` | SQLite branches/files | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts`, `concurrency.test.ts` | Branch protection is not modeled. |
 | `push_files` | SQLite files/commits | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts` | Multi-file pushes are one local commit; Git object APIs are simplified. |
-| `search_issues` | SQLite issues | hot | semantic | `mcp-contract.test.ts`, `performance.test.ts`, `fixture-endpoints.test.ts`, `search-query-qualifiers.test.ts`, `upstream-measured-semantics.test.ts` | Free text is TOKENISED, all-terms, whole-token (F-791); `repo:`/`user:`/`org:`/`state:`/`is:` are parsed, other qualifiers are not (divergence #1). No `state=open` default, deliberately (F-1427). |
-| `list_issues` | SQLite issues | hot | semantic | `mcp-contract.test.ts`, `performance.test.ts`, `fixture-endpoints.test.ts`, `list-state-default.test.ts`, `upstream-measured-semantics.test.ts` | Only state, labels, assignee, and pagination filters are supported. ⚠️ The two doors differ, as GitHub's do, on TWO arguments. `state` (F-1468): the MCP tool takes `["OPEN","CLOSED"]` and returns BOTH when it is absent, which is what GitHub's own listing declares and describes; the REST `GET /issues` takes `open`/`closed`/`all` and defaults to `open` (F-1427). `labels` (F-1614): the MCP tool takes a string ARRAY and UNIONS it (GitHub's MCP runs on GraphQL); REST takes a CSV and INTERSECTS it. See "The two doors take `labels` differently". |
+| `search_issues` | SQLite issues | hot | semantic | `mcp-contract.test.ts`, `performance.test.ts`, `fixture-endpoints.test.ts`, `search-query-qualifiers.test.ts`, `upstream-measured-semantics.test.ts` | Free text is TOKENISED, all-terms, whole-token; `repo:`/`user:`/`org:`/`state:`/`is:` are parsed, other qualifiers are not (divergence #1). No `state=open` default, deliberately. |
+| `list_issues` | SQLite issues | hot | semantic | `mcp-contract.test.ts`, `performance.test.ts`, `fixture-endpoints.test.ts`, `list-state-default.test.ts`, `upstream-measured-semantics.test.ts` | Only state, labels, assignee, and pagination filters are supported. ⚠️ The two doors differ, as GitHub's do, on TWO arguments. `state`: the MCP tool takes `["OPEN","CLOSED"]` and returns BOTH when it is absent, which is what GitHub's own listing declares and describes; the REST `GET /issues` takes `open`/`closed`/`all` and defaults to `open`. `labels`: the MCP tool takes a string ARRAY and UNIONS it (GitHub's MCP runs on GraphQL); REST takes a CSV and INTERSECTS it. See "The two doors take `labels` differently". |
 | `add_issue_comment` | SQLite issue comments | hot | semantic | `mcp-contract.test.ts`, `state-export.test.ts` | Comment edit/delete APIs are not implemented. |
 | `create_issue` | SQLite issues | hot | semantic | `mcp-contract.test.ts` | Issue templates and milestones are not modeled. |
 | `create_pull_request_review` | SQLite PR reviews | hot | semantic | `mcp-contract.test.ts`, `state-export.test.ts` | Inline review comments are not created by this tool. |
-| `list_pull_requests` | SQLite pull requests | hot | semantic | `mcp-contract.test.ts`, `v2-hot-paths-rest.test.ts`, `list-state-default.test.ts` | Sorting and advanced filters are simplified. `stack` is derived from the base chain (divergence #11). An absent `state` means `open`, as on real GitHub (F-1427). |
+| `list_pull_requests` | SQLite pull requests | hot | semantic | `mcp-contract.test.ts`, `v2-hot-paths-rest.test.ts`, `list-state-default.test.ts` | Sorting and advanced filters are simplified. `stack` is derived from the base chain (divergence #11). An absent `state` means `open`, as on real GitHub. |
 | `merge_pull_request` | SQLite merge mutation | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts` | Merge methods are simplified to one deterministic local merge. |
 | `update_pull_request_branch` | SQLite merge of base into head | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts`, `m5-hot-gaps.test.ts` | Merge commit carries a single parent; conflicting paths resolve head-wins (no 422 merge-conflict); 202-shaped no-op instead of GitHub's 422 when base has no new commits or when its changes are already contained on head (merge commits are only created when files change); no async update job. |
 | `create_pull_request` | SQLite pull requests/files | hot | semantic | `mcp-contract.test.ts`, `concurrency.test.ts` | Cross-repo forks are supported only when the fork exists in the clone. |
@@ -77,11 +76,11 @@ in the package README. Changing any of those is a breaking change for
 | `get_me` | SQLite users + JWT actor | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts` | Returns the JWT-claimed `login` (default `pome-agent`). |
 | `search_commits` | SQLite commit graph (default branches) | hot | semantic | `mcp-contract.test.ts`, `m5-hot-gaps.test.ts`, `search-query-qualifiers.test.ts` | Substring match over commit message/author on default-branch ancestry; `repo:`/`user:`/`org:` are parsed, other qualifiers are not (divergence #1). |
 | `get_release_by_tag` | SQLite releases | hot | semantic | `mcp-contract.test.ts`, `m5-hot-gaps.test.ts` | 404 for unknown tag. |
-| `get_tag` | SQLite tags | hot | semantic | `mcp-contract.test.ts`, `m5-hot-gaps.test.ts` | MCP-only (no REST route; git-plumbing REST stays cold per F-729); returns the lightweight tag object, not the annotated-tag git object. |
-| `issue_read` | SQLite issues, issue comments, issue labels | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts` | GitHub's consolidated reader (F-1376). Methods `get`, `get_comments`, `get_labels`; `get_sub_issues` and `get_parent` answer 501 — sub-issues are not modeled. |
-| `issue_write` | SQLite issues, labels, assignees | hot | semantic | `mcp-contract.test.ts`, `mcp-error-semantics.test.ts` | GitHub's consolidated writer (F-1376). Methods `create` and `update`. Milestones, issue types and `state_reason` are not implemented. |
-| `pull_request_read` | SQLite pull requests, PR files, commits, reviews, comments, check runs | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts` | GitHub's consolidated reader (F-1376). `get_diff` and `get_files` return simplified placeholder patches; `get_comments` serves the PR's conversation timeline and `get_review_comments` its inline diff comments, from the two tables GitHub splits them across (F-1423). |
-| `pull_request_review_write` | SQLite PR reviews | hot | semantic | `mcp-contract.test.ts`, `state-export.test.ts` | GitHub's consolidated review writer (F-1376). Only `create` with an explicit `event`; pending reviews and review threads are not modeled, so the other four methods answer 501. |
+| `get_tag` | SQLite tags | hot | semantic | `mcp-contract.test.ts`, `m5-hot-gaps.test.ts` | MCP-only (no REST route; git-plumbing REST stays cold); returns the lightweight tag object, not the annotated-tag git object. |
+| `issue_read` | SQLite issues, issue comments, issue labels | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts` | GitHub's consolidated reader. Methods `get`, `get_comments`, `get_labels`; `get_sub_issues` and `get_parent` answer 501 — sub-issues are not modeled. |
+| `issue_write` | SQLite issues, labels, assignees | hot | semantic | `mcp-contract.test.ts`, `mcp-error-semantics.test.ts` | GitHub's consolidated writer. Methods `create` and `update`. Milestones, issue types and `state_reason` are not implemented. |
+| `pull_request_read` | SQLite pull requests, PR files, commits, reviews, comments, check runs | hot | semantic | `mcp-contract.test.ts`, `domain.test.ts` | GitHub's consolidated reader. `get_diff` and `get_files` return simplified placeholder patches; `get_comments` serves the PR's conversation timeline and `get_review_comments` its inline diff comments, from the two tables GitHub splits them across. |
+| `pull_request_review_write` | SQLite PR reviews | hot | semantic | `mcp-contract.test.ts`, `state-export.test.ts` | GitHub's consolidated review writer. Only `create` with an explicit `event`; pending reviews and review threads are not modeled, so the other four methods answer 501. |
 | `list_repository_collaborators` | SQLite collaborators | hot | semantic | `mcp-contract.test.ts` | Permission filtering is not implemented. |
 
 ## REST Surfaces
@@ -113,7 +112,7 @@ Twin-only fields are namespaced under `_twin.*`, matching `twin-slack` and
 If you hit this envelope and the route is one your agent needs, that's a
 fidelity gap worth filing — open an issue or a PR adding the route.
 
-### An absent `state` means `open` on the three list routes (F-1427)
+### An absent `state` means `open` on the three list routes
 
 `GET /repos/:o/:r/issues`, `GET /repos/:o/:r/pulls` and
 `GET /repos/:o/:r/milestones` each default `state` to `open`, the way real
@@ -145,7 +144,7 @@ match is closed would answer `[]`, replacing a value mismatch with an
 empty-array one. Any residual `state` / `closed_at` finding on `/search/issues`
 is a property of that surface's upstream comparison, not of this default.
 
-Where that explicit state is SPELLED moved in 0.10.6 (F-1389): it is a `q`
+Where that explicit state is SPELLED moved in 0.10.6: it is a `q`
 qualifier, `?q=idempotency state:closed`, not a `?state=` query parameter.
 GitHub's search API declares `q, sort, order, per_page, page` and encodes every
 filter inside `q`, so `?state=` came off this route's declaration and is now
@@ -162,33 +161,34 @@ made non-empty by any seed. It is applied from 0.10.4.
 ## Tier-mismatch ledger
 
 Surfaces whose measured fidelity sits **above** their ruled heat target
-(warm → target `shape`), per the F-729 ruling (2026-07-11) and the M5
+(warm → target `shape`), per the heat ruling (2026-07-11) and the M5
 additive-only project `[DECISION]`: nothing is demoted in code this
 milestone — the ledger makes over-investment visible while the Twin
-Fidelity Watch launch gate (F-440) counts consecutive green runs. Demotions,
+Fidelity Watch launch gate counts consecutive green runs. Demotions,
 if any, become follow-up tickets after that gate closes.
 
-| Ledger entry | Kind | Ruled heat | Current fidelity | Ruling |
-| --- | --- | --- | --- | --- |
-| `POST /repos/:owner/:repo/labels` | REST | warm | semantic | F-729 G4 |
-| `GET /repos/:owner/:repo/milestones` | REST | warm | semantic | F-729 G2 |
-| `POST /repos/:owner/:repo/milestones` | REST | warm | semantic | F-729 G2 |
-| `PATCH /repos/:owner/:repo/milestones/:number` | REST | warm | semantic | F-729 G2 |
-| `DELETE /repos/:owner/:repo/milestones/:number` | REST | warm | semantic | F-729 G2 |
-| `POST /repos/:owner/:repo/releases` | REST | warm | semantic | F-729 G4 |
-| `PUT /repos/:owner/:repo/collaborators/:username` | REST | warm | semantic | F-729 G4 |
+| Ledger entry | Kind | Ruled heat | Current fidelity |
+| --- | --- | --- | --- |
+| `POST /repos/:owner/:repo/labels` | REST | warm | semantic |
+| `GET /repos/:owner/:repo/milestones` | REST | warm | semantic |
+| `POST /repos/:owner/:repo/milestones` | REST | warm | semantic |
+| `PATCH /repos/:owner/:repo/milestones/:number` | REST | warm | semantic |
+| `DELETE /repos/:owner/:repo/milestones/:number` | REST | warm | semantic |
+| `POST /repos/:owner/:repo/releases` | REST | warm | semantic |
+| `PUT /repos/:owner/:repo/collaborators/:username` | REST | warm | semantic |
 
 ### Hot-gap deferrals
 
 Hot surfaces still **below** their `semantic` target, deferred by explicit
 ruling rather than filled in M5:
 
-- `GET /repos/:owner/:repo/pulls/:number/diff` (fidelity `shape`) — F-729
-  ruling point G1: byte-accurate patch modeling is out of the M5 window;
-  placeholder patches remain (divergence #2). The gap stays visible here and in
+- `GET /repos/:owner/:repo/pulls/:number/diff` (fidelity `shape`) — byte-accurate
+  patch modeling is out of the M5 window; placeholder patches remain
+  (divergence #2). The gap stays visible here and in
   the inventory; follow-up post-M5.
 
-  The MCP half of this gap moved in F-1376 and is no longer a row of its own.
+  The MCP half of this gap moved into the consolidated tools and is no longer a
+  row of its own.
   `get_pull_request_diff` is not a tool GitHub declares; the diff is now
   `pull_request_read` method `get_diff`, one of nine methods on a tool whose
   other eight are semantic. A per-tool tier cannot say "semantic except one
@@ -211,10 +211,10 @@ divergence 24"), and renumbering would silently repoint every one of them, inclu
 entries in an append-only changelog that cannot be corrected without falsifying
 the record. So a gap in this list means a divergence was retired, and the first
 one is 22: `pull_request_read`'s `get_comments` answered from the review-comment
-table until F-1423 gave the conversation its own read in 0.10.5. The lint matches
+table until 0.10.5 gave the conversation its own read. The lint matches
 on each bullet's bold title and never on its number, so gaps cost it nothing.
 
-The most recent gap is **31**, retired by F-1497: "The 401 and 403 envelopes
+The most recent gap is **31**, retired: "The 401 and 403 envelopes
 carry an empty `documentation_url` and no `status` leaf at all." All four
 envelope-building sites it named — `auth.unauthorized`, `auth.sidMismatch`,
 `admin.forbidden` and the SDK default behind the last of them — build through
@@ -234,7 +234,7 @@ always 32's, and 32 now names the twin-only 401/403 surfaces explicitly.
    `/search/commits`, `/search/repositories` and `/search/users` still match the
    whole remaining `q` as one case-insensitive substring.
 
-   Five SCOPE qualifiers are lifted out of `q` (F-1389, F-791):
+   Five SCOPE qualifiers are lifted out of `q`:
    `repo:owner/name`, `user:login`, `org:login` on all three scoped searches, and
    `state:open|closed` plus `is:` on `/search/issues` only, several of them
    OR-ing together the way GitHub's do. `is:open`/`is:closed` set the same filter
@@ -250,7 +250,7 @@ always 32's, and 32 now names the twin-only 401/403 surfaces explicitly.
    and `search_users` parse no qualifiers at all and still match the whole `q`;
    and quoted qualifier values (`repo:"a/b"`) are not unquoted.
 
-   **⚠️ WHAT THIS ENTRY USED TO SAY, AND WHY IT WAS THE DEFECT (F-791).** It read
+   **⚠️ WHAT THIS ENTRY USED TO SAY, AND WHY IT WAS THE DEFECT.** It read
    *"the free text left in `q` is matched as one case-insensitive substring"* and
    listed `is:` among the unparsed, with `narrowing is the safe failure` as the
    reason for both. Narrowing is the safe failure for a SIMULATOR. It is not for
@@ -273,14 +273,14 @@ always 32's, and 32 now names the twin-only 401/403 surfaces explicitly.
    `is:bogusvalue` answers 0 rather than searching for the literal. The
    whole-token half matters as much as the multi-word half and pulls the other
    way — splitting the query and testing each term with a substring match, the
-   fix F-791 itself prescribed, would answer 607 for `authenticati` and score a
-   call GitHub refuses to serve. `test/upstream-measured-semantics.test.ts`
-   carries the table and the provenance of every row.
+   fix the original finding prescribed, would answer 607 for `authenticati` and
+   score a call GitHub refuses to serve.
+   `test/upstream-measured-semantics.test.ts` carries the table and the provenance of every row.
 
    **A compound is indexed whole AND in parts, and the two sides of the match
    therefore differ.** `per_page` → 110 against `per page` → 226 says a compound
    is a token in its own right; it says nothing about containment, and reading
-   only that pair is how F-791's first fix concluded `_` holds a token together
+   only that pair is how the first fix concluded `_` holds a token together
    and made a bare `coupon` miss a body saying `apply_coupon` — its own
    false-empty class, one size smaller. The negation settles it:
    `per_page NOT page` → 0, `per_page NOT per` → 0, `pull-request NOT request`
@@ -360,7 +360,7 @@ always 32's, and 32 now names the twin-only 401/403 surfaces explicitly.
     (`GET /repos/:o/:r/pulls`, `.../pulls/:n`) these upstream-only omissions are
     accepted (INFO), not drift.
 
-    **`stack` is modelled, not omitted (F-1178).** GitHub shipped stacked pull
+    **`stack` is modelled, not omitted.** GitHub shipped stacked pull
     requests and added `stack` to both the `pull-request` and
     `pull-request-simple` schemas on 2026-08-02; the declared lane caught it as
     shape drift on both routes, and the twin now emits it. It is not on the
@@ -431,15 +431,15 @@ always 32's, and 32 now names the twin-only 401/403 surfaces explicitly.
     GitHub models pull requests as issues, so `GET /repos/:o/:r/issues` includes the
     repo's open PR (with a `pull_request` member) — 3 items where the twin returns 2. The
     twin's `/issues` excludes PRs; a faithful twin would include them. Fixing the twin is
-    out of scope, but the array-aware oracle (FDRS-455) now SEES the item-count
+    out of scope, but the array-aware oracle now SEES the item-count
     divergence: registered as accepted on the collection root so this L1 read surface is
     INFO, not drift, and flagged as a genuine twin-fidelity gap for follow-up.
 
-    **Narrowed by F-1151: the COMMENT routes now honour the rule.**
+    **Narrowed: the COMMENT routes now honour the rule.**
     `GET|POST /repos/:o/:r/issues/:number/comments` accept a pull-request number, which is
-    how real GitHub documents commenting on a PR's conversation. Until F-1151 they did
-    not — `issue_comments` carried a foreign key to `issues(repo_id, number)` and a PR has
-    no row there, so every PR comment failed the constraint and the route answered
+    how real GitHub documents commenting on a PR's conversation. They used not to
+    — `issue_comments` carried a foreign key to `issues(repo_id, number)` and a PR
+    has no row there, so every PR comment failed the constraint and the route answered
     `404 Issue not found`. That was this bullet's write-side face, and it was recorded
     nowhere: the matrix listed the route as `hot`/`semantic` with no caveat, and the only
     comment tool the bundled `pr-summary-*` examples expose 404'd on every run. What
@@ -469,8 +469,8 @@ always 32's, and 32 now names the twin-only 401/403 surfaces explicitly.
     on the compare surface's `commits` leaf and on `/pulls/:n/commits`. Four, not the
     two-commit figure a reader derives from "the twin spends one commit where the
     Contents API spends a PUT plus a DELETE": the real repo also carries the
-    branch-convergence merge that gives a `renamed_from` move a source to consume
-    (F-1510), and the seeder issues that merge rather than rewriting history through the
+    branch-convergence merge that gives a `renamed_from` move a source to consume,
+    and the seeder issues that merge rather than rewriting history through the
     Git Data API, so the golden and the seeder agree on one commit shape. A count of two
     or three here means the seeder changed, not that the golden went stale.
 20. **`/labels` and `/collaborators` list counts reflect the seeded sandbox content.**
@@ -492,13 +492,13 @@ always 32's, and 32 now names the twin-only 401/403 surfaces explicitly.
     `GET /repos/:o/:r/pulls/:n/comments` these upstream-only omissions are
     accepted (INFO), not drift.
 
-    **`line`, `side`, `commit_id` and `pull_request_url` are served, not omitted
-    (F-1422).** They had been dropped by the LIST route alone: it built its
+    **`line`, `side`, `commit_id` and `pull_request_url` are served, not
+    omitted.** They had been dropped by the LIST route alone: it built its
     elements inline out of six columns while `POST` to the same route served the
     same row through `pullRequestReviewCommentJson`. One row, two shapes, and the
     read side — the measured one — was the lean one. That went unmeasured rather
     than unnoticed: the surface answered `[]` on every seed anyone could write
-    until F-1421 made a review comment seedable, and a shape-diff compares no
+    until a review comment became seedable, and a shape-diff compares no
     elements when either side is empty. Both verbs now serve the one serializer,
     which is asserted as that property — the LIST element and the CREATE response
     are the same object for the same comment — in
@@ -525,8 +525,9 @@ always 32's, and 32 now names the twin-only 401/403 surfaces explicitly.
     watchdog is permitted to use. It is registered in pome-cloud with a written
     `verification_opt_out` so the promotion gate reads it as waived-with-a-reason
     rather than never-checked, and it holds no committed golden: the one it held
-    until F-1430 was an empty `check_runs` array diffed against the twin's empty
-    one, which published green while binding no key, no leaf type and no element.
+    until it was retired was an empty `check_runs` array diffed against the
+    twin's empty one, which published green while binding no key, no leaf type
+    and no element.
 
 25. **Issue-comment objects omit moderation and social metadata.** The twin's
     issue-comment object carries what an agent reads a comment for — id, body,
@@ -601,8 +602,8 @@ always 32's, and 32 now names the twin-only 401/403 surfaces explicitly.
     it, and so does this twin — so the divergence is invisible until the file is
     read back, the same shape the old divergence 24 had.
 
-    **It is new, and it is new because 24 was fixed.** Until F-1460 this route
-    took plain text, so no caller could express a non-UTF-8 byte at all and the
+    **It is new, and it is new because 24 was fixed.** This route used to
+    take plain text, so no caller could express a non-UTF-8 byte at all and the
     limitation was unreachable by construction. Accepting base64 is exactly what
     makes it expressible. Recorded rather than fixed because the fix is a storage
     convention change — `files.content`, `encodeContent`, `size`, and every
@@ -623,7 +624,7 @@ always 32's, and 32 now names the twin-only 401/403 surfaces explicitly.
     declaration's zod schema and is projected by `githubErrorEnvelope`'s zod
     branch in `src/twin.ts`, which sees an issue list and not a field name.
 
-    **F-1491 closed exactly two of these and no more.** `PUT /contents/*` with
+    **Exactly two of these are closed, and no more.** `PUT /contents/*` with
     no `sha` on an existing path is raised by the DOMAIN rather than by zod — the
     declaration correctly makes `sha` optional, since GitHub only requires it on
     an update — so that one call site could adopt GitHub's message directly, and
@@ -644,8 +645,8 @@ always 32's, and 32 now names the twin-only 401/403 surfaces explicitly.
     unfixed shape on `POST /issues` deliberately — when the global change lands,
     that test fails, and failing is the signal.
 
-32. **`documentation_url` names no operation on three MCP tools.** NARROWED by
-    F-1498 from "on essentially every error". The measured half is closed: a
+32. **`documentation_url` names no operation on three MCP tools.** NARROWED
+    from "on essentially every error". The measured half is closed: a
     routed, authenticated error now carries the url real GitHub carries for that
     operation, on **64 of the 66 REST surfaces** the twin mounts and **33 of the
     36 MCP tools** it serves. The urls are `externalDocs.url` out of GitHub's
@@ -669,7 +670,7 @@ always 32's, and 32 now names the twin-only 401/403 surfaces explicitly.
     ⚠️ **This residual is UNMEASURED, and deliberately not fixed.** No lane has
     ever compared this twin's MCP error envelope to `api.githubcopilot.com/mcp/`,
     so picking one of the three legs would invent a divergence in the direction
-    F-1498 exists to close. It stays generic until somebody measures it.
+    this divergence exists to close. It stays generic until somebody measures it.
 
     **The genericness is a REQUIREMENT on three classes, not a gap**, and that
     is the half of this entry that must not be "fixed": GitHub itself sends the
@@ -690,7 +691,7 @@ always 32's, and 32 now names the twin-only 401/403 surfaces explicitly.
     are generic for the same reason: GitHub has no operation at those paths to
     name.
 
-    **F-1497 added two more surfaces to that same list**, and they are the
+    **Two more surfaces were added to that same list**, and they are the
     reason divergence 31 could be retired rather than half-fixed. Both now carry
     a real url where they used to carry `""`, and both carry the GENERIC one:
 
@@ -717,15 +718,15 @@ always 32's, and 32 now names the twin-only 401/403 surfaces explicitly.
     routes *and* ~30 MCP tools. So `routes.ts`'s `route()` helper installs a
     per-call envelope keyed on the declaration's own `surface` string, and
     `executeTool` stamps the error it rethrows, keyed on the tool name plus the
-    `method` it just parsed. The two throw-site urls in `src/domain/git.ts`
-    (F-1460, F-1491) are untouched and still win, because a `sha` or base64
+    `method` it just parsed. The two throw-site urls in `src/domain/git.ts` are
+    untouched and still win, because a `sha` or base64
     refusal can only be raised by the contents operations.
 
     Pinned by `test/operation-documentation-url.test.ts` — both halves, the
     named and the deliberately generic — and by
     `test/error-envelope-status.test.ts`, whose two generic-url assertions moved
-    rather than went away, twice: F-1498 re-cut them from "every envelope is
-    generic" to "these three classes are", and F-1497 moved the 401 reading from
+    rather than went away, twice: first re-cut from "every envelope is
+    generic" to "these three classes are", then the 401 reading moved from
     `""` to the generic url without letting it become operation-specific. That
     file now asserts `.not.toContain("#")` on the 401's url rather than one
     literal, so any operation anchor trips it.
@@ -750,14 +751,14 @@ CLI auth available. The fixture set is the contract.
 ### 2. MCP parity (`scripts/fidelity-parity.ts`)
 
 `scripts/fidelity-parity.ts` is declarative scenario data for the shared
-engine runner (`@pome-sh/sdk/parity`, F-730): an ordered, stateful call
+engine runner (`@pome-sh/sdk/parity`): an ordered, stateful call
 chain that exercises every MCP tool end-to-end against a freshly seeded
 local twin. The runner fails unless three rings agree — the tool-table
 fixture the served listing is derived from
-([`fixtures/mcp-tools-list.raw.json`](fixtures/mcp-tools-list.raw.json),
-F-1325), the structured inventory
+([`fixtures/mcp-tools-list.raw.json`](fixtures/mcp-tools-list.raw.json)),
+the structured inventory
 ([`fidelity.inventory.json`](fidelity.inventory.json), which also carries
-the hot/warm/cold heat tier per F-729), and the scenario's tool coverage —
+the hot/warm/cold heat tier), and the scenario's tool coverage —
 and every call must answer 2xx through `POST /s/:sid/mcp/call`. The tables
 above are 1:1-linted against the same inventory by
 `test/fidelity-contract.test.ts`, so an implemented-but-undocumented
@@ -802,13 +803,13 @@ with:
 That's exactly the input we use to upgrade a tool from `shape` to
 `semantic`, or to add a new entry to **Known deviations** above.
 
-## Declared input surface (F-1179)
+## Declared input surface
 
 Fidelity is not only about what a surface *answers*; it is also about what it
 *accepts*. An agent can call this twin with a parameter the real vendor rejects,
 or omit one the vendor requires, and the response shape can be identical either
 way — so the output comparison cannot see it. That is the same class of gap as
-F-1166, which was only caught because a write round-trip happened to read back a
+the one caught only because a write round-trip happened to read back a
 field nobody had mentioned.
 
 So each route declares its inputs, and **the declaration is the thing the handler
@@ -843,7 +844,7 @@ two-way comparison — and makes `missingRequired` live. Surfaces with no declar
 inputs are omitted rather than published with an empty list: comparing nothing
 against nothing would render as a match nobody measured.
 
-### Undeclared inputs: `ignore` (F-1372)
+### Undeclared inputs: `ignore`
 
 **Real GitHub answers 200 to a query parameter it does not know, and to an
 unknown top-level body key, so this twin discards them too.** Measured
@@ -854,7 +855,7 @@ unknown top-level body key, so this twin discards them too.** Measured
 `?pome_undeclared_probe=x`, plus `POST /markdown` for the body case. The transcript is in
 [`docs/undeclared-route-inputs.md`](../../docs/undeclared-route-inputs.md).
 
-F-1179 shipped this twin refusing, which was a divergence of our own making in
+This twin used to refuse, which was a divergence of our own making in
 the worst direction: an agent written against real GitHub sends a parameter
 this twin has not got around to declaring, GitHub serves it, the twin 4xx'd, and
 the exam recorded a failure the agent did not commit.
@@ -865,7 +866,7 @@ disposition — and the 286 published inputs are byte-identical, so what this
 twin is short of GitHub's real surface is still the declared-fidelity lane's
 finding to report. The disposition decides only what the CALLER is told.
 
-### Nine inputs GitHub does not declare, removed (F-1389)
+### Nine inputs GitHub does not declare, removed
 
 The declared lane compares in both directions, and the direction that had gone
 unmeasured was ours: inputs this twin ACCEPTED that GitHub's OpenAPI does not
@@ -878,7 +879,7 @@ declare. Nine came off in 0.10.6, taking the published surface from 295 to 286.
   from the path and nothing observable differs.
 - **`encoding` on `PUT /repos/:owner/:repo/contents/*`.** GitHub declares
   `content` as base64 and takes no encoding switch. The BEHAVIOURAL half of that
-  finding was deferred and recorded as divergence 24; F-1460 closed it and
+  finding was deferred and recorded as divergence 24; it is now closed and
   retired the divergence — see *The two doors take `content` differently* below.
 - **`owner`, `repo` and `state` on `/search/code`, `/search/commits` and
   `/search/issues`** — seven inputs across three routes. GitHub's search API
@@ -893,7 +894,7 @@ discarded rather than refused: a request still sending one gets the answer it
 would have got without it, the way real GitHub answers. None of the three
 surfaces 4xx's.
 
-### The two doors take `labels` differently, and both are right (F-1614)
+### The two doors take `labels` differently, and both are right
 
 **This is fidelity, not an inconsistency. Do not "unify" it.** The same shape of
 fact as `content` below, and resolved the same way — but this one is a
@@ -933,7 +934,7 @@ take both — would be a false PASS here: the twin would serve a call the vendor
 rejects. `test/upstream-measured-semantics.test.ts` and
 `test/mcp-argument-surface.test.ts` both fail if that comes back.
 
-### The two doors take `content` differently, and both are right (F-1460)
+### The two doors take `content` differently, and both are right
 
 **This is fidelity, not an inconsistency. Do not "unify" it.** Real GitHub's two
 write doors disagree with each other, so a faithful twin has to disagree with
@@ -973,7 +974,7 @@ this twin's `validationFailed`) and the operation-specific `documentation_url`.
 `test/contents-base64.test.ts` holds all of it, including two tests whose only
 job is to fail if the doors are ever unified.
 
-### Optimistic locking on the contents door: 409, not 422 (F-1491)
+### Optimistic locking on the contents door: 409, not 422
 
 Unlike `content`, the `sha` rule is the **same on both doors**, so it lives in the
 domain (`src/domain/git.ts`) where both reach it. Measured live 2026-08-12 against
@@ -1003,7 +1004,7 @@ Neither body carries an `errors` array, and both carry the operation-specific
 which is sound *here* and does not generalise: a `sha` conflict can only be
 raised by the contents operations, so the throw site knows the operation. Most of
 this twin's errors do not have that property, which is why every other url is
-attached at the DOOR instead (F-1498, divergence 32) — and why these two still
+attached at the DOOR instead (divergence 32) — and why these two still
 win when it is: `withOperationDocs` only overwrites the generic default.
 
 GitHub's own published OpenAPI description declares the 409 independently —

@@ -130,8 +130,7 @@ Two properties make this worth a lesson rather than a bug report:
   a tool that was never exposed*. True, and beside the point — the model never
   needed the denied tool. It built the read out of an allowed **write**
   (`update_issue` 404s on a missing issue) and out of the SDK's **shell**. A
-  denial is only as strong as the enumeration behind it. See
-  [F-1292](https://linear.app/pome-sh/issue/F-1292).
+  denial is only as strong as the enumeration behind it.
 * **It is the most common real version of this bug.** Over-restrictive tool
   allowlists are a production default. Nobody writes "don't dedup" in a system
   prompt; plenty of people ship an agent that cannot see what it needs to.
@@ -152,8 +151,7 @@ one trial proves nothing.
 > duplicate. Four reached issue #1 anyway — one route was `update_issue` used as
 > an existence oracle, the other was the SDK's shell reading the fixture out of
 > this very file's neighbours. The numbers, the run ids and both routes are in
-> [`VERIFICATION.md`](./VERIFICATION.md); the re-cut is
-> [F-1292](https://linear.app/pome-sh/issue/F-1292).
+> [`VERIFICATION.md`](./VERIFICATION.md); the re-cut is pending.
 >
 > **Everything in the three sections below describes the baseline as designed,
 > not as it behaves.** Read them as the intent under repair.
@@ -205,8 +203,8 @@ The agent searches, finds issue #1, comments on it, and posts *its* link back to
   withdrawn.** Shutting the first three paths surfaced two more the same
   afternoon — `list_issue_comments` and `update_issue` — and the twin's read
   surface is wide enough that the next pass would surface more. Do not extend the
-  list; the flaw has to stop being a denial ([F-1292](https://linear.app/pome-sh/issue/F-1292),
-  numbers in [`VERIFICATION.md`](./VERIFICATION.md)).
+  list; the flaw has to stop being a denial (numbers in
+  [`VERIFICATION.md`](./VERIFICATION.md)).
 * **Fix fails (stays red).** If a criterion reads `NOT EVALUATED` rather than
   failed, the run is `INCOMPLETE` — the grader could not see that state at all,
   which is a wiring problem rather than an agent problem. `pome run` exits 1 on
@@ -217,11 +215,10 @@ The agent searches, finds issue #1, comments on it, and posts *its* link back to
 
 The criteria above assert that the agent **linked the right issue**. They do not
 yet assert that it **opened no second one** — a negative assertion the declared
-GitHub vocabulary could not express until `github.no-new-issues`
-([F-1198](https://linear.app/pome-sh/issue/F-1198)). Until that check reaches the
-cloud's pin, an agent that comments on #1, posts the link *and also* files a
-duplicate passes. Said out loud here rather than left for a reader to discover,
-because this example is the one that defines the standard.
+GitHub vocabulary could not express until `github.no-new-issues` existed. Until
+that check reaches the cloud's pin, an agent that comments on #1, posts the link
+*and also* files a duplicate passes. Said out loud here rather than left for a
+reader to discover, because this example is the one that defines the standard.
 
 ## Local examinee
 
@@ -241,10 +238,9 @@ via env), it works the task over MCP, and exits when done.
 >
 > **No trial filed a duplicate** — the behaviour the whole lesson is built
 > around. Run ids and the routes the agent used are in
-> [`VERIFICATION.md`](./VERIFICATION.md); the re-cut is
-> [F-1292](https://linear.app/pome-sh/issue/F-1292). Treat this example as a
-> working local examinee with a **known-green** placeholder defect, not as a
-> lesson, until that ticket closes.
+> [`VERIFICATION.md`](./VERIFICATION.md); the re-cut is pending. Treat this
+> example as a working local examinee with a **known-green** placeholder defect,
+> not as a lesson, until that re-cut lands.
 
 ### Telemetry
 
@@ -363,7 +359,7 @@ first, commented on #1, posted the link, and scored 75.
 This is the one exam surface that changes depending on **who runs it**, which is
 why it is not left to intention: `scripts/check-example-sdk-isolation.mjs` in
 this repo's CI fails any bundled Claude-Agent-SDK example whose `query()`
-options omit either door (F-1295).
+options omit either door.
 
 `npm run typecheck` type-checks; `npm test` runs the env-contract and
 tool-policy tests.

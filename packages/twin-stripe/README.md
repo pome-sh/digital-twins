@@ -184,7 +184,7 @@ that pins and verifies the new signed digest.
 - `npm run build` exits 0 and emits `dist/src/server.js`.
 - Built output is loadable under Node 24 — the snapshot runs
   `runtime: "node24"`. SQLite is the built-in `node:sqlite` (via the sdk's
-  `openTwinDatabase()`, F-703) — no native modules, no compiler toolchain.
+  `openTwinDatabase()`) — no native modules, no compiler toolchain.
 
 ### Runtime
 
@@ -211,7 +211,7 @@ that pins and verifies the new signed digest.
 Shape tier (faithful response shape, deliberately no billing semantics —
 no events emitted, no invoices minted, no billing-cycle arithmetic):
 
-- Products, prices, subscriptions, invoice reads (F-734).
+- Products, prices, subscriptions, invoice reads.
 
 Loud 501 with `fidelity: "unsupported"`:
 

@@ -13,7 +13,7 @@ the hosted Gmail twin + hosted evals via `pome run tasks/01-throttled-send.md -n
 > `skipped (unknown_twin)` and the satisfaction score was computed from the
 > single `[model]` criterion alone. Red/green below is therefore **model-judged
 > only** — not the deterministic verification this doc is for. Re-run after the
-> gmail deterministic evaluator lands (tracked in Linear, F-924).
+> gmail deterministic evaluator lands (tracked in Linear).
 
 ## Results (hosted, n=3 each — model criterion only; all [code] criteria skipped)
 
@@ -35,13 +35,13 @@ the hosted Gmail twin + hosted evals via `pome run tasks/01-throttled-send.md -n
 
 1. **Cloud: no gmail/linear deterministic evaluator** — `[code]` criteria on the
    newly hosted twins are silently skipped and the run still shows ✓100
-   (fail-open presentation). Linear: F-924 (evaluator), F-925 (surface skips loudly).
+   (fail-open presentation). Both the evaluator and loud skip surfacing are tracked.
 2. **Baseline is prompt-layer** — `RETRY_RULE_V1` is an instruction, and a
    strong model ignores it and retries anyway (2/3 green). Per the M4b quality
    bar (ratified 2026-07-24) the red flaw must move into code/harness (e.g. the
-   send wrapper swallows 429 / caps attempts at 1). Reworked under F-916/F-923.
+   send wrapper swallows 429 / caps attempts at 1). Reworked since.
 3. **`pome register agent` ignored manifest `twins`** — enabled services came up
-   `github` only; gmail was merged in via a direct `POST /v1/agents`. Linear: F-926.
+   `github` only; gmail was merged in via a direct `POST /v1/agents`.
 
 ## Run links
 

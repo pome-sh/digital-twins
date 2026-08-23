@@ -70,7 +70,7 @@ npx vitest run --project twin-gmail                    # what the new listing no
 
 `list_labels` takes no arguments and returns every label, system ones included.
 It paginated over user labels only until the 2026-08-10 capture, which is when
-Google's own listing stopped saying so ([F-1400](https://linear.app/pome-sh/issue/F-1400)).
+Google's own listing stopped saying so.
 
 ## Named 501 gaps (not fake success)
 

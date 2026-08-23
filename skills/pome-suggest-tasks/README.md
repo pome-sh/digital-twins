@@ -19,10 +19,10 @@ pome-suggest-tasks/
 
 ## Role
 
-Runs after registration (F-858), before Skill 1 (`pome-author-task`) — the
+Runs after registration, before Skill 1 (`pome-author-task`) — the
 own-agent parallel to `pome-intake` (Skill 0, for managed agents). It closes the
 M2 "users don't know how to write tasks" gap by **proposing** tasks grounded in
-what the agent actually does, not by docs (F-891). It authors nothing itself: it
+what the agent actually does, not by docs. It authors nothing itself: it
 produces one chosen candidate and hands off to the authoring chain.
 
 ## Install

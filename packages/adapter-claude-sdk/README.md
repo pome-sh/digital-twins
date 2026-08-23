@@ -5,8 +5,8 @@ SPDX-License-Identifier: Apache-2.0
 # @pome-sh/adapter-claude-sdk
 
 Drop-in adapter for Anthropic's `claude-agent-sdk`. Add one import + one call,
-and your agent's runs produce overlay signals (`HookEvent` audit rows plus —
-under FDRS-408 — `ToolUseEvent` / `ToolResultEvent` payload rows) that let the
+and your agent's runs produce overlay signals (`HookEvent` audit rows plus
+`ToolUseEvent` / `ToolResultEvent` payload rows) that let the
 Pome correlator stitch your trace into a [`Run`](../../cli/src/contract/run.ts) with named lanes,
 ordered steps, and a generated fix prompt.
 
@@ -54,23 +54,22 @@ That's the whole user-facing surface.
   `AsyncLocalStorage` scope is empty, so Anthropic API calls from inside
   `claude-agent-sdk` are naturally immune).
 
-## Architecture (FDRS-322 + FDRS-407)
+## Architecture
 
 `tool_call_id` lands on the twin's `TwinHttpEvent` at the moment the request
 reaches the twin — single source of truth, no race under parallel tool calls.
 `HookEvent` rows are written to the sidechannel as each SDK hook fires; they
 follow the discriminated-union schema in
 [`packages/wire/src/recorder-events.ts`][wire], so the
-correlator (FDRS-412) can merge them into `events.jsonl` by `ts`-ordered
+correlator can merge them into `events.jsonl` by `ts`-ordered
 insertion. Hook handlers are read-only — they observe and never mutate the
 event the SDK passes them.
 
 Rationale for choosing global `fetch` replacement (with ALS gating + host
 allowlist) over a `pomeFetch` helper, sidechannel-only correlation, or
-side-effect import is captured in the `[DECISION]` comment on
-[FDRS-322](https://linear.app/pome-sh/issue/FDRS-322).
+side-effect import is recorded in this repository's git history.
 
-### Where the correlation core lives (F-950)
+### Where the correlation core lives
 
 The correlation mechanism itself is **not in this package**. The
 `AsyncLocalStorage` store, the `x-pome-correlation-id` fetch injection, and the
@@ -127,7 +126,7 @@ discriminated-union shape in [`wire`][wire]:
 {"ts":"2026-05-26T20:00:01.456Z","event_id":"...","parent_id":"toolu_abc","kind":"HookEvent","hook_name":"PostToolUse","tool_name":"list_open_issues"}
 ```
 
-The correlator (`FDRS-412`) reads this alongside `events.jsonl` and produces a
+The correlator reads this alongside `events.jsonl` and produces a
 `Run` with named lanes + ordered steps.
 
 ## License

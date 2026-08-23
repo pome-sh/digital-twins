@@ -13,7 +13,7 @@ wins. Exact `ant` flags come from `ant --help` / the Managed Agents docs — thi
 reference fixes the **mapping and the order**, not CLI syntax.
 
 Requires `ant` authenticated (`brew install anthropics/tap/ant && ant auth
-login`; `ant auth login` is F-782). No `ant` → you cannot launch a managed-agent
+login`). No `ant` → you cannot launch a managed-agent
 examinee; either authenticate or run the examinee yourself and use the REST path.
 
 ## The spec drives everything — map it, don't invent it
@@ -47,7 +47,7 @@ spec. `examinee_task.prompt` is the kickoff message.
 4. **Session** — `ant beta:sessions create` on the agent + environment, with
    `initial_events` verbatim and the kickoff task = `examinee_task.prompt`.
 
-## always_allow is load-bearing (F-787)
+## always_allow is load-bearing
 
 Managed Agents defaults a minimal `mcp_toolset` to **ask-for-permission**. A
 headless coach never sends `user.tool_confirmation`, so an examinee without

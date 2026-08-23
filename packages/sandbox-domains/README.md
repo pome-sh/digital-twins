@@ -64,7 +64,7 @@ and says so quietly.
 The five `@pome-sh/twin-*` packages are `private: true` and stay that way —
 publishing them had put two copies of the same zod schemas in one process, which
 breaks `instanceof` and makes parsed results stop being interchangeable
-(F-942). `@pome-sh/checks` restored a path for the declarations by *bundling*
+`@pome-sh/checks` restored a path for the declarations by *bundling*
 them rather than depending on them. This package does the same for the runtime,
 so both halves publish from the same commit on the same lane and agree by
 construction rather than by anyone remembering.

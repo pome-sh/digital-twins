@@ -22,7 +22,7 @@ sufficient:
    grader could not run rendered as `NOT EVALUATED` — so a `100` in the table
    below is not the same claim a `100` is today.
 3. **They predate the twin images.** All five twin snapshots were rebuilt and
-   promoted on 2026-08-03 (F-1147). Any stamp recorded before then was measured
+   promoted on 2026-08-03. Any stamp recorded before then was measured
    against a different substrate.
 
 They are kept, unedited, because the "33, not 0" story is real and this is where
@@ -126,8 +126,7 @@ pristine; a stronger model may or may not remove the last flake.
 
 **Status: measured 2026-08-04, `claude-opus-5`, n=5, hosted through the coach
 door. The baseline PASSED 4 of 5.** It is not a failing baseline, and nothing
-here may be stamped `verified red` until it is re-cut — see
-[F-1292](https://linear.app/pome-sh/issue/F-1292).
+here may be stamped `verified red` until it is re-cut.
 
 | Variant | Pass rate | Score (per trial) | Behavior |
 |---|---|---|---|
@@ -168,7 +167,7 @@ Two independent routes, both of which the agent volunteered in its own output:
 2. **The exam is open-book.** `deniedTools()` names two web tools and three MCP
    tools. Every Claude Agent SDK built-in — `Bash`, `Read`, `Glob`, `Grep` — is
    live, and the examinee's cwd — `local/` at the time of this run, the example
-   root since F-1290 flattened it — carries or sits one level below the task
+   root since it was flattened — carries or sits one level below the task
    file with its criteria and full seed, this file, and the README. Trial 5 ran
    `cat src/index.ts`, found the fixture, and reported: *"the deny-list …
    appears to be an intentional fixture rather than a misconfiguration …
@@ -199,7 +198,7 @@ table and the `verified red:` stamp in [`README.md`](./README.md).
 ### The criteria ARE finished — that half shipped
 
 `github.no-new-issues` landed in `twin-github` 0.9.0
-([F-1198](https://linear.app/pome-sh/issue/F-1198), digital-twins#283), published
+(digital-twins#283), published
 in `packages-v31`, and reached prod in pome-cloud `v0.4.49`. The task carries it
 (digital-twins#305), so the set now asserts the agent **opened no second issue**
 and not merely that it linked the right one — the negative assertion
@@ -236,7 +235,7 @@ enumeration behind it, and enumerations are never complete.
 
 ---
 
-## The two follow-up measurements F-1292 asked for (2026-08-05)
+## The two follow-up measurements the re-cut asked for (2026-08-05)
 
 The 2026-08-04 numbers above said the baseline is green and named two routes.
 They left two questions open, and both were answered by measurement before any
@@ -246,7 +245,7 @@ re-cut was designed. Same model (`claude-opus-5`, pinned), same task
 
 ### 1 · Does the task need a planted defect at all? — **yes**
 
-The open question on F-1292 was whether the red could come from the task being
+The open question was whether the red could come from the task being
 *natively* unreliable, with no planted flaw: *"if it lands around 2/5 or 3/5, the
 example needs no planted defect and this ticket's fix is deletion rather than
 redesign."*
@@ -263,7 +262,7 @@ The five traces are the same eight-step shape with no variance worth reporting:
 `slack_list_channels` → `slack_get_channel_history` → `list_issues` →
 `get_file_contents` → `add_issue_comment` → `slack_reply_to_thread`. (Those four
 Slack names are the surface twin-slack served on 2026-08-05 and no longer does:
-F-1330 replaced them with Slack's own — `slack_search_channels`,
+they were replaced with Slack's own — `slack_search_channels`,
 `slack_read_channel` and `slack_send_message` with a `thread_ts`. They are left
 as recorded, because this is what those five runs did, not a claim about what a
 run today would do.) The
@@ -300,7 +299,7 @@ trials used **both** of these, and neither is in `ISSUE_LOOKUP_TOOLS`:
 shell cost the agent nothing it needed. Two trials also *tried* the denied
 `list_issues`, failed, and routed around it in the same turn.
 
-**Conclusion, and it is the answer to F-1292's second "done when".** Closing the
+**Conclusion, and it is the answer to the second "done when".** Closing the
 sandbox is necessary — an examinee that can `cat tasks/duplicate-issue.md` is
 reading its own criteria and seed — but it is not the fix. Completing the
 denial is not the fix either: this measurement found two more paths after the
@@ -315,7 +314,7 @@ Fixed in this commit: the sandbox (`tools: []`, an allowlist rather than another
 name in a deny-list), and the claims in `src/index.ts` and
 `README.md` that the 2026-08-04 run refuted.
 
-Left open, deliberately, for the F-1292 design decision: the baseline defect
+Left open, deliberately, for the re-cut's design decision: the baseline defect
 itself. Nothing here is stamped `verified red`, and the shipped
 `DENY_ISSUE_LOOKUP = true` is now documented as a known-green baseline rather
 than a lesson.

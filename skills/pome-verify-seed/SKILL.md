@@ -85,7 +85,7 @@ costs one session slot; offer it, don't default to it.
    session has no evidence worth keeping — discarding it is the point. Never
    `finalize_run` a probe session; that would score the untouched seed.
    Call `stop_session`; if it succeeds outright, teardown is done. **If it is
-   refused** (F-983: an open session holds an ungraded run, and the platform
+   refused** (an open session holds an ungraded run, and the platform
    will not destroy one silently), the refusal carries a server-issued
    `discard_token` in its `error.details`. That is a one-shot confirmation
    nonce for this refusal, not a credential — it authenticates nothing and

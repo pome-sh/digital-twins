@@ -113,8 +113,8 @@ that pins and verifies the new signed digest.
   build regenerates one on each rebuild)
 - `npm run build` exits 0 and emits `dist/src/server.js`
 - Built output is loadable under Node 24 — the snapshot runs `runtime: "node24"`.
-  SQLite is the built-in `node:sqlite` (via the sdk's `openTwinDatabase()`,
-  F-703) — no native modules, no compiler toolchain.
+  SQLite is the built-in `node:sqlite` (via the sdk's
+  `openTwinDatabase()`) — no native modules, no compiler toolchain.
 
 ### Runtime
 
@@ -125,7 +125,7 @@ that pins and verifies the new signed digest.
 - `GET /healthz` returns 200 within ~3s of process start (the snapshot build
   sleeps 3s after `node dist/src/server.js` before probing)
 - All admin routes are localhost-only (`/admin/*`)
-- Bearer auth at `Authorization: Bearer <jwt>` — engine mechanism (`@pome-sh/sdk`), shape pinned in `src/twin.ts` (F-712)
+- Bearer auth at `Authorization: Bearer <jwt>` — engine mechanism (`@pome-sh/sdk`), shape pinned in `src/twin.ts`
 
 ### Cloud consumer coordination
 

@@ -14,14 +14,14 @@ Immutable upstream captures for `@pome-sh/twin-gmail`. Normal tests must not req
 
 | File | Purpose |
 | --- | --- |
-| `mcp-tools-list.raw.json` | Live unauthenticated `tools/list` (13 tools as returned). **This file IS the tool table** — `src/mcp.ts` derives it (F-1325) |
+| `mcp-tools-list.raw.json` | Live unauthenticated `tools/list` (13 tools as returned). **This file IS the tool table** — `src/mcp.ts` derives it |
 | `mcp-tools-list.canonical.json` | The same listing re-derived with its provenance attached and readable whitespace |
 | `mcp-tools-list.meta.json` | The provenance contract: substrate, endpoint, protocol version, capture date, `rawFileSha256`, assumed configuration |
 | `mcp-initialize.raw.json` / `.meta.json` | Live `initialize` (protocolVersion) |
 | `mcp-tools-call-unauth-error.raw.json` | Live unauthenticated `tools/call` error envelope |
 | `mcp-tools-call.representative.json` | Schema-derived representative success call shapes |
 
-### This IS the upstream golden — `fixtures/mcp-tools-list/gmail.*`, adopted (F-1400)
+### This IS the upstream golden — `fixtures/mcp-tools-list/gmail.*`, adopted
 
 `mcp-tools-list.raw.json` is byte-for-byte
 [`fixtures/mcp-tools-list/gmail.raw.json`](../../../fixtures/mcp-tools-list/), and the two
@@ -44,15 +44,14 @@ tools it called matched were the 2 Google had left byte-identical.
 `Message.bccRecipients`, `Label.messagesTotal`/`messagesUnread`, and a `list_labels` that returns ALL
 labels (the July prose said "all user-defined") taking no page arguments at all. Serving those words
 over the old handlers would advertise three capabilities the twin does not have, which is the
-false-capability shape [F-1330](https://linear.app/pome-sh/issue/F-1330) exists to stop, arrived at
+false-capability shape a vendored listing exists to stop, arrived at
 from the other direction. `test/mcp.test.ts` holds the handlers to the listing, reading the advertised
 property set out of the fixture rather than naming fields, so the next field Google adds is a red here
 and not a silent absence.
 
 What this lane still cannot see: because the served table IS the vendored capture, the only divergence
 it can ever report is capture staleness. Whether the twin behaves like the tools it serves is answered
-by pome-cloud's read leg and write round trip
-([F-1397](https://linear.app/pome-sh/issue/F-1397)).
+by pome-cloud's read leg and write round trip.
 
 ### Provenance notes
 
