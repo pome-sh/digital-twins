@@ -437,8 +437,11 @@ jobs:
         run: npm run verify:cloud-token -w @pome-sh/twin-slack
 
       # twin-github's behavior harness (PR flow, negative fidelity, concurrency
-      # race). Self-boots on an ephemeral port when REVIEW_TARGET=local, so it is
-      # CI-runnable with no live GitHub and no model. What it covers, precisely:
+      # race). Self-boots on an ephemeral port under REVIEW_TARGET=local, so it is
+      # CI-runnable with no live GitHub and no model. `local` is already
+      # review-harness.ts's default, so the env below changes nothing today and is
+      # stated to keep the target visible at the call site rather than only in the
+      # script. What this covers, precisely:
       # the LEGACY REST shim, not JSON-RPC MCP — `isJsonRpcMcp()` is false for any
       # 127.0.0.1/localhost host, and the self-boot always yields one. The
       # JSON-RPC transport is driven by packages/twin-github/test/mcp-*.test.ts
