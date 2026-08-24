@@ -10,7 +10,7 @@ write a version number here or in `package.json`. Released
 entries are insertions only: a correction is the next entry, naming the one it
 corrects.
 
-## Unreleased (patch)
+## 0.26.11 — 2026-08-24
 
 **No consumer-visible change.** The repo's lint gates were consolidated behind
 one runner (`npm run lint`, rules under `scripts/lint/rules/`), so comments in

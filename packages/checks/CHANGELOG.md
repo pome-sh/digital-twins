@@ -1,6 +1,6 @@
 # @pome-sh/checks
 
-## Unreleased (patch)
+## 0.3.6 — 2026-08-24
 
 **No consumer-visible change.** The repo's lint gates were consolidated behind
 one runner (`npm run lint`, rules under `scripts/lint/rules/`), so comments in
