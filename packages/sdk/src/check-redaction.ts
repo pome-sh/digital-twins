@@ -225,7 +225,7 @@ const describeOutcome = (outcome: CheckOutcome): string =>
  *
  * The catch RETURNS rather than falling through, exactly as
  * `check-discrimination.ts`'s `reasonOnEmptyWorld` does: D4's
- * no-catch-and-continue gate is right to forbid the assign-and-continue shape,
+ * `no-catch` lint rule is right to forbid the assign-and-continue shape,
  * and a predicate that crashes is itself one of the answers this probe reports.
  */
 function say(evaluate: () => CheckOutcome): CheckOutcome | { threw: string } {

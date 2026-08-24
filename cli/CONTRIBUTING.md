@@ -64,8 +64,8 @@ back from the cloud, whether via a hosted `pome run` or an upload through
 `pome eval`.
 
 This boundary is enforced mechanically, repo-wide, by
-[`scripts/no-eval-in-oss.mjs`](../scripts/no-eval-in-oss.mjs) (`npm run
-gate:no-eval` from the repo root). The gate denies three things across
+[`scripts/lint/rules/no-eval.mjs`](../scripts/lint/rules/no-eval.mjs)
+(`npm run lint -- no-eval` from the repo root). The rule denies three things across
 `cli/src/**`, `cli/scripts/**`, and `packages/**` in one pass — there is no
 separate `cli/`-local copy to run. The gate denies:
 

@@ -11,7 +11,7 @@
 // exists to demonstrate
 // a correctly-joined trace).
 //
-// `check-workspace-pins-match-workspace.mjs` cannot own this: it runs OFFLINE
+// `workspace-pins.mjs` cannot own this: it runs OFFLINE
 // before `npm ci`, and its rule ("a `@pome-sh/*` dep must resolve to the
 // workspace") is the wrong rule for a pin that is published on purpose. This
 // gate needs the registry, so it lives where `agent-examples/*` are already
@@ -69,7 +69,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { loadWorkspaceMembers } from "./check-workspace-pins-match-workspace.mjs";
+import { loadWorkspaceMembers } from "./lib/workspace-members.mjs";
 
 // Prerelease/build metadata included: `0.4.0-rc.1` is an exact, registry-
 // resolvable version, and rejecting it would drop the first rc into

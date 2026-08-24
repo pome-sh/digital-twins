@@ -4,6 +4,14 @@ SPDX-License-Identifier: Apache-2.0
 
 # @pome-sh/wire — CHANGELOG
 
+## Unreleased (patch)
+
+**No consumer-visible change.** The repo's lint gates were consolidated behind
+one runner (`npm run lint`, rules under `scripts/lint/rules/`), so comments in
+this package that pointed at a gate script by path now point at the rule that
+replaced it. Prose only: no export, schema, tool, route, status code or response
+body moved.
+
 ## 0.3.2 — 2026-08-23
 
 **No consumer-visible change.** Internal tracker ids were removed from source

@@ -418,7 +418,7 @@ function readMarkerFromFile(filePath, name) {
   return marker ? marker[1].trim() : null;
 }
 
-// `.mts`/`.cts` included deliberately: `lint-no-bare-import-meta-main.mjs`
+// `.mts`/`.cts` included deliberately: `import-meta-main.mjs`
 // next door scans them, and a file this pattern misses is invisible to the
 // denominator — the exact class the file-level pass exists to close, so the
 // two extension sets must not disagree.
@@ -551,7 +551,7 @@ export function run(root) {
   // zero-entry scan exits 0 having asserted nothing; the cli/ half had no
   // equivalent, so renaming `cli/` or `cli/scripts/` would have dropped eight
   // entries and stayed green — coverage silently shrinking, which is the shape
-  // this milestone exists to kill and which `lint:import-meta-main` already
+  // this milestone exists to kill and which `the `import-meta-main` lint rule` already
   // makes a hard failure PER ROOT. Derived, not listed: if the root
   // `workspaces` array names `cli`, the cli/ denominator must be non-empty. A
   // repo whose workspaces do not name `cli` legitimately contributes nothing.

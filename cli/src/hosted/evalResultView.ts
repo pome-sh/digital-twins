@@ -12,7 +12,7 @@
 // verdict-rendering half of `src/cli/render.ts`. The local scoring engine
 // (`scoreResults`, the deterministic matchers, the BYOK LLM judge) was deleted
 // under the no-eval-in-OSS rule; only the pure display model survives, moved out of the
-// `evaluator/` tree so the `no-eval-in-oss` gate can assert that tree is gone.
+// `evaluator/` tree so the `no-eval` lint rule can assert that tree is gone.
 //
 // Moved AGAIN from `src/score/view.ts` to here. `score/` (a
 // module-name stem the repo-wide gate now denies outright) has to cease to

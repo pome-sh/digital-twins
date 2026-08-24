@@ -136,7 +136,7 @@ function sandboxWithDeferredTwin() {
   // some other broken shape would still pass an absence check). The absence
   // of a bare `import.meta.main` ANYWHERE under scripts/**/contract/** —
   // including in this file — is asserted repo-wide by
-  // scripts/lint-no-bare-import-meta-main.mjs, which subsumes what
+  // scripts/lint/rules/import-meta-main.mjs, which subsumes what
   // used to be a second, narrower copy of that same assertion here: two
   // checks asserting one property in different places is the shape D5 warns
   // about, and the repo-wide one covers strictly more (every file, not just
@@ -151,7 +151,7 @@ function sandboxWithDeferredTwin() {
   //
   // Deliberately still a text match and NOT the repo-wide gate's AST
   // classifier, tempting as reusing it is: `findEntryGuardRealpathGaps` lives
-  // in `lint-no-bare-import-meta-main.mjs`, which imports `typescript`, and
+  // in `import-meta-main.mjs`, which imports `typescript`, and
   // THIS test runs in ci.yml's CHEAP block, which has no `npm ci`. Importing it
   // here crashes the job with ERR_MODULE_NOT_FOUND — a dependency-free test
   // must stay dependency-free. The AST version of this property is asserted

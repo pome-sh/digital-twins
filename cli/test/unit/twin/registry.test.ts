@@ -7,7 +7,7 @@
 // twin list in config/, and the twin packages' own manifests.
 //
 // This replaces the CLI half of the former repo-wide
-// `scripts/check-first-party-twin-registration.mjs` regex lint.
+// `scripts/lint/rules/first-party-twins.mjs` regex lint.
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";

@@ -47,7 +47,10 @@ npm run test:pack            # installs both tarballs in a clean room
 npm run gate:examples        # typechecks + tests every example, own install
 npm run smoke:examples       # launches every example for real
 npm run lint:dead-code       # knip
-npm run lint:code-health     # barrels + file size
+npm run lint                 # every lint rule, one runner
+npm run lint -- <rule>       # one rule, for local iteration
+npm run lint -- --list       # what rules exist
+npm run lint:test            # each rule's case table
 npm run probe:twins          # every declared endpoint answers
 ```
 
@@ -142,13 +145,34 @@ survives, because a server reads them. Leave them alone.
 
 ## CI
 
-The `lint:*` and `gate:*` scripts in the root `package.json` run on every PR,
+The `lint` and `gate:*` scripts in the root `package.json` run on every PR,
 wired in [`.github/workflows/ci.yml`](.github/workflows/ci.yml). They are the
-source of truth for what this repo guarantees — read the script when one fails
-rather than guessing at the rule.
+source of truth for what this repo guarantees — read the rule when one fails
+rather than guessing at it.
 
-The ones that catch people: `gate:no-eval` (product boundary),
-`lint:no-cloud-imports`, `lint:dead-code`, `gate:route-inputs`,
+`npm run lint` is one runner over the rules in
+[`scripts/lint/rules/`](scripts/lint/rules/). The runner owns traversal,
+reporting and exit codes; a rule is a declaration plus a predicate, and its
+module header is where the argument for it lives. `npm run lint -- <rule>` runs
+one for local iteration, `npm run lint -- --list` names them all, and
+`npm run lint:test` runs each rule's case table — which asserts the RED
+direction, because a rule that has quietly stopped failing prints the same line
+as a rule with nothing to report.
+
+Adding a rule is one file plus its case table. No npm script, no CI step: the
+registry in `scripts/lint/rules.mjs` is the only other edit, and the runner
+holds that pairing both ways — it fails on a rule with no case table, on a rule
+module missing from the registry, and on a case table naming no registered
+rule. None of those three can leave enforcement quietly reduced.
+
+The gates that are NOT rules, because they are different in kind rather than in
+rule: `lint:no-cloud-imports` (shell, and in the pre-commit hook), `lint:dead-code`
+(knip), `gate:route-inputs` (codegen freshness), `gate:mcp-tools-list`,
+`test:pack`, and the tarball audits, which inspect built npm artifacts rather
+than the source tree.
+
+The ones that catch people: `lint` (the product boundary lives in its `no-eval`
+rule), `lint:no-cloud-imports`, `lint:dead-code`, `gate:route-inputs`,
 `gate:mcp-tools-list`, `test:pack`, and the tarball audits.
 
 Secrets: `.github/workflows/secret-scan.yml` runs TruffleHog over the diff,

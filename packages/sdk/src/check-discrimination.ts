@@ -29,7 +29,7 @@ const describeOutcome = (outcome: CheckOutcome): string =>
  * to say anything at all.
  *
  * Extracted so the catch RETURNS rather than falling through — D4's
- * no-catch-and-continue gate is right to forbid the assign-and-continue shape,
+ * `no-catch` lint rule is right to forbid the assign-and-continue shape,
  * and the intent here really is "produce a value or none".
  */
 function reasonOnEmptyWorld<TState, TArgs extends Record<string, string>>(

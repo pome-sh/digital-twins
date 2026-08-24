@@ -820,7 +820,7 @@ validates against** — not a description of it. `declareRouteInputs()`
 object carrying both the machine-readable surface and the `parse()` a handler
 receives its values from. A handler is handed no request object to read around
 the declaration with, and
-[`scripts/lint-route-input-declarations.mjs`](../../scripts/lint-route-input-declarations.mjs)
+[`scripts/lint/rules/route-inputs.mjs`](../../scripts/lint/rules/route-inputs.mjs)
 fails the build if any module a route registrar reaches reads one imperatively.
 
 **This twin declares 286 inputs across 65 published surfaces**

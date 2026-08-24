@@ -72,7 +72,7 @@
 // described by the `RouteRequestSource` interface rather than by hono's
 // `Context`. That keeps it loadable in bun (pome-cloud's `tools/fidelity-watch`
 // runs there) and importable by the artifact emitter with no engine behind it.
-// See `scripts/check-twin-leaf-portability.mjs`.
+// See `scripts/lint/rules/twin-leaves.mjs`.
 
 import { z } from "zod";
 

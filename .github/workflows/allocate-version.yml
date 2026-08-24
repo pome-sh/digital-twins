@@ -100,7 +100,7 @@ on:
       # depends on it too — listing only the direct import would leave the arm
       # blind to exactly the PR that changes how examples are discovered.
       - "scripts/check-example-pins-published.mjs"
-      - "scripts/check-workspace-pins-match-workspace.mjs"
+      - "scripts/lint/rules/workspace-pins.mjs"
       - ".github/workflows/allocate-version.yml"
 
 # One allocation at a time, and never cancelled mid-write: the number is a

@@ -255,9 +255,9 @@ jobs:
       # Every internal @pome-sh/* package is bundled into the two published
       # tarballs, so a third-party dep of an inlined package that is not
       # declared by the publisher becomes ERR_MODULE_NOT_FOUND for the user.
-      - name: Bundled-runtime-dependency gate
+      - name: Bundled-runtime-dependency lint rule
         if: matrix.enabled == 'true'
-        run: npm run gate:bundled-deps
+        run: npm run lint -- bundled-deps
       # The release gate: install both tarballs in a clean room, boot all five
       # twins from the CLI tarball, and typecheck a consumer against the
       # adapter's shipped declarations.
@@ -396,7 +396,7 @@ jobs:
           exit 1
 
   # @pome-sh/wire → GitHub Packages. See the file header for why this is its own
-  # lane. On what it deliberately does NOT run: `gate:bundled-deps` and
+  # lane. On what it deliberately does NOT run: the `bundled-deps` lint rule and
   # `test:pack` are assertions about the two npmjs TARBALLS (no leaked
   # @pome-sh/* deps, five twins boot, a consumer typechecks against the shipped
   # declarations). They say nothing about wire's own tarball, and they still run
