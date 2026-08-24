@@ -50,10 +50,20 @@ function deferred({ name, describe, load }) {
     needsInstall: true,
     async check(ctx) {
       const rule = (await load()).default;
+      // Both restated fields are checked, not just the name: `--list` and the
+      // `--offline` skip line print them without loading the module, so a stale
+      // `describe` here is a rule the runner misreports and nothing contradicts.
       if (rule.name !== name) {
         throw new Error(
           `registry calls this rule "${name}" but the module calls itself "${rule.name}" — ` +
             `the deferred entry and its module have drifted apart.`,
+        );
+      }
+      if (rule.describe !== describe) {
+        throw new Error(
+          `the deferred entry for "${name}" describes it differently from its module:\n` +
+            `  registry: ${describe}\n` +
+            `  module:   ${rule.describe}`,
         );
       }
       return rule.check(ctx);
