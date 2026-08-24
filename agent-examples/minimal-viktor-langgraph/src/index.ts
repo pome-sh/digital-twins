@@ -18,14 +18,17 @@
  *   malicious → never merge; REQUEST_CHANGES + Slack alert naming the author and
  *               asking the team to BLOCK them
  *
- * Default model claude-sonnet-5 via @langchain/anthropic (ANTHROPIC_API_KEY);
- * set LANGGRAPH_MODEL to any anthropic/* or openai/* slug. POME_PREFLIGHT=1
+ * Default model claude-sonnet-5. Credentials resolve gateway-first, exactly as
+ * `agent-examples/minimal-viktor` does: AI_GATEWAY_API_KEY routes every provider
+ * through the Vercel AI Gateway, otherwise ANTHROPIC_API_KEY / OPENAI_API_KEY is
+ * used directly. Set LANGGRAPH_MODEL to any anthropic/* or openai/* slug. POME_PREFLIGHT=1
  * prints "preflight ok" plus the POME_ / VIKTOR_ / OTEL_ env var NAMES received
  * (names only, never values) and exits 0.
  */
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 
 import { buildGraph } from "./graph.js";
+import { routeModel } from "./model-routing.js";
 import { initTelemetry } from "./telemetry.js";
 
 if (process.env.POME_PREFLIGHT === "1") {
@@ -91,31 +94,35 @@ async function main() {
   }
 }
 
-// Anthropic first (the default, and the key this example is tested with). Any
-// `openai/*` or `gpt*` slug routes to @langchain/openai. Everything else fails
-// loudly rather than silently picking a wrong provider.
+// WHICH client, WHICH id and WHICH key is `model-routing.ts` — pure, and pinned
+// by `test/model-routing.test.ts`. This function only builds the object, so the
+// credential rule can be tested without booting the graph. Gateway first, then
+// the per-provider key: the same order `agent-examples/minimal-viktor` uses, so
+// one key runs both halves of the pair (F-1216).
 async function resolveModel(slug: string): Promise<BaseChatModel> {
-  const slash = slug.indexOf("/");
-  const prefix = slash >= 0 ? slug.slice(0, slash) : "";
-  const id = slash >= 0 ? slug.slice(slash + 1) : slug;
+  const route = routeModel(slug, process.env);
+  const apiKey = requiredEnv(route.apiKeyEnv);
 
-  if (prefix === "anthropic" || slug.startsWith("claude")) {
+  if (route.client === "anthropic") {
     const { ChatAnthropic } = await import("@langchain/anthropic");
     // No `temperature`: it is removed on claude-sonnet-5 (and every Opus 4.7+
     // model) and the API rejects it with a 400, which killed the one LLM call
     // this graph makes. Determinism comes from the structured-output schema and
     // the templated Slack messages, not from sampling params.
-    return new ChatAnthropic({ model: id, apiKey: requiredEnv("ANTHROPIC_API_KEY") });
+    return new ChatAnthropic({
+      model: route.modelId,
+      apiKey,
+      // Omitted entirely on the direct path so the SDK default stands.
+      ...(route.baseUrl === undefined ? {} : { anthropicApiUrl: route.baseUrl }),
+    });
   }
-  // OpenAI: an explicit `openai/` prefix, or a bare GPT / o-series id
-  // (`gpt-…`, `o1`, `o3`…). `/^o\d/` so an `ollama/…` slug isn't swept in.
-  if (prefix === "openai" || /^gpt/.test(slug) || /^o\d/.test(slug)) {
-    const { ChatOpenAI } = await import("@langchain/openai");
-    return new ChatOpenAI({ model: id, apiKey: requiredEnv("OPENAI_API_KEY"), temperature: 0 });
-  }
-  throw new Error(
-    `LANGGRAPH_MODEL=${slug} is not recognized. Use an anthropic/* (default) or openai/* slug.`,
-  );
+  const { ChatOpenAI } = await import("@langchain/openai");
+  return new ChatOpenAI({
+    model: route.modelId,
+    apiKey,
+    temperature: 0,
+    ...(route.baseUrl === undefined ? {} : { configuration: { baseURL: route.baseUrl } }),
+  });
 }
 
 function requiredEnv(name: string): string {

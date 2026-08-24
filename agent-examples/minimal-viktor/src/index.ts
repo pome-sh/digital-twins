@@ -31,6 +31,7 @@ import { fileURLToPath } from "node:url";
 import { generateText, stepCountIs, tool } from "ai";
 import { z } from "zod";
 
+import { routeModel } from "./model-routing.js";
 import { initTelemetry } from "./telemetry.js";
 
 function buildSystem(slackChannel: string) {
@@ -227,31 +228,28 @@ async function main() {
   }
 }
 
-// AI Gateway first (one AI_GATEWAY_API_KEY routes every provider — required for
-// the default alibaba/qwen-3-32b). Otherwise fall back to a per-provider key,
-// and fail loudly for providers that have no direct SDK here.
+// WHICH credential routes this run is `model-routing.ts` — pure, and pinned by
+// `test/model-routing.test.ts` alongside the identical assertion in
+// `agent-examples/minimal-viktor-langgraph` (F-1216). AI Gateway first (one
+// AI_GATEWAY_API_KEY routes every provider — required for the default
+// alibaba/qwen-3-32b), otherwise a per-provider key. This function only builds
+// the client the decision names.
 async function resolveModel(slug: string): Promise<Parameters<typeof generateText>[0]["model"]> {
-  if (process.env.AI_GATEWAY_API_KEY) return slug;
+  const route = routeModel(slug, process.env);
+  // The gateway takes the slug as a bare string; the AI SDK routes it natively.
+  if (route.via === "gateway") return route.modelId;
 
-  const slash = slug.indexOf("/");
-  const prefix = slash >= 0 ? slug.slice(0, slash) : "";
-  const id = slash >= 0 ? slug.slice(slash + 1) : slug;
-
-  if (prefix === "anthropic" || slug.startsWith("claude")) {
+  const apiKey = requiredEnv(route.apiKeyEnv);
+  if (route.provider === "anthropic") {
     const { createAnthropic } = await import("@ai-sdk/anthropic");
-    return createAnthropic({ apiKey: requiredEnv("ANTHROPIC_API_KEY") })(id);
+    return createAnthropic({ apiKey })(route.modelId);
   }
-  if (prefix === "google" || slug.startsWith("gemini")) {
+  if (route.provider === "google") {
     const { createGoogleGenerativeAI } = await import("@ai-sdk/google");
-    return createGoogleGenerativeAI({ apiKey: requiredEnv("GOOGLE_GENERATIVE_AI_API_KEY") })(id);
+    return createGoogleGenerativeAI({ apiKey })(route.modelId);
   }
-  if (prefix === "openai" || slug.startsWith("gpt") || slug.startsWith("o")) {
-    const { createOpenAI } = await import("@ai-sdk/openai");
-    return createOpenAI({ apiKey: requiredEnv("OPENAI_API_KEY") })(id);
-  }
-  throw new Error(
-    `VIKTOR_MODEL=${slug} needs AI_GATEWAY_API_KEY (the Vercel AI Gateway routes alibaba/* and every other provider with one key).`,
-  );
+  const { createOpenAI } = await import("@ai-sdk/openai");
+  return createOpenAI({ apiKey })(route.modelId);
 }
 
 function requiredEnv(name: string): string {
