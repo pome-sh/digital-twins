@@ -1,5 +1,13 @@
 # @pome-sh/adapter-claude-sdk — CHANGELOG
 
+## Unreleased (patch)
+
+**No consumer-visible change.** The repo's lint gates were consolidated behind
+one runner (`npm run lint`, rules under `scripts/lint/rules/`), so comments in
+this package that pointed at a gate script by path now point at the rule that
+replaced it. Prose only: no export, schema, tool, route, status code or response
+body moved.
+
 ## 0.3.11 — 2026-08-23
 
 **No consumer-visible change.** Internal tracker ids were removed from source

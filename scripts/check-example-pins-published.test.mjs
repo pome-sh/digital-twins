@@ -5,7 +5,7 @@
 // functions, no network and no `npm ci` needed: `checkExamplePinsPublished`
 // takes an injected `npmView`, and `discoverExampleSiblingDeps` runs against
 // a throwaway fixture tree built the same way
-// `check-workspace-pins-match-workspace.test.mjs` builds one, since both
+// `workspace-pins.test.mjs` builds one, since both
 // gates read the same root `workspaces` shape.
 
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";

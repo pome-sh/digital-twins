@@ -242,7 +242,7 @@ export type RecorderEvent = z.infer<typeof recorderEventSchema>;
 // empty tape would be worse than a duplicated key. The exported readers
 // normalize (`normalizeParentVocab`), so a parsed row always carries an
 // explicit `parent_event_id`, never `undefined`. Writer-side discipline is
-// enforced out-of-band by the `lint:parent-vocab` CI gate, which fails on a
+// enforced out-of-band by the `parent-vocab` lint rule, which fails on a
 // bare `parent_id` in any emitter.
 const eventBaseShape = {
   ts: z.string().datetime(),

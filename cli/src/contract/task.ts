@@ -44,7 +44,7 @@ import { seedStateSchema } from "./seed-state.js";
 // a value OUTSIDE the three is an error rather than a silently-stripped key, so
 // a typo in the vocabulary is caught where it is written. Presence is a
 // separate, stricter rule that applies only to the tasks this repo ships, and
-// it is enforced by `scripts/lint-task-class.mjs` rather than here.
+// it is enforced by `scripts/lint/rules/task-class.mjs` rather than here.
 export const taskClassSchema = z.enum(["conformance", "restraint", "adversarial"]);
 export type TaskClass = z.infer<typeof taskClassSchema>;
 

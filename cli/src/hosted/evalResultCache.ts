@@ -5,7 +5,7 @@
 // (what /finalize returned and the terminal rendered) as `verdict.json`
 // next to the trial's raw trace. This is a provenance-labeled CACHE of the
 // cloud judge's output — NOT a local score: the OSS CLI still has no
-// scoring engine (no-eval-in-oss), score.json is still never
+// scoring engine (the `no-eval` lint rule), score.json is still never
 // written, and deleting verdict.json loses nothing the dashboard doesn't
 // hold. `pome fix-prompt` reads these to hand grouped failure signatures
 // to the user's coding agent without a credentialed cloud round-trip —

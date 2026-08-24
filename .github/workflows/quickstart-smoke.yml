@@ -53,7 +53,7 @@ jobs:
   # WORKSPACE twins, and an npx user's declared pins are never installed by any
   # lane in this repo — do not read this job as coverage of an npx user's
   # published pins, because it is not. What keeps workspace @pome-sh edges
-  # honest is scripts/check-workspace-pins-match-workspace.mjs
+  # honest is scripts/lint/rules/workspace-pins.mjs
   # in ci.yml (exact pins between private packages are banned; deps are `"*"`).
   #
   # The agent mints a JWT from the shared TWIN_AUTH_SECRET env, probes the twin's

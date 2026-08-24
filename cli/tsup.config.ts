@@ -16,7 +16,7 @@
 // under `src/task/` imported three twins' package roots for a zod seed schema.
 // Both settings were doing their job and the claim was still false —
 // `pome --version` loaded 1183.6 KB, of which 697.9 KB was three twin servers.
-// `scripts/check-twin-chunk-laziness.mjs` asserts the graph these settings need.
+// `scripts/lint/rules/twin-chunks.mjs` asserts the graph these settings need.
 //
 // Entry name is `src/cli/main` rather than the default `main` deliberately —
 // `dist/src/cli/main.js` is the `bin` target, the path `contract/cli-start.test.mjs`
@@ -27,7 +27,7 @@
 // providers, `ai`, `commander`, `hono`, `zod`, `graphql`, `yaml`,
 // `@hono/node-server`, `@anthropic-ai/sdk`. Bundling them would fight their own
 // conditional exports and duplicate zod's schema identity — which is the bug
-// this whole restructure exists to remove. `scripts/check-bundled-runtime-deps.mjs`
+// this whole restructure exists to remove. `scripts/lint/rules/bundled-deps.mjs`
 // asserts every specifier the inlined packages import is declared here.
 import { chmodSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";

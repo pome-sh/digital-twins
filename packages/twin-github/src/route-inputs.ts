@@ -17,7 +17,7 @@
 //
 // zod and the sdk's `route-inputs` leaf are the only imports on purpose: the
 // artifact emitter and pome-cloud's bun-hosted fidelity-watch load this module
-// with no engine behind it (`scripts/check-twin-leaf-portability.mjs`). Never
+// with no engine behind it (`scripts/lint/rules/twin-leaves.mjs`). Never
 // reach for the `@pome-sh/sdk` barrel — it drags `node:sqlite`.
 
 import { z } from "zod";

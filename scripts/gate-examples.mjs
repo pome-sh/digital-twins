@@ -37,7 +37,7 @@
 // drifted twice already (#308 off 0.2.5, then 0.3.1 against a workspace 0.3.3,
 // which also dragged the retired `@pome-sh/shared-types` back into the
 // example's install graph as 0.3.1's declared runtime dep) before anything
-// watched it. `check-workspace-pins-match-workspace.mjs` cannot own that watch:
+// watched it. `workspace-pins.mjs` cannot own that watch:
 // it runs OFFLINE before `npm ci`, and "resolve to the workspace" is the wrong
 // rule for a deliberately-published pin. The right rule — re-pin once the
 // workspace version publishes, skip while it has not — needs the registry, so

@@ -357,7 +357,7 @@ the same trial called only `mcp__github__*` / `mcp__slack__*`, searched issues
 first, commented on #1, posted the link, and scored 75.
 
 This is the one exam surface that changes depending on **who runs it**, which is
-why it is not left to intention: `scripts/check-example-sdk-isolation.mjs` in
+why it is not left to intention: `scripts/lint/rules/example-isolation.mjs` in
 this repo's CI fails any bundled Claude-Agent-SDK example whose `query()`
 options omit either door.
 

@@ -36,7 +36,7 @@ describe("barrel", () => {
   });
 
   // The twin list is derived from `config/first-party-twins.json` everywhere else
-  // in this repo (`check-first-party-twin-registration.mjs` is the gate). A sixth
+  // in this repo (`first-party-twins.mjs` is the gate). A sixth
   // twin whose vocabulary never reached this package would otherwise be a
   // criterion that silently never binds — the exact failure this ticket exists
   // to stop.

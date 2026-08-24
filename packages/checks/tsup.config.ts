@@ -17,7 +17,7 @@
 // That also settles a pin question with no good answer. AGENTS.md forbids exact
 // `@pome-sh/*` pins between internal packages (the rule); `"*"` in a
 // PUBLISHED manifest is unbounded at the consumer's install time; and `^0.x` is
-// rejected by `scripts/check-workspace-pins-match-workspace.mjs`. Bundling means
+// rejected by `scripts/lint/rules/workspace-pins.mjs`. Bundling means
 // there is no pin to pick, because the published `package.json` declares zero
 // `@pome-sh/*` runtime dependencies. `scripts/ci/check-checks-tarball.mjs`
 // asserts that.

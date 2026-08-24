@@ -63,7 +63,7 @@ Two things, and they are what make the ruling narrow enough to take:
    declaration is short of the vendor's real surface is still exactly as
    visible to pome-cloud's declared-fidelity lane as it was. Runtime strictness
    was never how declaration completeness got enforced — that is
-   `scripts/lint-route-input-declarations.mjs` plus the lane — which is why
+   `scripts/lint/rules/route-inputs.mjs` plus the lane — which is why
    `ignore` costs nothing there and stands on fidelity alone.
 
 ## Evidence

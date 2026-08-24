@@ -26,7 +26,7 @@
 //
 // If you need a twin's seed schema or its default world, import its `./seed`
 // subpath: `seed.ts` is a zod-only leaf, and that is why the fix needed no
-// `async` threading. `scripts/check-twin-chunk-laziness.mjs` is the standing
+// `async` threading. `scripts/lint/rules/twin-chunks.mjs` is the standing
 // gate — it fails on any static edge from the CLI to a twin's root, `db.ts` or
 // `domain/`, so this comment cannot go stale again without CI saying so.
 //

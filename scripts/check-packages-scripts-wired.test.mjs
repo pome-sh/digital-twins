@@ -13,7 +13,7 @@
 // Each case builds a throwaway tree (a `packages/<name>/package.json`, an
 // optional `.github/workflows/ci.yml`, and any script files the package.json
 // commands name) and runs the real script against it via a different cwd —
-// same pattern as check-twin-chunk-laziness.test.mjs.
+// same pattern as twin-chunks.test.mjs.
 
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";

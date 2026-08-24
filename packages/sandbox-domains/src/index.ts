@@ -112,7 +112,7 @@ import { StripeDomain, openTwinStripeDatabase } from "./stripe.js";
 
 /**
  * The five first-party twin ids, in the order `config/first-party-twins.json`
- * declares them. `scripts/check-first-party-twin-registration.mjs` compares
+ * declares them. `scripts/lint/rules/first-party-twins.mjs` compares
  * this against the canonical list, so a sixth twin whose runtime is missing
  * here is a named CI failure rather than a twin pome-cloud silently cannot
  * boot — the same guarantee `CHECKS_TWIN_NAMES` gives the vocabulary half.

@@ -7,7 +7,7 @@
 // path, query, header and body values from that declaration's `parse()`. No
 // handler here touches the request: the imperative query, path-param and
 // JSON-body reads this file used to make are gone, and
-// `scripts/lint-route-input-declarations.mjs` fails the build if one comes back.
+// `scripts/lint/rules/route-inputs.mjs` fails the build if one comes back.
 // `c` survives only for `c.get("session")`, which is caller IDENTITY, not a
 // route input.
 //

@@ -163,7 +163,7 @@ export function examineeOptions(mcpServers: Record<string, McpServerConfig>) {
     // searched issues first, commented on #1, posted the link, and scored 75.
     //
     // Local, and therefore inherited from a machine nobody controls: this is the
-    // one exam surface that changes depending on who runs it. `scripts/check-example-sdk-isolation.mjs`
+    // one exam surface that changes depending on who runs it. `scripts/lint/rules/example-isolation.mjs`
     // is what stops it being deleted along with the comment that explains it.
     settingSources: [],
     disallowedTools: deniedTools(),

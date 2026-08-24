@@ -5,9 +5,15 @@
 # Install with:  bash scripts/hooks/install.sh
 #
 # Gates:
-#  - ADR-002 open-core boundary: no `pome-cloud` imports in packages/.
+#  - ADR-002 open-core boundary: no `pome-cloud` imports in packages/ (shell,
+#    so it stays outside the node runner).
 #  - Capture-only OSS boundary: no local eval/scoring/judging/correlation.
 #  - No cross-package file-copy markers.
+#
+# The last two are lint RULES, run by name through the one runner. Everything
+# `npm run lint` knows about is available here — `npm run lint -- <rule>` is the
+# same entry point CI uses, so a hook and a CI step cannot disagree about what a
+# rule checks.
 #
 # Every gate here is pure node/bash from this repo's dev deps — nothing to
 # install. Secrets are scanned in CI by secret-scan.yml, not here.
@@ -20,8 +26,5 @@ cd "$repo_root"
 echo "pre-commit: open-core boundary lint"
 bash scripts/lint-no-cloud-imports.sh
 
-echo "pre-commit: no local eval gate"
-npm run gate:no-eval
-
-echo "pre-commit: copy-marker gate"
-npm run lint:copy-markers
+echo "pre-commit: capture-only + copy-marker lint rules"
+npm run lint -- no-eval copy-markers

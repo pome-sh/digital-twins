@@ -85,11 +85,20 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: actionlint (workflow syntax + embedded shell)
         run: actionlint -color
-      # Cheap, dependency-free gates — always on so docs PRs still catch
-      # copy-marker / barrel / cloud-import / policy fixture regressions.
-      - run: node scripts/check-copy-markers.mjs
-      - run: node scripts/lint-code-health.mjs
-      - run: node scripts/check-first-party-twin-registration.mjs
+      # Every dependency-free lint rule, plus each rule's case table. Always on,
+      # so a docs-only PR still catches copy-marker / barrel / skill-manifest /
+      # criterion-marker regressions: several of these rules exist precisely
+      # because the diff that drifts them touches only `skills/` or `docs/`, which
+      # the scope step below classifies as docs-only, and a heavy-block gate would
+      # be skipped by exactly the PR that breaks it.
+      #
+      # `--offline` skips the three rules that need an installed node_modules (the
+      # two typescript-AST walks and the lockfile scan); the heavy job below runs
+      # the runner again with no flag, so those are covered there and this is a
+      # subset, never the only run. Skipped rules are named in the output rather
+      # than silently dropped.
+      - run: npm run lint -- --offline
+      - run: npm run lint:test -- --offline
       # Closes a class of silent pass: a `packages/*` script that produces no
       # verdict because nothing reaches it, and no verdict reads exactly like a
       # pass. The partition is total: every
@@ -263,82 +272,13 @@ jobs:
       # exactly the PR that adds an unhardened call.
       - run: node scripts/ci/assert-hardened-cdn-fetches.mjs
       - run: node scripts/ci/assert-hardened-cdn-fetches.test.mjs
-      # the plugin manifest is what makes the `skills` installer render
-      # one select-all row instead of six unticked checkboxes. It has to live in
-      # the always-on block: adding a skill touches only `skills/`, which the
-      # scope step above classifies as docs-only, so a heavy-block gate would be
-      # skipped by exactly the PR that drifts it.
-      - run: node scripts/check-plugin-manifest-lists-every-skill.mjs
-      - run: node scripts/check-plugin-manifest-lists-every-skill.test.mjs
-      # the legacy D/P criterion markers are retired; fail on any
-      # reintroduction outside the parser's own legacy-detection code.
-      - run: node scripts/lint-legacy-criterion-markers.mjs
-      # The criterion grammar quoted in the pome-author-task skill reference must
-      # be the one cli/src/task/parseTask.ts runs. That doc is a byte-identical
-      # mirror of pome-cloud's canonical copy, which pome-cloud gates; this gate
-      # is the mirror's half, and without it the mirror can publish a grammar
-      # that silently drops a criterion kind to prose. It lives in
-      # THIS block, not the heavy one, because a PR that only edits `skills/`
-      # is classified docs-only and would skip the gate that catches it.
-      - run: node scripts/lint-task-format-doc.mjs
-      - run: node scripts/lint-task-format-doc.test.mjs
-      # "each twin is a lazily-loaded chunk" was a comment in
-      # registry.ts and a 0.21.0 headline, and it was false for github, gmail and
-      # linear for six releases: five modules on the CLI's startup path imported
-      # those twins' package ROOTS to reach a zod seed schema, and a root export
-      # carries the domain and the Hono app too. `pome --version` parsed 698 KB of
-      # three twin servers. Nothing failed, so nothing noticed — it took a manual
-      # audit. Static-graph walk, no build and no install needed, so it belongs in
-      # this block rather than behind the heavy gate.
-      - run: node scripts/check-twin-chunk-laziness.mjs
-      - run: node scripts/check-twin-chunk-laziness.test.mjs
-      # pome-cloud's fidelity-watch reads twin declarations — the stripe tool
-      # table, github's and slack's 501 envelopes, linear's GraphQL schema —
-      # straight out of a pome-twins checkout, under BUN, which implements no
-      # `node:sqlite`. A twin tool table that reaches for the sdk ROOT barrel to
-      # get its (dependency-free) fixture loader drags `openTwinDatabase` in with
-      # it, so `import "@pome-sh/sdk"` executes
-      # `import { DatabaseSync } from "node:sqlite"`. Every twins suite runs on
-      # Node and stays green; pome-cloud's daily cron is where it surfaces
-      # in a repo this repo's CI does not run. Same static-graph walk as the gate
-      # above, no build and no install needed.
-      - run: node scripts/check-twin-leaf-portability.mjs
-      - run: node scripts/check-twin-leaf-portability.test.mjs
-      # Every input a twin's REST/GraphQL handlers see arrives through
-      # the route's own declaration, which is what gets published to
-      # pome-cloud's declared-fidelity lane. One `c.req.query("sort")` typechecks,
-      # passes every test, and silently drops that name from the published
-      # surface — after which the lane compares the vendor's inputs against an
-      # incomplete list and reports no drift. A pass nobody measured is worse
-      # than the `not-compared` it reported before. No type can stop that line,
-      # so the invariant is this reachability walk: same static graph as the two
-      # gates above, no build and no install needed.
-      - run: node scripts/lint-route-input-declarations.mjs
-      - run: node scripts/lint-route-input-declarations.test.mjs
-      # No catch-and-continue in the SDK twin engine
-      # (packages/sdk/src): every statement catch must throw, return an
-      # error/sentinel, or reject. Dependency-free, runs before `npm ci`.
-      - run: node scripts/no-catch-and-continue.mjs
-      # npm only SYMLINKS a sibling when the declared pin matches its
-      # version; otherwise it installs a real nested copy from the registry,
-      # and that package is built and tested against the PUBLISHED artifact
-      # instead of this tree. A drifted pin leaves CI green — everything it runs
-      # genuinely passes, against the wrong sdk — for as long as nobody reads
-      # the manifest.
-      # The scan's subject is the root `workspaces` field, not a hand-kept
-      # `packages/*` list, so `cli/package.json` is in scope too and a PR
-      # reintroducing an exact pin there is caught by the same walk.
-      # `agent-examples/*` are deliberately NOT in scope — they
-      # install from the registry by design; see the script's header.
-      # Dependency-free, so it runs here before `npm ci`.
-      - run: node scripts/check-workspace-pins-match-workspace.mjs
-      - run: node scripts/check-workspace-pins-match-workspace.test.mjs
-      # the sibling of the gate above for `agent-examples/*`'s deliberately
-      # published pins. The regression suite is pure functions with an
-      # injected registry answer (no network, no npm ci), so it runs here
-      # alongside its offline sibling; the live registry check itself runs in
-      # `gate-examples.mjs` in the heavy job below, where every example
-      # is already `npm ci`'d against the real registry.
+      # The `agent-examples/*` half of the pin story: those install from the
+      # REGISTRY on purpose, so the `workspace-pins` lint rule deliberately
+      # leaves them alone and this suite covers them instead. Pure functions with
+      # an injected registry answer (no network, no npm ci), so it runs here; the
+      # live registry check itself runs in `gate-examples.mjs` in the heavy job
+      # below, where every example is already `npm ci`'d against the real
+      # registry.
       - run: node scripts/check-example-pins-published.test.mjs
       - run: bash scripts/lint-no-cloud-imports.sh
       - run: bash scripts/lint-no-cloud-imports.test.sh
@@ -366,59 +306,29 @@ jobs:
           set -euo pipefail
           npm ci
           npm run lint:dead-code
-          # a bare `import.meta.main` entry guard is undefined on Node
-          # 24.0.0/24.0.1/24.0.2/24.1.0 (it landed in 24.2), root `engines`
-          # allows `>=24`, and a guard built on it exits 0 having run nothing.
-          # scripts/probe-twin-endpoints.mjs and SIX bundled examples shipped
-          # exactly that shape; this PARSES every source file under scripts/,
-          # contract/, cli/src/, cli/scripts/, packages/ and agent-examples/ (never a
-          # hand-kept list) so the next one reds instead of going quiet. Every
-          # one of those roots is in the heavy-suite scope regex above, so this
-          # is not path-filtered away from any diff that could trip it. Needs
-          # only node_modules (the typescript parser), not a build, so it runs
-          # here rather than after `npm run build`.
-          npm run lint:import-meta-main
-          node scripts/lint-no-bare-import-meta-main.test.mjs
-          # `options.tools` and `options.settingSources` close DIFFERENT
-          # doors, and a bundled example that omits either is not isolated
-          # however carefully its comments say it is. An example with `tools: []`
-          # but no `settingSources` restriction searches the DEVELOPER's real
-          # Slack workspace through inherited Claude Code plugin MCP servers,
-          # makes zero twin calls, and scores as a triage failure — a verdict
-          # about the wrong workspace entirely. Parses every source
-          # file of every agent-examples/* package that declares the SDK (discovered
-          # from the manifests, never a hand-kept list), because the likeliest
-          # regression is deleting the options and keeping the comment that
-          # explains them, which a grep would call green. Same dependency
-          # profile as the line above — the typescript parser, no build — so it
-          # runs here.
-          npm run lint:example-isolation
-          node scripts/check-example-sdk-isolation.test.mjs
-          # zero native deps is an invariant: no gyp-marked package in the
-          # production closure (prebuilt installers like esbuild/fsevents pass).
-          npm run gate:no-native
-          # One repo-wide capture-only gate, scanning cli/src/**,
-          # cli/scripts/**, and packages/**.
-          npm run gate:no-eval
+          # Every lint rule, and every rule's case table. `npm run lint` owns
+          # traversal, reporting and exit codes; a rule is a declaration plus a
+          # predicate under scripts/lint/rules/. The always-on block above ran
+          # the same runner with `--offline`, which skips the three rules that
+          # need an installed node_modules (the two typescript-AST walks and the
+          # lockfile scan) — this is the run that covers them, and it is a
+          # superset, so nothing is only checked in one place. Needs
+          # node_modules, not a build, so it runs here rather than after
+          # `npm run build`.
+          #
+          # `lint:test` is not decoration. Several rules exist because a claim
+          # went releases without anyone checking it, and the way such a rule
+          # stops working is by silently ceasing to go RED — a rule that scans
+          # nothing prints the same line as a rule that scanned everything. Each
+          # table asserts the red direction, and the runner fails on a rule that
+          # has no table at all.
+          npm run lint
+          npm run lint:test
           # the contract now enumerates the event union from zod and
           # requires a fixture per kind, so a new kind with none reds this line.
           # Before that it compared bytes no schema change could move.
           npm run check:trace-contract -w @pome-sh/wire
           node packages/wire/scripts/emit-trace-contract.test.mjs
-          # `parent_id` meant four different things across five writers.
-          # The schema still ACCEPTS it so stored 0.13.0 rows keep parsing, which
-          # is exactly why the gate lives here: zod cannot tell a reader from a
-          # writer, so nothing else stops a new emitter reintroducing it.
-          npm run lint:parent-vocab
-          node scripts/lint-parent-vocab.test.mjs
-          # every shipped task declares which POPULATION it is in:
-          # `conformance` (does our fake GitHub answer correctly) versus the exam
-          # half, `restraint` + `adversarial` (is the agent any good). pome-cloud
-          # pins its scored denominators against the exam half, so a task landing
-          # here unclassified would silently join whichever population the reader
-          # assumed and blend two averages back into one.
-          npm run lint:task-class
-          node scripts/lint-task-class.test.mjs
           # the committed manifest JSON Schema (served at
           # pome.sh/schemas/v1/pome.json) must match the zod source.
           npm run check:manifest-schema -w @pome-sh/cli
@@ -550,12 +460,6 @@ jobs:
           npm run test:coverage -w @pome-sh/twin-slack
           # Former cli-ci.yml (folded in here — one required check, one npm ci).
           npx vitest run --project cli
-          # Every internal @pome-sh/* package is INLINED into the published CLI
-          # bundle, so its own `dependencies` are never installed for it: a
-          # third-party import the CLI does not declare (twin-linear needs
-          # `graphql`) becomes ERR_MODULE_NOT_FOUND inside a lazily-loaded twin
-          # chunk, on that twin only.
-          npm run gate:bundled-deps
           # Black-box twin runtime-contract suite. Spawns the BUILT twins
           # via plain `node` — Node 24 to match the GHCR runtime image — and asserts
           # the control-plane surface frozen in CONTRACT.md.
