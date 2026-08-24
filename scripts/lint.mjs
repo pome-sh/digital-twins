@@ -22,7 +22,7 @@
 //   node scripts/lint.mjs --verbose        rules that have extra detail print it
 
 import { spawnSync } from "node:child_process";
-import { existsSync, realpathSync } from "node:fs";
+import { existsSync, readdirSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -39,18 +39,30 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
  *
  * @param {{ root?: string, only?: string[], offline?: boolean, verbose?: boolean }} options
  */
-export function runRules({ root = REPO_ROOT, only = [], offline = false, verbose = false } = {}) {
+export async function runRules({ root = REPO_ROOT, only = [], offline = false, verbose = false } = {}) {
   const selected = selectRules(only);
   const ctx = createContext({ root, verbose });
   const results = [];
 
   for (const rule of selected) {
     if (offline && rule.needsInstall) {
+      // Naming a rule AND passing --offline is a contradiction: the run would
+      // print a pass having checked nothing at all. Skipping is only honest when
+      // the caller asked for everything.
+      if (only.length > 0) {
+        throw new Error(
+          `${rule.name} needs an installed node_modules, so --offline cannot run it. ` +
+            `Drop one of the two: a named rule that --offline skips would exit 0 having checked nothing.`,
+        );
+      }
       results.push({ rule, skipped: "needs an installed node_modules" });
       continue;
     }
     try {
-      const outcome = rule.check(ctx) ?? {};
+      // `await`: the rules that parse TypeScript are deferred behind a dynamic
+      // import, so their `check` is async. Every other rule's is sync and
+      // `await` is a no-op on it.
+      const outcome = (await rule.check(ctx)) ?? {};
       results.push({
         rule,
         violations: outcome.violations ?? [],
@@ -63,6 +75,24 @@ export function runRules({ root = REPO_ROOT, only = [], offline = false, verbose
     }
   }
   return results;
+}
+
+/**
+ * Every rule module on disk must be in the registry.
+ *
+ * The registry is a hand-written list of static imports, which is what lets
+ * `knip` follow it — but it also means deleting one import line silently removes
+ * a rule from enforcement. Nothing else would notice: the case-table runner
+ * iterates the registry rather than the directory, so the orphaned table stops
+ * running too, and knip counts every file under `scripts/lint/` as an entry
+ * point. So the runner checks the directory against the registry on every run.
+ */
+export function findUnregisteredRules(rulesDir = resolve(dirname(fileURLToPath(import.meta.url)), "lint/rules")) {
+  const registered = new Set(RULES.map((rule) => `${rule.name}.mjs`));
+  return readdirSync(rulesDir)
+    .filter((name) => name.endsWith(".mjs") && !name.endsWith(".test.mjs"))
+    .filter((name) => !registered.has(name))
+    .sort();
 }
 
 /** The rules named in `only`, or all of them. An unknown name is a failure, not a silent no-op. */
@@ -194,7 +224,16 @@ if (!invokedDirectly && ENTRY.endsWith("lint.mjs")) {
 }
 
 if (invokedDirectly) {
-  const { only, root, offline, verbose, list, runTests } = parseArgv(process.argv.slice(2));
+  // A usage error (unknown rule, contradictory flags) is a failed lint run, not a
+  // crash report: print the sentence and exit 1.
+  main(process.argv.slice(2)).catch((err) => {
+    console.error(err.message);
+    process.exit(1);
+  });
+}
+
+async function main(argv) {
+  const { only, root, offline, verbose, list, runTests } = parseArgv(argv);
 
   if (list) {
     for (const rule of RULES) {
@@ -203,8 +242,19 @@ if (invokedDirectly) {
     process.exit(0);
   }
 
+  // Before anything else: a rule module that never made it into the registry is
+  // a rule that does not run, and every other check here would stay green.
+  const unregistered = findUnregisteredRules();
+  if (unregistered.length > 0) {
+    console.error(
+      `${unregistered.length} rule module(s) under scripts/lint/rules/ are not in scripts/lint/rules.mjs, ` +
+        `so the runner never reaches them: ${unregistered.join(", ")}. Add the import, or delete the file.`,
+    );
+    process.exit(1);
+  }
+
   if (runTests) process.exit(runRuleTests({ only, offline }) ? 0 : 1);
 
-  const results = runRules({ root, only, offline, verbose });
+  const results = await runRules({ root, only, offline, verbose });
   process.exit(report(results, { verbose }) ? 0 : 1);
 }

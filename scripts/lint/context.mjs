@@ -41,22 +41,43 @@ export function createContext({ root, verbose = false }) {
 
   /**
    * Every file under `dirs` (repo-root-relative) whose extension is in `ext`,
-   * sorted, pruning `skip` at any depth. A directory that does not exist
-   * contributes nothing — a rule that needs a floor on the count asserts it
-   * itself, because "scanned nothing" and "found nothing wrong" print the same.
+   * sorted, pruning `skip` at any depth.
    *
-   * `statSync` rather than the dirent: `isDirectory()`/`isFile()` are both
-   * false for a symlink, so keying off the dirent silently skips a symlinked
-   * script or subdirectory, and a skip reads as a pass.
+   * `mustExist` (default true) is the difference between "found nothing wrong"
+   * and "scanned nothing": a rule that names a directory and finds it gone has
+   * stopped covering it, and a silent skip reads exactly like a clean tree. Pass
+   * `mustExist: false` only where a directory is genuinely optional — a scan root
+   * that not every checkout has.
+   *
+   * `statSync` rather than the dirent: `isDirectory()`/`isFile()` are both false
+   * for a symlink, so keying off the dirent silently skips a symlinked script or
+   * subdirectory, and a skip reads as a pass.
    */
-  function files({ dirs, ext, skip = DEFAULT_SKIP_DIRS }) {
-    const key = JSON.stringify([dirs, ext, skip]);
+  function files({ dirs, ext, skip = DEFAULT_SKIP_DIRS, mustExist = true }) {
+    const key = JSON.stringify([dirs, ext, skip, mustExist]);
     const cached = walkCache.get(key);
     if (cached) return cached;
 
     const extensions = new Set(ext);
     const skipDirs = new Set(skip);
     const out = [];
+
+    if (mustExist) {
+      const missing = dirs.filter((dir) => {
+        try {
+          return !statSync(join(root, dir)).isDirectory();
+        } catch {
+          return true;
+        }
+      });
+      if (missing.length > 0) {
+        throw new Error(
+          `scan director${missing.length === 1 ? "y" : "ies"} not found: ${missing.join(", ")}. ` +
+            `A rule that cannot find what it was told to walk has stopped covering it — move the ` +
+            `rule with the code, or drop the entry deliberately.`,
+        );
+      }
+    }
 
     const walk = (dir) => {
       let entries;

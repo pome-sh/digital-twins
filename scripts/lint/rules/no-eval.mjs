@@ -123,7 +123,10 @@ export default {
       }
     }
 
-    for (const file of ctx.files({ dirs: SCAN_DIRS, ext: EXTENSIONS, skip: SKIP_DIRS })) {
+    // `mustExist: false`, as the predecessor's `existsSync` guard was:
+    // `cli/scripts` is optional in a checkout, and the PATH arm above is what
+    // notices a tree that should not be there.
+    for (const file of ctx.files({ dirs: SCAN_DIRS, ext: EXTENSIONS, skip: SKIP_DIRS, mustExist: false })) {
       if (file === SELF || file === SELF_CASES) continue;
       const rel = ctx.rel(file);
 

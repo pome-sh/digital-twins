@@ -92,7 +92,10 @@ export default {
   describe: "no bare `parent_id` in emitter source",
   check(ctx) {
     const violations = [];
-    for (const file of ctx.files({ dirs: emitterDirs(ctx.root), ext: [".ts", ".mjs"] })) {
+    // `mustExist: false`: the dirs are derived from `packages/*` and
+    // `agent-examples/*`, and not every member has a `src/` (packages/shared-types
+    // does not). The old `globSync` patterns returned nothing for those too.
+    for (const file of ctx.files({ dirs: emitterDirs(ctx.root), ext: [".ts", ".mjs"], mustExist: false })) {
       const rel = ctx.rel(file);
       if (allowed(rel)) continue;
       const text = ctx.read(file);

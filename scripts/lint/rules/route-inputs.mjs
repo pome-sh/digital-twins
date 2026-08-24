@@ -315,7 +315,7 @@ export default {
 
     for (const dir of twinDirs) {
       const found = ctx
-        .files({ dirs: [`packages/${dir}/src`], ext: [".ts"] })
+        .files({ dirs: [`packages/${dir}/src`], ext: [".ts"], mustExist: false })
         .filter((file) => !file.endsWith(".d.ts"))
         .filter((file) => {
           const code = stripNonCode(ctx.read(file));

@@ -85,7 +85,7 @@ export default {
     const twinsWithNoToolTable = [];
     for (const dir of twinDirs) {
       const found = ctx
-        .files({ dirs: [`packages/${dir}/src`], ext: [".ts"] })
+        .files({ dirs: [`packages/${dir}/src`], ext: [".ts"], mustExist: false })
         .filter((file) => !file.endsWith(".d.ts") && readFileSync(file, "utf8").includes(TOOL_TABLE_MARKER));
       if (found.length === 0) twinsWithNoToolTable.push(dir);
       else toolTables.push(...found);

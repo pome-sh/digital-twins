@@ -525,7 +525,8 @@ export default {
   describe: "every catch in the SDK engine throws, returns an error, or rejects",
   check(ctx) {
     const violations = [];
-    for (const file of ctx.files({ dirs: [SCAN_DIR], ext: [".ts"], skip: SKIP_DIRS })) {
+    // `mustExist: false`, as the predecessor's `existsSync` guard was.
+    for (const file of ctx.files({ dirs: [SCAN_DIR], ext: [".ts"], skip: SKIP_DIRS, mustExist: false })) {
       violations.push(...findViolationsIn(ctx.rel(file), ctx.read(file)));
     }
     return {
