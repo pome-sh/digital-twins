@@ -30,6 +30,7 @@ import { createContext } from "./lint/context.mjs";
 import { RULES } from "./lint/rules.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const RULES_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "lint/rules");
 
 /**
  * Run `rules` against `root` and return one result per rule. A rule reports by
@@ -87,10 +88,26 @@ export async function runRules({ root = REPO_ROOT, only = [], offline = false, v
  * running too, and knip counts every file under `scripts/lint/` as an entry
  * point. So the runner checks the directory against the registry on every run.
  */
-export function findUnregisteredRules(rulesDir = resolve(dirname(fileURLToPath(import.meta.url)), "lint/rules")) {
+export function findUnregisteredRules(rulesDir = RULES_DIR) {
   const registered = new Set(RULES.map((rule) => `${rule.name}.mjs`));
   return readdirSync(rulesDir)
     .filter((name) => name.endsWith(".mjs") && !name.endsWith(".test.mjs"))
+    .filter((name) => !registered.has(name))
+    .sort();
+}
+
+/**
+ * The other direction: a case table whose rule is not in the registry.
+ *
+ * `runRuleTests` iterates the registry, so such a table is never run — it reads
+ * as coverage from the directory listing while asserting nothing. Cheap to check
+ * and the counterpart to the guarantee above, so the invariant is symmetric:
+ * every rule has a table, and every table has a rule.
+ */
+export function findOrphanCaseTables(rulesDir = RULES_DIR) {
+  const registered = new Set(RULES.map((rule) => `${rule.name}.test.mjs`));
+  return readdirSync(rulesDir)
+    .filter((name) => name.endsWith(".test.mjs"))
     .filter((name) => !registered.has(name))
     .sort();
 }
@@ -159,7 +176,6 @@ export function report(results, { verbose = false, log = console.log, error = co
  * proved can go red is a rule that may already have stopped going red.
  */
 export function runRuleTests({ only = [], offline = false } = {}) {
-  const rulesDir = resolve(dirname(fileURLToPath(import.meta.url)), "lint/rules");
   let failed = 0;
   const untested = [];
 
@@ -168,7 +184,7 @@ export function runRuleTests({ only = [], offline = false } = {}) {
       console.log(`  – ${rule.name} — SKIPPED (case table needs an installed node_modules)`);
       continue;
     }
-    const testFile = join(rulesDir, `${rule.name}.test.mjs`);
+    const testFile = join(RULES_DIR, `${rule.name}.test.mjs`);
     if (!existsSync(testFile)) {
       untested.push(rule.name);
       continue;
@@ -249,6 +265,14 @@ async function main(argv) {
     console.error(
       `${unregistered.length} rule module(s) under scripts/lint/rules/ are not in scripts/lint/rules.mjs, ` +
         `so the runner never reaches them: ${unregistered.join(", ")}. Add the import, or delete the file.`,
+    );
+    process.exit(1);
+  }
+  const orphanTables = findOrphanCaseTables();
+  if (orphanTables.length > 0) {
+    console.error(
+      `${orphanTables.length} case table(s) under scripts/lint/rules/ name no registered rule, so they ` +
+        `never run: ${orphanTables.join(", ")}. Rename the table to match its rule, or delete it.`,
     );
     process.exit(1);
   }

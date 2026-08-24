@@ -161,7 +161,9 @@ as a rule with nothing to report.
 
 Adding a rule is one file plus its case table. No npm script, no CI step: the
 registry in `scripts/lint/rules.mjs` is the only other edit, and the runner
-fails on a rule with no case table at all.
+holds that pairing both ways — it fails on a rule with no case table, on a rule
+module missing from the registry, and on a case table naming no registered
+rule. None of those three can leave enforcement quietly reduced.
 
 The gates that are NOT rules, because they are different in kind rather than in
 rule: `lint:no-cloud-imports` (shell, and in the pre-commit hook), `lint:dead-code`
