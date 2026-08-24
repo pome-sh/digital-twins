@@ -513,7 +513,36 @@ for (const [label, source] of Object.entries(GUARD_GAP_CLEAN_CASES)) {
     assert(owning.length === 1, `exactly one uncommented CI step runs \`${command.trim()}\` (got ${owning.length})`);
     if (owning.length !== 1) continue;
     const step = owning[0];
-    assert(/set -euo pipefail/.test(step), `the step running \`${command.trim()}\` sets a failing shell mode`);
+    // The property is that a failure REACHES the step's conclusion, not that any
+    // particular shell line is present. Which check proves that depends on the
+    // step's shape, so derive the shape rather than assuming one:
+    //
+    //   one command   → the step's exit code IS the command's (Actions runs
+    //                   `bash -e {0}`), so nothing can swallow it.
+    //   many commands → an earlier failure is swallowed by the commands after
+    //                   it unless the block sets a failing shell mode.
+    //
+    // Asserting `set -euo pipefail` unconditionally would demand a shell line
+    // that does nothing on a one-command step, which is how this assertion read
+    // when every command in the heavy suite shared one 60-line block.
+    // Text, not YAML, deliberately — same reason the search above is textual: a
+    // commented-out command has to stay visible. `run: <cmd>` contributes its
+    // inline tail; a `run: |` block contributes each of its lines; every other
+    // mapping key (`name:`, `if:`, `env:`, `with:`) contributes nothing.
+    const commands = step
+      .split("\n")
+      .map((line) => line.trim().replace(/^-\s+/, ""))
+      .filter((line) => line && !line.startsWith("#"))
+      .map((line) => (line.startsWith("run:") ? line.slice("run:".length).trim() : line))
+      .filter((line) => line && line !== "|" && !/^[\w-]+:(\s|$)/.test(line))
+      .filter((line) => line !== "set -euo pipefail");
+    if (commands.length > 1) {
+      assert(
+        /set -euo pipefail/.test(step),
+        `the multi-command step running \`${command.trim()}\` sets a failing shell mode, so an ` +
+          `earlier failure is not swallowed by the ${commands.length - 1} command(s) after it`
+      );
+    }
     assert(!/continue-on-error/.test(step), `the step running \`${command.trim()}\` has no continue-on-error`);
     assert(!/\bif:\s*false\b/.test(step), `the step running \`${command.trim()}\` is not disabled`);
   }
