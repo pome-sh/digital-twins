@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { GATEWAY_ORIGIN, routeModel } from "../src/model-routing.js";
+import { GATEWAY_ORIGIN, redactCredentials, routeModel } from "../src/model-routing.js";
 
 const GATEWAY = { AI_GATEWAY_API_KEY: "gw-key" };
 const DIRECT_ANTHROPIC = { ANTHROPIC_API_KEY: "sk-ant" };
@@ -107,5 +107,37 @@ describe("routeModel — gateway first, then the per-provider key", () => {
   it("names the env var it wanted when no credential is present", () => {
     expect(() => routeModel("claude-sonnet-5", {})).toThrow(/ANTHROPIC_API_KEY/);
     expect(() => routeModel("gpt-5", {})).toThrow(/OPENAI_API_KEY/);
+  });
+});
+
+describe("redactCredentials — a provider SDK's error text never carries a key", () => {
+  const KEY = "sk-ant-0123456789abcdef";
+
+  it("replaces the credential value with a named placeholder", () => {
+    const out = redactCredentials(`401 from provider: Bearer ${KEY} rejected`, {
+      ANTHROPIC_API_KEY: KEY,
+    });
+    expect(out).not.toContain(KEY);
+    expect(out).toContain("[ANTHROPIC_API_KEY redacted]");
+  });
+
+  it("replaces EVERY occurrence, not just the first", () => {
+    const out = redactCredentials(`${KEY} … ${KEY}`, { ANTHROPIC_API_KEY: KEY });
+    expect(out).not.toContain(KEY);
+  });
+
+  // A short or empty value would otherwise match everywhere and turn the whole
+  // message into placeholders — losing the diagnostic to protect a non-secret.
+  it("ignores a value too short to be a credential", () => {
+    expect(redactCredentials("a totally normal message", { ANTHROPIC_API_KEY: "x" })).toBe(
+      "a totally normal message",
+    );
+    expect(redactCredentials("unchanged", { ANTHROPIC_API_KEY: "" })).toBe("unchanged");
+  });
+
+  it("leaves a message that carries no credential alone", () => {
+    expect(redactCredentials("model not found", { ANTHROPIC_API_KEY: KEY })).toBe(
+      "model not found",
+    );
   });
 });

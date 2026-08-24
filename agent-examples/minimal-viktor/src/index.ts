@@ -31,7 +31,7 @@ import { fileURLToPath } from "node:url";
 import { generateText, stepCountIs, tool } from "ai";
 import { z } from "zod";
 
-import { routeModel } from "./model-routing.js";
+import { redactCredentials, routeModel } from "./model-routing.js";
 import { initTelemetry } from "./telemetry.js";
 
 function buildSystem(slackChannel: string) {
@@ -221,7 +221,10 @@ async function main() {
   } catch (err) {
     // A model/tool-loop failure is a failed trial, not a silent crash: surface
     // a one-line summary and a nonzero exit so the runner records it.
-    console.error(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+    // Scrubbed: the message is a provider SDK's, and this example runs with a
+    // real key.
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(JSON.stringify({ error: redactCredentials(message, process.env) }));
     process.exitCode = 1;
   } finally {
     await telemetry.shutdown();

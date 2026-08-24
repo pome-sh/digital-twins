@@ -16,6 +16,37 @@
  * a key.
  */
 
+type Env = Record<string, string | undefined>;
+
+/** Every env var this example reads a credential from. ONE source of truth: the
+ *  same list routes a model and scrubs those values out of anything logged. */
+export const CREDENTIAL_ENV_VARS = [
+  "AI_GATEWAY_API_KEY",
+  "ANTHROPIC_API_KEY",
+  "GOOGLE_GENERATIVE_AI_API_KEY",
+  "OPENAI_API_KEY",
+] as const;
+
+/**
+ * Replace any credential VALUE with a named placeholder.
+ *
+ * The run's catch logs whatever a provider SDK put in `err.message`, and this
+ * example is meant to be run with a real key — so a client that echoes its
+ * Authorization header into an error would print that key to stdout, and from
+ * there into the recorded trace. We do not control the SDK's error text, so the
+ * sink is sanitised instead. Guarded on length so a short or empty value cannot
+ * turn every string into placeholders. The LangGraph sibling carries the
+ * identical helper; the pair agrees on credentials, including how it fails.
+ */
+export function redactCredentials(text: string, env: Env): string {
+  let out = text;
+  for (const name of CREDENTIAL_ENV_VARS) {
+    const value = env[name]?.trim();
+    if (value && value.length >= 8) out = out.split(value).join(`[${name} redacted]`);
+  }
+  return out;
+}
+
 export type ModelRoute =
   | { via: "gateway"; modelId: string }
   | {
@@ -25,7 +56,6 @@ export type ModelRoute =
       apiKeyEnv: "ANTHROPIC_API_KEY" | "GOOGLE_GENERATIVE_AI_API_KEY" | "OPENAI_API_KEY";
     };
 
-type Env = Record<string, string | undefined>;
 
 export function routeModel(slug: string, env: Env): ModelRoute {
   // Gateway first. The slug goes through WHOLE: the AI SDK routes on the provider

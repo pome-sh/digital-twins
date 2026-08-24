@@ -28,7 +28,7 @@
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 
 import { buildGraph } from "./graph.js";
-import { routeModel } from "./model-routing.js";
+import { redactCredentials, routeModel } from "./model-routing.js";
 import { initTelemetry } from "./telemetry.js";
 
 if (process.env.POME_PREFLIGHT === "1") {
@@ -86,8 +86,10 @@ async function main() {
       }),
     );
   } catch (err) {
-    // A model/graph failure is a failed trial, not a silent crash.
-    console.error(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }));
+    // A model/graph failure is a failed trial, not a silent crash. Scrubbed:
+    // the message is a provider SDK's, and this example runs with a real key.
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(JSON.stringify({ error: redactCredentials(message, process.env) }));
     process.exitCode = 1;
   } finally {
     await telemetry.shutdown();

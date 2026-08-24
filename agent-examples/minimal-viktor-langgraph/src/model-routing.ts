@@ -19,6 +19,35 @@
 /** The gateway's own origin. BARE — see `baseUrlFor` for why that matters. */
 export const GATEWAY_ORIGIN = "https://ai-gateway.vercel.sh";
 
+/** Every env var this example reads a credential from. ONE source of truth: the
+ *  same list routes a model and scrubs those values out of anything logged. */
+export const CREDENTIAL_ENV_VARS = [
+  "AI_GATEWAY_API_KEY",
+  "ANTHROPIC_API_KEY",
+  "OPENAI_API_KEY",
+] as const;
+
+/**
+ * Replace any credential VALUE with a named placeholder.
+ *
+ * The graph's catch logs whatever a provider SDK put in `err.message`, and this
+ * example is meant to be run with a real key — so a client that echoes its
+ * Authorization header into an error would print that key to stdout, and from
+ * there into the recorded trace. We do not control the SDK's error text, so the
+ * sink is sanitised instead. Guarded on length so a short or empty value cannot
+ * turn every string into placeholders.
+ */
+export function redactCredentials(text: string, env: Env): string {
+  let out = text;
+  for (const name of CREDENTIAL_ENV_VARS) {
+    const value = env[name]?.trim();
+    if (value && value.length >= 8) out = out.split(value).join(`[${name} redacted]`);
+  }
+  return out;
+}
+
+type Env = Record<string, string | undefined>;
+
 export type ChatClient = "anthropic" | "openai";
 
 export interface ModelRoute {
@@ -31,8 +60,6 @@ export interface ModelRoute {
   /** Base URL override. `undefined` on the direct path — the SDK default is right. */
   baseUrl: string | undefined;
 }
-
-type Env = Record<string, string | undefined>;
 
 /**
  * The gateway speaks both protocols, at different paths, and the difference is
