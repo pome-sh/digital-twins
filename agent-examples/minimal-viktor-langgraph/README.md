@@ -291,9 +291,18 @@ VERIFICATION.md       what the red/green flip measured, and against which model
 ## Prerequisites
 
 1. **`pome login`** — hosted runs and cloud scoring require it.
-2. **`ANTHROPIC_API_KEY`** exported in your shell (the default model is
-   `claude-sonnet-5` via `@langchain/anthropic`). Set `LANGGRAPH_MODEL` to any
-   `anthropic/*` or `openai/*` slug to change it.
+2. **A model key** exported in your shell — either works, and they are checked in
+   this order:
+   * **`AI_GATEWAY_API_KEY`** routes through the Vercel AI Gateway. One key, every
+     provider. This is the same credential `agent-examples/minimal-viktor` takes,
+     so one key runs both halves of the pair.
+   * **`ANTHROPIC_API_KEY`** (or `OPENAI_API_KEY` for an `openai/*` slug) talks to
+     the provider directly.
+
+   The default model is `claude-sonnet-5` via `@langchain/anthropic`. Set
+   `LANGGRAPH_MODEL` to any `anthropic/*` or `openai/*` slug to change it — write
+   it the obvious way (`claude-sonnet-5` or `anthropic/claude-sonnet-5`); the
+   gateway's provider qualifier is added for you.
 3. Hosted quota. Each task at `-n 3` creates 6 sandboxes (3 runs × github +
    slack, all cloud-scored). Running all six tasks is 36 sandboxes.
 4. **`@pome-sh/shared-types` ≥ 0.10.1** on the cloud side (the OpenInference
@@ -315,7 +324,9 @@ npm test                     # checkSlack fixtures, header parsing, mirror branc
 pome register agent minimal-viktor-langgraph --twins github,slack
 pome doctor                  # must be green or `pome run` refuses to start
 
-export ANTHROPIC_API_KEY=... # your Anthropic key
+export ANTHROPIC_API_KEY=...   # your Anthropic key
+# …or, to use one key for this example and minimal-viktor both:
+# export AI_GATEWAY_API_KEY=... # your Vercel AI Gateway key
 ```
 
 ### Fork it → your own agent (under 2 min)
@@ -370,7 +381,9 @@ npx tsx scripts/run-trials.ts --cleanup <session_id> [<session_id> ...]
 
 | Env var | Default | Meaning |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | — (required for the default model) | Anthropic key |
+| `AI_GATEWAY_API_KEY` | — | Vercel AI Gateway key. **Checked first**; routes every provider, and is the credential `minimal-viktor` uses |
+| `ANTHROPIC_API_KEY` | — (required for the default model, absent a gateway key) | Anthropic key, used directly |
+| `OPENAI_API_KEY` | — (required for an `openai/*` slug, absent a gateway key) | OpenAI key, used directly |
 | `LANGGRAPH_MODEL` | `claude-sonnet-5` | `anthropic/*` (default) or `openai/*` slug |
 | `VIKTOR_SLACK_CHANNEL` | `eng-alerts` | channel Viktor reports to |
 | `POME_SLACK_REST_URL` / `VIKTOR_SLACK_REST_URL` | injected by pome (native) | Slack twin base. `POME_*` is preferred; `VIKTOR_*` is a manual fallback for the `--probe`/`--verify` utilities |
