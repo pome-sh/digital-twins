@@ -145,7 +145,7 @@ export function createRelease(domain: GitHubDomain,
       prerelease,
       options.actor ?? "pome-agent",
       now,
-      // F-1459 — `updated_at` on creation IS `created_at`. There is no release
+      // `updated_at` on creation IS `created_at`. There is no release
       // update route on this twin, so nothing can ever move it apart; when one
       // is added it must set this column, which is why it is a real column and
       // not `created_at` aliased in the serializer.

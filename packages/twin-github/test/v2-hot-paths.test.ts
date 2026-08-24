@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-300 — v2 hot path expansion (27 endpoints).
-// One describe block per cluster. Each endpoint has at minimum a happy-path
-// case + one error/edge case (404/422/409/permission).
+// V2 hot path expansion (27 endpoints). One describe block per cluster.
 
 import { describe, expect, it } from "vitest";
 import { openGitHubCloneDatabase } from "../src/db.js";
@@ -88,7 +86,7 @@ describe("v2 / cluster A — branches & files", () => {
     it("requires matching sha (optimistic locking)", () => {
       const domain = freshDomain();
       domain.createOrUpdateFile({ owner: "acme", repo: "api", path: "lock.md", message: "m", content: "x\n" });
-      // F-1491 — a stale sha is GitHub's 409 conflict, not a 422 validation
+      // A stale sha is GitHub's 409 conflict, not a 422 validation
       // failure, and the message names the path and the sha the caller sent.
       expect(() => domain.deleteFile({ owner: "acme", repo: "api", path: "lock.md", message: "stale", sha: "WRONG" })).toThrow("lock.md does not match WRONG");
     });

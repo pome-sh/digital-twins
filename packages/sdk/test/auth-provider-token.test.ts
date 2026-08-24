@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// Provider-shaped token mechanism tests (F-681, spec = F-712 [DECISION] row 1
-// + row 10 + the appendix bug). The engine owns mint + verify; twins declare
-// only their token shape (prefixes + HMAC provider domain).
+// Provider-shaped token mechanism tests (spec = the [DECISION] row 1 + row 10 + the
+// appendix bug).
 import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
@@ -79,7 +77,7 @@ describe("verifyProviderToken", () => {
     expect(verifyProviderToken(githubSpec, token, SECRET)).toBeUndefined();
   });
 
-  it("REGRESSION (F-712 appendix): a sid whose base64url encoding contains '_' round-trips", () => {
+ it("REGRESSION: a sid whose base64url encoding contains '_' round-trips", () => {
     // '?' (0x3F) + '>' (0x3E) produce a 6-bit group of 63 → '_' in base64url.
     const sid = "?>?";
     expect(Buffer.from(sid, "utf8").toString("base64url")).toContain("_");
@@ -123,7 +121,7 @@ describe("verifyProviderToken", () => {
     expect(verifyProviderToken(slackSpec, "xoxb-pome-nounderscore", SECRET)).toBeUndefined();
   });
 
-  it("accepts tokens minted by the pre-F-681 twin code (wire compat)", () => {
+ it("accepts tokens minted by the legacy twin code (wire compat)", () => {
     // Byte-identical to twin-slack's signSlackProviderToken / twin-github's
     // signProvider — cloud-minted tokens in flight must keep verifying.
     const sid = "compat-sid";

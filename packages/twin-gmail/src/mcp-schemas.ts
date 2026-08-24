@@ -99,7 +99,7 @@ export const sensitiveMessageLabelInputSchema = z
   })
   .passthrough();
 
-// F-1400: no arguments. The 2026-07-20 capture declared `pageSize`/`pageToken`
+// No arguments. The 2026-07-20 capture declared `pageSize`/`pageToken`
 // here and the twin paginated; the 2026-08-10 one declares an empty property
 // set, so there is no page to ask for and none is offered back.
 export const listLabelsInputSchema = z.object({}).passthrough();

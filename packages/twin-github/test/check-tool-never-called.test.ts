@@ -1,18 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1125 — `` `<tool>` was never called ``, the two phrases F-1076 deferred.
-//
-// F-1076 left these in `GITHUB_TAPE_DEFERRALS` on purpose, and the reason was
-// data rather than access: the phrases name MCP TOOL names while the tape
-// recorded HTTP transport, so answering them meant digging a tool name out of a
-// `/mcp` request body — and getting that wrong makes a NEGATIVE criterion
-// false-pass, the one failure D4 forbids outright.
-//
-// `RecorderEvent.tool` is the durable fix, so this check reads a field instead
-// of re-deriving one. The tests that matter most are therefore the ones about
-// what the field means: it is stamped on BOTH transports (proved end-to-end in
-// `tool-stamping.test.ts`), it is stamped on the ATTEMPT rather than only on
-// success, and a tape nobody handed us is refused by name rather than passed.
+// `` `<tool>` was never called ``, the two deferred phrases.
 
 import { describe, expect, it } from "vitest";
 import type { CheckTapeEvent } from "@pome-sh/sdk/checks";
@@ -137,9 +124,8 @@ describe("github.tool-never-called — verdicts", () => {
   });
 
   it("ignores a row whose tool field is absent — an older recording", () => {
-    // Rows written before F-1125 carry no `tool`. They must not be READ as this
-    // action; the criterion answering "never" over a tape that predates the
-    // field is a known limitation of an old recording, not a match.
+    // Rows written before carry no `tool`. They must not be READ as this action; the
+    // criterion answering "never" over a tape that predates the field is a known.
     const outcome = run("create_commit_status", [call({ tool: undefined })]);
     expect(outcome.passed).toBe(true);
   });

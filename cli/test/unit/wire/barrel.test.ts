@@ -13,13 +13,8 @@ import * as hub from "../../../src/types/shared.js";
 import * as barrel from "../../../src/contract/index.js";
 import * as run from "../../../src/contract/run.js";
 
-// F-942 — the recorder-events / otel / redaction leaves moved to
-// `@pome-sh/wire`, so the contract barrel no longer carries them; their
-// leaf-vs-barrel identity is guarded in
-// `packages/wire/test/export-surface.test.ts`. What has to be proven HERE is the
-// seam the CLI actually imports through: `src/types/shared.ts` merges two
-// `export *`s, and a second zod copy behind either one would break every
-// discriminated union in the recorder without breaking a type.
+// The recorder-events / otel / redaction leaves moved to `@pome-sh/wire`, so the
+// contract barrel no longer carries them; their leaf-vs-barrel identity is.
 describe("src/types/shared.ts hub preserves identity across both halves", () => {
   it("re-exports @pome-sh/wire's schemas by reference", () => {
     expect(hub.recorderEventSchema).toBe(wire.recorderEventSchema);

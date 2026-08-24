@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// sdk-boot suite (F-681 → F-683). Before the port this ran the frozen
-// FDRS-711 slack assertions against a proof entry (contract/proof/
+// sdk-boot suite. Before the port this ran the frozen
+// slack assertions against a proof entry (contract/proof/
 // slack-sdk-server.mjs) that assembled the twin on the @pome-sh/sdk engine.
-// Since F-683 the slack package's OWN entry (`node dist/src/server.js`, cwd
+// The slack package's OWN entry (`node dist/src/server.js`, cwd
 // = package root — the frozen boot contract) boots through defineTwin(), so
 // the proof entry is superseded and deleted: this suite now spawns the real
 // package and keeps the same 11 frozen assertions running against the

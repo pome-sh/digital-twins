@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Regression coverage for scripts/probe-example-tools.mjs (F-1152).
+ * Regression coverage for scripts/probe-example-tools.mjs.
  *
  * The gate exists because `comment_on_pull_request` in
  * agent-examples/pr-summary-agent and agent-examples/pr-summary-review wrapped
@@ -123,7 +123,7 @@ assertThrows(
   );
 }
 
-// ── deriveSeedFacts / resolveArgs (F-1163) ──────────────────────────────────
+// ── deriveSeedFacts / resolveArgs ───────────────────────────────────────────
 // The load-bearing half of the ticket: probe arguments come off the seed
 // itself, never a hand-written literal, so a sixth viktor seed needs no new
 // fixture and a repo with no PR/issue/file simply yields no bucket for it.
@@ -182,14 +182,14 @@ assertThrows(
   assert(facts.pr.last_number === 2 && facts.pr.number === 2, "a single-PR seed's first and last PR are the same");
 
   const resolved = resolveArgs(
-    { owner: "$repo.owner", repo: "$repo.name", pull_number: "$pr.number", body: "F-1152 probe." },
+    { owner: "$repo.owner", repo: "$repo.name", pull_number: "$pr.number", body: "literal probe." },
     facts,
   );
   assert(
     resolved.owner === "acme" && resolved.repo === "widgets" && resolved.pull_number === 2,
     "resolveArgs fills $repo.* and $pr.number from the derived facts",
   );
-  assert(resolved.body === "F-1152 probe.", "resolveArgs passes a non-$ literal through unchanged");
+  assert(resolved.body === "literal probe.", "resolveArgs passes a non-$ literal through unchanged");
 
   assert(
     resolveArgs({ issue_number: "$issue.number" }, noPr).issue_number === 1,
@@ -318,7 +318,7 @@ assertThrows(
   }
 }
 
-// ── discoverSeeds / discoverExamplesWithSeeds (F-1163) ──────────────────────
+// ── discoverSeeds / discoverExamplesWithSeeds ───────────────────────────────
 // Discovery, not a hand-kept list — a new .seed.json under an example's
 // tasks/ is covered with no edit anywhere in this repo.
 {
@@ -670,7 +670,7 @@ assert(
   );
 }
 
-// 4. stale-expect — the escape hatch expires loudly. Without this an F-1151-style
+// 4. stale-expect — the escape hatch expires loudly. Without this a regression
 // twin fix leaves a permanent exemption behind.
 {
   const probes = [
@@ -880,7 +880,7 @@ await withWireRuntime(async () => {
   const tape = store.events();
   assert(
     tape.some((event) => event.status === 404 && event.tool === "add_issue_comment"),
-    "the twin's own tape carries the 404 and stamps the action (F-1125, MCP surface)",
+    "the twin's own tape carries the 404 and stamps the action (MCP surface)",
   );
 });
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// What Gmail's declared checks can assert about DRAFTS (F-1128).
+// What Gmail's declared checks can assert about DRAFTS.
 //
 // The shape that makes this its own module: an exported draft row is
 // `{mailboxEmail, id, messageId, createdAt, updatedAt}` and carries NO

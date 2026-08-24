@@ -48,9 +48,8 @@ describe("/admin/* — localhost-only state controls", () => {
   });
 
   it("rejects non-localhost callers via remote address heuristic", async () => {
-    // Feed the gate through the public setClientIp() seam instead of a
-    // hand-built c.env.incoming mock, so this test no longer depends on the
-    // node bridge's private env shape (FDRS-587).
+    // Feed the gate through the public setClientIp() seam instead of a hand-built
+    // c.env.incoming mock, so this test no longer depends on the node bridge's private.
     const twin = createTwinStripeApp();
     const app = new Hono();
     app.use("*", async (c, next) => {

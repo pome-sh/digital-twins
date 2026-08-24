@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The two golden fixture agents for `agent-examples/support-triage` (F-646), and
-// the per-criterion breakdown each one must produce.
+// The two golden fixture agents for `agent-examples/support-triage`, and the
+// per-criterion breakdown each one must produce.
 //
 // The task's lesson is ROUTING UNDER A LOCAL CONVENTION. Five issues are open in
 // `acme/orders-service`. `#47` is the textual bullseye — its title and body carry
@@ -23,8 +23,7 @@
 // WHY THE WRONG RUN FAILS ALL FIVE. It would be easy to write a wrong agent that
 // fails only `no-new-issues`, and it would be a weaker fixture: the pair would
 // then prove one check discriminates, not that the run's verdict does. It would
-// also no longer reach 0, which is F-646's headline and this gate's sharpest
-// property — every criterion that silently stopped discriminating would move the
+// also no longer reach 0, which is this gate's sharpest property — every criterion that silently stopped discriminating would move the
 // number OFF zero, and there is no other value with that quality.
 //
 // Reaching 0 on the five-criterion task needs the wrong run to both open a
@@ -110,8 +109,8 @@ export const wrongAgent: FixtureAgent = {
 };
 
 /**
- * The agent that does nothing at all — F-1521's reason for existing, kept as a
- * fixture rather than argued about in a comment.
+ * The agent that does nothing at all — the positive tape assertion's reason for
+ * existing, kept as a fixture rather than argued about in a comment.
  *
  * It is NOT a third column of the breakdown below. `correct` and `wrong` are a
  * discriminating PAIR over the task's lesson (route to the tracking issue, or
@@ -141,8 +140,8 @@ export const nullAgent: FixtureAgent = {
  * be re-worded without changing what grades it, and an index says nothing a
  * reader can check. The id is the thing a report names.
  *
- * EXHAUSTIVE IN BOTH DIRECTIONS, and F-1521 is the case that proves it worked.
- * The gate fails when the task carries a `[code]` criterion this table does not
+ * EXHAUSTIVE IN BOTH DIRECTIONS, and the tape criterion is the case that proves
+ * it worked. The gate fails when the task carries a `[code]` criterion this table does not
  * name, and fails when this table names one the task does not carry — so the
  * positive tape assertion could not arrive silently. It landed exactly the way
  * the slot predicted: a red gate naming the missing row, one entry added, no
@@ -170,10 +169,10 @@ export const SUPPORT_TRIAGE_BREAKDOWN: Record<
   // it a real failure for anyone who breaks it while denying a do-nothing agent
   // the free pass the marker would hand back.
   "slack.no-message-containing": { correct: "passed", wrong: "failed" },
-  // The lesson's restraint half (F-1198 declared this check so it could be
-  // graded at all). Seed-true, unmarked, for the reason above.
+  // The lesson's restraint half — this check was declared so it could be graded
+  // at all. Seed-true, unmarked, for the reason above.
   "github.no-new-issues": { correct: "passed", wrong: "failed" },
-  // F-1521 — the only criterion a NULL agent cannot clear by absence. The two
+  // The only criterion a NULL agent cannot clear by absence. The two
   // negatives above and this one fail in opposite directions: an agent that does
   // nothing opens no duplicate and names no decoy, so it passes both, and leaves
   // no comment so it fails this. The wrong fixture fails it for the live reason

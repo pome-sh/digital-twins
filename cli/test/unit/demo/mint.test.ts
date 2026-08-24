@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-643 — anonymous demo mint: wire shape, group threading, honest
-// capacity mapping.
+// Anonymous demo mint: wire shape, group threading, honest capacity mapping.
 import { describe, expect, it } from "vitest";
 import { mintDemoSessions } from "../../../src/demo/mint.js";
 import { DemoCapacityError } from "../../../src/demo/capacity.js";
@@ -13,7 +12,7 @@ function jsonResponse(status: number, body: unknown): Response {
   });
 }
 
-describe("mintDemoSessions (FDRS-643)", () => {
+describe("mintDemoSessions", () => {
   it("POSTs {task_name, task_hash:'', group_id} with NO auth header, once per trial, same group", async () => {
     const bodies: unknown[] = [];
     let n = 0;

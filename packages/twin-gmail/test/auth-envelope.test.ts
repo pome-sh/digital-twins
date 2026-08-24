@@ -1,43 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// F-1497 — twin-gmail's auth-refusal envelopes, measured against Google.
-//
-// ── THE MEASUREMENT THIS FILE PINS ────────────────────────────────────────
-//
-// `GET https://gmail.googleapis.com/gmail/v1/users/me/profile`, probed live on
-// 2026-08-13, twice: once with `Authorization: Bearer <deliberately invalid>`
-// and once with no `Authorization` header at all. A read with no request body,
-// so nothing was created and no quota beyond a rejected request was consumed.
-//
-//   BAD CREDENTIAL → HTTP 401
-//   {"error":{"code":401,
-//     "message":"Request had invalid authentication credentials. Expected OAuth 2 access token, login cookie or other valid authentication credential. See https://developers.google.com/identity/sign-in/web/devconsole-project.",
-//     "errors":[{"message":"Invalid Credentials","domain":"global","reason":"authError","location":"Authorization","locationType":"header"}],
-//     "status":"UNAUTHENTICATED"}}
-//
-//   NO Authorization HEADER → HTTP 401
-//   {"error":{"code":401,
-//     "message":"Request is missing required authentication credential. Expected OAuth 2 access token, login cookie or other valid authentication credential. See https://developers.google.com/identity/sign-in/web/devconsole-project.",
-//     "errors":[{"message":"Login Required.","domain":"global","reason":"required","location":"Authorization","locationType":"header"}],
-//     "status":"UNAUTHENTICATED",
-//     "details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"CREDENTIALS_MISSING","domain":"googleapis.com","metadata":{"method":"caribou.api.proto.MailboxService.GetProfile","service":"gmail.googleapis.com"}}]}}
-//
-// Two things that says, and both are assertions below rather than prose:
-//
-// 1. **Google DISTINGUISHES a bad credential from a missing one**, on three
-//    leaves at once. This twin sent the bad-credential body for both until
-//    F-1497.
-// 2. **Google sends NO `documentation_url` and NO top-level `status`.** The
-//    GitHub-shaped leaves F-1497 added to twin-github must never appear here,
-//    and the `documentation_url: ""` this twin's admin 403 was inheriting from
-//    `@pome-sh/sdk`'s shared gate had to go.
-//
-// ⚠️ WHAT IS DELIBERATELY NOT REPRODUCED: the missing-credential body's
-// `details[]` block, whose `metadata.method` names the backend method the
-// request would have reached. Authentication fails before dispatch, so this
-// layer does not know the operation, and inventing one would be a divergence
-// pointing the other way — the same reasoning that keeps twin-github's 401
-// `documentation_url` generic. Registered as a divergence, and the last test
-// here pins the absence so it reads as a gap and not as coverage.
+// Twin-gmail's auth-refusal envelopes, measured against Google.
 import { sign } from "hono/jwt";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createGmailTwinApp } from "../src/index.js";
@@ -68,7 +30,7 @@ async function refuse(init: RequestInit = {}) {
   return { status: response.status, body: (await response.json()) as Record<string, unknown> };
 }
 
-describe("F-1497 — gmail's 401 tells a bad credential from a missing one", () => {
+describe("gmail's 401 tells a bad credential from a missing one", () => {
   it("a BAD bearer answers Google's invalid-credentials body, whole", async () => {
     const got = await refuse({ headers: { authorization: "Bearer f1497-invalid-not-a-real-token" } });
 
@@ -95,7 +57,7 @@ describe("F-1497 — gmail's 401 tells a bad credential from a missing one", () 
   });
 
   it("NO Authorization header answers the missing-credential body instead", async () => {
-    // The fix. Before F-1497 this was byte-identical to the test above, which
+    // The fix. This used to be byte-identical to the test above, which
     // is what made it a measured divergence rather than a shape question.
     const got = await refuse();
 
@@ -149,7 +111,7 @@ describe("F-1497 — gmail's 401 tells a bad credential from a missing one", () 
   });
 });
 
-describe("F-1497 — gmail's admin-gate 403 is Google-shaped, not GitHub's", () => {
+describe("gmail's admin-gate 403 is Google-shaped, not GitHub's", () => {
   it("answers PERMISSION_DENIED with no documentation_url", async () => {
     // ⚠️ THIS BODY USED TO COME FROM `@pome-sh/sdk`'s shared admin gate, and it
     // read `{message:"Forbidden", documentation_url:""}` — GitHub's envelope,
@@ -170,12 +132,10 @@ describe("F-1497 — gmail's admin-gate 403 is Google-shaped, not GitHub's", () 
   });
 });
 
-describe("F-1497 — the leaves Google does NOT send, pinned as absences", () => {
+describe("the leaves Google does NOT send, pinned as absences", () => {
   it("no `documentation_url` anywhere, on any refusal", async () => {
-    // The one-line reading of what F-1497 measured: of five vendors, only
-    // GitHub sends this key. Serialised rather than key-checked so a leak into
-    // `error.documentation_url` — the nesting this twin actually uses — is
-    // caught too.
+    // The one-line reading of the measurement: of five vendors, only GitHub sends this
+    // key.
     process.env.TWIN_ADMIN_TOKEN = "f1497-gmail-admin-token";
     const app = createGmailTwinApp();
     const bodies = [

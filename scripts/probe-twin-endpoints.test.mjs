@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * Regression coverage for scripts/probe-twin-endpoints.mjs (F-1305).
+ * Regression coverage for scripts/probe-twin-endpoints.mjs.
  *
  * The gate exists because nothing called every endpoint a twin declares.
- * Measured on `51b5efe`: the five twins declare 137 MCP tools, the F-1152
+ * Measured on `51b5efe`: the five twins declare 137 MCP tools, the
  * example probe gate reached 9 of them (all github's), and 23 — slack's 8 and
  * linear's 15 — were reached by nothing over the MCP wire at all, including by
  * their own test suites, which exercise them through `executeTool()` on the
@@ -103,7 +103,7 @@ assert(
   "evaluateTwinProbeRun is silent on a clean run",
 );
 
-// 0. setup steps (F-1376): state-building, never coverage.
+// 0. setup steps: state-building, never coverage.
 //
 // twin-github's three release readers only answer once a release exists, and
 // GitHub declares no `create_release` MCP tool for the twin to serve — so the
@@ -259,7 +259,7 @@ assert(
 // No model, no API key, no Docker, no socket: each twin runs in this process on
 // `:memory:` SQLite and is driven through Hono's `app.request`.
 
-// The F-1151 regression, as a live fixture. `add_issue_comment` at a PULL
+// The PR-comment regression, as a live fixture. `add_issue_comment` at a PULL
 // REQUEST's number is the call that answered `404 Issue not found` for the
 // whole life of agent-examples/pr-summary-agent and agent-examples/pr-summary-review.
 {
@@ -301,7 +301,7 @@ assert(
 
 // The anti-drift clause, end to end, on the twin that most needs it: slack
 // declared 11 tools and its own suite reached 3 over the wire. It declares 18
-// now (F-1330 replaced the table with Slack's own), and the count below is
+// now (the table was replaced with Slack's own), and the count below is
 // derived from the twin rather than typed, so the clause survives the next one.
 {
   // Derived, not typed: an empty manifest reds one unprobed-endpoint per
@@ -363,7 +363,7 @@ if (failures > 0) {
 }
 console.log("probe-twin-endpoints: all assertions passed.");
 
-// resolvePath (F-1376): a setup step addresses state an earlier probe minted, so
+// resolvePath: a setup step addresses state an earlier probe minted, so
 // `$alias` resolves in a path SEGMENT — and only in a whole segment, so a
 // literal `$` cannot be mistaken for a reference.
 {

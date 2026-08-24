@@ -1,16 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1172: `CREATE TABLE IF NOT EXISTS` is a no-op on a database that already
-// has the table, so a `LINEAR_TWIN_DB` file written before the AgentSession
-// rename used to open CLEAN on the old columns and then die later, far from the
-// cause, with `"undefined" is not valid JSON` out of `mapAgentSession`.
-// Reopening old files is a supported path (see db.ts's `ensureColumn` calls);
-// cloud's per-session databases are ephemeral, local and self-host files are
-// not.
-//
-// This builds a genuinely pre-rename `agent_sessions` table — asserting its
-// column set equals the frozen pre-rename list before going anywhere near the
-// migration — and then reopens it with the shipping code.
+// `CREATE TABLE IF NOT EXISTS` is a no-op on a database that already has the table, so
+// a `LINEAR_TWIN_DB` file written before the AgentSession rename used.
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -91,7 +81,7 @@ function seedPreRenameDatabase(): string {
   return path;
 }
 
-describe("a pre-rename agent_sessions table migrates on open (F-1172)", () => {
+describe("a pre-rename agent_sessions table migrates on open", () => {
   it("renames the columns instead of opening clean and crashing later", () => {
     const path = seedPreRenameDatabase();
 

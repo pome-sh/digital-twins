@@ -3,10 +3,7 @@ import { openGitHubCloneDatabase } from "../src/db.js";
 import { GitHubDomain } from "../src/domain/index.js";
 import { TAPE_ASSERTABLE_TOOLS, githubToolFixture, isMutatingTool } from "../src/tools.js";
 
-// Migrated from the CLI twin-github copy during the twin consolidation
-// (FDRS-648). `create_commit_status` / `create_check_run` 404 on an unknown
-// SHA (requireCommitOnRepo), so every case drives them against a PR's real
-// head SHA obtained from a seeded repository.
+// Migrated from the CLI twin-github copy during the twin consolidation.
 function seededPr(statuses?: Array<{ context: string; state: "error" | "failure" | "pending" | "success"; description?: string }>) {
   const db = openGitHubCloneDatabase(":memory:");
   const domain = new GitHubDomain(db);
@@ -48,30 +45,14 @@ function repoExport(domain: GitHubDomain) {
   };
 }
 
-// F-1376 took `create_commit_status` and `create_check_run` off the MCP door:
-// GitHub's MCP server registers neither, under any toolset or feature flag, so a
-// twin serving them scored work no examinee could have done. The OPERATIONS are
-// untouched — they were GitHub REST operations all along, and they are still
-// reachable at `POST /repos/:owner/:repo/statuses/:sha` and
-// `POST /repos/:owner/:repo/check-runs`, which is how scenario 18's trap is
-// still reachable and still recorded. These tests drive the domain the REST
-// handlers drive; `test/tool-stamping.test.ts` covers the REST routes' action
-// stamps, which is what makes "was never called" answerable.
-describe("twin-github check-run / commit-status surfaces (FDRS-524, F-1376)", () => {
+// `create_commit_status` and `create_check_run` came off the MCP door: GitHub's MCP
+// server registers neither, under any toolset or feature flag, so a twin.
+describe("twin-github check-run / commit-status surfaces", () => {
   it("serves neither as an MCP tool, and keeps both tape-assertable", () => {
     const names = githubToolFixture.toolNames;
     expect(names).not.toContain("create_commit_status");
     expect(names).not.toContain("create_check_run");
-    // The tape vocabulary is NOT the tool table. Both actions are still stamped
-    // on their REST routes, so task 18's `[code] create_commit_status was never
-    // called` still has something to be false about.
-    //
-    // CONTAINMENT, not equality. What this file owns is that dropping these two
-    // from the MCP door did not drop them from the tape vocabulary; the set's
-    // full membership belongs to `test/tool-stamping.test.ts`, which is the file
-    // that can actually pay for a name by probing both of its doors (F-1521 added
-    // a third, and an equality here would have made that a two-file edit for no
-    // property).
+    // The tape vocabulary is NOT the tool table.
     expect([...TAPE_ASSERTABLE_TOOLS]).toContain("create_commit_status");
     expect([...TAPE_ASSERTABLE_TOOLS]).toContain("create_check_run");
     // And nothing may quietly bring them back as tools without this failing.

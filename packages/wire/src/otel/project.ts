@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * otel/project — the single attribute→projection function (M1.1 / FDRS-480).
+ * otel/project — the single attribute→projection function (M1.1).
  *
  * The typed `gen_ai_*` / `http_*` / `url_*` / `server_*` / `error_type` fields
  * on an `OtelSpanEvent` are PROJECTIONS of the verbatim `attributes` bag, never

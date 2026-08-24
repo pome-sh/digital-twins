@@ -47,7 +47,7 @@ describe("runAgentCommand", () => {
   it("forwards documented provider keys without inheriting unrelated secrets", async () => {
     saveEnv();
     process.env.OPENAI_API_KEY = "sk-test-provider";
-    // FDRS-667 — Claude subscription auth must reach the agent subprocess.
+    // Claude subscription auth must reach the agent subprocess.
     process.env.CLAUDE_CODE_OAUTH_TOKEN = "sk-ant-oat-test";
     process.env.SECRET_SHOULD_NOT_LEAK = "raw-secret";
 

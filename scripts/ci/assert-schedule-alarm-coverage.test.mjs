@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Regression coverage for scripts/ci/assert-schedule-alarm-coverage.mjs
-// (F-1471, and F-1493's effective-permissions check). Builds scratch
+// (and the effective-permissions check). Builds scratch
 // `.github/workflows` trees so every assertion is about the PARSER, not
 // about which alarms this repo happens to carry today.
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
@@ -178,7 +178,7 @@ withScratchRoot(
 // ── Break-on-purpose: a step-level if: false (deeper than the job's own
 // keys) must not be mistaken for the job-level if: that actually gates the
 // alarm call. This is one of the three shapes that defeated a grep-based
-// version of this exact check during F-1230's own review — a flat regex over
+// version of this exact check during its own review — a flat regex over
 // lines would see the nearer "if: false" and misread a healthy job-level
 // if: failure() as neutralised.
 withScratchRoot(
@@ -464,7 +464,7 @@ withScratchRoot(
   },
 );
 
-// ── F-1493: a calling job whose permissions map omits issues: write must
+// ── A calling job whose permissions map omits issues: write must
 // gap, naming both the workflow and the job.
 withScratchRoot(
   {

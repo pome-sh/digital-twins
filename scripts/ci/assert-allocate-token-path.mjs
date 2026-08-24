@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1511 — THE VERSION-ALLOCATING PUSH CAN ONLY EVER HAPPEN WITH THE APP TOKEN.
+// THE VERSION-ALLOCATING PUSH CAN ONLY EVER HAPPEN WITH THE APP TOKEN.
 //
 // `allocate-version.yml`'s checkout carries a fallback:
 //
@@ -58,8 +58,8 @@
 //
 // Comment stripping is `list-scheduled-workflows.mjs`'s, not a third copy: its
 // stripper is quote-aware because a blanket `#.*$` once truncated two distinct
-// quoted values to the same mangled prefix and made a bijection compare two equal
-// wrecks (F-1471).
+// quoted values to the same mangled prefix and made a bijection compare two
+// equal wrecks.
 //
 // Usage: node scripts/ci/assert-allocate-token-path.mjs [repo root]
 
@@ -377,7 +377,7 @@ export function main(argv = process.argv.slice(2)) {
 // Realpath'd on both sides — node resolves symlinks before deriving
 // `import.meta.url`, so a bare `pathToFileURL()` of argv[1] misses through a
 // symlinked checkout (a worktree, or macOS's symlinked `/tmp`) in the same silent
-// shape (F-1488), and a guard miss while invoked as this file throws rather than
+// shape, and a guard miss while invoked as this file throws rather than
 // exits 0.
 const SELF = realpathSync(fileURLToPath(import.meta.url));
 const ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";

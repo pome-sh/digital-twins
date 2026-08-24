@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// What Slack's declared checks can assert about MESSAGES and REACTIONS (F-1126).
+// What Slack's declared checks can assert about MESSAGES and REACTIONS.
 //
 // All four are migrated from pome-cloud's
 // `services/evaluators/deterministic/slack.ts`, where they were hand-written
@@ -150,7 +150,7 @@ export const noReactionAdded: Check<{ reaction: string; channel: string }> = def
   polarity: () => "negative",
   // The reaction name, because that is the literal this predicate compares
   // against `reactions[].name` — the line below has said so since the check
-  // shipped, and this field said `null` anyway (F-1157).
+  // shipped, and this field said `null` anyway.
   //
   // It is the sharpest case in the vocabulary for why that mattered. A NEGATIVE
   // criterion asserting a scanned literal is absent reads a redactor's work as
@@ -180,7 +180,7 @@ export const noReactionAdded: Check<{ reaction: string; channel: string }> = def
   evaluate({ reaction, channel }, { final }) {
     const found = resolveChannel(final, channel);
     if ("missing" in found) return missSkip(found);
-    // F-1159. `?? []` used to read a MISSING `reactions` collection the same as
+    // `?? []` used to read a MISSING `reactions` collection the same as
     // an EMPTY one: the filter fell through to zero rows either way, and this
     // negative criterion scored `passed` over an export it never actually
     // observed — an agent that did react still collected the point. Same

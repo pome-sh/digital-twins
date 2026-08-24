@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * otel/fixtures/data — frozen golden-fixture corpus (M1.3 / FDRS-482).
+ * otel/fixtures/data — frozen golden-fixture corpus (M1.3).
  *
  * The single source of truth for trace fixtures across M2–M6. Static
  * data, deterministic by construction, and DEEP-FROZEN on export (review
@@ -27,9 +27,9 @@ import type { OtelSpanInput } from "../map-span.js";
 // How a fixture's attribute shape was sourced. Kept explicit so consumers never
 // mistake a documentation-derived example for a live capture.
 //
-// `"live-capture"` (ported from pome-cloud, FDRS-653) is reserved for shapes
+// `"live-capture"` (ported from pome-cloud) is reserved for shapes
 // captured from a REAL emitter run (creds + network egress required — the
-// capture tooling itself is cloud-owned, see FDRS-521). It is part of the
+// capture tooling itself is cloud-owned, ). It is part of the
 // union so a future capture can set it without a type change; NO fixture in
 // this file uses it today — everything here is honestly
 // `"documentation-derived"`.

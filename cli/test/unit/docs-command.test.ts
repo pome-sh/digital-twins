@@ -30,7 +30,7 @@ describe("pome docs helpers", () => {
     expect(findTopic("install", DOCS_TOPICS)?.id).toBe("getting-started");
   });
 
-  it("keeps routing the retired skills-setup/skills-test keywords (F-893)", () => {
+  it("keeps routing the retired skills-setup/skills-test keywords", () => {
     // The skills-setup / skills-test topics were removed with the Gen-1 CLI
     // wiring commands; every keyword that used to reach them must still resolve
     // (never an unknown-topic exit 2). Some migrated onto a new topic; others

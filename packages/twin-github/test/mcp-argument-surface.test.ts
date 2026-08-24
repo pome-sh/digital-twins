@@ -1,54 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// The twin's ARGUMENT SURFACE against GitHub's, pinned (F-1468).
-//
-// `test/mcp-tool-fixture.test.ts` proves the twin serves the projection's bytes.
-// This proves what those bytes do NOT: that the validators behind them are the
-// ones a reader of the listing would expect. The two documents stopped being
-// generated from each other when the fixture became GitHub's, and an examinee
-// only ever collides with the second.
-//
-// ── WHY THIS IS AN EXACT SET AND NOT `toEqual([])` ─────────────────────────
-//
-// twin-slack's equivalent asserts empty, because F-1330 moved its validators
-// onto Slack's argument surface in the same change that adopted the fixture.
-// This one does not, and the reason is not effort: closing an entry here usually
-// TIGHTENS what the twin accepts, and a tightening breaks every task written
-// against the twin as it is. It ships with a corpus heat reading and its
-// migrations (F-1330's discipline), not with a fixture swap.
-//
-// That reading ran, and the three tightenings it cleared are gone from this list
-// rather than sitting in it: `query` required on the five search tools and
-// `branch` on the two file writers (zero callers measured across the corpus, the
-// bundled examples, 17 hosted saved tasks and 50 hosted runs), and
-// `list_issues.state` on GitHub's casing (one caller, migrated in the same
-// change). What remains is what still has heat, or still wants a ruling.
-//
-// So the gap is PINNED rather than tolerated. Adding a validator argument
-// GitHub does not declare, or dropping one it does, fails this test until a
-// person edits the list — and editing it is where the argument for the change
-// gets made. A count, a per-tool allowance or a `length` assertion would each
-// let the next one arrive unread, which is the failure `EXPECTED_OPT_OUTS` and
-// the MCP-lane registry are both shaped to prevent.
-//
-// THE RESIDUE IS THE WORKLIST. Three shapes, and they are not equally urgent:
-//
-//   FALSE PASS — the twin accepts what GitHub refuses. One left:
-//     `create_pull_request` takes a call with no `base`. An examinee that omits
-//     the argument is graded as succeeding here and would fail against GitHub.
-//     Worst class for a grading instrument, and first in line.
-//
-//     The other four went in F-1468's tightening, once the heat read found them
-//     free: `query` on the five search tools and `branch` on the two file
-//     writers had zero callers anywhere, and `list_issues.state` had exactly one
-//     (agent-examples/triage-agent), migrated in the same change.
-//   ALIAS — the twin validates a snake_case spelling GitHub does not declare
-//     (`per_page`, `pull_number`, `q`, `expected_head_sha`) ALONGSIDE the
-//     camelCase one. Breaks nobody today and is invisible to an examinee
-//     reading the listing; removing an alias is the breaking half.
-//   UNMODELLED — GitHub declares an argument the twin ignores (`sort`, `order`,
-//     `fields`, `draft`, `reviewers`). Silently dropped rather than refused, so
-//     an examinee that passes it is graded on a call the twin did not make.
+// The twin's ARGUMENT SURFACE against GitHub's, pinned as an EXACT set so a new gap
+// cannot arrive unread.
 import { describe, expect, it } from "vitest";
 import { typeDisagreements } from "@pome-sh/sdk/mcp-tool-fixture";
 import { toolSchemaConformance } from "../src/tool-schema-conformance.js";
@@ -157,7 +109,7 @@ const KNOWN_RESIDUE: string[] = [
     "'update_pull_request_branch' validates 'pull_number', which GitHub's inputSchema does not declare",
 ];
 
-describe("MCP argument surface vs GitHub's declared one (F-1468)", () => {
+describe("MCP argument surface vs GitHub's declared one", () => {
   it("has exactly the known residue — no more, and no fewer", () => {
     expect(toolSchemaConformance().sort()).toEqual(KNOWN_RESIDUE);
   });
@@ -171,14 +123,8 @@ describe("MCP argument surface vs GitHub's declared one (F-1468)", () => {
     expect(KNOWN_RESIDUE.length).toBeGreaterThan(50);
   });
 
-  // ⚠️ REQUIRED MEANS PRESENT, NOT TRUTHY. F-1468's first cut wrote the search
-  // tools' refine as `value.query ?? value.q`, which rejects `q: ""` — and
-  // GitHub declares `query` as a plain string with no `minLength`, so an empty
-  // one is a call the vendor accepts. Requiring an argument is not licence to
-  // narrow its domain: that would have swapped a false PASS for a false FAILURE,
-  // the very trade this ticket exists to avoid. The CLI's own smoke app caught
-  // it (`search_repositories` with `{ q: "" }`), which is luck, so it is pinned
-  // here where it is the subject.
+  // REQUIRED MEANS PRESENT, NOT TRUTHY: GitHub declares `query` with no
+  // `minLength`, so `q: ""` is a call the vendor accepts.
   it("an EMPTY query satisfies the requirement, because GitHub declares no minimum", () => {
     for (const name of ["search_repositories", "search_code", "search_users", "search_issues", "search_commits"]) {
       const schema = toolArgumentSchemas.find((t) => t.name === name)!.schema;
@@ -189,21 +135,10 @@ describe("MCP argument surface vs GitHub's declared one (F-1468)", () => {
     }
   });
 
-  // ── THE TYPE AXIS (F-1614) ────────────────────────────────────────────────
-  //
-  // The residue above compares which arguments each side has and which it
-  // requires. Until F-1614 it compared nothing else, and that gap shipped a
-  // defect for as long as the pin existed: GitHub declared `list_issues.labels`
-  // as an array of strings, this twin validated it as one string, both
-  // documents had the key, neither required it, and `toolSchemaConformance()`
-  // reported nothing — while the twin answered 422 `invalid_type` to the exact
-  // shape its own listing advertises.
-  //
-  // These three cases are the guard on the guard. The real fixture now agrees
-  // everywhere, so a test that only read it would pass whether the comparison
-  // worked or not.
+  // ── THE TYPE AXIS ───────────────────────────────────────────────────────── Guard
+  // on the guard: the real fixture agrees everywhere, so a test that only.
   describe("a TYPE disagreement on a shared key is reported", () => {
-    it("catches the exact shape F-1614 was, replayed against a planted pair", () => {
+ it("catches the exact shape was, replayed against a planted pair", () => {
       expect(
         typeDisagreements(
           "list_issues",
@@ -237,10 +172,8 @@ describe("MCP argument surface vs GitHub's declared one (F-1468)", () => {
     });
   });
 
-  // F-1614's own regression at the fixture level: the tool that carried the
-  // defect is asserted against GitHub's declaration directly, so a future edit
-  // that puts `labels` back on a string fails here as well as in
-  // `upstream-measured-semantics.test.ts`.
+  // The regression at fixture level: the tool that carried the defect is
+  // asserted against GitHub's declaration directly.
   it("validates list_issues.labels as the array GitHub declares", () => {
     const declared = githubToolFixture.tools.find((tool) => tool.name === "list_issues")!;
     const labels = (declared.inputSchema as { properties: Record<string, { type?: string }> }).properties.labels;

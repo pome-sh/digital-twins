@@ -83,17 +83,7 @@ describe("barrel", () => {
   });
 });
 
-// The invariant the whole packaging strategy exists to protect (F-942). zod is a
-// `peerDependency` and tsup must never inline it: if it does, the seed schemas
-// this package hands out are built from a DIFFERENT zod than the one the
-// consumer imports, and nothing announces it — `.parse()` still returns an
-// object, `instanceof` quietly stops holding, and a schema composed across the
-// boundary throws somewhere unrelated.
-//
-// This is the source-level half; `scripts/ci/check-checks-tarball.mjs` asserts
-// the same thing about the built tarball, where the bundler is what could break
-// it. Both are needed: this one would pass on a bundle that inlined zod, and that
-// one cannot see whether the schemas are zod at all.
+// The invariant the whole packaging strategy exists to protect.
 describe("zod schema identity", () => {
   const schemas = [
     ["github", barrel.githubSeedSchema],
@@ -120,12 +110,7 @@ describe("zod schema identity", () => {
 });
 
 describe("dsl", () => {
-  // The symbols pome-cloud's 13 `@pome-sh/checks/dsl` import sites use. `export *`
-  // means an ADDITION needs no edit here; this list is what makes a REMOVAL a
-  // named failure in this repo instead of a TypeError in the consumer's.
-  //
-  // Those sites read `@pome-sh/sdk/checks` until F-1349 moved them, which is the
-  // ticket that made this list describe a real consumer rather than a planned one.
+  // The symbols pome-cloud's 13 `@pome-sh/checks/dsl` import sites use.
   it("re-exports the check DSL pome-cloud imports", () => {
     for (const name of [
       "defineCheck",
@@ -157,22 +142,8 @@ describe("dsl", () => {
 });
 
 describe("per-twin subpaths", () => {
-  // Each subpath keeps the twin's OWN names, so a pome-cloud import site moves
-  // by changing the specifier and nothing else.
-  //
-  // F-1349 made this arm load-bearing rather than illustrative: pome-cloud now
-  // imports these subpaths for real, and it reaches for the TWIN'S names, not
-  // the barrel's prefixed aliases. `defaultSeedState` (github/gmail/linear/slack)
-  // and `defaultSeed` (stripe) are what `criterion-discrimination.ts` and
-  // `apps/mcp/src/task/parseTask.ts` bind their null-agent worlds from; the
-  // barrel exports the same values as `defaultGitHubSeed` and friends, so the
-  // barrel arm above stays green if a subpath drops or renames them.
-  //
-  // The seed-schema expectation is per-twin and EXACT for the same reason. It
-  // used to be `["seedSchema","gmailSeedSchema","linearSeedSchema"].some(n => n in module)`,
-  // which passes as long as ANY of the three is present — so gmail exporting
-  // `seedSchema` instead of `gmailSeedSchema` would have been green here and a
-  // compile error in `apps/mcp/src/task/taskSchema.ts`.
+  // Each subpath keeps the twin's OWN names, so a pome-cloud import site moves by
+  // changing the specifier and nothing else.
   const modules = { github, gmail, linear, slack, stripe } as const;
   const arrays = {
     github: "GITHUB_CHECKS",
@@ -226,8 +197,6 @@ describe("per-twin subpaths", () => {
     });
 
     // `applySeed` writes SQLite rows and `loadSeedFromEnv` reads process.env.
-    // Both are twin RUNTIME behaviour; this package is declarations only, and the
-    // runtime channel stays GHCR (F-1308).
     it(`${twin} does not leak runtime seed helpers`, () => {
       expect(module).not.toHaveProperty("applySeed");
       expect(module).not.toHaveProperty("loadSeedFromEnv");

@@ -1,23 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1399 — the truth table for the one predicate that decides whether a
-// finished run has a verdict to state.
-//
-// F-1416 MOVED THIS FILE HERE, from pome-cloud's private `packages/contract`,
-// along with the predicate it tests. Four surfaces in two repositories ask this
-// question about the same run — pome-cloud's dashboard badge (`run-status.ts`)
-// and markdown report header (`run-report.ts`), and this repo's CLI terminal
-// verdict and `verdict.json` `state`. Each pome-cloud surface used to carry a
-// hand-written copy of the clauses, edited in lockstep twice (F-1296 added the
-// seed-exclusion exemption to both, F-1399 the empty-denominator clause) before
-// F-1399 merged them; the CLI's agreement test then carried a THIRD copy, as a
-// transcription, and that one went stale green. The table belongs wherever the
-// shared answer lives, because a test on one side can only ever pin what one
-// side believes — and since F-1416 the shared answer is here, in the one
-// package both repositories install.
-//
-// Each row is a real run shape, and the comment on it is the shape's name in
-// the product, not a restatement of the arithmetic.
+// The truth table for the one predicate that decides whether a finished run has a
+// verdict to state.
 
 import { describe, expect, it } from "vitest";
 import {
@@ -61,14 +44,14 @@ describe("isIncompleteTally", () => {
       incomplete: false,
     },
     {
-      // F-925: a score of 100 over a shrunken denominator is what "the check
+      // A score of 100 over a shrunken denominator is what "the check
       // never ran" looks like, so ANY unreached criterion takes the verdict.
       name: "one criterion the grader could not reach beside three it could",
       tally: tally({ evaluated: 3, unreached: 1 }),
       incomplete: true,
     },
     {
-      // F-1296: an exclusion is a verdict, not a gap. A dedup task scoring 3/3
+      // An exclusion is a verdict, not a gap. A dedup task scoring 3/3
       // with a fourth criterion the seed already satisfied is a clean pass.
       name: "one criterion excluded as already true in the seed beside three evaluated",
       tally: tally({ evaluated: 3, preSatisfied: 1 }),
@@ -80,7 +63,7 @@ describe("isIncompleteTally", () => {
       incomplete: true,
     },
     {
-      // F-1399, the hero shape. Score 0, and not one thing the agent could
+      // The hero shape. Score 0, and not one thing the agent could
       // have got wrong. This is the row the third clause exists for.
       name: "EVERY criterion excluded as already true in the seed",
       tally: tally({ evaluated: 0, preSatisfied: 2 }),
@@ -92,7 +75,7 @@ describe("isIncompleteTally", () => {
       incomplete: true,
     },
     {
-      // Already incomplete before F-1399 and still incomplete after: the new
+      // Already incomplete before and still incomplete after: the new
       // clause must not be the only thing holding these up.
       name: "EVERY criterion unreached — nothing could be evaluated",
       tally: tally({ evaluated: 0, unreached: 4 }),
@@ -139,11 +122,8 @@ describe("isIncompleteTally", () => {
   });
 });
 
-// F-1414 — the reduction that feeds the table above, now that three surfaces in
-// three apps count the same column: the dashboard's badge, the MCP's
-// `first_failure_viewed`, and the control plane's prior-failure probe. Only the
-// `skipped` flag and the reason move the counts; everything else on a criterion
-// row is the caller's business.
+// The reduction that feeds the table above, now that three surfaces in three apps
+// count the same column: the dashboard's badge, the MCP's `first_failure_viewed`.
 describe("tallyCriteriaResults", () => {
   const scored = (passed: boolean) => ({ skipped: false, passed, reason: "judged" });
   const excludedBySeed = () => ({ skipped: true, passed: false, reason: PRE_SATISFIED_REASON });
@@ -178,9 +158,8 @@ describe("tallyCriteriaResults", () => {
   });
 
   it("reduces the all-excluded run to the empty denominator the predicate refuses", () => {
-    // The F-1399 hero shape as a criteria array rather than a hand-built tally:
-    // this is the run that scores 0 with nothing at risk, and the run every
-    // funnel used to read as an agent failure.
+    // The hero shape as a criteria array rather than a hand-built tally: this is the
+    // run that scores 0 with nothing at risk, and the run every funnel used to.
     const tally = tallyCriteriaResults([excludedBySeed(), excludedBySeed()]);
     expect(tally).toEqual({ evaluated: 0, notEvaluated: 2, preSatisfied: 2, total: 2 });
     expect(isIncompleteTally(tally)).toBe(true);
@@ -207,13 +186,8 @@ describe("tallyCriteriaResults", () => {
 });
 
 describe("PRE_SATISFIED_REASON", () => {
-  // The literal is on the wire in `runs.criteria_results`, so it is a
-  // compatibility surface, not an internal name. pome-cloud's control plane
-  // stamps it (`evaluators/deterministic/pre-satisfied.ts`, which re-exports
-  // this), pome-cloud's dashboard counts it, and this repo's CLI reads it back
-  // (`cli/src/hosted/evalResultView.ts`, which also re-exports it rather than
-  // restating it — F-1416). A rename that reached only some of them would make
-  // every dedup run read as incomplete on those surfaces alone.
+  // The literal is on the wire in `runs.criteria_results`, so it is a compatibility
+  // surface, not an internal name.
   it("is the exact string the control plane stamps and every reader counts", () => {
     expect(PRE_SATISFIED_REASON).toBe("already_true_in_seed");
   });

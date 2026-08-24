@@ -2,25 +2,25 @@
 //
 // Adapter signals JSONL writer.
 //
-// Locked architecture (FDRS-322 [DECISION] 2026-05-11): the CLI runner invokes
+// Locked architecture ([DECISION] 2026-05-11): the CLI runner invokes
 // the agent as a subprocess, so adapter signals cannot live in process memory.
 // They are appended to `process.env.POME_ADAPTER_SIGNALS_PATH`, one JSON line
 // per event, in the order the adapter observes them. The CLI reads the file
-// after the subprocess exits and feeds it to the correlator (FDRS-412).
+// after the subprocess exits and feeds it to the correlator.
 //
-// FDRS-407: rows are now M0-schema events. The on-disk shape matches
+// Rows are now M0-schema events. The on-disk shape matches
 // `@pome-sh/wire`'s discriminated union (`hookEventSchema` and
 // siblings). Legacy `{type: "step"}` / `{type: "tool_call"}` shapes are
 // removed.
 //
-// FDRS-408: adds ToolUseEvent / ToolResultEvent writers. Same single-writer
+// Adds ToolUseEvent / ToolResultEvent writers. Same single-writer
 // pattern, same on-disk file as HookEvent.
 //
-// FDRS-409: adds SubagentSpawnEvent writer. Emitted once per sub-agent the
+// Adds SubagentSpawnEvent writer. Emitted once per sub-agent the
 // first time the adapter observes a non-null `parent_tool_use_id` on an SDK
 // message; same single-writer pattern.
 //
-// F-766: adds LlmTurnEvent writer. Emitted once per assistant turn that
+// Adds LlmTurnEvent writer. Emitted once per assistant turn that
 // reported usage (see turn-usage.ts); same single-writer pattern, same file.
 //
 // Standalone dev (no CLI runner): env unset → every write is a static noop.
@@ -55,7 +55,7 @@ export function writeHookEvent(row: HookEventRow): void {
 }
 
 // The CLI forwards lines from this signals JSONL into the canonical
-// events.jsonl post-run (FDRS-326). HookEvent writers (FDRS-407) share the
+// events.jsonl post-run. HookEvent writers share the
 // same file — there's one writer per process.
 export type ToolUseEventRow = ToolUseEvent;
 
@@ -84,7 +84,7 @@ export function writeSubagentSpawnEvent(row: SubagentSpawnEventRow): void {
   appendFileSync(path, JSON.stringify(row) + "\n");
 }
 
-// `LlmTurnEvent` — one row per assistant turn that reported usage (F-766). The
+// `LlmTurnEvent` — one row per assistant turn that reported usage. The
 // writer is intentionally identical to its siblings: the turn-detection logic
 // lives in `withTurnUsage` (turn-usage.ts), and this file stays a thin,
 // single-writer JSONL appender.

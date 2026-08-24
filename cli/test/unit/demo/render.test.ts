@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-643 — verdict rendering per the design of record (CLI moments
-// moment 01): words not scores, errored rows show no duration, the summary
-// fraction excludes errored trials from its denominator.
+// Verdict rendering per the design of record (CLI moments moment 01): words not
+// scores, errored rows show no duration, the summary fraction excludes errored.
 import { describe, expect, it } from "vitest";
 import {
   criterionPhrase,
@@ -163,7 +162,7 @@ describe("criterionPhrase", () => {
   });
 });
 
-describe("at-capacity labels (FDRS-662)", () => {
+describe("at-capacity labels", () => {
   it("labels every kind honestly, never a stack trace", () => {
     expect(capacityLabel("daily_model_cap")).toMatch(/daily model budget .* try again tomorrow/);
     expect(capacityLabel("daily_judge_cap")).toMatch(/evaluation budget .* try again tomorrow/);

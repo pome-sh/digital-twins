@@ -1,13 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-405 — E2E test that `runTask({ noCapture: true })` skips spawning
-// the capture-server child and the agent inherits NO HTTP_PROXY. The result
-// must still produce TwinHttpEvent rows (twin traffic is unaffected), but
-// must NOT produce LlmCallEvent rows (no proxy = no CONNECT-tunnel capture).
-//
-// This is the matching half of the overhead gate: the gate runs the same
-// scenario twice, once with capture (default) and once with `--no-capture`,
-// then compares per-call latencies. The "without" run must genuinely be
-// proxy-free or the comparison is degenerate.
+// E2E test that `runTask({ noCapture: true })` skips spawning the capture-server child
+// and the agent inherits NO HTTP_PROXY.
 
 import { mkdtemp, readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
@@ -29,7 +22,7 @@ function listenEphemeral(server: ReturnType<typeof createNetServer>): Promise<nu
   });
 }
 
-describe("runTask — noCapture (FDRS-405)", () => {
+describe("runTask — noCapture", () => {
   let echoPort = 0;
   let echoCloser: (() => Promise<void>) | null = null;
 

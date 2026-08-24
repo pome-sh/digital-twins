@@ -1,12 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-635 test fixture: same scripted triage work as capture-probe-agent.ts,
-// then two raw CONNECTs through the runner-injected HTTPS_PROXY:
-//   1. POME_EGRESS_TEST_BLOCKED ("host:port") — MUST be refused with 403 by
-//      the egress floor. A 200 here means the proxy silently passed a
-//      non-allowlisted host through to "production", which is exactly the
-//      failure FDRS-635 exists to prevent — so the fixture exits non-zero.
-//   2. POME_CAPTURE_TEST_TARGET ("host:port", a loopback echo) — MUST still
-//      tunnel (200): loopback/twin-adjacent traffic is unaffected.
+// Test fixture: same scripted triage work as capture-probe-agent.ts, then two raw
+// CONNECTs through the runner-injected HTTPS_PROXY: 1.
 
 import { createConnection } from "node:net";
 import { URL } from "node:url";

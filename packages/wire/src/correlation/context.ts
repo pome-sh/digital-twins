@@ -20,7 +20,7 @@
 // race-proofness this module exists to provide, and it is the property
 // `test/correlation-context.test.ts` pins.
 //
-// WHY IT LIVES IN wire AND NOT IN AN ADAPTER (F-950). Nothing below knows what
+// WHY IT LIVES IN wire AND NOT IN AN ADAPTER. Nothing below knows what
 // a Claude tool is. Establishing the scope is the framework-specific half — the
 // Claude adapter reads the SDK's real `tool_use_id` off an MCP `_meta` key,
 // a Vercel AI SDK adapter would read `toolCallId` off `experimental_telemetry`

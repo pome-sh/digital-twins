@@ -4,20 +4,20 @@
  * THIS twin's tools.
  *
  * The catalog is a cross-repo contract between this package (runtime) and
- * `pome-cloud` (dashboard toggles). Until F-942 it lived in
+ * `pome-cloud` (dashboard toggles). It used to live in
  * `@pome-sh/shared-types` and this file was a three-function shim over it — so
  * a catalog entry naming a tool that does not exist was a change in one package
  * caught (if at all) by a test in another. The data now sits next to the
  * tool-table fixture that is the only thing able to contradict it, and
  * `assertAccessControlCatalogMatchesTools` reads the names straight off
- * `githubToolFixture` — the same listing the twin serves (F-1325), not a
+ * `githubToolFixture` — the same listing the twin serves, not a
  * second copy of it.
  *
  * Display labels follow the hosted Twins Manage UI: `{METHOD} {operation}`
  * where `operation` is camelCase (with a few legacy aliases like `addComment`).
  *
  * Endpoints are grouped by functional cluster (Issues, Branches & files, ...),
- * aligned with the FDRS-300 hot-path expansion table -- not
+ * aligned with the hot-path expansion table -- not
  * reversible/irreversible.
  */
 import { z } from "zod";
@@ -75,7 +75,7 @@ export const githubAccessControlEndpointSchema = z.object({
   category: githubAccessControlCategorySchema,
   /** Default allow/deny when a session has no explicit override. */
   default_allowed: z.boolean(),
-  /** FDRS-300 v2 hot-path; false for the original 25-endpoint surface. */
+  /** v2 hot-path; false for the original 25-endpoint surface. */
   v2: z.boolean().default(false),
 });
 export type GitHubAccessControlEndpoint = z.infer<typeof githubAccessControlEndpointSchema>;
@@ -106,7 +106,7 @@ function entry(
   return { tool, operation, method, category, default_allowed: defaultAllowed, v2 };
 }
 
-// F-1376 — the consolidated MCP tools GitHub declares are policy keys in their
+// The consolidated MCP tools GitHub declares are policy keys in their
 // own right, and they are listed FIRST in each category so a reader meets them
 // before the single-purpose names they cover.
 //
@@ -253,7 +253,7 @@ export function githubAccessControlToolNames(
  * ── WHY THIS IS NO LONGER "IS IT AN MCP TOOL" ───────────────────────────────
  *
  * It used to be, and that was right for as long as this twin's MCP tool table
- * and its REST route table named the same operations. F-1376 ended that: GitHub
+ * and its REST route table named the same operations. That ended: GitHub
  * declares no MCP tool for milestones, commit statuses, check runs or
  * issue-comment editing, so those thirty-four tools stopped being served — but
  * every one of them is still reachable over the REST door, which is exactly how
@@ -263,12 +263,12 @@ export function githubAccessControlToolNames(
  * and dropping them is not a no-op: `tool` is the POLICY KEY pome-cloud stores a
  * builder's allow/deny against, so deleting an entry silently un-gates a live
  * REST operation in the dashboard. The check that matters is "does this name
- * point at something this twin serves", and after F-1376 that question has two
+ * point at something this twin serves", and that question now has two
  * answers, so it reads both tables.
  *
  * Both halves are derived, never listed here: `githubToolFixture.toolNames` is
- * the served MCP listing (F-1325) and `GITHUB_ROUTES`' keys are the declared
- * REST surface (F-1179). A typo in a catalog entry still fails.
+ * the served MCP listing and `GITHUB_ROUTES`' keys are the declared
+ * REST surface. A typo in a catalog entry still fails.
  */
 export function assertAccessControlCatalogMatchesTools() {
   const served = new Set<string>([...githubToolFixture.toolNames, ...Object.keys(GITHUB_ROUTES)]);

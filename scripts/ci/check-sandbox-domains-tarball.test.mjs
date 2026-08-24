@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Regression suite for scripts/ci/check-sandbox-domains-tarball.mjs (F-1526).
+// Regression suite for scripts/ci/check-sandbox-domains-tarball.mjs.
 //
 // The gate's whole value is that it fails on things nobody can see from inside
 // this workspace, so the thing worth testing is that it FAILS — a gate asserted
@@ -127,7 +127,7 @@ check(
   leakedPeer.output,
 );
 
-// The F-942 bug, in a brand-new package: two zod identities in one process.
+// The two-schema-identity bug, in a brand-new package.
 const zodNotPeer = withMutatedManifest((m) => {
   delete m.peerDependencies.zod;
   m.dependencies.zod = "^4.4.3";
@@ -148,7 +148,7 @@ check(
   driftedAnchor.output,
 );
 
-// The export spec is F-1526's measured contract with pome-cloud.
+// The export spec is the measured contract with pome-cloud.
 const droppedSubpath = withMutatedManifest((m) => {
   delete m.exports["./server"];
 });
@@ -170,7 +170,7 @@ check(
 // ── The specifier scanner ───────────────────────────────────────────────────
 //
 // Not reachable by mutating a manifest, and the half that actually broke during
-// F-1526: the loose `\bfrom\s*"…"` form used on `.d.ts` reads SQL and English
+// The loose `\bfrom\s*"…"` form used on `.d.ts` reads SQL and English
 // inside bundled JS string literals as import specifiers. These pin both
 // directions so a future simplification back to one pattern reds here.
 console.log("\ncheck-sandbox-domains-tarball.mjs — specifier scanning");

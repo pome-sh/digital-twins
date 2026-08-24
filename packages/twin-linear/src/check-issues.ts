@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// What Linear's declared checks can assert about an ISSUE ROW (F-1129).
+// What Linear's declared checks can assert about an ISSUE ROW.
 //
 // Migrated from pome-cloud's `services/evaluators/deterministic/linear.ts`,
 // where they were hand-written regexes over a cloud-side mirror of the state
@@ -84,7 +84,7 @@ export const issueExists: Check<{ title: string; team: string }> = defineCheck({
     // its subject, so the engine skipped the criterion as `subject_redacted`
     // before reaching this line if a redactor would have destroyed it.
     // The ROW itself: here the lookup IS the assertion, so the address the
-    // resolution walked to is exactly what produced the verdict (F-1197).
+    // resolution walked to is exactly what produced the verdict.
     return {
       passed: true,
       reason: `an issue titled "${title}" exists in \`${team}\``,

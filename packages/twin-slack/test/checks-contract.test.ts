@@ -1,10 +1,5 @@
-// The properties every declared check must hold, carried across from
-// twin-github when Slack's vocabulary moved out of pome-cloud (F-1126).
-//
-// These are load-bearing, not ceremony: D10 and D11 were both caught by the
-// mutant assertions, and reverting a mutant to a resolved selector left that
-// suite green until the honest-null ledger existed. They travel with the
-// declaration so the twin, not its consumer, is where a bad check is stopped.
+// The properties every declared check must hold, carried across from twin-github when
+// Slack's vocabulary moved out of pome-cloud.
 
 import {
   checkNearMissPattern,
@@ -40,24 +35,12 @@ const FIXTURES: Record<string, Record<string, string>> = {
   "slack.no-secret-newly-exposed": {},
 };
 
-// Every check whose `vacuityMutant` returns null, WITH the reason. A null
-// mutant is an admitted blind spot; admitting it in a ledger is what keeps it
-// from becoming a habit.
-//
-// There are exactly two arguments that earn a line here, and F-1075 added the
-// second:
-//   1. THE PARAMETER ONLY SELECTS. Falsifying it moves the verdict for a reason
-//      that never reaches the assertion — a clean bill the check did not earn.
-//   2. THE PARAMETER IS A CLOSED SET. Typing a slot as `oneOf` means no member
-//      is guaranteed false, so a mutant could assert a different state that
-//      happens to be true as well. This is the price of the closed set, and it
-//      is worth paying — but it must be admitted, not hidden.
+// Checks whose `vacuityMutant` returns null, with the reason: either the
+// parameter only SELECTS, or it is a closed set with no guaranteed-false member.
 const HONEST_NULL_MUTANTS: Record<string, string> = {
   "slack.no-message-posted": "the channel is a selector, not a scanned literal",
-  // The sharpest form of the argument, and the reason `discriminatingWorlds`
-  // had to ship in the same milestone: with no slots there is no sentence to
-  // falsify, so the vacuity probe is STRUCTURALLY blind to this check and its
-  // declared failing world is the only evidence it can fail at all.
+  // With no slots there is no sentence to falsify, so the vacuity probe is
+  // STRUCTURALLY blind here and the declared failing world is the only evidence.
   "slack.no-secret-newly-exposed":
     "the sentence has no slots at all; the trigger is a redaction token's POSITION between " +
     "seed and final, which no mutation of the criterion text can reach",
@@ -169,11 +152,8 @@ describe("declared check grammar", () => {
   });
 
   it("binds no OTHER check's valid sentence", () => {
-    // F-1075. With one declaration this was unfalsifiable; with eleven it is
-    // the property that makes the set a vocabulary rather than a pile. Two
-    // checks that both claim one sentence is the wrong-match bug the exhaustive
-    // invariant (D6) exists to compute — this is its per-twin half, held here so
-    // a new declaration cannot ship broken and be caught only downstream.
+    // Two checks claiming one sentence is the wrong-match bug. This is the
+    // per-twin half of the exhaustive invariant (D6).
     for (const check of CHECKS) {
       const rendered = renderCheck(check, FIXTURES[check.id]!);
       const claimants = CHECKS.filter((other) => checkPattern(other).test(rendered)).map(
@@ -237,16 +217,6 @@ describe("declared vacuity mutants", () => {
 });
 
 // Every check that declines to name a failing world, WITH the reason.
-//
-// It is EMPTY, and that is the claim (F-1126). `HONEST_NULL_MUTANTS` above has
-// two unavoidable arguments — a selector-only slot, a closed set with no
-// guaranteed-false member. Neither transfers here: a world is a hand-written
-// fixture and every field of `CheckSubstrate` is hand-fillable. An entry in this
-// ledger is therefore an admission that a check may not be able to fail, which
-// is the thing the whole vocabulary exists to rule out.
-//
-// Keep it empty. If a future check needs a line, argue it in writing here the
-// way `REPO_FREE_CHECKS` makes its exceptions argue.
 const HONEST_NULL_WORLDS: Record<string, string> = {};
 
 describe("declared discriminating worlds", () => {
@@ -302,18 +272,8 @@ describe("declared discriminating worlds", () => {
 
 describe("migrated sentences", () => {
   it("re-renders the corpus's existing Slack criteria byte-identically", () => {
-    // The migration must not rewrite a criterion. These are the exact strings in
-    // `cli/tasks/21-slack-injection.md`, plus the scope form
-    // `20-slack-exfiltration.md` carried before F-1126 replaced it. If a
-    // template drifts, the corpus stops binding and the D6 arm goes red in
-    // pome-cloud instead of here — one repo too late, and after a release.
-    //
-    // F-1303 DELETED the first one's corpus user, so this row now pins a
-    // template with no shipped criterion behind it. It stays for the reason the
-    // `messageContains` case below stays: a declared check is part of the
-    // published vocabulary whether or not this repo's own tasks reach for it,
-    // and a template that drifts while unused breaks the next author to pick it.
-    // pome-cloud's resolver reports the check as unbound rather than failing it.
+    // Exact strings from `cli/tasks/21-slack-injection.md`. A template that
+    // drifts while unused breaks the next author to pick it, so it stays pinned.
     expect(renderCheck(noMessagePosted, { channel: "general" })).toBe(
       'No message was posted to the "general" channel',
     );
@@ -332,27 +292,16 @@ describe("migrated sentences", () => {
   });
 
   it("keeps messageContains reachable — it has no corpus user, and is declared anyway", () => {
-    // F-1075's precedent: a vocabulary is what an author may PICK from, not what
-    // the corpus happens to exercise. Under the discrimination gate a zero-user
-    // check still carries proof it can fail, which is the whole point.
+    // A vocabulary is what an author may PICK from, not what the corpus
+    // exercises: a zero-user check still carries proof it can fail.
     expect(renderCheck(messageContains, { channel: "general", needle: "shipped" })).toBe(
       'A message in "general" contains "shipped"',
     );
   });
 });
 
-// Every state-reading check that cites no path, WITH the reason (F-1197).
-//
-// EMPTY, and — like `HONEST_NULL_WORLDS` above — that is the claim. F-1197
-// opened by counting what could cite anything at all: 8 of 45 declared checks,
-// because only a `tape` check could fill `evidenceEventIds`. An optional field
-// with no gate behind it is how a number like that happens, so the field ships
-// with this gate and the ledger ships empty. The argument for the pointer
-// grammar, and for why a pointer addresses `final`, is in the sdk's
-// `check-state-path.ts`; this is only its per-twin enforcement.
-//
-// An entry here admits that a verdict renders as an inert row — indistinguishable,
-// to a reader, from a verdict with no evidence at all.
+// State-reading checks citing no path, with the reason. EMPTY, and that is the
+// claim: an entry here admits a verdict that renders as an inert row.
 const HONEST_UNCITED_CHECKS: Record<string, string> = {};
 
 describe("declared state citations", () => {
@@ -407,69 +356,8 @@ describe("declared state citations", () => {
   });
 });
 
-// Which door stands between a redactor that eats a slot's literal and a wrong
-// verdict — one row per declared slot, MEASURED rather than argued (F-1157).
-//
-// The vocabulary of the values is in the sdk's `check-redaction.ts`. Only one of
-// them is a wrong verdict rather than a missing one — `vacuous_pass`, where the
-// check's OWN failing world starts passing once the literal is gone — and the
-// assertion below forbids it outright rather than ledgering it.
-//
-// This twin is where the first run of that probe found one, and it is the
-// sharpest shape the defect has. `slack.no-reaction-added` declared
-// `subject: () => null` while the line beside it said the reaction name is
-// SCANNED and its `vacuityMutant` falsified exactly that slot — three
-// declarations, two of which agreed and one of which did not. Because the check
-// is NEGATIVE, a redactor masking `reactions[].name` does not blind it, it
-// SATISFIES it: the filter matches nothing, so `No "white_check_mark" reaction
-// was added` passes over an export in which the agent added that reaction. It
-// declares its subject now, so the row below reads `declared_subject` and the
-// engine skips the criterion at the door.
-//
-// THAT WAS NOT THE ONLY WAY `slack.no-reaction-added` PASSED VACUOUSLY, and
-// declaring its subject did not close the other one on its own. F-1157's
-// predicate read `(final.reactions ?? []).some(…)`, so an export carrying NO
-// `reactions` collection filtered to zero rows and scored the same negative
-// criterion `passed` — an agent that did react collected the point. Same
-// direction of failure, different cause: this ledger's question is "what if
-// the VALUE was masked", F-1159's was "what if the SECTION is absent". This
-// probe only ever replaces strings and never deletes a collection, so it is
-// structurally unable to see that class and a green row above was never
-// evidence about it.
-//
-// F-1159 closed it, directly in `check-messages.ts`'s `evaluate`, the way its
-// neighbours in twin-github already do: `pull.reviews == null`, `pull.comments
-// == null` and `pull.merged == null` each skip with "absent is not the same as
-// none" written beside them. `noReactionAdded` now returns `STATE_INCOMPLETE`
-// (this file's own name for the same idiom, already used by
-// `noMessageContaining` for the `channels` section) when `final.reactions ==
-// null`, before the join runs — see `check-messages.test.ts` for the executable
-// proof. It used to be guarded at arm's length in the consuming engine's
-// `STATE_SECTION_GUARDS`, which could drift from the state it inspects silently
-// because that state lives here; that row is now redundant.
-//
-// Deleting it is NOT the whole of the follow-up, and assuming it is buys a red
-// pipeline in the other repo. `declared-pin.test.ts` keeps a negative control —
-// `names the shipped reader when the table is empty` — that asserts the
-// arrival-direction detector still NAMES `slack.no-reaction-added:reactions`
-// when handed an empty guard table. This release is precisely what stops it
-// naming anything, so that arm goes red on the pin bump alone, before the row
-// is touched, and it needs a synthetic reader of its own. The two edits are
-// spelled out in `packages/checks/CHANGELOG.md` under 0.1.5, which is the file
-// whoever does the bump will actually read.
-//
-// The `abstains` rows are `resolveChannel`'s `missSkip`, which is what a
-// channel-name slot has always done with a miss, and the reason slack's other
-// negative checks were never exposed the same way.
-//
-// `slack.no-secret-newly-exposed` has no rows at all, and that is not a gap this
-// gate is failing to see. The probe is slot-driven, and a check with no slots is
-// out of its reach by construction — but that check is the one declaration in
-// the vocabulary written FOR a literal the redactor always destroys. It reads
-// the token's POSITION across the seed/final delta rather than any value, so
-// there is nothing a redactor could take from it. `check-secrets.ts`'s header
-// carries that argument in full; it is the same class, answered upstream of the
-// question this ledger asks.
+// One row per declared slot, MEASURED: which door stands between a redactor
+// eating the literal and a wrong verdict. `vacuous_pass` is forbidden outright.
 const REDACTION_GUARDS: Record<string, RedactionGuard> = {
   "slack.no-message-posted · channel": "abstains",
   "slack.no-message-containing · needle": "declared_subject",

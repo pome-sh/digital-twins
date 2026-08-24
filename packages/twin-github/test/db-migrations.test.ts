@@ -1,20 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1151 — the schema upgrade an EXISTING database file gets.
-//
-// `migrate()` runs on every open, so a twin whose db predates a change is
-// repaired in place rather than rebuilt. That makes the ensure* functions the one
-// place where a wrong condition is invisible: a fresh `:memory:` db is created
-// from `MIGRATION_SQL` and never exercises them, so the whole package could stay
-// green while every persisted db kept the old shape. This file opens the door the
-// other tests do not.
-//
-// It also guards the specific hazard in this change. `issue_comments` used to be
-// rebuilt by BOTH `ensureIssueNumberCascade` (adding the `issues` FK) and now
-// `ensureCommentsAllowPullRequests` (removing it). Leaving it in the first list
-// would have the two fight on every boot of an older db, and whichever ran last
-// would decide whether PR comments worked — silently, and differently for a
-// persisted db than for the in-memory ones the suite uses.
+// The schema upgrade an EXISTING database file gets.
 
 import { describe, expect, it } from "vitest";
 import { migrate, openGitHubCloneDatabase } from "../src/db.js";
@@ -40,7 +25,7 @@ function foreignKeyTargets(db: GitHubCloneDatabase, table: string): string[] {
   return rows.map((row) => row.table);
 }
 
-/** A db carrying the pre-F-1151 `issue_comments` shape, with one comment in it. */
+/** A db carrying the legacy `issue_comments` shape, with one comment in it. */
 function legacyDatabase() {
   const db = openGitHubCloneDatabase(":memory:");
   const domain = new GitHubDomain(db);
@@ -61,7 +46,7 @@ function legacyDatabase() {
   return { db, domain };
 }
 
-describe("issue_comments migration (F-1151)", () => {
+describe("issue_comments migration", () => {
   it("starts from a db that really does carry the old constraint", () => {
     // Guards the fixture itself: if this assertion ever fails, the tests below
     // are proving nothing because they never had an old schema to upgrade.

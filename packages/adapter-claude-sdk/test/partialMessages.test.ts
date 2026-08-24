@@ -1,12 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-998. The `includePartialMessages` plumbing: which messages the flag adds to
-// the stream (so they can be filtered back out), when the adapter turns it on,
-// and the `message_delta` tracker that carries the only authoritative per-turn
-// output-token count the SDK ever emits.
-//
-// The message shapes below are verbatim from a live Opus run through
-// `claude` 2.1.220 — see the tape evidence on the ticket.
+// The `includePartialMessages` plumbing: which messages the flag adds to the stream
+// (so they can be filtered back out), when the adapter turns it on, and.
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {

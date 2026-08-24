@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-679 code-health gates: barrel policy + file-size tripwire.
+// Code-health gates: barrel policy + file-size tripwire.
 import { readFile, readdir } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -25,7 +25,7 @@ const BARREL_PATHS = [
   "cli/src/contract/index.ts",
 ];
 
-// Existing large modules — shrink this list as files are split (F-679).
+// Existing large modules — shrink this list as files are split.
 const FILE_SIZE_ALLOWLIST = new Set([
   "cli/src/cli/main.ts",
   "cli/src/cli/eval.ts",

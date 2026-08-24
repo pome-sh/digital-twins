@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-636 — `pome run -n k` trial-count resolution.
-//
-// [DECISION 2026-07-05]: -n is an integer 1..20 on the hosted run path;
-// the default comes from the scenario config's `runs` field (which
-// taskConfigSchema already parses, defaulting 1, but nothing consumed
-// until now); both are capped at 20.
+// `pome run -n k` trial-count resolution. [DECISION 2026-07-05]: -n is an integer
+// 1..20 on the hosted run path; the default comes from the scenario config's.
 
 import { describe, expect, it } from "vitest";
 import { HostedUsageError } from "../../../src/hosted/errors.js";
@@ -14,7 +10,7 @@ import {
   parseTrialsFlag,
 } from "../../../src/runner/trialCount.js";
 
-describe("parseTrialsFlag (FDRS-636)", () => {
+describe("parseTrialsFlag", () => {
   it("accepts integers 1..20", () => {
     expect(parseTrialsFlag("1")).toBe(1);
     expect(parseTrialsFlag("5")).toBe(5);
@@ -39,7 +35,7 @@ describe("parseTrialsFlag (FDRS-636)", () => {
   });
 });
 
-describe("effectiveTrialCount (FDRS-636)", () => {
+describe("effectiveTrialCount", () => {
   it("-n overrides the scenario config's runs field", () => {
     expect(effectiveTrialCount(5, 2)).toBe(5);
     expect(effectiveTrialCount(1, 7)).toBe(1);

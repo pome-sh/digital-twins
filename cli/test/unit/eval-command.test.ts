@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// Unit tests for `pome eval <run-dir>` (FDRS-656): run-dir validation with
-// per-file named errors, meta.json parsing / agent+task derivation, and the
-// upload+finalize flow against a mocked EvalClient (matching the stub
-// patterns in runTaskHosted.upload.test.ts).
+// Unit tests for `pome eval <run-dir>`: run-dir validation with per-file named errors,
+// meta.json parsing / agent+task derivation, and the upload+finalize.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { existsSync } from "node:fs";
@@ -177,7 +175,7 @@ function mockPutFetch(): { putUrls: () => string[] } {
   return { putUrls: () => urls };
 }
 
-describe("pome eval run-dir validation (FDRS-656)", () => {
+describe("pome eval run-dir validation", () => {
   let tmp: string;
 
   beforeEach(async () => {
@@ -263,7 +261,7 @@ describe("pome eval run-dir validation (FDRS-656)", () => {
   });
 });
 
-describe("pome eval meta parsing + identity derivation (FDRS-656)", () => {
+describe("pome eval meta parsing + identity derivation", () => {
   it("parses the fields writeRunArtifactsCore persists", () => {
     const meta = parseRunMeta(META);
     expect(meta).toEqual({
@@ -322,7 +320,7 @@ describe("pome eval meta parsing + identity derivation (FDRS-656)", () => {
   });
 });
 
-describe("pome eval upload + finalize flow (FDRS-656)", () => {
+describe("pome eval upload + finalize flow", () => {
   let tmp: string;
 
   beforeEach(async () => {
@@ -348,7 +346,7 @@ describe("pome eval upload + finalize flow (FDRS-656)", () => {
       projectConfig: null,
     });
 
-    // Session minted from the FDRS-655 contract body.
+    // Session minted from the contract body.
     expect(calls.create).toEqual([
       { agent: "triage-bot", taskName: "01-bug-happy-path" },
     ]);
@@ -377,9 +375,8 @@ describe("pome eval upload + finalize flow (FDRS-656)", () => {
     expect(result.cloudRunId).toBe(FAKE_RUN_ID);
     expect(result.reusedSession).toBe(false);
 
-    // FDRS-657 — the eval-session marker is persisted for idempotent
-    // re-upload, but the cloud verdict is EPHEMERAL: NO score.json is written
-    // next to the trace. Local artifacts stay trace/audit only.
+    // The eval-session marker is persisted for idempotent re-upload, but the cloud
+    // verdict is EPHEMERAL: NO score.json is written next to the trace.
     expect(existsSync(join(runDir, "eval-session.json"))).toBe(true);
     expect(existsSync(join(runDir, "score.json"))).toBe(false);
   });
@@ -580,7 +577,7 @@ describe("pome eval upload + finalize flow (FDRS-656)", () => {
   });
 });
 
-describe("pome eval review fixes (FDRS-656 follow-up)", () => {
+describe("pome eval review fixes (review)", () => {
   let tmp: string;
   const originalExitCode = process.exitCode;
 
@@ -886,11 +883,9 @@ describe("pome eval review fixes (FDRS-656 follow-up)", () => {
     expect(uploaded.event_id).toBe("req_legacy");
   });
 
-  it("already-kinded rows (LlmTurnEvent) survive eval upload unchanged (F-766)", async () => {
-    // Pre-F-766, every row was mapped through toTwinHttpEvent, which re-wrapped
-    // any non-TwinHttpEvent kind — clobbering `kind` to "TwinHttpEvent" and
-    // setting event_id to the (absent) request_id. A kinded row must now
-    // round-trip intact so cloud sees the real per-turn usage + cache tokens.
+  it("already-kinded rows (LlmTurnEvent) survive eval upload unchanged", async () => {
+    // Every row used to be mapped through toTwinHttpEvent, which re-wrapped any
+    // non-TwinHttpEvent kind — clobbering `kind` to "TwinHttpEvent" and setting event_id.
     const turnRow = JSON.stringify({
       kind: "LlmTurnEvent",
       ts: "2026-06-30T10:00:02.000Z",

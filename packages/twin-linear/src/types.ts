@@ -26,10 +26,10 @@ export type LinearAgentActivityType =
   | "response"
   | "error"
   | "prompt";
-/** Linear's `AgentActivitySignal` enum, member-for-member (F-1176). */
+/** Linear's `AgentActivitySignal` enum, member-for-member. */
 export type LinearAgentActivitySignal = "stop" | "continue" | "auth" | "select";
 /**
- * Linear's `AgentActivityContent` union, member-for-member (F-1176).
+ * Linear's `AgentActivityContent` union, member-for-member.
  *
  * Upstream this is a real GraphQL union discriminated on `type`, whose six
  * members are `AgentActivity{Thought,Action,Response,Elicitation,Error,Prompt}
@@ -46,7 +46,7 @@ export type LinearAgentActivityContent =
   | { type: "prompt"; body: string; title?: string | null; bodyData?: unknown }
   | { type: "error"; body: string; reasonCode?: string | null; bodyData?: unknown }
   | { type: "action"; action: string; parameter: string; result?: string | null; resultData?: unknown };
-/** Linear's `AgentSessionStatus` enum, member-for-member (F-1172). */
+/** Linear's `AgentSessionStatus` enum, member-for-member. */
 export type LinearAgentSessionStatus =
   | "pending"
   | "active"

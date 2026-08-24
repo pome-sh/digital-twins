@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-643 — the demo gateway client against a stub server that validates
-// the STRICT demo-llm wire schema (mirrored from pome-cloud demo-llm.ts).
-// Also proves the CONNECT-proxy path: through a capture-server-shaped
-// CONNECT proxy, the same request arrives intact.
+// The demo gateway client against a stub server that validates the STRICT demo-llm
+// wire schema (mirrored from pome-cloud demo-llm.ts).
 import { createServer, type Server } from "node:http";
 import { connect as netConnect, type Socket } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
@@ -110,7 +108,7 @@ const CONVERSATION: DemoMessage[] = [
   },
 ];
 
-describe("callDemoGateway (FDRS-643 / FDRS-637 wire contract)", () => {
+describe("callDemoGateway wire contract", () => {
   it("sends a STRICT schema-valid body (no system role, no model field) with the demo_token bearer", async () => {
     const { server, seen } = stubGateway(() => ({
       status: 200,

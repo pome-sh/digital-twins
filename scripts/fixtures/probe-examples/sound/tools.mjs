@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// A throwaway example for scripts/probe-example-tools.test.mjs (F-1152). Its
+// A throwaway example for scripts/probe-example-tools.test.mjs. Its
 // tools all reach subjects the seed provides, so the gate must stay silent.
 //
 // Two shapes are deliberate. It calls the twin's MCP surface, which is where
-// F-1125 stamps the twin ACTION on the tape even for a failed call, so the
+// The twin stamps its ACTION on the tape even for a failed call, so the
 // end-to-end test can assert the action name reaches the report. And `twin()`
 // SWALLOWS a non-2xx and returns it as a value instead of throwing — copying
 // `agent-examples/merge-agent`'s `gh()` — so the fixture also exercises the path
@@ -23,7 +23,7 @@ export function buildTools(config) {
 
   return {
     list_open_issues: {
-      // `OPEN`, not `open` (F-1468): GitHub's MCP `list_issues` declares
+      // `OPEN`, not `open`: GitHub's MCP `list_issues` declares
       // `["OPEN","CLOSED"]` and the twin follows it. Its REST `GET /issues` is
       // the door that takes lowercase.
       execute: ({ owner, repo }) => twin("list_issues", { owner, repo, state: "OPEN" }),

@@ -95,7 +95,7 @@ describe("Refunds — POST/GET /v1/refunds", () => {
     expect(list.body.data).toHaveLength(1);
   });
 
-  it("Idempotency-Key ABSENT: each POST creates a NEW refund row (FDRS-316 hero bug)", async () => {
+ it("Idempotency-Key ABSENT: each POST creates a NEW refund row (hero bug)", async () => {
     const app = await createStripeApp();
     const { chargeId } = await createAndSettle(app, 20000);
     const r1 = await rest(app, "POST", "/v1/refunds", { charge: chargeId, amount: 7500 });
@@ -165,7 +165,7 @@ describe("Refunds — POST/GET /v1/refunds", () => {
       amount: 7500,
       status: "succeeded",
     });
-    // Canonical RecorderEvent fields landed by FDRS-318:
+    // Canonical RecorderEvent fields landed :
     expect(refundPost!).toMatchObject({
       twin: "stripe",
       step_id: null,
@@ -174,7 +174,7 @@ describe("Refunds — POST/GET /v1/refunds", () => {
   });
 });
 
-describe("Refunds — ledger + events (F-733 semantic reconciliation)", () => {
+describe("Refunds — ledger + events (semantic reconciliation)", () => {
   it("mints a negative refund-type balance transaction and links it from the refund", async () => {
     const app = await createStripeApp();
     const { chargeId } = await createAndSettle(app, 20000);

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Orchestrator for the twin runtime-contract suite (FDRS-711): build the wire
+// Orchestrator for the twin runtime-contract suite: build the wire
 // contract + the five twins, then run the black-box suite with plain `node`.
 
 import { spawnSync } from "node:child_process";
@@ -40,7 +40,7 @@ function run(cmd, args) {
 // `>=24`, so on 24.0/24.1 it is `undefined`, this guard is false, and
 // `npm run test:contract` exits 0 having built nothing and asserted nothing —
 // the exact "a check that never ran reads like one that passed" failure
-// F-1353 exists to remove, promoted from one file to the whole suite. The
+// this runner exists to remove, promoted from one file to the whole suite. The
 // argv/import.meta.url comparison the repo's other entry guards use, pinned
 // for the same reason in scripts/capture-mcp-tools-list.test.mjs — but
 // realpath'd on BOTH sides: node resolves symlinks before deriving
@@ -64,7 +64,7 @@ if (invokedDirectly) {
   // the twins with plain `node`, so wire's dist/ must exist before anything boots.
   let status = run("npm", ["run", "build", "-w", "@pome-sh/wire"]);
   // The sdk build must precede the twin builds: twin-slack is a thin
-  // @pome-sh/sdk plugin since F-683 and compiles against the sdk dist.
+  // @pome-sh/sdk plugin and compiles against the sdk dist.
   if (status === 0) status = run("npm", ["run", "build", "-w", "@pome-sh/sdk"]);
   if (status === 0) status = run("npm", ["run", "build", "-w", "@pome-sh/twin-github"]);
   if (status === 0) status = run("npm", ["run", "build", "-w", "@pome-sh/twin-slack"]);

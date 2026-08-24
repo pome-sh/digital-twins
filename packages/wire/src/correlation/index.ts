@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * correlation — framework-agnostic per-tool-call trace correlation (F-950).
+ * correlation — framework-agnostic per-tool-call trace correlation.
  *
  * The mechanism that lets a twin's `TwinHttpEvent` name the tool call that
  * caused it, with none of the agent framework's vocabulary in it. Extracted from

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// F-1460 — the base64 rule for `PUT /repos/:owner/:repo/contents/*`.
+// The base64 rule for `PUT /repos/:owner/:repo/contents/*`.
 //
 // ⚠️ THIS BELONGS TO THE REST DOOR AND NOWHERE ELSE. `routes.ts` is the only
 // caller, deliberately. The domain (`domain/git.ts`) serves BOTH doors off one
@@ -54,7 +54,7 @@ function invalidBase64(): never {
  * is a TEXT column and `encodeContent` re-encodes it as UTF-8 on the way out
  * (`util.ts`), so this twin stores text end to end and a caller who writes a PNG
  * gets replacement characters back. That is a REAL divergence from GitHub, and
- * a NEW one — before F-1460 `content` was never base64, so no caller could
+ * a NEW one — before `content` was never base64, so no caller could
  * express non-UTF-8 bytes at all and the gap was unreachable. It is recorded as
  * divergence 29 rather than hidden here, because closing it means changing the
  * storage convention for every surface that reads file content (diffs, search,

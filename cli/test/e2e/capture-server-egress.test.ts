@@ -1,17 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-635 — integration tests for the capture-server's deny-by-default
-// egress floor.
-//
-// The proxy refuses CONNECT tunnels to hosts outside the allowlist with a
-// 403 BEFORE dialing upstream, and records each refusal in the egress
-// sidecar (egress.jsonl — deliberately NOT events.jsonl, whose row shape is
-// locked by @pome-sh/wire / the correlator). Loopback targets are always
-// allowed so twin traffic can never be broken by a bad allowlist.
-//
-// The "allowed but unresolvable" case asserts the ordering: an allowlisted
-// host fails with 502 (upstream dial attempted, `.invalid` never resolves —
-// RFC 6761), a denied host fails with 403 (never dialed). Distinct status
-// codes prove the gate fires before the dial.
+// Integration tests for the capture-server's deny-by-default egress floor.
 
 import { mkdtemp, readFile } from "node:fs/promises";
 import { createServer as createNetServer, createConnection, type Socket } from "node:net";
@@ -102,7 +90,7 @@ function connectStatus(
   });
 }
 
-describe("pome capture-server — egress floor (FDRS-635)", () => {
+describe("pome capture-server — egress floor", () => {
   let capture: CaptureServerHandle | null = null;
   let upstream: Awaited<ReturnType<typeof startUpstream>> | null = null;
 

@@ -200,7 +200,7 @@ export function createRootValue(ctx: GraphQLRuntimeContext): Record<string, unkn
       return payload({ agentSession: formatAgentSession(session) });
     },
     // `id` is non-null on the schema, as it is upstream — there is no longer an
-    // `input.id` to fall back to (F-1176).
+    // No `input.id` to fall back to.
     agentSessionUpdate: ({ id, input }: { id: string; input: unknown }) => {
       const session = commands.updateAgentSession(id, parseAgentSessionUpdateInput(input), actor);
       return payload({ agentSession: formatAgentSession(session) });

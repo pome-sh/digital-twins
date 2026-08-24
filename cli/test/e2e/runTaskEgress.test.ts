@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-635 — E2E test that `pome run` (via `runTask`) enforces the
-// deny-by-default egress floor end-to-end: the agent's CONNECT to a
-// non-allowlisted host is refused with 403 (asserted inside the fixture),
-// loopback tunnels still work, twin traffic is unaffected, and the refused
-// host is surfaced on the run result so the CLI can name it in the output.
+// E2E test that `pome run` (via `runTask`) enforces the deny-by-default egress floor
+// end-to-end: the agent's CONNECT to a non-allowlisted host is refused.
 
 import { mkdtemp } from "node:fs/promises";
 import { createServer as createNetServer, type Socket } from "node:net";
@@ -31,7 +28,7 @@ function appendAllowlist(existing: string | undefined, names: string[]): string 
   return [...values].join(",");
 }
 
-describe("runTask — egress floor wiring (FDRS-635)", () => {
+describe("runTask — egress floor wiring", () => {
   let echoPort = 0;
   let echoCloser: (() => Promise<void>) | null = null;
 

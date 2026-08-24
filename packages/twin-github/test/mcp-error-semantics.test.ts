@@ -25,10 +25,8 @@ describe("GitHub-shaped error semantics", () => {
 
     const response = await app.request(`${base}/repos/acme/api/actions/runs`, withAuth(token));
     expect(response.status).toBe(501);
-    // FDRS-431: response-envelope twin metadata lives under `_twin.*` (clean
-    // cutover — no bare top-level `fidelity`). The recorder event below keeps
-    // its own `fidelity` tier field — that is internal tape telemetry, not the
-    // response envelope.
+    // Response-envelope twin metadata lives under `_twin.*` (clean cutover — no bare
+    // top-level `fidelity`).
     const body = await response.json() as {
       fidelity?: unknown;
       _twin: { fidelity: string };

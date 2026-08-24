@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
-// Payment methods REST — F-732 (M5 card-on-file chain).
+// Payment methods REST (M5 card-on-file chain).
 //
 // POST /v1/payment_methods · GET /v1/payment_methods/:id ·
 // POST /v1/payment_methods/:id/attach|detach. The top-level list
-// (GET /v1/payment_methods) stays on the loud-501 surface per the F-729
+// (GET /v1/payment_methods) stays on the loud-501 surface per the heat
 // ruling — the customer-scoped list is the hot read.
 
 import type { Hono } from "hono";

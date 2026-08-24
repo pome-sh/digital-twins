@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1179 — the gate that keeps a twin's published input surface COMPLETE.
+// The gate that keeps a twin's published input surface COMPLETE.
 //
 // # What it enforces
 //
@@ -291,7 +291,7 @@ const MIDDLEWARE_EXEMPTIONS = [
     file: "packages/twin-linear/src/twin.ts",
     expression: `const peek = new HonoRequest(c.req.raw.clone())`,
     reason:
-      "recorder plumbing, not a route input: F-1385's `extensions` gate answers ahead of " +
+      "recorder plumbing, not a route input: the `extensions` gate answers ahead of " +
       "`bearerAuth`, so it runs before the recorder — and the recorder captures `request_body` " +
       "with its own `c.req.raw.clone().json()`, which throws once the stream is disturbed and " +
       "records null instead. Parsing the original would blank the tape on every recorded " +

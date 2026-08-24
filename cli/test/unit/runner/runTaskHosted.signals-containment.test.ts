@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-656 review fix 6 — the uploadAndFinalize extraction briefly moved the
-// signals redactJsonl call OUT of a guarded path, so a throwing redaction
-// aborted the whole hosted run where it previously degraded to "signals
-// skipped". This locks the warn-and-continue contract: a redaction failure
-// must not fail the run, and finalize must simply omit signalsStorageKey.
+// Review fix 6 — the uploadAndFinalize extraction briefly moved the signals
+// redactJsonl call OUT of a guarded path, so a throwing redaction aborted the whole.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";

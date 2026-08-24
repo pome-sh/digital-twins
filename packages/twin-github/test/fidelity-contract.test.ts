@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// Fidelity contract (F-730): the structured inventory is the hub — it must
-// match the live tool list exactly, and the FIDELITY doc tables must match
-// the inventory 1:1 (tier included). This replaces the old soft "docs
-// mention the tool name" check, which could not see undocumented surfaces.
+// Fidelity contract: the structured inventory is the hub — it must match the live tool
+// list exactly, and the FIDELITY doc tables must match the inventory.
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -41,18 +38,8 @@ describe("fidelity contract documentation", () => {
   });
 
   it("keeps fidelity.inventory.json's rest rows 1:1 with the routes the twin mounts", () => {
-    // F-1368. The lint above compares two DOCUMENTS — the inventory and
-    // FIDELITY_MATRIX.md — so they agreed with each other and with nothing that
-    // serves traffic; 62 rest rows stood against 66 real routes and nothing
-    // could see it. A surface absent from the inventory is not `not-compared`,
-    // it is invisible, and the inventory is the denominator every fidelity lane
-    // counts against.
-    //
-    // `GITHUB_ROUTE_INPUTS` is the right subject rather than a second reading of
-    // the router: `routes.ts` mounts every route FROM these declarations
-    // (F-1179), and `route-input-declarations.test.ts` pins that export equal
-    // to the registrar's calls AND to the booted app's own table. So comparing
-    // against it is comparing against what answers requests.
+    // The lint above compares two DOCUMENTS — the inventory and FIDELITY_MATRIX.md —
+    // so they agreed with each other and with nothing that serves traffic; 62.
     expect(
       lintFidelityRestRoutes(
         inventory,
@@ -82,20 +69,13 @@ describe("fidelity contract documentation", () => {
   });
 });
 
-// Heat discipline (F-735, mirroring F-736's twin-slack pass): every surface
-// carries its ruled heat tier and the exact target mapping from
-// packages/sdk/ENDPOINT-TIERS.md holds. twin-github's two ruled exceptions:
-// the MCP transport rows stay `unclassified` (engine introspection, outside
-// the rubric's inventory scope; removal deferred post-F-440), and the PR-diff
-// surfaces are hot-with-explicit-defer (F-729 ruling point G1).
-describe("heat tiers (F-729 ruling, F-735 re-cut)", () => {
+// Heat discipline (mirroring the twin-slack pass): every surface carries its ruled
+// heat tier and the exact target mapping from packages/sdk/ENDPOINT-TIERS.md.
+describe("heat tiers (heat ruling)", () => {
   const surfaces = [...inventory.tools, ...inventory.rest];
   const ENGINE_INTROSPECTION = ["POST /mcp/call", "POST /mcp/tools/:name"];
-  // The MCP half of G1 left the inventory in F-1376: `get_pull_request_diff` is
-  // not a tool GitHub declares, and its replacement `pull_request_read` carries
-  // the placeholder-patch gap on ONE of nine methods, which a per-tool tier
-  // cannot express. FIDELITY.md's hot-gap deferral says so; the REST route is
-  // still one surface doing one thing, so it keeps the tier and the deferral.
+  // The MCP half of G1 left the inventory: `get_pull_request_diff` is not a tool
+  // GitHub declares, and its replacement `pull_request_read` carries the placeholder-patch.
   const DEFERRED_HOT_GAPS = ["GET /repos/:owner/:repo/pulls/:number/diff"];
 
   function ledgerSection(): string {

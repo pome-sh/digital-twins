@@ -10,6 +10,13 @@ write a version number here or in `package.json`. Released
 entries are insertions only: a correction is the next entry, naming the one it
 corrects.
 
+## 0.26.10 — 2026-08-23
+
+**No consumer-visible change.** Internal tracker ids were removed from source
+comments, JSDoc and test names across the workspace, and the comment blocks
+touched in test files were cut to the claim they document. Prose only: no
+export, schema, tool, route, status code or response body moved.
+
 ## 0.26.9 — 2026-08-23
 
 **No consumer-visible change.** Internal tracker ids were removed from source

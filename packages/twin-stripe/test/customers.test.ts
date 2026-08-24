@@ -1,9 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// Customers — F-732 (M5 customer-management hot path, ruled F-729).
-// Customer CRUD at semantic tier: create/retrieve/update/list/delete,
-// Stripe metadata merge semantics, the deleted-customer stub, lifecycle
-// events, and F1 account scoping.
+// Customers (M5 customer-management hot path, ruled hot).
 
 import { describe, expect, it } from "vitest";
 import { callTool, createStripeApp, rest } from "./_appHelper.js";

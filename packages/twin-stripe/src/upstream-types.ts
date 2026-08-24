@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Spec contract for shape fidelity (FDRS-478 — twin-stripe port of FDRS-475).
+// Spec contract for shape fidelity (twin-stripe port).
 //
 // This shim anchors the twin's response serializers to Stripe's official
 // published TypeScript types (the `stripe` / stripe-node package, devDependency,
@@ -10,7 +10,7 @@
 // wrong-named or mistyped field becomes a COMPILE error. This is the
 // type-level guard rail — runtime behavior is unchanged.
 //
-// Since F-1484 the file also carries one INPUT anchor (`STRIPE_REFUND_REASONS`,
+// The file also carries one INPUT anchor (`STRIPE_REFUND_REASONS`,
 // at the bottom). It is a runtime `const` rather than a type, because a
 // validator needs the values — but the `stripe` import above stays `import
 // type` and is still erased, so nothing here reaches the devDependency at run
@@ -20,7 +20,7 @@
 // the anchor pins `stripe@22.2.0` (apiVersion 2026-05-27.dahlia), which is
 // DECOUPLED from the wire apiVersion the twin serves (2026-03-04.preview). The
 // compile anchor guards SHAPE only; the wire version is tracked by FIDELITY.md +
-// live capture. Bumping `stripe` re-runs the anchor (the FDRS-476 bump → tsc →
+// live capture. Bumping `stripe` re-runs the anchor (the bump → tsc →
 // decision loop).
 import type Stripe from "stripe";
 
@@ -34,7 +34,7 @@ export type Balance = Stripe.Balance;
 export type Customer = Stripe.Customer;
 export type DeletedCustomer = Stripe.DeletedCustomer;
 export type PaymentMethod = Stripe.PaymentMethod;
-// F-734 warm surfaces (shape tier): the anchor is the shape check for these —
+// Warm surfaces (shape tier): the anchor is the shape check for these —
 // the serializers emit faithful subsets with no semantic machine behind them.
 export type Product = Stripe.Product;
 export type Price = Stripe.Price;
@@ -66,7 +66,7 @@ export type DeepPartial<T> = T extends (infer U)[]
     ? { [K in keyof T]?: DeepPartial<T[K]> }
     : T;
 
-// FDRS-476 (phase 2 of FDRS-475) — upstream-added-field guard.
+// Upstream-added-field guard.
 // Uncovered = upstream keys the serializer neither emits nor registers as a
 // deliberate omission. When that set is empty the assertion is `true`; when it
 // is non-empty the type becomes an error-carrying object whose member type
@@ -76,7 +76,7 @@ export type AssertNoUncovered<Upstream, Emitted, Allow extends PropertyKey> =
     ? true
     : { __UNCOVERED_UPSTREAM_FIELDS__: Exclude<keyof Upstream, keyof Emitted | Allow> };
 
-// F-1484 — the one INPUT anchor in this file, and the only value set the twin
+// The one INPUT anchor in this file, and the only value set the twin
 // closes against the vendor rather than accepting freely.
 //
 // Both doors that create a refund (`create_refund`'s MCP schema and

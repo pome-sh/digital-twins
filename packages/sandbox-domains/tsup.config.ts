@@ -4,20 +4,20 @@
 // whose entire reason to exist is a CROSS-REPO consumer: pome-cloud boots this
 // in-process as the grading/authoring runtime (`lib/twin-state.ts`), and
 // `checks-package-drift.test.ts` compares its binding surface against
-// `@pome-sh/checks`'s, per twin, with no allowlist (F-1524).
+// `@pome-sh/checks`'s, per twin, with no allowlist.
 //
 // ── Why a bundle, and why now ────────────────────────────────────────────────
 //
 // The twins and the sdk are `private: true` and stay that way — commit 6369379
-// privatised them to fix two zod schema identities for one wire type (F-942),
-// and F-1308 is explicit that it is not being reversed. That left the drift
+// privatised them to fix two zod schema identities for one wire type,
+// and that is not being reversed. That left the drift
 // gate's two legs on different clocks: `@pome-sh/checks` could publish a
 // widened vocabulary, and the runtime leg pome-cloud actually booted had no
 // publish lane at all, so a red gate had NO legal move. This package is the
 // runtime leg's lane, in the one shape the lane already knows how to ship: a
 // self-contained bundle with zero `@pome-sh/*` runtime dependencies.
 //
-// Published under the F-1511 allocator alongside `@pome-sh/checks`, so both
+// Published under the allocator alongside `@pome-sh/checks`, so both
 // legs are cut from the SAME `main` commit and their binding surfaces agree by
 // construction rather than by anyone remembering to publish two things.
 //
@@ -36,7 +36,7 @@
 // pome-cloud hands `parseSeed` a seed it built with its OWN zod, and the parsed
 // result is what the domain then writes into SQLite. Two zod copies means two
 // schema identities — `instanceof` fails, `.parse()` results stop being
-// interchangeable — the F-942 bug that dissolved `@pome-sh/shared-types`. A
+// interchangeable — the bug that dissolved `@pome-sh/shared-types`. A
 // peerDependency is what guarantees the consumer's graph holds exactly one zod.
 //
 // ── hono is an ORDINARY dependency here, and that is the difference ──────────
@@ -76,7 +76,7 @@
 // a red; dropping it from knip's view is silence.
 //
 // `zod` is deliberately NOT in that ignore list: `test/surface.test.ts` imports
-// it to assert the peer identity (F-942) from the consumer's side, so it is
+// it to assert the peer identity from the consumer's side, so it is
 // genuinely used and knip is right to want to see it.
 //
 // ── splitting: true is load-bearing, not a size tweak ────────────────────────
@@ -120,7 +120,7 @@ export default defineConfig({
   treeshake: true,
   noExternal: [/^@pome-sh\//],
   // See cli/tsup.config.ts: tsup 8 strips the `node:` prefix by default, which
-  // turns `node:sqlite` — the driver every `open*Database` opens (F-703) — into
+  // turns `node:sqlite` — the driver every `open*Database` opens — into
   // a bare `"sqlite"` that resolves nowhere.
   removeNodeProtocol: false,
 });

@@ -96,7 +96,7 @@ export function listCommits(domain: GitHubDomain, input: { owner: string; repo: 
 }
 
 
-// F-1491 — the contents door's optimistic locking, and the two documentation
+// The contents door's optimistic locking, and the two documentation
 // urls it answers with.
 //
 // These urls are stamped HERE, on four call sites, rather than left to the
@@ -129,7 +129,7 @@ function shaConflict(path: string, sha: string, documentationUrl: string): never
   conflict(`${path} does not match ${sha}`, documentationUrl);
 }
 
-// F-1460 — `content` arrives DECODED, from both doors. The REST route decodes
+// `content` arrives DECODED, from both doors. The REST route decodes
 // base64 before it gets here (`rest-content.ts`); the MCP tools pass their plain
 // text straight through, because that is what GitHub's MCP server accepts. No
 // `encoding` switch: GitHub declares one on neither door.
@@ -221,7 +221,7 @@ export function createBranch(domain: GitHubDomain, input: { owner: string; repo:
   return branchJson(branch, repo);
 }
 
-// ===== v2 hot paths (FDRS-300) ==========================================
+// ===== v2 hot paths ==========================================
 // Cluster A — branches & files -------------------------------------------
 
 export function listBranchesForRepo(domain: GitHubDomain, input: { owner: string; repo: string } & PageOptions) {

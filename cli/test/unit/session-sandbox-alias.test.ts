@@ -1,12 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// F-1557 — `pome sandbox` is an ALIAS of `pome session`, never a second
-// command tree. The docs leg of the session→sandbox copy pass rewrites
-// `apps/docs/docs/cli/session.mdx` to say `sandbox`, and a documented command
-// that does not answer is worse than the inconsistency it replaces — so the
-// alias is load-bearing for a page in another repo that nothing here can see.
-// These tests are what makes dropping it fail: the dispatch cases compare the
-// two spellings' runner arguments for deep equality (one implementation, not
-// two that agree today), and the help cases pin both listings.
+// `pome sandbox` is an ALIAS of `pome session`, never a second command tree.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Command } from "commander";
@@ -80,7 +73,7 @@ async function dispatch(
   return mocks[runner].mock.calls[0]!;
 }
 
-describe("`pome sandbox` aliases `pome session` (F-1557)", () => {
+describe("`pome sandbox` aliases `pome session`", () => {
   const originalExitCode = process.exitCode;
 
   beforeEach(() => {

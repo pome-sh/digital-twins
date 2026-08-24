@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 // Unit tests for the events.jsonl upload orchestration in runTaskHosted.
-// Covers FDRS-357 Task 11: happy path, requestEventsUploadUrl throws, PUT 5xx.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -96,10 +95,8 @@ function makeStubClient({
   getFinalizeSignalsStorageKey: () => string | undefined;
   getFinalizeInput: () => unknown;
   getCreateSessionInput: () => unknown;
-  /** F-983 — the FULL argument list of every deleteSession call, so the
-   *  teardown's `{ discard: true }` is pinned. Capturing only the session id
-   *  would let a refactor silently drop the discard opt-in, and once the
-   *  control plane starts refusing, teardown would stop deleting sessions. */
+  /** The FULL argument list of every deleteSession call, so the teardown's `{ discard:
+   *  true }` is pinned. */
   getDeleteSessionCalls: () => Array<
     [string, boolean | undefined, { discard?: boolean } | undefined]
   >;
@@ -123,7 +120,7 @@ function makeStubClient({
       } as CreateSessionResponse;
     },
     async createEvalSession() {
-      // FDRS-656 — never reached by runTaskHosted; eval-command tests
+      // Never reached by runTaskHosted; eval-command tests
       // supply their own mock.
       throw new HostedOrchError("no eval-session stubbed");
     },
@@ -205,7 +202,7 @@ function makeStubClient({
   };
 }
 
-describe("runTaskHosted events.jsonl upload orchestration (FDRS-357)", () => {
+describe("runTaskHosted events.jsonl upload orchestration", () => {
   let tmp: string;
 
   beforeEach(async () => {
@@ -401,16 +398,13 @@ describe("runTaskHosted events.jsonl upload orchestration (FDRS-357)", () => {
     // finalize must receive the storage key as traceStorageKey.
     expect(getFinalizeTraceStorageKey()).toBe(FAKE_UPLOAD_KEY);
 
-    // F-983 — the `finally` teardown must OPT IN to discarding. Asserting the
-    // whole argument list, not just the session id: dropping `discard: true`
-    // would make teardown stop deleting sessions once the control plane
-    // starts refusing ungraded ones, stranding sandboxes on the team's quota.
+    // The `finally` teardown must OPT IN to discarding.
     expect(getDeleteSessionCalls()).toEqual([
       [FAKE_SESSION_ID, true, { discard: true }],
     ]);
   });
 
-  it("state upload happy path: PUTs both state blobs and forwards both keys to finalize (FDRS-395)", async () => {
+  it("state upload happy path: PUTs both state blobs and forwards both keys to finalize", async () => {
     const STATE_INITIAL_URL = "https://signed.example/put-state-initial";
     const STATE_FINAL_URL = "https://signed.example/put-state-final";
     const STATE_INITIAL_KEY = `team-tm_x/session-${FAKE_SESSION_ID}/state_initial.json`;
@@ -483,7 +477,7 @@ describe("runTaskHosted events.jsonl upload orchestration (FDRS-357)", () => {
     expect(stateFinalBody).not.toContain("redaction_fixture_secret_state_session");
   });
 
-  it("requestStateUploadUrl throws (e.g. 404): finalize gets no state keys and run completes (FDRS-395)", async () => {
+  it("requestStateUploadUrl throws (e.g. 404): finalize gets no state keys and run completes", async () => {
     const { client, getFinalizeStateKeys } = makeStubClient({
       requestEventsUploadUrlImpl: async () => {
         throw new HostedOrchError("no route");
@@ -515,7 +509,7 @@ describe("runTaskHosted events.jsonl upload orchestration (FDRS-357)", () => {
     });
   });
 
-  it("state PUT 503 on one of the pair: forwards the surviving key, omits the failed one (FDRS-395)", async () => {
+  it("state PUT 503 on one of the pair: forwards the surviving key, omits the failed one", async () => {
     const STATE_INITIAL_URL = "https://signed.example/put-state-initial";
     const STATE_FINAL_URL = "https://signed.example/put-state-final";
     const STATE_INITIAL_KEY = `team-tm_x/session-${FAKE_SESSION_ID}/state_initial.json`;
@@ -815,12 +809,8 @@ describe("runTaskHosted ADR-013 score reporting", () => {
     ]);
   });
 
-  // F-1299: the parser fix is pointless if the flag never reaches the wire —
-  // the cloud's seed-exclusion escape hatch (docs/grading/seed-exclusion.md,
-  // pome-cloud) reads `criteria[].always_scored` off THIS request body, not
-  // off the task markdown (the CLI parses it locally and never re-uploads the
-  // source). A criterion with no keyword must still forward byte-identical to
-  // before this field existed — no `always_scored: false`.
+  // The parser fix is pointless if the flag never reaches the wire — the cloud's
+  // seed-exclusion escape hatch (docs/grading/seed-exclusion.md, pome-cloud) reads.
   it("forwards always-scored criteria as `always_scored: true` on the wire, and omits the key otherwise", async () => {
     const taskWithAlwaysScored =
       "# Trivial always-scored\n\n## Prompt\np\n\n## Success Criteria\n" +

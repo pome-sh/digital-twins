@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-644 — the run-set fix prompt: grouped failure signatures from the
-// persisted cloud verdicts, one bounded representative trace, honest
-// variance framing. PURE — no network, no LLM, no local judging.
+// The run-set fix prompt: grouped failure signatures from the persisted cloud
+// verdicts, one bounded representative trace, honest variance framing.
 
 import { describe, expect, it } from "vitest";
 import {
@@ -120,7 +119,7 @@ function mixedTrials(): TrialFixInput[] {
   ];
 }
 
-describe("run-set fix prompt (FDRS-644)", () => {
+describe("run-set fix prompt", () => {
   it("groups failure signatures per criterion with per-trial judge reasons, failing-first", () => {
     const prompt = buildGroupFixUserPrompt({
       taskName: "scn",
@@ -234,13 +233,9 @@ describe("run-set fix prompt (FDRS-644)", () => {
     expect(prompt).toContain(`"${CRITERIA.comment}"`);
   });
 
-  it("names a seed-excluded criterion apart from the abstentions (F-1392)", () => {
+  it("names a seed-excluded criterion apart from the abstentions", () => {
     // A criterion the seed already satisfied is `skipped` on the wire like an
-    // abstention and means the opposite: the grader DID reach a verdict, and
-    // the verdict is that the criterion was never at risk. Folded into "not
-    // uniformly evaluated", it sends the reader's coding agent looking for an
-    // instrument gap that does not exist — the same conflation F-1392 removed
-    // from the run-level tally.
+    // abstention and means the opposite: the grader DID reach a verdict, and the verdict.
     const preSatisfiedResult: CriterionResult = {
       criterion: { type: "code", text: CRITERIA.comment },
       passed: false,
@@ -272,12 +267,9 @@ describe("run-set fix prompt (FDRS-644)", () => {
     );
   });
 
-  // F-1404 — a set reaches this builder holding an INCOMPLETE trial two ways:
-  // "fail wins over incomplete" routes a mixed set here, and a trial dir the
-  // user points at directly targets its set whatever the outcome. Either way
-  // the prompt is handed to a coding agent as grounds for a fix, so it may not
-  // state anything about the ungraded trial that the grading never checked.
-  describe("an INCOMPLETE trial in the set (F-1404)", () => {
+  // A set reaches this builder holding an INCOMPLETE trial two ways: "fail wins over
+  // incomplete" routes a mixed set here, and a trial dir the user points at.
+  describe("an INCOMPLETE trial in the set", () => {
     const ungraded: CriterionResult = {
       criterion: { type: "model", text: CRITERIA.comment },
       passed: false,

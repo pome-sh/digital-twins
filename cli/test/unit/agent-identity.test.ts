@@ -95,7 +95,7 @@ describe("resolveRunAgentIdentity", () => {
     });
   });
 
-  it("sends the manifest's twins on the auto-create re-resolve so a fork's first run enables them (F-926)", async () => {
+  it("sends the manifest's twins on the auto-create re-resolve so a fork's first run enables them", async () => {
     const dir = await makeProject({ agent: { slug: "gmail-retry-notify" }, twins: ["gmail"] });
     const credentialsPath = await writeCreds(dir, "tm_new");
     const fetchMock = vi

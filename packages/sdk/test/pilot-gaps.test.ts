@@ -1,21 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// Engine gaps surfaced by the F-683 pilot port (twin-slack → thin plugin).
-// Written test-first per the pilot rule: gaps are fixed in the engine, never
-// by re-adding per-twin harness code.
-//
-//   1. ToolCallContext — tool handlers receive the authenticated session and
-//      a reportDelta sink so MCP-dispatched mutations carry actor identity
-//      and state_delta on the tape (parity with the per-twin mcp.ts modules).
-//   2. Tool-list serialization — per-tool `annotations` (MCP readOnlyHint)
-//      and a literal `inputSchema` override, emitted on BOTH tool-list
-//      surfaces (legacy GET /mcp/tools and JSON-RPC tools/list).
-//   3. Admin-gate envelope — `admin.forbidden` lets a twin keep its frozen
-//      403 body (slack: {ok:false, error:"restricted_action"}).
-//   4. Correlation/step stamping — every recorded event carries
-//      correlation_id (x-pome-correlation-id header, else request_id) and
-//      task_step_id/scenario_step_id from x-pome-scenario-step-id, exactly
-//      like the per-twin recorders the engine replaces.
+// Engine gaps surfaced by the pilot port (twin-slack → thin plugin).
 
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";

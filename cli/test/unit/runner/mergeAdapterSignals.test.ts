@@ -65,7 +65,7 @@ function llmTurn(ts: string, event_id: string, turn_index = 0) {
 }
 
 describe("mergeAdapterSignalsIntoEvents", () => {
-  it("interleaves 3 LlmCallEvents + 2 HookEvents in ts order; every merged row validates (FDRS-412)", async () => {
+  it("interleaves 3 LlmCallEvents + 2 HookEvents in ts order; every merged row validates", async () => {
     const dir = await workspace();
     const eventsPath = join(dir, "events.jsonl");
     const signalsPath = join(dir, "signals.jsonl");
@@ -98,7 +98,7 @@ describe("mergeAdapterSignalsIntoEvents", () => {
     }
   });
 
-  it("admits LlmTurnEvent signal rows and preserves cache tokens (F-766)", async () => {
+  it("admits LlmTurnEvent signal rows and preserves cache tokens", async () => {
     const dir = await workspace();
     const eventsPath = join(dir, "events.jsonl");
     const signalsPath = join(dir, "signals.jsonl");
@@ -122,7 +122,7 @@ describe("mergeAdapterSignalsIntoEvents", () => {
 
     const turnRow = parsed.find((r) => r.kind === "LlmTurnEvent");
     expect(turnRow).toBeDefined();
-    // The cache-token counts — the whole point of F-766 — survive the merge.
+    // The cache-token counts — the whole point — survive the merge.
     expect(turnRow.cache_read_input_tokens).toBe(900);
     expect(turnRow.cache_creation_input_tokens).toBe(128);
     expect(turnRow.turn_index).toBe(0);
@@ -250,10 +250,8 @@ describe("mergeAdapterSignalsIntoEvents", () => {
   });
 });
 
-// F-1200 — the merge is the one place that sees both the twin's tape and the
-// adapter's signals, so it is where a twin HTTP row gets the tool call that
-// caused it. Before this, every twin row shipped with a null parent and the
-// waterfall could only render twin calls as a separate list.
+// The merge is the one place that sees both the twin's tape and the adapter's signals,
+// so it is where a twin HTTP row gets the tool call that caused it.
 describe("resolveTwinHttpParents", () => {
   const toolUse = (event_id: string, tool_use_id: string) => ({
     ts: "2026-08-03T12:00:00.000Z",
@@ -314,9 +312,8 @@ describe("resolveTwinHttpParents", () => {
   });
 
   it("leaves the parent null when the id names no tool call", () => {
-    // A pre-F-1200 `tlc_`, a `req_` from the no-header fallback, or a REST call
-    // made outside any tool handler. Inventing a parent would put twin calls
-    // under tools that did not make them.
+    // A legacy `tlc_`, a `req_` from the no-header fallback, or a REST call made
+    // outside any tool handler.
     const rows = parse([
       toolUse("evt_tool_3", "toolu_abc"),
       twinHttp("req_3", { correlation_id: "tlc_deadbeef" }),
@@ -348,19 +345,16 @@ describe("resolveTwinHttpParents", () => {
   });
 });
 
-// F-1200 acceptance. The ticket's observable is "one tree: run → turn → tool →
-// twin HTTP", and the thing that made it impossible was structural: every twin
-// row carried a null parent, so the two trees were unstitchable. This walks the
-// whole chain on real shapes rather than asserting the join in isolation.
-describe("F-1200 acceptance: a twin call sits inside the tool that made it", () => {
+// Acceptance. The observable is "one tree: run → turn → tool → twin HTTP", and the
+// thing that made it impossible was structural: every twin row carried a.
+describe("acceptance: a twin call sits inside the tool that made it", () => {
   it("merged tape → the twin row is parented at the tool that caused it", async () => {
     const dir = await workspace();
     const eventsPath = join(dir, "events.jsonl");
     const signalsPath = join(dir, "signals.jsonl");
 
-    // The twin's tape: written by another process, which cannot know the
-    // agent-side event_id. It carries the causing tool's id on the header it
-    // received — since F-1200 that is the SDK's real `toolu_`, not a `tlc_`.
+    // The twin's tape: written by another process, which cannot know the agent-side
+    // event_id.
     await writeFile(
       eventsPath,
       JSON.stringify({
@@ -410,7 +404,7 @@ describe("F-1200 acceptance: a twin call sits inside the tool that made it", () 
 
     const twin = rows.find((r) => r.kind === "TwinHttpEvent");
     const tool = rows.find((r) => r.kind === "ToolUseEvent");
-    // Before F-1200 this was null, which is what made the two trees unstitchable.
+    // This used to be null, which is what made the two trees unstitchable.
     expect(tool?.event_id).toBe("evt_tool_1");
     expect(twin?.parent_event_id).toBe("evt_tool_1");
   });

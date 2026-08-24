@@ -1,52 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// F-1460 — `content` on the two write doors, which take it DIFFERENTLY, because
-// real GitHub takes it differently.
-//
-// ── THE MEASUREMENT THIS FILE PINS ────────────────────────────────────────
-//
-// Probed live against real GitHub on 2026-08-12 (throwaway private repo,
-// `PUT /repos/:owner/:repo/contents/*`, deleted after):
-//
-//   | sent                          | GitHub answered                        |
-//   |-------------------------------|----------------------------------------|
-//   | `aGVsbG8gd29ybGQK`            | 201, round-trips byte-identical        |
-//   | `hello world\n`               | 422 `content is not valid Base64`      |
-//   | `!!!@@@###$$$`                | 422 `content is not valid Base64`      |
-//   | `abcde` (good alphabet, len 5)| 422 `content is not valid Base64`      |
-//   | `test`  (good alphabet, len 4)| 201 — silently writes 3 garbage bytes  |
-//   | base64 with an embedded `\n`  | 201 — whitespace tolerated             |
-//
-//   {"message":"content is not valid Base64",
-//    "documentation_url":"https://docs.github.com/rest/repos/contents#create-or-update-file-contents",
-//    "status":"422"}
-//
-// The rule is STRUCTURAL, not semantic: GitHub validates the base64 alphabet
-// and the padded length, and decodes whatever survives that. `test` is well
-// formed, so it is accepted and the repository gets three junk bytes — GitHub
-// never asks whether the result is text. A twin that only rejected
-// "things that don't look like content" would pass the plain-text cases here
-// and still diverge on `test`, so the length case and the garbage-in case are
-// both load-bearing.
-//
-// ⚠️ NOT MEASURED, INFERRED: base64url (`-`, `_`) is treated as outside the
-// alphabet. The four probes above never sent one. If that ever matters, probe
-// it rather than trusting this line.
-//
-// ── WHY THE MCP DOOR IS THE OPPOSITE, AND MUST STAY THAT WAY ──────────────
-//
-// GitHub's own MCP server takes `content` as PLAIN TEXT and base64-encodes it
-// itself. Its captured tool schema says so in the description a model reads —
-// "Do not base64-encode it; this server does that before calling the REST API"
-// — and `github/github-mcp-server`'s `create_or_update_file` does
-// `contentBytes := []byte(content)` and lets `json.Marshal` encode it, while
-// `push_files` hands `content` straight to a `github.TreeEntry` for the Git
-// Trees API, which also takes plain UTF-8.
-//
-// So the two doors of this twin are asymmetric ON PURPOSE, and the asymmetry is
-// fidelity rather than sloppiness. The last two tests in this file exist to
-// make a future "unify the doors" change fail loudly: unifying them is exactly
-// the bug. F-1460's own ticket proposed that unification and was wrong; the
-// measurement above is why.
+// `content` on the two write doors, which take it DIFFERENTLY, because real GitHub
+// takes it differently.
 
 import { describe, expect, it } from "vitest";
 import { createGitHubCloneApp } from "../src/twin.js";
@@ -99,7 +53,7 @@ async function readBack(app: ReturnType<typeof createGitHubCloneApp>, path: stri
   };
 }
 
-describe("F-1460 — REST `PUT /contents/*` takes base64, the way GitHub does", () => {
+describe("REST `PUT /contents/*` takes base64, the way GitHub does", () => {
   it("round-trips a base64 body byte-identically", async () => {
     const app = createGitHubCloneApp();
     const text = "hello world\n";
@@ -120,17 +74,7 @@ describe("F-1460 — REST `PUT /contents/*` takes base64, the way GitHub does", 
   });
 
   it("mangles bytes that are not UTF-8 — divergence 29, and it is NEW", async () => {
-    // ⚠️ This test pins a GAP, not a fidelity claim. Real GitHub stores bytes;
-    // this twin stores text (`files.content` is a TEXT column and `util.ts`'s
-    // `encodeContent` re-encodes it as UTF-8 on the way out), so a caller who
-    // writes a PNG gets replacement characters back.
-    //
-    // It is worth a test because the gap is NEWLY REACHABLE. Before F-1460
-    // `content` was plain text on this route, so no caller could express a
-    // non-UTF-8 byte at all and nothing could observe the limitation. Accepting
-    // base64 is what makes it expressible. Closing it means changing the storage
-    // convention for every surface that reads file content — diffs, search,
-    // blobs — so it is recorded as divergence 29 and left, not smuggled in here.
+    // ⚠️ This test pins a GAP, not a fidelity claim.
     const app = createGitHubCloneApp();
     const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff]);
 
@@ -228,7 +172,7 @@ describe("F-1460 — REST `PUT /contents/*` takes base64, the way GitHub does", 
   });
 });
 
-describe("F-1460 — the MCP door keeps taking plain text, the way GitHub's MCP server does", () => {
+describe("the MCP door keeps taking plain text, the way GitHub's MCP server does", () => {
   it("`create_or_update_file` writes plain text through unchanged", async () => {
     const app = createGitHubCloneApp();
     const text = "export const ok = true;\n";
@@ -283,11 +227,8 @@ describe("F-1460 — the MCP door keeps taking plain text, the way GitHub's MCP 
   });
 
   it("no longer takes an `encoding` switch GitHub does not declare on either tool", async () => {
-    // F-1389 took `encoding` off the REST declaration; this takes it off the MCP
-    // validators, where it survived because the served table (a capture) and the
-    // zod validators are two different objects. Undeclared inputs are DISCARDED
-    // under the `ignore` ruling, so the call still succeeds — it just no longer
-    // means anything, and the content is written verbatim as plain text.
+    // `encoding` came off the REST declaration; this takes it off the MCP validators,
+    // where it survived because the served table (a capture) and the zod validators.
     const app = createGitHubCloneApp();
 
     const called = await mcp(app, "create_or_update_file", {

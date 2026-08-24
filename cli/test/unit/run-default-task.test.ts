@@ -1,12 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-645 — "run yours": bare `pome run` defaults to the demo task.
-//   - default-task module: the user copy pins `runs: 5` inside the Config
-//     fence, swaps the packaged maintainer comment for the user-facing one,
-//     ships the seed sidecar, and never clobbers an existing copy;
-//   - main.ts glue: bare `pome run` drops the copy on first use, announces
-//     it, prints the moment-05 frame after the doctor + credential gates,
-//     and dispatches the trial-group path with the pinned k=5 (an explicit
-//     -n still wins); an explicit path never triggers any of it.
+// "run yours": bare `pome run` defaults to the demo task.
 
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
@@ -93,7 +86,7 @@ async function fixtureRepo(opts: { wired?: boolean } = {}): Promise<string> {
   return dir;
 }
 
-describe("default-task module (FDRS-645)", () => {
+describe("default-task module", () => {
   it("pins runs: 5 into the real packaged md's Config fence and the real parser reads it back", async () => {
     const raw = await readFile(demoTaskPath(), "utf8");
     const sidecar = JSON.parse(
@@ -181,7 +174,7 @@ describe("default-task module (FDRS-645)", () => {
   });
 });
 
-describe("bare `pome run` glue (FDRS-645)", () => {
+describe("bare `pome run` glue", () => {
   const originalCwd = process.cwd();
   const originalExitCode = process.exitCode;
   let stderr: string[];
@@ -280,7 +273,7 @@ describe("bare `pome run` glue (FDRS-645)", () => {
   }, 30_000);
 
   it("a bare manifest (no command) errors with guidance instead of spawning a missing scaffold", async () => {
-    // F-904: `pome init` in an existing project writes no `command`. `pome run`
+    // `pome init` in an existing project writes no `command`. `pome run`
     // must not silently fall back to the starter scaffold it never created.
     const dir = await mkdtemp(join(tmpdir(), "pome-run-bare-"));
     process.chdir(dir);
@@ -312,7 +305,7 @@ describe("bare `pome run` glue (FDRS-645)", () => {
     expect(runTaskHosted).not.toHaveBeenCalled();
   }, 30_000);
 
-  // F-865 — a MIGRATED project declares its task directory in the manifest;
+  // A MIGRATED project declares its task directory in the manifest;
   // bare `pome run` runs that whole declared set instead of the demo drop.
   async function fixtureRepoWithTasks(
     taskFiles: Record<string, string>,

@@ -134,7 +134,7 @@ export class SlackDomain {
       // Channels + members + messages.
       // `channelIdByHandle` is what lets `files[].channels` name a channel the
       // way `channels[].members` names a user — by seed handle, never by a
-      // minted id (F-1509).
+      // minted id.
       const channelIdByHandle = new Map<string, string>();
       const seedChannels = state.channels ?? [];
       for (const ch of seedChannels) {
@@ -204,7 +204,7 @@ export class SlackDomain {
         }
       }
 
-      // Files (F-1509). Written with the SAME derivations `filesUpload` uses —
+      // Files. Written with the SAME derivations `filesUpload` uses —
       // `mimetype` from `filetype`, `size` from the byte length of `content`,
       // `title` defaulting to `name` — so a seeded file and an uploaded one are
       // indistinguishable to `serializeFile`. A `channels` handle that names no
@@ -696,7 +696,7 @@ export class SlackDomain {
     // nondeterministic — a channel created within the same ms as the seed rows
     // tie-broke by id, while one created a ms later sorted last. rowid equals
     // creation order (created_at is monotonic within a run), which is what the
-    // old ordering produced in every non-tie case (F-683 determinism check).
+    // old ordering produced in every non-tie case (determinism check).
     return this.db.prepare(`SELECT * FROM channels ORDER BY rowid`).all() as ChannelRow[];
   }
 

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// M5 hot-gap fills (F-735): search_commits, get_release_by_tag, get_tag at
-// semantic tier, plus the update_pull_request_branch shape→semantic upgrade
-// (real merge commit of base into head instead of a branch-pointer reset).
+// M5 hot-gap fills: search_commits, get_release_by_tag, get_tag at semantic tier, plus
+// the update_pull_request_branch shape→semantic upgrade (real merge.
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { openGitHubCloneDatabase } from "../src/db.js";
@@ -109,7 +108,7 @@ describe("get_release_by_tag and get_tag", () => {
 
   it("resolves tags containing slashes over REST", async () => {
     const app = createGitHubCloneApp();
-    // `create_release` is a REST-only surface since F-1376 — GitHub declares no such MCP tool.
+    // `create_release` is a REST-only surface since — GitHub declares no such MCP tool.
     await req(app, "POST", "/repos/acme/api/releases", { tag_name: "release/2026-07" });
 
     const rest = await req(app, "GET", "/repos/acme/api/releases/tags/release/2026-07");
@@ -136,10 +135,9 @@ describe("get_release_by_tag and get_tag", () => {
   });
 });
 
-describe("named cold surfaces (F-729 ruling)", () => {
-  // Rubric rule 4 (ENDPOINT-TIERS.md): named cold rows must return the
-  // documented loud-501 envelope, test-backed. These pin the catch-all for
-  // the surfaces the F-729 ruling named cold on twin-github.
+describe("named cold surfaces (heat ruling)", () => {
+  // Rubric rule 4 (ENDPOINT-TIERS.md): named cold rows must return the documented
+  // loud-501 envelope, test-backed.
   it.each([
     "/repos/acme/api/actions/runs",
     "/repos/acme/api/git/trees/abc123",

@@ -1,14 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1076 — the tape substrate's first declaration, and the world in which it
-// fails.
-//
-// The failing-world case is the one that carries the weight. This is a NEGATIVE
-// criterion, and a negative criterion nobody can make fail is not a guard — it
-// is a clean bill of health issued automatically. The whole justification for
-// reading the tape is that `state_final.json` is byte-identical whether the
-// examinee reached for an unimplemented route or never tried, so the only
-// evidence that a violation happened lives on the tape.
+// The tape substrate's first declaration, and the world in which it fails.
 
 import { describe, expect, it } from "vitest";
 import type { CheckTapeEvent } from "@pome-sh/sdk/checks";

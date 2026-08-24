@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-679/M6 copy-marker gate. Cross-package file copies are not allowed in OSS
+// Copy-marker gate (M6). Cross-package file copies are not allowed in OSS
 // packages; shared code should move through published packages instead.
 import { readFile } from "node:fs/promises";
 import { readdir } from "node:fs/promises";

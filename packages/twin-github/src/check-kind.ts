@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The one type every GitHub check declaration is written against (F-1075).
+// The one type every GitHub check declaration is written against.
 //
 // It exists so `check-issues.ts`, `check-pulls.ts` and `check-repos.ts` can be
 // separate files without each re-deriving the binding between a declaration and

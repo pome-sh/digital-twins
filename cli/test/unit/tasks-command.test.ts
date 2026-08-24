@@ -73,9 +73,8 @@ describe("pome tasks", () => {
     expect(out).toContain("01-bug-happy-path.md");
     expect(out).toContain("03-already-triaged.md");
     expect(out).toContain("05-github-identity-spoof.md");
-    // F-1303 deleted both: `00-default-seed` was a reference document, not a
-    // task, and `04-judge-context` measured our own judge lane. Asserted absent
-    // rather than dropped, so a re-add has to be deliberate.
+    // Both are deleted: `00-default-seed` was a reference document, not a task, and
+    // `04-judge-context` measured our own judge lane.
     expect(out).not.toContain("00-default-seed.md");
     expect(out).not.toContain("04-judge-context.md");
   });

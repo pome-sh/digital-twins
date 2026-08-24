@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Customers REST — F-732 (M5 customer-management hot path).
+// Customers REST (M5 customer-management hot path).
 //
 // POST /v1/customers · GET /v1/customers(/:id) · POST /v1/customers/:id ·
 // DELETE /v1/customers/:id · GET /v1/customers/:id/payment_methods.

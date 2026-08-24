@@ -1,15 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1125 — `RecorderEvent.tool`, the first-class name of the twin action a call
-// invoked.
-//
-// The point of these tests is that the field is TRANSPORT-INDEPENDENT. A twin
-// action is reachable more than one way (JSON-RPC `tools/call`, the two legacy
-// MCP dispatch routes, and a REST route that does the same thing), and a check
-// asking "was this action ever called" has to get the same answer through all
-// of them. Stamping only the MCP name would leave the REST door open and turn
-// `X was never called` into a pass over a run that called X — the negative
-// false-pass D4 forbids, relocated rather than removed.
+// `RecorderEvent.tool`, the first-class name of the twin action a call invoked.
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";

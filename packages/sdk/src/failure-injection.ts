@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Scenario-level failure injection (FDRS-339), graduated from twin-stripe
-// into the engine by the F-684 port ruling: making a twin fail on attempt N
+// Scenario-level failure injection, graduated from twin-stripe
+// into the engine by the port ruling: making a twin fail on attempt N
 // of a (method, path) tuple is a generic twin capability — any provider
 // double needs "the server processed it but the client never saw the
 // response" to reproduce lost-response retry bugs. Only the rule *payloads*
@@ -18,7 +18,7 @@
 //     response path substitutes status + body on the way out, so the
 //     recorded event and the wire agree. This models a "server processed
 //     but response delivery failed" failure — required to reproduce the
-//     FDRS-316 hero scenario.
+// hero scenario.
 //
 // Counters live per `(account_id, method, path)` so successive POSTs from
 // the same account to the same path resolve to `attempt: 1`, `attempt: 2`,
@@ -102,7 +102,7 @@ export function failureInjectionMiddleware(
         method,
         path: rawPath,
         request_body: requestBody,
-        // F-1125 — same capture policy as the engine's emit(); an injected
+        // Same capture policy as the engine's emit(); an injected
         // fault must not be the one row a header-reading check cannot see.
         request_headers: recordedRequestHeaders(c),
         // Injection is transport-level: it intercepts a (method, path) tuple,

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1511 — THE PR-TIME HALF OF THE RELEASE CONTRACT, re-scoped from
+// THE PR-TIME HALF OF THE RELEASE CONTRACT, re-scoped from
 // scripts/ci/check-version-bump-required.mjs, whose history is under that path
 // (the rewrite is large enough that `--follow` will not bridge it).
 //

@@ -8,7 +8,7 @@
 // `apps/mcp/src/lib/capture.ts` wrap a recorded event into the unified
 // `TwinHttpEvent` NDJSON row that uploaded `events.jsonl` carries. Nothing else
 // on that barrel is imported there, and the barrel is the whole engine — which
-// is why both manifests were pinned to a frozen `@pome-sh/sdk@0.11.1` (F-1527's
+// is why both manifests were pinned to a frozen `@pome-sh/sdk@0.11.1` (the
 // sixth pin) rather than to anything anyone could move.
 //
 // It arrives through `@pome-sh/sdk/server` because that is the only public

@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1230 — every workflow with a `schedule:` trigger needs a failure alarm
+// Every workflow with a `schedule:` trigger needs a failure alarm
 // (D5 · "every check runs somewhere that can fail"). The set of scheduled
 // workflows is DERIVED from `.github/workflows/*.yml` rather than typed into
 // a list anywhere: a hand-maintained list of "workflows with a schedule" is
 // exactly the shape D5 names as the bug — it stays green while a thirteenth
-// scheduled workflow lands uncovered. F-1471 (the follow-up that asserts
+// scheduled workflow lands uncovered. The follow-up that asserts
 // "every scheduled workflow reaches the alarm" as a property, not an
 // instance) reads this same derivation rather than re-parsing the tree with
 // its own rules.
@@ -73,7 +73,7 @@ export function findScheduledWorkflows(root) {
           throw new Error(
             `${file}: an \`on:\` flow mapping that spans more than one line is not parsed by ` +
               "this derivation, so a `schedule:` trigger inside it would be invisible to it and " +
-              "to the alarm-coverage check (F-1471) alike. Rewrite it in block form.",
+              "to the alarm-coverage check alike. Rewrite it in block form.",
           );
         }
         inOnBlock = inline === "";
@@ -153,7 +153,7 @@ export function findBrokenLocalUses(root) {
  * preceded by whitespace, and never inside a quoted scalar. A blanket strip
  * silently TRUNCATES values — `label: "schedule-alarm:x#1"` and
  * `label: "schedule-alarm:x#2"` both reduce to `"schedule-alarm:x`, so the
- * F-1471 title/label bijection compares two mangled values, finds them equal,
+ * The title/label bijection compares two mangled values, finds them equal,
  * and reports green on exactly the typo it exists to catch. Failing to strip a
  * real comment is the safer error, so an unterminated quote leaves the rest of
  * the line intact rather than guessing.
@@ -175,7 +175,7 @@ function stripComment(raw) {
 
 /**
  * Every workflow file as `[name, comment-stripped lines]`. Exported so
- * scripts/ci/assert-schedule-alarm-coverage.mjs (F-1471) reads the exact same
+ * scripts/ci/assert-schedule-alarm-coverage.mjs reads the exact same
  * file list and comment-stripping rule rather than re-implementing it — two
  * readers of ".github/workflows/*.yml with comments stripped" drifting apart
  * is the same shape of bug this file's `cron:`/`schedule:` cross-check exists
@@ -224,7 +224,7 @@ export function main(argv = process.argv.slice(2)) {
         `  cron: key but no on: schedule: -> ${onlyCron.join(", ") || "(none)"}\n` +
         "Fix the parser in list-scheduled-workflows.mjs, not this assertion — " +
         "a scheduled workflow it cannot see is a scheduled workflow the alarm " +
-        "coverage check (F-1471) cannot see either.",
+        "coverage check cannot see either.",
     );
   }
 

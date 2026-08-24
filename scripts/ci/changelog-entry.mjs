@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1511 — THE CHANGELOG CONTRACT, now that the number is not the author's.
+// THE CHANGELOG CONTRACT, now that the number is not the author's.
 //
 // The old contract was one rule: a package's `CHANGELOG.md` top heading must
 // equal the version in the same PR. That rule is what made every open PR carry

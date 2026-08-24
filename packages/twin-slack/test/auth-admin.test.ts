@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// Admin-gate coverage for twin-slack (F-683): the gate MECHANISM (token
-// mode, loopback socket check, production fail-closed) is the engine's and
-// is covered by the sdk + contract suites; what this file pins is the
-// slack-declared SHAPE — the frozen 403 {ok:false, error:"restricted_action"}
-// envelope wired through `admin.forbidden` in the twin manifest.
+// Admin-gate coverage for twin-slack: the gate MECHANISM (token mode, loopback socket
+// check, production fail-closed) is the engine's and is covered by the.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createSlackTwinApp } from "../src/twin.js";
 import { openSlackTwinDatabase } from "../src/db.js";

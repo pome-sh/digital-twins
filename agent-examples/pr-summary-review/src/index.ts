@@ -18,7 +18,7 @@
  * Two run modes share the same code path:
  *
  * 1. Standalone — `npx @pome-sh/cli twin start github`, then `npm run start`.
- *    Auth comes from env only (F-647): either paste the POME_AUTH_TOKEN the
+ *    Auth comes from env only: either paste the POME_AUTH_TOKEN the
  *    CLI prints, or export the same TWIN_AUTH_SECRET in both terminals and
  *    the agent mints its own bearer JWT. The agent talks to the twin at
  *    http://127.0.0.1:3333/s/standalone/mcp.
@@ -74,7 +74,7 @@ pull request has both a summary comment and a review verdict.`;
 
 const TASK = process.env.POME_TASK?.trim() || DEFAULT_TASK;
 
-// Optional model override (F-928). When set, it is forwarded verbatim as the
+// Optional model override. When set, it is forwarded verbatim as the
 // Claude Agent SDK's `options.model`, which the SDK turns into the `claude`
 // CLI's `--model` flag. Omit it to run the CLI's own default model. Accepts an
 // alias (`haiku`, `sonnet`, `opus`) or a full id (`claude-haiku-4-5`). The
@@ -137,7 +137,7 @@ async function main() {
       // (.claude/settings.local.json) — INCLUDING the Claude Code plugin MCP
       // servers configured on whoever's machine this runs on. Omitted, the SDK
       // loads all three ("matches CLI defaults"); `[]` is its documented
-      // isolation mode. Measured 2026-08-05 (F-1295): a sibling example with
+      // isolation mode. Measured 2026-08-05: a sibling example with
       // `tools: []` already set searched the DEVELOPER's real Slack workspace,
       // made zero twin calls, and would have scored as a triage failure.
       tools: [],
@@ -156,7 +156,7 @@ async function main() {
       thinking.reset();
       if (msg.type === "system" && msg.subtype === "init") {
         // Log the model the CLI actually resolved so a downshift (or a silent
-        // runtime override) is visible, never guessed (F-928).
+        // runtime override) is visible, never guessed.
         console.log(
           `model:    ${msg.model}` +
             (MODEL ? ` (requested "${MODEL}")` : " (SDK default — no options.model set)")
@@ -176,7 +176,7 @@ async function main() {
       }
     }
   } catch (err) {
-    // F-1518: the Claude Agent SDK's message iterator can REJECT — not just
+    // The Claude Agent SDK's message iterator can REJECT — not just
     // yield an error `result` message — when the underlying `claude` CLI exits
     // non-zero (an invalid API key is one way; the SDK calls
     // `inputStream.error()` on the stream being iterated). Uncaught, that threw
@@ -241,7 +241,7 @@ function startThinkingIndicator() {
  * Build the tool table this agent hands the model.
  *
  * Exported and config-taking (rather than closing over module-level env) so a
- * gate can exercise every tool against a live twin without a model — F-1152.
+ * gate can exercise every tool against a live twin without a model.
  * This example and `pr-summary-agent` both shipped a `comment_on_pull_request`
  * the GitHub twin answered `404 Issue not found` for, on every subject, for as
  * long as the examples existed, and no gate looked: `gate:examples` is
@@ -399,7 +399,7 @@ function readKeyFromInfisical(): string | null {
   }
 }
 
-// Auth is env-only (F-647): the agent never probes the twin's on-disk state —
+// Auth is env-only: the agent never probes the twin's on-disk state —
 // the persisted-secret location is a server↔CLI internal contract.
 async function resolveAuthToken(): Promise<string> {
   // Pome CLI evaluator (and `pome twin start`'s printed line) pre-mint the
@@ -484,7 +484,7 @@ function trimSlash(url: string): string {
 // the POME_PREFLIGHT path (an early return) masked this.
 // NOT `import.meta.main`: that landed in Node 24.2 and this package's `engines`
 // allows `>=24`, so on 24.0/24.1 it is `undefined`, this guard is false, and
-// `npm start` prints nothing and exits 0 having run no agent at all (F-1481).
+// `npm start` prints nothing and exits 0 having run no agent at all.
 // Realpath'd on BOTH sides because node resolves symlinks before deriving
 // `import.meta.url`, so a bare `resolve` of argv[1] misses through a symlinked
 // checkout (a worktree, macOS's `/tmp`) in the same silent shape.

@@ -1,24 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// `list_issues.state` takes GitHub's spelling, and the fold that makes it work
-// (F-1468).
-//
-// ── WHY THIS FILE EXISTS SEPARATELY ────────────────────────────────────────
-//
-// The twin accepted `state: "open"` on the MCP `list_issues` tool until F-1468
-// tightened the validator onto GitHub's own declaration, which is
-// `["OPEN","CLOSED"]`. That tightening is a two-part change and only one part
-// is visible in a schema:
-//
-//   1. the validator now REFUSES the lowercase spelling, and
-//   2. `listIssues` filters `issue.state === state` against rows stored
-//      LOWERCASE, so an unfolded `OPEN` matches nothing.
-//
-// Part 2 fails SILENTLY. It returns `[]` rather than an error, which reads to an
-// examinee as "this repository has no open issues" and to a grader as a task the
-// agent simply did not complete. A schema-shaped test — "does `OPEN` parse?" —
-// passes on a twin with that bug, which is why the assertions below go through
-// the tool to real seeded rows and count them.
+// `list_issues.state` takes GitHub's spelling, and the fold that makes it work.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -29,12 +10,8 @@ import { TEST_AUTH_SECRET, TEST_SID, signTestToken, withAuth } from "./_authHelp
 const OPEN_ISSUE = 1;
 const CLOSED_ISSUE = 2;
 
-/**
- * A world with BOTH states present. The default seed has no closed issue, so
- * every assertion below would pass on it vacuously — "closed returns nothing"
- * and "closed is filtered correctly" are the same green when there is nothing
- * to filter. F-1170's rule: an assertion that cannot fail is not one.
- */
+/** A world with BOTH states present. The default seed has no closed issue, so every
+ *  assertion below would pass on it vacuously — "closed returns nothing". */
 const WORLD = {
   repositories: [
     {
@@ -99,14 +76,7 @@ describe("list_issues.state — GitHub's spelling, and the fold behind it", () =
   });
 
   it("an ABSENT state returns BOTH here, and only open over REST", async () => {
-    // GitHub's two doors disagree about the absent case and the twin follows
-    // each. Its MCP enum has no `all` member and its description says both are
-    // returned when the argument is absent; its REST `GET /issues` defaults to
-    // open, which is F-1427's ruling and is asserted in list-state-default.test.ts.
-    //
-    // Without this fold the MCP tool could not reach a closed issue except by
-    // asking for closed ones, so an examinee told "list the issues" would get a
-    // filtered world it never asked for — and be graded on it.
+    // GitHub's two doors disagree about the absent case and the twin follows each.
     const app = createGitHubCloneApp({ seed: WORLD as never });
     const viaMcp = await call(app, "list_issues", { owner: "acme", repo: "api" });
     expect(numbers(viaMcp)).toEqual([OPEN_ISSUE, CLOSED_ISSUE]);
@@ -126,17 +96,9 @@ describe("list_issues.state — GitHub's spelling, and the fold behind it", () =
     expect((await response.text()).toLowerCase()).toContain("state");
   });
 
-  // ── THE INCONSISTENCY IS GITHUB'S, AND IT IS DELIBERATE HERE ──────────────
-  //
-  // ⚠️ DO NOT "UNIFY" THESE TWO ENUMS. GitHub spells `state` differently on the
-  // two tools, and the twin matches each one. Anyone reading the twin's source
-  // will see `["OPEN","CLOSED"]` on one line and `["open","closed","all"]` a few
-  // lines away and reach for consistency; doing that introduces a divergence
-  // where the vendor has none, on whichever tool gets "fixed".
-  //
-  // The evidence is the committed capture, so this test reads it rather than
-  // restating it: if GitHub ever does unify them, this fails and the twin should
-  // follow the capture, not this comment.
+  // ── THE INCONSISTENCY IS GITHUB'S, AND DELIBERATE HERE ────────────────────
+  // ⚠️ DO NOT "UNIFY" THESE TWO ENUMS: GitHub spells `state` differently on the
+  // two tools, so unifying invents a divergence. This reads the capture, not prose.
   it("list_issues and list_pull_requests disagree on casing BECAUSE GitHub does", () => {
     const golden = JSON.parse(
       readFileSync(
@@ -147,17 +109,14 @@ describe("list_issues.state — GitHub's spelling, and the fold behind it", () =
     const enumOf = (tool: string) =>
       golden.result.tools.find((t) => t.name === tool)?.inputSchema.properties?.state?.enum;
 
-    // THREE spellings on one vendor, not two. `issue_write` was found by the
-    // parity harness during F-1468's own migration, which is the argument for
-    // reading the capture rather than generalising from two data points.
+    // THREE spellings on one vendor, not two. `issue_write` was found by the parity
+    // harness during the own migration, which is the argument for reading the capture.
     expect(enumOf("list_issues")).toEqual(["OPEN", "CLOSED"]);
     expect(enumOf("list_pull_requests")).toEqual(["open", "closed", "all"]);
     expect(enumOf("issue_write")).toEqual(["open", "closed"]);
 
-    // And the twin follows each one, which is the point: `list_pull_requests`
-    // was deliberately NOT tightened by F-1468, because it was already right.
-    // Asserted through the validators rather than by eye, so "the twin follows
-    // the capture" is a check and not a claim in a comment.
+    // And the twin follows each one, which is the point: `list_pull_requests` was
+    // deliberately NOT tightened, because it was already right.
     const schemaOf = (tool: string) => toolArgumentSchemas.find((t) => t.name === tool)!.schema;
     const issues = schemaOf("list_issues");
     expect(issues.safeParse({ owner: "o", repo: "r", state: "OPEN" }).success).toBe(true);

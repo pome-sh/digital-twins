@@ -13,15 +13,7 @@ import {
 // test is the explanation, never the hash arithmetic.
 const MOVED = "sha256:the-cloud-published-a-different-digest";
 
-/**
- * The cloud's payload, mirrored from this CLI's own declarations.
- *
- * Derived, never a literal list — the vocabulary is a CLOSED SET THAT GROWS
- * (F-1075, F-1151), so a hand-written fixture would assert the size of the set
- * where these tests mean to assert the classification of a difference. Every
- * field `GET /v1/checks` serves is mirrored, including the compiled `pattern`
- * and the parameter patterns, because prod really does serve both.
- */
+/** The cloud's payload, mirrored from this CLI's own declarations. */
 function mirror(twin: string): RemoteVocabulary {
   return {
     digest: MOVED,
@@ -84,7 +76,7 @@ describe("explainSkew", () => {
     ]);
   });
 
-  // F-1137's first Done-when bullet. `substrate` is hashed by `checksDigest` and
+  // the first Done-when bullet. `substrate` is hashed by `checksDigest` and
   // was not compared by the refusal, so this skew refused while naming nothing.
   it("names the check and both substrates when only the substrate moved", () => {
     const remote = mirror("github");
@@ -116,9 +108,8 @@ describe("explainSkew", () => {
     ]);
   });
 
-  // F-1137's second Done-when bullet, localised. The compiled pattern IS on the
-  // `GET /v1/checks` wire (F-1074 Phase 3, verified against prod), so a
-  // generator-only skew can name the check rather than only its class.
+  // the second Done-when bullet, localised. The compiled pattern IS on the `GET
+  // /v1/checks` wire (verified against prod), so a generator-only skew can name.
   it("names the check when the compiled pattern moved under an identical declaration", () => {
     const remote = mirror("github");
     const id = remote.checks[0]!.id;
@@ -143,9 +134,7 @@ describe("explainSkew", () => {
     expect(explainSkew("github", remote).map((f) => f.kind)).toEqual(["template"]);
   });
 
-  // F-1137's second Done-when bullet, unlocalised: the class the ticket asks for.
-  // A control plane that publishes no compiled pattern leaves nothing to diff
-  // field-by-field, and this is the branch that used to render as the empty string.
+  // The sentence is reported, not the compiled pattern, when the template moved.
   it("names the generator as its own class when the cloud published nothing to diff", () => {
     const remote = mirror("github");
     remote.checks = remote.checks.map(({ id, template, substrate }) => ({

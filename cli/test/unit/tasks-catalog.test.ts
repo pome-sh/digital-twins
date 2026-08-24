@@ -30,14 +30,8 @@ describe("tasks catalog", () => {
     expect(findTwin("not-a-twin")).toBeNull();
   });
 
-  // F-1303 deleted `00-default-seed.md`, which was the only `runnable: false`
-  // entry — a "seed-only reference document (not a task)" that nonetheless
-  // contributed three `[code]` criteria to the scored corpus.
-  //
-  // Pinned at ZERO rather than deleted with it. `runnableTasks()` still filters,
-  // and a filter whose input can never match is indistinguishable from one that
-  // works — so the count is asserted, and the next entry to carry the flag
-  // (F-1305's twin-smoke tasks) has to turn this red on the way in.
+  // `00-default-seed.md` is deleted, and it was the only `runnable: false` entry — a
+  // "seed-only reference document (not a task)" that nonetheless contributed.
   it("no catalog entry is non-runnable today", () => {
     const nonRunnable = TASK_TWINS.flatMap((twin) =>
       twin.tasks
@@ -59,9 +53,8 @@ describe("tasks catalog", () => {
     }
   });
 
-  // Drift gate: a task file added to disk but not registered here is
-  // invisible to `pome tasks`. Fail loudly so the catalog stays the single
-  // source of truth for the bundled task library (FDRS-624).
+  // Drift gate: a task file added to disk but not registered here is invisible to
+  // `pome tasks`.
   it("every bundled task .md file is registered in the catalog", () => {
     const onDisk = readdirSync(bundledTasksDir)
       .filter((f) => f.endsWith(".md"))

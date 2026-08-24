@@ -1,38 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// The golden-scenario CI gate (F-646) — `agent-examples/support-triage`.
-//
-// WHY IT EXISTS. Nothing asserted end to end that the scoring pipeline produces
-// the right answer for a run whose correctness is known by construction.
-// Individual silent-scoring bugs were found and fixed one at a time — a matcher
-// that hard-failed what it could not match (F-597), a lesson with no check that
-// could express it so a duplicate-filing agent scored 100 (F-1198) — and the
-// CLASS could regress freely, because every one of them was invisible: a wrong
-// verdict looks exactly like a right one until someone reads the run.
-//
-// WHAT IT ASSERTS, and the order matters:
-//
-//   1. THE BREAKDOWN, per criterion. This is the assertion that catches "right
-//      total, wrong reasons" — the aggregate agreeing for compensating errors.
-//   2. THE DENOMINATOR. `gradedCount` is asserted for BOTH runs. Without it the
-//      wrong run's 0 is satisfied by a pipeline that graded nothing at all,
-//      which is the all-skip defect wearing the right answer's clothes.
-//   3. NO SKIPS AND NO UNMATCHED, on both runs. A criterion that binds nothing
-//      is dropped by the grader and the denominator moves for a reason nobody
-//      wrote down; that is the silent one, so it is asserted directly rather
-//      than inferred from the total.
-//   4. THE AGGREGATE, last. It is the weakest of the four and it is the one the
-//      ticket's headline names, which is exactly why it is not the only one.
-//
-// AND WHAT IT DOES NOT DO. It does not touch a model, a key, a socket or the
-// network — the fixtures are scripts and the twins are in-process. `[model]`
-// criteria are counted and deliberately not graded; the count is asserted so
-// "no LLM in CI" is a property this file holds rather than a promise it makes.
-//
-// SCOPE (2026-08-12 scope note, One Working Curriculum M0). The pair covers the
-// vertical slice: support-triage's task, github + slack. The stripe pair the
-// original ticket asked for lands with M3's replication; the end state is still
-// "github and stripe at minimum".
+// The golden-scenario CI gate — `agent-examples/support-triage`.
 
 import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
@@ -48,10 +15,7 @@ import {
   SUPPORT_TRIAGE_BREAKDOWN,
 } from "./supportTriageFixtures.js";
 
-// The example's real task file, not a copy. A fixture of the task would drift
-// from the task, and the drift would land on the side that says the gate is
-// green — see F-1198's own history, where the corpus and the vocabulary
-// disagreed for as long as nothing compared them.
+// The example's real task file, not a copy.
 const TASK = resolve(
   dirname(fileURLToPath(import.meta.url)),
   "../../../agent-examples/support-triage/tasks/duplicate-issue.md",
@@ -91,10 +55,9 @@ describe("golden scenario — support-triage, known-correct vs known-wrong", () 
     const graded = correct.criteria.map((row) => row.checkId).sort();
 
     expect(correct.criteria).toHaveLength(declared.length);
-    // Names the missing/extra row directly. This is the line that redded when
-    // F-1521 put the positive tape assertion on this task, and adding one entry
-    // to `SUPPORT_TRIAGE_BREAKDOWN` was the whole integration — the prediction
-    // the comment here used to make, now a thing that happened.
+    // Names the missing/extra row directly. This is the line that redded when the
+    // positive tape assertion landed on this task; adding one entry to
+    // `SUPPORT_TRIAGE_BREAKDOWN` was the whole integration.
     expect(graded).toEqual(expected);
     expect(wrong.criteria.map((row) => row.checkId).sort()).toEqual(expected);
   });
@@ -148,9 +111,9 @@ describe("golden scenario — support-triage, known-correct vs known-wrong", () 
   it("declares ZERO [model] criteria — this task's verdict has no judge in it", () => {
     // Pinned at zero, and this is the strongest single assertion in the file.
     //
-    // The count went 2 → 1 → 0. F-1521 took the first: a MODEL was being asked
-    // whether the agent had commented at all, which the tape answers
-    // deterministically. The last one asked whether the comment carried the
+    // The count went 2 → 1 → 0. The first went when the positive tape assertion
+    // landed: a MODEL was being asked whether the agent had commented at all,
+    // which the tape answers deterministically. The last one asked whether the comment carried the
     // customer's repro — and it was removed because it never discriminated. It
     // passed on all 25 measured trials spanning both arms and three models,
     // INCLUDING runs that commented on the wrong issue, because its sentence
@@ -168,15 +131,8 @@ describe("golden scenario — support-triage, known-correct vs known-wrong", () 
     expect(nothing.modelCriteria).toBe(0);
   });
 
-  // F-1521's Done-when, measured on the real task rather than on a hand-built
-  // tape: an agent that does NOTHING must fail the tape criterion.
-  //
-  // The row-by-row assertion is the point, not the aggregate. A null agent
-  // satisfies `github.no-new-issues` honestly — it opened no duplicate, because
-  // it opened nothing — and that is precisely what a prohibition cannot
-  // distinguish from doing the work. Before a positive assertion existed, this
-  // task's only github criterion was that prohibition. So the line that matters
-  // is the pair: the prohibition PASSES and the tape criterion FAILS, in one run.
+  // The Done-when, measured on the real task rather than on a hand-built tape: an
+  // agent that does NOTHING must fail the tape criterion.
   it("THE NULL AGENT — doing nothing clears the prohibition and fails the tape criterion", () => {
     expect(breakdownOf(nothing)).toEqual({
       "github.no-new-issues": "passed",
@@ -202,8 +158,8 @@ describe("golden scenario — support-triage, known-correct vs known-wrong", () 
     // side is wrong. This harness scores `passed / (passed + failed)` flat —
     // eleven lines of ratio arithmetic that exist to make the assertions above
     // expressible, as the header of `goldenRun.ts` says at length. The product's
-    // engine lives in pome-cloud and applies F-1296: a criterion true in the
-    // seed AND still true at finish leaves the denominator entirely. Both
+    // engine lives in pome-cloud and excludes seed-true criteria: a criterion
+    // true in the seed AND still true at finish leaves the denominator entirely. Both
     // negatives here are seed-true, so hosted grades a do-nothing agent 0-of-3
     // and reports 0. Do not "fix" either number into the other; the two graders
     // answer different questions and only the pass/fail below is common to them.
@@ -212,8 +168,8 @@ describe("golden scenario — support-triage, known-correct vs known-wrong", () 
     expect(nothing.tape.tools).toEqual([]);
   });
 
-  // A criterion reads this tape now (F-1521), and the assertion stays because it
-  // is the one that says WHY the verdict above is what it is. `tool-was-called`
+  // A criterion reads this tape now, and the assertion stays because it is the
+  // one that says WHY the verdict above is what it is. `tool-was-called`
   // reports only passed/failed; these four lines are where a reader sees that the
   // correct run's pass rests on a stamped `add_issue_comment` and the wrong run's
   // failure on a tape that names `create_issue` in its place — the difference

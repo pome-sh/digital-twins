@@ -1,11 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// F-709 acceptance — `pome twin start` as a real child process: boots the
-// twin as a foreground server, reuses the secret persisted at the F-708
-// contract location (POME_TWIN_DATA_DIR override), and both the JWT it
-// prints AND a JWT minted from the persisted secret authenticate against
-// the running twin. Ctrl-C (SIGINT) stops it cleanly. The frozen control
-// plane itself is asserted by contract/cli-start.test.mjs; this test owns
-// the secret read path + the printed-token journey.
+// Acceptance — `pome twin start` as a real child process: boots the twin as a
+// foreground server, reuses the secret persisted at the boot-secret contract.
 
 import { spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // What Gmail's declared checks can assert about the RUN — the recorded call tape
-// rather than the exported end state (F-1128).
+// rather than the exported end state.
 //
 // Why this class has to exist at all: an unsupported call leaves NO STATE TRACE.
 // The twin answers 501 and mutates nothing, so `state_final.json` is
@@ -83,7 +83,7 @@ export const noUnsupportedEndpoint: Check<Record<string, never>> = defineCheck({
 
     const unsupported = tape.filter((event) => event.fidelity === "unsupported");
     if (unsupported.length === 0) {
-      // No evidence on the pass branch (F-980). This asserts a NEGATIVE over the
+      // No evidence on the pass branch. This asserts a NEGATIVE over the
       // whole tape and a negative over an empty set has no single call to point
       // at; citing all N inspected calls would be a copy of the trace.
       return {

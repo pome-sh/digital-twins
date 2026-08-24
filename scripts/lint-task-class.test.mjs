@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Regression suite for `lint-task-class.mjs` (F-1302).
+// Regression suite for `lint-task-class.mjs`.
 //
 // Case 5 is why this file exists rather than a "it went green once" note. The
 // gate's whole job is to refuse a task that declares no class — and the cheapest
 // way for it to stop doing that job is for the WALK to stop finding the file,
 // not for the check to break. A gate that scans nothing prints the same success
-// line as a gate that scanned everything, which is F-989 restated. So the suite
+// line as a gate that scanned everything, which is the vacuous-pass defect restated. So the suite
 // asserts the zero-file case is RED, and that a task nested one level deeper
 // than `tasks/` is still seen.
 //
@@ -123,7 +123,7 @@ check("6. an example task two levels below the corpus root is seen", {
   contains: "agent-examples/agent/tasks/01-unlabelled.md",
 });
 
-// F-1300's walker gap, asserted from the other side: a task nested UNDER a
+// The walker gap, asserted from the other side: a task nested UNDER a
 // `tasks/` directory must still be seen. `collectTaskFiles` reads `.md` at
 // depth 0 or in any directory literally named `tasks`, so a `tasks/<topic>/`
 // subdirectory is a live way to leave the corpus.

@@ -1,6 +1,6 @@
-// file-size: the recorder's store implementations, the handle() middleware, and the F-720/F-698 write-through contract are one unit — the contract is documented inline against the code it constrains.
+// file-size: the recorder's store implementations, the handle() middleware, and the write-through contract are one unit — the contract is documented inline against the code it constrains.
 // SPDX-License-Identifier: Apache-2.0
-// Twin-core recorder (F-681 / F-720). Home: `packages/sdk/src/recorder.ts`
+// Twin-core recorder. Home: `packages/sdk/src/recorder.ts`
 // (`@pome-sh/sdk`); all first-party twins and the CLI harness consume it.
 // In-memory recorder + `handle()` helper. `handle({mutation}, fn)` wraps a
 // Hono handler so every wrapped route emits a `RecorderEvent` matching
@@ -10,7 +10,7 @@
 //   - `state_mutation` = the declared route/tool mutation flag.
 //   - `error` = response_body.message when status >= 400, null otherwise.
 //   - Memory is bounded by session timeout × max-rps.
-// ── Write-through contract (F-720) ──────────────────────────────────────────
+// ── Write-through contract ──────────────────────────────────────────
 // Acceptance: an event is *accepted* once `RecorderStore.record()` returns.
 // Heap stores retain it in memory; durable stores queue it for append.
 // `flush()` / `close()` are the durability barrier; `record()` is not fsync.
@@ -18,7 +18,7 @@
 // first, then `createRecorderHandle` redacts *before* every `store.record()`
 // call — including custom stores and direct `recorder.record()` — so no
 // store ever sees unredacted secrets. Stores must not re-emit raw bodies.
-// Persisted row shape (F-698): durable stores write one redacted
+// Persisted row shape: durable stores write one redacted
 // `TwinHttpEvent` NDJSON line per accepted event (shared-types
 // `twinHttpEventSchema`) so on-disk `events.jsonl` matches the uploaded
 // raw-trace byte shape. The in-memory mirror / `GET /_pome/events` still
@@ -28,7 +28,7 @@
 // stores may omit it (no-op if called via a handle that forwards). Callers
 // that need crash-bounded loss (≤ in-flight event) must await `flush()`
 // before relying on the on-disk tape, or use a store that fsyncs on each
-// `record()` (F-698 production default).
+// `record()` (production default).
 // `close()`: optional. When present, flushes pending writes, releases the
 // backing resource, and is idempotent. After `close()`, further `record()`
 // calls are undefined (stores should throw or no-op). Callers must await
@@ -143,7 +143,7 @@ export interface FileBackedRecorderStoreOptions extends RecorderStoreOptions {
   path: string;
   /**
    * When true, each accepted write is `fsync`'d so a `kill -9` loses at most
-   * the in-flight event. Default true for the production durable path (F-698).
+   * the in-flight event. Default true for the production durable path.
    */
   fsync?: boolean;
 }
@@ -151,14 +151,14 @@ export interface FileBackedRecorderStoreOptions extends RecorderStoreOptions {
 /**
  * Env key for the durable recorder tape. When set, twin boot paths and the
  * self-host harness use `createFileBackedRecorderStore` instead of heap-only.
- * Architecture (F-698 / §9 Q3): recorder *transport* lives in twin-core
+ * Architecture: recorder *transport* lives in twin-core
  * (`packages/sdk`); twins inherit durability by reading this env.
  */
 export const POME_RECORDER_EVENTS_PATH = "POME_RECORDER_EVENTS_PATH";
 
 /**
  * Wrap a legacy `RecorderEvent` into the unified `TwinHttpEvent` NDJSON row
- * shape used by uploaded `events.jsonl` (FDRS-398). Pass-through only when
+ * shape used by uploaded `events.jsonl`. Pass-through only when
  * `kind` is already `"TwinHttpEvent"`; any other kind is re-wrapped so the
  * durable tape never persists a mismatched discriminator. Disk rows from the
  * durable store use this shape so finalize/upload does not need a second wrap
@@ -169,7 +169,7 @@ export const POME_RECORDER_EVENTS_PATH = "POME_RECORDER_EVENTS_PATH";
  * `ToolUseEvent` that caused the call. What it DOES carry is the causing tool's
  * id, arriving on `x-pome-correlation-id` and persisted as `correlation_id`
  * (always) and `tool_call_id` (when the twin pins `stampToolCallId`). Since
- * F-1200 that header holds the SDK's real `toolu_…`, so the parent is resolvable
+ * That header holds the SDK's real `toolu_…`, so the parent is resolvable
  * — and `mergeAdapterSignalsIntoEvents` in the CLI resolves it, because that is
  * the one place that sees both this tape and the adapter's signals.
  */
@@ -198,7 +198,7 @@ export function toTwinHttpEventRow(
 }
 
 /**
- * Durable recorder store (F-720 contract / F-698 implementation).
+ * Durable recorder store.
  *
  * Keeps an in-memory mirror of legacy `RecorderEvent` rows for `events()` /
  * `GET /_pome/events` (unchanged API), and appends each accepted event as a
@@ -343,7 +343,7 @@ export interface RecorderHandleOptions {
    */
   errorEnvelope?: ErrorEnvelopeFn;
   /**
-   * FDRS-402 adapter-rich stamping pin (F-682): when true, events persist
+   * adapter-rich stamping pin: when true, events persist
    * the incoming `x-pome-correlation-id` header as `tool_call_id` (github's
    * frozen tape shape). Default false — slack's frozen tape stamps null.
    */
@@ -378,7 +378,7 @@ export function createRecorderHandle(options: RecorderHandleOptions): RecorderHa
     declaredTool?: string
   ) {
     const requestId = `req_${randomUUID()}`;
-    // FDRS-402 / FDRS-653 stamping (F-683: engine parity with the per-twin
+    // stamping (engine parity with the per-twin
     // recorders it replaces): correlation_id persists the adapter's
     // x-pome-correlation-id (falling back to the request id), and the task
     // author's x-pome-scenario-step-id lands as the canonical task_step_id
@@ -386,7 +386,7 @@ export function createRecorderHandle(options: RecorderHandleOptions): RecorderHa
     // preserve semantics, tolerant readers accept either).
     const stepId = c.req.header("x-pome-scenario-step-id") ?? null;
     const correlationHeader = c.req.header("x-pome-correlation-id") ?? null;
-    // Redaction is unconditional at the engine layer (F-681 / F-720): every
+    // Redaction is unconditional at the engine layer: every
     // event that reaches any store — including custom stores — is already
     // scrubbed. Optional recordingProjection runs immediately before that.
     accept({
@@ -398,7 +398,7 @@ export function createRecorderHandle(options: RecorderHandleOptions): RecorderHa
       task_step_id: stepId,
       scenario_step_id: stepId,
       step_id: null,
-      // FDRS-402 adapter-rich path: only twins that pin `stampToolCallId`
+      // adapter-rich path: only twins that pin `stampToolCallId`
       // persist the header here (github); the default tape stamps null.
       tool_call_id: options.stampToolCallId ? correlationHeader : null,
       method: c.req.method,
@@ -479,7 +479,7 @@ export function createRecorderHandle(options: RecorderHandleOptions): RecorderHa
 // The Response constructor forbids a body on null-body statuses (204/205/
 // 304) — `c.json(null, 204)` throws and surfaces as a 500. github's frozen
 // surface answers deletes and the collaborator-membership check with a bare
-// 204 (F-682), so those statuses return an empty body.
+// 204, so those statuses return an empty body.
 function respondWith(c: Context, status: number, body: unknown): Response {
   if (status === 204 || status === 205 || status === 304) {
     return c.body(null, status as never);
@@ -488,8 +488,7 @@ function respondWith(c: Context, status: number, body: unknown): Response {
 }
 
 // `clone()` throws synchronously once the body stream is disturbed — e.g.
-// after the form token resolver's parseBody() read a form-encoded POST
-// (F-683). A consumed or non-JSON body records as null, never a 500.
+// after the form token resolver's parseBody() read a form-encoded POST. A consumed or non-JSON body records as null, never a 500.
 async function readRequestJson(c: Context): Promise<unknown> {
   try {
     return await c.req.raw.clone().json();

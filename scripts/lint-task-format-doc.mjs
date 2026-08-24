@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1299 — the criterion grammar the authoring skill PROMISES must be the
+// The criterion grammar the authoring skill PROMISES must be the
 // grammar the parser RUNS.
 //
 // `skills/pome-author-task/references/task-format.md` is a byte-identical
 // mirror of pome-cloud's `apps/mcp/docs/task-format.md`, and pome-cloud gates
 // its own copy (`apps/mcp/test/task-format-doc.test.ts`). Nothing gated the
-// mirror, so it sat a whole marker keyword behind for the length of F-1296: the
+// mirror, so it sat a whole marker keyword behind while the cloud moved: the
 // doc published a grammar under which `- [code always-scored] …` is not a
 // criterion line at all, and a line the grammar does not match is skipped as
-// prose. That is the silent criterion drop F-1299 closes, promised to authors
+// prose. That is the silent criterion drop this gate closes, promised to authors
 // in writing.
 //
 // A cross-repo byte diff is not runnable from this repo's CI — the canonical
@@ -44,7 +44,7 @@ function main() {
   const parser = readFileSync(join(root, PARSER_PATH), "utf8");
 
   // A gate that shrugs when it cannot find its subject passes for the same
-  // reason a gate over a corpus that stopped being found passes (F-989).
+  // reason a gate over a corpus that stopped being found passes.
   const docMatch = doc.match(DOC_GRAMMAR_FENCE_RE);
   if (!docMatch) {
     console.error(
@@ -85,7 +85,7 @@ function main() {
 // is satisfied by any file of that name anywhere on disk, weaker even than
 // an unresolved full-path compare. Realpath'd on both sides instead — node
 // resolves symlinks before deriving `import.meta.url`, so a bare compare
-// misses through a symlinked checkout (F-1488) — and a guard miss while
+// misses through a symlinked checkout — and a guard miss while
 // invoked as this file throws rather than exits 0.
 const SELF = realpathSync(fileURLToPath(import.meta.url));
 const ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";

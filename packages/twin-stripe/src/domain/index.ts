@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Domain barrel (F-684): re-exports only, per the repo barrel policy
-// (scripts/lint-code-health.mjs). The StripeDomain coordinator lives in
-// ./stripe-domain.ts; per-table domain modules sit alongside it.
+// Domain barrel: re-exports only, per the repo barrel policy
+// (scripts/lint-code-health.mjs). The StripeDomain coordinator lives in. /stripe-domain.ts; per-table domain modules sit alongside it.
 export { StripeDomain } from "./stripe-domain.js";
 export { PaymentIntentsDomain, piUnexpectedState } from "./payment-intents.js";
 export type { CreatePIInput, ListPIsInput } from "./payment-intents.js";

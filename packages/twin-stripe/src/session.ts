@@ -19,7 +19,7 @@ export type RegisterX402RoutesOptions = {
   runId: string;
 };
 
-// F-1125 — record the gated exchange, whoever answered it.
+// Record the gated exchange, whoever answered it.
 //
 // The x402 legs used to reach the tape not at all. The payment middleware
 // answers every challenge leg itself and returns BEFORE `next()`, so the route

@@ -1,77 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1614 + F-791 — the two `list_issues` / `search_issues` behaviours that were
-// MEASURED against real GitHub rather than reasoned about, and the twin pinned
-// to what came back.
-//
-// ── WHY THIS FILE EXISTS SEPARATELY FROM THE OTHER SEARCH SUITES ────────────
-//
-// `search-query-qualifiers.test.ts` pins how `q` is SCOPED; `list-state-default`
-// pins the state default. Neither could have caught either defect here, because
-// both defects are agreements between the twin and itself: the twin advertised
-// an array and validated a string, and it matched `q` as one substring. Nothing
-// in the repository held a statement about what the VENDOR does with the same
-// call, so there was nothing for either to disagree with.
-//
-// This file is that statement. Every expectation below is a measurement, its
-// provenance named on the case, and the twin is asserted against the vendor's
-// answer rather than against a prior reading of this twin's own code.
-//
-// ── HOW EACH ROW WAS MEASURED (2026-08-21) ──────────────────────────────────
-//
-// Four rungs were available and all four were used, weakest first:
-//
-//   1. the vendor's DECLARED schema — `fixtures/mcp-tools-list.raw.json`, which
-//      is GitHub's own `tools/list` capture (`config/mcp-capture-sources.json`
-//      pins `github/github-mcp-server` @ c2bc7dc0, `--toolsets=default`);
-//   2. the vendor's SOURCE at that pinned commit — `pkg/github/issues.go`'s
-//      `ListIssues` and `pkg/github/params.go`'s `OptionalStringArrayParam`;
-//   3. the vendor's live REST and GraphQL APIs, via `gh api` / `gh api graphql`
-//      against `cli/cli`;
-//   4. the vendor's DEPLOYED MCP server — `tools/call list_issues` against
-//      `https://api.githubcopilot.com/mcp/` with a GitHub token.
-//
-// Rung 4 had never been read before this ticket; `config/mcp-capture-sources.json`
-// asks for exactly that read under `unguardedDirection`.
-//
-//   call                                    real GitHub            rung
-//   ─────────────────────────────────────── ────────────────────── ────
-//   MCP list_issues labels:["auth"]          18 issues              3,4
-//   MCP list_issues labels:["auth","codesp"] 39 = 18+21 → ANY-of    3,4
-//   REST ?labels=auth,codespaces             0        → ALL-of      3
-//   MCP list_issues labels:"auth" (string)   REFUSED                2,4
-//   MCP list_issues labels:[]                no filter              2,4
-//   labels:["AUTH"] / ?labels=AUTH           18 → case-insensitive  3,4
-//   search q="codespaces"                    345                    3
-//   search q="authentication"                607                    3
-//   search q="codespaces authentication"     37       → ALL terms   3
-//   search q="authenticati" (prefix)         0        → whole token 3
-//   search q="… is:open"                     5  ≡ state:open        3
-//   search q="… is:issue" / "… is:pr"        21 / 16  → partition   3
-//   search q="… is:bogusvalue"               0                      3
-//
-// The two that decided the SHAPE of the fix, and would each have been got wrong
-// by reasoning from the ticket text:
-//
-//   * MULTI-LABEL IS A UNION, NOT AN INTERSECTION. GitHub's MCP `list_issues`
-//     runs on GraphQL (`issues(labels: [String!])`), and GraphQL ORs the set —
-//     18 + 21 = 39 on `cli/cli`. GitHub's REST `?labels=a,b` INTERSECTS the same
-//     two labels to 0. F-1614's prescribed fix was "join the array to CSV and
-//     call the REST-shaped domain", which would have answered 0 where GitHub
-//     answers 39 — the same false-empty class as F-791, introduced by the patch
-//     for F-1614.
-//
-//   * A TERM MATCHES A WHOLE TOKEN, NOT A SUBSTRING. `authentication` returns
-//     607 and `authenticati` returns 0. F-791's prescribed fix was "tokenise on
-//     whitespace and match all terms", which with a substring test per term
-//     would answer 607 for the prefix — trading a false EMPTY for a false HIT,
-//     and a false hit is the worse class for a grading instrument
-//     (`mcp-argument-surface.test.ts`'s own taxonomy).
-//
-// Counts on a live repository drift, so nothing below asserts 18 or 607. What is
-// asserted is the RELATION each count established — union vs intersection, whole
-// token vs prefix, `is:open` ≡ `state:open` — against a seeded world this repo
-// owns.
+// `list_issues`/`search_issues` semantics measured against real GitHub 2026-08-21:
+// multi-label UNIONs on MCP and INTERSECTs on REST; a term matches a whole.
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createGitHubCloneApp } from "../src/twin.js";
@@ -91,20 +20,8 @@ afterAll(() => {
 
 const base = `/s/${TEST_SID}`;
 
-/**
- * A world shaped to make each measured relation observable, and to make the
- * WRONG answer a different set rather than a different count.
- *
- * `bug` and `tracking` are carried by DIFFERENT issues with exactly one issue in
- * common, so union (3), intersection (1) and either label alone (2, 2) are four
- * distinct sets. A fix that ANDs where GitHub ORs cannot pass by coincidence.
- *
- * The coupon issue is F-791's own stated regression case, transplanted from the
- * ticket: its title carries `coupon` and `500` as separate words, so a
- * whole-string matcher finds nothing for `coupon 500` and a tokenised one finds
- * it. `couponless` exists solely to be a token that a PREFIX match would reach
- * and a whole-token match must not.
- */
+/** A world where union (3), intersection (1) and either label alone (2, 2) are
+ *  four distinct sets, so an AND-where-GitHub-ORs fix cannot pass by luck. */
 const WORLD: GitHubStateSeed = {
   users: [
     { login: "acme", type: "Organization", name: "Acme" },
@@ -201,10 +118,9 @@ async function searchIssues(query: string): Promise<number[]> {
   return numbers(body?.items);
 }
 
-describe("F-1614 — the MCP door takes the array it advertises, and ORs it", () => {
-  // Rung 1 + 2: the fixture declares `{"type":"array","items":{"type":"string"}}`
-  // and `OptionalStringArrayParam` reads it as one. Rung 4: the deployed server
-  // answered 18 issues for `labels:["auth"]`.
+describe("the MCP door takes the array it advertises, and ORs it", () => {
+  // GitHub declares an array of strings, and the deployed server answered 18
+  // issues for `labels:["auth"]`.
   it("accepts `labels: [\"bug\"]`, the shape its own inputSchema declares", async () => {
     expect(await listIssues({ state: "OPEN", labels: ["bug"] })).toEqual([8, 23]);
   });
@@ -247,7 +163,7 @@ describe("F-1614 — the MCP door takes the array it advertises, and ORs it", ()
     expect(numbers(body)).toEqual([8, 23]);
   });
 
-  // The other half of F-1460's rule, applied here: the doors disagree and both
+  // The other half of the rule, applied here: the doors disagree and both
   // are right, so the REST door must NOT drift onto the MCP door's semantics.
   it("keeps the REST door on GitHub's CSV INTERSECTION", async () => {
     const both = await rest("/repos/acme/orders-service/issues?state=open&labels=bug,tracking");
@@ -260,7 +176,7 @@ describe("F-1614 — the MCP door takes the array it advertises, and ORs it", ()
   });
 });
 
-describe("F-791 — free text is tokenised, and a term matches a whole token", () => {
+describe("free text is tokenised, and a term matches a whole token", () => {
   // The ticket's own stated regression case, seeded and asserted.
   it("finds the issue whose title carries every term, in any order", async () => {
     expect(await searchIssues("coupon 500")).toEqual([8]);
@@ -285,15 +201,8 @@ describe("F-791 — free text is tokenised, and a term matches a whole token", (
     expect(await searchIssues("couponless")).toEqual([31]);
   });
 
-  // Measured by NEGATION, which is the only query that settles containment:
-  // `per_page NOT page` → 0, `per_page NOT per` → 0, `pull-request NOT request`
-  // → 0 on `cli/cli`. Every document carrying the compound also answers to its
-  // parts, so the index emits both.
-  //
-  // ⚠️ This is the case F-791's own first fix got wrong. Reading only
-  // `per_page` 110 ≠ `per page` 226, it concluded `_` holds a token together —
-  // and a bare `coupon` then missed a body that says `apply_coupon`, which is
-  // F-791's false-empty class in a narrower form.
+  // Settled by negation: `per_page NOT page` → 0, so a document carrying the
+  // compound also answers to its parts. Reading only the counts got this wrong.
   it("a bare term REACHES inside a snake_case or hyphenated compound", async () => {
     // #31's body says `apply_coupon` and its title says `couponless`. The first
     // must be reachable by `coupon`, the second must not — same issue, so this
@@ -317,7 +226,7 @@ describe("F-791 — free text is tokenised, and a term matches a whole token", (
   });
 });
 
-describe("F-791 — `is:` is GitHub's commonest issue qualifier and is parsed", () => {
+describe("`is:` is GitHub's commonest issue qualifier and is parsed", () => {
   // Measured: `is:open` → 5 and `state:open` → 5, the same set. The twin used to
   // leave `is:open` in the free text, so ANY query carrying it answered [].
   it("`is:open` filters to the open issues, exactly as `state:open` does", async () => {

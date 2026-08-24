@@ -1,15 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// FDRS-613 / M8 — canonical /v1 wire fixture corpus (the cloud control-plane
-// half; the event-kind half is `packages/wire/test/v1-event-corpus.test.ts`).
-//
-// Every JSON fixture under `test/fixtures/contract/v1/<schema>/` MUST parse
-// successfully under the schema keyed by its directory name. pome-twins is the
-// source of truth for this corpus; cloud consumers validate against the
-// contract instead of mirroring source bytes. This is intentionally parse-only:
-// it catches represented required fields, enum narrowing, and other
-// fixture-level wire incompatibilities, but it is not a proof of whole-schema
-// equality.
+// M8 — canonical /v1 wire fixture corpus (the cloud control-plane half; the event-kind
+// half is `packages/wire/test/v1-event-corpus.test.ts`).
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -27,11 +18,6 @@ const here = dirname(fileURLToPath(import.meta.url));
 const corpusRoot = join(here, "..", "..", "fixtures", "contract", "v1");
 
 // Directory name → schema. Keep in lockstep with fixtures/contract/v1/README.md.
-//
-// The `*TaskVocab` dirs (FDRS-653) hold NEW-vocabulary payloads (task_name /
-// task_source / criterion code|model). They are twins-only until the FDRS-654
-// consumer swap. The original dirs keep their 0.3.0-era (scenario_*) payloads
-// on purpose: they now double as tolerant-reader proof.
 const SCHEMA_BY_DIR: Record<string, ZodTypeAny> = {
   planTier: planTierSchema,
   createSessionRequest: createSessionRequestSchema,
@@ -66,9 +52,9 @@ describe("/v1 fixture-corpus parity (twins schema)", () => {
   }
 });
 
-// FDRS-653 — the 0.3.0-era corpus must not just PARSE, it must NORMALIZE to
-// the W3 task vocabulary; new-vocab fixtures must round-trip unchanged.
-describe("/v1 fixture corpus — task-vocab normalization (FDRS-653)", () => {
+// The 0.3.0-era corpus must not just PARSE, it must NORMALIZE to
+// the task vocabulary; new-vocab fixtures must round-trip unchanged.
+describe("/v1 fixture corpus — task-vocab normalization", () => {
   const readFixture = (dir: string, file: string) =>
     JSON.parse(readFileSync(join(corpusRoot, dir, file), "utf8"));
 

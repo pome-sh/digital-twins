@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// no-eval-in-oss gate (FDRS-657 / F-692 / D9) — REPO-WIDE, consolidated.
+// no-eval-in-oss gate (D9) — REPO-WIDE, consolidated.
 //
 // pome-twins is capture-only: it must never compute a score, call a judge, or
 // correlate locally, anywhere in the OSS surface (cli/src/**, cli/scripts/**,
@@ -22,7 +22,7 @@
 //      side-effect `import "..."` — against the SPECIFIER, so prose/comments
 //      referencing the old design don't trip it.
 //
-// Promoted from `cli/scripts/no-eval-in-oss.mjs` (D9/F-692) — grown, not
+// Promoted from `cli/scripts/no-eval-in-oss.mjs` (D9) — grown, not
 // rewritten — and folds in the former `scripts/no-correlator-in-oss.mjs`
 // (deleted; its `packages/correlator` + `@pome-sh/correlator` checks are
 // subsumed by rules 1 and 3 above).
@@ -211,7 +211,7 @@ async function scanFileImports(file, root, violations) {
 // Run as a script (not when imported by the test). Realpath'd on both
 // sides — node resolves symlinks before deriving `import.meta.url`, so a
 // bare `resolve()` of argv[1] misses through a symlinked checkout (a
-// worktree, or macOS's symlinked `/tmp`) in the same silent shape F-1488
+// worktree, or macOS's symlinked `/tmp`) in the same silent shape found
 // found in ten CI gates: the guard falls false and this file exits 0 having
 // checked nothing, for the gate that exists specifically to keep evaluation
 // out of the OSS repo. A guard miss while invoked as this file throws rather

@@ -1,21 +1,21 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1326 — the capture producer for upstream MCP `tools/list`.
+// The capture producer for upstream MCP `tools/list`.
 //
 // C1's note on the parent ticket: "what is missing is a producer, not an
 // engine." This is the producer. It freezes, per twin, the tool listing the
-// VENDOR serves, so F-1325's lane has something real to compare a twin
+// VENDOR serves, so the divergence lane has something real to compare a twin
 // against. It is deliberately NOT on a cron: goldens are refreshed on purpose
-// and reviewed as a diff, and the staleness alarm over them is F-1328.
+// and reviewed as a diff. There is no staleness alarm over them yet.
 //
 // Three things are load-bearing:
 //
 // 1. THE SOURCE TABLE IS DATA. Every twin, its substrate, and the exact
 //    configuration that substrate was read under live in
 //    `config/mcp-capture-sources.json`. Nothing in this file names a twin.
-//    Adding one is a data edit — the F-1117 shape — because the alternative,
-//    a switch over twin ids, is the rot F-989 and F-1130 produced twice: a
+//    Adding one is a data edit, because the alternative — a switch over twin
+//    ids — is the rot that produced the same bug twice: a
 //    hand-kept list that stops covering its subject while the gate reading it
 //    stays green.
 //
@@ -23,7 +23,7 @@
 //    surfaces are not uniform. The remote GitHub server serves a DIFFERENT set
 //    at /mcp/ (44 tools, the `default` toolset) than at /mcp/x/all (85). An
 //    adapter that read the union would report 41 coverage gaps for tools no
-//    examinee of ours can call, and F-1179 is explicit that a lane reporting
+//    examinee of ours can call, and a lane reporting
 //    divergence that is not real is worse than one honestly reporting
 //    not-compared. So the toolset the capture assumed is declared, pinned, and
 //    copied verbatim into meta.json — and a source with no declared
@@ -42,7 +42,7 @@
 //                      golden or a hand-typed sha.
 //   --offline          the same re-derivation, WRITTEN. See below.
 //
-// ── WHY --offline HAS A WRITE MODE (F-1394) ────────────────────────────────
+// ── WHY --offline HAS A WRITE MODE ─────────────────────────────────────────
 //
 // `configuration` is prose about a capture, and it is copied verbatim into
 // meta.json and canonical.json — so a sentence added to the source table moves
@@ -59,7 +59,7 @@
 // the mode can restate what a capture meant and can never restate what it
 // FOUND. And `captureDate` is carried from the committed meta.json, exactly as
 // `--check` carries it, so a re-derivation cannot make an old reading look like
-// a fresh one. F-1328's staleness alarm is downstream of that date; a mode that
+// a fresh one. A staleness alarm is downstream of that date; a mode that
 // stamped today would reset the alarm without contacting anybody.
 import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -102,7 +102,8 @@ export function sha256(text) {
 
 // ── adapters ────────────────────────────────────────────────────────────────
 // `live-wire-oauth` is the SAME reader as `live-wire-unauth` plus a bearer, so
-// F-1329 adds a token to the source table, not an adapter to this file. The
+// An OAuth-gated substrate adds a token to the source table, not an adapter to
+// this file. The
 // test asserts the two entries hold the identical function reference, because
 // "same code path" is only true for as long as nobody forks it.
 
@@ -114,9 +115,9 @@ async function readLiveWire(source) {
     if (!envName) {
       throw new Error(`${source.twin}: substrate ${SUBSTRATE_OAUTH} requires \`authTokenEnv\` on the source table`);
     }
-    // BLANK AND ABSENT ARE DIFFERENT FACTS, AND SO IS WHITESPACE (F-1184).
+    // BLANK AND ABSENT ARE DIFFERENT FACTS, AND SO IS WHITESPACE.
     //
-    // F-1184's lesson is that a value blanked in the secret store must not reach
+    // A value blanked in the secret store must not reach
     // a runner as an empty string and READ AS "no credential configured" — the
     // operator who blanked it and the operator who never set it need different
     // instructions. The previous guard was `if (!token)` with the message "is
@@ -326,9 +327,10 @@ const SUBSTRATES = {
  * validator of the same field can be checked against it.
  *
  * `packages/sdk/src/mcp-tool-fixture.ts` validates `substrate` on the
- * PER-TWIN tool-table fixtures (F-1325). Two validators of one field name, in
+ * PER-TWIN tool-table fixtures. Two validators of one field name, in
  * two languages, in two trees, with no import between them is how a vocabulary
- * forks without anyone noticing — and F-1327 has to read both trees. The SDK's
+ * forks without anyone noticing — and the divergence lane has to read both
+ * trees. The SDK's
  * enum is required to be a superset of this list; its
  * `substrate-vocabulary.test.ts` imports this array and asserts it.
  */
@@ -355,9 +357,10 @@ export function adapterFor(substrate) {
  * criterion 9 refuses a twin for serving a tool the golden does not declare, and
  * its own reasoning turns on this field: it is sound against `exact`, and against
  * `subset-of-remote` only because github's golden ENUMERATES its delta from the
- * remote with written evidence. F-1394 is what an undeclared class costs.
- * linear's golden was captured under a read-only grant, said nothing about
- * completeness, and the gate reported six write tools that mcp.linear.app really
+ * remote with written evidence. An undeclared class has already cost us one
+ * false report: linear's golden was captured under a read-only grant, said
+ * nothing about completeness, and the gate reported six write tools that
+ * mcp.linear.app really
  * serves — `save_issue`, `save_comment`, `delete_comment`, `create_issue_label`,
  * `save_project`, `save_document` — as tools twin-linear had invented. Fabricated
  * findings are the one thing that lane must never produce.
@@ -399,7 +402,7 @@ export function loadSources({ repoRoot = REPO_ROOT, sourcesPath, table } = {}) {
           `${twin}: a capturable source must declare \`configuration.completeness\` as one of ` +
             `${COMPLETENESS_CLASSES.join(", ")} (got ${JSON.stringify(config.completeness)}). ` +
             `A consumer that reports a tool as twin-only is asserting the vendor does not serve it, ` +
-            `which this golden can only support if it says what it covers — see F-1394.`
+            `which this golden can only support if it says what it covers.`
         );
       }
       for (const field of ["endpoint", "method", "protocol", "protocolVersion"]) {
@@ -508,8 +511,8 @@ export function deriveGolden({ source, rawText, captureDate }) {
  *
  * `configuration` and `authTokenEnv` are written here for the same reason they
  * are written into a captured meta.json. A deferred twin's declared
- * configuration is the thing F-1329's capture will ASSUME — it is the whole
- * content of "F-1329 adds a token, not an adapter" — so leaving it out of the
+ * configuration is the thing a credentialed capture will ASSUME — it is the whole
+ * content of "a token, not an adapter" — so leaving it out of the
  * recorded artefact would let someone change what that capture reads while
  * this gate stayed green.
  */
@@ -527,7 +530,7 @@ export function deriveStatus({ source }) {
     ...(source.evidence ? { evidence: source.evidence } : {}),
     ...(source.revisitWhen ? { revisitWhen: source.revisitWhen } : {}),
     consumerContract:
-      "F-1325's lane must report this twin as not-compared. It must never report it as zero coverage.",
+      "The divergence lane must report this twin as not-compared. It must never report it as zero coverage.",
   });
 }
 
@@ -606,7 +609,7 @@ export async function runCapture(options = {}) {
       // they were fetched. Every other field is derived from the raw response
       // and so cannot be forged this way; captureDate is the one that can.
       //
-      // This matters to F-1328. A staleness alarm that reads meta.captureDate
+      // This matters to a staleness alarm that reads meta.captureDate
       // is reading the one field in the golden that this gate cannot check.
       // It should date a golden from git history (the commit that last touched
       // <twin>.raw.json) and treat the JSON field as a label, not evidence.
@@ -650,7 +653,7 @@ export async function runCapture(options = {}) {
       // a twin became capturable. So the first credentialed capture of slack,
       // linear or stripe would commit a real golden and the lane would go on
       // publishing "401 missing_token", with no red anywhere. That is the whole
-      // F-1329 errand landing and reading as if it had not.
+      // credentialed capture landing and reading as if it had not.
       if (existsSync(paths.status)) {
         problems.push(
           `${twin}: both a golden and ${twin}.status.json exist. Every consumer resolves the status file ` +
@@ -726,7 +729,7 @@ function parseArgv(argv) {
 // Realpath'd on both sides — node resolves symlinks before deriving
 // `import.meta.url`, so a bare `pathToFileURL(resolve(...))` of argv[1]
 // misses through a symlinked checkout (a worktree, or macOS's symlinked
-// `/tmp`) in the same silent shape (F-1488), and a guard miss while invoked
+// `/tmp`) in the same silent shape, and a guard miss while invoked
 // as this file throws rather than exits 0.
 const SELF = realpathSync(fileURLToPath(import.meta.url));
 const ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";

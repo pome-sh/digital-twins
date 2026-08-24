@@ -70,7 +70,7 @@ export function createLinearTwinDefinition(
         reportDelta(linearStateDelta(before, domain.exportState()));
         return { ok: true };
       },
-      // F-1497 — declared, so the shared gate in `@pome-sh/sdk` stops
+      // Declared, so the shared gate in `@pome-sh/sdk` stops
       // answering a GraphQL twin with GitHub's `{message, documentation_url}`.
       forbidden: () => forbiddenEnvelope(),
     },
@@ -88,8 +88,8 @@ export function createLinearTwinDefinition(
       allowRawBearer: true,
       resolveCredential: (token) => resolveLinearCredential(db, token),
       // Both take `unauthorizedEnvelope`'s default: Linear answers a bad
-      // bearer and a missing one with the SAME body (measured 2026-08-13,
-      // F-1497), and has no session-id concept to give the mismatch leg a
+      // bearer and a missing one with the SAME body (measured 2026-08-13),
+      // and has no session-id concept to give the mismatch leg a
       // third one. The messages that used to be here — "Bad credentials" and
       // "Session id mismatch" — were the twin's own inventions, and the first
       // was GitHub's.
@@ -134,14 +134,14 @@ export function withPublicOAuth(app: Hono, db: LinearTwinDatabase): Hono {
 
 /**
  * Answer `extensions` ahead of `bearerAuth`, because Linear answers it ahead of
- * authentication (F-1385).
+ * authentication.
  *
  * The ordering is the fix, not a detail. Linear returns its 400 for an
  * unsatisfiable persisted query with no credential at all, while the same
  * request without `extensions` has to reach the auth check to earn its 401. A
  * twin that rejected after its own auth check would show an agent sending an
  * APQ payload with a stale token a 401 where Linear shows a 400 — the same
- * divergence F-1385 exists to close, in a form that is harder to see. So the
+ * divergence the declaration exists to close, in a form harder to see. So the
  * gate is mounted the way `withPublicOAuth` mounts the OAuth endpoints: on a
  * router wrapped AROUND the engine's session app, whose `bearerAuth` has not
  * run yet. `test/route-input-declarations.test.ts` pins it with a deliberately

@@ -16,10 +16,8 @@ import {
   type CheckTapeEvent
 } from "../src/checks.js";
 
-// These fixtures exercise the GRAMMAR — render, parse, digest, near-miss —
-// not the vocabulary, so they decline to name worlds. The ledger discipline
-// that makes a null cost something lives in each twin's checks-contract test,
-// where the declarations actually ship (F-1126).
+// These fixtures exercise the GRAMMAR — render, parse, digest, near-miss — not the
+// vocabulary, so they decline to name worlds.
 const noNewLabels: CheckDefinition<unknown, { repo: string }> = defineCheck({
   id: "example.no-new-labels",
   description: "Compares the repo's label definitions in the seed against the final state.",
@@ -312,11 +310,8 @@ describe("defineCheck rejects a param pattern that opens its own capture group",
   });
 });
 
-// ── F-1076: the tape substrate ───────────────────────────────────────────────
-//
-// D1's open half. A declaration may now read the recorded call tape as an
-// ORDERED sequence of complete events, bodies included. Ordering is a contract
-// the consumer owes the check, not an artifact of how the blob got parsed.
+// ── the tape substrate ─────────────────────────────────────────────────────── D1's
+// open half.
 
 describe("tape substrate", () => {
   it("hands a declaration the ordered tape and lets it cite events", () => {
@@ -465,9 +460,8 @@ describe("probeDiscrimination", () => {
   });
 
   it("breaks on the DEGENERATE arm when the failing world fails the way an EMPTY world does", () => {
-    // F-1126's measured defect: 11 of 13 GitHub checks returned `passed: false`
-    // on `{}` because their selector missed. A fixture that reproduces the empty
-    // world's reason proves nothing about the assertion.
+    // the measured defect: 11 of 13 GitHub checks returned `passed: false` on `{}`
+    // because their selector missed.
     const bad = {
       ...base,
       discriminatingWorlds: () => ({ passing: world({ n: 1 }), failing: world({}) }),

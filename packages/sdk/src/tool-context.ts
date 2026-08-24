@@ -3,7 +3,7 @@
 // Per-call ToolCallContext factory shared by every MCP dispatch surface
 // (server.ts legacy routes + mcp-jsonrpc.ts tools/call). Exposes the
 // authenticated session and captures a handler-reported state delta for the
-// recorded event (F-683).
+// recorded event.
 
 import type { Context } from "hono";
 import type { RecorderEvent, ToolCallContext } from "./index.js";

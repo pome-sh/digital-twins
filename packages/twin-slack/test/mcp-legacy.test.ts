@@ -29,10 +29,7 @@ describe("legacy MCP routes", () => {
       tools: Array<{ name: string; input_schema: { additionalProperties: boolean } }>;
     };
     expect(body.tools.map((t) => t.name).sort()).toEqual([...slackToolFixture.toolNames].sort());
-    // The legacy surface keeps its snake_case key. It no longer carries
-    // `additionalProperties:false`, because F-1330 made the served schemas
-    // Slack's and Slack declares none — the legacy shim renames the key, it
-    // does not add constraints the vendor's listing has not got.
+    // The legacy surface keeps its snake_case key.
     for (const tool of body.tools) {
       expect(tool.input_schema.additionalProperties).toBeUndefined();
     }

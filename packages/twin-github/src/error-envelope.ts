@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // GitHub's wire-frozen error projection, and the per-door url attachment
-// F-1498 hangs off it.
+// the operation-url work hangs off it.
 //
 // It moved out of `twin.ts` because `routes.ts` needs it too: the manifest
 // installs this as the twin-wide `errorEnvelope`, and each mounted route
@@ -71,7 +71,7 @@ export function githubErrorEnvelope(err: unknown): { status: number; body: unkno
 }
 
 /**
- * The same projection with one route's operation url attached (F-1498).
+ * The same projection with one route's operation url attached.
  *
  * `undefined` gives the plain projection back rather than a wrapper that does
  * nothing, so the twin-only routes are literally the twin-wide behavior — there

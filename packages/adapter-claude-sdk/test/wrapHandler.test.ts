@@ -70,22 +70,9 @@ describe("wrapHandler", () => {
   });
 });
 
-// F-1200. The minted `tlc_<random>` named nothing: `ToolUseEvent.tool_use_id`
-// is the SDK's `toolu_…`, so the twin row's `tool_call_id` could never be
-// joined back to the tool call that caused it, and every twin HTTP row stayed
-// an orphan.
-//
-// The real id is already on the handler's `extra` argument. Measured against
-// @anthropic-ai/claude-agent-sdk 0.3.218 + Claude Code CLI 2.1.220: the CLI
-// stamps `_meta["claudecode/toolUseId"]` on every `tools/call`
-// (`let Y=dw_(V), re = Y ? {"claudecode/toolUseId":Y} : {}`), and it equals the
-// assistant stream's `tool_use.id`.
-//
-// It is a CLI-side convention, NOT a typed SDK contract — `tool()`'s `extra` is
-// `unknown` in sdk.d.ts, and the CLI emits the key conditionally. So every read
-// below is tolerant and every miss falls back to a minted id. A thrown error
-// here would take down a tool call over a trace-linkage detail.
-describe("wrapHandler — real tool_use_id from extra (F-1200)", () => {
+// The minted `tlc_<random>` named nothing: `ToolUseEvent.tool_use_id` is the SDK's
+// `toolu_…`, so the twin row's `tool_call_id` could never be joined back.
+describe("wrapHandler — real tool_use_id from extra", () => {
   const withToolUseId = (id: unknown) => ({ _meta: { "claudecode/toolUseId": id } });
 
   it("uses the SDK tool_use_id the CLI stamped on extra._meta", async () => {

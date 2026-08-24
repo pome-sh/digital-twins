@@ -11,7 +11,7 @@ import { randomBytes } from "node:crypto";
  * whenever the runtime exposes one, because that is the id the rest of the trace
  * already uses: `ToolUseEvent.tool_use_id` is the model's `toolu_…`, so a
  * `TwinHttpEvent` stamped with a minted `tlc_…` joins to nothing and stays an
- * orphan with a null parent (F-1200 — the bug that made this a fallback rather
+ * orphan with a null parent — the bug that made this a fallback rather
  * than the default). Mint only when the id is genuinely unavailable: a runtime
  * that does not surface one, or a framework whose tool boundary has no id of its
  * own. A correlated-but-unjoinable row still beats an uncorrelated one, which is

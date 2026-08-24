@@ -1,13 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// Card-mode PaymentIntent chain — F-731 (M5 payments hot path beyond x402).
-//
-// The ruled collect-payment(card) chain (F-729 list 1/3):
-//   create PI with payment_method_types: ["card"] → confirm with a
-//   payment_method → decline/retry via Stripe's magic test PMs → update
-//   the PI with a new PM (POST /v1/payment_intents/:id) → confirm →
-//   succeeded, with the same charge/balance/event side effects as the
-//   crypto settle path.
+// Card-mode PaymentIntent chain (M5 payments hot path beyond x402).
 
 import { describe, expect, it } from "vitest";
 import { callTool, createStripeApp, rest } from "./_appHelper.js";
@@ -456,7 +448,7 @@ describe("card PaymentIntents — update (POST /v1/payment_intents/:id)", () => 
   });
 });
 
-describe("card PaymentIntents — review hardening (F-731)", () => {
+describe("card PaymentIntents — review hardening", () => {
   it("refuses to refund a failed charge", async () => {
     const app = await createStripeApp();
     const pm = await createPM(app, CARD_GENERIC_DECLINE);

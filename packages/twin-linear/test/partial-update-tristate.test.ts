@@ -1,16 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1166: partial updates must honour the three-way distinction that GraphQL
-// partial-update inputs require:
-//
-//   * key absent entirely        -> leave the stored value alone
-//   * key present, value `null`  -> clear the stored value
-//   * key present, value `undefined` -> leave the stored value alone
-//     (`undefined` is the absence of a value, not a value)
-//
-// The twin used to conflate the last two by testing key presence with the `in`
-// operator, so any caller that built a patch object literal with every key
-// always present silently wiped every field it did not mention.
+// Partial updates must honour the three-way distinction that GraphQL partial-update
+// inputs require: * key absent entirely -> leave the stored value alone.
 import { describe, expect, it } from "vitest";
 import { createRecorderStore } from "@pome-sh/sdk/server";
 import {
@@ -62,7 +52,7 @@ async function graphql(
   };
 }
 
-/** Create a session over GraphQL, then give it a plan — the only way in, since F-1176. */
+/** Create a session over GraphQL, then give it a plan — the only way in, since. */
 async function sessionWithPlan(instance: ReturnType<typeof createLinearTwinApp>, plan: string) {
   const issues = await graphql(instance, `query { issues(first: 1) { nodes { id } } }`);
   const issueId = issues.data?.issues.nodes[0].id as string;
@@ -90,7 +80,7 @@ function callTool(commands: LinearDomain, name: string, args: Record<string, unk
   return tool.handler(commands, args, { reportDelta: () => {} } as never);
 }
 
-// Linear's `AgentSessionCreateOnIssue` carries no `plan` (F-1176), so a seeded
+// Linear's `AgentSessionCreateOnIssue` carries no `plan`, so a seeded
 // session's plan arrives through the update mutation that does.
 async function seededSession(commands: LinearDomain, plan: string) {
   const issue = commands.listIssues()[0]!;
@@ -101,7 +91,7 @@ async function seededSession(commands: LinearDomain, plan: string) {
   return commands.updateAgentSession(session.id, { plan });
 }
 
-describe("agentSessionUpdate partial-update tri-state (F-1166)", () => {
+describe("agentSessionUpdate partial-update tri-state", () => {
   it("leaves plan untouched when the key is present but undefined", async () => {
     const commands = domain();
     const session = await seededSession(commands, "PLAN-RESIDUE");
@@ -190,7 +180,7 @@ describe("agentSessionUpdate partial-update tri-state (F-1166)", () => {
   });
 });
 
-describe("sibling mutations share the tri-state contract (F-1166)", () => {
+describe("sibling mutations share the tri-state contract", () => {
   it("issueUpdate leaves description untouched when the key is present but undefined", async () => {
     const commands = domain();
     const team = commands.listTeams()[0]!;
@@ -287,7 +277,7 @@ describe("sibling mutations share the tri-state contract (F-1166)", () => {
 // guard that computes the timestamps and the flags that write them must agree
 // on `!= null`, or an unrelated sibling edit sent alongside `stateId: null`
 // wipes a Done issue's completedAt while leaving it in the Done state.
-describe("issueUpdate lifecycle timestamps ignore a null stateId (F-1166)", () => {
+describe("issueUpdate lifecycle timestamps ignore a null stateId", () => {
   async function doneIssue(commands: LinearDomain) {
     const team = commands.listTeams()[0]!;
     const done = commands.getWorkflowState("Done", "ENG")!;

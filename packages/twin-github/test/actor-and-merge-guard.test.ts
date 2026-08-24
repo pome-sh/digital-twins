@@ -16,7 +16,7 @@ afterAll(() => {
 
 const base = `/s/${TEST_SID}`;
 
-/** F-1460 — `PUT /contents/*` takes base64, the way GitHub's does. */
+/** `PUT /contents/*` takes base64, the way GitHub's does. */
 const b64 = (text: string) => Buffer.from(text, "utf8").toString("base64");
 
 async function seedBranchAndPR(app: ReturnType<typeof createGitHubCloneApp>, token: string, branch: string) {

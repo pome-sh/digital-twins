@@ -1,12 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-818 — the canonical pome.json / pome.yaml manifest data model. The manifest
-// zod schema, SLUG_RE, and deriveAgentSlug live here as the single source of
-// truth consumed by CLI, control-plane, and MCP; the control-plane's private
-// copies (apps/control-plane/src/routes/agents.ts SLUG_RE and
-// packages/db/src/agent-slug.ts deriveAgentSlug in pome-cloud) are retired in
-// favor of these exports (F-820), so local and server validation stay
-// byte-identical. Full format spec: Linear F-804.
+// The canonical pome.json / pome.yaml manifest data model.
 
 import { describe, expect, it } from "vitest";
 import { parse as parseYaml } from "yaml";
@@ -17,7 +10,7 @@ import {
   manifestSchema,
 } from "../../../src/contract/index.js";
 
-// The F-804 canonical pome.json example, verbatim.
+// The canonical pome.json example, verbatim.
 const POME_JSON_EXAMPLE = `{
   "$schema": "https://pome.sh/schemas/v1/pome.json",
   "agent": {
@@ -34,7 +27,7 @@ const POME_JSON_EXAMPLE = `{
   "pass_threshold": 100
 }`;
 
-// The F-804 pome.yaml alias, verbatim — same keys, different carrier.
+// The pome.yaml alias, verbatim — same keys, different carrier.
 const POME_YAML_EXAMPLE = `# yaml-language-server: $schema=https://pome.sh/schemas/v1/pome.json
 agent:
   slug: pr-review-agent
@@ -49,7 +42,7 @@ artifacts_dir: runs
 pass_threshold: 100
 `;
 
-describe("SLUG_RE (F-818)", () => {
+describe("SLUG_RE", () => {
   it("is byte-identical to the control-plane's slug regex", () => {
     // The whole point of the move: local and server validation share one
     // regex. This pins the source so a 'harmless' edit here is loud.
@@ -67,7 +60,7 @@ describe("SLUG_RE (F-818)", () => {
   });
 });
 
-describe("deriveAgentSlug (F-818)", () => {
+describe("deriveAgentSlug", () => {
   it("derives the canonical kebab slug from a display name", () => {
     expect(deriveAgentSlug("PR Review Agent")).toBe("pr-review-agent");
   });
@@ -122,8 +115,8 @@ describe("deriveAgentSlug (F-818)", () => {
   });
 });
 
-describe("manifestSchema — carrier-agnostic (F-818)", () => {
-  it("validates the F-804 pome.json example verbatim", () => {
+describe("manifestSchema — carrier-agnostic", () => {
+ it("validates the pome.json example verbatim", () => {
     const parsed = manifestSchema.parse(JSON.parse(POME_JSON_EXAMPLE));
     expect(parsed.agent.slug).toBe("pr-review-agent");
     expect(parsed.agent.framework).toBe("langgraph");
@@ -132,7 +125,7 @@ describe("manifestSchema — carrier-agnostic (F-818)", () => {
     expect(parsed.tasks).toBe("tasks/");
   });
 
-  it("validates the F-804 pome.yaml example and yields the same manifest", () => {
+ it("validates the pome.yaml example and yields the same manifest", () => {
     const fromYaml = manifestSchema.parse(parseYaml(POME_YAML_EXAMPLE));
     const fromJson = manifestSchema.parse(JSON.parse(POME_JSON_EXAMPLE));
     // Carriers share keys: apart from the JSON-only "$schema" pointer the two

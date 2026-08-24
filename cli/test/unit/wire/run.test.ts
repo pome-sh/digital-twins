@@ -84,7 +84,7 @@ describe("laneSchema", () => {
 });
 
 describe("criterionSchema + judgeModelSchema (moved from old scenarios section into run.ts)", () => {
-  // FDRS-653 (W3 vocab): 0.3.0-era D/P spellings stay accepted and normalize
+  // Task vocab: 0.3.0-era D/P spellings stay accepted and normalize
   // to the canonical code/model kinds. Full matrix in test/task-vocab.test.ts.
   it("criterionSchema parses {type: 'D', text} and normalizes to 'code'", () => {
     const r = criterionSchema.parse({ type: "D", text: "label was added" });
@@ -175,7 +175,7 @@ describe("runSchema (new fields)", () => {
     expect(r.events_jsonl_url).toBeNull();
   });
 
-  it("accepts a storage-key events_jsonl_url (FDRS-613: relaxed from .url() to match pome-cloud)", () => {
+ it("accepts a storage-key events_jsonl_url — relaxed from .url() to match pome-cloud", () => {
     const r = runSchema.parse({
       ...baseRun,
       events_jsonl_url: "team-tm_1/session-ses_123/events.jsonl",
@@ -183,7 +183,7 @@ describe("runSchema (new fields)", () => {
     expect(r.events_jsonl_url).toBe("team-tm_1/session-ses_123/events.jsonl");
   });
 
-  it("defaults FDRS-613 reconciled fields (correlator_kind/environment/agent telemetry/summary)", () => {
+ it("defaults reconciled fields (correlator_kind/environment/agent telemetry/summary)", () => {
     const r = runSchema.parse(baseRun);
     expect(r.correlator_kind).toBe("heuristic");
     expect(r.environment).toBe("simulation");

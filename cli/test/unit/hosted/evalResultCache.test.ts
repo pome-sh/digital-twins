@@ -1,13 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-644 — the per-trial cloud verdict artifact (verdict.json): write/read
-// roundtrip, the two-level scan, run-set grouping, latest-FAILED selection,
-// and the fix-prompt discovery semantics (trial dir → its set regardless of
-// outcome; root → latest failed set). Foreign/corrupt files never throw.
-//
-// F-1404 — `outcome` (fail / incomplete / pass) is derived from the on-disk
-// `state`, not `!passed`: `passed` alone can't tell a genuine failure apart
-// from a trial the grader never finished, and both used to trip the old
-// `anyFailed` boolean the same way.
+// The per-trial cloud verdict artifact (verdict.json): write/read roundtrip, the
+// two-level scan, run-set grouping, latest-FAILED selection, and the fix-prompt.
 
 import { mkdir, mkdtemp, readFile, readdir, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -62,9 +55,8 @@ function verdict(over: Partial<VerdictArtifact>): VerdictArtifact {
   };
 }
 
-/** F-1195 — a verdict.json exactly as a pre-F-1195 CLI wrote it: recognizable
- *  (source/session_id/task_name/task_path/criteria_results all present and
- *  shaped) but missing `state` and the four counts, at `version: 1`. */
+/** A verdict.json exactly as a legacy CLI wrote it: recognizable
+ *  (source/session_id/task_name/task_path/criteria_results all present and shaped) but missing. */
 function v1OnDiskArtifact(sessionId: string): Record<string, unknown> {
   return {
     version: 1,
@@ -104,7 +96,7 @@ async function writeTrial(
   return runDir;
 }
 
-describe("verdict artifact (FDRS-644)", () => {
+describe("verdict artifact", () => {
   it("write/read roundtrip; corrupt and foreign files read as null", async () => {
     const tmp = await mkdtemp(join(tmpdir(), "verdict-"));
     const runDir = join(tmp, "scn", "ses_1");
@@ -127,7 +119,7 @@ describe("verdict artifact (FDRS-644)", () => {
     expect(await readVerdictArtifact(join(tmp, "scn", "nope"))).toBeNull();
   });
 
-  it("writes `task_path`; the retired `scenario_path` spelling is refused BY NAME, not normalized (F-1195)", async () => {
+  it("writes `task_path`; the retired `scenario_path` spelling is refused BY NAME, not normalized", async () => {
     const tmp = await mkdtemp(join(tmpdir(), "verdict-legacy-"));
 
     // Write path: the retired spelling never lands on disk again.
@@ -140,11 +132,7 @@ describe("verdict artifact (FDRS-644)", () => {
     expect(onDisk.task_path).toBe("tasks/scn.md");
     expect(onDisk).not.toHaveProperty("scenario_path");
 
-    // Read path: F-933's normalize branch is gone. Every file spelling the
-    // path the old way was written by `@pome-sh/cli` <= 0.8.x at artifact
-    // version 1, so the version gate refuses it first — but it is still
-    // RECOGNIZED as ours, so the skip is named rather than silently dropped
-    // the way a foreign file is.
+    // Read path: the normalize branch is gone.
     const legacyDir = join(tmp, "scn", "ses_old");
     await mkdir(legacyDir, { recursive: true });
     const { task_path: _tp, ...withoutTaskPath } = verdict({ session_id: "ses_old" });
@@ -236,13 +224,8 @@ describe("verdict artifact (FDRS-644)", () => {
     expect(latestIncompleteRunSet(sets)).toBeNull();
   });
 
-  // F-1392 — the old `anyFailed` read `!t.verdict.passed`, so a group holding
-  // a trial whose only non-passing criterion was pre-satisfied must NOT trip
-  // it, or it gets misrouted to `pome fix-prompt` as an agent defect. This is
-  // resolved upstream in `scoreFromFinalizeResponse` (the trial's `passed`
-  // and `state` are written correctly at verdict.json write time); this test
-  // pins the group-level behavior against the artifact directly rather than
-  // re-deriving it.
+  // The old `anyFailed` read `!t.verdict.passed`, so a group holding a trial whose
+  // only non-passing criterion was pre-satisfied must NOT trip it, or it gets.
   it("a group holding a pre-satisfied-only trial (state: pass) has outcome pass, not fail", async () => {
     const trials = [
       {
@@ -273,11 +256,8 @@ describe("verdict artifact (FDRS-644)", () => {
     expect(sets[0]!.outcome).toBe("pass");
   });
 
-  // F-1404 — the defect as filed: a set holding ONLY an incomplete trial (no
-  // trial genuinely failed) must not read as `outcome: "fail"`. Both trials
-  // here have `passed: false` (the old, wrong signal) but neither has
-  // `state: "fail"` — this is the exact shape `!t.verdict.passed` could not
-  // tell apart from group B above.
+  // The defect as filed: a set holding ONLY an incomplete trial (no trial genuinely
+  // failed) must not read as `outcome: "fail"`.
   it("a group whose only non-passing trials are INCOMPLETE has outcome incomplete, not fail", async () => {
     const trials = [
       {
@@ -318,10 +298,8 @@ describe("verdict artifact (FDRS-644)", () => {
     expect(latestIncompleteRunSet(sets)?.groupId).toBe("grp_i");
   });
 
-  // F-1404 — a set mixing a genuine failure with an incomplete trial: the
-  // failure is real signal and must win. `fix-prompt` should still be told
-  // there is something to fix here, not that the set merely has a grading
-  // gap.
+  // A set mixing a genuine failure with an incomplete trial: the failure is real
+  // signal and must win.
   it("a group mixing a genuine failure and an incomplete trial has outcome fail (fail wins)", async () => {
     const trials = [
       {
@@ -359,12 +337,8 @@ describe("verdict artifact (FDRS-644)", () => {
     expect(latestIncompleteRunSet(sets)).toBeNull();
   });
 
-  // F-1404 — "pass" is the one outcome that asserts a verified result, so it
-  // must never be what an unrecognized `state` falls through to. The read path
-  // already refuses such a file (`isVerdictArtifact` checks `state` against
-  // the three words), so this pins the SECOND line of defense: a `state` this
-  // build does not know reads "incomplete", the claim that checks least — an
-  // ungraded run must not become an invisible one.
+  // "pass" is the one outcome that asserts a verified result, so it must never be what
+  // an unrecognized `state` falls through to.
   it("groupRunSets never reports an unrecognized state as a pass", () => {
     const sets = groupRunSets([
       {
@@ -415,10 +389,8 @@ describe("verdict artifact (FDRS-644)", () => {
     expect(missing.totalSets).toBe(0);
   });
 
-  // F-1404 — the root-level shape the ticket names directly: a root whose
-  // only non-passing run set is INCOMPLETE. `set` must stay null (nothing
-  // here is proven to be the agent's fault) and `incompleteSet` must name
-  // the gap instead of the caller falling back to "all passed".
+  // The root-level shape the ticket names directly: a root whose only non-passing run
+  // set is INCOMPLETE.
   it("discoverRunSet(root): an incomplete-only root surfaces incompleteSet, not set", async () => {
     const tmp = await mkdtemp(join(tmpdir(), "verdict-incomplete-root-"));
     await writeTrial(tmp, "scn", "i1", {
@@ -450,13 +422,9 @@ describe("verdict artifact (FDRS-644)", () => {
     expect(d.set?.trials.map((t) => t.verdict.session_id)).toEqual(["t1", "t2"]);
   });
 
-  // F-1195 — a v1 artifact is RECOGNIZABLE (it has every field a verdict.json
-  // has always had), just missing `state` and the four counts this ticket
-  // added. `readVerdictArtifact` still refuses it (no dual-format reader —
-  // zero customers), but the detailed API must say WHY, distinctly from a
-  // foreign/corrupt file, so a v1 run never looks identical to "no run
-  // happened here" to fix-prompt discovery.
-  describe("v1 verdict.json is a named stale-version skip, not a silent drop (F-1195)", () => {
+  // A v1 artifact is RECOGNIZABLE (it has every field a verdict.json has always had),
+  // just missing `state` and the four counts this ticket added.
+  describe("v1 verdict.json is a named stale-version skip, not a silent drop", () => {
     it("readVerdictArtifact still returns null for a v1 file (no dual-format reader)", async () => {
       const tmp = await mkdtemp(join(tmpdir(), "verdict-v1-"));
       const dir = join(tmp, "scn", "ses_v1");
@@ -485,10 +453,8 @@ describe("verdict artifact (FDRS-644)", () => {
     it("`stale-version` is keyed on the version number, never on the new fields being absent", async () => {
       const tmp = await mkdtemp(join(tmpdir(), "verdict-version-key-"));
 
-      // A file that CLAIMS the current version but is missing `state` is a
-      // corrupt current-version file, not a prior version — saying
-      // "stale-version" about it would be the artifact stating more than it
-      // checked, one layer down.
+      // A file claiming the current version but missing `state` is CORRUPT, not a
+      // prior version: "stale-version" would state more than it checked.
       const corruptCurrent = join(tmp, "scn", "ses_corrupt");
       await mkdir(corruptCurrent, { recursive: true });
       const { state: _state, ...withoutState } = verdict({ session_id: "ses_corrupt" });
@@ -601,20 +567,11 @@ describe("verdict artifact (FDRS-644)", () => {
     });
   });
 
-  // F-1411 — a v2 verdict.json that is truncated, hand-edited into an
-  // unexpected `state`, or valid JSON that isn't a verdict artifact at all
-  // used to read as `{status: "unreadable"}` and vanish from every count:
-  // not `totalSets`, not `staleVersionCount`. Unlike a stale-version file
-  // (a REAL trial an older CLI wrote correctly), this is a file nothing wrote
-  // correctly — a different fact, so it gets its own count and its own named
-  // paths, never folded into either existing one.
-  describe("a corrupt current-version verdict.json is a named, counted 'unreadable' skip (F-1411)", () => {
-    // Each of the three damage shapes the ticket names is asserted TWICE, and
-    // the second assertion is the one that matters: `readVerdictArtifactDetailed`
-    // already returned `unreadable` for all three before this change, so a test
-    // that stops there passes against the unfixed code and pins nothing (the
-    // exact shape F-1375 exists to remove). The read status is stated as the
-    // premise; `discoverRunSet` counting and NAMING the dir is the claim.
+  // A v2 verdict.json that is truncated, hand-edited into an unexpected `state`, or
+  // valid JSON that isn't a verdict artifact at all used to read as `{status:
+  describe("a corrupt current-version verdict.json is a named, counted 'unreadable' skip", () => {
+    // Each of the three damage shapes the ticket names is asserted TWICE, and the
+    // second assertion is the one that matters: `readVerdictArtifactDetailed` already.
     async function discoverOne(prefix: string, sid: string, body: string) {
       const tmp = await mkdtemp(join(tmpdir(), prefix));
       const dir = join(tmp, "scn", sid);
@@ -700,10 +657,8 @@ describe("verdict artifact (FDRS-644)", () => {
       expect(unreadableDirs).toEqual([...unreadableDirs].sort());
     });
 
-    // F-1195's own lesson, replayed for `unreadable`: the count must survive
-    // to the caller even when a real, readable run set exists beside it — a
-    // "only report it when there's nothing else" guard is exactly the silent
-    // drop this milestone exists to remove.
+    // the own lesson, replayed for `unreadable`: the count must survive to the caller
+    // even when a real, readable run set exists beside it — a "only report it.
     it("discoverRunSet(root) reports unreadableCount and names the path even when another run set parsed fine", async () => {
       const tmp = await mkdtemp(join(tmpdir(), "verdict-unreadable-mixed-"));
       await writeTrial(tmp, "scn", "ses_fail", {
@@ -770,19 +725,11 @@ describe("verdict artifact (FDRS-644)", () => {
     });
   });
 
-  // F-1445 — the counts above are only honest about DAMAGE if a file that is
-  // merely mid-write can never reach them. `pome fix-prompt` scanning a root
-  // while a `pome run` finalizes in it is an ordinary thing to do, and a
-  // plain `writeFile` publishes the path first (O_TRUNC empties it) and the
-  // bytes second, so the scanner had a real window in which to read a prefix
-  // and report it as "truncated, hand-edited, or not a verdict artifact".
-  describe("verdict.json is published by rename, so a concurrent scan never sees a prefix (F-1445)", () => {
-    /** Big enough that the write is a measurable interval rather than an
-     *  instant: ~4 MB of JSON. On the pre-F-1445 code the artifact path is
-     *  observably empty (or partial) for that whole interval, which is what
-     *  lets this test fail on `origin/main` instead of passing vacuously —
-     *  a small artifact lands in one syscall and the window is too narrow to
-     *  sample reliably. */
+  // The counts above are only honest about DAMAGE if a file that is merely mid-write
+  // can never reach them.
+  describe("verdict.json is published by rename, so a concurrent scan never sees a prefix", () => {
+    /** Big enough that the write is a measurable interval rather than an instant: ~4
+     *  MB of JSON. */
     function largeVerdict(sid: string): VerdictArtifact {
       return verdict({
         session_id: sid,
@@ -826,9 +773,8 @@ describe("verdict artifact (FDRS-644)", () => {
 
       // Sampling proof: an assertion over zero observations is not evidence.
       expect(scans.length).toBeGreaterThan(10);
-      // The ticket's claim, both halves: no scan accused the run of damage,
-      // and every scan still found the one complete run set — "silently saw
-      // nothing" would be the same race wearing the pre-F-1411 face.
+      // The ticket's claim, both halves: no scan accused the run of damage, and every
+      // scan still found the one complete run set — "silently saw nothing" would.
       expect(scans.filter((s) => s.unreadable > 0)).toEqual([]);
       expect(scans.filter((s) => s.sets !== 1)).toEqual([]);
     }, 60_000);
@@ -869,12 +815,9 @@ describe("verdict artifact (FDRS-644)", () => {
     });
   });
 
-  // F-1445 — `readVerdictArtifactDetailed` used to collapse "there is no
-  // verdict.json here" into `unreadable`, which is why both call sites
-  // re-`existsSync`'d the path they had just failed to read. The status now
-  // carries the distinction, so the re-stat (and the check-then-read window
-  // it opened) is gone.
-  describe("an absent verdict.json is `missing`, not `unreadable` (F-1445)", () => {
+  // `readVerdictArtifactDetailed` used to collapse "there is no verdict.json here"
+  // into `unreadable`, which is why both call sites re-`existsSync`'d the path.
+  describe("an absent verdict.json is `missing`, not `unreadable`", () => {
     it("names the absence directly, for a run dir with no verdict.json and for a dir that isn't there", async () => {
       const tmp = await mkdtemp(join(tmpdir(), "verdict-missing-"));
       const empty = join(tmp, "scn", "ses_never_finalized");

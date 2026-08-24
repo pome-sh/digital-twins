@@ -1,32 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1423 — `pull_request_read`'s two comment methods read two different tables.
-//
-// The dispatch answered BOTH `get_comments` and `get_review_comments` from
-// `domain.getPullRequestComments`, i.e. from `pull_request_review_comments`,
-// behind a comment claiming the twin "stores one comment thread per PR and
-// answers both from it rather than inventing a split it does not model". That
-// justification stopped being true: F-1151 gave a PR's CONVERSATION its own
-// storage (`issue_comments`, keyed on the PR's number, because GitHub models a
-// pull request as an issue), and F-1421 gave the seed both vocabularies as
-// separate fields. So the twin does model the split — the tool dispatch just
-// read the wrong side of it.
-//
-// Why it is worth a suite of its own: `pull_request_read` is a tool an EXAMINEE
-// calls. An agent that asks for a pull request's discussion and is handed
-// inline diff comments is graded against a world that answered a different
-// question than the one it asked. Nothing else catches it — the L1 MCP lane
-// compares tool names and input schemas, not response bodies, so a wrong-table
-// dispatch is invisible to every fidelity lane that runs today.
-//
-// Every assertion below is on CONTENT, never on a count. Both tables holding
-// one row each is precisely the state in which a length assertion passes
-// against the bug: `get_comments` returned one element before this fix too, it
-// was simply the wrong one. So each method is pinned to the body its own table
-// holds, and asserted NOT to carry the other's. `ONLY_CONVERSATION` then
-// removes the second table entirely — pre-fix, `get_comments` answered `[]`
-// there while the PR visibly had a comment, which is the same defect seen from
-// the side where the wrong table is empty rather than merely different.
+// `pull_request_read`'s two comment methods read two different tables.
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createGitHubCloneApp } from "../src/twin.js";
@@ -106,7 +79,7 @@ const BOTH_SURFACES = world({ withInline: true });
 /** The conversation alone — `get_comments` must not need the other table. */
 const ONLY_CONVERSATION = world({ withInline: false });
 
-describe("F-1423 — pull_request_read reads the conversation and the diff separately", () => {
+describe("pull_request_read reads the conversation and the diff separately", () => {
   it("answers get_comments from the PR's conversation, not its review comments", async () => {
     const app = createGitHubCloneApp({ seed: BOTH_SURFACES });
 
@@ -154,7 +127,7 @@ describe("F-1423 — pull_request_read reads the conversation and the diff separ
     expect(conversation).not.toHaveProperty("path");
     expect(conversation).not.toHaveProperty("line");
     // GitHub browses a PR's conversation comment at `/pull/N#issuecomment-…`
-    // even though the API pointer stays on the issues path (F-1151).
+    // even though the API pointer stays on the issues path.
     expect(conversation.html_url).toContain(`/acme/api/pull/${PULL}#issuecomment-`);
   });
 

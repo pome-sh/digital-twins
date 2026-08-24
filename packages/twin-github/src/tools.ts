@@ -17,12 +17,12 @@ import { toolOperationDocumentationUrl } from "./operation-docs.js";
 /**
  * The tool table GitHub serves. Every name, description and input schema on
  * the wire comes from this fixture; the array below declares only how each
- * tool's arguments are validated (F-1325).
+ * tool's arguments are validated.
  *
  * Its substrate is `twin-code-transcription` — this listing was read off this
- * twin, not off GitHub. F-1326's upstream golden records 44 tools for the
+ * twin, not off GitHub. the upstream golden records 44 tools for the
  * `default` toolset the examples point at, against the 65 here. That gap is
- * real, and closing it is not F-1325's to do: reporting it is F-1327's.
+ * real, and closing it is not the to do: reporting it is the lane's.
  */
 export const githubToolFixture = loadMcpToolFixture({ raw: rawListing, meta: metaListing });
 
@@ -64,7 +64,7 @@ function normalizePullNumber<T extends { pull_number?: number; pullNumber?: numb
  * uppercase spelling has to be folded down HERE, at the MCP boundary, and
  * nowhere else.
  *
- * ⚠️ WHY NOT IN `listIssues`. The REST route reaches the same function and F-1427
+ * ⚠️ WHY NOT IN `listIssues`. The REST route reaches the same function and it
  * established its `state=open` default there; teaching the domain to accept both
  * casings would make the REST route accept `OPEN` too, which real GitHub does
  * not, and would replace a divergence with a wider one.
@@ -83,7 +83,8 @@ function normalizePullNumber<T extends { pull_number?: number; pullNumber?: numb
  * declaration there is no spelling left for "both". GitHub's own description of
  * the argument answers what that means — *"by default both open and closed
  * issues are returned when not provided"* — while its REST `GET /issues`
- * defaults to `open`, which is F-1427's ruling and stays exactly as it is.
+ * The REST route reaches the same function and defaults to `open`, which is the
+ * ruling and stays exactly as it is.
  *
  * So absent maps to `all` HERE and nowhere else. Without it the MCP tool would
  * have no way to reach a closed issue except by asking for closed ones, and an
@@ -100,7 +101,7 @@ function normalizeCommentId<T extends { comment_id?: number; commentId?: number 
 }
 
 /**
- * The MCP door's `labels`, turned into the filter the domain takes (F-1614).
+ * The MCP door's `labels`, turned into the filter the domain takes.
  *
  * This sits beside `normalizeIssueState` because it is the same kind of job —
  * the MCP spelling of an argument translated once, at the boundary, rather than
@@ -152,10 +153,10 @@ export const toolArgumentSchemas = [
   },
   {
     name: "create_or_update_file",
-    // F-1460 — no `encoding`. GitHub's MCP server declares none and needs none:
+    // No `encoding`. GitHub's MCP server declares none and needs none:
     // it takes `content` as PLAIN TEXT and base64-encodes it itself before
     // calling the REST API, which its own tool description says outright. The
-    // switch survived F-1389 because that ticket removed it from the REST
+    // switch survived the declaration cut because that only removed it from the REST
     // DECLARATION, and the served table (a capture) and these validators are two
     // different objects. Undeclared now, so `ignore` discards it if sent.
     schema: z.object({ ...ownerRepo, path: z.string().min(1), message: z.string().min(1), content: z.string(), branch: z.string().min(1), sha: z.string().optional() })
@@ -170,7 +171,7 @@ export const toolArgumentSchemas = [
     // file's `content` straight to a Git tree entry, which takes plain UTF-8.
     schema: z.object({ ...ownerRepo, branch: z.string().optional(), message: z.string().min(1), files: z.array(z.object({ path: z.string().min(1), content: z.string() })).min(1) })
   },
-  // GitHub's consolidated issue pair (F-1376). `issue_read` and `issue_write`
+  // GitHub's consolidated issue pair. `issue_read` and `issue_write`
   // replace the seven single-purpose tools this twin used to serve — `get_issue`,
   // `update_issue`, `list_issue_comments`, `list_issue_labels`,
   // `add_issue_labels`, `remove_issue_label`, `add_assignees` — none of which
@@ -223,7 +224,7 @@ export const toolArgumentSchemas = [
     name: "add_issue_comment",
     schema: z.object({ ...ownerRepo, issue_number: z.coerce.number().int().positive().optional(), issueNumber: z.coerce.number().int().positive().optional(), body: z.string().min(1) }).refine((value) => value.issue_number ?? value.issueNumber, "issue_number is required")
   },
-  // Kept, and registered as a divergence rather than removed (F-1376): GitHub
+  // Kept, and registered as a divergence rather than removed: GitHub
   // serves this exact name from the `issues` toolset when the client sets
   // `X-MCP-Features: issues_granular`, so an examinee can legitimately call it.
   // The divergence is that this twin serves it unconditionally.
@@ -240,7 +241,7 @@ export const toolArgumentSchemas = [
       perPage: z.coerce.number().int().positive().optional()
     })
   },
-  // GitHub's consolidated pull-request reader (F-1376), replacing the seven
+  // GitHub's consolidated pull-request reader, replacing the seven
   // `get_pull_request*` tools GitHub no longer declares.
   {
     name: "pull_request_read",
@@ -295,7 +296,7 @@ export const toolArgumentSchemas = [
     name: "create_pull_request",
     schema: z.object({ ...ownerRepo, title: z.string().min(1), body: z.string().optional(), head: z.string().min(1), base: z.string().optional() })
   },
-  // ===== v2 hot paths (FDRS-300) ==========================================
+  // ===== v2 hot paths ==========================================
   // Cluster A — branches & files
   {
     name: "list_branches",
@@ -323,7 +324,7 @@ export const toolArgumentSchemas = [
   // fourteen tools GitHub's MCP server does not register under any toolset or
   // feature flag. They were GitHub REST operations that were never MCP tools,
   // so an examinee could only ever have reached them the way it still can —
-  // over this twin's REST door, which is unchanged (F-1376, group D).
+  // over this twin's REST door, which is unchanged (group D).
   // Cluster G — tags & releases
   {
     name: "list_tags",
@@ -342,7 +343,7 @@ export const toolArgumentSchemas = [
     name: "get_me",
     schema: z.object({})
   },
-  // M5 hot gaps (F-735)
+  // M5 hot gaps
   {
     name: "search_commits",
     schema: z.object({ query: z.string().optional(), q: z.string().optional(), owner: z.string().optional(), repo: z.string().optional(), ...pageShape }).refine((value) => value.query !== undefined || value.q !== undefined, "query is required")
@@ -382,7 +383,7 @@ const MUTATING_TOOL_NAMES = new Set<string>([
   "merge_pull_request",
   "update_pull_request_branch",
   "create_pull_request",
-  // v2 hot paths (FDRS-300)
+  // v2 hot paths
   "delete_file",
   "update_pull_request",
   "add_reply_to_pull_request_comment"
@@ -392,9 +393,9 @@ export function isMutatingTool(name: string) {
   return MUTATING_TOOL_NAMES.has(name);
 }
 
-// F-1125 — the actions a tape check may assert "was never called" about.
+// The actions a tape check may assert "was never called" about.
 //
-// The constant MOVED to `./tape-assertable-tools.js` (F-1306) and is re-exported
+// The constant MOVED to `./tape-assertable-tools.js` and is re-exported
 // here so `routes.ts`, the package root and `test/tool-stamping.test.ts` keep
 // reading it from where they always did. It left because `check-params.ts` reads
 // it too, and importing it from this module put ~40 zod tool schemas and
@@ -406,7 +407,7 @@ export { TAPE_ASSERTABLE_TOOLS } from "./tape-assertable-tools.js";
 
 /**
  * Dispatch an MCP tool call, and put the REST operation's `documentation_url`
- * on whatever it throws (F-1498).
+ * on whatever it throws.
  *
  * GitHub's own MCP server proxies REST errors verbatim, so a tool's error
  * surfaces the underlying operation's url — but which operation that is depends
@@ -527,12 +528,12 @@ function dispatchTool(
         // GitHub distinguishes the issue-level `get_comments` from the
         // diff-level `get_review_comments`, and so does this twin: a PR's
         // CONVERSATION lives in `issue_comments`, keyed on the PR's own number
-        // because GitHub models a pull request as an issue (F-1151), while the
+        // because GitHub models a pull request as an issue, while the
         // comments anchored to a file and line live in
         // `pull_request_review_comments`. Both halves of the justification that
         // stood here — one thread per PR, a split the twin does not model —
-        // stopped being true at F-1151, and F-1421 then gave the seed both
-        // vocabularies as separate fields (F-1423).
+        // stopped being true, and the seed then gained both
+        // vocabularies as separate fields.
         case "get_comments":
           return domain.getPullRequestConversation(pull);
         case "get_review_comments":
@@ -578,7 +579,7 @@ function dispatchTool(
       return domain.updatePullRequestBranch(normalizePullNumber(parsed), onDelta);
     case "create_pull_request":
       return domain.createPullRequest({ ...parsed, actor: parsed.actor ?? options.actor }, onDelta);
-    // ===== v2 hot paths (FDRS-300) ========================================
+    // ===== v2 hot paths ========================================
     case "list_branches":
       return domain.listBranchesForRepo(parsed);
     case "delete_file":
@@ -597,7 +598,7 @@ function dispatchTool(
       return domain.getLatestRelease(parsed);
     case "get_me":
       return domain.getMe({ actor: options.actor });
-    // M5 hot gaps (F-735)
+    // M5 hot gaps
     case "search_commits":
       return domain.searchCommits(parsed);
     case "get_release_by_tag":

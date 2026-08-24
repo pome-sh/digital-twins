@@ -32,10 +32,8 @@ describe("util helpers", () => {
     expect(cursorDecode(null)).toBeNull();
   });
 
-  // The `asBool` / `asNumber` / `asString` coercions these three blocks pinned
-  // are gone with F-1179: route inputs are declared and parsed by
-  // `src/route-inputs.ts`, whose behaviour is pinned by
-  // `test/route-input-declarations.test.ts` against the real HTTP surface.
+  // The `asBool` / `asNumber` / `asString` coercions these three blocks pinned are
+  // gone: route inputs are declared and parsed by `src/route-inputs.ts`, whose.
 
   it("csvList splits comma-separated values", () => {
     expect(csvList("a, b ,c")).toEqual(["a", "b", "c"]);

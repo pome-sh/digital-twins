@@ -1,8 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-587: lock the admin gate's fail-CLOSED behavior over a REAL listening
-// socket. The server is booted with @hono/node-server serve() on an ephemeral
-// port — NOT app.request() and NOT a hand-built c.env.incoming mock — so the
-// client IP flows through the runtime bridge exactly as it does in production.
+// Lock the admin gate's fail-CLOSED behavior over a REAL listening socket.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { serve, type ServerType } from "@hono/node-server";
 import { networkInterfaces } from "node:os";

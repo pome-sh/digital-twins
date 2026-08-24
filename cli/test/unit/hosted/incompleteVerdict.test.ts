@@ -1,22 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-932 + F-925's CLI half — the CLI names the third state `incomplete` and
-// stops contradicting the cloud.
-//
-// The symptom, from the F-920 cold walk:
-//
-//   UNEVAL Task 01 — Bug, happy path
-//     score: un-evaluated (cannot pass) — 2 passed, 0 failed, 2 skipped, 0 errored; cloud score: 100/100
-//
-// Two of four criteria never ran. The CLI was RIGHT about that — 100/100 over
-// the other two is not a verified pass. It expressed a correct observation in
-// two broken ways: `cannot pass` reads as the agent's failure, and the state had
-// no name the cloud shared.
-//
-// What must NOT change, and why these tests guard it: `scoreStatus` and
-// `can_pass` are the A5 inflation guard. They are the one place the CLI refuses
-// to inflate a partial run into a pass, which is exactly what F-925 added
-// server-side. Renaming the state must not loosen it.
+// The CLI half — the CLI names the third state `incomplete` and stops contradicting
+// the cloud.
 
 import { describe, expect, it } from "vitest";
 import type { CriterionResult } from "../../../src/contract/index.js";
@@ -43,7 +27,7 @@ const abstained = (text: string): CriterionResult => ({
   skipped: true,
   reason: "tool_not_recorded",
 });
-// F-1392 — the one exemption: excluded because the seed already satisfied it,
+// The one exemption: excluded because the seed already satisfied it,
 // not because the grader couldn't reach a verdict.
 const preSatisfied = (text: string): CriterionResult => ({
   criterion: { type: "code", text },
@@ -52,11 +36,7 @@ const preSatisfied = (text: string): CriterionResult => ({
   reason: PRE_SATISFIED_REASON,
 });
 
-// Built by the SHIPPED producer rather than re-derived here. This helper used
-// to restate `can_pass` inline, which meant every assertion below could stay
-// green while `scoreFromFinalizeResponse` said something else — a test-local
-// second implementation of the exact predicate whose two implementations
-// disagreeing is the bug this file guards (F-1392).
+// Built by the SHIPPED producer rather than re-derived here.
 function score(results: CriterionResult[], satisfaction: number): Score {
   return scoreFromFinalizeResponse({
     run_id: "run_test",
@@ -93,10 +73,8 @@ describe("scoreStatus — the third state is named `incomplete`", () => {
   });
 
   it("degrades to score-only when the response carried no criteria_results", () => {
-    // Pre-FDRS-618 cloud builds omit the field; `scoreFromFinalizeResponse`
-    // sets can_pass/evaluated true for them, so the guard is a no-op and the
-    // verdict is the raw score. This is the compat the `pome run` divergence
-    // was written to protect — already protected here.
+    // Older cloud builds omit the field; `scoreFromFinalizeResponse` sets
+    // can_pass/evaluated true for them, so the guard is a no-op and the verdict is the raw.
     const legacy: Score = { ...score([], 100), evaluated: true, can_pass: true };
     expect(scoreStatus(legacy, 100)).toBe("pass");
   });
@@ -128,13 +106,8 @@ describe("runScoreLine — the copy stops blaming the agent", () => {
   });
 });
 
-// F-1392 — pome-cloud's F-1296 excludes a criterion the seed already
-// satisfied from the abstention denominator (`isRunIncomplete` in
-// apps/dashboard/src/lib/run-status.ts). The CLI counted every `skipped`
-// result with no exemption, so a run the dashboard calls PASS came out
-// `incomplete` / exit 1 in CI. These tests pin the fix at the `isPreSatisfied`
-// predicate and its two call sites (`scoreStatus` via `can_pass`, and
-// `runScoreLine`'s copy).
+// Pome-cloud excludes a criterion the seed already satisfied from the abstention
+// denominator (`isRunIncomplete` in apps/dashboard/src/lib/run-status.ts).
 describe("isPreSatisfied / PRE_SATISFIED_REASON — the one exemption, keyed on the shared reason string", () => {
   it("is true only for a skipped result with the exact reason", () => {
     expect(isPreSatisfied({ skipped: true, reason: PRE_SATISFIED_REASON })).toBe(true);
@@ -145,7 +118,7 @@ describe("isPreSatisfied / PRE_SATISFIED_REASON — the one exemption, keyed on 
   });
 });
 
-describe("scoreStatus — a pre-satisfied criterion is not an abstention (F-1392)", () => {
+describe("scoreStatus — a pre-satisfied criterion is not an abstention", () => {
   it("returns pass for a run whose ONLY non-passing criterion is pre-satisfied", () => {
     const s = score([ok("a"), ok("b"), preSatisfied("github.no-new-issues")], 100);
     expect(s.can_pass).toBe(true);
@@ -169,14 +142,8 @@ describe("scoreStatus — a pre-satisfied criterion is not an abstention (F-1392
   });
 
   it("is still incomplete when EVERY criterion was pre-satisfied — no denominator, no verified pass", () => {
-    // The A5 guard (`total_required > 0`) predates this exemption and
-    // outranks it: nothing passed and nothing failed, so there is no score to
-    // clear a threshold with. `runScoreLine` names this state rather than
-    // reporting a contradictory count. The dashboard reads this run the same
-    // way since F-1399 — `cross-surface-agreement.test.ts` is where that
-    // agreement is CHECKED and `evalResultView.ts`'s `scoreStatus` comment is
-    // where it is explained. Neither is restated here: a restated claim about
-    // another repo is one that goes false on its own (F-1413).
+    // The A5 guard (`total_required > 0`) predates this exemption and outranks it:
+    // nothing passed and nothing failed, so there is no score to clear a threshold.
     const s = score([preSatisfied("github.no-new-issues")], 0);
     expect(s.preSatisfied).toBe(1);
     expect(s.total_required).toBe(0);
@@ -201,7 +168,7 @@ describe("scoreStatus — a pre-satisfied criterion is not an abstention (F-1392
   });
 });
 
-describe("runScoreLine — pre-satisfied criteria are named apart from abstentions (F-1392)", () => {
+describe("runScoreLine — pre-satisfied criteria are named apart from abstentions", () => {
   it("names the pre-satisfied count separately from the not-evaluated count, mirroring the dashboard's verdict line", () => {
     // 1 real abstention + 1 pre-satisfied — still incomplete (the abstention),
     // but the line must not say "2 of 4 criteria not evaluated": only the
@@ -255,12 +222,8 @@ describe("runScoreLine — pre-satisfied criteria are named apart from abstentio
   });
 });
 
-// F-1195 — `evaluationCounts` is the ONE place this arithmetic exists, so
-// `verdict.json` and `runScoreLine`'s "N of M criteria not evaluated" cannot
-// drift apart. These pin the four counts directly against the shapes
-// `verdict.json` needs to name: a full pass, an unevaluated criterion (the
-// original bug — a bare `score`/`pass_threshold` pair with no denominator),
-// and a pre-satisfied exclusion (must agree with the dashboard).
+// `evaluationCounts` is the ONE place this arithmetic exists, so `verdict.json` and
+// `runScoreLine`'s "N of M criteria not evaluated" cannot drift apart.
 describe("evaluationCounts — the counts verdict.json and the terminal both read", () => {
   it("a fully-evaluated run: evaluated = total, nothing left out", () => {
     const s = score([ok("a"), ok("b")], 100);
@@ -273,7 +236,7 @@ describe("evaluationCounts — the counts verdict.json and the terminal both rea
   });
 
   it("an abstained criterion counts as not-evaluated, not folded into evaluated", () => {
-    // This is the F-1195 bug shape: 100/100 over what DID run, with a third
+    // This is the bug shape: 100/100 over what DID run, with a third
     // criterion that never did.
     const s = score([ok("a"), ok("b"), abstained("c")], 100);
     expect(evaluationCounts(s)).toEqual({

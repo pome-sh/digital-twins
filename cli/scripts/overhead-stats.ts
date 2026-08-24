@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-405 — helpers for the overhead-gate orchestrator. Extracted from
+// Helpers for the overhead-gate orchestrator. Extracted from
 // `overhead-gate.ts` so the math is unit-testable without spawning processes.
 
 export interface LatencyStats {
@@ -73,7 +73,7 @@ export function median(values: ReadonlyArray<number>): number {
   return percentile(sorted, 0.5);
 }
 
-// F-728 — the runner's measured noise floor at the gate's own statistic: an
+// The runner's measured noise floor at the gate's own statistic: an
 // A/A test. Pairwise p99Delta between baseline (no-capture) runs says how far
 // apart two runs of the SAME distribution land on this runner right now, with
 // zero true overhead in play. p99Delta is directional — tail stalls in the
@@ -105,7 +105,7 @@ export interface GateVerdict {
   pass: boolean;
 }
 
-// F-728 — the full gate verdict, pure so it's unit-testable. Per-pair p99
+// The full gate verdict, pure so it's unit-testable. Per-pair p99
 // deltas → median (one noisy A/B pair can't flip the verdict) → compared
 // against budget + allowance, where allowance is the A/A noise floor from
 // the baseline runs, capped at the budget itself. The cap bounds worst-case

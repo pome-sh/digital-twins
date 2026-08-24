@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// How a declared check READS the exported Stripe account (F-1127).
+// How a declared check READS the exported Stripe account.
 //
 // pome-cloud kept a hand-maintained mirror of this shape in
 // `deterministic/stripe.ts` (`StripeStateTree`, `StripePaymentIntent`,
@@ -49,7 +49,7 @@
 //     written against upstream's semantics finds nothing here.
 //   - Every collection is exported `ORDER BY created DESC, rowid DESC` — NEWEST
 //     FIRST. `created` has unix-second resolution, so the rowid tiebreak is what
-//     makes it deterministic (F-683). Nothing in this vocabulary asserts on
+//     makes it deterministic. Nothing in this vocabulary asserts on
 //     order, and that is deliberate: the ordered substrate is the TAPE, and a
 //     state check that leaned on export order would be reading an
 //     implementation detail the twin is free to change.
@@ -128,7 +128,7 @@ export interface StripeCheckState {
  *  resolver must be able to say WHY it found nothing, because the ways of
  *  finding nothing get different verdicts.
  *
- *  F-1197 added the pointers, also twin-github's: `path` is where the resolution
+ * The pointers follow twin-github's: `path` is where the resolution
  *  landed, `searched` is the collection a failed lookup scanned — absent when the
  *  export carried no such collection, because a citation that resolves to
  *  nothing is the affordance-to-nowhere that ticket removes. */
@@ -136,7 +136,7 @@ export type Resolved<T> =
   | { found: T; path: string }
   | { missing: string; searched?: string };
 
-/** The exported collections a pointer can address (F-1197). Named because seven
+/** The exported collections a pointer can address. Named because seven
  *  declarations reach for them, and because these are WIRE names — `refunds`,
  *  not `refund_rows` — which is exactly the distinction this file's header
  *  spends thirty lines on. A literal typed out at each call site is a chance to

@@ -1,14 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1179 / F-1372 — twin-linear's declared input surface.
-//
-// Linear is the twin the other four were rebuilt to resemble: its OPERATION
-// arguments were already readable with zero transcription, out of the executable
-// schema `/graphql` runs every request against. What was NOT declared was the
-// HTTP transport around it — the GraphQL envelope and the four OAuth endpoints —
-// and this suite covers both halves: that the transport handles an input it
-// does not name the way F-1372 measured Linear handling one, and that the
-// argument projection is the schema rather than a second description of it.
+// Twin-linear's declared input surface. Linear is the twin the other four were rebuilt
+// to resemble: its OPERATION arguments were already readable with zero.
 
 import { createHash } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -54,14 +46,8 @@ afterAll(() => {
 /** The probe name: something no vendor and no twin declares anywhere. */
 const UNDECLARED = "pome_undeclared_probe";
 
-/**
- * F-1372's ruling for this twin: Linear ignores a parameter it does not
- * recognise, on all six routes. Four are OAuth, where RFC 6749 §3.1 and §3.2
- * both say the authorization server "MUST ignore unrecognized request
- * parameters"; real Linear was measured obeying that, and answering `/graphql`
- * identically with and without an unknown envelope or query key, on 2026-08-09
- * (`docs/undeclared-route-inputs.md`).
- */
+/** the ruling for this twin: Linear ignores a parameter it does not recognise, on all
+ *  six routes. */
 const RULED: UndeclaredDisposition = "ignore";
 
 /** A URL for a declaration, with its path params filled in plausibly. */
@@ -82,7 +68,7 @@ describe("route input declarations", () => {
     const dissenting = LINEAR_ROUTE_INPUTS.filter((d) => d.undeclared !== RULED).map(
       (d) => `${d.surface} is '${d.undeclared}'`
     );
-    expect(dissenting, `these routes disagree with the twin's F-1372 ruling ('${RULED}')`).toEqual(
+    expect(dissenting, `these routes disagree with the twin's heat ruling ('${RULED}')`).toEqual(
       []
     );
   });
@@ -180,20 +166,8 @@ describe("route input declarations", () => {
   });
 });
 
-// ─── F-1385 — `extensions`, the fourth envelope member ───────────────────────
-//
-// Re-measured against real `https://api.linear.app/graphql` on 2026-08-11. The
-// ticket's reading — that Linear's 400 is "automatic persisted queries simply
-// switched off" — is FALSIFIED by that measurement: Linear runs APQ in
-// verify-only mode, and the 400 is the hash check failing. The full transcript
-// is in `docs/undeclared-route-inputs.md`; this suite is the same table driven
-// over the real HTTP wire, which is the third of F-1385's Done-whens.
-//
-// Every case below is answered BEFORE authentication, which is why each one is
-// also run with a deliberately-bad bearer token further down. That ordering is
-// the fix, not a detail: reject after the auth check and an agent sending an
-// APQ payload with a stale token sees 401 here and 400 at Linear — the same
-// divergence in a harder-to-see form.
+// ─── `extensions`, the fourth envelope member ────────────────────────────────
+// Re-measured against real `https://api.linear.app/graphql` on 2026-08-11.
 
 /** A query, and the hash an Apollo client computes for it. */
 const APQ_QUERY = "{__typename}";
@@ -276,7 +250,7 @@ async function get(
   return { status: response.status, body: await response.json() };
 }
 
-describe("`extensions` — the persisted-query envelope member (F-1385)", () => {
+describe("`extensions` — the persisted-query envelope member", () => {
   it("declares it on both `/graphql` surfaces, so the declared lane can compare it", () => {
     // The C case of the measurement is why this is DECLARED rather than left to
     // the twin's `ignore` disposition: an unknown envelope key (`bogusKey`)

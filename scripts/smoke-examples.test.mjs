@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Regression suite for `smoke-examples.mjs` (F-1478).
+// Regression suite for `smoke-examples.mjs`.
 //
 // The gate's whole job, before this ticket, was undermined by one gap: an
 // exit inside SETTLE_MS was ALWAYS "OK", so an example that returned having
@@ -11,9 +11,9 @@
 // timing-dependent — the real launches are exercised by `npm run
 // smoke:examples` itself in CI).
 //
-// Four cases are the break-on-purpose scenarios F-1478 names explicitly:
+// Four cases are the break-on-purpose scenarios this gate names explicitly:
 // exits 0 immediately with no evidence of work, exits 1 immediately with no
-// recognized benign reason, a module-body TDZ (F-900's subject — must never
+// recognized benign reason, a module-body TDZ (this gate's whole subject — must never
 // regress to a skip or a pass no matter what else changes here), and zero
 // examples discovered.
 import assert from "node:assert/strict";
@@ -87,7 +87,7 @@ function check(name, got, want) {
   );
 }
 
-// ── F-1519: an outbound-call failure is its own named verdict, distinct from
+// ── An outbound-call failure is its own named verdict, distinct from
 // ok — but ONLY once the positive-evidence marker is present. The marker is
 // what a real launch prints (either via @pome-sh/adapter-claude-sdk's query(),
 // or the literal print each non-adapter example carries) immediately before
@@ -112,7 +112,7 @@ function check(name, got, want) {
   check("marker + AI Gateway auth rejection before settle is 'reached'", v.status, "reached");
 }
 
-// ── F-1519 fail-closed: no marker means no "reached", no matter how benign
+// ── Fail-closed: no marker means no "reached", no matter how benign
 // the crash text looks. This is the ticket's central acceptance bar — a
 // pre-wiring crash whose message deliberately CONTAINS benign-looking text
 // ("ECONNREFUSED", "401 invalid x-api-key") must still FAIL, because the
@@ -136,12 +136,12 @@ function check(name, got, want) {
   }
 }
 
-// ── F-1519 the other direction: the marker is printed at the outbound call
+// ── The other direction: the marker is printed at the outbound call
 // SITE, so a crash between that line and the syscall prints it first. Both of
 // these were MEASURED on this branch (the adapter seam with an unresolvable
 // `claude` binary; `gmail-retry-notify` with a malformed twin URL) and both
 // FAILED under the old text classifier, so the marker alone must not convert
-// them into passes — that is F-1478's defect through the back door.
+// them into passes — that is the same defect through the back door.
 {
   for (const [label, output] of [
     [
@@ -163,7 +163,7 @@ function check(name, got, want) {
   }
 }
 
-// ── F-1519: both of the SDK's racing error shapes give the SAME verdict once
+// ── Both of the SDK's racing error shapes give the SAME verdict once
 // the marker is present. This is the exact nondeterminism the ticket names:
 // `@anthropic-ai/claude-agent-sdk@0.3.221`'s query() picks between
 // "Claude Code returned an error result: …" (lastErrorResultText won the
@@ -189,8 +189,8 @@ function check(name, got, want) {
 // ── the signature list is locked against REAL CI output, not invented text ──
 //
 // Every string below is copied verbatim from the `smoke:examples` job log of
-// the F-1478 PR run (github.com/pome-sh/digital-twins/actions/runs/31614212888),
-// with OUTBOUND_MARKER prepended — a real launch since F-1519 prints it before
+// a real PR run (github.com/pome-sh/digital-twins/actions/runs/31614212888),
+// with OUTBOUND_MARKER prepended — a real launch prints it before
 // any of this text. This is the case that matters: the list decides whether
 // the gate is usable in the only environment that gates anything, and a
 // tightened pattern that no longer matches what CI actually prints reds all
@@ -316,7 +316,7 @@ function check(name, got, want) {
   }
 }
 
-// ── F-1486: the credentialed leg's floor — zero alive is a hard failure ────
+// ── The credentialed leg's floor — zero alive is a hard failure ────────────
 {
   const zero = assertAliveFloor({ live: true, okCount: 0, total: 8 });
   check("zero alive on the live leg fails the floor", zero.ok, false);
@@ -337,7 +337,7 @@ function check(name, got, want) {
   check("a no-op floor carries no message", notLive.message, null);
 }
 
-// ── F-1486: an absent credential on the live leg must be named, not silent ─
+// ── An absent credential on the live leg must be named, not silent ─────────
 {
   check(
     "every required var is reported missing from an empty env",
@@ -362,7 +362,7 @@ function check(name, got, want) {
     [...LIVE_REQUIRED_ENV].sort(),
   );
   // Truthy but blank — a space or newline pasted into the secret box
-  // (F-1187/F-1184's blank-in-Infisical shape). Untrimmed, this sails through
+  // (the blank-in-Infisical shape). Untrimmed, this sails through
   // and the leg launches every example with a whitespace API key.
   check(
     "a whitespace-only secret is named as absent, not accepted",
@@ -376,7 +376,7 @@ function check(name, got, want) {
   );
 }
 
-// ── F-1486: an unrecognised SMOKE_EXAMPLES_LIVE must ERROR, never mean "PR leg"
+// ── An unrecognised SMOKE_EXAMPLES_LIVE must ERROR, never mean "PR leg"
 // A flag typo'd to `true` silently reverts to the uncredentialed leg: dead
 // loopback ports, no credential check, no floor, exit 0. That is a green
 // nightly proving nothing — this ticket's own subject, one character away.
@@ -398,7 +398,7 @@ function check(name, got, want) {
   }
 }
 
-// ── F-1486: the LIVE leg must still hand every example a task ───────────────
+// ── The LIVE leg must still hand every example a task ───────────────────────
 // Four of the eight `requiredEnv("POME_TASK")`. The first cut of the live leg
 // overlaid nothing at all, so those four died on `Error: POME_TASK is required`
 // and were classified FAIL ("returned without evidence it did any real work") —
@@ -477,7 +477,7 @@ function check(name, got, want) {
   check("the PR leg does not pin a model slug", pr.VIKTOR_MODEL, undefined);
   assert.ok(pr.POME_TASK?.trim(), "the PR leg must supply a non-blank POME_TASK");
   check("the PR leg never re-enables POME_PREFLIGHT", pr.POME_PREFLIGHT, undefined);
-  // F-1519: MARK_OUTBOUND_ENV is neither a credential nor twin/model wiring —
+  // MARK_OUTBOUND_ENV is neither a credential nor twin/model wiring —
   // it applies on BOTH legs unconditionally, or an example launched on
   // whichever leg forgot it never prints OUTBOUND_MARKER and can never be
   // classified as reached.
@@ -485,7 +485,7 @@ function check(name, got, want) {
   check("the PR leg tells examples to emit the marker too", pr[MARK_OUTBOUND_ENV], "1");
 }
 
-// ── F-1486: the fast-correct-completion edge must be named in the failure ───
+// ── The fast-correct-completion edge must be named in the failure ───────────
 // OK is "still alive at the settle", so on the credentialed leg a correct-but-
 // fast example exits 0 inside the settle and lands on FAIL. The verdict is
 // acceptable; a message insisting the example is broken is not, because the
@@ -502,7 +502,7 @@ function check(name, got, want) {
   assert.match(liveFast.reason, /CORRECT but FAST/);
 
   // Off the live leg the note must NOT appear — the PR leg's exit-0 examples
-  // really are do-nothing exits, and F-1478's message is the right one there.
+  // really are do-nothing exits, and the do-nothing message is right there.
   const prFast = classifyLaunch({
     output: "Triaged 0 open items in acme/api — nothing to do.",
     stillRunningAtSettle: false,
@@ -527,7 +527,7 @@ function check(name, got, want) {
   );
 }
 
-// ── F-1518: the counted-numerator property ──────────────────────────────────
+// ── The counted-numerator property ──────────────────────────────────────────
 // Measured on PR #417: the summary read "7 of 8" and named seven, and nothing
 // said the eighth (`pr-summary-agent`) had gone MISSING rather than FAILED —
 // classifyLaunch()'s three named outcomes (ok/reached/fail) are worthless if
@@ -577,7 +577,7 @@ function check(name, got, want) {
   check("nothing discovered, nothing reported is a pass", assertReportedCount([], []).ok, true);
 }
 
-// ── F-1519: the marker guard reds when a new example has no route to the
+// ── The marker guard reds when a new example has no route to the
 // marker at all — asserting the PROPERTY (does this example's source or its
 // @pome-sh/adapter-claude-sdk dependency give it a way to print
 // OUTBOUND_MARKER?), never a hand-kept list of the four that need it directly.
@@ -668,7 +668,7 @@ function check(name, got, want) {
   }
 }
 
-// ── F-1519: the real agent-examples/ directory in THIS repo passes the guard ─────
+// ── The real agent-examples/ directory in THIS repo passes the guard ─────────────
 // The synthetic fixtures above prove the guard's logic; this proves the
 // guard actually holds against the tree it will run against in CI.
 {

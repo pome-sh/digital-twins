@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Derive `fixtures/mcp-tools-list.{raw,meta,canonical}.json` from the upstream
-// golden at `fixtures/mcp-tools-list/gmail.*` (F-1400).
+// golden at `fixtures/mcp-tools-list/gmail.*`.
 //
 // ── WHY THIS EXISTS ──────────────────────────────────────────────────────────
 //
@@ -34,7 +34,7 @@
 // declares `Message.bccRecipients`, `Label.messagesTotal`/`messagesUnread`, and
 // a `list_labels` that returns ALL labels rather than only user-defined ones.
 // Running this script without moving `src/mcp.ts` would make the twin advertise
-// three capabilities it does not have — the false-capability shape F-1330
+// three capabilities it does not have — the false-capability shape adoption
 // exists to prevent, reached from the other direction. `test/mcp.test.ts` holds
 // the handler side to the same listing this writes.
 //
@@ -58,7 +58,7 @@ const CANONICAL = "mcp-tools-list.canonical.json";
  * read this array and know it is the whole of what a human decided.
  */
 const NOTES = [
-  "F-1400: these bytes are Google's, adopted rather than transcribed. The fixture that shipped before this one was the same endpoint read on 2026-07-20 and was never refreshed, so the twin advertised a seventeen-day-old listing and pome-cloud's mcp_diff reported 34 findings across 11 tools — all of them the vendor moving, none of them a twin defect. Produced by scripts/adopt-upstream-mcp-fixture.ts; `npm run gate:mcp-fixture -w @pome-sh/twin-gmail` re-derives and diffs.",
+  "These bytes are Google's, adopted rather than transcribed. The fixture that shipped before this one was the same endpoint read on 2026-07-20 and was never refreshed, so the twin advertised a seventeen-day-old listing and pome-cloud's mcp_diff reported 34 findings across 11 tools — all of them the vendor moving, none of them a twin defect. Produced by scripts/adopt-upstream-mcp-fixture.ts; `npm run gate:mcp-fixture -w @pome-sh/twin-gmail` re-derives and diffs.",
   "13 tools, which is every tool the capture carries. Unlike twin-slack's adoption there is no suppression list: nothing here is withheld, so raw.json is byte-identical to fixtures/mcp-tools-list/gmail.raw.json and the two shas agree.",
   "Descriptions, schemas and annotations are the capture's verbatim. Three of its claims are behavioural and were implemented in the same change rather than merely served: Message.bccRecipients, Label.messagesTotal/messagesUnread, and a list_labels that answers with ALL labels — the July listing said 'all user-defined labels' and the twin returned exactly those.",
   "list_labels takes no arguments in this listing. The July capture declared pageSize/pageToken and the twin paginated; Google has since removed both, along with nextPageToken from the response, so the twin answers every label in one page. LIMITS.md's MCP page-size row no longer names this tool.",
@@ -119,7 +119,7 @@ const meta = {
   twin: "gmail",
   // Provenance is the CAPTURE's, copied rather than kept: a fixture that could
   // hold its own captureDate could go stale while still looking current, which
-  // is the defect F-1400 is.
+  // is the defect.
   substrate: upstreamMeta.substrate,
   endpoint: upstreamMeta.endpoint,
   method: upstreamMeta.method,

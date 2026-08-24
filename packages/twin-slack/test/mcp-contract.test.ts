@@ -1,14 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
 // MCP tools contract — pins the 18 tools this twin serves so any drift
-// (added/removed/renamed tool, changed required fields, changed mutating set)
-// breaks this test loudly.
-//
-// The expectations below are SLACK'S, read off F-1329's live OAuth capture and
-// written out by hand here so the contract has no external dependency. That is
-// the whole difference F-1330 made: this file used to pin eleven names copied
-// out of an archived reference server, and it was green the entire time the
-// twin served a tool surface no Slack deployment has.
+// (added/removed/renamed tool, changed required fields, changed mutating set) breaks.
 
 import { describe, expect, it } from "vitest";
 import { MUTATING_TOOL_NAMES, slackToolFixture, toolSchemas } from "../src/tools.js";
@@ -47,12 +39,7 @@ const EXPECTED_TOOLS: ExpectedTool[] = [
   { name: "slack_get_reactions", required: ["channel_id", "message_ts"], readOnly: true },
 ];
 
-/**
- * Names the twin served before F-1330 that Slack has never declared. Kept as a
- * standing assertion rather than deleted with the code: the failure mode this
- * ticket fixed was a plausible-sounding name nobody checked, and the cheapest
- * guard against its return is to say out loud that these eight are not Slack's.
- */
+/** Names the twin served before that Slack has never declared. */
 const FABRICATED_NAMES = [
   "slack_post_message",
   "slack_reply_to_thread",
@@ -85,10 +72,8 @@ describe("MCP tools contract", () => {
   });
 
   it("does not serve slack_send_message_draft, the one tool Slack declares and this twin does not", () => {
-    // Ruled cold in F-1330's gate 1; registered in pome-cloud's
-    // known-divergences/slack.mcp.yaml, reasoned in
-    // docs/slack-mcp-unexposed-tools.md. The absence is a decision, so it is
-    // asserted rather than merely true.
+    // Ruled cold in the gate 1; registered in pome-cloud's
+    // known-divergences/slack.mcp.yaml, reasoned in docs/slack-mcp-unexposed-tools.md.
     expect(slackToolFixture.toolNames).not.toContain("slack_send_message_draft");
     expect(slackToolFixture.meta.configuration?.unexposed).toMatch(/slack_send_message_draft/);
   });
@@ -110,9 +95,8 @@ describe("MCP tools contract", () => {
   });
 
   it("declares no additionalProperties, because Slack declares none", () => {
-    // The reversal F-1330 landed. Every one of these carried
-    // `additionalProperties:false` before, so a correctly-named call carrying
-    // a real Slack parameter was hard-rejected.
+    // The reversal. Every one of these carried `additionalProperties:false` before, so
+    // a correctly-named call carrying a real Slack parameter was hard-rejected.
     for (const tool of slackToolFixture.tools) {
       expect(tool.inputSchema.additionalProperties, tool.name).toBeUndefined();
       expect(tool.inputSchema.type).toBe("object");
@@ -128,26 +112,13 @@ describe("MCP tools contract", () => {
     }
   });
 
-  // F-1330 — the fixture carries the inputSchema the wire serves, and the zod
-  // schemas are what `tools/call` validates against. Byte equality between the
-  // two stopped being possible when the fixture became Slack's (its schemas
-  // carry prose no zod schema projects to), so the pin is the argument surface:
-  // same keys, same required set, and no rejection of an unknown key.
+  // The fixture carries the inputSchema the wire serves, and the zod schemas are what
+  // `tools/call` validates against.
   it("validates exactly the argument surface Slack declares", () => {
     expect(toolSchemaConformance()).toEqual([]);
   });
 
-  // ⚠️ AND THAT `[]` NOW COVERS THE TYPE AXIS TOO (F-1614) — it did not before.
-  //
-  // twin-github advertised `list_issues.labels` as an array of strings,
-  // validated it as one string, and answered 422 `invalid_type` to the shape its
-  // own listing publishes. Its conformance stayed green the whole time, because
-  // the comparison looked at which arguments each side HAS and which it
-  // REQUIRES and never at their type. This twin's comparison had the same blind
-  // spot, and an empty residue is the one result that cannot tell the two apart.
-  //
-  // So the check is planted rather than assumed. `typeDisagreements` is shared
-  // (`@pome-sh/sdk/mcp-tool-fixture`) so both twins run one comparison.
+  // ⚠️ AND THAT `[]` NOW COVERS THE TYPE AXIS TOO — it did not before.
   it("would REPORT a type disagreement, so the empty residue above means something", () => {
     expect(
       typeDisagreements("slack_send_message", "Slack", { blocks: { type: "array" } }, { blocks: { type: "string" } }),

@@ -46,7 +46,7 @@ function assert(condition: unknown, message: string) {
 // fixture to the implementations 1:1 and throws both ways at module load, and
 // healthz / `/mcp/tools` / `tools/list` all report that one derived table — so
 // `served.length === slackToolFixture.tools.length` cannot fail; the twin would
-// not construct. The hardcoded `11` this file carried until F-1472 was a real
+// not construct. The hardcoded `11` this file carried until was a real
 // bug, but replacing it with a derived literal replaced it with an assertion
 // that asserts nothing, which is this milestone's own subject in a passing
 // costume. The count IS checked, by `gate:mcp-fixture` and
@@ -160,7 +160,7 @@ let threadParentTs = "";
   assert(tools.every((t) => t.name.startsWith("slack_")), "all tools prefixed slack_");
 }
 
-// 10. MCP JSON-RPC tools/list. F-1330 dropped `additionalProperties:false` from
+// 10. MCP JSON-RPC tools/list. `additionalProperties:false` is gone from
 // the served schemas because Slack's own listing declares none — already
 // asserted by mcp-tool-fixture.test.ts / mcp-contract.test.ts / mcp-legacy.test.ts.
 {

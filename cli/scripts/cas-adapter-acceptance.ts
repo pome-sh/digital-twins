@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// FDRS-413 — PR/FAQ acceptance #2 e2e gate. Runs `pome run` against scenario 01
+// PR/FAQ acceptance #2 e2e gate. Runs `pome run` against scenario 01
 // with the CAS-adapter triage fixture (`packages/adapter-claude-sdk/fixtures/
 // cas-triage-agent.ts`) and asserts the resulting events.jsonl shape:
 //
@@ -9,17 +9,17 @@
 //     x-pome-correlation-id flowed through), and ≥ 1 ToolUseEvent in the same
 //     run so the "originating tool use" half of the call is present. See the
 //     [DECISION] note below on why this is the operational reading of the
-//     "matching event_id" line in FDRS-413's done-when list.
+//     "matching event_id" line in the done-when list.
 //   * ≥ 1 HookEvent with hook_name="PreToolUse"
 //   * `pome inspect` exits 0 with a "Trace health:" section, and the CAS
 //     adapter layer is non-zero + [ok] (i.e., "present")
 //
-// [DECISION] FDRS-413 done-when reads: "TwinHttpEvent.tool_call_id matching an
+// [DECISION] The done-when reads: "TwinHttpEvent.tool_call_id matching an
 // originating ToolUseEvent.event_id". The locked adapter architecture
-// (FDRS-322) makes those two ids structurally distinct: tool_call_id is
-// ALS-bound (the SDK's own `toolu_…` since F-1200, else a `tlc_<hex>` from
+// makes those two ids structurally distinct: tool_call_id is
+// ALS-bound (the SDK's own `toolu_…`, else a `tlc_<hex>` from
 // `@pome-sh/wire/correlation`'s `generateToolCallId()` — the module moved out of
-// the adapter in F-950), while
+// the adapter), while
 // ToolUseEvent.event_id is a separate UUID minted in the signals writer. They
 // cannot be made string-equal without coupling that wasn't planned for in M0.
 // The intent of the line is to verify the run contains BOTH halves of an
@@ -61,11 +61,11 @@ const CLI_ROOT = process.cwd();
 // registry.npmjs.org at runtime, which the egress floor refuses (exit 3).
 const TSX_BIN = resolveTsxBin(import.meta.url);
 
-// FDRS-641 — `pome run` hard-gates on the doctor wiring checks (config → twin
+// `pome run` hard-gates on the doctor wiring checks (config → twin
 // → routing → egress) with no --force. This synthetic gate used to run in a
-// bare `cli/` with no manifest, so post-FDRS-641 it dies at the config check
+// bare `cli/` with no manifest, so it dies at the config check
 // before spawning the agent. Rather than bypass the gate, run `pome run` from a
-// throwaway directory holding a valid pome.json manifest (F-819) + a
+// throwaway directory holding a valid pome.json manifest + a
 // wiring-marker source that reads POME_GITHUB_REST_URL — what doctor's routing
 // scan wants, with no hardcoded host to trip it. Twin/egress pass against the
 // local github twin + deny-by-default floor the run already uses.
@@ -78,7 +78,7 @@ async function makeDoctorScaffold(): Promise<string> {
   await writeFile(
     join(dir, "agent.ts"),
     [
-      "// FDRS-641 doctor wiring marker. The gate's real agent is passed via",
+      "// Doctor wiring marker. The gate's real agent is passed via",
       "// --agent; this file exists only so `pome doctor`'s routing scan finds",
       "// a POME_*_REST_URL read (and no hardcoded host) in the config dir.",
       "const baseUrl = process.env.POME_GITHUB_REST_URL;",
@@ -164,7 +164,7 @@ async function runPome(input: { target: string; scaffold: string }): Promise<str
   };
   env.POME_AGENT_ENV_ALLOWLIST = appendAllowlist(process.env.POME_AGENT_ENV_ALLOWLIST, "POME_CAPTURE_TEST_TARGET");
 
-  // cwd = scaffold dir so `pome run`'s FDRS-641 doctor preflight finds the
+  // cwd = scaffold dir so `pome run`'s doctor preflight finds the
   // scaffolded pome.json manifest + wiring marker (and passes).
   const { stdout, stderr, exitCode } = await runChild(pomeExec, args, env, input.scaffold);
   if (exitCode !== 0) {
@@ -241,7 +241,7 @@ async function assertEventsShape(runDir: string): Promise<void> {
     );
   }
 
-  // (iv) ≥1 LlmTurnEvent carrying cache tokens (F-766). The whole point of the
+  // (iv) ≥1 LlmTurnEvent carrying cache tokens. The whole point of the
   // kind is that per-turn usage — including the cache-read/cache-creation
   // token counts the OTLP side-lane drops — reaches the events.jsonl ledger.
   const turns = rows.filter((r) => r.kind === "LlmTurnEvent");
@@ -288,7 +288,7 @@ async function assertInspect(runDir: string): Promise<void> {
     .find((l) => l.includes("CAS adapter:"));
   if (!casLine) fail(`pome inspect Trace health missing "CAS adapter:" line`);
   if (!/\[ok\]/.test(casLine)) {
-    fail(`Trace health CAS adapter line not [ok]: "${casLine.trim()}" (FDRS-413 requires CAS adapter present)`);
+    fail(`Trace health CAS adapter line not [ok]: "${casLine.trim()}" (the gate requires the CAS adapter present)`);
   }
   if (/\b0\//.test(casLine)) {
     fail(`Trace health CAS adapter count is zero: "${casLine.trim()}"`);
@@ -299,7 +299,7 @@ async function assertInspect(runDir: string): Promise<void> {
 async function copyArtifacts(runDir: string, dest: string): Promise<void> {
   const { mkdir, copyFile } = await import("node:fs/promises");
   await mkdir(dest, { recursive: true });
-  // Mirrors the file set the runner produces (F-689: no local score.json,
+  // Mirrors the file set the runner produces (no local score.json,
   // no tool_calls.jsonl/state-before/after/diff — those were deleted; only
   // the raw trace/state + optional adapter signals survive).
   for (const name of [

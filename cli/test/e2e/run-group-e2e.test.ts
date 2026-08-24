@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-636 — `pome run -n k` end-to-end against a STUB cloud, in the pattern
-// of demo-e2e.test.ts: the REAL runTrialGroup + runTaskHosted machinery
-// (per-trial preflight, agent subprocess, state/events capture, presigned
-// uploads, finalize/abandon, teardown DELETE) with a scripted control plane.
-// Everything short of the real cloud + a real judge — the founder's Phase G
-// live run covers those.
+// `pome run -n k` end-to-end against a STUB cloud, in the pattern of demo-e2e.test.ts:
+// the REAL runTrialGroup + runTaskHosted machinery (per-trial preflight.
 
 import { createServer, type Server } from "node:http";
 import { mkdtemp, writeFile } from "node:fs/promises";
@@ -186,7 +182,7 @@ afterAll(async () => {
   }
 });
 
-describe("pome run -n k end-to-end against a stub cloud (FDRS-636)", () => {
+describe("pome run -n k end-to-end against a stub cloud", () => {
   it("mints k upfront (shared group_id, fresh idempotency keys) → sequential trials → verdict table + summary + reliability link", async () => {
     cloud = await startStubCloud();
     const tmp = await mkdtemp(join(tmpdir(), "pome-group-e2e-"));
@@ -260,7 +256,7 @@ describe("pome run -n k end-to-end against a stub cloud (FDRS-636)", () => {
     expect(cloud.putKeys.filter((k) => k.includes("ses_1"))).toContain("/put/ses_1/events.jsonl");
     expect(cloud.putKeys.filter((k) => k.includes("ses_3"))).toContain("/put/ses_3/events.jsonl");
 
-    // FDRS-644 — completed trials cached the CLOUD verdict next to the raw
+    // Completed trials cached the CLOUD verdict next to the raw
     // trace; the abandoned trial has none (no verdict was ever produced).
     const v1 = await readVerdictArtifact(join(tmp, "runs", "scn", "ses_1"));
     const v3 = await readVerdictArtifact(join(tmp, "runs", "scn", "ses_3"));
@@ -271,7 +267,7 @@ describe("pome run -n k end-to-end against a stub cloud (FDRS-636)", () => {
       session_id: "ses_1",
       passed: true,
       score: 100,
-      // F-1195 — a full pass: the one criterion evaluated, nothing left out.
+      // A full pass: the one criterion evaluated, nothing left out.
       state: "pass",
       evaluated: 1,
       not_evaluated: 0,
@@ -280,9 +276,8 @@ describe("pome run -n k end-to-end against a stub cloud (FDRS-636)", () => {
     });
     expect(v3?.verdict.passed).toBe(false);
     expect(v3?.verdict.criteria_results[0]?.reason).toBe("under-rated");
-    // F-1195 — a genuine fail (the criterion ran and was judged unsatisfied,
-    // not skipped): `state` names it `fail`, distinct from `incomplete`, and
-    // the denominator shows the criterion WAS evaluated.
+    // A genuine fail (the criterion ran and was judged unsatisfied, not skipped):
+    // `state` names it `fail`, distinct from `incomplete`, and the denominator shows.
     expect(v3?.verdict).toMatchObject({
       state: "fail",
       score: 58,
@@ -293,15 +288,13 @@ describe("pome run -n k end-to-end against a stub cloud (FDRS-636)", () => {
     });
     expect(await readVerdictArtifact(join(tmp, "runs", "scn", "ses_2"))).toBeNull();
 
-    // FDRS-644 — the fix & green handoff renders (a completed trial failed):
+    // The fix & green handoff renders (a completed trial failed):
     // artifacts-dir-aware fix-prompt command + the literal re-run command.
     expect(text).toContain("fix & green: hand the failure signatures to your coding agent —");
     expect(text).toContain(`pome fix-prompt ${join(tmp, "runs")}`);
     expect(text).toContain(`after the fix lands, re-run the task:  pome run ${taskPath} -n 3`);
 
     // And fix-prompt's discovery reassembles this exact run set from disk.
-    // Membership, not order: FDRS-663 runs trials in parallel, so within-set
-    // order is finalized_at (completion) order and either trial can win.
     const discovery = await discoverRunSet(join(tmp, "runs"));
     expect(discovery.set?.groupId).toBe(result.groupId);
     expect(

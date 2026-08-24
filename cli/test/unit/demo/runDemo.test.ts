@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-643 — `pome demo` orchestration: group threading, per-trial verdicts
-// from the cloud evaluation, errored exclusion, at-capacity abort.
+// `pome demo` orchestration: group threading, per-trial verdicts from the cloud
+// evaluation, errored exclusion, at-capacity abort.
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -146,7 +146,7 @@ function finalizeResponse(
   };
 }
 
-describe("runDemo (FDRS-643)", () => {
+describe("runDemo", () => {
   it("threads one grp_ id through every mint, runs k trials, renders verdict words + preview link", async () => {
     const out: string[] = [];
     const seenOptions: RunTaskOpts[] = [];
@@ -328,7 +328,7 @@ describe("runDemo (FDRS-643)", () => {
     expect(text).toContain("daily model budget is exhausted — try again tomorrow");
   });
 
-  it("abandons the errored trial AND the never-run remainder when the gateway reports capacity mid-run (F-710)", async () => {
+  it("abandons the errored trial AND the never-run remainder when the gateway reports capacity mid-run", async () => {
     const out: string[] = [];
     const abandonCalls: Array<{ sessionId: string; errorCode?: string }> = [];
     const result = await runDemo({
@@ -361,7 +361,7 @@ describe("runDemo (FDRS-643)", () => {
     expect(result.exitCode).toBe(4);
   });
 
-  it("abandons with daily_judge_cap when finalize hits the judge cap; the finalized trial is never abandoned (F-710)", async () => {
+  it("abandons with daily_judge_cap when finalize hits the judge cap; the finalized trial is never abandoned", async () => {
     const abandonCalls: Array<{ sessionId: string; errorCode?: string }> = [];
     const result = await runDemo({
       apiBase: "https://api.example.com",
@@ -391,7 +391,7 @@ describe("runDemo (FDRS-643)", () => {
     expect(result.exitCode).toBe(0);
   });
 
-  it("abandons a timed-out trial with agent_timeout and a failed agent with agent_exit_nonzero (F-710)", async () => {
+  it("abandons a timed-out trial with agent_timeout and a failed agent with agent_exit_nonzero", async () => {
     const abandonCalls: Array<{ sessionId: string; errorCode?: string }> = [];
     const result = await runDemo({
       apiBase: "https://api.example.com",
@@ -423,7 +423,7 @@ describe("runDemo (FDRS-643)", () => {
     expect(result.exitCode).toBe(0);
   });
 
-  it("abandons with trial_crashed when upload/finalize machinery throws a non-capacity error (F-710)", async () => {
+  it("abandons with trial_crashed when upload/finalize machinery throws a non-capacity error", async () => {
     const abandonCalls: Array<{ sessionId: string; errorCode?: string }> = [];
     const result = await runDemo({
       apiBase: "https://api.example.com",
@@ -452,7 +452,7 @@ describe("runDemo (FDRS-643)", () => {
     expect(result.exitCode).toBe(0);
   });
 
-  it("never abandons a trial whose finalize succeeded, even when the cloud could not evaluate it (F-710)", async () => {
+  it("never abandons a trial whose finalize succeeded, even when the cloud could not evaluate it", async () => {
     const abandonCalls: Array<{ sessionId: string; errorCode?: string }> = [];
     const result = await runDemo({
       apiBase: "https://api.example.com",
@@ -477,7 +477,7 @@ describe("runDemo (FDRS-643)", () => {
     expect(result.exitCode).toBe(1);
   });
 
-  it("never abandons when the crash happens AFTER finalize succeeded (F-710)", async () => {
+  it("never abandons when the crash happens AFTER finalize succeeded", async () => {
     const abandonCalls: Array<{ sessionId: string; errorCode?: string }> = [];
     const result = await runDemo({
       apiBase: "https://api.example.com",
@@ -506,7 +506,7 @@ describe("runDemo (FDRS-643)", () => {
     expect(abandonCalls).toEqual([]);
   });
 
-  it("abandon is best-effort: a failing abandon changes neither exit code nor terminal output (F-710)", async () => {
+  it("abandon is best-effort: a failing abandon changes neither exit code nor terminal output", async () => {
     const outWithFailingAbandon: string[] = [];
     const outBaseline: string[] = [];
     const runOnce = (

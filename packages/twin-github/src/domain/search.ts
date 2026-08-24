@@ -66,7 +66,7 @@ import type { FileChange, MutatingOptions, PageOptions, StateDeltaCallback } fro
 
 
 /**
- * F-1389 — GitHub's search API takes ONE scoping input, `q`, and encodes every
+ * GitHub's search API takes ONE scoping input, `q`, and encodes every
  * filter as a qualifier inside it. Its OpenAPI declares `q, sort, order,
  * per_page, page` and nothing else.
  *
@@ -123,7 +123,7 @@ interface ParsedSearchQuery {
  *
  * So terms AND, and a partial word matches nothing. Both halves matter here and
  * they pull in opposite directions: matching the whole query as one substring
- * (the F-791 defect) answers EMPTY for a query whose terms are all present,
+ * (the defect) answers EMPTY for a query whose terms are all present,
  * while splitting the query and testing each term with `includes` — the fix the
  * ticket prescribed — would answer 607 for `authenticati` and score a call
  * GitHub refuses to serve. A false hit is the worse of the two for a grading
@@ -143,8 +143,8 @@ interface ParsedSearchQuery {
  *
  * Zero on all three: the index emits the compound AND the parts `_` or `-` join.
  * So a bare `coupon` DOES reach a body that only says `apply_coupon`, and the
- * earlier reading made that a false EMPTY — F-791's own class, in a narrower
- * form, introduced by F-791's own fix.
+ * earlier reading made that a false EMPTY — the own class, in a narrower
+ * form, introduced by the own fix.
  *
  * Hence the asymmetry, which is not an accident and must not be "tidied" into one
  * function: a DOCUMENT offers each compound plus its parts, and a QUERY term
@@ -222,8 +222,7 @@ function parseSearchQuery(raw: string, options: { state?: boolean; is?: boolean 
         return lead;
       case "is":
         // GitHub's commonest issue qualifier, and the one whose absence hurt
-        // most: `is:open` left in the free text zeroed EVERY query carrying it
-        // (F-791). Measured 2026-08-21 on `cli/cli`: `is:open` and `state:open`
+        // most: `is:open` left in the free text zeroed EVERY query carrying it. Measured 2026-08-21 on `cli/cli`: `is:open` and `state:open`
         // returned the same 5, and `is:issue` 21 + `is:pr` 16 partitioned the
         // unscoped 37 exactly.
         //
@@ -286,7 +285,7 @@ export function searchUsers(domain: GitHubDomain, input: { query?: string; q?: s
 
 
 /**
- * `owner` / `repo` survive on the DOMAIN signature after F-1389 took them off
+ * `owner` / `repo` survive on the DOMAIN signature after the declaration cut took them off
  * the REST declaration, because the MCP door still declares them on
  * `search_code` and `search_commits`. That door is a separate published surface
  * with its own frozen tool fixture, and it is out of this ticket's scope on the
@@ -360,18 +359,18 @@ export function searchIssues(domain: GitHubDomain, input: { query?: string; q?: 
   filtered = filtered.filter((issue) => inScope(parsed, issue.owner, issue.full_name));
   if (input.owner) filtered = filtered.filter((issue) => issue.owner === input.owner);
   if (input.repo) filtered = filtered.filter((issue) => issue.name === input.repo);
-  // NO `state=open` default here, deliberately (F-1427). The three repo LIST
+  // NO `state=open` default here, deliberately. The three repo LIST
   // surfaces gained one because real GitHub defaults them; GitHub's SEARCH API
   // does not — a search returns what the query asks for, and `state:open` is a
   // query qualifier, not a default. Adding one to match the lists would be a new
   // divergence in the other direction, and a worse one: this search matches
   // tokens over the seeded world rather than ranking it, so any query whose only
   // match is closed would answer `[]` — an empty-array divergence in place of a
-  // value one. (That clause read "substring matching" until F-791 tokenised the
+  // value one. (That clause read "substring matching" until tokenised the
   // term; the argument it makes is unchanged by which of the two it is.)
   //
   // `state:` in `q` is GitHub's own spelling and wins over `input.state`, which
-  // only an MCP caller can still set (F-1389 took `?state=` off the REST
+  // only an MCP caller can still set (`?state=` came off the REST
   // declaration). A request naming both has already contradicted itself; the
   // qualifier is the half GitHub would have read.
   const state = parsed.state ?? (input.state === "all" ? undefined : input.state);

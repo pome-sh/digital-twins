@@ -223,7 +223,7 @@ const BASE = { ...SDK_FILES, ...EXEMPT_FIXTURES, ...cleanTwin("github"), ...clea
   check(
     "case 1: the pass names how many modules it walked, so zero coverage is visible",
     // The twin count tracks EXEMPT_FIXTURES, which has to carry every twin the
-    // real exemption list names — five since F-1385 added twin-linear's.
+    // real exemption list names — five, including twin-linear's.
     /OK — \d+ module\(s\) reachable from \d+ route registrar\(s\) across 5 twins/.test(output),
     output.trim()
   );

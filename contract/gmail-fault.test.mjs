@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-917 black-box case: a Gmail seed with a named `rate-limited` fault throttles
+// Black-box case: a Gmail seed with a named `rate-limited` fault throttles
 // `messages.send` by call count over the real wire. Proves the contract that
 // pome-cloud relies on — the deployed dist, not a library import.
 

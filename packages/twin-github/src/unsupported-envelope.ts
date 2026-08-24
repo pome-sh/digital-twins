@@ -3,7 +3,7 @@
 // Canonical loud-501 "unsupported route" envelope for the GitHub twin.
 //
 // Twin-only metadata (`fidelity`, `supported_surfaces`) lives under the `_twin`
-// namespace, matching twin-slack / twin-stripe (FDRS-431 clean cutover). Kept in
+// namespace, matching twin-slack / twin-stripe (clean cutover). Kept in
 // this dependency-light module — no sqlite, no http, no hono — so the cross-twin
 // this dependency-light module — no sqlite, no http, no hono — so mirror
 // lint scripts can import the real wire shape without booting the app. `app.ts` builds its catch-all body from

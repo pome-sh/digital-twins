@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// F-705 — the no-native-modules gate keeps M2's "zero native deps" true by
-// failing CI when a gyp-marked package enters the production closure. The
-// decision table lives here: prod + gyp marker = offend; install-script
-// without markers (esbuild-shaped) = pass; dev/devOptional (fsevents-shaped)
-// = out of scope; platform-gated optional prod = skipped, missing prod = throw.
+// The no-native-modules gate keeps M2's "zero native deps" true by failing CI when a
+// gyp-marked package enters the production closure.
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -43,7 +40,7 @@ async function makeRoot(pkgs: FixturePkg[]): Promise<string> {
   return root;
 }
 
-describe("no-native-modules gate (F-705)", () => {
+describe("no-native-modules gate", () => {
   it("flags a production package with binding.gyp", async () => {
     const root = await makeRoot([
       { path: "node_modules/native-thing", bindingGyp: true },

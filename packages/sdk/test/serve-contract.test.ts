@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// Engine surfaces required by the frozen runtime contract (F-681 / F-711):
-// healthz implementation+runtime block, per-twin healthz extras, the
-// definition-level auth options, JSON-RPC /s/:sid/mcp, the per-twin 501
-// unsupported envelope, state_delta plumbing, and the serve() boot guard.
+// Engine surfaces required by the frozen runtime contract: healthz
+// implementation+runtime block, per-twin healthz extras, the definition-level auth options.
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -41,7 +38,7 @@ describe("healthz contract shape", () => {
       expect(typeof runtime[key]).toBe("string");
     }
     expect(runtime.package).toBe("@pome-sh/twin-toy");
-    // Default extras keep the pre-F-681 fields.
+    // Default extras keep the legacy fields.
     expect(body.version).toBe("0.1.0");
     expect(body.fidelity).toBe("semantic");
   });
@@ -247,7 +244,7 @@ describe("state_delta plumbing", () => {
 });
 
 describe("serve() boot guard", () => {
-  // F-708: a non-loopback bind with no env-injected secret no longer refuses
+  // A non-loopback bind with no env-injected secret no longer refuses
   // to boot — the engine self-generates a secret and persists it.
   it("self-generates and persists TWIN_AUTH_SECRET on a non-loopback bind", async () => {
     const saved = process.env.TWIN_AUTH_SECRET;

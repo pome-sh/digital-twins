@@ -1,12 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// FDRS-653 — W3 "scenario → task" wire vocabulary behind a tolerant reader.
-//
-// Contract under test:
-//   - Canonical schemas/types use the NEW vocabulary (task_*, code|model).
-//   - Readers accept BOTH old and new keys and normalize to new.
-//   - Nothing a 0.3.0-era artifact contains becomes invalid.
-//   - When both keys are present, the new key wins.
+// The "scenario → task" wire vocabulary behind a tolerant reader.
 import { describe, expect, it } from "vitest";
 import {
   LEGACY_CRITERION_KIND_MAP,
@@ -73,11 +66,7 @@ describe("normalizeTaskVocabKeys", () => {
   });
 
   it("leaves scenario_step_id intact — event rows have PRESERVE semantics, not rename-and-delete", () => {
-    // Regression pin (FDRS-653 review): scenario_step_id must NOT be in
-    // LEGACY_TASK_VOCAB_KEY_MAP. If it were, applying this helper to an
-    // events.jsonl row (e.g. from the FDRS-654 cloud consumer work) would
-    // silently strip the frozen-v1 step linkage. Event-row normalization is
-    // recorderEventSchema/eventSchema's job (preserve + populate task_step_id).
+    // Regression pin: scenario_step_id must NOT be in LEGACY_TASK_VOCAB_KEY_MAP.
     expect(LEGACY_TASK_VOCAB_KEY_MAP).not.toHaveProperty("scenario_step_id");
     const eventLikeRow = {
       scenario_step_id: "step-2",
@@ -101,7 +90,7 @@ describe("criterion kind vocabulary", () => {
     expect(criterionKindSchema.safeParse("D").success).toBe(false);
   });
 
-  it("legacy kind map matches the W3 decision", () => {
+  it("legacy kind map matches the rename decision", () => {
     expect(LEGACY_CRITERION_KIND_MAP).toEqual({ D: "code", P: "model" });
   });
 

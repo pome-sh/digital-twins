@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-300 — REST surface integration tests for the 27 v2 hot-path endpoints.
-// Goes through the real Hono app, asserts HTTP status codes match GitHub
-// expectations, and confirms mutations are persisted in follow-up reads.
+// REST surface integration tests for the 27 v2 hot-path endpoints.
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createGitHubCloneApp } from "../src/twin.js";
@@ -21,7 +19,7 @@ afterAll(() => {
 
 const base = `/s/${TEST_SID}`;
 
-/** F-1460 — `PUT /contents/*` takes base64, the way GitHub's does. */
+/** `PUT /contents/*` takes base64, the way GitHub's does. */
 const b64 = (text: string) => Buffer.from(text, "utf8").toString("base64");
 
 function app() {
@@ -71,7 +69,7 @@ describe("REST / cluster A — branches & files", () => {
     expect(put.status).toBe(201);
     const sha = (put.body as { content: { sha: string } }).content.sha;
     const stale = await jsonReq(a, "DELETE", "/repos/acme/api/contents/del.txt", { message: "drop", sha: "WRONG" }, aliceToken);
-    // F-1491 — measured: real GitHub answers a mismatched `sha` with 409, not 422.
+    // Measured: real GitHub answers a mismatched `sha` with 409, not 422.
     expect(stale.status).toBe(409);
     const removed = await jsonReq(a, "DELETE", "/repos/acme/api/contents/del.txt", { message: "drop", sha }, aliceToken);
     expect(removed.status).toBe(200);
@@ -106,7 +104,7 @@ describe("REST / cluster B — commits & diffs", () => {
     expect(response.body).toMatchObject({ sha: head, stats: expect.any(Object) });
   });
 
-  it("PUT /contents returns 201 on create and 200 on update (FDRS-596)", async () => {
+  it("PUT /contents returns 201 on create and 200 on update", async () => {
     const a = app();
     const create = await jsonReq(a, "PUT", "/repos/acme/api/contents/newfile.ts", { message: "add", content: b64("1\n") });
     expect(create.status).toBe(201);
@@ -170,11 +168,8 @@ describe("REST / cluster C — pull requests deeper", () => {
     expect((response.body as { title: string }).title).toBe("New");
   });
 
-  // FDRS-453 — real GitHub returns the leaner "pull request simple" shape from
-  // the LIST endpoint and the full PullRequest only from the single-PR GET.
-  // The single-PR-only fields are merged / commits / additions / deletions /
-  // changed_files. Lock the list-vs-single shape difference so the twin tracks
-  // GitHub's documented schemas.
+  // Real GitHub returns the leaner "pull request simple" shape from the LIST endpoint
+  // and the full PullRequest only from the single-PR GET.
   const singlePrOnlyFields = ["merged", "commits", "additions", "deletions", "changed_files"] as const;
 
   it("GET /pulls (LIST) omits the single-PR-only fields", async () => {
@@ -207,13 +202,8 @@ describe("REST / cluster C — pull requests deeper", () => {
     expect(item).toMatchObject({ number: n, state: "open", title: "CR", merged: false });
   });
 
-  // F-1178 — GitHub shipped stacked pull requests and added `stack` to BOTH the
-  // `pull-request` and `pull-request-simple` schemas, each `$ref`ing one new
-  // `pull-request-stack` schema (vendored REST description at openapi-spec-mcp
-  // commit f0d07e7, 2026-08-02; absent at a8f0142, 2026-07-31). Its shape is
-  // read from that schema, not guessed from the name: nullable, with a REQUIRED
-  // `base: { ref, sha }` and optional integer `size` / `position` / `id` /
-  // `number`. Both surfaces carry it, so both are asserted here.
+  // GitHub shipped stacked pull requests and added `stack` to BOTH the `pull-request`
+  // and `pull-request-simple` schemas, each `$ref`ing one new `pull-request-stack`.
   type StackJson = { base: { ref: string; sha: string }; size: number; position: number; id: number; number: number };
 
   // Puts one commit on `ref` so a PR opened from it has a diff.

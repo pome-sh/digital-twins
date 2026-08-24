@@ -15,7 +15,7 @@ type QueryParams = Parameters<typeof sdkQuery>[0];
 type HooksConfig = Partial<Record<HookEvent, HookCallbackMatcher[]>>;
 
 /**
- * F-1519 — the positive-evidence marker `scripts/smoke-examples.mjs` classifies
+ * The positive-evidence marker `scripts/smoke-examples.mjs` classifies
  * REACHED-OUTBOUND on, instead of matching the SDK's failure text. This wrapper
  * sits directly around `sdkQuery()`, the exact call whose internal race between
  * stream-parsing and the child process's 'exit' event picks between two error
@@ -31,9 +31,9 @@ export const OUTBOUND_MARKER = "POME_SMOKE_REACHED_OUTBOUND";
 /**
  * Drop-in replacement for `@anthropic-ai/claude-agent-sdk`'s `query()`. The
  * returned async iterator yields every SDK message verbatim while attaching
- * pome's read-only `HookEvent` emitter to every SDK hook event (FDRS-407)
+ * pome's read-only `HookEvent` emitter to every SDK hook event
  * and emitting `ToolUseEvent` / `ToolResultEvent` rows for each tool_use /
- * tool_result content block observed in the message stream (FDRS-408).
+ * tool_result content block observed in the message stream.
  * User-supplied hooks in `params.options.hooks` are preserved — pome's
  * matchers are prepended per event so they fire alongside user callbacks.
  *
@@ -46,9 +46,9 @@ export const OUTBOUND_MARKER = "POME_SMOKE_REACHED_OUTBOUND";
  * override the choice, and the CLI does not error on an unknown id (it silently
  * falls back). To see the model that actually ran, read `model` off the SDK's
  * `system`/`init` message, or the per-turn `message.model` (both flow into the
- * gen_ai spans and `LlmTurnEvent` this wrapper emits). See F-928.
+ * gen_ai spans and `LlmTurnEvent` this wrapper emits).
  *
- * Telemetry runs turn on `includePartialMessages` internally (F-998): the true
+ * Telemetry runs turn on `includePartialMessages` internally: the true
  * per-turn `output_tokens` reaches the SDK only on a `message_delta` stream
  * event. Everything that option adds is filtered back out before it reaches the
  * returned iterator, so the message sequence is exactly what it would have been.
@@ -72,7 +72,7 @@ export function query(params: QueryParams): AsyncGenerator<SDKMessage, void, unk
   // Three read-only stream wrappers, composed innermost-first:
   //   • withToolEvents   — ToolUse/ToolResult/SubagentSpawn rows → signals JSONL
   //   • withTurnUsage    — one LlmTurnEvent per usage-bearing assistant turn
-  //                        (incl. cache tokens) → signals JSONL (F-766)
+  //                        (incl. cache tokens) → signals JSONL
   //   • withGenAiSpans   — gen_ai OTLP spans for the dashboard telemetry panel;
   //                        flushes the exporter on the terminal `result`.
   // The two signals wrappers append to POME_ADAPTER_SIGNALS_PATH and are inert
@@ -81,7 +81,7 @@ export function query(params: QueryParams): AsyncGenerator<SDKMessage, void, unk
     withTurnUsage<SDKMessage>(withToolEvents<SDKMessage>(sdkQuery(prepared))),
   );
 
-  // F-1519 — marks the outbound attempt before anything the wrapped stream can
+  // Marks the outbound attempt before anything the wrapped stream can
   // throw. Wrapping `instrumented` (rather than `sdkQuery(prepared)` directly)
   // keeps the marker outermost-of-the-instrumentation but still fires on the
   // very first pull, since none of withGenAiSpans/withTurnUsage/withToolEvents

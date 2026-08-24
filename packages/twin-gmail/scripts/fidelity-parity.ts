@@ -9,7 +9,7 @@ import {
 import { composeMime, createGmailTwinApp, encodeGmailRaw, gmailToolFixture } from "../src/index.js";
 
 const email = "pome-agent@pome-twin.test";
-// F-1325 — the inventory is bound to the tool-table fixture, not to the code.
+// The inventory is bound to the tool-table fixture, not to the code.
 const launchToolNames: string[] = [...gmailToolFixture.toolNames];
 const rawInventory = JSON.parse(
   readFileSync(join(import.meta.dirname, "..", "fidelity.inventory.json"), "utf8"),

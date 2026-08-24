@@ -7,7 +7,7 @@
 // import-checked against each other.
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1325 — every twin derives its MCP tool table from a fixture.
+// Every twin derives its MCP tool table from a fixture.
 //
 // `twin-slack` served eight tool names that do not exist on Slack for as long
 // as it existed: commit 6abec3c copied them out of an archived reference
@@ -567,7 +567,7 @@ function issues(error: z.ZodError): string {
     .join("; ");
 }
 
-// ── THE TYPE AXIS OF A CONFORMANCE COMPARISON (F-1614) ──────────────────────
+// ── THE TYPE AXIS OF A CONFORMANCE COMPARISON ──────────────────────
 //
 // Each twin's `tool-schema-conformance.ts` compares its validators against the
 // vendor's `inputSchema` from the fixture above. Both of the two that exist

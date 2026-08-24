@@ -117,7 +117,7 @@ export class GitHubDomain {
         for (const label of repoSeed.labels ?? []) {
           this.createLabel(repo, label.name, label.color ?? "ededed", label.description ?? "");
         }
-        // F-1421 — milestones sit beside labels: repository-level, and in
+        // Milestones sit beside labels: repository-level, and in
         // existence before any issue points at one.
         for (const milestone of repoSeed.milestones ?? []) {
           const created = this.createMilestone({
@@ -136,7 +136,7 @@ export class GitHubDomain {
         }
         this.createBranchInternal(repo, repo.default_branch, null);
         const files = repoSeed.files?.filter((file) => (file.branch ?? repo.default_branch) === repo.default_branch) ?? [];
-        // F-1500 — the default branch IS the initial commit, so there is no
+        // The default branch IS the initial commit, so there is no
         // earlier tree for a path to have moved out of. Refusing here rather than
         // letting `commitFiles` fail on a delete of an absent path is what makes
         // the message name the seed field the author got wrong.
@@ -171,7 +171,7 @@ export class GitHubDomain {
             this.bumpEntityCounter(repo.id, to);
           }
           if (issue.state === "closed") this.updateIssue({ owner: repo.owner, repo: repo.name, issue_number: issue.number ?? created.number, state: "closed" });
-          // F-1421 — after the renumber, so a comment lands on the number the
+          // After the renumber, so a comment lands on the number the
           // seed asked for rather than the one `createIssue` handed out.
           for (const comment of issue.comments ?? []) {
             this.seedComment(repo, issue.number ?? created.number, comment);
@@ -220,14 +220,14 @@ export class GitHubDomain {
               });
             }
           }
-          // F-1421 — the PR's conversation timeline. The shared per-repo
+          // The PR's conversation timeline. The shared per-repo
           // `entity_counter` is what lets one table hold both: within a repo a
           // number names an issue or a pull request, never both, so `prNumber`
           // selects this PR's comments and no issue's.
           for (const comment of pull.comments ?? []) {
             this.seedComment(repo, prNumber, comment);
           }
-          // F-1421 — inline review comments, through the write path rather than
+          // Inline review comments, through the write path rather than
           // a raw INSERT: it is what checks that `path` names a file this PR
           // changes, that `line` exists in that file, and that the resolved
           // commit is one of the PR's. A seeded comment that skipped those
@@ -248,12 +248,12 @@ export class GitHubDomain {
               { actor: author }
             );
           }
-          // F-1427 — LAST, after every child is seeded. `seedSchema` has taken
+          // LAST, after every child is seeded. `seedSchema` has taken
           // `pull_requests[].state` since the field was added, but nothing ever
           // applied it: `createPullRequest` hardcodes `'open'` in its INSERT, so
           // a seed asking for a closed PR got an open one and
           // `GET /pulls?state=closed` could not be made non-empty by any seed —
-          // the same shape of invisibility F-1421 fixed for the five entities
+          // the same shape of invisibility fixed for the five entities
           // the seed could not express at all. Ordering is the reason this sits
           // here rather than beside `createPullRequest`: the review and
           // update-branch write paths refuse a non-open PR, so closing first
@@ -263,7 +263,7 @@ export class GitHubDomain {
             this.updatePullRequest({ owner: repo.owner, repo: repo.name, pull_number: prNumber, state: "closed" });
           }
         }
-        // F-1421 — tags and releases last: both name a commit, so every branch
+        // Tags and releases last: both name a commit, so every branch
         // and commit the seed can point them at exists by now. Tags first, so a
         // release naming a seeded tag reuses it instead of minting a second.
         for (const tag of repoSeed.tags ?? []) {
@@ -301,7 +301,7 @@ export class GitHubDomain {
   }
 
   /**
-   * F-1500 — expand a branch's seeded file entries into the commit that produces
+   * Expand a branch's seeded file entries into the commit that produces
    * them, turning each `renamed_from` into what a move actually is: the source
    * path deleted and its content written at the new path, in ONE commit.
    *
@@ -336,14 +336,14 @@ export class GitHubDomain {
   }
 
   /**
-   * F-1421 — plant one conversation comment on an issue or a pull request.
+   * Plant one conversation comment on an issue or a pull request.
    *
    * A direct INSERT, for the same reason the seeded reviews above bypass
    * `createPullRequestReview`: `addIssueComment` stamps `user_login =
    * "pome-agent"` unconditionally, and a seeded world where the agent under
    * test wrote every comment it is being asked to read has nothing to read.
    * The one check the write path does that matters here is kept — the comment
-   * must hang off an issue or a pull request that exists (F-1151).
+   * must hang off an issue or a pull request that exists.
    */
   seedComment(repo: RepoRow, number: number, comment: { body: string; author?: string }) {
     this.requireCommentTarget(repo.id, number);
@@ -386,7 +386,7 @@ export class GitHubDomain {
           files: this.listPullRequestFileRows(repo.id, pull.number),
           reviews: this.listPullRequestReviewRows(repo.id, pull.number),
           review_comments: this.listPullRequestReviewCommentRows(repo.id, pull.number),
-          // F-1151. THREE distinct comment surfaces reach a pull request and this
+          // THREE distinct comment surfaces reach a pull request and this
           // is the third, so the export keeps them apart rather than merging them
           // into one count a predicate could not attribute:
           //   `reviews[].body`     — the prose attached to a review verdict
@@ -886,7 +886,7 @@ export class GitHubDomain {
         raw_url: `https://raw.githubusercontent.com/${repo.full_name}/${commit.sha}/${version.path}`,
         contents_url: `https://api.github.com/repos/${repo.full_name}/contents/${version.path}?ref=${commit.sha}`,
         patch: `@@ ${version.path} @@`,
-        // F-1513 moved the COMPARE surface onto the shared `diffFileRows`; this
+        // The COMPARE surface moved onto the shared `diffFileRows`; this
         // one is still outside it, and for a reason that is not scope. A single
         // commit's change set is read straight out of `file_versions`, whose
         // `status` column has no `renamed` member, so there is no pair of trees
@@ -902,7 +902,7 @@ export class GitHubDomain {
 
 
   computeCompareFiles(repo: RepoRow, base: CommitRow, head: CommitRow): PullRequestFileRow[] {
-    // F-1513 — the trees this surface diffs are built by walking ancestry and
+    // The trees this surface diffs are built by walking ancestry and
     // folding `file_versions`, where the pull surface reads two branch file
     // tables; past that the two answer the same question and now do it with the
     // same code, so a move reads as one `renamed` entry here too. The urls are
@@ -1086,7 +1086,7 @@ export class GitHubDomain {
 
 
   calculatePullFiles(baseRepo: RepoRow, baseRef: string, headRepo: RepoRow, headRef: string): PullRequestFileRow[] {
-    // F-1513 — the rows themselves are `diffFileRows`, shared with
+    // The rows themselves are `diffFileRows`, shared with
     // `computeCompareFiles`. What is local to a pull request is the pair of
     // trees (two BRANCHES, one of which can live in a fork) and the urls, which
     // name the head branch ref because that is what the PR is opened against.
@@ -1123,7 +1123,7 @@ export class GitHubDomain {
     }
   }
 
-  // F-1178 — the `stack` member of GitHub's `pull-request` / `pull-request-simple`
+  // The `stack` member of GitHub's `pull-request` / `pull-request-simple`
   // schemas. GitHub models a stack as its own entity with its own id and number;
   // the twin has no stack table, so it reads a stack off the state that DOES
   // encode one — pull requests linked `base_ref` -> `head_ref`, i.e. a PR whose
@@ -1342,7 +1342,7 @@ export class GitHubDomain {
   }
 
 
-  // F-1151 — what the ISSUE COMMENT endpoints may address.
+  // What the ISSUE COMMENT endpoints may address.
   //
   // Real GitHub models every pull request as an issue and documents
   // `/repos/:o/:r/issues/:number/comments` as the way to comment on a PR's
@@ -1427,7 +1427,7 @@ export class GitHubDomain {
   }
 
 
-  // F-1422 — `PullRequestReviewCommentRow`, not a six-key structural subset of
+  // `PullRequestReviewCommentRow`, not a six-key structural subset of
   // it. The query is `SELECT *` and always was, so the narrow cast described
   // less than the reader was handed and every caller inherited that description
   // as its ceiling: `getPullRequestComments` served exactly the six keys named

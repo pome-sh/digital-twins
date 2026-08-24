@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// What the recorder captures FROM THE REQUEST (F-1125).
+// What the recorder captures FROM THE REQUEST.
 //
 // One module because there are five emission sites — the engine's `handle()`
 // middleware, the JSON-RPC tool dispatch, the failure injector, and two of

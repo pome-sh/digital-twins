@@ -42,7 +42,7 @@ export function filesUpload(domain: SlackDomain,
 ): Record<string, unknown> {
   const workspace = domain.requireWorkspace();
   const acting = domain.resolveActorUser(actor);
-  // F-1389 (SLACK-DECL-IN-003) — `channels` only. The singular `channel`
+  // SLACK-DECL-IN-003 — `channels` only. The singular `channel`
   // fallback that stood here is what made an upload addressed `channel=C123`
   // land in that channel on the twin and in no channel at all on Slack, which
   // documents no singular form on this method. Dropping the fallback as well as
@@ -135,7 +135,7 @@ export function filesList(domain: SlackDomain, args: { channel?: string; user?: 
     // files.list paginates via `paging` (page/pages), not a cursor. Real Slack
     // does NOT return a `response_metadata.next_cursor` envelope on files.list,
     // so the twin omits it rather than emitting an empty-cursor stub that diffs
-    // as a twin-only field (FDRS-473 Kind B).
+    // as a twin-only field (Kind B).
   };
 }
 

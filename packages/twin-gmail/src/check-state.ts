@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// How a declared check READS the exported Gmail mailbox (F-1128).
+// How a declared check READS the exported Gmail mailbox.
 //
 // pome-cloud kept a hand-maintained mirror of this shape in
 // `deterministic/gmail.ts`. That mirror is deleted in the same milestone; this
@@ -40,7 +40,7 @@ import { childStatePath, statePath, type CheckOutcome } from "@pome-sh/sdk/check
 /** A resolver must be able to say WHY it found nothing: the ways of finding
  *  nothing get different verdicts. Same shape and same reason as twin-github's.
  *
- *  F-1197 added the pointers, also twin-github's: `path` is where the resolution
+ * The pointers follow twin-github's: `path` is where the resolution
  *  landed, `searched` is the collection a failed lookup scanned. Both optional on
  *  the missing arm because gmail's commonest refusal is `state_incomplete` — the
  *  collection is absent from the export entirely, so there is nowhere to point
@@ -195,7 +195,7 @@ export function resolveMessage(
  * regardless.
  *
  * ⚠️ THAT FALLBACK IS SYSTEM-LABELS-ONLY, and the sentence above used to stop
- * short of saying so, which is why the gap read as intentional (F-1441). It
+ * short of saying so, which is why the gap read as intentional. It
  * holds when `id === name` — `INBOX`, `UNREAD`, `STARRED`. A USER label's
  * minted id differs from its display name by construction (the default seed
  * ships `{ id: "Label_follow_up", name: "Follow Up" }`), so with `labels`
@@ -206,7 +206,7 @@ export function resolveMessage(
  * indistinguishable from "the label was never applied". **Every caller must
  * decide what an absent or capped `labels` collection means before calling**.
  *
- * THERE ARE THREE CALLERS, not the two F-1441 counted, and the third is in this
+ * THERE ARE THREE CALLERS, not the two first counted, and the third is in this
  * very file:
  *   * `gmail.mailbox-label-count` and `gmail.one-message-per-recipient` in
  *     check-messages.ts REFUSE — `state_incomplete` / `collection_truncated` —
@@ -218,7 +218,7 @@ export function resolveMessage(
  *     the direction is safe — but safe-by-polarity is how this class survives
  *     review, so it is measured rather than assumed. `section-read-sweep.test.ts`
  *     in @pome-sh/checks deletes `labels` from that check's own passing world on
- *     every run and asserts the verdict MOVES; before F-1437 it did not, because
+ * every run and asserts the verdict MOVES; before it did not, because
  *     that world minted the label with `id === name` and the fallback above
  *     answered the join unaided.
  *
@@ -292,7 +292,7 @@ export function resolveLabelByName(
  * the caller decides whether that emptiness is answerable.
  *
  * ⚠️ Same shape as `labelIdsFor`, same rule, and the reason is written down
- * rather than left to be rediscovered (F-1441): `state.messages ?? []` cannot
+ * rather than left to be rediscovered: `state.messages ?? []` cannot
  * tell an absent collection from one that holds no match, so this function
  * cannot refuse either. It is safe TODAY only because its sole caller
  * null-checks `final.messages` first (`check-drafts.ts:63`) — safe-by-caller,

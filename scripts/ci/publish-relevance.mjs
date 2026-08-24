@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1511 — WHICH PUBLISHED ARTIFACTS DOES A SET OF CHANGED FILES MOVE?
+// WHICH PUBLISHED ARTIFACTS DOES A SET OF CHANGED FILES MOVE?
 //
 // One answer, two callers. This table used to live inside
 // `check-version-bump-required.mjs`, where it powered a PR-time demand ("bump
@@ -18,7 +18,7 @@
 //     are still the author's.
 //
 // Both import this file rather than each carrying a copy: a second
-// hand-maintained "which paths matter for which package" is the F-1135 shape —
+// hand-maintained "which paths matter for which package" is the brittle shape —
 // one goes stale while both still look like they are watching, and here the two
 // copies would disagree about whether a release was owed at all.
 //
@@ -47,7 +47,7 @@ function isUnpublishableTestPath(file) {
  * twin-slack's tsconfig.build.json compile `examples/**\/*.ts` into
  * `dist/examples/*.js` (rootDir "."), and `files: ["dist", ...]` names
  * `dist`. The actual load-bearing fact is `private: true` — release.yml
- * (F-1308, F-949, F-1526) publishes cli, adapter-claude-sdk, checks, wire and
+ * publishes cli, adapter-claude-sdk, checks, wire and
  * sandbox-domains, and no twin is any of those. Nothing in this repo currently
  * asserts a twin stays private, so if one were ever unprivated this exemption
  * would need re-checking; today it holds for all five. `@pome-sh/sandbox-domains`
@@ -63,7 +63,7 @@ function isUnpublishableTestPath(file) {
  * any other `src/` module and is publish-relevant if the CLI bundle imports
  * it.
  *
- * F-1455, reproduced by PR #366 (F-1453): a PR touching only
+ * Reproduced by PR #366: a PR touching only
  * packages/twin-stripe/examples/buyer-agent/ was told to bump @pome-sh/cli
  * for a republish that would be byte-identical.
  */
@@ -81,7 +81,7 @@ function isTwinExamplePath(file) {
  * tarballs inline twin SOURCE through tsup, and tsup cannot inline a markdown
  * file.
  *
- * Same shape of over-match as F-1455, one directory over: `packages/twin-` is a
+ * Same shape of over-match, one directory over: `packages/twin-` is a
  * plain prefix, so documentation that cannot change one byte of any published
  * artifact was demanding a `@pome-sh/cli` release — i.e. a republish that would
  * be byte-identical. The usual advice ("if your change doesn't warrant a
@@ -103,7 +103,7 @@ function isTwinTopLevelDocPath(file) {
 /**
  * A twin's own top-level `scripts/` is dev/CI tooling, run via tsx on the `.ts`
  * source. It ships in no tarball, and — as with the two carve-outs above — the
- * load-bearing fact is `private: true`: release.yml (F-1308, F-949, F-1526)
+ * load-bearing fact is `private: true`: release.yml
  * publishes cli, adapter-claude-sdk, checks, wire and sandbox-domains, and no twin
  * is any of those. That is deliberately the ONLY reason claimed here, because the tempting
  * second one is false for four of the five twins: only
@@ -119,10 +119,10 @@ function isTwinTopLevelDocPath(file) {
  * under `cli/src/`, `packages/sandbox-domains/src/` or any twin's own `src/`
  * imports a twin script — so tsup never sees these files.
  *
- * Third instance of the F-1455 over-match, one directory over from the
+ * Third instance of the same over-match, one directory over from the
  * `examples/` and top-level-`.md` carve-outs above: `packages/twin-` is a plain
  * prefix, so editing a validator that CI runs was demanding an `@pome-sh/cli`
- * release — a republish that would be byte-identical. Found on F-1354, which had
+ * release — a republish that would be byte-identical. Found on a PR that had
  * to touch `packages/twin-github/scripts/validate-mcp.ts` to wire that script
  * into CI at all, and "if your change doesn't warrant a release it shouldn't be
  * touching a publish-relevant path" has no answer: a twin's own validator has
@@ -150,11 +150,11 @@ function isTwinScriptPath(file) {
  * from each twin's package `exports`, which resolve into `src/` only, and a
  * Dockerfile is imported by nothing.
  *
- * Fourth instance of the F-1455 over-match, one file over from `examples/`,
+ * Fourth instance of the same over-match, one file over from `examples/`,
  * top-level `.md` and `scripts/`: `packages/twin-` is a plain prefix, so
  * patching a base image demanded BOTH a `@pome-sh/cli` and a
  * `@pome-sh/sandbox-domains` release — two republishes that would each be
- * byte-identical. Found on F-1532, where a fixable base-image CVE had frozen the
+ * byte-identical. Found where a fixable base-image CVE had frozen the
  * twin image publish deterministically and the remedy could only be applied in
  * these five files. "If your change doesn't warrant a release it shouldn't be
  * touching a publish-relevant path" has no answer here either: a twin's
@@ -169,7 +169,7 @@ function isTwinDockerfilePath(file) {
 }
 
 /**
- * F-1511 — a `CHANGELOG.md` is exempt, and this one is NOT the F-1455 shape:
+ * A `CHANGELOG.md` is exempt, and this one is NOT that over-match shape:
  * these bytes really do ship (`packages/checks/package.json` and
  * `packages/twin-linear/package.json` name `CHANGELOG.md` in `files`, and npm
  * packs a root CHANGELOG.md whether or not `files` asks it to). The exemption is
@@ -245,7 +245,7 @@ export const PUBLISHED_PACKAGES = [
     pathPrefixes: ["packages/adapter-claude-sdk/", "packages/wire/"],
   },
   {
-    // The grading vocabulary, published to npmjs for pome-cloud (F-1308).
+    // The grading vocabulary, published to npmjs for pome-cloud.
     //
     // Its publish-relevant paths are the DECLARATION layer of six other
     // packages, because that is what tsup inlines into its tarball: each twin's
@@ -269,7 +269,7 @@ export const PUBLISHED_PACKAGES = [
     pathPatterns: [
       /^packages\/twin-[a-z]+\/src\/(checks|check-[a-z-]+|seed|tape-assertable-tools)\.ts$/,
       /^packages\/sdk\/src\/(checks|check-state-path|check-discrimination|check-redaction|failure-injection)\.ts$/,
-      // The declaration bundler moved out of this package (F-1526) so
+      // The declaration bundler moved out of this package so
       // @pome-sh/sandbox-domains could share it instead of copying ~300 lines. It
       // is still what makes this tarball's `.d.ts` resolvable for a consumer,
       // so it is still publish-relevant here — the move must not quietly drop
@@ -279,13 +279,13 @@ export const PUBLISHED_PACKAGES = [
   },
   {
     // The twin domain layer — the in-process runtime pome-cloud's
-    // `lib/twin-state.ts` boots and a bound check reads (F-1526).
+    // `lib/twin-state.ts` boots and a bound check reads.
     //
     // `@pome-sh/checks` ships the DECLARATIONS, this ships what they read. The
     // two are the two legs of pome-cloud's `checks-package-drift.test.ts`, and
     // the reason they are separate entries on one lane is that both must be cut
     // from the SAME `main` commit: publishing a widened vocabulary whose runtime
-    // could not follow is precisely the wall F-1524 recorded.
+    // could not follow is precisely the wall that blocked the vocabulary widening.
     //
     // Its paths are WHOLE directories where the checks entry above names files,
     // and the difference is not an oversight. A twin's routes, tools and domain
@@ -309,7 +309,7 @@ export const PUBLISHED_PACKAGES = [
     pathPatterns: [/^scripts\/bundle-declarations\.mjs$/],
   },
   {
-    // Published to BOTH registries from one version line (F-949): npmjs for
+    // Published to BOTH registries from one version line: npmjs for
     // pome-cloud's migration off @pome-sh/shared-types, GitHub Packages for its
     // original cross-repo consumers. Its own independent version line and
     // therefore its own independent entry here.
@@ -332,13 +332,13 @@ export const PUBLISHED_PACKAGES = [
     // wire's own `version`. `check:trace-contract` (a required ci.yml gate) is a
     // byte compare, so a version moved without regenerating it reds `main` —
     // "Bumping wire's version also means re-running emit:trace-contract" was a
-    // human instruction from F-1201 until this table replaced it, and a human
+    // human instruction until this table replaced it, and a human
     // instruction is exactly what stops being followed when the version stops
     // being written by a human.
     //
     // `regenerate` runs the REAL emitter rather than patching the one key,
     // because that emitter also enumerates the event union out of zod and
-    // asserts a fixture per kind (F-1201) — a hand-patch would keep the byte
+    // asserts a fixture per kind — a hand-patch would keep the byte
     // compare green while silently dropping that assertion. It is the reason
     // allocate-version.yml has an `npm ci` at all, and it runs only when a
     // package in the plan names one.

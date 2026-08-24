@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1489 — every third-party network call `.github/workflows/**` makes on the
+// Every third-party network call `.github/workflows/**` makes on the
 // publish path must go through one hardened path, and a new one that does not
 // must red CI.
 //
@@ -9,12 +9,12 @@
 // killed the stripe twin-image job twice on 2026-08-12 (#390, #391), and on
 // `main` — where the cosign sign/attest steps do run — the same 503 fails an
 // image publish. The repo already knew the fix (ci.yml's actionlint loop,
-// F-1471) and had it in two hand-copied variants with a third install missing
+// the coverage check) and had it in two hand-copied variants with a third install missing
 // it entirely. A list of "the installs we hardened" is the same shape as the
 // bug: it stays green while a sixth install lands unhardened. So this is a
 // PROPERTY check over the workflow tree.
 //
-// F-1530 widened it from fetches to network calls, because the same shape found
+// It was widened from fetches to network calls, because the same shape found
 // a third instance: with both twin-image.yml fetches hardened, the REGISTRY
 // WRITE standing between them was still a single unretried `docker push`. On
 // 2026-08-14 GHCR answered `unknown blob` after every layer had reported
@@ -25,7 +25,7 @@
 // and this file's test for no property gained, and shapes (a) and (b)
 // are still what most of it does.
 //
-// F-1534 closed the residual this header used to record at the bottom. With (a)
+// The signing leg closed the residual this header used to record at the bottom. With (a)
 // and (c) hardened, `sign-image-digests.sh`'s cosign calls were the last
 // unretried GHCR interaction in that job, and on 2026-08-18 they were the ones
 // that broke: run 32144441622's stripe leg pushed both tags, signed them and
@@ -146,14 +146,14 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 /** The hardened fetch path, relative to the repo root. */
 export const HELPER = "scripts/ci/fetch-pinned-release.sh";
 
-/** The hardened registry-write path, relative to the repo root (F-1530). */
+/** The hardened registry-write path, relative to the repo root. */
 export const PUSH_HELPER = "scripts/ci/push-scanned-image.sh";
 
-/** The hardened sign/attest/verify path, relative to the repo root (F-1534). */
+/** The hardened sign/attest/verify path, relative to the repo root. */
 export const SIGN_HELPER = "scripts/ci/sign-image-digests.sh";
 
 /**
- * The F-1494 pattern is 2 escapable attempts + 1 fatal one. Fewer than three
+ * The retry pattern is 2 escapable attempts + 1 fatal one. Fewer than three
  * means a single transient 5xx can still reach the fatal attempt on its heels;
  * the ticket's own failure was two 503s minutes apart on consecutive PRs.
  */
@@ -162,7 +162,7 @@ export const MIN_ATTEMPTS = 3;
 const FETCH_COMMANDS = /(?:^|[\s(`$])(?:curl|wget|aria2c|gh\s+release\s+download)(?=\s|$)/;
 
 /**
- * Every way a `run:` block commits a manifest to a registry (F-1530). Writes
+ * Every way a `run:` block commits a manifest to a registry. Writes
  * only: `docker pull` and `docker buildx imagetools inspect` are reads, and a
  * read that fails cannot leave a tag behind — `imagetools inspect` is in fact
  * the read this repo's hardened push path and pome-cloud's
@@ -179,7 +179,7 @@ const REGISTRY_WRITE_COMMANDS = [
 ];
 
 /**
- * Every way a `run:` block reaches a registry through cosign (F-1534). ANY
+ * Every way a `run:` block reaches a registry through cosign. ANY
  * subcommand, not a list of the four sign-image-digests.sh runs: `sign` and
  * `attest` write, `verify` and `verify-attestation` read, `copy` writes,
  * `triangulate` reads, and `initialize` pulls the TUF root off a CDN. Every one
@@ -406,14 +406,14 @@ export function findFetchesInScript(script) {
   return findings;
 }
 
-/** Every registry-WRITE invocation in one shell script (F-1530). */
+/** Every registry-WRITE invocation in one shell script. */
 export function findRegistryWritesInScript(script) {
   return shellSegments(script).segments.filter((segment) =>
     REGISTRY_WRITE_COMMANDS.some((command) => command.test(segment)),
   );
 }
 
-/** Every cosign invocation in one shell script (F-1534). */
+/** Every cosign invocation in one shell script. */
 export function findSigningCallsInScript(script) {
   return shellSegments(script).segments.filter((segment) =>
     SIGNING_COMMANDS.some((command) => command.test(segment)),
@@ -456,7 +456,7 @@ export function findUnhardenedRunFetches(root) {
 }
 
 // ---------------------------------------------------------------------------
-// Shape (c): registry writes inside `run:` scripts (F-1530).
+// Shape (c): registry writes inside `run:` scripts.
 // ---------------------------------------------------------------------------
 
 /** `run:` blocks that write to a registry without using the hardened path. */
@@ -476,7 +476,7 @@ export function findUnhardenedRegistryWrites(root) {
         for (const segment of findRegistryWritesInScript(script)) {
           problems.push(
             `${file}:${step.line} (job ${job.name}) writes to a container registry outside ${PUSH_HELPER}: ` +
-              `${segment}. A single \`unknown blob\` from GHCR then fails the leg (F-1530), leaving a commit ` +
+              `${segment}. A single \`unknown blob\` from GHCR then fails the leg, leaving a commit ` +
               "with no image and nothing to re-run it.",
           );
         }
@@ -487,7 +487,7 @@ export function findUnhardenedRegistryWrites(root) {
 }
 
 // ---------------------------------------------------------------------------
-// Shape (d): cosign calls inside `run:` scripts (F-1534).
+// Shape (d): cosign calls inside `run:` scripts.
 // ---------------------------------------------------------------------------
 
 /** `run:` blocks that invoke cosign without using the hardened path. */
@@ -509,7 +509,7 @@ export function findUnhardenedSigningCalls(root) {
             `${file}:${step.line} (job ${job.name}) calls cosign outside ${SIGN_HELPER}: ${segment}. ` +
               "Every cosign subcommand talks to the registry, and this step runs after the image is " +
               "already published — a single `DENIED` from a degraded GHCR then reds the job over a correct, " +
-              "public artifact (F-1534). Reads are in scope here for exactly that reason, unlike shape (c).",
+              "public artifact. Reads are in scope here for exactly that reason, unlike shape (c).",
           );
         }
       }
@@ -610,7 +610,7 @@ export function findTableDefects(table, refs) {
   return problems;
 }
 
-/** One repeated-attempt group, checked against the F-1494 shape. */
+/** One repeated-attempt group, checked against the retry shape. */
 export function checkAttemptGroup(where, repo, attempts) {
   const problems = [];
   const at = (a) => `${where} step ${a.line}`;

@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// F-709 — read side of the F-708 secret contract in `pome twin start`:
-// env-injected TWIN_AUTH_SECRET always wins, else the persisted
-// `.pome-data/<twin>/secret` (POME_TWIN_DATA_DIR overrides the directory)
-// is reused, else a per-boot ephemeral secret. Blank file = absent; a
-// present-but-short secret fails loudly (mirrors the engine's
-// readSecretFile rule — never mint against a weak HS256 key).
+// Read side of the secret contract in `pome twin start`: env-injected TWIN_AUTH_SECRET
+// always wins, else the persisted `.pome-data/<twin>/secret` (POME_TWIN_DATA_DIR.
 
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";

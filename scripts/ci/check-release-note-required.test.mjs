@@ -9,24 +9,24 @@
  *
  * ── The cases inherited from the version-bump gate this file re-scopes ───────
  *
- * The publish-relevance table moved to `publish-relevance.mjs` (F-1511) but did
+ * The publish-relevance table moved to `publish-relevance.mjs` but did
  * not change, and neither did the bugs it has been taught. Each carve-out below
  * is a measured over-match, and every one has the same shape: a plain string
  * prefix matching files that ship in no tarball, so a PR was told to publish a
  * byte-identical artifact.
  *
- *   F-1375  `cli/` matched `cli/test/**` — no package's `files` array names a
+ *   1  `cli/` matched `cli/test/**` — no package's `files` array names a
  *           test directory. Carved out EXCEPT under `examples/`, `assets/` and
  *           `tasks/`, which the CLI's `files` really does publish verbatim.
- *   F-1455  `packages/twin-` matched a twin's own top-level `examples/`
- *           (PR #366 / F-1453). Not because of `files` — twin-github's and
+ *   2  `packages/twin-` matched a twin's own top-level `examples/`
+ *           (PR #366). Not because of `files` — twin-github's and
  *           twin-slack's `dist/examples/` really is packed — but because every
  *           twin is `private: true` and release.yml publishes only cli,
  *           adapter-claude-sdk, checks and wire. Same prefix, one directory
  *           over: a twin's top-level `.md`.
- *   F-1354  Same prefix again: a twin's own top-level `scripts/`, found on the
+ *   3  Same prefix again: a twin's own top-level `scripts/`, found on the
  *           PR whose whole job was wiring such a script into CI.
- *   F-1532  Same prefix, one file over: a twin's own `Dockerfile`. A GHCR image
+ *   4  Same prefix, one file over: a twin's own `Dockerfile`. A GHCR image
  *           is not an npm artifact, so patching a base image was demanding both
  *           a cli and a sandbox-domains release. Found on the PR that had to
  *           edit all five to clear a fixable base-image CVE.
@@ -36,7 +36,7 @@
  * a regex that widened to `.+` would pass every exemption test while quietly
  * stopping the demand for files that really do ship.
  *
- * ── The cases this file adds (F-1511) ───────────────────────────────────────
+ * ── The cases this file adds ────────────────────────────────────────────────
  *
  * The demand inverted: a PR must NOT write the number, and must carry the words.
  * Both directions are asserted, plus the two CHANGELOG properties that used to
@@ -223,7 +223,7 @@ console.log("check-release-note-required.mjs — publish relevance (inherited)")
 }
 
 {
-  // F-1354: a twin's own top-level scripts/ is dev/CI tooling in no tarball.
+  // A twin's own top-level scripts/ is dev/CI tooling in no tarball.
   const r = run({ changes: { "packages/twin-github/scripts/validate-mcp.ts": "// tooling\n" } });
   check("a change confined to a twin's scripts/ needs no entry", r.status === 0, r.out);
 }
@@ -262,7 +262,7 @@ console.log("check-release-note-required.mjs — publish relevance (inherited)")
 }
 
 {
-  // F-1532: a twin's Dockerfile builds its GHCR image, which no tarball carries.
+  // A twin's Dockerfile builds its GHCR image, which no tarball carries.
   // The real case was all five at once, to clear a fixable base-image CVE.
   const r = run({
     changes: {
@@ -491,7 +491,7 @@ console.log("the gate's own surface");
   // really reaches a consumer's tarball out of the relevance table, silently.
   //
   // Written as a property over `PUBLISHED_PACKAGES` rather than against any one
-  // package, because the way it breaks is a NAME. F-1526's package was called
+  // package, because the way it breaks is a NAME. The new package was called
   // `twin-domains` first, which put a published `README.md` (in its `files`) under
   // the `packages/twin-*` top-level-markdown carve-out; renaming it to
   // `sandbox-domains` is what actually fixed that, and the fix is invisible in
@@ -519,7 +519,7 @@ console.log("the gate's own surface");
       isPublishIrrelevantPath("packages/twin-github/scripts/validate-mcp.ts") !== null,
   );
 
-  // The shared declaration bundler moved to scripts/ (F-1526) so sandbox-domains
+  // The shared declaration bundler moved to scripts/ so sandbox-domains
   // could use it instead of copying ~300 lines. Both packages' `.d.ts` are
   // unresolvable for a consumer if it regresses, so it must stay publish-relevant
   // for both — the move must not have quietly dropped it out of the table.

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-778 legacy criterion-marker gate. The [D]/[P] authoring markers were
+// Legacy criterion-marker gate. The [D]/[P] authoring markers were
 // retired in favor of [code]/[model]; this gate fails on any reintroduced
 // legacy marker form ([D], [P], [D:<twin>], [P:<twin>]) anywhere in the repo.
 //

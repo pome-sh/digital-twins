@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Internal helpers for `@pome-sh/sdk/server` (`createApp`/`serve`). Split
-// out of server.ts (F-685) purely for module-size hygiene; everything a twin
+// out of server.ts purely for module-size hygiene; everything a twin
 // may import (TwinBootError, isLoopbackHost) is re-exported from server.ts,
 // which stays the only public entry.
 
@@ -39,7 +39,7 @@ export function isLoopbackHost(value: string): boolean {
 }
 
 /**
- * F-708: self-generate `TWIN_AUTH_SECRET` on first boot. An env-injected
+ * Self-generate `TWIN_AUTH_SECRET` on first boot. An env-injected
  * secret always wins (pome-cloud injects per-tenant secrets — that contract
  * is untouched), and loopback binds keep the dev-fallback path. Otherwise
  * the secret persisted at the compose-era contract location

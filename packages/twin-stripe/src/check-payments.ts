@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // What Stripe's declared checks can assert about PAYMENT INTENTS, CHARGES and
-// EVENTS (F-1127).
+// EVENTS.
 //
 // Two migrate from pome-cloud's `services/evaluators/deterministic/stripe.ts`,
 // where they were hand-written regexes over a cloud-side mirror of the state

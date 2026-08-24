@@ -224,7 +224,7 @@ describe("PaymentIntents — state machine + happy paths", () => {
   });
 
   it("create rejects unknown payment_method_types loudly", async () => {
-    // Card is a supported rail since F-731 (see pi-card.test.ts); anything
+    // Card is a supported rail since (see pi-card.test.ts); anything
     // outside ["crypto"] / ["card"] still fails loudly.
     const app = await createStripeApp();
     const r = await rest(app, "POST", "/v1/payment_intents", {

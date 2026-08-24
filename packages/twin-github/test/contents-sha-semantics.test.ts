@@ -1,71 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// F-1491 — optimistic locking on `PUT` / `DELETE /repos/:owner/:repo/contents/*`.
-//
-// ── THE MEASUREMENT THIS FILE PINS ────────────────────────────────────────
-//
-// Probed live against real GitHub on 2026-08-12, two throwaway private repos,
-// both deleted after. `.context/probe-f1490-f1491.sh` and
-// `.context/probe-sha-detail.sh` are the transcripts.
-//
-// The ticket's title carried 409 as a HYPOTHESIS. It measured true, and it
-// measured true THREE WAYS — a `sha` that is not a sha, a well-formed 40-hex
-// sha that exists nowhere, and the real sha OF A DIFFERENT BLOB all get the
-// same answer, so GitHub does not distinguish "malformed" from "stale":
-//
-//   | request                                    | GitHub answered                 |
-//   |--------------------------------------------|---------------------------------|
-//   | existing path, no `sha`                    | 422 `Invalid request.\n\n"sha"…`|
-//   | existing path, `sha: "deadbeef"`           | **409** `<path> does not match …`|
-//   | existing path, 40-hex sha that exists not  | **409** `<path> does not match …`|
-//   | existing path, real sha of ANOTHER file    | **409** `<path> does not match …`|
-//   | path that does NOT exist, any `sha`        | **201** — `sha` ignored entirely|
-//   | existing path, correct `sha`               | 200 (not 201)                   |
-//   | `branch` that does not exist + wrong `sha` | 404 — branch is checked FIRST   |
-//
-//   422: {"message":"Invalid request.\n\n\"sha\" wasn't supplied.",
-//         "documentation_url":"https://docs.github.com/rest/repos/contents#create-or-update-file-contents",
-//         "status":"422"}
-//   409: {"message":"dir/sub/file.txt does not match deadbeef",
-//         "documentation_url":"https://docs.github.com/rest/repos/contents#create-or-update-file-contents",
-//         "status":"409"}
-//
-// Neither body carries an `errors` array. `DELETE` answers the same two shapes
-// against its own doc anchor (`#delete-a-file`).
-//
-// `status` is a quoted string in the assertions below because F-1490 closed
-// that half globally in `githubError` — 59 of 59 measured GitHub error responses
-// send it quoted, and GitHub's own `basic-error` schema types it `string`. The
-// numbers this file shipped with were the divergence, not the claim.
-//
-// The OTHER half of F-1490 is still open and deliberately not widened here:
-// every envelope this twin builds outside the four sites below carries the
-// generic `https://docs.github.com/rest` where GitHub names the operation
-// (divergence 32). This file pins the operation-specific url because a sha
-// conflict can only come FROM the contents operations, so the throw site knows
-// which one — exactly the subset F-1490 could not generalise.
-//
-// ── WHY THIS DID NOT GO IN `validationFailed` ─────────────────────────────
-//
-// `validationFailed(field, code, value)` yields `Validation Failed` plus a
-// structured `errors` array and is used on 48 call sites. GitHub's OTHER 422s
-// were measured too, and they split cleanly rather than agreeing with either
-// shape:
-//
-//   * a MISSING required body field → `Invalid request.\n\n"<field>" wasn't
-//     supplied.`, no `errors` array. Measured on four unrelated surfaces:
-//     `PUT /contents` (`sha`), `DELETE /contents` (`sha`), `POST /issues`
-//     (`title`), `POST /pulls` (`head`).
-//   * a business rule on an existing model → `Validation Failed` WITH an
-//     `errors` array, which is what this twin already emits. Measured on
-//     `POST /labels` (`{resource:"Label",code:"already_exists",field:"name"}`)
-//     and `POST /pulls` head==base (`{resource:"PullRequest",code:"custom"}`).
-//
-// So the twin's generic shape is RIGHT for the already-exists family and wrong
-// for the missing-field family. Migrating the whole missing-field family is a
-// global change to `githubErrorEnvelope`'s zod branch — it would move
-// `POST /issues` without a title and every other required field — and is not
-// this ticket. The last test in this file is the guard that it did not happen
-// by accident.
+// Optimistic locking on `PUT` / `DELETE /repos/:owner/:repo/contents/*`.
 
 import { describe, expect, it } from "vitest";
 import { createGitHubCloneApp } from "../src/twin.js";
@@ -106,7 +40,7 @@ async function seedFile(app: ReturnType<typeof createGitHubCloneApp>, path: stri
   return (got.body as { sha: string }).sha;
 }
 
-describe("F-1491 — a wrong `sha` on the contents door is a 409, as GitHub answers it", () => {
+describe("a wrong `sha` on the contents door is a 409, as GitHub answers it", () => {
   it("PUT with a `sha` that is not a sha at all", async () => {
     const app = createGitHubCloneApp();
     await seedFile(app, "probe.txt");
@@ -214,7 +148,7 @@ describe("F-1491 — a wrong `sha` on the contents door is a 409, as GitHub answ
     const app = createGitHubCloneApp();
     await seedFile(app, "probe.txt");
 
-    // Plain text on this door (F-1460); only the `sha` semantics are shared.
+    // Plain text on this door; only the `sha` semantics are shared.
     const called = await mcp(app, "create_or_update_file", {
       owner: "acme",
       repo: "api",
@@ -251,7 +185,7 @@ describe("F-1491 — a wrong `sha` on the contents door is a 409, as GitHub answ
   });
 });
 
-describe("F-1491 — a MISSING `sha` is still a 422, but GitHub's 422, not the generic one", () => {
+describe("a MISSING `sha` is still a 422, but GitHub's 422, not the generic one", () => {
   it("PUT on an existing path with no `sha`", async () => {
     const app = createGitHubCloneApp();
     await seedFile(app, "probe.txt");
@@ -318,7 +252,7 @@ describe("F-1491 — a MISSING `sha` is still a 422, but GitHub's 422, not the g
   });
 });
 
-describe("F-1491 — the cases the twin already had right, now guarded", () => {
+describe("the cases the twin already had right, now guarded", () => {
   it("ignores `sha` entirely when the path does not exist — 201, not a conflict", async () => {
     const app = createGitHubCloneApp();
 
@@ -378,14 +312,12 @@ describe("F-1491 — the cases the twin already had right, now guarded", () => {
   });
 });
 
-describe("F-1491 — `validationFailed`'s other 48 call sites did NOT move", () => {
+describe("`validationFailed`'s other 48 call sites did NOT move", () => {
   it("keeps `Validation Failed` + an `errors` array for the already-exists family", async () => {
     const app = createGitHubCloneApp();
 
-    // Measured on real GitHub: `POST /labels` on a name that exists answers
-    // `Validation Failed` WITH `errors: [{resource:"Label",code:"already_exists",
-    // field:"name"}]`. The twin's generic shape is CORRECT here, so the sha fix
-    // must not have leaked into the shared helper.
+    // Measured: `POST /labels` on an existing name answers `Validation Failed`
+    // WITH `errors`. The generic shape is correct here, so the sha fix must not leak.
     const dup = await rest(app, "POST", "/repos/acme/api/labels", { name: "bug", color: "ffffff" });
 
     expect(dup.status).toBe(422);

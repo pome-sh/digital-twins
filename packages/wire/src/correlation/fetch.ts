@@ -3,8 +3,8 @@
 // correlation/fetch — global fetch hook with AsyncLocalStorage gating + host
 // allowlist, framework-agnostic.
 //
-// Locked architecture (FDRS-322 [DECISION] 2026-05-11; moved here unchanged by
-// F-950): replace `globalThis.fetch` once, at adapter-init time. Each outbound
+// Locked architecture ([DECISION] 2026-05-11, moved here unchanged):
+// replace `globalThis.fetch` once, at adapter-init time. Each outbound
 // request reads the current tool_call_id from ALS; if absent — i.e. the call did
 // not originate inside a wrapped tool handler — the wrapper is a transparent
 // passthrough, which is how an agent framework's own traffic (the Anthropic
@@ -22,7 +22,7 @@
 // patch is inert for every request that is not a wrapped tool handler talking to
 // a known twin.
 //
-// FRAMEWORK-AGNOSTIC (F-950): nothing below references any agent SDK. The
+// FRAMEWORK-AGNOSTIC: nothing below references any agent SDK. The
 // framework-specific half is establishing the ALS scope around a tool
 // invocation, which is the adapter's job — see `./context.ts`'s
 // `withCorrelation`.
@@ -32,7 +32,7 @@ import { currentToolCallId } from "./context.js";
 /**
  * The header a pome adapter stamps on outgoing twin requests and every twin's
  * recorder reads back as `TwinHttpEvent.tool_call_id`. Lowercase to match the
- * recorders' contract (FDRS-402) and HTTP header-name convention.
+ * recorders' contract and HTTP header-name convention.
  */
 export const CORRELATION_HEADER = "x-pome-correlation-id";
 

@@ -1,7 +1,7 @@
-// file-size: one declaration per REST surface, 60 of them, and `GMAIL_ROUTE_INPUTS` is the complete set the artifact emitter publishes — splitting the list across files would mean this twin's input surface no longer has a single place to read, which is the second-source-of-truth F-1179 exists to remove. Same reason as twin-github's list.
+// file-size: one declaration per REST surface, 60 of them, and `GMAIL_ROUTE_INPUTS` is the complete set the artifact emitter publishes — splitting the list across files would mean this twin's input surface no longer has a single place to read, which is the second source of truth these declarations exist to remove. Same reason as twin-github's list.
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1179 — every REST input this twin accepts, declared by the schemas that
+// Every REST input this twin accepts, declared by the schemas that
 // validate it.
 //
 // Nothing here describes a handler; `parse()` IS the handler's only view of the
@@ -23,7 +23,7 @@ import {
 } from "@pome-sh/sdk/route-inputs";
 
 /**
- * F-1372 — Gmail refuses a query parameter it does not know, so the strict
+ * Gmail refuses a query parameter it does not know, so the strict
  * default is affirmed here rather than merely inherited.
  *
  * Gmail's REST surface is gRPC transcoded — the 401 it answers an anonymous

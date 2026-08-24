@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// REST routes #1-6 from FDRS-270.
+// REST routes #1-6.
 //
 // Every input each route accepts is declared in ../route-inputs.ts; the body
 // schemas that used to be module-private consts here moved there unchanged.
@@ -38,7 +38,7 @@ export function registerPaymentIntentRoutes(
     return ok(piBody, true, delta);
   });
 
-  // 4b. POST /v1/payment_intents/:id — update (F-731, the retry-with-new-PM step)
+  // 4b. POST /v1/payment_intents/:id — update (the retry-with-new-PM step)
   declaredRoute(router, STRIPE_ROUTES.updatePaymentIntent, recorder, runId, ({ path, body }, c) => {
     const { body: piBody, delta } = domain.updatePaymentIntent(accountId(c), path.id, body);
     return ok(piBody, true, delta);

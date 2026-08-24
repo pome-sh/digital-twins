@@ -8,16 +8,15 @@ import type { TwinDatabase } from "@pome-sh/sdk/db";
 import type { FailureInjectionRule } from "@pome-sh/sdk/failure-injection-rules";
 import type { RecorderEvent } from "@pome-sh/wire";
 
-// The engine's driver wrapper is the only database surface a twin sees
-// (F-681/F-684): prepare/exec/pragma/transaction/close.
+// The engine's driver wrapper is the only database surface a twin sees: prepare/exec/pragma/transaction/close.
 export type TwinStripeDatabase = TwinDatabase;
 
 // ----- Recorder -------------------------------------------------------------
 //
-// RecorderEvent is the canonical wedge surface (FDRS-318). Re-exported from
+// RecorderEvent is the canonical wedge surface. Re-exported from
 // shared-types so this twin can't drift its on-wire event shape from the
 // CLI / cloud parsers. The recorder mechanism lives in the engine since
-// F-684; domain routes only need the `record` sink (the engine's
+// Domain routes only need the `record` sink (the engine's
 // RecorderHandle satisfies it structurally).
 
 export type { RecorderEvent, StateDelta } from "@pome-sh/wire";
@@ -34,7 +33,7 @@ export type StripeFidelity = "semantic" | "unsupported";
 
 // ----- Seed -----------------------------------------------------------------
 
-// Failure injection graduated into the engine (F-684 ruling): the rule
+// Failure injection graduated into the engine: the rule
 // store + middleware are generic twin mechanism; the rule payloads stay in
 // the stripe seed. Re-exported so seed consumers keep one import site.
 export type { FailureInjectionMode, FailureInjectionRule } from "@pome-sh/sdk/failure-injection-rules";
@@ -270,9 +269,9 @@ export type RefundRow = {
   created: number;
 };
 
-// ----- Billing rows (F-734, shape tier) --------------------------------------
+// ----- Billing rows (shape tier) --------------------------------------
 //
-// Products / prices / subscriptions are warm surfaces (ruled F-729):
+// Products / prices / subscriptions are warm surfaces (ruled warm):
 // stored rows served back in Stripe shape, no semantic state machine —
 // no events emitted, no invoices minted, no billing-cycle arithmetic.
 
@@ -320,7 +319,7 @@ export type SubscriptionRow = {
 
 // ----- Bearer session -------------------------------------------------------
 
-// The shape the engine's bearerAuth resolves for stripe: the F-712 hooks
+// The shape the engine's bearerAuth resolves for stripe: the hooks
 // (resolveCredential / providerSession / sessionExtras in twin.ts) all
 // stamp `account_id` + `via` onto the generic engine session.
 export type ResolvedSession = {

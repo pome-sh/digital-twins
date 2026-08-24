@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Billing REST — F-734 (M5 warm surfaces, shape tier per the F-729 ruling).
+// Billing REST (M5 warm surfaces, shape tier per the ruling).
 //
 // Products: POST/GET /v1/products(/:id) · Prices: POST/GET /v1/prices(/:id) ·
 // Subscriptions: POST/GET /v1/subscriptions(/:id), POST/DELETE

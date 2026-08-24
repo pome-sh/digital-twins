@@ -6,7 +6,7 @@
 // The gate exists because a green twins CI shipped a change that could not be
 // LOADED by the runtime pome-cloud reads those files with, so the thing most
 // worth proving is that it goes red on the exact shape that shipped: a tool
-// table importing the `@pome-sh/sdk` ROOT for the F-1325 fixture loader, when
+// table importing the `@pome-sh/sdk` ROOT for the fixture loader, when
 // the root barrel re-exports the `node:sqlite`-backed database module.
 //
 // The rest of the cases guard the ways a gate like this quietly stops working:
@@ -127,7 +127,7 @@ check("1. the fixed shape is green: every tool table on the `/mcp-tool-fixture` 
   expect: "green",
 });
 
-check("2. a tool table importing the sdk ROOT is red (the shape F-1325 shipped)", {
+check("2. a tool table importing the sdk ROOT is red (the shape that shipped)", {
   files: {
     "packages/twin-stripe/src/tools.ts": [
       `import { loadMcpToolFixture } from "@pome-sh/sdk";`,

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The fixture worlds Slack's declarations name (F-1126).
+// The fixture worlds Slack's declarations name.
 //
 // In `src/` rather than `test/` for the same reason twin-github's are:
 // `discriminatingWorlds` is a DECLARED field read from npm by pome-cloud and the

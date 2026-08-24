@@ -18,7 +18,7 @@ export { registerGmailRoutes };
 
 /**
  * Gmail's 401, measured live against `gmail.googleapis.com` on 2026-08-13
- * (F-1497) with `GET /gmail/v1/users/me/profile`, both ways.
+ * with `GET /gmail/v1/users/me/profile`, both ways.
  *
  * Google DISTINGUISHES a bad credential from a missing one, on three leaves at
  * once — `message`, `errors[0].message` and `errors[0].reason` — and this twin
@@ -35,7 +35,7 @@ export { registerGmailRoutes };
  * ⚠️ NO `documentation_url` AND NO TOP-LEVEL `status` — Google sends neither,
  * on either body. The only `status` is the nested gRPC one this twin already
  * sends (`UNAUTHENTICATED`), and that is measured. So the GitHub-shaped leaves
- * F-1497 added to twin-github must not appear here; what F-1497 removed from
+ * twin-github carries must not appear here; what was removed from
  * this twin is the `documentation_url: ""` it was inheriting from the SDK's
  * admin gate on its 403 (see `admin.forbidden` below).
  *
@@ -79,7 +79,7 @@ function unauthorized(kind: UnauthorizedKind = "invalid"): { status: number; bod
  * Gmail's 403, in the shape this twin already renders every other Google error
  * in (`gmailErrorEnvelope` + `googleStatus`, which maps 403 → PERMISSION_DENIED).
  *
- * Declared rather than defaulted (F-1497). `/admin/*` is a twin-only route, so
+ * Declared rather than defaulted. `/admin/*` is a twin-only route, so
  * the gate in `@pome-sh/sdk` used to answer it — and that default was GitHub's
  * envelope, `{message:"Forbidden", documentation_url:""}`, on a Google twin.
  * Google sends neither a bare `message` at the top level nor a

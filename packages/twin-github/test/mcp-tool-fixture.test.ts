@@ -1,13 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1325 — the fixture is the tool table, not a document about it.
-//
-// The derivation is structural (`deriveMcpToolTable` throws on any 1:1
-// mismatch), but "structurally impossible" is a claim worth one round trip:
-// this suite drives the real `tools/list` surface and compares the answer to
-// the fixture field by field. It also re-derives the canonical bytes and
-// re-hashes the raw file from disk, which is the half of the load-time assert
-// a bundled twin cannot make for itself.
+// The fixture is the tool table, not a document about it.
 
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -74,18 +66,13 @@ describe("github MCP tool fixture", () => {
   });
 
   it("declares a substrate that names the capture it projects, and proves it by digest", () => {
-    // Was `twin-code-transcription` until F-1468, when these rows stopped being
-    // ours. The word had to move with them: a reader who saw `transcription`
-    // over GitHub's own descriptions and annotations would go looking for a
-    // capture problem behind a file that no longer has one.
+    // Was `twin-code-transcription` until these rows stopped being ours.
     expect(meta.substrate).toBe("upstream-capture-projection");
     expect(meta.transcription).toBeUndefined();
     expect(meta.liveToolCount).toBe(36);
 
-    // The digest is the claim. `rawFileSha256` proves this file has not been
-    // hand-edited since it was derived; only `projection.sourceRawFileSha256`
-    // proves WHAT it was derived from, and re-pointing the producer at a stale
-    // or hand-edited golden would re-hash clean without it.
+    // The digest is the claim: only `projection.sourceRawFileSha256` proves WHAT
+    // this was derived from — a stale golden would re-hash clean without it.
     const upstreamRaw = readFileSync(
       join(import.meta.dirname, "..", "..", "..", "fixtures", "mcp-tools-list", "github.raw.json"),
       "utf8",
@@ -138,7 +125,7 @@ describe("github MCP tool fixture", () => {
     expect(dropped.search_pull_requests).toMatch(/COVERAGE GAP/);
   });
 
-  // F-1376's arithmetic, pinned where it can be read against the upstream
+  // the arithmetic, pinned where it can be read against the upstream
   // golden in this repo rather than only in pome-cloud's lane.
   it("serves exactly two tools GitHub's captured default surface does not declare", () => {
     const upstream = new Set(
@@ -147,41 +134,21 @@ describe("github MCP tool fixture", () => {
       ) as { liveToolOrder: string[] }).liveToolOrder
     );
     const twinOnly = githubToolFixture.toolNames.filter((name) => !upstream.has(name));
-    // Both are real GitHub tools, served from Default:true toolsets behind the
-    // client-settable X-MCP-Features flags `issues_granular` and
-    // `pull_requests_granular`, and both carry an entry in pome-cloud's
-    // known-divergences/github.mcp.yaml. See docs/github-mcp-twin-only-tools.md.
+    // Both are real GitHub tools behind the `issues_granular` /
+    // `pull_requests_granular` feature flags. See docs/github-mcp-twin-only-tools.md.
     expect(twinOnly).toEqual(["create_issue", "create_pull_request_review"]);
   });
 
-  // F-1325 — the fixture carries the inputSchema the wire serves, and the zod
-  // schemas in tools.ts are what `tools/call` validates against. Nothing keeps
-  // the two together except this.
-  // The NAME half of the old byte-pin, which survives F-1468 unchanged: a tool
-  // in the listing with no handler answers an examinee with a crash, and a
-  // handler with no listing row is unreachable. `deriveMcpToolTable` throws on
-  // either at module load; this is the round trip that proves it did.
+  // The fixture carries the inputSchema the wire serves, and the zod schemas in
+  // tools.ts are what `tools/call` validates against.
   it("declares a validator for every fixture row, and a row for every validator", () => {
     expect(toolArgumentSchemas.map((tool) => tool.name).sort()).toEqual(
       [...githubToolFixture.toolNames].sort()
     );
   });
 
-  // The SCHEMA half is deliberately gone, and this is the note that says so
-  // rather than a deletion a future reader has to reconstruct.
-  //
-  // It used to assert `githubToolInputSchema(declared.schema)` deep-equals the
-  // fixture's `inputSchema`, which held because `regenerate-mcp-tool-fixture.ts`
-  // GENERATED the fixture from those same validators. The bytes are GitHub's
-  // now, carrying prose, annotations and keyword choices no zod schema
-  // projects, so the assertion could only be restored by putting the twin's
-  // schemas back on the wire — which is the defect F-1468 fixed.
-  //
-  // What that pin was buying is real and did not vanish with it: the twin can
-  // now advertise one argument surface and accept another. The property moved
-  // to `test/mcp-argument-surface.test.ts`, which pins the EXACT residue
-  // between GitHub's declared arguments and the validators, so a new gap fails
-  // and the 109 known ones are a list somebody has to edit.
+  // The SCHEMA half is deliberately gone, and this is the note that says so rather
+  // than a deletion a future reader has to reconstruct.
   it("advertises GitHub's schemas, not a projection of its own validators", () => {
     const listIssues = githubToolFixture.tools.find((tool) => tool.name === "list_issues");
     const properties = (listIssues?.inputSchema as { properties?: Record<string, unknown> }).properties ?? {};

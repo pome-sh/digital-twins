@@ -323,7 +323,7 @@ export function openLinearTwinDatabase(
 }
 
 /**
- * Pre-F-1172 agent session states that Linear does not have, and the Linear
+ * Legacy agent session states that Linear does not have, and the Linear
  * member each one becomes. Linear has no cancellation state; `stale` ("no
  * longer progressing") is its closest neighbour.
  */
@@ -343,7 +343,7 @@ export function migrate(db: LinearTwinDatabase): void {
 }
 
 /**
- * F-1176 — carry a pre-`content` `agent_activities` table forward.
+ * Carry a pre-`content` `agent_activities` table forward.
  *
  * Same reasoning as `migrateAgentSessions` below: `CREATE TABLE IF NOT EXISTS`
  * leaves an existing file on its old columns, and dropping `type` / `body`
@@ -387,7 +387,7 @@ function migrateAgentActivities(db: LinearTwinDatabase): void {
 }
 
 /**
- * F-1172 — carry a pre-rename `agent_sessions` table forward.
+ * Carry a pre-rename `agent_sessions` table forward.
  *
  * `CREATE TABLE IF NOT EXISTS` is a no-op on a database that already has the
  * table, so without this an existing `LINEAR_TWIN_DB` file opens clean on the

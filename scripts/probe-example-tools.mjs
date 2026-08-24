@@ -164,7 +164,7 @@ function resolveToken(token, ctx) {
 /**
  * Every `.seed.json` an example ships, sorted for a stable probe order.
  *
- * F-1163: `probe:examples` used to probe only the one seed each manifest entry
+ * `probe:examples` used to probe only the one seed each manifest entry
  * hand-named. `pr-summary-review` ships 3, both viktor examples ship 6 — 13 of
  * 20 seeds across the bundled examples were never probed at all, and a new
  * seed landed uncovered by construction, since nothing read the directory.
@@ -217,7 +217,7 @@ export function discoverExamplesWithSeeds(examplesDir) {
  * The first repo, PR number and issue number a seed carries, for `resolveArgs`
  * to fill probe argument templates with.
  *
- * F-1163: hand-writing six near-identical probe arg sets per viktor example
+ * Hand-writing six near-identical probe arg sets per viktor example
  * (one per seed) is the defect the ticket names, not a workaround for it — a
  * seventh seed would land with no probe arguments and nothing would say so.
  * Reading the subject straight off the seed means a new seed is covered by

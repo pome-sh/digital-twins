@@ -197,7 +197,7 @@ export class StripeDomain {
       };
     }
 
-    // Card rail (F-731): synchronous attempt with real success/decline
+    // Card rail: synchronous attempt with real success/decline
     // semantics. Unlike crypto, re-confirming a settled card PI is refused.
     // Whitelist the two confirmable card states so an off-diagram status
     // (e.g. a seeded card PI in requires_action) can never mint a charge.
@@ -315,7 +315,7 @@ export class StripeDomain {
   }
 
   /**
-   * POST /v1/payment_intents/:id (F-731). The ruled retry-with-new-PM step:
+   * POST /v1/payment_intents/:id. The ruled retry-with-new-PM step:
    * metadata merges per-key, and attaching a PM moves the card PI back to
    * requires_confirmation. PM/customer resolution happens here so unknown
    * ids 404 with Stripe's resource_missing before any state gate fires.
@@ -459,7 +459,7 @@ export class StripeDomain {
    * Create a refund. Returns the serialized API shape plus a canonical
    * `state_delta` so the route can hand both to `respond()`.
    *
-   * F-733: the whole flow — refund INSERT + charges.amount_refunded UPDATE
+   * The whole flow — refund INSERT + charges.amount_refunded UPDATE
    * (inside `refunds.create()`, nested as a savepoint), the negative
    * refund-type balance transaction, the ledger link backfill, and the
    * charge.refunded / refund.created events — commits in one better-sqlite3
@@ -673,9 +673,9 @@ export class StripeDomain {
     return serializedList(rows.map(eventJson), hasMore, limit, "/v1/events");
   }
 
-  // ---------- Billing (F-734, shape tier) ----------
+  // ---------- Billing (shape tier) ----------
   //
-  // Warm surfaces per the F-729 ruling: stored rows served in Stripe shape,
+  // Warm surfaces per the ruling: stored rows served in Stripe shape,
   // deliberately WITHOUT the semantic billing machine — creating a product,
   // price, or subscription emits no events and mints no invoices; the
   // recorder deltas stay truthful to the single-row writes.
@@ -773,7 +773,7 @@ export class StripeDomain {
     return subscriptionJson(row, prices);
   }
 
-  // Invoices are reads-only (F-729 ruling point 2: create/finalize/pay stay
+  // Invoices are reads-only (create/finalize/pay stay
   // unlisted-cold) and nothing in the twin mints one, so the list is always
   // empty and retrieve always 404s — loud, Stripe-shaped, documented.
 
@@ -797,7 +797,7 @@ export class StripeDomain {
    *
    * Ordering is `created DESC, rowid DESC`: `created` has unix-second
    * resolution, so rows minted within the same second tied and flipped
-   * order run-to-run (the F-683 export-race class). The insertion-order
+   * order run-to-run (the export-race class). The insertion-order
    * tiebreak keeps the export deterministic — same seed + same ops =>
    * same state (test/state-export.test.ts).
    */

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// What Stripe's declared checks can assert about REFUNDS in the final state
-// (F-1127).
+// What Stripe's declared checks can assert about REFUNDS in the final state.
 //
 // Both are new, and both replace prose. Task 14 shipped these two lines:
 //
@@ -17,7 +16,7 @@
 //
 // The prediction went with them, and deliberately: it asserted that an
 // `Idempotency-Key` on the retry is what separates one refund row from two, and
-// that is FALSE in this twin as measured (F-1138). Leaving a false causal claim
+// that is FALSE in this twin as measured. Leaving a false causal claim
 // in a criterion is worse than leaving it in prose, because the criterion is
 // what a report quotes back.
 //

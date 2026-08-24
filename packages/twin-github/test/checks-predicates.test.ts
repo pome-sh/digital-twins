@@ -1,21 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1075 — behaviour of the ten checks that replaced the control plane's GitHub
-// regexes. The contract suite next door proves the GRAMMAR properties hold for
-// every declaration; this one proves each predicate answers its own sentence.
-//
-// The fixtures are deliberately shaped like a real `exportState()` rather than
-// like the read-model: SQLite integer booleans, label ROWS where assignees are
-// plain strings, and `state` as a lowercase column. Every one of those is a
-// shape a hand-written fixture gets wrong, and getting it wrong here would make
-// the suite agree with a predicate that disagrees with production.
-//
-// F-1076 — every substrate below carries `tape: null`, and that is the honest
-// value rather than boilerplate: these checks declare `final` or `seed+final`,
-// so the engine hands them no tape and they must never read one. The key is
-// REQUIRED precisely so a call site cannot forget it, because forgetting it
-// would hand a tape check a hole and let a negative criterion pass over a tape
-// nobody read.
+// Behaviour of the ten checks that replaced the control plane's GitHub regexes.
 
 import { parseCheck, renderCheck, type CheckDefinition } from "@pome-sh/sdk/checks";
 import { describe, expect, it } from "vitest";
@@ -295,9 +279,8 @@ describe("github.pr-state", () => {
   });
 });
 
-// F-1151. The properties worth pinning here are the ones the three readings put
-// at risk: this check must count the CONVERSATION timeline and must not be
-// satisfied by either of its neighbours.
+// The properties worth pinning here are the ones the three readings put at risk: this
+// check must count the CONVERSATION timeline and must not be satisfied.
 describe("github.pr-comment-exists", () => {
   const subject = check("github.pr-comment-exists");
   const args = { pr: "1", repo: REPO };
@@ -509,12 +492,7 @@ describe("every check, against a repo that is not in the state", () => {
       // return a named failure so the other criteria still score.
       expect(outcome.passed, `${declared.id} passed against a missing repo`).toBe(false);
       expect(outcome.reason, `${declared.id} failed without naming a reason`).toBeTruthy();
-      // Only a check that SELECTS a repo can name the missing one. F-1076's
-      // tape check selects none — it is handed `tape: null` here and correctly
-      // answers `tape_missing`, which is the D18.5 property above and not a
-      // statement about repositories. `checks-contract.test.ts` is where a
-      // check earns the right to be repo-free, via the `REPO_FREE_CHECKS`
-      // ledger; this loop just declines to ask it the wrong question.
+      // Only a check that SELECTS a repo can name the missing one.
       if (Object.keys(declared.params).includes("repo")) {
         expect(outcome.reason, `${declared.id} did not name the missing repo`).toContain(
           "acme/missing",

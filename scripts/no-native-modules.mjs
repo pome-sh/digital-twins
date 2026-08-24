@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-705 no-native-modules gate. "Zero native deps" (M2) is an invariant, not
+// no-native-modules gate. "Zero native deps" (M2) is an invariant, not
 // an event: no package in the PRODUCTION dependency closure of the published
 // packages may carry a node-gyp build step. Detection is by gyp markers —
 // a `binding.gyp` file or a truthy `gypfile` manifest field — NOT by
@@ -94,7 +94,7 @@ function hasPackagedNodeBinary(pkgDir) {
 // Run as a script (not when imported by the test). Realpath'd on both
 // sides — node resolves symlinks before deriving `import.meta.url`, so a
 // bare `resolve()` of argv[1] misses through a symlinked checkout (a
-// worktree, or macOS's symlinked `/tmp`) in the same silent shape (F-1488),
+// worktree, or macOS's symlinked `/tmp`) in the same silent shape,
 // and a guard miss while invoked as this file throws rather than exits 0.
 const SELF = realpathSync(fileURLToPath(import.meta.url));
 const ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";

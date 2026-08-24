@@ -45,18 +45,18 @@ export const stateDeltaSchema = z
 export type StateDelta = z.infer<typeof stateDeltaSchema>;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Legacy single-shape recorder event (pre-FDRS-398).
+// Legacy single-shape recorder event (legacy).
 //
 // Kept exported as-is for the 58 callers across twin runtimes, SDK, correlator,
 // CLI, and cloud control plane that still emit/consume this shape on disk.
 // Their migration to the unified discriminated-union `eventSchema` below is
-// owned by downstream M0 tickets (FDRS-402 / 403 / 412 / 415 / 417).
+// owned by downstream M0 tickets.
 // `isLegacyEventRow` lets readers detect this shape during the rollout.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Internal plain-object shape. Kept as a `ZodObject` so `twinHttpEventSchema`
 // can `.extend` it and stay a discriminated-union member; the exported
-// `recorderEventSchema` wraps it with the FDRS-653 task-vocab normalization.
+// `recorderEventSchema` wraps it with the task-vocab normalization.
 const recorderEventObjectSchema = z.object({
   ts: z.string().datetime(),
   run_id: z.string().min(1),
@@ -68,7 +68,7 @@ const recorderEventObjectSchema = z.object({
   // the correlator (dynamic grouping: "this event landed in Step stp_xyz").
   // 90% of events use only one; both can coexist.
   //
-  // W3 vocab (FDRS-653): `task_step_id` is canonical; `scenario_step_id` is
+  // Task vocab: `task_step_id` is canonical; `scenario_step_id` is
   // the 0.3.0-era spelling. BOTH stay in the schema for the tolerant-reader
   // window — this row shape is the frozen v1 trace format and its emitters
   // (twin runtimes, shipped CLIs on vendored 0.3.0) still write the old key.
@@ -84,7 +84,7 @@ const recorderEventObjectSchema = z.object({
   method: z.string().min(1),
   path: z.string(),
   request_body: z.unknown(),
-  // F-1125 — the request headers as received, keys lowercased by the runtime.
+  // The request headers as received, keys lowercased by the runtime.
   //
   // Recorded WHOLESALE rather than through an allowlist. An allowlist is a
   // narrowing no downstream consumer can lift and no task author can extend,
@@ -96,14 +96,14 @@ const recorderEventObjectSchema = z.object({
   // by key. Asserted both ways in `packages/sdk/test/redaction.test.ts`: the
   // bearer must not survive, and `x-payment` must.
   //
-  // Optional, not nullable: ABSENT means this row predates F-1125, and a
+  // Optional, not nullable: ABSENT means this row predates the field, and a
   // present-but-empty map would erase that distinction. A required field here
   // would be far worse than a missing one — `twinHttpEventSchema` is the only
   // gate into the cloud's tape and a row that fails it is dropped SILENTLY, so
   // every recording an older CLI wrote would arrive as an empty tape, which for
   // a negative criterion is a free pass.
   request_headers: z.record(z.string(), z.string()).optional(),
-  // F-1125 — the twin ACTION this call invoked, when the twin declares one for
+  // The twin ACTION this call invoked, when the twin declares one for
   // the surface that served it. This is the field that stops a tape check from
   // reverse-engineering a tool name out of an MCP transport path.
   //
@@ -139,7 +139,7 @@ const recorderEventObjectSchema = z.object({
   error: z.string().nullable(),
 });
 
-// FDRS-653 tolerant reader: populate the canonical `task_step_id` from the
+// Tolerant reader: populate the canonical `task_step_id` from the
 // 0.3.0-era `scenario_step_id` when only the old key was written. The old key
 // is preserved as-sent (additive normalization — a re-serialized row still
 // parses under a 0.3.0 reader, which treats both keys as optional).
@@ -152,11 +152,11 @@ function normalizeTaskStepVocab<
   return event;
 }
 
-// F-1200 tolerant reader: populate the canonical `parent_event_id` from the
-// pre-F-1200 `parent_id` when only the old key was written, and settle an
+// Tolerant reader: populate the canonical `parent_event_id` from the
+// legacy `parent_id` when only the old key was written, and settle an
 // absent parent to an explicit `null` so a parsed row never carries
 // `undefined`. The old key is preserved as-sent (additive normalization — a
-// re-serialized row still parses under a pre-F-1200 reader).
+// re-serialized row still parses under a legacy reader).
 //
 // The guard is `=== undefined`, NOT `== null` as the task-step normalizer uses.
 // Here an explicit `parent_event_id: null` is the documented root-of-chain
@@ -178,7 +178,7 @@ function normalizeParentVocab<
     : event;
 }
 
-// F-1200, the HookEvent arm of the same tolerant read. A pre-F-1200 HookEvent
+// The HookEvent arm of the same tolerant read. A legacy HookEvent
 // wrote the SDK's raw `tool_use_id` into `parent_id`, so the generic rule above
 // would copy it into `parent_event_id` and mint a parent edge pointing at a row
 // that does not exist — the exact confusion the vocab split removes. Route it to
@@ -200,7 +200,7 @@ export const recorderEventSchema = recorderEventObjectSchema.transform(normalize
 export type RecorderEvent = z.infer<typeof recorderEventSchema>;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FDRS-398 — unified events.jsonl discriminated-union schema (v1).
+// Unified events.jsonl discriminated-union schema (v1).
 //
 // Hard-cut from the legacy single-shape `RecorderEvent`. The on-disk row is
 // now a tagged union over `kind`. Every variant carries:
@@ -208,7 +208,7 @@ export type RecorderEvent = z.infer<typeof recorderEventSchema>;
 //   - `parent_event_id` — points at the spawning row's `event_id`, or null at
 //                         the root of a parent chain (e.g. the first LLM call
 //                         in a turn).
-//   - `parent_id`       — the pre-F-1200 spelling of the same field. Legacy
+//   - `parent_id`       — the legacy spelling of the same field. Legacy
 //                         INPUT key only; no writer in this repo emits it.
 //   - `kind`            — the discriminator literal (see each schema below)
 //
@@ -216,8 +216,8 @@ export type RecorderEvent = z.infer<typeof recorderEventSchema>;
 //   - PR/FAQ: linear.app/pome-sh/project/agent-trace-v1-af8924d607f0
 //   - Milestone M0 "Universal Floor"
 //   - /plan-eng-review 2026-05-26 amendments:
-//       • Dropped OtelSpanEvent from this frozen v1 union (FDRS-400 cancelled).
-//         It later shipped additively (FDRS-480): the schema + mapper live in
+// • Dropped OtelSpanEvent from this frozen v1 union (cancelled).
+//         It later shipped additively: the schema + mapper live in
 //         `./otel/` and are composed into `otelEventSchema` (= eventSchema ∪
 //         OtelSpanEvent). This v1 union is intentionally left unchanged.
 //       • LlmCallEvent per-call token/model/cost reclassified
@@ -229,14 +229,14 @@ export type RecorderEvent = z.infer<typeof recorderEventSchema>;
 // Common fields on every event variant. Spread (not extend) so the resulting
 // Zod object types stay readable.
 //
-// F-1200 vocab split. `parent_id` used to mean four different things depending
+// Vocab split. `parent_id` used to mean four different things depending
 // on which of five writers produced the row — a spawning `event_id`, a raw SDK
 // `tool_use_id`, a hard null, and a mirror of `parent_span_id`. `parent_event_id`
 // is now the one canonical meaning (the spawning row's `event_id`); the hook
 // writer's raw SDK id lives on `HookEvent.causing_tool_use_id`.
 //
 // BOTH keys stay in the schema, and both are optional, for the same reason
-// `scenario_step_id` does (FDRS-653): every shipped 0.13.0 emitter writes
+// `scenario_step_id` does: every shipped 0.13.0 emitter writes
 // `parent_id`, and this shape is the only gate into the cloud's tape — a row
 // that fails to parse is dropped SILENTLY, so a stored recording arriving as an
 // empty tape would be worse than a duplicated key. The exported readers
@@ -255,7 +255,7 @@ const eventBaseShape = {
 // discriminator + parent-chain fields. `extend` keeps it in lockstep with
 // the RecorderEvent object shape so updates to the underlying HTTP-call shape
 // flow through automatically. NOTE: as a discriminated-union member this stays
-// a plain `ZodObject` — the FDRS-653 task-vocab normalization is applied by
+// a plain `ZodObject` — the task-vocab normalization is applied by
 // the exported `recorderEventSchema` / `eventSchema` readers, not here.
 export const twinHttpEventSchema = recorderEventObjectSchema.extend({
   kind: z.literal("TwinHttpEvent"),
@@ -291,7 +291,7 @@ export const llmCallEventSchema = z.object({
 });
 export type LlmCallEvent = z.infer<typeof llmCallEventSchema>;
 
-// `ToolUseEvent` — emitted by the CAS adapter (FDRS-408) for each tool_use
+// `ToolUseEvent` — emitted by the CAS adapter for each tool_use
 // content block in an `SDKAssistantMessage`. `input` is opaque (already
 // redactor-scrubbed by the writer) so we type it as `unknown`.
 export const toolUseEventSchema = z.object({
@@ -303,7 +303,7 @@ export const toolUseEventSchema = z.object({
 });
 export type ToolUseEvent = z.infer<typeof toolUseEventSchema>;
 
-// `ToolResultEvent` — emitted by the CAS adapter (FDRS-408) for each
+// `ToolResultEvent` — emitted by the CAS adapter for each
 // tool_result content block in a user message. `tool_use_id` matches the
 // originating `ToolUseEvent.tool_use_id`; `parent_event_id` points at
 // that ToolUseEvent's `event_id`.
@@ -316,7 +316,7 @@ export const toolResultEventSchema = z.object({
 });
 export type ToolResultEvent = z.infer<typeof toolResultEventSchema>;
 
-// `SubagentSpawnEvent` — emitted once per sub-agent (FDRS-409), the first
+// `SubagentSpawnEvent` — emitted once per sub-agent, the first
 // time the adapter sees a non-null `parent_tool_use_id` on an
 // `SDKAssistantMessage`.
 export const subagentSpawnEventSchema = z.object({
@@ -327,12 +327,12 @@ export const subagentSpawnEventSchema = z.object({
 export type SubagentSpawnEvent = z.infer<typeof subagentSpawnEventSchema>;
 
 // `HookEvent` — thin audit-trail row written by the adapter for each of the
-// SDK's 25 hook invocations (FDRS-407). `tool_name` is null when the hook
+// SDK's 25 hook invocations. `tool_name` is null when the hook
 // isn't tool-scoped (e.g. SessionStarted, PreCompact, PermissionGranted on a
 // non-tool resource).
-// F-1200: a hook fires *because of* a tool call, but it is not spawned by that
+// A hook fires *because of* a tool call, but it is not spawned by that
 // call's row — the SDK hands the hook a raw `tool_use_id`, and the adapter has
-// no `event_id` for it at hook time. Before F-1200 that raw id was written to
+// no `event_id` for it at hook time. That raw id used to be written to
 // `parent_id`, which is one of the four meanings that field carried. It now has
 // its own name, and a HookEvent's `parent_event_id` is null: the hook is an
 // audit-trail row, not a node in the causal tree.
@@ -345,7 +345,7 @@ export const hookEventSchema = z.object({
 });
 export type HookEvent = z.infer<typeof hookEventSchema>;
 
-// `LlmTurnEvent` — emitted by the CAS adapter (F-766) once per assistant turn
+// `LlmTurnEvent` — emitted by the CAS adapter once per assistant turn
 // that reported usage (same turn detection as the OTLP `withGenAiSpans` lane).
 // Per-turn LLM usage — and specifically the cache-read/cache-creation token
 // counts — is the only capture-side datum that never otherwise reaches
@@ -385,7 +385,7 @@ export type LlmTurnEvent = z.infer<typeof llmTurnEventSchema>;
 
 // The unified event row. Discriminated on `kind` — adding a future variant
 // (e.g. `OtelSpanEvent` in v2) is a non-breaking extension. The exported
-// reader applies the FDRS-653 task-vocab normalization to `TwinHttpEvent`
+// reader applies the task-vocab normalization to `TwinHttpEvent`
 // rows (the only variant carrying the step-expectation key).
 const eventUnionSchema = z.discriminatedUnion("kind", [
   twinHttpEventSchema,
@@ -403,7 +403,7 @@ export const eventSchema = eventUnionSchema.transform((event) => {
 });
 export type Event = z.infer<typeof eventSchema>;
 
-// Detect a pre-FDRS-398 legacy row on disk. A new-shape row always carries a
+// Detect a legacy legacy row on disk. A new-shape row always carries a
 // string `kind` discriminator; a legacy row does not. Non-object inputs
 // (`null`, arrays, primitives) are not event rows at all — return false so
 // the caller surfaces the underlying type error rather than treating them as

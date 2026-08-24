@@ -1,16 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// FDRS-636 — `pome run -n k` group orchestration, unit level.
-//
-// Locked decisions under test:
-//   - all k sessions minted UPFRONT with ONE shared `grp_` + nanoid21 id
-//     stamped on every mint body, and a FRESH idempotency key per mint;
-//   - trials run SEQUENTIALLY against the pre-minted sessions
-//     (runTaskHosted stays the isolation unit, abandonOnFailure on);
-//   - an errored trial renders as an errored row and the remaining trials
-//     continue; errored rows are excluded from the verdict fraction;
-//   - group exit code: 0 iff ≥1 trial completed AND every completed trial
-//     passed; 1 when a completed trial failed; 2 when nothing completed;
-//   - the default hosted client carries a 60s per-request transport timeout.
+// `pome run -n k` group orchestration, unit level.
 
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -61,12 +50,7 @@ interface FakeCloud {
   events: string[];
   mints: Array<{ groupId?: string; idempotencyKey?: string; twins: string[] }>;
   deleted: string[];
-  /** F-983 — the FULL argument list of every deleteSession call. `deleted`
-   *  keeps only the session ids for the existing assertions; this pins the
-   *  `{ discard: true }` opt-in the rollback depends on. Without it a
-   *  refactor could drop the opt-in silently, and once the control plane
-   *  refuses ungraded sessions the rollback would leave the half-group open,
-   *  burning the team's concurrent-twin quota. */
+  /** The FULL argument list of every deleteSession call. */
   deleteCalls: Array<
     [string, boolean | undefined, { discard?: boolean } | undefined]
   >;
@@ -193,12 +177,8 @@ function trialResult(input: {
   exitCode: number;
   durationMs: number;
   failedTexts?: string[];
-  /**
-   * F-925 — the run's three-state verdict. Defaults from `exitCode` so every
-   * existing call site keeps meaning what it meant; pass it explicitly to
-   * simulate a trial that finalized but could not be fully graded, which is
-   * the state `exitCode` alone cannot express.
-   */
+  /** The run's three-state verdict. Defaults from `exitCode` so every existing call
+   *  site keeps meaning what it meant; pass it explicitly to simulate a trial. */
   verdict?: ScoreStatus;
 }): RunTaskHostedResult {
   return {
@@ -218,7 +198,7 @@ beforeEach(() => {
   vi.mocked(createHostedClient).mockClear();
 });
 
-describe("runTrialGroup — upfront minting (FDRS-636)", () => {
+describe("runTrialGroup — upfront minting", () => {
   it("mints all k sessions upfront with one shared grp_ id and fresh idempotency keys, then runs trials sequentially", async () => {
     const taskPath = await scenarioFixture();
     const cloud = makeFakeClient();
@@ -323,11 +303,8 @@ describe("runTrialGroup — upfront minting (FDRS-636)", () => {
     expect(trialsRun).toBe(0);
     expect(cloud.deleted).toEqual(["ses_1", "ses_2"]);
 
-    // F-983 — every rollback delete must OPT IN to discarding, asserted on the
-    // whole argument list rather than just the session id. These sessions were
-    // minted and never launched, so there is no tape to lose; but if the opt-in
-    // were dropped, the control plane's ungraded-session refusal would leave
-    // the half-group open and eat the team's concurrent-twin quota.
+    // Every rollback delete must OPT IN to discarding, asserted on the whole argument
+    // list rather than just the session id.
     expect(cloud.deleteCalls).toEqual([
       ["ses_1", true, { discard: true }],
       ["ses_2", true, { discard: true }],
@@ -335,7 +312,7 @@ describe("runTrialGroup — upfront minting (FDRS-636)", () => {
   });
 });
 
-describe("runTrialGroup — errored trials (FDRS-636)", () => {
+describe("runTrialGroup — errored trials", () => {
   it("an errored trial renders as an errored row, the rest continue, and the fraction excludes it", async () => {
     const taskPath = await scenarioFixture();
     const cloud = makeFakeClient();
@@ -398,9 +375,7 @@ describe("runTrialGroup — errored trials (FDRS-636)", () => {
     expect(result.exitCode).toBe(0);
   });
 
-  // F-925 — the state `exitCode` alone could not express. A trial that
-  // finalized with a criterion that never ran is neither a pass nor the
-  // agent's failure; it leaves the fraction and cannot buy the group a 0.
+  // The state `exitCode` alone could not express.
   it("keeps an ungradable trial out of the fraction and out of a green exit", async () => {
     const taskPath = await scenarioFixture();
     const cloud = makeFakeClient();
@@ -502,12 +477,7 @@ describe("runTrialGroup — errored trials (FDRS-636)", () => {
   });
 });
 
-// FDRS-663 — free-tier `concurrentTwins: 3` vs the k=5 default. Decided cut
-// (option A): bounded/lazy minting inside the group runner — mint ≤ the
-// team's concurrent quota (discovered adaptively from the mint-gate quota
-// error), run trials with that concurrency, and mint the remaining trials'
-// sessions lazily as slots free up. Resolves FDRS-636's deferred "bounded
-// trial parallelism (plan-quota semantics)" thread.
+// Free-tier `concurrentTwins: 3` vs the k=5 default.
 interface QuotaCloud {
   client: HostedClient;
   /** Every createSession attempt, successful or quota-refused. */
@@ -590,7 +560,7 @@ function makeQuotaCloud(input: {
   return cloud;
 }
 
-describe("runTrialGroup — quota-bounded mint + bounded parallelism (FDRS-663)", () => {
+describe("runTrialGroup — quota-bounded mint + bounded parallelism", () => {
   it("a quota error mid-mint bounds the group instead of aborting: k=5 completes at concurrency 3", async () => {
     const taskPath = await scenarioFixture();
     const cloud = makeQuotaCloud({ limit: 3 });
@@ -810,11 +780,8 @@ describe("runTrialGroup — dashboard link + client construction", () => {
     expect(out.join("\n")).toContain("→ https://app.pome.sh/runs/task/scn");
   });
 
-  // FDRS-665 — the handoff link carries the agent by construction: with a
-  // registered slug (written by `pome install` / `pome register agent`,
-  // FDRS-669) the CLI prints /agents/<slug>/tasks/<name>?group=grp_… — the
-  // run set's reliability view, never the agent-less empty state. ?group is
-  // forward-compat: the page honors it in M1.
+  // The handoff link carries the agent by construction: with a registered slug
+  // (written by `pome install` / `pome register agent`) the CLI prints /agents/<slug>/tasks/<name>?group=grp_….
   it("prints /agents/<slug>/tasks/<name>?group=grp_… when the manifest slug resolves", async () => {
     const taskPath = await scenarioFixture();
     identityMock.resolveRunAgentIdentity.mockResolvedValueOnce({

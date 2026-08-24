@@ -1,12 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// Determinism check for the stripe port (F-684, mirroring the F-683 slack
-// state-export check): the same seed plus the same operations must export
-// an equivalent `/_pome/state` — field-for-field — modulo the values the
-// twin intentionally randomizes (Stripe-shaped ids, client secrets, the
-// id-derived 0x deposit address) and wall-clock unix timestamps. A row
-// ordering race, a dropped column, or a leaked non-deterministic field
-// fails the string comparison loudly.
+// Determinism check for the stripe port (mirroring the slack state-export check): the
+// same seed plus the same operations must export an equivalent `/_pome/state`.
 
 import { beforeAll, describe, expect, it } from "vitest";
 import { createStripeApp, rest, type StripeTestApp } from "./_appHelper.js";
@@ -70,7 +64,7 @@ async function runScriptedOps(app: StripeTestApp): Promise<unknown> {
   return state.body;
 }
 
-describe("state export determinism (F-684)", () => {
+describe("state export determinism", () => {
   it("fresh default seed exports the identical state twice", async () => {
     const a = await createStripeApp();
     const b = await createStripeApp();

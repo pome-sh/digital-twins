@@ -1,5 +1,20 @@
 # @pome-sh/sandbox-domains
 
+## 0.2.11 — 2026-08-23
+
+**No consumer-visible change.** Internal tracker ids were removed from source
+comments, JSDoc and test names across the workspace, and the comment blocks
+touched in test files were cut to the claim they document. Prose only: no
+export, schema, tool, route, status code or response body moved.
+
+## 0.2.10 — 2026-08-23
+
+**No consumer-visible change.** Internal tracker ids were removed from comments
+in the shared declaration bundler (`scripts/bundle-declarations.mjs`) and the CI
+gates around it. Comment text only: the bundle's inputs, outputs and export
+surface are unchanged. Listed only because that script sits on a path the next
+release carries.
+
 ## 0.2.9 — 2026-08-23
 
 **No consumer-visible change.** Internal tracker ids were removed from the

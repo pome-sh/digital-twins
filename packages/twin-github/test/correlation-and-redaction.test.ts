@@ -1,12 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// FDRS-402 — recorder middleware must:
-//   1. Read `x-pome-correlation-id` from incoming requests and persist it on
-//      the recorded event as `tool_call_id` AND (for legacy correlator
-//      compatibility) as `correlation_id`.
-//   2. Apply a centralized secret redactor to request_body / response_body
-//      before persisting, so events.jsonl never contains `Authorization`,
-//      `token`, `api_key`, etc. payloads.
+// Recorder middleware must: 1. Read `x-pome-correlation-id` from incoming requests and
+// persist it on the recorded event as `tool_call_id` AND (for legacy.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createGitHubCloneApp } from "../src/twin.js";
 import { createRecorderStore } from "@pome-sh/sdk/server";
@@ -39,7 +33,7 @@ function lastEvent(events: RecorderEvent[]): RecorderEvent {
   return events[events.length - 1]!;
 }
 
-describe("FDRS-402 — x-pome-correlation-id persistence (REST)", () => {
+describe("x-pome-correlation-id persistence (REST)", () => {
   it("persists header as tool_call_id AND correlation_id on a mutating REST call", async () => {
     const { app, recorder } = setupApp();
     const response = await app.request(`${base}/repos/acme/api/issues`, withAuth(token, {
@@ -83,7 +77,7 @@ describe("FDRS-402 — x-pome-correlation-id persistence (REST)", () => {
   });
 });
 
-describe("FDRS-402 — x-pome-correlation-id persistence (MCP JSON-RPC)", () => {
+describe("x-pome-correlation-id persistence (MCP JSON-RPC)", () => {
   it("persists header as tool_call_id AND correlation_id when invoking a tool via MCP", async () => {
     const { app, recorder } = setupApp();
     const response = await app.request(mcp, withAuth(token, {
@@ -110,7 +104,7 @@ describe("FDRS-402 — x-pome-correlation-id persistence (MCP JSON-RPC)", () => 
   });
 });
 
-describe("FDRS-402 — centralized redactor on request_body / response_body", () => {
+describe("centralized redactor on request_body / response_body", () => {
   it("redacts secret-shaped keys in the recorded request_body", async () => {
     const { app, recorder } = setupApp();
     const response = await app.request(`${base}/repos/acme/api/issues`, withAuth(token, {
@@ -124,15 +118,8 @@ describe("FDRS-402 — centralized redactor on request_body / response_body", ()
         nested: { authorization: "Bearer leaked" }
       })
     }));
-    // `token`, `api_key` and `nested` are not declared inputs of
-    // `POST /repos/{owner}/{repo}/issues` — on this twin or on GitHub. F-1179
-    // had the route refuse them with a 422; F-1372 measured GitHub accepting
-    // and discarding an undeclared key, so the issue is created and the three
-    // extra fields go nowhere near the handler.
-    //
-    // Which makes this the case that matters most for the redactor: the body
-    // ships in the trace whether or not the route did anything with it, so a
-    // secret in a field nobody reads is still a secret in the tape.
+    // `token`, `api_key` and `nested` are not declared inputs of `POST
+    // /repos/{owner}/{repo}/issues` — on this twin or on GitHub.
     expect(response.status).toBe(201);
 
     const event = lastEvent(recorder.events());

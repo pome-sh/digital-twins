@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1385 — `extensions`, the fourth member of the GraphQL-over-HTTP request
+// `extensions`, the fourth member of the GraphQL-over-HTTP request
 // envelope, and the only one Linear answers on its own.
 //
 // # What was measured, and what it falsified
 //
-// F-1385 was filed reading Linear's 400 as "automatic persisted queries are
+// Linear's 400 was first read as "automatic persisted queries are
 // switched off" — an unhandled path rather than a contract. A re-measurement
 // of `https://api.linear.app/graphql` on **2026-08-11** falsifies that. Linear
 // runs APQ, in VERIFY-ONLY mode: it checks that `sha256Hash` is the SHA-256 of
@@ -19,7 +19,7 @@
 // That third line is why modelling this needs no persisted-query store. Linear
 // never REGISTERS the pair: a hash-only request answers `PersistedQueryNotFound`
 // even straight after the same hash arrived with its query. So "implement
-// persisted queries", the option F-1385's `[DECISION]` rejected as an order of
+// persisted queries", the option the `[DECISION]` rejected as an order of
 // magnitude more work, is not what upstream has either — there is nothing to
 // store, only a hash to verify.
 //
@@ -44,7 +44,7 @@ import { createHash } from "node:crypto";
 /**
  * The answer Linear gives instead of serving the request, or `null` to serve
  * it. `null` is the ordinary outcome: an envelope with no `extensions`, or one
- * whose persisted-query descriptor Linear is satisfied by.
+ * whose persisted-query descriptor Linear accepts.
  */
 export type PersistedQueryAnswer = { readonly status: number; readonly body: unknown } | null;
 

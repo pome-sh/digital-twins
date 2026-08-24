@@ -1,18 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// Unit tests for the boot-time seed loader `loadSeedFromEnv`. Lives at
-// `packages/twin-stripe/src/seed.ts`; the twin server (`server.ts`)
-// calls it on startup so a cloud spawn that sets `POME_SEED_JSON` boots
-// the Stripe domain from the CLI-supplied scenario seed rather than the
-// hard-coded `defaultSeed()`.
-//
-// FDRS-369: twin-stripe was silently ignoring the env-supplied seed at
-// boot (twin-github had this for FDRS-353, twin-stripe never wired it
-// in), so hosted Stripe scenarios saw an empty world. This test mirrors
-// `packages/twin-github/test/seed-from-env.test.ts` and additionally
-// pins the unwrap contract decided in FDRS-365: twin-stripe peels
-// `body.stripe?.seed ?? body`, so both the canonical wrapped shape
-// (`{ stripe: { seed: {...} } }`) and the flat shape boot the same DB.
+// Unit tests for the boot-time seed loader `loadSeedFromEnv`.
 
 import { describe, expect, it } from "vitest";
 import { defaultSeed, loadSeedFromEnv } from "../src/seed.js";
@@ -91,7 +78,7 @@ describe("loadSeedFromEnv", () => {
     expect(seed.api_keys?.[0]?.key).toBe("sk_test_pome_default");
   });
 
-  it("peels the canonical { stripe: { seed: ... } } wrapped shape (FDRS-365)", () => {
+  it("peels the canonical { stripe: { seed: ... } } wrapped shape", () => {
     const seed = loadSeedFromEnv({
       POME_SEED_JSON: JSON.stringify(SCENARIO_14_SEED_WRAPPED),
     });

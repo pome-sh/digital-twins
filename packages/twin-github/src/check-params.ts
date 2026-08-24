@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The typed slots GitHub's declared checks fill (F-1075).
+// The typed slots GitHub's declared checks fill.
 //
 // These live in the twin, not the sdk, for the same reason the declarations do:
 // the twin owns what a GitHub label name or a GitHub login may look like. The
@@ -13,7 +13,7 @@
 // repair — the sentence should be re-rendered from the check instead.
 
 import { oneOf, type CheckParamType } from "@pome-sh/sdk/checks";
-// From the standalone data module, NOT from `./tools.js` (F-1306): this file is
+// From the standalone data module, NOT from `./tools.js`: this file is
 // in the eager import graph of `@pome-sh/twin-github/checks`, which the CLI
 // loads on every invocation, and `tools.ts` carries ~40 zod tool schemas plus
 // `executeTool`'s domain dispatch. `tools.ts` re-exports the same constant.
@@ -123,7 +123,7 @@ export const commitStatusState = oneOf(
   "success",
 );
 
-// F-1125 — a twin ACTION a tape check may assert was never called.
+// A twin ACTION a tape check may assert was never called.
 //
 // The set is not a matter of taste and it is not this file's to choose: it is
 // `TAPE_ASSERTABLE_TOOLS`, the actions the recorder stamps on BOTH the MCP and

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Does a declared check actually discriminate? (F-1126)
+// Does a declared check actually discriminate?
 //
 // Split from `checks.ts` because it is the other half of the relationship: that
 // file DEFINES the grammar a declaration is written in, this one EXERCISES a

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// withToolEvents (FDRS-408 + FDRS-409)
+// withToolEvents
 //
 // Walks the SDK message stream and emits one `ToolUseEvent` per `tool_use`
 // content block in assistant messages, then one `ToolResultEvent` per
@@ -8,7 +8,7 @@
 // points at the originating ToolUseEvent.event_id so the two halves of the
 // call are durably linked in events.jsonl.
 //
-// Sub-agent attribution (FDRS-409): when the adapter sees a message whose
+// Sub-agent attribution: when the adapter sees a message whose
 // top-level `parent_tool_use_id` is non-null for the first time, it emits
 // one `SubagentSpawnEvent` whose `parent_event_id` points at the spawning
 // `ToolUseEvent.event_id` (looked up via `tool_use_id == parent_tool_use_id`).
@@ -17,7 +17,7 @@
 // under the spawn row instead of leaving them parentless.
 //
 // Step boundaries (the prior `withStepBoundaries` in this file) were removed
-// when FDRS-407 replaced step signals with the SDK's hook-driven `HookEvent`
+// when step signals were replaced with the SDK's hook-driven `HookEvent`
 // rows. The message-stream wrapper here is the surviving pome insertion
 // point in the SDK iterator.
 
@@ -76,7 +76,7 @@ export async function* withToolEvents<T extends WithType>(
     // Partial messages carry a `parent_tool_use_id` of their own, so a subagent
     // stream event would otherwise be enough to mint a SubagentSpawnEvent. This
     // lane reads content blocks, which partial messages do not carry — skipping
-    // them keeps the emitted rows identical whether or not F-998 asked the SDK
+    // them keeps the emitted rows identical whether or not the caller asked the SDK
     // for them.
     if (isPartialMessageArtifact(msg)) {
       yield msg;

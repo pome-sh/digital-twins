@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Billing domain — F-734 (M5 warm surfaces: products, prices, subscriptions).
+// Billing domain (M5 warm surfaces: products, prices, subscriptions).
 //
-// SHAPE TIER by ruling (F-729): these are stored rows served back in Stripe
+// SHAPE TIER by ruling: these are stored rows served back in Stripe
 // shape, deliberately without the semantic billing machine. Concretely:
 // no events are emitted, no invoices are minted, no proration or
 // billing-cycle arithmetic runs, and cancellation is a plain status flip.

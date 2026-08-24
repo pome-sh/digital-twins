@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1329 — mint a one-shot bearer for an OAuth-gated MCP `tools/list` capture.
+// Mint a one-shot bearer for an OAuth-gated MCP `tools/list` capture.
 //
 // ── WHY THIS IS A SCRIPT AND NOT A RUNBOOK ─────────────────────────────────
 //
@@ -18,7 +18,7 @@
 // `scripts/capture-mcp-tools-list.mjs` is deliberately off-cron and CI runs it
 // `--check --offline`, so nothing automated ever reads these tokens. They are
 // one-shot: mint, capture, commit the golden, revoke. Storing one in a secret
-// store would buy nothing and would manufacture F-1104 — a lane that quietly
+// store would buy nothing and would manufacture a lane that quietly
 // stopped running behind a page that kept publishing — because all three vendors
 // issue expiring access tokens.
 //
@@ -74,9 +74,9 @@ const VENDORS = {
     register: "https://mcp.linear.app/register",
     resource: "https://mcp.linear.app/mcp",
     port: 16735,
-    // WAS `"read"`, AND THAT DEFAULT COST A GOLDEN (F-1394). This file's header
+    // WAS `"read"`, AND THAT DEFAULT COST A GOLDEN. This file's header
     // argues there is no safe default because the scopes decide what the
-    // LISTING contains — and then this line quietly supplied one. F-1329 ran
+    // LISTING contains — and then this line quietly supplied one. The capture ran
     // `mint-mcp-capture-token.mjs linear` with no `--scopes`, got a read-only
     // grant, and froze a golden of 36 tools without a single write in it; the
     // fidelity lane then reported six write tools twin-linear serves as tools

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Engine auth (F-681). Spec of record: the F-712 [DECISION] — the engine
+// Engine auth. Spec of record: the [DECISION] — the engine
 // owns the auth *mechanism* (bearer resolution, provider-shaped token
 // verify + minting, JWT verification with expired-vs-invalid
 // classification, the session-id match); each twin declares only its
@@ -34,9 +34,9 @@ export function resolveAuthSecret(): string {
   return secret ?? "dev-only-insecure-secret";
 }
 
-// ─── Provider-shaped tokens (F-712 rows 1 + 10) ─────────────────────────────
+// ─── Provider-shaped tokens ─────────────────────────────
 //
-// Wire shape (frozen, minted by twins + cloud since before F-681):
+// Wire shape (frozen, minted by twins + cloud):
 //   <prefix><base64url(sid)>_<sig22>          (legacy, no expiry)
 //   <prefix><base64url(sid)>_<exp>_<sig22>    (expiring)
 // where sig = hmac-sha256(secret, "<provider>:<sid>[:<exp>]") base64url,
@@ -61,7 +61,7 @@ export interface MintProviderTokenOptions {
 }
 
 /**
- * Mint a provider-shaped token (F-712 row 10: minting lives in the engine;
+ * Mint a provider-shaped token (minting lives in the engine;
  * CLI + cloud mint through it, parameterized by the twin's declared shape).
  */
 export function mintProviderToken(
@@ -102,7 +102,7 @@ export function mintProviderToken(
  * The parse is right-anchored — the signature is always the trailing 22
  * base64url chars, the optional exp is a trailing all-digit segment of the
  * remainder — and the HMAC disambiguates the exp-vs-sid split. This fixes
- * the F-712 appendix bug once: the old per-twin `([^_]+)` regexes broke for
+ * the appendix bug once: the old per-twin `([^_]+)` regexes broke for
  * any sid whose base64url encoding contains `_` (the alphabet includes it).
  */
 export function verifyProviderToken(
@@ -166,7 +166,7 @@ function safeEqual(a: string, b: string) {
   return ab.length === bb.length && timingSafeEqual(ab, bb);
 }
 
-// ─── Bearer middleware (F-712 rows 2–9) ─────────────────────────────────────
+// ─── Bearer middleware ─────────────────────────────────────
 
 /** Why a request failed auth; rendered by the twin's `unauthorized` hook. */
 export type UnauthorizedKind = "no_token" | "invalid" | "expired";
@@ -176,7 +176,7 @@ export interface AuthEnvelope {
   body: unknown;
 }
 
-/** Extra token location (F-712 row 3). Returns the token or undefined. */
+/** Extra token location. Returns the token or undefined. */
 export type TokenResolver = (
   c: Context
 ) => string | undefined | Promise<string | undefined>;
@@ -254,7 +254,7 @@ export interface BearerAuthOptions {
 /**
  * The engine's last-resort 401 bodies, for a twin that declares neither hook.
  *
- * ⚠️ THESE CARRY NO VENDOR-SPECIFIC KEY, AND THAT IS THE POINT (F-1497). They
+ * ⚠️ THESE CARRY NO VENDOR-SPECIFIC KEY, AND THAT IS THE POINT. They
  * used to send `documentation_url: ""` — GitHub's key, with a value GitHub
  * never sends — which is a claim about a vendor this module cannot know. All
  * five vendors were probed live on 2026-08-13 with a deliberately invalid
@@ -397,7 +397,7 @@ export function bearerAuth(options: BearerAuthOptions = {}): MiddlewareHandler {
 
 /**
  * Admin endpoint protection. Thin wrapper over the shared admin-gate module
- * (FDRS-587 / FDRS-616) using the default error envelope.
+ * using the default error envelope.
  */
 export function requireAdminAuth(): MiddlewareHandler {
   return createAdminGate();

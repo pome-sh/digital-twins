@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Regression coverage for scripts/ci/list-scheduled-workflows.mjs (F-1230).
+// Regression coverage for scripts/ci/list-scheduled-workflows.mjs.
 // Builds a scratch .github/workflows tree so the assertions do not depend on
 // which workflows this repo happens to carry today.
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";

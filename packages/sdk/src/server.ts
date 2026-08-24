@@ -64,7 +64,7 @@ export {
   toTwinHttpEventRow,
   POME_RECORDER_EVENTS_PATH,
 } from "./recorder.js";
-// F-1125 — twins that build their own recorder events (stripe's respond
+// Twins that build their own recorder events (stripe's respond
 // helpers, its dedupe replay, and the x402 gate) must capture headers the same
 // way the engine does. Re-exported so there is ONE answer to "which headers get
 // recorded" rather than one per emission site.
@@ -187,7 +187,7 @@ export function createApp<TDb, TSeed, TDomain>(
   const root = new Hono();
 
   // Contract core: {ok, twin, implementation, tools, runtime}. Extras
-  // default to the pre-F-681 fields; a twin with a frozen healthz shape
+  // default to the legacy fields; a twin with a frozen healthz shape
   // supplies its own (possibly empty) extras via `definition.healthz`.
   const healthzExtras =
     definition.healthz ??
@@ -209,7 +209,7 @@ export function createApp<TDb, TSeed, TDomain>(
   const readBody = definition.bodyReader ?? ((c: Context) => readJson(c.req.raw));
 
   // 7. Admin sub-app. Gate mechanism is the engine's; a twin with a frozen
-  //    403 body declares it via `admin.forbidden` (F-683).
+  //    403 body declares it via `admin.forbidden`.
   const adminForbidden = definition.admin?.forbidden;
   const adminApp = new Hono();
   adminApp.use(
@@ -274,7 +274,7 @@ export function createApp<TDb, TSeed, TDomain>(
   root.route("/admin", adminApp);
 
   // 8. Session sub-app. Auth mechanism is the engine's; the twin's declared
-  //    shape (F-712) rides in via `definition.auth`.
+  //    shape rides in via `definition.auth`.
   const session = new Hono();
   session.use("*", bearerAuth(definition.auth));
 
@@ -304,7 +304,7 @@ export function createApp<TDb, TSeed, TDomain>(
     })
   );
   // NOT recorder-wrapped: no pre-port twin recorded /_pome/state fetches on
-  // the tape (F-683 review pin) — the export is a read-side probe, and
+  // the tape (review pin) — the export is a read-side probe, and
   // recording it would embed the full state as an event response_body.
   session.get("/_pome/state", async (c: Context) => {
     try {
@@ -324,7 +324,7 @@ export function createApp<TDb, TSeed, TDomain>(
   session.get("/_pome/events", (c) => c.json(recorder.events()));
 
   // 8b. Extra per-twin `/_pome/*` routes (github's frozen
-  //     GET /s/:sid/_pome/access-control, F-682). Registered after the core
+  //     GET /s/:sid/_pome/access-control). Registered after the core
   //     routes so the platform surface can never be shadowed; core names are
   //     rejected outright at boot.
   if (definition.pomeRoutes) {
@@ -358,7 +358,7 @@ export function createApp<TDb, TSeed, TDomain>(
     "/mcp/tools/:name",
     recorder.handle({ mutation: false }, async (c) => {
       const name = c.req.param("name") ?? "";
-      // F-1125 — stamp before `findTool`, which throws on an unknown name. An
+      // Stamp before `findTool`, which throws on an unknown name. An
       // attempt that named a forbidden action still has to appear on the tape.
       if (name) setRecordedTool(c, name);
       const tool = findTool(definition, name);
@@ -399,7 +399,7 @@ export function createApp<TDb, TSeed, TDomain>(
           .object({ tool: z.string().min(1), arguments: jsonRecord.default({}) })
           .parse(raw) as { tool: string; arguments: Record<string, unknown> };
       }
-      // F-1125 — same as `/mcp/tools/:name`: stamp the name the caller sent
+      // Same as `/mcp/tools/:name`: stamp the name the caller sent
       // before the lookup that can reject it.
       setRecordedTool(c, call.tool);
       const tool = findTool(definition, call.tool);
@@ -441,7 +441,7 @@ export function createApp<TDb, TSeed, TDomain>(
 
   root.route("/s/:sid", session);
 
-  // 11b. SDK-compat root mount (stripe F3, F-684): the same session router
+  // 11b. SDK-compat root mount (stripe F3): the same session router
   //      answers at the root path. Root /healthz + /admin/* were registered
   //      first and stay first-match; unknown root paths hit the twin's auth
   //      wall (bearerAuth answers 401 before the 501 catch-all). Pair with
@@ -466,7 +466,7 @@ export interface ServeResult {
   app: Hono;
   /**
    * Stop the bound HTTP server (if any), then flush+close the recorder store
-   * so durable tapes drain before process exit (F-698).
+   * so durable tapes drain before process exit.
    */
   close(): Promise<void>;
 }
@@ -481,7 +481,7 @@ export async function serve<TDb, TSeed, TDomain>(
 ): Promise<ServeResult> {
   const hostname = options.hostname ?? "127.0.0.1";
   // Contract boot guard: a twin must never serve real traffic with the dev
-  // fallback secret. Since F-708 a non-loopback bind with no env-injected
+  // fallback secret. A non-loopback bind with no env-injected
   // secret self-generates + persists one instead of refusing to boot; a
   // failed generation still throws before the app is built, so the process
   // exits non-zero without ever listening.

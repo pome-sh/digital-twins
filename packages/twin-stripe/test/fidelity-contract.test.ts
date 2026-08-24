@@ -1,11 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// Fidelity contract (F-730): the structured inventory is the hub — it must
-// match the live tool list exactly, and the FIDELITY.md tables must match
-// the inventory 1:1 (tier included). The old matrix-only check missed the
-// refunds chain shipping without docs; that gap is now declared as
-// doc_drift in fidelity.inventory.json (reconciliation owned by F-733) and
-// this test fails the moment the declaration goes stale.
+// Fidelity contract: the structured inventory is the hub — it must match the live tool
+// list exactly, and the FIDELITY.md tables must match the inventory.
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -57,27 +52,10 @@ describe("Stripe fidelity contract", () => {
   });
 });
 
-// ── F-1127 ──────────────────────────────────────────────────────────────────
+// ── idempotency reconciliation ───────────────────────────────────────────────
 describe("state-shape parity", () => {
-  // `check-state.ts` is a hand-written reader of what `exportState()` produces,
-  // and pome-cloud deletes its own mirror of that shape in the same milestone —
-  // so from here on this model is the only one, and nothing but this arm makes
-  // it agree with the export.
-  //
-  // The parity harness's three rings (live tool list, fidelity.inventory.json,
-  // scenario coverage) are all about the TOOL surface. This is the arm that was
-  // missing, and its absence is why the cloud's copy could drift for a milestone
-  // with nothing to notice. It lives in the file that already runs rather than
-  // in a new gate — A3's instruction: reuse the parity harness, do not build a
-  // second drift gate.
-  //
-  // Stripe's export does NOT spread SQLite rows the way Slack's does: every
-  // collection goes through `serializers.ts` first, so what a check reads is the
-  // Stripe WIRE object and the join fields lose their `_id` suffix
-  // (`refunds.charge_id` → `refund.charge`). A model written against the seed
-  // schema would carry the row names and silently match nothing, which for a
-  // positive criterion means failing a correct agent. That renaming is what this
-  // arm exists to pin.
+  // Stripe's export runs every collection through `serializers.ts`, so a check
+  // reads the WIRE object and join fields lose `_id`. This arm pins that renaming.
   const settledAndRefunded = (): Record<string, unknown> => {
     const db = openTwinStripeDatabase(":memory:");
     applySeed(

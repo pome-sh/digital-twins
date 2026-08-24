@@ -1,24 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// F-1138 — `after_handler` failure injection must not eat the Idempotency-Key
-// record.
-//
-// The mode models "the server processed it, but response delivery to the client
-// failed." Real Stripe writes the idempotency record server-side in exactly
-// that situation, which is the entire reason the header exists: a retry replays
-// rather than re-executing. The twin used to persist the refund and drop the
-// key — the half of the failure that hurts and none of the half that protects —
-// so an agent doing the textbook-correct thing still over-refunded, and task 14
-// failed it for a reason that was the twin's rather than the agent's.
-//
-// The measurement in the last describe is the probe F-1127 used while grading
-// the stripe corpus, promoted out of that branch's design doc into the test
-// tree. The seed mirrors `cli/tasks/14-stripe-refund-retry.md` verbatim with one
-// deliberate edit: every `account_id` is retargeted at the harness session's
-// account, because the JWT resolves to `acct_test-session` and a mismatch reads
-// as an empty `/_pome/state` rather than as an error. Reaching into `cli/tasks/`
-// from here would invert the dependency, so the seed is mirrored and this
-// comment is the pin.
+// `after_handler` failure injection must not eat the Idempotency-Key record.
 
 import { describe, expect, it } from "vitest";
 import {
@@ -125,7 +106,7 @@ async function refundPostEvents(app: StripeTestApp) {
   );
 }
 
-describe("F-1138 — after_handler keeps the Idempotency-Key record", () => {
+describe("after_handler keeps the Idempotency-Key record", () => {
   it("writes one idempotency row carrying the handler's real 200, not the injected 402", async () => {
     const app = await createStripeApp();
     await seedTask14(app);
@@ -202,7 +183,7 @@ describe("F-1138 — after_handler keeps the Idempotency-Key record", () => {
   });
 });
 
-describe("F-1138 — the properties the fix had to keep", () => {
+describe("the properties the fix had to keep", () => {
   // The ordering comment in twin.ts: injection runs OUTSIDE idempotency so a
   // configured `before_handler` failure is produced where the cache cannot see
   // it. Caching it would replay the synthetic 4xx forever.
@@ -246,12 +227,8 @@ describe("F-1138 — the properties the fix had to keep", () => {
   });
 });
 
-// The five archetypes F-1127 measured against task 14's real seed. The table is
-// the point: the criterion `The number of refunds on charge "ch_test_200" is 1`
-// must separate an agent that protects the retry from one that does not, and
-// before F-1138 the CAREFUL row read 2 — identical to CARELESS, which made the
-// header decorative.
-describe("F-1138 — task 14 criterion discrimination", () => {
+// The five archetypes measured against task 14's real seed.
+describe("task 14 criterion discrimination", () => {
   it("NULL: an agent that does nothing leaves zero refunds", async () => {
     const app = await createStripeApp();
     await seedTask14(app);
