@@ -55,8 +55,9 @@ describe("golden scenario — support-triage, known-correct vs known-wrong", () 
     const graded = correct.criteria.map((row) => row.checkId).sort();
 
     expect(correct.criteria).toHaveLength(declared.length);
-    // Names the missing/extra row directly. This is the line that redded when The
-    // positive tape assertion sits on this task, and adding one entry to `SUPPORT_TRIAGE_BREAKDOWN`.
+    // Names the missing/extra row directly. This is the line that redded when the
+    // positive tape assertion landed on this task; adding one entry to
+    // `SUPPORT_TRIAGE_BREAKDOWN` was the whole integration.
     expect(graded).toEqual(expected);
     expect(wrong.criteria.map((row) => row.checkId).sort()).toEqual(expected);
   });
@@ -107,10 +108,27 @@ describe("golden scenario — support-triage, known-correct vs known-wrong", () 
     expect([correct.satisfaction, wrong.satisfaction]).toEqual([100, 0]);
   });
 
-  it("runs no [model] criterion and no model — the gate is deterministic and free", () => {
-    // The task declares ONE `[model]` criterion.
-    expect(correct.modelCriteria).toBe(1);
-    expect(wrong.modelCriteria).toBe(1);
+  it("declares ZERO [model] criteria — this task's verdict has no judge in it", () => {
+    // Pinned at zero, and this is the strongest single assertion in the file.
+    //
+    // The count went 2 → 1 → 0. The first went when the positive tape assertion
+    // landed: a MODEL was being asked whether the agent had commented at all,
+    // which the tape answers deterministically. The last one asked whether the comment carried the
+    // customer's repro — and it was removed because it never discriminated. It
+    // passed on all 25 measured trials spanning both arms and three models,
+    // INCLUDING runs that commented on the wrong issue, because its sentence
+    // never named which issue the report had to be on. A free assertion, in
+    // AutomationBench's sense, worth 20 points to every failing run.
+    //
+    // Zero is now a PROPERTY of this task and not an accident of the golden
+    // harness: `support-triage` is the quickstart, every point it reports comes
+    // from twin state or the recorded tape, and a judge re-entering here would
+    // put grader variance back on the pass/fail boundary of the one lesson a
+    // stranger walks first. Adding a `[model]` criterion to this task reds this
+    // line, deliberately — argue it in the PR, do not relax it.
+    expect(correct.modelCriteria).toBe(0);
+    expect(wrong.modelCriteria).toBe(0);
+    expect(nothing.modelCriteria).toBe(0);
   });
 
   // The Done-when, measured on the real task rather than on a hand-built tape: an
@@ -118,6 +136,8 @@ describe("golden scenario — support-triage, known-correct vs known-wrong", () 
   it("THE NULL AGENT — doing nothing clears the prohibition and fails the tape criterion", () => {
     expect(breakdownOf(nothing)).toEqual({
       "github.no-new-issues": "passed",
+      "slack.no-message-containing": "passed",
+      "github.issue-comment-contains": "failed",
       "github.tool-was-called": "failed",
       "slack.message-contains": "failed",
     });
@@ -131,19 +151,44 @@ describe("golden scenario — support-triage, known-correct vs known-wrong", () 
       "0 call(s) inspected",
     );
 
-    // And it does not clear the exam. Pinned rather than compared: 33 is
-    // 1-of-3, so this also records that the criterion is IN the denominator.
-    expect(nothing.satisfaction).toBe(33);
+    // And it does not clear the exam. Pinned rather than compared: 40 is
+    // 2-of-5, so this also records that the criteria are IN the denominator.
+    //
+    // 40 IS NOT THE NUMBER A HOSTED RUN REPORTS FOR A NULL AGENT, and neither
+    // side is wrong. This harness scores `passed / (passed + failed)` flat —
+    // eleven lines of ratio arithmetic that exist to make the assertions above
+    // expressible, as the header of `goldenRun.ts` says at length. The product's
+    // engine lives in pome-cloud and excludes seed-true criteria: a criterion
+    // true in the seed AND still true at finish leaves the denominator entirely. Both
+    // negatives here are seed-true, so hosted grades a do-nothing agent 0-of-3
+    // and reports 0. Do not "fix" either number into the other; the two graders
+    // answer different questions and only the pass/fail below is common to them.
+    expect(nothing.satisfaction).toBe(40);
     expect(nothing.satisfaction).toBeLessThan(nothing.passThreshold);
     expect(nothing.tape.tools).toEqual([]);
   });
 
-  // A criterion reads this tape now, and the assertion stays because it is the one
-  // that says WHY the verdict above is what it is.
+  // A criterion reads this tape now, and the assertion stays because it is the
+  // one that says WHY the verdict above is what it is. `tool-was-called`
+  // reports only passed/failed; these four lines are where a reader sees that the
+  // correct run's pass rests on a stamped `add_issue_comment` and the wrong run's
+  // failure on a tape that names `create_issue` in its place — the difference
+  // between a discriminating pair and a coincidence.
+  //
+  // Both tapes open with `list_issues`, and that shared row is doing work: it
+  // says the pair differs in what the agent DID with what it found, not in
+  // whether it bothered to look. A wrong fixture that skipped the search would
+  // let a reader explain the whole verdict as "one of them was lazy".
+  //
+  // It also keeps the substrate honest in the direction that fails silently: a
+  // tape with no `tool` on any row makes `github.tool-was-called` answer
+  // `tool_not_recorded` and SKIP, which would quietly drop the criterion out of
+  // the denominator rather than fail anyone. The no-skip arm above catches that;
+  // this one names the cause.
   it("captures a per-twin tape with stamped tool names, which the tape criterion reads", () => {
     expect(correct.tape.byTwin).toEqual({ github: 2, slack: 1 });
     expect(correct.tape.tools).toEqual(["add_issue_comment", "list_issues", "slack_send_message"]);
-    expect(wrong.tape.byTwin).toEqual({ github: 1, slack: 1 });
-    expect(wrong.tape.tools).toEqual(["create_issue", "slack_send_message"]);
+    expect(wrong.tape.byTwin).toEqual({ github: 2, slack: 1 });
+    expect(wrong.tape.tools).toEqual(["create_issue", "list_issues", "slack_send_message"]);
   });
 });

@@ -1,9 +1,14 @@
 # support-triage-v2 — FIXED.
-# Byte-identical to support-triage-v1 EXCEPT the one line below (the search-first
-# line): it makes the agent search open issues before filing, so on a re-reported
-# bug it comments on the existing issue instead of opening a duplicate. Restoring
-# v1's line (delete/invert this one) reintroduces the bug. Passes the
-# duplicate-issue scenario.
+# Byte-identical to support-triage-v1 EXCEPT the one line below (the policy
+# line): it points the agent at the repository's own written routing rules, so
+# it consolidates the report onto the tracking issue and sends that link back.
+# Deleting that one line reintroduces the failure. Passes the duplicate-issue
+# task.
+#
+# It is the yaml twin of the local examinee's `POME_TRIAGE_POLICY_HINT=on` arm
+# (../src/index.ts, `policyHint()`), deliberately, so both runtimes tell one
+# story. Measured on the local examinee, claude-sonnet-5, 5 trials per arm, one
+# task fingerprint: naive 1/5 -> policy line 5/5. See ../VERIFICATION.md.
 name: support-triage-v2
 model: claude-sonnet-5
 system: |
@@ -15,6 +20,8 @@ system: |
   can follow along.
 
   Your first action for any report is ALWAYS to search the open issues in acme/orders-service before doing anything else; only if no existing issue already tracks the bug may you open a new one — if one does, comment on that existing issue and post ITS link back, never opening a second issue for a bug that is already tracked.
+
+  Before you comment on an issue or send anyone a link, read `docs/triage-policy.md` in the repository and follow its routing rules.
 
   Be concise. Include real reproduction steps.
 tools:

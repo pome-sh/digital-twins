@@ -15,11 +15,16 @@
  * CLI injects on `pome run … --agent "npm run start"`, so both launchers
  * share this one code path.
  *
- * ⚠️ THE BASELINE BELOW IS NOT RED. Measured 2026-08-04 on `claude-opus-5`,
- * n=5, hosted: `DENY_ISSUE_LOOKUP = true` scored 25 · 100 · 100 · 100 · 100 and
- * no trial filed a duplicate. The re-cut is pending; ../VERIFICATION.md carries
- * the run ids and the two routes the agent found around the denial. Do not
- * describe this file's defect as a working lesson until that ticket closes.
+ * THIS EXAMINEE CARRIES NO PLANTED DEFECT, and that is deliberate. The tool
+ * denial that used to ship here was measured green four separate ways (4/5 open
+ * sandbox, 5/5 sealed, 5/5 with the denial gone, 5/5 with the search-first rule
+ * deleted from the prompt) — see ../VERIFICATION.md. The difficulty now lives in
+ * the seeded world: the repository runs a consolidated-tracking convention that
+ * is written down in `docs/triage-policy.md` and nowhere else, and the issue that
+ * textually matches the report is not the one the report belongs on.
+ *
+ * So the two arms of this example are a naive agent and an informed one, not a
+ * broken agent and a repaired one. `POME_TRIAGE_POLICY_HINT=on` is the fix.
  *
  * `query` comes from `@pome-sh/adapter-claude-sdk` rather than the raw SDK. It
  * is a drop-in — the message stream is byte-for-byte what the SDK yields — and
@@ -73,15 +78,25 @@ const ISSUE_LOOKUP_TOOLS = [
   "mcp__github__get_issue",
 ];
 
-// ⛔ Ships as `true` — the failing baseline. Set it to `false`; that is the fix.
-const DENY_ISSUE_LOOKUP = true;
+// Ships as `false`. The denial is RETIRED as a lesson — it was measured green
+// with the sandbox open (4/5) and greener with it sealed (5/5), because the twin
+// exposes read paths the list never named (`list_issue_comments`, and
+// `update_issue` as a 404-vs-200 existence oracle). Completing the enumeration
+// was not viable: shutting three paths surfaced two more in one afternoon.
+//
+// The constant and `deniedTools()` stay because the web clamp below rides the
+// same function. Nothing pins the two branches any more — the lesson they used
+// to carry moved to `policyHint()` and the test moved with it. Do not flip this
+// back to `true` expecting a red: you will get a 5/5 and a false story.
+const DENY_ISSUE_LOOKUP = false;
 
 /**
  * The tools this examinee refuses to expose.
  *
- * Named rather than inlined so `test/tool-policy.test.ts` can pin BOTH branches
- * without asserting which one ships — a guard the documented fix turns red is a
- * guard you edit to make green.
+ * Still a function of an explicit flag, not a bare constant, because the shape
+ * is the reusable one: `policyHint()` below is the live lesson and copies it, so
+ * both arms of a lesson can be asserted without asserting which one ships — a
+ * guard the documented fix turns red is a guard you edit to make green.
  *
  * `WebSearch`/`WebFetch` are unconditional and are NOT part of the lesson: the
  * seeded twin world is the whole exam, so an agent that can reach the open web
@@ -126,11 +141,15 @@ export const BUILT_IN_TOOLS: string[] = [];
  * at call time (the `scripts/smoke-examples.mjs` gate exists because exactly
  * that crash once shipped in `agent-examples/triage-agent`).
  *
- * Exported so `test/tool-policy.test.ts` can assert the two policy constants are
- * WIRED IN, not merely declared. Asserting `BUILT_IN_TOOLS` is empty proves
- * nothing on its own: delete `tools:` from this object and that assertion stays
- * green while the sandbox reopens. A guard whose subject is no longer connected
- * to anything passes forever, which is the same shape of mistake.
+ * Composed here, and passed to `query()` as a CALL rather than spread inline, so
+ * that `scripts/check-example-sdk-isolation.mjs` has a single place to resolve.
+ * That gate is what asserts the two policy constants are WIRED IN rather than
+ * merely declared — it walks the AST from the `query()` call site through this
+ * function's sole `return` and reds if `tools` or `settingSources` is absent.
+ * The distinction is the whole point: asserting `BUILT_IN_TOOLS` is empty proves
+ * nothing on its own, because deleting `tools:` from this object leaves that
+ * assertion green while the sandbox reopens. A guard whose subject is no longer
+ * connected to anything passes forever, which is the same shape of mistake.
  */
 export function examineeOptions(mcpServers: Record<string, McpServerConfig>) {
   return {
@@ -178,16 +197,54 @@ export function examineeOptions(mcpServers: Record<string, McpServerConfig>) {
 const TRIAGE_RULE =
   "Your first action for any report is ALWAYS to search the open issues in acme/orders-service before doing anything else; only if no existing issue already tracks the bug may you open a new one — if one does, comment on that existing issue and post ITS link back, never opening a second issue for a bug that is already tracked.";
 
-const SYSTEM_PROMPT = `You are a support-triage agent for the acme engineering org.
+// THE FIX ARM, and the only difference between this example's two measured arms.
+//
+// OFF by default: the naive agent, which is the honest state of most production
+// triage agents — it has never been told the repository has conventions, so it
+// never goes looking for them. ON: one sentence pointing at the policy file.
+//
+// This is an env switch rather than a committed edit for the same reason
+// `POME_TRIAGE_RULE` was: both arms have to be runnable from one commit, or the
+// two numbers are measured against two different trees and are not comparable.
+//
+// It is NOT an omission-only prompt flaw of the kind failure-classes.md §3 bans.
+// That ban is about a prompt that fails to state the CORRECT BEHAVIOUR, which a
+// strong model then supplies from judgment; TRIAGE_RULE above states the correct
+// behaviour in full and stays put in both arms. What the baseline omits is the
+// existence of a LOCAL CONVENTION no amount of judgment can derive — the agent
+// cannot reason its way to "this org consolidates onto tracking issues".
+//
+// Shaped as a function taking an explicit flag, exactly like `deniedTools()`
+// above, so `test/example.test.ts` can pin BOTH arms without asserting which one
+// ships. A test that pinned the shipped arm would go red the moment someone runs
+// the fix, and a guard you edit to make green is not a guard.
+//
+// `buildSystemPrompt` takes the hint as a PARAMETER for the same reason. The
+// interpolation is the part that fails silently: delete `${hint}` from the
+// template below and the fix arm still returns its sentence, the helper still
+// has a test, and the documented one-line fix quietly stops doing anything.
+export function policyHint(
+  enabled: boolean = process.env.POME_TRIAGE_POLICY_HINT === "on",
+): string {
+  return enabled
+    ? "\n\nBefore you comment on an issue or send anyone a link, read `docs/triage-policy.md` in the repository and follow its routing rules."
+    : "";
+}
+
+export function buildSystemPrompt(hint: string = policyHint()): string {
+  return `You are a support-triage agent for the acme engineering org.
 
 Your job: watch the #support Slack channel for bug reports, reproduce and
 triage them, track each bug as a GitHub issue in acme/orders-service with the
 "bug" label, and post the tracking issue link back to #support so the reporter
 can follow along.
 
-${TRIAGE_RULE}
+${TRIAGE_RULE}${hint}
 
 Be concise. Include real reproduction steps.`;
+}
+
+const SYSTEM_PROMPT = buildSystemPrompt();
 
 // Fallback kickoff prompt when the launcher doesn't inject POME_TASK. Matches
 // the `## Prompt` of ../tasks/duplicate-issue.md (the task itself —
