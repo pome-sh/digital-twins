@@ -57,4 +57,6 @@ verbatim, so the only thing the examinee's behaviour can change is the label.
 twins: [github]
 class: conformance
 timeout: 120
+runs: 3
+passThreshold: 100
 ```
