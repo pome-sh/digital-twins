@@ -168,8 +168,10 @@ rule. None of those three can leave enforcement quietly reduced.
 The gates that are NOT rules, because they are different in kind rather than in
 rule: `lint:no-cloud-imports` (shell, and in the pre-commit hook), `lint:dead-code`
 (knip), `gate:route-inputs` (codegen freshness), `gate:mcp-tools-list`,
-`test:pack`, and the tarball audits, which inspect built npm artifacts rather
-than the source tree.
+`test:pack`, and the tarball audits. Those audits come in two halves: the
+`gate:*-manifest` variants read `package.json` only, so they need no build and
+run on every PR, while the full `gate:*-tarball` variants pack and inspect the
+built npm artifact.
 
 The ones that catch people: `lint` (the product boundary lives in its `no-eval`
 rule), `lint:no-cloud-imports`, `lint:dead-code`, `gate:route-inputs`,
