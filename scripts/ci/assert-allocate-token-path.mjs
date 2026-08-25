@@ -315,8 +315,7 @@ export function checkAllocateTokenPath(root) {
         errors.push(
           `the checkout \`ref: ${step.ref}\` is unconditional while this workflow still has a ` +
             `\`pull_request:\` trigger. On that arm it checks out a tree WITHOUT the PR's own files, so ` +
-            `the plan-only arm proves nothing and reds on the first missing module — which is exactly ` +
-            `how a rule violation reads as a lost race. Use ` +
+            `the plan-only arm proves nothing and reds on the first missing module. Use ` +
             `\`\${{ github.event_name == 'pull_request' && github.ref || 'main' }}\`.`,
         );
       }

@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Every workflow with a `schedule:` trigger needs a failure alarm
-// (D5 · "every check runs somewhere that can fail"). The set of scheduled
+// Every workflow with a `schedule:` trigger needs a failure alarm, because
+// every check must run somewhere that can fail. The set of scheduled
 // workflows is DERIVED from `.github/workflows/*.yml` rather than typed into
 // a list anywhere: a hand-maintained list of "workflows with a schedule" is
-// exactly the shape D5 names as the bug — it stays green while a thirteenth
-// scheduled workflow lands uncovered. The follow-up that asserts
-// "every scheduled workflow reaches the alarm" as a property, not an
-// instance) reads this same derivation rather than re-parsing the tree with
-// its own rules.
+// exactly the shape of the bug — it stays green while a thirteenth
+// scheduled workflow lands uncovered. `assert-schedule-alarm-coverage.mjs`,
+// which asserts "every scheduled workflow reaches the alarm" as a property
+// rather than an instance, reads this same derivation rather than re-parsing
+// the tree with its own rules.
 //
 // Deliberately line-based, not a YAML parser: a workflow file's own comments
 // can contain the literal string "schedule:" (this file does), so the search
@@ -113,7 +113,7 @@ export function findCronWorkflows(root) {
   const cron = [];
   for (const [file, lines] of workflowLines(root)) {
     // `cron:` also appears inside a flow sequence — `schedule: [{cron: "…"}]`,
-    // the very shape findScheduledWorkflows() was taught to read in #384. An
+    // the very shape findScheduledWorkflows() reads. An
     // anchored `^\s*-?\s*cron:` missed it, so two of the three shapes that
     // review fixed would fail this file's OWN set-equality cross-check: a
     // correctly-alarmed workflow red the derivation. A guard that reds on right
@@ -207,7 +207,7 @@ export function main(argv = process.argv.slice(2)) {
   if (scheduled.length === 0) {
     throw new Error(
       "found zero workflows with a schedule: trigger — this repo has had at " +
-        "least one since #300, so this is a parser regression, not a true fact " +
+        "least one, so this is a parser regression, not a true fact " +
         "about the tree. Refusing to report a vacuous green.",
     );
   }

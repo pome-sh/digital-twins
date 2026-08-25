@@ -224,10 +224,9 @@ assert(findFetchesInScript("gh release download v1 -R o/r").length === 1, "gh re
 //
 // `Push scanned image` was one bare `docker push` with no retry, sitting
 // between two `uses:` installs that had both been given three-attempt ladders.
-// On 2026-08-14 GHCR answered `unknown blob` after every
-// layer had reported `Pushed`, the stripe leg died, and `stripe-bbf27bf` did
-// not exist — which failed four consecutive twin-snapshot-verify runs and
-// opened pome-cloud#752, because nothing re-ran that step for four days.
+// GHCR can answer `unknown blob` after every layer has reported `Pushed`, so a
+// leg dies and its per-commit tag does not exist — which fails every downstream
+// snapshot verify for as long as nobody re-runs the step.
 // ---------------------------------------------------------------------------
 
 // PLANTED FAILURE — the exact shape twin-image.yml's push step had.
@@ -307,10 +306,10 @@ assert(findRegistryWritesInScript("docker push ghcr.io/o/r:v1").length === 1, "a
 // With shapes (a) and (c) closed, the sign/attest/verify step was the last
 // unretried GHCR interaction on the publish path — a single step at
 // twin-image.yml:344 with no attempt siblings, sitting between an SBOM fetch
-// and a cosign install that both have three-attempt ladders. On 2026-08-18 a
-// degraded GHCR answered `DENIED: denied` off its token endpoint and killed the
-// stripe leg of run 32144441622 on `verify-attestation` — AFTER both tags were
-// pushed, signed and attested. A red job over a correct, published artifact.
+// and a cosign install that both have three-attempt ladders. A degraded GHCR
+// answers `DENIED: denied` off its token endpoint and kills the leg on
+// `verify-attestation` — AFTER both tags are pushed, signed and attested. A red
+// job over a correct, published artifact.
 // ---------------------------------------------------------------------------
 
 // PLANTED FAILURE — the WRITE half, inline. This is the shape the sign step
@@ -1011,7 +1010,7 @@ take() {
   return 1
 }
 if take "\${state}/cosignfail_\${op}_\${slug}"; then
-  # Verbatim from run 32144441622 on 2026-08-18, the stripe leg. Both tags were
+  # Verbatim from an observed failure. Both tags were
   # pushed, signed and attested before this answer arrived on the READ.
   echo "Error: GET https://ghcr.io/token?scope=repository:pome-sh/twins:pull&service=ghcr.io: DENIED: denied" >&2
   exit 1
@@ -1153,7 +1152,7 @@ for (const op of SIGN_OPS) {
 // anything here fails, push-scanned-image.sh has already published every tag,
 // so the message has to say which operation ran out, on which ref, and what
 // state that leaves public. `##[error]The process failed with exit code 1` is
-// exactly the message that made 2026-08-18 read like a broken twin.
+// exactly the message that makes a degraded registry read like a broken twin.
 {
   const dead = await runSign(PER_COMMIT, { [PER_COMMIT]: { "verify-attestation": 99 } }, { attempts: 2 });
   assert(dead.status !== 0, "a registry that never answers the verify must fail the step");

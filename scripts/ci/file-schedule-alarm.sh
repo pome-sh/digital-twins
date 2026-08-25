@@ -4,12 +4,10 @@
 # Shared filing logic for `.github/workflows/schedule-alarm.yml`, the reusable
 # workflow every schedule-triggered workflow in this repo calls with a
 # `failure()`-guarded job (see repo-policy.yml and the
-# meta-alarm job in release-alarm.yml). Copies check-release-staleness.yml's
-# retired pattern (#300, deleted in a3c9441 alongside the Changesets flow it
-# watched): a constant title, ONE long-lived tracking issue reused across
-# consecutive failures rather than a new issue per run, one label per alarm so
-# several alarms never collide on the same issue, and a body naming what
-# failed plus the run URL.
+# meta-alarm job in release-alarm.yml). One constant title, ONE long-lived
+# tracking issue reused across consecutive failures rather than a new issue per
+# run, one label per alarm so several alarms never collide on the same issue,
+# and a body naming what failed plus the run URL.
 #
 # Green is asserted as hard as red (same stance as release-alarm.mjs): a
 # recovered workflow CLOSES its tracking issue rather than leaving it open,

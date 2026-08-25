@@ -115,7 +115,7 @@ export const SIGN_HELPER = "scripts/ci/sign-image-digests.sh";
 /**
  * The retry pattern is 2 escapable attempts + 1 fatal one. Fewer than three
  * means a single transient 5xx can still reach the fatal attempt on its heels;
-  * a real outage is two 503s minutes apart on consecutive runs.
+ * a real outage is two 503s minutes apart on consecutive runs.
  */
 export const MIN_ATTEMPTS = 3;
 

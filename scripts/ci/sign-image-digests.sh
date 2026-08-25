@@ -53,7 +53,7 @@
 #      registry, the attempts spent, the exact state that ref is now in
 #      (published-and-unsigned is a different re-run decision from
 #      published-signed-attested-but-unverified), and which refs ARE fully
-#      verified. Without that, 2026-08-18 reads as a broken twin.
+#      verified. Without that, a degraded registry reads as a broken twin.
 #
 # Env knobs exist ONLY for scripts/ci/assert-hardened-cdn-fetches.test.mjs,
 # which drives this script against a fake `cosign` that reproduces the GHCR
@@ -102,7 +102,7 @@ fail_out() {
   else
     landed="Signed, attested and verified: $(printf '%s' "${verified_refs}" | tr '\n' ' ' | sed 's/ *$//')."
   fi
-  echo "::error::twin image sign: ${operation} did not succeed for ${ref} after ${attempts} attempts against ${registry}. The registry is degraded; this is not a failure of the twin, the build or the signature Failing closed on purpose — pome-cloud's deploy gate hard-gates the image signature, so an unverified image must not read as published-and-good. Note the tags are ALREADY PUBLISHED: scripts/ci/push-scanned-image.sh pushed and read back every tag in IMAGE_TAGS before this step ran. ${ref} is ${progress}. ${landed} Re-running this job re-signs and re-verifies; it needs no rebuild." >&2
+  echo "::error::twin image sign: ${operation} did not succeed for ${ref} after ${attempts} attempts against ${registry}. The registry is degraded; this is not a failure of the twin, the build or the signature. Failing closed on purpose — pome-cloud's deploy gate hard-gates the image signature, so an unverified image must not read as published-and-good. Note the tags are ALREADY PUBLISHED: scripts/ci/push-scanned-image.sh pushed and read back every tag in IMAGE_TAGS before this step ran. ${ref} is ${progress}. ${landed} Re-running this job re-signs and re-verifies; it needs no rebuild." >&2
   exit 1
 }
 
@@ -124,7 +124,7 @@ registry_attempt() {
     fi
     if [ "$attempt" -lt "$attempts" ]; then
       delay=$((attempt * sleep_unit))
-      # Deliberately does NOT name a specific registry error. 2026-08-18's was
+      # Deliberately does NOT name a specific registry error. One observed was
       # `DENIED: denied` off the token endpoint; the same run answered
       # `error parsing HTTP 403 response body` two legs over. They are one fault
       # from here, and cosign's own output is directly above.

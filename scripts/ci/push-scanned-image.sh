@@ -81,7 +81,7 @@ fail_out() {
   else
     leftover="Already published and NOT signed, because the sign/attest step never runs after this failure: $(printf '%s' "${landed_tags}" | tr '\n' ' ' | sed 's/ *$//')."
   fi
-  echo "::error::twin image push: could not publish ${tag} to ${registry} after ${attempts} attempts — ${reason}. The registry is degraded; this is not a failure of the twin, the build or the scan Failing closed on purpose, and no later tag was pushed. ${leftover}" >&2
+  echo "::error::twin image push: could not publish ${tag} to ${registry} after ${attempts} attempts — ${reason}. The registry is degraded; this is not a failure of the twin, the build or the scan. Failing closed on purpose, and no later tag was pushed. ${leftover}" >&2
   exit 1
 }
 
@@ -114,7 +114,7 @@ while IFS= read -r tag || [ -n "$tag" ]; do
       reason="the push exited 0 but ${tag} still resolves to nothing, so the registry accepted the layers and committed no manifest"
     else
       # Deliberately does NOT name a specific registry error. The observed one was
-      # `unknown blob` after every layer reported `Pushed`; run 32144441622's was
+      # `unknown blob` after every layer reported `Pushed`; another was
       # `error parsing HTTP 403 response body` on the first tag. They are one
       # fault from here, and a message that asserted either would misdirect a
       # reader on the other — docker's own output is directly above.

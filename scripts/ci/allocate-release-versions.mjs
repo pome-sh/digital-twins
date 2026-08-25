@@ -241,9 +241,9 @@ export function planAllocations({ root = resolve(HERE, "../.."), date = today(),
 
   // An example that pins a `@pome-sh/*` package from the registry
   // (today only `agent-examples/support-triage`) must never fall out of sync with
-  // that sibling's published version: two incidents (adapter 0.3.4 and 0.3.6,
-  // both 2026-08-13) each reddened `check-example-pins-published.mjs` until a
-  // human noticed and opened a one-line PR. `planExampleRepins` is the part of
+  // that sibling's published version: a drifted pin reds
+  // `check-example-pins-published.mjs` until a human notices and opens a
+  // one-line PR. `planExampleRepins` is the part of
   // that gate's own logic that already answers "which pins are safely fixable
   // right now" (its `violations`: drifted AND the sibling is CONFIRMED
   // published) — reused rather than re-implemented, discovered from

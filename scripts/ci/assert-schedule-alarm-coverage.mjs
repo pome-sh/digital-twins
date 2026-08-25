@@ -359,8 +359,8 @@ export function findScheduleAlarmCalls(root) {
  * If `permissions:` is absent at BOTH the job and the workflow level, the
  * effective grant is the repository/organization default — a setting this
  * script cannot read from the filesystem. Treating "cannot resolve" as a
-  * silent pass would be exactly the silent degradation this exists to catch (an
-  * unstated grant one settings-page click away from
+ * silent pass would be exactly the silent degradation this exists to catch (an
+ * unstated grant one settings-page click away from
  * losing `issues: write` entirely, with nothing in the diff to review), so
  * it is reported as a hard failure naming the workflow and job instead —
  * the same "unsupported shape must never be indistinguishable from a
@@ -445,7 +445,7 @@ function isTriviallyFalse(ifExpr) {
 /**
  * A call counts as reaching the alarm's FAILURE leg — the half that must
  * exist for every scheduled workflow — only if it is not neutralised. Three
-  * independent ways a wired-looking call is dead in production:
+ * independent ways a wired-looking call is dead in production:
  * `continue-on-error: true` swallows the reusable call's own failure so a
  * broken alarm still reports green; a literal `if: false` means the job
  * never runs at all; and `outcome` has to be the literal string `failure` —

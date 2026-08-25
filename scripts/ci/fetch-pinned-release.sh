@@ -17,7 +17,7 @@
 #      measured doing two different things: locally `--retry-delay 0` backed
 #      off 1s/2s/4s as documented, while on the runner the same flags burned
 #      five attempts in 0.8s against a `curl: (56) Connection died`
-#      (run 31620014945). A retry budget that looks handled and is not is worse
+#      A retry budget that looks handled and is not is worse
 #      than none, and a loop with a literal `sleep` cannot be version-dependent.
 #
 #   2. UNCONDITIONAL VERIFICATION. The sha256 comparison is not `|| true`, not

@@ -6,7 +6,8 @@
 // `scripts/clean-room-pack-test.mjs` audits the two npmjs tarballs — it asserts
 // they carry NO `@pome-sh/*` dependency, which is the assertion that keeps wire
 // inlined rather than installed. It says nothing about wire's own tarball,
-// users only as bytes inside the CLI's and the adapter's `dist/`.
+// which reaches those users only as bytes inside the CLI's and the adapter's
+// `dist/`.
 //
 // Now it is also published to GitHub Packages for cross-repo consumers
 // (pome-cloud), and that install path has failure modes the workspace hides.

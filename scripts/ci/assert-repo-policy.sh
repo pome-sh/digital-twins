@@ -7,8 +7,9 @@
 # cannot hold. /protection is auth-gated outright, and /rulesets/{id} answers
 # 200 for any caller on a public repo but ELIDES bypass_actors without that
 # scope — so it would pass while checking nothing. This endpoint returns the
-# same effective rules
-# deletion) for a metadata-scoped GITHUB_TOKEN, no PAT needed.
+# same effective rules (pull_request review count, required status checks,
+# non-fast-forward, deletion) for a metadata-scoped GITHUB_TOKEN, no PAT
+# needed.
 #
 # The property that matters: this must FAIL, not silently pass, if the rules
 # it reads stop covering a policy it asserts (ruleset deleted, disabled or
@@ -17,8 +18,7 @@
 # with no matching rule, is a hard failure naming that policy — never
 # treated as "nothing to check".
 #
-# This endpoint returns only
-# rules from rulesets whose enforcement is `active`. A ruleset flipped to
+# It returns only rules from rulesets whose enforcement is `active`. A ruleset flipped to
 # `evaluate` or `disabled` drops out entirely, so its rules vanish from this
 # payload and the empty-array branch below hard-fails. That is why enforcement
 # is not asserted separately — losing it cannot present as a green run.
@@ -228,7 +228,7 @@ console.log("required contexts:", required.join(", "));
 console.log(
   "NOT verified live (needs Administration:read, deliberately not held): ruleset bypass_actors "
     + "(founder-team bypass); and classic branch protection's own required_status_checks copy, which "
-    + "this endpoint cannot see at all — deleted 2026-08-13 because no App can bypass it, and a "
+    + "this endpoint cannot see at all, and must carry no such rule because no App can bypass it. A "
     + "re-added copy is caught by release-alarm.yml's UNALLOCATED leg within a day, not here",
 );
 NODE
