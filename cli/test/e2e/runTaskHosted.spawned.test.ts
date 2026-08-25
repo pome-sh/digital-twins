@@ -262,9 +262,11 @@ describe("pome run --hosted (e2e via spawn)", () => {
     child.stderr.on("data", (d) => (stderr += d.toString()));
     const code = await new Promise<number>((res) => child.on("close", res));
 
-    // `pome run` and `pome eval` agree on this shape — an ungraded run is exit 1
-    // on both, with no divergence carved out for a cloud that omits
-    // `criteria_results`.
+    // This response CARRIES `criteria_results` with nothing evaluated, so the A5
+    // guard applies and `pome run` exits 1 on it exactly as `pome eval` does.
+    // A response omitting `criteria_results` entirely is a different path:
+    // `scoreFromFinalizeResponse` sets `evaluated` and `can_pass` true there
+    // (`uploadAndFinalize.ts`), which this case does not exercise.
     expect(code, `stderr was:\n${stderr}`).toBe(1);
     // The label and the copy. "cannot pass" was a verdict about the
     // AGENT for a gap in the GRADER.

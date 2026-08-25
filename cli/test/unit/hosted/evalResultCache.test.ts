@@ -132,7 +132,9 @@ describe("verdict artifact", () => {
     expect(onDisk.task_path).toBe("tasks/scn.md");
     expect(onDisk).not.toHaveProperty("scenario_path");
 
-    // Read path: a verdict with no `task_path` is not normalized.
+    // Read path: the old spelling is not normalized into the new one. This
+    // artifact is refused on its `version`, and the absent `task_path` is not
+    // filled in from `scenario_path`.
     const legacyDir = join(tmp, "scn", "ses_old");
     await mkdir(legacyDir, { recursive: true });
     const { task_path: _tp, ...withoutTaskPath } = verdict({ session_id: "ses_old" });

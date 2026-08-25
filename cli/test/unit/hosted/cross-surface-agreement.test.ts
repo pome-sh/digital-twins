@@ -14,7 +14,7 @@
 // end). What this file adds for the artifact is the VOCABULARY claim — that it
 // spells the answer in the dashboard's three words and no others.
 //
-// The two repos publish no module to each other. What crosses is the
+// The two repos share no application code. What crosses is the
 // `criteria_results` wire shape, one reason string, and the counting itself:
 // `isIncompleteTally`, `tallyCriteriaResults` and `PRE_SATISFIED_REASON` live
 // in `packages/wire/src/run-completeness.ts`, are published as
@@ -321,7 +321,7 @@ describe("CLI and dashboard answer `what state is this run in?` the same way", (
       });
     }
 
-    it("records the same word as the dashboard on the all-pre-satisfied run, and states that word in the artifact's own doc", async () => {
+    it("records the same word as the dashboard on the all-pre-satisfied run, and keeps the mechanism behind it legible in the artifact's own doc", async () => {
       const row = rowNamed("every criterion seed-excluded — no denominator");
       const cliWord = cliRunStatus(row.results, row.satisfaction);
       // The all-pre-satisfied run: both surfaces read `incomplete`, the
