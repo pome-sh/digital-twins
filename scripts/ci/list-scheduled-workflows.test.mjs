@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Regression coverage for scripts/ci/list-scheduled-workflows.mjs.
-// Builds a scratch .github/workflows tree so the assertions do not depend on
-// which workflows this repo happens to carry today.
+//
+// Asserts the derivation reds on a parse it cannot follow, rather than reporting an
+// empty set as a fact about the tree.
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -30,7 +30,6 @@ function withScratchRoot(files, fn) {
   }
 }
 
-// A real schedule trigger is found.
 withScratchRoot(
   {
     "scheduled.yml": "name: x\non:\n  schedule:\n    - cron: '0 0 * * *'\njobs: {}\n",
@@ -42,9 +41,6 @@ withScratchRoot(
   },
 );
 
-// A `schedule:` mentioned only in a comment, or inside a job step's shell
-// text, must NOT count — the parser anchors on the top-level `on:` block, not
-// on the string appearing anywhere in the file.
 withScratchRoot(
   {
     "commented.yml":
@@ -56,9 +52,6 @@ withScratchRoot(
   },
 );
 
-// A `schedule:` nested under a REUSABLE workflow's `workflow_call.inputs`
-// (or any other non-top-level block) must not count either — anchored on the
-// `on:` block specifically, indented exactly one level.
 withScratchRoot(
   {
     "reusable.yml":
@@ -70,13 +63,9 @@ withScratchRoot(
   },
 );
 
-// Vacuous-green guard: zero scheduled workflows across the whole tree throws
-// rather than reporting a silent, technically-true empty list.
 withScratchRoot({ "none.yml": "name: x\non:\n  push:\n    branches: [main]\njobs: {}\n" }, (root) => {
   let threw = false;
   try {
-    // main() enforces the non-zero floor; findScheduledWorkflows() itself is
-    // allowed to return an empty array (it is the honest primitive).
     const found = findScheduledWorkflows(root);
     assert(found.length === 0, "sanity: this fixture has no schedule trigger");
   } catch {
@@ -85,7 +74,6 @@ withScratchRoot({ "none.yml": "name: x\non:\n  push:\n    branches: [main]\njobs
   assert(!threw, "findScheduledWorkflows itself must not throw on an empty result");
 });
 
-// Missing .github/workflows directory is a hard failure, not an empty list.
 {
   const root = mkdtempSync(join(tmpdir(), "list-scheduled-wf-missing-"));
   let threw = false;
@@ -98,21 +86,10 @@ withScratchRoot({ "none.yml": "name: x\non:\n  push:\n    branches: [main]\njobs
   assert(threw, "a missing .github/workflows directory must throw, not report zero");
 }
 
-// Against the real tree: this repo carries at least repo-policy.yml and
-// release-alarm.yml on a schedule today. A regression
-// here would mean the real-tree floor assertion (this same non-zero-count
-// logic, run by main()) is not actually watching anything.
-// The three YAML shapes the first revision of the parser silently missed. Each
-// is a scheduled workflow that would have gone uncovered, invisibly, because
-// the only floor was "at least one workflow is scheduled" — which the three
-// real ones satisfy forever.
 withScratchRoot(
   {
-    // `on` is YAML 1.1 truthy, so yamllint's standard workaround is to quote it.
     "quoted-on.yml": "name: x\n\"on\":\n  schedule:\n    - cron: '0 0 * * *'\njobs: {}\n",
-    // Flow form entirely on the `on:` line.
     "flow-on.yml": "name: x\non: {schedule: [{cron: '0 0 * * *'}]}\njobs: {}\n",
-    // Four-space indent under `on:`, and an inline value on `schedule:`.
     "deep-indent.yml": "name: x\non:\n    schedule: [{cron: '0 0 * * *'}]\njobs: {}\n",
   },
   (root) => {
@@ -120,12 +97,6 @@ withScratchRoot(
     for (const expected of ["quoted-on.yml", "flow-on.yml", "deep-indent.yml"]) {
       assert(found.includes(expected), `${expected} must count as scheduled, got ${found}`);
     }
-    // The half that matters here:
-    // asserting only the `on: schedule:` read said nothing about the SET
-    // EQUALITY main() enforces between the two reads. The `cron:` read was
-    // anchored at line start, so it missed `schedule: [{cron: …}]` — meaning
-    // two of the three shapes this very fixture proves are parsed would have
-    // FAILED main()'s cross-check. A correctly-alarmed workflow red the guard.
     const cron = findCronWorkflows(root);
     for (const expected of ["quoted-on.yml", "flow-on.yml", "deep-indent.yml"]) {
       assert(cron.includes(expected), `${expected} must also be seen by the cron: read, or main()'s set-equality reds a correct workflow; got ${cron}`);
@@ -137,13 +108,6 @@ withScratchRoot(
   },
 );
 
-// A flow mapping that SPANS lines (`on: {` with the keys below it) is read by
-// neither rule, so a cron inside one is invisible to both — and two blind reads
-// agree, so the set-equality cross-check has nothing to disagree about and the
-// alarm-coverage check reports a clean pass on an unalarmed cron. actionlint
-// accepts the shape as valid workflow YAML, so nothing else catches it either.
-// An unsupported shape must be LOUD, never indistinguishable from an absent
-// trigger.
 withScratchRoot(
   {
     "multiline-flow-on.yml": 'name: x\non: {\n  schedule: [{cron: "0 3 * * *"}]\n}\njobs: {}\n',
@@ -160,14 +124,10 @@ withScratchRoot(
   },
 );
 
-// The cross-check floor: the `cron:` read and the `on: schedule:` read are two
-// independent rules over the same fact, so a parser that stops matching one
-// workflow shows up as a set difference rather than as a still-non-zero count.
 withScratchRoot(
   {
     "scheduled.yml": "name: x\non:\n  schedule:\n    - cron: '0 0 * * *'\njobs: {}\n",
     "plain.yml": "name: y\non:\n  push:\n    branches: [main]\njobs: {}\n",
-    // `cron:` only in prose must not count on the cron side either.
     "prose.yml": "name: z\n# nightly cron: not a trigger\non:\n  push:\njobs: {}\n",
   },
   (root) => {
@@ -183,9 +143,6 @@ withScratchRoot(
   },
 );
 
-// A wired-but-BROKEN alarm: the job is present, the `uses:` path is a typo, and
-// GitHub would refuse to run the workflow. Nothing else in CI catches this —
-// actionlint is not wired in, and the reusable call is never exercised on a PR.
 withScratchRoot(
   {
     "caller.yml":

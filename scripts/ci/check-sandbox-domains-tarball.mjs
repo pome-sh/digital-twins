@@ -1,59 +1,13 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Release gate for @pome-sh/sandbox-domains' tarball.
+// Release gate for @pome-sh/sandbox-domains' tarball. NOT a copy of
+// check-checks-tarball.mjs: three assertions are deliberately inverted, because
+// this package IS the engine's domain half. It REQUIRES `node:sqlite` and treats
+// hono as an ordinary declared external, where checks forbids both.
 //
-// This package exists for one reason: pome-cloud boots the twin domain layer
-// IN-PROCESS as its grading/authoring runtime (`lib/twin-state.ts`), and
-// `checks-package-drift.test.ts` compares that runtime's binding surface
-// against `@pome-sh/checks`'s vocabulary with no allowlist. Every failure mode
-// below is invisible from inside this workspace and lands in the consumer's
-// repo instead.
-//
-// ── Why this is not check-checks-tarball.mjs with a different path ───────────
-//
-// The two packages are cut from the same twins and ship on the same lane, and
-// three of their assertions are deliberately INVERTED. Reading this file as a
-// copy of that one will get the inversions wrong:
-//
-//   - checks FORBIDS engine bytes (`node:sqlite`, `hono`): a declarations-only
-//     package shipping a database driver means something reached
-//     `@pome-sh/sdk/server` where a narrow subpath would do. This package IS
-//     the engine's domain half, so it REQUIRES `node:sqlite` (assertion 6) —
-//     a sandbox-domains tarball with no SQLite driver is a second declarations
-//     package that silently cannot open a database.
-//   - checks forbids `hono` outright. Here hono is a declared, external,
-//     ordinary dependency: each domain arrives through its twin's package
-//     ROOT, which is also where `defineTwin()` runs at module scope, and
-//     `./server` re-exports `toTwinHttpEventRow` from `@pome-sh/sdk/server`.
-//     Measured on the real bundle: `hono`, `hono/jwt`, `hono/request`.
-//   - checks asserts `defineCheck` exists exactly once. The shared primitive
-//     here is the sdk's SQLite layer, so assertion 7 counts that instead.
-//
-// What is NOT inverted, and is the same fatal shape in both: a leaked
-// `@pome-sh/*` runtime dependency (assertion 3). The sdk and the five twins are
-// `private: true` and on no registry at these versions, so the consumer's
-// `npm i` 404s. Bundling via tsup `noExternal` is what makes this package
-// installable at all.
-//
-// ── Assertions 4 and 5 are the ones that earn their keep ────────────────────
-//
-// Rather than a hand-kept allowlist of permitted externals, this reads every
-// bare specifier out of the SHIPPED bytes — JS and `.d.ts` both — and requires
-// each to be a node: builtin, the zod peer, or a declared runtime dependency
-// (4). Then the converse: every declared dependency is actually imported (5).
-// Without 5 the manifest can name a package nothing uses, which a consumer
-// still installs and still audits.
-//
-// Modes:
-//   --manifest-only  Only what is readable from package.json (private, no
-//                    publishConfig.registry, no @pome-sh/* runtime deps, zod is
-//                    a peer, the upstream anchors match the twins'). No build,
-//                    no `npm pack`, no network — so ci.yml runs it on every PR.
-//   (default)        The above, plus pack and audit the real tarball. Requires
-//                    a built `packages/sandbox-domains/dist`.
-//
-// Usage: node scripts/ci/check-sandbox-domains-tarball.mjs [--manifest-only] [--keep]
+// The dependency set is read from the shipped bytes, both directions — every
+// bare specifier declared, every declared dep imported.
 
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
@@ -67,14 +21,6 @@ const MANIFEST_ONLY = process.argv.includes("--manifest-only");
 const PACKAGE_DIRECTORY = join(ROOT, "packages", "sandbox-domains");
 const MANIFEST_PATH = join(PACKAGE_DIRECTORY, "package.json");
 
-/**
- * The export spec, measured from pome-cloud's own imports rather than
- * designed fresh: `apps/control-plane/src/lib/twin-state.ts`,
- * `checks-package-drift.test.ts`, `lib/twin-tape-pull.ts` and
- * `apps/mcp/src/lib/capture.ts`. A subpath that stops exporting one of these
- * does not fail to build here — it fails in the consumer's repo, which is the
- * whole reason the list is duplicated into a gate.
- */
 const REQUIRED_EXPORTS = {
   "./github": ["GitHubDomain", "openGitHubCloneDatabase", "parseSeed", "GITHUB_CHECKS"],
   "./gmail": ["GmailDomain", "openGmailTwinDatabase", "parseSeed", "GMAIL_CHECKS"],
@@ -90,39 +36,18 @@ const REQUIRED_EXPORTS = {
   "./server": ["toTwinHttpEventRow"],
 };
 
-/**
- * Type-only anchors the twins hold as devDependencies for shape fidelity, which
- * this package must hold as real `dependencies` because they reach its SHIPPED
- * `.d.ts` (`GitHubDomain.pullRequestStack(): PullRequestStack`,
- * `StripeDomain`'s `PaymentIntent[…]` field types). Unlike `@pome-sh/*` these
- * are public and resolvable, so declaring them is correct and vendoring 4.6 MB
- * of generated OpenAPI types into every tarball is not.
- *
- * The specs must EQUAL the twins' own: the declarations shipped here were
- * generated against those versions, so a range that admits a different one is a
- * claim this build never checked.
- */
 const UPSTREAM_ANCHORS = {
   "@octokit/openapi-types": "packages/twin-github/package.json",
   stripe: "packages/twin-stripe/package.json",
 };
 
-/** node: builtins and the zod peer resolve for any consumer without being declared. */
 const ALWAYS_RESOLVABLE = (specifier) => specifier === "zod" || specifier.startsWith("node:");
 
-/** `hono/jwt` is satisfied by a declared `hono`; compare on the package name. */
 function packageNameOf(specifier) {
   const parts = specifier.split("/");
   return specifier.startsWith("@") ? parts.slice(0, 2).join("/") : parts[0];
 }
 
-/**
- * Blank out comments, preserving length, before looking for specifiers. Doc
- * comments contain quoted PROSE, and one of them — `could not tell "the path is
- * absent" from "the path holds null"` — parses as `from "the path holds null"`
- * and reds this gate over an English sentence. Any regex scanner over shipped
- * source needs this; `scripts/bundle-declarations.mjs` carries the same guard.
- */
 function maskComments(text) {
   const out = text.split("");
   let index = 0;
@@ -149,32 +74,8 @@ function maskComments(text) {
   return out.join("");
 }
 
-/**
- * Every module specifier in a shipped `.d.ts`. Covers `from "x"`, bare
- * `import "x"`, and inline import types (`import("./auth.js").SessionValue`),
- * which tsc emits for inferred types — the form the first version of
- * `bundle-declarations.mjs` missed and shipped unvendored. A declaration file
- * carries prose only in COMMENTS, which `maskComments` handles, so the loose
- * `\bfrom\s*"…"` form is safe here.
- */
 const DECLARATION_SPECIFIER_PATTERN = /(?:\bfrom\s*|\bimport\s*)\(?\s*(['"])([^'"]+)\1/g;
 
-/**
- * Every module specifier in a shipped `.js` — and deliberately NOT the pattern
- * above, which cannot be used on bundled JS.
- *
- * `maskComments` blanks comments but only SKIPS string literals (it has to:
- * blanking them would destroy the specifiers themselves). Bundled twin code is
- * full of SQL and English inside strings, and the loose pattern read
- * `m.to_json AS "…"`, `") return contains(document.from);"` and
- * `"…sent to everyone, some of them twice"` as import specifiers — reporting
- * a dozen phantom undeclared "packages" named after fragments of prose.
- *
- * tsup emits ESM with every static `import`/`export … from` at the start of a
- * line, so anchoring to line-start is both precise and complete for this
- * output. Dynamic `import("x")` is matched separately: it needs the literal
- * `import(` prefix, which prose does not produce.
- */
 const JS_STATIC_IMPORT_PATTERN = /^\s*(?:import|export)\b[^;\n]*?\bfrom\s*(['"])([^'"]+)\1/gm;
 const JS_BARE_IMPORT_PATTERN = /^\s*import\s*(['"])([^'"]+)\1/gm;
 const JS_DYNAMIC_IMPORT_PATTERN = /\bimport\s*\(\s*(['"])([^'"]+)\1\s*\)/g;
@@ -195,11 +96,6 @@ function specifiersIn(text, kind) {
 const failures = [];
 const manifest = JSON.parse(readFileSync(MANIFEST_PATH, "utf8"));
 
-// ── Manifest assertions (no build, no network) ───────────────────────────────
-
-// 1 — stricter than npm on purpose: npm publishes a manifest with no `private`
-// field quite happily, but the difference between "absent" and "explicitly
-// false" is the difference between a silent regression and a loud one.
 if (manifest.private !== false) {
   failures.push(
     `packages/sandbox-domains/package.json has \`private: ${JSON.stringify(manifest.private)}\`; it must be exactly \`false\`.\n` +
@@ -208,7 +104,6 @@ if (manifest.private !== false) {
   );
 }
 
-// 2 — registry is chosen by the publish job, not pinned in the manifest.
 if (manifest.publishConfig?.registry !== undefined) {
   failures.push(
     `packages/sandbox-domains/package.json pins \`publishConfig.registry\` to ${JSON.stringify(manifest.publishConfig.registry)}.\n` +
@@ -225,7 +120,6 @@ if (manifest.publishConfig?.access !== "public") {
   );
 }
 
-// 3 — the whole point of the bundling strategy, and identical to the checks gate.
 for (const field of ["dependencies", "peerDependencies", "optionalDependencies"]) {
   const internal = Object.keys(manifest[field] ?? {}).filter((name) => name.startsWith("@pome-sh/"));
   if (internal.length > 0) {
@@ -247,8 +141,6 @@ if (manifest.peerDependencies?.zod === undefined) {
   );
 }
 
-// The upstream fidelity anchors must not drift from the twins they were
-// generated against.
 for (const [name, twinManifestPath] of Object.entries(UPSTREAM_ANCHORS)) {
   const twinManifest = JSON.parse(readFileSync(join(ROOT, twinManifestPath), "utf8"));
   const expected = twinManifest.devDependencies?.[name] ?? twinManifest.dependencies?.[name];
@@ -269,7 +161,6 @@ for (const [name, twinManifestPath] of Object.entries(UPSTREAM_ANCHORS)) {
   }
 }
 
-/** Every file path an `exports` map points at, conditions and subpaths flattened. */
 function exportTargets(exportsField) {
   const targets = new Set();
   const walk = (node) => {
@@ -280,9 +171,6 @@ function exportTargets(exportsField) {
   return targets;
 }
 
-// Every subpath the export spec names must exist in the manifest at all — a
-// missing one is ERR_PACKAGE_PATH_NOT_EXPORTED before any of the tarball
-// assertions below get a chance to look at its contents.
 for (const subpath of Object.keys(REQUIRED_EXPORTS)) {
   if (manifest.exports?.[subpath] === undefined) {
     failures.push(
@@ -292,21 +180,15 @@ for (const subpath of Object.keys(REQUIRED_EXPORTS)) {
   }
 }
 
-// `main`/`types` are the pre-`exports` resolution path; older tooling still
-// reads them, so they have to ship too.
 const declaredPaths = exportTargets(manifest.exports);
 for (const field of ["main", "types"]) {
   if (typeof manifest[field] === "string") declaredPaths.add(manifest[field].replace(/^\.\//, ""));
 }
 declaredPaths.delete("package.json"); // always in the tarball; not a build output
 
-// ── Tarball assertions ──────────────────────────────────────────────────────
-
 function auditTarball() {
   const workDirectory = mkdtempSync(join(tmpdir(), "pome-sandbox-domains-tarball-"));
   try {
-    // --ignore-scripts: `prepublishOnly` would rebuild, which would hide a
-    // "published a stale dist" bug. The caller is expected to have built.
     const packed = execFileSync(
       "npm",
       ["pack", "-w", "@pome-sh/sandbox-domains", "--ignore-scripts", "--pack-destination", workDirectory],
@@ -329,7 +211,6 @@ function auditTarball() {
       );
     }
 
-    // npm wraps every tarball entry in a top-level `package/` directory.
     const shipped = new Set(
       execFileSync("tar", ["-tf", tarball], { encoding: "utf8" })
         .split("\n")
@@ -356,8 +237,6 @@ function auditTarball() {
       );
     }
 
-    // Read the real shipped bytes, not the workspace's dist: `files` negations
-    // and `.npmignore` are exactly the kind of thing that makes the two differ.
     const extractDirectory = mkdtempSync(join(tmpdir(), "pome-sandbox-domains-extract-"));
     execFileSync("tar", ["-xf", tarball, "-C", extractDirectory], { stdio: "inherit" });
     const packageRoot = join(extractDirectory, "package");
@@ -388,10 +267,6 @@ function auditTarball() {
       failures.push("the tarball ships no .js at all — the bundle did not build.");
     }
 
-    // 4 — every bare specifier the shipped bytes name is resolvable for a
-    // consumer. Measured off the tarball rather than allowlisted, so a new
-    // transitive import is named here instead of becoming the consumer's
-    // ERR_MODULE_NOT_FOUND (js) or TS2307 (d.ts).
     const declaredRuntime = new Set([
       ...Object.keys(packedManifest.dependencies ?? {}),
       ...Object.keys(packedManifest.peerDependencies ?? {}),
@@ -425,20 +300,6 @@ function auditTarball() {
       );
     }
 
-    // 5 — and the converse: a declared dependency nothing imports is a package
-    // the consumer installs and audits for no reason. `zod` is exempt because a
-    // peer is a CONSTRAINT on the consumer's graph, not a thing this tarball
-    // has to reach (it does, but that is not what makes it correct).
-    //
-    // 4 and 5 are two sides of ONE knob, and getting that backwards costs a
-    // build cycle: `noExternal` only forces `@pome-sh/*` inlining, and tsup
-    // decides every OTHER third-party package by whether this manifest declares
-    // it. Declared ⇒ left external ⇒ must stay declared (hono). Undeclared ⇒
-    // inlined into the bundle ⇒ must NOT be declared (graphql, which twin-linear
-    // reaches through its package root, and which showed up here only as tsup's
-    // `// ../../node_modules/graphql/…` source comments). So the fix for a
-    // failure here is never "declare it and move on" — decide which side of the
-    // knob the package belongs on first.
     const unusedDeps = Object.keys(packedManifest.dependencies ?? {}).filter(
       (name) => !importedPackages.has(name),
     );
@@ -452,11 +313,6 @@ function auditTarball() {
       );
     }
 
-    // 6 — the runtime actually shipped. This is the INVERSE of the checks gate's
-    // engine assertion, and it is the difference between this package and a
-    // second declarations package: without a SQLite driver every `open*Database`
-    // export is a function that cannot open anything, and nothing else notices
-    // until a grader boots a twin.
     const sqliteCarriers = [...sources].filter(([, text]) => text.includes("node:sqlite"));
     if (sqliteCarriers.length === 0) {
       failures.push(
@@ -467,12 +323,6 @@ function auditTarball() {
       );
     }
 
-    // 7 — one SQLite layer across the whole tarball. Seven entries all reach the
-    // sdk's db module; without `splitting: true` each would carry its own copy,
-    // so `@pome-sh/sandbox-domains/github`'s opener and `.../stripe`'s would be
-    // different function objects holding different `DatabaseSync` handles. Same
-    // argument as zod, one layer in — and the same shape as the checks gate's
-    // `defineCheck` count, over this package's own shared primitive.
     if (sqliteCarriers.length > 1) {
       failures.push(
         `\`node:sqlite\` is imported by ${sqliteCarriers.length} shipped modules; it must be exactly one.\n` +
@@ -482,7 +332,6 @@ function auditTarball() {
       );
     }
 
-    // 8 — zod stays external. A bundled zod shows up as its own internals.
     const zodInlined = [...sources]
       .filter(([, text]) => /\bclass \$?ZodObject\b|\$ZodType\b/.test(text))
       .map(([file]) => file);
@@ -501,8 +350,6 @@ function auditTarball() {
       );
     }
 
-    // 9 — the export spec, read off the shipped bytes. A re-export that silently
-    // stopped resolving is invisible here and fatal in pome-cloud.
     for (const [subpath, symbols] of Object.entries(REQUIRED_EXPORTS)) {
       const target = manifest.exports?.[subpath];
       const file = typeof target === "string" ? target : target?.default;
@@ -520,17 +367,6 @@ function auditTarball() {
         );
       }
     }
-
-    // The declarations must be self-contained apart from resolvable externals.
-    // `noExternal` does not cover them: the declaration bundler leaves bare
-    // specifiers alone, so `export … from "@pome-sh/twin-github"` lands verbatim
-    // in the shipped `.d.ts` and resolves nowhere for a consumer.
-    // `scripts/bundle-declarations.mjs` rewrites them; assertion 4 above is the
-    // tarball-side check that it ran and covered everything, since an
-    // unrewritten `@pome-sh/*` specifier is by definition undeclared.
-    //
-    // The authoritative test is the consumer COMPILE in
-    // scripts/clean-room-pack-test.mjs, which catches type errors this cannot see.
 
     if (failures.length === 0) {
       console.log(

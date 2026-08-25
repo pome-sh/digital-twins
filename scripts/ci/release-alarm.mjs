@@ -1,84 +1,12 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// A failed release must reach a human without a human going looking.
+// Does every version main declares reach its registry? Its own cron, in its own
+// workflow, so the alarm survives a release.yml that never triggered.
 //
-// release.yml has no failure path — no `if: failure()`, no notification, no
-// tracking issue — so a publish that died is indistinguishable from a merge
-// that owed no publish, and the first signal is somebody noticing a package
-// missing from npm.
-//
-// This is the checker behind `.github/workflows/release-alarm.yml`. It runs on
-// its own daily schedule, in a SEPARATE workflow file, because the alarm has to
-// survive the thing it is watching: an `if: failure()` step inside release.yml
-// cannot see the silence this exists for, a release workflow that never
-// triggers at all.
-//
-// ── What it asserts ──────────────────────────────────────────────────────────
-//
-// Primarily an OUTCOME check, not a mechanism one: for every package
-// `release.yml` can publish, does its registry actually serve the version main
-// declares? That question is blind to HOW a publish went missing, which is the
-// point — "ran and failed", "never ran", "cancelled", "the plan job skipped it"
-// and "someone disabled the job" all land on the same answer. The mechanism
-// legs below exist for the cases where nothing was owed and the release path is
-// broken anyway, which the outcome check cannot see until the next bump.
-//
-//   UNALLOCATED — main carries a pending `## Unreleased` entry that no
-//                 allocation consumed. The version number is written on
-//                 main after the merge by allocate-version.yml, so a broken or
-//                 unconfigured allocator produces a state the outcome check
-//                 CANNOT see: main declares the old version, the registry serves
-//                 the old version, everything agrees, and the fix never ships.
-//                 A pending entry is transient by construction — the allocator
-//                 consumes it on the next push — so one still sitting there past
-//                 the grace window is that silence, named.
-//   UNPUBLISHED — main declares a version its registry does not serve. The
-//                 only state a consumer can observe directly.
-//   BEHIND      — main declares a version BELOW the registry's `latest`. Not
-//                 yet a missing publish; it is the floor check in
-//                 decide-publish.sh armed to hard-fail the whole lane on the
-//                 next merge, taking that merge's unrelated publishes with it.
-//   NEVER_RAN   — main's HEAD has no `release.yml` run at all and is past the
-//                 grace window. The silence: a push to main that
-//                 triggered nothing (a bot pushing with the ambient
-//                 GITHUB_TOKEN cannot trigger workflows), or Actions disabled.
-//   STUCK       — a run has been queued/in_progress past the stuck window.
-//                 `release.yml` sets `cancel-in-progress: false`, so one hung
-//                 run holds the concurrency lock and everything behind it waits.
-//   FAILED      — the newest COMPLETED run on main did not succeed, with
-//                 nothing newer in flight. Catches a broken release path even
-//                 when no version was owed, so it is visible before the next
-//                 bump rather than after it.
-//   UNMEASURED  — a registry read failed for a reason other than 404. Reported
-//                 as its own state and never folded into UNPUBLISHED: a 401 for
-//                 a package that exists reads identically to "nothing published
-//                 yet" unless the two are kept apart, which is the same
-//                 distinction decide-publish.sh is careful about.
-//
-// Silence is asserted as hard as noise: everything green produces no issue, no
-// comment, and exit 0. An alarm that cries wolf gets muted, and a muted alarm
-// is no alarm.
-//
-// ── Why the package list is derived, not typed ───────────────────────────────
-//
-// The publish targets are parsed out of `release.yml`'s own
-// `scripts/ci/decide-publish.sh` invocations rather than listed here. A second
-// hand-maintained copy of "what gets published" is a guard that goes quietly
-// blind the day someone adds a fifth package — a list that stops matching its
-// subject still passes, forever. Deriving it means a new target is watched the
-// same day it is added, and a `release.yml` restructured past the parse is a
-// hard failure (`--targets` in ci.yml's always-on block) rather than an alarm
-// that silently watches nothing.
-//
-// Usage: node scripts/ci/release-alarm.mjs [repo root]
-//        node scripts/ci/release-alarm.mjs --targets   (parse only, no network)
-//   env: GITHUB_REPOSITORY, GH_TOKEN
-//        GRACE_MINUTES (default 90)  — how long after a push to main before its
-//          missing publish counts as missing rather than still building.
-//        STUCK_MINUTES (default 360) — how long in flight before a run is hung.
-//        NOW_MS (tests)
-//   Writes alarm= / reason= / report= to $GITHUB_OUTPUT. Exits 1 when alarming.
+// Targets are parsed out of release.yml, never listed here; `--targets` reds if
+// the parse finds none. UNMEASURED never folds into UNPUBLISHED — a 401 reads
+// identically to "nothing published yet".
 
 import { execFileSync, spawnSync } from "node:child_process";
 import { appendFileSync, existsSync, readFileSync, realpathSync } from "node:fs";
@@ -92,14 +20,6 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const RELEASE_WORKFLOW = "release.yml";
 const ALLOCATE_WORKFLOW = "allocate-version.yml";
 
-/**
- * Every publish target `release.yml` decides on, read from the workflow itself.
- *
- * `decide-publish.sh <name> <manifest> <output-key> [registry]` — an omitted
- * registry means registry.npmjs.org. @pome-sh/wire legitimately appears twice
- * with two registries (npmjs and GitHub Packages, from the same version line),
- * so targets are keyed on name+registry rather than name.
- */
 export function parseTargets(root) {
   const targets = readTargets(root);
   for (const t of targets) {
@@ -110,21 +30,6 @@ export function parseTargets(root) {
   return targets;
 }
 
-/**
- * The parse half of `parseTargets`, without the "every manifest exists" leg.
- *
- * Split out for callers that need to know WHICH manifests a workflow names
- * before those manifests exist — the test suite's historical fixtures build a
- * scratch tree from the real release.yml and have to create them. Folding that
- * need into `parseTargets` would mean weakening the existence check, and that
- * check is the whole reason the alarm cannot silently watch a package whose
- * manifest was moved or renamed.
- *
- * The empty-targets guard stays HERE rather than in `parseTargets`, because it
- * is a property of the parser rather than of the tree: an alarm watching zero
- * packages passes forever, and a fixture builder that silently created nothing
- * would be the same failure one layer down.
- */
 export function readTargets(root) {
   const file = join(root, ".github/workflows", RELEASE_WORKFLOW);
   if (!existsSync(file)) throw new Error(`${RELEASE_WORKFLOW} not found at ${file}`);
@@ -145,13 +50,6 @@ export function readTargets(root) {
   return targets;
 }
 
-/**
- * Semver order, enough for the `x.y.z[-pre]` versions these packages use.
- * A prerelease sorts BELOW its release, which is where this deliberately
- * differs from decide-publish.sh's `sort -V` (GNU version sort puts
- * `1.0.0-rc1` above `1.0.0`). Nothing here ships prereleases; if that changes,
- * the release's own floor check is the one that has to be corrected, not this.
- */
 export function compareVersions(a, b) {
   const split = (v) => {
     const [core, pre = ""] = String(v).split("-");
@@ -173,32 +71,17 @@ function gh(args) {
   return execFileSync("gh", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 }
 
-/**
- * What the registry currently serves.
- *
- * Read independently of decide-publish.sh on purpose. A watcher that shares its
- * subject's code goes blind with it, and the shared thing that MUST NOT drift —
- * which package, which manifest, which registry — is derived from release.yml
- * above rather than duplicated. What is duplicated is fifteen lines of
- * 404-vs-everything-else, and the distinction is asserted by this script's own
- * regression suite.
- */
 export function registryVersion(name, registry) {
   const args = ["view", name, "version", ...(registry ? ["--registry", registry] : [])];
   const r = spawnSync("npm", args, { encoding: "utf8" });
   const output = `${r.stdout ?? ""}${r.stderr ?? ""}`;
   if (r.status === 0) return { version: r.stdout.trim() };
-  // A brand-new package genuinely has nothing published; 0.0.0 is the correct
-  // baseline and is NOT an alarm on its own (the drift check below still fires
-  // if main declares a version, which is exactly right for a first publish that
-  // never happened).
   if (/E404|404 Not Found/.test(output)) return { version: "0.0.0", unpublished: true };
   return { error: output.trim().split("\n").filter(Boolean).slice(-2).join(" / ") || "unknown npm error" };
 }
 
 const minutesSince = (iso, now) => (now - Date.parse(iso)) / 60_000;
 
-/** Newest first, so "the newest completed run" needs no scan order assumption. */
 function newestFirst(runs) {
   return [...runs].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
 }
@@ -207,7 +90,6 @@ function runUrl(repo, run) {
   return `https://github.com/${repo}/actions/runs/${run.id}`;
 }
 
-/** The mechanism legs: is the release path itself alive? */
 function inspectReleaseRuns({ repo, head, runs, now, graceMinutes, stuckMinutes }) {
   const alarms = [];
   const lines = [];
@@ -247,8 +129,6 @@ function inspectReleaseRuns({ repo, head, runs, now, graceMinutes, stuckMinutes 
     );
   }
 
-  // Only when nothing newer is in flight: a failure already being retried is
-  // the release path working, and paging it teaches people to ignore the label.
   const newerInFlight =
     newestCompleted &&
     inFlight.some((r) => Date.parse(r.created_at) > Date.parse(newestCompleted.created_at));
@@ -266,30 +146,6 @@ function inspectReleaseRuns({ repo, head, runs, now, graceMinutes, stuckMinutes 
   return { alarms, lines, headAge, forHead, inFlight };
 }
 
-/**
- * The allocation leg: is anything still WAITING for a number?
- *
- * A pending `## Unreleased` entry on main is transient by construction —
- * allocate-version.yml consumes it on the push that created it — so one still
- * there is the allocator not running: the secret unset, the ruleset bypass
- * revoked, three rejected pushes, a crash. None of that is visible to the
- * outcome leg below, which compares main's declared version against the
- * registry and finds them in perfect agreement on the OLD number.
- *
- * WHAT THIS DOES NOT COVER, stated rather than implied: the other half of what
- * earns a release is publish RELEVANCE (paths moved with no entry written), and
- * that half is not checked here. It needs the git history the allocator walks,
- * and a watcher that re-derives it would either share the allocator's table (and
- * go blind with it) or keep a second copy (and drift from it). The PR gate
- * demands an entry for every publish-relevant change, so reaching that state
- * takes a bypassed gate — and any OTHER package with an entry still fires this
- * leg in the same run, because a dead allocator is dead for all of them.
- *
- * Reads the tree it is checked out in, not the registry, so it costs nothing and
- * cannot fail for a network reason. The CHANGELOG path per package comes from
- * scripts/ci/publish-relevance.mjs, the same table the allocator and the PR gate
- * read.
- */
 function inspectPendingEntries({ root }) {
   const alarms = [];
   const lines = [];
@@ -297,9 +153,6 @@ function inspectPendingEntries({ root }) {
   for (const pkg of PUBLISHED_PACKAGES) {
     const file = join(root, pkg.changelog);
     if (!existsSync(file)) {
-      // Asserted pre-merge by check-release-note-required.mjs, so this is
-      // unreachable through a PR. Reported rather than skipped: an alarm that
-      // silently stops watching a package is the shape of every bug in this file.
       alarms.push(
         `UNMEASURED — ${pkg.changelog} is missing, so nothing here can say whether ` +
           `${pkg.name} is waiting for a version number.`,
@@ -329,7 +182,6 @@ function inspectPendingEntries({ root }) {
   return { alarms, lines };
 }
 
-/** The outcome leg: does each registry serve what main declares? */
 function inspectRegistries({ root, targets, readVersion }) {
   const alarms = [];
   const lines = [];
@@ -402,16 +254,7 @@ export function check({
   const lines = [...path.lines, ""];
   const alarms = [...path.alarms];
 
-  // Registry drift is only meaningful once HEAD's own release has had time to
-  // run. Inside the grace window a bump that merged four minutes ago is
-  // legitimately not on npm yet, and firing there would be the false alarm that
-  // gets the label muted. HEAD is the right subject even for a publish an
-  // EARLIER commit missed: `release.yml` diffs against the registry, not against
-  // the previous commit, so HEAD's run publishes whatever is still owed.
   if (path.headAge > graceMinutes) {
-    // Same grace window, same reason: an entry that merged four minutes ago is
-    // legitimately still waiting for allocate-version.yml to finish, and firing
-    // there would be the false alarm that gets the label muted.
     const allocation = inspectPendingEntries({ root });
     lines.push(...allocation.lines);
     alarms.push(...allocation.alarms);
@@ -433,9 +276,6 @@ export function main(argv = process.argv.slice(2)) {
   const flags = argv.filter((a) => a.startsWith("--"));
   const root = resolve(argv.find((a) => !a.startsWith("--")) ?? join(HERE, "../.."));
 
-  // Dead-guard check, network-free: prove release.yml still yields targets. Run
-  // in ci.yml's always-on block so a release restructure that this parser cannot
-  // follow reds the PR that causes it, rather than the alarm going quietly blind.
   if (flags.includes("--targets")) {
     const targets = parseTargets(root);
     for (const t of targets) {
@@ -470,11 +310,6 @@ export function main(argv = process.argv.slice(2)) {
   console.log("\n✅ Every version main declares is on its registry, and the release path is alive.");
 }
 
-// Realpath'd on both sides — node resolves symlinks before deriving
-// `import.meta.url`, so a bare `pathToFileURL()` of argv[1] (with no
-// realpath) misses through a symlinked checkout (a worktree, or macOS's
-// symlinked `/tmp`) in the same silent shape, and a guard miss
-// while invoked as this file throws rather than exits 0.
 const SELF = realpathSync(fileURLToPath(import.meta.url));
 const ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";
 const invokedDirectly = ENTRY === SELF;

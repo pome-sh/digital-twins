@@ -1,24 +1,8 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
-/**
- * Regression coverage for scripts/ci/assert-allocate-token-path.mjs.
- *
- * Every case below MUTATES THE REAL `allocate-version.yml` rather than a
- * hand-written sample, because the claim under test is about the file that ships:
- * a checker that only ever fails on a synthetic fixture proves nothing about the
- * edits a person would actually make. Each mutation is one plausible edit — the
- * kind that passes review because it looks like tidying — and each must red.
- *
- * The property: on a `push` event, the job either fails before the push step or
- * pushes with the pome-ops-push installation token. It can never reach the push
- * step holding `github.token`. Reaching it is a silent double failure —
- * `github-actions` can never be a ruleset bypass actor (the push is refused), and
- * a push made with `GITHUB_TOKEN` does not trigger workflows (so a landed commit
- * would publish nothing) — and both look like a quiet green.
- *
- * A checker that has never failed is a checker nobody knows works, so the
- * positive case (the real file passes) is asserted alongside fifteen negatives.
- */
+//
+// Asserts the token-path checker goes RED on each of the four edits that would make
+// the ambient-token fallback reachable on a push.
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -39,7 +23,6 @@ function check(label, condition, detail = "") {
   console.error(`  ✗ ${label}${detail ? `\n      ${detail}` : ""}`);
 }
 
-/** A repo root whose only workflow is a (possibly mutated) copy of the real one. */
 function run(mutate = (text) => text) {
   const dir = mkdtempSync(join(tmpdir(), "allocate-token-path-"));
   try {
@@ -51,7 +34,6 @@ function run(mutate = (text) => text) {
   }
 }
 
-/** Drop a whole `- name: <name>` step block, up to the next step at the same indent. */
 function dropStep(text, name) {
   const lines = text.split("\n");
   const start = lines.findIndex((line) => line.includes(`- name: ${name}`));
@@ -62,7 +44,6 @@ function dropStep(text, name) {
   return [...lines.slice(0, start), ...lines.slice(end)].join("\n");
 }
 
-/** Edit one line inside a named step (the first line matching `match`). */
 function editInStep(text, name, match, replacement) {
   const lines = text.split("\n");
   const start = lines.findIndex((line) => line.includes(`- name: ${name}`));
@@ -76,7 +57,6 @@ function editInStep(text, name, match, replacement) {
   return lines.join("\n");
 }
 
-/** Insert a line after the `- name:` line of a named step. */
 function insertInStep(text, name, line) {
   const lines = text.split("\n");
   const start = lines.findIndex((l) => l.includes(`- name: ${name}`));
@@ -101,8 +81,6 @@ console.log("assert-allocate-token-path.mjs — the real file");
     result.summary,
   );
 
-  // The parser is the part that can silently drift and make every case below
-  // vacuous, so it is asserted directly too.
   const steps = parseSteps(REAL.split("\n").map((line) => line.replace(/\s+#.*$/, "")));
   check(
     "parseSteps finds each step exactly once, in file order",
@@ -226,9 +204,6 @@ console.log("the pushing step");
   );
   check("a neutralised guard reds", names(neutralised).includes("pushing step"), names(neutralised));
 
-  // Without this, all three attempts report "a merge landed first"
-  // while main was answering GH013. Collapsing the rule-violation branch back
-  // into a bare retry is the "simplification" that would restore that.
   const raceOnly = run((t) => t.replace(/GH013/g, "GH0XX"));
   check(
     "losing the rule-violation branch reds — a refusal is not a race",
@@ -283,9 +258,6 @@ console.log("the fallback itself");
 
 console.log("the checkout ref, per arm");
 {
-  // `ref: main` on a pull_request event checks out a tree
-  // WITHOUT the PR's files, so the arm that exists to prove this PR's allocator
-  // runs died with `Cannot find module …/allocate-release-versions.test.mjs`.
   const unconditional = run((t) =>
     t.replace(
       "ref: ${{ github.event_name == 'pull_request' && github.ref || 'main' }}",
@@ -298,9 +270,6 @@ console.log("the checkout ref, per arm");
     names(unconditional),
   );
 
-  // The other direction: the push arm must read the moving TIP, not the sha the
-  // event fired on, or a merge that landed while the run queued is left out of the
-  // release it belongs to.
   const eventSha = run((t) =>
     t.replace(
       "ref: ${{ github.event_name == 'pull_request' && github.ref || 'main' }}",
@@ -325,8 +294,6 @@ console.log("the checkout ref, per arm");
     names(missing),
   );
 
-  // And the per-arm form is accepted with either spelling of the merge ref, so the
-  // check does not red a correct file (a guard that reds right answers gets deleted).
   const shaForm = run((t) =>
     t.replace(
       "ref: ${{ github.event_name == 'pull_request' && github.ref || 'main' }}",

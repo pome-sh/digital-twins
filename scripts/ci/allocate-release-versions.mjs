@@ -1,76 +1,13 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// The number is written here, on main, after the merge.
+// Writes the version numbers main's tip has earned. Owed if EITHER a pending
+// `## Unreleased (level)` entry exists OR a publish-relevant path moved since
+// the last commit that changed the version.
 //
-// A version line hand-written in a PR invalidates every other open PR that
-// pinned it, silently, because those PRs stay green — their CI ran before the
-// merge. Writing it on the tip instead removes the whole class.
-//
-// The tempting alternative, recorded because it is cheaper and will be
-// suggested again: have PRs write a placeholder and compute the real number at
-// publish time from the registry's `latest`. It makes release.yml's `plan` job
-// vacuous — "behind the registry is a hard failure" becomes structurally
-// impossible to trip, so that check passes forever without being able to fire.
-//
-// This script is the whole of "the pipeline writes it". `.github/workflows/
-// allocate-version.yml` runs it on every push to `main`; it writes version lines
-// and CHANGELOG headings, and commits. `release.yml` is untouched: it still
-// diffs each package's local manifest against its registry on push to `main`,
-// still hard-fails on behind-npm, still baselines a never-seen package at 0.0.0.
-// The bump commit is a push to `main`, so it is that commit's own `release.yml`
-// run that publishes.
-//
-// ── WHAT EARNS A NUMBER ──────────────────────────────────────────────────────
-//
-// A package is owed a release if EITHER holds:
-//
-//   pending    — its CHANGELOG has an `## Unreleased (patch|minor)` section.
-//                Someone asked for a release in words; that is a request in its
-//                own right, even for a change no path rule would notice.
-//   relevance  — a publish-relevant path of that package moved since the last
-//                commit that changed its version (`publish-relevance.mjs` owns
-//                which paths those are, including the wire→cli/adapter/checks
-//                coupling). This is the half that cannot be forgotten: the
-//                failure this apparatus exists to prevent is a fix that merges
-//                clean and never reaches a consumer, and a rule that only fires
-//                when someone remembered to write prose reintroduces it.
-//
-// The LEVEL is never inferred. It comes from the pending heading, and a package
-// owed a release with no pending entry gets a patch plus an entry naming the
-// commits — see `derivedEntry()` for why that is written rather than refused.
-//
-// ── THE THREE PROPERTIES THAT HOLD ──────────────────────────────────────────
-//
-// 1. THE BUMP COMMIT CANNOT RE-TRIGGER A PUBLISH LOOP. Relevance is measured
-//    from `lastVersionChange()` — the newest commit that moved that package's
-//    version — and the bump commit IS such a commit. So one push after a
-//    release, the range is empty and the pending entry it consumed is gone: the
-//    allocator is a no-op on its own output. That is structural, not a marker
-//    match. Two further, independent guards sit on top of it: a `CHANGELOG.md`
-//    is not a publish-relevant path (`publish-relevance.mjs` explains why), and
-//    allocate-version.yml skips a push whose head commit carries the marker
-//    below. Either one alone would stop the loop; none of them is load-bearing
-//    alone.
-//
-// 2. TWO PRs MERGING CLOSE TOGETHER CANNOT DOUBLE-ALLOCATE. The unit of
-//    allocation is `main`'s TIP, never the pushed range: the script reads the
-//    tip's manifests and the tip's pending entries, and allocate-version.yml
-//    serialises itself with a `concurrency` group and re-runs the whole
-//    computation after any rejected push. Two merges that land inside one
-//    window get ONE number carrying both entries — which is the truth (both
-//    were on `main` when the number was cut), not a lost release.
-//
-// 3. INSERTIONS ONLY. `changelog-entry.mjs`'s `writeRelease()` reassembles a
-//    file as `preamble + newSection + releasedRegion`, so a released entry is
-//    carried across byte-for-byte. The PR gate compares that same region against
-//    the base branch, which is the human half of the same property.
-//
-// Usage:
-//   node scripts/ci/allocate-release-versions.mjs [repo root]      # plan only
-//   node scripts/ci/allocate-release-versions.mjs --write \
-//        [--plan-out f.json] [--message-out f.txt] [--regen-out f.sh] [repo root]
-//   env: POME_ALLOCATION_DATE=YYYY-MM-DD (tests; default: today, UTC)
+// The unit is main's TIP, never the pushed range, so two merges in one window
+// get one number. Loop safety is structural, not a marker match: relevance is
+// measured from `lastVersionChange()`, and the bump commit is one.
 
 import { execFileSync } from "node:child_process";
 import { readFileSync, realpathSync, writeFileSync } from "node:fs";
@@ -83,20 +20,8 @@ import { PUBLISHED_PACKAGES, packagesTouchedBy } from "./publish-relevance.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
-/**
- * Carried in the bump commit's subject. Read by allocate-version.yml's job-level
- * `if:` as a cheap "don't even start" — deliberately NOT the loop guard (see
- * property 1 above). If this string and the workflow's copy of it ever drift,
- * the allocator simply runs and finds nothing to do; nothing breaks.
- */
 export const BUMP_COMMIT_MARKER = "[release-bump]";
 
-/**
- * How far back to look for the commit that last moved a package's version.
- * Path-filtered, so this is 60-odd commits for a real package, and the loop
- * usually exits on the first. Exhausting it is not treated as "nothing to do":
- * see `lastVersionChange`.
- */
 const VERSION_WALK_LIMIT = 500;
 
 function git(root, args) {
@@ -107,7 +32,6 @@ function gitLines(root, args) {
   return git(root, args).split("\n").filter(Boolean);
 }
 
-/** The version a manifest declared at a ref, or null if it wasn't there. */
 function versionAt(root, ref, manifest) {
   try {
     return JSON.parse(git(root, ["show", `${ref}:${manifest}`])).version ?? null;
@@ -116,22 +40,6 @@ function versionAt(root, ref, manifest) {
   }
 }
 
-/**
- * The newest commit that CHANGED this manifest's version — the point after which
- * changed files are not yet in any release.
- *
- * "Changed the version" rather than "touched the manifest", because a Renovate
- * dependency bump touches the manifest without allocating anything, and rather
- * than "carries the marker below", because that would be blind to the hand-bump
- * era this replaces (and to a founder-bypass bump). The bump commit this script
- * writes is itself a version change, which is what makes the loop terminate.
- *
- * Returns `{ sha }`, or `{ sha: null, exhausted }` when no such commit is
- * reachable. A null answer widens the range to the whole history, which will
- * over-allocate rather than under-allocate — the deliberate direction: a
- * spurious patch release is visible and cheap, a silently skipped one is the
- * defect this file exists to prevent.
- */
 export function lastVersionChange(root, manifest) {
   const shas = gitLines(root, ["log", "--format=%H", "--", manifest]);
   for (const sha of shas.slice(0, VERSION_WALK_LIMIT)) {
@@ -140,20 +48,6 @@ export function lastVersionChange(root, manifest) {
   return { sha: null, exhausted: shas.length > VERSION_WALK_LIMIT };
 }
 
-/**
- * The entry written for a package that is owed a release and has no words —
- * today, only the coupled case: wire moved, so the CLI's, the adapter's and
- * checks' tarballs all carry different bytes and each needs a release, and
- * whoever changed wire may have had nothing to say about three other packages.
- * Version-only releases have been accepted for exactly this since
- * `cli/CHANGELOG.md` 0.21.7.
- *
- * WRITTEN, NOT REFUSED. Failing here would mean not publishing, which is the
- * silence the whole apparatus exists to end; and this repo's own convention is
- * that a gap gets named in the record rather than papered over. So the entry
- * says plainly that no words were supplied and names the commits, which is
- * where the words are.
- */
 function derivedEntry({ pkg, files, commits }) {
   const paths = [...new Set(files.map((file) => file.replace(/[^/]+$/, "")))].sort().slice(0, 6);
   return [
@@ -165,10 +59,6 @@ function derivedEntry({ pkg, files, commits }) {
   ].join("\n");
 }
 
-/**
- * What `main`'s tip owes, per package. Pure read — nothing is written unless
- * `applyAllocations()` is called with the result.
- */
 export function planAllocations({ root = resolve(HERE, "../.."), date = today(), npmView } = {}) {
   if (git(root, ["rev-parse", "--is-shallow-repository"]).trim() === "true") {
     throw new Error(
@@ -239,39 +129,6 @@ export function planAllocations({ root = resolve(HERE, "../.."), date = today(),
     });
   }
 
-  // An example that pins a `@pome-sh/*` package from the registry
-  // (today only `agent-examples/support-triage`) must never fall out of sync with
-  // that sibling's published version: a drifted pin reds
-  // `check-example-pins-published.mjs` until a human notices and opens a
-  // one-line PR. `planExampleRepins` is the part of
-  // that gate's own logic that already answers "which pins are safely fixable
-  // right now" (its `violations`: drifted AND the sibling is CONFIRMED
-  // published) — reused rather than re-implemented, discovered from
-  // `agent-examples/*/package.json` rather than a hand-kept list.
-  //
-  // Deliberately measured against the manifests ON DISK, before this run's own
-  // `writes` above are applied: a package THIS SAME run is bumping is not yet
-  // published (that happens in `release.yml`'s run of the commit this script is
-  // about to push), so `planExampleRepins`'s own registry check correctly finds
-  // it unpublished and leaves it alone — repinning to a version that does not
-  // exist yet would need a lockfile entry `npm install --package-lock-only`
-  // cannot resolve, and a manifest pin with no matching lockfile entry breaks
-  // `npm ci` for that example outright, which is worse than the drift this
-  // exists to fix. That version's example pin gets corrected on the FIRST
-  // subsequent run of this workflow after `release.yml` actually publishes it —
-  // still fully automatic, still no human PR, just one push later.
-  //
-  // ONE guard around the whole call, rather than a guard per throw site. A
-  // re-pin is cosmetic; an allocation is not — and this function runs on every
-  // push to `main`, so ANY throw from the example walk stops EVERY package's
-  // release over one example directory. The reachable vectors today are already
-  // more than one (an ambiguous pin, a malformed `agent-examples/*/package.json` that
-  // `discoverExampleSiblingDeps` `JSON.parse`s unguarded, `loadWorkspaceMembers`
-  // on an empty `workspaces` glob) and the next one arrives with the next
-  // caller, so the invariant is enforced here where it is total. The failure is
-  // loud — `notes` is printed as `::warning::` — and the read-side gate in
-  // `ci.yml` still reds on whatever the example is doing wrong, so nothing is
-  // swallowed, only de-escalated to the blast radius it should have had.
   let repins = [];
   try {
     repins = npmView ? planExampleRepins(root, npmView) : planExampleRepins(root);
@@ -285,17 +142,6 @@ export function planAllocations({ root = resolve(HERE, "../.."), date = today(),
   return { head, date, allocations, repins, notes, message: commitMessage(allocations, repins, head) };
 }
 
-/**
- * Replace the `"version": "x.y.z"` line textually rather than re-emitting
- * `JSON.stringify(manifest)`: a manifest round-tripped through JSON.parse loses
- * its key order, its indentation and its trailing newline, and the diff of a
- * release commit should be one line.
- *
- * The occurrence count is asserted rather than assumed. `String.replace` with a
- * string pattern silently replaces only the FIRST match, so a manifest that grew
- * a second `"version":` key (inside a nested config block) would have the wrong
- * one rewritten and still parse as valid JSON.
- */
 function rewriteVersion(manifest, { from, to, path }) {
   const line = (version) => `"version": "${version}"`;
   const occurrences = manifest.split(line(from)).length - 1;
@@ -329,7 +175,6 @@ function commitMessage(allocations, repins, head) {
   ].join("\n");
 }
 
-/** Applies a plan's writes. Returns the paths written. */
 export function applyAllocations(plan, { root = resolve(HERE, "../..") } = {}) {
   const written = [];
   for (const allocation of [...plan.allocations, ...plan.repins]) {
@@ -351,9 +196,6 @@ export function main(argv = process.argv.slice(2)) {
     return index >= 0 ? argv[index + 1] : null;
   };
   const flagValues = new Set(["--plan-out", "--message-out", "--regen-out"].map(flagValue).filter(Boolean));
-  // An optional positional repo root, same shape as release-alarm.mjs, so the
-  // regression suite can drive the real CLI over a throwaway repository instead
-  // of asserting against the plan function alone.
   const root = resolve(argv.find((arg) => !arg.startsWith("--") && !flagValues.has(arg)) ?? resolve(HERE, "../.."));
 
   const plan = planAllocations({ root });
@@ -377,11 +219,6 @@ export function main(argv = process.argv.slice(2)) {
   if (planOut) writeFileSync(planOut, `${JSON.stringify(plan, null, 2)}\n`);
   const messageOut = flagValue("--message-out");
   if (messageOut) writeFileSync(messageOut, plan.message);
-  // The regeneration commands are DERIVED from the table beside the artifacts
-  // they produce (wire's trace-contract.json embeds wire's own version and is
-  // byte-compared by a required gate), rather than hand-wired into the workflow
-  // YAML: a second versioned artifact should not need a workflow edit to be
-  // regenerated, and the command belongs next to the file it writes.
   const regenOut = flagValue("--regen-out");
   if (regenOut) {
     const commands = [...plan.allocations, ...plan.repins].flatMap((a) => a.regenerate);
@@ -395,11 +232,6 @@ export function main(argv = process.argv.slice(2)) {
   return plan;
 }
 
-// Realpath'd on both sides — node resolves symlinks before deriving
-// `import.meta.url`, so a bare `pathToFileURL()` of argv[1] misses through a
-// symlinked checkout (a worktree, or macOS's symlinked `/tmp`) in the same
-// silent shape, and a guard miss while invoked as this file throws
-// rather than exits 0.
 const SELF = realpathSync(fileURLToPath(import.meta.url));
 const ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";
 const invokedDirectly = ENTRY === SELF;

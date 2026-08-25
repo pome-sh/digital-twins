@@ -1,65 +1,15 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// The version-allocating push can only ever happen with the app token.
+// allocate-version.yml's `steps.app-token.outputs.token || github.token`
+// fallback must stay reachable only on the plan-only pull_request arm. On a push
+// it is a silent double failure: `github-actions` can never be a ruleset bypass
+// actor, and a push made with GITHUB_TOKEN triggers no workflows, so the number
+// lands and nothing publishes it. Four one-line edits would each make it
+// reachable, so the reachability is asserted here rather than commented.
 //
-// `allocate-version.yml`'s checkout carries a fallback:
-//
-//     token: ${{ steps.app-token.outputs.token || github.token }}
-//
-// That exists for ONE arm — the `pull_request` arm, which plans, never writes,
-// and on a fork has no secrets at all. Everywhere else it must be unreachable,
-// because reaching it is a silent double failure: `github-actions` can never be
-// a ruleset bypass actor, so the push is refused; and a push made with
-// `GITHUB_TOKEN` triggers no workflows, so if it somehow landed, no
-// `release.yml` run would publish it. Both look like a quiet green.
-//
-// A comment saying "this fallback is only for PRs" is not a guarantee. Four
-// edits would each make it reachable on a push, none obviously wrong in review:
-// dropping the precondition step, marking the precondition or the mint step
-// `continue-on-error: true`, narrowing either step's `if:` so it can be false
-// on a push, or handing the push step `github.token` directly. So the
-// reachability is a PROPERTY over the workflow text, checked here.
-//
-// ── WHAT IS ASSERTED, AND WHY EACH LINE HOLDS THE PROPERTY ───────────────────
-//
-//   1. Exactly ONE mint step (`uses: actions/create-github-app-token@…`), with an
-//      `id:` (an output nothing can reference is not a token), the non-PR guard,
-//      and no `continue-on-error`. This is what makes
-//      `steps.<id>.outputs.token` non-empty on every push that reaches the
-//      checkout: the step runs, and if it fails the job stops before the checkout,
-//      because every later step inherits an implicit `success()`.
-//   2. A precondition step BEFORE the mint step, same guard, no
-//      `continue-on-error`, naming both secrets and containing `exit 1`. The mint
-//      action fails on empty inputs by itself; this is what makes the failure name
-//      which secret, on which repository, and what to do — the message someone
-//      meets when releases have silently stopped.
-//   3. Every step that runs `git push` carries the non-PR guard, has no
-//      `continue-on-error`, comes after the mint step, and mentions no ambient
-//      token anywhere in it.
-//   4. Every `github.token` / `secrets.GITHUB_TOKEN` occurrence in the file is
-//      inside the exact fallback expression `steps.<mintId>.outputs.token ||
-//      github.token`. A bare `token: ${{ github.token }}` — the shape someone
-//      reaches for when the mint step is temporarily commented out — reds.
-//   5. The plan-only arm exists, is PR-guarded, and does not push. That arm is the
-//      fallback's whole reason for being; if it disappears, the fallback should go
-//      with it rather than sit there reachable-in-principle.
-//   6. The checkout ref is per arm, and its non-PR branch is `main` — the moving
-//      TIP, not the event sha, because a second merge that landed while this
-//      run queued belongs in the same release. An unconditional `ref: main`
-//      checks out a tree WITHOUT the PR's own files, so the plan-only arm —
-//      whose entire job is to prove this PR's allocator still runs — dies with
-//      `Cannot find module …/allocate-release-versions.test.mjs`. Asserted only
-//      while the file has a `pull_request:` trigger to serve.
-//   7. Floors: the file exists, and the push-step and mint-step counts are
-//      non-zero. A checker whose subject has gone empty passes forever.
-//
-// Comment stripping is `list-scheduled-workflows.mjs`'s, not a third copy: its
-// stripper is quote-aware, because a blanket `#.*$` truncates two distinct
-// quoted values to the same mangled prefix and makes a bijection compare two
-// equal wrecks.
-//
-// Usage: node scripts/ci/assert-allocate-token-path.mjs [repo root]
+// Also asserts the checkout ref is per arm: an unconditional `ref: main` checks
+// out a tree without the PR's own files.
 
 import { realpathSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -76,15 +26,6 @@ const PR_ONLY_GUARD = "github.event_name == 'pull_request'";
 const AMBIENT_TOKEN_RE = /github\.token|secrets\.GITHUB_TOKEN/g;
 const SECRET_NAMES = ["OPS_APP_ID", "OPS_APP_PRIVATE_KEY"];
 
-/**
- * The workflow's steps, as raw text blocks in file order.
- *
- * Split on the `- ` items at the `steps:` list indent, so a `- ` inside a `run:`
- * block or a prose line cannot start a step. Deliberately NOT a YAML library:
- * every other workflow-property check in this repo reads the same
- * comment-stripped lines, and adding a parser here would mean two answers to
- * "what does this file say" that can disagree.
- */
 export function parseSteps(lines) {
   const stepsAt = lines.findIndex((line) => /^\s*steps:\s*$/.test(line));
   if (stepsAt === -1) return [];
@@ -101,8 +42,6 @@ export function parseSteps(lines) {
       continue;
     }
     if (!current) continue;
-    // A line at or left of the list indent that is not a new item has left the
-    // steps block (the next job key, or the next job).
     const indent = line.match(/^(\s*)\S/);
     if (indent && itemIndent !== null && indent[1].length <= itemIndent && !/^\s*-\s/.test(line)) {
       break;
@@ -131,23 +70,14 @@ export function parseSteps(lines) {
   });
 }
 
-/**
- * The non-pull_request branch of a checkout `ref:` must be `main` — the moving tip.
- * Accepts the literal, and the per-arm expression whose fallback side is `'main'`.
- * The PR side is deliberately left open (`github.ref` and `github.sha` are both
- * the merge ref on that event); what matters is that it is not `main`, which is a
- * tree without the PR's own files.
- */
 const REF_IS_TIP_LITERAL = /^main$/;
 const REF_IS_TIP_PER_ARM =
   /^\$\{\{\s*github\.event_name\s*==\s*'pull_request'\s*&&\s*[^|]+\|\|\s*'main'\s*\}\}$/;
 
-/** Absent or literally `false`. Anything else — including `${{ true }}` — is not. */
 function neutralised(step) {
   return step.continueOnError !== null && !/^(false|\$\{\{\s*false\s*\}\})$/.test(step.continueOnError);
 }
 
-/** Runs on every push, and cannot be turned off by an expression that reads as config. */
 function guardedToRunOnPush(step) {
   if (!step.guard) return false;
   if (!step.guard.includes(NON_PR_GUARD)) return false;
@@ -171,7 +101,6 @@ export function checkAllocateTokenPath(root) {
     throw new Error(`${WORKFLOW}: parsed zero steps — the parser has drifted from the file.`);
   }
 
-  // 1 — the mint step.
   const mintSteps = steps.filter((step) => step.uses?.startsWith(`${MINT_ACTION}@`));
   if (mintSteps.length !== 1) {
     errors.push(
@@ -199,7 +128,6 @@ export function checkAllocateTokenPath(root) {
     }
   }
 
-  // 2 — the precondition step, before the mint step.
   const preconditions = steps.filter(
     (step) =>
       SECRET_NAMES.every((secret) => step.text.includes(secret)) &&
@@ -228,7 +156,6 @@ export function checkAllocateTokenPath(root) {
     }
   }
 
-  // 3 — every pushing step.
   const pushSteps = steps.filter((step) => step.pushes);
   if (pushSteps.length === 0) {
     errors.push(
@@ -260,13 +187,6 @@ export function checkAllocateTokenPath(root) {
           `bypass actor, and a push made with it does not trigger release.yml.`,
       );
     }
-    // A refusal is not a race. Without this branch a rule violation spends all
-    // three attempts reporting "a merge landed first" while main was answering
-    // GH013 (classic branch protection's duplicate required-checks rule, which no
-    // App can bypass). Retrying cannot fix a rule, and a retry loop that cannot
-    // tell the two apart hides the one thing a human needs to read. This asserts
-    // the distinction survives — collapsing the branch back into a bare retry is
-    // exactly the "simplification" that would restore the misdiagnosis.
     if (!/GH013/.test(step.text)) {
       errors.push(
         `the pushing step "${step.name}" does not distinguish a rule violation (GH013) from a ` +
@@ -276,7 +196,6 @@ export function checkAllocateTokenPath(root) {
     }
   }
 
-  // 4 — every ambient-token occurrence is the one sanctioned fallback.
   const fallbackRe = mint?.id
     ? new RegExp(`steps\\.${mint.id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\.outputs\\.token\\s*\\|\\|\\s*github\\.token`)
     : null;
@@ -294,8 +213,6 @@ export function checkAllocateTokenPath(root) {
     );
   }
 
-  // 6 — the checkout ref, per arm. Ordered before the plan-only check below only
-  // because it needs the same `hasPrTrigger` fact.
   const hasPrTrigger = lines.some((line) => /^\s{2}pull_request:\s*$/.test(line));
   const checkouts = steps.filter((step) => step.uses?.startsWith("actions/checkout@"));
   if (checkouts.length === 0) {
@@ -331,7 +248,6 @@ export function checkAllocateTokenPath(root) {
     }
   }
 
-  // 7 — the plan-only arm the fallback exists for.
   const planOnly = steps.filter((step) => step.guard?.includes(PR_ONLY_GUARD) && !step.pushes);
   if (ambientOccurrences > 0 && planOnly.length === 0) {
     errors.push(
@@ -371,11 +287,6 @@ export function main(argv = process.argv.slice(2)) {
   );
 }
 
-// Realpath'd on both sides — node resolves symlinks before deriving
-// `import.meta.url`, so a bare `pathToFileURL()` of argv[1] misses through a
-// symlinked checkout (a worktree, or macOS's symlinked `/tmp`) in the same silent
-// shape, and a guard miss while invoked as this file throws rather than
-// exits 0.
 const SELF = realpathSync(fileURLToPath(import.meta.url));
 const ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";
 const invokedDirectly = ENTRY === SELF;

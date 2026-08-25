@@ -1,48 +1,8 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
-/**
- * Regression coverage for scripts/ci/check-release-note-required.mjs.
- *
- * Stands up a throwaway git repo carrying every manifest and CHANGELOG the gate
- * knows about, then drives it over real commits so the `git diff --name-only
- * base HEAD` / `git show base:path` paths are exercised rather than mocked.
- *
- * ── The cases inherited from the version-bump gate this file re-scopes ───────
- *
- * The publish-relevance table moved to `publish-relevance.mjs` but did
- * not change, and neither did the bugs it has been taught. Each carve-out below
- * is a measured over-match, and every one has the same shape: a plain string
- * prefix matching files that ship in no tarball, so a PR was told to publish a
- * byte-identical artifact.
- *
- *   1  `cli/` matched `cli/test/**` — no package's `files` array names a
- *           test directory. Carved out EXCEPT under `examples/`, `assets/` and
- *           `tasks/`, which the CLI's `files` really does publish verbatim.
- *   2  `packages/twin-` matched a twin's own top-level `examples/`
- *           Not because of `files` — twin-github's and
- *           twin-slack's `dist/examples/` really is packed — but because every
- *           twin is `private: true` and release.yml publishes only cli,
- *           adapter-claude-sdk, checks and wire. Same prefix, one directory
- *           over: a twin's top-level `.md`.
- *   3  Same prefix again: a twin's own top-level `scripts/`, found on the
- *           PR whose whole job was wiring such a script into CI.
- *   4  Same prefix, one file over: a twin's own `Dockerfile`. A GHCR image
- *           is not an npm artifact, so patching a base image was demanding both
- *           a cli and a sandbox-domains release. Found on the PR that had to
- *           edit all five to clear a fixable base-image CVE.
- *
- * Each carve-out is paired with an anchoring case (`src/examples/`,
- * `src/scripts/`, `cli/scripts/`, a doc riding along with a src change) because
- * a regex that widened to `.+` would pass every exemption test while quietly
- * stopping the demand for files that really do ship.
- *
- * ── The cases this file adds ────────────────────────────────────────────────
- *
- * The demand inverted: a PR must NOT write the number, and must carry the words.
- * Both directions are asserted, plus the two CHANGELOG properties that
- * be a convention with nothing behind them — released entries are never
- * rewritten, and the newest released heading names the version beside it.
- */
+//
+// Both directions per rule, plus the two CHANGELOG properties: a rewritten released
+// entry reds, and a heading that disagrees with its manifest version reds.
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -79,21 +39,11 @@ function write(dir, relPath, contents) {
 const baseChangelog = (name, version = BASE_VERSION) =>
   `# ${name} — CHANGELOG\n\n## ${version} — 2026-08-01\n\nThe entry that already shipped.\n`;
 
-/** Insert a pending section above the released region, the way an author would. */
 function addPendingEntry(text, { level = "patch", body = "- a thing a consumer must know" } = {}) {
   const at = text.indexOf("## ");
   return `${text.slice(0, at)}## Unreleased (${level})\n\n${body}\n\n${text.slice(at)}`;
 }
 
-/**
- * Build a repo whose base commit carries every published package at 1.0.0 with a
- * matching CHANGELOG, apply `changes` / `versions` / `entries` / `changelogs` as
- * a second commit, and run the gate against the base sha.
- *
- * `seedChangelogVersion` seeds a base that is ALREADY inconsistent, which is the
- * only way to reach the heading↔version check without also tripping the
- * hand-written-version one.
- */
 function run({ changes = {}, versions = {}, entries = [], changelogs = {}, seedChangelogVersion = {} }) {
   const dir = mkdtempSync(join(tmpdir(), "release-note-gate-"));
   try {
@@ -119,9 +69,6 @@ function run({ changes = {}, versions = {}, entries = [], changelogs = {}, seedC
       if (changelogs[pkg.name]) write(dir, pkg.changelog, changelogs[pkg.name]);
     }
     git(dir, "add", "-A");
-    // `--allow-empty` so a case can seed an inconsistent BASE and change nothing
-    // in the PR — which is how the heading↔version check is reached without also
-    // tripping the hand-written-version one.
     git(dir, "commit", "-q", "--allow-empty", "-m", "change");
 
     const r = spawnSync("node", [SCRIPT, baseSha], { cwd: dir, encoding: "utf8" });
@@ -158,7 +105,6 @@ console.log("check-release-note-required.mjs — publish relevance (inherited)")
 }
 
 {
-  // A test file mixed in with a src change must not mask the src change.
   const r = run({
     changes: { "cli/src/thing.ts": "export const a = 1;\n", "cli/test/thing.test.ts": "// t\n" },
   });
@@ -166,8 +112,6 @@ console.log("check-release-note-required.mjs — publish relevance (inherited)")
 }
 
 {
-  // `files: ["examples", ...]` publishes these verbatim, so they are not exempt
-  // just because of the filename.
   const r = run({ changes: { "cli/examples/demo/smoke.test.ts": "// shipped\n" } });
   check("a *.test.ts under cli/examples/ still demands an entry", r.status === 1, r.out);
 }
@@ -192,7 +136,6 @@ console.log("check-release-note-required.mjs — publish relevance (inherited)")
 }
 
 {
-  // Anchoring check, single path segment: `[^/]+\/[^/]+\.md` must not loosen.
   const r = run({
     changes: {
       "packages/twin-github/FIDELITY.md": "# doc\n",
@@ -216,14 +159,11 @@ console.log("check-release-note-required.mjs — publish relevance (inherited)")
 }
 
 {
-  // Anchoring check: packages/twin-stripe/src/examples/handler.ts compiles into
-  // that twin's own dist/ same as any other src/ module.
   const r = run({ changes: { "packages/twin-stripe/src/examples/handler.ts": "export const a = 1;\n" } });
   check("a twin's src/examples/ change with no entry still fails", r.status === 1, r.out);
 }
 
 {
-  // A twin's own top-level scripts/ is dev/CI tooling in no tarball.
   const r = run({ changes: { "packages/twin-github/scripts/validate-mcp.ts": "// tooling\n" } });
   check("a change confined to a twin's scripts/ needs no entry", r.status === 0, r.out);
 }
@@ -238,7 +178,6 @@ console.log("check-release-note-required.mjs — publish relevance (inherited)")
 }
 
 {
-  // Anchoring check: cli/scripts/ is NOT a twin script.
   const r = run({ changes: { "cli/scripts/copy-prompts.mjs": "// tooling\n" } });
   check(
     "a cli/scripts/ change with no entry still fails",
@@ -262,8 +201,6 @@ console.log("check-release-note-required.mjs — publish relevance (inherited)")
 }
 
 {
-  // A twin's Dockerfile builds its GHCR image, which no tarball carries.
-  // The real case was all five at once, to clear a fixable base-image CVE.
   const r = run({
     changes: {
       "packages/twin-github/Dockerfile": "FROM node:24-trixie-slim\n",
@@ -277,8 +214,6 @@ console.log("check-release-note-required.mjs — publish relevance (inherited)")
 }
 
 {
-  // Anchoring check, exact filename under the twin root: `src/` is where tsup
-  // actually reaches, so a Dockerfile sitting there is not exempt.
   const r = run({ changes: { "packages/twin-stripe/src/Dockerfile": "FROM scratch\n" } });
   check(
     "a Dockerfile under a twin's src/ with no entry still fails",
@@ -304,12 +239,6 @@ console.log("check-release-note-required.mjs — publish relevance (inherited)")
 console.log("the coupling: one change, several artifacts");
 
 {
-  // wire's bytes are inlined into the CLI's and the adapter's tarballs, so one
-  // wire change is THREE releases, and
-  // the demand names all three: a PR that writes one entry and forgets two ships
-  // two releases with no record of what is in them. `@pome-sh/checks` is
-  // deliberately not among them — its relevance is named declaration FILES, not
-  // whole directories.
   const r = run({ changes: { "packages/wire/src/thing.ts": "export const a = 1;\n" } });
   const named = PUBLISHED_PACKAGES.filter((pkg) => r.out.includes(`${pkg.name}: this PR changes`)).map(
     (pkg) => pkg.name,
@@ -331,9 +260,6 @@ console.log("the coupling: one change, several artifacts");
 }
 
 {
-  // @pome-sh/checks' relevance is named FILES inside other packages, not whole
-  // directories: a twin's or the sdk's non-declaration change is not a
-  // vocabulary change.
   const plain = run({ changes: { "packages/sdk/src/registry.ts": "export const a = 1;\n" } });
   check(
     "a non-declaration sdk change demands the CLI only",
@@ -368,10 +294,6 @@ console.log("the number is not the PR's to write");
 }
 
 {
-  // A version moved DOWN
-  // (a stale branch rebased past a release) hard-failed release.yml's floor check
-  // after merge. It is now the same failure as any other hand-written number,
-  // which is the point — there is no right value for a PR to carry.
   const r = run({ versions: { "@pome-sh/cli": "0.9.0" }, entries: ["@pome-sh/cli"] });
   check("a version moved DOWN is refused too", r.status === 1 && r.out.includes("0.9.0"), r.out);
 }
@@ -379,8 +301,6 @@ console.log("the number is not the PR's to write");
 console.log("the CHANGELOG contract");
 
 {
-  // A pending entry with no publish-relevant change is a deliberate release
-  // request and must pass — the allocator honours it.
   const r = run({ entries: ["@pome-sh/checks"] });
   check("a pending entry with no code change is allowed", r.status === 0, r.out);
 }
@@ -430,10 +350,6 @@ console.log("the CHANGELOG contract");
 }
 
 {
-  // The preamble is explicitly NOT part of the record: it describes the format,
-  // and this very ticket had to rewrite cli/CHANGELOG.md's. This is also the case
-  // that proves a CHANGELOG is exempt from publish relevance — it is the one
-  // changed file, and no release is demanded for it.
   const r = run({
     changelogs: {
       "@pome-sh/cli": `# @pome-sh/cli — CHANGELOG\n\nA new note about how this file works.\n\n## ${BASE_VERSION} — 2026-08-01\n\nThe entry that already shipped.\n`,
@@ -448,8 +364,6 @@ console.log("the CHANGELOG contract");
 }
 
 {
-  // The surviving half of the old contract, on a base that is already
-  // inconsistent — the shape a hand-edit on main would leave behind.
   const r = run({ seedChangelogVersion: { "@pome-sh/cli": "0.9.0" } });
   check(
     "a released heading that disagrees with the manifest version fails",
@@ -471,9 +385,6 @@ console.log("the gate's own surface");
 }
 
 {
-  // Appending BELOW the newest released heading is a rewrite of the record, not
-  // an insertion — the same refusal as editing an entry in place, and the shape a
-  // "just add a note at the bottom" edit takes.
   const r = run({
     changelogs: { "@pome-sh/cli": `${baseChangelog("@pome-sh/cli")}\nA trailing note.\n` },
   });
@@ -485,19 +396,6 @@ console.log("the gate's own surface");
 }
 
 {
-  // Every carve-out in publish-relevance.mjs justifies itself with "the package
-  // this path belongs to publishes nothing", so none of them may ever exempt a
-  // path inside a package that DOES publish — that would drop a file which
-  // really reaches a consumer's tarball out of the relevance table, silently.
-  //
-  // Written as a property over `PUBLISHED_PACKAGES` rather than against any one
-  // package, because the way it breaks is a NAME. The new package was called
-  // `twin-domains` first, which put a published `README.md` (in its `files`) under
-  // the `packages/twin-*` top-level-markdown carve-out; renaming it to
-  // `sandbox-domains` is what actually fixed that, and the fix is invisible in
-  // the carve-outs themselves. This is the assertion that notices if a future
-  // package name — or a rename of the twins, which is coming — walks back into
-  // one of these prefixes.
   const exemptedPublished = PUBLISHED_PACKAGES.flatMap((pkg) => {
     const directory = dirname(pkg.manifest);
     return [`${directory}/README.md`, `${directory}/examples/demo/index.ts`, `${directory}/scripts/validate.ts`]
@@ -510,8 +408,6 @@ console.log("the gate's own surface");
     exemptedPublished.join("\n      "),
   );
 
-  // …and the carve-outs still apply to the five PRIVATE twins, or the rule was
-  // widened into uselessness rather than kept honest.
   check(
     "the private twins keep their carve-outs",
     isPublishIrrelevantPath("packages/twin-github/FIDELITY.md") !== null &&
@@ -519,10 +415,6 @@ console.log("the gate's own surface");
       isPublishIrrelevantPath("packages/twin-github/scripts/validate-mcp.ts") !== null,
   );
 
-  // The shared declaration bundler moved to scripts/ so sandbox-domains
-  // could use it instead of copying ~300 lines. Both packages' `.d.ts` are
-  // unresolvable for a consumer if it regresses, so it must stay publish-relevant
-  // for both — the move must not have quietly dropped it out of the table.
   const bundlerConsumers = PUBLISHED_PACKAGES.filter((pkg) =>
     (pkg.pathPatterns ?? []).some((pattern) => pattern.test("scripts/bundle-declarations.mjs")),
   ).map((pkg) => pkg.name);

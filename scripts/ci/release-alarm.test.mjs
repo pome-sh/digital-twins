@@ -1,20 +1,8 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
-/**
- * Regression coverage for scripts/ci/release-alarm.mjs.
- *
- * Both directions are asserted, and the silent one matters more. An alarm that
- * fires on a healthy release gets muted, and a muted alarm is exactly the state
- * this ticket exists to end — so every "fires" case below has a matching "stays
- * silent" case: a bump inside the grace window, a failure already being retried,
- * a first-ever publish, a run in flight.
- *
- * The fixture's `.github/workflows/release.yml` is the REAL one, copied from
- * this repo. That makes `parseTargets` a live assertion rather than a test
- * against a hand-written sample: if a release restructure moves the
- * decide-publish.sh calls past the parser, this suite reds instead of the alarm
- * silently watching zero packages.
- */
+//
+// One case per alarm state, plus the dead-guard: a package list parsed to empty must
+// red rather than watch nothing forever.
 import { spawnSync } from "node:child_process";
 import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -27,10 +15,6 @@ import { check, compareVersions, parseTargets, readTargets } from "./release-ala
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const SCRIPT = join(ROOT, "scripts/ci/release-alarm.mjs");
 const REPO = "pome-sh/digital-twins";
-// Compared with `===`, never with `.includes`: a host substring match is a
-// weaker claim than the one being made here (the registry IS this one, not
-// merely contains its name), and CodeQL's js/incomplete-url-substring-
-// sanitization is right to flag the weaker form.
 const GH_PACKAGES = "https://npm.pkg.github.com";
 const NOW = Date.parse("2026-08-06T12:00:00Z");
 const HEAD_SHA = "9119a07f0000000000000000000000000000abcd";
@@ -47,11 +31,6 @@ function check_(label, condition, detail = "") {
 
 const minutesAgo = (m) => new Date(NOW - m * 60_000).toISOString();
 
-/**
- * A CHANGELOG with nothing pending, for every published package — the state
- * every allocation leaves behind. `pending` names packages that get an
- * `## Unreleased` section instead, which is the state a dead allocator leaves.
- */
 function writeChangelogs(dir, pending = {}) {
   for (const pkg of PUBLISHED_PACKAGES) {
     mkdirSync(join(dir, dirname(pkg.changelog)), { recursive: true });
@@ -63,7 +42,6 @@ function writeChangelogs(dir, pending = {}) {
   }
 }
 
-/** A repo root carrying the real release.yml and manifests at the paths it names. */
 function fixture(versions = {}, pending = {}) {
   const dir = mkdtempSync(join(tmpdir(), "release-alarm-"));
   mkdirSync(join(dir, ".github/workflows"), { recursive: true });
@@ -82,7 +60,6 @@ function fixture(versions = {}, pending = {}) {
   return dir;
 }
 
-/** A `gh api` stand-in: answers the commit and the run-list calls, nothing else. */
 function ghStub({ head = { sha: HEAD_SHA, ageMin: 600 }, runs = [] }) {
   return (args) => {
     const joined = args.join(" ");
@@ -124,7 +101,6 @@ function run(opts = {}) {
 
 const kinds = (r) => r.alarms.map((a) => a.split(" ")[0]);
 
-// ── the publish targets are derived from release.yml, not typed here ─────────
 console.log("parseTargets");
 {
   const targets = parseTargets(ROOT);
@@ -147,8 +123,6 @@ console.log("parseTargets");
     targets.every((t) => JSON.parse(readFileSync(join(ROOT, t.manifest), "utf8")).version),
   );
 
-  // The dead-guard case: a release.yml the parser cannot follow must be a hard
-  // failure. An alarm that finds zero packages passes forever.
   const empty = mkdtempSync(join(tmpdir(), "release-alarm-empty-"));
   mkdirSync(join(empty, ".github/workflows"), { recursive: true });
   writeFileSync(join(empty, ".github/workflows/release.yml"), "name: release\njobs: {}\n");
@@ -170,7 +144,6 @@ console.log("compareVersions");
   check_("0.0.0 baseline is below everything", compareVersions("0.1.0", "0.0.0") > 0);
 }
 
-// ── silence ─────────────────────────────────────────────────────────────────
 console.log("stays silent when everything is green");
 {
   const r = run({ runs: [{ ageMin: 300, conclusion: "success" }] });
@@ -180,7 +153,6 @@ console.log("stays silent when everything is green");
 
 console.log("stays silent inside the grace window");
 {
-  // A bump that merged four minutes ago is legitimately not on npm yet.
   const r = run({
     head: { sha: HEAD_SHA, ageMin: 4 },
     runs: [{ ageMin: 4, status: "in_progress" }],
@@ -213,7 +185,6 @@ console.log("stays silent after a workflow_dispatch recovers a failed push (the 
   check_("no alarms", r.alarms.length === 0, r.alarms.join("\n"));
 }
 
-// ── noise, and only where it is owed ────────────────────────────────────────
 console.log("UNPUBLISHED — main declares a version npm does not serve");
 {
   const r = run({
@@ -227,9 +198,6 @@ console.log("UNPUBLISHED — main declares a version npm does not serve");
   });
   check_("fires", kinds(r).filter((k) => k === "UNPUBLISHED").length === 2, r.alarms.join("\n"));
   check_("names the package", r.alarms.some((a) => a.includes("@pome-sh/checks 0.2.0")));
-  // wire is behind on npmjs and current on GitHub Packages. Two targets, ONE
-  // alarm — counted rather than host-matched, which is the sharper claim: a
-  // checker that judged wire once would give either two alarms or none.
   check_(
     "the two wire registries are judged separately",
     r.alarms.filter((a) => a.startsWith("UNPUBLISHED") && a.includes("@pome-sh/wire")).length === 1,
@@ -281,8 +249,6 @@ console.log("STUCK — a run holding the concurrency lock");
 
 console.log("FAILED — a broken release path with nothing owed");
 {
-  // Every version matches its registry: the outcome check cannot see this, and
-  // it is the reason the mechanism leg exists.
   const r = run({ runs: [{ ageMin: 200, conclusion: "failure" }] });
   check_("fires", kinds(r).includes("FAILED"), r.alarms.join("\n"));
   check_("nothing else does", r.alarms.length === 1, r.alarms.join("\n"));
@@ -292,10 +258,6 @@ console.log("FAILED — a broken release path with nothing owed");
 
 console.log("UNALLOCATED — a number nobody wrote");
 {
-  // The state a broken or unconfigured allocate-version.yml leaves: main carries
-  // the words and not the number, main and the registry agree on the OLD version,
-  // and every other leg is green. The outcome check cannot see this at all, which
-  // is the whole reason this leg exists.
   const r = run({
     runs: [{ ageMin: 300, conclusion: "success" }],
     pending: { "@pome-sh/cli": "## Unreleased (patch)" },
@@ -313,9 +275,6 @@ console.log("UNALLOCATED — a number nobody wrote");
   );
   check_("the report names the waiting package", /@pome-sh\/cli — pending patch/.test(r.report), r.report);
 
-  // A `## Unreleased` heading with no level is refused by the same parser
-  // allocate-version.yml runs, so the allocator is failing on it too — reported,
-  // never silently read as "nothing pending".
   const malformed = run({
     runs: [{ ageMin: 300, conclusion: "success" }],
     pending: { "@pome-sh/wire": "## Unreleased" },
@@ -327,7 +286,6 @@ console.log("UNALLOCATED — a number nobody wrote");
     malformed.alarms.join("\n"),
   );
 
-  // Inside the grace window an entry is legitimately still being allocated.
   const fresh = run({
     head: { sha: HEAD_SHA, ageMin: 4 },
     runs: [{ ageMin: 4, status: "in_progress" }],
@@ -338,10 +296,6 @@ console.log("UNALLOCATED — a number nobody wrote");
 
 console.log("UNMEASURED — an unreadable registry is never read as 'unpublished'");
 {
-  // wire is in sync on npmjs and unreadable on GitHub Packages: the ONLY
-  // correct output is one UNMEASURED and nothing else. A checker that folded a
-  // 401 into "unpublished" would add an UNPUBLISHED here, and one that gave up
-  // on the whole package would lose the npmjs judgement — both are counted for.
   const r = run({
     versions: { "@pome-sh/wire": "0.4.0" },
     registry: {
@@ -363,17 +317,8 @@ console.log("UNMEASURED — an unreadable registry is never read as 'unpublished
   );
 }
 
-// ── the incident this exists for, replayed from the real record ─────────────
-//
-// Every number below is measured, not invented: run ids and conclusions from
-// the GitHub Actions API, manifest versions from `git show <sha>:<manifest>`,
-// registry state from `npm view <pkg> time`. The claim under test is the
-// ticket's own bar — "merge something that makes a publish job fail, expect a
-// signal naming the run and the package" — checked against the eleven hours
-// where nothing fired.
-console.log("2026-08-06, replayed");
+console.log("four consecutive failed runs on one day, replayed");
 {
-  /** A fixture whose release.yml is a historical one, not today's. */
   function historical(releaseYaml, versions) {
     const dir = mkdtempSync(join(tmpdir(), "release-alarm-hist-"));
     mkdirSync(join(dir, ".github/workflows"), { recursive: true });
@@ -382,29 +327,15 @@ console.log("2026-08-06, replayed");
       mkdirSync(join(dir, dirname(manifest)), { recursive: true });
       writeFileSync(join(dir, manifest), JSON.stringify({ version }));
     }
-    // Backfill any target the YAML names that the caller did not — `parseTargets`
-    // hard-fails on a manifest that does not exist, so a hand-written map has to
-    // be re-edited every time release.yml gains a package. It was, once: a new
-    // fifth target broke the replay below, which passes the REAL release.yml
-    // against a four-entry map. The versions are what each replay is about, so
-    // callers still name those; the rest only need to exist, and matching
-    // `fixture()`'s self-updating shape is what stops a sixth package breaking a
-    // 2026-08-06 replay it has nothing to do with.
     for (const t of readTargets(dir)) {
       if (versions[t.manifest] !== undefined) continue;
       mkdirSync(join(dir, dirname(t.manifest)), { recursive: true });
       writeFileSync(join(dir, t.manifest), JSON.stringify({ name: t.name, version: "1.0.0" }));
     }
-    // Today's CHANGELOGs even in a historical fixture: the allocation leg's
-    // subject is the tree the alarm is checked out in, and the replay below is
-    // about the registry and the run list, not about the allocation contract.
     writeChangelogs(dir);
     return dir;
   }
 
-  // 06:37 UTC — the first cron after the first two failures (00:42 and 01:26,
-  // both on the `adapter-claude-sdk` publish job). main is f8694aca, committed
-  // 01:26:29 UTC. release.yml at that commit decided three targets.
   const at0637 = Date.parse("2026-08-06T06:37:00Z");
   const early = check({
     root: historical(
@@ -434,8 +365,6 @@ console.log("2026-08-06, replayed");
               { id: 31059706519, head_sha: "ba15fcb200000000000000000000000000000000", status: "completed", conclusion: "success", created_at: "2026-08-06T00:26:24Z" },
             ],
           }),
-    // What each registry actually served at 06:37: cli 0.21.8 landed 01:28,
-    // adapter was still on 0.3.1 (0.3.3 did not publish until 13:11).
     readVersion: (name) =>
       ({
         "@pome-sh/cli": { version: "0.21.8" },
@@ -464,9 +393,6 @@ console.log("2026-08-06, replayed");
     early.alarms.join("\n"),
   );
 
-  // 12:00 UTC — after the 11:28 run failed on THREE jobs (adapter, checks,
-  // wire), main at 9119a07. The human noticed later; the manual
-  // workflow_dispatch that recovered it ran at 13:10.
   const at1200 = Date.parse("2026-08-06T12:00:00Z");
   const late = check({
     root: historical(
@@ -492,15 +418,6 @@ console.log("2026-08-06, replayed");
               { id: 31094244061, head_sha: "452daee900000000000000000000000000000000", status: "completed", conclusion: "failure", created_at: "2026-08-06T10:41:20Z" },
             ],
           }),
-    // cli 0.21.9 published at 10:42; checks 0.1.0 and wire 0.2.1 had never been
-    // published (13:04 and 13:03, by the manual dispatch); adapter was on 0.3.1.
-    //
-    // Anything this replay does not name is a package that did not exist on
-    // 2026-08-06 and is answered in sync with the version `historical` backfilled
-    // — the same `?? { version: "1.0.0" }` fallback `registryStub` uses. Without
-    // it the fifth target reads `undefined` and this replay reds over a
-    // package it is not about, which is the trap the fixture backfill above
-    // exists to close on the other side.
     readVersion: (name, registry) =>
       registry
         ? { version: "0.2.1" }
@@ -533,7 +450,6 @@ console.log("2026-08-06, replayed");
   );
 }
 
-// ── end to end: exit code, $GITHUB_OUTPUT protocol, --targets ───────────────
 console.log("the script's own surface");
 {
   const dir = fixture({ "@pome-sh/checks": "0.2.0" });
@@ -551,7 +467,6 @@ console.log("the script's own surface");
     `,
   );
   writeFileSync(join(bin, "gh"), `#!/usr/bin/env bash\nexec node "$(dirname "$0")/gh-impl.mjs" "$@"\n`);
-  // Every package resolves except @pome-sh/checks, which is E404 — the 08-06 shape.
   writeFileSync(
     join(bin, "npm"),
     `#!/usr/bin/env bash\nif [[ "$*" == *"@pome-sh/checks"* ]]; then\n  echo "npm error code E404" >&2\n  exit 1\nfi\necho 1.0.0\n`,
@@ -578,7 +493,6 @@ console.log("the script's own surface");
   check_("report is heredoc-delimited", /report<<POME_EOF/.test(out), out);
   check_("annotates for the run log", /::error::UNPUBLISHED/.test(r.stderr), r.stderr);
 
-  // --targets is the network-free dead-guard arm ci.yml runs on every PR.
   const t = spawnSync("node", [SCRIPT, "--targets"], { encoding: "utf8", env: process.env });
   check_("--targets exits 0 against the real repo", t.status === 0, t.stderr);
   check_("--targets lists @pome-sh/cli", /@pome-sh\/cli/.test(t.stdout), t.stdout);
