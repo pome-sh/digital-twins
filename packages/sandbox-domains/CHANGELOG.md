@@ -1,6 +1,6 @@
 # @pome-sh/sandbox-domains
 
-## Unreleased (patch)
+## 0.2.14 — 2026-08-25
 
 **No consumer-visible change.** Added `// file-size:` header comments to twin
 modules that were previously exempted from the file-size lint by name, and removed

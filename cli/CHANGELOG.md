@@ -10,7 +10,7 @@ write a version number here or in `package.json`. Released
 entries are insertions only: a correction is the next entry, naming the one it
 corrects.
 
-## Unreleased (patch)
+## 0.26.12 — 2026-08-25
 
 **No consumer-visible change.** Added `// file-size:` header comments to four CLI
 modules that were previously exempted from the file-size lint by name. Prose only
