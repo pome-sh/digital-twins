@@ -1,38 +1,13 @@
 name: release alarm
 
-# A failed release must reach a human without a human going looking.
-# release.yml has no failure path of its own, so a publish that died reads
-# exactly like a merge that owed no publish, and the first signal is somebody
-# noticing a package missing from npm.
-#
-# A separate workflow file because the alarm has to survive the thing it
-# watches: an `if: failure()` step inside release.yml cannot see the worse
-# silence, a release workflow that never triggers at all.
-#
-# It lives here rather than in the consuming repo because `issues: write` is
-# per-repo and every recovery (re-dispatch release.yml, repair the npm Trusted
-# Publisher) is a digital-twins operation, and because one of the five publish
-# targets — @pome-sh/wire on GitHub Packages — needs a token even to READ,
-# which the ambient `packages: read` below covers.
-#
-# Both directions: everything green produces no issue and a green run, and a
-# recovered failure CLOSES the tracking issue. An alarm that cries wolf gets
-# muted, and a stale open issue teaches people to skim the next real one.
+# Daily check that every version main declares reached its registry. A separate file
+# on its own cron, because the alarm has to survive a release.yml that never ran.
+# The pull_request arm proves this file's own job wiring still works.
+
 on:
   schedule:
-    # Daily, off the top of the hour to dodge cron-queue congestion. Daily rather
-    # than hourly because the bar is a signal a human receives within a day.
-    #
-    # The one thing that can silence this file: GitHub disables scheduled workflows
-    # after 60 days with no commits. That is why `--targets` and the regression
-    # suite also run in ci.yml on every PR — a repo quiet enough to lose its cron
-    # is a repo whose release nobody is triggering either.
     - cron: "37 6 * * *"
   workflow_dispatch:
-  # Changing the checker or its subject must prove it still parses on the PR
-  # that changes it. ci.yml runs the same two commands; this arm additionally
-  # proves THIS FILE's job wiring works, which a syntax-valid workflow can get
-  # wrong and otherwise only discover at the next cron.
   pull_request:
     paths:
       - "scripts/ci/release-alarm.mjs"
@@ -40,10 +15,6 @@ on:
       - ".github/workflows/release-alarm.yml"
       - ".github/workflows/release.yml"
       - "scripts/ci/decide-publish.sh"
-      # The UNALLOCATED leg reads these two — the CHANGELOG grammar it parses a
-      # pending entry with, and the table saying which CHANGELOG belongs to which
-      # package. A change to either can blind that leg without touching a file
-      # above.
       - "scripts/ci/changelog-entry.mjs"
       - "scripts/ci/publish-relevance.mjs"
 
@@ -61,20 +32,9 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
-      # Declared explicitly because a `permissions:` block sets every scope it
-      # omits to `none`, and an alarm that silently 403s on the run list reports the
-      # release path healthy because it could not see it.
       actions: read
       issues: write # the tracking issue
       packages: read # @pome-sh/wire's GitHub Packages version, as plan-wire reads it
-    # Whether this job's own mechanism ever reached a verdict, for the meta-alarm
-    # below. 'success' or 'failure' both mean it evaluated the release. Any other
-    # value means it never got that far, and the meta-alarm keys off exactly that
-    # rather than off empty, because there are two such values: 'skipped' (the
-    # step was reached but its implicit `success()` was false, so a failed
-    # checkout or regression suite skips `check`) and '' (the job died before the
-    # runner reached the step at all). `check` is `continue-on-error: true`, so
-    # `outcome`, not `conclusion`, carries the real verdict.
     outputs:
       checked: ${{ steps.check.outcome }}
     steps:
@@ -85,20 +45,12 @@ jobs:
         with:
           node-version: 24
 
-      # Gate on the checker's own tests BEFORE checking, so a red run is a real
-      # claim about the release and not a broken checker.
       - name: Regression-test the checker
         run: node scripts/ci/release-alarm.test.mjs
 
-      # The dead-guard assertion: release.yml still yields publish targets. An
-      # alarm whose package list has quietly gone empty passes forever.
       - name: The publish targets are still derivable from release.yml
         run: node scripts/ci/release-alarm.mjs --targets
 
-      # The GitHub Packages READ only — never a `@pome-sh:registry=` scope mapping,
-      # which would redirect every @pome-sh/* read to a registry where they do not
-      # exist and make each look brand new. In $HOME/.npmrc so the token never sits
-      # in the workspace.
       - name: Authenticate reads against GitHub Packages
         if: github.event_name != 'pull_request'
         env:
@@ -107,9 +59,6 @@ jobs:
           set -euo pipefail
           printf '//npm.pkg.github.com/:_authToken=%s\n' "${GITHUB_PACKAGES_TOKEN}" >> "$HOME/.npmrc"
 
-      # Reads live registry and run state, so it only means anything off a PR
-      # branch — a PR checkout is not main, and its manifests are not what
-      # release.yml will publish.
       - name: Did every version main declares actually reach its registry?
         id: check
         if: github.event_name != 'pull_request'
@@ -119,18 +68,12 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: node scripts/ci/release-alarm.mjs
 
-      # Scoped to the check step's own outcome rather than a bare `if: failure()`
-      # so a checkout or runner fault does not file a confident "the release is
-      # broken" issue about a check that never ran.
       - name: File or update the tracking issue
         if: steps.check.outcome == 'failure'
         continue-on-error: true # alerting must never be the reason the job is red
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          # Empty when the checker died before reaching a verdict (a throw, a gh
-          # failure). Saying so beats printing nothing on an issue filed because
-          # something is wrong.
           ALARM_REASON: ${{ steps.check.outputs.reason }}
           ALARM_REPORT: ${{ steps.check.outputs.report }}
         run: |
@@ -185,9 +128,6 @@ jobs:
             || gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file "$body" || true
           fi
 
-      # The other direction. Without this the tracking issue outlives the
-      # problem, and an open issue nobody closes is how a label stops being read
-      # — which is this ticket's own defect wearing a different hat.
       - name: Close the tracking issue once the release delivers again
         if: steps.check.outcome == 'success'
         continue-on-error: true
@@ -224,40 +164,12 @@ jobs:
           gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body-file "$body" || true
           gh issue close "$existing" --repo "$GITHUB_REPOSITORY" || true
 
-      # `continue-on-error` above keeps the job green so alerting failures never
-      # masquerade as release failures — so the run's own conclusion has to be
-      # set here, or a red release would show a green check and we are back to
-      # silence with extra steps.
       - name: Fail the run when the alarm fired
         if: steps.check.outcome == 'failure'
         run: |
           echo "::error::The release alarm fired — see the tracking issue and the step log above."
           exit 1
 
-  # who watches the watchman. `alarm`'s job conclusion is 'failure'
-  # in two different situations that must not be reported the same way: the
-  # deliberate last step above exiting 1 because it correctly found the
-  # release broken (already communicated via the "twins release is not
-  # delivering" issue — not this job's problem to also alarm about), and
-  # checkout/setup-node/the regression suite/the --targets dead-guard failing
-  # BEFORE `check` ever ran, which means the mechanism itself is broken and
-  # said nothing about the release either way. `outputs.checked` distinguishes
-  # them: it is 'success' or 'failure' exactly when `check` reached a verdict
-  # (the mechanism worked, whatever it found), and anything else — 'skipped'
-  # when a preceding step failed and took `check`'s implicit `success()` with
-  # it, '' when the job died before the step existed in the context at all —
-  # means it never got the chance. Testing for "not one of the two verdicts"
-  # rather than for `== ''` is deliberate: 'skipped' is the COMMON case and an
-  # `== ''` test would have made this job unfireable in precisely the
-  # situation it was written for. Gated off pull_request because `check` is
-  # deliberately skipped there and a non-verdict on a PR run is expected, not
-  # a mechanism outage.
-  #
-  # NOT covered by design, so as not to overstate this: `release-alarm.mjs`
-  # THROWING once `check` is running yields outcome 'failure', which is
-  # indistinguishable here from "the release is not delivering". That case is
-  # handled inside the job instead — the tracking-issue body prints
-  # `(no reason was produced)` when the checker died before a verdict.
   meta-alarm:
     needs: alarm
     if: >-
@@ -276,15 +188,6 @@ jobs:
       outcome: failure
       detail: "release-alarm.yml failed before its own check step ever ran — checkout, setup-node, the regression suite (scripts/ci/release-alarm.test.mjs), or the --targets dead-guard broke, so this run said nothing about whether the release is actually delivering. See the run log for which step failed."
 
-  # The exact negation of `meta-alarm`'s gate, and deliberately NOT also
-  # requiring `needs.alarm.result == 'success'`. The fact this alarm tracks is
-  # "did the mechanism reach a verdict", which `checked` alone answers. Also
-  # requiring a green job would mean that once the mechanism broke and filed,
-  # a subsequent run that worked perfectly but found the release genuinely
-  # broken (verdict 'failure', so the job reds on purpose) closes nothing — and
-  # since a real release outage is exactly when release-alarm.yml is red for a
-  # stretch, the "mechanism is broken" issue would sit open, contradicted and
-  # unread, for the whole stretch.
   meta-alarm-recovery:
     needs: alarm
     if: >-

@@ -1,4 +1,9 @@
 name: twin image
+
+# Builds, scans and publishes each twin image to GHCR. Waits on ci and secret-scan
+# for the same SHA so a red twin cannot ship a rolling tag. cosign stays pinned to
+# a v2 binary: v3 `attest --type spdx` rejects the anchore SBOM predicate, and the
+# installer action's default tracks its own major.
 on:
   push:
     branches: [main]
@@ -13,8 +18,6 @@ on:
       - 'packages/*/package.json'
       - 'package.json'
       - 'package-lock.json'
-      # The twin Dockerfiles COPY cli/package.json so `npm ci` can see every
-      # workspace manifest named in the lockfile.
       - 'cli/package.json'
       - '.dockerignore'
       - '.trivyignore'
@@ -26,12 +29,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  # On PRs, build only twins whose package tree (or shared runtime inputs)
-  # changed. main/dispatch always build the full matrix so GHCR stays
-  # coherent. @pome-sh/wire / lockfiles / Docker wiring ⇒ all twins. (The cloud
-  # contract in cli/src/contract is deliberately NOT here: no twin imports it.)
-  #
-  # FIRST_PARTY_TWINS: github, slack, stripe, gmail, linear
   detect-twins:
     runs-on: ubuntu-latest
     permissions:
@@ -90,18 +87,6 @@ jobs:
           echo "twins=[${joined%,}]" >> "$GITHUB_OUTPUT"
           echo "PR twin matrix: [${joined%,}]"
 
-  # Package typecheck/test live in `ci`; secret scanning is a parallel gate.
-  # Wait for both on this SHA before building/scanning/pushing so a red twin
-  # cannot still ship a rolling tag to GHCR.
-  #
-  # The secret-scan wait carries its own `if:`, because secret-scan.yml does not
-  # run for every event this workflow does: it triggers on `pull_request` and
-  # `push: branches: [main]`, so on a `main` ref there is a run to wait for and
-  # anywhere else there is not. Waiting where no run exists polls until the
-  # 30-minute timeout and fails the publish. That covers push and dispatch on
-  # `main`. It does NOT cover a `workflow_dispatch` on another ref, which still
-  # publishes a `<twin>-<sha>` tag: `Push scanned image` below is only
-  # `event_name != 'pull_request'`, so write access is the whole gate there.
   wait-gates:
     runs-on: ubuntu-latest
     permissions:
@@ -112,10 +97,6 @@ jobs:
       - name: Wait for the ci workflow on this SHA
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        # PRs use the merge commit as github.sha; workflow runs are keyed by the
-        # head SHA. Passed as an argument — the runner silently ignores env:
-        # overrides of default GITHUB_* variables, so an `env: GITHUB_SHA:`
-        # form waits on the merge SHA forever and times out on every PR.
         run: |
           set -euo pipefail
           sha="${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
@@ -151,23 +132,15 @@ jobs:
       - uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         id: meta
         with:
-          # One shared package, one image per twin distinguished by tag
-          # prefix: ghcr.io/pome-sh/twins:<twin> (rolling) and :<twin>-<sha>.
-          # `latest=false` — a single `latest` can't span three
-          # twins in one package.
           images: ghcr.io/pome-sh/twins
           flavor: |
             latest=false
           tags: |
             type=raw,value=${{ matrix.twin }},enable={{is_default_branch}}
             type=sha,prefix=${{ matrix.twin }}-,format=short
-      # /healthz reports these via the Dockerfiles' GIT_SHA/BUILD_TIME args;
-      # without them every published image says git_sha:"dev".
       - name: Resolve build provenance
         id: buildinfo
         run: echo "time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
-      # Build once and load into the local daemon so Trivy can scan the exact
-      # image before it is pushed. Also tag it locally for the scan ref.
       - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         id: build
         with:
@@ -183,9 +156,6 @@ jobs:
           build-args: |
             GIT_SHA=${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
             BUILD_TIME=${{ steps.buildinfo.outputs.time }}
-      # Fail the publish on fixable HIGH/CRITICAL CVEs. `ignore-unfixed` drops
-      # vulns with no upstream fix (nothing actionable); documented, reviewed
-      # exceptions go in `.trivyignore` at the repo root.
       - name: Scan image for vulnerabilities (Trivy)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -195,20 +165,6 @@ jobs:
           exit-code: '1'
           ignore-unfixed: true
           trivyignores: .trivyignore
-      # anchore/sbom-action fetches the syft binary from the anchore release CDN on
-      # every run with no retry of its own, so a 503 there kills this job — and on
-      # main the cosign steps below do run, so it fails an image publish.
-      #
-      # An action step cannot be wrapped in a shell retry loop, so the retry is the
-      # STEP, repeated. Attempts 1 and 2 are `continue-on-error`; each later attempt
-      # runs only if the earlier ones actually FAILED (a skipped step's outcome is
-      # `skipped`, never `failure`, so the chain cannot self-trigger). The last
-      # attempt carries no escape hatch.
-      #
-      # Every copy MUST carry byte-identical `uses:` and `with:` — a retry that
-      # installs a different build is not a retry.
-      # scripts/ci/assert-hardened-cdn-fetches.mjs enforces that, the attempt count,
-      # and the fatal last attempt.
       - name: Generate image SBOM (attempt 1 of 3)
         id: sbom_1
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
@@ -238,7 +194,6 @@ jobs:
         run: |
           echo "::warning::SBOM attempt 2 failed. github.com/anchore/syft/releases is degraded; last retry in 15s."
           sleep 15
-      # Last attempt: no `continue-on-error`. Its failure fails the job.
       - name: Generate image SBOM (attempt 3 of 3)
         id: sbom_3
         if: ${{ steps.sbom_1.outcome == 'failure' && steps.sbom_2.outcome == 'failure' }}
@@ -248,28 +203,11 @@ jobs:
           format: spdx-json
           output-file: twin-${{ matrix.twin }}.spdx.json
           upload-artifact: true
-      # Fail closed, but say WHAT failed. The step above has already failed the
-      # job; this only replaces
-      # `##[error]The process '/usr/bin/sh' failed with exit code 1` with the
-      # name of the CDN that would not answer, so the run log says whether to
-      # re-run or to read the code.
       - name: Name the CDN that failed the SBOM
         if: ${{ failure() && steps.sbom_3.outcome == 'failure' }}
         run: |
           echo "::error::twin-${{ matrix.twin }}: could not generate the image SBOM after 3 attempts. anchore/sbom-action fetches the syft binary from the anchore release CDN (github.com/anchore/syft/releases), and that CDN is unavailable — this is not a failure of the twin, the build or the scan. Failing closed on purpose: an image with no SBOM is never signed, attested or pushed."
           exit 1
-      # cosign MUST stay pinned to a v2.x binary: v3 `attest --type spdx` rejects
-      # the anchore SBOM predicate ("invalid attestation: decoding json"), failing
-      # the sign step and producing NO attestation. The installer action's default
-      # binary version tracks the action's own major, so bumping the action alone
-      # silently drifts the binary to v3 — pinning it here decouples the two.
-      #
-      # Repeated for the same reason as the SBOM group above: this installer's whole
-      # job is to pull cosign off the sigstore release CDN, one step before signing.
-      # All three copies must carry the same `cosign-release`; a retry that installs
-      # a different cosign is not a retry.
-      # scripts/ci/assert-hardened-cdn-fetches.mjs reds if the three `with:` blocks
-      # ever disagree.
       - name: Install cosign (attempt 1 of 3)
         id: cosign_install_1
         if: ${{ github.event_name != 'pull_request' }}
@@ -294,8 +232,6 @@ jobs:
         run: |
           echo "::warning::cosign install attempt 2 failed. github.com/sigstore/cosign/releases is degraded; last retry in 15s."
           sleep 15
-      # Last attempt: no `continue-on-error`. Its failure fails the job, which
-      # is the point — an unsigned image must never ship.
       - name: Install cosign (attempt 3 of 3)
         id: cosign_install_3
         if: ${{ github.event_name != 'pull_request' && steps.cosign_install_1.outcome == 'failure' && steps.cosign_install_2.outcome == 'failure' }}
@@ -307,37 +243,11 @@ jobs:
         run: |
           echo "::error::twin-${{ matrix.twin }}: could not install cosign after 3 attempts. sigstore/cosign-installer fetches the pinned cosign v2.6.4 binary from the sigstore release CDN (github.com/sigstore/cosign/releases), and that CDN is unavailable — this is not a failure of the twin, the build or the scan. Failing closed on purpose: an image that cannot be signed and attested is not pushed."
           exit 1
-      # Push the EXACT image built and scanned above — no second build, so the
-      # published artifact is byte-identical to the one Trivy scanned. PR builds
-      # verify and scan but never push; without that gate a fork's GITHUB_TOKEN
-      # could poison the image. `github.event_name` is the PR-vs-push signal that
-      # survives merge-queue retargeting.
-      #
-      # GHCR can log every layer as `Pushed`, then answer `unknown blob` and exit 1
-      # — a tag that never existed behind a green-looking push. So the retry, the
-      # per-tag manifest read-back and the fail-closed message live in
-      # scripts/ci/push-scanned-image.sh, and assert-hardened-cdn-fetches.mjs
-      # (shape c) reds on a registry write that skips that helper.
-      #
-      # Tags arrive through `env:`, not interpolated into the script: a registry/tag
-      # string spliced into a shell body is one metadata-action change away from
-      # being a shell body.
       - name: Push scanned image
         if: ${{ github.event_name != 'pull_request' }}
         env:
           IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
         run: bash scripts/ci/push-scanned-image.sh
-      # A degraded GHCR can fail `verify-attestation`'s registry READ with
-      # `DENIED: denied` after the tags are already pushed, signed and attested
-      # — a red job over an artifact that is correct and already public. So
-      # these cosign calls retry too.
-      #
-      # The ladder is per OPERATION and lives in the script, not here, and
-      # scripts/ci/assert-hardened-cdn-fetches.mjs (shape d) reds on a cosign
-      # call in any `run:` block that does not go through that helper. Reads are
-      # in scope for shape (d) where they are exempt from shape (c), for the
-      # reason above: by the time this step runs, the push step has already
-      # published every tag.
       - name: Sign pushed image digests and attest SBOM
         id: sign
         if: ${{ github.event_name != 'pull_request' }}

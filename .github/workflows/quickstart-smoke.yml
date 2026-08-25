@@ -1,10 +1,8 @@
 name: quickstart-smoke
-# The clean-machine quickstart (README): `npx @pome-sh/cli twin start github`
-# then the bundled triage agent must reach the twin with env-only auth.
-# Auth is env-only by design — the agent must not probe the twin's disk for a
-# secret, which couples the two to a shared filesystem and breaks the moment
-# they are not on one. This gate keeps the npx-equivalent flow from silently
-# re-breaking.
+
+# The README quickstart, end to end, with env-only auth. The twins here are
+# workspace tarballs, not an npx user's published pins — do not read this as
+# coverage of those.
 on:
   pull_request:
     paths:
@@ -12,7 +10,6 @@ on:
       - 'agent-examples/triage-agent/**'
       - 'packages/wire/**'
       - 'packages/sdk/**'
-      # Smoke boots github + gmail via the CLI; keep both twins in the filter.
       - 'packages/twin-github/**'
       - 'packages/twin-gmail/**'
       - 'packages/adapter-claude-sdk/**'
@@ -22,7 +19,6 @@ on:
       - '.github/workflows/quickstart-smoke.yml'
   push:
     branches: [main]
-    # Match PR paths — do not pay pack/CLI-build cost on unrelated main merges.
     paths:
       - 'README.md'
       - 'agent-examples/triage-agent/**'
@@ -42,20 +38,6 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # End-to-end: hermetic auth-token unit test, then build the CLI from this
-  # checkout and run `twin start github` — the same in-process boot path the
-  # published `npx @pome-sh/cli` front door uses.
-  #
-  # The twins here are NOT the CLI's published @pome-sh/* deps: the build step
-  # below packs tarballs from packages/ over them. So this exercises the boot
-  # path against WORKSPACE twins, and no lane in this repo installs an npx
-  # user's declared pins — do not read this job as coverage of those. What keeps
-  # workspace @pome-sh edges honest is scripts/lint/rules/workspace-pins.mjs.
-  #
-  # The agent mints a JWT from the shared TWIN_AUTH_SECRET env, probes the twin's
-  # /tools with it in PREFLIGHT mode (POME_PREFLIGHT=1), and exits 0. That path
-  # never calls Claude, but the code asserts ANTHROPIC_API_KEY is set, so we pass
-  # a throwaway value.
   smoke:
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
@@ -70,22 +52,7 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             agent-examples/triage-agent/package-lock.json
-      # Root install so the example's adapter dep resolves. The example's
-      # `file:` adapter dep resolves its own @anthropic-ai/claude-agent-sdk
-      # from the workspace node_modules, so the module import in the test
-      # succeeds.
       - run: npm ci
-      # build the adapter's dist BEFORE the example installs. The
-      # adapter is dist-only (`files: [dist]`, `exports: ./dist/index.js`, no
-      # `src`) and the example consumes it via a `file:` dep that npm packs on
-      # install; without a built dist the packed package has nothing to import
-      # (`Cannot find module '@pome-sh/adapter-claude-sdk'`). Build must precede
-      # the example's `npm ci` so the pack includes dist/.
-      #
-      # @pome-sh/wire must build first: the adapter bundles it via tsup's
-      # `noExternal`, which resolves wire's `exports` map at build time — wire
-      # is dist-only (like the adapter), so without this the adapter's own
-      # build fails with "Could not resolve @pome-sh/wire/redaction".
       - run: npm run build -w @pome-sh/wire
       - run: npm run build -w @pome-sh/adapter-claude-sdk
       - name: Auth-token unit test
@@ -93,15 +60,8 @@ jobs:
         run: |
           npm ci
           npm test
-      # `cli/` is a root workspace member, so the root `npm ci` already linked the
-      # @pome-sh/* twins out of packages/* and the CLI builds straight from this
-      # checkout. The root build chain builds packages in dependency order and ends
-      # with the CLI.
       - name: Build the CLI from this checkout
         run: npm run build
-      # One secret, shared via env by the twin and the agent — the README's
-      # TWIN_AUTH_SECRET flow. (Not a real credential: generated per run,
-      # loopback twin, torn down with the job.)
       - name: Generate the shared twin auth secret
         run: echo "TWIN_AUTH_SECRET=$(node -e 'console.log(require("crypto").randomBytes(32).toString("hex"))')" >> "$GITHUB_ENV"
       - name: Start the GitHub twin via the CLI
@@ -122,8 +82,6 @@ jobs:
         working-directory: agent-examples/triage-agent
         env:
           POME_PREFLIGHT: "1"
-          # preflight probes the twin only; it never calls Claude in this mode,
-          # but index.ts asserts the key is present, so a placeholder suffices.
           ANTHROPIC_API_KEY: "sk-ant-preflight-not-used"
         run: npm start
       - name: Gmail quickstart boot and token alias

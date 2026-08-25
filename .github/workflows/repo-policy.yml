@@ -1,24 +1,10 @@
 name: repo-policy
 
-# Assert protected main policy (PR + review + required checks).
-#
-# The live check reads GET .../rules/branches/{branch}, which an ordinary
-# contents:read GITHUB_TOKEN can call. Do not move it to GET .../protection or
-# GET .../rulesets/{id}: both need Administration:read, which GITHUB_TOKEN
-# cannot hold. /protection is auth-gated outright (401 unauthenticated), and
-# /rulesets/{id} answers 200 for any caller on a public repo but ELIDES the
-# bypass_actors field without that scope — so it would pass while checking
-# nothing. Needing no PAT is what lets this run on pull_request, so drift is
-# caught on every touching PR rather than once a week.
-# repo-policy is not in config/required-checks.json's required set, so this
-# cannot deadlock a merge.
-#
-# Ordering, when you change the required contexts: land the config/required-checks.json
-# edit first and accept a red repo-policy on that PR and until the ruleset is
-# updated by hand (including a failing Monday cron, which will file the
-# schedule-alarm issue). Doing it the other way — requiring a context before the
-# job that reports it exists — leaves every PR waiting forever on a check that
-# never runs, and that is the actual deadlock. The red here is the check working.
+# Asserts main's live branch rules on a weekly cron and on any PR that touches them.
+# When changing the required contexts, land config/required-checks.json first and
+# accept a red here until the ruleset is updated by hand; the other order leaves
+# every PR waiting on a check that never runs.
+
 on:
   schedule:
     - cron: "41 5 * * 1"
@@ -27,13 +13,10 @@ on:
     paths:
       - "scripts/ci/assert-repo-policy.sh"
       - "scripts/ci/assert-repo-policy.test.mjs"
-      # The required-context list this script reads.
       - "config/required-checks.json"
       - ".github/workflows/repo-policy.yml"
       - ".github/workflows/dependency-review.yml"
       - ".github/workflows/ci.yml"
-      # Owns the `secret scan` required context: renaming that job drops a
-      # required check, so the live-drift assertion has to re-run on the PR.
       - ".github/workflows/secret-scan.yml"
 
 permissions:
@@ -53,13 +36,6 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: bash scripts/ci/assert-repo-policy.sh
 
-  # A cron that fires, fails and tells nobody is the failure this job closes: it
-  # sees the failure in the same run `assert` failed in. See schedule-alarm.yml
-  # for why an embedded failure() job is the right shape here.
-  #
-  # Gated on the events that actually run the live drift check rather than on
-  # `!= 'pull_request'`, so a future event cannot silently start filing — or,
-  # worse, CLOSING — this alarm before someone decides it should.
   schedule-alarm:
     needs: assert
     if: failure() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
@@ -73,7 +49,6 @@ jobs:
       outcome: failure
       detail: "repo-policy.yml's scheduled run failed. It needs no credential beyond the ambient GITHUB_TOKEN, so check the run log for the actual assertion in scripts/ci/assert-repo-policy.sh that broke."
 
-  # The other direction: a recovered run closes the tracking issue.
   schedule-alarm-recovery:
     needs: assert
     if: success() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')

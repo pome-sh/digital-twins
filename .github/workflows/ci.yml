@@ -1,4 +1,9 @@
 name: ci
+
+# The required check is the job name `typecheck-test`, so the job must always run.
+# The always-on block is dependency-free and runs BEFORE `npm ci`: nothing in it
+# may statically import a devDependency. Everything gated on
+# `steps.scope.outputs.heavy` is skipped for docs-only PRs.
 on:
   pull_request:
   push:
@@ -10,10 +15,6 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # The required check context is the job name `typecheck-test` (ruleset +
-  # config/required-checks.json). The job MUST always run on every PR so the
-  # context is never missing. Docs-only PRs run the cheap dependency-free gates
-  # and skip everything gated on `steps.scope.outputs.heavy`.
   typecheck-test:
     runs-on: ubuntu-latest
     permissions:
@@ -44,15 +45,6 @@ jobs:
             echo "Skipping heavy suite (docs/chore-only PR); required check stays green."
           fi
 
-      # ---------------------------------------------------------------------
-      # Always-on gates. Dependency-free, so they run before `npm ci` and cover
-      # docs-only PRs too — several rules below exist precisely because the diff
-      # that drifts them is one the scope step calls docs-only.
-      # ---------------------------------------------------------------------
-
-      # actionlint parses every workflow for YAML shape and, with shellcheck on
-      # PATH (pre-installed on ubuntu-latest), every embedded `run:` block.
-      # Binary fetched and checksummed rather than trusted as a third-party Action.
       - name: Install actionlint
         env:
           ACTIONLINT_VERSION: 1.7.12
@@ -76,101 +68,45 @@ jobs:
       - name: actionlint (workflow syntax + embedded shell)
         run: actionlint -color
 
-      # Every dependency-free lint rule, plus each rule's case table. `--offline`
-      # skips the three rules needing node_modules and names them rather than
-      # dropping them silently; the heavy block runs the same runner with no flag.
       - run: npm run lint -- --offline
       - run: npm run lint:test -- --offline
 
-      # Catches a `packages/*` script that produces no verdict because nothing
-      # reaches it — no verdict reads exactly like a pass. Reads package.json
-      # scripts and workflow text only, so it runs before `npm ci`.
       - run: node scripts/check-packages-scripts-wired.mjs
       - run: node scripts/check-packages-scripts-wired.test.mjs
 
-      # Locks the smoke:examples classifier so an exit inside SETTLE_MS cannot go
-      # back to reading as success. Pure functions, no install needed.
       - run: node scripts/smoke-examples.test.mjs
 
-      # Versions are written on main after the merge, so what this demands of a PR
-      # is the WORDS, not the number. The base comes from the checked-out history,
-      # NOT `pull_request.base.sha` — that field is pinned at the last synchronize
-      # while the checkout merges main as it is now, so the two disagree the moment
-      # main advances.
       - if: github.event_name == 'pull_request'
         run: node scripts/ci/check-release-note-required.mjs "$(git merge-base HEAD "origin/${{ github.base_ref }}")"
       - run: node scripts/ci/check-release-note-required.test.mjs
 
-      # Drives real git repositories, because both properties that matter are
-      # properties of history: the bump commit cannot re-trigger a publish loop,
-      # and two merges inside one allocation window cannot double-allocate.
       - run: node scripts/ci/allocate-release-versions.test.mjs
 
-      # That fallback must be reachable only on the plan-only pull_request arm. On a
-      # push it is a silent double failure: `github-actions` can never be a ruleset
-      # bypass actor, and a push made with GITHUB_TOKEN triggers no workflows, so a
-      # landed commit would publish nothing. A comment saying "PR-only" guards none
-      # of the four one-line edits that would make it reachable.
       - run: node scripts/ci/assert-allocate-token-path.mjs
       - run: node scripts/ci/assert-allocate-token-path.test.mjs
 
-      # Both ways @pome-sh/wire silently stops publishing are readable from its
-      # package.json: `private: true` makes `npm publish -w` skip and EXIT 0, and a
-      # wrong `publishConfig.registry` aims it at public npm, which cannot be undone
-      # after 72 hours. The tarball half runs in release.yml.
       - run: npm run gate:wire-manifest
 
-      # Same two manifest-readable failure modes for @pome-sh/checks, plus one
-      # more: a leaked `@pome-sh/*` runtime dependency 404s on the consumer's
-      # install, because those versions are on no registry.
       - run: npm run gate:checks-manifest
 
-      # Same for @pome-sh/sandbox-domains, plus one the vocabulary package cannot
-      # have: its `dependencies` are load-bearing in both directions, since
-      # declaring a package is what makes tsup leave it external.
       - run: npm run gate:sandbox-domains-manifest
       - run: node scripts/ci/check-sandbox-domains-tarball.test.mjs
 
-      # Asserts a 401 from GitHub Packages is never read as "unpublished" (which
-      # would bypass the never-publish-behind-latest floor) and that the npmjs
-      # and GitHub Packages lanes cannot block each other.
       - run: node scripts/ci/decide-publish.test.mjs
 
-      # release-alarm.yml's package list is PARSED out of release.yml rather than
-      # typed a second time, so a release restructure the parser cannot follow
-      # must red the PR causing it: an alarm watching zero packages passes forever.
       - run: node scripts/ci/release-alarm.mjs --targets
       - run: node scripts/ci/release-alarm.test.mjs
 
-      # The schedule-alarm coverage property, read out of `.github/workflows/*.yml`
-      # rather than a hand-kept list. Asserts at least one workflow is scheduled (an
-      # alarm covering zero passes forever), that the `schedule:` and `cron:` reads
-      # agree, and that no workflow calls a local `uses:` that is not there.
       - run: node scripts/ci/list-scheduled-workflows.mjs
       - run: node scripts/ci/list-scheduled-workflows.test.mjs
       - run: bash scripts/ci/file-schedule-alarm.test.sh
 
-      # Keeps the above true as a PROPERTY: every scheduled workflow must reach a
-      # job calling schedule-alarm.yml with `outcome: failure`, unneutralised by
-      # continue-on-error or a dead `if:`, with the title/label pair agreeing
-      # between the failure and recovery calls. Permissions checked both ways — a
-      # caller's grant is a CEILING, and the filing job must resolve `issues: write`.
       - run: node scripts/ci/assert-schedule-alarm-coverage.mjs
       - run: node scripts/ci/assert-schedule-alarm-coverage.test.mjs
 
-      # Every third-party network call on the publish path goes through one
-      # hardened path, in four shapes: a non-loopback `run:` fetch calls
-      # fetch-pinned-release.sh, a binary-installing `uses:` appears as a
-      # repeated-attempt group, a registry write calls push-scanned-image.sh, a
-      # cosign invocation calls sign-image-digests.sh. The set of actions is read
-      # out of the workflows; the per-action verdict is a reviewed row in
-      # cdn-fetch-actions.json, and an action with no row reds.
       - run: node scripts/ci/assert-hardened-cdn-fetches.mjs
       - run: node scripts/ci/assert-hardened-cdn-fetches.test.mjs
 
-      # The `agent-examples/*` half of the pin story: those install from the
-      # registry on purpose, so `workspace-pins` leaves them alone and this covers
-      # them. The live registry check runs in gate:examples below.
       - run: node scripts/check-example-pins-published.test.mjs
 
       - run: npm run lint:no-cloud-imports
@@ -178,21 +114,8 @@ jobs:
       - run: node scripts/ci/wait-for-workflow.test.mjs
       - run: node scripts/ci/assert-repo-policy.test.mjs
 
-      # The upstream tools/list goldens are what the divergence lane compares a
-      # twin against, so a hand edit would move the answer without moving the
-      # question. `--offline` re-derives meta + canonical from the committed
-      # raw.json, and reds on an edited golden or a hand-typed sha. Re-capturing
-      # from the live substrate is a separate, human-reviewed lane
-      # (`npm run capture:mcp-tools-list`).
       - run: npm run gate:mcp-tools-list
       - run: node scripts/capture-mcp-tools-list.test.mjs
-
-      # ---------------------------------------------------------------------
-      # Heavy suite. Every step below is gated on `steps.scope.outputs.heavy`,
-      # and each one is separately named so a failure and a duration both point
-      # somewhere. Order is load-bearing: build precedes typecheck and every
-      # gate that imports a twin's compiled declarations.
-      # ---------------------------------------------------------------------
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         if: steps.scope.outputs.heavy == 'true'
@@ -209,21 +132,14 @@ jobs:
         if: steps.scope.outputs.heavy == 'true'
         run: npm run lint:dead-code
 
-      # The three rules `--offline` skipped above: two TypeScript-AST walks and
-      # the lockfile scan. Needs node_modules, not a build.
       - name: Lint (all rules, with node_modules)
         if: steps.scope.outputs.heavy == 'true'
         run: npm run lint
 
-      # Each rule's case table. A rule that silently stops going RED prints the
-      # same line as a rule that scanned everything, so every table asserts the
-      # red direction and the runner fails a rule that has no table at all.
       - name: Lint rule case tables
         if: steps.scope.outputs.heavy == 'true'
         run: npm run lint:test
 
-      # The contract enumerates the event union from zod and requires a fixture
-      # per kind, so a new kind with none reds here.
       - name: Trace contract (@pome-sh/wire)
         if: steps.scope.outputs.heavy == 'true'
         run: |
@@ -231,15 +147,10 @@ jobs:
           npm run check:trace-contract -w @pome-sh/wire
           node packages/wire/scripts/emit-trace-contract.test.mjs
 
-      # The committed manifest JSON Schema, served at pome.sh/schemas/v1/pome.json,
-      # must match the zod source.
       - name: Manifest JSON Schema (@pome-sh/cli)
         if: steps.scope.outputs.heavy == 'true'
         run: npm run check:manifest-schema -w @pome-sh/cli
 
-      # Consumers import siblings through their published `exports`, so the
-      # workspace is built in dependency order before typecheck, test, and every
-      # gate below that imports a twin's compiled declarations.
       - name: Build workspaces
         if: steps.scope.outputs.heavy == 'true'
         run: npm run build
@@ -248,21 +159,10 @@ jobs:
         if: steps.scope.outputs.heavy == 'true'
         run: npm run typecheck
 
-      # packages/twin-*/route-inputs.json is DERIVED from each twin's route
-      # declarations and read by pome-cloud. Without this it is a hand-kept list of
-      # parameter names drifting from the handlers. Needs the build: the emitter
-      # imports compiled declarations rather than regexing TypeScript.
       - name: Route-inputs artifact
         if: steps.scope.outputs.heavy == 'true'
         run: npm run gate:route-inputs
 
-      # Each fixture is a PROJECTION of the upstream capture, not a transcription,
-      # so this catches a producer diverging from the golden it claims to be.
-      # twin-slack subtracts unexposed tools, twin-gmail subtracts nothing, and
-      # twin-github can also ADD, since two tools GitHub gates behind
-      # `X-MCP-Features` cannot appear in a flags-off golden and are carried
-      # forward. The sha in each meta.json only catches a hand edit to
-      # the raw file. Needs the build: the scripts import @pome-sh/sdk.
       - name: MCP fixture gates (slack, gmail, github)
         if: steps.scope.outputs.heavy == 'true'
         run: |
@@ -271,56 +171,26 @@ jobs:
           npm run gate:mcp-fixture -w @pome-sh/twin-gmail
           npm run gate:mcp-fixture -w @pome-sh/twin-github
 
-      # twin-github's per-operation `documentation_url` slice of GitHub's OpenAPI
-      # description. The 12.9 MB description is NOT committed, so this is what
-      # proves the 24 KB that is: the REST keys must be exactly the surfaces the
-      # twin MOUNTS (66, not route-inputs.json's 65 — that artifact drops
-      # zero-input surfaces, which is how `GET /user` went missing), the MCP keys
-      # exactly the 36 tools it serves, every mapped `method` one the tool's own
-      # zod schema accepts, and every url from the committed x-github pair.
       - name: Operation-docs artifact (twin-github)
         if: steps.scope.outputs.heavy == 'true'
         run: npm run gate:operation-docs -w @pome-sh/twin-github
 
-      # The strict-subtraction case: twin-linear's 22 names are a subset of the
-      # golden's 58, `carried` is empty, and nothing is feature-flag-gated the way
-      # twin-github's two carried rows are — so this catches the producer gaining
-      # a row it did not take from the capture.
       - name: MCP fixture gate (twin-linear)
         if: steps.scope.outputs.heavy == 'true'
         run: npm run gate:mcp-fixture -w @pome-sh/twin-linear
 
-      # Real-SDK wire-protocol validation: boots the twin in-process, drives
-      # tools/list and a tools/call over an actual StreamableHTTPClientTransport,
-      # and diffs the resulting recorder event against the legacy `/mcp/call`
-      # shim's. `request_headers` is exempt from the pass/fail (the two callers
-      # are different HTTP clients) but stays printed in the diff.
       - name: MCP wire protocol (twin-github)
         if: steps.scope.outputs.heavy == 'true'
         run: npm run validate:mcp -w @pome-sh/twin-github
 
-      # The bundled agent-examples/ projects are standalone npm packages with
-      # their own lockfiles, not workspaces, so neither `npm run typecheck` nor
-      # `npm test` above covers them. Typechecks each against the just-built
-      # adapter and runs each example's own suite.
       - name: Typecheck and test bundled examples
         if: steps.scope.outputs.heavy == 'true'
         run: npm run gate:examples
 
-      # tsc cannot see a temporal-dead-zone crash: gate:examples was green while
-      # every real launch of agent-examples/triage-agent died with `Cannot access
-      # 'TwinMcpClient' before initialization`. Launches each example for real
-      # (POME_PREFLIGHT unset) and fails if it crashes on load.
       - name: Launch each example (load-crash check)
         if: steps.scope.outputs.heavy == 'true'
         run: npm run smoke:examples
 
-      # The two gates above each stop short of a twin call: gate:examples is green
-      # on a well-typed tool whose endpoint 404s, and smoke:examples returns
-      # before any tool fires because a real run needs a model. Boots each
-      # example's declared twins on EVERY seed it ships and invokes every
-      # registered tool once per seed, no model. Probe arguments are read off each
-      # seed rather than hand-written, so a new seed is covered with no edit here.
       - name: Probe every example tool on every seed
         if: steps.scope.outputs.heavy == 'true'
         run: |
@@ -328,12 +198,6 @@ jobs:
           npm run probe:examples
           node scripts/probe-example-tools.test.mjs
 
-      # The gate above probes what the bundled EXAMPLES expose; this one's subject
-      # is the twin. Takes the endpoint list from each twin's own tools/list and
-      # calls every one, so a twin that gains a tool gains a probe with no hand
-      # edit and a declared tool nothing calls is a named red. The twins' own
-      # suites drive executeTool() on the domain, which is not the layer the MCP
-      # wire breaks at. No model, no key, no socket.
       - name: Probe every twin tool over MCP
         if: steps.scope.outputs.heavy == 'true'
         run: |
@@ -345,25 +209,14 @@ jobs:
         if: steps.scope.outputs.heavy == 'true'
         run: npx vitest run --project wire --project sdk --project adapter-claude-sdk --project twin-stripe --project twin-gmail --project twin-linear --project checks --project sandbox-domains
 
-      # The tarball half of the @pome-sh/checks audit: the engine is not inlined,
-      # zod stayed external (one schema identity), the DSL exists exactly once
-      # across seven entries, and every `exports` subpath ships. Needs the build.
       - name: Tarball audit (@pome-sh/checks)
         if: steps.scope.outputs.heavy == 'true'
         run: npm run gate:checks-tarball
 
-      # Deliberately the INVERSE of the gate above on three points: the SQLite
-      # driver must be present (exactly once), hono is a declared external rather
-      # than a forbidden engine byte, and every bare specifier in the shipped JS
-      # and `.d.ts` must be a declared dependency. Plus the export spec, read off
-      # the packed modules — the table pome-cloud's `lib/twin-state.ts` imports.
       - name: Tarball audit (@pome-sh/sandbox-domains)
         if: steps.scope.outputs.heavy == 'true'
         run: npm run gate:sandbox-domains-tarball
 
-      # These two run with their own coverage thresholds instead of a second plain
-      # `npm test` pass: a declared `test:coverage` with thresholds nothing runs
-      # enforces nothing.
       - name: Unit tests with coverage thresholds (twin-github, twin-slack)
         if: steps.scope.outputs.heavy == 'true'
         run: |
@@ -375,9 +228,6 @@ jobs:
         if: steps.scope.outputs.heavy == 'true'
         run: npx vitest run --project cli
 
-      # Black-box twin runtime-contract suite. Spawns the BUILT twins via plain
-      # `node` — Node 24 to match the GHCR runtime image — and asserts the
-      # control-plane surface frozen in CONTRACT.md.
       - name: Twin runtime contract (black-box)
         if: steps.scope.outputs.heavy == 'true'
         run: npm run test:contract
@@ -386,9 +236,6 @@ jobs:
         if: steps.scope.outputs.heavy == 'true'
         run: npm run fidelity:parity -w @pome-sh/twin-github -w @pome-sh/twin-slack -w @pome-sh/twin-stripe -w @pome-sh/twin-gmail -w @pome-sh/twin-linear
 
-      # Each twin's own `smoke` script carries hardcoded tool counts and envelope
-      # assertions, so a declared-but-uninvoked smoke script goes stale silently
-      # the day a tool table moves. Invoking it here is what catches that.
       - name: Per-twin smoke scripts (github, slack, stripe)
         if: steps.scope.outputs.heavy == 'true'
         run: |
@@ -397,66 +244,28 @@ jobs:
           npm run smoke -w @pome-sh/twin-slack
           npm run smoke -w @pome-sh/twin-stripe
 
-      # Same shape as twin-github's validate:mcp above, with no committed output
-      # artifact — it would embed the ephemeral port each run binds to.
       - name: MCP wire protocol (twin-slack)
         if: steps.scope.outputs.heavy == 'true'
         run: npm run validate:mcp -w @pome-sh/twin-slack
 
-      # The xoxb-pome-<sid>-<sig> token shape pome-cloud's control plane signs,
-      # checked end-to-end against the twin's own auth middleware.
       - name: Cloud token shape vs twin auth (twin-slack)
         if: steps.scope.outputs.heavy == 'true'
         run: npm run verify:cloud-token -w @pome-sh/twin-slack
 
-      # twin-github's behavior harness (PR flow, negative fidelity, concurrency
-      # race). Self-boots on an ephemeral port under REVIEW_TARGET=local, so it is
-      # CI-runnable with no live GitHub and no model. `local` is already
-      # review-harness.ts's default, so the env below changes nothing today and is
-      # stated to keep the target visible at the call site rather than only in the
-      # script. What this covers, precisely:
-      # the LEGACY REST shim, not JSON-RPC MCP — `isJsonRpcMcp()` is false for any
-      # 127.0.0.1/localhost host, and the self-boot always yields one. The
-      # JSON-RPC transport is driven by packages/twin-github/test/mcp-*.test.ts
-      # and twin-slack's validate:mcp above.
       - name: Behavior harness (twin-github)
         if: steps.scope.outputs.heavy == 'true'
         env:
           REVIEW_TARGET: local
         run: npm run review:harness -w @pome-sh/twin-github
 
-      # The frozen M1 runtime-contract assertions, asserted against twins started
-      # via the CLI front door (`pome twin start <twin>`). Excluded from
-      # contract/run.mjs's own discovery by name: run.mjs only builds its own five
-      # packages, never cli/, so `npm run test:contract` alone cannot produce this
-      # file's prerequisite (cli/dist/src/cli/main.js). It works here only because
-      # `Build workspaces` above built every workspace including cli/.
       - name: Contract suite vs pome twin start
         if: steps.scope.outputs.heavy == 'true'
         run: node --test contract/cli-start.test.mjs
 
-      # The release gate, run on every PR: pack both published packages, install
-      # them in clean rooms with no access to this workspace, boot all five twins
-      # from the CLI tarball, and typecheck a real consumer against the adapter's
-      # shipped declarations. This is the check `bundleDependencies` never had —
-      # it declared seven bundled packages, shipped none, and npm reported a
-      # successful install.
       - name: Clean-room pack test (both published packages)
         if: steps.scope.outputs.heavy == 'true'
         run: npm run test:pack
 
-      # Two fixture runs whose correctness is known by CONSTRUCTION
-      # (deterministic scripts, no model, no socket) pushed through the real
-      # evaluator path — `parseTaskFile`, `bindCriterion`, each declared check's
-      # own `evaluate` — over the real github + slack twins. Asserted: the
-      # PER-CRITERION breakdown for both runs, the denominator that produced it,
-      # that nothing was skipped or left unbound, and only then the aggregate.
-      # It also runs inside the cli unit tests above; re-running it here for ~1s
-      # buys a named failing step, and this gate's whole subject is a wrong
-      # verdict that looks exactly like a right one. Proven non-vacuous rather
-      # than asserted so: with the `github.no-new-issues` matcher removed it reds
-      # on 4 of 7, and against a matcher comparing issue TITLES instead of numbers
-      # it reds on the breakdown while the aggregate stays under threshold.
       - name: Golden scenario gate
         if: steps.scope.outputs.heavy == 'true'
         run: npm run gate:golden

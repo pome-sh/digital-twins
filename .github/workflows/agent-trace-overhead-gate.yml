@@ -1,31 +1,8 @@
 name: agent-trace-overhead-gate
 
-# Runs the bundled triage scenario in capture-on/off A/B pairs,
-# accumulates N per-call latency samples from each, and fails the build when
-# p99(with − without) exceeds the 5ms budget. N=1000 buys p99 stability, and
-# when the first pair lands over budget the gate escalates to 3 pairs —
-# median delta judged against budget + an A/A noise allowance measured from
-# the no-capture baselines — so shared-runner tail noise can't flip the
-# verdict while a real capture-path regression still fails every path.
-# Same run also asserts PR/FAQ acceptance #1:
-# scenario 01 with a no-adapter agent emits ≥1 LlmCallEvent + ≥1
-# TwinHttpEvent (tool_call_id: null) in events.jsonl, and `pome inspect`
-# exits 0 with a "Trace health" section.
-#
-# A durable-recorder micro-benchmark (heap vs file-backed fsync) with an
-# explicit per-event p99 budget runs alongside it; the path filters cover
-# packages/sdk + twin-slack/stripe so recorder durability changes trip the gate.
-#
-# A second job step runs scenario 01 against the CAS-adapter triage fixture and
-# enforces PR/FAQ acceptance #2: ≥1
-# LlmCallEvent + ≥1 TwinHttpEvent with non-null tool_call_id + ≥1
-# ToolUseEvent + ≥1 HookEvent(PreToolUse), and `pome inspect` reports the
-# CAS adapter layer as present. The resulting trace is uploaded as a build
-# artifact so reviewers can eyeball a real adapter run.
-#
-# Not a PR required check: the p99 latency gate is expensive and sensitive to
-# runner noise. Keep coverage on main + PRs that touch recorder/SDK/twin paths
-# + manual dispatch.
+# p99 capture overhead against a 5ms budget, plus the recorder and CAS-adapter
+# acceptance runs. Not a required check: the latency gate is sensitive to runner
+# noise, so it covers main, path-matched PRs and manual dispatch.
 
 on:
   push:
@@ -74,22 +51,11 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: package-lock.json
-      # Repo-root install populates every workspace package plus its devDeps
-      # (notably @anthropic-ai/claude-agent-sdk) so the acceptance fixture can
-      # resolve `withPome()` + the SDK's `tool()` at runtime, and so the pack
-      # step below can build all publishable packages.
       - run: npm ci
-      # `cli/` is a root workspace member, so the `npm ci` above already linked the
-      # @pome-sh/* packages out of packages/* and the CLI builds straight from this
-      # checkout. The root chain builds in dependency order and ends with the CLI.
       - name: Build CLI
         run: npm run build
       - name: Run agent-trace overhead gate (PR/FAQ #1)
         env:
-          # Wired by cli/scripts/overhead-gate.ts as `gate:agent-trace-overhead`, a
-          # named script so check-packages-scripts-wired.mjs can see it wired. The
-          # budget is 5ms; N and the escalation pair count are calibrated for
-          # shared-runner noise, and both are overrideable for local triage.
           OVERHEAD_BENCH_N: '1000'
           OVERHEAD_BENCH_PAIRS: '3'
           OVERHEAD_BENCH_BUDGET_MS: '5'
@@ -101,13 +67,9 @@ jobs:
         run: npm run gate:recorder-overhead -w @pome-sh/cli
       - name: Run CAS-adapter acceptance gate (PR/FAQ #2)
         env:
-          # Named `gate:cas-adapter-acceptance` for the same reason as
-          # gate:agent-trace-overhead above.
           CAS_ACCEPTANCE_ARTIFACT_OUT: ${{ github.workspace }}/cas-adapter-trace
         run: npm run gate:cas-adapter-acceptance -w @pome-sh/cli
       - name: Upload CAS-adapter trace
-        # Always upload, even on failure — the trace is the most useful
-        # artifact for debugging a gate regression.
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

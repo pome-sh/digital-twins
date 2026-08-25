@@ -1,70 +1,33 @@
 name: allocate version
 
-# The version number leaves the PR author's hands; this is the hand it lands
-# in. A number written in a PR is a claim about `main` that goes stale
-# silently: it invalidates every other open PR that pinned it, and those PRs
-# stay green because their CI ran before the merge.
+# Reads main's tip, allocates the version numbers it earned, pushes ONE commit back.
+# Does not publish: the bump commit's own release.yml run does that.
 #
-# This reads main's tip, allocates the numbers that tip earned
-# (scripts/ci/allocate-release-versions.mjs decides), writes them into the
-# manifests and CHANGELOG headings, and pushes ONE commit back to main. It
-# does not publish: the bump commit is a push to main, so the publish is that
-# commit's own release.yml run.
-#
-# The push uses an installation token from the org's `pome-ops-push` GitHub
-# App, not the ambient GITHUB_TOKEN, for two independent reasons either of
-# which is sufficient. First, main's live rules require a pull request, and a
-# direct push needs a bypass actor — `github-actions` can never be one, an App
-# installation can (`actor_type: Integration`). Second, GitHub refuses to let a
-# push made with GITHUB_TOKEN trigger workflows, so the number would land and
-# no release.yml run would ever see it. An App token is not event-suppressed.
-#
-# The credential must fail loud: a missing secret is a hard, named failure and
-# never a fallback, because falling back would push nothing or publish
-# nothing, and both look like a quiet green.
+# The push uses the pome-ops-push App token, not GITHUB_TOKEN, for two independent
+# reasons: `github-actions` can never be a ruleset bypass actor, and a push made
+# with GITHUB_TOKEN triggers no workflows — so the number would land and nothing
+# would publish it. A missing secret must fail loud, never fall back.
+
 on:
   push:
     branches: [main]
   workflow_dispatch:
-  # release.yml's `dispatch-allocate-version` POSTs this the moment a publish
-  # lands, which is the only moment `planExampleRepins` can see the
-  # just-published sibling on the registry. A NAMED type, never a bare
-  # `repository_dispatch:` — that would accept every event type anyone POSTs at
-  # this repository as a licence to push to main.
-  #
-  # This event behaves identically to the push arm, so nothing downstream needs
-  # a special case: GitHub starts it only from the default branch's workflow
-  # file, and `github.sha` and `github.ref` both resolve there — same checkout
-  # ref, same concurrency group.
   repository_dispatch:
     types: [repin-examples]
-  # Changing the allocator or the table it reads must prove the job wiring
-  # still works on the PR that changes it. This arm plans, never writes or
-  # pushes.
   pull_request:
     paths:
       - "scripts/ci/allocate-release-versions.mjs"
       - "scripts/ci/allocate-release-versions.test.mjs"
       - "scripts/ci/changelog-entry.mjs"
       - "scripts/ci/publish-relevance.mjs"
-      # The allocator imports planExampleRepins from here, and the next entry is
-      # the transitive half: check-example-pins-published.mjs imports
-      # loadWorkspaceMembers, so listing only the direct import would leave this
-      # arm blind to the PR that changes how examples are discovered.
       - "scripts/check-example-pins-published.mjs"
       - "scripts/lint/rules/workspace-pins.mjs"
       - ".github/workflows/allocate-version.yml"
 
-# One allocation at a time, never cancelled mid-write: the number is a side
-# effect on main, so a cancelled run is a half-written release commit.
-# Serialising also means the retry loop below only races a human merge.
 concurrency:
   group: allocate-version-${{ github.ref }}
   cancel-in-progress: false
 
-# The ambient token gets nothing. The push uses the pome-ops-push
-# installation token, so `contents: write` here would hand out a capability
-# nothing in this file uses and which could not do the job anyway.
 permissions:
   contents: read
 
@@ -73,26 +36,8 @@ jobs:
     name: write the version numbers this push earned
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # A cheap "don't even start" on the allocator's own commit, NOT the loop
-    # guard — that is structural and lives in the allocator, which measures
-    # relevance from the last commit that moved a version.
-    #
-    # Scoped to `push` explicitly, because `github.event.head_commit` exists on no
-    # other event. Widening this guard to every event is the plausible "fix" for
-    # that null and would turn release.yml's dispatch into a silent no-op: a
-    # dispatch must run even when main's tip IS a [release-bump] commit, which is
-    # precisely the tip it is dispatched from.
-    #
-    # Termination does not rest on this guard for the dispatch arm. release.yml
-    # dispatches only after a real publish, and the commit this run pushes can
-    # cause another publish only by moving a version, which requires a pending
-    # `## Unreleased` entry that this same run consumes. CI writes none, so the
-    # chain is bounded.
     if: ${{ github.event_name != 'push' || !contains(github.event.head_commit.message, '[release-bump]') }}
     steps:
-      # Named before the mint step: the action's own failure on an empty input does
-      # not say which secret, on which repository, or what to do — and this is the
-      # message someone meets when releases have silently stopped.
       - name: The pome-ops-push credentials must exist
         if: github.event_name != 'pull_request'
         env:
@@ -113,11 +58,6 @@ jobs:
             exit 1
           fi
 
-      # An installation token, not a PAT: nothing to re-mint before an expiry
-      # nobody scheduled, and no binding of the release path to one account.
-      # `app-id` (not `client-id`) matches pome-cloud's call sites so both repos
-      # read the same way. No `owner`/`repositories` inputs — the default scopes the
-      # token to this repository through the org installation.
       - name: Mint a pome-ops-push installation token
         id: app-token
         if: github.event_name != 'pull_request'
@@ -126,23 +66,13 @@ jobs:
           app-id: ${{ secrets.OPS_APP_ID }}
           private-key: ${{ secrets.OPS_APP_PRIVATE_KEY }}
 
-      # fetch-depth: 0 is load-bearing. The allocator asks when a package's version
-      # last moved and refuses to answer from a shallow clone, because a truncated
-      # walk silently mis-scopes which packages are owed a release.
-      #
-      # The ref is per arm. On a push, `main` rather than the event sha, because the
-      # number belongs to the TIP: a second merge that landed while this run queued
-      # has its entry on main and belongs in the same release. On a pull_request,
-      # `github.ref` — the merge ref — because that arm proves THIS PR's allocator
-      # runs, and a checkout of main does not contain the PR's files at all.
-      #
-      # `|| github.token` is for the pull_request arm only, where the mint step is
-      # skipped and a fork PR has no secrets. That arm never pushes, so the ambient
-      # token is right there and wrong everywhere else — asserted structurally by
-      # scripts/ci/assert-allocate-token-path.mjs.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # The ref is per arm. On a push, main (the moving tip). On a pull_request, the
+          # merge ref — a checkout of main has none of the PR's own files.
           ref: ${{ github.event_name == 'pull_request' && github.ref || 'main' }}
+          # Load-bearing: the allocator asks when a version last moved and a truncated walk
+          # silently mis-scopes which packages are owed a release.
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token || github.token }}
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -151,8 +81,6 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
 
-      # Gate on the allocator's own tests before letting it write to main: a commit
-      # on main is not the place to discover the writer is broken.
       - name: Regression-test the allocator
         run: node scripts/ci/allocate-release-versions.test.mjs
 

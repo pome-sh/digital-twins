@@ -1,25 +1,10 @@
 name: schedule alarm
 
-# A scheduled workflow that fails tells nobody: the error can be precise and
-# actionable and still cost a human reading Actions run history by hand.
-#
-# The reusable workflow every schedule-triggered workflow here calls from a
-# `failure()`-guarded job: constant title, one long-lived tracking issue reused
-# across consecutive failures, one label per alarm so unrelated alarms never
-# collide, and a body naming what failed plus the run URL. Green is asserted as
-# hard as red — recovery CLOSES the tracking issue.
-#
-# An embedded `failure()` job is enough here, where release-alarm.yml needs its
-# own cron, because the failure modes differ. release.yml is push-triggered and
-# a push that triggers no run at all is invisible to a step inside the workflow
-# that never ran. A cron that fires reliably and FAILS is visible in its own
-# run, with the step-level error text already in the job env.
-#
-# release-alarm.yml is itself schedule-triggered and so inside this property.
-# Its subject (does every version main declares reach its registry) is a
-# different fact from whether its own mechanism is intact, and conflating the
-# two would report a checkout failure as a release problem — so it calls this
-# same workflow from a job gated on its `check` step never having been reached.
+# Reusable alarm every schedule-triggered workflow calls from a failure()-guarded
+# job. One long-lived issue per title, closed on recovery. Deliberately no `if:` on
+# the outcome value: validating it here would SKIP the job on a bad value and
+# render a green check over a dead alarm.
+
 on:
   workflow_call:
     inputs:
@@ -45,11 +30,6 @@ permissions:
   contents: read
 
 jobs:
-  # Deliberately NO `if:` on the outcome value. Validating it here would act as
-  # the opposite: a caller passing `Failure`, or an expression resolving to '',
-  # would SKIP this job, render a green skipped check, and leave that alarm dead
-  # with no signal anywhere. Letting the job run keeps
-  # file-schedule-alarm.sh's own `exit 1` on an unrecognised OUTCOME reachable.
   alarm:
     name: file or close the tracking issue
     runs-on: ubuntu-latest
