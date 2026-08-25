@@ -79,21 +79,17 @@ jobs:
       # resolve `withPome()` + the SDK's `tool()` at runtime, and so the pack
       # step below can build all publishable packages.
       - run: npm ci
-      # `cli/` is a root workspace member: the `npm ci` above already linked
-      # the @pome-sh/* packages out of packages/*, so the CLI builds straight
-      # from this checkout (no tarball pack + manifest rewrite, no second
-      # lockfile). The root chain builds the packages in dependency order and
-      # ends with the CLI.
+      # `cli/` is a root workspace member, so the `npm ci` above already linked the
+      # @pome-sh/* packages out of packages/* and the CLI builds straight from this
+      # checkout. The root chain builds in dependency order and ends with the CLI.
       - name: Build CLI
         run: npm run build
       - name: Run agent-trace overhead gate (PR/FAQ #1)
         env:
-          # Wired by `cli/scripts/overhead-gate.ts` (`gate:agent-trace-overhead`
-          # in cli/package.json — a named script so check-packages-scripts-
-          # wired.mjs's cli/ audit can see it wired, same `npm run <name> -w
-          # <pkg>` shape as everywhere else in this file). The budget is 5ms; N
-          # and the escalation pair count are calibrated for shared-runner noise.
-          # Overrideable for local triage runs.
+          # Wired by cli/scripts/overhead-gate.ts as `gate:agent-trace-overhead`, a
+          # named script so check-packages-scripts-wired.mjs can see it wired. The
+          # budget is 5ms; N and the escalation pair count are calibrated for
+          # shared-runner noise, and both are overrideable for local triage.
           OVERHEAD_BENCH_N: '1000'
           OVERHEAD_BENCH_PAIRS: '3'
           OVERHEAD_BENCH_BUDGET_MS: '5'

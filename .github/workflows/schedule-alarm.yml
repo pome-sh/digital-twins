@@ -3,53 +3,23 @@ name: schedule alarm
 # A scheduled workflow that fails tells nobody: the error can be precise and
 # actionable and still cost a human reading Actions run history by hand.
 #
-# This is the reusable workflow every schedule-triggered workflow in this repo
-# calls from a `failure()`-guarded job: constant title, one long-lived tracking
-# issue reused across consecutive failures (never a new issue per run), one
-# label per alarm so unrelated alarms never collide on the same issue, and a
-# body naming what failed plus the run URL. Green is asserted as hard as red:
-# recovery CLOSES the tracking issue, the same stance
-# scripts/ci/release-alarm.mjs takes for the release path.
+# The reusable workflow every schedule-triggered workflow here calls from a
+# `failure()`-guarded job: constant title, one long-lived tracking issue reused
+# across consecutive failures, one label per alarm so unrelated alarms never
+# collide, and a body naming what failed plus the run URL. Green is asserted as
+# hard as red — recovery CLOSES the tracking issue.
 #
-# ── Why a `failure()`-guarded call here is enough, and NOT a second
-#    separately-cron'd file like release-alarm.yml ──────────────────────────
+# An embedded `failure()` job is enough here, where release-alarm.yml needs its
+# own cron, because the failure modes differ. release.yml is push-triggered and
+# a push that triggers no run at all is invisible to a step inside the workflow
+# that never ran. A cron that fires reliably and FAILS is visible in its own
+# run, with the step-level error text already in the job env.
 #
-# `release-alarm.yml` is a separate file on its OWN daily cron because
-# `release.yml` is PUSH-triggered and has no failure path of its own: a push
-# that triggers no run at all is invisible to an `if: failure()` step living
-# inside the workflow that never ran. The watcher has to survive the thing it
-# watches.
-#
-# `repo-policy.yml` is a different shape. Its failure mode is NOT "never
-# triggers" — its weekly cron fires reliably; the gap is that a run FIRES,
-# FAILS, and nobody is told. A `failure()`-guarded job inside the same workflow
-# file sees that failure in the same run, for free, with the actual step-level
-# error text available in its own job env to put in the alarm body. Embedding
-# is proportionate to that failure mode.
-#
-# The theoretical case release-alarm.yml's separateness DOES guard against —
-# GitHub disabling a repository's scheduled workflows after 60 days with no
-# commits — is a risk this repo already carries and has already accepted for
-# release-alarm.yml itself (see that file's own comment): a repo quiet enough
-# to lose its cron is a repo whose release path nobody is exercising either.
-# Embedding the alarm in repo-policy.yml does not make that pre-existing,
-# accepted risk any worse. The other half of "never fires" — a
-# future edit that deletes or breaks a workflow's own `schedule:` block or its
-# alarm job — is a code-review-time regression, not a runtime outage, and
-# belongs to the static CI check over the workflow files themselves, which gets
-# feedback on the PR that causes it rather than waiting for a missed cadence.
-#
-# `release-alarm.yml` is itself schedule-triggered and therefore inside this
-# same property, but its subject (does every version main declares reach its
-# registry) is unrelated to whether ITS OWN mechanism is intact — a checkout
-# failure, a broken regression suite, or a `release-alarm.mjs` throw before
-# it reaches a verdict is a different fact than "the release is not
-# delivering," and conflating the two would mean the mechanism's own outage
-# reports as a release problem. So release-alarm.yml calls this same reusable
-# workflow too, from a job gated on its `check` step never having been
-# reached at all (see the `meta-alarm` job there) — reusing this file rather
-# than inventing a second mechanism, per the same "no hand-maintained second
-# copy" reasoning as everything else in this milestone.
+# release-alarm.yml is itself schedule-triggered and so inside this property.
+# Its subject (does every version main declares reach its registry) is a
+# different fact from whether its own mechanism is intact, and conflating the
+# two would report a checkout failure as a release problem — so it calls this
+# same workflow from a job gated on its `check` step never having been reached.
 on:
   workflow_call:
     inputs:
@@ -75,13 +45,11 @@ permissions:
   contents: read
 
 jobs:
-  # Deliberately NO `if:` on the outcome value. An `if: inputs.outcome ==
-  # 'failure' || == 'success'` would look like input validation and act as the
-  # opposite: a caller that passes `Failure`, or an expression that resolves to
-  # '', would SKIP this job, render a green skipped check, and leave that alarm
-  # dead with no signal anywhere. Letting the job run means
-  # file-schedule-alarm.sh's own `exit 1` on an unrecognised OUTCOME is
-  # reachable and reds the run.
+  # Deliberately NO `if:` on the outcome value. Validating it here would act as
+  # the opposite: a caller passing `Failure`, or an expression resolving to '',
+  # would SKIP this job, render a green skipped check, and leave that alarm dead
+  # with no signal anywhere. Letting the job run keeps
+  # file-schedule-alarm.sh's own `exit 1` on an unrecognised OUTCOME reachable.
   alarm:
     name: file or close the tracking issue
     runs-on: ubuntu-latest
