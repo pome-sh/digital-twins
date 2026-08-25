@@ -8,4 +8,4 @@ chmod +x scripts/hooks/pre-commit
 git config core.hooksPath scripts/hooks
 
 echo "✅ git hooks installed (core.hooksPath = scripts/hooks)"
-echo "   pre-commit will run the OSS boundary, no-eval, and copy-marker gates."
+echo "   pre-commit will run the OSS boundary and no-eval gates."
