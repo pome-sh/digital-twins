@@ -1,6 +1,6 @@
 # @pome-sh/checks
 
-## Unreleased (patch)
+## 0.3.7 — 2026-08-25
 
 **No consumer-visible change.** Comment cleanup in `scripts/bundle-declarations.mjs`,
 which builds this package's bundled type declarations: a reference to the pull

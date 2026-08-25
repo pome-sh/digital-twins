@@ -1,6 +1,6 @@
 # @pome-sh/sandbox-domains
 
-## Unreleased (patch)
+## 0.2.13 — 2026-08-25
 
 **No consumer-visible change.** Comment cleanup in `scripts/bundle-declarations.mjs`,
 which builds this package's bundled type declarations: a reference to the pull
