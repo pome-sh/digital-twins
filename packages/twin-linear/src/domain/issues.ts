@@ -1,4 +1,3 @@
-// file-size: Issue CRUD + label/relation patches share one transaction surface with webhook emit; further split would duplicate ActorContext/scope checks.
 // SPDX-License-Identifier: Apache-2.0
 import { badUserInput } from "../errors.js";
 import type { LinearIssue } from "../types.js";

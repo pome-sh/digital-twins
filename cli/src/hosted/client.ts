@@ -1,3 +1,7 @@
+// file-size: every control-plane call the CLI makes, each paired with the zod schema it
+// parses its response through. The pairing is the point: a call whose schema lives in
+// another module can be changed without the schema following it, and the schema is the
+// only thing standing between a changed server response and a silent misread.
 // SPDX-License-Identifier: Apache-2.0
 import {
   createEvalSessionResponseSchema,

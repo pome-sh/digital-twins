@@ -1,6 +1,5 @@
 // file-size: LinearDomain coordinator keeps lifecycle/identity helpers and thin delegations; area modules own issues/comments/catalog/etc.
 // SPDX-License-Identifier: Apache-2.0
-// file-size: Thin facade over domain modules; method surface mirrors LinearDomain API.
 import { resetDatabase } from "../db.js";
 import { badUserInput, notFound } from "../errors.js";
 import { linearIdFromCounter } from "../ids.js";

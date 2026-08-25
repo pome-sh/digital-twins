@@ -1,3 +1,6 @@
+// file-size: the `pome eval` command with its server contract documented inline against
+// the calls that depend on it — the route shapes, the ADR-013 no-local-scoring rule and
+// the idempotent-re-run behaviour are the reason the code reads the way it does.
 // SPDX-License-Identifier: Apache-2.0
 //
 // `pome eval [run-dir]` — upload an EXISTING raw trace directory to Pome

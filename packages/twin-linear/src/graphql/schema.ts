@@ -1,6 +1,5 @@
 // file-size: Linear GraphQL schema SDL string — single source of truth for the twin schema surface.
 // SPDX-License-Identifier: Apache-2.0
-// file-size: GraphQL SDL floor; keep ops + input fields co-located for fidelity parity.
 import { buildSchema, type GraphQLSchema } from "graphql";
 
 /** Emulate Linear operation-floor schema (rewritten for twin-linear). */

@@ -1,6 +1,5 @@
 // file-size: Linear MCP tool surface — one registry of tool defs + handlers pending further split.
 // SPDX-License-Identifier: Apache-2.0
-// file-size: MCP launch tool table co-located with canonical fixture mapping.
 // The two VALUES come from `@pome-sh/sdk/mcp-tool-fixture`, not the root barrel:
 // the barrel re-exports `openTwinDatabase`, so importing it EXECUTES `db.ts`'s
 // `import { DatabaseSync } from "node:sqlite"` and this module stops loading in
