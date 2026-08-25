@@ -144,7 +144,7 @@ const BENIGN_FAILURE_SIGNATURES = [
 //
 // So: a veto. Each pattern is an error CODE that cannot be produced by a
 // failure AFTER an outbound call, which is what keeps this deterministic where
-// the error-TEXT matching this ticket removed was not — none of these appear in
+// error-TEXT matching is not — none of these appear in
 // the SDK's racing error shapes. The imprecision is fail-closed in the safe
 // direction: a pre-outbound class this list misses keeps today's verdict, and
 // no real outbound failure can be redded by it.
@@ -329,7 +329,7 @@ export function missingLiveEnv(env = process.env) {
 // The floor the credentialed leg asks for: at least one example
 // must be alive at the settle — zero-alive is the exact fact no environment
 // currently asserts. Deliberately >= 1, not a hardcoded count of examples or
-// a fraction of `total`: a literal tied to `total` is the milestone's own
+// a fraction of `total`: a literal tied to `total` is this gate's own
 // "two floors that compared quantities which moved together" shape — either
 // number drifts in lockstep as examples are added or removed, so the
 // cross-check never disagrees with itself. The floor here is independent of
@@ -357,9 +357,9 @@ export function assertAliveFloor({ live, okCount, total }) {
 // gap this closes is a DIFFERENT failure mode, one level up: an example that
 // never reaches `classifyLaunch()` at all and so never lands in any of the
 // three buckets — the printed "N of M" total quietly shrinks to N-1 with
-// nothing saying the Mth example went MISSING rather than FAILED. Measured on
-// The shape this prevents: the summary reads "7 of 8" and names seven, and nothing says the
-// eighth (`pr-summary-agent`) had vanished rather than failed. Pure and
+// nothing saying the Mth example went MISSING rather than FAILED: the summary
+// reads "7 of 8", names seven, and says nothing about the eighth having
+// vanished rather than failed. Pure and
 // exported so the regression suite can assert it without spawning all eight
 // examples: feed it a discovered list and the names main()'s loop actually
 // produced a verdict for.
@@ -612,7 +612,7 @@ function smokeOne(name) {
       // exit. Measured on this branch: a complete summary printed, then 194s
       // of nothing before the process ended — in CI (no `timeout-minutes` on
       // `typecheck-test`, so GitHub's 360-minute default) a hang after a
-      // finished summary is a new flake replacing the one this ticket fixed.
+      // finished summary is a new flake replacing the one this gate removed.
       // The verdict is already computed from `output`, so releasing the pipes
       // here loses nothing.
       child.stdout?.destroy();

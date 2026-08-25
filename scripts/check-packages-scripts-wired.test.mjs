@@ -131,7 +131,7 @@ check(
 // first version used `/pome:unwired-ok:\s*(.+)/`, and `\s` matches a newline —
 // so a bare marker consumed the line break and reported the NEXT LINE of the
 // file as its justification. An exemption with no reason is exactly what the
-// milestone forbids.
+// this gate forbids.
 check(
   "a marker with no reason text is rejected, not satisfied by the next line",
   {
@@ -372,7 +372,7 @@ check(
 );
 
 // Case 26: an unreferenced cli/ check reds by name —
-// the exact break-on-purpose the PR verifies by hand against the real repo.
+// the exact break-on-purpose to verify by hand against the real repo.
 check(
   "unwired cli/package.json check reds, naming it",
   {

@@ -44,7 +44,7 @@
 // `run_task` local-subprocess spawn, and a plain `npm start`). Deliberately not
 // the `pome run` path itself: the measured trial was launched from a
 // developer shell by the coach, so a CLI-side clamp would not have caught the
-// very incident this ticket is about, and the obvious mechanism there
+// very incident this rule is about, and the obvious mechanism there
 // (`CLAUDE_CONFIG_DIR` at an empty dir, which the SDK does honor) also holds
 // `.credentials.json` — it would break subscription auth under `pome run`, the
 // thing an earlier fix addressed. The adapter change is a behavior change to a PUBLISHED

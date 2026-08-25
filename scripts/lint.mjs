@@ -9,7 +9,6 @@
 // CI step per rule — four places to touch to add one, which is why rules that
 // should exist would not.
 //
-//
 // Usage:
 //   node scripts/lint.mjs                  every rule
 //   node scripts/lint.mjs parent-vocab     one rule (local iteration)

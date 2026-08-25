@@ -5,7 +5,7 @@
 //
 // ── WHY THIS IS A SCRIPT AND NOT A RUNBOOK ─────────────────────────────────
 //
-// The three grants this ticket needs are authorization-code + PKCE flows, and a
+// The three grants needed are authorization-code + PKCE flows, and a
 // hand-run PKCE flow is where a runbook's accuracy goes to die: the verifier has
 // to survive between two commands, the challenge is base64url of a SHA-256 of
 // the verifier's ASCII (not of its bytes decoded), `state` has to be checked,

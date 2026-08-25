@@ -386,7 +386,7 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
     else fail("14. a registry error produces no repin (never treated as published)", JSON.stringify(repins));
   }
 
-  // 15. Replays the real incidents (#395: adapter 0.3.4, #425: adapter 0.3.6)
+  // 15. Replays two observed incidents (adapter 0.3.4, adapter 0.3.6)
   // — the exact state right after each release, before the human PR.
   for (const { was, published: newVersion } of [
     { was: "0.3.3", published: "0.3.4" },

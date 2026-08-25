@@ -29,15 +29,13 @@
 // populated node_modules.
 //
 // `agent-examples/support-triage` is the fourth and the exception: it pins the
-// PUBLISHED adapter by exact version (#308), because its README documents it as
+// PUBLISHED adapter by exact version, because its README documents it as
 // standalone-fetchable via `npx degit`, which copies that subtree and nothing
 // above it, so a `file:` path out of the tree breaks its `npm install`. So this
 // gate typechecks that example against the registry artifact, NOT against the
-// adapter source next to it — and nothing compared the two until this gate. It had
-// drifted twice already (#308 off 0.2.5, then 0.3.1 against a workspace 0.3.3,
-// which also dragged the retired `@pome-sh/shared-types` back into the
-// example's install graph as 0.3.1's declared runtime dep) before anything
-// watched it. `workspace-pins.mjs` cannot own that watch:
+// adapter source next to it. That pin has drifted from the workspace version
+// twice, once dragging a retired package back into the example's install graph
+// as a declared runtime dep. `workspace-pins.mjs` cannot own that watch:
 // it runs OFFLINE before `npm ci`, and "resolve to the workspace" is the wrong
 // rule for a deliberately-published pin. The right rule — re-pin once the
 // workspace version publishes, skip while it has not — needs the registry, so
@@ -100,9 +98,9 @@ for (const name of examples) {
   // One try PER LEG, not one around both. With both in a single try a tsc error
   // stopped that example's tests from running at all, so a type error and a test
   // regression in the same commit took two CI rounds to see — and "a check that
-  // silently stops running behind another check's failure" is the exact shape the
-  // pin-parity note below calls the whole subject here. Putting the test
-  // leg behind the typecheck leg would have re-armed it one directory over.
+  // silently stops running behind another check's failure" is exactly what the
+  // pin-parity note below is about. Putting the test leg behind the typecheck
+  // leg would re-arm it one directory over.
   const broke = [];
   for (const [leg, args] of [
     ["typecheck", ["run", "typecheck"]],
@@ -136,9 +134,9 @@ if (failures.length > 0) {
 // Deliberately NOT behind the typecheck exit above, because that
 // made an unrelated tsc error in ANY example (say `agent-examples/merge-agent`) hide a
 // real published-pin drift until someone fixed the typecheck and CI came round
-// again — a check that silently stops running behind another check's failure is
-// the whole subject here. It reads manifests and calls the registry, so
-// it needs none of the installs above to have succeeded.
+// again — a check that silently stops running behind another check's failure.
+// It reads manifests and calls the registry, so it needs none of the installs
+// above to have succeeded.
 console.log("\n=== agent-examples/* pin↔registry parity ===");
 const parityOk = reportExamplePinParity(repoRoot);
 if (!parityOk) {

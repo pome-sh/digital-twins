@@ -348,7 +348,7 @@ for (const id of Object.keys(TWIN_BOOT)) {
 }
 
 // ── the gate is actually wired into CI ──────────────────────────────────────
-// A gate nothing runs is the failure mode this ticket exists to prevent.
+// A gate nothing runs is the failure mode this exists to prevent.
 {
   const ci = readFileSync(join(ROOT, ".github/workflows/ci.yml"), "utf8");
   assert(ci.includes("npm run probe:twins"), "ci.yml runs the declared-endpoint gate");

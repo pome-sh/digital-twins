@@ -32,7 +32,7 @@
 // helper extracted out of one is covered because the route file still imports
 // it. Both are the ways a hand-maintained list would have gone quietly stale —
 // and gmail's input names lived in exactly such a helper (`rest-common.ts`)
-// before this ticket, two modules away from anything named "routes".
+// two modules away from anything named "routes".
 //
 // A twin with no discoverable registrar is a hard failure, not a skip: removing
 // the thing a reachability gate walks is the cheap way to pass it.
@@ -47,7 +47,7 @@ import { buildSpecifierMap, reachable, stripNonCode } from "../../lib/static-imp
 
 /**
  * The imperative request reads. Each is a way to obtain an input value whose
- * NAME appears only at the call site — which is precisely the shape this ticket
+ * NAME appears only at the call site — which is precisely the shape this rule
  * replaced, in all four HTTP twins at once.
  *
  * `c.req.method` and `c.req.path` are deliberately absent: they are routing

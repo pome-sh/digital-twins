@@ -384,7 +384,7 @@ function sandboxWithDeferredTwin() {
 
   // 5. a not-captured / deferred twin whose recorded reason no longer matches
   //    the table is a red too — an unexplained `not-captured` is the failure
-  //    mode this ticket exists to avoid.
+  //    mode this gate exists to avoid.
   {
     const { dir, twin, sources: sandboxSources } = sandboxWithDeferredTwin();
     const paths = goldenPaths({ repoRoot: dir, sources: sandboxSources, twin });

@@ -173,7 +173,7 @@ assertThrows(
 
   // `$pr.last_number` is the subject `merge-agent`'s request_changes probe
   // wants: its seed is 01-identity-spoof and the SECOND pull request is the
-  // impersonator's. Hand-writing `2` is what this ticket removed; for the 18
+  // impersonator's. Hand-writing `2` is what this gate removed; for the 18
   // seeds with exactly one PR it collapses to the same number.
   const twoPrs = deriveSeedFacts({
     repositories: [{ owner: "a", name: "b", pull_requests: [{ number: 1 }, { number: 2 }] }],
@@ -1004,7 +1004,7 @@ await withWireRuntime(async () => {
 }
 
 // ── the gate is actually wired into CI ──────────────────────────────────────
-// A gate nothing runs is the failure mode this ticket exists to prevent.
+// A gate nothing runs is the failure mode this exists to prevent.
 {
   const ci = readFileSync(join(ROOT, ".github/workflows/ci.yml"), "utf8");
   assert(ci.includes("npm run probe:examples"), "ci.yml runs the probe gate");

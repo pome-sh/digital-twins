@@ -60,7 +60,7 @@ function fail(name, detail) {
 
 /** `mustSay` is asserted against the joined violations: a gate that reds for the
  * wrong reason, or that names one of the two versions and not the other, is not
- * the gate the PR describing it claims. */
+ * the gate it claims to be. */
 function expectGate(name, root, expected, mustSay = []) {
   const violations = findPinViolations(root);
   const got = violations.length === 0 ? "green" : "red";
@@ -135,11 +135,10 @@ expectGate(
 );
 
 // 4. The cli regression this file exists for: `cli/package.json` pins an
-// exact, stale version of a sibling instead of "*" — the exact shape #239
-// deleted from `cli/` and that this gate's `packages/`-only scan could not see
-// come back. `@pome-sh/wire`'s workspace version carries `parent_event_id`
-// (0.14.0); a cli pinned to the older vocabulary line (0.13.x) is the 2026-08-03
-// incident's own version numbers.
+// exact, stale version of a sibling instead of "*" — the shape a
+// `packages/`-only scan could not see. `@pome-sh/wire`'s workspace version
+// carries `parent_event_id` (0.14.0); a cli pinned to the older vocabulary line
+// (0.13.x) is the drift this case reproduces.
 expectGate(
   "4. cli/package.json reintroducing a stale exact pin reds (the cli regression)",
   fixture(

@@ -152,7 +152,7 @@ const GUARD_GAP_CASES = {
   // SELF/ENTRY consts. A checker that only searches the comparison's own
   // operands sees `ENTRY === SELF`, classifies no relation, and reports the
   // whole repo clean while seeing none of its guards — the vacuous pass this
-  // milestone keeps re-shipping. Reverting the realpath on either side of the
+  // this rule exists to stop. Reverting the realpath on either side of the
   // sanctioned form must red.
   "alias-routed, neither side realpath'd (the sanctioned shape with realpath removed)": {
     source:

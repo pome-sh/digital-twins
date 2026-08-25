@@ -4,10 +4,10 @@
 // (`agent-examples/support-triage` documents why in `gate-examples.mjs`'s
 // header: it is `npx degit`-fetchable as a standalone subtree, so a `file:`
 // link out of its own directory would break its `npm install`). Nothing
-// watched that pin drift out from under the sibling workspace version twice
-// (#308 off 0.2.5, then off 0.3.1 — the second time dragging the retired
-// `@pome-sh/shared-types` back into the example's install graph as a runtime
-// dependency — two schema identities in one process, in the one example that
+// watched that pin drift out from under the sibling workspace version, which
+// has happened twice — the second time dragging a retired package back into
+// the example's install graph as a runtime dependency, giving two schema
+// identities in one process, in the one example that
 // exists to demonstrate
 // a correctly-joined trace).
 //

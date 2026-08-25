@@ -96,7 +96,7 @@ for (const [label, { source, missing }] of Object.entries(OPEN_DOORS)) {
 
 // An options object the gate cannot resolve must be a FINDING, never a pass.
 // "I could not tell" and "it is isolated" printing the same way is the whole
-// class of bug this ticket family keeps hitting.
+// class of bug this rule exists to catch.
 {
   const cases = {
     "options from an imported helper": `${IMPORT_LINE}\nimport { opts } from "./opts.js";\nawait query({ prompt: "go", options: opts });`,

@@ -17,7 +17,7 @@
 //
 // `--check` is what makes the derivation load-bearing. Without it the JSON is
 // just another hand-maintained list of parameter names, which is exactly the
-// second source of truth this ticket exists to not create.
+// second source of truth this exists to not create.
 //
 // Reads the BUILT output (`packages/twin-*/dist/route-inputs.js`), not the
 // TypeScript, so it needs `npm run build` first — that is also what CI does,

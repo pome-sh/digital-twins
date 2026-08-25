@@ -132,7 +132,7 @@ const LIFECYCLE_SCRIPTS = new Set([
  *    matches a newline, so a bare `// pome:unwired-ok:` consumed the line
  *    break and captured the next line of the file as its justification — it
  *    reported a stray `import` statement as the reason someone chose not to
- *    run a check. An exemption with no reason is what the milestone forbids.
+ *    run a check. An exemption with no reason is what this gate forbids.
  *
  * 2. An unnamed marker exempts EVERY script in the package whose command
  *    names that file, and three files here implement two scripts each: a write
