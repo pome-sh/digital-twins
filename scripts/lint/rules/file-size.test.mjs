@@ -54,7 +54,7 @@ defineCases("file-size", [
     contains: "exceeds 500 LOC",
   },
   {
-    name: "a header that is not on the first line does not count",
+    name: "a header below the first statement does not count",
     files: tree({ [SUBJECT]: `const a = 1;\n// file-size: buried where nobody reads it\n${lines(600)}` }),
     expect: "red",
     contains: "exceeds 500 LOC",
@@ -64,6 +64,35 @@ defineCases("file-size", [
     files: tree({
       [SUBJECT]: `#!/usr/bin/env node\n// file-size: the whole command surface in one place\n${lines(600)}`,
     }),
+    expect: "green",
+  },
+  {
+    // The shape every twin entrypoint has. Demanding one exact index reported a
+    // missing header while the header sat two lines above the complaint.
+    name: "a header below a shebang AND an SPDX line still counts",
+    files: tree({
+      [SUBJECT]: `#!/usr/bin/env node\n// SPDX-License-Identifier: Apache-2.0\n// file-size: one boot path\n${lines(600)}`,
+    }),
+    expect: "green",
+  },
+  {
+    name: "a header below SPDX with no shebang counts",
+    files: tree({
+      [SUBJECT]: `// SPDX-License-Identifier: Apache-2.0\n// file-size: one boot path\n${lines(600)}`,
+    }),
+    expect: "green",
+  },
+  {
+    name: "a header under a shebang on a small file is RED too, not skipped",
+    files: tree({ [SUBJECT]: `#!/usr/bin/env node\n// file-size: stale\n${lines(10)}` }),
+    expect: "red",
+    contains: "exempts nothing",
+  },
+  {
+    // 500 content lines plus the trailing newline's empty string. Counting that
+    // string reported 501 and called a conforming file a violation.
+    name: "a file at exactly the limit passes, trailing newline not counted",
+    files: tree({ [SUBJECT]: `${lines(499)}\n` }),
     expect: "green",
   },
   {

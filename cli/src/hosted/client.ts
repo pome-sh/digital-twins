@@ -1,7 +1,10 @@
-// file-size: every control-plane call the CLI makes, each paired with the zod schema it
-// parses its response through. The pairing is the point: a call whose schema lives in
-// another module can be changed without the schema following it, and the schema is the
-// only thing standing between a changed server response and a silent misread.
+// file-size: every control-plane call lives inside one `createHostedClient` closure, so
+// they share the auth headers, the timeout and retry budgets, and the error mapping to
+// HostedAuthError / HostedOrchError. Splitting a call out means either re-deriving that
+// wiring or exporting it, and a second caller of the retry budget is how two commands
+// start disagreeing about how long to wait. The finalize accept/poll state machine below
+// is local because it is the only multi-step protocol here; the plain response schemas
+// are shared and imported from ../types/shared.js.
 // SPDX-License-Identifier: Apache-2.0
 import {
   createEvalSessionResponseSchema,

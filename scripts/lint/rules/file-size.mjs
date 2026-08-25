@@ -2,9 +2,9 @@
 //
 // File-size ceiling. A missing scan root is RED, not an empty pass.
 //
-// One escape hatch: a `// file-size: <reason>` header on the first line, or the
-// line after a shebang. The reason travels with the file, so it cannot go stale
-// by rename and it is visible to whoever opens the module rather than only to
+// One escape hatch: a `// file-size: <reason>` header in the file's leading
+// comment block. The reason travels with the file, so it cannot go stale by
+// rename and it is visible to whoever opens the module rather than only to
 // whoever opens this rule.
 //
 // A header on a file that no longer exceeds the limit is RED, the same way
@@ -18,6 +18,10 @@
 const FILE_SIZE_LIMIT = 500;
 const FILE_SIZE_HEADER = /^\/\/\s*file-size:\s*.+/;
 
+// How far into the file the header may sit: shebang, SPDX, and the header itself
+// in either order, plus a blank line. Deliberately small.
+const LEADING_BLOCK_LINES = 4;
+
 const SCAN_DIRS = [
   "packages/twin-gmail/src",
   "packages/twin-github/src",
@@ -30,10 +34,26 @@ const SCAN_DIRS = [
   "cli/src",
 ];
 
-/** The header sits on line 1, or on line 2 where a shebang owns line 1. */
+/** The header sits in the file's leading comment block, so it can go above or
+ *  below the SPDX line and after a shebang — the twin entrypoints are
+ *  `#!` then SPDX, and demanding one exact index there reports a missing header
+ *  while the header is visibly two lines up. Bounded to the block so a
+ *  `// file-size:` written mid-file cannot exempt anything. */
 function declaredReason(lines) {
-  const at = lines[0]?.startsWith("#!") ? 1 : 0;
-  return FILE_SIZE_HEADER.test(lines[at] ?? "");
+  for (const raw of lines.slice(0, LEADING_BLOCK_LINES)) {
+    const line = raw.trim();
+    if (FILE_SIZE_HEADER.test(line)) return true;
+    if (line === "" || line.startsWith("#!") || line.startsWith("//")) continue;
+    return false;
+  }
+  return false;
+}
+
+/** Content lines, ignoring the trailing empty string a final newline leaves.
+ *  Counting it made the reported length one more than the file has, which read
+ *  as an off-by-one in every violation message. */
+function lineCount(lines) {
+  return lines.length > 0 && lines.at(-1) === "" ? lines.length - 1 : lines.length;
 }
 
 export default {
@@ -46,10 +66,11 @@ export default {
       const rel = ctx.rel(file);
       const lines = ctx.read(file).split("\n");
       const stated = declaredReason(lines);
-      if (lines.length <= FILE_SIZE_LIMIT) {
+      const count = lineCount(lines);
+      if (count <= FILE_SIZE_LIMIT) {
         if (stated) {
           violations.push(
-            `${rel}: ${lines.length} lines is under the ${FILE_SIZE_LIMIT} LOC limit, so its ` +
+            `${rel}: ${count} lines is under the ${FILE_SIZE_LIMIT} LOC limit, so its ` +
               `\`// file-size:\` header exempts nothing — drop the header.`,
           );
         }
@@ -60,7 +81,7 @@ export default {
         continue;
       }
       violations.push(
-        `${rel}: ${lines.length} lines exceeds ${FILE_SIZE_LIMIT} LOC — add a \`// file-size: <reason>\` header or split the module`,
+        `${rel}: ${count} lines exceeds ${FILE_SIZE_LIMIT} LOC — add a \`// file-size: <reason>\` header or split the module`,
       );
     }
     return { violations, summary: `${exempt} module(s) state a reason` };
