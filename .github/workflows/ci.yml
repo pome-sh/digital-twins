@@ -131,19 +131,19 @@ jobs:
       # workspace and EXIT 0, and a wrong `publishConfig.registry` aims it at
       # public npm, which cannot be undone after 72 hours. The tarball half needs
       # a build and runs in release.yml's publish-wire job.
-      - run: node scripts/ci/check-wire-tarball.mjs --manifest-only
+      - run: npm run gate:wire-manifest
 
       # Same two manifest-readable failure modes for @pome-sh/checks, plus one
       # more: a leaked `@pome-sh/*` runtime dependency 404s on the consumer's
       # install, because those versions are on no registry.
-      - run: node scripts/ci/check-checks-tarball.mjs --manifest-only
+      - run: npm run gate:checks-manifest
 
       # Same for @pome-sh/sandbox-domains, which adds one the vocabulary package
       # cannot have: its `dependencies` are load-bearing in BOTH directions,
       # since declaring a package is what makes tsup leave it external. The test
       # asserts the gate by BREAKING the manifest nine ways — a gate only ever
       # run against a green tree is one that could have been `process.exit(0)`.
-      - run: node scripts/ci/check-sandbox-domains-tarball.mjs --manifest-only
+      - run: npm run gate:sandbox-domains-manifest
       - run: node scripts/ci/check-sandbox-domains-tarball.test.mjs
 
       # Asserts a 401 from GitHub Packages is never read as "unpublished" (which
@@ -195,7 +195,7 @@ jobs:
       # answer; the live registry check runs in gate:examples below.
       - run: node scripts/check-example-pins-published.test.mjs
 
-      - run: bash scripts/lint-no-cloud-imports.sh
+      - run: npm run lint:no-cloud-imports
       - run: bash scripts/lint-no-cloud-imports.test.sh
       - run: node scripts/ci/wait-for-workflow.test.mjs
       - run: node scripts/ci/assert-repo-policy.test.mjs
@@ -205,8 +205,8 @@ jobs:
       # question. `--offline` re-derives meta + canonical from the committed
       # raw.json: no network, no Go toolchain, and it reds on an edited golden or
       # a hand-typed sha. Re-capturing from the live substrate is a separate,
-      # human-reviewed lane (`node scripts/capture-mcp-tools-list.mjs`).
-      - run: node scripts/capture-mcp-tools-list.mjs --check --offline
+      # human-reviewed lane (`npm run capture:mcp-tools-list`).
+      - run: npm run gate:mcp-tools-list
       - run: node scripts/capture-mcp-tools-list.test.mjs
 
       # ---------------------------------------------------------------------
