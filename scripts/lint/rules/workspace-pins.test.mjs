@@ -4,22 +4,16 @@
 // Regression suite for `workspace-pins.mjs`, extended to
 // cover `cli/`.
 //
-// A 2026-08-03 failure was investigated where the CLI's build typechecked
-// against a `@pome-sh/shared-types` version behind what `packages/` (and its
-// own source) actually used — a pin that had drifted out from under it. That
-// specific architecture (`cli-ci.yml`, `use-local-pome-tarballs.mjs`, an exact
-// registry pin in `cli/package.json`) was deleted across `6369379` (#237) and
-// `a3c9441` (#239) the day AFTER the ticket was filed: every
-// internal `@pome-sh/*` dep, cli's included, became a workspace-resolved `"*"`,
-// which npm always symlinks — so the specific "stale pin passes CI, breaks on
-// publish" shape this gate is named for cannot recur through `cli/` today. What
-// CAN recur is the thing #239 fixed being silently undone: nothing stopped
-// `cli/package.json` from reintroducing an exact pin, because this gate held its
-// own `packages/*` list. It now reads the root `workspaces` field instead, which
-// is why case 7 (a `packages/*` package pinning a stale `@pome-sh/cli`) reds and
-// case 8 asserts that field still names `cli` — every other case runs against a
-// fixture with its own root manifest, so the gate is proven to fire on the shape
-// rather than trusted to, but no fixture can prove it is aimed at the real tree.
+// Every internal `@pome-sh/*` dep, cli's included, is a workspace-resolved
+// `"*"`, which npm always symlinks — so the "stale pin passes CI, breaks on
+// publish" shape this gate is named for cannot recur through `cli/` while that
+// holds. What CAN recur is that property being silently undone: nothing stops
+// `cli/package.json` from reintroducing an exact pin. So the gate reads the root
+// `workspaces` field rather than keeping its own `packages/*` list, which is why
+// case 7 (a `packages/*` package pinning a stale `@pome-sh/cli`) reds and case 8
+// asserts that field still names `cli`. Every other case runs against a fixture
+// with its own root manifest, so the gate is proven to fire on the shape rather
+// than trusted to — but no fixture can prove it is aimed at the real tree.
 //
 // The failure class through `agent-examples/*`'s deliberately-published pins is a
 // different rule (needs the registry, tolerates a pin equal to a version that

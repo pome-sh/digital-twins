@@ -59,7 +59,7 @@ const OPEN_DOORS = {
     source: `${IMPORT_LINE}\nawait query({ prompt: "go", options: { settingSources: [] } });`,
     missing: ["tools"],
   },
-  // `allowedTools` is the trap this ticket's blast radius is built on: it reads
+  // `allowedTools` is the trap the blast radius is built on: it reads
   // like a restriction and is not one (it only auto-approves). A gate that
   // accepted it would bless three of the four bundled examples exactly as they
   // shipped.

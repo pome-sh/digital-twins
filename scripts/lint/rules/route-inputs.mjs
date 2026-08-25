@@ -19,7 +19,7 @@
 // anyway — no type can prevent. It is one line, it typechecks, every existing
 // test passes, and the published artifact silently stops being the whole truth.
 //
-// That is worse than the state before this ticket. `not-compared` is honest;
+// That is worse than not checking at all. `not-compared` is honest;
 // "compared, no drift" computed from an incomplete declaration is a lane
 // reporting a pass nobody measured, which is how people learn to ignore it.
 //

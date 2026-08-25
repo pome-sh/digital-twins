@@ -1,137 +1,72 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Example-launch smoke. `tsc` cannot see a temporal-dead-zone crash: the
-// examples typecheck gate was green while every real launch of
-// `agent-examples/triage-agent` died at startup with
-//   ReferenceError: Cannot access 'TwinMcpClient' before initialization
-// because the top-level `await main()` ran before the `class TwinMcpClient`
-// below it was evaluated. The POME_PREFLIGHT path (a hoisted-function early
-// return) never reached the class, so `pome doctor` / `POME_PREFLIGHT=1` passed
-// against a code path that stopped short of the bug.
+// Example-launch smoke. `tsc` cannot see a temporal-dead-zone crash: an example
+// whose top-level `await main()` runs before the class below it is evaluated
+// typechecks clean and dies at startup with `ReferenceError: Cannot access
+// 'X' before initialization`. The POME_PREFLIGHT path is a hoisted-function
+// early return, so it never reaches the class either — `pome doctor` passes
+// against a code path that stops short of the bug.
 //
-// This gate launches each runnable example for real — POME_PREFLIGHT unset, so
-// `main()` runs past the point where a launch-above-class TDZ would fire — and
-// fails if the module crashes on load with a TDZ ReferenceError.
+// So this launches each runnable example for real, POME_PREFLIGHT unset.
 //
-// For as long as this gate existed, an exit *inside* SETTLE_MS was
-// unconditionally treated as OK, on the theory that a benign network/auth
-// failure (no live twin, no real model key in CI) is expected and must not be
-// a false red. That theory is right, but the implementation never checked it —
-// ANY exit before the settle read as success, so an example that returns
-// having done nothing at all (wrong parse, an early return, a swallowed
-// error — `minimal-viktor-langgraph` did all three at once) passed exactly
-// like a healthy launch. Measured in CI on pome-sh/digital-twins#382: 8 of 8
-// examples reported OK, seven exited 1, one exited 0, and zero were "still
-// running" at the settle — the one signal this gate computes that actually
-// means "reached real work" was thrown away every time.
+// ── HOW A LAUNCH IS CLASSIFIED ───────────────────────────────────────────────
 //
-// The fix asserts the property instead of trusting the exit path:
-//   - still alive at the settle → OK. The launch reached async work (a network
-//     call, a model call) and is still in it — a TDZ throws synchronously
-//     during module evaluation, well under this window, so surviving it is
-//     real evidence, not silence.
-//   - exits before the settle with the TDZ signature in its output → FAIL,
-//     unconditionally. This is the crash this gate exists to catch, and must
-//     never become a skip or a pass no matter what else changes here.
-//   - exits before the settle WITHOUT the TDZ signature → only a network/auth
-//     failure this gate's own SMOKE_ENV deliberately manufactures (dead twin
-//     endpoints, invalid model keys) excuses this. That is asserted by
-//     matching the output against BENIGN_FAILURE_SIGNATURES below — a property
-//     of the failure ("connection refused", "invalid api key" …), not a list
-//     of which examples are allowed to exit early. A match is a named, counted
-//     REACHED-OUTBOUND, printed distinctly from OK. No match is a FAIL: the
-//     example returned before it could have done anything, and nothing in its
-//     own output says why.
+//   still alive at SETTLE_MS            OK. It reached async work, and a TDZ
+//                                       throws synchronously during module
+//                                       evaluation, well inside the window.
+//   exits with the TDZ signature        FAIL, unconditionally. The crash this
+//                                       gate exists to catch; must never
+//                                       become a skip or a pass.
+//   exits having printed the marker     REACHED-OUTBOUND, a pass. Named for
+//                                       what it proves — module evaluated,
+//                                       startup guards cleared, an outbound
+//                                       call opened — never for what it does
+//                                       not (that the work was correct;
+//                                       `probe:examples` owns that).
+//   exits without the marker            FAIL. It returned before it could have
+//                                       done anything.
 //
-// Measured on this PR in real CI (the only environment that gates anything):
-// 7 of 8 examples are REACHED-OUTBOUND and ZERO are OK, because with no live
-// twin and no valid model key nothing survives 5s. That is why the outbound
-// failure is a PASS and not a skip — a "skip" that is the permanent steady
-// state means a gate that verifies nothing and reports green, which is exactly
-// the defect this ticket exists to remove. It is named for what it proves
-// (module evaluated, startup guards cleared, an outbound call opened) and never
-// for what it does not (that the work was correct — `probe:examples` and the
-// scenario suites are the gates for that).
+// ── WHY A MARKER AND NOT THE ERROR TEXT ──────────────────────────────────────
 //
-// The REACHED-OUTBOUND leg above is the only thing any environment
-// ever proves, because CI has no credentials and 0 of 8 examples are ever
-// "still running at the settle" here. `SMOKE_EXAMPLES_LIVE=1` switches this
-// same gate — same classifier, same discovery, same output-tail printing —
-// into the mode a credentialed caller runs: it stops overlaying SMOKE_ENV's
-// dead loopback ports and invalid keys, so whatever real twin wiring and
-// model key the caller already put in `process.env` (booting real local
-// twins via `pome twin start`, a real `ANTHROPIC_API_KEY`) flows straight
-// through to each example. In this mode a hard credential check runs BEFORE
-// anything launches — an absent credential must never degrade into a second
-// REACHED-OUTBOUND run that reports success, which would prove nothing while
-// looking like a run that does — and a floor after the run asserts at
-// least one example was alive at the settle for real, naming what it
-// expected when it was not.
+// Matching failure text cannot be made deterministic. The Claude Agent SDK's
+// `query()` picks between two error shapes on a field set by a race between its
+// own stream parsing and the child's 'exit' event: win the race and the same
+// underlying 401 reads "Claude Code returned an error result: … 401 invalid
+// x-api-key"; lose it and it reads "Claude Code process exited with code 1".
+// Same tree, either verdict. Widening the signature list to catch "process
+// exited with code" would convert every pre-wiring crash into a pass.
 //
-// REACHED-OUTBOUND above was decided by matching the FAILURE TEXT
-// against BENIGN_FAILURE_SIGNATURES — an archaeology problem, not a proof.
-// `@anthropic-ai/claude-agent-sdk@0.3.221`'s query() picks between two error
-// shapes on a field (`lastErrorResultText`) set by a race between its own
-// stream-parsing and the child process's 'exit' event: win the race and the
-// thrown error reads "Claude Code returned an error result: … 401 invalid
-// x-api-key" (matches the signature list → REACHED-OUTBOUND); lose it and the
-// SAME underlying failure reads "Claude Code process exited with code 1.
-// stderr: <tail>" (matches nothing → FAIL). Same tree, either verdict —
-// measured on run 31711971267: attempt 1 was "7 of 8" reached + exit 1,
-// the re-run was "8 of 8". No regex over the error text can be made
-// deterministic against a race that lives inside a dependency's internals,
-// and widening the signatures to catch "process exited with code" would
-// convert every pre-wiring crash into a pass — the exact defect this gate
-// already fixed once, reintroduced through the back door.
+// `OUTBOUND_MARKER` is instead a fixed literal every example prints,
+// synchronously, immediately before its first outbound call — before either
+// error shape can be constructed. Examples routing through
+// `@pome-sh/adapter-claude-sdk`'s `query()` get it from that seam; the rest
+// print it themselves, gated on `POME_SMOKE_MARK_OUTBOUND=1` so real users
+// never see it. `assertEveryExampleEmitsMarker()` asserts the PROPERTY — every
+// discovered example has a route to the marker — rather than hand-listing which
+// ones need their own, so a ninth example that forgets reds here by name.
+// `BENIGN_FAILURE_SIGNATURES` still fires, but only to supply a human-readable
+// REASON alongside a marker-backed verdict, never to decide one.
 //
-// The fix: classify on POSITIVE EVIDENCE THE EXAMPLE ITSELF EMITS, not on
-// which shape of error text survived the race. `OUTBOUND_MARKER` below is a
-// fixed literal every example prints, synchronously, at the earliest point it
-// is about to make its first outbound (twin or model) call — before either of
-// the SDK's two racing error shapes can even be constructed. Four examples
-// (`pr-summary-agent`, `pr-summary-review`, `support-triage`, `triage-agent`)
-// get this for free from `@pome-sh/adapter-claude-sdk`'s `query()`, the shared
-// seam every one of them already routes through — it wraps the exact racy
-// `sdkQuery()` call, so the marker point and the race are in the same
-// function. The other four (`gmail-retry-notify`, `merge-agent`,
-// `minimal-viktor`, `minimal-viktor-langgraph`) import nothing from
-// `@pome-sh/*` at all — no shared seam covers them — so each prints the
-// literal marker itself, gated on `POME_SMOKE_MARK_OUTBOUND=1` so real users
-// never see it. `assertEveryExampleEmitsMarker()` asserts the PROPERTY (every
-// discovered example has a route to the marker — either the shared seam or
-// its own literal) rather than hand-listing which four need their own, so a
-// ninth example that forgets it reds here by name instead of silently
-// reporting FAIL forever with nothing pointing at why.
+// What the marker does NOT prove is that a socket was written: it is printed at
+// the call SITE, so anything throwing between that line and the syscall prints
+// it first. `PRE_OUTBOUND_VETOES` reds those on their own error CODE, which is
+// deterministic where error text is not, because none of those codes can be
+// produced by a failure after a call went out.
 //
-// What the marker does NOT prove: that a socket was written. It is printed at
-// the outbound call SITE, so anything that throws between that line and the
-// syscall prints it first. Two such classes were measured (the SDK failing to
-// resolve the `claude` binary; a malformed twin URL) and both used to FAIL, so
-// `PRE_OUTBOUND_VETOES` below reds them explicitly on their own error CODE —
-// deterministic where the removed error-TEXT matching was not, since none of
-// those codes can be produced by a failure after a call went out. Crashes
-// AFTER a successful outbound call are out of scope by design and always were:
-// this gate's claim is "reached an outbound call", never "the work was
-// correct" (`probe:examples` and the scenario suites own that).
+// ── TWO THINGS STATED RATHER THAN ENGINEERED AWAY ────────────────────────────
 //
-// Fail-closed: REACHED-OUTBOUND now requires the marker to be present in the
-// captured output. `BENIGN_FAILURE_SIGNATURES` still fires — but only to
-// supply a human-readable REASON alongside a marker-backed "reached" verdict,
-// never to decide the verdict itself. An example that crashes before it ever
-// reaches its marker line cannot be classified as reached no matter how
-// benign-looking its crash text is (verified by launching a deliberately
-// pre-wiring crash whose message contains "ECONNREFUSED"/"401 invalid
-// x-api-key" — it still FAILs).
+// `SMOKE_EXAMPLES_LIVE=1` runs the same classifier and discovery without
+// overlaying SMOKE_ENV's dead ports and invalid keys, so a credentialed
+// caller's real wiring flows through. In that mode a hard credential check runs
+// BEFORE anything launches — an absent credential must never degrade into a
+// second REACHED-OUTBOUND run that reports success — and a floor afterwards
+// asserts at least one example was alive at the settle.
 //
-// SETTLE_MS is a second, independent nondeterminism this does NOT remove: it
-// is a wall clock racing the `claude` CLI's cold-start time, so the OK
-// (still-alive) vs REACHED (marker-then-exit) split is environment-shaped — a
-// machine with an authenticated `claude` login can report several "still
-// running at the settle" where CI reports zero. That split does not change
-// the pass/fail verdict (both OK and REACHED are passing outcomes, and the
-// marker fires within milliseconds of process start either way, long before
-// SETTLE_MS), so it is stated here and in the printed summary rather than
-// engineered away.
+// SETTLE_MS is a wall clock racing the `claude` CLI's cold start, so the OK
+// versus REACHED split is environment-shaped: a machine with an authenticated
+// login reports several still-alive where CI reports zero. Both are passing
+// outcomes and the marker fires within milliseconds of process start, so this
+// changes no verdict.
 import { spawn } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -343,7 +278,7 @@ export function launchEnv(baseEnv, live) {
 // to `true`/`yes`/`TRUE`/`1 ` would otherwise make LIVE false and silently run
 // the PR leg instead — SMOKE_DEAD_WIRING overlaid, no credential check, no
 // floor, REACHED-OUTBOUND x 8, exit 0. A green nightly that proves nothing is
-// this ticket's own subject, and it must not be one character away.
+// the failure this guards, and it must not be one character away.
 export function resolveLiveFlag(value) {
   if (value === undefined || value === "") return { live: false, error: null };
   if (value === "1") return { live: true, error: null };
@@ -377,7 +312,7 @@ export const LIVE_REQUIRED_ENV = ["ANTHROPIC_API_KEY", "POME_AUTH_TOKEN"];
 // Named, not silent: a credentialed leg missing a secret must fail loudly
 // before anything launches, never fall through into a second uncredentialed
 // REACHED-OUTBOUND run that reports success — that would be a nightly
-// proving nothing while looking like it proves something, this ticket's own
+// proving nothing while looking like it proves something, this gate's own
 // subject.
 // `!env[name]` alone is not enough. GitHub Actions substitutes an unset secret
 // as the EMPTY STRING rather than leaving the var absent (falsy, so caught), but
@@ -423,7 +358,7 @@ export function assertAliveFloor({ live, okCount, total }) {
 // never reaches `classifyLaunch()` at all and so never lands in any of the
 // three buckets — the printed "N of M" total quietly shrinks to N-1 with
 // nothing saying the Mth example went MISSING rather than FAILED. Measured on
-// PR #417: the summary read "7 of 8" and named seven, and nothing said the
+// The shape this prevents: the summary reads "7 of 8" and names seven, and nothing says the
 // eighth (`pr-summary-agent`) had vanished rather than failed. Pure and
 // exported so the regression suite can assert it without spawning all eight
 // examples: feed it a discovered list and the names main()'s loop actually
@@ -530,7 +465,7 @@ function sourceContainsMarker(srcDir) {
 // in real CI, 7 of 8 examples land here and ZERO land on "ok", because with no
 // live twin and no valid model key nothing can still be running at the settle.
 // A skip that is the permanent steady state is a gate that verifies nothing and
-// goes green — this milestone's own subject. So it is named for what it
+// goes green. So it is named for what it
 // positively proves (the process evaluated its module, cleared its startup
 // guards, and got far enough to open an outbound twin/model call) and printed
 // distinctly from "ok", which is the strictly stronger evidence.

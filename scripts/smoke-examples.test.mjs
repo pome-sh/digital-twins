@@ -3,19 +3,16 @@
 //
 // Regression suite for `smoke-examples.mjs`.
 //
-// The gate's whole job, before this ticket, was undermined by one gap: an
-// exit inside SETTLE_MS was ALWAYS "OK", so an example that returned having
-// done nothing looked identical to a healthy launch. `classifyLaunch()` is
-// where that got fixed, so this suite drives it directly with synthetic
-// evidence rather than spawning all eight real examples (slow, network- and
-// timing-dependent — the real launches are exercised by `npm run
-// smoke:examples` itself in CI).
+// The gap that undermines this gate's whole job: an exit inside SETTLE_MS
+// reading as "OK", so an example that returned having done nothing looks
+// identical to a healthy launch. `classifyLaunch()` is where that is decided,
+// so this suite drives it directly with synthetic evidence rather than spawning
+// all eight real examples (slow, network- and timing-dependent — the real
+// launches are exercised by `npm run smoke:examples` itself in CI).
 //
-// Four cases are the break-on-purpose scenarios this gate names explicitly:
-// exits 0 immediately with no evidence of work, exits 1 immediately with no
-// recognized benign reason, a module-body TDZ (this gate's whole subject — must never
-// regress to a skip or a pass no matter what else changes here), and zero
-// examples discovered.
+// Four break-on-purpose scenarios: exits 0 immediately with no evidence of
+// work, exits 1 immediately with no recognized benign reason, a module-body TDZ
+// (must never regress to a skip or a pass), and zero examples discovered.
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -113,7 +110,7 @@ function check(name, got, want) {
 }
 
 // ── Fail-closed: no marker means no "reached", no matter how benign
-// the crash text looks. This is the ticket's central acceptance bar — a
+// the crash text looks. This is the central acceptance bar — a
 // pre-wiring crash whose message deliberately CONTAINS benign-looking text
 // ("ECONNREFUSED", "401 invalid x-api-key") must still FAIL, because the
 // marker (proof the example ever reached its outbound call site) never
@@ -164,7 +161,7 @@ function check(name, got, want) {
 }
 
 // ── Both of the SDK's racing error shapes give the SAME verdict once
-// the marker is present. This is the exact nondeterminism the ticket names:
+// the marker is present. This is the exact nondeterminism at issue:
 // `@anthropic-ai/claude-agent-sdk@0.3.221`'s query() picks between
 // "Claude Code returned an error result: …" (lastErrorResultText won the
 // race) and "Claude Code process exited with code N. stderr: …" (lost the
@@ -379,7 +376,7 @@ function check(name, got, want) {
 // ── An unrecognised SMOKE_EXAMPLES_LIVE must ERROR, never mean "PR leg"
 // A flag typo'd to `true` silently reverts to the uncredentialed leg: dead
 // loopback ports, no credential check, no floor, exit 0. That is a green
-// nightly proving nothing — this ticket's own subject, one character away.
+// nightly proving nothing, one character away.
 {
   check("unset means the PR leg, with no error", resolveLiveFlag(undefined), {
     live: false,
@@ -528,7 +525,7 @@ function check(name, got, want) {
 }
 
 // ── The counted-numerator property ──────────────────────────────────────────
-// Measured on PR #417: the summary read "7 of 8" and named seven, and nothing
+// The shape this pins: the summary reads "7 of 8" and names seven, and nothing
 // said the eighth (`pr-summary-agent`) had gone MISSING rather than FAILED —
 // classifyLaunch()'s three named outcomes (ok/reached/fail) are worthless if
 // main()'s loop can silently drop an example before it ever reaches them.
@@ -547,7 +544,7 @@ function check(name, got, want) {
   check("every discovered example reporting is a pass", clean.ok, true);
   check("a clean pass carries no message", clean.message, null);
 
-  // The exact PR #417 shape: one discovered example silently produced no
+  // The exact shape: one discovered example silently produces no
   // verdict at all, and the summary must red naming it — not "failed",
   // "missing".
   const oneVanished = assertReportedCount(all8, all8.filter((n) => n !== "pr-summary-agent"));

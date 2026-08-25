@@ -101,7 +101,7 @@ for (const name of examples) {
   // stopped that example's tests from running at all, so a type error and a test
   // regression in the same commit took two CI rounds to see — and "a check that
   // silently stops running behind another check's failure" is the exact shape the
-  // pin-parity note below calls this milestone's whole subject. Putting the test
+  // pin-parity note below calls the whole subject here. Putting the test
   // leg behind the typecheck leg would have re-armed it one directory over.
   const broke = [];
   for (const [leg, args] of [
@@ -133,11 +133,11 @@ if (failures.length > 0) {
 // Confirm each bundled example's exact `@pome-sh/*` pin still equals
 // the sibling workspace version wherever that version is published.
 //
-// Deliberately NOT behind the typecheck exit above. It used to be, and that
+// Deliberately NOT behind the typecheck exit above, because that
 // made an unrelated tsc error in ANY example (say `agent-examples/merge-agent`) hide a
 // real published-pin drift until someone fixed the typecheck and CI came round
 // again — a check that silently stops running behind another check's failure is
-// this milestone's whole subject. It reads manifests and calls the registry, so
+// the whole subject here. It reads manifests and calls the registry, so
 // it needs none of the installs above to have succeeded.
 console.log("\n=== agent-examples/* pin↔registry parity ===");
 const parityOk = reportExamplePinParity(repoRoot);

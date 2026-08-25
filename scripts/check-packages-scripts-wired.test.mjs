@@ -65,7 +65,7 @@ check(
   { expect: "green" }
 );
 
-// Case 2 (the "do" in the ticket's "done when"): an unreferenced check:foo
+// Case 2: an unreferenced check:foo
 // must red the gate BY NAME.
 check(
   "unwired check:foo reds, naming it",
@@ -371,7 +371,7 @@ check(
   { expect: "green" }
 );
 
-// Case 26 (the ticket's own "do"): an unreferenced cli/ check reds by name —
+// Case 26: an unreferenced cli/ check reds by name —
 // the exact break-on-purpose the PR verifies by hand against the real repo.
 check(
   "unwired cli/package.json check reds, naming it",
@@ -408,7 +408,7 @@ check(
 );
 
 // Case 29 (the motivating find): a raw cli/scripts/ file declared by NO
-// package.json script at all — make-unwired-fixture.mjs's exact shape — has
+// package.json script at all has
 // no script name for the npm-run regex to find, so it reds by its own path.
 check(
   "an orphan cli/scripts/ file invoked by no script and imported by nothing reds by path",

@@ -18,7 +18,7 @@
 // Both packages also get a files-field tarball audit: the real `tar`
 // listing is grepped for dangling `.map` files and a compiled `dist/examples/`
 // directory. tsup's `sourcemap: false` / `clean: true` config should already
-// make both impossible, but that was previously an unverified claim about the
+// make both impossible, but that is an unverified claim about the
 // build config, not an asserted property of the artifact actually published.
 //
 // The CLI checks:
@@ -113,7 +113,7 @@ function assertNoHardLinks(tarball) {
 }
 
 // Tarball-files-field audit: `npm pack` respects each package's `files`
-// field, but nothing previously asserted WHAT actually lands in the tgz.
+// field, and nothing else asserts WHAT actually lands in the tgz.
 // tsup's `sourcemap: false` / `clean: true` config (Lane D) means a stray
 // `.map` or a leftover `dist/examples/` from a prior build shouldn't be
 // possible today — but that's exactly the kind of invariant that silently

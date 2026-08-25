@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Regression fixtures for scripts/lint-no-cloud-imports.sh (F-696).
+# Regression fixtures for scripts/lint-no-cloud-imports.sh.
 # Proves forbidden import forms fail, scan dirs are covered, and clean trees pass.
 set -euo pipefail
 

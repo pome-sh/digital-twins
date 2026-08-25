@@ -55,12 +55,12 @@ const FORBIDDEN_PATHS = [
 // "@pome-sh/correlator" or "evaluator/score" is not a violation.
 const FORBIDDEN_MODULE_PATTERNS = [
   { re: /@pome-sh\/correlator/, why: "the correlator (no local correlation in the OSS CLI)" },
-  { re: /(^|\/)evaluator\//, why: "the deleted local evaluator tree" },
-  { re: /(^|\/)matrix\//, why: "the deleted local-scoring matrix tree" },
-  { re: /correlateRun/, why: "the deleted local correlation module" },
-  { re: /probabilistic/, why: "the deleted local LLM judge" },
-  { re: /deterministic/, why: "the deleted deterministic matchers" },
-  { re: /twin-plugins/, why: "the deleted deterministic twin matchers" },
+  { re: /(^|\/)evaluator\//, why: "a local evaluator tree" },
+  { re: /(^|\/)matrix\//, why: "a local scoring matrix" },
+  { re: /correlateRun/, why: "a local correlation module" },
+  { re: /probabilistic/, why: "a local LLM judge" },
+  { re: /deterministic/, why: "local deterministic matchers" },
+  { re: /twin-plugins/, why: "local deterministic twin matchers" },
   {
     re: /^@pome-cloud\//,
     why: "a pome-cloud-only package — pome-twins (OSS) must never depend on cloud code",

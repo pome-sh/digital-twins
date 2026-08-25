@@ -3,15 +3,12 @@
 //
 // The repo's one lint runner.
 //
-// Every rule under `scripts/lint/rules/` used to be its own executable: its own
-// tree walk, its own violation formatting, its own `process.exit(1)`, its own
-// realpath entry guard, its own npm script, and its own CI step. The rule — the
-// only part that differed — was a fraction of each file. Adding a rule meant
-// touching four places, which is why rules that should exist did not.
+// One runner owns traversal (`scripts/lint/context.mjs`), the report format and
+// the exit code, so a rule is a declaration plus a predicate. A rule per
+// executable means a tree walk, a formatter, an entry guard, an npm script and a
+// CI step per rule — four places to touch to add one, which is why rules that
+// should exist would not.
 //
-// What lives here: traversal (via `scripts/lint/context.mjs`), the report
-// format, and the exit code. What lives in a rule: a declaration and a
-// predicate.
 //
 // Usage:
 //   node scripts/lint.mjs                  every rule

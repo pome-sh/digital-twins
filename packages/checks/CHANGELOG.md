@@ -1,5 +1,13 @@
 # @pome-sh/checks
 
+## Unreleased (patch)
+
+**No consumer-visible change.** Comment cleanup in `scripts/bundle-declarations.mjs`,
+which builds this package's bundled type declarations: a reference to the pull
+request that motivated one workaround was removed in favour of stating the
+underlying cause. Prose only — no export, schema, tool, route, status code or
+response body moved, and the emitted declarations are byte-identical.
+
 ## 0.3.6 — 2026-08-24
 
 **No consumer-visible change.** The repo's lint gates were consolidated behind

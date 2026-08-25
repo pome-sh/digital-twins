@@ -76,13 +76,13 @@ defineCases("no-eval", [
     name: "IMPORT: a reintroduced local LLM judge is a violation",
     files: { [SRC]: `import { judge } from "./probabilistic/judge.js";\nexport const j = judge;\n` },
     expect: "red",
-    contains: "the deleted local LLM judge",
+    contains: "a local LLM judge",
   },
   {
     name: "IMPORT: a reintroduced deterministic matcher is a violation",
     files: { [SRC]: `import { match } from "./deterministic/match.js";\nexport const m = match;\n` },
     expect: "red",
-    contains: "the deleted deterministic matchers",
+    contains: "local deterministic matchers",
   },
   {
     name: "IMPORT: a reintroduced correlator package is a violation",

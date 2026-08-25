@@ -29,11 +29,10 @@
 // from `~/.claude.json` — which is why no amount of repo hygiene reaches them
 // and why only `settingSources: []` does.
 //
-// This gate is the answer to "an example is not sealed by intention". It PARSES
-// rather than greps, for the reason `scripts/lint/rules/import-meta-main.mjs`
-// gives: a grep for "settingSources" also matches the word in the comment three
-// lines above the options object it was deleted from, which is the single most
-// likely way this regresses.
+// An example is not sealed by intention. This PARSES rather than greps, for the
+// reason `scripts/lint/rules/import-meta-main.mjs` gives: a grep for
+// "settingSources" also matches the word in a comment beside the options
+// object, which is the single most likely way this regresses.
 //
 // [DECISION] central AND per-example, and the central half is NOT here.
 // Per-example options are what this gate enforces, and they are load-bearing on

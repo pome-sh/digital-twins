@@ -32,7 +32,7 @@
 //
 // The file set is DISCOVERED — every source file under the roots below, found
 // by walking the directory tree, never a hand-kept list. A hand-kept list is
-// the exact shape this milestone (D5) targets: it stops covering its subject
+// the exact shape this targets: it stops covering its subject
 // the day a file is added and nothing notices.
 //
 // The realpath check extends this same walk with a second, related check rather than
@@ -358,7 +358,7 @@ function anyWrappedIn(leaves, sideTop, names) {
  * comparison. A purely operand-local search therefore sees `ENTRY === SELF`,
  * finds no argv0 and no `import.meta.url`, and classifies no relation at all
  * — reporting "no un-realpath'd entry guard" over a repo in which it can see
- * none of them. That is the vacuous pass this milestone keeps re-shipping, so
+ * none of them. That is the vacuous pass to avoid, so
  * the alias is followed one hop.
  *
  * A name declared more than once is dropped rather than guessed at: two

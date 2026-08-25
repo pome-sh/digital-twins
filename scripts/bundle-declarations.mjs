@@ -39,9 +39,8 @@
 // event — were all unreachable. The JS import works fine, so nothing fails
 // until a consumer runs `tsc`.
 //
-// This is the same root cause PR #324 hit for the adapter's `CORRELATION_HEADER`
-// re-export. That fix was a local `const` re-export, which works for ONE value
-// whose literal type the emitter can widen inline. It does not generalise: this
+// The narrow fix is a local `const` re-export, which works for ONE value whose
+// literal type the emitter can widen inline. It does not generalise: this
 // package re-exports ~50 symbols, most of them TYPES, and a type alias cannot be
 // laundered through a `const`.
 //

@@ -2,11 +2,11 @@
 //
 // The one test harness for lint rules.
 //
-// Every rule used to ship its own regression suite, and every one of those
-// suites was the same forty lines: mkdtemp a throwaway tree, write a `files`
-// map into it, `spawnSync` the real script with `cwd` pointed at it, compare the
-// exit code against green/red, and keep a failure counter. Twenty copies of the
-// scaffolding around a case table that was the only part that differed.
+// One harness rather than a regression suite per rule: mkdtemp a throwaway
+// tree, write a `files` map into it, spawn the real runner with `cwd` pointed at
+// it, compare the exit code against green/red, keep a failure counter. That
+// scaffolding is identical every time; the case table is the only part that
+// differs.
 //
 // A case runs the REAL runner against the REAL rule (`node scripts/lint.mjs
 // <rule> --root <tmp>`), not an in-process call to the predicate. That is

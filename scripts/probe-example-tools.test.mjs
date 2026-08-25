@@ -124,7 +124,7 @@ assertThrows(
 }
 
 // ── deriveSeedFacts / resolveArgs ───────────────────────────────────────────
-// The load-bearing half of the ticket: probe arguments come off the seed
+// The load-bearing half: probe arguments come off the seed
 // itself, never a hand-written literal, so a sixth viktor seed needs no new
 // fixture and a repo with no PR/issue/file simply yields no bucket for it.
 {
@@ -355,7 +355,7 @@ assertThrows(
   rmSync(emptyDir, { recursive: true, force: true });
 }
 
-// ── the "Do:" acceptance test from the ticket, plus break-on-purpose ────────
+// ── the acceptance test, plus break-on-purpose ──────────────────────────────
 // "add a seed to an example. Expect: it is probed with no hand edit." — run
 // for real, against a throwaway copy of the `sound` fixture, with templated
 // probe args so a second seed with a DIFFERENT issue number only stays green

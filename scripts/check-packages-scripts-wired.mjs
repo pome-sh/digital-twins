@@ -1,10 +1,8 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Closes a class we found one instance of: a `packages/*` npm
-// script that names itself a check (`validate:mcp`) declared in a
-// package.json and invoked by NOTHING. It went red for weeks with no
-// verdict, and no verdict reads exactly like a pass.
+// A `packages/*` npm script that names itself a check but is invoked by NOTHING
+// produces no verdict, and no verdict reads exactly like a pass.
 //
 // The rule is a TOTAL partition, not a prefix list. Every
 // `packages/*/package.json` script is either
@@ -19,24 +17,18 @@
 //
 // Anything else fails this gate by name.
 //
-// This gate started life as an allowlist of check-NAME prefixes
-// (`validate:*`, `check:*`, `lint:*`, `gate:*`, `test:*`, `assert:*`) — the
-// vocabulary originally specified. That vocabulary could not see
-// `verify:cloud-token`, a real check that had also never run, and the audit
-// found it by hand instead. A prefix list of what counts as a check is itself
-// a hand-maintained list, which is the exact shape D5 names as the bug: it
-// covers its subject until someone names a script something new, and then it
-// silently stops, with nothing red. So the partition is inverted — the
-// DENOMINATOR is every script, the only fixed list is npm's own lifecycle
-// names, and a script that is neither wired nor reasoned-about is a red.
+// The partition is inverted on purpose: the DENOMINATOR is every script, and
+// the only fixed list is npm's own lifecycle names. A prefix list of what
+// counts as a check (`validate:*`, `check:*`, `gate:*` …) is itself
+// hand-maintained, so it covers its subject until someone names a script
+// something new and then silently stops, with nothing red. Under this shape
 // `smoke`, `review:harness`, `verify:cloud-token` and `preview:drift` are all
-// inside the gate's reach under this shape and were all outside it before.
+// inside the gate's reach.
 //
-// NO CENTRAL ALLOWLIST. A script deliberately exempt from this gate carries
-// its own reason inline, in the source file its package.json command invokes
-// — a line matching `pome:unwired-ok(<script>): <reason>` — and this gate
-// reads that file rather than a list here. A list of which checks are exempt is the same
-// shape as the bug the milestone is about.
+// NO CENTRAL ALLOWLIST. A script deliberately exempt carries its own reason
+// inline, in the source file its package.json command invokes — a line matching
+// `pome:unwired-ok(<script>): <reason>` — and this gate reads that file. A list
+// of which checks are exempt is the same shape as the bug.
 //
 // Textual, not semantic: this reads workflow YAML and root scripts as text
 // looking for `npm run <name> ... -w <package>`. A caller that reaches a
@@ -50,48 +42,34 @@
 //
 // Usage: node scripts/check-packages-scripts-wired.mjs
 //
-// The `cli/` extension. This gate was first scoped to `packages/*`; `cli/`
-// is a root workspace member too (AGENTS.md) and had the identical shape:
-// `gate:no-eval`, `gate:no-native`, `gate:recorder-overhead` and `test:e2e`
-// declared, only `check:manifest-schema` reached. Same total partition, same
-// three-way split (lifecycle / wired / marker), same marker syntax — no
-// second mechanism, no exemption list, just a second package.json to read.
+// `cli/` is a root workspace member too, with the identical shape, so it gets
+// the same total partition, the same three-way split and the same marker
+// syntax — no second mechanism, just a second package.json to read.
 //
-// `cli/` also has raw executable files under `cli/scripts/*` that are not
-// declared as ANY npm script. The motivating instance was
-// `cli/scripts/make-unwired-fixture.mjs` (since deleted, so do not go
-// looking for it): broken on `main` — a stale exact-text replacement threw
-// before it did anything — reached by nothing, and invisible to a denominator
-// built only from npm SCRIPT NAMES. So `cli/`'s denominator is the union of
-// (a) `cli/package.json`'s own non-lifecycle scripts, audited exactly like
-// `packages/*`, and (b) every file under `cli/scripts/**` that is neither the
-// invoked file of a declared `cli/package.json` script NOR imported by a
-// sibling file in `cli/scripts/**` — an imported file is a library module,
-// covered by whatever imports it, and if THAT importer is itself dead, IT is
-// what shows up here, which is the more actionable diagnosis. A file in (b)
-// has no script name for the `npm run <name> -w <pkg>` regex to find, so the
-// only coverage it can have is being one of (a)'s invoked files (already
-// excluded) or being imported by a sibling — anything left is wired via its
-// own `pome:unwired-ok(<relpath>): <reason>` marker or it fails, the same
-// marker mechanism as everywhere else in this file, keyed by the file's path
-// instead of a script name. Note what that does NOT say: a file invoked
-// DIRECTLY by a workflow step is not covered either, see the next paragraph.
+// `cli/` also has raw executable files under `cli/scripts/*` declared as no npm
+// script at all, which are invisible to a denominator built from script NAMES.
+// So `cli/`'s denominator is the union of (a) `cli/package.json`'s own
+// non-lifecycle scripts, audited exactly like `packages/*`, and (b) every file
+// under `cli/scripts/**` that is neither the invoked file of a declared script
+// NOR imported by a sibling in `cli/scripts/**`. An imported file is a library
+// module covered by whatever imports it, and if THAT importer is dead, IT shows
+// up here — the more actionable diagnosis. A file in (b) has no script name for
+// the `npm run <name> -w <pkg>` regex to find, so its only coverage is its own
+// `pome:unwired-ok(<relpath>): <reason>` marker, keyed by path instead of
+// script name. Note what that does NOT cover: a file a workflow step invokes
+// directly, see below.
 //
-// ONE CALLING CONVENTION, AND IT IS A FALSE RED, NOT A BLIND SPOT. `isWired`
-// recognises `npm run <name> ... -w <pkg>` and nothing else. A workflow that
-// invokes a declared script's FILE directly — `run: npx tsx
-// scripts/overhead-gate.ts` — is a real, running check that this gate reds
-// anyway, by name, saying "no workflow reaches it". Verified by hand against
-// that exact shape. Three of `agent-trace-overhead-gate.yml`'s steps were
-// written that way and all three were converted to `npm run <name> -w
-// @pome-sh/cli` rather than teach the gate a second wiring shape, because one
-// detection mechanism is the whole reason the marker path can be trusted.
-// The cost is real and is accepted deliberately: the NEXT person who adds a
-// direct `tsx <path>` step gets a red whose diagnosis names the fix (declare
-// it as a script and call it the standard way), so the failure is loud and
-// self-correcting rather than silent. If that ever stops being the right
-// trade, the fix is to also scan the corpus for the script's resolved file
-// path — not to add an exemption list.
+// ONE CALLING CONVENTION, AND IT IS A FALSE RED RATHER THAN A BLIND SPOT.
+// `isWired` recognises `npm run <name> ... -w <pkg>` and nothing else, so a
+// workflow invoking a declared script's FILE directly (`run: npx tsx
+// scripts/overhead-gate.ts`) is a real, running check that this gate reds
+// anyway, by name. That cost is accepted deliberately: the next person who adds
+// a direct `tsx <path>` step gets a red whose diagnosis names the fix — declare
+// it as a script and call it the standard way — so the failure is loud and
+// self-correcting rather than silent, and one detection mechanism is the whole
+// reason the marker path can be trusted. If that stops being the right trade,
+// the fix is to also scan for the script's resolved file path, not to add an
+// exemption list.
 
 import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
@@ -479,7 +457,7 @@ function resolveRelativeImport(fromFile, specifier) {
  * file of a declared `cli/package.json` script (any of them, including
  * LIFECYCLE ones — `prepublishOnly` reaching `assert-publishable.mjs` counts
  * as reached) nor imported by a sibling file in the same tree. What is left
- * is a candidate entry point exactly like the deleted `make-unwired-fixture.mjs`: no
+ * is a candidate entry point: no
  * script name names it, so it cannot be "wired" the way a package.json
  * script can — it can only carry its own exemption marker or fail.
  */
@@ -551,7 +529,7 @@ export function run(root) {
   // zero-entry scan exits 0 having asserted nothing; the cli/ half had no
   // equivalent, so renaming `cli/` or `cli/scripts/` would have dropped eight
   // entries and stayed green — coverage silently shrinking, which is the shape
-  // this milestone exists to kill and which `the `import-meta-main` lint rule` already
+  // this gate exists to kill and which the `import-meta-main` lint rule already
   // makes a hard failure PER ROOT. Derived, not listed: if the root
   // `workspaces` array names `cli`, the cli/ denominator must be non-empty. A
   // repo whose workspaces do not name `cli` legitimately contributes nothing.
@@ -628,7 +606,7 @@ export function run(root) {
   }
 
   // Cli/scripts/** files nothing declares as a script at all
-  // (the deleted make-unwired-fixture.mjs's shape). No script name exists for these, so
+  // (a generator with no npm script name). No script name exists for these, so
   // the only way to clear one is the marker, read straight from the file.
   for (const entry of fileEntries) {
     const reason = readMarkerFromFile(entry.filePath, entry.scriptName);

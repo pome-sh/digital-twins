@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// no-catch (D4) — §3.A code-health, SDK ENGINE ONLY.
+// no-catch — SDK engine only.
 //
 // `packages/sdk` is the twin engine: the recorder, auth, MCP JSON-RPC, and
 // server plumbing every hosted twin runs on. A `catch` that logs-and-continues
@@ -22,11 +22,10 @@
 // out of the block and keeps going as if nothing broke. That is the exact bug
 // class this gate forbids.
 //
-// ALLOWLIST (D4) — target EMPTY, currently TWO entries. The original plan assumed
-// every engine catch would satisfy the rule literally; two do not, because they
-// handle the error by ASSIGNING an explicit error result to an outer-scoped
-// variable and FALLING THROUGH to a single shared record()/return below the
-// try/catch, rather than exiting from inside the clause:
+// ALLOWLIST — target EMPTY, currently TWO entries. Both handle the error by
+// assigning an explicit error result to an outer-scoped variable and falling
+// through to a single shared record()/return below the try/catch, rather than
+// exiting from inside the clause:
 //
 //   • mcp-jsonrpc.ts (handleToolsCall) — the catch builds the JSON-RPC error
 //     envelope (status/responseBody/toolError/mcpResult) that the function
@@ -38,12 +37,12 @@
 //     be re-read; the same read-optional-default-null shape recorder.ts already
 //     factors into a `try { return … } catch { return null }` helper.
 //
-// Both are genuine error handling, NOT log-and-continue/empty swallows, so they
-// are listed here rather than papered over. Entries are keyed by FILE plus a
-// CONTENT FINGERPRINT — a distinctive substring that must appear in that catch
-// clause's (whitespace-normalized, literal-stripped) body — NOT by line number,
-// so the entry survives edits elsewhere in the file and cannot be satisfied by
-// an unrelated catch. To reach true zero-allowlist a reviewer can extract the
+// Both are genuine error handling, not log-and-continue, so they are listed
+// rather than papered over. Entries are keyed by FILE plus a CONTENT
+// FINGERPRINT — a distinctive substring that must appear in that catch clause's
+// whitespace-normalized, literal-stripped body — never by line number, so an
+// entry survives edits elsewhere in the file and cannot be satisfied by an
+// unrelated catch. To reach zero entries, extract the
 // mcp result into a helper that returns the outcome, and reuse recorder.ts's
 // read-or-null helper in failure-injection — then delete the two entries.
 //
@@ -61,23 +60,16 @@
 //     `{` — so `.catch(cb)` (dotted) and any bare `catch(…)` call whose
 //     argument list is not followed by a block are never treated as a clause.
 //
-// The scan runs against a comment-and-literal-STRIPPED copy of the source so a
-// comment or string that says "catch" / "return" / "throw" never trips or
-// satisfies the gate, and a brace/quote inside a literal can't desync the brace
-// matcher. Stripping is a single mode-stack state machine that handles:
-//   • line + block comments;
-//   • single/double-quoted strings;
-//   • TEMPLATE LITERALS with full `${}` nesting — template text is blanked,
-//     but code inside a `${ … }` expression (including nested templates) is
-//     kept and scanned, so a catch clause inside a template expression is
-//     judged like any other;
-//   • regex literals, detected by the preceding TOKEN (not just the previous
-//     character): a `/` starts a regex at start-of-input, after an opening
-//     punctuator/operator, or after a keyword such as `return` / `case` /
-//     `typeof` — so `return /a{2}/` is stripped and its braces can't corrupt
-//     brace matching, while `a / b` stays division.
-// Blanked spans are replaced character-for-character with spaces (newlines
-// preserved), so byte offsets and reported line numbers are exact.
+// The scan runs against a comment-and-literal-STRIPPED copy of the source, so a
+// comment or string saying "catch" / "return" / "throw" can neither trip nor
+// satisfy the gate, and a brace or quote inside a literal cannot desync the
+// brace matcher. One mode-stack state machine handles comments, quoted strings,
+// template literals with full `${}` nesting (template text blanked, code inside
+// an expression kept and scanned), and regex literals detected by the preceding
+// TOKEN rather than the previous character — so `return /a{2}/` is stripped and
+// its braces cannot corrupt brace matching while `a / b` stays division.
+// Blanked spans are replaced character-for-character with spaces, newlines
+// preserved, so byte offsets and reported line numbers stay exact.
 //
 // NESTED FUNCTIONS DON'T COUNT: before the exit scan, the bodies of function
 // expressions DEFINED inside the catch clause (`=> { … }` arrow blocks and
@@ -88,22 +80,22 @@
 // still counts. (A nested statement try/catch is NOT masked: its handler runs
 // inline at the catch's own level, so an exit there is a real exit path.)
 //
-// LIMITATIONS (honest): this is a structural scanner, not a data-flow analyzer.
-// A CONDITIONAL exit is accepted BY DESIGN:
+// LIMITATIONS. This is a structural scanner, not a data-flow analyzer, and a
+// CONDITIONAL exit is accepted by design:
 //   catch (err) { if (shouldRethrow(err)) throw err; console.error(err); }
-// passes, because an exit token exists at the clause's own level even though
-// the else-path falls through. Deciding whether EVERY branch exits requires
-// full control-flow analysis — out of scope for a dependency-free pre-`npm ci`
-// lint; a conditional swallow is deliberate, visible, reviewable code, and its
-// semantics belong to the PR reviewer, not this gate. Concise method shorthand
-// in an object literal (`{ m() { return 1; } }`) inside a catch body is not
-// masked (only arrow blocks and `function` expressions are); the engine has no
-// such shape inside a catch. A body that computes an error result and falls
-// through to a shared `return` after the try/catch reads as a violation even
-// when legitimate — that shape is what the fingerprint ALLOWLIST is for. The
-// regex-vs-division token heuristic can misread a degenerate `a++ / b`
-// (previous token seen is `+`) as a regex start; the engine has no such code
-// and the gate favors a rule a reviewer can verify by eye over a full parser.
+// passes, because an exit token exists at the clause's own level even though the
+// else-path falls through. Deciding whether EVERY branch exits needs full
+// control-flow analysis, which is out of scope for a dependency-free
+// pre-`npm ci` lint; a conditional swallow is deliberate, visible, reviewable
+// code whose semantics belong to the PR reviewer.
+//
+// Concise method shorthand in an object literal inside a catch body is not
+// masked — only arrow blocks and `function` expressions are. A body that
+// computes an error result and falls through to a shared `return` after the
+// try/catch reads as a violation even when legitimate; that shape is what the
+// fingerprint allowlist is for. The regex-versus-division heuristic can misread
+// a degenerate `a++ / b` as a regex start. The gate favours a rule a reviewer
+// can verify by eye over a full parser.
 
 // The engine surface this rule governs (relative to the repo root).
 const SCAN_DIR = "packages/sdk/src";

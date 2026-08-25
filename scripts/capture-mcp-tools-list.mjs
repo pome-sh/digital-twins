@@ -649,7 +649,7 @@ export async function runCapture(options = {}) {
       // pome-cloud's `loadUpstreamMcpGolden` resolves `<twin>.status.json`
       // FIRST and returns not-compared without ever looking at raw/meta — the
       // recorded refusal is meant to outrank a file that simply is not there.
-      // But this producer only ever WROTE status.json; nothing deleted it when
+      // This producer only ever WRITES status.json; nothing deletes it when
       // a twin became capturable. So the first credentialed capture of slack,
       // linear or stripe would commit a real golden and the lane would go on
       // publishing "401 missing_token", with no red anywhere. That is the whole

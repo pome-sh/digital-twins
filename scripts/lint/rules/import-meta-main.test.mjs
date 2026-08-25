@@ -378,7 +378,7 @@ for (const [label, source] of Object.entries(GUARD_GAP_CLEAN_CASES)) {
 }
 
 // ── scanRepo: break-on-purpose against a scratch fixture ───────────────────
-// The ticket's own break-on-purpose case, as an assertion: add a bare guard to
+// The break-on-purpose case, as an assertion: add a bare guard to
 // a scratch file, and the scan must red naming that exact file — while a
 // sibling that only MENTIONS the string must not.
 {
@@ -402,7 +402,7 @@ for (const [label, source] of Object.entries(GUARD_GAP_CLEAN_CASES)) {
 }
 
 // ── scanRepo: realpath break-on-purpose, one scratch file per shape ───────
-// The ticket's own break-on-purpose matrix: a one-sided-realpath guard, a
+// The break-on-purpose matrix: a one-sided-realpath guard, a
 // no-realpath guard, and a basename guard added to a scratch script each red
 // naming that exact file; a correct both-sides-realpath'd guard next to them
 // does not.
@@ -470,7 +470,7 @@ for (const [label, source] of Object.entries(GUARD_GAP_CLEAN_CASES)) {
   // The floor on the assertion above, and the whole reason `guardRelations`
   // exists. `guardGaps.length === 0` over the real repo is satisfied both by
   // "every guard realpaths both sides" and by "the classifier recognized no
-  // guard at all", and the second is how two floors in this milestone shipped
+  // guard at all", and the second is how a floor can ship
   // dead. The repo has one guard per runnable script; the twelve that were fixed
   // ones alone put the count above 12, so a bound well under the real number
   // reds on a classifier going blind without reding on someone deleting a
