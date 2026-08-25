@@ -23,7 +23,11 @@
 // the unified "code"/"model" vocabulary (legacy "D"/"P" tolerated) while
 // scenario files still parse [code]/[model] markers. This module renders CLOUD
 // verdicts, so it takes the wide wire shape (a live-run finding).
-import { PRE_SATISFIED_REASON } from "@pome-sh/wire/run-completeness";
+import {
+  ABSTAINED_OUTCOME,
+  ADVISORY_OUTCOME,
+  PRE_SATISFIED_REASON,
+} from "@pome-sh/wire/run-completeness";
 import type { z } from "zod";
 import type { criterionSchema } from "../types/shared.js";
 
@@ -44,10 +48,21 @@ export type CriterionOutcome = "passed" | "failed" | "skipped" | "errored";
 
 export type CriterionResult = {
   criterion: WireCriterion;
-  // Explicit four-state outcome. ADDITIVE + OPTIONAL — when
-  // absent (older cloud producers) it is derived from `passed`/`skipped` via
-  // `outcomeOf`.
-  outcome?: CriterionOutcome;
+  // The raw `outcome` off the wire row. ADDITIVE + OPTIONAL — when absent
+  // (which is every row a pre-narrator cloud serves) the state is derived from
+  // `passed`/`skipped` via `outcomeOf`.
+  //
+  // TYPED `string`, NOT `CriterionOutcome`, because TWO vocabularies share this
+  // one key and only one of them is ever served. pome-cloud stamps the
+  // narrator's `advisory` / `abstained` here — WHY the row left the denominator
+  // — while the four states above are the marker to PRINT, and have never had a
+  // wire producer at all. A union of the two would make an unrecognised
+  // spelling a type error at the parse boundary rather than what it should be:
+  // a value nothing recognises and nothing exempts. `outcomeOf` narrows this
+  // back to the four-state model, mapping the narrator states to `"skipped"` —
+  // which is what they are on the two booleans — so every existing reader keeps
+  // working unchanged and the exemption is read through `isNarrated` instead.
+  outcome?: string;
   passed: boolean;
   // Wire-compat: `skipped` stays a boolean and is TRUE for both `skipped` and
   // `errored` outcomes.
@@ -77,6 +92,14 @@ export type Score = {
   // `"skipped"`) — but they are not abstentions, so `can_pass` and
   // `runScoreLine` subtract this count back out of the "not evaluated" tally.
   preSatisfied: number;
+  // The two narrator subsets of `skipped`, on the same footing as
+  // `preSatisfied` above: still counted in `skipped`, still rendered with the
+  // `-` marker, but not abstentions — so `can_pass` and `runScoreLine` subtract
+  // them back out of the "not evaluated" tally. Named separately because the
+  // two read differently to a human: an advisory row has a reading to show, an
+  // abstain has a missing subject to name.
+  advisory: number;
+  abstained: number;
   // = passed + failed. The satisfaction denominator.
   total_required: number;
   // false when total_required === 0 (nothing was evaluated). Renders as
@@ -95,7 +118,29 @@ export type Score = {
 // Derive the four-state outcome from a cloud result. Prefers the explicit
 // `outcome` field; falls back to the legacy passed/skipped booleans. PURE.
 export function outcomeOf(result: CriterionResult): CriterionOutcome {
-  if (result.outcome) return result.outcome;
+  // The narrator states collapse to `skipped`, which is what they are on the
+  // wire's two booleans. Returning them raw would drop the row out of every
+  // count in `scoreFromFinalizeResponse` at once — `passed`, `failed`,
+  // `skipped` and `errored` all filter on this function — and `total` would
+  // then under-report the width of the task on the terminal line and in
+  // `verdict.json`. The row still belongs in the tally; it is only exempt from
+  // BLOCKING a pass, and `isNarrated` is what says so.
+  if (result.outcome === ADVISORY_OUTCOME || result.outcome === ABSTAINED_OUTCOME) {
+    return "skipped";
+  }
+  // The four-state spellings are matched EXPLICITLY rather than passed through,
+  // so a spelling no version of this CLI has heard of falls back to the two
+  // booleans below instead of becoming a display state by arriving. The
+  // booleans already say the honest thing about whether the row is in the
+  // denominator, which is the only question this function answers.
+  if (
+    result.outcome === "passed" ||
+    result.outcome === "failed" ||
+    result.outcome === "skipped" ||
+    result.outcome === "errored"
+  ) {
+    return result.outcome;
+  }
   if (result.skipped) return "skipped";
   return result.passed ? "passed" : "failed";
 }
@@ -122,7 +167,7 @@ export function outcomeOf(result: CriterionResult): CriterionOutcome {
 // the D3 parallel copy with the longest possible feedback loop; a rename now
 // breaks the build on whichever side has not moved, instead of quietly making
 // one of them count every seed exclusion as an abstention.
-export { PRE_SATISFIED_REASON };
+export { ABSTAINED_OUTCOME, ADVISORY_OUTCOME, PRE_SATISFIED_REASON };
 
 /**
  * Was this criterion excluded for having already been true in the seed?
@@ -135,6 +180,29 @@ export function isPreSatisfied(
   result: Pick<CriterionResult, "skipped" | "reason">,
 ): boolean {
   return result.skipped && result.reason === PRE_SATISFIED_REASON;
+}
+
+/**
+ * Did the narrator name this row's state, rather than the grader missing it?
+ *
+ * The `[model]`-lane sibling of `isPreSatisfied` above, and exempt from
+ * `can_pass` for the same reason: the grader DID reach a verdict on the row, and
+ * the verdict is that it had no score authority over it. A run whose every
+ * `[code]` criterion scored is complete with narrator prose beside it.
+ *
+ * Reads `outcome` and never the prose in `reason`, which on an advisory row is
+ * the narrator's own free text — a predicate that sniffed it would exempt any
+ * judge that happened to use the word. Requires `skipped` for the same reason
+ * the wire reduction does: a row still in the denominator must not be exempted
+ * out of an abstention count it was never in.
+ */
+export function isNarrated(
+  result: Pick<CriterionResult, "skipped" | "outcome">,
+): boolean {
+  return (
+    result.skipped &&
+    (result.outcome === ADVISORY_OUTCOME || result.outcome === ABSTAINED_OUTCOME)
+  );
 }
 
 export type ScoreStatus = "pass" | "fail" | "incomplete";
@@ -247,8 +315,11 @@ function criteriaWord(n: number): string {
 export interface EvaluationCounts {
   /** passed + failed — the satisfaction denominator (`score.total_required`). */
   evaluated: number;
-  /** skipped + errored − preSatisfied — abstentions that actually block
-   *  `can_pass`. Zero on a fully-evaluated OR fully-pre-satisfied run. */
+  /** skipped + errored − preSatisfied − advisory − abstained — abstentions that
+   *  actually block `can_pass`. Zero on a fully-evaluated run, on a
+   *  fully-pre-satisfied one, and on one whose only unscored rows are the
+   *  narrator's. Counting the narrator rows here would put a non-zero "not
+   *  evaluated" beside a `pass` state in `verdict.json`. */
   notEvaluated: number;
   /** Excluded from the denominator because the seed already satisfied them
    *  (`PRE_SATISFIED_REASON`) — not an abstention, so not counted in
@@ -261,12 +332,16 @@ export interface EvaluationCounts {
 
 export function evaluationCounts(score: Score): EvaluationCounts {
   const evaluated = score.total_required;
-  const notEvaluated = score.skipped + score.errored - score.preSatisfied;
+  const exempt = score.preSatisfied + score.advisory + score.abstained;
+  const notEvaluated = score.skipped + score.errored - exempt;
   return {
     evaluated,
     notEvaluated,
     preSatisfied: score.preSatisfied,
-    total: evaluated + notEvaluated + score.preSatisfied,
+    // `total` counts every exemption, not just `preSatisfied`, so it still
+    // names every criterion the run recorded — the reason `outcomeOf` keeps
+    // narrator rows inside `skipped` rather than returning their state raw.
+    total: evaluated + notEvaluated + exempt,
   };
 }
 

@@ -11,7 +11,13 @@ import { gzipSync } from "node:zlib";
 import type { HostedClient } from "./client.js";
 import type { FinalizeResponse, PerTwinStateKeys } from "../types/shared.js";
 import type { Score } from "./evalResultView.js";
-import { isPreSatisfied, outcomeOf } from "./evalResultView.js";
+import {
+  ABSTAINED_OUTCOME,
+  ADVISORY_OUTCOME,
+  isNarrated,
+  isPreSatisfied,
+  outcomeOf,
+} from "./evalResultView.js";
 import { redactSecrets } from "../recorder/redaction.js";
 
 /** The narrow client surface the upload orchestration needs. `pome eval`
@@ -318,18 +324,27 @@ export async function uploadRunBlobs(
  * builds omit `criteria_results`; for those, preserve the cloud score as
  * renderable instead of inventing an empty local A5 verdict.
  *
- * `can_pass` exempts a `skipped` result stamped
- * `PRE_SATISFIED_REASON` (`already_true_in_seed`): the seed already satisfied
- * that criterion, so it is not an abstention and a run holding one can still
- * pass. Every OTHER skipped reason, and every `errored`, still blocks
- * `can_pass` — this is the same exemption pome-cloud's `isRunIncomplete`
- * applies over the same `criteria_results`, narrowed to nothing
- * else.
+ * `can_pass` exempts TWO classes of `skipped` result, and both are the same
+ * claim — the grader reached a verdict on the row, so its absence from the
+ * denominator is not a gap:
+ *
+ *   - a result stamped `PRE_SATISFIED_REASON` (`already_true_in_seed`): the seed
+ *     already satisfied that criterion, so nothing was ever at risk.
+ *   - a result the narrator named `advisory` or `abstained` (`isNarrated`): the
+ *     narrator has no score authority over a `[model]` criterion, so a run whose
+ *     every `[code]` criterion scored is complete with its prose beside them.
+ *
+ * Every OTHER skipped reason, and every `errored`, still blocks `can_pass`.
+ * These are the same two exemptions pome-cloud's `isRunIncomplete` applies over
+ * the same `criteria_results`, narrowed to nothing else — and the agreement is
+ * pinned row by row in `cross-surface-agreement.test.ts` rather than asserted
+ * here, because this side alone cannot see the other.
  *
  * `errored` is a DISPLAY-MODEL state with no wire producer today: it is
- * reachable only through `CriterionResult.outcome`, which neither this repo's
- * `criterionResultSchema` nor pome-cloud's carries, so `finalizeResponseSchema`
- * strips it off every real /finalize response and `outcomeOf` falls back to
+ * reachable only through `CriterionResult.outcome`, whose two SERVED values are
+ * the narrator states above — neither this repo's `criterionResultSchema` nor
+ * pome-cloud's has ever carried `"errored"`, so `finalizeResponseSchema` strips
+ * that spelling off every real /finalize response and `outcomeOf` falls back to
  * passed/skipped. The term stays in the arithmetic because a cloud that starts
  * emitting it must not thereby acquire a pass — but no wire fixture can
  * exercise it, and a test that fabricates one is testing the display model, not
@@ -345,12 +360,29 @@ export function scoreFromFinalizeResponse(finalized: FinalizeResponse): Score {
   const preSatisfied = results.filter(
     (r) => outcomeOf(r) === "skipped" && isPreSatisfied(r),
   ).length;
+  // The narrator's two states, counted off `outcome` (via `isNarrated`) and
+  // never off the prose in `reason`, which on an advisory row is the narrator's
+  // own free text.
+  //
+  // `!isPreSatisfied` keeps the three exemptions DISJOINT, mirroring the
+  // else-if chain in wire's `tallyCriteriaResults`: all three are subtracted
+  // from `skipped` below, so a row counted into two of them would subtract more
+  // than `skipped` holds and exempt a real gap standing beside it. No producer
+  // emits such a row — the seed exclusion is a `[code]` evaluator's and these
+  // are the `[model]` judge's — and the arithmetic does not rely on that.
+  const advisory = results.filter(
+    (r) => isNarrated(r) && !isPreSatisfied(r) && r.outcome === ADVISORY_OUTCOME,
+  ).length;
+  const abstained = results.filter(
+    (r) => isNarrated(r) && !isPreSatisfied(r) && r.outcome === ABSTAINED_OUTCOME,
+  ).length;
   const totalRequired = passed + failed;
-  // The abstentions that actually block a pass: every skipped result MINUS
-  // the ones the seed already satisfied, plus every errored result (never
-  // exempted — the trap here is that a pre-satisfied result is a wire-observed
-  // fact for `skipped`, not for `errored`).
-  const unresolvedAbstentions = skipped - preSatisfied + errored;
+  // The abstentions that actually block a pass: every skipped result MINUS the
+  // ones the grader reached a verdict on anyway (the seed exclusions and the
+  // narrator's two states), plus every errored result (never exempted — the
+  // trap here is that a pre-satisfied result is a wire-observed fact for
+  // `skipped`, not for `errored`).
+  const unresolvedAbstentions = skipped - preSatisfied - advisory - abstained + errored;
   return {
     satisfaction: finalized.score,
     passed,
@@ -358,6 +390,8 @@ export function scoreFromFinalizeResponse(finalized: FinalizeResponse): Score {
     skipped,
     errored,
     preSatisfied,
+    advisory,
+    abstained,
     total_required: totalRequired,
     evaluated: hasCriteriaResults ? totalRequired > 0 : true,
     can_pass: hasCriteriaResults

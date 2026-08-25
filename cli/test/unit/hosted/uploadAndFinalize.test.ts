@@ -9,7 +9,7 @@ import {
   uploadRunBlobs,
   type UploadClient,
 } from "../../../src/hosted/uploadAndFinalize.js";
-import { scoreStatus } from "../../../src/hosted/evalResultView.js";
+import { evaluationCounts, scoreStatus } from "../../../src/hosted/evalResultView.js";
 import { HostedOrchError } from "../../../src/hosted/errors.js";
 import { finalizeResponseSchema, type FinalizeResponse } from "../../../src/contract/index.js";
 
@@ -267,9 +267,21 @@ describe("scoreFromFinalizeResponse — the seed-pre-satisfied exemption", () =>
     expect(scoreStatus(score, 100)).toBe("incomplete");
   });
 
-  it("cannot see an `errored` criterion at all — `outcome` does not survive the wire", () => {
-    // Review: a fixture that sets `outcome: "errored"` only typechecks through a cast,
-    // and a cast in a fixture is usually a fixture describing a state the system.
+  it("reads an `errored` criterion off the wire now that `outcome` survives the parse", () => {
+    // THIS TEST USED TO ASSERT THE OPPOSITE, and the assertion it made was
+    // true when it was written: `criterionResultSchema` had no `outcome` field,
+    // so zod stripped the key and `errored` was a display state no wire fixture
+    // could reach. `outcome` had to be declared for the narrator exemption to
+    // be readable at all, and declaring it makes every spelling of the field
+    // survive, not just the narrator's two.
+    //
+    // What does NOT change is the verdict, which is the part worth pinning: the
+    // row moves from the `skipped` bucket to the `errored` one, and `errored` is
+    // never exempted, so the run is still INCOMPLETE and still cannot pass.
+    // That was the stated reason for keeping the term in the arithmetic while
+    // nothing could produce it — "a cloud that starts emitting it must not
+    // thereby acquire a pass" — and it now holds against a real payload rather
+    // than a fabricated display-model row.
     const parsed = finalizeResponseSchema.parse({
       run_id: "run_x",
       score: 100,
@@ -293,13 +305,52 @@ describe("scoreFromFinalizeResponse — the seed-pre-satisfied exemption", () =>
       ],
     });
 
-    expect(parsed.criteria_results?.[1]).not.toHaveProperty("outcome");
+    expect(parsed.criteria_results?.[1]?.outcome).toBe("errored");
     const score = scoreFromFinalizeResponse(parsed);
-    expect(score.errored).toBe(0);
-    expect(score.skipped).toBe(1);
-    // Still incomplete — via the skipped bucket, which is the only bucket the
-    // wire can put it in.
+    expect(score.errored).toBe(1);
+    expect(score.skipped).toBe(0);
+    // The bucket moved; the verdict did not. `errored` is not one of the two
+    // exemptions, so it still blocks a pass.
     expect(score.can_pass).toBe(false);
+    expect(scoreStatus(score, 100)).toBe("incomplete");
+    // And the row is still counted: `total` names every criterion the run
+    // recorded whichever bucket the row landed in.
+    expect(evaluationCounts(score).total).toBe(2);
+  });
+
+  it("falls back to the booleans for an `outcome` spelling it has never heard of", () => {
+    // The tolerant-reader half of the same change. A closed enum here would
+    // have rejected the whole /finalize response; a pass-through would have let
+    // an unknown string become a display state by arriving. Neither: the value
+    // survives on the row, and every predicate reads the two booleans, which
+    // already say whether the row is in the denominator.
+    const parsed = finalizeResponseSchema.parse({
+      run_id: "run_x",
+      score: 100,
+      dashboard_url: "https://app.pome.sh/runs/run_x",
+      criteria_results: [
+        {
+          criterion: { type: "code", text: "No unsupported endpoint was called" },
+          passed: true,
+          skipped: false,
+          reason: "matched",
+        },
+        {
+          criterion: { type: "model", text: "Severity is set correctly" },
+          outcome: "deliberated",
+          passed: false,
+          skipped: true,
+          reason: "a state this CLI has never heard of",
+        },
+      ],
+    });
+    expect(parsed.criteria_results?.[1]?.outcome).toBe("deliberated");
+    const score = scoreFromFinalizeResponse(parsed);
+    expect(score.skipped).toBe(1);
+    expect(score.advisory).toBe(0);
+    expect(score.abstained).toBe(0);
+    // Not exempted, so the run keeps its INCOMPLETE — the fail-safe direction
+    // for a state whose meaning this version cannot know.
     expect(scoreStatus(score, 100)).toBe("incomplete");
   });
 

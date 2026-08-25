@@ -2,10 +2,13 @@
 // The CLI half — the CLI names the third state `incomplete` and stops contradicting
 // the cloud.
 
+import { ABSTAINED_OUTCOME, ADVISORY_OUTCOME } from "@pome-sh/wire/run-completeness";
 import { describe, expect, it } from "vitest";
 import type { CriterionResult } from "../../../src/contract/index.js";
+import { finalizeResponseSchema } from "../../../src/contract/index.js";
 import {
   evaluationCounts,
+  isNarrated,
   isPreSatisfied,
   PRE_SATISFIED_REASON,
   runScoreLine,
@@ -34,6 +37,23 @@ const preSatisfied = (text: string): CriterionResult => ({
   passed: false,
   skipped: true,
   reason: PRE_SATISFIED_REASON,
+});
+// The narrator's two states. `[model]` rather than `[code]`, which is the only
+// lane they occur in, and indistinguishable from `abstained()` above on the two
+// booleans alone — `outcome` is the whole difference.
+const advisory = (text: string): CriterionResult => ({
+  criterion: { type: "model", text },
+  passed: false,
+  skipped: true,
+  reason: "the assistant acknowledged the cancellation in its reply",
+  outcome: ADVISORY_OUTCOME,
+});
+const abstainedByNarrator = (text: string): CriterionResult => ({
+  criterion: { type: "model", text },
+  passed: false,
+  skipped: true,
+  reason: "no refund was requested in this run",
+  outcome: ABSTAINED_OUTCOME,
 });
 
 // Built by the SHIPPED producer rather than re-derived here.
@@ -278,5 +298,120 @@ describe("evaluationCounts — the counts verdict.json and the terminal both rea
       preSatisfied: 1,
       total: 1,
     });
+  });
+});
+
+// ── The narrator states, on the CLI's own surfaces ──────────────────────────
+//
+// The CLI does not call `isIncompleteTally`: it reaches the same verdict
+// through `scoreFromFinalizeResponse`'s `can_pass` and `scoreStatus`. So the
+// wire predicate learning the narrator states does NOT fix the CLI, and
+// `cross-surface-agreement.test.ts` is where the two are held to one answer.
+// What this block pins is the CLI half in isolation, starting with the defect
+// that made every other assertion here moot.
+describe("an advisory [model] row does not take the CLI's verdict", () => {
+  it("survives the /finalize parse instead of being stripped", () => {
+    // THE FIRST DEFECT, AND THE QUIET ONE. `criterionResultSchema` is a plain
+    // `z.object` union and zod strips unknown keys, so before `outcome` was
+    // declared on the BASE schema the field was discarded before any
+    // arithmetic could read it — the exemption would have been correct and
+    // dead. On the base and not one arm because an advisory row carries no
+    // `confidence`/`judge_model` and so lands on the DETERMINISTIC arm, whose
+    // `.extend({})` object is what would have done the stripping.
+    const parsed = finalizeResponseSchema.parse({
+      run_id: "run_x",
+      score: 100,
+      dashboard_url: "https://app.pome.sh/runs/run_x",
+      criteria_results: [ok("a"), advisory("b"), abstainedByNarrator("c")],
+    });
+    expect(parsed.criteria_results?.map((r) => r.outcome)).toEqual([
+      undefined,
+      ADVISORY_OUTCOME,
+      ABSTAINED_OUTCOME,
+    ]);
+  });
+
+  it("keeps a 100/100 run with every [code] criterion scored a PASS", () => {
+    // The hero row. Three scored `[code]` criteria and two `[model]` rows the
+    // narrator read but had no authority to score: nothing is missing, so the
+    // run has a verdict and the verdict is the score.
+    const s = score([ok("a"), ok("b"), ok("c"), advisory("d"), advisory("e")], 100);
+    expect(scoreStatus(s, 100)).toBe("pass");
+    expect(taskPassed(s, 100)).toBe(true);
+    expect(s.can_pass).toBe(true);
+  });
+
+  it("keeps an abstained [model] row from taking the verdict too", () => {
+    const s = score([ok("a"), abstainedByNarrator("b")], 100);
+    expect(scoreStatus(s, 100)).toBe("pass");
+  });
+
+  it("still reports INCOMPLETE when a real gap stands beside an advisory row", () => {
+    // The exemption is narrow. An unreachable judge is a gap whether or not
+    // the narrator also wrote prose somewhere in the same run.
+    const s = score([ok("a"), advisory("b"), abstained("c")], 100);
+    expect(scoreStatus(s, 100)).toBe("incomplete");
+  });
+
+  it("still reports INCOMPLETE for a [model]-only run — no denominator", () => {
+    // Clause 3's shape, and the CLI reaches it by its own route: `evaluated`
+    // is false because nothing was scored. Neither a pass nor a failure, so
+    // `incomplete` is the honest class here as it is on the dashboard.
+    const s = score([advisory("a"), advisory("b")], 0);
+    expect(scoreStatus(s, 100)).toBe("incomplete");
+    expect(s.evaluated).toBe(false);
+  });
+
+  it("counts the narrator rows as their own subsets of skipped", () => {
+    // Subsets, not further buckets — the same discipline `preSatisfied`
+    // follows, so `total` still names every criterion the run recorded and the
+    // terminal line cannot under-report the width of the task.
+    const s = score([ok("a"), advisory("b"), abstainedByNarrator("c")], 100);
+    expect(s.skipped).toBe(2);
+    expect(s.advisory).toBe(1);
+    expect(s.abstained).toBe(1);
+    expect(evaluationCounts(s)).toEqual({
+      evaluated: 1,
+      notEvaluated: 0,
+      preSatisfied: 0,
+      total: 3,
+    });
+  });
+
+  it("names the narrator rows apart from the abstentions that DO block a pass", () => {
+    // `notEvaluated` is documented as "abstentions that actually block
+    // can_pass". Once the narrator rows stop blocking it, counting them there
+    // would be a fresh lie in `verdict.json` — on a run whose state is `pass`.
+    const s = score([ok("a"), advisory("b"), abstained("c")], 100);
+    expect(evaluationCounts(s)).toEqual({
+      evaluated: 1,
+      notEvaluated: 1,
+      preSatisfied: 0,
+      total: 3,
+    });
+  });
+
+  it("reads the state off `outcome` and never off the prose in `reason`", () => {
+    // `reason` on an advisory row is the narrator's free text. A predicate that
+    // sniffed it would exempt any judge that happened to use the word.
+    expect(isNarrated(advisory("a"))).toBe(true);
+    expect(isNarrated(abstainedByNarrator("a"))).toBe(true);
+    expect(isNarrated(ok("a"))).toBe(false);
+    const prosePretendingToBeAState: CriterionResult = {
+      criterion: { type: "model", text: "a" },
+      passed: false,
+      skipped: true,
+      reason: "the judge was advisory about it",
+    };
+    expect(isNarrated(prosePretendingToBeAState)).toBe(false);
+  });
+
+  it("keeps the seed exemption and the narrator exemption distinct", () => {
+    const s = score([ok("a"), preSatisfied("b"), advisory("c")], 100);
+    expect(s.preSatisfied).toBe(1);
+    expect(s.advisory).toBe(1);
+    expect(isPreSatisfied(advisory("c"))).toBe(false);
+    expect(isNarrated(preSatisfied("b"))).toBe(false);
+    expect(scoreStatus(s, 100)).toBe("pass");
   });
 });

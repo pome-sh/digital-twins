@@ -72,6 +72,31 @@ const baseCriterionResultSchema = z.object({
   passed: z.boolean(),
   skipped: z.boolean(),                        // true if [code] fell back to [model] but the judge was unreachable, etc.
   reason: z.string(),                          // human-readable evidence
+  // Why this row is out of the denominator, when `skipped` alone is too coarse.
+  // The two values that carry meaning here are `ADVISORY_OUTCOME` and
+  // `ABSTAINED_OUTCOME` (`@pome-sh/wire/run-completeness`), which the narrator
+  // stamps on a `[model]` row it read but had no authority to score.
+  //
+  // ON THE BASE AND NOT ON ONE ARM, for the mirror image of the reason the arm
+  // order below is what it is: an advisory row carries no `confidence` /
+  // `judge_model`, so it fails the probabilistic arm and lands on the
+  // DETERMINISTIC one — whose `.extend({})` is a plain `z.object` and would
+  // strip an unknown key. Declared on one arm, the state would be discarded
+  // before any consumer could read it, and the run would keep reading
+  // INCOMPLETE with the exemption sitting there correct and dead.
+  //
+  // `z.string()` AND NOT THE CLOSED ENUM pome-cloud declares for the same
+  // field, because the two sides of this field have opposite jobs. pome-cloud
+  // PRODUCES it and validates what it serves; the CLI CONSUMES it, and
+  // `finalizeResponseSchema` is deliberately a tolerant reader (its own comment
+  // says so: cloud may emit additive keys "that older/newer CLIs strip rather
+  // than reject"). A closed enum here would turn a cloud that adds a third
+  // outcome state into a hard parse failure of the ENTIRE /finalize response —
+  // an unreadable run instead of an unrecognised field. The closed vocabulary
+  // is applied by the PREDICATE that reads it (`isNarrated`), exactly as
+  // `reason` is a plain string and `PRE_SATISFIED_REASON` is a comparison, so
+  // an unrecognised spelling is not exempted from anything.
+  outcome: z.string().optional(),
 });
 
 export const deterministicCriterionResultSchema = baseCriterionResultSchema.extend({

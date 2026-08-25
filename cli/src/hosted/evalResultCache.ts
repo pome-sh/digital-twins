@@ -24,8 +24,9 @@
 import { randomUUID } from "node:crypto";
 import { readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { CriterionResult } from "../types/shared.js";
-import type { ScoreStatus } from "./evalResultView.js";
+// The DISPLAY-model row, not the contract one: the writer passes
+// `score.results` and `fix-prompt` reduces this array with `outcomeOf`.
+import type { CriterionResult, ScoreStatus } from "./evalResultView.js";
 import {
   groupRunSets,
   latestFailedRunSet,

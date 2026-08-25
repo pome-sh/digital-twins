@@ -154,6 +154,8 @@ function scoreOf(satisfaction: number, failedTexts: string[] = []): Score {
     skipped: 0,
     errored: 0,
     preSatisfied: 0,
+    advisory: 0,
+    abstained: 0,
     total_required: 2,
     evaluated: true,
     can_pass: true,

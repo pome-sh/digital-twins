@@ -51,6 +51,49 @@ name, default, exit code, wire field or response shape moved.
 directory holding it. Nothing read it. No export, flag, schema, route, status
 code or response body moved.
 
+## Unreleased (minor)
+
+**A hosted run whose every `[code]` criterion was scored no longer prints
+INCOMPLETE and exits 1 because its `[model]` rows were the narrator's.** The
+terminal verdict, `verdict.json`'s `state` and the dashboard badge now agree on
+such a run instead of two of them calling it unfinished.
+
+`@pome-sh/wire`'s completeness predicate learning the narrator states (see that
+package's entry) does not by itself reach the CLI, which computes its own verdict
+through `scoreFromFinalizeResponse`'s `can_pass` and `scoreStatus`. Two changes
+were needed here:
+
+- `criterionResultSchema` gained `outcome` on the **base** object. The schema is
+  a `z.union` of two plain `z.object`s and zod strips unknown keys, so the field
+  was discarded before any arithmetic could read it — the exemption would have
+  been correct and dead. On the base and not one arm because an advisory row
+  carries no `confidence`/`judge_model` and so lands on the *deterministic* arm,
+  whose `.extend({})` is what would have stripped it.
+- `can_pass` now exempts a row the narrator named `advisory` or `abstained`, the
+  way it already exempted one the seed had already satisfied. `Score` gains
+  `advisory` and `abstained` counts, and `evaluationCounts`'s `notEvaluated`
+  subtracts them — it is documented as "abstentions that actually block
+  `can_pass`", so counting them there would have put a non-zero "not evaluated"
+  beside a `pass` in `verdict.json`.
+
+The exemption is narrow: one unreachable judge beside two narrator readings is
+still `incomplete`, a `[model]`-only run is still `incomplete` (no denominator),
+and a failing `[code]` criterion still fails.
+
+Two consequences of `outcome` no longer being stripped, both additive:
+
+- The field now survives onto `verdict.json`'s `criteria_results` rows.
+- `errored` becomes reachable from the wire. A cloud that sends
+  `outcome: "errored"` moves that row from the `skipped` count to the `errored`
+  one; the verdict does not change, because `errored` is never exempted and still
+  blocks a pass. No cloud emits it today.
+
+`outcome` is read as a plain `string`, not a closed enum: `finalizeResponseSchema`
+is deliberately a tolerant reader, and an enum would turn a cloud that adds a
+third outcome state into a hard parse failure of the entire /finalize response.
+An unrecognised spelling survives on the row, exempts nothing, and falls back to
+the two booleans.
+
 ## 0.26.12 — 2026-08-25
 
 **No consumer-visible change.** Added `// file-size:` header comments to four CLI

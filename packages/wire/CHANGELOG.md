@@ -4,6 +4,59 @@ SPDX-License-Identifier: Apache-2.0
 
 # @pome-sh/wire — CHANGELOG
 
+## Unreleased (minor)
+
+**`@pome-sh/wire/run-completeness` learns the narrator's two states.** A run
+whose every `[code]` criterion was scored no longer reads `incomplete` because
+its `[model]` rows carry the narrator's reading instead of a score.
+
+`isIncompleteTally`'s clause 2 was `notEvaluated - preSatisfied > 0`, and the
+seed exclusion was the only exemption it knew. An advisory `[model]` row is
+`passed: false, skipped: true` with the narrator's prose in `reason`, so it
+counted as an abstention — and a run with three scored `[code]` criteria beside
+two advisory `[model]` ones was reported as a run the grader never finished, on
+every surface that asks this question. Measured, not inferred.
+
+Added:
+
+- `ADVISORY_OUTCOME` (`"advisory"`) and `ABSTAINED_OUTCOME` (`"abstained"`) —
+  the two values a `criteria_results` row carries in `outcome` when `skipped`
+  alone is too coarse. Owned here for the reason `PRE_SATISFIED_REASON` is: the
+  predicate below reads them, so a drift in either string is a silent drift in
+  the predicate. The zod field stays in pome-cloud's `@pome-cloud/contract`,
+  which serves it and builds its enum from these two constants.
+- `CriterionResultLike.outcome?: string` — typed `string` rather than a union of
+  the two, exactly as `reason` is not a union of the reason codes, so a state
+  this version has never heard of is a value nothing recognises rather than a
+  parse error. An unrecognised spelling is not exempted from anything.
+
+Changed:
+
+- **`CriteriaTallyLike` gains required `advisory: number` and
+  `abstained: number`** — the reason this is a minor. They are DISJOINT SUBSETS
+  of `notEvaluated`, on the same footing as `preSatisfied`: `evaluated +
+  notEvaluated` still equals `total`, and a consumer that ignores all three gets
+  the legacy arithmetic rather than a wrong one. Disjointness is load-bearing —
+  the predicate subtracts all three, so a reduction counting one row into two of
+  them would drive the clause negative and exempt a real gap.
+- `isIncompleteTally` clause 2 is now
+  `notEvaluated - preSatisfied - advisory - abstained > 0`. **Clause 3
+  (`evaluated === 0`) and clause 1 (`total === 0`) are unchanged**: a
+  `[model]`-only run genuinely is neither a pass nor a failure, so `incomplete`
+  is the right verdict class there and only its wording was ever wrong.
+- `tallyCriteriaResults` counts the two new fields off `outcome`, and only on a
+  row that is `skipped` — an `outcome` on a scored row is ignored rather than
+  subtracted from a bucket it was never in.
+
+For pome-cloud, this is a pin bump with no type edits: `CriteriaTally`
+(`services/score-merge.ts`) and `CriteriaCounts` (`dashboard/src/lib/
+run-status.ts`) already carry both names, and the interface is structural.
+⚠️ One hazard in the same bump — `deriveCriteriaCounts` returns
+`{ passed, advisory, abstained, ...tallyCriteriaResults(results) }`, spread
+LAST, so wire's counts now silently overwrite the locally-computed ones. They
+agree today, which is what makes it invisible. Delete the local counting or move
+the spread first.
+
 ## 0.3.3 — 2026-08-24
 
 **No consumer-visible change.** The repo's lint gates were consolidated behind
