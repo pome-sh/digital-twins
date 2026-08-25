@@ -1,12 +1,9 @@
 name: release
-# The single release pipeline for the five published packages, replacing
-# cli-release.yml (Changesets + a manual "publish the @pome-sh/* batch first"
-# gate that produced 16 batch releases in 14 days, 4 of them consecutive
-# failures) and sdk-publish.yml.
+# The single release pipeline for the five published packages.
 #
 # Model: version-diff on push to main. Bump the version in the package's own
-# package.json, merge, and this workflow publishes it. Nothing to remember, no
-# version PR, no changeset files.
+# package.json, merge, and this workflow publishes it. Nothing to remember and no
+# version PR.
 #
 # @pome-sh/cli, @pome-sh/adapter-claude-sdk and @pome-sh/checks version
 # INDEPENDENTLY (D11) and are diff-gated separately: the CLI bundles the internal
