@@ -57,6 +57,16 @@ npx @pome-sh/cli twin start github    # http://127.0.0.1:3333 — prints MCP URL
 
 For a persistent `pome` command: `npm install -g @pome-sh/cli`.
 
+<!-- One generic quickstart above; the per-twin walkthroughs live on the docs
+     site and are LINKED, never copied — one source per walkthrough. -->
+
+Per-twin walkthroughs — one twin end to end on a hosted sandbox, five
+minutes each: [GitHub](https://docs.pome.sh/quickstart/twins/github) ·
+[Stripe](https://docs.pome.sh/quickstart/twins/stripe) ·
+[Slack](https://docs.pome.sh/quickstart/twins/slack) ·
+[Gmail](https://docs.pome.sh/quickstart/twins/gmail) ·
+[Linear](https://docs.pome.sh/quickstart/twins/linear).
+
 ## Running an agent
 
 `pome run --local` records a run — the trace plus before/after state — for you to
