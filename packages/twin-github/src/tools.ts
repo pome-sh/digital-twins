@@ -1,3 +1,6 @@
+// file-size: the twin's whole MCP tool table in one registry, and the import discipline
+// documented directly below is what keeps it loadable under bun — a split would give a
+// second file the chance to reach the `@pome-sh/sdk` root and pull in `node:sqlite`.
 // SPDX-License-Identifier: Apache-2.0
 // `@pome-sh/sdk/mcp-tool-fixture` rather than the `@pome-sh/sdk` root: the root
 // barrel re-exports `openTwinDatabase`, so importing it EXECUTES `db.ts`'s

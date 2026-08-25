@@ -54,15 +54,64 @@ defineCases("file-size", [
     contains: "exceeds 500 LOC",
   },
   {
-    name: "a header that is not on the first line does not count",
+    name: "a header below the first statement does not count",
     files: tree({ [SUBJECT]: `const a = 1;\n// file-size: buried where nobody reads it\n${lines(600)}` }),
     expect: "red",
     contains: "exceeds 500 LOC",
   },
   {
-    name: "an allowlisted module is exempt at any length",
-    files: tree({ "cli/src/cli/main.ts": lines(900) }),
+    name: "a header on the line after a shebang counts, because a shebang owns line 1",
+    files: tree({
+      [SUBJECT]: `#!/usr/bin/env node\n// file-size: the whole command surface in one place\n${lines(600)}`,
+    }),
     expect: "green",
+  },
+  {
+    // The shape every twin entrypoint has. Demanding one exact index reported a
+    // missing header while the header sat two lines above the complaint.
+    name: "a header below a shebang AND an SPDX line still counts",
+    files: tree({
+      [SUBJECT]: `#!/usr/bin/env node\n// SPDX-License-Identifier: Apache-2.0\n// file-size: one boot path\n${lines(600)}`,
+    }),
+    expect: "green",
+  },
+  {
+    name: "a header below SPDX with no shebang counts",
+    files: tree({
+      [SUBJECT]: `// SPDX-License-Identifier: Apache-2.0\n// file-size: one boot path\n${lines(600)}`,
+    }),
+    expect: "green",
+  },
+  {
+    name: "a header under a shebang on a small file is RED too, not skipped",
+    files: tree({ [SUBJECT]: `#!/usr/bin/env node\n// file-size: stale\n${lines(10)}` }),
+    expect: "red",
+    contains: "exempts nothing",
+  },
+  {
+    // 500 content lines plus the trailing newline's empty string. Counting that
+    // string reported 501 and called a conforming file a violation.
+    name: "a file at exactly the limit passes, trailing newline not counted",
+    files: tree({ [SUBJECT]: `${lines(499)}\n` }),
+    expect: "green",
+  },
+  {
+    name: "a shebang with no header on the line below it is still a violation",
+    files: tree({ [SUBJECT]: `#!/usr/bin/env node\n${lines(600)}` }),
+    expect: "red",
+    contains: "exceeds 500 LOC",
+  },
+  {
+    name: "a header on a module under the limit is RED — a stale exemption, not a free pass",
+    files: tree({ [SUBJECT]: lines(10, "// file-size: a reason that stopped applying") }),
+    expect: "red",
+    contains: [SUBJECT, "exempts nothing"],
+  },
+  {
+    name: "no module is exempt by name — the reason has to be in the file",
+    files: tree({ "cli/src/cli/main.ts": lines(900) }),
+    expect: "red",
+    contains: "exceeds 500 LOC",
   },
   {
     name: "a scan directory that no longer exists is RED, not an empty pass",

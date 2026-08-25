@@ -1,3 +1,7 @@
+// file-size: one hosted run end to end — mint session, run the agent, upload the trace,
+// finalize, write the verdict artifact. The exit-code and `state` decisions at the tail
+// depend on nearly every step above them, and the long comments arguing those decisions
+// are worth more beside the code than in a module that has to re-derive the context.
 // SPDX-License-Identifier: Apache-2.0
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";

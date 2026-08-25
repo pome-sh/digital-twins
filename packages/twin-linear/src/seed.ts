@@ -1,3 +1,5 @@
+// file-size: the Linear seed schema and its defaults in one module, so the shape a task
+// author writes and the values it falls back to cannot drift apart.
 // SPDX-License-Identifier: Apache-2.0
 import { z } from "zod";
 import {

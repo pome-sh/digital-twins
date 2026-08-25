@@ -1,3 +1,6 @@
+// file-size: one serializer per GitHub resource the twin emits, 39 of them — splitting
+// the anchored emitters would scatter the shape-anchor discipline across modules. Same
+// reason as twin-stripe's serializers.
 // SPDX-License-Identifier: Apache-2.0
 import type {
   BranchRow,

@@ -1,3 +1,6 @@
+// file-size: the x402 seller-side middleware plus the fidelity caveat below it, which
+// bounds what any output from this module can be trusted to mean. The caveat is only
+// load-bearing while it sits in front of the flow it qualifies.
 // SPDX-License-Identifier: Apache-2.0
 //
 // =============================================================================

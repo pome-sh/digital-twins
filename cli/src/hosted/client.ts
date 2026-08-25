@@ -1,3 +1,10 @@
+// file-size: every control-plane call lives inside one `createHostedClient` closure, so
+// they share the auth headers, the timeout and retry budgets, and the error mapping to
+// HostedAuthError / HostedOrchError. Splitting a call out means either re-deriving that
+// wiring or exporting it, and a second caller of the retry budget is how two commands
+// start disagreeing about how long to wait. The finalize accept/poll state machine below
+// is local because it is the only multi-step protocol here; the plain response schemas
+// are shared and imported from ../types/shared.js.
 // SPDX-License-Identifier: Apache-2.0
 import {
   createEvalSessionResponseSchema,
