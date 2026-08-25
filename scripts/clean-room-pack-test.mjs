@@ -1,56 +1,8 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Clean-room release gate for the four npmjs-published packages. (`@pome-sh/wire`
-// is also published, but to GitHub Packages for cross-repo consumers, and is
-// audited separately by scripts/ci/check-wire-tarball.mjs. What matters
-// HERE is the assertion below that neither npm tarball declares an `@pome-sh/*`
-// dependency: that is what keeps wire inlined rather than installed, and it must
-// keep holding now that wire is resolvable-but-401 rather than nonexistent.)
-//
-// Packs `@pome-sh/cli` and `@pome-sh/adapter-claude-sdk`, installs each tarball
-// into a throwaway directory with NO access to this workspace, and drives them
-// the way a user would. This is the gate that would have caught the failure the
-// restructure was built around: `bundleDependencies` declared seven packages and
-// shipped none, npm trusted the declaration and skipped fetching them, the
-// install reported success, and the CLI died on its first command.
-//
-// Both packages also get a files-field tarball audit: the real `tar`
-// listing is grepped for dangling `.map` files and a compiled `dist/examples/`
-// directory. tsup's `sourcemap: false` / `clean: true` config should already
-// make both impossible, but that is an unverified claim about the
-// build config, not an asserted property of the artifact actually published.
-//
-// The CLI checks:
-//   - packed manifest declares no `@pome-sh/*` and no `file:` dependency
-//   - no hard-link entries (npm registry rejects those with E415)
-//   - no dangling `.map` files, no compiled `dist/examples/` directory
-//   - `assets/` shipped (the fix-prompt system prompt is read at module scope)
-//   - `pome --help` and `pome --version` run
-//   - EVERY twin boots from the tarball and answers `/healthz` 200. All five,
-//     not a sample: each twin is its own lazily-loaded chunk, so each is an
-//     independent failure mode — a missing chunk or an unresolvable third-party
-//     import (twin-linear needs `graphql`) only shows up on that twin's boot.
-//
-// The adapter checks:
-//   - packed manifest declares no `@pome-sh/*` dependency (its wire types are
-//     bundled; `@pome-sh/wire` is not installable by an end user)
-//   - no dangling `.map` files, no compiled `dist/examples/` directory
-//   - runtime import of `flushPomeTelemetry` with the peer installed
-//   - a real consumer file TYPECHECKS against the shipped `dist/index.d.ts`.
-//     Runtime-import-only would pass even if dts bundling dropped or
-//     mis-resolved the bundled wire types: only the consumer's tsc breaks.
-//
-// `@pome-sh/checks` and `@pome-sh/sandbox-domains` get their own sections at the
-// bottom — the two packages whose only consumer is in another repository, and
-// the two where a runtime import proves the least. checks needs the consumer
-// COMPILE (its whole job is re-exported declarations); sandbox-domains needs the
-// consumer CONSTRUCTION (its openers must actually open a database), and its
-// install deliberately names nothing but the tarball, its zod peer and
-// typescript, so anything else it needs has to arrive through its own
-// `dependencies`.
-//
-// Usage: node scripts/clean-room-pack-test.mjs [--keep]
+// Installs both tarballs in a clean room and boots every twin from them, which is
+// the only place a missing `files` entry or a leaked dep actually shows up.
 
 import { execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -95,7 +47,6 @@ function fail(message) {
 
 function pack(workspace, destination) {
   mkdirSync(destination, { recursive: true });
-  // --ignore-scripts: prepublishOnly would rebuild; the caller already built.
   run("npm", ["pack", "-w", workspace, "--ignore-scripts", "--pack-destination", destination], {
     cwd: ROOT,
   });
@@ -112,20 +63,11 @@ function assertNoHardLinks(tarball) {
   }
 }
 
-// Tarball-files-field audit: `npm pack` respects each package's `files`
-// field, and nothing else asserts WHAT actually lands in the tgz.
-// tsup's `sourcemap: false` / `clean: true` config (Lane D) means a stray
-// `.map` or a leftover `dist/examples/` from a prior build shouldn't be
-// possible today — but that's exactly the kind of invariant that silently
-// stops holding the day someone flips a tsup option or a stale `dist/` gets
-// packed without a clean rebuild. Grep the real tarball listing so a
-// regression fails CI instead of shipping.
 function assertNoStrayTarballArtifacts(tarball, label) {
   const listing = run("tar", ["-tf", tarball])
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean)
-    // npm wraps every entry in a top-level `package/` directory.
     .map((line) => line.replace(/^package\//, ""));
 
   const sourcemaps = listing.filter((path) => path.endsWith(".map"));
@@ -133,11 +75,6 @@ function assertNoStrayTarballArtifacts(tarball, label) {
     fail(`${label}: tarball contains dangling sourcemaps:\n${sourcemaps.join("\n")}`);
   }
 
-  // A compiled `agent-examples/` directory under `dist/` would mean the top-level
-  // workspace `agent-examples/` (standalone demo projects, never meant to publish)
-  // got swept into the bundle output. `cli/examples/**` (raw .ts demo
-  // agents) is a deliberate, separate top-level `files` entry — this only
-  // guards the BUILD OUTPUT, not the package's own declared source examples.
   const compiledExamples = listing.filter((path) => /^dist\/.*\bexamples\//.test(path));
   if (compiledExamples.length > 0) {
     fail(`${label}: tarball's dist/ contains a compiled examples/ directory:\n${compiledExamples.join("\n")}`);
@@ -179,7 +116,6 @@ async function waitForHealth(port, child, twin) {
         return null;
       }
     } catch {
-      /* not listening yet */
     }
     await new Promise((r) => setTimeout(r, 250));
   }
@@ -214,7 +150,6 @@ async function bootTwinFromTarball(room, cliBin, twin, port) {
   }
 }
 
-// ── @pome-sh/cli ────────────────────────────────────────────────────────────
 console.log("\n@pome-sh/cli — clean-room pack test");
 const cliRoom = makeRoom("cli");
 const cliTarball = pack("@pome-sh/cli", join(cliRoom, "tarballs"));
@@ -257,7 +192,6 @@ for (const { name, port } of TWINS) {
   await bootTwinFromTarball(cliInstall, cliBin, name, port);
 }
 
-// ── @pome-sh/adapter-claude-sdk ─────────────────────────────────────────────
 console.log("\n@pome-sh/adapter-claude-sdk — clean-room pack test");
 const adapterRoom = makeRoom("adapter");
 const adapterTarball = pack("@pome-sh/adapter-claude-sdk", join(adapterRoom, "tarballs"));
@@ -307,9 +241,6 @@ writeFileSync(
 run(process.execPath, [join(adapterInstall, "runtime-check.mjs")], { cwd: adapterInstall });
 console.log("  ✓ runtime import + flushPomeTelemetry()");
 
-// Type-level check: the shipped dist/index.d.ts must typecheck for a real
-// consumer. `tool()`'s generic binds through the peer SDK's zod-shaped
-// `AnyZodRawShape`/`InferShape`, which is where bundled-dts breakage shows up.
 writeFileSync(
   join(adapterInstall, "consumer.ts"),
   `import {
@@ -351,9 +282,6 @@ writeFileSync(
   JSON.stringify(
     {
       compilerOptions: {
-        // ESNext + DOM + @types/node because the peer SDK's OWN declarations
-        // reference Response/AbortSignal/NodeJS/Symbol.dispose. A consumer that
-        // could not compile those could not use the SDK at all.
         target: "ES2022",
         lib: ["ESNext", "DOM"],
         types: ["node"],
@@ -361,10 +289,6 @@ writeFileSync(
         moduleResolution: "NodeNext",
         strict: true,
         noEmit: true,
-        // Deliberately NOT skipLibCheck: the point is to check the SHIPPED
-        // declarations, including the wire types dts bundling inlined into
-        // them. With skipLibCheck the whole check degrades to "does the import
-        // resolve", which the runtime check above already covers.
         skipLibCheck: false,
       },
       files: ["consumer.ts"],
@@ -373,7 +297,6 @@ writeFileSync(
     2,
   ),
 );
-// zod is the peer SDK's own dependency; install it for the consumer's schema.
 run("npm", ["install", "zod", "--no-audit", "--no-fund", "--ignore-scripts"], {
   cwd: adapterInstall,
 });
@@ -389,20 +312,6 @@ try {
 }
 console.log("  ✓ consumer file typechecks against the shipped dist/index.d.ts");
 
-// ── @pome-sh/checks ─────────────────────────────────────────────────────────
-//
-// This package needs the consumer COMPILE more than either of the others, and it
-// is the reason this section exists. Its whole job is to re-export declarations
-// out of six `private: true` workspace packages, and `noExternal` governs only
-// the JS bundle: the declaration bundler leaves bare `@pome-sh/*` specifiers
-// behind, pointing at packages that are on no registry. The JS import keeps
-// working, so nothing fails until a consumer runs `tsc` — 11 × TS2307 for the
-// specifiers, and every DSL symbol behind `export * from "@pome-sh/sdk/checks"`
-// missing outright. It shipped that way until a review caught it by hand.
-//
-// `skipLibCheck` is OFF, deliberately: with it on, an unresolvable specifier
-// INSIDE a shipped `.d.ts` is silently tolerated and this degrades to "does the
-// import resolve", which the runtime check already covers.
 console.log("\n@pome-sh/checks — clean-room pack test");
 const checksRoom = makeRoom("checks");
 const checksTarball = pack("@pome-sh/checks", join(checksRoom, "tarballs"));
@@ -431,9 +340,6 @@ run(
   ],
   { cwd: checksInstall },
 );
-// Same assertion as the other two, and it bites harder here: a leaked
-// `@pome-sh/*` dependency would 404 rather than merely be redundant, because
-// those packages are private at these versions.
 assertManifestPure(
   join(checksInstall, "node_modules", "@pome-sh", "checks", "package.json"),
   "@pome-sh/checks",
@@ -516,11 +422,6 @@ writeFileSync(
     {
       compilerOptions: {
         target: "ES2022",
-        // No `lib: ["DOM"]` and no `types: ["node"]`, on purpose. A declarations
-        // package has no business requiring either, and dropping them is what
-        // catches an ambient leak — `NodeJS.ProcessEnv` reached the published
-        // surface through a vendored `loadSeedFromEnv` signature and only showed
-        // up once a consumer compiled without @types/node.
         lib: ["ES2022"],
         module: "NodeNext",
         moduleResolution: "NodeNext",
@@ -548,23 +449,6 @@ try {
 }
 console.log("  ✓ consumer file typechecks against the shipped declarations (skipLibCheck off)");
 
-// ── @pome-sh/sandbox-domains ───────────────────────────────────────────────────
-//
-// The grading RUNTIME, and the one published package where "the import
-// resolves" is genuinely not enough: pome-cloud does not just read these
-// exports, it CONSTRUCTS them — opens a SQLite database, builds a domain over
-// it, and parses a seed through it. A tarball whose `open*Database` resolves and
-// then cannot open anything satisfies every name-shaped assertion and fails on
-// the grader, which is why the runtime check below boots rather than imports.
-//
-// `skipLibCheck` stays OFF for the same reason as checks above, and it reaches
-// further here: this package's declarations legitimately name three EXTERNAL
-// packages (`hono`, `@octokit/openapi-types`, `stripe`) that its manifest must
-// therefore declare. Installing the tarball alone — with no workspace, and
-// without hand-installing those — is what proves the manifest actually carries
-// them. It is the assertion that would have caught `graphql` being declared for
-// a package tsup had inlined, and `@hono/node-server` being declared for one
-// nothing imported.
 console.log("\n@pome-sh/sandbox-domains — clean-room pack test");
 const domainsRoom = makeRoom("sandbox-domains");
 const domainsTarball = pack("@pome-sh/sandbox-domains", join(domainsRoom, "tarballs"));
@@ -580,18 +464,6 @@ writeFileSync(
 const domainsZodRange = JSON.parse(
   readFileSync(join(ROOT, "packages", "sandbox-domains", "package.json"), "utf8"),
 ).peerDependencies.zod;
-// Only the tarball, its zod PEER and typescript are named here. Everything else
-// the package needs has to arrive through its own `dependencies`, which is the
-// point of the exercise.
-// `@types/node` is here and is NOT a hole in the exercise. This package opens
-// SQLite databases through `node:sqlite`, and its shipped declarations reach
-// `hono`'s and `stripe`'s own `.d.ts`, which require `@types/node` and the DOM
-// lib themselves (neither declares `@types/node`; both assume a Node consumer,
-// which is standard for a server library). A consumer of a package like this is
-// a Node server — pome-cloud's control-plane — so requiring those is honest.
-// What is NOT installed is anything that would let this package's own missing
-// `dependencies` pass unnoticed: `hono`, `@octokit/openapi-types` and `stripe`
-// must all still arrive through the tarball's own manifest.
 run(
   "npm",
   [
@@ -686,21 +558,6 @@ writeFileSync(
     {
       compilerOptions: {
         target: "ES2022",
-        // DOM and `@types/node` ARE allowed here, and that is the one place this
-        // room deliberately differs from the checks room above. The reason there
-        // ("a declarations package has no business requiring either") does not
-        // transfer: this package is a RUNTIME. Its declarations reach hono's and
-        // stripe's own `.d.ts`, which name `File`, `Request`, `ReadableStream`
-        // and `NodeJS.*` — third-party types that need those libs and are not
-        // this repo's to fix.
-        //
-        // `skipLibCheck` stays OFF, which is what keeps the assertion worth
-        // making: the tarball installs INTO node_modules, so turning it on would
-        // skip this package's own declarations too and degrade the whole section
-        // to "does the import resolve" — which the runtime check already covers.
-        // The cost is that a genuine type regression shipped by hono or stripe
-        // reds this gate; renovate keeps both current and the rest of the repo's
-        // typecheck already carries the same exposure.
         lib: ["ES2022", "DOM"],
         types: ["node"],
         module: "NodeNext",

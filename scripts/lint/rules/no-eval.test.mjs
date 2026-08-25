@@ -1,25 +1,13 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// The old gate shipped with no case table, for the rule whose whole job is
-// keeping evaluation out of the OSS repo. All three arms are asserted (path,
-// name, import), plus the two documented narrownesses — a prose mention is not
-// an import, and a `fixtures/` directory is deliberately unscanned — because a
-// rule that reds on prose gets deleted and a rule that reds on its own fixtures
-// gets allowlisted into uselessness.
-//
-// Folded in from `cli/test/unit/no-eval-in-oss.test.ts`, a vitest suite that
-// asserted the same predicate from a third place.
+// Case table for no-eval. Every case asserts the RED direction: a rule that has
+// quietly stopped failing prints the same line as one with nothing to report.
 
 import { defineCases } from "../harness.mjs";
 
 const SRC = "packages/twin-x/src/thing.ts";
 
-// Assembled rather than written out. `scripts/lint-no-cloud-imports.sh` greps
-// this directory for the same specifier and cannot tell a fixture from a real
-// import, and `no-eval` itself scans `scripts/` — weakening either of them to
-// make room for a fixture is the wrong trade. The rule sees the real string at
-// runtime, which is what the case is about.
 const CLOUD_JUDGE = ["@pome", "cloud/judge"].join("-");
 
 defineCases("no-eval", [
@@ -59,7 +47,6 @@ defineCases("no-eval", [
     contains: CLOUD_JUDGE,
   },
   {
-    // A false positive on prose is how this rule gets deleted.
     name: "prose naming a forbidden specifier is not an import",
     files: {
       [SRC]: `// The old design imported "@pome-sh/correlator" here; it lives in pome-cloud now.\nexport const a = 1;\n`,
@@ -67,7 +54,6 @@ defineCases("no-eval", [
     expect: "green",
   },
   {
-    // Documented narrowness: fixture directories legitimately embed the strings.
     name: "a fixtures/ directory is deliberately unscanned",
     files: { "packages/twin-x/src/fixtures/score.ts": `import "${CLOUD_JUDGE}";\n` },
     expect: "green",
@@ -97,17 +83,12 @@ defineCases("no-eval", [
     contains: "@pome-sh/correlator",
   },
   {
-    // `cli/src/**` is not the whole OSS surface: eval logic reintroduced beside
-    // the build scripts is the same violation.
     name: "SCOPE: cli/scripts/ is walked too",
     files: { "cli/scripts/thing.mjs": `import "@pome-sh/correlator";\n` },
     expect: "red",
     contains: "cli/scripts/thing.mjs",
   },
   {
-    // The NAME rule is a PREFIX match, so `judge-local.mjs` trips it and
-    // `local-judge.mjs` does not — the documented narrowness, asserted from both
-    // sides so nobody has to guess which way it goes.
     name: "SCOPE: repo-root scripts/ is walked too, by name and by import",
     files: {
       "scripts/judge-local.mjs": `export const x = 1;\n`,

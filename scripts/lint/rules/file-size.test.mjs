@@ -1,19 +1,11 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// The old gate shipped with no case table. What is worth proving is that the
-// escape hatch works only in the one place it is documented to: a
-// `// file-size:` header on the FIRST line. A header further down the file would
-// be an escape hatch nobody could find by reading the top of the module.
-//
-// The last case pins the other direction — a scan directory that has vanished
-// must be RED, because a rule that walks nothing prints the same line as a rule
-// that found nothing.
+// Case table for file-size. Every case asserts the RED direction: a rule that has
+// quietly stopped failing prints the same line as one with nothing to report.
 
 import { defineCases } from "../harness.mjs";
 
-// Every directory the rule is told to walk. All of them have to exist, or the
-// case fails on a missing scan root instead of on its own subject.
 const SCAN_DIRS = [
   "packages/twin-gmail/src",
   "packages/twin-github/src",
@@ -30,8 +22,6 @@ const SUBJECT = "cli/src/big.ts";
 const lines = (count, first = "") =>
   [first, ...Array.from({ length: count }, (_, index) => `const x${index} = ${index};`)].join("\n");
 
-/** Every scan directory present and trivially clean, then `overrides` applied.
- *  A key mapped to `undefined` is dropped, to express "this file does not exist". */
 const tree = (overrides = {}) =>
   Object.fromEntries(
     Object.entries({
@@ -70,7 +60,6 @@ defineCases("file-size", [
     contains: "exceeds 500 LOC",
   },
   {
-    // Existing debt, allowlisted by exact path. The list should only shrink.
     name: "an allowlisted module is exempt at any length",
     files: tree({ "cli/src/cli/main.ts": lines(900) }),
     expect: "green",

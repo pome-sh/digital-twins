@@ -1,18 +1,8 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Regression suite for `smoke-examples.mjs`.
-//
-// The gap that undermines this gate's whole job: an exit inside SETTLE_MS
-// reading as "OK", so an example that returned having done nothing looks
-// identical to a healthy launch. `classifyLaunch()` is where that is decided,
-// so this suite drives it directly with synthetic evidence rather than spawning
-// all eight real examples (slow, network- and timing-dependent — the real
-// launches are exercised by `npm run smoke:examples` itself in CI).
-//
-// Four break-on-purpose scenarios: exits 0 immediately with no evidence of
-// work, exits 1 immediately with no recognized benign reason, a module-body TDZ
-// (must never regress to a skip or a pass), and zero examples discovered.
+// Case table for smoke-examples. Every case asserts the RED direction: a rule that has
+// quietly stopped failing prints the same line as one with nothing to report.
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -45,21 +35,18 @@ function check(name, got, want) {
   }
 }
 
-// ── break-on-purpose 1: exits 0 immediately, no signal of real work ────────
 {
   const v = classifyLaunch({ output: '{"decisions":[],"reports":[]}', stillRunningAtSettle: false, exitCode: 0 });
   check("exit 0 before settle with no benign signature reds", v.status, "fail");
   assert.match(v.reason, /exited code 0/);
 }
 
-// ── break-on-purpose 2: exits 1 immediately, no recognized reason ──────────
 {
   const v = classifyLaunch({ output: "boom, something broke", stillRunningAtSettle: false, exitCode: 1 });
   check("exit 1 before settle with no benign signature reds", v.status, "fail");
   assert.match(v.reason, /exited code 1/);
 }
 
-// ── break-on-purpose 3: a module-body TDZ still reds, whatever else is true ─
 {
   const tdzOutput = "ReferenceError: Cannot access 'TwinMcpClient' before initialization";
   check(
@@ -84,12 +71,6 @@ function check(name, got, want) {
   );
 }
 
-// ── An outbound-call failure is its own named verdict, distinct from
-// ok — but ONLY once the positive-evidence marker is present. The marker is
-// what a real launch prints (either via @pome-sh/adapter-claude-sdk's query(),
-// or the literal print each non-adapter example carries) immediately before
-// its first outbound attempt, so these fixtures include it exactly as real
-// captured output would.
 {
   const v = classifyLaunch({
     output: `${OUTBOUND_MARKER}\nTypeError: fetch failed\n  ECONNREFUSED 127.0.0.1:59321`,
@@ -109,13 +90,6 @@ function check(name, got, want) {
   check("marker + AI Gateway auth rejection before settle is 'reached'", v.status, "reached");
 }
 
-// ── Fail-closed: no marker means no "reached", no matter how benign
-// the crash text looks. This is the central acceptance bar — a
-// pre-wiring crash whose message deliberately CONTAINS benign-looking text
-// ("ECONNREFUSED", "401 invalid x-api-key") must still FAIL, because the
-// marker (proof the example ever reached its outbound call site) never
-// printed. Archaeology of the failure text alone is exactly what let a lost
-// SDK race convert a real crash into a pass.
 {
   for (const output of [
     "TypeError: fetch failed\n  ECONNREFUSED 127.0.0.1:59321",
@@ -133,12 +107,6 @@ function check(name, got, want) {
   }
 }
 
-// ── The other direction: the marker is printed at the outbound call
-// SITE, so a crash between that line and the syscall prints it first. Both of
-// these were MEASURED on this branch (the adapter seam with an unresolvable
-// `claude` binary; `gmail-retry-notify` with a malformed twin URL) and both
-// FAILED under the old text classifier, so the marker alone must not convert
-// them into passes — that is the same defect through the back door.
 {
   for (const [label, output] of [
     [
@@ -160,12 +128,6 @@ function check(name, got, want) {
   }
 }
 
-// ── Both of the SDK's racing error shapes give the SAME verdict once
-// the marker is present. This is the exact nondeterminism at issue:
-// `@anthropic-ai/claude-agent-sdk@0.3.221`'s query() picks between
-// "Claude Code returned an error result: …" (lastErrorResultText won the
-// race) and "Claude Code process exited with code N. stderr: …" (lost the
-// race) for the identical underlying 401. Both must classify identically.
 {
   const wonRace = classifyLaunch({
     output: `${OUTBOUND_MARKER}\nClaude Code returned an error result: … 401 invalid x-api-key`,
@@ -183,17 +145,6 @@ function check(name, got, want) {
   check("both racing shapes agree on the verdict", wonRace.status, lostRace.status);
 }
 
-// ── the signature list is locked against REAL CI output, not invented text ──
-//
-// Every string below is copied verbatim from the `smoke:examples` job log of
-// a real PR run (github.com/pome-sh/digital-twins/actions/runs/31614212888),
-// with OUTBOUND_MARKER prepended — a real launch prints it before
-// any of this text. This is the case that matters: the list decides whether
-// the gate is usable in the only environment that gates anything, and a
-// tightened pattern that no longer matches what CI actually prints reds all
-// eight examples at once. If a dependency changes its error wording, this
-// fails here — cheaply, naming the example — instead of in a CI run that reds
-// everything.
 {
   const realCiOutput = {
     "gmail-retry-notify":
@@ -216,11 +167,6 @@ function check(name, got, want) {
       exitCode: 1,
     });
     check(`real CI output for ${name} (with marker) classifies as reached`, v.status, "reached");
-    // The status alone is decided by the marker, so asserting only that would
-    // pass with BENIGN_FAILURE_SIGNATURES emptied — a vacuous version of the
-    // claim in this block's header. The REASON is what the signature list
-    // still owns, so assert a class was actually recognized: a pattern
-    // tightened past what CI prints reds here, cheaply, naming the example.
     assert.match(
       v.reason,
       /an outbound call failed \(.+\)/,
@@ -229,13 +175,6 @@ function check(name, got, want) {
   }
 }
 
-// ── a swallowed outbound failure that still exits 0 is a FAIL, not reached ──
-//
-// The marker alone must not buy a pass on the PR leg: SMOKE_ENV's dead wiring
-// cannot succeed, so an example that reaches its marker, hits the dead twin,
-// logs it, and exits clean has swallowed the failure and reported success.
-// This is the shape `minimal-viktor-langgraph` had, and it only red-lined
-// because its index.ts sets a non-zero exit code.
 {
   const v = classifyLaunch({
     output: `${OUTBOUND_MARKER}\n{"error":"list_collaborators acme/api failed: fetch failed"}`,
@@ -247,11 +186,6 @@ function check(name, got, want) {
   assert.match(v.reason, /swallowed/);
 }
 
-// ── the benign list must not be broad enough to swallow a real defect, even
-// with the marker present — matchBenignFailure() is descriptive only now, it
-// never gates a "reached" verdict on its own (the marker plus a non-zero exit
-// does). These fixtures omit the marker, so a broken example's ordinary
-// failure prose (which was never proof of anything) still reds.
 {
   for (const output of [
     "",
@@ -260,11 +194,7 @@ function check(name, got, want) {
     "request failed",
     "TypeError: Cannot read properties of undefined (reading 'ref')",
     "AssertionError: expected 1 to equal 0",
-    // This example's own Slack report for seed 04, which a bare /unauthorized/i
-    // matched — an example excusing itself with its own healthy-path output.
     "merge blocked: author drive-by-dev is not an authorized collaborator https://github.com/o/r/pull/1",
-    // A crash whose stack happens to have a 401st line: a bare /\b401\b/ read
-    // this as an auth rejection.
     "TypeError: x is not a function\n    at run (/app/src/graph.ts:401:9)",
   ]) {
     check(
@@ -275,21 +205,18 @@ function check(name, got, want) {
   }
 }
 
-// ── the fail message has to tell the reader what to do about it ───────────
 {
   const v = classifyLaunch({ output: "unrecognized boom", stillRunningAtSettle: false, exitCode: 1 });
   assert.match(v.reason, new RegExp(OUTBOUND_MARKER));
   check("an unrecognized failure names the marker it never saw", v.status, "fail");
 }
 
-// ── still running at the settle is the one real "did work" signal ──────────
 {
   const v = classifyLaunch({ output: "· thinking… 2s", stillRunningAtSettle: true });
   check("still running at the settle is ok", v.status, "ok");
   assert.match(v.reason, new RegExp(String(SETTLE_MS)));
 }
 
-// ── break-on-purpose 4: zero examples discovered is a hard failure ─────────
 {
   const emptyDir = mkdtempSync(join(tmpdir(), "smoke-examples-empty-"));
   try {
@@ -299,7 +226,6 @@ function check(name, got, want) {
   }
 }
 
-// ── discovery is a glob over `start` scripts, not a hand-kept list ─────────
 {
   const dir = mkdtempSync(join(tmpdir(), "smoke-examples-discover-"));
   try {
@@ -313,7 +239,6 @@ function check(name, got, want) {
   }
 }
 
-// ── The credentialed leg's floor — zero alive is a hard failure ────────────
 {
   const zero = assertAliveFloor({ live: true, okCount: 0, total: 8 });
   check("zero alive on the live leg fails the floor", zero.ok, false);
@@ -326,15 +251,11 @@ function check(name, got, want) {
   const many = assertAliveFloor({ live: true, okCount: 8, total: 8 });
   check("every example alive still meets the floor", many.ok, true);
 
-  // The floor must never apply to the uncredentialed (PR) leg — that leg's
-  // permanent steady state is 0 alive, and this floor is not the mechanism
-  // that would make it red for that.
   const notLive = assertAliveFloor({ live: false, okCount: 0, total: 8 });
   check("the floor is a no-op when not on the live leg", notLive.ok, true);
   check("a no-op floor carries no message", notLive.message, null);
 }
 
-// ── An absent credential on the live leg must be named, not silent ─────────
 {
   check(
     "every required var is reported missing from an empty env",
@@ -351,16 +272,11 @@ function check(name, got, want) {
     missingLiveEnv({ ANTHROPIC_API_KEY: "sk-ant-real" }),
     ["POME_AUTH_TOKEN"],
   );
-  // GitHub Actions substitutes an UNSET secret as the empty string, so the
-  // empty case is the one that actually happens in production, not a curiosity.
   check(
     "an empty-string secret is named as absent, not accepted",
     missingLiveEnv({ ANTHROPIC_API_KEY: "", POME_AUTH_TOKEN: "" }).sort(),
     [...LIVE_REQUIRED_ENV].sort(),
   );
-  // Truthy but blank — a space or newline pasted into the secret box
-  // (the blank-in-Infisical shape). Untrimmed, this sails through
-  // and the leg launches every example with a whitespace API key.
   check(
     "a whitespace-only secret is named as absent, not accepted",
     missingLiveEnv({ ANTHROPIC_API_KEY: "   ", POME_AUTH_TOKEN: "\t\n " }).sort(),
@@ -373,10 +289,6 @@ function check(name, got, want) {
   );
 }
 
-// ── An unrecognised SMOKE_EXAMPLES_LIVE must ERROR, never mean "PR leg"
-// A flag typo'd to `true` silently reverts to the uncredentialed leg: dead
-// loopback ports, no credential check, no floor, exit 0. That is a green
-// nightly proving nothing, one character away.
 {
   check("unset means the PR leg, with no error", resolveLiveFlag(undefined), {
     live: false,
@@ -395,11 +307,6 @@ function check(name, got, want) {
   }
 }
 
-// ── The LIVE leg must still hand every example a task ───────────────────────
-// Four of the eight `requiredEnv("POME_TASK")`. The first cut of the live leg
-// overlaid nothing at all, so those four died on `Error: POME_TASK is required`
-// and were classified FAIL ("returned without evidence it did any real work") —
-// the nightly would have redded 4 of 8 on its first run for an unset env var.
 {
   const realWiring = {
     ANTHROPIC_API_KEY: "sk-ant-real",
@@ -410,9 +317,6 @@ function check(name, got, want) {
 
   const live = launchEnv(realWiring, true);
   assert.ok(live.POME_TASK?.trim(), "the LIVE leg must supply a non-blank POME_TASK");
-  // minimal-viktor's default alibaba/* slug is reachable ONLY via the AI
-  // Gateway; on the credentialed leg (no fake gateway key) it throws before any
-  // outbound call. The leg must pin a slug the ONE provisioned secret can serve.
   assert.match(
     live.VIKTOR_MODEL ?? "",
     /^anthropic\//,
@@ -433,13 +337,8 @@ function check(name, got, want) {
     live.POME_GITHUB_MCP_URL,
     "http://127.0.0.1:3333/s/standalone/mcp",
   );
-  // Compared to a boolean, never passed as a value: check() prints `got` on
-  // failure, and handing it anything read off a *_API_KEY property is
-  // clear-text logging of sensitive information (js/clear-text-logging), which
-  // CodeQL flags high even when the value is this file's own fake literal.
   check("the LIVE leg keeps the real model key", live.ANTHROPIC_API_KEY === "sk-ant-real", true);
   check("the LIVE leg never re-enables POME_PREFLIGHT", live.POME_PREFLIGHT, undefined);
-  // The whole point of the leg: no dead loopback port may be overlaid.
   for (const [k, v] of Object.entries(live)) {
     assert.ok(
       !String(v).includes("59321"),
@@ -456,7 +355,6 @@ function check(name, got, want) {
     "a blank caller POME_TASK must not reach requiredEnv() as blank",
   );
 
-  // The PR leg is unchanged: the dead wiring overlay still wins outright.
   const pr = launchEnv(realWiring, false);
   check("the PR leg still overlays the dead loopback port", pr.POME_GITHUB_MCP_URL, "http://127.0.0.1:59321/s/smoke/mcp");
   check(
@@ -464,8 +362,6 @@ function check(name, got, want) {
     pr.ANTHROPIC_API_KEY === "sk-ant-smoke-invalid",
     true,
   );
-  // The PR leg's fake gateway key is what lets alibaba/* resolve and then fail
-  // at the outbound call (REACHED-OUTBOUND). Removing it would red that leg.
   check(
     "the PR leg still overlays the fake gateway key",
     pr.AI_GATEWAY_API_KEY === "smoke-invalid",
@@ -474,19 +370,10 @@ function check(name, got, want) {
   check("the PR leg does not pin a model slug", pr.VIKTOR_MODEL, undefined);
   assert.ok(pr.POME_TASK?.trim(), "the PR leg must supply a non-blank POME_TASK");
   check("the PR leg never re-enables POME_PREFLIGHT", pr.POME_PREFLIGHT, undefined);
-  // MARK_OUTBOUND_ENV is neither a credential nor twin/model wiring —
-  // it applies on BOTH legs unconditionally, or an example launched on
-  // whichever leg forgot it never prints OUTBOUND_MARKER and can never be
-  // classified as reached.
   check("the LIVE leg tells examples to emit the marker", live[MARK_OUTBOUND_ENV], "1");
   check("the PR leg tells examples to emit the marker too", pr[MARK_OUTBOUND_ENV], "1");
 }
 
-// ── The fast-correct-completion edge must be named in the failure ───────────
-// OK is "still alive at the settle", so on the credentialed leg a correct-but-
-// fast example exits 0 inside the settle and lands on FAIL. The verdict is
-// acceptable; a message insisting the example is broken is not, because the
-// first real nightly red would be undiagnosable.
 {
   const liveFast = classifyLaunch({
     output: "Triaged 0 open items in acme/api — nothing to do.",
@@ -498,8 +385,6 @@ function check(name, got, want) {
   assert.match(liveFast.reason, /credentialed leg/);
   assert.match(liveFast.reason, /CORRECT but FAST/);
 
-  // Off the live leg the note must NOT appear — the PR leg's exit-0 examples
-  // really are do-nothing exits, and the do-nothing message is right there.
   const prFast = classifyLaunch({
     output: "Triaged 0 open items in acme/api — nothing to do.",
     stillRunningAtSettle: false,
@@ -511,8 +396,6 @@ function check(name, got, want) {
     !prFast.reason.includes("credentialed leg"),
     "the PR leg's failure message must not carry the live-only note",
   );
-  // A non-zero exit is a crash on either leg; the fast-completion note would be
-  // misleading there, so it must not appear.
   assert.ok(
     !classifyLaunch({
       output: "unrecognized boom",
@@ -524,11 +407,6 @@ function check(name, got, want) {
   );
 }
 
-// ── The counted-numerator property ──────────────────────────────────────────
-// The shape this pins: the summary reads "7 of 8" and names seven, and nothing
-// said the eighth (`pr-summary-agent`) had gone MISSING rather than FAILED —
-// classifyLaunch()'s three named outcomes (ok/reached/fail) are worthless if
-// main()'s loop can silently drop an example before it ever reaches them.
 {
   const all8 = [
     "gmail-retry-notify",
@@ -544,19 +422,12 @@ function check(name, got, want) {
   check("every discovered example reporting is a pass", clean.ok, true);
   check("a clean pass carries no message", clean.message, null);
 
-  // The exact shape: one discovered example silently produces no
-  // verdict at all, and the summary must red naming it — not "failed",
-  // "missing".
   const oneVanished = assertReportedCount(all8, all8.filter((n) => n !== "pr-summary-agent"));
   check("one missing example fails the count assertion", oneVanished.ok, false);
   assert.match(oneVanished.message, /pr-summary-agent/);
   assert.match(oneVanished.message, /1 of 8/);
-  // Names it as absent from every existing bucket, never as belonging to one.
   assert.match(oneVanished.message, /neither OK, REACHED-OUTBOUND, nor FAILED/);
 
-  // Compares NAMES, not just lengths: dropping one example and (by some other
-  // bug) reporting an unrelated name twice must still be caught, because the
-  // two lengths would otherwise net out even.
   const droppedAndDuplicated = assertReportedCount(all8, [
     ...all8.filter((n) => n !== "triage-agent"),
     "merge-agent", // duplicate report, same length as the 8 discovered
@@ -568,21 +439,12 @@ function check(name, got, want) {
   );
   assert.match(droppedAndDuplicated.message, /triage-agent/);
 
-  // Zero discovered, zero reported is vacuously fine — discoverExamples()'s
-  // own zero-examples case is a separate hard failure (break-on-purpose 4
-  // above), not this assertion's job to catch.
   check("nothing discovered, nothing reported is a pass", assertReportedCount([], []).ok, true);
 }
 
-// ── The marker guard reds when a new example has no route to the
-// marker at all — asserting the PROPERTY (does this example's source or its
-// @pome-sh/adapter-claude-sdk dependency give it a way to print
-// OUTBOUND_MARKER?), never a hand-kept list of the four that need it directly.
 {
   const dir = mkdtempSync(join(tmpdir(), "smoke-examples-marker-"));
   try {
-    // Covered via the shared seam: depends on @pome-sh/adapter-claude-sdk, no
-    // literal marker in its own source required.
     mkdirSync(join(dir, "via-adapter", "src"), { recursive: true });
     writeFileSync(
       join(dir, "via-adapter", "package.json"),
@@ -593,8 +455,6 @@ function check(name, got, want) {
     );
     writeFileSync(join(dir, "via-adapter", "src", "index.ts"), "import { query } from '@pome-sh/adapter-claude-sdk';\n");
 
-    // Covered directly: no @pome-sh dependency, but its own source contains
-    // the literal marker.
     mkdirSync(join(dir, "via-literal", "src"), { recursive: true });
     writeFileSync(
       join(dir, "via-literal", "package.json"),
@@ -605,8 +465,6 @@ function check(name, got, want) {
       `if (process.env.${MARK_OUTBOUND_ENV} === "1") console.error("${OUTBOUND_MARKER}");\n`,
     );
 
-    // NOT covered: no @pome-sh dependency and no literal marker anywhere in
-    // its source — exactly the ninth-example-that-forgot-it shape.
     mkdirSync(join(dir, "forgot-it", "src"), { recursive: true });
     writeFileSync(
       join(dir, "forgot-it", "package.json"),
@@ -614,11 +472,6 @@ function check(name, got, want) {
     );
     writeFileSync(join(dir, "forgot-it", "src", "index.ts"), "console.log('does real work, prints nothing marker-shaped');\n");
 
-    // NOT covered: it DEPENDS on the adapter, but from the REGISTRY — a
-    // published tarball cut before the marker existed prints nothing, which is
-    // `agent-examples/support-triage`'s real shape (measured: zero occurrences of the
-    // marker in its installed dist). A dependency-name-only check called this
-    // covered while every run FAILED it.
     mkdirSync(join(dir, "registry-pinned", "src"), { recursive: true });
     writeFileSync(
       join(dir, "registry-pinned", "package.json"),
@@ -629,8 +482,6 @@ function check(name, got, want) {
     );
     writeFileSync(join(dir, "registry-pinned", "src", "index.ts"), "import { query } from '@pome-sh/adapter-claude-sdk';\n");
 
-    // NOT covered: the literal appears, but only as a MENTION in a comment —
-    // coverage requires an emitting `console.error(...)` call.
     mkdirSync(join(dir, "mentions-it", "src"), { recursive: true });
     writeFileSync(
       join(dir, "mentions-it", "package.json"),
@@ -649,7 +500,6 @@ function check(name, got, want) {
     check("an example with no route to the marker reds the guard", withGap.ok, false);
     assert.match(withGap.message, /forgot-it/);
     assert.match(withGap.message, new RegExp(OUTBOUND_MARKER));
-    // Only the example actually missing it is named.
     assert.ok(!withGap.message.includes("via-adapter"), "a covered example must not be named as missing");
     assert.ok(!withGap.message.includes("via-literal"), "a covered example must not be named as missing");
 
@@ -665,9 +515,6 @@ function check(name, got, want) {
   }
 }
 
-// ── The real agent-examples/ directory in THIS repo passes the guard ─────────────
-// The synthetic fixtures above prove the guard's logic; this proves the
-// guard actually holds against the tree it will run against in CI.
 {
   const real = discoverExamples();
   const coverage = assertEveryExampleEmitsMarker(examplesDirForRepo(), real);
@@ -675,9 +522,6 @@ function check(name, got, want) {
 }
 
 function examplesDirForRepo() {
-  // fileURLToPath, not `.pathname`: the latter stays percent-encoded, so a
-  // checkout under a path with a space reds this on ENOENT for a reason that
-  // has nothing to do with the property being asserted.
   return fileURLToPath(new URL("../agent-examples", import.meta.url));
 }
 

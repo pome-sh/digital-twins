@@ -1,27 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The one test harness for lint rules.
-//
-// One harness rather than a regression suite per rule: mkdtemp a throwaway
-// tree, write a `files` map into it, spawn the real runner with `cwd` pointed at
-// it, compare the exit code against green/red, keep a failure counter. That
-// scaffolding is identical every time; the case table is the only part that
-// differs.
-//
-// A case runs the REAL runner against the REAL rule (`node scripts/lint.mjs
-// <rule> --root <tmp>`), not an in-process call to the predicate. That is
-// deliberate: the interesting failure is a rule that stops being reached, and an
-// in-process call cannot see a rule missing from the registry or a runner that
-// swallows a throw.
-//
-// Usage:
-//
-//   import { defineCases } from "../harness.mjs";
-//
-//   defineCases("parent-vocab", [
-//     { name: "clean tree", files: { ... }, expect: "green" },
-//     { name: "quoted key", files: { ... }, expect: "red", contains: "parent_id" },
-//   ]);
+// One harness for every rule's case table. A case runs the REAL runner against the
+// REAL rule, not the predicate in-process: the interesting failure is a rule that
+// stopped being reached.
 
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
@@ -31,7 +12,6 @@ import { fileURLToPath } from "node:url";
 
 const RUNNER = resolve(dirname(fileURLToPath(import.meta.url)), "../lint.mjs");
 
-/** Materialize a `{ relativePath: contents }` map into a fresh temp directory. */
 export function fixtureTree(files, prefix = "lint-rule-") {
   const root = mkdtempSync(join(tmpdir(), prefix));
   for (const [rel, body] of Object.entries(files)) {
@@ -42,7 +22,6 @@ export function fixtureTree(files, prefix = "lint-rule-") {
   return root;
 }
 
-/** Run one rule against a throwaway tree. Returns the exit code and all output. */
 export function runRule(ruleName, files, { flags = [] } = {}) {
   const root = fixtureTree(files, `${ruleName}-`);
   const result = spawnSync(process.execPath, [RUNNER, ruleName, "--root", root, ...flags], {
@@ -51,19 +30,6 @@ export function runRule(ruleName, files, { flags = [] } = {}) {
   return { code: result.status, out: `${result.stdout ?? ""}${result.stderr ?? ""}`, root };
 }
 
-/**
- * Run a rule's case table and exit non-zero if any case disagrees.
- *
- * Each case is
- * `{ name, files, expect: "green" | "red", contains?, notContains?, flags? }`.
- *
- * `contains` is asserted on the combined output — a red case that reds for the
- * wrong reason is a rule that stopped checking what it claims, so the assertion
- * has to be on the message and not only on the exit code. `notContains` is its
- * inverse, for a case whose point is that a neighbouring file was NOT implicated.
- * Both take a string, a RegExp (for a line number or a count the message
- * interpolates), or an array of either.
- */
 export function defineCases(ruleName, cases) {
   let failures = 0;
 

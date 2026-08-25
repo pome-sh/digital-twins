@@ -1,16 +1,11 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Cases 5, 6 and 8–10 are the ones that matter. 5 and 6 guard the lexer (a
-// type-only import counted as a runtime edge is a false red that gets the rule
-// deleted; an import BELOW a statement that the lexer swallows is a false
-// green). 8–10 guard the cheap ways a reachability rule stops working: the twin
-// stops calling the loader, a named leaf moves, or the tree has nothing in it.
+// Case table for twin-leaves. Every case asserts the RED direction: a rule that has
+// quietly stopped failing prints the same line as one with nothing to report.
 
 import { defineCases } from "../harness.mjs";
 
-/** A minimal sdk: a root barrel that re-exports the `node:sqlite` driver (the
- *  real shape), plus the dependency-free fixture loader on its own subpath. */
 const SDK = {
   "packages/sdk/package.json": JSON.stringify({
     name: "@pome-sh/sdk",
@@ -39,8 +34,6 @@ const CLEAN_TABLE = [
   `export const fixture = loadMcpToolFixture({});`,
 ].join("\n");
 
-/** A minimal twin. The domain module exists so the twin has something worth NOT
- *  reaching. */
 function twin(name, toolTable = CLEAN_TABLE) {
   const dir = `packages/twin-${name}/`;
   return {
@@ -53,8 +46,6 @@ function twin(name, toolTable = CLEAN_TABLE) {
   };
 }
 
-/** The named CROSS_RUNTIME_LEAVES the rule insists exist. Kept trivially clean
- *  so a case only ever fails on the thing it is about. */
 const LEAVES = {
   "packages/twin-github/src/unsupported-envelope.ts": `export const unsupportedEnvelope = { body: {} };\n`,
   "packages/twin-slack/src/unsupported-envelope.ts": `export const unsupportedEnvelope = { body: {} };\n`,
@@ -62,10 +53,6 @@ const LEAVES = {
   "packages/twin-linear/src/graphql/schema.ts": `export const linearGraphQLSchema = "type Query { a: Int }";\n`,
 };
 
-/** `CROSS_RUNTIME_LEAVES` names `packages/twin-stripe/src/tools.ts` and every
- *  twin needs a tool table, so a tree always carries the five real twin dirs.
- *  `overrides` replaces any of them; a key mapped to `undefined` is dropped, to
- *  express "this file does not exist". */
 function tree(overrides = {}) {
   const files = { ...SDK };
   for (const name of ["github", "gmail", "linear", "slack", "stripe"]) Object.assign(files, twin(name));

@@ -1,14 +1,8 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// The old gate shipped with no case table. The distinction worth pinning is the
-// one the rule's header argues for: detection is by GYP MARKERS, not by
-// `hasInstallScript`. Prebuilt-binary installers (esbuild, fsevents) have install
-// scripts and need no compiler, so a rule keyed on install scripts would red on
-// dependencies that must pass.
-//
-// Folded in from `cli/test/unit/no-native-modules.test.ts`, a vitest suite that
-// asserted the same predicate from a third place.
+// Case table for no-native. Every case asserts the RED direction: a rule that has
+// quietly stopped failing prints the same line as one with nothing to report.
 
 import { defineCases } from "../harness.mjs";
 
@@ -55,8 +49,6 @@ defineCases("no-native", [
     contains: "packaged .node binary",
   },
   {
-    // The whole reason detection is by gyp marker: esbuild and fsevents have
-    // install scripts and need no compiler.
     name: "an install script alone is not a native build step",
     files: {
       "package-lock.json": lock({ "node_modules/prebuilt": { ...PROD, hasInstallScript: true } }),
@@ -69,8 +61,6 @@ defineCases("no-native", [
     expect: "green",
   },
   {
-    // `npm ci --omit=dev` never installs them and no published artifact carries
-    // them.
     name: "a native dev dependency is out of the production closure",
     files: {
       "package-lock.json": lock({ "node_modules/native": { ...PROD, dev: true } }),
@@ -80,24 +70,18 @@ defineCases("no-native", [
     expect: "green",
   },
   {
-    // A non-optional prod entry with nothing on disk means the scan cannot see
-    // its markers, which must not read as a pass.
     name: "an uninstalled non-optional prod package is red, not skipped",
     files: { "package-lock.json": lock({ "node_modules/missing": PROD }) },
     expect: "red",
     contains: "cannot inspect",
   },
   {
-    // Another OS's prebuilt-binary package. Nothing to inspect on this machine.
     name: "a platform-gated optional prod package not installed here is skipped, and said so",
     files: { "package-lock.json": lock({ "node_modules/darwin-only": { ...PROD, optional: true } }) },
     expect: "green",
     contains: "platform-gated optional packages not installed here",
   },
   {
-    // A workspace symlink's own dependencies have their own lockfile entries, so
-    // inspecting the link itself would double-count and would follow into a tree
-    // this scan already covers.
     name: "a workspace link entry is not inspected",
     files: { "package-lock.json": lock({ "packages/twin-x": { link: true, resolved: "packages/twin-x" } }) },
     expect: "green",

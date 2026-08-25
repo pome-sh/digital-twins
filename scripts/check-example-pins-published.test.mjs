@@ -1,12 +1,8 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Regression suite for `check-example-pins-published.mjs`. Pure
-// functions, no network and no `npm ci` needed: `checkExamplePinsPublished`
-// takes an injected `npmView`, and `discoverExampleSiblingDeps` runs against
-// a throwaway fixture tree built the same way
-// `workspace-pins.test.mjs` builds one, since both
-// gates read the same root `workspaces` shape.
+// Case table for check-example-pins-published. Every case asserts the RED direction: a rule that has
+// quietly stopped failing prints the same line as one with nothing to report.
 
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -28,9 +24,6 @@ function pass(name) {
   console.log(`✓ ${name}`);
 }
 
-/** A throwaway root with one workspace package and one example, mirroring the
- * real tree's `packages/adapter-claude-sdk` + `agent-examples/support-triage`
- * shape. */
 function fixture({ workspaceVersion, examplePin, exampleField = "dependencies", extraExamples = {} }) {
   const root = mkdtempSync(join(tmpdir(), "example-pins-"));
   writeFileSync(join(root, "package.json"), JSON.stringify({ name: "root", workspaces: ["packages/*"] }));
@@ -54,8 +47,6 @@ function fixture({ workspaceVersion, examplePin, exampleField = "dependencies", 
   return root;
 }
 
-// 1. Discovery: an exact pin with a matching sibling is picked up, with the
-// field it lives in and the workspace version to compare against.
 {
   const root = fixture({ workspaceVersion: "0.3.3", examplePin: "0.3.1" });
   const { exact } = discoverExampleSiblingDeps(root);
@@ -73,9 +64,6 @@ function fixture({ workspaceVersion, examplePin, exampleField = "dependencies", 
   }
 }
 
-// 2. A `file:`/`link:` workspace link resolves from the source next to it and
-// cannot reach a registry, so it is not this gate's subject — but it is COUNTED,
-// not dropped, so the report cannot claim a denominator it does not have.
 for (const pin of ["file:../../packages/adapter-claude-sdk", "link:../../packages/adapter-claude-sdk"]) {
   const root = fixture({ workspaceVersion: "0.3.3", examplePin: pin });
   const { exact, linked, unwatchable } = discoverExampleSiblingDeps(root);
@@ -86,11 +74,6 @@ for (const pin of ["file:../../packages/adapter-claude-sdk", "link:../../package
   }
 }
 
-// 3. THE HOLE THE FIRST DRAFT HAD: a range/`*`/dist-tag pin resolves FROM the
-// registry — the exact risk this gate watches — but has no single version to
-// compare. It must be reported as UNWATCHABLE, never silently dropped, or
-// re-pinning the hero example to `^0.3.3` deletes its watch while the report
-// still reads as a pass.
 for (const pin of ["*", "^0.3.3", "~0.3.1", "0.3.x", ">=0.3.0", "latest", "npm:@pome-sh/adapter-claude-sdk@0.3.3"]) {
   const root = fixture({ workspaceVersion: "0.3.3", examplePin: pin });
   const { exact, linked, unwatchable } = discoverExampleSiblingDeps(root);
@@ -101,10 +84,6 @@ for (const pin of ["*", "^0.3.3", "~0.3.1", "0.3.x", ">=0.3.0", "latest", "npm:@
   }
 }
 
-// 3b. …and an unwatchable pin makes `reportExamplePinParity` return false even
-// when every OTHER pin in the tree is a clean exact match. This is the case the
-// zero-pins floor below CANNOT catch: with a second exact pin present the floor
-// is satisfied by arithmetic and the range pin's silence is invisible.
 {
   const root = fixture({
     workspaceVersion: "0.3.3",
@@ -118,12 +97,6 @@ for (const pin of ["*", "^0.3.3", "~0.3.1", "0.3.x", ">=0.3.0", "latest", "npm:@
   else fail("3b. an unwatchable pin reds even when another exact pin matches cleanly", `returned ${ok}`);
 }
 
-// 4. Zero EXACT pins under `agent-examples/*` must throw rather than report a pass
-// having made no registry call. Asserted on the MESSAGE, not merely "something
-// threw": with an empty `packages/` the fixture used to throw
-// `no workspace manifests found` out of `loadWorkspaceMembers` before the floor
-// was ever reached, so a bare `catch {}` passed this case while the floor itself
-// had no coverage at all.
 {
   const root = fixture({
     workspaceVersion: "0.3.3",
@@ -143,8 +116,6 @@ for (const pin of ["*", "^0.3.3", "~0.3.1", "0.3.x", ">=0.3.0", "latest", "npm:@
   }
 }
 
-// 4b. A `@pome-sh/*` dep naming no workspace sibling is out of scope in all
-// three classes — nothing in the tree to compare it against.
 {
   const root = fixture({ workspaceVersion: "0.3.3", examplePin: "0.3.3" });
   writeFileSync(
@@ -161,7 +132,6 @@ for (const pin of ["*", "^0.3.3", "~0.3.1", "0.3.x", ">=0.3.0", "latest", "npm:@
 
 const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/adapter-claude-sdk" };
 
-// 5. Published sibling version, pin already matches — green, no skip.
 {
   const result = checkExamplePinsPublished(
     [{ ...pin, pin: "0.3.3", workspaceVersion: "0.3.3" }],
@@ -174,8 +144,6 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
   }
 }
 
-// 6. THE LIVE-DEFECT SHAPE, break-on-purpose: published sibling version, pin
-// STALE — must red, naming the example, the pin, and the workspace version.
 {
   const result = checkExamplePinsPublished(
     [{ ...pin, pin: "0.3.1", workspaceVersion: "0.3.3" }],
@@ -197,8 +165,6 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
   }
 }
 
-// 7. Workspace version NOT published (E404) — a named, counted SKIP, never a
-// violation and never folded into "checked clean".
 {
   const result = checkExamplePinsPublished(
     [{ ...pin, pin: "0.3.1", workspaceVersion: "9.9.9" }],
@@ -216,9 +182,6 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
   }
 }
 
-// 8. A registry error that is NOT "not found" (401/5xx/timeout) is a HARD
-// FAILURE — never downgraded to a skip, even though it also means "cannot
-// confirm the pin is current".
 {
   const result = checkExamplePinsPublished(
     [{ ...pin, pin: "0.3.1", workspaceVersion: "0.3.3" }],
@@ -231,10 +194,6 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
   }
 }
 
-// 9. `defaultNpmView`'s own E404 classification, exercised through a mocked
-// `npm` on PATH rather than the real registry — same technique
-// `decide-publish.test.mjs` uses. A 404 (unpublished) must NOT be confused
-// with a 401/5xx (hard error).
 {
   const { chmodSync, mkdtempSync: mkdtemp, readFileSync, writeFileSync: write } = await import("node:fs");
   const { defaultNpmView } = await import("./check-example-pins-published.mjs");
@@ -271,9 +230,6 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
     else fail("9c. defaultNpmView classifies a clean exit as published", JSON.stringify(result));
   });
 
-  // 9d. A failure with EMPTY stderr — the shape a killed call (the `timeout`
-  // in `defaultNpmView`) and some network aborts take. No `E404` to match on,
-  // so it must land in `error`, never fall through to "unpublished".
   withMockNpm("exit 1", () => {
     const result = defaultNpmView("@pome-sh/adapter-claude-sdk", "0.3.3", { attempts: 1 });
     if (result.status === "error" && result.detail) {
@@ -283,8 +239,6 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
     }
   });
 
-  // 9e. A TRANSIENT 5xx is retried rather than reddening the required check on
-  // the first blip: this mock 503s twice, then succeeds.
   {
     const counter = join(mkdtemp(join(tmpdir(), "npm-attempts-")), "n");
     withMockNpm(
@@ -298,8 +252,6 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
     );
   }
 
-  // 9f. …but a PERSISTENT error still ends as an error once the attempts are
-  // spent. Retrying must not become a way to eventually pass.
   withMockNpm('echo "npm error code E503" >&2; exit 1', () => {
     const result = defaultNpmView("@pome-sh/adapter-claude-sdk", "0.3.3", { attempts: 3, delayMs: 0 });
     if (result.status === "error" && result.attempts === 3) {
@@ -309,8 +261,6 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
     }
   });
 
-  // 9g. An E404 returns on the FIRST attempt — the ordinary unpublished path
-  // must not pay the retry budget.
   {
     const counter = join(mkdtemp(join(tmpdir(), "npm-404-attempts-")), "n");
     withMockNpm(
@@ -326,16 +276,10 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
   }
 }
 
-// PlanExampleRepins is the write-side of this same gate: a pin that
-// this file's own `violations` classifier already calls drifted-against-a-
-// published-sibling is exactly the set safe to rewrite automatically.
 {
   const published = (name, version) => (n, v) =>
     n === name && v === version ? { status: "published" } : { status: "unpublished" };
 
-  // 11. A genuinely drifted, published pin produces a repin: the manifest
-  // text is rewritten (old pin -> new pin, nothing else touched) and a
-  // lockfile-regeneration command names the right example directory.
   {
     const root = fixture({ workspaceVersion: "0.3.6", examplePin: "0.3.5" });
     const repins = planExampleRepins(root, published("@pome-sh/adapter-claude-sdk", "0.3.6"));
@@ -359,10 +303,6 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
     }
   }
 
-  // 12. The exact incident shape: the sibling is NOT yet published (this run's
-  // own bump, or a `release.yml` publish still in flight) — must not repin.
-  // Repinning here would set a pin to a version `npm install
-  // --package-lock-only` cannot resolve, breaking `npm ci` outright.
   {
     const root = fixture({ workspaceVersion: "0.3.7", examplePin: "0.3.6" });
     const repins = planExampleRepins(root, () => ({ status: "unpublished" }));
@@ -370,7 +310,6 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
     else fail("12. an unpublished sibling produces no repin, ever", JSON.stringify(repins));
   }
 
-  // 13. Already matching: no-op, no write planned — idempotence.
   {
     const root = fixture({ workspaceVersion: "0.3.6", examplePin: "0.3.6" });
     const repins = planExampleRepins(root, published("@pome-sh/adapter-claude-sdk", "0.3.6"));
@@ -378,7 +317,6 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
     else fail("13. a pin that already matches the published sibling is a no-op", JSON.stringify(repins));
   }
 
-  // 14. A registry error (not E404) must not be read as "go ahead and repin".
   {
     const root = fixture({ workspaceVersion: "0.3.6", examplePin: "0.3.5" });
     const repins = planExampleRepins(root, () => ({ status: "error", detail: "ECONNRESET" }));
@@ -386,8 +324,6 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
     else fail("14. a registry error produces no repin (never treated as published)", JSON.stringify(repins));
   }
 
-  // 15. Replays two observed incidents (adapter 0.3.4, adapter 0.3.6)
-  // — the exact state right after each release, before the human PR.
   for (const { was, published: newVersion } of [
     { was: "0.3.3", published: "0.3.4" },
     { was: "0.3.5", published: "0.3.6" },
@@ -402,11 +338,6 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
     }
   }
 
-  // 16b. TWO drifted pins in ONE example. `applyAllocations` writes a plan's
-  // entries in order and last write wins per path, so the LAST entry for a
-  // manifest must already carry every earlier substitution — otherwise the
-  // first repin is silently dropped while the commit message still claims it,
-  // and the read-side gate keeps reddening on a drift the commit says it fixed.
   {
     const root = mkdtempSync(join(tmpdir(), "example-pins-two-"));
     writeFileSync(join(root, "package.json"), JSON.stringify({ name: "root", workspaces: ["packages/*"] }));
@@ -426,7 +357,6 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
       }),
     );
     const repins = planExampleRepins(root, () => ({ status: "published" }));
-    // Whichever entry lands last for that path is what ends up on disk.
     const lastForPath = repins.filter((r) => r.writes[0].path === "agent-examples/support-triage/package.json").at(-1);
     const onDisk = JSON.parse(lastForPath?.writes[0].contents ?? "{}");
     if (
@@ -440,12 +370,6 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
     }
   }
 
-  // 16c. An ambiguous manifest — the same `"<dep>": "<pin>"` bytes repeated in
-  // an `overrides` block, which npm accepts and this gate does not read as a
-  // second install field. `planExampleRepins` runs inside `planAllocations` on
-  // EVERY push to main, so throwing here would stop every package's release
-  // over one example manifest. It must skip that pin and keep going, leaving
-  // the read-side gate to red on it.
   {
     const root = mkdtempSync(join(tmpdir(), "example-pins-ambig-"));
     writeFileSync(join(root, "package.json"), JSON.stringify({ name: "root", workspaces: ["packages/*"] }));
@@ -470,8 +394,6 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
     } catch (e) {
       threw = e;
     }
-    // The gate itself must still call it drift — skipping the WRITE must never
-    // skip the READ.
     const { violations } = checkExamplePinsPublished(discoverExampleSiblingDeps(root).exact, () => ({
       status: "published",
     }));
@@ -482,7 +404,6 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
     }
   }
 
-  // 16d. …and one ambiguous pin must not cost a DIFFERENT example its repin.
   {
     const root = fixture({
       workspaceVersion: "0.3.6",
@@ -503,8 +424,6 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
     }
   }
 
-  // 16. No `package.json` at the repo root (a throwaway fixture, like
-  // allocate-release-versions.test.mjs's) — must return empty, not throw.
   {
     const root = mkdtempSync(join(tmpdir(), "no-root-manifest-"));
     let threw = null;
@@ -522,9 +441,6 @@ const pin = { example: "support-triage", field: "dependencies", dep: "@pome-sh/a
   }
 }
 
-// 10. Aimed at the REAL tree, not only fixtures: `agent-examples/*` must still carry
-// at least one exact `@pome-sh/*` pin with a workspace sibling, and nothing
-// unwatchable. No fixture can prove the gate points at the live corpus.
 {
   const { dirname, resolve } = await import("node:path");
   const { fileURLToPath } = await import("node:url");

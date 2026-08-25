@@ -1,22 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The rule registry. Static imports rather than a directory glob, for two
-// reasons: a glob makes every rule file an implicit entry point that `knip`
-// cannot follow, and a rule that fails to load is a rule that silently stopped
-// running — an import error here is a hard failure at startup, where a glob
-// would just find one fewer file. `findUnregisteredRules` in the runner closes
-// the other direction: a rule module missing from this list.
-//
-// The two rules that parse TypeScript are DEFERRED rather than imported. They
-// `import ts from "typescript"`, a devDependency, and ESM resolves a static
-// import at module load — before the runner gets to decide anything. So a static
-// import here would make `npm run lint -- --offline` die with
-// ERR_MODULE_NOT_FOUND in CI's always-on block, which runs before `npm ci`,
-// taking every other rule down with it. `needsInstall` has to gate the module
-// LOAD, not just the call.
-//
-// Order is run order, cheapest first, so a local `npm run lint` fails fast on
-// the obvious things before the import-graph walks and the TypeScript AST rules.
+// The rule registry. Entries may defer their import, because ci.yml's always-on
+// block runs before `npm ci` and a static import of a devDependency dies at load.
 
 import barrels from "./rules/barrels.mjs";
 import bundledDeps from "./rules/bundled-deps.mjs";
@@ -36,13 +21,6 @@ import twinChunks from "./rules/twin-chunks.mjs";
 import twinLeaves from "./rules/twin-leaves.mjs";
 import workspacePins from "./rules/workspace-pins.mjs";
 
-/**
- * A rule whose module must not be loaded until the runner knows it can be.
- *
- * `name` and `describe` are restated here because `--list` and the `--offline`
- * skip line have to name the rule without loading it. The loaded module is
- * checked against them, so the two cannot drift apart silently.
- */
 function deferred({ name, describe, load }) {
   return {
     name,
@@ -50,9 +28,6 @@ function deferred({ name, describe, load }) {
     needsInstall: true,
     async check(ctx) {
       const rule = (await load()).default;
-      // Both restated fields are checked, not just the name: `--list` and the
-      // `--offline` skip line print them without loading the module, so a stale
-      // `describe` here is a rule the runner misreports and nothing contradicts.
       if (rule.name !== name) {
         throw new Error(
           `registry calls this rule "${name}" but the module calls itself "${rule.name}" — ` +
@@ -84,14 +59,12 @@ const exampleIsolation = deferred({
 });
 
 export const RULES = [
-  // Manifests and single known files: no tree walk at all.
   barrels,
   bundledDeps,
   workspacePins,
   skillManifest,
   taskFormatDoc,
   firstPartyTwins,
-  // Line scans over a subtree.
   copyMarkers,
   fileSize,
   legacyMarkers,
@@ -99,11 +72,9 @@ export const RULES = [
   taskClass,
   noEval,
   noCatch,
-  // Static import-graph walks.
   twinChunks,
   twinLeaves,
   routeInputs,
-  // TypeScript AST walks and lockfile inspection — need an installed tree.
   importMetaMain,
   exampleIsolation,
   noNative,

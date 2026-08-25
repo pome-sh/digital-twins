@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// File-size tripwire. Past the limit a module either states its reason in a
-// `// file-size:` header or gets split. The allowlist is existing debt and
-// should only ever shrink.
+// Barrel and file-size ceilings. A missing scan root is RED, not an empty pass.
 
 const FILE_SIZE_LIMIT = 500;
 const FILE_SIZE_HEADER = /^\/\/\s*file-size:\s*.+/;

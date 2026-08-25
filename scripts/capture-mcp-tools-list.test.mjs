@@ -1,18 +1,8 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Regression coverage for scripts/capture-mcp-tools-list.mjs.
-//
-// No network, no `go`, no clone: every case here drives the producer through
-// its injected `readSubstrate` seam, or through `--offline`, which re-derives
-// meta + canonical from the COMMITTED raw.json. The committed raw.json IS the
-// fixture of the upstream response — a second copy of the same bytes under
-// scripts/fixtures/ would be one more thing to drift.
-//
-// The block that matters most is "the guard fires": a --check that
-// has never been watched go red is not a guard. Each of the four ways a
-// golden can be wrong — edited raw, edited canonical, edited meta provenance,
-// hand-typed sha — gets its own red here.
+// Case table for capture-mcp-tools-list. Every case asserts the RED direction: a rule that has
+// quietly stopped failing prints the same line as one with nothing to report.
 import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -59,8 +49,6 @@ function assertThrows(fn, match, msg) {
 }
 
 const quiet = () => {};
-// Silence the producer's own stderr in the guard-fires block: those reds are the
-// assertion, not a failure of this suite.
 const SILENT = { log: quiet, err: quiet };
 
 function sandbox() {
@@ -72,19 +60,6 @@ function sandbox() {
   return dir;
 }
 
-
-/**
- * A sandbox whose source table carries one SYNTHETIC uncaptured twin.
- *
- * The last three deferred twins are captured, so `sources.twins` now has no
- * `capture: false` row at all. The guards below cover the not-captured path —
- * the recorded-reason gate and the declared-configuration round-trip — and if
- * they simply iterated the real table they would now iterate NOTHING and report
- * the same green as a satisfied guard. That is this repo's vacuous-green rule,
- * and the
- * fix is a fixture rather than a weakened assertion: the behaviour is still
- * reachable the moment a sixth twin is added deferred, so it stays tested.
- */
 function sandboxWithDeferredTwin() {
   const dir = sandbox();
   const twin = "deferred-probe";
@@ -111,9 +86,6 @@ function sandboxWithDeferredTwin() {
   return { dir, twin, source, sources };
 }
 
-// ── the declared source table ───────────────────────────────────────────────
-// Adding a twin is a data edit, never a new `case:`. The gate
-// on that is that nothing in the producer enumerates twin ids.
 {
   const sources = loadSources({ repoRoot: ROOT });
   const ids = Object.keys(sources.twins);
@@ -130,32 +102,6 @@ function sandboxWithDeferredTwin() {
     );
   }
 
-  // This producer's entry guard follows the sanctioned form (positive
-  // assertion: THIS file's guard really is process.argv[1] vs.
-  // import.meta.url, not just "not import.meta.main" — a guard rewritten into
-  // some other broken shape would still pass an absence check). The absence
-  // of a bare `import.meta.main` ANYWHERE under scripts/**/contract/** —
-  // including in this file — is asserted repo-wide by
-  // scripts/lint/rules/import-meta-main.mjs, which subsumes what
-  // used to be a second, narrower copy of that same assertion here: two
-  // checks asserting one property in different places is the shape D5 warns
-  // about, and the repo-wide one covers strictly more (every file, not just
-  // this producer) with no hand-kept list of which files to watch.
-  //
-  // Two independent, ORDER-INDEPENDENT assertions, one per side. The single
-  // regex these replace was `/process\.argv\[1\][\s\S]{0,120}import\.meta\.url/`,
-  // which encodes source ORDER rather than the guard: this guard was rewritten
-  // into the sanctioned realpath-both-sides form, which declares the
-  // `import.meta.url` const first, and the old regex failed on a guard that had
-  // just been made strictly STRONGER.
-  //
-  // Deliberately still a text match and NOT the repo-wide gate's AST
-  // classifier, tempting as reusing it is: `findEntryGuardRealpathGaps` lives
-  // in `import-meta-main.mjs`, which imports `typescript`, and
-  // THIS test runs in ci.yml's CHEAP block, which has no `npm ci`. Importing it
-  // here crashes the job with ERR_MODULE_NOT_FOUND — a dependency-free test
-  // must stay dependency-free. The AST version of this property is asserted
-  // repo-wide in the heavy block, over this file among all the others.
   assert(
     /realpathSync\(\s*fileURLToPath\(\s*import\.meta\.url\s*\)\s*\)/.test(producerText),
     "the CLI entry guard realpaths its own side (realpathSync(fileURLToPath(import.meta.url)))"
@@ -166,10 +112,6 @@ function sandboxWithDeferredTwin() {
   );
 }
 
-// ── every capturable source declares the configuration it assumed ───────────
-// "A capture without one FAILS rather than defaulting." The failure has to be
-// at load, not at write: a producer that defaults is a producer that records a
-// configuration nobody chose.
 {
   assertThrows(
     () =>
@@ -223,10 +165,6 @@ function sandboxWithDeferredTwin() {
   );
 }
 
-// ── A credential adds a token, not an adapter ───────────────────────────────
-// live-wire-oauth and live-wire-unauth must resolve to the SAME reader. If they
-// ever diverge, "a token, not an adapter" stops being true and nobody finds out
-// until the next credentialed capture.
 {
   assert(
     adapterFor("live-wire-oauth").read === adapterFor("live-wire-unauth").read,
@@ -246,7 +184,6 @@ function sandboxWithDeferredTwin() {
   );
 }
 
-// ── derivation: sha is computed, never carried ──────────────────────────────
 {
   const rawText = JSON.stringify({
     jsonrpc: "2.0",
@@ -282,8 +219,6 @@ function sandboxWithDeferredTwin() {
     "canonical.result is the raw result, verbatim"
   );
 
-  // A capture whose sha was hand-typed cannot survive: derivation ignores any
-  // sha present on the source table.
   const tampered = deriveGolden({
     source: { ...source, rawFileSha256: "0".repeat(64) },
     rawText,
@@ -295,9 +230,6 @@ function sandboxWithDeferredTwin() {
   );
 }
 
-// ── substrate + configuration round-trip into meta.json ─────────────────────
-// One case per adapter, driven off the REAL committed source table so a twin
-// whose configuration stops reaching meta.json reds here.
 {
   const sources = loadSources({ repoRoot: ROOT });
   for (const [twin, source] of Object.entries(sources.twins)) {
@@ -320,21 +252,17 @@ function sandboxWithDeferredTwin() {
   }
 }
 
-// ── the committed goldens are what the producer derives ─────────────────────
 {
   const code = await runCapture({ repoRoot: ROOT, check: true, offline: true, ...SILENT });
   assert(code === 0, "`--check --offline` is green against the committed goldens");
 }
 
-// ── the guard fires ─────────────────────────────────────────────────────────
-// Four independent edits, four reds, and nothing written back.
 {
   const sources = loadSources({ repoRoot: ROOT });
   const captured = Object.entries(sources.twins).filter(([, s]) => s.capture);
   assert(captured.length > 0, "at least one twin is captured (otherwise the guard guards nothing)");
 
   for (const [twin] of captured) {
-    // 1. canonical edited
     {
       const dir = sandbox();
       const paths = goldenPaths({ repoRoot: dir, sources, twin });
@@ -347,7 +275,6 @@ function sandboxWithDeferredTwin() {
       assert(readFileSync(paths.canonical, "utf8") === before, `${twin}: --check wrote nothing`);
       rmSync(dir, { recursive: true, force: true });
     }
-    // 2. raw edited (canonical + sha both stop matching)
     {
       const dir = sandbox();
       const paths = goldenPaths({ repoRoot: dir, sources, twin });
@@ -358,7 +285,6 @@ function sandboxWithDeferredTwin() {
       assert(code !== 0, `${twin}: --check reds when raw.json loses a tool`);
       rmSync(dir, { recursive: true, force: true });
     }
-    // 3. meta provenance edited — the substrate claim itself
     {
       const dir = sandbox();
       const paths = goldenPaths({ repoRoot: dir, sources, twin });
@@ -369,7 +295,6 @@ function sandboxWithDeferredTwin() {
       assert(code !== 0, `${twin}: --check reds when meta.json misstates the substrate`);
       rmSync(dir, { recursive: true, force: true });
     }
-    // 4. sha hand-typed to something plausible
     {
       const dir = sandbox();
       const paths = goldenPaths({ repoRoot: dir, sources, twin });
@@ -382,9 +307,6 @@ function sandboxWithDeferredTwin() {
     }
   }
 
-  // 5. a not-captured / deferred twin whose recorded reason no longer matches
-  //    the table is a red too — an unexplained `not-captured` is the failure
-  //    mode this gate exists to avoid.
   {
     const { dir, twin, sources: sandboxSources } = sandboxWithDeferredTwin();
     const paths = goldenPaths({ repoRoot: dir, sources: sandboxSources, twin });
@@ -403,11 +325,6 @@ function sandboxWithDeferredTwin() {
     rmSync(dir, { recursive: true, force: true });
   }
 
-  // 7. the DEFERRED twins' declared configuration is the thing a credentialed
-  //    capture will assume, so it has to be recorded and gated exactly like a
-  //    captured twin's. Without this, someone could change which header
-  //    Slack's future capture sends, or which env var holds its token, and
-  //    every gate would stay green.
   {
     const { dir: statusDir, twin, source, sources: sandboxSources } = sandboxWithDeferredTwin();
     const paths = goldenPaths({ repoRoot: statusDir, sources: sandboxSources, twin });
@@ -457,7 +374,6 @@ function sandboxWithDeferredTwin() {
     rmSync(statusDir, { recursive: true, force: true });
   }
 
-  // 6. a missing golden is a red, not a silent skip.
   {
     const dir = sandbox();
     const [twin] = captured[0];
@@ -468,7 +384,6 @@ function sandboxWithDeferredTwin() {
   }
 }
 
-// ── --check never writes, even when it would be green ───────────────────────
 {
   const dir = sandbox();
   const sources = loadSources({ repoRoot: dir });
@@ -482,9 +397,6 @@ function sandboxWithDeferredTwin() {
   rmSync(dir, { recursive: true, force: true });
 }
 
-// ── write mode round-trips through an injected substrate reader ─────────────
-// The write path is exercised without a socket: the fake reader stands in for
-// whichever adapter the substrate names.
 {
   const dir = sandbox();
   const sources = loadSources({ repoRoot: dir });
@@ -511,16 +423,6 @@ function sandboxWithDeferredTwin() {
   rmSync(dir, { recursive: true, force: true });
 }
 
-// ── --offline WRITES the re-derivation, and cannot forge a capture ───────────
-//
-// The mode exists because `configuration` is prose about a capture that is
-// copied into two derived files, and three of the five sources sit behind
-// one-shot OAuth grants — so without it, a corrected sentence about slack's
-// golden means either minting a fresh Slack grant or hand-editing the goldens.
-//
-// What has to stay true is that it re-states what a capture MEANT and never
-// what it FOUND. Both halves get a red of their own below: the derived fields
-// still come from the committed raw bytes, and `captureDate` does not move.
 {
   const dir = sandbox();
   const sources = loadSources({ repoRoot: dir });
@@ -534,14 +436,12 @@ function sandboxWithDeferredTwin() {
   table.twins[twin].configuration.matchesExaminee = "re-stated by an offline re-derivation, not by a capture";
   writeFileSync(cfgPath, `${JSON.stringify(table, null, 2)}\n`);
 
-  // The edit alone reds the gate — the whole reason the mode has to exist.
   const stale = await runCapture({ repoRoot: dir, sourcesPath: cfgPath, check: true, offline: true, ...SILENT });
   assert(stale !== 0, "--check reds while the source table's configuration and the goldens disagree");
 
   const code = await runCapture({
     repoRoot: dir,
     sourcesPath: cfgPath,
-    // A date that is nothing like the committed one, so carrying it is visible.
     today: "2099-12-31",
     offline: true,
     ...SILENT,
@@ -565,7 +465,6 @@ function sandboxWithDeferredTwin() {
   rmSync(dir, { recursive: true, force: true });
 }
 
-// ── --offline has nothing to re-derive FROM, and says so rather than inventing ──
 {
   const dir = sandbox();
   const sources = loadSources({ repoRoot: dir });
@@ -579,9 +478,6 @@ function sandboxWithDeferredTwin() {
   rmSync(dir, { recursive: true, force: true });
 }
 {
-  // An undated golden cannot be re-derived either: `today` belongs to a run
-  // that read a substrate, and stamping it here would reset any staleness
-  // clock without anybody having contacted the vendor.
   const dir = sandbox();
   const sources = loadSources({ repoRoot: dir });
   const twin = Object.keys(sources.twins).find((id) => sources.twins[id].capture);
@@ -599,13 +495,6 @@ function sandboxWithDeferredTwin() {
   rmSync(dir, { recursive: true, force: true });
 }
 
-// ── every capturable source states what its capture COVERS ──────────────────
-//
-// The field is required at load, beside `configuration` itself. linear's golden
-// was captured under a read-only grant, declared no completeness class, and
-// pome-cloud's promotion-gate went on to report six write tools that
-// mcp.linear.app really serves as tools the twin had invented — the fabricated
-// finding that lane must never produce.
 {
   const sources = loadSources({ repoRoot: ROOT });
   for (const [id, source] of Object.entries(sources.twins)) {
@@ -623,7 +512,6 @@ function sandboxWithDeferredTwin() {
   for (const [label, value] of [
     ["absent", undefined],
     ["an unknown class", "probably-fine"],
-    // The flattering default a missing field would otherwise mean.
     ["the empty string", ""],
   ]) {
     const mutated = structuredClone(table);
@@ -637,11 +525,6 @@ function sandboxWithDeferredTwin() {
   }
 }
 
-// ── a substrate read that comes back malformed fails loudly ─────────────────
-// Four shapes an upstream read can come back wrong in. Each must refuse to
-// become a golden: an empty listing written as a golden is the worst outcome
-// available here, because it reads as "the vendor serves nothing" and turns
-// every tool a twin has into a divergence.
 {
   const sources = loadSources({ repoRoot: ROOT });
   const twin = Object.keys(sources.twins).find((id) => sources.twins[id].capture);
@@ -667,32 +550,8 @@ function sandboxWithDeferredTwin() {
   }
 }
 
-// ── a deferred oauth row is CAPTURE-READY, not merely declared ───────────────
-// The whole content of "a token, not an adapter" is that the errand
-// is one env var away. It was not: slack and linear declared no
-// `protocolVersion`, which `loadSources` requires on every capturable source, so
-// flipping `capture` threw `must declare protocolVersion` before opening a
-// socket — a schema error, read by whoever had just finished an OAuth flow, in
-// the one moment they have every reason to blame their own credential.
-//
-// Asserted over EVERY deferred oauth row rather than the two that exist today,
-// so a sixth twin added the same way is caught by this file and not by a human
-// mid-errand.
 {
   const table = JSON.parse(readFileSync(join(ROOT, "config/mcp-capture-sources.json"), "utf8"));
-  // Every oauth row, captured or deferred. All three are captured, so keying
-  // this on `!row.capture` would now select NOTHING and report the same green as
-  // a satisfied guard — the shape the flip-throws bug hid behind in the first
-  // place. The durable invariant is the one that made the flip safe: an oauth
-  // row carries the two fields a capture needs, whether or not it is capturing
-  // today.
-  //
-  // Named `gatedSources`, not `oauth`: CodeQL's `js/clear-text-logging` treats a
-  // binding whose IDENTIFIER matches an auth keyword as a sensitive source, and
-  // this suite's `assert()` helper ends in `console.error`. Nothing here holds a
-  // secret — the source table stores env var NAMES, never values — but a
-  // name-based heuristic cannot know that, and a suppression comment would sit
-  // there long after anyone remembers why.
   const gatedSources = Object.entries(table.twins).filter(([, row]) => row.substrate === "live-wire-oauth");
   assert(gatedSources.length > 0, "the source table has live-wire-oauth rows for this guard to cover");
   for (const [twin, row] of gatedSources) {
@@ -703,8 +562,6 @@ function sandboxWithDeferredTwin() {
         `error before the socket opens, at whoever has just finished an OAuth flow`
     );
 
-    // …and a row that is NOT capturing must be one env var away from capturing.
-    // Proven by flipping it, on a deep copy, for real.
     const flipped = JSON.parse(JSON.stringify(table));
     flipped.twins[twin].capture = true;
     delete flipped.twins[twin].reason;
@@ -716,17 +573,10 @@ function sandboxWithDeferredTwin() {
   }
 }
 
-// ── the recorded refusal is RETIRED by the capture that supersedes it ────────
-// pome-cloud's `loadUpstreamMcpGolden` resolves `<twin>.status.json` FIRST and
-// never looks at the raw/meta beside it. Nothing used to delete that file, so
-// The first credentialed capture would have committed a real golden while
-// the lane went on publishing "401 missing_token" — the errand landing and
-// reading as though it had not, with nothing red anywhere.
 {
   const sources = loadSources({ repoRoot: ROOT });
   const twin = Object.keys(sources.twins).find((id) => sources.twins[id].capture);
 
-  // (a) --check reds when both artefacts exist, and says which one wins.
   {
     const dir = sandbox();
     const paths = goldenPaths({ repoRoot: dir, sources, twin });
@@ -748,7 +598,6 @@ function sandboxWithDeferredTwin() {
     rmSync(dir, { recursive: true, force: true });
   }
 
-  // (b) a real capture deletes it, so the commit cannot land half-applied.
   {
     const dir = sandbox();
     const paths = goldenPaths({ repoRoot: dir, sources, twin });
@@ -766,13 +615,6 @@ function sandboxWithDeferredTwin() {
   }
 }
 
-// ── SET-BUT-BLANK is not UNSET ──────────────────────────────────────────────
-// A value blanked in the secret store must not reach a runner and read
-// as "no credential configured" — the operator who blanked it and the operator
-// who never set it need different instructions. `if (!token)` said "is not set"
-// for both, and let whitespace through entirely: `Bearer    ` went on the wire
-// and came back as the VENDOR's 401, which reads as a bad token and sends
-// whoever just minted one back through the OAuth flow.
 {
   const ENV = "BLANK_PROBE";
   const source = {
@@ -795,12 +637,6 @@ function sandboxWithDeferredTwin() {
   delete process.env[ENV];
 }
 
-// ── the Streamable HTTP transport may frame the answer as SSE ───────────────
-// MCP lets a server answer a POST with either a JSON body or an SSE stream, and
-// both are correct. Measured 2026-08-09: gmail, slack and stripe answer
-// application/json; LINEAR answers SSE. Before this, `JSON.parse` on the wire
-// bytes threw "the substrate did not answer JSON" — a message that reads like a
-// broken endpoint or a bad token rather than a framing nothing handled.
 {
   const envelope = { jsonrpc: "2.0", id: 1, result: { tools: [{ name: "get_issue" }] } };
   const payload = JSON.stringify(envelope);
@@ -815,14 +651,10 @@ function sandboxWithDeferredTwin() {
     "CRLF-framed SSE is unwrapped (the spec allows either line ending)"
   );
 
-  // A heartbeat or a `ping` BEFORE the real message must not be mistaken for the
-  // answer: the first event carrying `result` or `error` wins, not the first
-  // event that parses.
   const withNoise =
     `event: ping\ndata: {"jsonrpc":"2.0","method":"ping"}\n\n` + `event: message\ndata: ${payload}\n\n`;
   assert(unwrapEventStream(withNoise) === payload, "a leading ping event is skipped, not returned as the answer");
 
-  // Multi-line data is one payload, per the SSE spec.
   const split = `event: message\ndata: {"jsonrpc":"2.0","id":1,\ndata: "result":{"tools":[{"name":"get_issue"}]}}\n\n`;
   assert(
     JSON.parse(unwrapEventStream(split)).result.tools.length === 1,
@@ -836,12 +668,6 @@ function sandboxWithDeferredTwin() {
   );
 }
 
-// ── the framing is DECLARED and then CHECKED, never inferred ────────────────
-// `configuration` is copied verbatim into meta.json and `--check --offline`
-// re-derives it with no substrate to observe, so a framing filled in from the
-// live response would make the offline gate disagree with the online capture.
-// Declaring it keeps the gate deterministic AND makes a vendor that silently
-// switches transport framing a loud failure instead of a silent re-shape.
 {
   const envelope = JSON.stringify({ jsonrpc: "2.0", id: 1, result: { tools: [{ name: "t" }] } });
   const realFetch = globalThis.fetch;

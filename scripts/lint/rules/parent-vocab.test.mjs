@@ -1,10 +1,8 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Case 2 is the reason this table exists: the first version of the rule stripped
-// string literals before scanning, so `{ "parent_id": null }` emitted the
-// forbidden field with the rule still green. A rule that cannot fail is worse
-// than no rule, because it reads as coverage.
+// Case table for parent-vocab. Every case asserts the RED direction: a rule that has
+// quietly stopped failing prints the same line as one with nothing to report.
 
 import { defineCases } from "../harness.mjs";
 
@@ -70,8 +68,6 @@ defineCases("parent-vocab", [
     contains: `${EMITTER}:2:`,
   },
   {
-    // `test/` is not emitter source: only `src/` is walked, so a fixture naming
-    // the legacy key cannot red the rule for the package that owns it.
     name: "a package's test tree is out of scope",
     files: { "packages/twin-x/test/emit.test.ts": `const row = { parent_id: null };\n` },
     expect: "green",

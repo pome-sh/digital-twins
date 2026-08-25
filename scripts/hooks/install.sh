@@ -1,9 +1,4 @@
 #!/usr/bin/env bash
-# Point this clone's git hooks at the versioned hooks in scripts/hooks/.
-# Idempotent — safe to re-run. Run once per clone:
-#
-#   bash scripts/hooks/install.sh
-#
 set -euo pipefail
 
 repo_root="$(git rev-parse --show-toplevel)"

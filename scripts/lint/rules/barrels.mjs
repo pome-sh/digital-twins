@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// A barrel index re-exports and does nothing else. Logic in a barrel is logic
-// every importer of the package root pays for, whatever subpath they wanted.
+// No deep imports past a package's barrel where the barrel is the contract.
 
 const BARREL_PATHS = [
   "packages/twin-gmail/src/index.ts",
@@ -25,8 +24,6 @@ export default {
   check(ctx) {
     const violations = [];
     for (const rel of BARREL_PATHS) {
-      // A listed barrel that no longer exists means this rule silently stopped
-      // covering it, so it is a violation rather than a skip.
       if (!ctx.exists(rel)) {
         violations.push(`${rel}: listed as a barrel but absent — move this rule's entry with the file.`);
         continue;

@@ -1,21 +1,12 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// 470 lines of hand-rolled lexer, so most of this table is about the lexer
-// rather than the rule: the cases that matter are the ones where a naive scan
-// gets it backwards. A `.catch()` promise handler is not a catch clause and a
-// regex literal's unbalanced brace is not a block delimiter (both false reds,
-// and a rule with false reds gets deleted); an exit inside a function DEFINED
-// in the catch body does not exit the catch, and a template literal must not
-// swallow the code inside its `${}` (both false greens, which is worse).
-//
-// Folded in from `cli/test/unit/no-catch-and-continue.test.ts`, a vitest suite
-// that asserted the same predicate from a third place.
+// Case table for no-catch. Every case asserts the RED direction: a rule that has
+// quietly stopped failing prints the same line as one with nothing to report.
 
 import { defineCases } from "../harness.mjs";
 
 const SRC = "packages/sdk/src/thing.ts";
-/** The reviewed assign-and-fall-through shape the allowlist exists for. */
 const FALL_THROUGH = (assignment) =>
   [
     `export async function f() {`,
@@ -63,22 +54,17 @@ defineCases("no-catch", [
     contains: "does not throw, return, or reject",
   },
   {
-    // A `.catch()` promise handler is not a statement catch clause. A false red
-    // here is how the rule gets deleted.
     name: "a `.catch()` promise handler is not a catch clause",
     files: { [SRC]: `export const run = () => work().catch((err) => log(err));\n` },
     expect: "green",
   },
   {
-    // The exit is inside a callback DEFINED in the catch body, so it does not
-    // exit the catch. This is the false-green a naive token scan produces.
     name: "an exit inside a nested function does not count as the catch's exit",
     files: { [SRC]: wrap("    queue.push(() => { throw err; });") },
     expect: "red",
     contains: "does not throw, return, or reject",
   },
   {
-    // Only `packages/sdk/src` is the engine surface this rule governs.
     name: "a swallowing catch outside the SDK engine is out of scope",
     files: { "packages/twin-x/src/thing.ts": wrap("    console.warn(err);") },
     expect: "green",
@@ -99,7 +85,6 @@ defineCases("no-catch", [
     expect: "green",
   },
   {
-    // A nested template must not desync the brace matcher.
     name: "nested template literals do not desync the lexer",
     files: {
       [SRC]: [
@@ -116,7 +101,6 @@ defineCases("no-catch", [
     expect: "green",
   },
   {
-    // ...and must not hide the code inside its own `${}` either.
     name: "a catch-and-continue INSIDE a template ${} expression is still seen",
     files: {
       [SRC]: [
@@ -134,8 +118,6 @@ defineCases("no-catch", [
     contains: "does not throw, return, or reject",
   },
   {
-    // An unbalanced `}` inside a regex literal would desync a brace matcher that
-    // did not strip regexes after a keyword.
     name: "a regex literal's braces do not desync the lexer",
     files: {
       [SRC]: [
@@ -153,8 +135,6 @@ defineCases("no-catch", [
     expect: "green",
   },
   {
-    // `throw` must be the KEYWORD: `gen.throw(e)` is a property call that does
-    // not exit the catch.
     name: "a `.throw` property call is not an exit",
     files: { [SRC]: wrap("    gen.throw(err);") },
     expect: "red",
@@ -178,8 +158,6 @@ defineCases("no-catch", [
     contains: "does not throw, return, or reject",
   },
   {
-    // The allowlist is keyed by file AND a body fingerprint, not a line number:
-    // the same fall-through shape in the RIGHT file with the fingerprint passes.
     name: "allowlist: a fingerprint match in the named file passes",
     files: { "packages/sdk/src/mcp-jsonrpc.ts": FALL_THROUGH('toolError = err instanceof Error ? err.message : "x";') },
     expect: "green",

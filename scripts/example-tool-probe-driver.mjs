@@ -1,25 +1,8 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Probe driver — the child half of scripts/probe-example-tools.mjs.
-//
-// Runs INSIDE one example's dependency tree (under that example's own `tsx`
-// when it has one, so a `.ts` tool table and its zod / `file:`-linked adapter
-// copies resolve the way they do for a real run), and knows nothing about twins
-// or seeds. It takes a module path, an export name, a config object, and a probe
-// list; it reports what the wire did.
-//
-// Plain JavaScript, not TypeScript, for two reasons: bare `node` can run it
-// against the test suite's fixture examples (no `npm ci` in a throwaway tree),
-// and `tsx` registers a process-wide loader, so a `.mjs` entry can still
-// dynamically import a `.ts` module.
-//
-// The fetch hook is the whole point. `agent-examples/merge-agent`,
-// `agent-examples/minimal-viktor`, `agent-examples/gmail-retry-notify`, and
-// `agent-examples/minimal-viktor-langgraph` all deliberately SWALLOW a non-2xx and
-// hand the model `{ok: false, status}` so one bad twin call cannot abort a run
-// — so a probe that only watched for a thrown error would be silent on exactly
-// the failure this gate exists to catch. Only the response status counts.
+// Child process that invokes one example's tools against booted twins and reports
+// back as JSON.
 
 const emit = (row) => process.stdout.write(`${JSON.stringify(row)}\n`);
 
@@ -29,8 +12,6 @@ if (!spec) {
   process.exit(1);
 }
 
-// Install the hook BEFORE importing the example: a module that captured
-// `globalThis.fetch` at import time would otherwise keep the unhooked copy.
 let current = null;
 const realFetch = globalThis.fetch;
 globalThis.fetch = async (input, init) => {
@@ -64,19 +45,9 @@ try {
   process.exit(1);
 }
 
-// Three tool shapes the bundled examples use: the Claude Agent SDK's `tool()`
-// returns `{name, description, inputSchema, handler}` objects that callers
-// collect into an ARRAY; the Vercel AI SDK keeps a RECORD of name -> `{execute}`;
-// and LangChain's `tool()` (`agent-examples/minimal-viktor-langgraph`) returns a
-// `StructuredTool` instance invoked through its `.invoke()` method, also kept
-// in a name -> tool RECORD. `.invoke` has to be bound to the tool instance —
-// destructuring it the way `handler`/`execute` are read here would call it
-// with no `this` and it would throw on every probe.
 const table = new Map(Array.isArray(tools) ? tools.map((tool) => [tool.name, tool]) : Object.entries(tools));
 emit({ kind: "tools", names: [...table.keys()] });
 
-// Sequential, in declared order: probes mutate twin state, and a later probe may
-// depend on an earlier one's write.
 for (const probe of spec.probes) {
   const tool = table.get(probe.tool);
   if (!tool) continue; // the parent reports this as `unknown-tool`.
