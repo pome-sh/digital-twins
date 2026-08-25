@@ -1,41 +1,9 @@
 #!/usr/bin/env bash
-# F-696 — assert public-repo policy for pome-twins main.
-# F-1212 — the live drift check used to call the legacy
-# GET .../branches/{branch}/protection + GET .../rulesets endpoints, which
-# need Administration:read. GITHUB_TOKEN cannot hold that scope, so the
-# check depended on a hand-minted PAT (REPO_POLICY_TOKEN) that never existed
-# — the weekly cron has been red since it shipped and the live step never
-# ran once. GET .../rules/branches/{branch} returns the same effective rules
-# (pull_request review count, required status checks, non-fast-forward,
-# deletion) for a metadata-scoped GITHUB_TOKEN, no PAT needed.
 #
-# The property that matters: this must FAIL, not silently pass, if the rules
-# it reads stop covering a policy it asserts (ruleset deleted, disabled or
-# switched to `evaluate`, protection moved to classic branch protection,
-# endpoint drops a rule type). An empty/missing rules array, or any policy
-# with no matching rule, is a hard failure naming that policy — never
-# treated as "nothing to check".
-#
-# Verified against the live repo (F-1212 review): this endpoint returns only
-# rules from rulesets whose enforcement is `active`. A ruleset flipped to
-# `evaluate` or `disabled` drops out entirely, so its rules vanish from this
-# payload and the empty-array branch below hard-fails. That is why enforcement
-# is not asserted separately — losing it cannot present as a green run.
-# Rules inherited from an ORG-level ruleset do still appear here (with
-# ruleset_source_type "Organization"). They count towards coverage — the policy
-# is that main is covered, not that a particular ruleset object covers it — but
-# they are held to the same terms: an org rule contributing a required context
-# not in config/required-checks.json is still a failure, because an unexpected
-# required context is exactly the drift this check exists to surface.
-#
-# NOT covered live (dropped, not silently assumed true) — both are named in the
-# run log on success so a reader is never told coverage is total:
-#
-#   1. The ruleset's bypass_actors (founder-team bypass). GitHub elides the bypass_actors FIELD
-# for callers without Administration:read — the .../rulesets/{id} endpoint
-# itself is readable (it answers 200 even unauthenticated on this public repo),
-# but the field is simply absent, so asserting on it would fail OPEN for
-# GITHUB_TOKEN. Left unwatched rather than asserted-on-an-absent-field.
+# Asserts main's live branch rules. Reads GET .../rules/branches/{branch}, which an
+# ordinary GITHUB_TOKEN can call; /protection and /rulesets/{id} need
+# Administration:read and would pass while checking nothing. An empty rules array
+# is a hard failure, never "nothing to check".
 set -euo pipefail
 
 REPO="${GITHUB_REPOSITORY:-pome-sh/digital-twins}"
@@ -44,13 +12,8 @@ TOKEN="${GITHUB_TOKEN:?GITHUB_TOKEN required (ordinary Actions token; no PAT nee
 RULES_OUT="$(mktemp)"
 trap 'rm -f "${RULES_OUT}"' EXIT
 
-# F-1180 — the contexts live in config/required-checks.json. A second
-# hand-maintained copy of the same list is the F-1135 shape: one goes stale
-# while both still look like they are watching.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 REQUIRED_CHECKS_FILE="${REQUIRED_CHECKS_FILE:-${REPO_ROOT}/config/required-checks.json}"
-# Read into a variable first (not `mapfile < <(...)`, which is bash 4+ and
-# swallows the exit status): `set -e` must still fire if the file is unreadable.
 REQUIRED_CHECKS_RAW="$(
   REQUIRED_CHECKS_FILE="${REQUIRED_CHECKS_FILE}" node -e '
     const fs = require("fs");
@@ -89,10 +52,6 @@ fail_http() {
 echo "Asserting branch rules policy for ${REPO}@${BRANCH}"
 
 if [[ -n "${RULES_JSON:-}" ]]; then
-  # Fixture seam for assert-repo-policy.test.mjs only. Say so loudly: a run
-  # that reads a fixture asserts nothing about the live repo, and must never
-  # be mistaken for a drift check that passed. repo-policy.yml never sets it
-  # (asserted by the regression test).
   echo "::warning::RULES_JSON is set — reading fixture ${RULES_JSON}, NOT the live GitHub API. This run proves nothing about ${REPO}@${BRANCH}."
   cp "${RULES_JSON}" "${RULES_OUT}"
 else
@@ -227,7 +186,7 @@ console.log("required contexts:", required.join(", "));
 console.log(
   "NOT verified live (needs Administration:read, deliberately not held): ruleset bypass_actors "
     + "(founder-team bypass); and classic branch protection's own required_status_checks copy, which "
-    + "this endpoint cannot see at all — deleted 2026-08-13 because no App can bypass it, and a "
+    + "this endpoint cannot see at all, and must carry no such rule because no App can bypass it. A "
     + "re-added copy is caught by release-alarm.yml's UNALLOCATED leg within a day, not here",
 );
 NODE

@@ -1,20 +1,8 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Regression suite for scripts/ci/check-sandbox-domains-tarball.mjs.
-//
-// The gate's whole value is that it fails on things nobody can see from inside
-// this workspace, so the thing worth testing is that it FAILS — a gate asserted
-// only against a green tree is one that could have been `process.exit(0)`.
-//
-// Everything below runs the real script against a scratch copy of the manifest,
-// in `--manifest-only` mode (no build, no network). The tarball half is exercised
-// for real by `npm run gate:sandbox-domains-tarball` in ci.yml's heavy block and in
-// release.yml's publish job; what cannot be tested by mutating a manifest is the
-// specifier scanner, so its two failure modes are unit-tested directly against
-// the exported patterns' behaviour on strings that once broke it.
-//
-// Usage: node scripts/ci/check-sandbox-domains-tarball.test.mjs
+// Breaks the manifest several ways in --manifest-only mode. A gate only ever run
+// against a green tree could have been process.exit(0).
 
 import { execFileSync } from "node:child_process";
 import { copyFileSync, readFileSync, writeFileSync } from "node:fs";
@@ -35,7 +23,6 @@ function check(label, condition, detail = "") {
   }
 }
 
-/** Run the gate in manifest-only mode; returns `{ ok, output }`. */
 function runGate() {
   try {
     const output = execFileSync(process.execPath, [GATE, "--manifest-only"], {
@@ -49,7 +36,6 @@ function runGate() {
   }
 }
 
-/** Apply `mutate` to the manifest, run the gate, restore. */
 function withMutatedManifest(mutate) {
   copyFileSync(MANIFEST, BACKUP);
   try {
@@ -68,7 +54,6 @@ console.log("check-sandbox-domains-tarball.mjs — manifest assertions");
 const clean = runGate();
 check("passes on the real manifest", clean.ok, clean.output);
 
-// 1 — the failure mode that produces a fully GREEN release publishing nothing.
 const privatised = withMutatedManifest((m) => {
   m.private = true;
 });
@@ -78,7 +63,6 @@ check(
   privatised.output,
 );
 
-// A missing `private` field is not the same as `false`, and npm tolerates it.
 const privateAbsent = withMutatedManifest((m) => {
   delete m.private;
 });
@@ -88,7 +72,6 @@ check(
   privateAbsent.output,
 );
 
-// 2 — a pinned registry can only misroute the publish.
 const pinnedRegistry = withMutatedManifest((m) => {
   m.publishConfig.registry = "https://npm.pkg.github.com";
 });
@@ -98,7 +81,6 @@ check(
   pinnedRegistry.output,
 );
 
-// E402 after the merge has already landed.
 const restricted = withMutatedManifest((m) => {
   m.publishConfig.access = "restricted";
 });
@@ -108,7 +90,6 @@ check(
   restricted.output,
 );
 
-// 3 — the leak that 404s a consumer's install. The reason this package bundles.
 const leakedInternal = withMutatedManifest((m) => {
   m.dependencies["@pome-sh/sdk"] = "*";
 });
@@ -127,7 +108,6 @@ check(
   leakedPeer.output,
 );
 
-// The two-schema-identity bug, in a brand-new package.
 const zodNotPeer = withMutatedManifest((m) => {
   delete m.peerDependencies.zod;
   m.dependencies.zod = "^4.4.3";
@@ -138,7 +118,6 @@ check(
   zodNotPeer.output,
 );
 
-// The upstream fidelity anchors were generated against the twins' versions.
 const driftedAnchor = withMutatedManifest((m) => {
   m.dependencies["@octokit/openapi-types"] = "^27.0.0";
 });
@@ -148,7 +127,6 @@ check(
   driftedAnchor.output,
 );
 
-// The export spec is the measured contract with pome-cloud.
 const droppedSubpath = withMutatedManifest((m) => {
   delete m.exports["./server"];
 });
@@ -167,18 +145,11 @@ check(
   droppedTwin.output,
 );
 
-// ── The specifier scanner ───────────────────────────────────────────────────
-//
-// Not reachable by mutating a manifest, and the half that actually broke during
-// The loose `\bfrom\s*"…"` form used on `.d.ts` reads SQL and English
-// inside bundled JS string literals as import specifiers. These pin both
-// directions so a future simplification back to one pattern reds here.
 console.log("\ncheck-sandbox-domains-tarball.mjs — specifier scanning");
 
 const JS_STATIC = /^\s*(?:import|export)\b[^;\n]*?\bfrom\s*(['"])([^'"]+)\1/gm;
 const LOOSE = /(?:\bfrom\s*|\bimport\s*)\(?\s*(['"])([^'"]+)\1/g;
 
-/** Real bundled-JS bytes from the twins that the loose pattern misread. */
 const PROSE_SAMPLES = [
   'const sql = `SELECT m.to_json AS "from", m.ts FROM messages m`;',
   'if (field === "from") return contains(document.from);',
@@ -194,7 +165,6 @@ for (const sample of PROSE_SAMPLES) {
   );
 }
 
-/** …while every real form tsup emits is still found. */
 const REAL_IMPORTS = [
   ['import { Hono } from "hono";', "hono"],
   ['import { sign } from "hono/jwt";', "hono/jwt"],
@@ -206,8 +176,6 @@ for (const [line, expected] of REAL_IMPORTS) {
   check(`still finds a real import: ${expected}`, found.includes(expected), JSON.stringify(found));
 }
 
-// `hono/jwt` must be satisfied by a declared `hono`, or the gate demands a
-// dependency on a subpath that is not a package.
 const packageNameOf = (specifier) => {
   const parts = specifier.split("/");
   return specifier.startsWith("@") ? parts.slice(0, 2).join("/") : parts[0];
