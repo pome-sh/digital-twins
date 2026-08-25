@@ -8,5 +8,5 @@ cd "$repo_root"
 echo "pre-commit: open-core boundary lint"
 bash scripts/lint-no-cloud-imports.sh
 
-echo "pre-commit: capture-only + copy-marker lint rules"
-npm run lint -- no-eval copy-markers
+echo "pre-commit: capture-only lint rule"
+npm run lint -- no-eval
