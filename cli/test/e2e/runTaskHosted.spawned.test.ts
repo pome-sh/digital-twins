@@ -262,8 +262,11 @@ describe("pome run --hosted (e2e via spawn)", () => {
     child.stderr.on("data", (d) => (stderr += d.toString()));
     const code = await new Promise<number>((res) => child.on("close", res));
 
-    // `pome run` used to exit 0 here, a documented divergence from `pome eval`
-    // justified by legacy cloud builds that emit no `criteria_results`.
+    // This response CARRIES `criteria_results` with nothing evaluated, so the A5
+    // guard applies and `pome run` exits 1 on it exactly as `pome eval` does.
+    // A response omitting `criteria_results` entirely is a different path:
+    // `scoreFromFinalizeResponse` sets `evaluated` and `can_pass` true there
+    // (`uploadAndFinalize.ts`), which this case does not exercise.
     expect(code, `stderr was:\n${stderr}`).toBe(1);
     // The label and the copy. "cannot pass" was a verdict about the
     // AGENT for a gap in the GRADER.
@@ -273,8 +276,9 @@ describe("pome run --hosted (e2e via spawn)", () => {
     expect(stderr).not.toContain("cannot pass");
     expect(stderr).toContain("cloud score: 100/100");
 
-    // The bug this test guards: `verdict.json` used to write `score: 100,
-    // pass_threshold: 100, passed: false` with no denominator and no name for the third state.
+    // `verdict.json` must name the third state and carry its denominator. Writing
+    // `score: 100, pass_threshold: 100, passed: false` with neither leaves a CI
+    // reader no way to tell an ungraded run from a scoring bug.
     const v = await readVerdictArtifact(join(tmp, "runs", "scn", "ses_e2e"));
     expect(v).not.toBeNull();
     expect(v?.verdict.score).toBe(100);

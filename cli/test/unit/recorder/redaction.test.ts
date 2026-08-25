@@ -154,8 +154,8 @@ describe("redactEvent — provider secret shapes", () => {
   });
 });
 
-// Boundary pinning. These tests freeze the exact JWT / PEM scrub behavior of the
-// legacy backtracking regexes: they were run green against the old patterns.
+// Boundary pinning: the exact JWT / PEM scrub behavior at the edges, where a
+// pattern change is most likely to silently widen or narrow what gets scrubbed.
 describe("redactEvent — JWT scrub boundary pinning", () => {
   it("redacts a JWT glued mid-base64url-run from the eyJ onward", () => {
     expect(redactEvent({ v: "AAAAeyJab.cd.ef" })).toEqual({ v: "AAAA[REDACTED]" });

@@ -31,10 +31,9 @@ describe("pome docs helpers", () => {
   });
 
   it("keeps routing the retired skills-setup/skills-test keywords", () => {
-    // The skills-setup / skills-test topics were removed with the Gen-1 CLI
-    // wiring commands; every keyword that used to reach them must still resolve
-    // (never an unknown-topic exit 2). Some migrated onto a new topic; others
-    // already matched a surviving keyword via substring.
+    // These keywords have no topic of their own. Each must still resolve to a
+    // live topic rather than exit 2 on an unknown topic — some by routing onto
+    // a related topic, some by matching a surviving keyword via substring.
     expect(findTopic("wire", DOCS_TOPICS)?.id).toBe("existing-agent");
     expect(findTopic("test-with-pome", DOCS_TOPICS)?.id).toBe("cli-run");
     expect(findTopic("/test-with-pome", DOCS_TOPICS)?.id).toBe("cli-run");

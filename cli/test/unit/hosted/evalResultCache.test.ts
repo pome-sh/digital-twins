@@ -132,7 +132,9 @@ describe("verdict artifact", () => {
     expect(onDisk.task_path).toBe("tasks/scn.md");
     expect(onDisk).not.toHaveProperty("scenario_path");
 
-    // Read path: the normalize branch is gone.
+    // Read path: the old spelling is not normalized into the new one. This
+    // artifact is refused on its `version`, and the absent `task_path` is not
+    // filled in from `scenario_path`.
     const legacyDir = join(tmp, "scn", "ses_old");
     await mkdir(legacyDir, { recursive: true });
     const { task_path: _tp, ...withoutTaskPath } = verdict({ session_id: "ses_old" });
@@ -224,8 +226,8 @@ describe("verdict artifact", () => {
     expect(latestIncompleteRunSet(sets)).toBeNull();
   });
 
-  // The old `anyFailed` read `!t.verdict.passed`, so a group holding a trial whose
-  // only non-passing criterion was pre-satisfied must NOT trip it, or it gets.
+  // Reading the group outcome off `!t.verdict.passed` would trip on a trial whose
+  // only non-passing criterion was pre-satisfied. It must not.
   it("a group holding a pre-satisfied-only trial (state: pass) has outcome pass, not fail", async () => {
     const trials = [
       {
@@ -567,8 +569,9 @@ describe("verdict artifact", () => {
     });
   });
 
-  // A v2 verdict.json that is truncated, hand-edited into an unexpected `state`, or
-  // valid JSON that isn't a verdict artifact at all used to read as `{status:
+  // A v2 verdict.json can be truncated, hand-edited into an unexpected `state`,
+  // or valid JSON that is not a verdict artifact at all. Each must be named and
+  // counted rather than passed off as a plain absence.
   describe("a corrupt current-version verdict.json is a named, counted 'unreadable' skip", () => {
     // Each of the three damage shapes the ticket names is asserted TWICE, and the
     // second assertion is the one that matters: `readVerdictArtifactDetailed` already.
@@ -815,8 +818,8 @@ describe("verdict artifact", () => {
     });
   });
 
-  // `readVerdictArtifactDetailed` used to collapse "there is no verdict.json here"
-  // into `unreadable`, which is why both call sites re-`existsSync`'d the path.
+  // `readVerdictArtifactDetailed` names the absence itself, so no call site has
+  // to re-`existsSync` the path to tell "not there" from "there and broken".
   describe("an absent verdict.json is `missing`, not `unreadable`", () => {
     it("names the absence directly, for a run dir with no verdict.json and for a dir that isn't there", async () => {
       const tmp = await mkdtemp(join(tmpdir(), "verdict-missing-"));

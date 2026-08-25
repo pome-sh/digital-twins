@@ -557,12 +557,12 @@ describe("runTaskHosted failure paths", () => {
       hosted: { baseUrl: `http://127.0.0.1:${cloudPort}`, apiKey: "pme_test" },
     });
 
-    // F18 / F0-5 — once /finalize returns, the cloud-judged score is
-    // canonical. Score 0 < passThreshold (100 default) → exit 1
-    // ("below threshold"). The old "agent timeout trumps to exit 3"
-    // policy stole the documented auth slot for a non-auth condition.
-    // V1 still posts /finalize on timeout so the run is visible in the
-    // dashboard. The alternative (no post on timeout) loses signal.
+    // Once /finalize returns, the cloud-judged score is canonical. Score 0 <
+    // passThreshold (100 default) → exit 1 ("below threshold"). An agent timeout
+    // does not promote to exit 3: that slot is documented for auth, and spending
+    // it on a non-auth condition makes the code unreadable. /finalize is still
+    // posted on timeout so the run stays visible in the dashboard; not posting
+    // loses the signal entirely.
     expect(result.exitCode).toBe(1);
     expect(finalizePosts).toBe(1);
     expect(receivedFinalize).not.toBeNull();

@@ -51,8 +51,7 @@ describe("pome checks", () => {
     expect(captured.log.join("\n")).toContain("github");
   });
 
-  // A3's completion invariant, and the replacement for the case that used to live
-  // here.
+  // A3's completion invariant.
   it("leaves no mounted twin without a declared vocabulary", () => {
     expect(twinsWithoutChecks()).toEqual([]);
     for (const twin of MOUNTED_TWINS) {

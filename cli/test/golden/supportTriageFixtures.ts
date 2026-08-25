@@ -23,8 +23,9 @@
 // WHY THE WRONG RUN FAILS ALL FIVE. It would be easy to write a wrong agent that
 // fails only `no-new-issues`, and it would be a weaker fixture: the pair would
 // then prove one check discriminates, not that the run's verdict does. It would
-// also no longer reach 0, which is this gate's sharpest property — every criterion that silently stopped discriminating would move the
-// number OFF zero, and there is no other value with that quality.
+// also not reach 0, which is this gate's sharpest property: any criterion that
+// silently stopped discriminating moves the number OFF zero, and no other value
+// has that quality.
 //
 // Reaching 0 on the five-criterion task needs the wrong run to both open a
 // duplicate AND put `issues/47` in front of the reporter. Measured against the

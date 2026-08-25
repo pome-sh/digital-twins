@@ -6,9 +6,9 @@ import type {
   StripeSeedState,
 } from "../../src/task/taskSchema.js";
 
-// seedState is now a union (flat single-twin seed | multi-twin envelope), so
-// the historical `"key" in seedState` narrowing no longer selects a single arm.
-// These helpers assert + cast to the arm the test knows it produced.
+// seedState is a union (flat single-twin seed | multi-twin envelope), so a
+// `"key" in seedState` narrowing does not select a single arm. These helpers
+// assert + cast to the arm the test knows it produced.
 function asGithub(seed: unknown): GithubSeedState {
   if (!seed || typeof seed !== "object" || !("repositories" in seed)) {
     throw new Error("expected legacy GitHub seed");

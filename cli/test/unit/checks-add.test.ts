@@ -214,8 +214,9 @@ describe("the digest handshake", () => {
     expect(result.message).toContain("@pome-sh/cli@latest");
   });
 
-  // The refusal is correct, but it used to build its bullet list from `id` and
-  // `template` while `checksDigest` hashes `id`, `substrate` and the COMPILED pattern.
+  // The bullet list has to name the same fields `checksDigest` hashes — `id`,
+  // `substrate` and the COMPILED pattern — or a substrate-only move reads as an
+  // unexplained digest mismatch.
   it("names the check and both substrates when only the substrate moved", async () => {
     const result = await handshake("github", async (twin) => ({
       twin,

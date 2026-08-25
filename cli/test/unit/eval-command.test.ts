@@ -884,8 +884,8 @@ describe("pome eval review fixes (review)", () => {
   });
 
   it("already-kinded rows (LlmTurnEvent) survive eval upload unchanged", async () => {
-    // Every row used to be mapped through toTwinHttpEvent, which re-wrapped any
-    // non-TwinHttpEvent kind — clobbering `kind` to "TwinHttpEvent" and setting event_id.
+    // A non-TwinHttpEvent row must not go through toTwinHttpEvent, which would
+    // clobber `kind` to "TwinHttpEvent" and overwrite `event_id`.
     const turnRow = JSON.stringify({
       kind: "LlmTurnEvent",
       ts: "2026-06-30T10:00:02.000Z",
