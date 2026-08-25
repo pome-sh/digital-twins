@@ -1,9 +1,11 @@
 name: release
 # The single release pipeline for the five published packages.
 #
-# Model: version-diff on push to main. Bump the version in the package's own
-# package.json, merge, and this workflow publishes it. Nothing to remember and no
-# version PR.
+# Model: version-diff on push to main. A PR describes its change under an
+# `## Unreleased` heading in the package's CHANGELOG; allocate-version.yml
+# allocates the number on `main` after the merge and moves package.json in the
+# same commit, and this workflow publishes what that commit moved. The number is
+# not the PR author's to write, so there is nothing to remember and no version PR.
 #
 # @pome-sh/cli, @pome-sh/adapter-claude-sdk and @pome-sh/checks version
 # INDEPENDENTLY (D11) and are diff-gated separately: the CLI bundles the internal
@@ -225,10 +227,10 @@ jobs:
         run: echo "${{ matrix.package }} version unchanged — skipping."
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: matrix.enabled == 'true'
-      # Carried over from cli-release.yml. setup-node MUST stay off v7+ for the
-      # OIDC path: v7 changed how `registry-url` writes .npmrc and breaks
-      # Trusted Publishing with ENEEDAUTH (actions/setup-node#1551). renovate.json
-      # disables major bumps for this action for the same reason.
+      # setup-node MUST stay off v7+ for the OIDC path: v7 changed how
+      # `registry-url` writes .npmrc and breaks Trusted Publishing with
+      # ENEEDAUTH (actions/setup-node#1551). renovate.json disables major
+      # bumps for this action for the same reason.
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v6.4.0
         if: matrix.enabled == 'true'
         with:
