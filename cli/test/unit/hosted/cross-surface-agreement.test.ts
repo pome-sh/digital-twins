@@ -1,66 +1,39 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// D3 — "no surface states more than it checked", applied to the two
+// D3 — "no surface states more than it checked", applied to the three
 // surfaces that answer ONE question: is this run a pass, a fail, or a run the
 // grader did not finish?
 //
 // The CLI answers it in `scoreFromFinalizeResponse` + `scoreStatus`. The
 // dashboard answers it in `deriveRunStatus` (`apps/dashboard/src/lib/
-// run-status.ts`, pome-cloud). They share no code — the two repos publish no
-// module to each other, and the only thing that crosses is the
-// `criteria_results` wire shape plus one reason string. So "they agree" is a
-// claim someone has to check, and until this file existed nobody did. The
-// defect was a run the CLI called INCOMPLETE and the dashboard called PASS, shipped
-// for as long as it took a human to notice the two screens disagreeing.
-//
-// `dashboardRunStatus` below WAS a transcription — a hand copy of pome-cloud's
-// three clauses, named clause by clause so a reviewer could diff it against the
-// original. That copy is deleted. It now CALLS the real predicate, which
-// both repositories install from `@pome-sh/wire/run-completeness`.
-//
-// WHY THAT MATTERS MORE THAN IT LOOKS. The arithmetic moved out of
-// `run-status.ts` into a shared predicate inside pome-cloud, closing this exact
-// defect class one repo over — and the copy in THIS file went stale the moment
-// it did, and went stale GREEN: it kept passing while asserting something false
-// about the other repo. That happened twice. Both times
-// nothing detected it; it was caught because one person happened to be holding
-// both sides. A transcription is a parallel copy with the longest possible
-// feedback loop, and it was sitting inside the very test written to prove
-// parallel copies are gone.
-//
-// The fix was a cross-repo move, not a one-file patch: `isIncompleteTally`,
-// `tallyCriteriaResults` and `PRE_SATISFIED_REASON` now live in
-// `packages/wire/src/run-completeness.ts` here, published as
-// `@pome-sh/wire/run-completeness` and imported by pome-cloud's dashboard,
-// control plane and markdown report instead of by a private cloud package.
-// There is one implementation left across both repos. Changing it can no longer
-// leave this file asserting the old behaviour — the two things that could
-// happen are a type error and a red test, and no third thing.
-//
-// WHAT IS STILL WRITTEN OUT BY HAND HERE, stated so nobody has to guess: the
-// two-line COMPOSITION in `dashboardRunStatus` — incomplete outranks the score,
-// and the pass bar is a hard 100. That is `deriveRunStatus`
-// (`apps/dashboard/src/lib/run-status.ts`), and it stays cloud-side on purpose:
-// its `RunStatus` includes `in_progress`, a state derived from a `runs` row's
-// `finished_at`, and wire has no business knowing what a runs row is. What
-// moved is the ARITHMETIC — the counting, the exemption, the empty denominator
-// — which is the part that drifted twice and the part that drifts SILENTLY,
-// because a miscounting copy still returns a boolean. An ordering change is a
-// different animal: it is one line, it has no counts in it, and it cannot be
-// wrong by an off-by-one.
-//
-// There is no known divergence between the two surfaces today — the last one
-// is closed (below). A row CAN still carry a `divergence` marker if the two
-// surfaces disagree again: a known divergence with a test on it is a fact; the
-// same divergence with no test on it is the original defect again.
-//
-// There is now a THIRD surface answering the same question: the
-// `state` field of the `verdict.json` a hosted run writes, which is what CI
-// reads instead of scraping stderr. It answers with the CLI's word by
-// construction (`runTaskHosted.ts` passes the one `verdict` local it already
-// computed into the artifact; `test/e2e/runTaskHosted.spawned.test.ts` pins that end
-// to end). What this file adds is the VOCABULARY claim — that the artifact
+// run-status.ts`, pome-cloud). The third is the `state` field of the
+// `verdict.json` a hosted run writes, which is what CI reads instead of
+// scraping stderr; it carries the CLI's word by construction
+// (`runTaskHosted.ts` passes the one `verdict` local it already computed into
+// the artifact, and `test/e2e/runTaskHosted.spawned.test.ts` pins that end to
+// end). What this file adds for the artifact is the VOCABULARY claim — that it
 // spells the answer in the dashboard's three words and no others.
+//
+// The two repos publish no module to each other. What crosses is the
+// `criteria_results` wire shape, one reason string, and the counting itself:
+// `isIncompleteTally`, `tallyCriteriaResults` and `PRE_SATISFIED_REASON` live
+// in `packages/wire/src/run-completeness.ts`, are published as
+// `@pome-sh/wire/run-completeness`, and are imported by pome-cloud's
+// dashboard, control plane and markdown report. One implementation, so a
+// change to it cannot leave this file asserting something false about the
+// other repo — the only two outcomes are a type error and a red test.
+//
+// The counting is shared because it drifts SILENTLY: a miscounting copy still
+// returns a boolean. What stays cloud-side is the two-line COMPOSITION in
+// `dashboardRunStatus` — incomplete outranks the score, and the pass bar is a
+// hard 100. That belongs to `deriveRunStatus`, whose `RunStatus` includes
+// `in_progress`, a state derived from a `runs` row's `finished_at`, and wire
+// has no business knowing what a runs row is. An ordering change is one line
+// with no counts in it and cannot be wrong by an off-by-one.
+//
+// The surfaces agree on every row below. A row CAN carry a `divergence` marker
+// if they ever disagree again: a known divergence with a test on it is a fact;
+// the same divergence with no test on it is a defect.
 
 import { mkdir, mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -199,8 +172,7 @@ const table: Row[] = [
   },
   {
     // The hero shape: support-triage-dedup scores 100 over three
-    // criteria with a fourth excluded as already true in the seed. This is the
-    // row that used to read pass / incomplete.
+    // criteria with a fourth excluded as already true in the seed.
     name: "seed-excluded criterion beside three passes",
     results: [passing("a"), passing("b"), passing("c"), excluded("github.no-new-issues")],
     satisfaction: 100,
@@ -219,12 +191,10 @@ const table: Row[] = [
     expected: "fail",
   },
   {
-    // `isIncompleteTally` gained a third clause (`evaluated === 0`):
-    // an all-excluded run has an empty denominator, which used to fall
-    // through to `satisfaction_score === 100 ? pass : fail` and land on
-    // `fail` here. Both surfaces now agree it is `incomplete` — the CLI
-    // already read it that way (its own A5 guard), so this row used to be
-    // the one known divergence and is now just another agreement row.
+    // An all-excluded run has an empty denominator, caught by
+    // `isIncompleteTally`'s `evaluated === 0` clause. Both surfaces read it
+    // `incomplete`: the dashboard through that clause, the CLI through its
+    // own A5 guard.
     name: "every criterion seed-excluded — no denominator",
     results: [excluded("github.no-new-issues"), excluded("github.no-new-labels")],
     satisfaction: 0,
@@ -265,12 +235,11 @@ describe("CLI and dashboard answer `what state is this run in?` the same way", (
   // ── isIncompleteTally's FIRST clause, which no row above reaches ─────────
   //
   // `total === 0 ⇒ never incomplete` is the one clause no row in the table
-  // exercises, since every row has criteria. The clause itself is
-  // pinned where it is implemented (`packages/wire/test/run-completeness.
-  // test.ts` exhausts all three), so what these two cases are for is no longer
-  // "cover the transcription" — it is the CROSS-SURFACE fact, which is the only
-  // thing this file has ever been about: on the empty-results shape the two
-  // surfaces answer DIFFERENTLY, and that is correct rather than a divergence.
+  // exercises, since every row has criteria. The clause itself is pinned where
+  // it is implemented (`packages/wire/test/run-completeness.test.ts` exhausts
+  // all three). These two cases are here for the CROSS-SURFACE fact instead:
+  // on the empty-results shape the two surfaces answer DIFFERENTLY, and that
+  // is correct rather than a divergence.
   //
   // It is NOT a table row because the table's third assertion — the two
   // surfaces never split on `passed` — is false for this input at
@@ -352,14 +321,13 @@ describe("CLI and dashboard answer `what state is this run in?` the same way", (
       });
     }
 
-    it("records the same word as the dashboard now that the divergence is closed, and the closure is stated in the artifact's own doc", async () => {
+    it("records the same word as the dashboard on the all-pre-satisfied run, and states that word in the artifact's own doc", async () => {
       const row = rowNamed("every criterion seed-excluded — no denominator");
       const cliWord = cliRunStatus(row.results, row.satisfaction);
-      // The all-pre-satisfied run: `isIncompleteTally` gained an
-      // `evaluated === 0` clause, so the dashboard now reads `incomplete`
-      // here too — the CLI already did, via its own A5 guard. `passed` — the
-      // only bit CI can act on — agreed even before that; now the word
-      // itself does too.
+      // The all-pre-satisfied run: both surfaces read `incomplete`, the
+      // dashboard via `isIncompleteTally`'s `evaluated === 0` clause and the
+      // CLI via its own A5 guard. They agree on the word, not just on
+      // `passed` — the only bit CI can act on.
       expect(cliWord).toBe("incomplete");
       expect(dashboardRunStatus(row.results, row.satisfaction)).toBe("incomplete");
       expect(await roundtripState(cliWord)).toBe("incomplete");
@@ -387,12 +355,10 @@ describe("CLI and dashboard answer `what state is this run in?` the same way", (
   });
 });
 
-// ── What the table is still worth, now that the arithmetic is shared ────────
+// ── Why the table is not a tautology ────────────────────────────────────────
 //
-// A reasonable question: if both surfaces call one predicate, is a
-// row-by-row agreement table anything but a tautology? No, and the rows above
-// say why. `dashboardRunStatus` and `cliRunStatus` reach their answers by
-// genuinely different routes — the dashboard runs the shared predicate over
+// Both surfaces call one predicate, but they reach their answers by genuinely
+// different routes: the dashboard runs the shared predicate over
 // `criteria_results` and then a hard-100 bar, while the CLI goes through
 // `scoreFromFinalizeResponse` (which builds its own `Score`, including its own
 // `preSatisfied` subtraction and the A5 `can_pass` guard) and then
@@ -401,8 +367,6 @@ describe("CLI and dashboard answer `what state is this run in?` the same way", (
 // case a few blocks up is the standing proof — same input, two different
 // answers, both correct.
 //
-// So the table pins what it always pinned: that two independently-implemented
-// readers of one wire shape agree, row by row, and never split on the single
-// bit CI can act on. What was removed is the part that was never a test at
-// all — a copy of the other repo's counting, which could only ever agree with
-// itself.
+// So the table pins one thing: two independently-implemented readers of one
+// wire shape agree, row by row, and never split on the single bit CI can act
+// on.

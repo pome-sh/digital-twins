@@ -81,12 +81,10 @@ describe("resolveCredentials", () => {
     }
   });
 
-  // F0-6 regression — caller's apiBaseUrl (CLI flag / env, resolved by main.ts)
-  // must win over a stored Keychain/file api_url. Before this fix, the
-  // `process.env.POME_API_URL ?? stored ?? input` ladder inside
-  // resolveCredentials let a stale Keychain api_url shadow the explicit
-  // `--api-url` flag whenever POME_API_URL env was unset, silently routing
-  // requests at the prod control plane.
+  // The caller's apiBaseUrl (CLI flag / env, resolved by main.ts) must win over
+  // a stored Keychain/file api_url. If a stored value could shadow an explicit
+  // `--api-url`, the flag would silently route requests at the prod control
+  // plane.
   it("caller-provided apiBaseUrl wins over stored api_url (F0-6)", async () => {
     const tmp = await mkdtemp(join(tmpdir(), "pome-cred-"));
     try {
@@ -121,10 +119,9 @@ describe("resolveCredentials", () => {
     }
   });
 
-  // After F0-6, POME_API_URL no longer overrides inside resolveCredentials —
-  // env folding happens in `cli/main.ts`'s Commander option default, so the
-  // env-resolved value reaches us as `input.apiBaseUrl`. This test mirrors
-  // that contract: caller's input wins.
+  // `resolveCredentials` does not read POME_API_URL itself — env folding happens
+  // in `cli/main.ts`'s Commander option default, so the env-resolved value
+  // arrives as `input.apiBaseUrl`. Caller's input wins.
   it("caller-provided apiBaseUrl wins over POME_API_URL env", async () => {
     process.env.POME_API_KEY = "pme_x";
     process.env.POME_API_URL = "https://staging.example.com";

@@ -129,17 +129,15 @@ describe("auditCodeCriteria", () => {
     ]);
   });
 
-  // This assertion used to read the other way, and the flip is the point.
   it("binds a `was never called` criterion for an action the recorder stamps", () => {
     const audit = auditCodeCriteria(file("- [code] `create_commit_status` was never called"));
     expect(audit.findings).toEqual([]);
     expect(audit.bound).toBe(1);
   });
 
-  // The unbound-detection path still needs a subject, and it has to be a phrase
-  // github genuinely does not declare rather than one that merely used not to be
-  // declared — otherwise this coverage quietly expires the next time the
-  // vocabulary grows.
+  // The unbound-detection path needs a subject github genuinely does not
+  // declare. A phrase that merely happens to be undeclared today would let this
+  // coverage quietly expire the next time the vocabulary grows.
   it("catches a criterion phrased as an assertion github does not declare", () => {
     const { findings } = auditCodeCriteria(
       file("- [code] The webhook delivery for `acme/api` was retried"),

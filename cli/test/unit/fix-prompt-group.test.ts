@@ -302,7 +302,8 @@ describe("run-set fix prompt", () => {
       // "0 of 2 completed trials passed" would charge it as a loss.
       expect(prompt).toContain("0 of 1 completed trials passed");
       expect(prompt).not.toContain("of 2 completed trials passed");
-      // The old output said `trial 2 · ses_2 — failed: (see verdict)`.
+      // An ungraded trial is not a failing trial, so it gets no line in the
+      // failing-trials section and the section itself stays absent.
       expect(prompt).not.toContain("## Other failing trials");
       expect(prompt).not.toContain("trial 2 · ses_2 — failed");
     });

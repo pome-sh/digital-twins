@@ -4,14 +4,12 @@
 //
 // The CLI reads three non-code files at runtime: the fix-prompt system prompt
 // (read at MODULE SCOPE, so a wrong path is a startup crash, not a lazy error)
-// and the packaged demo task markdown + its seed sidecar. All three used to be
-// resolved with `dirname(fileURLToPath(import.meta.url))` relative to their
-// importing module and copied into a mirrored `dist/src/...` tree.
+// and the packaged demo task markdown + its seed sidecar.
 //
-// Under bundling that is unresolvable in principle: with `splitting: true` the
-// importing module has no file of its own — `fix-prompt/prompt.ts` may be
-// inlined into `dist/src/cli/main.js` or into a shared `dist/chunk-*.js`
-// depending on how esbuild split the graph. These tests pin the replacement:
+// None of them can be resolved relative to their importing module: with
+// `splitting: true` that module has no file of its own — `fix-prompt/prompt.ts`
+// may be inlined into `dist/src/cli/main.js` or into a shared `dist/chunk-*.js`
+// depending on how esbuild split the graph. These tests pin what holds instead:
 // assets live at `<packageRoot>/assets/**` in every layout, reachable from
 // anywhere inside `dist/`.
 

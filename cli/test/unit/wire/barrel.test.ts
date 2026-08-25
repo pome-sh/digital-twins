@@ -13,8 +13,8 @@ import * as hub from "../../../src/types/shared.js";
 import * as barrel from "../../../src/contract/index.js";
 import * as run from "../../../src/contract/run.js";
 
-// The recorder-events / otel / redaction leaves moved to `@pome-sh/wire`, so the
-// contract barrel no longer carries them; their leaf-vs-barrel identity is.
+// The recorder-events / otel / redaction leaves live in `@pome-sh/wire`, not on
+// the contract barrel. What this pins is their leaf-vs-barrel identity.
 describe("src/types/shared.ts hub preserves identity across both halves", () => {
   it("re-exports @pome-sh/wire's schemas by reference", () => {
     expect(hub.recorderEventSchema).toBe(wire.recorderEventSchema);

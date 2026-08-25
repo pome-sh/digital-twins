@@ -404,7 +404,7 @@ describe("acceptance: a twin call sits inside the tool that made it", () => {
 
     const twin = rows.find((r) => r.kind === "TwinHttpEvent");
     const tool = rows.find((r) => r.kind === "ToolUseEvent");
-    // This used to be null, which is what made the two trees unstitchable.
+    // A null `event_id` here leaves the two trees unstitchable.
     expect(tool?.event_id).toBe("evt_tool_1");
     expect(twin?.parent_event_id).toBe("evt_tool_1");
   });

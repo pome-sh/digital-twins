@@ -392,8 +392,7 @@ describe("runTrialGroup — errored trials", () => {
       runTaskHostedFn: async (options) => {
         const sid = options.premintedSession!.session_id;
         // Trial 2 scored 100 over a shrunken denominator: exit 1, but NOT a
-        // failure. Before this it arrived as `passed: exitCode === 0` and
-        // simply counted as a loss.
+        // failure. Reading `passed` off `exitCode === 0` would count it a loss.
         return sid === "ses_1"
           ? trialResult({ sessionId: sid, satisfaction: 100, exitCode: 0, durationMs: 1000 })
           : trialResult({

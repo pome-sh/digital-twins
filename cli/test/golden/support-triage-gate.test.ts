@@ -111,13 +111,12 @@ describe("golden scenario — support-triage, known-correct vs known-wrong", () 
   it("declares ZERO [model] criteria — this task's verdict has no judge in it", () => {
     // Pinned at zero, and this is the strongest single assertion in the file.
     //
-    // The count went 2 → 1 → 0. The first went when the positive tape assertion
-    // landed: a MODEL was being asked whether the agent had commented at all,
-    // which the tape answers deterministically. The last one asked whether the comment carried the
-    // customer's repro — and it was removed because it never discriminated. It
-    // passed on all 25 measured trials spanning both arms and three models,
-    // INCLUDING runs that commented on the wrong issue, because its sentence
-    // never named which issue the report had to be on. A free assertion, in
+    // Nothing in this task needs a judge. Whether the agent commented at all is
+    // a question the tape answers deterministically, so asking a MODEL is strictly
+    // worse. Whether the comment carried the customer's repro cannot be asked
+    // without naming which issue the report had to be on: phrased without that,
+    // it passed all 25 measured trials across both arms and three models —
+    // INCLUDING runs that commented on the wrong issue. A free assertion, in
     // AutomationBench's sense, worth 20 points to every failing run.
     //
     // Zero is now a PROPERTY of this task and not an accident of the golden
