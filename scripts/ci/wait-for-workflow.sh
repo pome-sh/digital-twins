@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Wait until a named workflow completes successfully for a given commit SHA.
-# Used by twin image publish jobs so they don't re-run package tests that `ci`
-# already owns (FDRS-586), while still refusing to push a red SHA to GHCR.
+#
+# Polls for another workflow's run on a given SHA. Waiting where no run exists polls
+# to the timeout, so callers gate this on the events that actually produce one.
 set -euo pipefail
 
 workflow="${1:?usage: wait-for-workflow.sh <workflow-file> [sha]}"
@@ -23,12 +23,9 @@ api() {
 echo "Waiting for workflow=${workflow} sha=${sha} (timeout ${timeout_s}s)"
 
 while (( SECONDS < deadline )); do
-  # Newest run for this workflow + SHA first.
   payload="$(api \
     "https://api.github.com/repos/${repo}/actions/workflows/${workflow}/runs?head_sha=${sha}&per_page=5")"
 
-  # Always track the newest run for this SHA (API returns newest first). Do not
-  # accept an older successful run while a newer one is still in progress.
   read -r status conclusion run_id <<<"$(
     node -e '
       const data = JSON.parse(process.argv[1]);

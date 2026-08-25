@@ -1,26 +1,9 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
-/**
- * Regression coverage for scripts/ci/allocate-release-versions.mjs and the
- * CHANGELOG grammar it writes through (scripts/ci/changelog-entry.mjs).
- *
- * Driven over REAL git repositories, because the three properties that matter
- * are all properties of history, not of a string:
- *
- *   - the bump commit cannot re-trigger a publish loop. Asserted by applying a
- *     plan, committing it, and re-planning: the second plan must be empty. That
- *     is the actual sequence `main` sees, and it is what a mocked git could not
- *     tell us anything about.
- *   - two merges landing inside one allocation window get ONE number carrying
- *     both entries, never two numbers or one lost entry.
- *   - insertions only: the released region of every rewritten CHANGELOG is
- *     byte-identical to the one that went in.
- *
- * Plus the refusals, because each one is a shape that must never be mistaken for
- * "nothing to do": an `## Unreleased` with no level, a pending entry below a
- * released one, a version that cannot be bumped, and a shallow clone (whose
- * truncated history would silently mis-scope which packages are owed a release).
- */
+//
+// Drives real git repositories, because both properties that matter are properties
+// of history: the bump commit cannot re-trigger a publish loop, and two merges
+// inside one allocation window cannot double-allocate.
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -68,7 +51,6 @@ const read = (dir, relPath) => readFileSync(join(dir, relPath), "utf8");
 const RELEASED = (name) => `## 1.0.0 — 2026-08-01\n\nThe entry ${name} already shipped.\n`;
 const changelogFor = (name) => `# ${name} — CHANGELOG\n\nHow this file works.\n\n${RELEASED(name)}`;
 
-/** A repo carrying every published package at 1.0.0, one commit deep. */
 function repo() {
   const dir = mkdtempSync(join(tmpdir(), "allocate-versions-"));
   git(dir, "init", "-q", "-b", "main");
@@ -83,13 +65,6 @@ function repo() {
   return dir;
 }
 
-/**
- * `repo()` has no root `package.json`/`agent-examples/`, so `planExample
- * Repins` is a no-op against it (proven in "the repin path is a no-op" below).
- * This adds the shape it needs: a root `workspaces` field naming
- * `ADAPTER.manifest`'s directory, and `agent-examples/support-triage` pinning the
- * adapter the same way the real tree does.
- */
 function withExamples(dir, { adapterPin }) {
   write(dir, "package.json", JSON.stringify({ name: "root", private: true, workspaces: ["packages/*", "cli"] }));
   write(
@@ -102,7 +77,6 @@ function withExamples(dir, { adapterPin }) {
   );
 }
 
-/** A `npmView` stub: only the named version of the named package is published. */
 const onlyPublished = (name, version) => (n, v) =>
   n === name && v === version ? { status: "published" } : { status: "unpublished" };
 
@@ -112,7 +86,6 @@ function commit(dir, files, message = "a merge") {
   git(dir, "commit", "-q", "--allow-empty", "-m", message);
 }
 
-/** Add a pending entry to a package's CHANGELOG, the way a PR author would. */
 function pend(dir, pkg, { level = "patch", body = "- something a consumer must know" } = {}) {
   const text = read(dir, pkg.changelog);
   const at = text.indexOf("## ");
@@ -122,7 +95,6 @@ function pend(dir, pkg, { level = "patch", body = "- something a consumer must k
 const plan = (dir, npmView) => planAllocations({ root: dir, date: DATE, npmView });
 const named = (result, name) => result.allocations.find((a) => a.name === name);
 
-/** Apply a plan and commit it the way allocate-version.yml does. */
 function land(dir, result) {
   applyAllocations(result, { root: dir });
   git(dir, "add", "-A");
@@ -160,12 +132,6 @@ console.log("changelog-entry.mjs — the grammar");
     threw,
   );
 
-  // The released region is a record, never parsed for requests: the adapter's
-  // real CHANGELOG carries a bare `## Unreleased` from the Changesets era between
-  // 0.2.3 and 0.2.2, and refusing to release over a heading from July would be
-  // this parser policing history it may not correct. A NEW one put down there is
-  // caught by the gate's insertions-only check instead, since it changes the
-  // released region.
   const withHistoricalHeading = "# c\n\n## 1.0.0\n\nshipped\n\n## Unreleased\n\n## 0.9.0\n\nolder\n";
   check(
     "a pending-ish heading inside the released region is neither a request nor an error",
@@ -173,9 +139,6 @@ console.log("changelog-entry.mjs — the grammar");
       parseChangelog(withHistoricalHeading).released.includes("## Unreleased"),
   );
 
-  // Two PRs branched off the same base can each add a section. Reddening `main`
-  // over that would rebuild a smaller treadmill, so both are honoured: highest
-  // level wins, both bodies survive.
   const twoSections =
     "# c\n\n## Unreleased (patch)\n\n- from PR one\n\n## Unreleased (minor)\n\n- from PR two\n\n## 1.0.0\n\nshipped\n";
   const merged = pendingRelease(twoSections);
@@ -207,8 +170,6 @@ console.log("nothing owed");
     check("a freshly seeded tree owes nothing", result.allocations.length === 0, JSON.stringify(result.allocations));
     commit(dir, { "README.md": "# docs only\n" }, "docs");
     check("a docs-only merge owes nothing", plan(dir).allocations.length === 0);
-    // The second, independent loop guard: a CHANGELOG is not a publish-relevant
-    // path, so editing one earns no release on its own.
     commit(dir, { [CLI.changelog]: changelogFor("@pome-sh/cli").replace("How this file works.", "Reworded.") }, "preamble");
     check("editing a CHANGELOG preamble owes nothing", plan(dir).allocations.length === 0);
   } finally {
@@ -242,12 +203,6 @@ console.log("a pending entry earns a number");
     check("the commit subject carries the loop marker", result.message.startsWith(`release: @pome-sh/cli 1.0.1 ${BUMP_COMMIT_MARKER}`), result.message);
     check("the commit body records from → to and why", result.message.includes("- @pome-sh/cli 1.0.0 → 1.0.1 (patch, entry)"), result.message);
 
-    // The whole design rests on this commit's push firing release.yml, and every
-    // one of these tokens suppresses ALL workflows for the commit that carries it
-    // — a publish that never happens, with a green run and no alarm leg able to
-    // tell it from "nothing was owed". `[release-bump]` looks enough like the
-    // family to be edited into one of them by someone tidying up, so the message
-    // is asserted rather than trusted.
     const CI_SUPPRESSING = ["[skip ci]", "[ci skip]", "[no ci]", "[skip actions]", "[actions skip]", "***NO_CI***"];
     check(
       "the commit message contains NO CI-suppressing token",
@@ -342,8 +297,6 @@ console.log("the bump commit cannot re-trigger a publish loop");
         read(dir, CLI.changelog).includes("## 1.0.1"),
     );
 
-    // And it stays terminated across the next unrelated push, which is when a
-    // marker-only guard would have let the bump commit's own diff back in.
     commit(dir, { "README.md": "# docs\n" }, "docs after a release");
     check("a later docs merge does not re-open it", plan(dir).allocations.length === 0);
   } finally {
@@ -355,8 +308,6 @@ console.log("two merges inside one window cannot double-allocate");
 {
   const dir = repo();
   try {
-    // Both PRs merge before the allocator gets to run — the exact race the old
-    // hand-written version line turned into a renumber-and-force-push cycle.
     pend(dir, CLI, { body: "- from PR one" });
     commit(dir, { "cli/src/one.ts": "export const a = 1;\n" }, "PR one (#106)");
     pend(dir, CLI, { level: "minor", body: "- from PR two" });
@@ -426,9 +377,6 @@ console.log("a shallow clone is refused, not silently mis-scoped");
 console.log("the script's own surface");
 {
   const dir = repo();
-  // Outside the repo: allocate-version.yml writes these under $RUNNER_TEMP for
-  // the same reason, and a leftover file inside the tree would show up in the
-  // `git commit -a` the workflow runs next.
   const out = mkdtempSync(join(tmpdir(), "allocate-out-"));
   try {
     pend(dir, WIRE, { body: "- wire moved" });
@@ -453,8 +401,6 @@ console.log("the script's own surface");
       readFileSync(regenOut, "utf8"),
     );
 
-    // The no-op run is the one that happens most often (every push that owes
-    // nothing), so its exit code and its files matter as much as the other.
     git(dir, "add", "-A");
     git(dir, "commit", "-qm", `release: 3 packages ${BUMP_COMMIT_MARKER}`);
     const again = spawnSync("node", [SCRIPT, "--write", "--regen-out", regenOut, dir], {
@@ -475,9 +421,6 @@ console.log("repin — a no-op without agent-examples/");
 {
   const dir = repo();
   try {
-    // repo() never creates a root package.json or agent-examples/, exactly like
-    // every OTHER fixture above — proving that stays true is what keeps this
-    // whole suite honest about the new code path touching nothing by default.
     check("no repins are planned", plan(dir).repins.length === 0);
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -488,11 +431,6 @@ console.log("repin — a broken example can never block a version allocation");
 {
   const dir = repo();
   try {
-    // The whole reason the repin call is wrapped: this runs on EVERY push to
-    // main, so a throw anywhere in the example walk would stop every package's
-    // release over one example directory. A manifest that is not valid JSON is
-    // the cheapest reachable vector (discoverExampleSiblingDeps JSON.parses it
-    // unguarded); the guard is around the call, so it covers the others too.
     withExamples(dir, { adapterPin: "0.9.0" });
     write(dir, "agent-examples/broken/package.json", "{ this is not json");
     pend(dir, CLI, { body: "- a fix consumers need" });
@@ -549,11 +487,6 @@ console.log("repin — the version THIS run allocates is never repinned to in th
 {
   const dir = repo();
   try {
-    // The adapter's OWN version is being bumped 1.0.0 -> 1.0.1 in this run
-    // (via a pending entry); support-triage still pins the OLD 1.0.0. Nothing
-    // has published 1.0.1 yet — that is release.yml's job, on this run's own
-    // future push — so repinning to it now would set a pin `npm install
-    // --package-lock-only` cannot resolve.
     withExamples(dir, { adapterPin: "1.0.0" });
     pend(dir, ADAPTER, { body: "- the adapter learned a thing" });
     git(dir, "add", "-A");
@@ -571,8 +504,6 @@ console.log("repin — the version THIS run allocates is never repinned to in th
     land(dir, result);
     check("the manifest still pins 1.0.0 after landing — nothing broke npm ci", JSON.parse(read(dir, "agent-examples/support-triage/package.json")).dependencies["@pome-sh/adapter-claude-sdk"] === "1.0.0");
 
-    // The NEXT run, once 1.0.1 is (now) published, closes the gap fully
-    // automatically — no human PR, just one push later.
     const npmViewNowNew = onlyPublished("@pome-sh/adapter-claude-sdk", "1.0.1");
     const next = plan(dir, npmViewNowNew);
     check("the next run repins to the now-published 1.0.1", next.repins.length === 1 && next.repins[0].to === "1.0.1", JSON.stringify(next.repins));
@@ -581,7 +512,7 @@ console.log("repin — the version THIS run allocates is never repinned to in th
   }
 }
 
-console.log("repin — replays the two real incidents (adapter 0.3.4 and 0.3.6, both 2026-08-13)");
+console.log("repin — replays two observed pin-drift incidents");
 for (const { from, to } of [
   { from: "0.3.3", to: "0.3.4" }, // #395
   { from: "0.3.5", to: "0.3.6" }, // #425

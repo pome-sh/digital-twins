@@ -1,50 +1,13 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// THE PR-TIME HALF OF THE RELEASE CONTRACT, re-scoped from
-// scripts/ci/check-version-bump-required.mjs, whose history is under that path
-// (the rewrite is large enough that `--follow` will not bridge it).
+// The PR-time half of the release contract: no hand-written version, an
+// `## Unreleased (level)` entry per artifact the PR moves, released entries never
+// rewritten, and each newest released heading still naming its manifest version.
 //
-// WHAT CHANGED, AND WHY THE FILE SURVIVED THE CHANGE. The old gate demanded that
-// a PR touching a package's publish-relevant paths BUMP that package's version.
-// It was right about the failure it existed to catch — `release.yml` publishes on
-// a version diff, so an unbumped change merges clean and silently never reaches
-// npm — and wrong about who should answer it. Every PR carrying the shared
-// version line meant every merge invalidated every open PR that had pinned a
-// consumed number, silently, across workspaces and humans (measured 2026-08-13:
-// #402/#405 stale-green overnight, five renumber+force-push cycles in one night,
-// 0.23.35/.36 burned unpublished). The NUMBER moved to
-// `allocate-release-versions.mjs`, on `main`, after the merge.
-//
-// The publish-relevance logic — which paths move which artifact, including the
-// wire→cli/adapter/checks coupling — did not become wrong; it became the
-// allocator's authority, and lives in `publish-relevance.mjs` where both read it.
-// What is left here is everything about a release that a PR is still the right
-// place to decide, which is all of it except the number:
-//
-//   1. NO HAND-WRITTEN NUMBER. A PR may not move a published package's `version`
-//      field. This is the invariant that makes every other PR's green mean
-//      something: nothing a PR contains can be invalidated by someone else's
-//      merge if no PR carries the number.
-//   2. AN ENTRY, FOR EVERY ARTIFACT THE PR MOVES. Publish-relevant paths changed
-//      ⇒ that package's CHANGELOG carries an `## Unreleased (patch|minor)`
-//      section with prose under it. The words and the patch/minor judgement stay
-//      with the author; only the number leaves.
-//   3. RELEASED ENTRIES ARE NEVER REWRITTEN. The region from the newest released
-//      heading down is byte-identical to the base branch's. This is the
-//      insertions-only property, checked against a real base rather than assumed
-//      — the allocator holds the same property by construction (see
-//      `changelog-entry.mjs`).
-//   4. THE HEADING AND THE NUMBER STILL AGREE. Each package's newest released
-//      heading names the version its manifest declares. That was the whole old
-//      CHANGELOG contract; it is now a fact about `main` that the allocator
-//      maintains, and this is where it stays checked.
-//
-// Runs as one of ci.yml's cheap, dependency-free gates (git reads only, no npm
-// install needed). Only meaningful against a PR's actual base, which is why
-// ci.yml guards it with `github.event_name == 'pull_request'`.
-//
-// Usage: node scripts/ci/check-release-note-required.mjs <base-sha>
+// The base must come from the checked-out history, not `pull_request.base.sha`,
+// which is pinned at the last synchronize. For a STACKED PR the base is its base
+// branch — checking against main gives a false green.
 
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
@@ -63,7 +26,6 @@ const changedFiles = execFileSync("git", ["diff", "--name-only", baseSha, "HEAD"
   .split("\n")
   .filter(Boolean);
 
-/** A file's contents at a ref, or null when it wasn't there. */
 function showAt(ref, path) {
   try {
     return execFileSync("git", ["show", `${ref}:${path}`], {
@@ -79,9 +41,6 @@ const failures = [];
 const touched = new Map(packagesTouchedBy(changedFiles).map((hit) => [hit.pkg.name, hit.files]));
 
 for (const pkg of PUBLISHED_PACKAGES) {
-  // The table's own paths must exist, so the allocator and release-alarm.mjs can
-  // read them without a "file missing" branch that would have to choose between
-  // silence and a false alarm. Cheapest possible place to assert it.
   const missing = [pkg.manifest, pkg.changelog].filter((path) => !existsSync(path));
   if (missing.length > 0) {
     failures.push(
@@ -95,9 +54,6 @@ for (const pkg of PUBLISHED_PACKAGES) {
   const baseManifest = showAt(baseSha, pkg.manifest);
   const baseVersion = baseManifest === null ? null : JSON.parse(baseManifest).version;
 
-  // 1 — the number is not this PR's to write. A brand-new package is the one
-  // exception: its first version has no base to differ from, and someone has to
-  // type the line that starts the line.
   if (baseVersion !== null && headVersion !== baseVersion) {
     failures.push(
       `${pkg.name}: this PR moves ${pkg.manifest}'s version from ${baseVersion} to ${headVersion}. ` +
@@ -120,7 +76,6 @@ for (const pkg of PUBLISHED_PACKAGES) {
     continue;
   }
 
-  // 2 — an entry for every artifact this PR moves.
   const relevantFiles = touched.get(pkg.name) ?? [];
   if (relevantFiles.length > 0 && !pending?.body) {
     failures.push(
@@ -136,17 +91,12 @@ for (const pkg of PUBLISHED_PACKAGES) {
     );
   }
 
-  // 3 — insertions only. Compared as bytes against the base branch: a rewritten
-  // released entry is a record that changed after the fact, and the released
-  // region is the one part of this file nobody may touch.
   const baseChangelog = showAt(baseSha, pkg.changelog);
   if (baseChangelog !== null) {
     let baseReleased = null;
     try {
       baseReleased = parseChangelog(baseChangelog, pkg.changelog).released;
     } catch {
-      // The BASE is malformed, which this PR cannot be blamed for and which the
-      // parse of HEAD above already reports if the PR leaves it that way.
       baseReleased = null;
     }
     if (baseReleased !== null && baseReleased !== headParsed.released) {
@@ -160,7 +110,6 @@ for (const pkg of PUBLISHED_PACKAGES) {
     }
   }
 
-  // 4 — the surviving half of the old CHANGELOG contract.
   if (headParsed.releasedHeading !== null) {
     const declared = headParsed.releasedHeading.replace(/^##\s+/, "").split(/\s/)[0];
     if (declared !== headVersion) {
@@ -180,9 +129,6 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-// The counts are printed because a gate that only ever says "OK" cannot be told
-// apart from one whose subject has gone empty — the same reason
-// release-alarm.mjs carries a --targets dead-guard.
 const exempt = changedFiles.filter((file) => isPublishIrrelevantPath(file)).length;
 console.log(
   `Release inputs OK. ${PUBLISHED_PACKAGES.length} published package(s); ` +
