@@ -1,26 +1,25 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// THE VERSION-ALLOCATING PUSH CAN ONLY EVER HAPPEN WITH THE APP TOKEN.
+// The version-allocating push can only ever happen with the app token.
 //
 // `allocate-version.yml`'s checkout carries a fallback:
 //
 //     token: ${{ steps.app-token.outputs.token || github.token }}
 //
-// That fallback exists for ONE arm — the `pull_request` arm, which plans and never
-// writes, and which on a fork has no secrets at all. Everywhere else it must be
-// unreachable, because reaching it is a silent double failure: `github-actions` can
-// never be a ruleset bypass actor (so the push is refused), and a push made with
-// `GITHUB_TOKEN` does not trigger workflows (so if it somehow landed, no
-// `release.yml` run would ever publish it). Both look like a quiet green, which is
-// the failure class this whole apparatus exists to remove.
+// That exists for ONE arm — the `pull_request` arm, which plans, never writes,
+// and on a fork has no secrets at all. Everywhere else it must be unreachable,
+// because reaching it is a silent double failure: `github-actions` can never be
+// a ruleset bypass actor, so the push is refused; and a push made with
+// `GITHUB_TOKEN` triggers no workflows, so if it somehow landed, no
+// `release.yml` run would publish it. Both look like a quiet green.
 //
-// A comment saying "this fallback is only for PRs" is not a guarantee. Four edits
-// would each make it reachable on a push, none of them obviously wrong in review:
+// A comment saying "this fallback is only for PRs" is not a guarantee. Four
+// edits would each make it reachable on a push, none obviously wrong in review:
 // dropping the precondition step, marking the precondition or the mint step
-// `continue-on-error: true`, narrowing either step's `if:` so it can be false on a
-// push, or handing the push step `github.token` directly. So the reachability is a
-// PROPERTY over the workflow text, checked here.
+// `continue-on-error: true`, narrowing either step's `if:` so it can be false
+// on a push, or handing the push step `github.token` directly. So the
+// reachability is a PROPERTY over the workflow text, checked here.
 //
 // ── WHAT IS ASSERTED, AND WHY EACH LINE HOLDS THE PROPERTY ───────────────────
 //
@@ -46,19 +45,18 @@
 //      fallback's whole reason for being; if it disappears, the fallback should go
 //      with it rather than sit there reachable-in-principle.
 //   6. The checkout ref is per arm, and its non-PR branch is `main` — the moving
-//      TIP, not the event sha, because a second merge that landed while this run
-//      queued belongs in the same release. This one is here because the first live
-//      run of this workflow died on it: an unconditional `ref: main` checks out a
-//      tree WITHOUT the PR's own files, so the plan-only arm — whose entire job is
-//      to prove this PR's allocator still runs — failed with
-//      `Cannot find module …/allocate-release-versions.test.mjs` (PR #421).
-//      Asserted only while the file has a `pull_request:` trigger to serve.
+//      TIP, not the event sha, because a second merge that landed while this
+//      run queued belongs in the same release. An unconditional `ref: main`
+//      checks out a tree WITHOUT the PR's own files, so the plan-only arm —
+//      whose entire job is to prove this PR's allocator still runs — dies with
+//      `Cannot find module …/allocate-release-versions.test.mjs`. Asserted only
+//      while the file has a `pull_request:` trigger to serve.
 //   7. Floors: the file exists, and the push-step and mint-step counts are
 //      non-zero. A checker whose subject has gone empty passes forever.
 //
 // Comment stripping is `list-scheduled-workflows.mjs`'s, not a third copy: its
-// stripper is quote-aware because a blanket `#.*$` once truncated two distinct
-// quoted values to the same mangled prefix and made a bijection compare two
+// stripper is quote-aware, because a blanket `#.*$` truncates two distinct
+// quoted values to the same mangled prefix and makes a bijection compare two
 // equal wrecks.
 //
 // Usage: node scripts/ci/assert-allocate-token-path.mjs [repo root]
@@ -262,7 +260,7 @@ export function checkAllocateTokenPath(root) {
           `bypass actor, and a push made with it does not trigger release.yml.`,
       );
     }
-    // A refusal is not a race. The first live run of this workflow spent all
+    // A refusal is not a race. Without this branch a rule violation spends all
     // three attempts reporting "a merge landed first" while main was answering
     // GH013 (classic branch protection's duplicate required-checks rule, which no
     // App can bypass). Retrying cannot fix a rule, and a retry loop that cannot
@@ -318,7 +316,7 @@ export function checkAllocateTokenPath(root) {
           `the checkout \`ref: ${step.ref}\` is unconditional while this workflow still has a ` +
             `\`pull_request:\` trigger. On that arm it checks out a tree WITHOUT the PR's own files, so ` +
             `the plan-only arm proves nothing and reds on the first missing module — which is exactly ` +
-            `how this workflow's first live run died. Use ` +
+            `how a rule violation reads as a lost race. Use ` +
             `\`\${{ github.event_name == 'pull_request' && github.ref || 'main' }}\`.`,
         );
       }

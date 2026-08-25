@@ -1,30 +1,16 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
 #
-# F-1534 — the ONE hardened path for a cosign interaction in
+# The ONE hardened path for a cosign interaction in
 # `.github/workflows/**`. Signs and SPDX-attests every tag in `IMAGE_TAGS`,
 # verifies each back out of the registry, and refuses to report success on
 # anything it could not verify.
 #
-# WHY THE RETRY EXISTS. F-1530 moved the registry WRITE into
-# scripts/ci/push-scanned-image.sh and gave it a five-attempt ladder. The
-# sign/attest/verify path moved into this file in the same PR and got none, so
-# it became the last unretried GHCR interaction in twin-image.yml's publish job
-# — one step with no attempt siblings, standing between an SBOM fetch and a
-# cosign install that both have three-attempt ladders (F-1489, F-1494) and a
-# push that now has five.
-#
-# It broke the next day. On 2026-08-18 run 32144441622 hit a degraded GHCR that
-# took out three of the five legs in two different steps. gmail and linear died
-# in the push (`error parsing HTTP 403 response body`, nothing published).
-# stripe got all the way through — both tags pushed, both signed, both attested
-# — and then died HERE, on `verify-attestation`'s registry read:
-#
-#   GET https://ghcr.io/token?scope=repository:pome-sh/twins:pull&service=ghcr.io:
-#   DENIED: denied
-#
-# That is a red job over an artifact that is correct and already public, which
-# is the property that makes this script's failure mode different from the push
+# WHY THE RETRY EXISTS. A degraded GHCR can push both tags, sign them, attest
+# them, and then fail `verify-attestation`'s registry READ with `DENIED:
+# denied`. That is a red job over an artifact that is correct and already
+# public, which is the property that makes this script's failure mode different
+# from the push
 # script's and drives every choice below.
 #
 # Properties, all four load-bearing:
@@ -34,10 +20,10 @@
 #      the `imagetools inspect` that resolves a tag to its digest reads too, and
 #      is the FIRST call here, so leaving it bare would fail the leg before the
 #      ladder below it was ever reached. A `DENIED`, 403 or 5xx from any of them
-#      is a fact about the registry, not a verdict about the artifact.
-#      scripts/ci/assert-hardened-cdn-fetches.mjs's shape (d) is why reads are in
-#      scope here when shape (c) exempts them: a failed read during the PUSH
-#      publishes nothing, while a failed read here happens after publication.
+#      is a fact about the registry, not a verdict about the artifact. Shape
+#      (d) of assert-hardened-cdn-fetches.mjs is why reads are in scope here
+#      when shape (c) exempts them: a failed read during the PUSH publishes
+#      nothing, while a failed read here happens after publication.
 #
 #   2. THE RETRY IS PER OPERATION, NOT AROUND THE PER-TAG BODY. Wrapping the
 #      whole body would re-run `sign` and `attest` because `verify` could not
@@ -52,12 +38,11 @@
 #      and then lost the connection costs a duplicate layer, never a wrong
 #      verdict.
 #
-#   3. SAME BUDGET AS THE PUSH. Five attempts, sleeping 5s/10s/15s/20s — the
-#      same numbers as scripts/ci/push-scanned-image.sh and
-#      scripts/ci/fetch-pinned-release.sh, so the publish path has one budget to
-#      reason about rather than three. An explicit loop with a literal `sleep`,
-#      for the reason those helpers' headers record: a retry budget that looks
-#      handled and is not is worse than none.
+#   3. SAME BUDGET AS THE PUSH. Five attempts, sleeping 5s/10s/15s/20s, the
+#      same numbers as push-scanned-image.sh and fetch-pinned-release.sh, so
+#      the publish path has one budget to reason about rather than three. An
+#      explicit loop with a literal `sleep`: a retry budget that looks handled
+#      and is not is worse than none.
 #
 #   4. FAIL CLOSED, NAMING WHAT IS ALREADY PUBLIC. An image that cannot be
 #      signed, attested or verified must stop the job — pome-cloud's deploy gate
@@ -117,7 +102,7 @@ fail_out() {
   else
     landed="Signed, attested and verified: $(printf '%s' "${verified_refs}" | tr '\n' ' ' | sed 's/ *$//')."
   fi
-  echo "::error::twin image sign: ${operation} did not succeed for ${ref} after ${attempts} attempts against ${registry}. The registry is degraded; this is not a failure of the twin, the build or the signature (F-1534). Failing closed on purpose — pome-cloud's deploy gate hard-gates the image signature, so an unverified image must not read as published-and-good. Note the tags are ALREADY PUBLISHED: scripts/ci/push-scanned-image.sh pushed and read back every tag in IMAGE_TAGS before this step ran. ${ref} is ${progress}. ${landed} Re-running this job re-signs and re-verifies; it needs no rebuild." >&2
+  echo "::error::twin image sign: ${operation} did not succeed for ${ref} after ${attempts} attempts against ${registry}. The registry is degraded; this is not a failure of the twin, the build or the signature Failing closed on purpose — pome-cloud's deploy gate hard-gates the image signature, so an unverified image must not read as published-and-good. Note the tags are ALREADY PUBLISHED: scripts/ci/push-scanned-image.sh pushed and read back every tag in IMAGE_TAGS before this step ran. ${ref} is ${progress}. ${landed} Re-running this job re-signs and re-verifies; it needs no rebuild." >&2
   exit 1
 }
 

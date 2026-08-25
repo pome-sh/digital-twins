@@ -38,14 +38,12 @@
 //
 // ── Assertions 4 and 5 are the ones that earn their keep ────────────────────
 //
-// The ticket's own instruction was "do not assume; the tarball gate asserts the
-// final dependency set either way". So rather than a hand-kept allowlist of
-// permitted externals, this reads every bare specifier out of the SHIPPED bytes
-// — JS and `.d.ts` both — and requires each to be a node: builtin, the zod
-// peer, or a declared runtime dependency (4). Then it requires the converse:
-// every declared dependency is actually imported (5). Without 5 the manifest
-// can name a package nothing uses, which a consumer still installs and still
-// audits — `@hono/node-server` was exactly that here until this gate said so.
+// Rather than a hand-kept allowlist of permitted externals, this reads every
+// bare specifier out of the SHIPPED bytes — JS and `.d.ts` both — and requires
+// each to be a node: builtin, the zod peer, or a declared runtime dependency
+// (4). Then the converse: every declared dependency is actually imported (5).
+// Without 5 the manifest can name a package nothing uses, which a consumer
+// still installs and still audits.
 //
 // Modes:
 //   --manifest-only  Only what is readable from package.json (private, no

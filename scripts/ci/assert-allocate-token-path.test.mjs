@@ -226,7 +226,7 @@ console.log("the pushing step");
   );
   check("a neutralised guard reds", names(neutralised).includes("pushing step"), names(neutralised));
 
-  // The first live run spent all three attempts reporting "a merge landed first"
+  // Without this, all three attempts report "a merge landed first"
   // while main was answering GH013. Collapsing the rule-violation branch back
   // into a bare retry is the "simplification" that would restore that.
   const raceOnly = run((t) => t.replace(/GH013/g, "GH0XX"));
@@ -281,9 +281,9 @@ console.log("the fallback itself");
   );
 }
 
-console.log("the checkout ref, per arm — the way the first live run actually died");
+console.log("the checkout ref, per arm");
 {
-  // PR #421's first run: `ref: main` on a pull_request event checks out a tree
+  // `ref: main` on a pull_request event checks out a tree
   // WITHOUT the PR's files, so the arm that exists to prove this PR's allocator
   // runs died with `Cannot find module …/allocate-release-versions.test.mjs`.
   const unconditional = run((t) =>

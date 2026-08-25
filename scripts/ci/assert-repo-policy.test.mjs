@@ -343,7 +343,7 @@ function main() {
     // Green runs must name what is NOT watched live, so a reader is never
     // told coverage is total. Deletion is now asserted live (the
     // ruleset carries the rule), so bypass_actors is the only named gap and
-    // the NOT-verified line must no longer mention deletion.
+    // the NOT-verified line must not mention deletion.
     const r = runAssert(baseRules());
     assert(r.stdout.includes("NOT verified live"), r.stdout);
     assert(r.stdout.includes("bypass_actors"), r.stdout);

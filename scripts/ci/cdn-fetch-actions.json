@@ -1,6 +1,6 @@
 {
   "_readme": [
-    "F-1489 — the classification half of scripts/ci/assert-hardened-cdn-fetches.mjs.",
+    "The classification half of scripts/ci/assert-hardened-cdn-fetches.mjs.",
     "",
     "WHAT IS DERIVED, AND WHAT IS NOT. The gate derives the SET OF ACTIONS TO JUDGE",
     "from `.github/workflows/**` — never from this file — so a new `uses:` step is",
@@ -44,7 +44,7 @@
       "fetchesFromCdn": false,
       "hardening": "not-needed",
       "why": "A bundled JavaScript action (dist/main.cjs, no network install) that signs a JWT with the private key it is handed and exchanges it at api.github.com for an installation token. It downloads no executable. Its only network call is to GitHub's own API, so a failure here is a GitHub outage and not a third-party CDN one — and it must NOT be retried blind under continue-on-error, because a failure that is actually a bad/rotated private key or an installation that no longer covers this repository should red allocate-version.yml loudly rather than be attempted three times.",
-      "evidence": "actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1, verified against the live repo to be exactly refs/tags/v3.2.0 (commit \"chore(main): release 3.2.0 (#370)\", 2026-05-12); action.yml `runs: using: node24, main: dist/main.cjs`. Same ref pome-cloud pins in fidelity-watch.yml and declared-diff.yml (PR #730), deliberately, so the two repos' release paths cannot drift onto different versions of the same mint step."
+      "evidence": "actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1, verified against the live repo to be exactly refs/tags/v3.2.0 (commit \"chore(main): release 3.2.0 (#370)\", 2026-05-12); action.yml `runs: using: node24, main: dist/main.cjs`. The same ref the sibling repository pins, deliberately, so the two repos' release paths cannot drift onto different versions of the same mint step."
     },
     "actions/setup-node": {
       "fetchesFromCdn": false,
@@ -91,8 +91,8 @@
     "anchore/sbom-action": {
       "fetchesFromCdn": true,
       "hardening": "repeat-attempts",
-      "why": "Downloads the syft binary from the anchore release CDN (github.com/anchore/syft/releases) on every run, with no retry of its own. THIS IS F-1489's SUBJECT: a 503 there killed the stripe twin-image job twice on 2026-08-12 (PRs #390, #391) with `[error] received HTTP status=503 ... [error] unable to find tag=''`. On a PR that is noise; on main the cosign sign/attest steps below it do run, so the same 503 fails an image publish. Retrying the whole step is sound here because the step has no verdict of its own — SBOM generation either produces the file or fails for an infrastructure reason.",
-      "evidence": "anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 (v0.24.0), action.yml `syft-version` input; observed run output quoted in F-1489."
+      "why": "Downloads the syft binary from the anchore release CDN (github.com/anchore/syft/releases) on every run, with no retry of its own. A 503 there has killed a twin-image job twice within minutes (`[error] received HTTP status=503 ... [error] unable to find tag=''`). On a PR that is noise; on main the cosign sign/attest steps below it do run, so the same 503 fails an image publish. Retrying the whole step is sound here because the step has no verdict of its own — SBOM generation either produces the file or fails for an infrastructure reason.",
+      "evidence": "anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 (v0.24.0), action.yml `syft-version` input."
     },
     "sigstore/cosign-installer": {
       "fetchesFromCdn": true,
@@ -103,14 +103,14 @@
     "aquasecurity/trivy-action": {
       "fetchesFromCdn": true,
       "hardening": "step-is-the-check",
-      "why": "Composite action whose first step is `aquasecurity/setup-trivy`, which downloads the Trivy binary from its release CDN — so the exposure is real. It is deliberately NOT wrapped in a repeated-attempt group, because in this repo the step runs with `exit-code: '1'` on HIGH/CRITICAL: its failure means EITHER the install broke OR Trivy found a fixable vulnerability. A repeated-attempt group retries the whole step, so attempts 1 and 2 would swallow a real CVE finding under `continue-on-error`, and the `::warning::` would report a flaky download on a run that actually found a vulnerability. Turning a finding into a retry is a worse property than the one F-1489 fixes.",
-      "residual": "A trivy install that 5xxes still reds twin-image, and on main still stops a publish, with no retry. Closing it means splitting the install from the scan — `skip-setup-trivy: true` on the trivy-action step plus an explicit `aquasecurity/setup-trivy` step in a repeated-attempt group — which adds a third-party pin and rewires the scanner on the publish path. Out of scope for F-1489, which is about the SBOM/sign leg; file it against twin-image.yml when the trivy CDN actually costs a run.",
+      "why": "Composite action whose first step is `aquasecurity/setup-trivy`, which downloads the Trivy binary from its release CDN — so the exposure is real. It is deliberately NOT wrapped in a repeated-attempt group, because in this repo the step runs with `exit-code: '1'` on HIGH/CRITICAL: its failure means EITHER the install broke OR Trivy found a fixable vulnerability. A repeated-attempt group retries the whole step, so attempts 1 and 2 would swallow a real CVE finding under `continue-on-error`, and the `::warning::` would report a flaky download on a run that actually found a vulnerability. Turning a finding into a retry is a worse property than the flakiness it would paper over.",
+      "residual": "A trivy install that 5xxes still reds twin-image, and on main still stops a publish, with no retry. Closing it means splitting the install from the scan — `skip-setup-trivy: true` on the trivy-action step plus an explicit `aquasecurity/setup-trivy` step in a repeated-attempt group — which adds a third-party pin and rewires the scanner on the publish path. Out of scope here, which is the SBOM/sign leg; file it against twin-image.yml when the trivy CDN actually costs a run.",
       "evidence": "aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 (v0.36.0), action.yaml lines 120-133."
     },
     "trufflesecurity/trufflehog": {
       "fetchesFromCdn": true,
       "hardening": "step-is-the-check",
-      "why": "Named in F-1489's sweep list, and swept: at the pinned ref it is a composite action that `docker run`s ghcr.io/trufflesecurity/trufflehog (and apt-get installs jq if missing). That is a container-registry pull, not a release-CDN binary fetch, so the sha256-pinned-fetch path has nothing to pin. It is also, like trivy, a step that IS the check — its failure normally means a verified secret was found, and retrying it twice under `continue-on-error` would swallow exactly that.",
+      "why": "Swept: at the pinned ref it is a composite action that `docker run`s ghcr.io/trufflesecurity/trufflehog (and apt-get installs jq if missing). That is a container-registry pull, not a release-CDN binary fetch, so the sha256-pinned-fetch path has nothing to pin. It is also, like trivy, a step that IS the check — its failure normally means a verified secret was found, and retrying it twice under `continue-on-error` would swallow exactly that.",
       "residual": "A GHCR outage still reds secret-scan (a required context) with no retry. The fix, if it ever costs a run, is a `docker pull` of the image in a repeated-attempt group BEFORE the scan step, leaving the scan itself un-retried — not wrapping the scan. The image tag is pinned only because secret-scan.yml passes `version:` explicitly; this action's own default is the mutable `latest`, so that input is part of the pin, not a convenience.",
       "evidence": "trufflesecurity/trufflehog@27b0417c16317ca9a472a9a8092acce143b49c55 (v3.95.9), action.yml `runs: using: composite`, `image` input defaulting to ghcr.io/trufflesecurity/trufflehog."
     }

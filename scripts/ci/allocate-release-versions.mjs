@@ -1,19 +1,17 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// THE NUMBER IS WRITTEN HERE, ON `main`, AFTER THE MERGE.
+// The number is written here, on main, after the merge.
 //
-// Every twins PR used to hand-write the shared version line, so every merge
-// invalidated every open PR that had pinned a consumed number — silently
-// (stale-green), across workspaces and humans, worse the more work ran in
-// parallel. Measured 2026-08-13: #402/#405 went stale-green overnight, five
-// renumber+force-push cycles in one batch night, 0.23.35/.36 burned unpublished.
-// The rejected alternative, recorded because it is the cheaper one and someone
-// will suggest it again: have PRs write a placeholder and compute the real
-// number at publish time from the registry's `latest`. It makes release.yml's
-// `plan` job vacuous — "behind the registry is a hard failure" becomes
-// structurally impossible to trip, so the check passes forever without ever
-// being able to fire.
+// A version line hand-written in a PR invalidates every other open PR that
+// pinned it, silently, because those PRs stay green — their CI ran before the
+// merge. Writing it on the tip instead removes the whole class.
+//
+// The tempting alternative, recorded because it is cheaper and will be
+// suggested again: have PRs write a placeholder and compute the real number at
+// publish time from the registry's `latest`. It makes release.yml's `plan` job
+// vacuous — "behind the registry is a hard failure" becomes structurally
+// impossible to trip, so that check passes forever without being able to fire.
 //
 // This script is the whole of "the pipeline writes it". `.github/workflows/
 // allocate-version.yml` runs it on every push to `main`; it writes version lines
@@ -42,7 +40,7 @@
 // owed a release with no pending entry gets a patch plus an entry naming the
 // commits — see `derivedEntry()` for why that is written rather than refused.
 //
-// ── THE THREE PROPERTIES THE TICKET ASKS FOR ─────────────────────────────────
+// ── THE THREE PROPERTIES THAT HOLD ──────────────────────────────────────────
 //
 // 1. THE BUMP COMMIT CANNOT RE-TRIGGER A PUBLISH LOOP. Relevance is measured
 //    from `lastVersionChange()` — the newest commit that moved that package's

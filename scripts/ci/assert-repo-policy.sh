@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# F-696 — assert public-repo policy for pome-twins main.
-# F-1212 — the live drift check used to call the legacy
-# GET .../branches/{branch}/protection + GET .../rulesets endpoints, which
-# need Administration:read. GITHUB_TOKEN cannot hold that scope, so the
-# check depended on a hand-minted PAT (REPO_POLICY_TOKEN) that never existed
-# — the weekly cron has been red since it shipped and the live step never
-# ran once. GET .../rules/branches/{branch} returns the same effective rules
-# (pull_request review count, required status checks, non-fast-forward,
+# Assert the protected-main policy: pull request, review, required checks.
+#
+# The live check reads GET .../rules/branches/{branch}, which an ordinary
+# GITHUB_TOKEN can call. Do NOT move it to GET .../branches/{branch}/protection
+# or GET .../rulesets/{id}: both need Administration:read, which GITHUB_TOKEN
+# cannot hold. /protection is auth-gated outright, and /rulesets/{id} answers
+# 200 for any caller on a public repo but ELIDES bypass_actors without that
+# scope — so it would pass while checking nothing. This endpoint returns the
+# same effective rules
 # deletion) for a metadata-scoped GITHUB_TOKEN, no PAT needed.
 #
 # The property that matters: this must FAIL, not silently pass, if the rules
@@ -16,7 +17,7 @@
 # with no matching rule, is a hard failure naming that policy — never
 # treated as "nothing to check".
 #
-# Verified against the live repo (F-1212 review): this endpoint returns only
+# This endpoint returns only
 # rules from rulesets whose enforcement is `active`. A ruleset flipped to
 # `evaluate` or `disabled` drops out entirely, so its rules vanish from this
 # payload and the empty-array branch below hard-fails. That is why enforcement
@@ -44,8 +45,8 @@ TOKEN="${GITHUB_TOKEN:?GITHUB_TOKEN required (ordinary Actions token; no PAT nee
 RULES_OUT="$(mktemp)"
 trap 'rm -f "${RULES_OUT}"' EXIT
 
-# F-1180 — the contexts live in config/required-checks.json. A second
-# hand-maintained copy of the same list is the F-1135 shape: one goes stale
+# The contexts live in config/required-checks.json. A second hand-maintained
+# copy of the same list goes stale
 # while both still look like they are watching.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 REQUIRED_CHECKS_FILE="${REQUIRED_CHECKS_FILE:-${REPO_ROOT}/config/required-checks.json}"

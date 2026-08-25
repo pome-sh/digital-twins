@@ -1,24 +1,19 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// THE CHANGELOG CONTRACT, now that the number is not the author's.
-//
-// The old contract was one rule: a package's `CHANGELOG.md` top heading must
-// equal the version in the same PR. That rule is what made every open PR carry
-// the number twice, and it is why a merge somewhere else invalidated both copies
-// at once. The new contract splits it by authorship:
-//
-//   ## Unreleased (patch)      ← the AUTHOR writes this, in the PR, with the
+// The CHANGELOG contract. The number is not the author's, so the contract is
+// split by authorship:
+//   ## Unreleased (patch)      <- the AUTHOR writes this, in the PR, with the
 //                                 prose under it. `patch` / `minor` is a
 //                                 judgement about consumers (all packages are
-//                                 pre-1.0, so minor plays the major role), so it stays
-//                                 with the person who made the change.
+//                                 pre-1.0, so minor plays the major role), so
+//                                 it stays with the person who made the
+//                                 change.
 //   ## 0.23.46 — 2026-08-14    ← `allocate-release-versions.mjs` writes this,
 //                                 on `main`, once, when it cuts the number.
 //
-// The heading↔number binding therefore still exists and still cannot drift — it
-// is now created in the same commit that creates the number, by the same script,
-// instead of being asserted after the fact against two hand-written copies.
+// The heading-to-number binding cannot drift: it is created in the same commit
+// that creates the number, by the same script.
 //
 // THREE PROPERTIES THIS FILE HOLDS, and each is a test in
 // `check-release-note-required.test.mjs` / `allocate-release-versions.test.mjs`:
@@ -33,8 +28,7 @@
 //      mentions "unreleased" but is not exactly `## Unreleased (patch|minor)`
 //      THROWS, naming the file and the line. The alternative — treating it as
 //      "no pending entry" — means a release request that reads as silence, which
-//      is the failure mode this repo has been bitten by often enough to have a
-//      rule about it in AGENTS.md.
+//      is the failure mode AGENTS.md has a rule about.
 //   3. No default level. `## Unreleased` with no level is refused rather than
 //      assumed to be a patch: whether a change forces consumers to act is not
 //      something a script can infer, and quietly guessing "patch" would ship a
@@ -59,7 +53,7 @@ export const PENDING_HEADING_EXAMPLE = "## Unreleased (patch)";
 const HEADING_RE = /^##[ \t].*$/gm;
 /** The only accepted pending heading. Case-insensitive, otherwise exact. */
 const PENDING_RE = /^##[ \t]+Unreleased[ \t]*\((patch|minor)\)[ \t]*$/i;
-/** "This heading is TRYING to be the pending one" — used to refuse near-misses. */
+/** "This heading is TRYING to be the pending one" — refuses near-misses. */
 const PENDING_ISH_RE = /^##[ \t].*unreleased/i;
 
 const LEVEL_RANK = { patch: 0, minor: 1 };

@@ -6,7 +6,6 @@
 // `scripts/clean-room-pack-test.mjs` audits the two npmjs tarballs — it asserts
 // they carry NO `@pome-sh/*` dependency, which is the assertion that keeps wire
 // inlined rather than installed. It says nothing about wire's own tarball,
-// because wire used to have no tarball: it was `private: true` and reached
 // users only as bytes inside the CLI's and the adapter's `dist/`.
 //
 // Now it is also published to GitHub Packages for cross-repo consumers
@@ -22,7 +21,7 @@
 //      ("Skipping workspace …, marked as private"). A one-character regression
 //      to `private: true` would therefore produce a fully green release that
 //      published nothing — exactly the silence
-//      `check-version-bump-required.mjs` exists to abolish.
+//      the release apparatus exists to abolish.
 //   3. Publishing to the wrong registry cannot be undone; public npm has no
 //      unpublish window after 72 hours.
 //

@@ -19,7 +19,7 @@
  *           test directory. Carved out EXCEPT under `examples/`, `assets/` and
  *           `tasks/`, which the CLI's `files` really does publish verbatim.
  *   2  `packages/twin-` matched a twin's own top-level `examples/`
- *           (PR #366). Not because of `files` — twin-github's and
+ *           Not because of `files` — twin-github's and
  *           twin-slack's `dist/examples/` really is packed — but because every
  *           twin is `private: true` and release.yml publishes only cli,
  *           adapter-claude-sdk, checks and wire. Same prefix, one directory
@@ -39,7 +39,7 @@
  * ── The cases this file adds ────────────────────────────────────────────────
  *
  * The demand inverted: a PR must NOT write the number, and must carry the words.
- * Both directions are asserted, plus the two CHANGELOG properties that used to
+ * Both directions are asserted, plus the two CHANGELOG properties that
  * be a convention with nothing behind them — released entries are never
  * rewritten, and the newest released heading names the version beside it.
  */
@@ -368,10 +368,10 @@ console.log("the number is not the PR's to write");
 }
 
 {
-  // The direction that used to have its own named failure: a version moved DOWN
+  // A version moved DOWN
   // (a stale branch rebased past a release) hard-failed release.yml's floor check
   // after merge. It is now the same failure as any other hand-written number,
-  // which is the point — there is no longer a right value for a PR to carry.
+  // which is the point — there is no right value for a PR to carry.
   const r = run({ versions: { "@pome-sh/cli": "0.9.0" }, entries: ["@pome-sh/cli"] });
   check("a version moved DOWN is refused too", r.status === 1 && r.out.includes("0.9.0"), r.out);
 }

@@ -6,17 +6,14 @@
 # against what its registry currently serves and writes `<output>=true|false`
 # to $GITHUB_OUTPUT.
 #
-# Folded in from the deleted scripts/check-cli-version-floor.sh (F-724): never
-# publish from a version base BEHIND the registry's published latest — that
+# Never publish from a version base BEHIND the registry's published latest — that
 # retags `latest` backwards for every existing consumer. A version that differs
 # but does not sort above the registry's is a hard fail, not a skip.
 #
-# Extracted from an inline `decide()` in release.yml by F-949, when
-# @pome-sh/wire became a third publish target on a DIFFERENT registry
-# (npm.pkg.github.com). Two callers now need identical semantics against
-# different registries and with different auth, and the wire decision must be
-# able to fail without taking the two npmjs publishes down with it — so this
-# lives in one tested file instead of being copy-pasted into a second job.
+# One shared implementation rather than an inline `decide()` per lane: two
+# callers need identical semantics against DIFFERENT registries and with
+# different auth, and the wire decision must be able to fail without taking
+# the two npmjs publishes down with it.
 # Regression suite: scripts/ci/decide-publish.test.mjs.
 #
 # Usage: decide-publish.sh <package-name> <manifest-path> <output-key> [registry]

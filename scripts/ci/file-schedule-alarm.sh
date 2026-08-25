@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# F-1230 — a scheduled workflow that fails tells nobody.
+# A scheduled workflow that fails tells nobody.
 #
 # Shared filing logic for `.github/workflows/schedule-alarm.yml`, the reusable
 # workflow every schedule-triggered workflow in this repo calls with a

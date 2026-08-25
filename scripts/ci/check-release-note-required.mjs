@@ -1,26 +1,13 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// THE PR-TIME HALF OF THE RELEASE CONTRACT, re-scoped from
-// scripts/ci/check-version-bump-required.mjs, whose history is under that path
-// (the rewrite is large enough that `--follow` will not bridge it).
+// The PR-time half of the release contract.
 //
-// WHAT CHANGED, AND WHY THE FILE SURVIVED THE CHANGE. The old gate demanded that
-// a PR touching a package's publish-relevant paths BUMP that package's version.
-// It was right about the failure it existed to catch — `release.yml` publishes on
-// a version diff, so an unbumped change merges clean and silently never reaches
-// npm — and wrong about who should answer it. Every PR carrying the shared
-// version line meant every merge invalidated every open PR that had pinned a
-// consumed number, silently, across workspaces and humans (measured 2026-08-13:
-// #402/#405 stale-green overnight, five renumber+force-push cycles in one night,
-// 0.23.35/.36 burned unpublished). The NUMBER moved to
-// `allocate-release-versions.mjs`, on `main`, after the merge.
-//
-// The publish-relevance logic — which paths move which artifact, including the
-// wire→cli/adapter/checks coupling — did not become wrong; it became the
-// allocator's authority, and lives in `publish-relevance.mjs` where both read it.
-// What is left here is everything about a release that a PR is still the right
-// place to decide, which is all of it except the number:
+// The number is written on main after the merge, by
+// `allocate-release-versions.mjs`. Which paths move which artifact — including
+// the wire -> cli/adapter/checks coupling — lives in `publish-relevance.mjs`,
+// which both read. What is left here is everything about a release a PR is
+// still the right place to decide, which is all of it except the number:
 //
 //   1. NO HAND-WRITTEN NUMBER. A PR may not move a published package's `version`
 //      field. This is the invariant that makes every other PR's green mean

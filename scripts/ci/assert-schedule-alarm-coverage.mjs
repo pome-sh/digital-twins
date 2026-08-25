@@ -1,28 +1,24 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// The guard that keeps alarm coverage true. The alarm wiring covers
-// every scheduled workflow that exists TODAY to the reusable alarm; nothing
-// stopped a thirteenth from landing next month with no alarm at all, and
-// nothing stopped a wired-but-broken alarm (a typo'd `uses:` target, a
-// title/label pair that disagrees with itself, a job neutralised by
-// `continue-on-error: true` or a dead `if:`) from passing review looking
-// correct. This is a PROPERTY check, not a list of which workflows have
-// alarms — that list is the same shape as the bug it exists to catch.
+// The guard that keeps alarm coverage true. A PROPERTY check, not a list of
+// which workflows have alarms — that list would be the same shape as the bug it
+// exists to catch. What it stops: a new scheduled workflow landing with no
+// alarm, and a wired-but-broken alarm (a typo'd `uses:` target, a title/label
+// pair that disagrees with itself, a job neutralised by `continue-on-error` or
+// a dead `if:`) passing review looking correct.
 //
 // Left side (which workflows must reach the alarm) is read from
-// list-scheduled-workflows.mjs's own derivation, never re-parsed here; that
-// file already asserts its own non-zero floor and its own two-independent-
-// reads cross-check, so this file inherits both for free by calling it
-// rather than copying its rules.
+// list-scheduled-workflows.mjs's own derivation, never re-parsed here, so this
+// file inherits that file's non-zero floor and its two-independent-reads
+// cross-check by calling it rather than copying its rules.
 //
 // Right side (does a given workflow reach the alarm) parses PER JOB BLOCK,
-// anchored on both ends by indentation, rather than grepping lines — a
-// grep-based version of this exact check was defeated three separate times
-// during its own review, by a commented-out step, a
-// `continue-on-error: true`, and a step-level `if:`. Comments are already
-// stripped before any of this runs (list-scheduled-workflows.mjs's
-// workflowLines()), so a commented-out job simply is not there to find.
+// anchored on both ends by indentation, rather than grepping lines: a
+// grep-based version is defeated by a commented-out step, a
+// `continue-on-error: true`, or a step-level `if:`. Comments are already
+// stripped before any of this runs, so a commented-out job is not there to
+// find.
 //
 // Usage: node scripts/ci/assert-schedule-alarm-coverage.mjs
 // Exits 1, naming every offending workflow/job, on:
@@ -59,7 +55,7 @@ import {
   // TRUE rather than a claim. It throws on zero scheduled workflows, on its
   // two independent reads (`on: schedule:` vs `cron:`) disagreeing, and on any
   // `uses: ./.github/workflows/…` pointing at an absent file — so dropping its
-  // separate ci.yml step can no longer quietly retire those three floors.
+  // separate ci.yml step cannot quietly retire those three floors.
   main as assertScheduledWorkflowDerivation,
 } from "./list-scheduled-workflows.mjs";
 
@@ -294,12 +290,11 @@ function parseJobs(lines) {
       } else if ((m = /^\s*needs:\s*(.*)$/.exec(line))) {
         needs = parseNeeds(lines, kIdx, m[1].trim());
       } else if ((m = /^\s*with:\s*(.*)$/.exec(line))) {
-        // Both spellings of the same mapping. `with:` alone on its line opens
-        // a block; `with: {title: …, outcome: failure}` is flow form, which an
-        // earlier revision of this file did not recognise at all — it parsed
-        // as no inputs, so a CORRECTLY covered workflow was reported both
-        // uncovered and missing its inputs. A guard that reds on right answers
-        // is a guard someone deletes.
+        // Both spellings of the same mapping. `with:` alone on its line opens a
+                // block; `with: {title: …, outcome: failure}` is flow form. Missing the
+                // flow form parses as no inputs, so a CORRECTLY covered workflow reads
+                // as both uncovered and missing its inputs — and a guard that reds on
+                // right answers is a guard someone deletes.
         const inline = m[1].trim();
         const found = inline
           ? [...inline.matchAll(/\b(title|label|outcome)\s*:\s*("[^"]*"|'[^']*'|[^,}]+)/g)].map((f) => [f[1], f[2]])
@@ -364,8 +359,8 @@ export function findScheduleAlarmCalls(root) {
  * If `permissions:` is absent at BOTH the job and the workflow level, the
  * effective grant is the repository/organization default — a setting this
  * script cannot read from the filesystem. Treating "cannot resolve" as a
- * silent pass would be exactly the silent-degradation shape this milestone
- * exists to catch (an unstated grant one settings-page click away from
+  * silent pass would be exactly the silent degradation this exists to catch (an
+  * unstated grant one settings-page click away from
  * losing `issues: write` entirely, with nothing in the diff to review), so
  * it is reported as a hard failure naming the workflow and job instead —
  * the same "unsupported shape must never be indistinguishable from a
@@ -450,8 +445,7 @@ function isTriviallyFalse(ifExpr) {
 /**
  * A call counts as reaching the alarm's FAILURE leg — the half that must
  * exist for every scheduled workflow — only if it is not neutralised. Three
- * independent ways a wired-looking call is dead in production, each one a
- * real defect this milestone hit once already (see this file's header):
+  * independent ways a wired-looking call is dead in production:
  * `continue-on-error: true` swallows the reusable call's own failure so a
  * broken alarm still reports green; a literal `if: false` means the job
  * never runs at all; and `outcome` has to be the literal string `failure` —
@@ -600,13 +594,11 @@ export function findUnclosableAlarms(calls) {
 export function main() {
   const root = resolve(HERE, "../..");
 
-  // Inherited floors, actually inherited: this calls list-scheduled-workflows'
-  // OWN entry point, which throws on zero scheduled workflows, on its two
-  // independent reads (`on: schedule:` vs `cron:`) disagreeing, and on a
-  // `uses: ./.github/workflows/…` target that is absent. Re-implementing only
-  // the zero check here (an earlier revision) meant the set-equality floor was
-  // claimed but not held: retiring ci.yml's separate step would have silently
-  // taken it with it.
+  // Inherited floors, actually inherited: this calls
+    // list-scheduled-workflows' OWN entry point, which throws on zero scheduled
+    // workflows, on its two independent reads disagreeing, and on an absent
+    // `uses: ./.github/workflows/…` target. Re-implementing only the zero check
+    // here would claim the set-equality floor without holding it.
   const scheduled = assertScheduledWorkflowDerivation([]);
 
   // Belt-and-braces on the count this check itself reasons about: the floor

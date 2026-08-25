@@ -10,7 +10,7 @@
 //
 //   1. `private: true` makes `npm publish -w` print a warning and EXIT 0. A
 //      one-character regression would produce a fully green release that
-//      published nothing — the silence `check-version-bump-required.mjs` exists
+//      published nothing — the silence the release apparatus exists
 //      to abolish.
 //   2. Inside this repo every `exports` subpath resolves through npm's workspace
 //      symlink to a full source tree, so a subpath pointing at a file `files`
@@ -23,8 +23,7 @@
 //      this is the assertion that keeps it that way.
 //   4. Bundling zod would be worse than a 404, because it succeeds: two copies
 //      of zod means two schema identities, `instanceof` fails and parsed results
-//      stop being interchangeable. That is the bug that dissolved
-//      `@pome-sh/shared-types`, and nothing at runtime announces it.
+//      stop being interchangeable, and nothing at runtime announces it.
 //   5. Bundling the twin ENGINE (hono, node:sqlite, @hono/node-server) would
 //      mean a "declarations only" package shipping an HTTP server and a database
 //      driver. `packages/twin-stripe/src/seed.ts` reaches one zod schema that

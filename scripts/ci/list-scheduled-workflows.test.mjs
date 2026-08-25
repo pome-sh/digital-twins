@@ -120,7 +120,7 @@ withScratchRoot(
     for (const expected of ["quoted-on.yml", "flow-on.yml", "deep-indent.yml"]) {
       assert(found.includes(expected), `${expected} must count as scheduled, got ${found}`);
     }
-    // The half this fixture used to leave untested, and the reason it mattered:
+    // The half that matters here:
     // asserting only the `on: schedule:` read said nothing about the SET
     // EQUALITY main() enforces between the two reads. The `cron:` read was
     // anchored at line start, so it missed `schedule: [{cron: …}]` — meaning

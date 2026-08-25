@@ -387,7 +387,7 @@ assert(findSigningCallsInScript("cosign triangulate ghcr.io/o/r:v1").length === 
 // twin-image.yml's install ladder annotates all three attempts with an `echo`
 // naming the binary. A prefix rule like shape (a)'s and (c)'s reads those two
 // lines as unhardened invocations and reds the repo on its own prose — measured,
-// not imagined: it did, on the first run of this gate.
+// not imagined.
 for (const prose of [
   `echo "::warning::cosign install attempt 1 failed. sigstore/cosign-installer fetches cosign from github.com/sigstore/cosign/releases"`,
   `echo "::error::could not install cosign after 3 attempts. sigstore/cosign-installer fetches the pinned cosign v2.6.4 binary from the sigstore release CDN"`,

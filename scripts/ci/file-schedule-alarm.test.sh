@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Regression + dry-run demonstration for scripts/ci/file-schedule-alarm.sh
-# (F-1230). Stubs `gh` on PATH so no real GitHub issue is ever created —
+# Stubs `gh` on PATH so no real GitHub issue is ever created —
 # every call the script would have made is appended to a log file instead,
-# which is also the "show the payload" evidence the ticket asks for.
+# which is also how the payload is shown.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -78,7 +78,7 @@ grep -q "^issue create" "$log"
 # lookup has: an issue filed without it is invisible to every later run, so each
 # failure would file a fresh one and no recovery could close any of them.
 grep -q -- "--label schedule-alarm:repo-policy" "$log"
-# And the body actually carries what failed plus the run URL, per the ticket.
+# And the body actually carries what failed plus the run URL.
 grep -qF "$DETAIL_1" "$bodies"
 grep -qF "https://github.com/pome-sh/pome-twins/actions/runs/999" "$bodies"
 

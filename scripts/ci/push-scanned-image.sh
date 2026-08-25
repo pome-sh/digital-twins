@@ -1,34 +1,28 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
 #
-# F-1530 — the ONE hardened path for a container-registry WRITE in
+# The ONE hardened path for a container-registry WRITE in
 # `.github/workflows/**`. Pushes every tag in `IMAGE_TAGS` to its registry and
 # refuses to report success on anything it cannot read back.
 #
-# WHY THIS FILE EXISTS. twin-image.yml's `Push scanned image` was a bare
-# `docker push` per tag with no retry, standing between two third-party fetches
-# that had both been given three-attempt ladders (F-1489, F-1494). On 2026-08-14
-# GHCR logged every layer of the stripe twin as `Pushed`, then answered
-# `unknown blob` — the registry failing to see a blob it had just accepted — and
-# exited 1. Nothing re-ran the step, so `ghcr.io/pome-sh/twins:stripe-bbf27bf`
-# simply did not exist: `twin-snapshot-verify` failed for four consecutive
-# nights, pome-cloud#752 reported `stripe — no-image`, and production kept
-# booting snapshots from a commit 43 commits behind. One transient registry error
-# was load-bearing for four days.
+# WHY THIS FILE EXISTS. A bare `docker push` per tag has no retry, and GHCR can
+# log every layer as `Pushed` and then answer `unknown blob` — the registry
+# failing to see a blob it just accepted — and exit 1. Nothing re-runs the step,
+# so the tag simply does not exist, and a consumer resolving it reports
+# no-image while production keeps booting an older snapshot. One transient
+# registry error stays load-bearing until somebody looks.
 #
 # Usage: IMAGE_TAGS=$'tag\ntag' push-scanned-image.sh
 #
 # Properties, all four load-bearing:
 #
-#   1. RETRY WITH BACKOFF. Five attempts per tag, sleeping 5s/10s/15s/20s
-#      between them — deliberately the same budget as
-#      scripts/ci/fetch-pinned-release.sh, so the publish path has one number to
-#      reason about rather than two. An explicit loop with a literal `sleep`, for
-#      the reason that helper's header records: a retry budget that looks handled
-#      and is not is worse than none. Retrying is safe because every tag names
-#      the same image already loaded into the local daemon — the layers are
-#      already uploaded, so a second attempt is a manifest PUT, which is the part
-#      that failed.
+#   1. RETRY WITH BACKOFF. Five attempts per tag, sleeping 5s/10s/15s/20s, the
+#      same budget as fetch-pinned-release.sh so the publish path has one
+#      number to reason about. An explicit loop with a literal `sleep`: a retry
+#      budget that looks handled and is not is worse than none. Retrying is safe
+#      because every tag names the same image already in the local daemon — the
+#      layers are uploaded, so a second attempt is a manifest PUT, which is the
+#      part that failed.
 #
 #   2. THE MANIFEST IS READ BACK, PER TAG. `docker push` exiting 0 is not the
 #      same fact as "this tag resolves": the whole failure class here is a
@@ -41,15 +35,14 @@
 #      as a confusing cosign error.
 #
 #   3. NO TAG IS PUSHED AFTER A FAILED ONE. `docker/metadata-action` emits the
-#      rolling `<twin>` tag first and the per-commit `<twin>-<sha>` tag LAST, and
-#      that order is load-bearing: the per-commit tag is what pome-cloud
-#      resolves, so its existence is a promise that everything before it landed.
-#      Exhausting a tag's attempts exits immediately, which leaves the per-commit
-#      tag absent — resolve-image-digest.ts then reports `not found`, the honest
-#      answer, instead of resolving a manifest whose siblings are missing and
-#      which the sign/attest step (it never runs after this failure) never
-#      signed. Whatever DID land is named in the error for the same reason: those
-#      tags are published and unsigned, and a human has to know that.
+#      rolling `<twin>` tag first and the per-commit `<twin>-<sha>` tag LAST,
+#      and that order is load-bearing: the per-commit tag is what a consumer
+#      resolves, so its existence is a promise that everything before it
+#      landed. Exhausting a tag's attempts exits immediately, leaving the
+#      per-commit tag absent so a resolver reports `not found` — the honest
+#      answer — rather than a manifest whose siblings are missing and which the
+#      sign step never signed. Whatever DID land is named in the error, because
+#      those tags are published and unsigned.
 #
 #   4. FAIL CLOSED, BY NAME. A registry that will not accept the manifest must
 #      stop the job — an image that cannot be published cannot be signed,
@@ -88,7 +81,7 @@ fail_out() {
   else
     leftover="Already published and NOT signed, because the sign/attest step never runs after this failure: $(printf '%s' "${landed_tags}" | tr '\n' ' ' | sed 's/ *$//')."
   fi
-  echo "::error::twin image push: could not publish ${tag} to ${registry} after ${attempts} attempts — ${reason}. The registry is degraded; this is not a failure of the twin, the build or the scan (F-1530). Failing closed on purpose, and no later tag was pushed. ${leftover}" >&2
+  echo "::error::twin image push: could not publish ${tag} to ${registry} after ${attempts} attempts — ${reason}. The registry is degraded; this is not a failure of the twin, the build or the scan Failing closed on purpose, and no later tag was pushed. ${leftover}" >&2
   exit 1
 }
 
@@ -120,7 +113,7 @@ while IFS= read -r tag || [ -n "$tag" ]; do
       fi
       reason="the push exited 0 but ${tag} still resolves to nothing, so the registry accepted the layers and committed no manifest"
     else
-      # Deliberately does NOT name a specific registry error. F-1530's was
+      # Deliberately does NOT name a specific registry error. The observed one was
       # `unknown blob` after every layer reported `Pushed`; run 32144441622's was
       # `error parsing HTTP 403 response body` on the first tag. They are one
       # fault from here, and a message that asserted either would misdirect a
@@ -141,7 +134,7 @@ while IFS= read -r tag || [ -n "$tag" ]; do
 
   if [ "$attempt" -gt 1 ]; then
     # A flaky-but-passing run has to say so, or the degradation is invisible
-    # until the day it is total — which is how F-1530 went unnoticed for four
+    # until the day it is total — which is how a partial outage goes unnoticed for
     # days.
     echo "::warning::twin image push: ${tag} landed only on attempt ${attempt}/${attempts} — ${registry} is degraded right now" >&2
   fi

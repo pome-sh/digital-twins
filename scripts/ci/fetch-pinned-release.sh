@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
 #
-# F-1489 — the ONE hardened path every release-CDN fetch in
+# The ONE hardened path every release-CDN fetch in
 # `.github/workflows/**` goes through. Before this file there were two
 # hand-copied variants of the same loop, each with its own retry budget, its
 # own message and its own chance of getting the verification wrong; the same
@@ -19,7 +19,6 @@
 #      five attempts in 0.8s against a `curl: (56) Connection died`
 #      (run 31620014945). A retry budget that looks handled and is not is worse
 #      than none, and a loop with a literal `sleep` cannot be version-dependent.
-#      (F-1471 got this wrong twice before landing it.)
 #
 #   2. UNCONDITIONAL VERIFICATION. The sha256 comparison is not `|| true`, not
 #      `if [ -n "$sha" ]`, and not skippable by a cache hit — a hash checked

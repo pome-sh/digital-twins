@@ -336,7 +336,7 @@ withScratchRoot(
 );
 
 // ── False red closed: flow-style `with: {…}`. GitHub accepts it, actionlint
-// accepts it, and an earlier revision of the parser required `with:` alone on
+// accepts it, and a parser requiring `with:` alone on
 // its line — so a CORRECTLY covered workflow was reported both uncovered and
 // missing its inputs. A guard that reds on right answers gets deleted.
 withScratchRoot(
@@ -508,7 +508,7 @@ withScratchRoot(
 // effective grant is the repo default, which this script cannot read from
 // the filesystem. Reported as a hard failure naming the workflow and job,
 // never a silent pass: an unstated grant is exactly the silent-degradation
-// shape this milestone exists to catch.
+// shape this gate exists to catch.
 withScratchRoot(
   {
     "absent-both.yml": `name: absent-both\non:\n  schedule:\n    - cron: '0 0 * * *'\njobs:\n  main:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n  schedule-alarm:\n    needs: main\n    if: failure()\n    uses: ./.github/workflows/schedule-alarm.yml\n    with:\n      title: "absent-both is failing"\n      label: "schedule-alarm:absent-both"\n      outcome: failure\n`,

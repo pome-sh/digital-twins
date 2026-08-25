@@ -3,24 +3,16 @@
 //
 // A failed release must reach a human without a human going looking.
 //
-// On 2026-08-06 four consecutive push-triggered `release.yml` runs failed over
-// eleven hours (00:42, 01:26, 10:41, 11:28 UTC). Nothing fired. `release.yml`
-// has no failure path — no `if: failure()`, no notification, no tracking issue
-// — so a publish that died is indistinguishable from a merge that owed no
-// publish. The first signal was a human noticing two packages missing from npm,
-// and the recovery was that human dispatching the workflow by hand. Two of
-// those four runs were the merges of the declaration-lane and wire work: the packages
-// the grading vocabulary now depends on, reporting themselves as merged while
-// publishing nothing.
+// release.yml has no failure path — no `if: failure()`, no notification, no
+// tracking issue — so a publish that died is indistinguishable from a merge
+// that owed no publish, and the first signal is somebody noticing a package
+// missing from npm.
 //
 // This is the checker behind `.github/workflows/release-alarm.yml`. It runs on
 // its own daily schedule, in a SEPARATE workflow file, because the alarm has to
-// survive the thing it is watching — the reasoning `check-release-staleness.yml`
-// gave before it was deleted alongside the Changesets flow it watched
-// (`a3c9441`, "replace two release systems with one"). Deleting it with its
-// subject was right; not replacing it was the gap. An `if: failure()` step
-// inside `release.yml` cannot see the silence this alarm exists for: a release
-// workflow that never triggers at all takes an embedded check down with it.
+// survive the thing it is watching: an `if: failure()` step inside release.yml
+// cannot see the silence this exists for, a release workflow that never
+// triggers at all.
 //
 // ── What it asserts ──────────────────────────────────────────────────────────
 //
@@ -42,7 +34,7 @@
 //                 consumes it on the next push — so one still sitting there past
 //                 the grace window is that silence, named.
 //   UNPUBLISHED — main declares a version its registry does not serve. The
-//                 08-06 shape, and the only state a consumer can observe.
+//                 only state a consumer can observe directly.
 //   BEHIND      — main declares a version BELOW the registry's `latest`. Not
 //                 yet a missing publish; it is the floor check in
 //                 decide-publish.sh armed to hard-fail the whole lane on the
@@ -65,8 +57,8 @@
 //                 distinction decide-publish.sh is careful about.
 //
 // Silence is asserted as hard as noise: everything green produces no issue, no
-// comment, and exit 0 — an alarm that cries wolf gets muted, and a muted alarm
-// is the state this ticket is about.
+// comment, and exit 0. An alarm that cries wolf gets muted, and a muted alarm
+// is no alarm.
 //
 // ── Why the package list is derived, not typed ───────────────────────────────
 //
