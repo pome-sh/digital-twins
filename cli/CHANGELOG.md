@@ -1,14 +1,18 @@
 # Changelog
 
-Entries are hand-written from 0.9.0 on. Changesets was retired with the
-packaging restructure, and F-1511 took the NUMBER out of PRs: in a PR, add your
-entry under an `## Unreleased (patch)` (or `(minor)`) heading above the newest
-released one. `.github/workflows/allocate-version.yml` rewrites that heading to
-the version it allocates on `main` after the merge, in the same commit that moves
+Entries are hand-written from 0.9.0 on. In a PR, add your entry under an
+`## Unreleased (patch)` (or `(minor)`) heading above the newest released one.
+`.github/workflows/allocate-version.yml` rewrites that heading to the version it
+allocates on `main` after the merge, in the same commit that moves
 `package.json`, and `.github/workflows/release.yml` publishes from there. Do not
-write a version number here or in `package.json`. Released
-entries are insertions only: a correction is the next entry, naming the one it
-corrects.
+write a version number here or in `package.json`. Released entries are insertions
+only: a correction is the next entry, naming the one it corrects.
+
+## Unreleased (patch)
+
+**No consumer-visible change.** Deleted an orphaned changeset file and the empty
+directory holding it. Nothing read it. No export, flag, schema, route, status
+code or response body moved.
 
 ## 0.26.12 — 2026-08-25
 
