@@ -8,7 +8,6 @@ import bundledDeps from "./rules/bundled-deps.mjs";
 import copyMarkers from "./rules/copy-markers.mjs";
 import fileSize from "./rules/file-size.mjs";
 import firstPartyTwins from "./rules/first-party-twins.mjs";
-import legacyMarkers from "./rules/legacy-markers.mjs";
 import noCatch from "./rules/no-catch.mjs";
 import noEval from "./rules/no-eval.mjs";
 import noNative from "./rules/no-native.mjs";
@@ -67,7 +66,6 @@ export const RULES = [
   firstPartyTwins,
   copyMarkers,
   fileSize,
-  legacyMarkers,
   parentVocab,
   taskClass,
   noEval,
