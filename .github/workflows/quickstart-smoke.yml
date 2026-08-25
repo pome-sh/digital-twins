@@ -46,15 +46,11 @@ jobs:
   # checkout and run `twin start github` — the same in-process boot path the
   # published `npx @pome-sh/cli` front door uses.
   #
-  # the twins here are NOT the CLI's published @pome-sh/* deps: the
-  # "Build the CLI from this checkout" step below runs
-  # scripts/use-local-pome-tarballs.mjs, which overwrites those deps with
-  # tarballs packed from packages/. So this job exercises the boot path against
-  # WORKSPACE twins, and an npx user's declared pins are never installed by any
-  # lane in this repo — do not read this job as coverage of an npx user's
-  # published pins, because it is not. What keeps workspace @pome-sh edges
-  # honest is scripts/lint/rules/workspace-pins.mjs
-  # in ci.yml (exact pins between private packages are banned; deps are `"*"`).
+  # The twins here are NOT the CLI's published @pome-sh/* deps: the build step
+  # below packs tarballs from packages/ over them. So this exercises the boot
+  # path against WORKSPACE twins, and no lane in this repo installs an npx
+  # user's declared pins — do not read this job as coverage of those. What keeps
+  # workspace @pome-sh edges honest is scripts/lint/rules/workspace-pins.mjs.
   #
   # The agent mints a JWT from the shared TWIN_AUTH_SECRET env, probes the twin's
   # /tools with it in PREFLIGHT mode (POME_PREFLIGHT=1), and exits 0. That path
@@ -97,10 +93,9 @@ jobs:
         run: |
           npm ci
           npm test
-      # `cli/` is a root workspace member: the root `npm ci` above already
-      # linked the @pome-sh/* twins out of packages/*, so the CLI builds
-      # straight from this checkout (the tarball pack/rewrite dance is gone).
-      # The root build chain builds the packages in dependency order and ends
+      # `cli/` is a root workspace member, so the root `npm ci` already linked the
+      # @pome-sh/* twins out of packages/* and the CLI builds straight from this
+      # checkout. The root build chain builds packages in dependency order and ends
       # with the CLI.
       - name: Build the CLI from this checkout
         run: npm run build

@@ -1,71 +1,38 @@
 name: release alarm
 
 # A failed release must reach a human without a human going looking.
-#
-# `release.yml` has no failure path of its own, so a publish that died reads
+# release.yml has no failure path of its own, so a publish that died reads
 # exactly like a merge that owed no publish, and the first signal is somebody
 # noticing a package missing from npm.
 #
-# ── Why this is a SEPARATE workflow file ─────────────────────────────────
+# A separate workflow file because the alarm has to survive the thing it
+# watches: an `if: failure()` step inside release.yml cannot see the worse
+# silence, a release workflow that never triggers at all.
 #
-# The alarm has to survive the thing it watches. An `if: failure()` step inside
-# `release.yml` cannot see the worse silence — a release workflow that never
-# triggers at all takes an embedded check down with it, and reports nothing.
+# It lives here rather than in the consuming repo because `issues: write` is
+# per-repo and every recovery (re-dispatch release.yml, repair the npm Trusted
+# Publisher) is a digital-twins operation, and because one of the five publish
+# targets — @pome-sh/wire on GitHub Packages — needs a token even to READ,
+# which the ambient `packages: read` below covers.
 #
-# ── Why it lives in digital-twins and not in pome-cloud ──────────────────────
-#
-# A real choice; pome-cloud is the consumer that CARES whether `@pome-sh/checks`
-# published, and an alarm in the repo whose CI is broken can be broken by the
-# same cause. Four reasons it belongs here anyway:
-#
-#   1. Shared fate does not actually favour pome-cloud. The causes that would
-#      take this workflow down with `release.yml` — Actions disabled, billing
-#      exhausted, the org suspended — are ORG-scoped, and pome-cloud is the same
-#      org and the same billing account. Moving the alarm one repo sideways buys
-#      protection only against someone disabling Actions on this repo alone,
-#      while costing everything below. The failure class this watches for — an
-#      npm Trusted Publishing identity mismatch, a publish step that throws —
-#      lives entirely inside `release.yml` and cannot touch a
-#      separately-triggered sibling.
-#   2. The issue has to be filed where the fix happens. `issues: write` is
-#      per-repo: filing into digital-twins from pome-cloud needs a long-lived
-#      cross-repo PAT in pome-cloud's secrets — the exact credential
-#      `vocabulary-parity.yml` refused to introduce in the other direction. The
-#      alternative, filing in pome-cloud, puts the alarm in the repo that cannot
-#      act on it: every recovery (re-dispatch `release.yml`, repair the npm
-#      Trusted Publisher) is a digital-twins operation.
-#   3. One of the five publish targets is only readable from here. `@pome-sh/wire`
-#      on GitHub Packages needs a token even to READ a version, and the ambient
-#      `packages: read` below covers it exactly as `release.yml`'s `plan-wire`
-#      job does. A pome-cloud alarm would need another PAT or would carry a
-#      blind spot on a fifth of what it watches, which is the whole point.
-#   4. This repo is public, so its Actions minutes are free; pome-cloud's are
-#      billed. Smallest of the four, but it points the same way.
-#
-# ── Both directions ──────────────────────────────────────────────────────────
-#
-# Everything green produces no issue, no comment, and a green run, and a
+# Both directions: everything green produces no issue and a green run, and a
 # recovered failure CLOSES the tracking issue. An alarm that cries wolf gets
-# muted, and a stale open issue teaches people to skim past the next real one.
+# muted, and a stale open issue teaches people to skim the next real one.
 on:
   schedule:
-    # Daily, off the top of the hour to dodge GitHub's cron-queue congestion.
-    # Daily rather than hourly because the bar in the ticket is "a signal a
-    # human receives within a day", and because the outcome this checks —
-    # is the package on the registry — does not become more true at 03:00.
+    # Daily, off the top of the hour to dodge cron-queue congestion. Daily rather
+    # than hourly because the bar is a signal a human receives within a day.
     #
-    # The one thing that can silence THIS file: GitHub disables scheduled
-    # workflows in a repository after 60 days with no commits. That is a
-    # property of the repo, not of the release, and it is why `--targets` and
-    # the regression suite also run in ci.yml on every PR — a repo quiet enough
-    # to lose its cron is a repo whose release nobody is triggering either.
+    # The one thing that can silence this file: GitHub disables scheduled workflows
+    # after 60 days with no commits. That is why `--targets` and the regression
+    # suite also run in ci.yml on every PR — a repo quiet enough to lose its cron
+    # is a repo whose release nobody is triggering either.
     - cron: "37 6 * * *"
   workflow_dispatch:
-  # Changing the checker or its subject must prove the checker still parses on
-  # the PR that changes it. ci.yml runs the same two commands in its always-on
-  # block (they need no network and cannot be skipped); this arm additionally
-  # proves THIS FILE's job wiring still works, which is the part a syntax-valid
-  # workflow can get wrong and only discover at the next cron.
+  # Changing the checker or its subject must prove it still parses on the PR
+  # that changes it. ci.yml runs the same two commands; this arm additionally
+  # proves THIS FILE's job wiring works, which a syntax-valid workflow can get
+  # wrong and otherwise only discover at the next cron.
   pull_request:
     paths:
       - "scripts/ci/release-alarm.mjs"
@@ -73,10 +40,10 @@ on:
       - ".github/workflows/release-alarm.yml"
       - ".github/workflows/release.yml"
       - "scripts/ci/decide-publish.sh"
-      # the alarm's UNALLOCATED leg reads these two: the CHANGELOG
-      # grammar it parses a pending entry with, and the table that says which
-      # CHANGELOG belongs to which published package. A change to either can
-      # blind that leg without touching a file above.
+      # The UNALLOCATED leg reads these two — the CHANGELOG grammar it parses a
+      # pending entry with, and the table saying which CHANGELOG belongs to which
+      # package. A change to either can blind that leg without touching a file
+      # above.
       - "scripts/ci/changelog-entry.mjs"
       - "scripts/ci/publish-relevance.mjs"
 
@@ -94,31 +61,20 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
-      # Declared even though this repo is public and its runs are publicly
-      # readable: a `permissions:` block sets every scope it omits to `none`,
-      # and an alarm that silently 403s on the run list is an alarm that
-      # reports the release path healthy because it could not see it.
+      # Declared explicitly because a `permissions:` block sets every scope it
+      # omits to `none`, and an alarm that silently 403s on the run list reports the
+      # release path healthy because it could not see it.
       actions: read
       issues: write # the tracking issue
       packages: read # @pome-sh/wire's GitHub Packages version, as plan-wire reads it
-    # whether this job's OWN mechanism ever reached a verdict, for
-    # the meta-alarm job below. 'success' or 'failure' both mean the mechanism
-    # worked and evaluated the release, whether or not it liked what it found.
-    #
-    # ANY OTHER VALUE means it never got that far, and the meta-alarm keys off
-    # exactly that — "not one of the two verdicts" — rather than off empty.
-    # There are two distinct non-verdict values and an earlier revision of this
-    # file only handled the rarer one:
-    #   'skipped' — the step was reached but its condition was false. A step
-    #     carrying an explicit `if:` still gets an implicit `success()`, so a
-    #     failed checkout / setup-node / regression suite / --targets dead-guard
-    #     SKIPS `check` and records 'skipped'. This is the common case, and the
-    #     one the meta-alarm exists for.
-    #   '' — `steps.check` is absent from the context entirely, i.e. the job
-    #     died before the runner got to that step at all (a "Set up job"
-    #     failure, a runner fault).
-    # Note also that `check` is `continue-on-error: true`, so `outcome` (not
-    # `conclusion`) is the field that carries the real verdict.
+    # Whether this job's own mechanism ever reached a verdict, for the meta-alarm
+    # below. 'success' or 'failure' both mean it evaluated the release. Any other
+    # value means it never got that far, and the meta-alarm keys off exactly that
+    # rather than off empty, because there are two such values: 'skipped' (the
+    # step was reached but its implicit `success()` was false, so a failed
+    # checkout or regression suite skips `check`) and '' (the job died before the
+    # runner reached the step at all). `check` is `continue-on-error: true`, so
+    # `outcome`, not `conclusion`, carries the real verdict.
     outputs:
       checked: ${{ steps.check.outcome }}
     steps:
@@ -130,8 +86,7 @@ jobs:
           node-version: 24
 
       # Gate on the checker's own tests BEFORE checking, so a red run is a real
-      # claim about the release and not a broken checker. Same ordering as the
-      # deleted check-release-staleness.yml.
+      # claim about the release and not a broken checker.
       - name: Regression-test the checker
         run: node scripts/ci/release-alarm.test.mjs
 
@@ -140,11 +95,10 @@ jobs:
       - name: The publish targets are still derivable from release.yml
         run: node scripts/ci/release-alarm.mjs --targets
 
-      # Auth for the GitHub Packages READ only — never a `@pome-sh:registry=`
-      # scope mapping, which would redirect every @pome-sh/* read (including
-      # cli's and the adapter's) to a registry where they do not exist and make
-      # each look brand new. `$HOME/.npmrc` so the token never sits in the
-      # workspace. Same shape as release.yml's plan-wire job.
+      # The GitHub Packages READ only — never a `@pome-sh:registry=` scope mapping,
+      # which would redirect every @pome-sh/* read to a registry where they do not
+      # exist and make each look brand new. In $HOME/.npmrc so the token never sits
+      # in the workspace.
       - name: Authenticate reads against GitHub Packages
         if: github.event_name != 'pull_request'
         env:

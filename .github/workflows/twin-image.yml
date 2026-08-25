@@ -195,24 +195,20 @@ jobs:
           exit-code: '1'
           ignore-unfixed: true
           trivyignores: .trivyignore
-      # anchore/sbom-action fetches the syft binary from the anchore
-      # release CDN (github.com/anchore/syft/releases) on every run, with no
-      # retry of its own, so a 503 there kills this job. On a PR that is noise,
-      # but on main the cosign sign/attest steps below DO run, so the same 503
-      # fails an image publish.
+      # anchore/sbom-action fetches the syft binary from the anchore release CDN on
+      # every run with no retry of its own, so a 503 there kills this job — and on
+      # main the cosign steps below do run, so it fails an image publish.
       #
-      # An action step cannot be wrapped in a shell retry loop, so the retry is
-      # the STEP, repeated. Attempts 1 and 2 are `continue-on-error`; each later
-      # attempt runs only `if:` the earlier ones actually FAILED (a skipped
-      # step's outcome is `skipped`, never `failure`, so the chain cannot
-      # self-trigger). The last attempt carries no escape hatch, so a genuinely
-      # unavailable CDN still refuses the publish — this is persistence, not a
-      # relaxed policy.
+      # An action step cannot be wrapped in a shell retry loop, so the retry is the
+      # STEP, repeated. Attempts 1 and 2 are `continue-on-error`; each later attempt
+      # runs only if the earlier ones actually FAILED (a skipped step's outcome is
+      # `skipped`, never `failure`, so the chain cannot self-trigger). The last
+      # attempt carries no escape hatch.
       #
       # Every copy MUST carry byte-identical `uses:` and `with:` — a retry that
-      # installs a different build, or writes a different output file, is not a
-      # retry. scripts/ci/assert-hardened-cdn-fetches.mjs enforces that, the
-      # attempt count, and the fatal last attempt.
+      # installs a different build is not a retry.
+      # scripts/ci/assert-hardened-cdn-fetches.mjs enforces that, the attempt count,
+      # and the fatal last attempt.
       - name: Generate image SBOM (attempt 1 of 3)
         id: sbom_1
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
@@ -262,30 +258,18 @@ jobs:
         run: |
           echo "::error::twin-${{ matrix.twin }}: could not generate the image SBOM after 3 attempts. anchore/sbom-action fetches the syft binary from the anchore release CDN (github.com/anchore/syft/releases), and that CDN is unavailable — this is not a failure of the twin, the build or the scan. Failing closed on purpose: an image with no SBOM is never signed, attested or pushed."
           exit 1
-      # cosign v2. The v3.0.6 bump (attempted RFC3161-timestamped signatures)
-      # was reverted: it gave no benefit — the pome-cloud deploy gate hard-gates
-      # only the image SIGNATURE, which verifies on un-timestamped v2 signatures
-      # too because the hashedrekord Rekor SET anchors the expired Fulcio cert
-      # (the SPDX attestation is best-effort there). And
-      # cosign v3 `attest --type spdx` rejected the anchore SBOM predicate
-      # ("invalid attestation: decoding json"), failing the sign step on every
-      # v3 run and producing NO attestation. v2 signs + attests cleanly.
+      # cosign MUST stay pinned to a v2.x binary: v3 `attest --type spdx` rejects
+      # the anchore SBOM predicate ("invalid attestation: decoding json"), failing
+      # the sign step and producing NO attestation. The installer action's default
+      # binary version tracks the action's own major, so bumping the action alone
+      # silently drifts the binary to v3 — pinning it here decouples the two.
       #
-      # `cosign-release` MUST stay pinned to a v2.x binary. The installer
-      # action's DEFAULT cosign version tracks the action major (v3.x installer
-      # → cosign v2 default; v4.x installer → cosign v3 default), so an automated
-      # bump of the action alone silently drifts the binary to v3 and
-      # reintroduces the failure above. Pinning the binary here decouples us
-      # from the action version.
-      #
-      # Repeated for the same reason as the SBOM group above: this
-      # installer's whole job is to pull the cosign binary off the sigstore
-      # release CDN, and it sits on the publish path one step before signing.
-      # ⚠️ ALL THREE COPIES MUST CARRY THE SAME `cosign-release: 'v2.6.4'`.
-      # A retry that installs a different cosign is not a retry, and v3 is the
-      # exact version the comment above rules out.
-      # scripts/ci/assert-hardened-cdn-fetches.mjs reds if the three `with:`
-      # blocks ever disagree.
+      # Repeated for the same reason as the SBOM group above: this installer's whole
+      # job is to pull cosign off the sigstore release CDN, one step before signing.
+      # All three copies must carry the same `cosign-release`; a retry that installs
+      # a different cosign is not a retry.
+      # scripts/ci/assert-hardened-cdn-fetches.mjs reds if the three `with:` blocks
+      # ever disagree.
       - name: Install cosign (attempt 1 of 3)
         id: cosign_install_1
         if: ${{ github.event_name != 'pull_request' }}
@@ -323,24 +307,21 @@ jobs:
         run: |
           echo "::error::twin-${{ matrix.twin }}: could not install cosign after 3 attempts. sigstore/cosign-installer fetches the pinned cosign v2.6.4 binary from the sigstore release CDN (github.com/sigstore/cosign/releases), and that CDN is unavailable — this is not a failure of the twin, the build or the scan. Failing closed on purpose: an image that cannot be signed and attested is not pushed."
           exit 1
-      # Push the EXACT image built + scanned above (already loaded into the local
-      # daemon under every steps.meta.outputs.tags) — no second build, so the
+      # Push the EXACT image built and scanned above — no second build, so the
       # published artifact is byte-identical to the one Trivy scanned. PR builds
-      # verify + scan but never push; only main / tag pushes publish. Without
-      # this gate the GITHUB_TOKEN from a fork or unauthorized actor could poison
-      # the image. `github.event_name` is the PR-vs-push signal that survives
-      # merge-queue retargeting.
+      # verify and scan but never push; without that gate a fork's GITHUB_TOKEN
+      # could poison the image. `github.event_name` is the PR-vs-push signal that
+      # survives merge-queue retargeting.
       #
-      # GHCR can log every layer as `Pushed`, then answer `unknown blob` and
-      # exit 1 — a tag that never existed, with a green-looking push behind it.
-      # So the retry, the per-tag manifest read-back and the fail-closed message
-      # live in scripts/ci/push-scanned-image.sh rather than inline here, and
-      # scripts/ci/assert-hardened-cdn-fetches.mjs (shape c) reds on a registry
-      # write that does not go through that helper.
+      # GHCR can log every layer as `Pushed`, then answer `unknown blob` and exit 1
+      # — a tag that never existed behind a green-looking push. So the retry, the
+      # per-tag manifest read-back and the fail-closed message live in
+      # scripts/ci/push-scanned-image.sh, and assert-hardened-cdn-fetches.mjs
+      # (shape c) reds on a registry write that skips that helper.
       #
-      # Tags arrive through `env:`, not `${{ }}` interpolated into the script,
-      # matching the sign step below: a registry/tag string spliced into a shell
-      # body is one metadata-action change away from being a shell body.
+      # Tags arrive through `env:`, not interpolated into the script: a registry/tag
+      # string spliced into a shell body is one metadata-action change away from
+      # being a shell body.
       - name: Push scanned image
         if: ${{ github.event_name != 'pull_request' }}
         env:

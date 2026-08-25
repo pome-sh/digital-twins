@@ -1,82 +1,17 @@
 name: release
-# The single release pipeline for the five published packages, replacing
-# cli-release.yml (Changesets + a manual "publish the @pome-sh/* batch first"
-# gate that produced 16 batch releases in 14 days, 4 of them consecutive
-# failures) and sdk-publish.yml.
+# Version-diff on push to main: bump the version in a package's own
+# package.json, merge, and this workflow publishes it. The five published
+# packages version independently; there is no lockstep to enforce.
 #
-# Model: version-diff on push to main. Bump the version in the package's own
-# package.json, merge, and this workflow publishes it. Nothing to remember, no
-# version PR, no changeset files.
+# @pome-sh/wire publishes to BOTH registries from the same version line, on two
+# lanes, because the auth mechanism differs per registry: npmjs uses OIDC
+# Trusted Publishing (`id-token: write`, no token), GitHub Packages uses
+# GITHUB_TOKEN with an .npmrc auth line. Keeping them separate also keeps them
+# from breaking each other — GitHub Packages needs auth even to READ, and that
+# read failing must not skip the npmjs publishes.
 #
-# @pome-sh/cli, @pome-sh/adapter-claude-sdk and @pome-sh/checks version
-# INDEPENDENTLY (D11) and are diff-gated separately: the CLI bundles the internal
-# packages, the adapter bundles the wire types, @pome-sh/checks bundles the five
-# twins' declaration layer plus the sdk check DSL, and none depends on another's
-# published version. There is no lockstep to enforce and therefore no
-# sync-versions script.
-#
-# @pome-sh/checks is the npmjs lane's third matrix entry. It exists
-# because @pome-sh/sdk and the five @pome-sh/twin-* packages are `private: true`
-# and stay that way, which froze pome-cloud's grading vocabulary: it npm-installs
-# the check declarations and could no longer receive a correction. Publishing the
-# declaration layer on its own restores that path without reversing the
-# privatisation that keeps zod from resolving to two schema identities.
-#
-# @pome-sh/sandbox-domains is the matrix entry that takes it the rest of the
-# way, and the reason it takes a second package is worth stating once here.
-# @pome-sh/checks gives the DECLARATIONS a publish path; the RUNTIME needs its
-# own. pome-cloud boots the twin domain layer in-process, and
-# `checks-package-drift.test.ts` demands the two declare an identical binding
-# surface — so widening the vocabulary with only the declaration leg
-# publishable turns that gate red with no legal move available. Bundling the
-# domain layer the same way (tsup `noExternal`, zod as a peer) puts both legs on
-# THIS lane, cut from the same commit by the same allocator run, so a widening
-# is two pins moving in one pome-cloud PR. The twins and the sdk stay
-# `private: true`.
-#
-# @pome-sh/wire publishes to BOTH registries, independently, from the SAME
-# version line. GitHub Packages serves cross-repo internal consumers like
-# pome-cloud; npmjs is needed as well because a scope can only resolve from one
-# registry per consumer, and pome-cloud's
-# other unavoidable @pome-sh/* deps (sdk, twin-*) exist only on public npmjs, so
-# routing @pome-sh/wire there for GitHub Packages would break those. Public npm
-# has no confidentiality downside for wire — it is trace-vocabulary Zod schemas
-# with no domain logic or secrets, already audited clean when the GitHub
-# Packages target shipped. Publishing to npmjs is ADDITIVE: the GitHub Packages
-# target is untouched, and wire stays bundled-inlined into the two npmjs
-# tarballs exactly as before (tsup `noExternal`).
-#
-# Hence wire is now the npmjs lane's FOURTH matrix entry (`plan`/`publish`,
-# alongside cli/adapter/checks) AND still has its own GitHub Packages lane
-# (`plan-wire`/`publish-wire`) — not a replacement of one lane by the other:
-#
-#   - The auth MECHANISM differs per registry, not per package. npmjs uses OIDC
-#     Trusted Publishing (no token, `id-token: write`, provenance); GitHub
-#     Packages uses GITHUB_TOKEN with `packages: write` and an .npmrc auth line.
-#     One job cannot honestly do both, and a shared job would carry four pieces
-#     of OIDC cargo (the setup-node v6 pin for actions/setup-node#1551, the
-#     npm@11.5.1 pin for the provenance crash, `NPM_CONFIG_PROVENANCE`,
-#     `id-token: write`) under a comment explaining that none of it applies to
-#     the GitHub Packages publish.
-#   - The lanes must not be able to break each other. GitHub Packages requires
-#     auth even to READ, and a read failure is deliberately a hard failure (a
-#     401 must never be mistaken for "unpublished" — that would bypass the
-#     never-publish-behind-latest floor check). If that read lived in `plan`,
-#     any GitHub Packages 401/403/outage — or an org owner flipping the
-#     package's visibility settings — would fail `plan` and silently skip the
-#     @pome-sh/cli, @pome-sh/adapter-claude-sdk and @pome-sh/checks publishes,
-#     which have nothing to do with GitHub Packages. Blast radius now matches
-#     the artifact. Symmetrically, wire's npmjs decision/publish lives entirely
-#     in `plan`/`publish` so an npmjs outage cannot take down the GitHub
-#     Packages publish either.
-#   - Wire's own `publishConfig.registry` still points at GitHub Packages (and
-#     ci.yml's `gate:wire-manifest` still asserts that on every PR — it is what
-#     `publish-wire` relies on by default). The npmjs-lane `publish` step
-#     therefore passes an explicit `--registry https://registry.npmjs.org` for
-#     wire ONLY, which outranks `publishConfig`. See the comment on that step.
-#
-# The shared decision logic lives in scripts/ci/decide-publish.sh (tested by
-# scripts/ci/decide-publish.test.mjs) so the lanes cannot drift.
+# Shared decision logic is in scripts/ci/decide-publish.sh so the lanes cannot
+# drift.
 on:
   push:
     branches: [main]
@@ -106,11 +41,9 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
-      # Deliberately reads ONLY registry.npmjs.org (the `registry` argument is
-      # omitted below, including for wire). @pome-sh/wire's GitHub Packages diff
-      # lives separately in `plan-wire` so that a GitHub Packages 401/outage
-      # cannot skip the npmjs publishes: a failure here fails `plan`, and
-      # everything needing it is skipped. Blast radius matches the artifact.
+      # Reads ONLY registry.npmjs.org — the `registry` argument is omitted below,
+      # including for wire. wire's GitHub Packages diff lives in `plan-wire` so a
+      # GitHub Packages outage cannot skip the npmjs publishes.
       - name: Compare local versions against npm
         id: diff
         run: |
@@ -118,17 +51,13 @@ jobs:
           scripts/ci/decide-publish.sh "@pome-sh/cli" "cli/package.json" "cli"
           scripts/ci/decide-publish.sh "@pome-sh/adapter-claude-sdk" "packages/adapter-claude-sdk/package.json" "adapter"
           scripts/ci/decide-publish.sh "@pome-sh/checks" "packages/checks/package.json" "checks"
-          # @pome-sh/sandbox-domains — the grading RUNTIME, the other leg of
-          # pome-cloud's drift gate. Decided on the same lane and in
-          # the same step as @pome-sh/checks on purpose: the two are compared
-          # against each other in the consumer, so a release that moves one and
-          # not the other is exactly the failure this entry exists to prevent.
+          # Decided in the same step as @pome-sh/checks on purpose: the consumer
+          # compares the two against each other, so releasing one without the other is
+          # the failure this entry prevents.
           scripts/ci/decide-publish.sh "@pome-sh/sandbox-domains" "packages/sandbox-domains/package.json" "sandboxDomains"
-          # wire's npmjs decision — independent of, and output-named distinctly
-          # from, plan-wire's `wire` output below (that one reads GitHub
-          # Packages). Same manifest, same version line, two registries decided
-          # separately: wire could be publishable on npmjs while already
-          # up to date (or even behind) on GitHub Packages, or vice versa.
+          # wire's npmjs decision. Output-named `wireNpm`, distinct from plan-wire's
+          # `wire` (GitHub Packages): one registry can be behind while the other is
+          # current, so the two decisions cannot share a name.
           scripts/ci/decide-publish.sh "@pome-sh/wire" "packages/wire/package.json" "wireNpm"
 
   plan-wire:
@@ -136,10 +65,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      # GitHub Packages — unlike registry.npmjs.org — requires a token even to
-      # READ a version. Without this the read answers 401, and a 401 is a hard
-      # failure by design (never mistaken for "unpublished"), so this permission
-      # is what stands between the workflow and a permanently red wire release.
+      # GitHub Packages requires a token even to READ. Without this the read
+      # answers 401, which is a hard failure by design, never read as
+      # "unpublished".
       packages: read
     outputs:
       wire: ${{ steps.diff.outputs.wire }}
@@ -148,11 +76,9 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
-      # Auth for the GitHub Packages read, and nothing else. Deliberately ONLY
-      # the `//host/:_authToken` line and never a `@pome-sh:registry=` scope
-      # mapping — see the header of decide-publish.sh for why that distinction
-      # is load-bearing. `$HOME/.npmrc` rather than a project `.npmrc` so the
-      # token never sits inside the workspace.
+      # Only the `//host/:_authToken` line, never a `@pome-sh:registry=` scope
+      # mapping — see the header of decide-publish.sh for why. In $HOME/.npmrc so
+      # the token never sits inside the workspace.
       - name: Authenticate reads against GitHub Packages
         env:
           GITHUB_PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -180,44 +106,24 @@ jobs:
             enabled: ${{ needs.plan.outputs.cli }}
           - package: "@pome-sh/adapter-claude-sdk"
             enabled: ${{ needs.plan.outputs.adapter }}
-          # @pome-sh/checks — the grading vocabulary, for pome-cloud.
-          # Same lane, same OIDC trusted publishing, its own version line. It is
-          # the third npmjs package rather than a second GitHub Packages one
-          # because a scope can only route to one registry: pome-cloud's whole
-          # `@pome-sh` scope resolves from npmjs, so a GitHub Packages copy would
-          # need an .npmrc change it cannot make without breaking @pome-sh/cli.
+          # On the npmjs lane rather than GitHub Packages because a scope routes to
+          # one registry, and pome-cloud's whole @pome-sh scope resolves from npmjs.
           - package: "@pome-sh/checks"
             enabled: ${{ needs.plan.outputs.checks }}
-          # @pome-sh/sandbox-domains — the grading RUNTIME, and what keeps the
-          # drift gate's red a fixable condition rather than a wall.
-          # @pome-sh/checks carries the check DECLARATIONS to pome-cloud; this
-          # carries the in-process domain layer those declarations read, so
-          # `checks-package-drift.test.ts` has two legs that can both move.
-          # Both are cut from the same `main` commit by
-          # the same allocator run, which is what makes their binding surfaces
-          # agree by construction.
-          #
-          # It runs `gate:sandbox-domains-tarball` where checks runs
-          # `gate:checks-tarball`, and the two audits are NOT interchangeable —
-          # three of their assertions are deliberately inverted (this one
-          # REQUIRES the `node:sqlite` bytes the checks audit treats as an engine
-          # leak). See the header of scripts/ci/check-sandbox-domains-tarball.mjs.
+          # The runtime leg of pome-cloud's drift gate, cut from the same commit by
+          # the same allocator run as @pome-sh/checks. Its tarball audit is NOT
+          # interchangeable with the checks audit — three assertions are inverted (this
+          # one REQUIRES the node:sqlite bytes the checks audit treats as an engine
+          # leak). See scripts/ci/check-sandbox-domains-tarball.mjs.
           - package: "@pome-sh/sandbox-domains"
             enabled: ${{ needs.plan.outputs.sandboxDomains }}
-          # @pome-sh/wire — the odd one out twice over. It is on this
-          # npmjs lane ADDITIONALLY to (not instead of) its separate GitHub
-          # Packages jobs further down in this file: pome-cloud's migration off
-          # @pome-sh/shared-types needs to npm-install wire, and the rest of its
-          # unavoidable @pome-sh/* deps only exist on public npmjs, so wire has
-          # to resolve from there too. `enabled` is `wireNpm`, not `wire` — the
-          # latter is the OTHER job's GitHub Packages output; reusing that name
-          # here would silently wire this job to the wrong decision. wire's own
-          # `publishConfig.registry` still targets GitHub Packages, so its
-          # Publish step below (and only its) passes an explicit
-          # `--registry` to land on npmjs instead. It skips the
-          # `gate:checks-tarball` step (`matrix.package == '@pome-sh/checks'`
-          # only) since that audit is specific to `@pome-sh/checks`'s six-inlined-
-          # workspace tarball shape and has no wire equivalent.
+          # On this npmjs lane IN ADDITION TO its GitHub Packages jobs below, because
+          # consumers resolving the rest of the @pome-sh scope from npmjs need wire
+          # there too. `enabled` is `wireNpm`, not `wire` — the latter is the GitHub
+          # Packages output, and reusing it here wires this job to the wrong decision.
+          # wire's own publishConfig.registry targets GitHub Packages, so its Publish
+          # step below passes an explicit --registry. It skips gate:checks-tarball,
+          # which is specific to the @pome-sh/checks tarball shape.
           - package: "@pome-sh/wire"
             enabled: ${{ needs.plan.outputs.wireNpm }}
     permissions:
@@ -228,10 +134,9 @@ jobs:
         run: echo "${{ matrix.package }} version unchanged — skipping."
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: matrix.enabled == 'true'
-      # Carried over from cli-release.yml. setup-node MUST stay off v7+ for the
-      # OIDC path: v7 changed how `registry-url` writes .npmrc and breaks
-      # Trusted Publishing with ENEEDAUTH (actions/setup-node#1551). renovate.json
-      # disables major bumps for this action for the same reason.
+      # setup-node MUST stay off v7+ on the OIDC path: v7 changed how
+      # `registry-url` writes .npmrc and breaks Trusted Publishing with ENEEDAUTH
+      # (actions/setup-node#1551). renovate.json pins the major for this reason.
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v6.4.0
         if: matrix.enabled == 'true'
         with:
@@ -264,21 +169,17 @@ jobs:
       - name: Clean-room pack test
         if: matrix.enabled == 'true'
         run: npm run test:pack
-      # @pome-sh/checks is the only published package whose install would 404:
-      # it inlines six `private: true` workspace packages, so a leaked
-      # @pome-sh/* dependency is unresolvable rather than merely wrong. Also
-      # asserts the twin engine did not ride along and that zod stayed external
-      # (two zod copies = two schema identities).
+      # The only published package whose install would 404: it inlines six
+      # `private: true` workspace packages, so a leaked @pome-sh/* dependency is
+      # unresolvable. Also asserts zod stayed external — two copies means two
+      # schema identities.
       - name: Audit the @pome-sh/checks tarball
         if: matrix.enabled == 'true' && matrix.package == '@pome-sh/checks'
         run: npm run gate:checks-tarball
-      # @pome-sh/sandbox-domains inlines the same six `private: true` workspace
-      # packages, so the same leaked-dependency 404 applies — but the rest of
-      # this audit is the INVERSE of the one above: it requires the `node:sqlite`
-      # driver to be present (a runtime bundle without one has openers that
-      # cannot open), requires every bare specifier in the shipped bytes to be a
-      # declared dependency and every declared dependency to be imported, and
-      # asserts the package's export spec against the packed modules.
+      # Same leaked-dependency 404 applies, but the rest of this audit is the
+      # INVERSE of the one above: it requires the node:sqlite driver present (a
+      # runtime bundle without one has openers that cannot open), and requires
+      # every bare specifier shipped to be a declared dependency and back.
       - name: Audit the @pome-sh/sandbox-domains tarball
         if: matrix.enabled == 'true' && matrix.package == '@pome-sh/sandbox-domains'
         run: npm run gate:sandbox-domains-tarball
@@ -296,22 +197,13 @@ jobs:
             exit 1
           fi
           echo "E415 hard-link check OK: $tgz"
-      # @pome-sh/wire's own package.json sets `publishConfig.registry` to
-      # GitHub Packages (npm.pkg.github.com) as its DEFAULT — see
-      # publish-wire's "Publish to GitHub Packages" step — and ci.yml's
-      # `gate:wire-manifest` asserts that value on
-      # every PR, so it cannot be changed or removed here without failing that
-      # gate. `publishConfig` outranks the ambient registry that
-      # `registry-url: https://registry.npmjs.org` above configured, so
-      # publishing wire on THIS lane with no override would either silently
-      # attempt GitHub Packages (wrong registry, and this job never
-      # authenticates against it — ENEEDAUTH) or, if it somehow succeeded,
-      # publish wire to GitHub Packages twice while npmjs got nothing. An
-      # explicit `--registry` flag outranks `publishConfig` and is the only
-      # thing that reliably wins here — the same reasoning `publish-wire`
-      # applies in the opposite direction for defence-in-depth. cli, adapter
-      # and checks have no `publishConfig.registry`, so they fall through to
-      # the plain `npm publish` and pick up the registry `setup-node` wrote.
+      # wire's publishConfig.registry defaults to GitHub Packages, and
+      # gate:wire-manifest asserts that on every PR, so it cannot be changed here.
+      # publishConfig outranks the ambient registry setup-node configured, so
+      # publishing wire on this lane without an override would attempt GitHub
+      # Packages, which this job never authenticates against. An explicit
+      # --registry outranks publishConfig and is the only thing that wins. cli,
+      # adapter and checks have no publishConfig.registry and fall through.
       - name: Publish
         if: matrix.enabled == 'true'
         run: |
@@ -324,59 +216,37 @@ jobs:
         env:
           NPM_CONFIG_PROVENANCE: "true"
 
-      # "published" has to mean "the registry SERVES it" before anything
-      # downstream reads it, and one thing downstream reads it seconds later:
-      # `dispatch-allocate-version` fires at the end of this run, and the re-pin
-      # it triggers acts only on a version `npm view` already answers for. An
-      # answer of E404 is indistinguishable from "genuinely not published"
-      # (deliberately — see scripts/check-example-pins-published.mjs), so a read
-      # that lands before propagation makes `planExampleRepins` skip the pin, and
-      # its single-attempt budget is spent: the dispatched run no-ops, `main`
-      # stays red on the pin drift, and there is no later run to retry it,
-      # because the next PR's own required `typecheck-test` reds on the same
-      # drift. That is the deadlock this milestone exists to close, reopened by a
-      # race. So wait here, where the package and the version are known exactly,
-      # rather than sleeping blindly in the dispatch job.
+      # `dispatch-allocate-version` fires seconds after this step, and the re-pin
+      # it triggers acts only on a version `npm view` already answers for. E404 is
+      # indistinguishable from "genuinely not published", so a read landing before
+      # propagation makes the re-pin skip, spending its single-attempt budget: main
+      # stays red on the pin drift with no later run to retry it. So wait here,
+      # where the package and version are known exactly.
       #
-      # `--prefer-online` forces npm's staleness check: setup-node restored the
-      # npm HTTP cache above, and a packument is cacheable for minutes, so
-      # without it a cached copy predating this publish is a legitimate answer.
-      # Bounded at eighteen attempts × 10s ≈ 3 minutes, and it exits on the first
-      # attempt in the ordinary case: the budget is sized for the CDN's packument
-      # cache rather than for the write, which is why it is minutes and not
-      # seconds. A timeout reds a publish that already succeeded, which is the
-      # loud half of the choice — the alternative is a green run whose dispatch
-      # achieves nothing.
+      # `--prefer-online` forces npm's staleness check; setup-node restored the HTTP
+      # cache above and a packument stays cacheable for minutes. Bounded at 18
+      # attempts x 10s, sized for the CDN's packument cache rather than the write,
+      # and it exits on the first attempt in the ordinary case.
       #
-      # A TIMEOUT ALSO SUPPRESSES THE DISPATCH, and that coupling is deliberate
-      # rather than unnoticed: this is a step of `publish`, so its failure makes
-      # `needs.publish.result` 'failure' and the dispatch job below then fires
-      # only if `publish-wire` published. Decoupling it — plumbing a matrix
-      # output so the dispatch fires regardless — buys a dispatched run that
-      # would very likely no-op for the same reason this step timed out, in
-      # exchange for a job graph nobody can read. A registry that will not serve
-      # a version three minutes after accepting it is abnormal, worth a red, and
-      # the recovery is the single command this step prints.
+      # A timeout also suppresses the dispatch, deliberately: a registry that will
+      # not serve a version three minutes after accepting it is abnormal and worth a
+      # red, and the recovery is the single command this step prints.
       - name: The registry serves what we just published
         if: matrix.enabled == 'true'
         env:
           PKG: ${{ matrix.package }}
         run: |
           set -euo pipefail
-          # Asked of npm by workspace NAME, which is all the matrix carries —
-          # decide-publish.sh is handed a manifest path, and duplicating that
-          # table here is a second place for it to drift.
+          # Asked by workspace NAME, which is all the matrix carries; decide-publish.sh
+          # takes a manifest path, and duplicating that table here is a second place to
+          # drift.
           #
-          # BOTH JSON SHAPES ARE ACCEPTED, and that is not defensive padding:
-          # `npm pkg get version -w <name> --json` answers
-          # `{"<name>": "0.3.6"}` on the npm@11.5.1 this job pins two steps up
-          # (for the OIDC provenance crash) and `{"<name>": {"version": "0.3.6"}}`
-          # on npm 12. Reading only the nested shape yields `undefined`, and
-          # `npm view <pkg>@undefined` then 404s for the full budget below and
-          # reds a publish that succeeded — on every release, from a step whose
-          # whole job is to stop a silent no-op. The version is asserted to look
-          # like one rather than interpolated blind, so an npm that answers a
-          # third shape fails HERE, naming what it said.
+          # Both JSON shapes are accepted because `npm pkg get version -w <name> --json`
+          # answers {"<name>": "0.3.6"} on the npm@11.5.1 pinned two steps up and
+          # {"<name>": {"version": "0.3.6"}} on npm 12. Reading only the nested shape
+          # yields undefined, and `npm view <pkg>@undefined` then 404s for the full
+          # budget and reds a publish that succeeded. The version is asserted to look
+          # like one rather than interpolated blind, so a third shape fails HERE.
           version="$(npm pkg get version -w "${PKG}" --json | node -p 'const v=JSON.parse(require("node:fs").readFileSync(0,"utf8"))[process.env.PKG];const n=typeof v==="string"?v:v?.version;if(!/^\d+\.\d+\.\d+/.test(n??""))throw new Error("npm pkg get returned no version for "+process.env.PKG+": "+JSON.stringify(v));n')"
           for attempt in $(seq 1 18); do
             if npm view "${PKG}@${version}" version --prefer-online --registry https://registry.npmjs.org >/dev/null 2>&1; then
@@ -395,15 +265,10 @@ jobs:
           echo "to land the re-pin by hand."
           exit 1
 
-  # @pome-sh/wire → GitHub Packages. See the file header for why this is its own
-  # lane. On what it deliberately does NOT run: the `bundled-deps` lint rule and
-  # `test:pack` are assertions about the two npmjs TARBALLS (no leaked
-  # @pome-sh/* deps, five twins boot, a consumer typechecks against the shipped
-  # declarations). They say nothing about wire's own tarball, and they still run
-  # on every PR and on both npmjs publishes — which is what keeps wire's
-  # bundled-inlining role verified. Publishing wire does not change that role:
-  # cli/ and adapter/ depend on it as a devDependency and tsup inlines it, so no
-  # end user ever resolves it from a registry.
+  # @pome-sh/wire -> GitHub Packages. See the file header for why this is its
+  # own lane. It deliberately does not run `bundled-deps` or `test:pack`: those
+  # assert things about the two npmjs tarballs, not wire's own, and they still
+  # run on every PR and on both npmjs publishes.
   publish-wire:
     name: publish @pome-sh/wire (GitHub Packages)
     needs: plan-wire
@@ -414,20 +279,17 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # No `registry-url`: that would point the DEFAULT registry at GitHub
-      # Packages for the whole job and `npm ci` would try to fetch zod,
-      # typescript and vitest from there. Registry selection for wire is
-      # explicit at publish time instead.
+      # No `registry-url`: that would point the default registry at GitHub
+      # Packages for the whole job, and `npm ci` would try to fetch zod, typescript
+      # and vitest from there. Registry selection is explicit at publish time.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci
-      # wire has no internal @pome-sh/* dependency, so it is the first node in
-      # scripts/build.mjs's topological order and builds standalone. Explicit
-      # here (rather than relying on wire's own `prepublishOnly`) so a build
-      # failure reads as a build failure.
+      # Explicit rather than relying on wire's prepublishOnly, so a build failure
+      # reads as a build failure.
       - name: Build @pome-sh/wire
         run: npm run build -w @pome-sh/wire
       - name: Typecheck and test @pome-sh/wire
@@ -440,19 +302,16 @@ jobs:
       # descriptor claiming a different version than the package.json beside it.
       - name: Trace-contract descriptor matches the shipped version
         run: npm run check:trace-contract -w @pome-sh/wire
-      # wire's published dist is what a cross-repo consumer resolves through its
-      # `exports` map — an export pointing at a file the tarball does not carry
-      # is only observable from OUTSIDE the workspace, where npm's workspace
-      # symlink is not there to paper over it.
+      # An `exports` entry pointing at a file the tarball does not carry is only
+      # observable from outside the workspace, where npm's symlink cannot hide it.
       - name: Audit the wire tarball
         run: npm run gate:wire-tarball
-      # Two independent guarantees that this cannot land on registry.npmjs.org:
-      # `publishConfig.registry` in packages/wire/package.json, and this
-      # explicit `--registry`. `publishConfig` alone is enough on every npm
-      # version this repo pins, but a publish to the wrong registry is not an
-      # error you can take back — public npm has no unpublish after 72 hours.
-      # No `--access public`: on GitHub Packages access is a property of the
-      # package/repository, not a publish flag.
+      # Two independent guarantees this cannot land on registry.npmjs.org:
+      # publishConfig.registry in packages/wire/package.json, and this explicit
+      # --registry. publishConfig alone suffices on every npm version this repo
+      # pins, but a publish to the wrong registry cannot be taken back — public npm
+      # has no unpublish after 72 hours. No --access public: on GitHub Packages
+      # access is a property of the package, not a publish flag.
       - name: Publish to GitHub Packages
         env:
           GITHUB_PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -461,126 +320,60 @@ jobs:
           printf '//npm.pkg.github.com/:_authToken=%s\n' "${GITHUB_PACKAGES_TOKEN}" >> "$HOME/.npmrc"
           npm publish -w @pome-sh/wire --registry https://npm.pkg.github.com
 
-  # The moment a version lands on a registry is also the moment
-  # scripts/check-example-pins-published.mjs can go red on `main`:
-  # agent-examples/support-triage pins @pome-sh/adapter-claude-sdk from the
-  # registry, and allocate-version.yml is the only thing that re-pins it
-  # (planExampleRepins, which the allocator imports). But the two
-  # allocate-version.yml runs that bracket a publish both miss the window —
-  # the run on the human merge commit plans BEFORE the version exists on the
-  # registry, and the run on the bump commit it produces is deliberately
-  # skipped by that workflow's own `[release-bump]` guard. Nothing else is
-  # on a timer: allocate-version.yml only fires on a push to `main`, a manual
-  # dispatch, or the `repin-examples` repository_dispatch this job POSTs. So
-  # this job dispatches it at the one moment the published version demonstrably
-  # exists — right after this run's own publish, and after the step above has
-  # watched the registry actually serve it.
+  # A published version is also the moment check-example-pins-published.mjs can
+  # go red on main: agent-examples/support-triage pins from the registry, and
+  # allocate-version.yml is the only thing that re-pins it. Both
+  # allocate-version.yml runs bracketing a publish miss the window — one plans
+  # before the version exists, the other is skipped by the [release-bump] guard
+  # — so this job dispatches it at the one moment the version demonstrably
+  # exists.
   #
-  # Depends on `publish`/`publish-wire` ONLY, not `plan`/`plan-wire`: those two
-  # are what "did anything get published" is a fact about, and naming a plan job
-  # here would let a plan-side failure that already skipped its own publish job
-  # take this one down through a dependency it was never given. A failed dispatch
-  # can never reach backwards into publishing either: nothing downstream of
-  # `publish`/`publish-wire` consumes this job's outcome, so it cannot
-  # un-publish, retry, or block either lane — it can only fire, or fail loudly,
-  # after they are already done.
+  # Depends on `publish`/`publish-wire` only, not the plan jobs: those two are
+  # what "did anything get published" is a fact about. Nothing downstream
+  # consumes this job's outcome, so it cannot un-publish, retry or block either
+  # lane.
   #
-  # `if:` is deliberately OR, not AND, and reads only the two publish jobs'
-  # `.result` (not their per-package outputs): a matrix job's `.result` is
-  # 'success' as long as every ENABLED leg passed, so a matrix where most
-  # packages were skipped (nothing to publish for them) still reports
-  # 'success' and must not suppress this. Symmetrically, a job with nothing
-  # enabled at all is 'skipped', not 'success', so "nothing published" (both
-  # skipped) correctly evaluates to false.
+  # `if:` is OR and reads only `.result`, not per-package outputs: a matrix job
+  # whose enabled legs all passed is 'success' even when most packages were
+  # skipped, while a job with nothing enabled is 'skipped'. So "nothing
+  # published" correctly evaluates to false.
   #
-  # `!cancelled()` IS LOAD-BEARING AND IS NOT DECORATION. Without a status-check
-  # function anywhere in an `if:`, GitHub applies its default requirement that
-  # every job in `needs:` SUCCEEDED — and one of these two lanes is skipped on
-  # almost every release, because `publish-wire` only runs when wire's GitHub
-  # Packages version moved and `publish` only when an npmjs version did. So the
-  # OR below would never have been reached in the ordinary case: the job would
-  # have been dropped for depending on a skipped lane, reading as a clean
-  # "skipped" in the UI while the re-pin it exists to trigger silently never
-  # happened. `!cancelled()` is what makes this job's own condition the thing
-  # that decides. The consequence to state plainly, because it is a widening:
-  # `publish` FAILING no longer suppresses this job when `publish-wire`
-  # succeeded, and that is correct rather than tolerated — the matrix does not
-  # fail fast, so a run where the adapter published and the CLI failed has
-  # already put a version on the registry that `agent-examples/*` is now drifted from.
-  # Suppressing the re-pin there would leave `main` red on the drift as well as
-  # on the failure.
+  # `!cancelled()` is load-bearing. Without a status-check function in an `if:`,
+  # GitHub requires every `needs:` job to have SUCCEEDED — and one of these two
+  # lanes is skipped on almost every release, so this job would be dropped and
+  # read as a clean "skipped" while the re-pin silently never happened. The
+  # consequence is a widening: `publish` failing does not suppress this job when
+  # `publish-wire` succeeded. That is correct — the matrix does not fail fast, so
+  # a partial run has already put a version on the registry that
+  # agent-examples/* is drifted from.
   #
-  # LOOP TERMINATION, and it deliberately does not rest on the `[release-bump]`
-  # marker, because on the event this job POSTs that marker cannot be read at
-  # all: `github.event.head_commit` exists only on a push, so
-  # allocate-version.yml's guard is scoped to `push` explicitly and the dispatch
-  # arm ALWAYS runs — which is required, since the tip it is dispatched from is
-  # itself a `[release-bump]` commit. What terminates the chain is that a
-  # dispatch costs a publish:
+  # Loop termination rests on a dispatch costing a publish, not on the
+  # [release-bump] marker (github.event.head_commit exists only on a push, so
+  # the dispatch arm always runs). This job fires only when something published,
+  # which needs a local version differing from the registry's. The dispatched
+  # run pushes at most one commit; if it is re-pin-only it moves no package
+  # version, so the next run publishes nothing and this job's `if:` is false. If
+  # it does move a version it consumed a pending `## Unreleased` entry, and
+  # nothing in CI writes entries, so the chain is bounded by what a human
+  # merged.
   #
-  #   1. This job fires only when `publish`/`publish-wire` actually published,
-  #      which needs a local version differing from the registry's.
-  #   2. The dispatched run pushes at most ONE commit. If it is re-pin-only it
-  #      touches `agent-examples/*` manifests and their lockfiles — no package version
-  #      — so the `plan`/`plan-wire` of the run that commit triggers find every
-  #      version equal to the registry's (the wait step above proved it is
-  #      served), publish nothing, and this job's `if:` is false. Chain over.
-  #   3. If that commit DOES move a version, it did so by consuming a pending
-  #      `## Unreleased` entry, and nothing in CI writes entries. So each further
-  #      iteration strictly consumes one, and the chain is bounded by the entries
-  #      a human merged.
-  #
-  # allocate-version.yml's push arm still skips a `[release-bump]` head commit,
-  # so the commit the dispatched run pushes does not also start an allocation of
-  # its own through the push arm. The two mechanisms are independent and neither
-  # is load-bearing alone.
-  #
-  # allocate-version.yml's `concurrency: allocate-version-${{ github.ref }}`
-  # covers a `repository_dispatch` the same as a `push`: GitHub sets `ref` to the
-  # default branch on that event, so both resolve to the same
-  # `allocate-version-refs/heads/main` group and a dispatch queues behind any
-  # allocation already in flight on `main` rather than racing it.
-  #
-  # It does NOT mean nothing is ever cancelled, and the honest version matters
-  # more than the reassuring one: GitHub keeps only the NEWEST pending run per
-  # group, so a dispatch arriving while a run is in progress and another is
-  # already pending displaces that pending run — and is itself displaceable by a
-  # later merge. What makes that safe is not the queue, it is that the allocator
-  # is a pure function of `main`'s tip: whichever run does start re-derives both
-  # the allocations and the re-pins from the tip, so a displaced run's work is
-  # not lost, it is recomputed. A future reader who instead relies on "nothing is
-  # cancelled" will mis-reason about exactly this.
+  # allocate-version.yml's concurrency group covers a repository_dispatch the
+  # same as a push, so a dispatch queues behind an allocation in flight. It does
+  # not mean nothing is cancelled: GitHub keeps only the newest pending run per
+  # group. What makes that safe is that the allocator is a pure function of
+  # main's tip, so a displaced run's work is recomputed rather than lost.
   dispatch-allocate-version:
     name: dispatch allocate-version.yml after a publish
     needs: [publish, publish-wire]
     if: ${{ !cancelled() && (needs.publish.result == 'success' || needs.publish-wire.result == 'success') }}
     runs-on: ubuntu-latest
     steps:
-      # Same app, same mint step as allocate-version.yml's own. The
-      # `pome-ops-push` installation (app_id 4582446, org
-      # installation 153466692) holds exactly `contents: write` +
-      # `metadata: read`, and `POST /repos/{owner}/{repo}/dispatches` — GitHub's
-      # documented requirement for the repository_dispatch event — is a
-      # `contents: write` endpoint, so this works with the grant that already
-      # exists and needs no re-approval of the app.
-      #
-      # This is the whole reason the event below is a `repository_dispatch` and
-      # not the `workflow_dispatch` this job first shipped as: `POST
-      # /repos/…/actions/workflows/{id}/dispatches` needs `actions: write`, which
-      # this installation does not have, so that version would have 403'd on
-      # every single release — loud, but strictly worse than the drift it exists
-      # to fix, since it also reds release.yml.
-      #
-      # Why not the ambient `GITHUB_TOKEN` with a job-level `actions: write`,
-      # which would need no app at all: dispatch events are the ONE documented
-      # exception to `GITHUB_TOKEN` event suppression (GitHub changelog,
-      # 2022-09-08 — `workflow_dispatch` and `repository_dispatch` from
-      # `GITHUB_TOKEN` do start runs, unlike a push), so that would in fact
-      # work. It is not used because it would mean granting the ambient token
-      # write scope inside the publishing workflow to save minting a token this
-      # repository already mints for the release path — and because the release
-      # path resting on a carve-out to a rule the rest of this file depends on
-      # is a worse thing to have to remember. The app token needs no carve-out.
+      # Same app and mint step as allocate-version.yml's own. The pome-ops-push
+      # installation holds `contents: write` + `metadata: read`, and
+      # `POST /repos/{owner}/{repo}/dispatches` is a `contents: write` endpoint, so
+      # this needs no re-approval of the app. That is why the event below is a
+      # repository_dispatch: the workflow_dispatch endpoint needs `actions: write`,
+      # which this installation does not have.
       - name: Mint a pome-ops-push installation token
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
@@ -588,10 +381,9 @@ jobs:
           app-id: ${{ secrets.OPS_APP_ID }}
           private-key: ${{ secrets.OPS_APP_PRIVATE_KEY }}
       # `gh api`, not `gh workflow run`: the latter is the `actions: write`
-      # endpoint. The `event_type` must match allocate-version.yml's
+      # endpoint. `event_type` must match allocate-version.yml's
       # `repository_dispatch: types:` exactly — a mismatch is a 204 that starts
-      # nothing, the silent no-op this job cannot afford, so the two are asserted
-      # against each other in scripts/ci/decide-publish.test.mjs.
+      # nothing, so the two are asserted against each other in decide-publish.test.mjs.
       - name: Dispatch allocate-version.yml
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
