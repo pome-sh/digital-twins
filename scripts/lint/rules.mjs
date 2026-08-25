@@ -5,7 +5,6 @@
 
 import barrels from "./rules/barrels.mjs";
 import bundledDeps from "./rules/bundled-deps.mjs";
-import copyMarkers from "./rules/copy-markers.mjs";
 import fileSize from "./rules/file-size.mjs";
 import firstPartyTwins from "./rules/first-party-twins.mjs";
 import noCatch from "./rules/no-catch.mjs";
@@ -64,7 +63,6 @@ export const RULES = [
   skillManifest,
   taskFormatDoc,
   firstPartyTwins,
-  copyMarkers,
   fileSize,
   parentVocab,
   taskClass,

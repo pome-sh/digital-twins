@@ -181,7 +181,7 @@ Secrets: `.github/workflows/secret-scan.yml` runs TruffleHog over the diff,
 verified findings only, on `pull_request` and on push to `main`. The PR run is
 the required check; the push run covers commits that reach `main` without one.
 The local hook (`bash scripts/hooks/install.sh`) wires the boundary and
-copy-marker gates and needs nothing installed.
+no-eval gates and needs nothing installed.
 
 Twin images publish only after `ci`, and `secret-scan` on `main`, pass on the
 same SHA, then Trivy. GHCR digests are cosign-signed and carry an SPDX SBOM.
