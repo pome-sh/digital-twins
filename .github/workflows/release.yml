@@ -288,8 +288,10 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci
-      # Explicit rather than relying on wire's prepublishOnly, so a build failure
-      # reads as a build failure.
+      # wire has no internal @pome-sh/* dependency, so it is the first node in
+      # scripts/build.mjs's topological order and builds standalone — which is
+      # what makes a single-package build sufficient here. Explicit rather than
+      # relying on wire's prepublishOnly, so a build failure reads as one.
       - name: Build @pome-sh/wire
         run: npm run build -w @pome-sh/wire
       - name: Typecheck and test @pome-sh/wire
