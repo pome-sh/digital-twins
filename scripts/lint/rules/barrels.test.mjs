@@ -1,16 +1,12 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// The old gate shipped with no case table. Case 4 is the one worth having: the
-// barrel list is hand-kept, so a listed file that MOVED must red rather than
-// quietly stop being checked.
+// Case table for barrels. Every case asserts the RED direction: a rule that has
+// quietly stopped failing prints the same line as one with nothing to report.
 
 import { defineCases } from "../harness.mjs";
 
-// One of the paths the rule carries; the others behave identically.
 const BARREL = "packages/wire/src/index.ts";
-// The rest of the list has to exist too, or every case fails on a missing file
-// instead of on its own subject.
 const OTHERS = [
   "packages/twin-gmail/src/index.ts",
   "packages/twin-gmail/src/domain/index.ts",
@@ -49,8 +45,6 @@ defineCases("barrels", [
     contains: ["found logic/prose in a barrel", "const derived = a + 1;"],
   },
   {
-    // The hand-kept list is the weak point: a listed barrel that moved must red,
-    // not silently drop out of coverage.
     name: "a listed barrel that no longer exists is red, not skipped",
     files: tree(undefined),
     expect: "red",

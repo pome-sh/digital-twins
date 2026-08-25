@@ -1,57 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// A bundled Claude-Agent-SDK example whose `query()` options omit
-// `tools` or `settingSources` is not isolated, however carefully its comments
-// say it is.
-//
-// Two DIFFERENT doors, and shutting one says nothing about the other:
-//
-//   options.tools           the BUILT-IN base set (Bash, Read, Grep, WebFetch,
-//                           …). `[]` replaces the set, so it is complete by
-//                           construction. Closed for the hero example by
-//                           the denial-enumeration finding.
-//   options.settingSources  FILESYSTEM settings — user (~/.claude/settings.json),
-//                           project (.claude/settings.json) and local
-//                           (.claude/settings.local.json), INCLUDING the
-//                           developer's Claude Code plugin MCP servers. The SDK
-//                           typedoc: "When omitted, all sources are loaded
-//                           (matches CLI defaults). Pass [] to disable
-//                           filesystem settings (SDK isolation mode)."
-//
-// Measured 2026-08-05: a hosted `claude-haiku-4-5` trial of
-// support-triage-dedup, launched from a developer shell with `options.tools: []`
-// ALREADY SET, called `mcp__plugin_slack_slack__slack_search_channels`,
-// `…__slack_search_public` and `…__slack_list_channel_members` — it searched the
-// developer's real Slack workspace, made zero twin calls, and would have scored
-// as "the agent failed to triage". A verdict about the wrong workspace entirely.
-// Those servers arrive as Claude Code PLUGINS (namespaced
-// `plugin_<plugin>_<server>`), not from the repo's committed `.mcp.json` and not
-// from `~/.claude.json` — which is why no amount of repo hygiene reaches them
-// and why only `settingSources: []` does.
-//
-// This gate is the answer to "an example is not sealed by intention". It PARSES
-// rather than greps, for the reason `scripts/lint/rules/import-meta-main.mjs`
-// gives: a grep for "settingSources" also matches the word in the comment three
-// lines above the options object it was deleted from, which is the single most
-// likely way this regresses.
-//
-// [DECISION] central AND per-example, and the central half is NOT here.
-// Per-example options are what this gate enforces, and they are load-bearing on
-// their own: `agent-examples/support-triage` is `npx degit`-fetchable as a standalone
-// subtree, so the options a reader copies out must carry the isolation with
-// them. The central half belongs in `@pome-sh/adapter-claude-sdk`'s `query()`
-// — the one in-process chokepoint EVERY bundled example already routes through,
-// and the only one that holds for all three launchers (`pome run`, the coach's
-// `run_task` local-subprocess spawn, and a plain `npm start`). Deliberately not
-// the `pome run` path itself: the measured trial was launched from a
-// developer shell by the coach, so a CLI-side clamp would not have caught the
-// very incident this ticket is about, and the obvious mechanism there
-// (`CLAUDE_CONFIG_DIR` at an empty dir, which the SDK does honor) also holds
-// `.credentials.json` — it would break subscription auth under `pome run`, the
-// thing an earlier fix addressed. The adapter change is a behavior change to a PUBLISHED
-// package's documented drop-in contract, so it is its own ticket with its own
-// version bump; this gate is what keeps the class closed until then, and stays
-// useful after, because the adapter cannot fix an example someone copies out.
+// Every example must seal its agent with `settingSources: []`. Parses rather than
+// greps: a grep for the option name also matches it in a comment beside the object.
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, extname, join, relative, resolve } from "node:path";
@@ -59,23 +9,12 @@ import { fileURLToPath } from "node:url";
 
 import ts from "typescript";
 
-// `../../..` — this rule lives two directories below `scripts/`. Only a default
-// for the exported helpers; the runner always passes an explicit root.
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 
-/** The two options that must both be present. Order is display order. */
 export const REQUIRED_OPTIONS = ["tools", "settingSources"];
 
-/** The dependency that makes an example one of this gate's subjects. */
 const SDK_PACKAGE = "@anthropic-ai/claude-agent-sdk";
 
-/**
- * The modules a `query` binding may come from. The adapter re-exports a drop-in
- * wrapper, and every bundled example imports it from there today — but an
- * example importing the raw SDK's `query` is the same agent with the same two
- * doors, so both count. A `query` from anywhere else (a twin's REST client, a
- * database helper) is not this gate's business.
- */
 const QUERY_MODULES = new Set([SDK_PACKAGE, "@pome-sh/adapter-claude-sdk"]);
 
 const SOURCE_EXTENSIONS = new Set([".ts", ".mts", ".cts", ".tsx", ".mjs", ".js", ".cjs"]);
@@ -91,26 +30,8 @@ const SCRIPT_KINDS = new Map([
   [".cjs", ts.ScriptKind.JS],
 ]);
 
-/**
- * The floor on how many `query()` call sites the walk must CLASSIFY before a
- * clean verdict means anything — four today, one per bundled SDK example. An
- * empty findings list is ambiguous on its own: it means "every example is
- * isolated" OR "the walk recognized no call site at all", and only the first is
- * a pass. A `typescript` upgrade moving an AST shape, or the examples
- * refactoring `query()` behind a helper, is exactly the moment a gate reports
- * the class closed having read nothing.
- */
 export const MIN_QUERY_CALL_SITES = 4;
 
-/**
- * Every `agent-examples/*` directory whose package.json declares the Claude Agent SDK
- * — DISCOVERED by reading the manifests, never a hand-kept list. A hand-kept
- * list stops covering its subject the day an example is added and nothing
- * notices, which is the enumeration failure this whole ticket family is about.
- *
- * `dependencies` and `devDependencies` both count: which section an example
- * files the SDK under says nothing about whether it launches an agent.
- */
 export function discoverSdkExamples(repoRoot = REPO_ROOT) {
   const examplesDir = join(repoRoot, "agent-examples");
   let entries;
@@ -144,7 +65,6 @@ export function discoverSdkExamples(repoRoot = REPO_ROOT) {
   return found;
 }
 
-/** Every source file under `dir`, recursively, sorted. */
 export function discoverSourceFiles(dir) {
   const found = [];
   const walk = (current) => {
@@ -158,8 +78,6 @@ export function discoverSourceFiles(dir) {
     for (const entry of entries) {
       if (PRUNED_DIRS.has(entry.name)) continue;
       const full = join(current, entry.name);
-      // `isDirectory()`/`isFile()` are both false for a symlink; statSync
-      // follows it. A silently skipped file reads as a pass.
       let stat;
       try {
         stat = statSync(full);
@@ -175,11 +93,8 @@ export function discoverSourceFiles(dir) {
   return found.sort();
 }
 
-/** Syntax errors, reported as their own category rather than as fake findings. */
 export function parseErrorsIn(source, fileName) {
   const sourceFile = createSourceFile(source, fileName);
-  // typescript RECOVERS from syntax errors rather than throwing, so an
-  // unreadable file would otherwise scan "clean".
   return (sourceFile.parseDiagnostics ?? []).map((d) => ts.flattenDiagnosticMessageText(d.messageText, " "));
 }
 
@@ -188,12 +103,6 @@ function createSourceFile(source, fileName) {
   return ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, kind);
 }
 
-/**
- * Local names bound to a `query` import from one of QUERY_MODULES — so
- * `import { query }`, `import { query as ask }` and `import * as sdk` (whose
- * `sdk.query(...)` is matched by the namespace set) are all seen, and a local
- * function that happens to be called `query` is not.
- */
 function collectQueryBindings(sourceFile) {
   const direct = new Set();
   const namespaces = new Set();
@@ -202,7 +111,6 @@ function collectQueryBindings(sourceFile) {
     if (!ts.isStringLiteral(statement.moduleSpecifier)) continue;
     if (!QUERY_MODULES.has(statement.moduleSpecifier.text)) continue;
     const bindings = statement.importClause?.namedBindings;
-    // `import type { … }` binds no value — a type-only import cannot be called.
     if (statement.importClause?.isTypeOnly) continue;
     if (!bindings) continue;
     if (ts.isNamespaceImport(bindings)) {
@@ -218,36 +126,17 @@ function collectQueryBindings(sourceFile) {
   return { direct, namespaces };
 }
 
-/**
- * Single-assignment `const X = <expr>` initializers, plus same-file functions'
- * single `return <expr>` expressions, both keyed by name.
- *
- * Load-bearing rather than a nicety. `agent-examples/support-triage` composes its
- * exam surface in `examineeOptions(mcpServers)` and passes the CALL to
- * `query()` — deliberately, so its own test can assert the policy constants are
- * wired in. A resolver that only understood an inline object literal would find
- * no options object there and would have to either red the one example that
- * already got this right, or skip it. Skipping is how a gate passes forever.
- *
- * A name declared twice is dropped rather than guessed at, and a function with
- * more than one `return` is dropped for the same reason: two answers mean the
- * gate cannot know which one reaches `query()`, and an unresolved options
- * object is reported as a finding rather than assumed clean.
- */
 function collectResolvables(sourceFile) {
   const byName = new Map();
   const remember = (name, expr) => {
     byName.set(name, byName.has(name) ? null : expr);
   };
 
-  /** The single returned expression of a function body, or undefined. */
   const soleReturn = (body) => {
     if (!body) return undefined;
-    // A concise arrow body (`() => ({ … })`) is the expression itself.
     if (!ts.isBlock(body)) return body;
     const returns = [];
     const walk = (node) => {
-      // Do not descend into a nested function — its `return` is not this one's.
       if (node !== body && (ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node) || ts.isArrowFunction(node))) {
         return;
       }
@@ -274,17 +163,6 @@ function collectResolvables(sourceFile) {
   return byName;
 }
 
-/**
- * Resolve an expression to the object literal it stands for: the literal
- * itself, a `const` bound to one, or a call to a same-file function that
- * returns one. Bounded depth, because a resolver that can loop on
- * `const a = b, b = a` is a hang, not a gate.
- *
- * Anything else — an imported helper, a conditional, a function with two
- * returns — resolves to `null`, which the caller reports as a finding. Failing
- * CLOSED is the whole point: "this gate could not tell" and "this example is
- * isolated" must never print the same way.
- */
 export function resolveObjectLiteral(expr, resolvables, depth = 0) {
   if (!expr || depth > 8) return null;
   if (ts.isParenthesizedExpression(expr)) return resolveObjectLiteral(expr.expression, resolvables, depth + 1);
@@ -299,16 +177,6 @@ export function resolveObjectLiteral(expr, resolvables, depth = 0) {
   return null;
 }
 
-/**
- * The property names an object literal sets UNCONDITIONALLY, following spreads
- * of resolvable object literals.
- *
- * A conditional spread — `...(MODEL ? { model: MODEL } : {})`, the shape three
- * of the bundled examples already use for `model` — deliberately does NOT
- * contribute. A door that is only shut when some env var is set is a door that
- * is open, and this gate exists because "shut in the case we thought about" is
- * exactly what `tools: []` alone turned out to be.
- */
 export function unconditionalKeys(objectLiteral, resolvables, depth = 0) {
   const keys = new Set();
   if (!objectLiteral || depth > 8) return keys;
@@ -327,13 +195,6 @@ export function unconditionalKeys(objectLiteral, resolvables, depth = 0) {
   return keys;
 }
 
-/**
- * Every `query()` call site in `source`, with the options keys it sets.
- *
- * Returns `{ callSites, findings }`. `callSites` counts what was CLASSIFIED,
- * sanctioned ones included — see MIN_QUERY_CALL_SITES for why an empty
- * `findings` alone is not a pass.
- */
 export function scanSource(source, fileName = "index.ts") {
   const sourceFile = createSourceFile(source, fileName);
   const { direct, namespaces } = collectQueryBindings(sourceFile);
@@ -359,19 +220,12 @@ export function scanSource(source, fileName = "index.ts") {
       if (!params) {
         findings.push({ line, reason: "unresolvable-params", missing: [...REQUIRED_OPTIONS] });
       } else {
-        // Quoted as well as bare, matching `unconditionalKeys` — a gate that
-        // reads `options:` but not `"options":` would report both doors open on
-        // a call that shuts them.
         const optionsProperty = params.properties.find(
           (p) =>
             p.name &&
             (ts.isIdentifier(p.name) || ts.isStringLiteral(p.name)) &&
             p.name.text === "options",
         );
-        // `query({ prompt, options })` is the same call as `options: options`,
-        // and resolving the shorthand through the same table is what keeps it
-        // from reading as an unresolvable object — a false RED on correct work,
-        // which is how a gate gets deleted rather than obeyed.
         const optionsValue = !optionsProperty
           ? undefined
           : ts.isPropertyAssignment(optionsProperty)
@@ -400,11 +254,6 @@ export function scanSource(source, fileName = "index.ts") {
   return { callSites, findings };
 }
 
-/**
- * Scan every discovered SDK example. Unparseable files are reported separately
- * from findings — a syntax error is not an open door, and reporting it as one
- * sends the reader looking for an options object that does not exist.
- */
 export function scanExamples(repoRoot = REPO_ROOT) {
   const examples = discoverSdkExamples(repoRoot);
   const findings = [];
@@ -447,7 +296,6 @@ const REASONS = {
 export default {
   name: "example-isolation",
   describe: "every bundled SDK example sets both `tools` and `settingSources` on `query()`",
-  // `typescript` is a devDependency: the AST walk needs an installed tree.
   needsInstall: true,
   check(ctx) {
     const { examples, filesScanned, callSites, findings, unparseable, silentExamples } = scanExamples(ctx.root);
@@ -461,14 +309,10 @@ export default {
 
     const violations = [];
 
-    // A file this rule cannot read is an unchecked file, which must not read as
-    // a pass.
     for (const bad of unparseable) {
       violations.push(`${bad.file}: could not be parsed, so it was NOT checked — ${bad.errors.join("; ")}`);
     }
 
-    // Either they launch no agent, or the call is in a shape this rule cannot
-    // see — and the second reads exactly like a pass.
     for (const name of silentExamples) {
       violations.push(
         `${name} declares ${SDK_PACKAGE} but this rule found no \`query()\` call in it.`,
@@ -479,9 +323,6 @@ export default {
       violations.push(`${finding.file}:${finding.line} — ${REASONS[finding.reason](finding.missing)}`);
     }
 
-    // The floor: an empty findings list is ambiguous on its own — it means
-    // "every example is isolated" OR "the walk recognized no call site at all",
-    // and only the first is a pass.
     if (violations.length === 0 && callSites < MIN_QUERY_CALL_SITES) {
       violations.push(
         `Classified only ${callSites} \`query()\` call site(s) across ${examples.length} SDK example(s), ` +

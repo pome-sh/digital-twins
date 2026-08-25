@@ -1,12 +1,8 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Cases 3 and 4 are why this table exists rather than a "it went green once"
-// note. The rule reads its two subjects out of two files by regex, and the
-// cheapest way for it to stop doing its job is for one of those regexes to stop
-// MATCHING — a doc that reformatted its fence, or a parser whose constant was
-// renamed. Either would leave the rule with nothing to compare and, without
-// these cases, nothing to say about it. So both are asserted RED.
+// Case table for task-format-doc. Every case asserts the RED direction: a rule that has
+// quietly stopped failing prints the same line as one with nothing to report.
 
 import { defineCases } from "../harness.mjs";
 

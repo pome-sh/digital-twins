@@ -1,15 +1,11 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Case 2 is the reason this table exists: the drift the rule is built for is a
-// NEW skill nobody adds to the manifest, and a rule that only checked "every
-// declared path exists" would be green on exactly that — the manifest stays
-// internally consistent while the new skill quietly falls out of the installer's
-// select-all row. Both directions are asserted.
+// Case table for skill-manifest. Every case asserts the RED direction: a rule that has
+// quietly stopped failing prints the same line as one with nothing to report.
 
 import { defineCases } from "../harness.mjs";
 
-/** A throwaway repo: skill dirs on disk + whatever the manifest claims. */
 function fixture(skillDirs, declared, extra = {}) {
   const files = {
     ".claude-plugin/plugin.json": JSON.stringify({ name: "pome-coach", skills: declared }, null, 2),
@@ -45,8 +41,6 @@ defineCases("skill-manifest", [
     expect: "green",
   },
   {
-    // A manifest with no `skills` array at all is the state the installer renders
-    // as a flat list with nothing ticked — the bug this rule exists to keep fixed.
     name: "a manifest with no `skills` array reds the rule",
     files: {
       ".claude-plugin/plugin.json": JSON.stringify({ name: "pome-coach" }),

@@ -1,25 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// "Zero native deps" (M2) is an invariant, not an event: no package in the
-// PRODUCTION dependency closure of the published packages may carry a node-gyp
-// build step. Detection is by gyp markers — a `binding.gyp` file or a truthy
-// `gypfile` manifest field — NOT by `hasInstallScript`: prebuilt-binary
-// installers (esbuild, fsevents) have install scripts but need no compiler, and
-// must pass.
-//
-// Scope is the lockfile's non-dev entries (workspace transitives included).
-// `dev` and `devOptional` entries are excluded: they never reach a production
-// install (`npm ci --omit=dev`) or a published artifact.
-//
-// Needs an installed `node_modules` — marker inspection needs the unpacked
-// package on disk, so this rule is skipped by `--offline`.
+// No native addons in the published tree — they break the clean-room install.
 
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
-// Intentional exceptions only; empty by design (same posture as the copy-marker
-// rule's allowlist). Keys are lockfile package paths, e.g.
-// "node_modules/some-package".
 const ALLOWLIST = new Set([]);
 
 export function findNativeModules(root) {
@@ -37,8 +22,6 @@ export function findNativeModules(root) {
     const pkgDir = join(root, path);
     if (!existsSync(pkgDir)) {
       if (entry.optional) {
-        // Platform-gated optional prod dep not installed here (e.g. another
-        // OS's prebuilt binary package). Nothing to inspect on this machine.
         skippedOptional.push(path);
         continue;
       }
@@ -53,10 +36,7 @@ export function findNativeModules(root) {
         markers.push('"gypfile": true');
       }
     } catch {
-      // Unreadable manifest: the binding.gyp check above still applies.
     }
-    // Packaged native addons sometimes ship prebuilt `.node` binaries without a
-    // binding.gyp in the published tarball — treat those as native too.
     if (hasPackagedNodeBinary(pkgDir)) markers.push("packaged .node binary");
     if (markers.length > 0) offenders.push({ path, markers });
   }
@@ -64,8 +44,6 @@ export function findNativeModules(root) {
   return { offenders, checked, skippedOptional };
 }
 
-/** Shallow walk: package root + one level of subdirs (covers common
- *  prebuild/lib layouts without scanning deep trees). */
 function hasPackagedNodeBinary(pkgDir) {
   const stack = [pkgDir];
   let visited = 0;

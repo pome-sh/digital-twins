@@ -1,25 +1,9 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// The repo's one lint runner.
-//
-// Every rule under `scripts/lint/rules/` used to be its own executable: its own
-// tree walk, its own violation formatting, its own `process.exit(1)`, its own
-// realpath entry guard, its own npm script, and its own CI step. The rule — the
-// only part that differed — was a fraction of each file. Adding a rule meant
-// touching four places, which is why rules that should exist did not.
-//
-// What lives here: traversal (via `scripts/lint/context.mjs`), the report
-// format, and the exit code. What lives in a rule: a declaration and a
-// predicate.
-//
-// Usage:
-//   node scripts/lint.mjs                  every rule
-//   node scripts/lint.mjs parent-vocab     one rule (local iteration)
-//   node scripts/lint.mjs --list           what rules exist
-//   node scripts/lint.mjs --offline        skip rules needing node_modules
-//   node scripts/lint.mjs --root <dir>     lint a tree that is not this repo
-//   node scripts/lint.mjs --verbose        rules that have extra detail print it
+// The one lint runner. It owns traversal, the report format and the exit code, so a
+// rule is a declaration plus a predicate. A rule that cannot find its subject
+// throws — a gate that shrugs when its corpus vanished prints the same as a clean one.
 
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, realpathSync } from "node:fs";
@@ -32,14 +16,6 @@ import { RULES } from "./lint/rules.mjs";
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const RULES_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "lint/rules");
 
-/**
- * Run `rules` against `root` and return one result per rule. A rule reports by
- * returning violations; a rule that cannot find its subject at all throws, and
- * that is a failure too — a gate that shrugs when its corpus went missing
- * prints the same thing as a gate whose corpus is clean.
- *
- * @param {{ root?: string, only?: string[], offline?: boolean, verbose?: boolean }} options
- */
 export async function runRules({ root = REPO_ROOT, only = [], offline = false, verbose = false } = {}) {
   const selected = selectRules(only);
   const ctx = createContext({ root, verbose });
@@ -47,9 +23,6 @@ export async function runRules({ root = REPO_ROOT, only = [], offline = false, v
 
   for (const rule of selected) {
     if (offline && rule.needsInstall) {
-      // Naming a rule AND passing --offline is a contradiction: the run would
-      // print a pass having checked nothing at all. Skipping is only honest when
-      // the caller asked for everything.
       if (only.length > 0) {
         throw new Error(
           `${rule.name} needs an installed node_modules, so --offline cannot run it. ` +
@@ -60,9 +33,6 @@ export async function runRules({ root = REPO_ROOT, only = [], offline = false, v
       continue;
     }
     try {
-      // `await`: the rules that parse TypeScript are deferred behind a dynamic
-      // import, so their `check` is async. Every other rule's is sync and
-      // `await` is a no-op on it.
       const outcome = (await rule.check(ctx)) ?? {};
       results.push({
         rule,
@@ -78,16 +48,6 @@ export async function runRules({ root = REPO_ROOT, only = [], offline = false, v
   return results;
 }
 
-/**
- * Every rule module on disk must be in the registry.
- *
- * The registry is a hand-written list of static imports, which is what lets
- * `knip` follow it — but it also means deleting one import line silently removes
- * a rule from enforcement. Nothing else would notice: the case-table runner
- * iterates the registry rather than the directory, so the orphaned table stops
- * running too, and knip counts every file under `scripts/lint/` as an entry
- * point. So the runner checks the directory against the registry on every run.
- */
 export function findUnregisteredRules(rulesDir = RULES_DIR) {
   const registered = new Set(RULES.map((rule) => `${rule.name}.mjs`));
   return readdirSync(rulesDir)
@@ -96,14 +56,6 @@ export function findUnregisteredRules(rulesDir = RULES_DIR) {
     .sort();
 }
 
-/**
- * The other direction: a case table whose rule is not in the registry.
- *
- * `runRuleTests` iterates the registry, so such a table is never run — it reads
- * as coverage from the directory listing while asserting nothing. Cheap to check
- * and the counterpart to the guarantee above, so the invariant is symmetric:
- * every rule has a table, and every table has a rule.
- */
 export function findOrphanCaseTables(rulesDir = RULES_DIR) {
   const registered = new Set(RULES.map((rule) => `${rule.name}.test.mjs`));
   return readdirSync(rulesDir)
@@ -112,7 +64,6 @@ export function findOrphanCaseTables(rulesDir = RULES_DIR) {
     .sort();
 }
 
-/** The rules named in `only`, or all of them. An unknown name is a failure, not a silent no-op. */
 export function selectRules(only) {
   if (only.length === 0) return RULES;
   const byName = new Map(RULES.map((rule) => [rule.name, rule]));
@@ -125,7 +76,6 @@ export function selectRules(only) {
   return only.map((name) => byName.get(name));
 }
 
-/** True when every result passed. Printing is the caller's job. */
 export function report(results, { verbose = false, log = console.log, error = console.error } = {}) {
   let failed = 0;
   const skipped = [];
@@ -152,8 +102,6 @@ export function report(results, { verbose = false, log = console.log, error = co
     error("");
   }
 
-  // Never silent: a rule that did not run has to say so, or the summary line
-  // reads as coverage the run does not have.
   for (const result of skipped) {
     log(`  – ${result.rule.name} — SKIPPED (${result.skipped})`);
   }
@@ -167,14 +115,6 @@ export function report(results, { verbose = false, log = console.log, error = co
   return true;
 }
 
-/**
- * Run each selected rule's case table — `scripts/lint/rules/<name>.test.mjs`,
- * found by convention rather than listed, so a new rule's table is picked up
- * with no second edit.
- *
- * A rule with NO table is reported, not skipped silently: a rule nobody has
- * proved can go red is a rule that may already have stopped going red.
- */
 export function runRuleTests({ only = [], offline = false } = {}) {
   let failed = 0;
   const untested = [];
@@ -224,13 +164,6 @@ function parseArgv(argv) {
   return { only, root, offline, verbose, list, runTests };
 }
 
-// Realpath'd on both sides, never a bare `import.meta.main` (undefined before
-// Node 24.2, which root `engines: >=24` allows) and never a basename compare
-// (satisfied by any file of that name anywhere on disk). Node resolves symlinks
-// before deriving `import.meta.url`, so an un-realpath'd compare falls false
-// through a symlinked checkout — a `git worktree`, or macOS's symlinked
-// `/tmp` — and the runner exits 0 having linted nothing. A guard miss while
-// invoked as this file throws rather than exits 0.
 const SELF = realpathSync(fileURLToPath(import.meta.url));
 const ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";
 const invokedDirectly = ENTRY === SELF;
@@ -240,8 +173,6 @@ if (!invokedDirectly && ENTRY.endsWith("lint.mjs")) {
 }
 
 if (invokedDirectly) {
-  // A usage error (unknown rule, contradictory flags) is a failed lint run, not a
-  // crash report: print the sentence and exit 1.
   main(process.argv.slice(2)).catch((err) => {
     console.error(err.message);
     process.exit(1);
@@ -258,8 +189,6 @@ async function main(argv) {
     process.exit(0);
   }
 
-  // Before anything else: a rule module that never made it into the registry is
-  // a rule that does not run, and every other check here would stay green.
   const unregistered = findUnregisteredRules();
   if (unregistered.length > 0) {
     console.error(

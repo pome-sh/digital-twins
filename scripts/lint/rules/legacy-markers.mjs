@@ -1,15 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The [D]/[P] authoring markers were retired in favor of [code]/[model]; this
-// rule fails on any reintroduced legacy form ([D], [P], [D:<twin>], [P:<twin>])
-// anywhere in the repo.
-//
-// Sanctioned exceptions (the ONLY places the legacy spelling may appear):
-//   - cli/src/task/parseTask.ts — the parser's legacy-marker detection and
-//     its migration-hint error message.
-//   - cli/test/unit/parseTask.test.ts — the rejection tests for that detection.
-//   - */CHANGELOG.md — historical release notes are records, not current
-//     spelling, and are never rewritten.
+// The retired [D]/[P] criterion markers must not reappear; [code]/[model] are current.
 
 import { fileURLToPath } from "node:url";
 
@@ -32,18 +23,10 @@ const EXTENSIONS = [
   ".sh",
 ];
 
-// `.context` and `.changeset` on top of the shared prune list: generated
-// scratch and release-tool state, neither of them authored spelling.
 const SKIP_DIRS = ["node_modules", "dist", "build", ".git", "coverage", ".context", ".changeset"];
 
 const LEGACY_MARKER_RE = /\[D\]|\[P\]|\[D:|\[P:/;
 
-// This rule's own source carries the marker forms it denies, and so does its
-// case table — a table that could not write a `[D]` could not prove the rule
-// goes red on one. Both are derived from `import.meta.url` rather than
-// hard-coded, so renaming the file cannot leave it self-tripping, and the
-// exemption stays scoped to these two files rather than to `*.test.mjs` at
-// large.
 const SELF = fileURLToPath(import.meta.url);
 const SELF_CASES = SELF.replace(/\.mjs$/, ".test.mjs");
 

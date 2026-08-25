@@ -1,14 +1,11 @@
 #!/usr/bin/env bash
-# Fails (exit 1) if any source file under packages/, cli/src/, cli/scripts/,
-# or repo-root scripts/ imports from `pome-cloud`, `pome-cloud/*`, or
-# `@pome-cloud/*`. Enforces ADR-002 open-core boundary in CI + pre-commit.
-# String mentions (URLs, comments) are allowed; only import/require/dynamic-import
-# syntax is rejected.
+#
+# No cloud imports in the open-source tree. Also runs in the pre-commit hook, so it
+# must need nothing installed.
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# Match quoted and template-literal module specifiers (import(`pome-cloud/...`)).
 PATTERN='(from[[:space:]]+|import[[:space:]]+|import[[:space:]]*\(|require[[:space:]]*\()[[:space:]]*(['\''"`])@?pome-cloud(/|['\''"`])'
 
 SCAN_DIRS=()

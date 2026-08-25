@@ -1,24 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Canonical first-party registration drift. First-party twins must be explicit
-// at operational seams (contracts, bundles, images), but those explicit arrays
-// are easy to update incompletely. This rule compares every registration with
-// config/first-party-twins.json and fails loudly.
-//
-// The CLI's own registration is no longer a hand-maintained array: `TwinName` is
-// derived from `TWIN_NAME_LIST` and `TWIN_REGISTRY` is a
-// `Record<TwinName, TwinEntry>`, so a missing CLI entry is a compile error and
-// the per-entry values are asserted by cli/test/unit/twin/registry.test.ts.
-// `TWIN_NAME_LIST` itself is still compared here — that list is what the type is
-// derived FROM, so nothing inside the CLI can catch it drifting from the
-// canonical set. The seams below live outside the type system entirely (twin
-// images, the black-box contract suite, the wire enums, workflow path filters)
-// and are the reason this rule survives.
-//
-// Two seams deliberately absent: Docker base-image updates are Renovate's,
-// which auto-discovers every `packages/twin-*/Dockerfile`; and the build order
-// is a topological sort over `npm query .workspace`, which names no package, so
-// a twin missing from the build is not expressible.
+// The first-party twin list is read from config, never typed twice.
 
 export default {
   name: "first-party-twins",
@@ -35,7 +17,6 @@ export default {
       }
     };
 
-    /** A quoted-string array declared under `exportName`, read from source. */
     const quotedArray = (path, exportName) => {
       const match = ctx
         .readRel(path)
@@ -51,21 +32,10 @@ export default {
     );
     compare("cli/src/twin/registry.ts TWIN_NAME_LIST", quotedArray("cli/src/twin/registry.ts", "TWIN_NAME_LIST"));
 
-    // `@pome-sh/checks` carries every twin's grading vocabulary to pome-cloud,
-    // and its barrel names the twins explicitly; there is no way to derive them,
-    // since each twin's array has a different element type. A new twin missing
-    // here does not fail to compile and does not fail any twin's own contract
-    // suite — it produces a criterion that silently never binds, which is the
-    // exact failure that package exists to prevent.
     compare(
       "packages/checks/src/index.ts CHECKS_TWIN_NAMES",
       quotedArray("packages/checks/src/index.ts", "CHECKS_TWIN_NAMES"),
     );
-    // `@pome-sh/sandbox-domains` carries the other half to the same consumer.
-    // Same seam, one step worse: a twin missing here compiles, and its criteria
-    // do not merely fail to bind, they bind against a vocabulary whose runtime
-    // pome-cloud cannot construct at all. Both arrays are checked because the
-    // two packages are the two legs of `checks-package-drift`.
     compare(
       "packages/sandbox-domains/src/index.ts SANDBOX_DOMAIN_NAMES",
       quotedArray("packages/sandbox-domains/src/index.ts", "SANDBOX_DOMAIN_NAMES"),
@@ -86,9 +56,6 @@ export default {
       ),
     );
 
-    // Twin-image matrix is dynamic on PRs (`detect-twins`); the canonical full
-    // set is declared as FIRST_PARTY_TWINS (and mirrored in the detect script's
-    // `all='[...]'` / `for twin in ...` loop).
     const imageText = ctx.readRel(".github/workflows/twin-image.yml");
     const imageRaw =
       imageText.match(/#\s*FIRST_PARTY_TWINS:\s*([^\n]+)/)?.[1] ??
@@ -103,10 +70,6 @@ export default {
         .filter(Boolean),
     );
 
-    // The twins are bundled into the CLI by tsup (`noExternal: [/^@pome-sh\//]`),
-    // so they are devDependencies of cli, not runtime deps. That list is still a
-    // registration seam: a twin missing from it would not install, and its
-    // registry entry's `import()` would not resolve.
     compare(
       "cli/package.json devDependencies",
       Object.keys(ctx.json("cli/package.json").devDependencies)

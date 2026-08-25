@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Copy-marker gate (M6). Cross-package file copies are not allowed in OSS
-// packages; shared code should move through published packages instead.
+// Banned vocabulary in anything a user reads (see AGENTS.md).
 
 const ALLOWLIST = new Set([]);
 

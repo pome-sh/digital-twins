@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// The old gate shipped with no case table. The sanctioned exceptions are the
-// part worth pinning: they are the whole reason the rule is not a plain grep,
-// and an exception that silently widened would let the retired spelling back in.
+// Case table for legacy-markers. Every case asserts the RED direction: a rule that has
+// quietly stopped failing prints the same line as one with nothing to report.
 
 import { defineCases } from "../harness.mjs";
 
@@ -33,14 +32,11 @@ defineCases("legacy-markers", [
     expect: "green",
   },
   {
-    // Release notes are records, not current spelling, and are never rewritten.
     name: "a CHANGELOG is a record, not authored spelling",
     files: { "packages/wire/CHANGELOG.md": "## 0.1.0\n\n- renamed [D] to [code]\n" },
     expect: "green",
   },
   {
-    // The allowlist is by exact path, so the parser's NEIGHBOUR is not covered by
-    // the parser's exception.
     name: "an unrelated source file may not name the retired form",
     files: { "cli/src/task/other.ts": `const HINT = "not [D]";\n` },
     expect: "red",

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Regression coverage for scripts/lint-no-bare-import-meta-main.mjs
-// (extended for the realpath-both-sides entry-guard shape).
+// Case table for import-meta-main. Every case asserts the RED direction: a rule that has
+// quietly stopped failing prints the same line as one with nothing to report.
 
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
@@ -28,13 +28,8 @@ function assert(cond, msg) {
   console.error(`FAIL  ${msg}`);
 }
 
-/** Every root the gate must cover, and one real file under each. */
 const REQUIRED_ROOTS = ["scripts", "contract", "cli/src", "cli/scripts", "packages", "agent-examples"];
 
-// ── findBareImportMetaMain: every real shape must red ───────────────────────
-// Formatting cannot hide it: a line break, parens, optional chaining, negation,
-// computed access, or a destructure straight off `import.meta` (with or without
-// a rename) all have to be caught — exactly the forms a naive regex misses.
 const REAL_SHAPES = {
   "bare member access": "if (import.meta.main) { run(); }",
   "wrapped in parens": "if ((import.meta.main)) { run(); }",
@@ -49,8 +44,6 @@ const REAL_SHAPES = {
   "destructured, no rename": "const { main } = import.meta;\nif (main) run();",
   "destructured with rename": "const { main: isMain } = import.meta;\nif (isMain) run();",
   "destructured, computed key": 'const { ["main"]: m } = import.meta;\nif (m) run();',
-  // `...rest` hands the whole object over, so `rest.main` is reachable and the
-  // guard is just as broken — the shape must not slip through as "no `main`".
   "destructured via rest": "const { ...rest } = import.meta;\nif (rest.main) run();",
   "assignment-expression destructure": "let main;\n({ main } = import.meta);",
   "assignment-expression spread": "let rest;\n({ ...rest } = import.meta);",
@@ -60,10 +53,6 @@ for (const [label, source] of Object.entries(REAL_SHAPES)) {
   assert(hits.length > 0, `a real import.meta.main reference is caught: ${label} (source: ${JSON.stringify(source)})`);
 }
 
-// The live instances the first cut could not see were `.ts`, so the parser
-// must read TypeScript syntax — not merely "not crash" on it. A JS-only parser
-// fails on the type annotations here and would report the file as unparseable
-// (or as clean), which is the silent skip this gate exists to prevent.
 {
   const tsSource = [
     "interface Wiring { readonly url: string }",
@@ -76,14 +65,11 @@ for (const [label, source] of Object.entries(REAL_SHAPES)) {
   assert(hits.length === 1 && hits[0].line === 4, `a bare guard in a .ts file is caught, with its line (got ${JSON.stringify(hits)})`);
 }
 
-// ── the false positives a grep would produce, which parsing must not ────────
 const FALSE_POSITIVES = {
   "line comment": "// import.meta.main\nconsole.log('ok');",
   "block comment": "/* uses import.meta.main historically */\nconsole.log('ok');",
   "string literal": "const s = 'import.meta.main';\nconsole.log(s);",
   "template literal": "const s = `guard is import.meta.main`;\nconsole.log(s);",
-  // A generator that builds source text out of lines exactly like this emits
-  // data, not a guard, and must stay green.
   "string array a generator emits": 'const lines = ["if (import.meta.main) {", "  await main();", "}"];',
   "unrelated .main property": "const config = { main: true };\nif (config.main) run();",
   "import.meta without .main": "const url = import.meta.url;\nconsole.log(url);",
@@ -95,21 +81,12 @@ for (const [label, source] of Object.entries(FALSE_POSITIVES)) {
   assert(hits.length === 0, `not a real reference, must not red: ${label} (got ${JSON.stringify(hits)})`);
 }
 
-// A file mixing a real reference with a comment/string mention of the same text
-// must still be caught by the real one.
 {
   const mixed = "// import.meta.main is banned here\nif (import.meta.main) { run(); }\nconst s = 'import.meta.main';";
   const hits = findBareImportMetaMain(mixed);
   assert(hits.length === 1, `a real reference is caught even alongside comment/string mentions (got ${hits.length})`);
 }
 
-// ── findEntryGuardRealpathGaps: the realpath shapes, each its own verdict ───
-// The sanctioned replacement for bare `import.meta.main` — comparing
-// `process.argv[1]` against `import.meta.url` — has its own silent-skip shape
-// when either side is not realpath'd. Node resolves symlinks before deriving
-// `import.meta.url`, so an unresolved argv0 disagrees through a symlinked
-// checkout and the guard falls false. Every shape a live instance shipped
-// must red, tagged with which shape it is; the sanctioned form must not.
 const GUARD_GAP_CASES = {
   "bare compare, no resolve at all": {
     source: "if (fileURLToPath(import.meta.url) === process.argv[1]) { main(); }",
@@ -147,13 +124,6 @@ const GUARD_GAP_CASES = {
     source: "if (process.argv[1].endsWith(basename(import.meta.url))) main();",
     kind: "basename-comparison",
   },
-  // The shape that matters most, because it is the shape every FIXED instance
-  // in this repo uses: argv0 and import.meta.url reach the comparison through
-  // SELF/ENTRY consts. A checker that only searches the comparison's own
-  // operands sees `ENTRY === SELF`, classifies no relation, and reports the
-  // whole repo clean while seeing none of its guards — the vacuous pass this
-  // milestone keeps re-shipping. Reverting the realpath on either side of the
-  // sanctioned form must red.
   "alias-routed, neither side realpath'd (the sanctioned shape with realpath removed)": {
     source:
       'const SELF = fileURLToPath(import.meta.url);\nconst ENTRY = process.argv[1] ? resolve(process.argv[1]) : "";\nif (ENTRY === SELF) main();',
@@ -173,8 +143,6 @@ const GUARD_GAP_CASES = {
     source: "const E = resolve(process.argv[1]);\nconst S = fileURLToPath(import.meta.url);\nif (E === S) main();",
     kind: "no-realpath",
   },
-  // Spellings of the same two reads. A gate asserting a PROPERTY has to cover
-  // the spellings of that property, not only the ones that happened to ship.
   "process.argv.at(1) instead of [1]": {
     source: "if (resolve(process.argv.at(1)) === fileURLToPath(import.meta.url)) main();",
     kind: "no-realpath",
@@ -192,14 +160,6 @@ for (const [label, { source, kind }] of Object.entries(GUARD_GAP_CASES)) {
   );
 }
 
-// The sanctioned form — both sides realpath'd, no basename() anywhere — is
-// NOT a finding, whether the leaves sit directly in the comparison or behind
-// the SELF/ENTRY intermediate consts every fixed instance in this repo uses.
-//
-// The `fs.realpathSync` / `realpathSync.native` / `await realpath` rows are
-// false-RED coverage, not padding: they are all the same act as the bare
-// identifier, and a gate that reds three correct spellings out of four is a
-// gate that gets deleted rather than obeyed.
 const GUARD_GAP_CLEAN_CASES = {
   "both sides realpath'd, direct": "if (realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url))) { main(); }",
   "both sides realpath'd, reversed operand order": "if (realpathSync(fileURLToPath(import.meta.url)) === realpathSync(resolve(process.argv[1]))) { main(); }",
@@ -220,9 +180,6 @@ for (const [label, source] of Object.entries(GUARD_GAP_CLEAN_CASES)) {
   assert(gaps.length === 0, `the sanctioned form is not a finding: ${label} (got ${JSON.stringify(gaps)})`);
 }
 
-// `relations` counts what the walk CLASSIFIED, sanctioned guards included. It
-// exists so an empty `gaps` can be told apart from a blind checker: those two
-// read identically in a CI log, and only one of them is a pass.
 {
   const clean = findEntryGuardRealpathGaps(
     'const SELF = realpathSync(fileURLToPath(import.meta.url));\nconst ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";\nif (ENTRY === SELF) main();',
@@ -233,7 +190,6 @@ for (const [label, source] of Object.entries(GUARD_GAP_CLEAN_CASES)) {
   assert(none.relations === 0 && none.gaps.length === 0, "a file with no entry guard classifies no relation");
 }
 
-// ── discoverSourceFiles: a directory walk, not a hand-kept list ─────────────
 {
   const dir = mkdtempSync(join(tmpdir(), "f1481-discover-"));
   try {
@@ -255,9 +211,6 @@ for (const [label, source] of Object.entries(GUARD_GAP_CLEAN_CASES)) {
   }
 }
 
-// `isDirectory()`/`isFile()` on a dirent are both FALSE for a symlink, so a
-// walk keyed off the dirent alone silently skips a symlinked script — a skip
-// that reads as a pass. This is the shape the gate itself is about.
 {
   const dir = mkdtempSync(join(tmpdir(), "f1481-symlink-"));
   try {
@@ -275,12 +228,6 @@ for (const [label, source] of Object.entries(GUARD_GAP_CLEAN_CASES)) {
   }
 }
 
-// ── the scan roots cannot silently narrow ──────────────────────────────────
-// This gate's own history is the argument for this assertion: one fix landed for
-// `contract/run.mjs`, the same bug survived ten lines away under `scripts/`,
-// and this gate's first cut then covered only those two roots while six live
-// instances sat in `agent-examples/*/src/*.ts`. A root dropping out of the walk must
-// red here rather than quietly stop being covered.
 {
   const byRoot = discoverSourceFiles(ROOT);
   for (const root of REQUIRED_ROOTS) {
@@ -296,11 +243,6 @@ for (const [label, source] of Object.entries(GUARD_GAP_CLEAN_CASES)) {
   assert(!all.some((f) => f.includes("node_modules")), "the walk never descends into node_modules");
 }
 
-// Independent second derivation of the same file set, using `find` rather than
-// the gate's own walk. If discovery silently stopped recursing (or started
-// skipping an extension or a root) this comparison — not a hardcoded count — is
-// what reds, so the floor moves with the tree. `-L` follows symlinks, matching
-// the walk's statSync, so the two share no blind spot.
 {
   const viaDiscovery = [...discoverSourceFiles(ROOT).values()].flat().sort();
   const findArgs = ["-L", ...REQUIRED_ROOTS];
@@ -329,9 +271,6 @@ for (const [label, source] of Object.entries(GUARD_GAP_CLEAN_CASES)) {
   );
 }
 
-// ── scanRepo: an empty root is a hard failure, PER ROOT ────────────────────
-// An aggregate floor is satisfied by `scripts/` alone, so relocating any other
-// root would leave it unscanned while the gate still printed a pass.
 {
   const dir = mkdtempSync(join(tmpdir(), "f1481-empty-"));
   try {
@@ -346,7 +285,6 @@ for (const [label, source] of Object.entries(GUARD_GAP_CLEAN_CASES)) {
     }
     assert(threw, "a root that exists in the config but not on disk throws rather than reporting a pass");
 
-    // And the aggregate case: nothing anywhere.
     let threwAll = false;
     try {
       scanRepo(mkdtempSync(join(tmpdir(), "f1481-void-")), ["scripts"]);
@@ -359,11 +297,6 @@ for (const [label, source] of Object.entries(GUARD_GAP_CLEAN_CASES)) {
   }
 }
 
-// ── an unparseable file is its own category, not a fake guard ──────────────
-// typescript RECOVERS from syntax errors rather than throwing, so without an
-// explicit diagnostics read an unreadable file scans "clean" — a skip that
-// reads as a pass. It must also not be reported as a broken entry guard, which
-// sends the reader looking for a guard that does not exist.
 {
   const dir = mkdtempSync(join(tmpdir(), "f1481-unparseable-"));
   try {
@@ -377,17 +310,12 @@ for (const [label, source] of Object.entries(GUARD_GAP_CLEAN_CASES)) {
   }
 }
 
-// ── scanRepo: break-on-purpose against a scratch fixture ───────────────────
-// The ticket's own break-on-purpose case, as an assertion: add a bare guard to
-// a scratch file, and the scan must red naming that exact file — while a
-// sibling that only MENTIONS the string must not.
 {
   const dir = mkdtempSync(join(tmpdir(), "f1481-scratch-"));
   try {
     mkdirSync(join(dir, "scripts"), { recursive: true });
     writeFileSync(join(dir, "scripts", "broken.mjs"), "// a scratch file that should never ship\nif (import.meta.main) { console.log('ran'); }\n");
     writeFileSync(join(dir, "scripts", "clean.mjs"), "// mentions import.meta.main only in prose, and in a string: 'import.meta.main'\nconsole.log('fine');\n");
-    // The `.ts` half of the same break, since that is where the live ones were.
     writeFileSync(join(dir, "scripts", "broken.ts"), "const n: number = 1;\nif (import.meta.main) { console.log(n); }\n");
     const { filesScanned, findings } = scanRepo(dir, ["scripts"]);
     assert(filesScanned === 3, `all three scratch files are scanned (got ${filesScanned})`);
@@ -401,11 +329,6 @@ for (const [label, source] of Object.entries(GUARD_GAP_CLEAN_CASES)) {
   }
 }
 
-// ── scanRepo: realpath break-on-purpose, one scratch file per shape ───────
-// The ticket's own break-on-purpose matrix: a one-sided-realpath guard, a
-// no-realpath guard, and a basename guard added to a scratch script each red
-// naming that exact file; a correct both-sides-realpath'd guard next to them
-// does not.
 {
   const dir = mkdtempSync(join(tmpdir(), "f1488-guard-scratch-"));
   try {
@@ -426,10 +349,6 @@ for (const [label, source] of Object.entries(GUARD_GAP_CLEAN_CASES)) {
       join(dir, "scripts", "correct.mjs"),
       'import { realpathSync } from "node:fs";\nimport { resolve } from "node:path";\nimport { fileURLToPath } from "node:url";\nconst SELF = realpathSync(fileURLToPath(import.meta.url));\nconst ENTRY = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";\nif (ENTRY === SELF) console.log("ran");\n'
     );
-    // The regression for the blind spot itself: the sanctioned SELF/ENTRY
-    // shape with its realpath removed. This is what a future author writes
-    // when they copy a fixed sibling and drop a call, and it is the shape the
-    // gate saw nothing at all in before.
     writeFileSync(
       join(dir, "scripts", "alias-broken.mjs"),
       'import { resolve } from "node:path";\nimport { fileURLToPath } from "node:url";\nconst SELF = fileURLToPath(import.meta.url);\nconst ENTRY = process.argv[1] ? resolve(process.argv[1]) : "";\nif (ENTRY === SELF) console.log("ran");\n'
@@ -445,19 +364,12 @@ for (const [label, source] of Object.entries(GUARD_GAP_CLEAN_CASES)) {
     assert(byFile.get("scripts/no-realpath.mjs") === "no-realpath", "no-realpath is named and classified");
     assert(byFile.get("scripts/basename.mjs") === "basename-comparison", "a basename compare is named and classified");
     assert(byFile.get("scripts/alias-broken.mjs") === "no-realpath", "an alias-routed broken guard is named and classified");
-    // The correct file's guard is COUNTED even though it is not a finding —
-    // five files, five guards, so the relation floor sees all of them.
     assert(guardRelations === 5, `every guard is classified, sanctioned ones included (got ${guardRelations})`);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 }
 
-// ── the shipped repo is clean ────────────────────────────────────────────
-// The regression that matters most: what would have caught
-// scripts/probe-twin-endpoints.mjs and the six examples shipping a bare
-// guard, and the ten entry-guard-realpath instances plus the two
-// basename ones.
 {
   const { filesScanned, findings, unparseable, guardGaps, guardRelations } = scanRepo(ROOT);
   assert(filesScanned > 0, "the real scan covers at least one file");
@@ -467,14 +379,6 @@ for (const [label, source] of Object.entries(GUARD_GAP_CLEAN_CASES)) {
     guardGaps.length === 0,
     `no un-realpath'd or basename entry guard anywhere in scope (got: ${JSON.stringify(guardGaps)})`
   );
-  // The floor on the assertion above, and the whole reason `guardRelations`
-  // exists. `guardGaps.length === 0` over the real repo is satisfied both by
-  // "every guard realpaths both sides" and by "the classifier recognized no
-  // guard at all", and the second is how two floors in this milestone shipped
-  // dead. The repo has one guard per runnable script; the twelve that were fixed
-  // ones alone put the count above 12, so a bound well under the real number
-  // reds on a classifier going blind without reding on someone deleting a
-  // script.
   assert(
     guardRelations >= 12,
     `the classifier actually SEES the repo's entry guards (got ${guardRelations} classified relations; ` +
@@ -482,26 +386,10 @@ for (const [label, source] of Object.entries(GUARD_GAP_CLEAN_CASES)) {
   );
 }
 
-// ── the rule is actually wired into CI, in a step that can fail ────────────
-// Asserting `ci.includes("npm run lint")` is satisfied by a COMMENTED-OUT line,
-// by the command sitting in a job that never runs, and by `set -euo pipefail`
-// appearing anywhere else in the file (it appears in the scope step at the top).
-// Locate the OWNING step and assert on that.
-//
-// The commands here are the RUNNER's, not this rule's: consolidation means this
-// rule has no npm script and no CI step of its own. What still has to hold is
-// that the runner runs somewhere it can fail, and — because this rule needs
-// `typescript` and is therefore skipped by `--offline` — that the run covering
-// it is the one with NO `--offline`. A repo where only the offline invocation
-// survived would skip this rule entirely while every other assertion here
-// stayed green.
 {
   const ci = readFileSync(join(ROOT, ".github/workflows/ci.yml"), "utf8");
-  // Newline-terminated so `npm run lint` does not also match
-  // `npm run lint -- --offline` or `npm run lint:test`.
   const COMMANDS = ["npm run lint\n", "npm run lint:test\n"];
 
-  // Steps start at a `      - ` list item within a job's `steps:`.
   const steps = ci.split(/\n(?=      - )/);
   for (const command of COMMANDS) {
     const owning = steps.filter((step) =>
@@ -513,22 +401,6 @@ for (const [label, source] of Object.entries(GUARD_GAP_CLEAN_CASES)) {
     assert(owning.length === 1, `exactly one uncommented CI step runs \`${command.trim()}\` (got ${owning.length})`);
     if (owning.length !== 1) continue;
     const step = owning[0];
-    // The property is that a failure REACHES the step's conclusion, not that any
-    // particular shell line is present. Which check proves that depends on the
-    // step's shape, so derive the shape rather than assuming one:
-    //
-    //   one command   → the step's exit code IS the command's (Actions runs
-    //                   `bash -e {0}`), so nothing can swallow it.
-    //   many commands → an earlier failure is swallowed by the commands after
-    //                   it unless the block sets a failing shell mode.
-    //
-    // Asserting `set -euo pipefail` unconditionally would demand a shell line
-    // that does nothing on a one-command step, which is how this assertion read
-    // when every command in the heavy suite shared one 60-line block.
-    // Text, not YAML, deliberately — same reason the search above is textual: a
-    // commented-out command has to stay visible. `run: <cmd>` contributes its
-    // inline tail; a `run: |` block contributes each of its lines; every other
-    // mapping key (`name:`, `if:`, `env:`, `with:`) contributes nothing.
     const commands = step
       .split("\n")
       .map((line) => line.trim().replace(/^-\s+/, ""))
@@ -547,9 +419,6 @@ for (const [label, source] of Object.entries(GUARD_GAP_CLEAN_CASES)) {
     assert(!/\bif:\s*false\b/.test(step), `the step running \`${command.trim()}\` is not disabled`);
   }
 
-  // It lives behind the heavy gate (it needs `npm ci` for the parser), so the
-  // scope regex MUST classify a diff to any scanned root as heavy — otherwise
-  // the rule is path-filtered away from the very changes that could trip it.
   const scopeRegex = ci.match(/'\^\((?<alts>[^']+)\)'/)?.groups?.alts ?? "";
   for (const root of REQUIRED_ROOTS) {
     const top = `${root.split("/")[0]}/`;
@@ -562,9 +431,6 @@ for (const [label, source] of Object.entries(GUARD_GAP_CLEAN_CASES)) {
     pkg.scripts["lint:test"] === "node scripts/lint.mjs --run-tests",
     "package.json declares the case-table runner"
   );
-  // The registry is a list of static imports rather than a glob, so an
-  // unregistered rule is not a rule that runs quietly — it is one that does not
-  // run at all, and `--offline` has to NAME it as skipped rather than drop it.
   const registered = RULES.find((rule) => rule.name === "import-meta-main");
   assert(registered !== undefined, "the rule is in scripts/lint/rules.mjs, so the runner reaches it");
   assert(registered?.needsInstall === true, "the rule declares needsInstall, so --offline names it as skipped");

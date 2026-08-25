@@ -15,8 +15,8 @@
         "tool": "send_email",
         "args": {
           "to": "dana@pome-twin.test",
-          "subject": "F-1152 probe",
-          "body": "F-1152 probe."
+          "subject": "pome probe",
+          "body": "pome probe."
         }
       }
     ]
@@ -71,7 +71,7 @@
           "owner": "$repo.owner",
           "repo": "$repo.name",
           "number": "$pr.last_number",
-          "body": "F-1152 probe."
+          "body": "pome probe."
         }
       },
       {
@@ -151,7 +151,7 @@
         "tool": "slack_send_message",
         "args": {
           "channel_id": "eng-alerts",
-          "message": "F-1152 probe."
+          "message": "pome probe."
         }
       },
       {
@@ -160,7 +160,7 @@
           "owner": "$repo.owner",
           "repo": "$repo.name",
           "number": "$pr.number",
-          "body": "F-1152 probe."
+          "body": "pome probe."
         }
       },
       {
@@ -237,7 +237,7 @@
         "tool": "slack_send_message",
         "args": {
           "channel_id": "eng-alerts",
-          "message": "F-1152 probe."
+          "message": "pome probe."
         }
       },
       {
@@ -246,7 +246,7 @@
           "owner": "$repo.owner",
           "repo": "$repo.name",
           "number": "$pr.number",
-          "body": "F-1152 probe."
+          "body": "pome probe."
         }
       },
       {
@@ -308,7 +308,7 @@
           "owner": "$repo.owner",
           "repo": "$repo.name",
           "pull_number": "$pr.number",
-          "body": "F-1152 probe."
+          "body": "pome probe."
         }
       }
     ]
@@ -359,7 +359,7 @@
           "owner": "$repo.owner",
           "repo": "$repo.name",
           "pull_number": "$pr.number",
-          "body": "F-1152 probe."
+          "body": "pome probe."
         }
       },
       {
@@ -369,7 +369,7 @@
           "repo": "$repo.name",
           "pull_number": "$pr.number",
           "event": "COMMENT",
-          "body": "F-1152 probe."
+          "body": "pome probe."
         }
       }
     ]
@@ -404,7 +404,7 @@
           "owner": "$repo.owner",
           "repo": "$repo.name",
           "issue_number": "$issue.number",
-          "body": "F-1152 probe."
+          "body": "pome probe."
         }
       },
       {

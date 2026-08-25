@@ -1,18 +1,7 @@
 #!/usr/bin/env node
-/**
- * Regression coverage for scripts/probe-twin-endpoints.mjs.
- *
- * The gate exists because nothing called every endpoint a twin declares.
- * Measured on `51b5efe`: the five twins declare 137 MCP tools, the
- * example probe gate reached 9 of them (all github's), and 23 — slack's 8 and
- * linear's 15 — were reached by nothing over the MCP wire at all, including by
- * their own test suites, which exercise them through `executeTool()` on the
- * domain and never cross the dispatch layer. `comment_on_pull_request` was a
- * dispatch-layer defect, so a domain-level call is exactly the shape of test
- * that was green through it.
- *
- * The cases below are written from that measurement.
- */
+//
+// Case table for probe-twin-endpoints. Every case asserts the RED direction: a rule that has
+// quietly stopped failing prints the same line as one with nothing to report.
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -44,10 +33,6 @@ function assertThrows(fn, match, msg) {
   assert(false, `${msg} (did not throw)`);
 }
 
-// ── resolveArgs ─────────────────────────────────────────────────────────────
-// A later probe routinely needs an id an earlier one minted. Without this the
-// manifest could only ever probe tools that read seeded state, which is the
-// half of every twin that was already covered.
 {
   const results = {
     merge_pr: { number: 7, head: { sha: "abc" } },
@@ -73,9 +58,6 @@ function assertThrows(fn, match, msg) {
   assert(out.owner === "acme" && out.literal === "not-a-reference" && out.count === 5, "resolveArgs passes literals through");
 }
 
-// An unresolvable reference throws rather than resolving to undefined: a
-// silently absent `pull_number` makes the twin answer 422 and the gate would
-// report a twin defect that is really a manifest typo.
 assertThrows(
   () => resolveArgs({ pull_number: "$never_ran.number" }, { merge_pr: { number: 7 } }),
   "$never_ran.number",
@@ -87,7 +69,6 @@ assertThrows(
   "resolveArgs rejects a path the earlier result does not carry",
 );
 
-// ── evaluateTwinProbeRun: the five ways the gate goes red ───────────────────
 const DECLARED = [{ name: "add_issue_comment" }, { name: "merge_pull_request" }];
 function call(status, over = {}) {
   return { status, method: "POST", path: "/s/probe/mcp", error: null, args: {}, ...over };
@@ -103,20 +84,11 @@ assert(
   "evaluateTwinProbeRun is silent on a clean run",
 );
 
-// 0. setup steps: state-building, never coverage.
-//
-// twin-github's three release readers only answer once a release exists, and
-// GitHub declares no `create_release` MCP tool for the twin to serve — so the
-// write that builds their subject is a REST call, not a probe. The risk that
-// buys is a setup step quietly counting as coverage for the tool it names, which
-// would make the anti-drift clause silent on exactly the tools hardest to reach.
 {
   const setup = { method: "POST", path: "/repos/acme/api/releases" };
   const findings = evaluateTwinProbeRun({
     twin: "github",
     declared: [...DECLARED, { name: "merge_pull_request" }],
-    // A setup step naming the SAME route family as a declared tool, and no probe
-    // for `merge_pull_request`.
     probes: [{ tool: "add_issue_comment" }, { setup, as: "release" }],
     calls: [call(200), call(201, { method: "POST", path: "/s/probe/repos/acme/api/releases" })],
   });
@@ -129,8 +101,6 @@ assert(
     "a setup step is not held to the declared-tool list — it has no tool identity",
   );
 
-  // …but it must still WORK. A silent 4xx here surfaces later as an
-  // unexplained refusal on whichever probe depended on the state it built.
   const broken = evaluateTwinProbeRun({
     twin: "github",
     declared: DECLARED,
@@ -143,8 +113,6 @@ assert(
   );
 }
 
-// 1. refused — THE incident, in the shape this gate sees it. The twin answered
-// `404 Issue not found` for add_issue_comment at a pull request's number.
 {
   const findings = evaluateTwinProbeRun({
     twin: "github",
@@ -156,7 +124,6 @@ assert(
   assert(findings[0].tool === "add_issue_comment", "the refused finding names the declared endpoint");
 }
 
-// A 5xx counts too — the claim is "the twin did not refuse", not "not 4xx".
 assert(
   evaluateTwinProbeRun({
     twin: "stripe",
@@ -167,9 +134,6 @@ assert(
   "a 5xx twin answer is also `refused`",
 );
 
-// MCP JSON-RPC answers HTTP 200 for a tool that failed and reports the failure
-// inside `result.isError`, so the gate reads the twin's recorded status. This
-// asserts the finding turns on that recorded status alone.
 assert(
   evaluateTwinProbeRun({
     twin: "linear",
@@ -180,9 +144,6 @@ assert(
   "a tool failure the JSON-RPC transport answered 200 for is still `refused`",
 );
 
-// 2. unprobed-endpoint — the anti-drift clause, and the whole point of the
-// ticket. The set comes from the twin's own tools/list, so a twin that gains a
-// tool reds this line with no hand edit to any list.
 {
   const findings = evaluateTwinProbeRun({
     twin: "slack",
@@ -194,8 +155,6 @@ assert(
   assert(findings[0].tool === "slack_get_reactions", "the unprobed-endpoint finding names the endpoint");
 }
 
-// 3. unknown-endpoint — a probe naming a tool the twin does not declare. This
-// is what a renamed or deleted tool looks like from the manifest's side.
 {
   const findings = evaluateTwinProbeRun({
     twin: "gmail",
@@ -209,8 +168,6 @@ assert(
   );
 }
 
-// 4. stale-expect — the escape hatch expires loudly. Without this a twin fix
-// leaves a permanent exemption behind, which is how a gate stops watching.
 {
   const probes = [{ tool: "merge_pull_request", expect_status: 405, why: "the seeded PR is not mergeable" }];
   assert(
@@ -227,7 +184,6 @@ assert(
   assert(findings.length === 1 && findings[0].kind === "stale-expect", "an expect_status that no longer happens is a finding");
 }
 
-// 5. driver-error — the probe never got to ask the twin anything.
 assert(
   evaluateTwinProbeRun({
     twin: "github",
@@ -238,7 +194,6 @@ assert(
   "a probe that could not be built is a finding",
 );
 
-// ── the report has to be readable without re-deriving anything ──────────────
 {
   const text = formatFindings(
     evaluateTwinProbeRun({
@@ -255,13 +210,6 @@ assert(
   }
 }
 
-// ── end to end, against real in-process twins ───────────────────────────────
-// No model, no API key, no Docker, no socket: each twin runs in this process on
-// `:memory:` SQLite and is driven through Hono's `app.request`.
-
-// The PR-comment regression, as a live fixture. `add_issue_comment` at a PULL
-// REQUEST's number is the call that answered `404 Issue not found` for the
-// whole life of agent-examples/pr-summary-agent and agent-examples/pr-summary-review.
 {
   const findings = await probeTwin("github", {
     probes: [
@@ -285,8 +233,6 @@ assert(
   assert(refused.length === 0, `commenting at a pull request's number is answered (got: ${JSON.stringify(refused)})`);
 }
 
-// ...and the gate really would have caught it. Same tool, at a number no issue
-// and no pull request carries: the twin answers 404 and the gate names it.
 {
   const findings = await probeTwin("github", {
     probes: [{ tool: "add_issue_comment", args: { owner: "acme", repo: "api", issue_number: 4242, body: "probe" } }],
@@ -299,14 +245,7 @@ assert(
   assert(text.includes("4242"), "the end-to-end report carries the arguments the probe sent");
 }
 
-// The anti-drift clause, end to end, on the twin that most needs it: slack
-// declared 11 tools and its own suite reached 3 over the wire. It declares 18
-// now (the table was replaced with Slack's own), and the count below is
-// derived from the twin rather than typed, so the clause survives the next one.
 {
-  // Derived, not typed: an empty manifest reds one unprobed-endpoint per
-  // declared tool, which is the count the one-probe run should leave behind
-  // minus the tool it covers.
   const declaredCount = (await probeTwin("slack", { probes: [] })).length;
   const findings = await probeTwin("slack", {
     probes: [{ tool: "slack_search_channels", args: { query: "general", limit: 10 } }],
@@ -322,8 +261,6 @@ assert(
   );
 }
 
-// Every twin boots and answers tools/list. A boot recipe naming an export that
-// does not exist would otherwise fail as a wall of identical 401s.
 for (const id of Object.keys(TWIN_BOOT)) {
   const findings = await probeTwin(id, { probes: [] });
   assert(
@@ -332,9 +269,6 @@ for (const id of Object.keys(TWIN_BOOT)) {
   );
 }
 
-// ── the shipped manifest covers every declared endpoint ─────────────────────
-// The gate proves this when it runs; this pins that the checked-in manifest is
-// the state the gate passes in, so a red is news rather than the default.
 {
   const manifest = JSON.parse(readFileSync(join(ROOT, "config/twin-endpoint-probes.json"), "utf8"));
   assert(
@@ -347,8 +281,6 @@ for (const id of Object.keys(TWIN_BOOT)) {
   }
 }
 
-// ── the gate is actually wired into CI ──────────────────────────────────────
-// A gate nothing runs is the failure mode this ticket exists to prevent.
 {
   const ci = readFileSync(join(ROOT, ".github/workflows/ci.yml"), "utf8");
   assert(ci.includes("npm run probe:twins"), "ci.yml runs the declared-endpoint gate");
@@ -363,9 +295,6 @@ if (failures > 0) {
 }
 console.log("probe-twin-endpoints: all assertions passed.");
 
-// resolvePath: a setup step addresses state an earlier probe minted, so
-// `$alias` resolves in a path SEGMENT — and only in a whole segment, so a
-// literal `$` cannot be mistaken for a reference.
 {
   const results = { review_pr: { number: 4 } };
   assert(

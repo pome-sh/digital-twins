@@ -1,21 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Root workspace build, ordered by the actual dependency graph.
-//
-// This replaced an eight-term `&&` chain in the root `package.json` that
-// hard-coded both the package list and the build order. Every package added,
-// removed, or renamed meant editing that string, and a wrong order surfaced as
-// an unrelated `tsc` error about a missing `dist/index.d.ts` — the restructure
-// that dissolves `@pome-sh/shared-types` into `@pome-sh/wire` would have had to
-// edit it twice.
-//
-// Instead: enumerate the workspaces npm itself reports, read the internal
-// `@pome-sh/*` edges out of their manifests, topologically sort, and run
-// `npm run build -w <name>` in that order. Nothing here names a package.
-//
-// Sequential on purpose. The graph is a chain in practice (wire/shared-types →
-// sdk → twins → cli) so parallelism buys almost nothing, and serial output keeps
-// a failing package's `tsc` diagnostics contiguous in CI logs.
+// Builds every workspace in dependency order.
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -30,11 +15,6 @@ const DEPENDENCY_FIELDS = [
   "optionalDependencies",
 ];
 
-/**
- * Workspace directories, straight from npm rather than by re-implementing glob
- * expansion of the `workspaces` field (which also has to honour npm's
- * `node_modules` and non-package-directory rules).
- */
 function listWorkspaceDirectories() {
   const result = spawnSync("npm", ["query", ".workspace", "--json"], {
     cwd: ROOT,
@@ -54,7 +34,6 @@ function readManifest(directory) {
   return JSON.parse(readFileSync(resolve(directory, "package.json"), "utf8"));
 }
 
-/** @returns {Map<string, {directory: string, hasBuild: boolean, dependsOn: Set<string>}>} */
 function loadGraph() {
   const nodes = new Map();
   for (const directory of listWorkspaceDirectories()) {
@@ -72,8 +51,6 @@ function loadGraph() {
       dependsOn,
     });
   }
-  // Edges to packages that are not workspace members (a real npm dependency on
-  // something in the `@pome-sh` scope) carry no ordering information.
   for (const node of nodes.values()) {
     for (const dependency of [...node.dependsOn]) {
       if (!nodes.has(dependency)) node.dependsOn.delete(dependency);
@@ -82,12 +59,6 @@ function loadGraph() {
   return nodes;
 }
 
-/**
- * Kahn's algorithm over the whole workspace graph — including packages without a
- * `build` script, so that a build-less package sitting between two buildable
- * ones still orders them correctly. Ties break alphabetically to keep the build
- * order (and therefore CI logs) stable across machines.
- */
 function topoSort(nodes) {
   const remaining = new Map([...nodes].map(([name, node]) => [name, new Set(node.dependsOn)]));
   const ordered = [];

@@ -1,22 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The CLI bundles every internal `@pome-sh/*` package into its own dist
-// (`noExternal: [/^@pome-sh\//]`), so those packages' own `dependencies` stop
-// being installed for them: whatever they `import` has to resolve from the
-// PUBLISHED CLI's dependency tree instead. Nothing in the type system or the
-// bundler notices when it cannot — esbuild happily leaves an unresolvable bare
-// import in a lazily-loaded chunk, and the failure lands on a user running
-// `pome twin start linear` with ERR_MODULE_NOT_FOUND.
-//
-// That is exactly how `graphql` (twin-linear's GraphQL executor) slipped
-// through. This rule unions the third-party runtime dependencies of every
-// internal package the CLI inlines and asserts each one is satisfiable from the
-// CLI manifest — either declared in cli `dependencies`, or inlined by the
-// bundler (`noExternal`).
+// Every third-party dep of an inlined workspace package must be declared by the
+// publisher, or it becomes ERR_MODULE_NOT_FOUND for the user.
 
-// Every workspace package the CLI inlines. Kept explicit rather than globbed:
-// a new internal package must be a deliberate addition here, and
-// adapter-claude-sdk is NOT in the CLI's graph (it is published separately).
 const BUNDLED_PACKAGES = [
   "packages/sdk",
   "packages/wire",
@@ -27,13 +13,8 @@ const BUNDLED_PACKAGES = [
   "packages/twin-linear",
 ];
 
-// Bare specifiers the bundler inlines rather than leaves as imports. Mirrors
-// cli/tsup.config.ts `noExternal`.
 const INLINED = [/^@pome-sh\//];
 
-/** Third-party runtime specifiers each bundled package needs at runtime.
- *  `peerDependencies` count: the sdk's optional `@hono/node-server` peer is a
- *  real runtime import on the server path. */
 function requiredSpecifiers(ctx) {
   const required = new Map(); // specifier -> [packages needing it]
   for (const dir of BUNDLED_PACKAGES) {
@@ -65,11 +46,6 @@ export default {
       );
     }
 
-    // @pome-sh/* left in the published runtime deps: none of them is
-    // installable by an end user, so a leaked spec breaks the install. The sdk
-    // and the twins are `private: true` and on no registry at all, and
-    // `@pome-sh/wire` is published only to GitHub Packages, which answers 401
-    // without a token. All of them are inlined by the bundler instead.
     for (const spec of declared) {
       if (!spec.startsWith("@pome-sh/")) continue;
       violations.push(

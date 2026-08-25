@@ -1,21 +1,11 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// The rule exists because a laziness claim went five releases without anyone
-// checking it, so the thing most worth proving is that it CAN go red — and goes
-// red on the exact shapes that shipped: an indirect chain through two CLI
-// modules (how `parseTask.ts` did it), and a package-root import for a value that
-// a leaf subpath already exports.
-//
-// Cases 5 and 6 guard the two ways a rule like this quietly stops working: a
-// scaffold's template-literal source counted as a real edge (false red, and the
-// rule gets deleted), and a type-only import counted as a runtime edge (same).
+// Case table for twin-chunks. Every case asserts the RED direction: a rule that has
+// quietly stopped failing prints the same line as one with nothing to report.
 
 import { defineCases } from "../harness.mjs";
 
-/** A minimal twin: a package root that re-exports domain + seed, a db module, a
- *  domain module, a zod-free `seed.ts` leaf, and a `checks.ts` the rule requires
- *  to stay reachable. */
 function twin(name) {
   const dir = `packages/twin-${name}/`;
   return {
@@ -135,8 +125,6 @@ defineCases("twin-chunks", [
     contains: "SQLite schema",
   },
   {
-    // A rule that silently passes on an empty tree reads as coverage it does not
-    // have — so an empty `packages/` is RED, not green.
     name: "a tree with no twins at all is RED, not green",
     files: { [MAIN]: `export const x = 1;\n` },
     expect: "red",

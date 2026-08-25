@@ -1,30 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// `.claude-plugin/plugin.json` must list every skill under `skills/`.
-//
-// What the manifest buys: the `skills` CLI reads it and groups the skills it
-// names under one collapsible row. That row carries its own radio, so
-// `npx skills add pome-sh/digital-twins` opens with the cursor already on
-// "Pome Coach" and one space selects all of them. The flat list it renders
-// without a manifest starts with nothing ticked and the cursor on the first
-// skill, which is how the bug was filed: a user takes the screen literally,
-// installs one skill, and the coach dead-ends routing into a skill that is not
-// there.
-//
-// The failure this rule exists to stop: a new skill is added under `skills/`,
-// nobody adds it here, and it silently lands in the installer's "Other"
-// bucket — outside the select-all row, which is precisely the state we were
-// fixing. Nothing else notices, because both files are individually valid and
-// the install still succeeds.
-//
-// Ordering is not checked. Presence is.
+// Every shipped skill must be declared in the plugin manifest.
 
 import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const MANIFEST_PATH = ".claude-plugin/plugin.json";
 
-/** Directories under `skills/` that are a skill: they contain a SKILL.md. */
 export function discoverSkillDirs(repoRoot) {
   const skillsDir = join(repoRoot, "skills");
   const found = [];
@@ -40,7 +22,6 @@ export function discoverSkillDirs(repoRoot) {
   return found.sort();
 }
 
-/** The two directions of drift. Exported for the rule's own case table. */
 export function diffSkillLists(onDisk, declared) {
   const declaredSet = new Set(declared);
   const onDiskSet = new Set(onDisk);

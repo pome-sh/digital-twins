@@ -1,27 +1,8 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Publish each twin's route input surface as a committed artifact.
-//
-// pome-cloud's declared-fidelity lane compares what a vendor declares it
-// accepts against what our twin accepts. It reads this repo through the
-// `POME_TWIN_SRC` checkout seam it already has (the repo is public, so no
-// credential is involved), so the twin side has to be a FILE — a lane that has
-// to boot five SQLite-backed twins to learn their parameter names would not run
-// daily, and one that reads TypeScript with a regex would be wrong.
-//
-// The artifact is DERIVED, never edited:
-//
-//   npm run emit:route-inputs           # rewrite packages/twin-*/route-inputs.json
-//   npm run gate:route-inputs           # --check: fail if any file is stale
-//
-// `--check` is what makes the derivation load-bearing. Without it the JSON is
-// just another hand-maintained list of parameter names, which is exactly the
-// second source of truth this ticket exists to not create.
-//
-// Reads the BUILT output (`packages/twin-*/dist/route-inputs.js`), not the
-// TypeScript, so it needs `npm run build` first — that is also what CI does,
-// and it means the artifact reflects the code that actually ships.
+// Derives packages/twin-*/route-inputs.json from the route declarations. `--check`
+// is the freshness gate; a hand-kept list would be a second source of truth.
 
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -31,16 +12,6 @@ import { pathToFileURL } from "node:url";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const CHECK = process.argv.includes("--check");
 
-/**
- * Per twin: which built module exports the declarations, and under what name.
- *
- * Explicit rather than discovered, because a MISSING entry has to be a failure.
- * A discovery walk that finds four twins where there are five publishes four
- * artifacts and exits 0, and the fifth twin's 1,130 vendor inputs keep reporting
- * `not-compared` with nothing anywhere saying why. The list is cross-checked
- * against `config/first-party-twins.json` below, so adding a twin without
- * adding it here fails.
- */
 const TWINS = [
   { twin: "github", exportName: "GITHUB_ROUTE_INPUTS" },
   { twin: "stripe", exportName: "STRIPE_ROUTE_INPUTS" },
@@ -49,10 +20,6 @@ const TWINS = [
   {
     twin: "linear",
     exportName: "LINEAR_ROUTE_INPUTS",
-    // twin-linear's API layer is GraphQL: its operation ARGUMENTS come from the
-    // executable schema it serves, not from an HTTP route declaration. Both
-    // halves publish through this one artifact so pome-cloud has one seam for
-    // five twins rather than four plus a bespoke fixture of its own.
     graphql: {
       module: "dist/src/graphql/argument-surface.js",
       exportName: "linearGraphqlArgumentSurfaces",

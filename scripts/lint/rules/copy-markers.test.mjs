@@ -1,19 +1,14 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// The old gate shipped with no case table, so nothing proved it could go red.
-// Both markers are asserted, plus the two false-positive shapes that would get
-// it deleted: a marker in prose, and a scoped-out file. The last case pins the
-// other direction — a scan directory that has vanished must be RED, because a
-// rule that walks nothing prints the same line as a rule that found nothing.
+// Case table for copy-markers. Every case asserts the RED direction: a rule that has
+// quietly stopped failing prints the same line as one with nothing to report.
 
 import { defineCases } from "../harness.mjs";
 
 const SRC = "packages/twin-x/src/thing.ts";
 const CLI = "cli/src/thing.ts";
 
-/** Both scanned directories present and clean, then `overrides` applied. A key
- *  mapped to `undefined` is dropped, to express "this file does not exist". */
 const tree = (overrides = {}) =>
   Object.fromEntries(
     Object.entries({
@@ -53,8 +48,6 @@ defineCases("copy-markers", [
     expect: "green",
   },
   {
-    // A `.js` file in a scanned directory is out of scope: the rule reads
-    // TypeScript sources only.
     name: "a marker in a non-TypeScript file is out of scope",
     files: tree({ "packages/twin-x/src/thing.js": `// Canonical: elsewhere\n` }),
     expect: "green",

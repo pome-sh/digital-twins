@@ -1,10 +1,8 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// The old gate shipped with no case table. Case 2 is the shape that actually
-// happened: `graphql`, twin-linear's GraphQL executor, was a dependency of the
-// twin and of nothing else, so the bundler left an unresolvable bare import in a
-// lazily-loaded chunk and the failure landed on a user, not on CI.
+// Case table for bundled-deps. Every case asserts the RED direction: a rule that has
+// quietly stopped failing prints the same line as one with nothing to report.
 
 import { defineCases } from "../harness.mjs";
 
@@ -18,7 +16,6 @@ const BUNDLED = [
   "packages/twin-linear",
 ];
 
-/** Every inlined package with no third-party deps, plus whatever `overrides` says. */
 function tree({ cliDeps = {}, overrides = {} } = {}) {
   const files = {
     "cli/package.json": JSON.stringify({ name: "@pome-sh/cli", version: "1.0.0", dependencies: cliDeps }),
@@ -60,8 +57,6 @@ defineCases("bundled-deps", [
     expect: "green",
   },
   {
-    // The sdk's optional `@hono/node-server` peer is a real runtime import on
-    // the server path, so peers count.
     name: "peerDependencies count as runtime requirements",
     files: tree({
       overrides: withDeps("packages/sdk", {
@@ -73,8 +68,6 @@ defineCases("bundled-deps", [
     contains: "@hono/node-server",
   },
   {
-    // An internal `@pome-sh/*` spec is inlined by the bundler, so it is not a
-    // requirement the CLI has to declare.
     name: "an internal @pome-sh/* dep is inlined, not required",
     files: tree({
       overrides: withDeps("packages/twin-github", {
@@ -85,8 +78,6 @@ defineCases("bundled-deps", [
     expect: "green",
   },
   {
-    // None of them is installable by an end user, so a leaked spec breaks the
-    // install of the published CLI.
     name: "an internal @pome-sh/* left in the CLI's runtime deps is a violation",
     files: tree({ cliDeps: { "@pome-sh/wire": "*" } }),
     expect: "red",

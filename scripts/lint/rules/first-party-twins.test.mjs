@@ -1,20 +1,13 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// The old gate shipped with no case table, for a rule that compares twelve
-// registration seams against one canonical list. Every case here adds a twin to
-// the canonical set and leaves exactly ONE seam behind, which is the drift the
-// rule exists to catch: the explicit arrays are easy to update incompletely, and
-// a twin missing from any one of them fails at a different, later, quieter place.
-//
-// Case "a renamed array" is the other half: a seam whose array this rule can no
-// longer find must be a hard failure, not a silently uncompared seam.
+// Case table for first-party-twins. Every case asserts the RED direction: a rule that has
+// quietly stopped failing prints the same line as one with nothing to report.
 
 import { defineCases } from "../harness.mjs";
 
 const TWINS = ["github", "slack"];
 
-/** Every seam, agreeing on `twins`, with `overrides` applied afterwards. */
 function tree(twins = TWINS, overrides = {}) {
   const quoted = twins.map((twin) => `"${twin}"`).join(", ");
   const files = {
@@ -43,7 +36,6 @@ function tree(twins = TWINS, overrides = {}) {
   return { ...files, ...overrides };
 }
 
-/** Every seam updated for a new twin EXCEPT the one named. */
 function allButOne(seam) {
   const added = [...TWINS, "linear"];
   return { ...tree(added), [seam]: tree(TWINS)[seam] };
@@ -69,15 +61,12 @@ defineCases("first-party-twins", [
     contains: "KNOWN_TWIN_IDS",
   },
   {
-    // A criterion that silently never binds is the failure this seam prevents.
     name: "a twin missing from the checks vocabulary is a violation",
     files: allButOne("packages/checks/src/index.ts"),
     expect: "red",
     contains: "CHECKS_TWIN_NAMES",
   },
   {
-    // One step worse: it compiles, and the criteria bind against a vocabulary
-    // whose runtime pome-cloud cannot construct at all.
     name: "a twin missing from the sandbox domains is a violation",
     files: allButOne("packages/sandbox-domains/src/index.ts"),
     expect: "red",
@@ -90,8 +79,6 @@ defineCases("first-party-twins", [
     contains: "contract/helpers.mjs",
   },
   {
-    // A twin missing from the devDependency list would not install, and its
-    // registry entry's `import()` would not resolve.
     name: "a twin missing from the CLI's devDependencies is a violation",
     files: allButOne("cli/package.json"),
     expect: "red",
@@ -104,15 +91,12 @@ defineCases("first-party-twins", [
     contains: "twin-image.yml",
   },
   {
-    // The path filter is separate from the matrix: a workflow that never triggers
-    // for a twin is a workflow that does not cover it.
     name: "a missing workflow path filter is a violation",
     files: allButOne(".github/workflows/agent-trace-overhead-gate.yml"),
     expect: "red",
     contains: "missing packages/twin-linear/** path filter",
   },
   {
-    // A seam this rule can no longer find is a seam it stopped comparing.
     name: "an array renamed out from under the rule is red, not silently uncompared",
     files: tree(TWINS, {
       "cli/src/twin/registry.ts": `export const TWIN_NAMES = ["github", "slack"] as const;\n`,
