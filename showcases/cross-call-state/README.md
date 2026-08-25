@@ -55,13 +55,21 @@ Everything below is what you should see. Every output block is verbatim from a
 real run — sandboxes `ses_gTgfTIGgoO4dgjZU` and `ses_qPk73MKVXnGjJr39`, prod,
 2026-08-25.
 
-Two shell variables keep the rest of this page readable:
+Mint the first sandbox, and give it two shell variables so the rest of this
+page stays readable:
 
 ```bash
+npx @pome-sh/cli@latest login          # once
+npx @pome-sh/cli@latest sandbox create --twin github \
+  --secrets-file .pome-sandbox.env --format json | jq '{session_id}'
+
 source .pome-sandbox.env
 R="$POME_GITHUB_REST_URL"
 A="Authorization: Bearer $POME_AUTH_TOKEN"
 ```
+
+`sandbox create` writes the bearer, the session id and the per-twin REST base
+into that file at mode `0600`. It expires in 30 minutes.
 
 ## The world
 
@@ -243,16 +251,37 @@ same moment**, and the same request against each returns a different world:
 So this is isolation, not a reset. Sandbox 1 still held its three writes while
 sandbox 2 had never seen them.
 
-The tape is per-sandbox too — sandbox 2's tape holds only sandbox 2's own reads,
-and each row's path carries its own session id:
+The tape is per-sandbox too. Same command as before, pointed at sandbox 2:
 
-```text
-GET /repos/acme/api/issues/1 200 false
-GET /repos/acme/api/issues/1/comments 200 false
+```bash
+curl -s -H "$A2" "$R2/_pome/events" > tape2.json
+jq -r '.[] | [.method, (.path|sub("^/s/[^/]+";"")), .status,
+  .state_mutation, .tool // "-"] | @tsv' tape2.json | column -t
 ```
 
-Two rows, both `false`. The six rows from sandbox 1 are not there, and cannot
-be: the sandbox id is a path segment on every row.
+```text
+GET  /repos/acme/api/issues/1           200  false  -
+GET  /repos/acme/api/issues/1/comments  200  false  -
+```
+
+Two rows, both `false`. The six rows from sandbox 1 are not on it.
+
+They cannot be, and the reason is mechanical rather than a promise: the sandbox
+id is a **path segment on every row**, which the `sub()` above strips for
+readability. Put it back and each tape names exactly one sandbox:
+
+```bash
+jq -r '[.[].path|split("/")[2]] | unique[]' tape.json   # sandbox 1
+jq -r '[.[].path|split("/")[2]] | unique[]' tape2.json  # sandbox 2
+```
+
+```text
+ses_gTgfTIGgoO4dgjZU
+ses_qPk73MKVXnGjJr39
+```
+
+One id each. So "no sandbox-1 row appears on sandbox-2's tape" is something you
+can assert rather than eyeball — which is exactly what `verify.sh` does.
 
 ## Assertable checks
 
