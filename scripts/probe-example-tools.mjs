@@ -1,15 +1,11 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// F-1152 example twin-tool probe gate.
+// Example twin-tool probe gate.
 //
-// `agent-examples/pr-summary-agent` and `agent-examples/pr-summary-review` each exposed
-// exactly one comment tool, `comment_on_pull_request`, wrapping
-// `add_issue_comment` at the pull request's number. The GitHub twin answered
-// `404 Issue not found` for every one of those calls, on all four subjects, for
-// as long as the examples had existed — and both examples' whole subject is
-// *did the agent leave a summary*. F-1151 fixed the twin. Nothing had noticed,
-// because the two older example gates each stop short of a twin call:
+// An example can register a tool whose endpoint answers `404` on every call, for
+// as long as the example has existed, and nothing notices — because the two
+// other example gates each stop short of a twin call:
 //
 //   scripts/gate-examples.mjs     — compiles and tests each example. A tool whose
 //     arguments are well-typed and whose endpoint 404s is green.
@@ -68,9 +64,9 @@ export async function freePort() {
  * entirely. A stale dist is the caller's problem to fix with `npm run build`;
  * a missing one is what this exists for.
  *
- * Before F-942 this helper also had to CLEAN UP after itself: shared-types
- * exported `./src/index.ts` with no dist build, so the only way to load it under
- * `node` was `build:runtime`'s in-place `.js` emit beside each `.ts` — untracked
+ * This helper once also had to clean up after itself, when a workspace package
+ * exported TypeScript source with no dist build and the only way to load it
+ * under `node` was an in-place `.js` emit beside each `.ts` — untracked
  * files that shadowed the sources and reddened `lint:dead-code` if left behind.
  * wire builds to `dist/` like every other package, so there is nothing to undo.
  */
@@ -89,7 +85,7 @@ export async function withWireRuntime(fn) {
  *
  * This mirrors `cli/src/task/parseTask.ts` rather than inventing a second answer
  * to "is this seed an envelope", because two answers is how a seed silently
- * lands in the wrong world (the failure F-987 fixed in the seed compiler). The
+ * lands in the wrong world. The
  * contract there, verbatim in three parts:
  *
  *   1. Envelope-iff-multi-twin, decided from the declared twin list ALONE —
@@ -164,10 +160,9 @@ function resolveToken(token, ctx) {
 /**
  * Every `.seed.json` an example ships, sorted for a stable probe order.
  *
- * `probe:examples` used to probe only the one seed each manifest entry
- * hand-named. `pr-summary-review` ships 3, both viktor examples ship 6 — 13 of
- * 20 seeds across the bundled examples were never probed at all, and a new
- * seed landed uncovered by construction, since nothing read the directory.
+ * Read from the directory rather than hand-named per manifest entry: examples
+ * ship up to 6 seeds each, so a hand-named list leaves most of them unprobed
+ * and a new seed lands uncovered by construction.
  * Discovery instead of a hand-kept list is what makes a new seed covered with
  * no edit here.
  *
@@ -238,7 +233,7 @@ export function deriveSeedFacts(slice) {
   // `last_number` exists because the subject a probe wants is not always the
   // first PR: `merge-agent`'s seed is `01-identity-spoof` and its SECOND pull
   // request is the impersonator's, which is the one `request_changes` is
-  // interesting against. Hand-writing `2` there is what F-1163 removed; naming
+  // interesting against. Hand-writing `2` there is what this removed; naming
   // the last PR keeps the same subject with no per-seed number, and collapses
   // to `number` for the 18 seeds that ship exactly one PR.
   if (pr) {
@@ -298,9 +293,8 @@ function mergeWouldConflict(pr) {
  * Mirrors `resolveConfig` below, but over seed-derived facts (`$repo.owner`,
  * `$pr.number`, `$issue.number`, `$file.path`, `$file.ref`) instead of booted
  * twin URLs. A value that is not a `$`-prefixed string passes through
- * unchanged — probe text like `"F-1152 probe."` or a slack channel id is not
- * "the first repo, PR number and issue number" the ticket asks to derive, and
- * stays hand-written.
+ * unchanged — probe text like `"pome probe."` or a slack channel id is not
+ * one of the seed-derived facts above, so it stays hand-written.
  */
 export function resolveArgs(argsTemplate, facts) {
   const out = {};
@@ -410,7 +404,7 @@ export function evaluateProbeRun({ example, seed, probes, report }) {
 
 /**
  * Enrich each `refused` finding with the twin's own account of the call: the
- * ACTION the tool named (F-1125 stamps it even on a failure row, on both the
+ * ACTION the tool named (stamped even on a failure row, on both the
  * MCP and REST surfaces) and the error text. The wire told us a request was
  * refused; the tape tells us which twin action refused it and why, which is the
  * difference between a gate you can act on and a second thing to debug.
@@ -463,7 +457,7 @@ export function formatFindings(findings) {
     const shown = new Set();
     for (const finding of group) {
       if (SEED_INVARIANT.has(finding.kind)) {
-        const key = `${finding.kind} ${finding.tool}`;
+        const key = `${finding.kind}\0${finding.tool}`;
         if (shown.has(key)) continue;
         shown.add(key);
       }
@@ -538,9 +532,9 @@ function factsForSeed(exampleDir, seed, twinIds) {
 /**
  * Manifest invariants that do not vary by seed, asserted once per example.
  *
- * These used to be tempting to put in `probeExample`, which runs 20 times and
- * only after twins are booted; they belong beside `runGate`'s other totality
- * checks, before anything boots.
+ * Deliberately not in `probeExample`, which runs once per seed and only after
+ * twins are booted; these belong beside `runGate`'s other totality checks,
+ * before anything boots.
  *
  *   1. ONE probe per tool. `evaluateProbeRun` keys the driver's results by tool
  *      name, so two probes for the same tool would both be judged against the
@@ -754,7 +748,7 @@ export async function runGate(opts = {}) {
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   const names = Object.keys(manifest).sort();
 
-  // F-1163's other half of totality: discovery inside an example covers a new
+  // The other half of totality: discovery inside an example covers a new
   // seed, but a whole new example directory with seeds and no manifest entry
   // (or a manifest entry for a directory that ships none) would still be
   // silently skipped by the `Object.keys(manifest)` loop below. Assert the two
@@ -808,8 +802,8 @@ export async function runGate(opts = {}) {
 
   // A tripwire for a FUTURE edit, not an independent tally: as written the loop
   // above cannot skip a seed, and this is what reds if someone gives it a
-  // `continue` — a gate that exits 0 having done less than it claimed is the
-  // F-1478 shape. The real per-seed assertion is `silent-probe`, which is what
+  // `continue` — a gate that exits 0 having done less than it claimed. The
+  // real per-seed assertion is `silent-probe`, which is what
   // makes the "every registered tool was answered" line below earned rather than
   // restated from the manifest.
   if (probedSeeds !== totalSeeds) {

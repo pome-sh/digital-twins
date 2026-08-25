@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// no-eval (D9) — REPO-WIDE.
+// no-eval — REPO-WIDE.
 //
 // pome-twins is capture-only: it must never compute a score, call a judge, or
 // correlate locally, anywhere in the OSS surface (cli/src/**, cli/scripts/**,
@@ -20,7 +20,7 @@
 //      `import "..."` — against the SPECIFIER, so prose/comments referencing the
 //      old design don't trip it.
 //
-// ALLOWLIST (D16): file-name-stem violations may be allowlisted by relative path
+// ALLOWLIST: file-name-stem violations may be allowlisted by relative path
 // below, for a module that is GENUINELY only trace-format TYPES (no eval logic)
 // and happens to collide with a denied stem. Target: EMPTY. Path violations and
 // import violations are NEVER allowlistable.

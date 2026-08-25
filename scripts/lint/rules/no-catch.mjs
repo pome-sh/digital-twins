@@ -105,7 +105,7 @@ const SCAN_DIR = "packages/sdk/src";
 // fixtures (this rule's own case table does exactly that in a tmp dir).
 const SKIP_DIRS = ["node_modules", "dist", "build", ".git", "coverage", "test", "tests", "__fixtures__", "fixtures"];
 
-// ALLOWLIST (D4): reviewed, documented assign-and-fall-through exceptions.
+// ALLOWLIST: reviewed, documented assign-and-fall-through exceptions.
 // `file` is the repo-root-relative path; `bodyIncludes` is a distinctive
 // substring that must appear in the catch clause's whitespace-normalized,
 // literal-stripped body. See the module header for why each is here and how
