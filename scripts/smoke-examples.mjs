@@ -57,14 +57,14 @@
 // ever proves, because CI has no credentials and 0 of 8 examples are ever
 // "still running at the settle" here. `SMOKE_EXAMPLES_LIVE=1` switches this
 // same gate — same classifier, same discovery, same output-tail printing —
-// into the mode a credentialed nightly runs: it stops overlaying SMOKE_ENV's
+// into the mode a credentialed caller runs: it stops overlaying SMOKE_ENV's
 // dead loopback ports and invalid keys, so whatever real twin wiring and
 // model key the caller already put in `process.env` (booting real local
 // twins via `pome twin start`, a real `ANTHROPIC_API_KEY`) flows straight
 // through to each example. In this mode a hard credential check runs BEFORE
 // anything launches — an absent credential must never degrade into a second
 // REACHED-OUTBOUND run that reports success, which would prove nothing while
-// looking like a nightly that does — and a floor after the run asserts at
+// looking like a run that does — and a floor after the run asserts at
 // least one example was alive at the settle for real, naming what it
 // expected when it was not.
 //
@@ -244,7 +244,7 @@ function matchBenignFailure(output) {
 // SMOKE_DEAD_WIRING below is load-bearing: the first cut of the live leg overlaid nothing
 // at all in LIVE mode, so those four died on `Error: POME_TASK is required`
 // and the gate classified them FAIL with "returned without evidence it did any
-// real work" — i.e. the credentialed nightly would have redded 4 of 8 on its
+// real work" — i.e. a credentialed run would have redded 4 of 8 on its
 // very first run, for an unset env var that has nothing to do with the
 // property this leg exists to prove, which is exactly the kind of
 // non-diagnosable red that trains a reader to ignore the alarm.
