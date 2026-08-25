@@ -1,5 +1,12 @@
 # @pome-sh/checks
 
+## Unreleased (patch)
+
+**No consumer-visible change.** Added `// file-size:` header comments to twin
+modules that were previously exempted from the file-size lint by name, and removed
+four header comments that no longer applied. Prose only — no export, schema, tool,
+route, status code or response body moved.
+
 ## 0.3.7 — 2026-08-25
 
 **No consumer-visible change.** Comment cleanup in `scripts/bundle-declarations.mjs`,

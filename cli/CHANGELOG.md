@@ -10,6 +10,12 @@ write a version number here or in `package.json`. Released
 entries are insertions only: a correction is the next entry, naming the one it
 corrects.
 
+## Unreleased (patch)
+
+**No consumer-visible change.** Added `// file-size:` header comments to four CLI
+modules that were previously exempted from the file-size lint by name. Prose only
+— no export, flag, schema, route, status code or response body moved.
+
 ## 0.26.11 — 2026-08-24
 
 **No consumer-visible change.** The repo's lint gates were consolidated behind
