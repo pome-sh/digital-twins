@@ -8,7 +8,7 @@ allocates on `main` after the merge, in the same commit that moves
 write a version number here or in `package.json`. Released entries are insertions
 only: a correction is the next entry, naming the one it corrects.
 
-## Unreleased (patch)
+## 0.26.13 — 2026-08-25
 
 **No consumer-visible change.** Deleted an orphaned changeset file and the empty
 directory holding it. Nothing read it. No export, flag, schema, route, status
