@@ -193,8 +193,8 @@ describe("@pome-sh/wire/correlation subpath surface", () => {
 // from the root barrel is load-bearing rather than economical: the barrel's.
 describe("@pome-sh/wire/run-completeness subpath surface", () => {
   const EXPECTED_RUN_COMPLETENESS_EXPORTS = [
-    "ABSTAINED_OUTCOME",
-    "ADVISORY_OUTCOME",
+    "ABSTAINED_SCORE_STATE",
+    "ADVISORY_SCORE_STATE",
     "PRE_SATISFIED_REASON",
     "isIncompleteTally",
     "tallyCriteriaResults",
@@ -222,16 +222,16 @@ describe("@pome-sh/wire/run-completeness subpath surface", () => {
     expect(PRE_SATISFIED_REASON).toBe("already_true_in_seed");
   });
 
-  it("pins the two narrator outcome values the exemption keys off", async () => {
+  it("pins the two narrator score_state values the exemption keys off", async () => {
     // Same both-sides-of-one-value claim as the reason string above.
     // pome-cloud's `@pome-cloud/contract` builds `criterionOutcomeSchema` from
     // these two literals and its judge stamps them onto `criteria_results`; the
     // predicate and this repo's CLI read them back. A rename on one side alone
     // keeps parsing and silently stops exempting.
-    const { ABSTAINED_OUTCOME, ADVISORY_OUTCOME } = await import(
+    const { ABSTAINED_SCORE_STATE, ADVISORY_SCORE_STATE } = await import(
       "../src/run-completeness.js"
     );
-    expect(ADVISORY_OUTCOME).toBe("advisory");
-    expect(ABSTAINED_OUTCOME).toBe("abstained");
+    expect(ADVISORY_SCORE_STATE).toBe("advisory");
+    expect(ABSTAINED_SCORE_STATE).toBe("abstained");
   });
 });

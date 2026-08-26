@@ -4,8 +4,8 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  ABSTAINED_OUTCOME,
-  ADVISORY_OUTCOME,
+  ABSTAINED_SCORE_STATE,
+  ADVISORY_SCORE_STATE,
   isIncompleteTally,
   PRE_SATISFIED_REASON,
   tallyCriteriaResults,
@@ -229,20 +229,20 @@ describe("tallyCriteriaResults", () => {
   const excludedBySeed = () => ({ skipped: true, passed: false, reason: PRE_SATISFIED_REASON });
   const unreached = () => ({ skipped: true, passed: false, reason: "judge_unavailable" });
   // The narrator's two states, as they actually arrive: `skipped: true` with
-  // the reading in `reason`, and the state itself in `outcome`. Nothing about
-  // the two booleans distinguishes these from `unreached()` above — which is
-  // the whole reason the `outcome` field exists.
+  // the reading in `reason`, and the state itself in `score_state`. Nothing
+  // about the two booleans distinguishes these from `unreached()` above — which
+  // is the whole reason the `score_state` field exists.
   const advisory = () => ({
     skipped: true,
     passed: false,
     reason: "the assistant acknowledged the cancellation in its reply",
-    outcome: ADVISORY_OUTCOME,
+    score_state: ADVISORY_SCORE_STATE,
   });
   const abstained = () => ({
     skipped: true,
     passed: false,
     reason: "no refund was requested in this run",
-    outcome: ABSTAINED_OUTCOME,
+    score_state: ABSTAINED_SCORE_STATE,
   });
 
   it("counts an evaluated criterion into the denominator whichever way it went", () => {
@@ -379,26 +379,26 @@ describe("tallyCriteriaResults", () => {
     expect(isIncompleteTally(tally)).toBe(true);
   });
 
-  it("treats an unrecognised outcome as a gap, not an exemption", () => {
+  it("treats an unrecognised score_state as a gap, not an exemption", () => {
     // The same fail-safe direction the unrecognised REASON takes above. A
     // spelling this package has never heard of — a future narrator state, or a
     // stale one — must not exempt itself from clause 2 by arriving.
     const tally = tallyCriteriaResults([
       { skipped: false, reason: "judged" },
-      { skipped: true, reason: "read it", outcome: `${ADVISORY_OUTCOME}_v2` },
+      { skipped: true, reason: "read it", score_state: `${ADVISORY_SCORE_STATE}_v2` },
     ]);
     expect(tally.advisory).toBe(0);
     expect(tally.abstained).toBe(0);
     expect(isIncompleteTally(tally)).toBe(true);
   });
 
-  it("ignores an outcome on a row that was actually evaluated", () => {
+  it("ignores a score_state on a row that was actually evaluated", () => {
     // `advisory` is a subset of `notEvaluated`, so a row that is NOT skipped
     // must never land in it: subtracting an exemption the predicate never
     // added to `notEvaluated` would drive clause 2 negative and exempt a real
     // gap standing beside it.
     const tally = tallyCriteriaResults([
-      { skipped: false, reason: "judged", outcome: ADVISORY_OUTCOME },
+      { skipped: false, reason: "judged", score_state: ADVISORY_SCORE_STATE },
       { skipped: true, reason: "judge_unavailable" },
     ]);
     expect(tally).toEqual({
@@ -419,7 +419,7 @@ describe("tallyCriteriaResults", () => {
     // `preSatisfied + advisory` exceed `notEvaluated` and exempt the gap
     // standing next to it.
     const tally = tallyCriteriaResults([
-      { skipped: true, reason: PRE_SATISFIED_REASON, outcome: ADVISORY_OUTCOME },
+      { skipped: true, reason: PRE_SATISFIED_REASON, score_state: ADVISORY_SCORE_STATE },
       { skipped: true, reason: "judge_unavailable" },
     ]);
     expect(tally.preSatisfied + tally.advisory + tally.abstained).toBe(1);
@@ -428,7 +428,7 @@ describe("tallyCriteriaResults", () => {
   });
 });
 
-describe("the narrator outcome values", () => {
+describe("the narrator score_state values", () => {
   // Both sides of one wire value, exactly as `PRE_SATISFIED_REASON` below.
   // pome-cloud's `@pome-cloud/contract` builds `criterionOutcomeSchema` FROM
   // these two literals and its judge stamps them onto `criteria_results`; the
@@ -437,8 +437,8 @@ describe("the narrator outcome values", () => {
   // silently stop exempting — every narrator run back to `INCOMPLETE` with
   // nothing failing.
   it("pins the two literals the predicate keys the exemption off", () => {
-    expect(ADVISORY_OUTCOME).toBe("advisory");
-    expect(ABSTAINED_OUTCOME).toBe("abstained");
+    expect(ADVISORY_SCORE_STATE).toBe("advisory");
+    expect(ABSTAINED_SCORE_STATE).toBe("abstained");
   });
 });
 

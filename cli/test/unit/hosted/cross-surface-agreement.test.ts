@@ -39,8 +39,8 @@ import { mkdir, mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  ABSTAINED_OUTCOME,
-  ADVISORY_OUTCOME,
+  ABSTAINED_SCORE_STATE,
+  ADVISORY_SCORE_STATE,
   isIncompleteTally,
   tallyCriteriaResults,
 } from "@pome-sh/wire/run-completeness";
@@ -133,21 +133,22 @@ const excluded = (text: string): CriterionResult => ({
   reason: PRE_SATISFIED_REASON,
 });
 // The narrator's two states. Identical to `abstained()` above on both booleans
-// — `outcome` is the only thing that separates a reading from a gap, which is
-// why the field had to survive the parse before either surface could act on it.
+// — `score_state` is the only thing that separates a reading from a gap, which
+// is why the field had to survive the parse before either surface could act on
+// it.
 const advisory = (text: string): CriterionResult => ({
   criterion: { type: "model", text },
   passed: false,
   skipped: true,
   reason: "the assistant acknowledged the cancellation in its reply",
-  outcome: ADVISORY_OUTCOME,
+  score_state: ADVISORY_SCORE_STATE,
 });
 const narratorAbstained = (text: string): CriterionResult => ({
   criterion: { type: "model", text },
   passed: false,
   skipped: true,
   reason: "no refund was requested in this run",
-  outcome: ABSTAINED_OUTCOME,
+  score_state: ABSTAINED_SCORE_STATE,
 });
 
 interface Row {

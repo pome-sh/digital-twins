@@ -2,7 +2,7 @@
 // The CLI half — the CLI names the third state `incomplete` and stops contradicting
 // the cloud.
 
-import { ABSTAINED_OUTCOME, ADVISORY_OUTCOME } from "@pome-sh/wire/run-completeness";
+import { ABSTAINED_SCORE_STATE, ADVISORY_SCORE_STATE } from "@pome-sh/wire/run-completeness";
 import { describe, expect, it } from "vitest";
 import type { CriterionResult } from "../../../src/contract/index.js";
 import { finalizeResponseSchema } from "../../../src/contract/index.js";
@@ -40,20 +40,20 @@ const preSatisfied = (text: string): CriterionResult => ({
 });
 // The narrator's two states. `[model]` rather than `[code]`, which is the only
 // lane they occur in, and indistinguishable from `abstained()` above on the two
-// booleans alone — `outcome` is the whole difference.
+// booleans alone — `score_state` is the whole difference.
 const advisory = (text: string): CriterionResult => ({
   criterion: { type: "model", text },
   passed: false,
   skipped: true,
   reason: "the assistant acknowledged the cancellation in its reply",
-  outcome: ADVISORY_OUTCOME,
+  score_state: ADVISORY_SCORE_STATE,
 });
 const abstainedByNarrator = (text: string): CriterionResult => ({
   criterion: { type: "model", text },
   passed: false,
   skipped: true,
   reason: "no refund was requested in this run",
-  outcome: ABSTAINED_OUTCOME,
+  score_state: ABSTAINED_SCORE_STATE,
 });
 
 // Built by the SHIPPED producer rather than re-derived here.
@@ -312,7 +312,7 @@ describe("evaluationCounts — the counts verdict.json and the terminal both rea
 describe("an advisory [model] row does not take the CLI's verdict", () => {
   it("survives the /finalize parse instead of being stripped", () => {
     // THE FIRST DEFECT, AND THE QUIET ONE. `criterionResultSchema` is a plain
-    // `z.object` union and zod strips unknown keys, so before `outcome` was
+    // `z.object` union and zod strips unknown keys, so before `score_state` was
     // declared on the BASE schema the field was discarded before any
     // arithmetic could read it — the exemption would have been correct and
     // dead. On the base and not one arm because an advisory row carries no
@@ -324,10 +324,10 @@ describe("an advisory [model] row does not take the CLI's verdict", () => {
       dashboard_url: "https://app.pome.sh/runs/run_x",
       criteria_results: [ok("a"), advisory("b"), abstainedByNarrator("c")],
     });
-    expect(parsed.criteria_results?.map((r) => r.outcome)).toEqual([
+    expect(parsed.criteria_results?.map((r) => r.score_state)).toEqual([
       undefined,
-      ADVISORY_OUTCOME,
-      ABSTAINED_OUTCOME,
+      ADVISORY_SCORE_STATE,
+      ABSTAINED_SCORE_STATE,
     ]);
   });
 
@@ -391,7 +391,7 @@ describe("an advisory [model] row does not take the CLI's verdict", () => {
     });
   });
 
-  it("reads the state off `outcome` and never off the prose in `reason`", () => {
+  it("reads the state off `score_state` and never off the prose in `reason`", () => {
     // `reason` on an advisory row is the narrator's free text. A predicate that
     // sniffed it would exempt any judge that happened to use the word.
     expect(isNarrated(advisory("a"))).toBe(true);

@@ -12,8 +12,8 @@ import type { HostedClient } from "./client.js";
 import type { FinalizeResponse, PerTwinStateKeys } from "../types/shared.js";
 import type { Score } from "./evalResultView.js";
 import {
-  ABSTAINED_OUTCOME,
-  ADVISORY_OUTCOME,
+  ABSTAINED_SCORE_STATE,
+  ADVISORY_SCORE_STATE,
   isNarrated,
   isPreSatisfied,
   outcomeOf,
@@ -341,14 +341,16 @@ export async function uploadRunBlobs(
  * here, because this side alone cannot see the other.
  *
  * `errored` is a DISPLAY-MODEL state with no wire producer today: it is
- * reachable only through `CriterionResult.outcome`, whose two SERVED values are
- * the narrator states above — neither this repo's `criterionResultSchema` nor
- * pome-cloud's has ever carried `"errored"`, so `finalizeResponseSchema` strips
- * that spelling off every real /finalize response and `outcomeOf` falls back to
- * passed/skipped. The term stays in the arithmetic because a cloud that starts
- * emitting it must not thereby acquire a pass — but no wire fixture can
- * exercise it, and a test that fabricates one is testing the display model, not
- * this function (`incompleteVerdict.test.ts` does exactly that, and says so).
+ * reachable only through `CriterionResult.outcome`, which neither this repo's
+ * `criterionResultSchema` nor pome-cloud's carries, so `finalizeResponseSchema`
+ * strips it off every real /finalize response and `outcomeOf` falls back to
+ * passed/skipped. The narrator states did NOT change this: they arrive on
+ * `score_state`, a separate key, precisely so that reserving `outcome` for this
+ * four-state vocabulary keeps meaning something. The term stays in the
+ * arithmetic because a cloud that starts emitting it must not thereby acquire a
+ * pass — but no wire fixture can exercise it, and a test that fabricates one is
+ * testing the display model, not this function (`incompleteVerdict.test.ts`
+ * does exactly that, and says so).
  */
 export function scoreFromFinalizeResponse(finalized: FinalizeResponse): Score {
   const hasCriteriaResults = finalized.criteria_results !== undefined;
@@ -360,7 +362,7 @@ export function scoreFromFinalizeResponse(finalized: FinalizeResponse): Score {
   const preSatisfied = results.filter(
     (r) => outcomeOf(r) === "skipped" && isPreSatisfied(r),
   ).length;
-  // The narrator's two states, counted off `outcome` (via `isNarrated`) and
+  // The narrator's two states, counted off `score_state` (via `isNarrated`) and
   // never off the prose in `reason`, which on an advisory row is the narrator's
   // own free text.
   //
@@ -371,10 +373,10 @@ export function scoreFromFinalizeResponse(finalized: FinalizeResponse): Score {
   // emits such a row — the seed exclusion is a `[code]` evaluator's and these
   // are the `[model]` judge's — and the arithmetic does not rely on that.
   const advisory = results.filter(
-    (r) => isNarrated(r) && !isPreSatisfied(r) && r.outcome === ADVISORY_OUTCOME,
+    (r) => isNarrated(r) && !isPreSatisfied(r) && r.score_state === ADVISORY_SCORE_STATE,
   ).length;
   const abstained = results.filter(
-    (r) => isNarrated(r) && !isPreSatisfied(r) && r.outcome === ABSTAINED_OUTCOME,
+    (r) => isNarrated(r) && !isPreSatisfied(r) && r.score_state === ABSTAINED_SCORE_STATE,
   ).length;
   const totalRequired = passed + failed;
   // The abstentions that actually block a pass: every skipped result MINUS the

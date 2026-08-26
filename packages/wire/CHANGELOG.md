@@ -19,16 +19,24 @@ every surface that asks this question. Measured, not inferred.
 
 Added:
 
-- `ADVISORY_OUTCOME` (`"advisory"`) and `ABSTAINED_OUTCOME` (`"abstained"`) —
-  the two values a `criteria_results` row carries in `outcome` when `skipped`
-  alone is too coarse. Owned here for the reason `PRE_SATISFIED_REASON` is: the
-  predicate below reads them, so a drift in either string is a silent drift in
-  the predicate. The zod field stays in pome-cloud's `@pome-cloud/contract`,
-  which serves it and builds its enum from these two constants.
-- `CriterionResultLike.outcome?: string` — typed `string` rather than a union of
-  the two, exactly as `reason` is not a union of the reason codes, so a state
-  this version has never heard of is a value nothing recognises rather than a
-  parse error. An unrecognised spelling is not exempted from anything.
+- `ADVISORY_SCORE_STATE` (`"advisory"`) and `ABSTAINED_SCORE_STATE`
+  (`"abstained"`) — the two values a `criteria_results` row carries in
+  `score_state` when `skipped` alone is too coarse. Owned here for the reason
+  `PRE_SATISFIED_REASON` is: the predicate below reads them, so a drift in
+  either string is a silent drift in the predicate. The zod field stays in
+  pome-cloud's `@pome-cloud/contract`, which serves it and builds its
+  `criterionScoreStateSchema` from these two constants.
+- `CriterionResultLike.score_state?: string` — typed `string` rather than a
+  union of the two, exactly as `reason` is not a union of the reason codes, so a
+  state this version has never heard of is a value nothing recognises rather
+  than a parse error. An unrecognised spelling is not exempted from anything.
+
+  The field is `score_state` and **not** `outcome`: the CLI's display model has
+  long reserved `outcome` on this same row for a disjoint vocabulary
+  (`passed | failed | skipped | errored`), and its `outcomeOf` prefers the wire
+  value over the booleans — so a cloud writing `advisory` into that key would
+  render an advisory row with the skipped glyph, which is the conflation these
+  states exist to remove.
 
 Changed:
 
@@ -44,9 +52,9 @@ Changed:
   (`evaluated === 0`) and clause 1 (`total === 0`) are unchanged**: a
   `[model]`-only run genuinely is neither a pass nor a failure, so `incomplete`
   is the right verdict class there and only its wording was ever wrong.
-- `tallyCriteriaResults` counts the two new fields off `outcome`, and only on a
-  row that is `skipped` — an `outcome` on a scored row is ignored rather than
-  subtracted from a bucket it was never in.
+- `tallyCriteriaResults` counts the two new fields off `score_state`, and only
+  on a row that is `skipped` — a `score_state` on a scored row is ignored rather
+  than subtracted from a bucket it was never in.
 
 For pome-cloud, this is a pin bump with no type edits: `CriteriaTally`
 (`services/score-merge.ts`) and `CriteriaCounts` (`dashboard/src/lib/

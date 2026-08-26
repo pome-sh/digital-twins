@@ -13,12 +13,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { assetPath } from "../cli/assets.js";
-import type { RecorderEvent } from "../types/shared.js";
+import type { CriterionResult, RecorderEvent } from "../types/shared.js";
 import type { Criterion, Task } from "../task/taskSchema.js";
 import { redactEvent, redactSecrets } from "../recorder/redaction.js";
-// The DISPLAY-model row, matching `VerdictArtifact.criteria_results` — this
-// module reduces that array with the two display helpers beside it.
-import type { CriterionResult } from "../hosted/evalResultView.js";
 import { isPreSatisfied, outcomeOf } from "../hosted/evalResultView.js";
 import type { VerdictArtifact } from "../hosted/evalResultCache.js";
 

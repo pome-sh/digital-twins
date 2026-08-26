@@ -267,21 +267,25 @@ describe("scoreFromFinalizeResponse — the seed-pre-satisfied exemption", () =>
     expect(scoreStatus(score, 100)).toBe("incomplete");
   });
 
-  it("reads an `errored` criterion off the wire now that `outcome` survives the parse", () => {
-    // THIS TEST USED TO ASSERT THE OPPOSITE, and the assertion it made was
-    // true when it was written: `criterionResultSchema` had no `outcome` field,
-    // so zod stripped the key and `errored` was a display state no wire fixture
-    // could reach. `outcome` had to be declared for the narrator exemption to
-    // be readable at all, and declaring it makes every spelling of the field
-    // survive, not just the narrator's two.
+  it("cannot see an `errored` criterion at all — `outcome` does not survive the wire", () => {
+    // A TRIPWIRE, and it stays one. If this test ever goes red, the wire grew
+    // the field and the `errored` path became real.
     //
-    // What does NOT change is the verdict, which is the part worth pinning: the
-    // row moves from the `skipped` bucket to the `errored` one, and `errored` is
-    // never exempted, so the run is still INCOMPLETE and still cannot pass.
-    // That was the stated reason for keeping the term in the arithmetic while
-    // nothing could produce it — "a cloud that starts emitting it must not
-    // thereby acquire a pass" — and it now holds against a real payload rather
-    // than a fabricated display-model row.
+    // It went red once during the narrator work, for a reason it does not
+    // offer: the field arrived carrying something ELSE. pome-cloud briefly
+    // named the narrator's states `outcome`, which is the key this repo's
+    // display model has long reserved for `passed | failed | skipped | errored`
+    // and reserved for the CLOUD to fill. Declaring it here to let the narrator
+    // states through would have silenced the only thing watching this slot —
+    // and, because `outcomeOf` prefers the wire value over the booleans, would
+    // have rendered an advisory row with the skipped glyph. The field was
+    // renamed to `score_state` instead, so this assertion is true again and
+    // still guards what it was written to guard. The sibling below guards the
+    // new key.
+    //
+    // A fixture that sets `outcome: "errored"` only typechecks through a cast,
+    // and a cast in a fixture is usually a fixture describing a state the
+    // system cannot be in.
     const parsed = finalizeResponseSchema.parse({
       run_id: "run_x",
       score: 100,
@@ -305,20 +309,55 @@ describe("scoreFromFinalizeResponse — the seed-pre-satisfied exemption", () =>
       ],
     });
 
-    expect(parsed.criteria_results?.[1]?.outcome).toBe("errored");
+    expect(parsed.criteria_results?.[1]).not.toHaveProperty("outcome");
     const score = scoreFromFinalizeResponse(parsed);
-    expect(score.errored).toBe(1);
-    expect(score.skipped).toBe(0);
-    // The bucket moved; the verdict did not. `errored` is not one of the two
-    // exemptions, so it still blocks a pass.
+    expect(score.errored).toBe(0);
+    expect(score.skipped).toBe(1);
+    // Still incomplete — via the skipped bucket, which is the only bucket the
+    // wire can put it in.
     expect(score.can_pass).toBe(false);
     expect(scoreStatus(score, 100)).toBe("incomplete");
-    // And the row is still counted: `total` names every criterion the run
-    // recorded whichever bucket the row landed in.
+  });
+
+  it("DOES let `score_state` survive the wire — the narrator's own key", () => {
+    // The other half of the tripwire above, and the reason the two are
+    // siblings: one asserts the reserved four-state key is still unfilled, the
+    // other that the narrator's key arrives. Declared on the BASE schema, so it
+    // survives the DETERMINISTIC arm an advisory row lands on (no `confidence`,
+    // no `judge_model`) rather than being stripped by its `.extend({})`.
+    const parsed = finalizeResponseSchema.parse({
+      run_id: "run_x",
+      score: 100,
+      dashboard_url: "https://app.pome.sh/runs/run_x",
+      criteria_results: [
+        {
+          criterion: { type: "code", text: "No unsupported endpoint was called" },
+          passed: true,
+          skipped: false,
+          reason: "matched",
+        },
+        {
+          criterion: { type: "model", text: "The reply acknowledged the cancellation" },
+          score_state: "advisory",
+          passed: false,
+          skipped: true,
+          reason: "the assistant acknowledged the cancellation in its reply",
+        },
+      ],
+    });
+    expect(parsed.criteria_results?.[1]?.score_state).toBe("advisory");
+    // And it does not leak into the four-state key it was renamed away from.
+    expect(parsed.criteria_results?.[1]).not.toHaveProperty("outcome");
+    const score = scoreFromFinalizeResponse(parsed);
+    expect(score.advisory).toBe(1);
+    expect(score.errored).toBe(0);
+    // The row is exempt from blocking a pass, and still counted: `total` names
+    // every criterion the run recorded.
+    expect(scoreStatus(score, 100)).toBe("pass");
     expect(evaluationCounts(score).total).toBe(2);
   });
 
-  it("falls back to the booleans for an `outcome` spelling it has never heard of", () => {
+  it("falls back to the booleans for a `score_state` it has never heard of", () => {
     // The tolerant-reader half of the same change. A closed enum here would
     // have rejected the whole /finalize response; a pass-through would have let
     // an unknown string become a display state by arriving. Neither: the value
@@ -337,14 +376,14 @@ describe("scoreFromFinalizeResponse — the seed-pre-satisfied exemption", () =>
         },
         {
           criterion: { type: "model", text: "Severity is set correctly" },
-          outcome: "deliberated",
+          score_state: "deliberated",
           passed: false,
           skipped: true,
           reason: "a state this CLI has never heard of",
         },
       ],
     });
-    expect(parsed.criteria_results?.[1]?.outcome).toBe("deliberated");
+    expect(parsed.criteria_results?.[1]?.score_state).toBe("deliberated");
     const score = scoreFromFinalizeResponse(parsed);
     expect(score.skipped).toBe(1);
     expect(score.advisory).toBe(0);
