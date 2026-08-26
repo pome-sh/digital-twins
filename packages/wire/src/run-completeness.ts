@@ -31,10 +31,11 @@
  * or a red test on both sides rather than a silent pass on one.
  *
  * WHY IT IS WIRE'S TO CARRY, and why that does not loosen the barrel rule. Everything
- * below reads exactly two fields of a `criteria_results` row — `skipped` and
- * `reason` — and returns a boolean. That row is a WIRE shape: it is what
- * /finalize puts on the wire and what both repos parse back. `reason` in
- * particular carries `PRE_SATISFIED_REASON` as a VALUE, so the string is
+ * below reads exactly three fields of a `criteria_results` row — `skipped`,
+ * `reason` and `score_state` — and returns a boolean. That row is a WIRE shape:
+ * it is what /finalize puts on the wire and what both repos parse back. `reason`
+ * and `score_state` in particular carry `PRE_SATISFIED_REASON` and the two
+ * narrator states as VALUES, so those strings are
  * already wire vocabulary in the same sense a semconv attribute key is. Nothing
  * here names a session, a task, a run id, a REST route or a database column,
  * and nothing here imports anything. The input types are structural on purpose
@@ -65,12 +66,62 @@
 export const PRE_SATISFIED_REASON = "already_true_in_seed";
 
 /**
+ * The two states a `[model]` criterion can be in that `passed` and `skipped`
+ * cannot tell apart — the values of the `score_state` field.
+ *
+ * - `advisory` — the narrator READ the criterion and wrote its reading into
+ *   `reason`, but has no score authority over it. The default posture for a
+ *   `[model]` criterion once the narrator is the judge.
+ * - `abstained` — the criterion names a subject that does not exist in this
+ *   run, so there was nothing to read.
+ *
+ * Both arrive as `passed: false, skipped: true`, which is what makes the field
+ * additive: the two booleans already say the honest thing (this row is not in
+ * the score denominator) and the value only says WHY.
+ *
+ * THE FIELD IS `score_state` AND NOT `outcome`, which is not a style choice.
+ * The CLI's display model (`cli/src/hosted/evalResultView.ts`) has reserved
+ * `outcome` on this same object for a DISJOINT vocabulary —
+ * `passed | failed | skipped | errored` — and reserved it *for the cloud to
+ * fill*. Its `outcomeOf` prefers the wire value over the two booleans, so a
+ * cloud writing `advisory` into that key would hand the CLI a value outside its
+ * own union and render an advisory row with the SKIPPED glyph: the exact
+ * conflation the narrator states exist to remove. `score_state` also says what
+ * these two values ARE — a statement about this row's relationship to the
+ * score, not a verdict on the criterion.
+ *
+ * OWNED HERE FOR THE REASON `PRE_SATISFIED_REASON` IS, and it is the same
+ * reason twice. The predicate below reads these literals to decide whether a
+ * row is a GAP or a reading, so a drift in either string is a silent drift in
+ * the predicate — a reader on a stale spelling counts every advisory row as an
+ * abstention and stamps `Incomplete` on a run whose every scored criterion
+ * scored. The VALUES live here; the zod field stays in pome-cloud's
+ * `@pome-cloud/contract`, which is what SERVES `criteria_results` and builds
+ * its `criterionScoreStateSchema` from these two constants rather than from
+ * inline literals. That split is not a compromise between the two rules — it is
+ * both of them being true at once, exactly as `PRE_SATISFIED_REASON` above is a
+ * wire VALUE on a contract-owned SHAPE.
+ */
+export const ADVISORY_SCORE_STATE = "advisory";
+export const ABSTAINED_SCORE_STATE = "abstained";
+
+/**
  * The shape every surface reduces its criteria to before asking the question.
  *
- * `preSatisfied` is a SUBSET of `notEvaluated`, not a fourth bucket — a consumer
- * that adds `evaluated + notEvaluated` and expects `total` keeps working, and
- * one that ignores `preSatisfied` gets the legacy arithmetic rather than a
- * wrong one. Structural rather than a shared class so the dashboard's
+ * `preSatisfied`, `advisory` and `abstained` are DISJOINT SUBSETS of
+ * `notEvaluated`, not further buckets — a consumer that adds `evaluated +
+ * notEvaluated` and expects `total` keeps working, and one that ignores the
+ * three gets the legacy arithmetic rather than a wrong one. Disjoint is
+ * load-bearing and not merely descriptive: the predicate subtracts all three
+ * from `notEvaluated`, so a reduction that counted one row into two of them
+ * would drive that clause negative and exempt a real gap standing beside it.
+ * `tallyCriteriaResults` guarantees it by counting each row at most once.
+ *
+ * The two narrator counts are named separately rather than as one `narrated`
+ * because both consumers already carry these two names, and because the
+ * surfaces that RENDER them render them differently: an advisory row has a
+ * reading to show, an abstain has a missing subject to name. Structural rather
+ * than a shared class so the dashboard's
  * `CriteriaCounts` (which also carries `passed`) and the control plane's
  * `CriteriaTally` (which also carries `failed`) both satisfy it as they are —
  * and so that this module can be published to a consumer whose
@@ -84,6 +135,10 @@ export interface CriteriaTallyLike {
   notEvaluated: number;
   /** The subset of `notEvaluated` the seed already satisfied. */
   preSatisfied: number;
+  /** The subset of `notEvaluated` the narrator read but could not score. */
+  advisory: number;
+  /** The subset of `notEvaluated` whose subject this run did not contain. */
+  abstained: number;
   /** Every criterion the run recorded. */
   total: number;
 }
@@ -106,15 +161,26 @@ export interface CriteriaTallyLike {
  *    evaluated", and only the second is a finding — the same reading
  *    `score-merge.ts`'s `isFullyUnevaluated` settled on for `all_skipped`.
  *
- * 2. `notEvaluated - preSatisfied > 0` → incomplete, later narrowed.
+ * 2. `notEvaluated - preSatisfied - advisory - abstained > 0` → incomplete.
  *    ANY criterion the grader could not reach makes the run neither
  *    green nor red, because a score of 100 over a shrunken denominator is what
- * "the check never ran" looks like. Subtracting `preSatisfied` is the
- *    exemption: a criterion excluded for having already been true in the seed
- *    is not an abstention — the grader DID reach a verdict, and the verdict is
- *    that the criterion tested nothing. Counting it would stamp the word on
- *    every correctly-scored dedup and injection run, which is how a reader
- *    learns to stop reading it.
+ * "the check never ran" looks like. The three subtractions are the exemptions,
+ *    and all three are the same claim: the grader DID reach a verdict on this
+ *    row, so its absence from the denominator is not a gap.
+ *
+ *    - `preSatisfied` — the criterion was already true in the seed, so the
+ *      verdict is that it tested nothing. Counting it would stamp the word on
+ *      every correctly-scored dedup and injection run, which is how a reader
+ *      learns to stop reading it.
+ *    - `advisory` / `abstained` — the narrator has no score authority over a
+ *      `[model]` criterion, so a run whose every `[code]` criterion scored is
+ *      complete with narrator prose beside it. Without this the word landed on
+ *      EVERY narrator run, and (because the markdown report gates the rerun
+ *      recipe on this predicate) took the fix→green loop with it.
+ *
+ *    The exemptions are narrow on purpose: they excuse the states the grader
+ *    named and nothing standing beside them. An unreachable judge is still a
+ *    gap, and one gap beside three readings still takes the verdict.
  *
  * 3. `evaluated === 0` → incomplete. Given clauses 1 and 2 this fires
  *    for exactly ONE shape that clause 2 does not already catch: every
@@ -140,7 +206,9 @@ export interface CriteriaTallyLike {
  */
 export function isIncompleteTally(tally: CriteriaTallyLike): boolean {
   if (tally.total === 0) return false;
-  return tally.notEvaluated - tally.preSatisfied > 0 || tally.evaluated === 0;
+  const unreached =
+    tally.notEvaluated - tally.preSatisfied - tally.advisory - tally.abstained;
+  return unreached > 0 || tally.evaluated === 0;
 }
 
 /**
@@ -157,6 +225,22 @@ export interface CriterionResultLike {
   skipped: boolean;
   /** Why it left. `PRE_SATISFIED_REASON` is the one reason that is not a gap. */
   reason?: string;
+  /**
+   * The closed-vocabulary half of the same question: `ADVISORY_SCORE_STATE` or
+   * `ABSTAINED_SCORE_STATE` when the narrator named the state, absent
+   * otherwise.
+   *
+   * TYPED `string` AND NOT A UNION OF THE TWO, exactly as `reason` above is not
+   * a union of the reason codes. This interface is structural and published,
+   * and the field it models is a zod enum owned in pome-cloud whose output type
+   * is that repo's to widen — a two-literal union here would make every future
+   * state a breaking change to this package, and would reject a caller passing
+   * rows it reads straight back out of a `criteria_results` jsonb column. The
+   * VALUES are still wire's (they are declared above); what is deliberately not
+   * wire's is the closed set. `tallyCriteriaResults` treats a spelling it does
+   * not recognise as a gap, which is the fail-safe direction.
+   */
+  score_state?: string;
 }
 
 /**
@@ -173,6 +257,13 @@ export interface CriterionResultLike {
  * answer. So the reduction moved next to the predicate that consumes it, and
  * The pair crossed the repo boundary together for the same
  * reason: separating them would have left one repo owning half the arithmetic.
+ *
+ * The three exemption counts come off two different fields — `preSatisfied` off
+ * `reason`, the two narrator states off `score_state` — because that is how the
+ * two producers stamp them, and a reduction that guessed one from the other
+ * would be sniffing prose. `score_state` is absent on every row whose two
+ * booleans fully describe it, so a pre-narrator row and a post-narrator row of
+ * the same state still reduce identically.
  *
  * `criteria_results` and not `criteria_breakdown`: the two agree on this split
  * by construction (`score-merge.ts` builds both from one `criteria.map`), and
@@ -192,13 +283,34 @@ export function tallyCriteriaResults(
   let evaluated = 0;
   let notEvaluated = 0;
   let preSatisfied = 0;
+  let advisory = 0;
+  let abstained = 0;
   for (const result of results) {
     if (result.skipped) {
       notEvaluated += 1;
+      // AT MOST ONE exemption per row, which is why this is an else-if chain
+      // and not three independent counters. `isIncompleteTally` subtracts all
+      // three from `notEvaluated`, so a row counted twice would make the
+      // subtraction exceed what it added and exempt an unrelated gap. No
+      // producer emits a row carrying two of these (the seed exclusion is a
+      // `[code]` evaluator's and the narrator states are the `[model]`
+      // judge's), and the arithmetic does not depend on that staying true.
       if (result.reason === PRE_SATISFIED_REASON) preSatisfied += 1;
+      else if (result.score_state === ADVISORY_SCORE_STATE) advisory += 1;
+      else if (result.score_state === ABSTAINED_SCORE_STATE) abstained += 1;
       continue;
     }
+    // A `score_state` on a row that was NOT skipped is ignored rather than
+    // counted: the row is in the denominator, so exempting it would subtract
+    // something `notEvaluated` never held.
     evaluated += 1;
   }
-  return { evaluated, notEvaluated, preSatisfied, total: results.length };
+  return {
+    evaluated,
+    notEvaluated,
+    preSatisfied,
+    advisory,
+    abstained,
+    total: results.length,
+  };
 }

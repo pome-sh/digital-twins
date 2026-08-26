@@ -8,6 +8,50 @@ allocates on `main` after the merge, in the same commit that moves
 write a version number here or in `package.json`. Released entries are insertions
 only: a correction is the next entry, naming the one it corrects.
 
+## Unreleased (minor)
+
+**A hosted run whose every `[code]` criterion was scored no longer prints
+INCOMPLETE and exits 1 because its `[model]` rows were the narrator's.** The
+terminal verdict, `verdict.json`'s `state` and the dashboard badge now agree on
+such a run instead of two of them calling it unfinished.
+
+`@pome-sh/wire`'s completeness predicate learning the narrator states (see that
+package's entry) does not by itself reach the CLI, which computes its own verdict
+through `scoreFromFinalizeResponse`'s `can_pass` and `scoreStatus`. Two changes
+were needed here:
+
+- `criterionResultSchema` gained `score_state` on the **base** object. The
+  schema is a `z.union` of two plain `z.object`s and zod strips unknown keys, so
+  the field was discarded before any arithmetic could read it — the exemption
+  would have been correct and dead. On the base and not one arm because an
+  advisory row carries no `confidence`/`judge_model` and so lands on the
+  *deterministic* arm, whose `.extend({})` is what would have stripped it.
+- `can_pass` now exempts a row the narrator named `advisory` or `abstained`, the
+  way it already exempted one the seed had already satisfied. `Score` gains
+  `advisory` and `abstained` counts, and `evaluationCounts`'s `notEvaluated`
+  subtracts them — it is documented as "abstentions that actually block
+  `can_pass`", so counting them there would have put a non-zero "not evaluated"
+  beside a `pass` in `verdict.json`.
+
+The exemption is narrow: one unreachable judge beside two narrator readings is
+still `incomplete`, a `[model]`-only run is still `incomplete` (no denominator),
+and a failing `[code]` criterion still fails.
+
+`score_state` now survives onto `verdict.json`'s `criteria_results` rows. It is
+a **separate key from `outcome`**, which this CLI's display model has long
+reserved for `passed | failed | skipped | errored` and which the wire still does
+not carry — `outcomeOf` prefers the wire value over the booleans, so folding the
+narrator states into that key would have rendered an advisory row with the
+skipped glyph. `errored` therefore remains a display-only state with no wire
+producer, and the test asserting exactly that is unchanged; a sibling now guards
+`score_state` arriving.
+
+`score_state` is read as a plain `string`, not a closed enum:
+`finalizeResponseSchema` is deliberately a tolerant reader, and an enum would
+turn a cloud that adds a third score state into a hard parse failure of the
+entire /finalize response. An unrecognised spelling survives on the row, exempts
+nothing, and falls back to the two booleans.
+
 ## 0.27.0 — 2026-08-26
 
 `pome twin start` takes a world. `--seed <path>` boots the twin from a JSON or

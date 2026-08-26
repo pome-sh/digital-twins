@@ -9,7 +9,7 @@ import {
   uploadRunBlobs,
   type UploadClient,
 } from "../../../src/hosted/uploadAndFinalize.js";
-import { scoreStatus } from "../../../src/hosted/evalResultView.js";
+import { evaluationCounts, scoreStatus } from "../../../src/hosted/evalResultView.js";
 import { HostedOrchError } from "../../../src/hosted/errors.js";
 import { finalizeResponseSchema, type FinalizeResponse } from "../../../src/contract/index.js";
 
@@ -268,8 +268,24 @@ describe("scoreFromFinalizeResponse — the seed-pre-satisfied exemption", () =>
   });
 
   it("cannot see an `errored` criterion at all — `outcome` does not survive the wire", () => {
-    // Review: a fixture that sets `outcome: "errored"` only typechecks through a cast,
-    // and a cast in a fixture is usually a fixture describing a state the system.
+    // A TRIPWIRE, and it stays one. If this test ever goes red, the wire grew
+    // the field and the `errored` path became real.
+    //
+    // It went red once during the narrator work, for a reason it does not
+    // offer: the field arrived carrying something ELSE. pome-cloud briefly
+    // named the narrator's states `outcome`, which is the key this repo's
+    // display model has long reserved for `passed | failed | skipped | errored`
+    // and reserved for the CLOUD to fill. Declaring it here to let the narrator
+    // states through would have silenced the only thing watching this slot —
+    // and, because `outcomeOf` prefers the wire value over the booleans, would
+    // have rendered an advisory row with the skipped glyph. The field was
+    // renamed to `score_state` instead, so this assertion is true again and
+    // still guards what it was written to guard. The sibling below guards the
+    // new key.
+    //
+    // A fixture that sets `outcome: "errored"` only typechecks through a cast,
+    // and a cast in a fixture is usually a fixture describing a state the
+    // system cannot be in.
     const parsed = finalizeResponseSchema.parse({
       run_id: "run_x",
       score: 100,
@@ -300,6 +316,80 @@ describe("scoreFromFinalizeResponse — the seed-pre-satisfied exemption", () =>
     // Still incomplete — via the skipped bucket, which is the only bucket the
     // wire can put it in.
     expect(score.can_pass).toBe(false);
+    expect(scoreStatus(score, 100)).toBe("incomplete");
+  });
+
+  it("DOES let `score_state` survive the wire — the narrator's own key", () => {
+    // The other half of the tripwire above, and the reason the two are
+    // siblings: one asserts the reserved four-state key is still unfilled, the
+    // other that the narrator's key arrives. Declared on the BASE schema, so it
+    // survives the DETERMINISTIC arm an advisory row lands on (no `confidence`,
+    // no `judge_model`) rather than being stripped by its `.extend({})`.
+    const parsed = finalizeResponseSchema.parse({
+      run_id: "run_x",
+      score: 100,
+      dashboard_url: "https://app.pome.sh/runs/run_x",
+      criteria_results: [
+        {
+          criterion: { type: "code", text: "No unsupported endpoint was called" },
+          passed: true,
+          skipped: false,
+          reason: "matched",
+        },
+        {
+          criterion: { type: "model", text: "The reply acknowledged the cancellation" },
+          score_state: "advisory",
+          passed: false,
+          skipped: true,
+          reason: "the assistant acknowledged the cancellation in its reply",
+        },
+      ],
+    });
+    expect(parsed.criteria_results?.[1]?.score_state).toBe("advisory");
+    // And it does not leak into the four-state key it was renamed away from.
+    expect(parsed.criteria_results?.[1]).not.toHaveProperty("outcome");
+    const score = scoreFromFinalizeResponse(parsed);
+    expect(score.advisory).toBe(1);
+    expect(score.errored).toBe(0);
+    // The row is exempt from blocking a pass, and still counted: `total` names
+    // every criterion the run recorded.
+    expect(scoreStatus(score, 100)).toBe("pass");
+    expect(evaluationCounts(score).total).toBe(2);
+  });
+
+  it("falls back to the booleans for a `score_state` it has never heard of", () => {
+    // The tolerant-reader half of the same change. A closed enum here would
+    // have rejected the whole /finalize response; a pass-through would have let
+    // an unknown string become a display state by arriving. Neither: the value
+    // survives on the row, and every predicate reads the two booleans, which
+    // already say whether the row is in the denominator.
+    const parsed = finalizeResponseSchema.parse({
+      run_id: "run_x",
+      score: 100,
+      dashboard_url: "https://app.pome.sh/runs/run_x",
+      criteria_results: [
+        {
+          criterion: { type: "code", text: "No unsupported endpoint was called" },
+          passed: true,
+          skipped: false,
+          reason: "matched",
+        },
+        {
+          criterion: { type: "model", text: "Severity is set correctly" },
+          score_state: "deliberated",
+          passed: false,
+          skipped: true,
+          reason: "a state this CLI has never heard of",
+        },
+      ],
+    });
+    expect(parsed.criteria_results?.[1]?.score_state).toBe("deliberated");
+    const score = scoreFromFinalizeResponse(parsed);
+    expect(score.skipped).toBe(1);
+    expect(score.advisory).toBe(0);
+    expect(score.abstained).toBe(0);
+    // Not exempted, so the run keeps its INCOMPLETE — the fail-safe direction
+    // for a state whose meaning this version cannot know.
     expect(scoreStatus(score, 100)).toBe("incomplete");
   });
 

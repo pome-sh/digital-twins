@@ -1,5 +1,15 @@
 # @pome-sh/adapter-claude-sdk — CHANGELOG
 
+## Unreleased (patch)
+
+**No consumer-visible change.** `@pome-sh/wire` taught its run-completeness
+predicate the narrator's advisory/abstained states and widened
+`CriteriaTallyLike` with two required counts. This package imports nothing from
+`@pome-sh/wire/run-completeness` — the subpath is deliberately off the root
+barrel, and an adapter has no run to ask the question about — so no export,
+schema, tool, route, status code or response body moved here. Listed because the
+release carries wire's compiled output.
+
 ## 0.3.12 — 2026-08-24
 
 **No consumer-visible change.** The repo's lint gates were consolidated behind

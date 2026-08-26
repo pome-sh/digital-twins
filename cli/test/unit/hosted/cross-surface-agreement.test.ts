@@ -38,7 +38,12 @@
 import { mkdir, mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { isIncompleteTally, tallyCriteriaResults } from "@pome-sh/wire/run-completeness";
+import {
+  ABSTAINED_SCORE_STATE,
+  ADVISORY_SCORE_STATE,
+  isIncompleteTally,
+  tallyCriteriaResults,
+} from "@pome-sh/wire/run-completeness";
 import { describe, expect, it } from "vitest";
 import type { CriterionResult } from "../../../src/contract/index.js";
 import {
@@ -127,6 +132,24 @@ const excluded = (text: string): CriterionResult => ({
   skipped: true,
   reason: PRE_SATISFIED_REASON,
 });
+// The narrator's two states. Identical to `abstained()` above on both booleans
+// — `score_state` is the only thing that separates a reading from a gap, which
+// is why the field had to survive the parse before either surface could act on
+// it.
+const advisory = (text: string): CriterionResult => ({
+  criterion: { type: "model", text },
+  passed: false,
+  skipped: true,
+  reason: "the assistant acknowledged the cancellation in its reply",
+  score_state: ADVISORY_SCORE_STATE,
+});
+const narratorAbstained = (text: string): CriterionResult => ({
+  criterion: { type: "model", text },
+  passed: false,
+  skipped: true,
+  reason: "no refund was requested in this run",
+  score_state: ABSTAINED_SCORE_STATE,
+});
 
 interface Row {
   name: string;
@@ -199,6 +222,65 @@ const table: Row[] = [
     results: [excluded("github.no-new-issues"), excluded("github.no-new-labels")],
     satisfaction: 0,
     expected: "incomplete",
+  },
+  // ── The narrator rows ────────────────────────────────────────────────────
+  //
+  // These are the rows the two surfaces would have split on, and the split
+  // would have been invisible from either side: the dashboard reads the
+  // exemption out of `@pome-sh/wire`, the CLI reaches the same question through
+  // `can_pass`, and nothing but this table compares them. The exemption had to
+  // be taught to BOTH — the wire predicate and `scoreFromFinalizeResponse` — and
+  // it is this file that says so rather than either implementation's comments.
+  {
+    // THE HERO SHAPE, and the one the defect was measured on: every `[code]`
+    // criterion scored, two `[model]` rows the narrator read without authority
+    // to score. Both surfaces called this INCOMPLETE, which on the report side
+    // also withheld the rerun recipe from every narrator run.
+    name: "two advisory [model] rows beside three passes",
+    results: [passing("a"), passing("b"), passing("c"), advisory("d"), advisory("e")],
+    satisfaction: 100,
+    expected: "pass",
+  },
+  {
+    name: "an abstained [model] row beside two passes",
+    results: [passing("a"), passing("b"), narratorAbstained("c")],
+    satisfaction: 100,
+    expected: "pass",
+  },
+  {
+    // The exemption does not reach across to a real gap. One unreachable judge
+    // beside two readings is still a run with something missing.
+    name: "an advisory row AND a real abstention beside a pass",
+    results: [passing("a"), advisory("b"), abstained("c")],
+    satisfaction: 100,
+    expected: "incomplete",
+  },
+  {
+    // Exempt from taking the verdict is not the same as exempt from the score:
+    // the `[code]` lane still decides pass vs fail, and a failure is still a
+    // failure with narrator prose beside it.
+    name: "an advisory row beside a failure",
+    results: [failing("a"), advisory("b")],
+    satisfaction: 0,
+    expected: "fail",
+  },
+  {
+    // Clause 3's shape in the `[model]` lane, and DELIBERATELY still
+    // `incomplete`: nothing was scored, so there is no denominator and neither
+    // a pass nor a failure to state. Only the WORDS this run is described with
+    // were ever wrong. The dashboard reaches it through `evaluated === 0`, the
+    // CLI through the same empty-denominator guard that catches the
+    // all-seed-excluded run above.
+    name: "every criterion an advisory [model] row — no denominator",
+    results: [advisory("a"), advisory("b")],
+    satisfaction: 0,
+    expected: "incomplete",
+  },
+  {
+    name: "a seed exclusion and a narrator abstain beside one pass",
+    results: [passing("a"), excluded("github.no-new-issues"), narratorAbstained("c")],
+    satisfaction: 100,
+    expected: "pass",
   },
 ];
 
