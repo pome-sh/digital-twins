@@ -523,7 +523,7 @@ export function createProgram() {
   session
     .command("create")
     .description("Create a hosted sandbox session for one or more twins and print its connection info")
-    .requiredOption(
+    .option(
       "--twin <name>",
       // The enumeration is derived, never typed: this line is the public
       // discovery surface for which twins exist, and a hand-written copy of the
@@ -531,8 +531,18 @@ export function createProgram() {
       // stays editorial — github+gmail is the pairing bundled task 27 exercises —
       // and `session-twin-help.test.ts` runs the twins it names through the same
       // validator, so it cannot rot either.
-      `${SESSION_TWIN_NAMES.join(" | ")}. Repeat the flag for a multi-twin session (e.g. --twin github --twin gmail).`,
+      //
+      // No longer `requiredOption`: a `--seed` file whose envelope names exactly
+      // one twin already says which twin the sandbox is for. Commander would
+      // reject the invocation before the action runs, so the check moved into
+      // `runSessionCreate`, which fails with the same "No twin specified"
+      // sentence when neither source supplies one.
+      `${SESSION_TWIN_NAMES.join(" | ")}. Repeat the flag for a multi-twin session (e.g. --twin github --twin gmail). Optional when --seed names exactly one twin.`,
       (value: string, previous: string[] = []) => [...previous, value],
+    )
+    .option(
+      "--seed <path>",
+      "Start the sandbox from a JSON or YAML seed file instead of each twin's default. A seed REPLACES the default; it does not merge. Same file `pome twin start --seed` takes; write one with `pome twin seed <name>`.",
     )
     .option(
       "--api-url <url>",
@@ -551,11 +561,12 @@ export function createProgram() {
     )
     .action(
       async (opts: {
-        twin: string[];
+        twin?: string[];
         apiUrl: string;
         showSecrets: boolean;
         secretsFile?: string;
         format: string;
+        seed?: string;
       }) => {
         try {
           const format = opts.format.trim().toLowerCase();
@@ -566,10 +577,11 @@ export function createProgram() {
           }
           await runSessionCreate({
             apiBaseUrl: opts.apiUrl,
-            twins: opts.twin,
+            twins: opts.twin ?? [],
             showSecrets: opts.showSecrets,
             format: format as "text" | "json" | "env",
             secretsFile: opts.secretsFile,
+            seedPath: opts.seed,
           });
         } catch (err) {
           console.error(friendlyHostedError(err));
@@ -1335,21 +1347,36 @@ export function createProgram() {
   const twin = program.command("twin").description("Manage local twins");
   twin
     .command("start")
-    .argument("<name>", `Twin name (${TWIN_NAME_LIST.join(" | ")})`)
+    .argument(
+      "[name]",
+      `Twin name (${TWIN_NAME_LIST.join(" | ")}). Optional when --seed names exactly one twin.`,
+    )
     .option(
       "--port <port>",
       "Port to bind (default: $PORT, else GMAIL_TWIN_PORT/3336 for gmail, else 3333)",
     )
     .option(
       "--seed <path>",
-      "Boot this twin's world from a JSON or YAML file instead of its default. Overrides POME_SEED_JSON.",
+      "Boot this twin from a JSON or YAML seed file instead of its default. A seed REPLACES the default; it does not merge. Takes the per-twin envelope { <twin>: { … } } or one twin's flat seed. Overrides POME_SEED_JSON.",
     )
     .description(
       "Start a standalone twin as a long-lived foreground server (Ctrl-C to stop)",
     )
-    .action(async (name: string, options: { port?: string; seed?: string }) => {
+    .action(async (name: string | undefined, options: { port?: string; seed?: string }) => {
       const { runTwinStartCommand } = await import("../twin/twinStart.js");
       await runTwinStartCommand(name, options);
+    });
+
+  twin
+    .command("seed")
+    .argument("<name...>", `Twin name (${TWIN_NAME_LIST.join(" | ")}). Repeat for one file covering several.`)
+    .option("--out <path>", "Write to this file instead of stdout. Refuses to overwrite.")
+    .description(
+      "Print a starter seed file for a twin, generated from the twin's own starting state",
+    )
+    .action(async (names: string[], options: { out?: string }) => {
+      const { runTwinSeedCommand } = await import("../twin/twinSeed.js");
+      await runTwinSeedCommand(names, options);
     });
 
   twin

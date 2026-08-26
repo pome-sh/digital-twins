@@ -8,6 +8,70 @@ allocates on `main` after the merge, in the same commit that moves
 write a version number here or in `package.json`. Released entries are insertions
 only: a correction is the next entry, naming the one it corrects.
 
+## Unreleased (minor)
+
+**A seed file a stranger can write.** One shape, generated rather than typed,
+and the same file at every door.
+
+`pome twin seed <name...>` prints a starter seed file for a twin, built from
+that twin's own starting state and normalised by its own `parseSeed`. Nobody
+types it, which is the point: every hand-written seed example we shipped was
+correct the day it merged, and three of the five on the docs site had since
+stopped parsing against their own twin's schema — `github` on
+`repositories.0.owner`, `gmail` on `primaryMailbox`, `linear` on
+`issues.0.assignee`. Copy one and the hosted path answers `503 Failed to spawn
+twin pod` twelve seconds later, so the first thing a new user does produces an
+error that blames us. A computed starter cannot reach a reader in that state.
+
+**The file shape is the per-twin envelope**, one twin or five:
+
+```json
+{ "github": { "repositories": [ … ] },
+  "slack":  { "channels":     [ … ] } }
+```
+
+`pome twin start --seed` and `pome sandbox create --seed` both take it, and both
+still take the flat single-twin shape 0.27.0 shipped. **The wire does not move**:
+`POME_SEED_JSON` stays flat, `POST /v1/sessions` keeps its envelope-iff-multi-twin
+rule, and `seed-envelope.ts` is untouched — the CLI unwraps, so a one-twin
+sandbox seeded from an envelope still sends the flat seed.
+
+Twelve of the twenty `<task>.seed.json` files in `agent-examples/` are already
+envelopes, and before this `twin start github --seed <one of them>` failed on
+`repositories: expected array, received undefined`. Worse: `twin start slack
+--seed <the same file>` **succeeded**. slack's and stripe's seed schemas are
+non-strict, so they accepted the envelope as their own flat seed, defaulted every
+field, and served an empty workspace while the boot line said the seed had
+landed. A file naming a twin the command was not asked for is now a loud error
+naming that twin, never a skipped key.
+
+**`pome sandbox create --seed`** is new, and it parses the seed with the twin's
+own parser before the round trip, so a bad seed is refused instantly with the
+field named instead of arriving as a 503 twelve seconds later. `--twin` becomes
+optional when the file's envelope names exactly one twin, as does `twin start`'s
+`<name>` argument.
+
+The boot line now reads `Seed:` rather than `World:`, and says what seeding does:
+
+```
+Seed: ./seed.json (replaces the github twin's default).
+```
+
+That sentence is the correction most worth having. A seed **replaces** the twin's
+default state; it does not merge into it. `vercel-labs/emulate` merges — its
+`api.ts` runs the plugin's own default seed and then layers your config on top —
+so a reader arriving from there will assume wrong.
+
+`pome twin seed --out <path>` refuses to overwrite an existing file. Generated
+output carries no `_meta`, and because it is `parseSeed`'s own output it declares
+only fields the schema declares, which is what will let it survive those schemas
+refusing unknown keys.
+
+`TWIN_REGISTRY` gains `seedFields()` and its `defaultSeed()` now answers for
+every twin, github included — that entry used to return `undefined` and let
+`boot` reach for `defaultSeedState()` itself, which left "what does this twin
+start with" unanswerable without booting one.
+
 ## 0.28.0 — 2026-08-26
 
 **A hosted run whose every `[code]` criterion was scored no longer prints
