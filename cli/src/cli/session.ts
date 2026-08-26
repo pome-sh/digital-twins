@@ -25,12 +25,27 @@ export function ensureMcpSuffix(url: string): string {
   return /\/mcp\/?$/.test(url) ? url : `${url.replace(/\/$/, "")}/mcp`;
 }
 
-// Multi-twin (M3): the CLI's ad-hoc session allowlist is the shared mounted-twin
-// set (github, stripe, slack, gmail, linear). Repeated `--twin` flags
-// stand up a multi-twin session in one call.
-// Keep newly-added twin ids explicit during contract publish windows: local
-// development may still resolve a previous installed package.
-const ALLOWED_TWINS = new Set<string>([...MOUNTED_TWINS, "gmail", "linear"]);
+// Multi-twin (M3): the CLI's ad-hoc session allowlist IS the shared mounted-twin
+// set. Repeated `--twin` flags stand up a multi-twin session in one call.
+//
+// The parenthetical roll-call that used to sit in this comment, and the
+// `"gmail", "linear"` that used to be appended below it "during contract publish
+// windows", were both inert: `MOUNTED_TWINS` arrives from `cli/src/contract/`,
+// which is source in this workspace and never a resolved package, so neither
+// could add a name the set lacked. What they did do is read as a second place
+// twins are named — the shape that let `sandbox create --help` spend a release
+// advertising four twins while this validator already accepted five.
+const ALLOWED_TWINS = new Set<string>(MOUNTED_TWINS);
+
+/** The twins `--twin` accepts, in mounted order.
+ *
+ *  `sandbox create` renders THIS as its `--twin` help (`cli/src/cli/main.ts`),
+ *  so the sentence a reader browses `--help` for and the code that rejects their
+ *  typo cannot name different sets. Before it did: help was a hand-written
+ *  `github | stripe | slack | gmail`, and `linear` mounted, booted and served its
+ *  whole surface without ever appearing there. Deriving is the fix rather than
+ *  adding the one missing word, because the sixth twin has the same problem. */
+export const SESSION_TWIN_NAMES: readonly string[] = [...ALLOWED_TWINS];
 
 function redactSession(res: CreateSessionResponse): Record<string, unknown> {
   const pcIn = res.provider_credentials;

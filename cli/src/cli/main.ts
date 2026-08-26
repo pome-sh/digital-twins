@@ -50,6 +50,7 @@ import {
   runSessionCreate,
   runSessionList,
   runSessionStop,
+  SESSION_TWIN_NAMES,
   type SessionListStateFilter,
 } from "./session.js";
 import { normalizeRegisterTwins, runRegisterAgent } from "./register.js";
@@ -524,7 +525,13 @@ export function createProgram() {
     .description("Create a hosted sandbox session for one or more twins and print its connection info")
     .requiredOption(
       "--twin <name>",
-      "github | stripe | slack | gmail. Repeat the flag for a multi-twin session (e.g. --twin github --twin gmail).",
+      // The enumeration is derived, never typed: this line is the public
+      // discovery surface for which twins exist, and a hand-written copy of the
+      // allowlist is what made it omit `linear` for a release. The worked example
+      // stays editorial — github+gmail is the pairing bundled task 27 exercises —
+      // and `session-twin-help.test.ts` runs the twins it names through the same
+      // validator, so it cannot rot either.
+      `${SESSION_TWIN_NAMES.join(" | ")}. Repeat the flag for a multi-twin session (e.g. --twin github --twin gmail).`,
       (value: string, previous: string[] = []) => [...previous, value],
     )
     .option(

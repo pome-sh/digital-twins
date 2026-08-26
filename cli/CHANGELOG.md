@@ -32,6 +32,21 @@ provenance block `pome compile-seeds` writes is dropped before parse. That was
 already true by accident — the twins' seed schemas are non-strict zod — and is
 now declared, so it survives those schemas being tightened.
 
+## Unreleased (patch)
+
+**`sandbox create --help` lists every mounted twin.** The `--twin` line read
+`github | stripe | slack | gmail`, a hand-written copy of an allowlist that has
+accepted `linear` since that twin mounted. So `--twin linear` was taken, the twin
+booted and served its endpoints, and the one surface a reader consults to find
+out which twins exist said it was not there.
+
+The enumeration is now derived from the mounted-twin set — `SESSION_TWIN_NAMES`
+in `src/cli/session.ts`, the same set `normalizeSessionTwins` rejects a typo
+against — so a sixth twin cannot mount without appearing in help. The worked
+example is still hand-picked, and `test/unit/session-twin-help.test.ts` runs the
+twins it names back through that validator, so it cannot go stale either. No flag
+name, default, exit code, wire field or response shape moved.
+
 ## 0.26.13 — 2026-08-25
 
 **No consumer-visible change.** Deleted an orphaned changeset file and the empty
