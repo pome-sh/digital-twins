@@ -21,7 +21,14 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { serve } from "@hono/node-server";
 import { sign } from "hono/jwt";
-import { defaultPortFor, isTwinName, TWIN_NAMES, TWIN_REGISTRY } from "./registry.js";
+import { parse as parseYaml } from "yaml";
+import {
+  defaultPortFor,
+  isTwinName,
+  TWIN_NAMES,
+  TWIN_REGISTRY,
+  type TwinName,
+} from "./registry.js";
 import { bootTwin } from "./twinHarness.js";
 
 /** The fixed session id a standalone twin serves under (`/s/standalone`). */
@@ -71,9 +78,80 @@ export function resolveStandaloneAuthSecret(
   return { secret: randomBytes(32).toString("hex"), source: "ephemeral" };
 }
 
+/** Where the world a standalone twin booted came from. Printed on boot so the
+ *  answer to "did my seed land?" does not require reading `/_pome/state`. */
+export type StandaloneSeed = {
+  seedState: unknown;
+  source: "file" | "env" | "default";
+  /** Set when `source` is "file": the path the world was read from. */
+  path?: string;
+};
+
+/**
+ * Read side of the world contract, mirroring `resolveStandaloneAuthSecret`:
+ *   1. `--seed <path>` (JSON or YAML — JSON is a YAML subset, one parser)
+ *   2. env `POME_SEED_JSON` — the SAME channel the cloud sets on a pod, so a
+ *      world that boots hosted boots here. Before this it was read by the twin
+ *      and silently discarded by this command, which boots through `bootTwin`
+ *      rather than the twin's own `loadSeedFromEnv`.
+ *   3. the twin's default world
+ *
+ * The twin's own `parseSeed` is the arbiter in both non-default cases: a
+ * user-authored world is refused HERE, naming its own bad field, rather than
+ * reaching SQLite (github) or throwing an un-attributed zod error mid-boot.
+ */
+export async function resolveStandaloneSeed(
+  twin: TwinName,
+  seedPath: string | undefined,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<StandaloneSeed> {
+  const entry = TWIN_REGISTRY[twin];
+
+  if (seedPath !== undefined) {
+    let raw: string;
+    try {
+      raw = readFileSync(seedPath, "utf8");
+    } catch (err) {
+      throw new Error(
+        `pome twin start --seed: cannot read ${seedPath}: ${(err as Error).message}`,
+      );
+    }
+    return {
+      seedState: await parseWorld(entry, raw, `--seed ${seedPath}`),
+      source: "file",
+      path: seedPath,
+    };
+  }
+
+  const fromEnv = env.POME_SEED_JSON;
+  if (fromEnv !== undefined && fromEnv !== "") {
+    return { seedState: await parseWorld(entry, fromEnv, "POME_SEED_JSON"), source: "env" };
+  }
+
+  return { seedState: await entry.defaultSeed(), source: "default" };
+}
+
+async function parseWorld(
+  entry: (typeof TWIN_REGISTRY)[TwinName],
+  raw: string,
+  origin: string,
+): Promise<unknown> {
+  let parsed: unknown;
+  try {
+    parsed = parseYaml(raw);
+  } catch (err) {
+    throw new Error(`${origin} is not valid JSON or YAML: ${(err as Error).message}`);
+  }
+  try {
+    return await entry.parseSeed(parsed);
+  } catch (err) {
+    throw new Error(`${origin} is not a world this twin can boot: ${(err as Error).message}`);
+  }
+}
+
 export async function runTwinStartCommand(
   name: string,
-  options: { port?: string },
+  options: { port?: string; seed?: string },
 ): Promise<void> {
   if (!isTwinName(name)) {
     throw new Error(`Unknown twin '${name}'. Supported: ${TWIN_NAMES.join(", ")}.`);
@@ -88,6 +166,10 @@ export async function runTwinStartCommand(
     throw new Error(`pome twin start: invalid --port "${portRaw}"`);
   }
 
+  // Resolve the world BEFORE the auth secret and the listener: a refused seed
+  // must not persist a secret file or leave a bound port behind.
+  const world = await resolveStandaloneSeed(name, options.seed);
+
   const resolved = resolveStandaloneAuthSecret(name);
   // The in-process twin's auth middleware (resolveAuthSecret) reads the env;
   // pinning the resolved secret here is what makes the minted JWT and the
@@ -97,7 +179,7 @@ export async function runTwinStartCommand(
   const baseUrl = `http://127.0.0.1:${port}`;
   const harness = await bootTwin({
     twin: name,
-    seedState: await TWIN_REGISTRY[name].defaultSeed(),
+    seedState: world.seedState,
     runId: STANDALONE_SID,
     twinBaseUrl: baseUrl,
   });
@@ -138,6 +220,15 @@ export async function runTwinStartCommand(
   }
 
   console.log(`Pome ${name} twin listening at ${restUrl}`);
+  // "Did my world land?" is the question a user-authored seed creates, and the
+  // twin cannot answer it after the fact — every world looks like a world.
+  if (world.source === "file") {
+    console.log(`World: seeded from ${world.path}.`);
+  } else if (world.source === "env") {
+    console.log("World: seeded from POME_SEED_JSON (--seed <path> overrides it).");
+  } else {
+    console.log(`World: the ${name} twin's default (pass --seed <path> for your own).`);
+  }
   if (resolved.source === "persisted") {
     console.log(
       `Auth: using the persisted secret from ${resolved.path} (an env-injected TWIN_AUTH_SECRET overrides it).`,

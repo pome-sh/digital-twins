@@ -1333,10 +1333,14 @@ export function createProgram() {
       "--port <port>",
       "Port to bind (default: $PORT, else GMAIL_TWIN_PORT/3336 for gmail, else 3333)",
     )
+    .option(
+      "--seed <path>",
+      "Boot this twin's world from a JSON or YAML file instead of its default. Overrides POME_SEED_JSON.",
+    )
     .description(
       "Start a standalone twin as a long-lived foreground server (Ctrl-C to stop)",
     )
-    .action(async (name: string, options: { port?: string }) => {
+    .action(async (name: string, options: { port?: string; seed?: string }) => {
       const { runTwinStartCommand } = await import("../twin/twinStart.js");
       await runTwinStartCommand(name, options);
     });
