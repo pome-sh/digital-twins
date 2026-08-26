@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // Acceptance — `pome twin start` as a real child process: boots the twin as a
 // foreground server, reuses the secret persisted at the boot-secret contract,
-// and boots a USER-AUTHORED world from `--seed`, read back through the twin's
+// and boots a USER-AUTHORED seed from `--seed`, read back through the twin's
 // own REST surface.
+//
+// The generated-starter round trip (`pome twin seed` → `--seed` → read back, all
+// five twins) is `twinSeedRoundTrip.test.ts`.
 
 import { spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
@@ -111,10 +114,10 @@ describe("pome twin start (e2e)", () => {
   );
 
   it(
-    "boots a world from --seed and serves a repository the default world has never had",
+    "boots a seed from --seed and serves a repository the default has never had",
     async () => {
       const cwd = await mkdtemp(join(tmpdir(), "pome-twin-start-seed-e2e-"));
-      const seedPath = join(cwd, "world.json");
+      const seedPath = join(cwd, "seed.json");
       // `vakoi/billing` is not in the github twin's defaultSeedState(); the
       // default's `acme/api` is. Asserting BOTH is what separates "my seed
       // landed" from "the twin merged my seed into its default".
@@ -179,8 +182,9 @@ describe("pome twin start (e2e)", () => {
       const fromDefault = await fetch(`${base}/s/standalone/repos/acme/api`, { headers: auth });
       expect(fromDefault.status).toBe(404);
 
-      // The boot line answers "did my world land?" without reading state.
-      expect(output).toContain(`World: seeded from ${seedPath}`);
+      // The boot line answers "did my seed land?" without reading state, and
+      // says outright what seeding does to the default.
+      expect(output).toContain(`Seed: ${seedPath} (replaces the github twin's default).`);
     },
     90_000,
   );
@@ -189,7 +193,7 @@ describe("pome twin start (e2e)", () => {
     "refuses a schema-invalid --seed before binding a port, and exits non-zero",
     async () => {
       const cwd = await mkdtemp(join(tmpdir(), "pome-twin-start-badseed-e2e-"));
-      const seedPath = join(cwd, "world.json");
+      const seedPath = join(cwd, "seed.json");
       await writeFile(seedPath, JSON.stringify({ repositories: [{ owner: "acme" }] }));
 
       const port = await freePort();
@@ -206,7 +210,7 @@ describe("pome twin start (e2e)", () => {
       );
 
       expect(exitCode).not.toBe(0);
-      expect(output).toContain("is not a world this twin can boot");
+      expect(output).toContain("is not a seed this twin can boot");
       // Nothing is listening: the world is resolved before the server binds.
       await expect(fetch(`http://127.0.0.1:${port}/healthz`)).rejects.toThrow();
     },

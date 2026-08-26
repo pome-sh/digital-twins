@@ -3,8 +3,15 @@ import { randomUUID } from "node:crypto";
 import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
-import { MOUNTED_TWINS } from "../contract/index.js";
+import { isMultiTwinSeedEnvelope, MOUNTED_TWINS } from "../contract/index.js";
 import { createHostedClient, perTwinReturnedByCloud } from "../hosted/client.js";
+import type { TwinName } from "../twin/registry.js";
+import {
+  parseSeedFileText,
+  readSeedFileText,
+  seedsForTwins,
+  soleTwinOf,
+} from "../twin/seedFile.js";
 import type { CreateSessionResponse } from "../types/shared.js";
 import {
   HostedAuthError,
@@ -147,15 +154,62 @@ export function normalizeSessionTwins(raw: string[]): string[] {
   return deduped;
 }
 
+/**
+ * Resolve `--seed <path>` into the twin list and the `seed` the wire wants.
+ *
+ * THE RULE does not move (`cli/src/contract/seed-envelope.ts`): a create-session
+ * `seed` is a per-twin envelope IFF the session has more than one twin, decided
+ * from `twins` alone. So the file the user wrote and the body we POST are not
+ * the same shape, and this is the only place that translates between them — a
+ * one-twin sandbox seeded from an envelope sends the FLAT seed.
+ *
+ * The twin's own `parseSeed` runs HERE, before the round trip. That is the same
+ * parser the pod runs, and without it a seed the pod refuses comes back as
+ * `503 Failed to spawn twin pod` twelve seconds later (F-1688) with nothing
+ * naming the field.
+ */
+export async function resolveSessionSeed(
+  seedPath: string,
+  requestedTwins: string[],
+): Promise<{ twins: string[]; seed: unknown }> {
+  const raw = readSeedFileText(seedPath, "pome sandbox create --seed");
+  const origin = `--seed ${seedPath}`;
+  const file = parseSeedFileText(raw, origin);
+
+  // An envelope naming exactly one twin already says which twin the sandbox is
+  // for, so `--twin` becomes optional rather than a second place to say it.
+  const twins = normalizeSessionTwins(
+    requestedTwins.length > 0 ? requestedTwins : [soleTwinOf(file) ?? ""].filter(Boolean),
+  );
+
+  // `normalizeSessionTwins` has already rejected anything outside MOUNTED_TWINS,
+  // and `scripts/lint/rules/first-party-twins.mjs` is the standing gate that
+  // MOUNTED_TWINS and the registry's TWIN_NAME_LIST name the same five — so this
+  // narrowing is checked, just not by the type system.
+  const byTwin = await seedsForTwins(file, twins as TwinName[], origin);
+  return {
+    twins,
+    seed: isMultiTwinSeedEnvelope(twins) ? byTwin : byTwin[twins[0]!],
+  };
+}
+
 export async function runSessionCreate(opts: {
   apiBaseUrl: string;
-  /** One-or-more twins. Repeated `--twin` flags stand up a multi-twin session. */
+  /** One-or-more twins. Repeated `--twin` flags stand up a multi-twin session.
+   *  May be empty when `seedPath` names exactly one twin. */
   twins: string[];
   showSecrets: boolean;
   format: "text" | "json" | "env";
   secretsFile?: string;
+  /** `--seed <path>`: the sandbox starts from this seed instead of each twin's
+   *  default. Same file `pome twin start --seed` takes. */
+  seedPath?: string;
 }): Promise<void> {
-  const twins = normalizeSessionTwins(opts.twins);
+  const resolvedSeed =
+    opts.seedPath === undefined
+      ? undefined
+      : await resolveSessionSeed(opts.seedPath, opts.twins);
+  const twins = resolvedSeed?.twins ?? normalizeSessionTwins(opts.twins);
 
   const creds = await resolveCredentials({ apiBaseUrl: opts.apiBaseUrl });
   const client = createHostedClient({
@@ -173,6 +227,7 @@ export async function runSessionCreate(opts: {
     idempotencyKey: randomUUID(),
     agentId: identity.agentId,
     agentVersion: identity.agentVersion,
+    ...(resolvedSeed ? { seed: resolvedSeed.seed } : {}),
   });
 
   if (opts.secretsFile) {
@@ -199,6 +254,11 @@ export async function runSessionCreate(opts: {
 
   console.error(`Session: ${session.session_id}`);
   console.error(`Expires: ${session.expires_at}`);
+  // Same reason the standalone twin prints a Seed line: once it is running,
+  // every seeded twin looks seeded.
+  if (opts.seedPath !== undefined) {
+    console.error(`Seed: ${opts.seedPath} (replaces the default for ${twins.join(", ")}).`);
+  }
   // Multi-twin (M3): print one API/MCP line per twin so a github+slack session
   // shows both endpoints. Falls back to the legacy bare twin_url on an older
   // cloud that only ships it.

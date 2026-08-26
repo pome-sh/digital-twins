@@ -55,6 +55,18 @@ Or start a standalone twin to point your own agent at it:
 npx @pome-sh/cli twin start github    # http://127.0.0.1:3333 — prints MCP URL + POME_AUTH_TOKEN
 ```
 
+To start it from your own world rather than the twin's, generate a seed file and
+edit it. It is generated from the twin, so it always parses:
+
+```bash
+npx @pome-sh/cli twin seed github --out seed.json   # the github twin's starting state
+npx @pome-sh/cli twin start --seed seed.json        # the file names the twin
+```
+
+A seed **replaces** the twin's default state; it does not merge into it. One file
+covers one twin or several — `{ "github": { … }, "slack": { … } }` — and the same
+file seeds a hosted sandbox: `pome sandbox create --seed seed.json`.
+
 For a persistent `pome` command: `npm install -g @pome-sh/cli`.
 
 <!-- One generic quickstart above; the per-twin walkthroughs live on the docs

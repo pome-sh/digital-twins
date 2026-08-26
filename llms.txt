@@ -27,4 +27,5 @@
 
 - Run an agent task with no install: `npx @pome-sh/cli init && npx @pome-sh/cli run --local tasks/01-bug-happy-path.md`
 - Start a standalone twin: `npx @pome-sh/cli twin start github`
+- Start one from your own world: `npx @pome-sh/cli twin seed github --out seed.json` then `npx @pome-sh/cli twin start --seed seed.json`. The seed file is `{ "<twin>": { … } }`, one twin or several, and it REPLACES the twin's default state rather than merging into it. The same file seeds a hosted sandbox via `pome sandbox create --seed`.
 - The hosted platform (hosted twins, grading, observability): https://pome.sh
