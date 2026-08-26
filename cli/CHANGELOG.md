@@ -8,6 +8,30 @@ allocates on `main` after the merge, in the same commit that moves
 write a version number here or in `package.json`. Released entries are insertions
 only: a correction is the next entry, naming the one it corrects.
 
+## Unreleased (minor)
+
+`pome twin start` takes a world. `--seed <path>` boots the twin from a JSON or
+YAML file instead of its built-in default, and `POME_SEED_JSON` — the same env
+the cloud sets on a hosted pod — is now honored here too. `--seed` wins over the
+env; neither set keeps the twin's default world. Before this, `twin start` boots
+through the registry's `defaultSeed()` and the env never reaches the twin's
+`loadSeedFromEnv`, so a world set that way was read by the twin and silently
+discarded: the only way to seed a twin was to write a Pome task file.
+
+The twin's own `parseSeed` is the arbiter. A world it refuses is refused before
+the port binds, naming the file (or the env var) and the field, and the command
+exits non-zero — including for the github twin, whose `boot` handed its seed
+straight to `domain.seed()` unparsed. Each twin's parser is reachable from the
+registry as `TWIN_REGISTRY[twin].parseSeed`, alongside `defaultSeed`.
+
+The boot output gains one line naming where the world came from, because every
+world looks like a world once it is running.
+
+A compiled `<task>.seed.json` is accepted as a world file unchanged: the `_meta`
+provenance block `pome compile-seeds` writes is dropped before parse. That was
+already true by accident — the twins' seed schemas are non-strict zod — and is
+now declared, so it survives those schemas being tightened.
+
 ## 0.26.13 — 2026-08-25
 
 **No consumer-visible change.** Deleted an orphaned changeset file and the empty

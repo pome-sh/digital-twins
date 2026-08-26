@@ -100,6 +100,19 @@ export type TwinEntry = {
   /** Default world for `pome twin start` with no seed. `undefined` means the
    *  twin seeds its own default during boot. */
   defaultSeed(): Promise<unknown>;
+  /**
+   * The twin's OWN seed parser, reached through its `/seed` leaf. This is the
+   * arbiter for a user-authored world: it is the same function the twin runs
+   * inside `loadSeedFromEnv`, so a seed this accepts is a seed the twin boots
+   * and a seed this rejects names its own bad field.
+   *
+   * `boot` re-parses for the twins whose factories take a parsed seed; that
+   * duplication is deliberate. `boot` is reached with an ALREADY-shaped seed
+   * from the task path, whereas this runs on raw user input BEFORE a port is
+   * bound — and github's `boot` hands its seed to `domain.seed()` unparsed, so
+   * without this entry a `--seed` typo would reach SQLite instead of an error.
+   */
+  parseSeed(input: unknown): Promise<unknown>;
   boot(ctx: TwinBootContext): Promise<TwinBoot>;
 };
 
@@ -111,6 +124,7 @@ export const TWIN_REGISTRY: Record<TwinName, TwinEntry> = {
     // The github twin's own `defaultSeedState()` is applied by `boot` below
     // when no seed is supplied — the pre-existing standalone behavior.
     defaultSeed: async () => undefined,
+    parseSeed: async (input) => (await import("@pome-sh/twin-github/seed")).parseSeed(input),
     async boot({ seedState, runId, recorder }) {
       const {
         createGitHubCloneApp,
@@ -139,6 +153,7 @@ export const TWIN_REGISTRY: Record<TwinName, TwinEntry> = {
     defaultPort: 3333,
     version: slackManifest.version,
     defaultSeed: async () => (await import("@pome-sh/twin-slack")).defaultSeedState(),
+    parseSeed: async (input) => (await import("@pome-sh/twin-slack/seed")).parseSeed(input),
     async boot({ seedState, runId, recorder }) {
       const { createSlackTwinApp, openSlackTwinDatabase, SlackDomain } =
         await import("@pome-sh/twin-slack");
@@ -169,6 +184,7 @@ export const TWIN_REGISTRY: Record<TwinName, TwinEntry> = {
     defaultPort: 3333,
     version: stripeManifest.version,
     defaultSeed: async () => (await import("@pome-sh/twin-stripe")).defaultSeed(),
+    parseSeed: async (input) => (await import("@pome-sh/twin-stripe/seed")).parseSeed(input),
     async boot({ seedState, runId, recorder, twinBaseUrl }) {
       // Engine-based twin: the factory owns middleware, MCP mount, and
       // the failure-injection store — seed rules ride in via `seed` and land in
@@ -234,6 +250,7 @@ export const TWIN_REGISTRY: Record<TwinName, TwinEntry> = {
     tokenEnvName: "POME_GMAIL_TOKEN",
     version: gmailManifest.version,
     defaultSeed: async () => (await import("@pome-sh/twin-gmail")).defaultSeedState(),
+    parseSeed: async (input) => (await import("@pome-sh/twin-gmail/seed")).parseSeed(input),
     async boot({ seedState, runId, recorder }) {
       const { createGmailTwinApp, GmailDomain, openGmailTwinDatabase, parseSeed } =
         await import("@pome-sh/twin-gmail");
@@ -257,6 +274,7 @@ export const TWIN_REGISTRY: Record<TwinName, TwinEntry> = {
     tokenEnvName: "POME_LINEAR_TOKEN",
     version: linearManifest.version,
     defaultSeed: async () => (await import("@pome-sh/twin-linear")).defaultSeedState(),
+    parseSeed: async (input) => (await import("@pome-sh/twin-linear/seed")).parseSeed(input),
     async boot({ seedState, runId, recorder }) {
       const {
         createLinearTwinApp,
