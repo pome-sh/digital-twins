@@ -8,7 +8,7 @@ allocates on `main` after the merge, in the same commit that moves
 write a version number here or in `package.json`. Released entries are insertions
 only: a correction is the next entry, naming the one it corrects.
 
-## Unreleased (minor)
+## 0.27.0 — 2026-08-26
 
 `pome twin start` takes a world. `--seed <path>` boots the twin from a JSON or
 YAML file instead of its built-in default, and `POME_SEED_JSON` — the same env
@@ -31,8 +31,6 @@ A compiled `<task>.seed.json` is accepted as a world file unchanged: the `_meta`
 provenance block `pome compile-seeds` writes is dropped before parse. That was
 already true by accident — the twins' seed schemas are non-strict zod — and is
 now declared, so it survives those schemas being tightened.
-
-## Unreleased (patch)
 
 **`sandbox create --help` lists every mounted twin.** The `--twin` line read
 `github | stripe | slack | gmail`, a hand-written copy of an allowlist that has
