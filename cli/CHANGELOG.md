@@ -8,7 +8,7 @@ allocates on `main` after the merge, in the same commit that moves
 write a version number here or in `package.json`. Released entries are insertions
 only: a correction is the next entry, naming the one it corrects.
 
-## Unreleased (patch)
+## 0.29.1 — 2026-08-26
 
 A task's `## Config` block now accepts `pass_threshold` as an alias for
 `passThreshold`. The manifest spells the same setting in snake_case, and
