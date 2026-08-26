@@ -1,6 +1,6 @@
 # @pome-sh/adapter-claude-sdk — CHANGELOG
 
-## Unreleased (patch)
+## 0.3.13 — 2026-08-26
 
 **No consumer-visible change.** `@pome-sh/wire` taught its run-completeness
 predicate the narrator's advisory/abstained states and widened

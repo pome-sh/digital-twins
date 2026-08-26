@@ -4,7 +4,7 @@ SPDX-License-Identifier: Apache-2.0
 
 # @pome-sh/wire — CHANGELOG
 
-## Unreleased (minor)
+## 0.4.0 — 2026-08-26
 
 **`@pome-sh/wire/run-completeness` learns the narrator's two states.** A run
 whose every `[code]` criterion was scored no longer reads `incomplete` because

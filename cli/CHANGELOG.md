@@ -8,7 +8,7 @@ allocates on `main` after the merge, in the same commit that moves
 write a version number here or in `package.json`. Released entries are insertions
 only: a correction is the next entry, naming the one it corrects.
 
-## Unreleased (minor)
+## 0.28.0 — 2026-08-26
 
 **A hosted run whose every `[code]` criterion was scored no longer prints
 INCOMPLETE and exits 1 because its `[model]` rows were the narrator's.** The
