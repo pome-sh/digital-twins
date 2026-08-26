@@ -27,6 +27,11 @@ registry as `TWIN_REGISTRY[twin].parseSeed`, alongside `defaultSeed`.
 The boot output gains one line naming where the world came from, because every
 world looks like a world once it is running.
 
+A compiled `<task>.seed.json` is accepted as a world file unchanged: the `_meta`
+provenance block `pome compile-seeds` writes is dropped before parse. That was
+already true by accident — the twins' seed schemas are non-strict zod — and is
+now declared, so it survives those schemas being tightened.
+
 ## 0.26.13 — 2026-08-25
 
 **No consumer-visible change.** Deleted an orphaned changeset file and the empty

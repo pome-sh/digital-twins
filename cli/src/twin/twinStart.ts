@@ -131,6 +131,24 @@ export async function resolveStandaloneSeed(
   return { seedState: await entry.defaultSeed(), source: "default" };
 }
 
+/**
+ * Drop the sidecar provenance block, so a compiled `<task>.seed.json` is a
+ * world file this door accepts as-is — `pome compile-seeds` has been emitting
+ * exactly this shape all along, and every task in the library is already one.
+ *
+ * DECLARED, not inherited. The twins' seed schemas are non-strict zod today, so
+ * `_meta` would be stripped by `parseSeed` anyway — but only by accident, and
+ * the moment those schemas refuse unknown keys that accident becomes a refusal
+ * of every sidecar in the library. Stripping it here is what survives that.
+ */
+function stripSidecarMeta(seed: unknown): unknown {
+  if (seed && typeof seed === "object" && !Array.isArray(seed)) {
+    const { _meta, ...rest } = seed as Record<string, unknown>;
+    return rest;
+  }
+  return seed;
+}
+
 async function parseWorld(
   entry: (typeof TWIN_REGISTRY)[TwinName],
   raw: string,
@@ -143,7 +161,7 @@ async function parseWorld(
     throw new Error(`${origin} is not valid JSON or YAML: ${(err as Error).message}`);
   }
   try {
-    return await entry.parseSeed(parsed);
+    return await entry.parseSeed(stripSidecarMeta(parsed));
   } catch (err) {
     throw new Error(`${origin} is not a world this twin can boot: ${(err as Error).message}`);
   }

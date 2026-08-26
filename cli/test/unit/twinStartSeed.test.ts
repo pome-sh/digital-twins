@@ -108,6 +108,22 @@ describe("resolveStandaloneSeed", () => {
     ).rejects.toThrow(/POME_SEED_JSON is not a world this twin can boot/);
   });
 
+  it("accepts a compiled task sidecar as-is, provenance block and all", async () => {
+    // `pome compile-seeds` emits `<task>.seed.json` with an `_meta` block, and
+    // that file IS a world — every task in the bundled library is already one.
+    // The strip is declared here rather than left to non-strict zod, so a
+    // later move to strict schemas does not refuse the whole library.
+    const path = await seedFile(
+      JSON.stringify({
+        _meta: { version: 1, source_hash: "sha256:abc", compiled_at: "2026-05-22T14:30:00.154Z" },
+        ...WORLD,
+      }),
+    );
+    const resolved = await resolveStandaloneSeed("github", path, {});
+    expect(repoNames(resolved.seedState)).toEqual(["vakoi/billing"]);
+    expect(resolved.seedState).not.toHaveProperty("_meta");
+  });
+
   it("every twin resolves its own default without reaching for github's", async () => {
     for (const twin of ["slack", "stripe", "gmail", "linear"] as const) {
       const resolved = await resolveStandaloneSeed(twin, undefined, {});
