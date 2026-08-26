@@ -8,7 +8,7 @@ allocates on `main` after the merge, in the same commit that moves
 write a version number here or in `package.json`. Released entries are insertions
 only: a correction is the next entry, naming the one it corrects.
 
-## Unreleased (minor)
+## 0.29.0 — 2026-08-26
 
 **A seed file a stranger can write.** One shape, generated rather than typed,
 and the same file at every door.
