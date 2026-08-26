@@ -8,6 +8,19 @@ allocates on `main` after the merge, in the same commit that moves
 write a version number here or in `package.json`. Released entries are insertions
 only: a correction is the next entry, naming the one it corrects.
 
+## Unreleased (patch)
+
+A task's `## Config` block now accepts `pass_threshold` as an alias for
+`passThreshold`. The manifest spells the same setting in snake_case, and
+`taskConfigSchema` is a non-strict object, so an authored `pass_threshold: 80`
+was silently stripped and the threshold fell back to the default `100` — the run
+then passed on evidence the author had ruled out. `passThreshold` remains
+canonical and wins when both spellings are present. Additive: no existing task
+changes meaning, and every consumer keeps reading `config.passThreshold`.
+
+New contract exports: `TASK_CONFIG_SNAKE_CASE_KEY_MAP` and
+`normalizeTaskConfigKeys`.
+
 ## 0.29.0 — 2026-08-26
 
 **A seed file a stranger can write.** One shape, generated rather than typed,

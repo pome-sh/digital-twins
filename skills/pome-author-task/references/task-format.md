@@ -162,9 +162,14 @@ YAML). Keys and defaults:
 | `twins` | array of twin ids | *(required)* | The twins mounted for the session. Available twins today: `github`, `slack`, `stripe`, `gmail`, `linear`. Must list at least one — there is no default, because the seed schema is chosen from this key alone. Order matters: `twins[0]` is the primary twin. |
 | `timeout` | integer | `60` | Seconds; must be a positive integer. |
 | `runs` | integer | `1` | Trials per run-set; must be a positive integer. |
-| `passThreshold` | number | `100` | Percent of runs that must pass; `0`–`100`. |
+| `passThreshold` | number | `100` | Percent of runs that must pass; `0`–`100`. Also accepted as `pass_threshold`, the spelling `pome.json` uses. |
 
-Unknown config keys are silently stripped, not rejected. `## Config` is
+Unknown config keys are silently stripped, not rejected. That is why
+`pass_threshold` is accepted here as an alias for `passThreshold`: the manifest
+spells the same setting in snake_case, so an author moving between the two files
+used to have `pass_threshold: 80` stripped and the threshold fall back to `100`
+— the run then passed on evidence they had explicitly ruled out. Write either
+spelling; when both appear, `passThreshold` wins. `## Config` is
 therefore mandatory: `twins` has no default, so a task with no config section
 fails validation with `config.twins must list at least one twin`.
 

@@ -140,6 +140,8 @@ const EXPECTED_EXPORTS = [
   "MOUNTED_TWINS",
   "SLUG_MAX_LENGTH",
   "SLUG_RE",
+  // snake_case aliases accepted in a task `## Config` block (F-1681).
+  "TASK_CONFIG_SNAKE_CASE_KEY_MAP",
   "acceptInviteRequestSchema",
   "acceptInviteResponseSchema",
   "agentResponseSchema",
@@ -182,6 +184,7 @@ const EXPECTED_EXPORTS = [
   "manifestAgentSchema",
   "manifestSchema",
   "meResponseSchema",
+  "normalizeTaskConfigKeys",
   "normalizeTaskVocabKeys",
   "perTwinStateKeysSchema",
   "persistedScenarioSchema",
