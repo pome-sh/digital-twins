@@ -48,14 +48,66 @@ import { seedStateSchema } from "./seed-state.js";
 export const taskClassSchema = z.enum(["conformance", "restraint", "adversarial"]);
 export type TaskClass = z.infer<typeof taskClassSchema>;
 
-export const taskConfigSchema = z.object({
-  twins: z.array(z.string()).default(["github"]),
-  class: taskClassSchema.optional(),                        // conformance vs the exam half
-  timeout: z.number().int().positive().default(60),         // seconds
-  runs: z.number().int().positive().default(1),
-  passThreshold: z.number().min(0).max(100).default(100),
-  judge: judgeModelSchema.default("claude-haiku-4-5"),       // CLI's BYOK config decides which endpoint serves this
-});
+/**
+ * snake_case spelling → canonical `## Config` key, for the keys a user hand-authors.
+ *
+ * The manifest (`./manifest.ts`) is snake_case — `pass_threshold`, `artifacts_dir` —
+ * and snake_case is what the published JSON Schema at `pome.sh/schemas/v1/pome.json`
+ * teaches. A task's `## Config` block is camelCase. Both files are written by hand,
+ * often in the same sitting, so the same word arriving in the other casing is not a
+ * typo to punish: `taskConfigSchema` is a non-strict `z.object`, so before this map
+ * existed an authored `pass_threshold: 80` was silently STRIPPED and the threshold
+ * fell back to the default 100 — the run then passed on evidence the author had
+ * explicitly said was not enough.
+ *
+ * Additive and permanent, the same shape `sandbox`/`session` took: camelCase stays
+ * canonical, and every consumer keeps reading `config.passThreshold`.
+ *
+ * Only keys with more than one word can disagree about casing, which today is
+ * exactly one. `twins`, `class`, `timeout`, `runs` and `judge` have nothing to
+ * alias.
+ */
+export const TASK_CONFIG_SNAKE_CASE_KEY_MAP = {
+  pass_threshold: "passThreshold",
+} as const;
+
+/**
+ * Rename a snake_case `## Config` key to its canonical camelCase name on a raw
+ * config object. Non-objects pass through untouched, so the wrapped schema still
+ * reports the real type error.
+ *
+ * When BOTH spellings are present the canonical one wins and the alias is dropped
+ * — the same precedence `normalizeTaskVocabKeys` uses, and for the same reason: a
+ * writer that knows the canonical key is the more authoritative of the two.
+ */
+export function normalizeTaskConfigKeys(value: unknown): unknown {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return value;
+  }
+  const record = value as Record<string, unknown>;
+  let out: Record<string, unknown> | null = null;
+  for (const [aliasKey, canonicalKey] of Object.entries(TASK_CONFIG_SNAKE_CASE_KEY_MAP)) {
+    if (!(aliasKey in record)) continue;
+    out ??= { ...record };
+    if (!(canonicalKey in record)) {
+      out[canonicalKey] = record[aliasKey];
+    }
+    delete out[aliasKey];
+  }
+  return out ?? value;
+}
+
+export const taskConfigSchema = z.preprocess(
+  normalizeTaskConfigKeys,
+  z.object({
+    twins: z.array(z.string()).default(["github"]),
+    class: taskClassSchema.optional(),                        // conformance vs the exam half
+    timeout: z.number().int().positive().default(60),         // seconds
+    runs: z.number().int().positive().default(1),
+    passThreshold: z.number().min(0).max(100).default(100),
+    judge: judgeModelSchema.default("claude-haiku-4-5"),       // CLI's BYOK config decides which endpoint serves this
+  }),
+);
 export type TaskConfig = z.infer<typeof taskConfigSchema>;
 
 /** @deprecated Use `taskConfigSchema`. Removed after the 0.3.0 window. */

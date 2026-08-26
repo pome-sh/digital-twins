@@ -9,7 +9,7 @@ import { linearSeedSchema as linearSeedStateSchema } from "@pome-sh/twin-linear/
 // (legacy `D`/`P` enum values) exists only for 0.3.0-era persisted artifacts,
 // never for scenario markdown. The former local criterion-kind fork is
 // retired here (M6 — one published contract).
-import { criterionSchema } from "../contract/index.js";
+import { criterionSchema, normalizeTaskConfigKeys } from "../contract/index.js";
 import { z } from "zod";
 
 export { criterionSchema };
@@ -42,13 +42,22 @@ export const taskCriterionSchema = criterionSchema.extend({
 // optional here but mandatory for the tasks THIS repo ships.
 export const taskClassSchema = z.enum(["conformance", "restraint", "adversarial"]);
 
-export const taskConfigSchema = z.object({
-  twins: z.array(z.string()).default(["github"]),
-  class: taskClassSchema.optional(),
-  timeout: z.number().int().positive().default(60),
-  runs: z.number().int().positive().default(1),
-  passThreshold: z.number().min(0).max(100).default(100)
-});
+// The snake_case alias for `passThreshold` comes from the published contract
+// (`normalizeTaskConfigKeys`, ../contract/task.ts) rather than being re-declared
+// here. This parser's config schema and the contract's are two schemas — the
+// contract carries `judge`, this one does not — but which spellings a hand-authored
+// `## Config` block may use is one fact, and a parser that knew fewer of them than
+// the contract would silently strip the key the contract accepts.
+export const taskConfigSchema = z.preprocess(
+  normalizeTaskConfigKeys,
+  z.object({
+    twins: z.array(z.string()).default(["github"]),
+    class: taskClassSchema.optional(),
+    timeout: z.number().int().positive().default(60),
+    runs: z.number().int().positive().default(1),
+    passThreshold: z.number().min(0).max(100).default(100)
+  })
+);
 
 // Scenario-level failure injection. Mirrors the packaged
 // twin-stripe `failureInjectionRuleSchema` without importing it into the

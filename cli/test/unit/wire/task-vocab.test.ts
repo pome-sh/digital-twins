@@ -7,6 +7,10 @@ import {
   normalizeTaskVocabKeys,
 } from "../../../src/contract/task-vocab.js";
 import {
+  TASK_CONFIG_SNAKE_CASE_KEY_MAP,
+  normalizeTaskConfigKeys,
+} from "../../../src/contract/task.js";
+import {
   CRITERION_KINDS,
   criterionKindSchema,
   criterionResultSchema,
@@ -369,5 +373,55 @@ describe("task*/scenario* export aliases", () => {
     });
     expect(parsed.criteria.map((c) => c.type)).toEqual(["code", "model"]);
     expect(parsed.config.judge).toBe("claude-haiku-4-5");
+  });
+});
+
+// ─── snake_case aliases in a task `## Config` block (F-1681) ─────────────────
+
+describe("normalizeTaskConfigKeys", () => {
+  it("renames every aliased key to its canonical spelling", () => {
+    for (const [alias, canonical] of Object.entries(TASK_CONFIG_SNAKE_CASE_KEY_MAP)) {
+      const out = normalizeTaskConfigKeys({ [alias]: 42 }) as Record<string, unknown>;
+      expect(out[canonical]).toBe(42);
+      expect(alias in out).toBe(false);
+    }
+  });
+
+  it("lets the canonical key win when both spellings are present", () => {
+    const out = normalizeTaskConfigKeys({
+      passThreshold: 80,
+      pass_threshold: 30,
+    }) as Record<string, unknown>;
+    expect(out.passThreshold).toBe(80);
+    expect("pass_threshold" in out).toBe(false);
+  });
+
+  it("passes non-objects through so the wrapped schema reports the type error", () => {
+    expect(normalizeTaskConfigKeys("nope")).toBe("nope");
+    expect(normalizeTaskConfigKeys(null)).toBe(null);
+    expect(normalizeTaskConfigKeys([1, 2])).toEqual([1, 2]);
+  });
+
+  it("returns the input untouched when it carries no alias", () => {
+    const input = { passThreshold: 55 };
+    expect(normalizeTaskConfigKeys(input)).toBe(input);
+  });
+});
+
+describe("taskConfigSchema snake_case alias", () => {
+  it("honours an authored pass_threshold instead of silently defaulting to 100", () => {
+    expect(taskConfigSchema.parse({ pass_threshold: 80 }).passThreshold).toBe(80);
+  });
+
+  it("still validates the aliased value — 101 is out of range under either spelling", () => {
+    expect(() => taskConfigSchema.parse({ pass_threshold: 101 })).toThrow();
+    expect(() => taskConfigSchema.parse({ passThreshold: 101 })).toThrow();
+  });
+
+  it("leaves the camelCase spelling and the other config keys working", () => {
+    const config = taskConfigSchema.parse({ passThreshold: 75, timeout: 12, runs: 3 });
+    expect(config.passThreshold).toBe(75);
+    expect(config.timeout).toBe(12);
+    expect(config.runs).toBe(3);
   });
 });

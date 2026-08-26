@@ -63,6 +63,28 @@ passThreshold: 75
     expect(asGithub(scenario.seedState).repositories[0]?.labels?.[0]?.name).toBe("bug");
   });
 
+  // F-1681 — the manifest spells this key `pass_threshold`; a `## Config` block
+  // spells it `passThreshold`. `taskConfigSchema` is non-strict, so before the
+  // alias an authored `pass_threshold: 80` was stripped and the threshold fell
+  // back to 100 — the run then passed on evidence the author had ruled out.
+  it("honours a snake_case pass_threshold in the config block", () => {
+    const scenario = parseTask(`# Demo
+
+## Prompt
+Triage issue #1.
+
+## Success Criteria
+- [code] Issue #1 has the \`bug\` label applied
+
+## Config
+\`\`\`yaml
+pass_threshold: 80
+\`\`\`
+`);
+
+    expect(scenario.config.passThreshold).toBe(80);
+  });
+
   it("rejects scenarios without a prompt", () => {
     expect(() =>
       parseTask(`# Demo
