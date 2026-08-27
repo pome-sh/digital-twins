@@ -1,0 +1,28 @@
+{
+  "name": "@pome-sh/langsmith-eval-example",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Bundled Pome example: LangSmith's evaluate() gives every dataset row its own hosted Pome sandbox, and each Pome criterion comes back as its own LangSmith feedback key.",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "task:write": "tsx scripts/write-task.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.105",
+    "ai": "^6.0.241",
+    "langsmith": "^0.9.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.5",
+    "tsx": "^4.23.5",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

@@ -79,6 +79,16 @@ const SMOKE_DEAD_WIRING = {
   // stay unable to reach a paid API even when the developer running it is
   // logged in.
   POME_API_URL: "http://127.0.0.1:59321",
+  // The same argument, one vendor over. `langsmith-eval` calls
+  // `api.smith.langchain.com`, and LangSmith's own free tier is metered on TRACES
+  // — 5k a month on Developer, with a hard stop at 5,000 when no payment method
+  // is on file — so a PR leg that reached it would spend a reader's quota rather
+  // than money. It cannot today, because that example validates its seeds
+  // against `POME_API_URL` above and dies there first; this line is what keeps
+  // that true when somebody reorders the calls. `LANGSMITH_ENDPOINT` is the name
+  // the SDK reads first (`LANGSMITH_* || LANGCHAIN_*`), so it wins over a
+  // developer's own `LANGCHAIN_ENDPOINT`.
+  LANGSMITH_ENDPOINT: "http://127.0.0.1:59321",
   POME_GITHUB_REST_URL: "http://127.0.0.1:59321",
   POME_GITHUB_MCP_URL: "http://127.0.0.1:59321/s/smoke/mcp",
   POME_SLACK_REST_URL: "http://127.0.0.1:59321",

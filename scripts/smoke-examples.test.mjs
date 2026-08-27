@@ -373,6 +373,21 @@ function check(name, got, want) {
     launchEnv({ ...realWiring, POME_API_URL: "https://api.pome.sh" }, true).POME_API_URL,
     "https://api.pome.sh",
   );
+  // `langsmith-eval` calls api.smith.langchain.com, whose free tier is metered on
+  // traces. Same argument as POME_API_URL: the PR leg is uncredentialed by design
+  // and a developer's own LANGSMITH_API_KEY is inherited from their shell, not
+  // overlaid here.
+  check(
+    "the PR leg overlays the LangSmith endpoint too, so no PR can spend a reader's trace quota",
+    pr.LANGSMITH_ENDPOINT,
+    "http://127.0.0.1:59321",
+  );
+  check(
+    "the LIVE leg leaves a caller-supplied LANGSMITH_ENDPOINT alone",
+    launchEnv({ ...realWiring, LANGSMITH_ENDPOINT: "https://api.smith.langchain.com" }, true)
+      .LANGSMITH_ENDPOINT,
+    "https://api.smith.langchain.com",
+  );
   check(
     "the PR leg still overlays the invalid model key",
     pr.ANTHROPIC_API_KEY === "sk-ant-smoke-invalid",
