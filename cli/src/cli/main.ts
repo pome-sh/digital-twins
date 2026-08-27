@@ -1330,10 +1330,14 @@ export function createProgram() {
     .command("seed")
     .argument("<name...>", `Twin name (${TWIN_NAME_LIST.join(" | ")}). Repeat for one file covering several.`)
     .option("--out <path>", "Write to this file instead of stdout. Refuses to overwrite.")
+    .option(
+      "--for-task",
+      "Emit the shape a `<task>.seed.json` sidecar takes — flat for one twin, the per-twin envelope for more, the rule the task's `## Config` twins already set. Without it you get a seed file for `--seed`, which is always the envelope.",
+    )
     .description(
       "Print a starter seed file for a twin, generated from the twin's own starting state",
     )
-    .action(async (names: string[], options: { out?: string }) => {
+    .action(async (names: string[], options: { out?: string; forTask?: boolean }) => {
       const { runTwinSeedCommand } = await import("../twin/twinSeed.js");
       await runTwinSeedCommand(names, options);
     });
