@@ -136,20 +136,20 @@ anything — used purely as a probe arena. Discipline:
   instead of guessing). The `mcp_servers[].url` endpoints speak MCP streamable
   HTTP with the same bearer.
 - **Opaque 404** on a probe = wrong path OR expired session — call
-  `get_session` (side-effect-free) before blaming the seed.
+  `get_sandbox` (side-effect-free) before blaming the seed.
 - **Mutation hole**: one mutating call (POST/PUT/DELETE, or an MCP tool with
-  side effects) and the live state is no longer the seed. `stop_session` —
+  side effects) and the live state is no longer the seed. `stop_sandbox` —
   today that succeeds outright; once the platform-side ungraded-session guard is
   live it may instead refuse and hand back a `discard_token` to confirm (see
   below) — then `run_task` again and continue on the fresh session. Never report
   findings from a dirtied session as seed facts.
-- **Reset = discard + re-mint.** `stop_session` ends a probe session without
+- **Reset = discard + re-mint.** `stop_sandbox` ends a probe session without
   evaluating — for probes that is exactly right (there is no evidence worth
   keeping). Call it once: if it succeeds, teardown is done. An open
   session holds an ungraded run (Pome creates the `runs` row at finalize), so
   the control plane may instead refuse with `error.details.reason ===
   "ungraded_session"` and a `discard_token`; read that token and call
-  `stop_session` again, passing it as `confirm_discard`, to confirm the
+  `stop_sandbox` again, passing it as `confirm_discard`, to confirm the
   discard. Against today's control plane this never happens — the first call
   always succeeds — so treat the refusal-then-confirm path as the case to
   handle once it ships, not the common case. Never `finalize_run` a probe

@@ -32,7 +32,14 @@ Removed:
   retired-topic keywords in `pome docs` (`test-with-pome`, `pome-test`).
 
 `pome docs --url` keeps its behavior — it suppresses the interactive picker —
-and is now described by what it does rather than as a compatibility flag.
+and is now described by what it does rather than as a compatibility flag. The
+topic table stops leaning on redirects from old doc URLs: `getting-started` now
+points at /quickstart/claude-code, `twins` at /docs/twins/coverage, `cli-session`
+becomes `cli-sandbox` at /docs/cli/sandbox, and the `changelog` topic is dropped
+because no page backs it. Two of those were already printing 404s.
+
+The coach skills call `get_sandbox` / `stop_sandbox`, matching the MCP tools now
+that the `*_session` names are gone (pome-cloud#853).
 
 ## 0.29.1 — 2026-08-26
 
