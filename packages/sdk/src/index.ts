@@ -332,16 +332,6 @@ export interface TwinDefinition<
    */
   middleware?: RouteRegistrar<TDomain>;
   /**
-   * Legacy `POST /mcp/call` dispatch pins (review): slack's frozen
-   * surface accepts `{name}`/`{params}` as aliases of `{tool}`/`{arguments}`
-   * and answers a body naming no tool with its own envelope instead of the
-   * strict-parse error.
-   */
-  legacyMcp?: {
-    aliases?: boolean;
-    missingTool?: () => { status: number; body: unknown };
-  };
-  /**
    * Extra `/s/:sid/_pome/health` fields merged over the contract core
    * `{ok, twin}`. When absent the engine adds `{version, fidelity}`; a twin
    * with a frozen per-session health shape (slack: bare {ok, twin};
@@ -473,12 +463,6 @@ const twinMeta = z.object({
   healthz: z.custom<Function>(isFunction).optional(),
   bodyReader: z.custom<Function>(isFunction).optional(),
   middleware: z.custom<Function>(isFunction).optional(),
-  legacyMcp: z
-    .object({
-      aliases: z.boolean().optional(),
-      missingTool: z.custom<Function>(isFunction).optional(),
-    })
-    .optional(),
   pomeHealth: z.custom<Function>(isFunction).optional(),
   unsupported: z.custom<Function>(isFunction).optional(),
   pomeRoutes: z.record(z.string(), z.custom<Function>(isFunction)).optional(),

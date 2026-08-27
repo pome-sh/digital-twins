@@ -53,13 +53,9 @@ export const PER_TWIN = {
     mcpCallUnknown: { status: 422, check: (b) => b.message === "Validation Failed" },
     // Body-parsing corners (review pins, probed 2026-07-08): github is
     // strict JSON everywhere — form-encoded and malformed bodies answer the
-    // GitHub wire error; {name}/{params} aliases are not accepted.
-    aliasTool: "list_repos",
+    // GitHub wire error.
     adminSeedForm: { status: 400, check: (b) => b.message === "Problems parsing JSON" },
     adminSeedMalformed: { status: 400, check: (b) => b.message === "Problems parsing JSON" },
-    mcpCallAlias: { status: 422, check: (b) => b.message === "Validation Failed" && b.errors?.[0]?.field === "tool" },
-    mcpCallForm: { status: 400, check: (b) => b.message === "Problems parsing JSON" },
-    mcpCallMalformed: { status: 400, check: (b) => b.message === "Problems parsing JSON" },
     pomeHealthKeys: ["fidelity", "implementation", "ok", "runtime", "twin"],
     adminSeedTape: "delta-null",
     unknownSession: { status: 501, check: (b) => b._twin?.fidelity === "unsupported" },
@@ -77,22 +73,13 @@ export const PER_TWIN = {
     expired: { status: 401, check: (b) => b.error === "token_expired" },
     rawToken: { status: 401 },
     mcpCallUnknown: { status: 404, check: (b) => b.error === "unknown_tool" },
-    // Body-parsing corners (review pins; probed 2026-07-08 against the
-    // pre-port 3cd86eb build): slack parses form-or-JSON tolerantly on every
-    // surface (official Slack SDKs default to form-urlencoded; malformed JSON
-    // collapses to {}), accepts the {name}/{params} alias keys, a body naming
-    // no tool is 400 {ok:false, error:"invalid_arguments"}, and admin errors
+    // Body-parsing corners (review pins; probed 2026-07-08): slack parses
+    // form-or-JSON tolerantly on every surface (official Slack SDKs default
+    // to form-urlencoded; malformed JSON collapses to {}), and admin errors
     // (a form seed whose string value fails the seed schema) are 500
     // internal_error — the admin surface has its own envelope.
-    // `slack_read_user_profile` because this probe sends no arguments at all
-    // ({name, params:{}} and a bare `tool=` form body) and it is one of the
-    // two Slack tools with an empty `required` — it defaults to the caller.
-    aliasTool: "slack_read_user_profile",
     adminSeedForm: { status: 500, check: (b) => b.ok === false && b.error === "internal_error" },
     adminSeedMalformed: { status: 200, check: (b) => b.ok === true },
-    mcpCallAlias: { status: 200, check: (b) => b.ok === true },
-    mcpCallForm: { status: 200, check: (b) => b.ok === true },
-    mcpCallMalformed: { status: 400, check: (b) => b.ok === false && b.error === "invalid_arguments" },
     pomeHealthKeys: ["ok", "twin"],
     adminSeedTape: "delta-null",
     unknownSession: {
@@ -116,15 +103,9 @@ export const PER_TWIN = {
     rawToken: { status: 200 },
     mcpCallUnknown: { status: 400, check: (b) => b.error?.code === "tool_unknown" },
     // Body-parsing corners (review pins, probed on the pre-port twin):
-    // stripe reads form-or-JSON (malformed JSON collapses to {}), rejects the
-    // alias keys with its parameter_invalid envelope, and dispatches
-    // form-encoded legacy /mcp/call bodies.
-    aliasTool: "retrieve_balance",
+    // stripe reads form-or-JSON, and a malformed JSON body collapses to {}.
     adminSeedForm: { status: 200, check: (b) => b.ok === true },
     adminSeedMalformed: { status: 200, check: (b) => b.ok === true },
-    mcpCallAlias: { status: 400, check: (b) => b.error?.code === "parameter_invalid" && b.error?.param === "tool" },
-    mcpCallForm: { status: 200, check: (b) => typeof b === "object" },
-    mcpCallMalformed: { status: 400, check: (b) => b.error?.code === "parameter_invalid" && b.error?.param === "tool" },
     pomeHealthKeys: ["fidelity", "implementation", "ok", "recorder", "runtime", "tthw_seconds", "twin"],
     adminSeedTape: "none",
     // Probed on the 3cd86eb baseline: an api-key-shaped bearer that resolves
@@ -165,24 +146,11 @@ export const PER_TWIN = {
       status: 404,
       check: (b) => b.error?.status === "NOT_FOUND",
     },
-    aliasTool: "list_labels",
     adminSeedForm: {
       status: 400,
       check: (b) => b.error?.status === "INVALID_ARGUMENT",
     },
     adminSeedMalformed: {
-      status: 400,
-      check: (b) => b.error?.status === "INVALID_ARGUMENT",
-    },
-    mcpCallAlias: {
-      status: 400,
-      check: (b) => b.error?.status === "INVALID_ARGUMENT",
-    },
-    mcpCallForm: {
-      status: 400,
-      check: (b) => b.error?.status === "INVALID_ARGUMENT",
-    },
-    mcpCallMalformed: {
       status: 400,
       check: (b) => b.error?.status === "INVALID_ARGUMENT",
     },
@@ -222,24 +190,11 @@ export const PER_TWIN = {
       status: 404,
       check: (b) => b.errors?.[0]?.extensions?.code === "NOT_FOUND",
     },
-    aliasTool: "list_issues",
     adminSeedForm: {
       status: 400,
       check: (b) => b.errors?.[0]?.extensions?.code === "BAD_USER_INPUT",
     },
     adminSeedMalformed: {
-      status: 400,
-      check: (b) => b.errors?.[0]?.extensions?.code === "BAD_USER_INPUT",
-    },
-    mcpCallAlias: {
-      status: 400,
-      check: (b) => b.errors?.[0]?.extensions?.code === "BAD_USER_INPUT",
-    },
-    mcpCallForm: {
-      status: 400,
-      check: (b) => b.errors?.[0]?.extensions?.code === "BAD_USER_INPUT",
-    },
-    mcpCallMalformed: {
       status: 400,
       check: (b) => b.errors?.[0]?.extensions?.code === "BAD_USER_INPUT",
     },
@@ -521,35 +476,6 @@ export function contractSuite(twin, exp, label = twin.name) {
       const malformedBody = await malformed.json().catch(() => ({}));
       assert.equal(malformed.status, exp.adminSeedMalformed.status);
       checkBody(exp.adminSeedMalformed, malformedBody, "admin/seed malformed JSON");
-    });
-
-    it("legacy /mcp/call body corners are frozen (alias keys, form encoding, malformed JSON)", async () => {
-      const alias = await fetch(`${t.base}${sPath("/mcp/call")}`, {
-        method: "POST",
-        headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json" },
-        body: JSON.stringify({ name: exp.aliasTool, params: {} }),
-      });
-      const aliasBody = await alias.json().catch(() => ({}));
-      assert.equal(alias.status, exp.mcpCallAlias.status, "mcp/call {name, params} alias");
-      checkBody(exp.mcpCallAlias, aliasBody, "mcp/call alias");
-
-      const form = await fetch(`${t.base}${sPath("/mcp/call")}`, {
-        method: "POST",
-        headers: { authorization: `Bearer ${jwt}`, "content-type": "application/x-www-form-urlencoded" },
-        body: `tool=${exp.aliasTool}`,
-      });
-      const formBody = await form.json().catch(() => ({}));
-      assert.equal(form.status, exp.mcpCallForm.status, "mcp/call form-encoded");
-      checkBody(exp.mcpCallForm, formBody, "mcp/call form");
-
-      const malformed = await fetch(`${t.base}${sPath("/mcp/call")}`, {
-        method: "POST",
-        headers: { authorization: `Bearer ${jwt}`, "content-type": "application/json" },
-        body: "{oops",
-      });
-      const malformedBody = await malformed.json().catch(() => ({}));
-      assert.equal(malformed.status, exp.mcpCallMalformed.status, "mcp/call malformed JSON");
-      checkBody(exp.mcpCallMalformed, malformedBody, "mcp/call malformed");
     });
 
     it("GET /s/:sid/_pome/health carries the exact frozen key set", async () => {

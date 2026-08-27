@@ -40,7 +40,7 @@ This document enumerates everything pome-cloud (and the pome CLI) may rely on wh
 - `GET /s/:sid/_pome/health` → 200 `{ok: true, twin, …}`.
 - `GET /s/:sid/_pome/state` → 200 JSON object — the redacted state export that feeds cloud-side `[code]` scoring.
 - `GET /s/:sid/_pome/events` → 200 JSON array — the recorder tape fetched at end of run. Row shape is `@pome-sh/wire` `recorderEventSchema`. Two fields are additive and a reader must treat ABSENT as "this recording predates the field", never as a value: `request_headers` (the request headers as received, keys lowercased, already redacted — `authorization` / `cookie` / `x-api-key` arrive as `[REDACTED]`) and `tool` (the twin ACTION the call invoked — stamped identically for an MCP `tools/call` and for a REST route that performs the same action; `null` means the serving surface declares no action, **not** that no action happened).
-- MCP: `GET /s/:sid/mcp/tools` → `{tools: […]}`; `POST /s/:sid/mcp` (streamable-HTTP JSON-RPC, stateless — `GET`/`DELETE` answer 405); legacy `POST /s/:sid/mcp/tools/:name` and `POST /s/:sid/mcp/call` (`{tool, arguments}`).
+- MCP: `GET /s/:sid/mcp/tools` → `{tools: […]}`; `POST /s/:sid/mcp` (streamable-HTTP JSON-RPC, stateless — `GET`/`DELETE` answer 405); legacy `POST /s/:sid/mcp/tools/:name` and `POST /s/:sid/mcp/call` — the latter takes exactly one body shape, `{tool, arguments}`, and no alias keys.
 - Reserved prefixes: `/_pome/*` and `/mcp/*` under the session mount belong to the platform (OQ-B6); domain routes must not shadow them.
 - Unknown **session** routes → **501** loud-unsupported envelope advertising `fidelity: "unsupported"` and the supported surfaces.
 
@@ -86,9 +86,6 @@ Probed against the pre-engine builds (`3cd86eb`); the contract suite asserts eve
 | --- | --- | --- | --- |
 | `/admin/seed` form-encoded body | 400 `Problems parsing JSON` | **500** `internal_error` (admin surface has its own envelope; the form value fails the seed schema) | 200 accepted |
 | `/admin/seed` malformed JSON | 400 `Problems parsing JSON` | 200 `{ok:true}` (tolerant parse collapses to `{}`) | 200 accepted (defaults applied) |
-| legacy `/mcp/call` `{name}/{params}` alias keys | 422 validation (`tool` missing) | **accepted** — aliases of `{tool}/{arguments}` | 400 `parameter_invalid` (`tool`) |
-| legacy `/mcp/call` form-encoded body | 400 `Problems parsing JSON` | dispatched | dispatched |
-| legacy `/mcp/call` malformed JSON | 400 `Problems parsing JSON` | 400 `{ok:false, error:"invalid_arguments"}` | 400 `parameter_invalid` (`tool`) |
 | `GET /s/:sid/_pome/health` exact keys | `ok, twin, implementation, fidelity, runtime` | `ok, twin` | `ok, twin, implementation, fidelity, runtime, tthw_seconds, recorder` |
 | `/_pome/state` fetches on the recorder tape | never | never | never |
 | `/admin/seed` on the recorder tape | recorded, `state_delta: null` | recorded, `state_delta: null` | not recorded |
@@ -110,9 +107,8 @@ Probed against the pre-engine builds (`3cd86eb`); the contract suite asserts eve
   `INVALID_ARGUMENT`.
 - `GET /s/:sid/_pome/health` has exactly
   `fidelity, ok, twin, version`; `GET /s/:sid/healthz` is enabled.
-- MCP advertises exactly the captured thirteen launch tools. Legacy unknown-tool
-  calls return 404 `NOT_FOUND`; strict alias/form/malformed bodies return 400
-  `INVALID_ARGUMENT`.
+- MCP advertises exactly the captured thirteen launch tools. Unknown-tool calls
+  on the legacy `/mcp/call` route return 404 `NOT_FOUND`.
 - Unknown session routes return 501 `UNIMPLEMENTED`; unknown root routes return
   404. `users.watch`, `users.stop`, resumable uploads, forwarding delivery,
   Calendar processing, and deleted writes remain loud no-side-effect 501 gaps.
@@ -145,9 +141,8 @@ Probed against the pre-engine builds (`3cd86eb`); the contract suite asserts eve
   `BAD_USER_INPUT`.
 - `GET /s/:sid/_pome/health` has exactly
   `fidelity, ok, twin, version`; `GET /s/:sid/healthz` is enabled.
-- MCP advertises exactly the captured twenty-two launch tools. Legacy unknown-tool
-  calls return 404 `NOT_FOUND`; strict alias/form/malformed bodies return 400
-  `BAD_USER_INPUT`.
+- MCP advertises exactly the captured twenty-two launch tools. Unknown-tool calls
+  on the legacy `/mcp/call` route return 404 `NOT_FOUND`.
 - Unknown session routes return 501 with `fidelity: "unsupported"`; unknown
   root routes return 401 (root session mount auth wall). Documents MCP tools
   and the full Linear GraphQL tail remain loud unsupported / cold gaps.

@@ -1,6 +1,14 @@
 # @pome-sh/sdk
 
 
+
+## Unreleased (minor)
+
+`POST /s/:sid/mcp/call` takes exactly one body shape, `{tool, arguments}`. The
+`legacyMcp` twin-definition hook is gone with the `{name}`/`{params}` alias keys
+and the per-twin missing-tool envelope it carried; a body naming no tool answers
+the twin's own projection of the strict-parse error (F-1580).
+
 ## 0.11.6 — 2026-08-09
 
 New `lintFidelityRestRoutes`, reachable from `@pome-sh/sdk/parity`, plus the

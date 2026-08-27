@@ -145,12 +145,6 @@ export const slackTwinDefinition: TwinDefinition<SlackTwinDatabase, SlackSeed, S
   // engine-owned surface — official Slack SDKs default to
   // application/x-www-form-urlencoded — and malformed JSON collapses to {}.
   bodyReader: (c) => parseFormOrJson(c),
-  // Frozen legacy /mcp/call surface: {name}/{params} alias keys; a body
-  // naming no tool answers 400 {ok:false, error:"invalid_arguments"}.
-  legacyMcp: {
-    aliases: true,
-    missingTool: () => ({ status: 400, body: slackError("invalid_arguments") }),
-  },
   // Frozen /_pome/health shape: exactly {ok, twin} — no extras.
   pomeHealth: () => ({}),
   state: ({ domain }) => domain.exportState(),
