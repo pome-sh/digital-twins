@@ -1,6 +1,6 @@
 {
   "name": "@pome-sh/sandbox-domains",
-  "version": "0.2.14",
+  "version": "0.2.15",
   "description": "Pome's twin domain layer — the in-process runtime a bound check reads: each digital twin's domain object, its SQLite opener, its seed parser and its declared check vocabulary. Runtime, not server: no Hono app, no routes, no MCP tool table.",
   "private": false,
   "type": "module",

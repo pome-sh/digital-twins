@@ -8,7 +8,7 @@ allocates on `main` after the merge, in the same commit that moves
 write a version number here or in `package.json`. Released entries are insertions
 only: a correction is the next entry, naming the one it corrects.
 
-## Unreleased (minor)
+## 0.30.0 — 2026-08-27
 
 Back-compat surfaces are removed rather than documented. There is nothing in the
 field to be compatible with, and every one of these was a place where the CLI

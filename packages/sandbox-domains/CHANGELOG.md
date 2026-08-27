@@ -1,6 +1,6 @@
 # @pome-sh/sandbox-domains
 
-## Unreleased (patch)
+## 0.2.15 — 2026-08-27
 
 **Prose only.** Two Linear declared-check descriptions (`linear.issue-has-label`,
 `linear.issue-assignee`) stop describing their own semantics by reference to what

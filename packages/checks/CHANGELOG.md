@@ -1,6 +1,6 @@
 # @pome-sh/checks
 
-## Unreleased (patch)
+## 0.3.9 — 2026-08-27
 
 **Prose only.** Two Linear declared-check descriptions (`linear.issue-has-label`,
 `linear.issue-assignee`) stop describing their own semantics by reference to what
