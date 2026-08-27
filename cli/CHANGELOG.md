@@ -8,6 +8,57 @@ allocates on `main` after the merge, in the same commit that moves
 write a version number here or in `package.json`. Released entries are insertions
 only: a correction is the next entry, naming the one it corrects.
 
+## Unreleased (minor)
+
+**A slack task seed could not declare `emoji`, and a stripe one could not declare
+`refunds`.** Both are fields those twins' seed schemas have declared for
+releases. `cli/src/task/taskSchema.ts` keeps a LOCAL schema for slack and stripe
+— three of the five arms import the twin's own, but those two must be `.strict()`
+and the twins' schemas are not — and both local copies had drifted from the twin
+they mirror:
+
+```
+slack    mirror lacked `emoji`                          (in the twin since #190)
+stripe   mirror lacked `refunds`, `balance_transactions`
+         and carried five fields the twin's seed schema does not have:
+         `customers`, `products`, `prices`, `events`, `balances`
+```
+
+So `parseTask` refused a slack seed using `emoji` with `Unrecognized key`, and
+accepted a stripe seed declaring `customers` that the twin then silently
+dropped. This had already been fixed once, for `files` — that fixed the
+instance. The mirrors now name exactly the twin's fields, in the twin's order; the field
+types stay this module's own permissive ones, `.strict()` is unchanged, and
+`task-seed-mirror.test.ts` fails the next time either key set moves — field order
+included, because key order survives `parse()` and a mirror that lists the same
+fields in a different order makes a parsed seed and a generated one differ by
+nothing but that.
+
+⚠️ The comparison lives in the test rather than in `taskSchema.ts` because
+deriving it there is not available: `@pome-sh/twin-stripe/seed` statically
+imports `./domain/schema.js` for `applySeed`, so it is **not** the zod-only leaf
+`registry.ts`'s header and `twin-chunks.mjs`'s own advice both call it, and a
+static import from the task parser puts stripe's domain in the graph
+`pome --version` loads. The lint rule caught that attempt. A test file is not in
+that graph.
+
+The five removed stripe keys were used by no task in this repo. `.strict()` means
+a task that does declare one now fails to parse instead of losing it at boot.
+
+**`pome twin seed --for-task`** writes the same generated seed in the shape a
+`<task>.seed.json` sidecar takes: flat for a single-twin task, the per-twin
+envelope for a multi-twin one — the rule `parseTask` has followed since
+2026-05-12, read off the twin count rather than chosen. Without the flag you
+still get a seed file for `--seed`, which is always the envelope, because a file
+handed around on its own has to say which twin it is for. The two outputs are
+byte-identical from two twins up, and a test asserts that so the flag cannot
+become a second format.
+
+This closes a hole that predates the seed door: `pome compile-seeds` emits a
+sidecar only for a single-twin **github** task, so slack, stripe, gmail and
+linear task seeds have always been hand-written. That is the same standing
+invitation to drift that left three documented seed examples unable to boot.
+
 ## 0.31.0 — 2026-08-27
 
 **One spelling for the sandbox command** (F-1695). `pome sandbox` is the only
