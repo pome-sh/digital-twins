@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Pins `pome session stop`'s `--discard` flag wiring in cli/src/cli/main.ts.
+// Pins `pome sandbox stop`'s `--discard` flag wiring in cli/src/cli/main.ts.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -17,8 +17,9 @@ vi.mock("../../src/cli/session.js", async (importOriginal) => {
 });
 
 import { createProgram } from "../../src/cli/main.js";
+import { HostedDiscardRefusedError } from "../../src/hosted/errors.js";
 
-describe("pome session stop --discard wiring", () => {
+describe("pome sandbox stop --discard wiring", () => {
   const originalExitCode = process.exitCode;
 
   beforeEach(() => {
@@ -34,7 +35,7 @@ describe("pome session stop --discard wiring", () => {
   });
 
   async function run(...args: string[]): Promise<void> {
-    await createProgram().parseAsync(["node", "pome", "session", "stop", ...args]);
+    await createProgram().parseAsync(["node", "pome", "sandbox", "stop", ...args]);
   }
 
   it("defaults discard to false", async () => {
@@ -51,17 +52,16 @@ describe("pome session stop --discard wiring", () => {
     );
   });
 
-  it("the `kill` alias also wires --discard through", async () => {
-    await createProgram().parseAsync([
-      "node",
-      "pome",
-      "session",
-      "kill",
-      "ses_a",
-      "--discard",
-    ]);
-    expect(mocks.runSessionStop).toHaveBeenCalledWith(
-      expect.objectContaining({ sessionId: "ses_a", discard: true }),
+  it("a refused discard is a usage error, not a twin failure", async () => {
+    // Exit 5, not 2. Nothing is broken when the CLI refuses: the invocation was
+    // missing `--discard`. Exit 2 means "twin or runner error" in the documented
+    // table, and a CI job branching on $? would go looking for an outage.
+    mocks.runSessionStop.mockRejectedValueOnce(
+      new HostedDiscardRefusedError("refused", "ses_a", "running", "my-task", 42, "tok"),
     );
+
+    await run("ses_a");
+
+    expect(process.exitCode).toBe(5);
   });
 });

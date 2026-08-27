@@ -1,5 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
-// `pome sandbox` is an ALIAS of `pome session`, never a second command tree.
+// `pome sandbox` is the ONLY spelling of this command tree, and `stop` is the
+// only spelling of its third subcommand.
+//
+// Two halves, both load-bearing. The dispatch cases prove every subcommand still
+// reaches its runner with each flag intact. The absence cases pin that no command
+// anywhere answers to `session` or `kill`, because a command alias is the kind of
+// convenience that gets re-added by a reviewer being helpful, and
+// VOCABULARY.md bans user-facing `session` outright.
+//
+// `session_id`, `/v1/sessions` and the `ses_` prefix are the WIRE, and are a
+// different thing from a command name a human types.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Command } from "commander";
@@ -73,7 +83,7 @@ async function dispatch(
   return mocks[runner].mock.calls[0]!;
 }
 
-describe("`pome sandbox` aliases `pome session`", () => {
+describe("`pome sandbox` is the only spelling", () => {
   const originalExitCode = process.exitCode;
 
   beforeEach(() => {
@@ -91,10 +101,9 @@ describe("`pome sandbox` aliases `pome session`", () => {
     process.exitCode = originalExitCode;
   });
 
-  // Flags are carried on every case so a spelling that reached a *different*
-  // parser — its own command tree with drifted defaults — shows up as an
+  // Flags are carried on every case so a subcommand that lost one shows up as an
   // argument diff rather than passing on the bare form.
-  const CASES: Array<{ name: string; runner: Runner; argv: string[] }> = [
+  const CASES: Array<{ name: string; runner: Runner; argv: string[]; expect: unknown[] }> = [
     {
       name: "create",
       runner: "runSessionCreate",
@@ -109,61 +118,73 @@ describe("`pome sandbox` aliases `pome session`", () => {
         "--api-url",
         "https://api.example.test",
       ],
+      expect: [
+        expect.objectContaining({
+          twins: ["github", "gmail"],
+          format: "json",
+          apiBaseUrl: "https://api.example.test",
+        }),
+      ],
     },
     {
       name: "list",
       runner: "runSessionList",
       argv: ["list", "--state", "all", "--limit", "5", "--format", "json"],
+      expect: [expect.objectContaining({ state: "all", limit: 5, format: "json" })],
     },
     {
       name: "stop",
       runner: "runSessionStop",
       argv: ["stop", "ses_a", "--discard"],
-    },
-    // The `stop` → `kill` alias nests under the outer one; both spellings of
-    // both levels have to compose.
-    {
-      name: "stop's own `kill` alias",
-      runner: "runSessionStop",
-      argv: ["kill", "ses_a", "--discard"],
+      expect: [expect.objectContaining({ sessionId: "ses_a", discard: true })],
     },
   ];
 
-  for (const { name, runner, argv } of CASES) {
-    it(`sandbox ${name} calls the same runner with the same arguments as session ${name}`, async () => {
-      const viaSandbox = await dispatch("sandbox", runner, argv);
-      const viaSession = await dispatch("session", runner, argv);
-
-      expect(viaSandbox).toEqual(viaSession);
+  for (const { name, runner, argv, expect: expected } of CASES) {
+    it(`sandbox ${name} reaches its runner with every flag intact`, async () => {
+      const call = await dispatch("sandbox", runner, argv);
+      expect(call).toMatchObject(expected);
       expect(process.exitCode).toBeUndefined();
     });
   }
 
-  it("is one command object, not a second tree", () => {
-    const answering = program().commands.filter(
-      (cmd) =>
-        [cmd.name(), ...cmd.aliases()].includes("session") ||
-        [cmd.name(), ...cmd.aliases()].includes("sandbox"),
+  it("is one command, named for the product noun", () => {
+    const answering = program().commands.filter((cmd) =>
+      [cmd.name(), ...cmd.aliases()].includes("sandbox"),
     );
 
     expect(answering).toHaveLength(1);
-    expect(answering[0]!.name()).toBe("session");
-    expect(answering[0]!.aliases()).toContain("sandbox");
+    expect(answering[0]!.name()).toBe("sandbox");
+    expect(answering[0]!.aliases()).toEqual([]);
   });
 
-  it("`pome --help` lists the sandbox spelling", () => {
-    expect(helpFor("--help")).toContain("session|sandbox");
+  it("no command anywhere answers to `session` or `kill`", () => {
+    const spellings: string[] = [];
+    const walk = (cmd: Command): void => {
+      for (const sub of cmd.commands) {
+        spellings.push(sub.name(), ...sub.aliases());
+        walk(sub);
+      }
+    };
+    walk(program());
+
+    expect(spellings).not.toContain("session");
+    expect(spellings).not.toContain("kill");
   });
 
-  it("`pome sandbox --help` lists it, and is byte-identical to `pome session --help`", () => {
-    const viaSandbox = helpFor("sandbox", "--help");
+  it("`pome --help` shows one spelling, not two", () => {
+    const help = helpFor("--help");
 
-    expect(viaSandbox).toContain("session|sandbox");
-    expect(viaSandbox).toBe(helpFor("session", "--help"));
-    // Every subcommand is reachable under the alias, not just the ones the
-    // dispatch cases above happen to name.
+    expect(help).toContain("sandbox");
+    expect(help).not.toContain("session|sandbox");
+  });
+
+  it("`pome sandbox --help` reaches every subcommand", () => {
+    const help = helpFor("sandbox", "--help");
+
     for (const sub of ["create", "list", "stop"]) {
-      expect(viaSandbox).toContain(sub);
+      expect(help).toContain(sub);
     }
+    expect(help).not.toContain("kill");
   });
 });

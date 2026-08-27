@@ -8,6 +8,31 @@ allocates on `main` after the merge, in the same commit that moves
 write a version number here or in `package.json`. Released entries are insertions
 only: a correction is the next entry, naming the one it corrects.
 
+## Unreleased (minor)
+
+**One spelling for the sandbox command** (F-1695). `pome sandbox` is the only
+name for it, and `pome sandbox stop` the only name for its third subcommand. The
+`session` and `kill` spellings are gone, along with the "session" wording in
+every line this command prints: `Sandbox: ses_…`, `Stopped sandbox ses_…`, `No
+sandboxes returned`, and the `--discard` refusal, which now tells you to type the
+command you actually have.
+
+`session_id`, `/v1/sessions` and the `ses_` id prefix are the wire and are
+untouched. This is the command a human types.
+
+**Two exit codes move onto the documented contract.** A `pome run` the doctor
+refuses now exits `5`, not `1`, and a `pome sandbox stop` refused for want of
+`--discard` exits `5`, not `2`. `1` means "scored below its pass threshold" and
+`2` means "twin or runner error"; neither had happened. A CI job branching on
+`$?` was reading a hardcoded production host as an agent regression.
+
+**`pome checks` finishes its sentence.** The description read "the closed set
+[code] criteria come from", which has no object. It is "the closed set a `[code]`
+criterion is graded by".
+
+**Minor, not patch:** a script typing `pome session` or `pome sandbox kill` stops
+working, and one branching on those two exit codes reads a different number.
+
 ## 0.30.0 — 2026-08-27
 
 Back-compat surfaces are removed rather than documented. There is nothing in the

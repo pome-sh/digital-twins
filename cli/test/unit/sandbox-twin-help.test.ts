@@ -56,11 +56,11 @@ function renderedHelp(...argv: string[]): string {
 /** The `--twin` option as declared, before help wrapping touches it. */
 function twinOption(): Option {
   const create = program()
-    .commands.find((cmd) => cmd.name() === "session")
+    .commands.find((cmd) => cmd.name() === "sandbox")
     ?.commands.find((cmd) => cmd.name() === "create");
-  if (!create) throw new Error("`session create` is no longer in the command tree");
+  if (!create) throw new Error("`sandbox create` is no longer in the command tree");
   const option = create.options.find((opt) => opt.long === "--twin");
-  if (!option) throw new Error("`session create` no longer declares --twin");
+  if (!option) throw new Error("`sandbox create` no longer declares --twin");
   return option;
 }
 

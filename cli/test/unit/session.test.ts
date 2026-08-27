@@ -305,7 +305,7 @@ describe("runSessionStop", () => {
     });
   });
 
-  it("prints 'Stopped session' when a confirmed discard succeeds", async () => {
+  it("prints 'Stopped sandbox' when a confirmed discard succeeds", async () => {
     // deleteSession resolving means the client already replayed the
     // discard_token and the second attempt landed a real 204/200 — the
     // ordinary success path, not a refusal.
@@ -322,7 +322,7 @@ describe("runSessionStop", () => {
       discard: true,
     });
     spy.mockRestore();
-    expect(errors.join("\n")).toContain("Stopped session ses_a");
+    expect(errors.join("\n")).toContain("Stopped sandbox ses_a");
   });
 
   it("prints the refusal naming the task and the keep-it path, and exits nonzero", async () => {

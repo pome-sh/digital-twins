@@ -80,7 +80,7 @@ function redactSession(res: CreateSessionResponse): Record<string, unknown> {
 
 function formatEnvExport(res: CreateSessionResponse, twins: string[]): string {
   const lines: string[] = [
-    `# Pome hosted session — treat as secret. Twins: ${twins.join(", ")}`,
+    `# Pome hosted sandbox — treat as secret. Twins: ${twins.join(", ")}`,
     `export POME_AUTH_TOKEN=${JSON.stringify(res.agent_token)}`,
     `export POME_SESSION_ID=${JSON.stringify(res.session_id)}`,
     // Legacy single-endpoint URL (= the primary twin's api_url). Kept for
@@ -231,7 +231,7 @@ export async function runSessionCreate(opts: {
 
   if (opts.secretsFile) {
     await writeSecretsFile(opts.secretsFile, formatEnvExport(session, twins));
-    console.error(`Wrote session secrets to ${opts.secretsFile} (mode 0600).`);
+    console.error(`Wrote sandbox secrets to ${opts.secretsFile} (mode 0600).`);
   }
 
   if (opts.format === "json") {
@@ -251,7 +251,7 @@ export async function runSessionCreate(opts: {
     return;
   }
 
-  console.error(`Session: ${session.session_id}`);
+  console.error(`Sandbox: ${session.session_id}`);
   console.error(`Expires: ${session.expires_at}`);
   // Same reason the standalone twin prints a Seed line: once it is running,
   // every seeded twin looks seeded.
@@ -345,7 +345,7 @@ export async function runSessionList(opts: {
   }
   if (rows.length === 0) {
     const scope = opts.state === "all" ? "any" : `state=${opts.state}`;
-    console.error(`No sessions returned (${scope}).`);
+    console.error(`No sandboxes returned (${scope}).`);
     return;
   }
   for (const r of rows) {
@@ -383,12 +383,12 @@ export async function runSessionStop(opts: {
       console.error(`  Open for ${err.openSeconds}s.`);
       console.error(
         `  To keep the run, finalize it instead. To discard it anyway: ` +
-          `pome session stop ${err.sessionId} --discard`,
+          `pome sandbox stop ${err.sessionId} --discard`,
       );
     }
     throw err;
   }
-  console.error(`Stopped session ${opts.sessionId}.`);
+  console.error(`Stopped sandbox ${opts.sessionId}.`);
 }
 
 /** Empty string means "already fully reported — print nothing more". Only
