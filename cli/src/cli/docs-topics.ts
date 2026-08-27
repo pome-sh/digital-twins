@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
  * Static index of public Mintlify pages on docs.pome.sh — avoids scraping HTML.
+ * Every `path` must be a page docs.json actually serves: there are no redirects
+ * from old doc URLs to lean on, so a stale path here prints a 404 to a user.
  * The authored docs live in the `pome` repo and publish through Mintlify; this
  * package keeps only topic metadata for URL navigation.
  */
@@ -22,7 +24,7 @@ export const DOCS_TOPICS: DocsTopic[] = [
   {
     id: "getting-started",
     title: "Quickstart",
-    path: "/getting-started",
+    path: "/quickstart/claude-code",
     keywords: ["install", "quickstart", "setup", "begin"],
   },
   {
@@ -55,7 +57,7 @@ export const DOCS_TOPICS: DocsTopic[] = [
   {
     id: "twins",
     title: "Twins overview",
-    path: "/docs/twins/index",
+    path: "/docs/twins/coverage",
     keywords: ["sandbox", "digital twin", "hosted"],
   },
   {
@@ -106,10 +108,10 @@ export const DOCS_TOPICS: DocsTopic[] = [
     ],
   },
   {
-    id: "cli-session",
-    title: "pome session",
-    path: "/docs/cli/session",
-    keywords: ["session", "hosted", "sandbox", "twin"],
+    id: "cli-sandbox",
+    title: "pome sandbox",
+    path: "/docs/cli/sandbox",
+    keywords: ["sandbox", "hosted", "twin"],
   },
   {
     id: "cli-tasks",
@@ -140,11 +142,5 @@ export const DOCS_TOPICS: DocsTopic[] = [
     title: "Troubleshooting",
     path: "/docs/troubleshooting",
     keywords: ["errors", "help", "fix", "debug"],
-  },
-  {
-    id: "changelog",
-    title: "Changelog",
-    path: "/changelog",
-    keywords: ["release", "version", "news"],
   },
 ];
