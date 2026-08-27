@@ -1,17 +1,36 @@
 # Twin Runtime Contract
 
+Every Pome digital twin honours the behaviour written below: how it boots, what
+it reads from the environment, which status codes and response bodies it
+answers, and the shape of the recorder tape it writes. Build against this
+document and any twin — one of the five first-party ones or one you wrote
+yourself — behaves the way you expect.
+
+**Changing any item below is a breaking contract change.** Update this document
+and the black-box suite in [`contract/`](./contract/) in the same pull request:
+the suite boots the built twins and asserts these lines, so a change that lands
+in one without the other turns the build red.
+
+Three consumers read this contract — the `pome` CLI, Pome's hosted control
+plane, and anyone self-hosting a twin. None of the three is privileged. A
+behaviour absent from this document is a behaviour no consumer may rely on.
+
+If you work at Pome, a contract change also needs the pome-cloud pull request
+that pins and verifies the new signed twin artifact (rule of record:
+`packages/twin-github/README.md`, runtime-contract section). Outside
+contributors have nothing to do there — that repo is private, and moving the
+pin is our side of the change, not yours.
+
+## Version history
+
 **Version 1.6.0** — the runtime dependency arrangement is `packages/wire` **with its built `dist/`**, 2026-08-05; recorder tape gains `request_headers` + `tool`, and the stripe x402 legs are recorded at all, 2026-07-29; Gmail named fault seeds added 2026-07-24; Linear contract added 2026-07-21; Gmail contract added 2026-07-20; boot-secret self-generation added 2026-07-10. Verified by the black-box suite in [`contract/`](./contract/).
-
-> **1.6.0 is a one-bullet change.** Only the *runtime dependency arrangement* bullet below moved: the twins now resolve their wire types from `packages/wire/dist` instead of `packages/shared-types/src` + its in-place runtime JS. Every other item in this document — each twin's entry point, env surface, HTTP status codes, response bodies, headers, recorder tape shape — is byte-identical in behavior. The contract suite in [`contract/`](./contract/) is unchanged apart from a build-prerequisite comment.
-
-This document enumerates everything pome-cloud (and the pome CLI) may rely on when booting and driving a twin. **Changing any item below is a breaking contract change**: update this document and the suite in the same PR, then open the matching pome-cloud consumer PR that pins and verifies the new signed twin artifact (rule of record: `packages/twin-github/README.md`, runtime-contract section).
 
 ## Boot
 
 - Entry point: `node dist/src/server.js` with **cwd = the twin package root** (`packages/twin-<name>`).
 - `GET /healthz` answers **200 within 3 seconds** of spawn.
 - Boot secret: an env-injected `TWIN_AUTH_SECRET` **always wins** — pome-cloud injects per-tenant secrets and the twin never self-generates when the variable is set (empty counts as unset). On a non-loopback bind host with no env secret, the twin **self-generates** a 32-byte hex secret, persists it at the compose-era location `.pome-data/<twin>/secret` (cwd-relative; `POME_TWIN_DATA_DIR` overrides the directory), prints it **once** to stdout, and reuses the persisted secret on subsequent boots. If the secret can be neither read nor generated, the twin still **refuses to boot** (exit code ≠ 0; the error names the variable). Loopback binds keep the dev-fallback path.
-- Runtime dependency arrangement (**changed in 1.6.0**): hoisted `node_modules` + `packages/wire` **with its built `dist/`** + `packages/sdk` **with its built `dist/`** (the twins are engine plugins; the runtime image ships both so the hoisted workspace symlinks resolve) — `npm run build -w @pome-sh/wire` and `npm run build -w @pome-sh/sdk`. `@pome-sh/wire` resolves through `exports` to `./dist/index.js`, so a plain-`node` boot loads ordinary compiled JS and no longer depends on type stripping. Until 1.5.0 this bullet named `packages/shared-types` **with its compiled runtime JS**: that package exported `./src/index.ts` and `build:runtime` emitted `.js` in place beside each `.ts` so the NodeNext `.js` specifiers would resolve, which required **Node ≥ 22.18** type stripping at runtime. Both requirements are gone. The GHCR runtime image ships `node:24`; the Dockerfiles are the reference implementation of this arrangement.
+- Runtime dependency arrangement: hoisted `node_modules` + `packages/wire` **with its built `dist/`** + `packages/sdk` **with its built `dist/`** (the twins are engine plugins; the runtime image ships both so the hoisted workspace symlinks resolve) — `npm run build -w @pome-sh/wire` and `npm run build -w @pome-sh/sdk`. `@pome-sh/wire` resolves through `exports` to `./dist/index.js`, so a plain-`node` boot loads ordinary compiled JS. The GHCR runtime image ships `node:24`; the Dockerfiles are the reference implementation of this arrangement.
 
 ## Environment surface
 
