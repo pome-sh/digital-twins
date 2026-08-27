@@ -8,7 +8,7 @@ allocates on `main` after the merge, in the same commit that moves
 write a version number here or in `package.json`. Released entries are insertions
 only: a correction is the next entry, naming the one it corrects.
 
-## Unreleased (minor)
+## 0.32.0 — 2026-08-27
 
 **A slack task seed could not declare `emoji`, and a stripe one could not declare
 `refunds`.** Both are fields those twins' seed schemas have declared for
