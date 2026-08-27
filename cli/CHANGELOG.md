@@ -8,7 +8,7 @@ allocates on `main` after the merge, in the same commit that moves
 write a version number here or in `package.json`. Released entries are insertions
 only: a correction is the next entry, naming the one it corrects.
 
-## Unreleased (minor)
+## 0.31.0 — 2026-08-27
 
 **One spelling for the sandbox command** (F-1695). `pome sandbox` is the only
 name for it, and `pome sandbox stop` the only name for its third subcommand. The
