@@ -24,6 +24,7 @@
 import { classificationColumns, readVerdicts, scoreColumns } from "./scoring.js";
 import type { ClassificationColumn, PomeVerdict, ScoreColumn } from "./scoring.js";
 import type { RefundWorld, StripeSeed } from "./dataset.js";
+import { trimTrailingSlashes } from "./url.js";
 
 export const DEFAULT_API_URL = "https://api.pome.sh";
 
@@ -58,7 +59,7 @@ export function controlPlaneRequest(
   path: string,
   body?: unknown,
 ): ControlPlaneRequest {
-  const base = (env.POME_API_URL?.trim() || DEFAULT_API_URL).replace(/\/+$/, "");
+  const base = trimTrailingSlashes(env.POME_API_URL?.trim() || DEFAULT_API_URL);
   const apiKey = env.POME_API_KEY?.trim();
   return {
     url: `${base}${path}`,
@@ -277,7 +278,7 @@ export async function mintSandbox(input: {
   }
   return {
     sessionId: body.session_id,
-    apiUrl: apiUrl.replace(/\/+$/, ""),
+    apiUrl: trimTrailingSlashes(apiUrl),
     agentToken: body.agent_token,
     expiresAt: body.expires_at,
   };

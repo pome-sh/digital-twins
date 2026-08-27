@@ -17,6 +17,7 @@ import { generateText, stepCountIs, tool } from "ai";
 import { z } from "zod";
 
 import type { RetryPolicy } from "./dataset.js";
+import { trimTrailingSlashes } from "./url.js";
 
 /** The model this example drives. Overridable so a reader can run it on
  *  whatever their key is for. */
@@ -44,7 +45,7 @@ export function refundRequest(
   refund: { charge: string; amountMinorUnits: number },
 ): TwinRequest {
   return {
-    url: `${apiUrl.replace(/\/+$/, "")}/v1/refunds`,
+    url: `${trimTrailingSlashes(apiUrl)}/v1/refunds`,
     method: "POST",
     headers: {
       authorization: `Bearer ${agentToken}`,
@@ -114,7 +115,7 @@ export async function runAgent(input: {
     return res.ok ? { ok: true as const, status: res.status, body } : { ok: false as const, status: res.status, body };
   };
 
-  const base = input.apiUrl.replace(/\/+$/, "");
+  const base = trimTrailingSlashes(input.apiUrl);
   const read = (path: string) => ({
     url: `${base}${path}`,
     method: "GET",
