@@ -8,6 +8,19 @@ allocates on `main` after the merge, in the same commit that moves
 write a version number here or in `package.json`. Released entries are insertions
 only: a correction is the next entry, naming the one it corrects.
 
+## Unreleased (patch)
+
+`pome install` is retired, and its redirect message no longer ends at a step you
+cannot look up. It used to close with "the pome-intake / REST-launch preflight" —
+internal vocabulary for something that lives inside an installed skill and
+appears on no published page, which left a reader two commands they could run
+and a third step they could not find. The docs are gated against documenting
+retired commands, so this message is the only surface there is. It now names the
+two wiring commands, the `pome` skill that routes from there, the `pome register
+agent` / `pome doctor` equivalent for a local repo, and the two docs.pome.sh URLs
+that walk the rest. Behavior is unchanged: still registered, still tolerates the
+old flags, still exits 0.
+
 ## 0.29.1 — 2026-08-26
 
 A task's `## Config` block now accepts `pass_threshold` as an alias for

@@ -278,14 +278,14 @@ export function createProgram() {
 
   program
     .command("install")
-    // The Gen-1 agent-driven wiring is retired; this is a redirect to
-    // the Gen-2 path. allowUnknownOption + allowExcessArguments keep old
+    // The Gen-1 agent-driven wiring is retired; this is a redirect to the
+    // current path. allowUnknownOption + allowExcessArguments keep old
     // invocations (`pome install --interactive`, `--api-url …`) landing on the
     // redirect instead of erroring on a now-removed flag or stray operand.
     .allowUnknownOption()
     .allowExcessArguments()
     .description(
-      "Retired. Prints the Gen-2 wiring path: `claude mcp add … pome` + `npx skills add pome-sh/digital-twins --skill '*'`, then the pome-intake / REST-launch preflight.",
+      "Retired. Prints the wiring path it was replaced by: `claude mcp add … pome` + `npx skills add pome-sh/digital-twins --skill '*'`, then the `pome` skill, and the docs URL that walks the rest.",
     )
     .action(async () => {
       const { runInstall } = await import("./install.js");

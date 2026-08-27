@@ -5,36 +5,50 @@
 // `pome-setup` skill, staging the edits in a shadow copy and gating them behind
 // a terminal diff. `pome-setup` then became a redirect
 // tombstone — so the wiring no longer actually ran, it just injected a pointer.
-// This command is now a thin redirect to the Gen-2 path; the shadow-diff engine
-// (`embedded-wiring.ts`) and the Agent SDK provisioning (`agent-sdk.ts`) were
-// deleted with it.
+// This command is now a thin redirect to the current path; the shadow-diff
+// engine (`embedded-wiring.ts`) and the Agent SDK provisioning (`agent-sdk.ts`)
+// were deleted with it.
 //
-// Wiring your own agent to pome is now: connect the pome control MCP, install
-// the Gen-2 coach skill set, then run `pome-intake` (managed agents) or the
-// coach's REST-launch preflight (self-hosted REST agents).
+// The message below is the only user-facing surface for the retirement:
+// `scripts/check-docs-retired-surface.ts` keeps docs.pome.sh from documenting
+// retired commands at all, so a reader who runs this one has nowhere else to
+// land. It therefore names only things they can then look up on docs.pome.sh.
+// It used to end at "the pome-intake / REST-launch preflight" — internal
+// vocabulary for a step that lives inside an installed skill
+// (`pome-run-task/references/launch-rest.md`) and appears on no published page,
+// which left the reader with two commands they could run and a third step they
+// could not find. "Gen-1"/"Gen-2" are ours too: the docs site never uses either.
 
-/** The Gen-2 wiring path `pome install` now points at. Printed to stderr,
- *  matching the rest of the CLI's informational output. */
-const GEN2_REDIRECT = [
-  "pome install (Gen-1 agent-driven wiring) is retired.",
+/** The wiring path `pome install` now points at. Printed to stderr, matching
+ *  the rest of the CLI's informational output.
+ *
+ *  Every step here is documented on docs.pome.sh, and
+ *  `install-command.test.ts` holds it that way: the skills it names are checked
+ *  against the `skills/` directory, and the internal terms it dropped are
+ *  asserted absent. */
+const RETIRED_REDIRECT = [
+  "pome install is retired. Wiring your agent to Pome is two commands:",
   "",
-  "Wire your own agent to pome the Gen-2 way:",
   "  1. claude mcp add --transport http pome https://mcp.pome.sh/mcp",
-  "                                           # connect the pome control MCP",
+  "                                           # connect the Pome MCP server",
   "  2. npx skills add pome-sh/digital-twins --skill '*'",
-  "                                           # install the Gen-2 coach skills",
+  "                                           # install the coach skills",
   "                                           # (--skill '*' takes all six; the",
   "                                           #  picker opens with none ticked)",
-  "  3. run the pome-intake skill to register the examinee and check twin",
-  "     coverage (self-hosted REST agent: use the coach's REST-launch preflight).",
   "",
-  "Already have pome.json? `pome register agent <name>` and `pome doctor` still apply.",
-  "See `pome docs getting-started`.",
+  "Then ask your agent to run the `pome` skill. It routes to `pome-intake`,",
+  "which registers the agent under test and checks twin coverage for it.",
+  "",
+  "Already have a repo with a pome.json? `pome register agent <name>` then",
+  "`pome doctor` is the same wiring from the CLI side.",
+  "",
+  "Walkthrough:      https://docs.pome.sh/quickstart/claude-code",
+  "Your own agent:   https://docs.pome.sh/existing-agent",
 ];
 
-/** Print the Gen-2 wiring path. Exported for the `pome install` command and its
- *  unit test. Never errors — a retired command should land the user on the
+/** Print the current wiring path. Exported for the `pome install` command and
+ *  its unit test. Never errors — a retired command should land the user on the
  *  right path, not exit non-zero. */
 export function runInstall(): void {
-  for (const line of GEN2_REDIRECT) console.error(line);
+  for (const line of RETIRED_REDIRECT) console.error(line);
 }
