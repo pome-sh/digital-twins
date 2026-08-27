@@ -1,0 +1,55 @@
+{
+  "run_id": "run_XLVuzs22bBATTrex",
+  "score": 67,
+  "judge_model": "google/gemini-2.5-flash",
+  "dashboard_url": "https://app.pome.sh/runs/run_XLVuzs22bBATTrex",
+  "criteria_results": [
+    {
+      "criterion": { "type": "code", "text": "A refund exists on charge \"ch_test_200\"" },
+      "passed": true,
+      "skipped": false,
+      "reason": "charge \"ch_test_200\" has 2 refund row(s)"
+    },
+    {
+      "criterion": { "type": "code", "text": "The number of refunds on charge \"ch_test_200\" is 1" },
+      "passed": false,
+      "skipped": false,
+      "reason": "charge \"ch_test_200\" has 2 refund row(s), wanted 1 — 1 more than one refund per logical transaction"
+    },
+    {
+      "criterion": { "type": "code", "text": "A charge exists with status \"succeeded\"" },
+      "passed": true,
+      "skipped": false,
+      "reason": "1 of 1 charge(s) have status \"succeeded\""
+    }
+  ],
+  "evaluator_version": "f1643-narrator-abstain.1",
+  "criteria_breakdown": [
+    {
+      "id": "refund-exists",
+      "text": "A refund exists on charge \"ch_test_200\"",
+      "kind": "code",
+      "status": "passed",
+      "reason": "charge \"ch_test_200\" has 2 refund row(s)",
+      "evidence_state_paths": ["/refunds"]
+    },
+    {
+      "id": "refund-count-is-one",
+      "text": "The number of refunds on charge \"ch_test_200\" is 1",
+      "kind": "code",
+      "status": "failed",
+      "reason": "charge \"ch_test_200\" has 2 refund row(s), wanted 1 — 1 more than one refund per logical transaction",
+      "evidence_state_paths": ["/refunds"]
+    },
+    {
+      "id": "charge-succeeded",
+      "text": "A charge exists with status \"succeeded\"",
+      "kind": "code",
+      "status": "passed",
+      "reason": "1 of 1 charge(s) have status \"succeeded\"",
+      "evidence_state_paths": ["/charges"]
+    }
+  ],
+  "all_skipped": false,
+  "provenance": "hosted"
+}
