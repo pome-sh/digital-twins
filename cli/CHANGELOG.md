@@ -8,6 +8,32 @@ allocates on `main` after the merge, in the same commit that moves
 write a version number here or in `package.json`. Released entries are insertions
 only: a correction is the next entry, naming the one it corrects.
 
+## Unreleased (minor)
+
+Back-compat surfaces are removed rather than documented. There is nothing in the
+field to be compatible with, and every one of these was a place where the CLI
+explained its own past to a reader who had no way to care.
+
+Removed:
+
+- `pome install`. It printed a wiring path and nothing else; the two commands it
+  named live in the quickstart. Its `install.ts` and the redirect message are
+  gone with it.
+- `pome sandbox create --show-secrets` and `pome run --hosted`. Both were
+  accepted-and-ignored no-ops that printed a note about being no-ops.
+- The `[D]` / `[P]` criterion markers' migration error. `[code]` and `[model]`
+  are the grammar; any other marker is prose, and the near-miss guard still
+  refuses a line that reaches for a real marker and misses.
+- `pome inspect`'s exit-2 path for an events.jsonl with no `kind` discriminator
+  ("produced by an older CLI version"). Every row is upgraded to the unified
+  shape before it reaches disk, so such a file is corrupt, not old, and the
+  parse error says so.
+- The `scenario_path` spelling in the verdict-artifact recognizer, and the
+  retired-topic keywords in `pome docs` (`test-with-pome`, `pome-test`).
+
+`pome docs --url` keeps its behavior — it suppresses the interactive picker —
+and is now described by what it does rather than as a compatibility flag.
+
 ## 0.29.1 — 2026-08-26
 
 A task's `## Config` block now accepts `pass_threshold` as an alias for

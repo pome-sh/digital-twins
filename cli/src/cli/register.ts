@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// `pome register agent <name>` / `pome install` — the vercel-link seam. POSTs
+// `pome register agent <name>` — the vercel-link seam. POSTs
 // the manifest identity to `POST /v1/agents` (the slug resolver: live
 // slug → alias → near-miss 409 → auto-create under the caller's team), then
 // persists the server-canonical identity into `pome.json` and caches the
@@ -117,11 +117,9 @@ function warnUnknownFramework(existingAgent: Record<string, unknown>): void {
 }
 
 /** Surface the slug rename when the resolver matched an old slug via an
- *  alias (cloud emits `resolved_via: "alias"` + a `hint` since v0.4.18). By this
+ *  alias (cloud emits `resolved_via: "alias"` + a `hint`). By this
  *  point the manifest has already been rewritten to the new canonical slug, so
- *  attribution self-heals silently; this only makes the change visible. Shared
- *  by `pome register agent` and `pome install` (both go through
- *  createAndPersistAgent), so the notice prints on either path.
+ *  attribution self-heals silently; this only makes the change visible.
  *
  *  Gated strictly on `resolved_via === "alias"` — the "alias branch only" rule.
  *  A bare `hint` is NOT a rename signal (a future cloud may attach a hint to a

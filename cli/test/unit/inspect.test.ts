@@ -3,7 +3,6 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  LEGACY_EVENTS_MESSAGE,
   computeTraceHealth,
   readEventsJsonl,
   renderEvents,
@@ -151,42 +150,12 @@ describe("readEventsJsonl", () => {
     ]);
   });
 
-  it("flags legacy rows that are missing the kind discriminator", async () => {
-    // Legacy row: shape matches legacy recorderEventSchema (no `kind`).
-    const legacy = {
-      ts: "2026-05-01T00:00:00.000Z",
-      run_id: "run_old",
-      twin: "github",
-      request_id: "req_1",
-      step_id: null,
-      tool_call_id: null,
-      method: "GET",
-      path: "/repos/acme/api",
-      request_body: null,
-      status: 200,
-      response_body: null,
-      latency_ms: 3,
-      fidelity: "semantic",
-      state_mutation: false,
-      state_delta: null,
-      error: null,
-    };
-    await writeFile(join(tmp, "events.jsonl"), JSON.stringify(legacy) + "\n");
-    const result = await readEventsJsonl(tmp);
-    expect(result.kind).toBe("legacy");
-  });
-
-  it("flags a legacy row even when mixed with new-shape rows", async () => {
-    // Defensive: if a corrupted run had a mix, we still surface the legacy
-    // error rather than partially rendering.
-    const lines =
-      JSON.stringify(twinHttp) +
-      "\n" +
-      JSON.stringify({ ts: "x", run_id: "y", twin: "github", request_id: "z" }) +
-      "\n";
-    await writeFile(join(tmp, "events.jsonl"), lines);
-    const result = await readEventsJsonl(tmp);
-    expect(result.kind).toBe("legacy");
+  it("throws on a row with no kind discriminator, rather than tolerating it", async () => {
+    // Every row is upgraded to the unified shape before it reaches disk, so a
+    // row without `kind` is a corrupt file. There is no tolerant path for it.
+    const unkinded = { ts: "2026-05-01T00:00:00.000Z", run_id: "r", twin: "github", request_id: "q" };
+    await writeFile(join(tmp, "events.jsonl"), JSON.stringify(unkinded) + "\n");
+    await expect(readEventsJsonl(tmp)).rejects.toThrow();
   });
 
   it("ignores blank lines", async () => {
@@ -307,15 +276,5 @@ describe("renderEvents", () => {
 
   it("handles the empty case", () => {
     expect(renderEvents([])).toEqual(["Events: (none)"]);
-  });
-});
-
-describe("LEGACY_EVENTS_MESSAGE", () => {
- it("is the exact wording the contract locks", () => {
-    // The exit-code-2 contract is the message + the code. If either drifts,
-    // tooling that scripts pome inspect (CI gates, dashboards) breaks.
-    expect(LEGACY_EVENTS_MESSAGE).toBe(
-      "this run was produced by an older CLI version (pre-M0); rerun against current CLI to view",
-    );
   });
 });

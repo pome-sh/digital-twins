@@ -104,7 +104,7 @@ async function startFakeCloud(): Promise<number> {
   return port;
 }
 
-describe("pome run --hosted (e2e via spawn)", () => {
+describe("pome run, hosted (e2e via spawn)", () => {
   let tmp: string;
   let port: number;
 
@@ -171,7 +171,6 @@ describe("pome run --hosted (e2e via spawn)", () => {
         CLI_ENTRY,
         "run",
         taskPath,
-        "--hosted",
         "--api-url",
         `http://127.0.0.1:${port}`,
         "--agent",
@@ -491,7 +490,6 @@ describe("pome run --hosted (e2e via spawn)", () => {
         CLI_ENTRY,
         "run",
         taskPath,
-        "--hosted",
         "--api-url",
         `http://127.0.0.1:${port}`,
         "--agent",

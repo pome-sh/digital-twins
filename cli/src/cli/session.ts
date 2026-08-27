@@ -198,7 +198,6 @@ export async function runSessionCreate(opts: {
   /** One-or-more twins. Repeated `--twin` flags stand up a multi-twin session.
    *  May be empty when `seedPath` names exactly one twin. */
   twins: string[];
-  showSecrets: boolean;
   format: "text" | "json" | "env";
   secretsFile?: string;
   /** `--seed <path>`: the sandbox starts from this seed instead of each twin's
@@ -277,17 +276,12 @@ export async function runSessionCreate(opts: {
     }
   }
   if (!printedAny) {
-    // Fallback for older cloud responses that only ship twin_url. Drop the
-    // "(legacy)" label that confused users into thinking the URL was
-    // deprecated (F21) — it's just the un-disambiguated single endpoint.
+    // The un-disambiguated single endpoint: a response that ships twin_url
+    // without per-twin bases has exactly one twin to point at.
     console.error(`Twin URL: ${session.twin_url}`);
   }
-  if (opts.showSecrets) {
-    console.error("--show-secrets no longer prints secrets. Use --secrets-file <path>.");
-  }
   console.error("Secrets redacted.");
-  // Print the concrete dashboard deep-link rather than the vague "open the
-  // Twins page" hint (F22). Users who care can copy it straight into the
+  // Concrete deep-link, not "open the Twins page" — copyable straight into a
   // browser.
   console.error(`Dashboard: ${DEFAULT_DASHBOARD_URL}/twins/${session.session_id}`);
 }

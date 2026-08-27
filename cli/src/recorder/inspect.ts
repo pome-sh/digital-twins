@@ -3,7 +3,6 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   eventSchema,
-  isLegacyEventRow,
   type Event,
   type HookEvent,
   type LlmCallEvent,
@@ -15,22 +14,19 @@ import {
 } from "../types/shared.js";
 
 /**
- * Result of reading + classifying a run's `events.jsonl`. The reader can take
- * three paths:
+ * Result of reading + classifying a run's `events.jsonl`:
  *   - `kind: "events"` — every row parsed cleanly against the discriminated
  *     union; the renderer walks `events` to print sections + trace health.
- *   - `kind: "legacy"` — at least one row is missing the `kind` discriminator
- *     (legacy shape). `pome inspect` prints the legacy error and exits 2.
  *   - `kind: "missing"` — `events.jsonl` does not exist (run never produced
  *     trace blobs). Renderer prints a one-line note; no exit-2.
+ *
+ * A row the union rejects throws out of the zod parse below. There is no
+ * tolerant path: the writer upgrades every row to the unified shape before it
+ * touches disk, so a row without a `kind` is a corrupt file, not an old one.
  */
 export type ReadEventsResult =
   | { kind: "events"; events: Event[] }
-  | { kind: "legacy" }
   | { kind: "missing" };
-
-export const LEGACY_EVENTS_MESSAGE =
-  "this run was produced by an older CLI version (pre-M0); rerun against current CLI to view";
 
 export async function readEventsJsonl(runDir: string): Promise<ReadEventsResult> {
   let raw: string;
@@ -48,10 +44,6 @@ export async function readEventsJsonl(runDir: string): Promise<ReadEventsResult>
     .map((line) => line.trim())
     .filter((line) => line.length > 0)
     .map((line) => JSON.parse(line) as unknown);
-
-  if (rows.some(isLegacyEventRow)) {
-    return { kind: "legacy" };
-  }
 
   const events = rows.map((row) => eventSchema.parse(row));
   return { kind: "events", events };

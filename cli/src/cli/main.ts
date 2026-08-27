@@ -14,7 +14,6 @@ import {
   readMetaSummary,
 } from "../recorder/artifacts.js";
 import {
-  LEGACY_EVENTS_MESSAGE,
   computeTraceHealth,
   readEventsJsonl,
   renderEvents,
@@ -277,22 +276,6 @@ export function createProgram() {
     });
 
   program
-    .command("install")
-    // The Gen-1 agent-driven wiring is retired; this is a redirect to
-    // the Gen-2 path. allowUnknownOption + allowExcessArguments keep old
-    // invocations (`pome install --interactive`, `--api-url …`) landing on the
-    // redirect instead of erroring on a now-removed flag or stray operand.
-    .allowUnknownOption()
-    .allowExcessArguments()
-    .description(
-      "Retired. Prints the Gen-2 wiring path: `claude mcp add … pome` + `npx skills add pome-sh/digital-twins --skill '*'`, then the pome-intake / REST-launch preflight.",
-    )
-    .action(async () => {
-      const { runInstall } = await import("./install.js");
-      runInstall();
-    });
-
-  program
     .command("login")
     .description("Sign in with Clerk and store a hosted team API key (macOS Keychain or ~/.pome/credentials.json)")
     .option(
@@ -336,7 +319,7 @@ export function createProgram() {
     )
     .option(
       "--url",
-      "Print docs.pome.sh URLs (default behavior; retained for compatibility).",
+      "Print the URL instead of opening the interactive topic picker.",
       false,
     )
     .description(
@@ -461,10 +444,6 @@ export function createProgram() {
       if (code !== 0) process.exitCode = code;
     });
 
-  // `pome skills` / `pome skills install` retired. It only symlinked
-  // the two Gen-1 tombstone skills into ~/.claude/skills/; the Gen-2 coach set
-  // installs via `npx skills add pome-sh/digital-twins`.
-
   const register = program
     .command("register")
     .description(
@@ -549,7 +528,6 @@ export function createProgram() {
       "Control-plane URL",
       process.env.POME_API_URL ?? DEFAULT_CONTROL_PLANE_URL,
     )
-    .option("--show-secrets", "Deprecated: secrets are never printed; use --secrets-file", false)
     .option(
       "--secrets-file <path>",
       "Write shell exports containing session secrets to a local file with mode 0600",
@@ -563,7 +541,6 @@ export function createProgram() {
       async (opts: {
         twin?: string[];
         apiUrl: string;
-        showSecrets: boolean;
         secretsFile?: string;
         format: string;
         seed?: string;
@@ -578,7 +555,6 @@ export function createProgram() {
           await runSessionCreate({
             apiBaseUrl: opts.apiUrl,
             twins: opts.twin ?? [],
-            showSecrets: opts.showSecrets,
             format: format as "text" | "json" | "env",
             secretsFile: opts.secretsFile,
             seedPath: opts.seed,
@@ -689,10 +665,6 @@ export function createProgram() {
         "k=1 keeps today's single-run behavior exactly.",
     )
     .option("--artifacts-dir <dir>", "Directory for run artifacts", "runs")
-    // --hosted is now the default. The flag stays as a one-release no-op so
-    // existing scripts and copy-pasted `pome docs` snippets don't break;
-    // remove on the next minor bump.
-    .option("--hosted", "Deprecated: hosted is now the default. Flag is a no-op.")
     .option(
       "--api-url <url>",
       "Control-plane base URL.",
@@ -721,7 +693,6 @@ export function createProgram() {
           agent?: string;
           trials?: string;
           artifactsDir: string;
-          hosted: boolean;
           local?: boolean;
           apiUrl: string;
           agentModel: string;
@@ -837,16 +808,8 @@ export function createProgram() {
         // `--local` (documented) or POME_LOCAL=1 (an internal escape hatch).
         // Self-host is CAPTURE-ONLY — it records the raw trace and
         // never scores/judges/correlates. A verdict comes only from the cloud
-        // (`pome eval <dir>`, or a hosted `pome run`). The --hosted flag is a
-        // deprecated no-op kept for one release.
+        // (`pome eval <dir>`, or a hosted `pome run`).
         const useLocal = options.local === true || process.env.POME_LOCAL === "1";
-        if (options.hosted && useLocal) {
-          console.error(
-            "Warning: --hosted is a no-op; running against a local twin (--local / POME_LOCAL=1). Drop it to record runs to the cloud.",
-          );
-        } else if (options.hosted) {
-          console.error("Note: --hosted is now the default; the flag is a deprecated no-op and will be removed in a future release.");
-        }
 
         // Trial groups are a hosted feature: the verdicts come
         // from cloud evaluation, and self-host runs are capture-only. Reject
@@ -1145,14 +1108,6 @@ export function createProgram() {
       const runDir = latest?.run_dir ?? resolve(run);
 
       const eventsResult = await readEventsJsonl(runDir);
-      if (eventsResult.kind === "legacy") {
-        // Exit code 2 is reserved for "legacy events.jsonl
-        // detected" — distinct from a JSON parse error (which throws and
-        // surfaces as exit code 1 via commander's default handling).
-        console.error(LEGACY_EVENTS_MESSAGE);
-        process.exitCode = 2;
-        return;
-      }
 
       const meta = await readMetaSummary(runDir);
 
@@ -1186,11 +1141,11 @@ export function createProgram() {
       "Path to the task .md file (only with an events.jsonl target)",
     )
     .description(
-      "Assemble a paste-into-IDE fix prompt (no LLM call, no network). With no args, reads the latest FAILED run set under ./runs: the persisted cloud verdicts (verdict.json) become grouped failure signatures over the raw traces, in one prompt. Point it at a trial run dir to target that set, or use the legacy `<events.jsonl> <task.md>` form for a single trace.",
+      "Assemble a paste-into-IDE fix prompt (no LLM call, no network). With no args, reads the latest FAILED run set under ./runs: the persisted cloud verdicts (verdict.json) become grouped failure signatures over the raw traces, in one prompt. Point it at a trial run dir to target that set, or point it at an `events.jsonl` with its task file for a single trace.",
     )
     .action(async (target?: string, taskArg?: string) => {
-      // Legacy 2-arg form: <events.jsonl> <task.md> — unchanged
-      // (CAPTURE-ONLY: raw trace + declared criteria, no verdict).
+      // Single-trace form: <events.jsonl> <task.md>. CAPTURE-ONLY — raw trace
+      // plus declared criteria, no verdict, which is what a --local run has.
       if (target !== undefined && target.endsWith(".jsonl")) {
         if (!taskArg) {
           console.error(

@@ -12,8 +12,7 @@ const CONTINUATION = " ".repeat(FIX_COLUMN.length);
 
 export interface RenderDoctorReportOptions {
   /** First line of the report. `pome doctor` and the run gate keep the
-   *  moment-03 default; `pome install` passes moment 02's
-   *  "verifying the wiring …". */
+   *  default; callers that frame it differently pass their own. */
   header?: string;
   /** When the report passes, append a caveat that a green check means
    *  the wiring is right, not that the examinee runs cleanly. `pome doctor`

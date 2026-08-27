@@ -30,22 +30,14 @@ describe("pome docs helpers", () => {
     expect(findTopic("install", DOCS_TOPICS)?.id).toBe("getting-started");
   });
 
-  it("keeps routing the retired skills-setup/skills-test keywords", () => {
-    // These keywords have no topic of their own. Each must still resolve to a
-    // live topic rather than exit 2 on an unknown topic — some by routing onto
-    // a related topic, some by matching a surviving keyword via substring.
+  it("routes the words a user actually types to a live topic", () => {
     expect(findTopic("wire", DOCS_TOPICS)?.id).toBe("existing-agent");
-    expect(findTopic("test-with-pome", DOCS_TOPICS)?.id).toBe("cli-run");
-    expect(findTopic("/test-with-pome", DOCS_TOPICS)?.id).toBe("cli-run");
-    expect(findTopic("pome-test", DOCS_TOPICS)?.id).toBe("cli-run");
     // `pome eval` has no dedicated docs page and is a different workflow from
     // `pome inspect`, so it routes to the CLI reference index, not cli-inspect.
     expect(findTopic("eval", DOCS_TOPICS)?.id).toBe("cli");
-    // Already-resolving keywords (via existing substrings) must not regress.
     expect(findTopic("register", DOCS_TOPICS)?.id).toBe("existing-agent");
-    expect(findTopic("pome-setup", DOCS_TOPICS)).not.toBeNull();
     expect(findTopic("setup", DOCS_TOPICS)).not.toBeNull();
-    expect(findTopic("run scenarios", DOCS_TOPICS)).not.toBeNull();
+    expect(findTopic("scenarios", DOCS_TOPICS)).not.toBeNull();
   });
 
   it("suggestTopics lists nearby ids for unknown input", () => {

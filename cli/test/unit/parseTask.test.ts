@@ -596,22 +596,12 @@ twins: ["github", "slack"]
     expect(scenario.criteria[1]).toMatchObject({ type: "model", twin: "slack" });
   });
 
-  it("rejects the legacy [D] marker with a migration hint", () => {
-    expect(() => parseTask(single("- [D] Issue #1 is labeled"))).toThrow(
-      /\[D\]→\[code\]/,
-    );
-  });
-
-  it("rejects the legacy [P] marker with a migration hint", () => {
-    expect(() => parseTask(single("- [P] The summary reads well"))).toThrow(
-      /\[P\]→\[model\]/,
-    );
-  });
-
-  it("rejects a tagged legacy marker ([D:github])", () => {
-    expect(() => parseTask(multi("- [D:github] Issue #1 is labeled"))).toThrow(
-      /\[D\]→\[code\]/,
-    );
+  it("knows only [code] and [model] — any other marker is prose", () => {
+    // `[D]`/`[P]` carry no special handling: the grammar names two kinds and
+    // anything else is a bullet. A task whose only criterion lines use an
+    // unknown marker parses to zero criteria and fails the schema's minimum.
+    expect(() => parseTask(single("- [D] Issue #1 is labeled"))).toThrow();
+    expect(() => parseTask(single("- [P] The summary reads well"))).toThrow();
   });
 
   it("still skips non-criterion bullet lines silently", () => {
@@ -712,18 +702,16 @@ twins: ["github", "slack"]
     ).toThrow(/needs a twin tag \(\[code:<twin>\]\)/);
   });
 
-  // A malformed near-miss must still error rather than being silently dropped
-  // as prose — the exact defect class LEGACY_CRITERION_LINE_RE exists to catch
-  // for [D]/[P]. Pins that adding the always-scored group to CRITERION_LINE_RE
-  // (and the match-index shift it required in parseCriteria) did not make the
-  // retired-marker guard unreachable for a file that ALSO carries a valid
-  // always-scored criterion.
-  it("does not let a retired [D] marker slip through as silently-skipped prose beside a valid always-scored criterion", () => {
+  // A near-miss on the REAL grammar must still error rather than being dropped
+  // as prose, including in a file that also carries a valid always-scored
+  // criterion — the always-scored group in CRITERION_LINE_RE shifted the match
+  // indices in parseCriteria, and this pins that the guard stayed reachable.
+  it("refuses a near-miss beside a valid always-scored criterion", () => {
     expect(() =>
       parseTask(
-        single("- [D] Issue #1 is labeled\n- [code always-scored] Something else"),
+        single("- [code always-scored extra] Issue #1 is labeled\n- [code always-scored] Something else"),
       ),
-    ).toThrow(/\[D\]→\[code\]/);
+    ).toThrow(/reaches for a \[code\]\/\[model\] marker/);
   });
 });
 

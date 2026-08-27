@@ -1,17 +1,7 @@
 ---
 name: pome
-description: Entry point for testing an agent with Pome — routes to the right coach skill by context (managed-agent YAML → pome-intake, local repo / self-hosted REST agent → the local-examinee run path, plain task authoring → pome-author-task) and maps CLI-era commands to the hosted MCP tools. Use when the user says "test my agent with pome", "run pome", or "use pome". Supersedes the Gen-1 /pome-test skill.
+description: Entry point for testing an agent with Pome — routes to the right coach skill by context (managed-agent YAML → pome-intake, local repo / self-hosted REST agent → the local-examinee run path, plain task authoring → pome-author-task). Use when the user says "test my agent with pome", "run pome", or "use pome".
 ---
-
-<!--
-Naming decision (2026-07-22): this router is named `pome`, NOT
-`pome-test`. The Gen-1 skill that the retired `pome skills install` command
-seeded may still occupy `pome-test` in users' skills directories, so a Gen-2
-skill with the same name would collide for anyone who has Gen-1. Gen-1
-`pome-setup` / `pome-test` were retired in M2 to tombstones that
-redirect here, then removed from the CLI; this router owns the shared
-trigger phrases so the two generations never claim the same entry point.
--->
 
 # Pome (entry router)
 
