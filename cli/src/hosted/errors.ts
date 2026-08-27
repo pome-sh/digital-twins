@@ -111,5 +111,9 @@ export function exitCodeFor(err: unknown): number {
   if (err instanceof HostedAuthError) return 3;
   if (err instanceof HostedQuotaError) return 4;
   if (err instanceof HostedUsageError) return 5;
+  // A refused discard is a usage error, not a twin/orch failure: nothing is
+  // broken, the invocation was missing `--discard`. Mapped here rather than at
+  // the one call site so every caller of this mapper agrees on it.
+  if (err instanceof HostedDiscardRefusedError) return 5;
   return 2;
 }

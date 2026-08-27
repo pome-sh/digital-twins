@@ -297,7 +297,8 @@ describe("bare `pome run` glue", () => {
     process.chdir(dir);
     await run();
 
-    expect(process.exitCode).toBe(1);
+    // 5 = usage error, the code for an invocation that could not proceed.
+    expect(process.exitCode).toBe(5);
     const err = stderr.join("\n");
     expect(err).toContain("wiring check failed");
     expect(err).not.toContain(runYoursFrameLines()[0]);

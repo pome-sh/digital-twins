@@ -63,7 +63,10 @@ describe("pome run — doctor preflight gate", () => {
       "--no-capture",
     ]);
 
-    expect(process.exitCode).toBe(1);
+    // 5 = usage error. NOT 1: the documented table reserves 1 for "scored below
+    // its pass threshold", and nothing ran here — a CI job branching on $? would
+    // read a hardcoded production host as an agent regression.
+    expect(process.exitCode).toBe(5);
     const text = stderr.join("\n");
     expect(text).toContain("cause");
     expect(text).toContain("api.github.com");

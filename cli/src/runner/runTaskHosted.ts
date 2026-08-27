@@ -118,7 +118,7 @@ export interface RunTaskHostedResult {
  * host-rewrites api.pome.sh→mcp.pome.sh with NO `/mcp` suffix. Trusting it would
  * drift POME_*_MCP_URL off main's `${twin_url}/mcp`. So for a synthesized entry
  * we construct `${api_url}/mcp`; only a cloud-returned value gets ensureMcpSuffix
- * (the same normalization `pome session create` applies). */
+ * (the same normalization `pome sandbox create` applies). */
 export function buildAgentEnv(params: {
   session: CreateSessionResponse;
   twins: string[];

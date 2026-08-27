@@ -374,7 +374,7 @@ export function createProgram() {
     .argument("[twin]", "Twin id (e.g. github). Omit to list twins that declare checks.")
     .option("--json", "Emit the declaration as JSON (for skills and agents).", false)
     .description(
-      "Browse the typed checks a twin declares — the closed set [code] criteria come from",
+      "Browse the typed checks a twin declares — the closed set a [code] criterion is graded by",
     )
     .action(async (twin: string | undefined, opts: { json: boolean }) => {
       await runChecksCommand(twin, { json: opts.json });
@@ -488,20 +488,21 @@ export function createProgram() {
       },
     );
 
-  // `sandbox` is the product noun (VOCABULARY.md); `session` is the
-  // spelling the CLI shipped with and every existing script types. Commander
-  // resolves both to this one command, so every subcommand, flag and line of
-  // output below is reachable under either without a second tree to drift.
+  // One spelling, and it is the product noun (VOCABULARY.md bans user-facing
+  // `session` outright). The `session` alias existed so scripts written against
+  // the CLI's first spelling kept working; there are no such scripts, and an
+  // alias a reader can meet in `--help` is a second name for one thing.
+  //
+  // `session_id`, `/v1/sessions` and the `ses_` prefix are the WIRE and stay.
   const session = program
-    .command("session")
-    .alias("sandbox")
+    .command("sandbox")
     .description(
-      "Hosted sandbox sessions (same API as the dashboard Twins page — requires login)",
+      "Hosted sandboxes (same API as the dashboard Twins page — requires login)",
     );
 
   session
     .command("create")
-    .description("Create a hosted sandbox session for one or more twins and print its connection info")
+    .description("Create a hosted sandbox for one or more twins and print its connection info")
     .option(
       "--twin <name>",
       // The enumeration is derived, never typed: this line is the public
@@ -516,7 +517,7 @@ export function createProgram() {
       // reject the invocation before the action runs, so the check moved into
       // `runSessionCreate`, which fails with the same "No twin specified"
       // sentence when neither source supplies one.
-      `${SESSION_TWIN_NAMES.join(" | ")}. Repeat the flag for a multi-twin session (e.g. --twin github --twin gmail). Optional when --seed names exactly one twin.`,
+      `${SESSION_TWIN_NAMES.join(" | ")}. Repeat the flag for a multi-twin sandbox (e.g. --twin github --twin gmail). Optional when --seed names exactly one twin.`,
       (value: string, previous: string[] = []) => [...previous, value],
     )
     .option(
@@ -568,7 +569,7 @@ export function createProgram() {
 
   session
     .command("list")
-    .description("List hosted sessions (defaults to --state running, like the dashboard)")
+    .description("List hosted sandboxes (defaults to --state running, like the dashboard)")
     .option(
       "--api-url <url>",
       "Control-plane URL",
@@ -613,9 +614,8 @@ export function createProgram() {
 
   session
     .command("stop")
-    .alias("kill")
-    .description("Stop a hosted session (aliased as `kill`)")
-    .argument("<session-id>", "Session id (ses_…)")
+    .description("Stop a hosted sandbox")
+    .argument("<session-id>", "Sandbox id (ses_…)")
     .option(
       "--api-url <url>",
       "Control-plane URL",
@@ -643,7 +643,7 @@ export function createProgram() {
           // so we don't print a duplicate (or bare blank) line here.
           const friendly = friendlyHostedError(err);
           if (friendly) console.error(friendly);
-          process.exitCode = 2;
+          process.exitCode = exitCodeFor(err);
         }
       },
     );
@@ -840,7 +840,11 @@ export function createProgram() {
             console.error(
               "pome run: wiring check failed — refusing to spawn the agent. Fix the cause above and re-run (there is no --force).",
             );
-            process.exitCode = 1;
+            // 5 = usage error, per docs/05-api-spec.md §1. NOT 1: that code
+            // means "scored below its pass threshold", and nothing ran here —
+            // a CI job branching on $? would read a hardcoded production host
+            // as an agent regression.
+            process.exitCode = 5;
             return;
           }
         }

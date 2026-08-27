@@ -150,7 +150,7 @@ out-of-band `--probe`/`--verify` helpers in `run-trials.ts`.
 ## Cleaning up a leaked sandbox
 
 If a `--probe` run is hard-killed mid-flight, delete any orphaned Slack sandbox
-(they don't show up in `pome session list`):
+(they don't show up in `pome sandbox list`):
 
 ```bash
 npx tsx scripts/run-trials.ts --cleanup <session_id> [<session_id> ...]
