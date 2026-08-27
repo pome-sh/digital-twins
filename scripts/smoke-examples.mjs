@@ -70,6 +70,15 @@ const SMOKE_LIVE_DEFAULTS = {
 
 const SMOKE_DEAD_WIRING = {
   POME_TWIN_BASE_URL: "http://127.0.0.1:59321",
+  // The HOSTED control plane, dead-wired for the same reason every twin base
+  // above is. Until `braintrust-eval` there was no example that called
+  // api.pome.sh, so an unset base was harmless; now an example that reads
+  // `POME_API_URL` would default to production and mint BILLABLE sandboxes —
+  // once per dataset row, on every PR, and again on every developer's
+  // `npm run smoke:examples`. The PR leg is uncredentialed by design and must
+  // stay unable to reach a paid API even when the developer running it is
+  // logged in.
+  POME_API_URL: "http://127.0.0.1:59321",
   POME_GITHUB_REST_URL: "http://127.0.0.1:59321",
   POME_GITHUB_MCP_URL: "http://127.0.0.1:59321/s/smoke/mcp",
   POME_SLACK_REST_URL: "http://127.0.0.1:59321",

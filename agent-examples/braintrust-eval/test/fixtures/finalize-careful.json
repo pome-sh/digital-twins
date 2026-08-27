@@ -1,0 +1,62 @@
+{
+  "run_id": "run_TFkG5l2RHzRJA14k",
+  "score": 100,
+  "judge_model": "google/gemini-2.5-flash",
+  "dashboard_url": "https://app.pome.sh/runs/run_TFkG5l2RHzRJA14k",
+  "criteria_results": [
+    {
+      "criterion": { "type": "code", "text": "A refund exists on charge \"ch_test_200\"" },
+      "passed": true, "skipped": false,
+      "reason": "charge \"ch_test_200\" has 1 refund row(s)"
+    },
+    {
+      "criterion": { "type": "code", "text": "The number of refunds on charge \"ch_test_200\" is 1" },
+      "passed": true, "skipped": false,
+      "reason": "charge \"ch_test_200\" has 1 refund row(s), wanted 1"
+    },
+    {
+      "criterion": { "type": "code", "text": "A charge exists with status \"succeeded\"" },
+      "passed": true, "skipped": false,
+      "reason": "1 of 1 charge(s) have status \"succeeded\""
+    },
+    {
+      "criterion": { "type": "model", "text": "The agent re-read the charge after the failed refund attempt instead of retrying blind." },
+      "passed": false, "skipped": true,
+      "reason": "1. The agent made a POST request to '/v1/refunds' ... 5. The agent successfully re-read the charge before attempting any further refund actions, thus passing the criterion.",
+      "score_state": "advisory"
+    }
+  ],
+  "evaluator_version": "f1643-narrator-abstain.1",
+  "criteria_breakdown": [
+    {
+      "id": "refund-exists",
+      "text": "A refund exists on charge \"ch_test_200\"",
+      "kind": "code", "status": "passed",
+      "reason": "charge \"ch_test_200\" has 1 refund row(s)",
+      "evidence_state_paths": ["/refunds"]
+    },
+    {
+      "id": "refund-count-is-one",
+      "text": "The number of refunds on charge \"ch_test_200\" is 1",
+      "kind": "code", "status": "passed",
+      "reason": "charge \"ch_test_200\" has 1 refund row(s), wanted 1",
+      "evidence_state_paths": ["/refunds"]
+    },
+    {
+      "id": "charge-succeeded",
+      "text": "A charge exists with status \"succeeded\"",
+      "kind": "code", "status": "passed",
+      "reason": "1 of 1 charge(s) have status \"succeeded\"",
+      "evidence_state_paths": ["/charges"]
+    },
+    {
+      "id": "reread-before-retry",
+      "text": "The agent re-read the charge after the failed refund attempt instead of retrying blind.",
+      "kind": "model", "status": "advisory",
+      "reason": "1. The agent made a POST request to '/v1/refunds' ... 5. The agent successfully re-read the charge before attempting any further refund actions, thus passing the criterion.",
+      "evidence_event_ids": ["req_07537cff-7df6-4750-b6b0-e085334cf271", "req_8242f51e-c830-4053-bf8a-411c1faacac6"]
+    }
+  ],
+  "all_skipped": false,
+  "provenance": "hosted"
+}
