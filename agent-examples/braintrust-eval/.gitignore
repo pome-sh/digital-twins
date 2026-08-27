@@ -1,0 +1,5 @@
+node_modules/
+.env
+.env.local
+# per-user: team-gated resolver cache (resolved agt_ id), written by `pome register`
+.pome/
