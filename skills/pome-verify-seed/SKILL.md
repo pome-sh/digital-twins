@@ -75,21 +75,21 @@ costs one session slot; offer it, don't default to it.
 
    Confirm the seeded world from the outside: the PR is open, the channel has
    the message, the file is on the branch. A 404 on a probe may be session
-   expiry — check `get_session` before blaming the seed.
+   expiry — check `get_sandbox` before blaming the seed.
 3. **Mutation hole**: if any probe mutated state (a POST slipped in, a tool had
-   side effects), the session no longer shows the seed — `stop_session` (see
+   side effects), the session no longer shows the seed — `stop_sandbox` (see
    teardown below; it may take two calls) and re-mint before probing further.
    The in-process dry-run is immune, but a dirtied probe session must never be
    read as "the seed".
-4. **Reset / teardown**: end every probe session with `stop_session`. A probe
+4. **Reset / teardown**: end every probe session with `stop_sandbox`. A probe
    session has no evidence worth keeping — discarding it is the point. Never
    `finalize_run` a probe session; that would score the untouched seed.
-   Call `stop_session`; if it succeeds outright, teardown is done. **If it is
+   Call `stop_sandbox`; if it succeeds outright, teardown is done. **If it is
    refused** (an open session holds an ungraded run, and the platform
    will not destroy one silently), the refusal carries a server-issued
    `discard_token` in its `error.details`. That is a one-shot confirmation
    nonce for this refusal, not a credential — it authenticates nothing and
-   grants no access. Pass it straight back as `stop_session`'s
+   grants no access. Pass it straight back as `stop_sandbox`'s
    `confirm_discard` parameter. Today's
    control plane never refuses, so expect the one-call success — treat the
    refusal-then-confirm path as the case to handle once it goes live, not the

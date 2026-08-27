@@ -119,10 +119,9 @@ describe("verdict artifact", () => {
     expect(await readVerdictArtifact(join(tmp, "scn", "nope"))).toBeNull();
   });
 
-  it("writes `task_path`; the retired `scenario_path` spelling is refused BY NAME, not normalized", async () => {
-    const tmp = await mkdtemp(join(tmpdir(), "verdict-legacy-"));
+  it("writes `task_path`, and a file without one is not a verdict artifact", async () => {
+    const tmp = await mkdtemp(join(tmpdir(), "verdict-taskpath-"));
 
-    // Write path: the retired spelling never lands on disk again.
     const fresh = join(tmp, "scn", "ses_new");
     await mkdir(fresh, { recursive: true });
     await writeVerdictArtifact(fresh, verdict({ session_id: "ses_new" }));
@@ -130,31 +129,27 @@ describe("verdict artifact", () => {
       await readFile(join(fresh, "verdict.json"), "utf8"),
     ) as Record<string, unknown>;
     expect(onDisk.task_path).toBe("tasks/scn.md");
-    expect(onDisk).not.toHaveProperty("scenario_path");
 
-    // Read path: the old spelling is not normalized into the new one. This
-    // artifact is refused on its `version`, and the absent `task_path` is not
-    // filled in from `scenario_path`.
-    const legacyDir = join(tmp, "scn", "ses_old");
-    await mkdir(legacyDir, { recursive: true });
+    // `task_path` is the only spelling recognized. A file missing it is not
+    // recognizable as one of ours, which is a different answer from "a version
+    // we can't read" — the version skip still names files that do carry it.
     const { task_path: _tp, ...withoutTaskPath } = verdict({ session_id: "ses_old" });
-    await writeFile(
-      join(legacyDir, "verdict.json"),
-      JSON.stringify({ ...withoutTaskPath, version: 1, scenario_path: "scenarios/scn.md" }),
-      "utf8",
-    );
-    expect(await readVerdictArtifact(legacyDir)).toBeNull();
-    expect(await readVerdictArtifactDetailed(legacyDir)).toEqual({
-      status: "stale-version",
-      version: 1,
-    });
-
-    // Neither spelling present → not recognizable as a verdict.json at all,
-    // which is a different answer from "a version we can't read".
     const neither = join(tmp, "scn", "ses_none");
     await mkdir(neither, { recursive: true });
     await writeFile(join(neither, "verdict.json"), JSON.stringify(withoutTaskPath), "utf8");
     expect(await readVerdictArtifactDetailed(neither)).toEqual({ status: "unreadable" });
+
+    const staleVersion = join(tmp, "scn", "ses_stale");
+    await mkdir(staleVersion, { recursive: true });
+    await writeFile(
+      join(staleVersion, "verdict.json"),
+      JSON.stringify({ ...verdict({ session_id: "ses_stale" }), version: 1 }),
+      "utf8",
+    );
+    expect(await readVerdictArtifactDetailed(staleVersion)).toEqual({
+      status: "stale-version",
+      version: 1,
+    });
   });
 
   it("rejects half-recognizable files instead of crashing downstream (adversarial fix)", async () => {

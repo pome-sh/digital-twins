@@ -91,7 +91,6 @@ describe("pome sandbox create --seed", () => {
     await runSessionCreate({
       apiBaseUrl: "https://api.example.com",
       twins: ["github"],
-      showSecrets: false,
       format: "text",
     });
     expect(sentSeed()).toBeUndefined();
@@ -101,7 +100,6 @@ describe("pome sandbox create --seed", () => {
     await runSessionCreate({
       apiBaseUrl: "https://api.example.com",
       twins: ["github"],
-      showSecrets: false,
       format: "text",
       seedPath: await seedFile({ github: GITHUB_SEED }),
     });
@@ -116,7 +114,6 @@ describe("pome sandbox create --seed", () => {
     await runSessionCreate({
       apiBaseUrl: "https://api.example.com",
       twins: ["github"],
-      showSecrets: false,
       format: "text",
       seedPath: await seedFile(GITHUB_SEED),
     });
@@ -127,7 +124,6 @@ describe("pome sandbox create --seed", () => {
     await runSessionCreate({
       apiBaseUrl: "https://api.example.com",
       twins: ["github", "slack"],
-      showSecrets: false,
       format: "text",
       seedPath: await seedFile({ github: GITHUB_SEED, slack: SLACK_SEED }),
     });
@@ -141,7 +137,6 @@ describe("pome sandbox create --seed", () => {
     await runSessionCreate({
       apiBaseUrl: "https://api.example.com",
       twins: [],
-      showSecrets: false,
       format: "text",
       seedPath: await seedFile({ linear: {} }),
     });
@@ -153,7 +148,6 @@ describe("pome sandbox create --seed", () => {
       runSessionCreate({
         apiBaseUrl: "https://api.example.com",
         twins: ["github"],
-        showSecrets: false,
         format: "text",
         seedPath: await seedFile({ github: GITHUB_SEED, slack: SLACK_SEED }),
       }),
@@ -166,7 +160,6 @@ describe("pome sandbox create --seed", () => {
       runSessionCreate({
         apiBaseUrl: "https://api.example.com",
         twins: ["github", "slack"],
-        showSecrets: false,
         format: "text",
         seedPath: await seedFile(GITHUB_SEED),
       }),
@@ -179,7 +172,6 @@ describe("pome sandbox create --seed", () => {
       runSessionCreate({
         apiBaseUrl: "https://api.example.com",
         twins: [],
-        showSecrets: false,
         format: "text",
         seedPath: await seedFile(GITHUB_SEED),
       }),
@@ -194,7 +186,6 @@ describe("pome sandbox create --seed", () => {
       runSessionCreate({
         apiBaseUrl: "https://api.example.com",
         twins: ["github"],
-        showSecrets: false,
         format: "text",
         seedPath: await seedFile({ github: { repositories: [{ owner: "acme" }] } }),
       }),
@@ -206,7 +197,6 @@ describe("pome sandbox create --seed", () => {
     await runSessionCreate({
       apiBaseUrl: "https://api.example.com",
       twins: ["github"],
-      showSecrets: false,
       format: "text",
       seedPath: await seedFile({ _meta: { source_hash: "sha256:abc" }, ...GITHUB_SEED }),
     });

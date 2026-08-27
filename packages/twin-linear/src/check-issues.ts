@@ -144,7 +144,7 @@ export const issueHasLabel: Check<{ title: string; team: string; label: string }
   id: "linear.issue-has-label",
   description:
     "Resolves the issue, joins its `labelIds` to the workspace label catalog, and asserts the " +
-    "named label is among them — case-insensitively, as the legacy rule's comparison was. The " +
+    "named label is among them, case-insensitively. The " +
     "join is the point: this export carries label IDS where the seed writes names and " +
     "twin-github writes objects, so one concept has three shapes and only this one is exported. " +
     "A label id with no catalog row is a partial export and SKIPS rather than failing.",
@@ -217,8 +217,8 @@ export const issueAssignee: Check<{ title: string; team: string; user: string }>
   id: "linear.issue-assignee",
   description:
     "Resolves the issue, then its assignee, and matches the given reference against that user's " +
-    "email, name OR displayName — every spelling the legacy rule accepted. An UNASSIGNED issue " +
-    "is a real FAIL. Declared with no shipped corpus user, carrying a legacy capability forward. " +
+    "email, name OR displayName. An UNASSIGNED issue " +
+    "is a real FAIL. Declared with no shipped corpus user. " +
     "This is the check whose `subject` earns its keep: an email reference is destroyed by a " +
     "team's `PII_PATTERNS`, which the twin's own redactor has no equivalent of, so without the " +
     "declaration the criterion would silently be unable to fire.",

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
  * Static index of public Mintlify pages on docs.pome.sh — avoids scraping HTML.
+ * Every `path` must be a page docs.json actually serves: there are no redirects
+ * from old doc URLs to lean on, so a stale path here prints a 404 to a user.
  * The authored docs live in the `pome` repo and publish through Mintlify; this
  * package keeps only topic metadata for URL navigation.
  */
@@ -22,7 +24,7 @@ export const DOCS_TOPICS: DocsTopic[] = [
   {
     id: "getting-started",
     title: "Quickstart",
-    path: "/getting-started",
+    path: "/quickstart/claude-code",
     keywords: ["install", "quickstart", "setup", "begin"],
   },
   {
@@ -37,9 +39,6 @@ export const DOCS_TOPICS: DocsTopic[] = [
       "register",
       "pome.json",
       "connect",
-      // Migrated from the retired skills-setup topic: wiring your own
-      // agent is now the "bring your own agent" path. ("pome-setup" / "setup"
-      // already resolve to getting-started via its "setup" keyword.)
       "wire",
     ],
   },
@@ -49,14 +48,6 @@ export const DOCS_TOPICS: DocsTopic[] = [
     path: "/docs/how-pome-works",
     keywords: ["twins", "scenarios", "runs", "scoring", "artifacts", "loop"],
   },
-  // The Gen-1 /setup and /test-with-pome skill pages were dropped from the docs
-  // nav, and the CLI commands that pointed at them are gone. The two
-  // topic entries are gone, but their still-live keywords are MIGRATED onto the
-  // surviving replacement topics so `pome docs <kw>` keeps routing:
-  //   wire → existing-agent;  test-with-pome / pome-test → cli-run;
-  //   eval → cli (the CLI reference index — no dedicated eval page exists).
-  //   (setup / pome-setup / register / run scenarios / /setup all already
-  //   resolve via existing substrings — see the tests.)
   {
     id: "dashboard",
     title: "Pome Dashboard",
@@ -66,7 +57,7 @@ export const DOCS_TOPICS: DocsTopic[] = [
   {
     id: "twins",
     title: "Twins overview",
-    path: "/docs/twins/index",
+    path: "/docs/twins/coverage",
     keywords: ["sandbox", "digital twin", "hosted"],
   },
   {
@@ -97,10 +88,8 @@ export const DOCS_TOPICS: DocsTopic[] = [
     id: "cli",
     title: "Command Line Interface",
     path: "/docs/cli",
-    // "eval" migrated from the retired skills-test topic: there is no
-    // dedicated `pome eval` docs page, and it is a distinct workflow from
-    // `pome inspect`, so it routes to the CLI reference index that documents
-    // every command rather than to a sibling command's page.
+    // No dedicated `pome eval` page exists, and eval is a distinct workflow
+    // from `pome inspect`, so "eval" routes to the reference index.
     keywords: ["commands", "flags", "pome run", "reference", "eval"],
   },
   {
@@ -116,25 +105,17 @@ export const DOCS_TOPICS: DocsTopic[] = [
       "default",
       "demo task",
       "run yours",
-      // Migrated from the retired skills-test topic: running tasks is
-      // how you test an agent with pome.
-      "test-with-pome",
-      "pome-test",
     ],
   },
   {
-    id: "cli-session",
-    title: "pome session",
-    path: "/docs/cli/session",
-    keywords: ["session", "hosted", "sandbox", "twin"],
+    id: "cli-sandbox",
+    title: "pome sandbox",
+    path: "/docs/cli/sandbox",
+    keywords: ["sandbox", "hosted", "twin"],
   },
   {
     id: "cli-tasks",
     title: "pome tasks",
-    // The M4 docs door renamed the docs.pome.sh page from
-    // /docs/cli/scenarios to /docs/cli/tasks (a redirect keeps the old URL
-    // alive), so `path` now points at the new route. The "scenarios" keyword
-    // stays so `pome docs scenarios` still resolves to this topic.
     path: "/docs/cli/tasks",
     keywords: ["tasks", "scenarios", "catalog", "copy", "library", "twin"],
   },
@@ -161,11 +142,5 @@ export const DOCS_TOPICS: DocsTopic[] = [
     title: "Troubleshooting",
     path: "/docs/troubleshooting",
     keywords: ["errors", "help", "fix", "debug"],
-  },
-  {
-    id: "changelog",
-    title: "Changelog",
-    path: "/changelog",
-    keywords: ["release", "version", "news"],
   },
 ];

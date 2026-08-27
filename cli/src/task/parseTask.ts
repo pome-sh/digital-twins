@@ -329,24 +329,16 @@ function splitSections(markdown: string) {
 // of the line an author can annotate without changing the graded sentence.
 //
 // Must stay byte-for-byte identical to the hosted mirror's
-// (`apps/mcp/src/task/parseTask.ts`, pome-cloud): a task written with the
-// keyword used to parse hosted and silently lose the criterion here, because
-// the older CLI-side regex did not match the line and `parseCriteria` skipped
-// it as unrecognised prose — the exact defect this regex closes.
+// (`apps/mcp/src/task/parseTask.ts`, pome-cloud). If the two disagree, a task
+// parses on one side and silently loses a criterion on the other.
 const CRITERION_LINE_RE =
   /^[-*]\s+\[(code|model)(?::([a-z][a-z0-9_-]*))?(\s+always-scored)?\]\s+(.+)$/;
-// The retired legacy marker spelling, matched ONLY to fail loudly. Without
-// this guard a legacy `[D]`/`[P]` line would fall through the silent
-// skip-non-criterion path below and the scenario would "pass" with fewer
-// criteria than its author wrote.
-const LEGACY_CRITERION_LINE_RE = /^[-*]\s+\[([DP])(?::([a-z][a-z0-9_-]*))?\]\s+(.+)$/;
 // A line that REACHES for a criterion marker and misses. The grammar
 // above is exact and `parseCriteria` skips anything it does not match as prose,
 // so `- [code always-scored ] …`, `- [code:slack always-scored extra] …` and
 // `- [code alwaysscored] …` each loaded the task with one fewer criterion and no
-// error at all. That is the same failure LEGACY_CRITERION_LINE_RE exists to
-// prevent for the retired markers: a line visibly trying to be a criterion is
-// worth an error, not a shrug.
+// error at all. A line visibly trying to be a criterion is worth an error, not
+// a shrug.
 //
 // DELIBERATELY NARROW. It fires only on a bullet the grammar itself knows
 // (`-`/`*`) whose bracket names `code` or `model` AS A WORD, so ordinary
@@ -390,13 +382,6 @@ function parseCriteria(input: string, twins: string[]): Criterion[] {
 
   for (const rawLine of input.split("\n")) {
     const line = rawLine.trim();
-    const legacy = line.match(LEGACY_CRITERION_LINE_RE);
-    if (legacy) {
-      const legacyMarker = `[${legacy[1]}${legacy[2] ? `:${legacy[2]}` : ""}]`;
-      throw new Error(
-        `Criterion "${legacyMarker} ${legacy[3]!.trim()}" uses a retired marker — markers were renamed [D]→[code] and [P]→[model] (tags carry over: [D:github]→[code:github]).`,
-      );
-    }
     const match = line.match(CRITERION_LINE_RE);
     if (!match) {
       // A near-miss is refused here rather than skipped. Reached only

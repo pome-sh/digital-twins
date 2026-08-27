@@ -1,6 +1,15 @@
 # @pome-sh/twin-linear — CHANGELOG
 
 
+## Unreleased (patch)
+
+Two declared-check descriptions stop explaining what a retired rule used to do.
+`linear.issue-has-label` and `linear.issue-assignee` still behave identically —
+the label comparison is case-insensitive, the assignee reference still matches
+email, name or displayName — but the descriptions say so on their own terms.
+They are published prose: pome-cloud generates its authoring reference from
+these strings, so the docs page picks the new wording up on the next pin bump.
+
 ## 0.4.1 — 2026-08-11
 
 **`extensions` is declared on both `/graphql` surfaces, and answered before

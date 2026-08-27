@@ -1,5 +1,13 @@
 # @pome-sh/checks
 
+## Unreleased (patch)
+
+**Prose only.** Two Linear declared-check descriptions (`linear.issue-has-label`,
+`linear.issue-assignee`) stop describing their own semantics by reference to what
+a retired rule used to do. Behavior, params, templates and ids are unchanged.
+These strings are published: pome-cloud renders its authoring reference from
+them, so the docs page changes when it bumps this pin.
+
 ## 0.3.8 — 2026-08-25
 
 **No consumer-visible change.** Added `// file-size:` header comments to twin

@@ -171,16 +171,14 @@ export async function writeVerdictArtifact(
  *  artifact version this repo has ever written, so a prior-version file can
  *  be told apart from a foreign/corrupt one and its skip NAMED rather than
  *  folded into "not a verdict file". Deliberately more generous than
- *  `isVerdictArtifact` below — including the legacy `scenario_path`
- *  spelling, which no reader accepts any more (see `isVerdictArtifact`) but
- *  which still identifies the file as one of ours worth naming. */
+ *  `isVerdictArtifact` below, so a prior-version file's skip can be named. */
 function looksLikeVerdictArtifactBase(parsed: unknown): parsed is Record<string, unknown> {
   if (typeof parsed !== "object" || parsed === null) return false;
   const v = parsed as Record<string, unknown>;
   if (v.source !== "cloud-finalize") return false;
   if (typeof v.session_id !== "string") return false;
   if (typeof v.task_name !== "string") return false;
-  if (typeof v.task_path !== "string" && typeof v.scenario_path !== "string") return false;
+  if (typeof v.task_path !== "string") return false;
   if (v.group_id !== null && typeof v.group_id !== "string") return false;
   if (typeof v.finalized_at !== "string") return false;
   if (typeof v.passed !== "boolean") return false;
@@ -205,14 +203,7 @@ function looksLikeVerdictArtifactBase(parsed: unknown): parsed is Record<string,
  *  VERDICT_ARTIFACT_VERSION`, the named `state`, and the four counts. A file
  *  that passes `looksLikeVerdictArtifactBase` but fails this is a prior
  *  version or a corrupt current one — `readVerdictArtifactDetailed` tells
- *  those two apart.
- *
- *  Version 2 also retired the legacy `scenario_path` tolerance the read path
- *  used to carry: `task_path` is required here. Every file spelling it the
- *  old way was written by `@pome-sh/cli` <= 0.8.x at artifact version 1, so
- *  the version check refuses it before the spelling could matter — the
- *  normalize step was a dual-format reader that could no longer fire, and
- *  this repo keeps no back-compat it cannot exercise. */
+ *  those two apart. */
 function isVerdictArtifact(parsed: unknown): parsed is VerdictArtifact {
   if (!looksLikeVerdictArtifactBase(parsed)) return false;
   const v = parsed;

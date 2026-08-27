@@ -109,11 +109,10 @@ describe("runSessionCreate secret output", () => {
     process.exitCode = originalExitCode;
   });
 
-  it("keeps JSON output redacted even when --show-secrets is set", async () => {
+  it("keeps JSON output redacted", async () => {
     await runSessionCreate({
       apiBaseUrl: "https://api.example.com",
       twins: ["github"],
-      showSecrets: true,
       format: "json",
     });
 
@@ -132,7 +131,6 @@ describe("runSessionCreate secret output", () => {
       await runSessionCreate({
         apiBaseUrl: "https://api.example.com",
         twins: ["stripe"],
-        showSecrets: false,
         format: "env",
         secretsFile,
       });
@@ -157,7 +155,6 @@ describe("runSessionCreate secret output", () => {
     await runSessionCreate({
       apiBaseUrl: "https://api.example.com",
       twins: ["github"],
-      showSecrets: true,
       format: "env",
     });
 
@@ -173,7 +170,6 @@ describe("runSessionCreate secret output", () => {
     await runSessionCreate({
       apiBaseUrl: "https://api.example.com",
       twins: ["slack"],
-      showSecrets: false,
       format: "json",
     });
     expect(mocks.createSession).toHaveBeenCalledWith(
@@ -185,7 +181,6 @@ describe("runSessionCreate secret output", () => {
     await runSessionCreate({
       apiBaseUrl: "https://api.example.com",
       twins: ["github", "slack"],
-      showSecrets: false,
       format: "json",
     });
     expect(mocks.createSession).toHaveBeenCalledWith(
@@ -197,7 +192,6 @@ describe("runSessionCreate secret output", () => {
     await runSessionCreate({
       apiBaseUrl: "https://api.example.com",
       twins: ["github", "github"],
-      showSecrets: false,
       format: "json",
     });
     expect(mocks.createSession).toHaveBeenCalledWith(
@@ -208,7 +202,6 @@ describe("runSessionCreate secret output", () => {
       runSessionCreate({
         apiBaseUrl: "https://api.example.com",
         twins: ["notion"],
-        showSecrets: false,
         format: "json",
       }),
     ).rejects.toThrow(/Unknown twin "notion"/);
@@ -218,7 +211,6 @@ describe("runSessionCreate secret output", () => {
     await runSessionCreate({
       apiBaseUrl: "https://api.example.com",
       twins: ["slack"],
-      showSecrets: true,
       format: "json",
     });
     const output = stdout.join("\n");
@@ -233,7 +225,6 @@ describe("runSessionCreate secret output", () => {
       await runSessionCreate({
         apiBaseUrl: "https://api.example.com",
         twins: ["github", "slack"],
-        showSecrets: false,
         format: "env",
         secretsFile,
       });
@@ -264,7 +255,6 @@ describe("runSessionCreate secret output", () => {
       await runSessionCreate({
         apiBaseUrl: "https://api.example.com",
         twins: ["gmail"],
-        showSecrets: false,
         format: "env",
         secretsFile,
       });

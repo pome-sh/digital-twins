@@ -24,43 +24,6 @@ describe("pome inspect command", () => {
     await rm(tmp, { recursive: true, force: true });
   });
 
- it("exits with code 2 and prints the legacy message on a legacy events.jsonl", async () => {
-    const legacy = {
-      ts: "2026-05-01T00:00:00.000Z",
-      run_id: "run_old",
-      twin: "github",
-      request_id: "req_1",
-      step_id: null,
-      tool_call_id: null,
-      method: "GET",
-      path: "/repos/acme/api",
-      request_body: null,
-      status: 200,
-      response_body: null,
-      latency_ms: 3,
-      fidelity: "semantic",
-      state_mutation: false,
-      state_delta: null,
-      error: null,
-    };
-    await writeFile(join(runDir, "events.jsonl"), JSON.stringify(legacy) + "\n");
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
-    const errSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
-
-    await createProgram().parseAsync(["node", "pome", "inspect", runDir]);
-
-    expect(process.exitCode).toBe(2);
-    const errors = errSpy.mock.calls.map((c) => String(c[0])).join("\n");
-    expect(errors).toContain(
-      "this run was produced by an older CLI version (pre-M0); rerun against current CLI to view",
-    );
-    // We must NOT render trace health or per-event sections before the
-    // legacy error — those would be misleading on legacy data.
-    const out = logSpy.mock.calls.map((c) => String(c[0])).join("\n");
-    expect(out).not.toContain("Trace health");
-    expect(out).not.toContain("Events");
-  });
-
   it("renders trace health + events on the green path", async () => {
     await writeFile(
       join(runDir, "meta.json"),
