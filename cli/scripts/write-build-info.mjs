@@ -3,8 +3,11 @@
 // into the published tarball (F6). CI sets POME_GIT_SHA and POME_BUILD_TIME
 // ahead of the build; locally we best-effort resolve the SHA via
 // `git rev-parse HEAD`. Falls back to "dev" so a contributor install
-// (`npm install -g .`) still produces a working — if uninformative —
-// `pome health` runtime block.
+// (`npm install -g .`) still produces the file.
+//
+// Nothing under `cli/src/**` reads it. The `runtime` block `pome health` prints
+// comes from `packages/sdk/src/build-info.ts`, fed by POME_TWIN_GIT_SHA and
+// POME_TWIN_BUILD_TIME, so this file stamps the tarball and nothing else.
 //
 // This script used to also copy `src/fix-prompt/prompts/` and the demo task
 // assets into the mirrored `dist/src/...` tree. Those assets now live at

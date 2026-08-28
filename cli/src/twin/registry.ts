@@ -329,7 +329,7 @@ export const TWIN_REGISTRY: Record<TwinName, TwinEntry> = {
 
 /**
  * The github twin's app with its own default world and no CLI session wiring —
- * `pome health`'s in-process smoke check, and the fixture the adapter tests
+ * the app `pome health` boots, and the fixture the adapter tests
  * drive. Return type is pinned to `unknown` (every caller casts to its own view
  * of the app) so tsc does not try to name the twin's Hono app type in this
  * module's emitted declarations: that inferred type references twin-github's
