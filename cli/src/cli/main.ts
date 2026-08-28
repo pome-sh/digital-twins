@@ -662,9 +662,9 @@ export function createProgram() {
     .summary("Run a task and print the score")
     .argument(
       "[path]",
-      "Task file or directory. Omit to run the bundled demo task.",
+      "Task markdown file or directory. Omit to run the demo task Pome copies into your project.",
     )
-    .option("--agent <command>", "Command that starts your agent")
+    .option("--agent <command>", "Command that starts your agent.")
     .option(
       "-n, --trials <count>",
       "Number of trials to run as one group, 1 to 20. Hosted only; defaults to the task's `runs` field.",
@@ -675,7 +675,7 @@ export function createProgram() {
       "Control-plane base URL.",
       process.env.POME_API_URL ?? DEFAULT_CONTROL_PLANE_URL,
     )
-    .option("--agent-model <name>", "Model recorded on the run.", "unknown")
+    .option("--agent-model <name>", "Informational; model name recorded on the run.", "unknown")
     .option(
       "--agent-version <version>",
       "Override the manifest's agent.version.",
@@ -686,10 +686,10 @@ export function createProgram() {
     )
     .option(
       "--local",
-      "Self-host: record a trace against a local twin, with no score. Score it later with `pome eval`.",
+      "Self-host: record a trace against an in-process twin, with no score. Score it with `pome eval`.",
     )
     .description(
-      "Run a task, or every task in a directory, against a hosted twin and print the score. With no path, runs the bundled demo task. Refuses to start when `pome doctor` fails, and there is no --force. See `pome docs cli-run` for trial groups and exit codes.",
+      "Run a task, or every task in a directory, and print the score. With no path, runs the demo task Pome copies into your project on first use. Refuses to start when `pome doctor` fails, and there is no --force. See `pome docs cli-run` for trial groups and exit codes.",
     )
     .action(
       async (
