@@ -341,6 +341,8 @@ export function createApp<TDb, TSeed, TDomain>(
   // 9. MCP routes from tool registry. `/mcp` is the streamable-HTTP
   //    JSON-RPC endpoint (stateless — GET/DELETE answer 405); `/mcp/tools`,
   //    `/mcp/tools/:name`, `/mcp/call` are the legacy dispatch surface.
+  //    `/mcp/call` takes exactly one body shape, `{tool, arguments}`; a twin's
+  //    `bodyReader` decides whether a form-encoded or malformed body reaches it.
   session.post("/mcp", (c) => handleMcpJsonRpc(c, { definition, domain, recorder, runId }));
   session.get("/mcp", (c) => mcpMethodNotAllowed(c));
   session.delete("/mcp", (c) => mcpMethodNotAllowed(c));
@@ -375,30 +377,9 @@ export function createApp<TDb, TSeed, TDomain>(
     "/mcp/call",
     recorder.handle({ mutation: false }, async (c) => {
       const raw = await readBody(c);
-      let call: { tool: string; arguments: Record<string, unknown> };
-      if (definition.legacyMcp?.aliases) {
-        // Frozen slack surface: {name}/{params} alias {tool}/{arguments};
-        // a body naming no tool answers the twin's own envelope (400
-        // invalid_arguments) instead of the strict-parse error.
-        const rec = (raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {}) as Record<string, unknown>;
-        const name = rec.tool ?? rec.name;
-        if (typeof name !== "string" || name.length === 0) {
-          const missing = definition.legacyMcp.missingTool;
-          if (missing) {
-            const envelope = missing();
-            return { status: envelope.status, body: envelope.body };
-          }
-          z.object({ tool: z.string().min(1) }).parse(rec); // throws the strict-parse error
-        }
-        call = {
-          tool: name as string,
-          arguments: (rec.arguments ?? rec.params ?? {}) as Record<string, unknown>,
-        };
-      } else {
-        call = z
-          .object({ tool: z.string().min(1), arguments: jsonRecord.default({}) })
-          .parse(raw) as { tool: string; arguments: Record<string, unknown> };
-      }
+      const call = z
+        .object({ tool: z.string().min(1), arguments: jsonRecord.default({}) })
+        .parse(raw) as { tool: string; arguments: Record<string, unknown> };
       // Same as `/mcp/tools/:name`: stamp the name the caller sent
       // before the lookup that can reject it.
       setRecordedTool(c, call.tool);

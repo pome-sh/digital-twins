@@ -1,6 +1,15 @@
 # @pome-sh/twin-slack — CHANGELOG
 
 
+
+## Unreleased (minor)
+
+`POST /s/:sid/mcp/call` no longer accepts `{name}`/`{params}` as aliases of
+`{tool}`/`{arguments}`, and a body naming no tool answers the strict-parse
+error instead of `{ok:false, error:"invalid_arguments"}`. Form-or-JSON body
+parsing is unchanged — it belongs to `bodyReader`, which every surface shares
+(F-1580).
+
 ## 0.4.1 — 2026-08-11
 
 `files.upload` takes `channels` only (F-1389).

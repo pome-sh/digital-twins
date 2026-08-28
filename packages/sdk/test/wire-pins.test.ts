@@ -94,43 +94,13 @@ describe("bodyReader — per-twin body parsing on engine-owned surfaces", () => 
   });
 });
 
-describe("legacyMcp — frozen alias keys and missing-tool envelope", () => {
-  const twin = () =>
-    toyTwin({
-      legacyMcp: {
-        aliases: true,
-        missingTool: () => ({ status: 400, body: { ok: false, error: "invalid_arguments" } }),
-      },
-    });
-
-  it("dispatches {name}/{params} as {tool}/{arguments}", async () => {
-    const app = createApp(twin());
-    const res = await app.request(sPath("/mcp/call"), {
-      method: "POST",
-      headers: { ...auth(), "content-type": "application/json" },
-      body: JSON.stringify({ name: "echo", params: { value: "aliased" } }),
-    });
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ echoed: "aliased" });
-  });
-
-  it("a body naming no tool answers the twin's missingTool envelope", async () => {
-    const app = createApp(twin());
-    const res = await app.request(sPath("/mcp/call"), {
-      method: "POST",
-      headers: { ...auth(), "content-type": "application/json" },
-      body: JSON.stringify({ arguments: {} }),
-    });
-    expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ ok: false, error: "invalid_arguments" });
-  });
-
-  it("without aliases the strict schema still governs", async () => {
+describe("legacy /mcp/call — one body shape, no alias keys", () => {
+  it("rejects {name}/{params}: only {tool}/{arguments} dispatches", async () => {
     const app = createApp(toyTwin());
     const res = await app.request(sPath("/mcp/call"), {
       method: "POST",
       headers: { ...auth(), "content-type": "application/json" },
-      body: JSON.stringify({ name: "echo" }),
+      body: JSON.stringify({ name: "echo", params: { value: "aliased" } }),
     });
     expect(res.status).not.toBe(200);
   });

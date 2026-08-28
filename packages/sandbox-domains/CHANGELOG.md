@@ -1,5 +1,11 @@
 # @pome-sh/sandbox-domains
 
+
+## Unreleased (patch)
+
+Carries the sdk change that leaves `POST /s/:sid/mcp/call` with one body shape,
+`{tool, arguments}` (F-1580).
+
 ## 0.2.15 — 2026-08-27
 
 **Prose only.** Two Linear declared-check descriptions (`linear.issue-has-label`,
