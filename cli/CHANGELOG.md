@@ -9,6 +9,19 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
+## Unreleased (patch)
+
+`SECURITY.md` states the `pome-sh` package on npm as what it is: not this
+package, not maintained, no security updates. It is still published at 0.8.0, so
+this is a warning rather than a note about the past.
+
+The `scenario*` schema aliases are gone from `cli/src/contract`
+(`scenarioSchema`, `scenarioConfigSchema`, `persistedScenarioSchema`, and the
+`Scenario`, `ScenarioConfig`, `PersistedScenario` types). They were referential
+copies of the `task*` exports kept for a 0.3.0 window, with no consumer outside
+the two tests that asserted they existed. The serialized `scenario` /
+`scenario_*` wire keys are unchanged.
+
 ## 0.34.1 — 2026-08-28
 
 **`pome health` is internal and no longer in `pome --help`.** It boots the GitHub

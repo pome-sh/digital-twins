@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The pome MANIFEST loader. Replaces the legacy
-// `pome.config.json` handling — no back-compat, 0 users. The committed manifest
+// The pome MANIFEST loader. The committed manifest
 // is `pome.json` (canonical) with `pome.yaml` / `pome.yml` as interchangeable
 // carriers of the same snake_case keys. One canonical zod schema
 // (`cli/src/contract` `manifestSchema`) validates every carrier.

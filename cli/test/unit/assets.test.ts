@@ -86,10 +86,10 @@ describe("cli/package.json packaging", () => {
     expect(Object.keys(pkg.dependencies).filter((d) => d.startsWith("@pome-sh/"))).toEqual([]);
   });
 
-  it("no longer declares bundleDependencies", () => {
-    // bundleDependencies packs from cli/node_modules, which npm leaves empty
-    // for a workspace member — it declared seven bundled packages and shipped
-    // none. The bundler replaces it.
+  it("declares no bundleDependencies", () => {
+    // It packs from cli/node_modules, which npm leaves empty for a workspace
+    // member, so declaring it ships an empty bundle and the published CLI
+    // crashes on a missing dependency. The bundler covers this instead.
     expect(pkg.bundleDependencies).toBeUndefined();
   });
 });

@@ -1102,14 +1102,6 @@ export function createProgram() {
       },
     );
 
-  // NOTE: `matrix` / `matrix-html` / `eval-report` were removed.
-  // They were a pure LOCAL-scoring orchestrator — they shelled out to
-  // `pome run` with POME_LOCAL=1 and aggregated the local score.json each
-  // child wrote. With local evaluation gone (the OSS CLI is capture-only),
-  // that path cannot produce a verdict, so the whole subsystem was retired
-  // rather than left as a broken command. Fleet evaluation lives in the
-  // cloud/research workspace.
-
   program
     .command("inspect")
     .argument("<run>", "Run id, run directory, or latest")

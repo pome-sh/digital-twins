@@ -17,7 +17,7 @@ defineCases("no-eval", [
     expect: "green",
   },
   {
-    name: "PATH: a deleted local-eval tree reappearing is a violation",
+    name: "PATH: a directory named for an eval role is a violation",
     files: { "cli/src/evaluator/index.ts": `export const evaluate = () => 1;\n` },
     expect: "red",
     contains: "deleted local-eval path reappeared: cli/src/evaluator",

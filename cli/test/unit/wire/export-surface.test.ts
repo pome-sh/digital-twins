@@ -40,11 +40,8 @@ import type {
   ManifestInput,
   MeResponse,
   PerTwinStateKeys,
-  PersistedScenario,
   PersistedTask,
   PlanTier,
-  Scenario,
-  ScenarioConfig,
   SeedEnvelope,
   SeedState,
   Session,
@@ -102,11 +99,8 @@ type _TypeSurfaceAssert = [
   ManifestInput,
   MeResponse,
   PerTwinStateKeys,
-  PersistedScenario,
   PersistedTask,
   PlanTier,
-  Scenario,
-  ScenarioConfig,
   SeedEnvelope,
   SeedState,
   Session,
@@ -130,7 +124,7 @@ type _TypeSurfaceAssert = [
 // Compile-time anchor: exactly one tuple entry per guarded type. The literal
 // type on the left fails to compile if an entry is added or removed above
 // without updating the count.
-const TYPE_SURFACE_SIZE: _TypeSurfaceAssert["length"] = 57;
+const TYPE_SURFACE_SIZE: _TypeSurfaceAssert["length"] = 54;
 
 // Runtime value exports (types are erased and cannot appear on `Object.keys`).
 const EXPECTED_EXPORTS = [
@@ -187,14 +181,11 @@ const EXPECTED_EXPORTS = [
   "normalizeTaskConfigKeys",
   "normalizeTaskVocabKeys",
   "perTwinStateKeysSchema",
-  "persistedScenarioSchema",
   "persistedTaskSchema",
   "planTierSchema",
   "probabilisticCriterionResultSchema",
   "providerScopedSeedStateSchema",
   "runSchema",
-  "scenarioConfigSchema",
-  "scenarioSchema",
   "seedEnvelopeSchema",
   "seedStateSchema",
   "sessionPublicSchema",
@@ -224,10 +215,10 @@ describe("cli/src/contract barrel export surface", () => {
     expect(Object.keys(api).sort()).toEqual([...EXPECTED_EXPORTS]);
   });
 
-  it("guards the TYPE surface (57 types/interfaces)", () => {
+  it("guards the TYPE surface (54 types/interfaces)", () => {
     // The real guard is the type-only import + _TypeSurfaceAssert tuple above,
     // enforced at typecheck time. This assertion just anchors the count at
     // runtime so the guard's scope is visible in test output.
-    expect(TYPE_SURFACE_SIZE).toBe(57);
+    expect(TYPE_SURFACE_SIZE).toBe(54);
   });
 });

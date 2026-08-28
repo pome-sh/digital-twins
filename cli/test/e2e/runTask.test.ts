@@ -17,13 +17,6 @@ const REQUIRED_RUN_DIR_FILES = [
   "stderr.log",
   "stdout.txt",
 ];
-const DELETED_RUN_DIR_FILES = [
-  "tool_calls.jsonl",
-  "state-before.json",
-  "state-after.json",
-  "state-diff.json",
-];
-
 // Self-host (`pome run` / `pome run --local`) is CAPTURE-ONLY.
 describe("Pome scenario runner (capture-only)", () => {
   it(
@@ -52,10 +45,7 @@ describe("Pome scenario runner (capture-only)", () => {
         for (const required of REQUIRED_RUN_DIR_FILES) {
           expect(entries.has(required)).toBe(true);
         }
-        // ...and the deleted correlation artifacts never come back.
-        for (const deleted of DELETED_RUN_DIR_FILES) {
-          expect(entries.has(deleted)).toBe(false);
-        }
+        // Capture-only: a score is the cloud's to write, never this repo's.
         expect(entries.has("score.json")).toBe(false);
       }
     },

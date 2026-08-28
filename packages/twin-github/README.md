@@ -61,7 +61,7 @@ The default seed creates:
   `StreamableHTTPClientTransport` expect (`initialize`, `tools/list`,
   `tools/call`, `ping`, `notifications/*`). 36 tools exposed via
   `tools/list` with camelCase `inputSchema`.
-- Legacy custom MCP routes (compat surface for already-deployed agents):
+- Per-tool HTTP routes, which answer with the upstream status code rather than a JSON-RPC envelope. The fidelity harness scores parity through them:
   - `GET  /s/:sid/mcp/tools` — returns `{ tools: [{ name, description, input_schema }, ...] }`
   - `POST /s/:sid/mcp/tools/:name` — body is the tool's arguments object
   - `POST /s/:sid/mcp/call` — body `{ tool, arguments }`
@@ -95,7 +95,7 @@ Every `tools/call` reaching `/s/:sid/mcp` produces one recorder event whose
 domain return — identical to what `POST /s/:sid/mcp/call` records. The
 only intentional difference is `path` (`request_headers` also differs, but
 that's a fact about the two callers — the MCP SDK client vs a plain-fetch
-legacy shim — not about the twin). Run `npm run validate:mcp` to print the
+HTTP caller — not about the twin). Run `npm run validate:mcp` to print the
 side-by-side diff; the same command runs in CI's heavy suite.
 
 ## Runtime contract (for snapshot consumers)
@@ -273,7 +273,7 @@ npm run typecheck
 npx vitest run --project twin-github
 npm run smoke
 npm run fidelity:parity
-npm run validate:mcp # prints the wire-protocol / legacy-shim parity diff
+npm run validate:mcp # prints the JSON-RPC / per-tool-route parity diff
 npm run review:harness
 npm run agent:claude
 ```

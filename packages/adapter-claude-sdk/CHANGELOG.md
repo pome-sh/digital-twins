@@ -1,5 +1,12 @@
 # @pome-sh/adapter-claude-sdk — CHANGELOG
 
+## Unreleased (patch)
+
+**No consumer-visible change.** A comment in `wrapQuery.ts` described a step-
+boundary wrapper this file no longer has; it now describes the hook-driven
+`HookEvent` rows that replaced it. No export, schema or emitted event moved.
+
+
 ## 0.3.13 — 2026-08-26
 
 **No consumer-visible change.** `@pome-sh/wire` taught its run-completeness

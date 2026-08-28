@@ -537,12 +537,10 @@ export async function runEval(options: RunEvalOptions): Promise<RunEvalResult> {
   // was evaluated, every criterion was judged (can_pass), AND the score clears
   // the threshold. An INCOMPLETE verdict (any criterion not evaluated) exits 1.
   //
-  // The divergence that used to be documented here is retired. `pome run`
-  // mapped the raw cloud score because "older cloud builds don't emit
-  // criteria_results" — but `scoreFromFinalizeResponse` already handles that
-  // case (`hasCriteriaResults ? … : true`), so the guard degrades to score-only
-  // for exactly those builds on its own. The divergence was protecting a case
-  // its own helper already protected, and the two commands now agree.
+  // `pome run` applies the same guard. A cloud response with no
+  // `criteria_results` degrades to score-only inside
+  // `scoreFromFinalizeResponse` (`hasCriteriaResults ? … : true`), so neither
+  // command needs a branch of its own for it.
   const exitCode = scoreStatus(score, EVAL_PASS_THRESHOLD) === "pass" ? 0 : 1;
 
   return {

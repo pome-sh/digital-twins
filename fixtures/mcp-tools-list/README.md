@@ -29,8 +29,7 @@ rather than stamped, so a re-derivation can never make an old reading look like 
 
 ## Per twin
 
-All five are captured; the two `status.json` files once written for slack and linear were retired
-by later captures, and stripe's by the same round of captures.
+All five are captured.
 
 | twin | substrate | completeness | what was read |
 | --- | --- | --- | --- |
@@ -74,9 +73,8 @@ permission question; it decided what the listing CONTAINED.
 
 ## gmail: the second tools/list in this repo is now these bytes
 
-[`packages/twin-gmail/fixtures/mcp-tools-list.*`](../../packages/twin-gmail/fixtures/) used to be a
-separate frozen oracle. Its `raw.json` is now
-`gmail.raw.json` **byte for byte** — same `rawFileSha256`, nothing subtracted — adopted by
+[`packages/twin-gmail/fixtures/mcp-tools-list.*`](../../packages/twin-gmail/fixtures/) holds the
+same bytes: its `raw.json` is `gmail.raw.json` **byte for byte** — same `rawFileSha256`, nothing subtracted — adopted by
 `packages/twin-gmail/scripts/adopt-upstream-mcp-fixture.ts` and diffed in CI by
 `npm run gate:mcp-fixture -w @pome-sh/twin-gmail`. Refreshing this golden without re-adopting is now
 a red rather than a silent divergence.

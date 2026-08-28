@@ -44,7 +44,7 @@ curl -X POST http://127.0.0.1:3333/s/demo/chat.postMessage \
   -H 'content-type: application/x-www-form-urlencoded' \
   -d 'channel=C_GENERAL&text=hello'
 
-# Legacy MCP call
+# Per-tool HTTP route
 curl -s -X POST http://127.0.0.1:3333/s/demo/mcp/call \
   -H "Authorization: Bearer $TOKEN" \
   -H 'content-type: application/json' \
@@ -94,7 +94,7 @@ an id no channel has.
   `StreamableHTTPClientTransport` expect (`initialize`, `tools/list`,
   `tools/call`, `ping`, `notifications/*`). 11 visible tools returned via
   `tools/list` with camelCase `inputSchema`.
-- Legacy custom MCP routes:
+- Per-tool HTTP routes, which answer with the upstream status code rather than a JSON-RPC envelope:
   - `GET  /s/:sid/mcp/tools` — returns `{ tools: [{ name, description, input_schema }, ...] }`
   - `POST /s/:sid/mcp/call` — body `{ tool, arguments }`
 

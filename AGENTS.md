@@ -67,6 +67,22 @@ contract suite in `contract/` is plain `.mjs` on `node --test`, because running
 it without TypeScript is what proves the published artifact boots — see
 `CONTRACT.md`. A self-test *of a script* stays beside its script as `.mjs`.
 
+**Do not test that something was deleted.** A test whose subject is a surface
+this repo no longer has runs on every suite from now on to re-assert a diff that
+already happened, and it can only fail if someone deliberately re-adds the
+thing. `it("`pome scenarios` is not a command")` was one. Write the test when a
+change made next year can break the assertion by accident; skip it when the only
+way to break it is to undo the commit it ships with. The same goes for a comment
+or a doc line explaining what used to be here: delete the surface, and delete the
+sentence about the surface.
+
+Three places are records rather than tombstones and stay: a CHANGELOG, each
+twin's `FIDELITY.md` divergence ledger (the numbers are stable identifiers and a
+gap in them is load-bearing), and an example's `VERIFICATION.md` (a measurement
+record, and the reason not to re-run a rejected experiment). So do wire and API
+field names still on the wire, and prose about a vendor's own naming, such as
+Slack calling `files.upload` its legacy v1 endpoint.
+
 Coverage cannot live in the root config: vitest reads `coverage` only at the
 top level and drops a `coverage` block inside a project entry **silently**.
 twin-github and twin-slack each keep a `vitest.coverage.config.ts` that
