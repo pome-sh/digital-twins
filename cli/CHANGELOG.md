@@ -9,7 +9,7 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
-## Unreleased (patch)
+## 0.33.3 — 2026-08-28
 
 **Four help entries printed their default twice.** `pome twin reset --help` read
 `name  Twin name (default: github) (default: "github")`, once from the argument's
