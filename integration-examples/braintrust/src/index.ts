@@ -39,6 +39,8 @@ import type { DatasetRow } from "./dataset.js";
 import { assertWorldSeeded, readCharge, validateSeed, withPomeSandbox } from "./pome.js";
 import type { Env, PomeRunEvidence } from "./pome.js";
 import { criteriaFor, renderTask } from "./task.js";
+import { initTelemetry } from "./telemetry.js";
+import type { Telemetry } from "./telemetry.js";
 
 /**
  * Whether a finished eval means the harness worked.
@@ -102,6 +104,7 @@ export async function runRow(
   input: DatasetRow["input"],
   env: Env,
   groupId: string,
+  telemetry: Telemetry = { shutdown: async () => {} },
 ): Promise<RefundTaskOutput> {
   const { world, policy } = input;
   const task = renderTask(world);
@@ -129,6 +132,8 @@ export async function runRow(
         policy: RETRY_POLICIES[policy],
         prompt: `${world.situation}\n\nThe charge id is ${world.chargeId}. Refund ${world.refundMinorUnits} (minor units).`,
         model: env.POME_AGENT_MODEL?.trim() || undefined,
+        tracer: telemetry.tracer,
+        traceName: input.rowId,
       });
       return {
         summary: `${run.summary}\n\n(${run.steps} model turns)`,
@@ -206,6 +211,16 @@ async function main(): Promise<void> {
   const project = env.BRAINTRUST_PROJECT?.trim() || "pome-refund-agent";
   const groupId = `bteval-${Date.now().toString(36)}`;
 
+  // Optional, and off by default. With no OTEL_EXPORTER_OTLP_ENDPOINT this is a
+  // no-op and the run is exactly what it was before — the score columns never
+  // depended on it. With one, the agent's gen_ai.* spans go wherever it points,
+  // which is how Braintrust's llm_calls / tool_calls / total_tokens stop reading
+  // zero for a run that really did call a model.
+  const telemetry = initTelemetry(env);
+  if (telemetry.tracer) {
+    console.log(`Exporting agent spans via OTLP to ${env.OTEL_EXPORTER_OTLP_ENDPOINT}.`);
+  }
+
   // Check every distinct world's SHAPE once, before anything is provisioned. A
   // seed error caught here is one 422 in under a second; caught after the
   // fan-out it is N sandboxes that each spent quota to boot the wrong world.
@@ -225,7 +240,7 @@ async function main(): Promise<void> {
 
   const { results } = await Eval<DatasetRow["input"], RefundTaskOutput>(project, {
     data: DATASET,
-    task: (input) => runRow(input, env, groupId),
+    task: (input) => runRow(input, env, groupId, telemetry),
     scores: [pomeCriteria, pomeRunScore],
     classifiers: [pomeNarratorReadings],
     maxConcurrency: options.maxConcurrency,
@@ -235,6 +250,11 @@ async function main(): Promise<void> {
   for (const row of results) {
     if (row.error) console.error(`row ${row.input.rowId} failed:`, row.error);
   }
+  // Flush BEFORE the exit. A BatchSpanProcessor holds spans until its timer
+  // fires, and `process.exit` does not wait for it — an unflushed run loses
+  // exactly the spans a reader went looking for, and looks like the exporter
+  // never worked.
+  await telemetry.shutdown();
   process.exit(exitCodeFor(results));
 }
 
