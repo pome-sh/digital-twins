@@ -9,7 +9,7 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
-## Unreleased (patch)
+## 0.34.1 — 2026-08-28
 
 **`pome health` is internal and no longer in `pome --help`.** It boots the GitHub
 twin, hardcoded, and prints that twin's raw health JSON. Root `--help` used to
