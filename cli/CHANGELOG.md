@@ -11,6 +11,17 @@ only: a correction is the next entry, naming the one it corrects.
 
 ## 0.33.2 — 2026-08-28
 
+**Four help entries printed their default twice.** `pome twin reset --help` read
+`name  Twin name (default: github) (default: "github")`, once from the argument's
+default value and once from a description that also named it. `sandbox create
+--format`, `sandbox list --state` and `demo --trials` did the same. Commander
+renders the default, so the text no longer repeats it.
+
+`pome twin reset` also says what it does. "Reset standalone twin state" named
+neither what is deleted nor what replaces it; it now reads "Delete a twin's local
+database and status file, so its next start begins from the twin's declared
+starting point again."
+
 **`pome run --help` is a reference card again.** It was 44 lines, of which
 `-n/--trials` alone was a 90-word paragraph covering the 1 to 20 range, the plan
 quota, slot reuse, the verdict table and three exit codes. Each flag now takes
