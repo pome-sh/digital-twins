@@ -9,7 +9,7 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
-## Unreleased (patch)
+## 0.34.2 — 2026-08-28
 
 `SECURITY.md` states the `pome-sh` package on npm as what it is: not this
 package, not maintained, no security updates. It is still published at 0.8.0, so
