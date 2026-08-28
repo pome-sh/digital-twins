@@ -1458,13 +1458,6 @@ export function createProgram() {
     });
 
   program
-    .command("version")
-    .description("Print the Pome version")
-    .action(() => {
-      console.log(PACKAGE_VERSION);
-    });
-
-  program
     .command("health")
     .description("Run an in-process smoke check")
     .action(async () => {

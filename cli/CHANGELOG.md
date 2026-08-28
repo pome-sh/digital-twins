@@ -9,6 +9,13 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
+## Unreleased (minor)
+
+**`pome version` is gone. Use `pome --version`.** The two printed the same
+string, and both sat in root `--help`. The flag is the convention every reader
+arrives with, so the subcommand was the one to drop. `pome version` now reports
+`error: unknown command 'version'`, and `pome --help` lists `-V, --version`.
+
 ## 0.33.3 — 2026-08-28
 
 **Four help entries printed their default twice.** `pome twin reset --help` read
