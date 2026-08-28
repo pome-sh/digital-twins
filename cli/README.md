@@ -40,7 +40,7 @@ local/OSS package release.
 
 ```bash
 pome login                       # one-time; opens the dashboard to sign in
-pome init                        # scaffolds tasks/, examples/agents/, runs/, pome.config.json
+pome init                        # scaffolds tasks/, examples/agents/, runs/, pome.json
 pome register agent my-agent     # scopes runs to this project
 pome run tasks/01-bug-happy-path.md --agent "node examples/agents/scripted-triage-agent.ts"
 pome inspect latest              # trace/audit view of the last run
@@ -49,7 +49,7 @@ pome inspect latest              # trace/audit view of the last run
 To capture a trace without the cloud (self-host), then get a verdict later:
 
 ```bash
-pome run --local tasks/01-bug-happy-path.md   # captures a raw trace only — no verdict
+pome run --local tasks/01-bug-happy-path.md   # captures a raw trace only, no verdict
 pome eval runs/01-bug-happy-path/<run-id>         # uploads it for a cloud verdict
 ```
 

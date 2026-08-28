@@ -9,6 +9,16 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
+## Unreleased (patch)
+
+**`pome --help` is an index again.** It had grown to 76 lines, because six
+commands described themselves in prose in the command list: `run` took 6 lines
+there, `demo` and `fix-prompt` 8 each. Every command now prints one line in the
+list and keeps its full description in its own `--help`, so the list is 31 lines
+and fits one screen. `pome init` and `pome endpoints` also say what they do:
+"Create pome.json and starter files" and "List the endpoints a twin serves".
+
+
 ## 0.33.0 — 2026-08-28
 
 Frozen twin contract: the bundled twins' `POST /s/:sid/mcp/call` takes exactly
