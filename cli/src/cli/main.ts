@@ -1458,8 +1458,8 @@ export function createProgram() {
     });
 
   program
-    .command("health")
-    .description("Run an in-process smoke check")
+    .command("health", { hidden: true })
+    .description("Internal: boot the GitHub twin in process and print its health JSON.")
     .action(async () => {
       const app = (await createGitHubSmokeApp()) as { request: (url: string) => Promise<Response> };
       const response = await app.request("http://pome.local/healthz");

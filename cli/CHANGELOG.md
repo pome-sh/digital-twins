@@ -9,6 +9,19 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
+## Unreleased (patch)
+
+**`pome health` is internal and no longer in `pome --help`.** It boots the GitHub
+twin, hardcoded, and prints that twin's raw health JSON. Root `--help` used to
+call it "Run an in-process smoke check", so a reader debugging Slack ran it, read
+`"ok":true`, and concluded the problem was elsewhere. `pome doctor` is the
+command that checks your wiring, in prose, with a named cause and a fix.
+
+The command still runs and still answers "can this install boot a twin at all",
+which is the one question it is good at and the one `pome doctor` cannot answer,
+since that command needs a manifest. It is hidden, next to `pome demo-agent`, and
+its description now says which twin it speaks for.
+
 ## 0.34.0 — 2026-08-28
 
 **`pome version` is gone. Use `pome --version`.** The two printed the same
