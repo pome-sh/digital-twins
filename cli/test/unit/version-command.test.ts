@@ -24,9 +24,12 @@ describe("there is one way to ask for the version", () => {
     expect(names).not.toContain("version");
   });
 
-  it("reports the installed version through --version", () => {
-    // Not a literal in the source: a hardcoded string would keep passing after
-    // a release, which is the whole point of asking a binary its version.
+  it("reports the version from package.json through --version", () => {
+    // Narrow on purpose: under vitest this exercises the filesystem branch of
+    // `readPackageVersion`, not the tsup `PKG_VERSION` define the published
+    // build uses. What it catches is resolution collapsing to the "0.0.0"
+    // fallback, which is the mode that would ship a binary unable to say which
+    // build it is.
     expect(createProgram().version()).toBe(installedVersion);
   });
 
@@ -36,7 +39,9 @@ describe("there is one way to ask for the version", () => {
     const help = program.helpInformation();
 
     expect(help).toContain("-V, --version");
-    const commandLines = help.slice(help.indexOf("Commands:")).split("\n");
-    expect(commandLines.filter((line) => line.trimStart().startsWith("version"))).toHaveLength(0);
+    // Over the whole text, not a slice from "Commands:": a missing block would
+    // make indexOf return -1 and the slice check pass while reading one char.
+    const lines = help.split("\n");
+    expect(lines.filter((line) => line.trimStart().startsWith("version"))).toHaveLength(0);
   });
 });
