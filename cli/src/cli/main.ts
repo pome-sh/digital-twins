@@ -1458,6 +1458,13 @@ export function createProgram() {
     });
 
   program
+  // Hidden: the one check a contributor can run with no project, no manifest
+  // and no account, which is why it is not folded into `pome doctor` (that one
+  // stops at "pome manifest not found"). It answers for GitHub and nothing
+  // else, and it answers in the twin's raw health JSON, so root `--help`
+  // offering it as "a smoke check" sent a reader debugging Slack to an
+  // `"ok":true` about a twin they had not asked about.
+  program
     .command("health", { hidden: true })
     .description("Internal: boot the GitHub twin in process and print its health JSON.")
     .action(async () => {

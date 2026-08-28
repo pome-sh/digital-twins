@@ -1,22 +1,27 @@
 // SPDX-License-Identifier: Apache-2.0
 // Root `--help` offered `pome health` as "Run an in-process smoke check". What
 // it does is boot the GitHub twin, hardcoded, and print that twin's raw health
-// JSON. So a reader debugging slack ran it, read `"ok":true`, and concluded the
+// JSON, so a reader debugging Slack ran it, read `"ok":true`, and concluded the
 // problem was elsewhere. `pome doctor` is the command that checks a user's
 // wiring, in prose, with a named cause and a fix.
 //
-// `health` is a liveness probe for CI and for a contributor checking that an
-// install can boot a twin at all, so it stays registered and hidden, next to
-// `demo-agent`. The rule below is derived rather than a list of two names: a
-// command that calls itself internal must not be in the index.
+// `health` stays registered and hidden, next to `demo-agent`, because it is the
+// one check that runs with no project, manifest or account. The rule below is
+// derived rather than a list of two names: a command that calls itself internal
+// must not be in root `--help`.
 
 import type { Command } from "commander";
 import { describe, expect, it } from "vitest";
 
 import { createProgram } from "../../src/cli/main.js";
 
-function isHidden(cmd: Command): boolean {
-  return Boolean((cmd as unknown as { _hidden?: boolean })._hidden);
+const INTERNAL_PREFIX = "Internal:";
+
+/** Commander's own answer to "what does `--help` list", rather than reading the
+ *  private `_hidden` field a minor upgrade could rename. */
+function listedInHelp(program: Command): Command[] {
+  const help = program.createHelp();
+  return help.visibleCommands(program) as Command[];
 }
 
 function rootHelp(): string {
@@ -31,22 +36,30 @@ function command(name: string): Command {
   return cmd;
 }
 
-describe("internal commands stay out of the index", () => {
-  it("hides every command that calls itself internal", () => {
-    const internal = createProgram().commands.filter((cmd) =>
-      cmd.description().startsWith("Internal:"),
+describe("internal commands stay out of root --help", () => {
+  it("lists no command that calls itself internal", () => {
+    const program = createProgram();
+    const internal = program.commands.filter((cmd) =>
+      cmd.description().startsWith(INTERNAL_PREFIX),
     );
+    const listed = new Set(listedInHelp(program).map((cmd) => cmd.name()));
 
     expect(internal.length, "no command declares itself internal any more").toBeGreaterThan(0);
     for (const cmd of internal) {
-      expect(isHidden(cmd), `${cmd.name()} says it is internal but is listed in --help`).toBe(true);
+      expect(listed.has(cmd.name()), `${cmd.name()} says it is internal but --help lists it`).toBe(
+        false,
+      );
     }
   });
 
-  it("keeps `health` registered, so CI and a contributor can still run it", () => {
-    // Hidden, not deleted: this is the one command that answers "can this
-    // install boot a twin at all" without a project, a manifest or an account.
-    expect(isHidden(command("health"))).toBe(true);
+  it("keeps both internal commands registered", () => {
+    // Hidden, not deleted. `health` is the only way to ask "can this install
+    // boot a twin at all" with no project, manifest or account, which is why it
+    // is not folded into `pome doctor`, and `demo-agent` is the child `pome
+    // demo` spawns. A later cleanup should not quietly drop either.
+    for (const name of ["health", "demo-agent"]) {
+      expect(command(name).description()).toContain(INTERNAL_PREFIX);
+    }
   });
 
   it("names the one twin `health` speaks for", () => {
@@ -54,7 +67,8 @@ describe("internal commands stay out of the index", () => {
     expect(command("health").description()).toMatch(/github/i);
   });
 
-  it("lists neither internal command in root --help", () => {
+  it("prints neither in the rendered root help", () => {
+    // The rendered text, not the model: this is what a reader sees.
     const lines = rootHelp().split("\n");
     for (const name of ["health", "demo-agent"]) {
       expect(
