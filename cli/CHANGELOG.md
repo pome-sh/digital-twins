@@ -9,7 +9,7 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
-## Unreleased (minor)
+## 0.34.0 — 2026-08-28
 
 **`pome version` is gone. Use `pome --version`.** The two printed the same
 string, and both sat in root `--help`. The flag is the convention every reader
