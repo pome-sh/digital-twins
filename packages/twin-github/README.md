@@ -61,7 +61,7 @@ The default seed creates:
   `StreamableHTTPClientTransport` expect (`initialize`, `tools/list`,
   `tools/call`, `ping`, `notifications/*`). 36 tools exposed via
   `tools/list` with camelCase `inputSchema`.
-- Legacy custom MCP routes (compat surface for already-deployed agents):
+- Per-tool HTTP routes, which answer with the upstream status code rather than a JSON-RPC envelope. The fidelity harness scores parity through them:
   - `GET  /s/:sid/mcp/tools` — returns `{ tools: [{ name, description, input_schema }, ...] }`
   - `POST /s/:sid/mcp/tools/:name` — body is the tool's arguments object
   - `POST /s/:sid/mcp/call` — body `{ tool, arguments }`

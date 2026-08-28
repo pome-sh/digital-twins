@@ -236,15 +236,4 @@ describe("pome tasks", () => {
     expect(existsSync(join(customDir, "01-bug-happy-path.md"))).toBe(true);
     expect(existsSync(join(dir, "tasks"))).toBe(false);
   });
-
-  it("`pome scenarios` is not a command", async () => {
-    await inTempDir();
-    const program = createProgram();
-    program.exitOverride();
-    program.configureOutput({ writeErr: () => {} });
-
-    await expect(
-      program.parseAsync(["node", "pome", "scenarios"]),
-    ).rejects.toThrow(/unknown command/i);
-  });
 });

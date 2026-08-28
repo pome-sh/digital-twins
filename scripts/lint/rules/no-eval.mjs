@@ -6,6 +6,10 @@
 
 import { fileURLToPath } from "node:url";
 
+// Paths that NAME a scoring capability. Not a list of files that once existed:
+// a directory called `score` or `evaluator` is local scoring whatever its files
+// happen to import, and the module and file-name arms below cannot see it when
+// those files carry innocuous names.
 const FORBIDDEN_PATHS = [
   "cli/src/evaluator",
   "cli/src/matrix",

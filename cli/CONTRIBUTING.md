@@ -69,9 +69,10 @@ This boundary is enforced mechanically, repo-wide, by
 `cli/src/**`, `cli/scripts/**`, and `packages/**` in one pass — there is no
 separate `cli/`-local copy to run. The gate denies:
 
-1. **Known deleted paths reappearing** — `src/evaluator/`, `src/matrix/`,
-   `src/score/`, `packages/correlator/`, and the retired local-scoring CLI
-   entrypoints must stay gone.
+1. **Paths that name a scoring capability** — `src/evaluator/`, `src/matrix/`,
+   `src/score/`, `packages/correlator/` and the CLI's scoring entrypoints. A
+   directory with one of those names is local scoring whatever its files import,
+   which is why the path list exists alongside the two checks below.
 2. **File names that look like an evaluator** — any file whose name starts
    with `correlate`, `score`, `judge`, or `verdict` (case-insensitive), no
    matter where it lives. If your change legitimately needs a name like
