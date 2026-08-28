@@ -68,16 +68,31 @@ test("listExamples reports the root with each example, so a message can locate i
     assert.equal(example.rel, `${example.root}/${example.name}`);
     assert.ok(EXAMPLE_ROOTS.includes(example.root));
   }
-  // The braintrust recipe is the reason the second root exists: it is not an
-  // examinee, so `pome.json` carries no `command`.
-  const braintrust = examples.find((e) => e.name === "braintrust");
-  assert.ok(braintrust, "integration-examples/braintrust is missing");
-  assert.equal(braintrust.root, "integration-examples");
-  const manifest = JSON.parse(readFileSync(join(braintrust.dir, "pome.json"), "utf8"));
-  assert.equal(
-    manifest.command,
-    undefined,
-    "integration-examples/braintrust grew a `command`, which would make it an examinee — if that is " +
-      "intended it belongs back under agent-examples/.",
-  );
+  // The two recipes are the reason the second root exists: neither is an
+  // examinee, so neither `pome.json` carries a `command`. This is the property
+  // the taxonomy IS — check it rather than trusting the directory name.
+  for (const name of ["braintrust", "langsmith"]) {
+    const recipe = examples.find((e) => e.name === name);
+    assert.ok(recipe, `integration-examples/${name} is missing`);
+    assert.equal(recipe.root, "integration-examples");
+    const manifest = JSON.parse(readFileSync(join(recipe.dir, "pome.json"), "utf8"));
+    assert.equal(
+      manifest.command,
+      undefined,
+      `integration-examples/${name} grew a \`command\`, which would make it an examinee — if that ` +
+        `is intended it belongs back under agent-examples/.`,
+    );
+  }
+
+  // The inverse, and the half that actually rots: every agent-examples/* entry
+  // must still BE an examinee. A new example dropped into the wrong root reads
+  // as covered by both scanners and is filed under a noun that does not fit.
+  for (const example of examples.filter((e) => e.root === "agent-examples")) {
+    const manifest = JSON.parse(readFileSync(join(example.dir, "pome.json"), "utf8"));
+    assert.ok(
+      manifest.command,
+      `${example.rel} has no \`command\`, so \`pome run\` cannot launch it — it is a harness that ` +
+        `drives Pome, not an agent Pome grades, and it belongs under integration-examples/.`,
+    );
+  }
 });

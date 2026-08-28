@@ -373,7 +373,7 @@ function check(name, got, want) {
     launchEnv({ ...realWiring, POME_API_URL: "https://api.pome.sh" }, true).POME_API_URL,
     "https://api.pome.sh",
   );
-  // `langsmith-eval` calls api.smith.langchain.com, whose free tier is metered on
+  // `integration-examples/langsmith` calls api.smith.langchain.com, whose free tier is metered on
   // traces. Same argument as POME_API_URL: the PR leg is uncredentialed by design
   // and a developer's own LANGSMITH_API_KEY is inherited from their shell, not
   // overlaid here.

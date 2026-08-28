@@ -16,7 +16,7 @@
 // Every Pome criterion comes back as its own LangSmith feedback key.
 //
 // This is the second framework over the same recipe.
-// `agent-examples/braintrust-eval` runs these same six worlds through the same
+// `integration-examples/braintrust` runs these same six worlds through the same
 // four Pome calls; `src/pome.ts` is that example's file, copied, and
 // `src/langsmith.ts` is everything that knows LangSmith exists.
 //
@@ -345,7 +345,7 @@ if (ENTRY === SELF) {
     // `ECONNREFUSED` / `ENOTFOUND` only on `err.cause`, and `AbortError` is a
     // NAME. Logging the message alone would show the classifier strictly less
     // than an uncaught rejection did.
-    console.error("\nlangsmith-eval failed before the eval could finish:", err);
+    console.error("\nintegration-examples/langsmith failed before the eval could finish:", err);
     process.exit(1);
   }
 }
