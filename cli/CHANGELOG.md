@@ -9,7 +9,7 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
-## Unreleased (patch)
+## 0.33.2 — 2026-08-28
 
 **`pome run --help` is a reference card again.** It was 44 lines, of which
 `-n/--trials` alone was a 90-word paragraph covering the 1 to 20 range, the plan
