@@ -11,12 +11,18 @@ only: a correction is the next entry, naming the one it corrects.
 
 ## Unreleased (patch)
 
-**`pome --help` is an index again.** It had grown to 76 lines, because six
-commands described themselves in prose in the command list: `run` took 6 lines
-there, `demo` and `fix-prompt` 8 each. Every command now prints one line in the
-list and keeps its full description in its own `--help`, so the list is 31 lines
-and fits one screen. `pome init` and `pome endpoints` also say what they do:
-"Create pome.json and starter files" and "List the endpoints a twin serves".
+**`pome --help` is an index again.** It had grown to 76 lines, because 14 of the
+21 commands described themselves in prose in the command list, 10 of them over
+three lines or more: `fix-prompt` took 9 lines there, `demo` and `doctor` 7 each.
+Every command now prints one line in the list and keeps its full description in
+its own `--help`. The command list is 22 lines, down from 66, and the whole
+output is 31 lines.
+
+Four commands also say what they do rather than what they are near. `pome docs`
+prints a URL, it does not open a browser, so its entry no longer says "Open".
+`pome checks` names its `add` and `lint` subcommands, one of which writes to a
+task file. `pome endpoints` answers for the github and gmail twins only, and now
+says so. `pome twin` lists the subcommands it actually has.
 
 
 ## 0.33.0 — 2026-08-28

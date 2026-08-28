@@ -1,7 +1,7 @@
 {
   "name": "@pome-sh/cli",
   "version": "0.33.0",
-  "description": "Digital-twin testing for AI agents \u2014 run tasks against resettable local or hosted twins and record tool-call traces for evaluation on pome.sh.",
+  "description": "Test AI agents against digital twins of real SaaS APIs. Records tool-call traces and scores them on pome.sh.",
   "keywords": [
     "ai",
     "agents",

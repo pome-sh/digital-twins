@@ -135,14 +135,15 @@ export function createProgram() {
   program
     .name("pome")
     .description(
-      "Test AI agents against digital twins of real SaaS APIs. Run `pome demo` for a first run, or `pome docs` for the guides.",
+      "Test AI agents against digital twins of real SaaS APIs. Runs are recorded to app.pome.sh. Start with `pome demo`.",
     )
     .version(PACKAGE_VERSION)
     .showHelpAfterError("(add --help for usage)");
 
   program
     .command("init")
-    .description("Create pome.json and starter files")
+    .summary("Set up Pome in this project")
+    .description("Create pome.json, plus starter files in a new project")
     .option(
       "--sdk <name>",
       "Scaffold for a specific agent SDK (claude | claude-managed). Adds the SDK-specific example file and pre-fills agent.framework so the dashboard badges runs correctly.",
@@ -314,7 +315,7 @@ export function createProgram() {
 
   program
     .command("docs")
-    .summary("Open the Pome documentation")
+    .summary("Print a docs.pome.sh URL by topic")
     .argument("[topic]", "Topic id (e.g. getting-started, github, cli) — prints the docs.pome.sh URL")
     .option(
       "--site <origin>",
@@ -375,7 +376,7 @@ export function createProgram() {
   // is a trap.
   const checks = program
     .command("checks")
-    .summary("List the checks a twin can grade with")
+    .summary("List, add, and lint a twin's checks")
     .argument("[twin]", "Twin id (e.g. github). Omit to list twins that declare checks.")
     .option("--json", "Emit the declaration as JSON (for skills and agents).", false)
     .description(
@@ -425,7 +426,7 @@ export function createProgram() {
 
   program
     .command("compile-seeds")
-    .summary("Compile prose seed state into JSON")
+    .summary("Compile a task's seed state to JSON")
     .argument("[target]", "Task .md file or directory (defaults to ./tasks)")
     .option("--force", "Recompile even if the sidecar's source hash matches", false)
     .option(
@@ -1004,7 +1005,7 @@ export function createProgram() {
 
   program
     .command("demo")
-    .summary("Try Pome without an account")
+    .summary("Run a sample task, no account needed")
     .description(
       "Zero-auth first-run demo: boots a local GitHub twin, runs the bundled demo agent for 5 isolated trials (model calls via pome's anonymous demo gateway), and prints per-trial verdicts evaluated in Pome cloud. No signup, no API keys; ends with a no-login preview link.",
     )
@@ -1071,7 +1072,7 @@ export function createProgram() {
 
   program
     .command("eval")
-    .summary("Score a trace you already recorded")
+    .summary("Score a trace recorded earlier")
     .argument(
       "[run-dir]",
       "Existing run directory (runs/<task>/<run-id>). Omit to use <artifacts-dir>/latest.json.",
@@ -1319,7 +1320,7 @@ export function createProgram() {
   const twin = program
     .command("twin")
     .summary("Run a twin on this machine")
-    .description("Start, seed, reset, and inspect a twin running on this machine");
+    .description("Start and reset a twin on this machine, print its status or a starter seed file");
   twin
     .command("start")
     .argument(
@@ -1392,8 +1393,9 @@ export function createProgram() {
 
   program
     .command("endpoints")
+    .summary("List a twin's endpoints")
     .argument("<name>", "Twin name")
-    .description("List the endpoints a twin serves")
+    .description("List the endpoints the github or gmail twin serves")
     .action((name: string) => {
       const endpoints =
         name === "github"

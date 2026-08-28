@@ -11,7 +11,7 @@ prints it to the terminal and records it to the dashboard, and
 
 **📚 Full documentation lives at [docs.pome.sh](https://docs.pome.sh).**
 Run `pome --help` (or `pome help <command>`) for the CLI reference, and
-`pome docs getting-started` to open the canonical quickstart.
+`pome docs getting-started` to print the quickstart's URL.
 
 ## Install
 

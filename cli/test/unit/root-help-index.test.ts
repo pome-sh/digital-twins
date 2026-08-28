@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // `pome --help` is the first thing a new user runs, and it is an index: it
 // answers "which command do I want", nothing more. It grew to 76 lines because
-// six commands described themselves in prose there — `run` alone took 6 lines,
-// `demo` and `fix-prompt` 8 each — so the list did not fit on one screen.
+// 14 of 21 commands described themselves in prose there, 10 of them over three
+// lines or more, so the list did not fit on one screen.
 //
 // Commander prints `.summary()` in the parent's command list and `.description()`
 // in the command's own `--help`. The assertions below hold that split: nothing in
@@ -49,6 +49,9 @@ function indexLines(program: Command): string[] {
 }
 
 describe("pome --help is a one-screen index", () => {
+  // Commander breaks the description column at whitespace only, so a single
+  // unbreakable token longer than the column overflows past 80 without wrapping.
+  // The length assertion below is what catches that case.
   it("gives each command exactly one line", () => {
     const program = createProgram();
     // Commander appends its own `help` entry, which is part of the index.
@@ -88,26 +91,55 @@ describe("pome --help is a one-screen index", () => {
     for (const cmd of visible(createProgram())) {
       const text = cmd.summary() || cmd.description();
       expect(text, `${cmd.name()}'s index text carries a parenthetical`).not.toMatch(/[()]/);
+      // Index entries only. The root description above the list does point at
+      // `pome demo`, which is where a new user needs to be sent.
       expect(text, `${cmd.name()}'s index text points at another command`).not.toMatch(/`pome /);
     }
   });
 
   it("keeps a fuller description behind every shortened entry", () => {
     // A summary earns its place only where the description does not fit the
-    // index. Where one exists, the long form must still be there one level
-    // down: without this, "shorten the index" and "delete the prose" pass the
-    // same assertions.
-    const summarised = visible(createProgram()).filter((cmd) => cmd.summary() !== "");
+    // index, so a summarised command must still have a description too long to
+    // BE the index entry. Without the length floor, gutting a paragraph down to
+    // one line passes: "shorten the index" and "delete the prose" then look the
+    // same to this file.
+    const program = createProgram();
+    const limit = indexTextWidth(program);
+    const summarised = visible(program).filter((cmd) => cmd.summary() !== "");
 
     expect(summarised.length).toBeGreaterThan(0);
     for (const cmd of summarised) {
-      expect(cmd.description(), `${cmd.name()} has a summary but no description`).not.toBe("");
+      const description = cmd.description();
       expect(cmd.summary(), `${cmd.name()}'s summary only repeats its description`).not.toBe(
-        cmd.description(),
+        description,
       );
+      expect(
+        description.length,
+        `${cmd.name()} has a summary but a description of ${description.length} chars, which would fit the index`,
+      ).toBeGreaterThan(limit);
       expect(help(cmd), `${cmd.name()} --help does not print its description`).toContain(
-        cmd.description().split("\n")[0]!.slice(0, 30),
+        description.split("\n")[0]!.slice(0, 30),
       );
+    }
+  });
+
+  it("keeps the load-bearing warning in each long description", () => {
+    // The five paragraphs are paragraphs because they carry a fact a user is
+    // hurt by not knowing. Shortening the index must not become an excuse to
+    // drop them, and only a named fact per command can tell the difference.
+    const facts: Record<string, RegExp> = {
+      run: /doctor/,
+      demo: /no signup|No signup/,
+      doctor: /egress/,
+      eval: /eval-sessions/,
+      "fix-prompt": /no network/,
+    };
+    const byName = new Map(visible(createProgram()).map((cmd) => [cmd.name(), cmd]));
+
+    for (const [name, fact] of Object.entries(facts)) {
+      const cmd = byName.get(name);
+      expect(cmd, `${name} is no longer a command`).toBeDefined();
+      expect(cmd!.description(), `${name}'s description dropped ${fact}`).toMatch(fact);
     }
   });
 });
