@@ -9,6 +9,24 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
+## Unreleased (patch)
+
+**Four help entries printed their default twice.** `pome twin reset --help` read
+`name  Twin name (default: github) (default: "github")`, once from the argument's
+default value and once from a description that also named it. `sandbox create
+--format`, `sandbox list --state` and `demo --trials` did the same. Commander
+renders the default, so the text no longer repeats it.
+
+`pome twin reset` also says what it does. "Reset standalone twin state" named
+neither what goes nor where it lived. It now names the paths: the twin's database
+under `.pome/` or `.pome-data/`, and `.pome/twin-status.json`, the one file `pome
+twin status` reads for every twin. It also says the case a reader hits first,
+which is that a twin holding its state in memory has nothing to delete.
+
+`sandbox create --format env` said it "is not printed". It does print: writing
+`--secrets-file` announces itself on stderr. What it does not print is the
+exports themselves, which is what the text now says.
+
 ## 0.33.2 — 2026-08-28
 
 **`pome run --help` is a reference card again.** It was 44 lines, of which

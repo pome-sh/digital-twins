@@ -544,7 +544,7 @@ export function createProgram() {
     )
     .option(
       "--format <fmt>",
-      "text (default) | json | env. env requires --secrets-file and is not printed.",
+      "Output format: text, json, or env. env writes the exports to --secrets-file instead of printing them.",
       "text",
     )
     .action(
@@ -587,10 +587,10 @@ export function createProgram() {
     .option("--limit <n>", "Max rows", "20")
     .option(
       "--state <state>",
-      "Filter by session state: running (default) | ready | done | expired | all. `running` matches both server-side `ready` and `running` (dashboard collapses both into one column).",
+      "Filter by sandbox state: running, ready, done, expired, or all. `running` also matches the server-side `ready` state, the way the dashboard shows them in one column.",
       "running",
     )
-    .option("--format <fmt>", "text | json", "text")
+    .option("--format <fmt>", "Output format: text or json", "text")
     .action(
       async (opts: { apiUrl: string; limit: string; state: string; format: string }) => {
         const validStates: SessionListStateFilter[] = [
@@ -1013,7 +1013,7 @@ export function createProgram() {
     )
     .option(
       "--trials <n>",
-      "Number of isolated trials (default 5 per the packaged demo).",
+      "Number of trials to run, 1 to 10",
       "5",
     )
     .option("--artifacts-dir <dir>", "Directory for run artifacts", "runs")
@@ -1356,8 +1356,18 @@ export function createProgram() {
 
   twin
     .command("reset")
-    .argument("[name]", "Twin name (default: github)", "github")
-    .description("Reset standalone twin state")
+    // The name defaults rather than being required, matching `twin start`, and
+    // the success line names the twin it acted on.
+    //
+    // The description names the paths rather than promising an outcome: `twin
+    // start` boots the twin in process, every twin opens an in-memory database
+    // unless a `*_DB` path is set, and it re-seeds on every boot. So a reset
+    // does not decide what the next start begins from.
+    .argument("[name]", "Twin name", "github")
+    .summary("Reset a twin's saved state")
+    .description(
+      "Delete the twin's database under `.pome/` or `.pome-data/`, and `.pome/twin-status.json`, the one file `pome twin status` reads for every twin. A twin holding its state in memory has nothing to delete.",
+    )
     .action(async (name: string) => {
       if (!isTwinName(name)) {
         throw new Error(`Unknown twin '${name}'. Supported: ${TWIN_NAME_LIST.join(", ")}.`);
