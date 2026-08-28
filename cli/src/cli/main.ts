@@ -662,17 +662,12 @@ export function createProgram() {
     .summary("Run a task and print the score")
     .argument(
       "[path]",
-      'Task markdown file or directory. Omit to run the demo task ("that was ours, run yours"): tasks/first-run-demo.md is dropped into your project on first use with runs: 5 pinned.',
+      "Task file or directory. Omit to run the bundled demo task.",
     )
-    .option("--agent <command>", "Agent command to run")
+    .option("--agent <command>", "Command that starts your agent")
     .option(
       "-n, --trials <count>",
-      "Run <count> isolated trials of the task as ONE trial group (integer 1-20; hosted only). " +
-        "Default is the task config's `runs` field (capped at 20). k>1 mints sessions with a shared group id up to your " +
-        "plan's concurrent-twin quota (remaining trials reuse slots as earlier trials finish), runs trials at that " +
-        "concurrency, prints the per-trial verdict table (numeric cloud-judge scores), and exits 0 iff at least one " +
-        "trial completed and every completed trial passed (1: a completed trial failed; 2: nothing completed). " +
-        "k=1 keeps today's single-run behavior exactly.",
+      "Number of trials to run as one group, 1 to 20. Hosted only; defaults to the task's `runs` field.",
     )
     .option("--artifacts-dir <dir>", "Directory for run artifacts", "runs")
     .option(
@@ -680,21 +675,21 @@ export function createProgram() {
       "Control-plane base URL.",
       process.env.POME_API_URL ?? DEFAULT_CONTROL_PLANE_URL,
     )
-    .option("--agent-model <name>", "Informational; recorded on the cloud run.", "unknown")
+    .option("--agent-model <name>", "Model recorded on the run.", "unknown")
     .option(
       "--agent-version <version>",
-      "Override the manifest's agent.version for this run (stamped on the session/run).",
+      "Override the manifest's agent.version.",
     )
     .option(
       "--no-capture",
-      "Self-host only: skip spawning the capture-server child and don't inject HTTP_PROXY/HTTPS_PROXY into the agent. Used by the CI overhead gate to baseline proxy-on-vs-off latency. No-op on hosted runs.",
+      "Self-host only: skip the capture proxy, so model calls are not recorded. Ignored on hosted runs.",
     )
     .option(
       "--local",
-      "Self-host: run against an in-process twin and CAPTURE a raw trace only (an audit log — no score, no verdict, no judge). A verdict comes from the cloud: run `pome eval <run-dir>` on the captured trace, or `pome login` and run against Pome cloud.",
+      "Self-host: record a trace against a local twin, with no score. Score it later with `pome eval`.",
     )
     .description(
-      'Run one or more Pome tasks. With no path, runs the demo task (tasks/first-run-demo.md, copied into your project on first use — "that was ours, run yours"). Refuses to start if the doctor wiring checks fail (see `pome doctor`); there is no --force.',
+      "Run a task, or every task in a directory, against a hosted twin and print the score. With no path, runs the bundled demo task. Refuses to start when `pome doctor` fails, and there is no --force. See `pome docs cli-run` for trial groups and exit codes.",
     )
     .action(
       async (
