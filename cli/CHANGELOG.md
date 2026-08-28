@@ -18,9 +18,14 @@ default value and once from a description that also named it. `sandbox create
 renders the default, so the text no longer repeats it.
 
 `pome twin reset` also says what it does. "Reset standalone twin state" named
-neither what is deleted nor what replaces it; it now reads "Delete a twin's local
-database and status file, so its next start begins from the twin's declared
-starting point again."
+neither what goes nor where it lived. It now names the paths: the twin's database
+under `.pome/` or `.pome-data/`, and `.pome/twin-status.json`, the one file `pome
+twin status` reads for every twin. It also says the case a reader hits first,
+which is that a twin holding its state in memory has nothing to delete.
+
+`sandbox create --format env` said it "is not printed". It does print: writing
+`--secrets-file` announces itself on stderr. What it does not print is the
+exports themselves, which is what the text now says.
 
 **`pome run --help` is a reference card again.** It was 44 lines, of which
 `-n/--trials` alone was a 90-word paragraph covering the 1 to 20 range, the plan

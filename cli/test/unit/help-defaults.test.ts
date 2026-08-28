@@ -28,13 +28,16 @@ function path(cmd: Command): string {
   return names.join(" ");
 }
 
-const NAMES_A_DEFAULT = /\(default[: )]/i;
+/** Only a parenthesized default, which is the shape Commander itself renders
+ *  and therefore the shape that duplicates. Prose like "instead of each twin's
+ *  default" stays legal, and has to: `sandbox create --seed` needs it. */
+const PARENTHESIZED_DEFAULT = /\(default[: )]/i;
 
 describe("help text never renders a default twice", () => {
   it("holds for every argument in the command tree", () => {
     for (const cmd of allCommands(createProgram())) {
       for (const arg of cmd.registeredArguments) {
-        const named = NAMES_A_DEFAULT.test(arg.description);
+        const named = PARENTHESIZED_DEFAULT.test(arg.description);
         const hasDefault = arg.defaultValue !== undefined;
         expect(
           named && hasDefault,
@@ -47,7 +50,7 @@ describe("help text never renders a default twice", () => {
   it("holds for every option in the command tree", () => {
     for (const cmd of allCommands(createProgram())) {
       for (const opt of cmd.options) {
-        const named = NAMES_A_DEFAULT.test(opt.description);
+        const named = PARENTHESIZED_DEFAULT.test(opt.description);
         const hasDefault = opt.defaultValue !== undefined;
         expect(
           named && hasDefault,
@@ -71,15 +74,19 @@ describe("help text never renders a default twice", () => {
     expect(help).toContain("github");
   });
 
-  it("says what `twin reset` deletes and what the next start does", () => {
-    // "Reset standalone twin state" named neither, which is what left a reader
-    // guessing whether a seed passed to `twin start` survived it.
+  it("names the paths `twin reset` deletes", () => {
+    // "Reset standalone twin state" named neither what goes nor where it lived,
+    // which is what left a reader guessing whether a seed passed to `twin start`
+    // survived it. Paths rather than an outcome: `twin start` re-seeds on every
+    // boot, so a reset does not decide what the next start begins from, and a
+    // description that promised otherwise would be the same defect in reverse.
     const reset = createProgram()
       .commands.find((cmd) => cmd.name() === "twin")
       ?.commands.find((cmd) => cmd.name() === "reset");
     const description = reset!.description();
 
     expect(description).toMatch(/delete/i);
-    expect(description).toMatch(/start/i);
+    expect(description).toContain(".pome/twin-status.json");
+    expect(description).not.toMatch(/next start|starting point/i);
   });
 });
