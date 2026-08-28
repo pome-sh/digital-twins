@@ -9,6 +9,15 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
+## Unreleased (patch)
+
+**`pome run --help` is a reference card again.** It was 44 lines, of which
+`-n/--trials` alone was a 90-word paragraph covering the 1 to 20 range, the plan
+quota, slot reuse, the verdict table and three exit codes. Each flag now takes
+two lines at most and the help is 26 lines. Nothing was dropped: the long form is
+on the `pome run` reference page, which the command description names by topic id
+(`pome docs cli-run`).
+
 ## 0.33.1 — 2026-08-28
 
 **`pome --help` is an index again.** It had grown to 76 lines, because 14 of the
