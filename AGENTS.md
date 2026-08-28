@@ -33,7 +33,8 @@ packages/
 contract/             cross-package tests against a booted twin
 scripts/              build and CI gates
 skills/               Claude skills shipped as a plugin
-agent-examples/       runnable agents, each with its own install
+agent-examples/       runnable AGENTS for Pome to grade, each with its own install
+integration-examples/ harnesses that DRIVE Pome from another eval platform
 ```
 
 ## Commands
@@ -95,7 +96,7 @@ exact pin between siblings installs a second registry copy and you get two zod
 schema identities in one runtime. This holds for `@pome-sh/wire` too, even
 though it is published.
 
-**`agent-examples/*` pins are exact, on purpose.** Each example installs
+**Example pins are exact, on purpose** — `agent-examples/*` and `integration-examples/*` alike. Each example installs
 independently, so it needs a real published version. This is the inverse of the
 rule above and both are correct.
 

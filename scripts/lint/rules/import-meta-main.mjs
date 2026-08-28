@@ -7,6 +7,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, extname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { EXAMPLE_ROOTS } from "../../lib/example-roots.mjs";
 
 import ts from "typescript";
 
@@ -14,7 +15,7 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 
 const SOURCE_EXTENSIONS = new Set([".mjs", ".js", ".cjs", ".ts", ".mts", ".cts", ".tsx"]);
 
-const SCAN_ROOTS = ["scripts", "contract", "cli/src", "cli/scripts", "packages", "agent-examples"];
+const SCAN_ROOTS = ["scripts", "contract", "cli/src", "cli/scripts", "packages", ...EXAMPLE_ROOTS];
 
 const PRUNED_DIRS = new Set(["node_modules", "dist", "build", ".git", "coverage", ".turbo", ".next"]);
 

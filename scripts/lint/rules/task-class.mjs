@@ -4,8 +4,9 @@
 
 import { readdirSync } from "node:fs";
 import { basename, join } from "node:path";
+import { EXAMPLE_ROOTS } from "../../lib/example-roots.mjs";
 
-const CORPORA = ["cli/tasks", "agent-examples"];
+const CORPORA = ["cli/tasks", ...EXAMPLE_ROOTS];
 const MAX_DEPTH = 3;
 const SKIP_DIRS = new Set([".git", "node_modules", "dist", "build", "coverage"]);
 

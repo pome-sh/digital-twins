@@ -1,4 +1,4 @@
-# `braintrust-eval` — bundled Pome example
+# `integration-examples/braintrust` — bundled Pome example
 
 Braintrust's `Eval()` gives every dataset row **its own world**.
 
@@ -150,12 +150,12 @@ for anyone who signed up with a personal address.
 ## Install and run
 
 ```bash
-cd agent-examples/braintrust-eval
+cd integration-examples/braintrust
 npm install
 npm start
 ```
 
-Like the other examples, this package is deliberately **not** part of the root
+Like every bundled example, this package is deliberately **not** part of the root
 npm workspace — that keeps the Braintrust and AI SDK trees out of the monorepo
 install for everyone who is not running it.
 

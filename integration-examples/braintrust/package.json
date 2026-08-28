@@ -1,5 +1,5 @@
 {
-  "name": "@pome-sh/braintrust-eval-example",
+  "name": "@pome-sh/braintrust-integration-example",
   "private": true,
   "version": "0.1.0",
   "type": "module",

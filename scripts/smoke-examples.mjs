@@ -10,8 +10,13 @@ import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { EXAMPLE_ROOTS, listExamples } from "./lib/example-roots.mjs";
+
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const examplesDir = join(repoRoot, "agent-examples");
+// Kept for `discoverExamples()`'s default and the marker check, both of which are
+// exported and unit-tested against a FIXTURE directory — they stay per-root on
+// purpose. `main()` walks every root via `listExamples`.
+const examplesDir = join(repoRoot, EXAMPLE_ROOTS[0]);
 
 export const SETTLE_MS = 5000;
 
@@ -71,7 +76,7 @@ const SMOKE_LIVE_DEFAULTS = {
 const SMOKE_DEAD_WIRING = {
   POME_TWIN_BASE_URL: "http://127.0.0.1:59321",
   // The HOSTED control plane, dead-wired for the same reason every twin base
-  // above is. Until `braintrust-eval` there was no example that called
+  // above is. Until `integration-examples/braintrust` there was no example that called
   // api.pome.sh, so an unset base was harmless; now an example that reads
   // `POME_API_URL` would default to production and mint BILLABLE sandboxes —
   // once per dataset row, on every PR, and again on every developer's
@@ -288,15 +293,15 @@ export function classifyLaunch({ output, stillRunningAtSettle, exitCode, signal,
   };
 }
 
-function smokeOne(name) {
+function smokeOne(example) {
+  const { rel, dir: cwd } = example;
   return new Promise((resolvePromise) => {
-    const cwd = join(examplesDir, name);
     const tsx = join(cwd, "node_modules", ".bin", "tsx");
     if (!existsSync(tsx)) {
       resolvePromise({
-        name,
+        name: rel,
         status: "fail",
-        reason: `tsx not installed (run \`npm ci\` in agent-examples/${name})`,
+        reason: `tsx not installed (run \`npm ci\` in ${rel})`,
         output: "",
       });
       return;
@@ -320,7 +325,7 @@ function smokeOne(name) {
       if (!child.killed) child.kill("SIGKILL");
       child.stdout?.destroy();
       child.stderr?.destroy();
-      resolvePromise({ name, output, ...verdict });
+      resolvePromise({ name: rel, output, ...verdict });
     };
 
     let exited = null;
@@ -378,31 +383,42 @@ async function main() {
     }
   }
 
-  const examples = discoverExamples();
+  // Every root, not just the first. An example that lands in a root nothing
+  // walks is not a failure here — it is silently unsmoked, which is the shape
+  // this file exists to make impossible.
+  const examples = listExamples(repoRoot).filter((example) => {
+    const pkg = JSON.parse(readFileSync(join(example.dir, "package.json"), "utf8"));
+    return Boolean(pkg.scripts?.start);
+  });
   if (examples.length === 0) {
     console.error("No runnable examples (with a `start` script) found.");
     process.exit(1);
   }
 
-  const markerCoverage = assertEveryExampleEmitsMarker(examplesDir, examples);
-  if (!markerCoverage.ok) {
-    console.error(markerCoverage.message);
-    process.exit(1);
+  for (const root of EXAMPLE_ROOTS) {
+    const inRoot = examples.filter((e) => e.root === root).map((e) => e.name);
+    if (inRoot.length === 0) continue;
+    const markerCoverage = assertEveryExampleEmitsMarker(join(repoRoot, root), inRoot);
+    if (!markerCoverage.ok) {
+      console.error(markerCoverage.message);
+      process.exit(1);
+    }
   }
 
   console.log(
     `Launch-smoking ${examples.length} example(s)${LIVE ? " (LIVE — real twin + model credentials)" : ""}: ` +
-      examples.join(", "),
+      examples.map((e) => e.rel).join(", "),
   );
 
   const failures = [];
   const reached = [];
   const oks = [];
-  for (const name of examples) {
-    process.stdout.write(`\n=== agent-examples/${name} === `);
+  for (const example of examples) {
+    const name = example.rel;
+    process.stdout.write(`\n=== ${name} === `);
     let result;
     try {
-      result = await smokeOne(name);
+      result = await smokeOne(example);
     } catch (err) {
       console.log(`did not report a verdict (runner threw: ${err instanceof Error ? err.message : String(err)})`);
       continue;
@@ -424,7 +440,7 @@ async function main() {
   }
 
   const reportedCount = assertReportedCount(
-    examples,
+    examples.map((e) => e.rel),
     [...oks, ...reached, ...failures].map((r) => r.name),
   );
 

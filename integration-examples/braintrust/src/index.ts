@@ -257,7 +257,7 @@ if (ENTRY === SELF) {
     // `ECONNREFUSED` / `ENOTFOUND` only on `err.cause`, and `AbortError` is a
     // NAME. Logging the message alone would show the classifier strictly less
     // than an uncaught rejection did.
-    console.error("\nbraintrust-eval failed before the eval could finish:", err);
+    console.error("\nintegration-examples/braintrust failed before the eval could finish:", err);
     process.exit(1);
   }
 }

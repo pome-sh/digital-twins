@@ -8,6 +8,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { EXAMPLE_ROOTS, listExamples } from "./lib/example-roots.mjs";
 import { loadWorkspaceMembers } from "./lib/workspace-members.mjs";
 
 const EXACT_VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
@@ -16,7 +17,6 @@ const SCOPE = "@pome-sh/";
 const INSTALL_FIELDS = ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"];
 
 export function discoverExampleSiblingDeps(repoRoot) {
-  const examplesDir = join(repoRoot, "agent-examples");
   const siblingsByName = new Map(
     loadWorkspaceMembers(repoRoot).map((member) => [member.manifest.name, member]),
   );
@@ -24,8 +24,11 @@ export function discoverExampleSiblingDeps(repoRoot) {
   const exact = [];
   const linked = [];
   const unwatchable = [];
-  for (const name of readdirSync(examplesDir).sort()) {
-    const pkgPath = join(examplesDir, name, "package.json");
+  // `root` travels WITH the record. Two roots hold examples now, so a bare
+  // `example` name no longer locates the manifest this gate has to rewrite —
+  // and getting that wrong would re-pin the wrong file, or silently none.
+  for (const { root, name, dir } of listExamples(repoRoot)) {
+    const pkgPath = join(dir, "package.json");
     if (!existsSync(pkgPath)) continue;
     const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
     for (const field of INSTALL_FIELDS) {
@@ -33,7 +36,7 @@ export function discoverExampleSiblingDeps(repoRoot) {
         if (!dep.startsWith(SCOPE)) continue;
         const sibling = siblingsByName.get(dep);
         if (!sibling) continue; // no workspace sibling to compare a published pin against
-        const record = { example: name, field, dep, pin, workspaceVersion: sibling.manifest.version };
+        const record = { root, example: name, field, dep, pin, workspaceVersion: sibling.manifest.version };
         if (EXACT_VERSION.test(pin)) exact.push(record);
         else if (WORKSPACE_LINK.test(pin)) linked.push(record);
         else unwatchable.push(record);
@@ -85,7 +88,8 @@ export function checkExamplePinsPublished(pins, npmView = defaultNpmView) {
 const writeSideNpmView = (name, version) => defaultNpmView(name, version, { attempts: 1 });
 
 export function planExampleRepins(repoRoot, npmView = writeSideNpmView) {
-  if (!existsSync(join(repoRoot, "package.json")) || !existsSync(join(repoRoot, "agent-examples"))) return [];
+  if (!existsSync(join(repoRoot, "package.json"))) return [];
+  if (!EXAMPLE_ROOTS.some((root) => existsSync(join(repoRoot, root)))) return [];
 
   const { exact } = discoverExampleSiblingDeps(repoRoot);
   const { violations, errors } = checkExamplePinsPublished(exact, npmView);
@@ -93,7 +97,7 @@ export function planExampleRepins(repoRoot, npmView = writeSideNpmView) {
   if (errors.length > 0) {
     console.warn(
       `::warning::${errors.length} example pin(s) could not be checked against the registry, so they are NOT ` +
-        `re-pinned in this run: ${errors.map((e) => `agent-examples/${e.example} ${e.dep}@${e.workspaceVersion} (${e.detail})`).join("; ")}`,
+        `re-pinned in this run: ${errors.map((e) => `${e.root}/${e.example} ${e.dep}@${e.workspaceVersion} (${e.detail})`).join("; ")}`,
     );
   }
 
@@ -102,7 +106,7 @@ export function planExampleRepins(repoRoot, npmView = writeSideNpmView) {
   const latest = new Map();
   const repins = [];
   for (const v of violations) {
-    const manifestRelPath = `agent-examples/${v.example}/package.json`;
+    const manifestRelPath = `${v.root}/${v.example}/package.json`;
     const contents = latest.get(manifestRelPath) ?? readFileSync(join(repoRoot, manifestRelPath), "utf8");
     const pattern = new RegExp(`("${escape(v.dep)}"\\s*:\\s*")${escape(v.pin)}(")`, "g");
     const occurrences = contents.match(pattern)?.length ?? 0;
@@ -117,13 +121,14 @@ export function planExampleRepins(repoRoot, npmView = writeSideNpmView) {
     const replacement = contents.replace(pattern, `$1${v.workspaceVersion}$2`);
     latest.set(manifestRelPath, replacement);
     repins.push({
+      root: v.root,
       example: v.example,
       dep: v.dep,
       from: v.pin,
       to: v.workspaceVersion,
       writes: [{ path: manifestRelPath, contents: replacement }],
       regenerate: [
-        `(cd "agent-examples/${v.example}" && npm install --package-lock-only --no-audit --no-fund --prefer-online)`,
+        `(cd "${v.root}/${v.example}" && npm install --package-lock-only --no-audit --no-fund --prefer-online)`,
       ],
     });
   }
@@ -146,7 +151,7 @@ export function reportExamplePinParity(repoRoot, npmView = defaultNpmView) {
   if (errors.length > 0) {
     console.error(`\n❌ registry lookup FAILED for ${errors.length} pin(s) (not a skip — a real error):\n`);
     for (const e of errors) {
-      console.error(`  agent-examples/${e.example} (${e.field}.${e.dep}@${e.workspaceVersion}): ${e.detail}`);
+      console.error(`  ${e.root}/${e.example} (${e.field}.${e.dep}@${e.workspaceVersion}): ${e.detail}`);
     }
   }
 
@@ -154,7 +159,7 @@ export function reportExamplePinParity(repoRoot, npmView = defaultNpmView) {
     console.error(`\n❌ published pin DRIFT in ${violations.length} example(s):\n`);
     for (const v of violations) {
       console.error(
-        `  agent-examples/${v.example} (${v.field}.${v.dep}): pins ${v.pin}, but the workspace sibling is ` +
+        `  ${v.root}/${v.example} (${v.field}.${v.dep}): pins ${v.pin}, but the workspace sibling is ` +
           `${v.workspaceVersion} and ${v.workspaceVersion} is published. Re-pin to ${v.workspaceVersion}.`,
       );
     }
@@ -167,7 +172,7 @@ export function reportExamplePinParity(repoRoot, npmView = defaultNpmView) {
     );
     for (const u of unwatchable) {
       console.error(
-        `  agent-examples/${u.example} (${u.field}.${u.dep}): "${u.pin}" is neither an exact version nor a ` +
+        `  ${u.root}/${u.example} (${u.field}.${u.dep}): "${u.pin}" is neither an exact version nor a ` +
           `file:/link: workspace link. Pin it to the workspace version (${u.workspaceVersion}) so it can be ` +
           `watched. A file: link is the alternative ONLY for an example that is not offered for standalone ` +
           `fetch — agent-examples/support-triage is (its README documents \`npx degit\` of that subtree alone), so a ` +
@@ -179,7 +184,7 @@ export function reportExamplePinParity(repoRoot, npmView = defaultNpmView) {
   if (skips.length > 0) {
     console.log(`\n⚠️  skipped ${skips.length} pin(s) — sibling workspace version not yet published:`);
     for (const s of skips) {
-      console.log(`  agent-examples/${s.example} (${s.field}.${s.dep}): workspace is ${s.workspaceVersion}, pin is ${s.pin}`);
+      console.log(`  ${s.root}/${s.example} (${s.field}.${s.dep}): workspace is ${s.workspaceVersion}, pin is ${s.pin}`);
     }
   }
 

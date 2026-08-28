@@ -358,7 +358,7 @@ function check(name, got, want) {
   const pr = launchEnv(realWiring, false);
   check("the PR leg still overlays the dead loopback port", pr.POME_GITHUB_MCP_URL, "http://127.0.0.1:59321/s/smoke/mcp");
   // The hosted control plane is dead-wired on the PR leg for a reason the twin
-  // bases above do not have: api.pome.sh is BILLABLE. `braintrust-eval` mints one
+  // bases above do not have: api.pome.sh is BILLABLE. `integration-examples/braintrust` mints one
   // sandbox per dataset row, so a PR leg that let POME_API_URL fall through to
   // its production default would spend real quota on every PR — and on every
   // logged-in developer's `npm run smoke:examples`, whose real POME_API_KEY is

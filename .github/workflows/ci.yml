@@ -36,7 +36,7 @@ jobs:
           fi
           # Paths that can affect package build/test/parity or the CI contract.
           if git diff --name-only "${BASE_SHA}" HEAD | grep -qE \
-            '^(packages/|cli/|agent-examples/|scripts/|contract/|config/|knip\.json|package(-lock)?\.json$|\.github/workflows/ci\.yml$)'; then
+            '^(packages/|cli/|agent-examples/|integration-examples/|scripts/|contract/|config/|knip\.json|package(-lock)?\.json$|\.github/workflows/ci\.yml$)'; then
             echo "heavy=true" >> "$GITHUB_OUTPUT"
             echo "Running heavy suite (package/cli/script/lockfile/ci changes)."
           else

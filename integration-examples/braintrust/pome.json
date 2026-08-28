@@ -1,7 +1,7 @@
 {
   "$schema": "https://pome.sh/schemas/v1/pome.json",
   "agent": {
-    "slug": "braintrust-eval",
+    "slug": "braintrust-integration",
     "name": "Braintrust refund agent",
     "description": "A billing refund agent driven by Braintrust Eval(), one Pome sandbox per dataset row",
     "framework": "vercel-ai-sdk"
