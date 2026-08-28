@@ -9,7 +9,7 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
-## Unreleased (patch)
+## 0.33.1 — 2026-08-28
 
 **`pome --help` is an index again.** It had grown to 76 lines, because 14 of the
 21 commands described themselves in prose in the command list, 10 of them over
@@ -23,7 +23,6 @@ prints a URL, it does not open a browser, so its entry no longer says "Open".
 `pome checks` names its `add` and `lint` subcommands, one of which writes to a
 task file. `pome endpoints` answers for the github and gmail twins only, and now
 says so. `pome twin` lists the subcommands it actually has.
-
 
 ## 0.33.0 — 2026-08-28
 
