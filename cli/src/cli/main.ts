@@ -135,14 +135,15 @@ export function createProgram() {
   program
     .name("pome")
     .description(
-      "Digital-twin testing for AI agents — `pome run` records to app.pome.sh. See `pome docs getting-started`.",
+      "Test AI agents against digital twins of real SaaS APIs. Runs are recorded to app.pome.sh. Start with `pome demo`.",
     )
     .version(PACKAGE_VERSION)
     .showHelpAfterError("(add --help for usage)");
 
   program
     .command("init")
-    .description("Create starter Pome config and folders")
+    .summary("Set up Pome in this project")
+    .description("Create pome.json, plus starter files in a new project")
     .option(
       "--sdk <name>",
       "Scaffold for a specific agent SDK (claude | claude-managed). Adds the SDK-specific example file and pre-fills agent.framework so the dashboard badges runs correctly.",
@@ -277,6 +278,7 @@ export function createProgram() {
 
   program
     .command("login")
+    .summary("Sign in and save an API key")
     .description("Sign in with Clerk and store a hosted team API key (macOS Keychain or ~/.pome/credentials.json)")
     .option(
       "--api-url <url>",
@@ -301,6 +303,7 @@ export function createProgram() {
 
   program
     .command("logout")
+    .summary("Delete the saved API key")
     .description("Remove locally stored hosted credentials (Keychain entry and/or ~/.pome/credentials.json)")
     .action(async () => {
       await clearLocalCredentials();
@@ -312,6 +315,7 @@ export function createProgram() {
 
   program
     .command("docs")
+    .summary("Print a docs.pome.sh URL by topic")
     .argument("[topic]", "Topic id (e.g. getting-started, github, cli) — prints the docs.pome.sh URL")
     .option(
       "--site <origin>",
@@ -331,6 +335,7 @@ export function createProgram() {
 
   program
     .command("tasks")
+    .summary("List or copy the bundled tasks")
     .argument(
       "[twin]",
       "Twin id (e.g. github). Omit to list available twins.",
@@ -371,6 +376,7 @@ export function createProgram() {
   // is a trap.
   const checks = program
     .command("checks")
+    .summary("List, add, and lint a twin's checks")
     .argument("[twin]", "Twin id (e.g. github). Omit to list twins that declare checks.")
     .option("--json", "Emit the declaration as JSON (for skills and agents).", false)
     .description(
@@ -420,6 +426,7 @@ export function createProgram() {
 
   program
     .command("compile-seeds")
+    .summary("Compile a task's seed state to JSON")
     .argument("[target]", "Task .md file or directory (defaults to ./tasks)")
     .option("--force", "Recompile even if the sidecar's source hash matches", false)
     .option(
@@ -446,6 +453,7 @@ export function createProgram() {
 
   const register = program
     .command("register")
+    .summary("Register an agent with Pome")
     .description(
       "Register a cloud entity (agent, ...) and link this project to it",
     );
@@ -496,6 +504,7 @@ export function createProgram() {
   // `session_id`, `/v1/sessions` and the `ses_` prefix are the WIRE and stay.
   const session = program
     .command("sandbox")
+    .summary("Create, list, and stop sandboxes")
     .description(
       "Hosted sandboxes (same API as the dashboard Twins page — requires login)",
     );
@@ -650,6 +659,7 @@ export function createProgram() {
 
   program
     .command("run")
+    .summary("Run a task and print the score")
     .argument(
       "[path]",
       'Task markdown file or directory. Omit to run the demo task ("that was ours, run yours"): tasks/first-run-demo.md is dropped into your project on first use with runs: 5 pinned.',
@@ -995,6 +1005,7 @@ export function createProgram() {
 
   program
     .command("demo")
+    .summary("Run a sample task, no account needed")
     .description(
       "Zero-auth first-run demo: boots a local GitHub twin, runs the bundled demo agent for 5 isolated trials (model calls via pome's anonymous demo gateway), and prints per-trial verdicts evaluated in Pome cloud. No signup, no API keys; ends with a no-login preview link.",
     )
@@ -1047,6 +1058,7 @@ export function createProgram() {
 
   program
     .command("doctor")
+    .summary("Check the agent and twin wiring")
     .description(
       "Check the agent↔twin wiring: pome.json (or pome.yaml) present + valid, the local twin boots + serves, requests routed to the twin (not a hardcoded production host), egress floor active. On failure prints one named cause (file:line where knowable) + one concrete fix and exits non-zero.",
     )
@@ -1060,6 +1072,7 @@ export function createProgram() {
 
   program
     .command("eval")
+    .summary("Score a trace recorded earlier")
     .argument(
       "[run-dir]",
       "Existing run directory (runs/<task>/<run-id>). Omit to use <artifacts-dir>/latest.json.",
@@ -1136,6 +1149,7 @@ export function createProgram() {
 
   program
     .command("fix-prompt")
+    .summary("Build a prompt for a failed run")
     .argument(
       "[target]",
       "Artifacts root or a trial run dir (default: runs). Legacy form: a path to events.jsonl — then <task> is required.",
@@ -1303,7 +1317,10 @@ export function createProgram() {
       );
     });
 
-  const twin = program.command("twin").description("Manage local twins");
+  const twin = program
+    .command("twin")
+    .summary("Run a twin on this machine")
+    .description("Start and reset a twin on this machine, print its status or a starter seed file");
   twin
     .command("start")
     .argument(
@@ -1376,8 +1393,9 @@ export function createProgram() {
 
   program
     .command("endpoints")
+    .summary("List a twin's endpoints")
     .argument("<name>", "Twin name")
-    .description("List supported endpoints")
+    .description("List the endpoints the github or gmail twin serves")
     .action((name: string) => {
       const endpoints =
         name === "github"
@@ -1395,6 +1413,7 @@ export function createProgram() {
 
   program
     .command("capture-server")
+    .summary("Record the agent's model calls")
     .description(
       "Boot an HTTP CONNECT-tunnel proxy that appends one LlmCallEvent per tunnel to events.jsonl. Spawned by `pome run`; agent traffic flows via HTTPS_PROXY.",
     )
