@@ -191,7 +191,7 @@ the handler.
 
 This twin had no zod across any of its five `rest-routes*.ts` modules; names existed only at
 call sites via `stringField(body, "raw")`-style helpers. All 60 routes are declared now, and
-`src/rest-upload.ts` is deleted — its multipart splitting is the shared mechanism's
+multipart splitting is the shared mechanism's
 `bodyEncoding: "media"`, so a JSON resource, a `multipart/related` metadata+media pair and a
 bare MIME body all land on the same declared input names.
 

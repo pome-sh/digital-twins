@@ -95,7 +95,7 @@ Every `tools/call` reaching `/s/:sid/mcp` produces one recorder event whose
 domain return — identical to what `POST /s/:sid/mcp/call` records. The
 only intentional difference is `path` (`request_headers` also differs, but
 that's a fact about the two callers — the MCP SDK client vs a plain-fetch
-legacy shim — not about the twin). Run `npm run validate:mcp` to print the
+HTTP caller — not about the twin). Run `npm run validate:mcp` to print the
 side-by-side diff; the same command runs in CI's heavy suite.
 
 ## Runtime contract (for snapshot consumers)
@@ -273,7 +273,7 @@ npm run typecheck
 npx vitest run --project twin-github
 npm run smoke
 npm run fidelity:parity
-npm run validate:mcp # prints the wire-protocol / legacy-shim parity diff
+npm run validate:mcp # prints the JSON-RPC / per-tool-route parity diff
 npm run review:harness
 npm run agent:claude
 ```

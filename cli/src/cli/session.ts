@@ -35,13 +35,9 @@ export function ensureMcpSuffix(url: string): string {
 // Multi-twin (M3): the CLI's ad-hoc session allowlist IS the shared mounted-twin
 // set. Repeated `--twin` flags stand up a multi-twin session in one call.
 //
-// The parenthetical roll-call that used to sit in this comment, and the
-// `"gmail", "linear"` that used to be appended below it "during contract publish
-// windows", were both inert: `MOUNTED_TWINS` arrives from `cli/src/contract/`,
-// which is source in this workspace and never a resolved package, so neither
-// could add a name the set lacked. What they did do is read as a second place
-// twins are named — the shape that let `sandbox create --help` spend a release
-// advertising four twins while this validator already accepted five.
+// `MOUNTED_TWINS` is the single place a twin is named. A second list here reads
+// as a second source of truth, which is how `sandbox create --help` spent a
+// release advertising four twins while this validator already accepted five.
 const ALLOWED_TWINS = new Set<string>(MOUNTED_TWINS);
 
 /** The twins `--twin` accepts, in mounted order.

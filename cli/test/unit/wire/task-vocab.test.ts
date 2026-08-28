@@ -19,10 +19,7 @@ import {
 } from "../../../src/contract/run.js";
 import {
   createSessionRequestSchema,
-  persistedScenarioSchema,
   persistedTaskSchema,
-  scenarioConfigSchema,
-  scenarioSchema,
   submitResultRequestSchema,
   taskConfigSchema,
   taskSchema,
@@ -348,16 +345,10 @@ describe("recorder events task_step_id vocabulary", () => {
   });
 });
 
-// ─── task* canonical exports + deprecated scenario* aliases ──────────────────
+// ─── task* canonical exports ─────────────────────────────────────────────────
 
-describe("task*/scenario* export aliases", () => {
-  it("scenario* exports are referentially identical to the canonical task* exports", () => {
-    expect(scenarioSchema).toBe(taskSchema);
-    expect(scenarioConfigSchema).toBe(taskConfigSchema);
-    expect(persistedScenarioSchema).toBe(persistedTaskSchema);
-  });
-
-  it("taskSchema parses a task with legacy D/P criteria and normalizes them", () => {
+describe("taskSchema", () => {
+  it("parses a task with D/P criteria and normalizes them", () => {
     const parsed = taskSchema.parse({
       slug: "github-issue-triage",
       title: "Triage the bug",

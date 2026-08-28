@@ -16,10 +16,8 @@
 // `parent_event_id` set to the SubagentSpawnEvent's `event_id`, chaining children
 // under the spawn row instead of leaving them parentless.
 //
-// Step boundaries (the prior `withStepBoundaries` in this file) were removed
-// when step signals were replaced with the SDK's hook-driven `HookEvent`
-// rows. The message-stream wrapper here is the surviving pome insertion
-// point in the SDK iterator.
+// Step boundaries come from the SDK's hook-driven `HookEvent` rows. The
+// message-stream wrapper here is pome's one insertion point in the SDK iterator.
 
 import { isPartialMessageArtifact } from "./partial-messages.js";
 import { redactSecrets } from "./redaction.js";

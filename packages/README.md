@@ -54,18 +54,15 @@ from it directly; `twin-gmail` and `twin-linear` only reach it transitively
 through `@pome-sh/sdk`. It's the one place a wire-shape change has to happen
 for every producer and consumer to see it consistently.
 
-It exists because that vocabulary used to live in a package called
-`@pome-sh/shared-types`, which drifted: internal consumers pinned an *exact*
-version against each other, the pins fell out of sync, and npm ended up
-installing two copies of the same Zod schemas at one runtime (two schema
-identities that were supposed to be identical). `@pome-sh/shared-types`
-was dissolved: the trace-wire half became `@pome-sh/wire`, and the
+It is split by audience, not by convenience: the trace-wire half is
+`@pome-sh/wire`, and the
 control-plane half (sessions, tasks, runs, the `/v1` REST surface, error
-envelopes, the `pome.json` manifest — none of which is a *trace* shape) moved
-to [`cli/src/contract/`](../cli/src/contract/), which isn't a workspace
+envelopes, the `pome.json` manifest — none of which is a *trace* shape) lives
+in [`cli/src/contract/`](../cli/src/contract/), which isn't a workspace
 package at all, just CLI-internal TypeScript. Every internal `@pome-sh/*`
-dependency is now `"*"` (workspace-resolved), not an exact pin, precisely so
-that drift can't recur (see `AGENTS.md`).
+dependency is `"*"` (workspace-resolved) rather than an exact pin, so two
+copies of the same Zod schemas can never be installed at one runtime
+(see `AGENTS.md`).
 
 `wire/trace-contract.json` is the machine-readable version of its own trace
 surface — generated from the Zod event union rather than hand-typed, so a new

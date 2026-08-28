@@ -4,6 +4,9 @@
 
 The latest published `@pome-sh/cli` release receives security updates. Older versions are not patched.
 
+The `pome-sh` package on npm is not this package and is not maintained. It
+receives no security updates. Install `@pome-sh/cli`.
+
 ## Reporting a vulnerability
 
 Please **do not** open a public GitHub issue for a suspected vulnerability.

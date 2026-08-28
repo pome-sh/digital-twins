@@ -73,10 +73,6 @@ describe("pome tasks", () => {
     expect(out).toContain("01-bug-happy-path.md");
     expect(out).toContain("03-already-triaged.md");
     expect(out).toContain("05-github-identity-spoof.md");
-    // Both are deleted: `00-default-seed` was a reference document, not a task, and
-    // `04-judge-context` measured our own judge lane.
-    expect(out).not.toContain("00-default-seed.md");
-    expect(out).not.toContain("04-judge-context.md");
   });
 
   it("lists runnable stripe, slack, and gmail tasks", async () => {

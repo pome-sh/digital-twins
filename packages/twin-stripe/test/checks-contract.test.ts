@@ -435,10 +435,9 @@ describe("migrated sentences", () => {
     );
   });
 
-  it("no longer accepts the legacy qualified PaymentIntent-status forms", () => {
-    // Dropped deliberately (zero corpus users), and asserted so the drop is a
-    // decision rather than an oversight someone re-adds by widening the template.
-    // An author who needs to name ONE intent uses the indefinite check.
+  it("names a PaymentIntent by the indefinite form only", () => {
+    // The template must stay narrow: widening it to accept an amount or an id
+    // here would let one criterion bind a second, differently-scoped check.
     expect(parseCheck(paymentIntentStatusIs, "The PaymentIntent with amount 10000 status is succeeded")).toBeNull();
     expect(parseCheck(paymentIntentStatusIs, 'The PaymentIntent with id "pi_123" status is succeeded')).toBeNull();
   });

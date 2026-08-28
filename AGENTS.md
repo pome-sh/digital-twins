@@ -76,6 +76,13 @@ way to break it is to undo the commit it ships with. The same goes for a comment
 or a doc line explaining what used to be here: delete the surface, and delete the
 sentence about the surface.
 
+Three places are records rather than tombstones and stay: a CHANGELOG, each
+twin's `FIDELITY.md` divergence ledger (the numbers are stable identifiers and a
+gap in them is load-bearing), and an example's `VERIFICATION.md` (a measurement
+record, and the reason not to re-run a rejected experiment). So do wire and API
+field names still on the wire, and prose about a vendor's own naming, such as
+Slack calling `files.upload` its legacy v1 endpoint.
+
 Coverage cannot live in the root config: vitest reads `coverage` only at the
 top level and drops a `coverage` block inside a project entry **silently**.
 twin-github and twin-slack each keep a `vitest.coverage.config.ts` that

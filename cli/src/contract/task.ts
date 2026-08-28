@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // contract §3 — TASKS. Task config, the parsed task markdown shape, and the
-// persisted task row, plus their deprecated `scenario*` aliases. The provider
+// persisted task row. The provider
 // seed-state schemas consumed by `taskSchema.seedState` live in `./seed-state.ts`.
 // Re-exported through the `cli/src/contract` barrel (index.ts).
 
@@ -10,11 +10,7 @@ import { criterionSchema, judgeModelSchema } from "./run.js";
 import { seedStateSchema } from "./seed-state.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 3. TASKS (formerly "scenarios") — originally adopted verbatim from
-//    oslo/pome/src/scenario/scenarioSchema.ts
-//
-// Task vocab: "task" is the canonical name; the `scenario*` exports
-// below are deprecated aliases kept for the 0.3.0 window.
+// 3. TASKS
 //
 // `criterionSchema` and `judgeModelSchema` were moved to `./run.ts` (2026-05-11
 // split) because CriterionResult depends on them; imported here from `./run.js`
@@ -110,12 +106,7 @@ export const taskConfigSchema = z.preprocess(
 );
 export type TaskConfig = z.infer<typeof taskConfigSchema>;
 
-/** @deprecated Use `taskConfigSchema`. Removed after the 0.3.0 window. */
-export const scenarioConfigSchema = taskConfigSchema;
-/** @deprecated Use `TaskConfig`. */
-export type ScenarioConfig = TaskConfig;
-
-// The parsed task (formerly "scenario") markdown shape. Criterion kinds inside
+// The parsed task markdown shape. Criterion kinds inside
 // `criteria` normalize D→code, P→model (tolerant reader).
 export const taskSchema = z.object({
   slug: z.string().min(1),
@@ -128,11 +119,6 @@ export const taskSchema = z.object({
   seedState: seedStateSchema,
 });
 export type Task = z.infer<typeof taskSchema>;
-
-/** @deprecated Use `taskSchema`. Removed after the 0.3.0 window. */
-export const scenarioSchema = taskSchema;
-/** @deprecated Use `Task`. */
-export type Scenario = Task;
 
 // Persisted Task row (dashboard upload path; cloud DB `tasks` table). Per
 // 04-data-model.md. Row ids keep the historical `scn_` prefix (persisted data;
@@ -148,8 +134,3 @@ export const persistedTaskSchema = z.object({
   archived_at: z.string().datetime().nullable(),
 });
 export type PersistedTask = z.infer<typeof persistedTaskSchema>;
-
-/** @deprecated Use `persistedTaskSchema`. Removed after the 0.3.0 window. */
-export const persistedScenarioSchema = persistedTaskSchema;
-/** @deprecated Use `PersistedTask`. */
-export type PersistedScenario = PersistedTask;
