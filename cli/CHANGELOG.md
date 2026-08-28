@@ -9,7 +9,7 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
-## 0.33.2 — 2026-08-28
+## Unreleased (patch)
 
 **Four help entries printed their default twice.** `pome twin reset --help` read
 `name  Twin name (default: github) (default: "github")`, once from the argument's
@@ -26,6 +26,8 @@ which is that a twin holding its state in memory has nothing to delete.
 `sandbox create --format env` said it "is not printed". It does print: writing
 `--secrets-file` announces itself on stderr. What it does not print is the
 exports themselves, which is what the text now says.
+
+## 0.33.2 — 2026-08-28
 
 **`pome run --help` is a reference card again.** It was 44 lines, of which
 `-n/--trials` alone was a 90-word paragraph covering the 1 to 20 range, the plan
