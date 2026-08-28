@@ -70,6 +70,25 @@ const SMOKE_LIVE_DEFAULTS = {
 
 const SMOKE_DEAD_WIRING = {
   POME_TWIN_BASE_URL: "http://127.0.0.1:59321",
+  // The HOSTED control plane, dead-wired for the same reason every twin base
+  // above is. Until `braintrust-eval` there was no example that called
+  // api.pome.sh, so an unset base was harmless; now an example that reads
+  // `POME_API_URL` would default to production and mint BILLABLE sandboxes —
+  // once per dataset row, on every PR, and again on every developer's
+  // `npm run smoke:examples`. The PR leg is uncredentialed by design and must
+  // stay unable to reach a paid API even when the developer running it is
+  // logged in.
+  POME_API_URL: "http://127.0.0.1:59321",
+  // The same argument, one vendor over. `langsmith-eval` calls
+  // `api.smith.langchain.com`, and LangSmith's own free tier is metered on TRACES
+  // — 5k a month on Developer, with a hard stop at 5,000 when no payment method
+  // is on file — so a PR leg that reached it would spend a reader's quota rather
+  // than money. It cannot today, because that example validates its seeds
+  // against `POME_API_URL` above and dies there first; this line is what keeps
+  // that true when somebody reorders the calls. `LANGSMITH_ENDPOINT` is the name
+  // the SDK reads first (`LANGSMITH_* || LANGCHAIN_*`), so it wins over a
+  // developer's own `LANGCHAIN_ENDPOINT`.
+  LANGSMITH_ENDPOINT: "http://127.0.0.1:59321",
   POME_GITHUB_REST_URL: "http://127.0.0.1:59321",
   POME_GITHUB_MCP_URL: "http://127.0.0.1:59321/s/smoke/mcp",
   POME_SLACK_REST_URL: "http://127.0.0.1:59321",

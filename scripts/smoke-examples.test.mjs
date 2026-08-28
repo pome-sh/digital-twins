@@ -357,6 +357,37 @@ function check(name, got, want) {
 
   const pr = launchEnv(realWiring, false);
   check("the PR leg still overlays the dead loopback port", pr.POME_GITHUB_MCP_URL, "http://127.0.0.1:59321/s/smoke/mcp");
+  // The hosted control plane is dead-wired on the PR leg for a reason the twin
+  // bases above do not have: api.pome.sh is BILLABLE. `braintrust-eval` mints one
+  // sandbox per dataset row, so a PR leg that let POME_API_URL fall through to
+  // its production default would spend real quota on every PR — and on every
+  // logged-in developer's `npm run smoke:examples`, whose real POME_API_KEY is
+  // inherited from their shell and is NOT overlaid here.
+  check(
+    "the PR leg overlays the hosted control-plane base too, so no PR can mint a billable sandbox",
+    pr.POME_API_URL,
+    "http://127.0.0.1:59321",
+  );
+  check(
+    "the LIVE leg leaves a caller-supplied POME_API_URL alone",
+    launchEnv({ ...realWiring, POME_API_URL: "https://api.pome.sh" }, true).POME_API_URL,
+    "https://api.pome.sh",
+  );
+  // `langsmith-eval` calls api.smith.langchain.com, whose free tier is metered on
+  // traces. Same argument as POME_API_URL: the PR leg is uncredentialed by design
+  // and a developer's own LANGSMITH_API_KEY is inherited from their shell, not
+  // overlaid here.
+  check(
+    "the PR leg overlays the LangSmith endpoint too, so no PR can spend a reader's trace quota",
+    pr.LANGSMITH_ENDPOINT,
+    "http://127.0.0.1:59321",
+  );
+  check(
+    "the LIVE leg leaves a caller-supplied LANGSMITH_ENDPOINT alone",
+    launchEnv({ ...realWiring, LANGSMITH_ENDPOINT: "https://api.smith.langchain.com" }, true)
+      .LANGSMITH_ENDPOINT,
+    "https://api.smith.langchain.com",
+  );
   check(
     "the PR leg still overlays the invalid model key",
     pr.ANTHROPIC_API_KEY === "sk-ant-smoke-invalid",

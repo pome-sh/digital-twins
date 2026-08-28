@@ -1,0 +1,11 @@
+{
+  "$schema": "https://pome.sh/schemas/v1/pome.json",
+  "agent": {
+    "slug": "langsmith-eval",
+    "name": "LangSmith refund agent",
+    "description": "A billing refund agent driven by LangSmith evaluate(), one Pome sandbox per dataset row",
+    "framework": "vercel-ai-sdk"
+  },
+  "twins": ["stripe"],
+  "tasks": "tasks"
+}
