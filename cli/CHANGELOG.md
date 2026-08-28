@@ -9,7 +9,7 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
-## Unreleased (minor)
+## 0.33.0 — 2026-08-28
 
 Frozen twin contract: the bundled twins' `POST /s/:sid/mcp/call` takes exactly
 one body shape, `{tool, arguments}`. Slack's `{name}`/`{params}` alias keys are
