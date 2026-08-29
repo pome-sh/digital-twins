@@ -4,11 +4,14 @@
 The packaged `npx @pome-sh/cli demo` task. This markdown is the
 CANONICAL source of the demo task content: the cloud's server-owned judge
 definition (pome-cloud apps/control-plane/src/lib/demo.ts,
-DEMO_TASK_DEFINITIONS["first-run-demo"]) is regenerated FROM this file — the
-judge scores the server copy, never a client-supplied body, so the two must
-stay in lockstep. Changing the prompt / expected behavior / criteria here
-without regenerating the server definition means the cloud judges a
-different task than the one the bundled agent ran.
+DEMO_TASK_DEFINITIONS["first-run-demo"]) mirrors this file — the judge scores
+the server copy, never a client-supplied body, so the two must stay in
+lockstep. Changing the prompt / expected behavior / criteria here without
+updating the server definition means the cloud judges a different task than
+the one the bundled agent ran.
+
+MIRROR IT BY HAND. There is no generator and no gate — F-1752 is the ticket to
+close that, and until it lands nothing but a reviewer notices a half-done sync.
 
 The three tools the bundled demo agent exposes (src/demo/agent.ts) are the
 contract this task is written against: list_open_issues, add_label,
