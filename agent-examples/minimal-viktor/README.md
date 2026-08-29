@@ -34,9 +34,28 @@ src/index.ts          the agent (AI SDK tool loop: GitHub tools + Slack post)
 src/telemetry.ts      OTLP gen_ai span wiring (makes runs "observed")
 scripts/pome-api.ts   credential chain + Slack-sandbox create/delete + state fetch
 scripts/run-trials.ts Slack utilities (--probe | --verify | --cleanup)
-tasks/*.md            6 tasks + hand-authored per-twin envelope seeds
-test/verify.test.ts   fixtures for the Slack assertion checks (used by --verify)
+tasks/*.md            6 tasks, each carrying its hand-authored per-twin envelope
+                      seed inline as fenced JSON (see "Where the seeds live")
+tasks/*.seed.json     the same seeds as sidecars, for `npm run probe:examples`
+test/*.test.ts        Slack assertion fixtures (used by --verify), model routing,
+                      and the inline/sidecar seed parity guard
 ```
+
+### Where the seeds live
+
+Every task's `## Seed State` is a fenced JSON block, and the identical bytes are
+also on disk as `<task>.seed.json`. Both copies are load-bearing:
+
+* **Inline is what runs hosted.** `POST /v1/sessions` receives the task as
+  `scenario_source` — this markdown and nothing else. A sidecar on your disk
+  never crosses the wire, so a task whose seed lives only there parses locally
+  and is refused hosted as "scenario source failed to parse".
+* **The sidecar is what gets probed.** `npm run probe:examples` finds an
+  example's seeds by globbing `tasks/*.seed.json`, and uses the same glob to
+  decide the example is probeable at all.
+
+`test/seed-inline-parity.test.ts` fails if the two ever disagree — editing one
+and not the other would change local runs while hosted kept the old world.
 
 ## The six tasks
 
