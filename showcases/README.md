@@ -34,6 +34,7 @@ of a twin running on the reader's own machine.
 | showcase | property | twins |
 | -------- | -------- | ----- |
 | [`cross-call-state`](./cross-call-state/) | state written by call N is readable at call N+1 — and does not cross into a second twin process | github |
+| [`permission-denial`](./permission-denial/) | a refused write is a recorded event that changes nothing — and the refusal tracks who asked, not which endpoint | github |
 
 ## Adding one
 
