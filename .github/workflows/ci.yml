@@ -100,6 +100,14 @@ jobs:
       # back to reading as success. Pure functions, no install needed.
       - run: node scripts/smoke-examples.test.mjs
 
+      # Keeps the two consumers that CANNOT import EXAMPLE_ROOTS — the
+      # heavy-suite path filter below and knip.json — in step with it. Belongs
+      # here rather than in the heavy block precisely because a root missing
+      # from that filter is what makes the heavy block not run at all: the gate
+      # has to survive a PR the scope step misclassifies. Imports node:fs and
+      # node:path only, so it runs before `npm ci`.
+      - run: node scripts/lib/example-roots.test.mjs
+
       # Versions are written on main after the merge by allocate-version.yml, so
       # what this demands of a PR is the WORDS and not the number: an
       # `## Unreleased (patch|minor)` entry for every artifact the PR moves, no

@@ -20,12 +20,14 @@
 // neither is being quietly deleted.
 //
 // It was false because `after_handler` failure injection substitutes the status
-// INSIDE the handler, so the idempotency middleware saw the injected 5xx,
-// declined it under its "only cache 2xx/3xx" rule, and stored nothing — dropping
-// the record real Stripe writes in precisely the situation `Idempotency-Key`
-// exists for. `setHandlerResult` (idempotency.ts) fixed it by parking the
-// HANDLER's own result for the middleware to cache, so a genuine 4xx still
-// declines while an injected lost response over a committed 200 does not.
+// INSIDE the handler, so the idempotency middleware saw the injected failure
+// status (the rule is `>= 400`; the regression fixture injects 402 and the two
+// integration examples inject 500), declined it under its "only cache 2xx/3xx"
+// rule, and stored nothing — dropping the record real Stripe writes in
+// precisely the situation `Idempotency-Key` exists for. `setHandlerResult`
+// (idempotency.ts) fixed it by parking the HANDLER's own result for the
+// middleware to cache, so a genuine 4xx still declines while an injected lost
+// response over a committed 200 does not.
 //
 // Measured against prod 2026-08-28. One seeded world (`ch_test_200`, 10000, a
 // partial refund of 5000, first response lost after the write lands), two

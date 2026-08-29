@@ -68,18 +68,25 @@ test("listExamples reports the root with each example, so a message can locate i
     assert.equal(example.rel, `${example.root}/${example.name}`);
     assert.ok(EXAMPLE_ROOTS.includes(example.root));
   }
-  // The two recipes are the reason the second root exists: neither is an
-  // examinee, so neither `pome.json` carries a `command`. This is the property
-  // the taxonomy IS — check it rather than trusting the directory name.
+  // The two recipes are the reason the second root exists, so their PRESENCE is
+  // load-bearing on its own: if both left, the root would still hold whatever
+  // arrived later and the property below would pass over it vacuously. That is
+  // a separate claim from the taxonomy, so it is a separate assertion.
   for (const name of ["braintrust", "langsmith"]) {
     const recipe = examples.find((e) => e.name === name);
     assert.ok(recipe, `integration-examples/${name} is missing`);
     assert.equal(recipe.root, "integration-examples");
-    const manifest = JSON.parse(readFileSync(join(recipe.dir, "pome.json"), "utf8"));
+  }
+
+  // The taxonomy itself, quantified over the root rather than over the two
+  // names: NO integration-examples/* entry is an examinee, so none carries a
+  // `command`. Naming only the recipes let a third one in free.
+  for (const example of examples.filter((e) => e.root === "integration-examples")) {
+    const manifest = JSON.parse(readFileSync(join(example.dir, "pome.json"), "utf8"));
     assert.equal(
       manifest.command,
       undefined,
-      `integration-examples/${name} grew a \`command\`, which would make it an examinee — if that ` +
+      `${example.rel} grew a \`command\`, which would make it an examinee — if that ` +
         `is intended it belongs back under agent-examples/.`,
     );
   }
