@@ -37,6 +37,11 @@ export const OUTBOUND_MARKER = "POME_SMOKE_REACHED_OUTBOUND";
  * User-supplied hooks in `params.options.hooks` are preserved — pome's
  * matchers are prepended per event so they fire alongside user callbacks.
  *
+ * ISOLATION, ON BY DEFAULT. Since 0.4.0 this wrapper defaults
+ * `options.settingSources` to `[]` — the SDK's documented isolation mode — when
+ * the caller does not choose one. `withSealedSettingSources` below carries the
+ * measurement behind it, the `tools` posture, and how to opt out.
+ *
  * Pinning the model: pass `params.options.model` (an alias like `"haiku"` /
  * `"sonnet"` / `"opus"`, or a full id like `"claude-haiku-4-5"`). This wrapper
  * forwards it verbatim to the upstream SDK, which passes it to the `claude` CLI
@@ -67,7 +72,7 @@ export function query(params: QueryParams): AsyncGenerator<SDKMessage, void, unk
   // injection is hidden again.
   const inject =
     shouldInjectPartialMessages() && params.options?.includePartialMessages !== true;
-  const prepared = withPomeHooks(params, inject);
+  const prepared = withSealedSettingSources(withPomeHooks(params, inject));
 
   // Three read-only stream wrappers, composed innermost-first:
   //   • withToolEvents   — ToolUse/ToolResult/SubagentSpawn rows → signals JSONL
@@ -114,6 +119,60 @@ async function* withoutPartialMessages(
     if (isPartialMessageArtifact(msg)) continue;
     yield msg;
   }
+}
+
+/**
+ * Defaults `options.settingSources` to `[]` — the SDK's own documented
+ * isolation mode: *"When omitted, all sources are loaded (matches CLI
+ * defaults). Pass `[]` to disable filesystem settings (SDK isolation mode)."*
+ * — unless the caller chose their own.
+ *
+ * WHY THIS IS A DEFAULT AND NOT A SUGGESTION. Measured 2026-08-05: a
+ * `claude-haiku-4-5` trial of the `support-triage` exam, launched from a
+ * developer shell with `tools: []` ALREADY SET, called
+ * `mcp__plugin_slack_slack__slack_search_channels`, `…__slack_search_public`
+ * and `…__slack_list_channel_members`. It searched the developer's REAL Slack
+ * workspace, made zero twin calls, and would have scored as "the agent failed
+ * to triage" — a verdict about the wrong workspace entirely. Re-run with
+ * `settingSources: []` the same trial called only `mcp__github__*` /
+ * `mcp__slack__*` and scored 75.
+ *
+ * `tools` and `settingSources` are DIFFERENT DOORS, and shutting one says
+ * nothing about the other. `tools` governs the SDK's built-in base set (`Bash`,
+ * `Read`, `Grep`, …); `settingSources` governs FILESYSTEM settings — user
+ * (`~/.claude/settings.json`), project (`.claude/settings.json`) and local
+ * (`.claude/settings.local.json`) — INCLUDING the Claude Code plugin MCP
+ * servers configured on whoever's machine the agent runs on. That is the one
+ * surface that changes depending on who runs it, which is what makes it a
+ * default rather than an option: an agent is not sealed by everyone remembering.
+ *
+ * THE `tools` POSTURE: deliberately NOT defaulted. `settingSources: []` removes
+ * configuration the HOST supplied and the caller never asked for; `tools: []`
+ * would remove the agent's own hands from every consumer of a drop-in wrapper.
+ * Only the first is the adapter's to shut. A caller who wants the closed
+ * sandbox passes `tools: []` themselves, as every bundled example does.
+ *
+ * OPTING OUT is by naming what you want, never by omission — omission is what
+ * shipped the defect above:
+ *
+ * ```ts
+ * query({ prompt, options: { settingSources: ["user", "project", "local"] } })
+ * ```
+ *
+ * That restores the pre-0.4.0 behaviour exactly. `["project"]` is the narrower
+ * choice worth knowing about: the SDK loads `CLAUDE.md` only when `'project'`
+ * is among the sources, so an agent that needs its repo's instructions asks for
+ * that source rather than dropping the seal.
+ *
+ * The test is `=== undefined`, matching the SDK's own branch
+ * (`if (settingSources !== undefined) push('--setting-sources=' + …)`), so
+ * `{ settingSources: undefined }` and an omitted key are treated as the same
+ * request. Sealing only one of the two spellings would make isolation depend on
+ * how a caller wrote "I didn't choose".
+ */
+function withSealedSettingSources(params: QueryParams): QueryParams {
+  if (params.options?.settingSources !== undefined) return params;
+  return { ...params, options: { ...(params.options ?? {}), settingSources: [] } };
 }
 
 function withPomeHooks(params: QueryParams, includePartialMessages: boolean): QueryParams {
