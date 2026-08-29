@@ -141,8 +141,9 @@ export function reportExamplePinParity(repoRoot, npmView = defaultNpmView) {
     throw new Error(
       "check-example-pins-published found zero exact-version @pome-sh/* pins with a workspace sibling under " +
         `agent-examples/* (${linked.length} file:/link: link(s), ${unwatchable.length} unwatchable) — refusing to ` +
-        "report a pass having made no registry call at all. agent-examples/support-triage must keep an exact pin: " +
-        "its README offers `npx degit` of that subtree alone, which cannot resolve a link out of the tree.",
+        "report a pass having made no registry call at all. Every example must keep an exact pin: " +
+        "`pome init --example <id>` fetches that subtree ALONE onto a user's machine, and a link out of the " +
+        "tree cannot resolve there.",
     );
   }
 
@@ -175,8 +176,9 @@ export function reportExamplePinParity(repoRoot, npmView = defaultNpmView) {
         `  ${u.root}/${u.example} (${u.field}.${u.dep}): "${u.pin}" is neither an exact version nor a ` +
           `file:/link: workspace link. Pin it to the workspace version (${u.workspaceVersion}) so it can be ` +
           `watched. A file: link is the alternative ONLY for an example that is not offered for standalone ` +
-          `fetch — agent-examples/support-triage is (its README documents \`npx degit\` of that subtree alone), so a ` +
-          `link out of the tree breaks its \`npm install\` and empties this gate at the same time.`,
+          `fetch, and since \`pome init --example ${u.example}\` fetches this subtree alone onto a user's ` +
+          `machine, this one is — so a link out of the tree breaks its \`npm install\` and empties this gate ` +
+          `at the same time.`,
       );
     }
   }

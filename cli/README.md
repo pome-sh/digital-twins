@@ -53,6 +53,36 @@ pome run --local tasks/01-bug-happy-path.md   # captures a raw trace only, no ve
 pome eval runs/01-bug-happy-path/<run-id>         # uploads it for a cloud verdict
 ```
 
+## Start from an example
+
+`pome init --example <id>` fetches a complete, runnable example — its agent,
+its tasks, its `pome.json` and its lockfile — into `./<id>`:
+
+```bash
+pome init --example minimal-viktor   # a merge bot on the GitHub + Slack twins
+cd minimal-viktor && npm install
+pome run tasks/01-clean-merge.md
+```
+
+An example is named by **id**, never by path — that is the whole point. The ids
+are derived from the example directories rather than restated anywhere, so an
+example that is renamed or deleted stops answering to the old id on the next
+command, with the valid ids printed underneath, instead of going quietly 404 in
+a link someone typed months ago. An unknown id lists every available one:
+
+```bash
+pome init --example nope    # → the full list, each with what it teaches
+```
+
+Two kinds are on that list: **agents for Pome to grade**, which you run with
+`pome run`, and **integration harnesses** (Braintrust, LangSmith) that drive Pome
+from their own eval runner and are started by it, not by `pome run`. The output
+tells you which one you scaffolded.
+
+The files come from GitHub at the commit that built your CLI, so an example is
+always the one this version was released with. `POME_EXAMPLE_REF` overrides the
+ref when you want a branch.
+
 See [docs.pome.sh](https://docs.pome.sh) for the task library, authentication,
 the Stripe/Slack twins, and everything else.
 

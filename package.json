@@ -25,6 +25,8 @@
     "lint:no-cloud-imports": "bash scripts/lint-no-cloud-imports.sh",
     "emit:route-inputs": "node scripts/emit-route-inputs.mjs",
     "gate:route-inputs": "node scripts/emit-route-inputs.mjs --check",
+    "emit:example-catalog": "node scripts/emit-example-catalog.mjs",
+    "gate:example-catalog": "node scripts/emit-example-catalog.mjs --check",
     "lint:dead-code": "knip --no-config-hints",
     "gate:wire-tarball": "node scripts/ci/check-wire-tarball.mjs",
     "gate:wire-manifest": "node scripts/ci/check-wire-tarball.mjs --manifest-only",
