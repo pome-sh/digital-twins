@@ -9,7 +9,7 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
-## Unreleased (minor)
+## 0.35.0 — 2026-08-29
 
 **`pome init --example <id>` scaffolds a complete bundled example.** It fetches
 the example's whole tree — agent, tasks, `pome.json`, lockfile — into `./<id>`,
