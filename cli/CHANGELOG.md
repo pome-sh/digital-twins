@@ -9,7 +9,7 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
-## Unreleased (patch)
+## 0.35.2 — 2026-08-29
 
 **A `[model]` criterion the narrator read now prints as a reading, not as a
 gap.** `scoreFromFinalizeResponse` already stopped counting an advisory row as
