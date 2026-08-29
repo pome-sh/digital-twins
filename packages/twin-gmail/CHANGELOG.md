@@ -1,6 +1,16 @@
 # @pome-sh/twin-gmail — CHANGELOG
 
 
+## Unreleased (patch)
+
+`parseSeed` drops a top-level `_meta` before validating (F-1689). This schema was
+already `.strict()` at every level, which is what made it refuse the provenance
+block `pome compile-seeds` stamps on every `<task>.seed.json` — so pointing
+`--seed` at a compiled sidecar, or handing one to `POME_SEED_JSON`, failed with
+`Unrecognized key: "_meta"`. Nothing else moves: `_meta` is dropped, not
+declared, so `seedFields()` and the starter `pome twin seed` generates are
+unchanged.
+
 ## 0.4.0 — 2026-08-10
 
 The MCP listing this twin serves is Google's current one, and the handlers

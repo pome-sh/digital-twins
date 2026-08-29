@@ -1,5 +1,22 @@
 # @pome-sh/checks
 
+## Unreleased (minor)
+
+**Every twin's `parseSeed` refuses a key no seed field matches** (F-1689). The
+github, slack and stripe schemas this package re-exports are `z.strictObject` at
+every level; gmail and linear already were. A misspelled field used to be an
+absence rather than an error — the seed parsed clean, the twin booted, and the
+route that should have served the field answered `[]`.
+
+This is the SQLite-free door pome-cloud reaches `parseSeed` through, so the
+refusal lands on the hosted seed path with it. `packages/checks/test/seed-strictness.test.ts`
+is the gate: it walks each twin's own zod tree, so a nested object added later
+without strictness reds even though nothing in that file names it.
+
+All five `parseSeed`s drop a top-level `_meta` before validating — Pome's own
+provenance block, dropped rather than declared so it stays out of each schema's
+declared field set.
+
 ## 0.3.10 — 2026-08-29
 
 **Comment only.** The `stripe.refund-count` / `stripe.refund-exists` source file

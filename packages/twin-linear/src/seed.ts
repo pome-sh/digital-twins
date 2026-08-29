@@ -373,8 +373,20 @@ export const linearSeedSchema = z
 
 export type ParsedLinearStateSeed = z.output<typeof linearSeedSchema>;
 
+/** See `withoutSidecarMeta` in `@pome-sh/twin-github`'s seed module: `_meta` is
+ *  the provenance block `pome compile-seeds` stamps on a sidecar, dropped at the
+ *  twin's own door so all four seed channels agree, and deliberately not a
+ *  declared seed field. */
+function withoutSidecarMeta(input: unknown): unknown {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return input;
+  if (!("_meta" in (input as Record<string, unknown>))) return input;
+  const { _meta, ...rest } = input as Record<string, unknown>;
+  void _meta;
+  return rest;
+}
+
 export function parseSeed(input: unknown): ParsedLinearStateSeed {
-  return linearSeedSchema.parse(input);
+  return linearSeedSchema.parse(withoutSidecarMeta(input));
 }
 
 /**

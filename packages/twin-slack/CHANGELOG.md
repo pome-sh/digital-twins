@@ -10,6 +10,24 @@ error instead of `{ok:false, error:"invalid_arguments"}`. Form-or-JSON body
 parsing is unchanged — it belongs to `bodyReader`, which every surface shares
 (F-1580).
 
+**A seed key no field matches is refused, naming the key** (F-1689). `seedSchema`
+is `z.strictObject` at every level. Before this, `{chanels: […]}` was ACCEPTED
+and `conversations.list` answered `[]` — the same silence the envelope rule was
+added to close one level up (`cli/src/twin/seedFile.ts`), now closed in the
+schema underneath it.
+
+`parseSeed` drops a top-level `_meta` before validating: Pome's provenance block
+is not a seed field, and the envelope sidecars carry it inside the twin's own arm
+where no caller-side strip reaches it.
+
+⚠️ **Frozen wire behaviour moves with it.** `POST /admin/seed` with a garbage body
+answered 200 `{ok:true}` and now answers 500 `{ok:false, error:"internal_error"}`
+with the zod message in `warning`. The STATUS is not new — `admin.errorEnvelope`
+has always answered 500 for every thrown error, which is the row the
+form-encoded case was already frozen at. What moved is which bodies throw.
+CONTRACT.md's per-twin table and `contract/suite.mjs` move in the same commit.
+
+
 ## 0.4.1 — 2026-08-11
 
 `files.upload` takes `channels` only (F-1389).

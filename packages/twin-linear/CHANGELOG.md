@@ -10,6 +10,11 @@ email, name or displayName — but the descriptions say so on their own terms.
 They are published prose: pome-cloud generates its authoring reference from
 these strings, so the docs page picks the new wording up on the next pin bump.
 
+`parseSeed` drops a top-level `_meta` before validating (F-1689). This schema was
+already `.strict()` at every level, which is what made it refuse the provenance
+block `pome compile-seeds` stamps on every `<task>.seed.json`. `_meta` is dropped,
+not declared, so `seedFields()` and the generated starter are unchanged.
+
 ## 0.4.1 — 2026-08-11
 
 **`extensions` is declared on both `/graphql` surfaces, and answered before

@@ -30,11 +30,14 @@
 // this accepts is a seed the twin boots.
 //
 // SILENCE IS THE FAILURE MODE THIS EXISTS TO PREVENT. slack's and stripe's seed
-// schemas are non-strict, so before the envelope was declared they ACCEPTED a
+// schemas WERE non-strict, so before the envelope was declared they ACCEPTED a
 // `{github, slack}` file as their own flat seed, defaulted every field, and
 // served an empty workspace while the boot line said the seed had landed. A file
 // naming a twin the command was not asked for is a loud error here, never a
-// skipped key.
+// skipped key. The schemas underneath refuse an unrecognised key of their own
+// now (F-1689), which makes the two halves agree rather than making this one
+// redundant: `{github, slack}` handed to slack is still a shape question, and
+// this module is the only thing that asks it.
 
 import { readFileSync } from "node:fs";
 import { parse as parseYaml } from "yaml";
@@ -73,11 +76,13 @@ export function parseSeedFileText(raw: string, origin: string): SeedFile {
   }
 
   // Drop the sidecar provenance block, so a compiled `<task>.seed.json` is a
-  // seed file this door accepts as-is. DECLARED, not inherited: the twins' seed
-  // schemas are non-strict today so `_meta` would be stripped by `parseSeed`
-  // anyway, but only by accident, and the moment those schemas refuse unknown
-  // keys (F-1689) that accident becomes a refusal of every sidecar in the
-  // library. `parseTask` strips it on the task path for the same reason.
+  // seed file this door accepts as-is. Still DECLARED here even though every
+  // twin's `parseSeed` now drops its own (F-1689): the shape rule below reads
+  // the top-level KEYS, and a `_meta` sitting beside `github` would make an
+  // envelope look like a file that mixes twin ids with other keys. So this strip
+  // is what decides the shape; the twin's is what survives strictness, including
+  // for the block twelve envelope sidecars carry INSIDE the twin's own arm,
+  // where nothing at this level can reach it.
   const { _meta, ...rest } = parsed as Record<string, unknown>;
   void _meta;
 

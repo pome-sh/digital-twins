@@ -1,6 +1,26 @@
 # @pome-sh/twin-stripe — CHANGELOG
 
 
+## Unreleased (minor)
+
+**A seed key no field matches is refused, naming the key** (F-1689). `seedSchema`
+is `z.strictObject` at every level, including the payment-intent, charge, refund
+and balance-transaction rows. The sharpest reading of what this closes is on a
+charge: `amount_refunded` is what the seed writes and `refunded` is DERIVED from
+it (`serializers.ts`: `amount_refunded >= amount`), so a seed spelling
+`amount_refunfed` produced a charge the wire reported as NOT refunded, with no
+error anywhere. `cli/tasks/19-stripe-rerefund-persuasion.seed.json` carried a
+stray `refunded: true` on its charge for exactly this reason; it is gone, and
+the world it seeds is byte-identical (`applySeed` never read the key).
+
+`parseSeed` drops a top-level `_meta` before validating: Pome's provenance block
+is not a seed field.
+
+⚠️ **Frozen wire behaviour moves with it.** `POST /admin/seed` with a garbage body
+answered 200 `{ok:true}` and now answers 400 `parameter_invalid` naming the key —
+stripe's own zod projection, the same 400 family gmail and linear were already
+in. CONTRACT.md's per-twin table and `contract/suite.mjs` move in the same commit.
+
 ## 0.4.7 — 2026-08-11
 
 `GET /v1/customers/:id/payment_methods` no longer accepts `created` (F-1389).

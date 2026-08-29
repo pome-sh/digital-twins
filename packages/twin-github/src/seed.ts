@@ -2,10 +2,10 @@
 import { z } from "zod";
 import type { GitHubStateSeed } from "./types.js";
 
-export const seedSchema = z.object({
+export const seedSchema = z.strictObject({
   users: z
     .array(
-      z.object({
+      z.strictObject({
         login: z.string().min(1),
         type: z.enum(["User", "Organization"]).default("User"),
         name: z.string().default("")
@@ -13,7 +13,7 @@ export const seedSchema = z.object({
     )
     .default([]),
   repositories: z.array(
-    z.object({
+    z.strictObject({
       owner: z.string().min(1),
       name: z.string().min(1),
       description: z.string().default(""),
@@ -22,7 +22,7 @@ export const seedSchema = z.object({
       collaborators: z.array(z.string().min(1)).default([]),
       labels: z
         .array(
-          z.object({
+          z.strictObject({
             name: z.string().min(1),
             color: z.string().default("ededed"),
             description: z.string().default("")
@@ -47,7 +47,7 @@ export const seedSchema = z.object({
       files: z
         .array(
           z
-            .object({
+            .strictObject({
               path: z.string().min(1),
               content: z.string().optional(),
               branch: z.string().optional(),
@@ -84,13 +84,15 @@ export const seedSchema = z.object({
       // Milestones, tags and releases are repository-level entities the
       // twin already SERVES (`GET /milestones`, `/tags`, `/releases`,
       // `/releases/latest`, `/releases/tags/:tag`) and the seed could not
-      // express. Zod strips unknown keys, so a seed naming one reached the
+      // express. Zod stripped unknown keys, so a seed naming one reached the
       // domain as nothing at all and those routes could only ever answer `[]`
       // — a shape of infidelity no shape-diff can see, because an empty array
-      // on both sides compares zero elements.
+      // on both sides compares zero elements. That silence is what `strictObject`
+      // closes for the general case (F-1689); this entry is the instance that
+      // was found first.
       milestones: z
         .array(
-          z.object({
+          z.strictObject({
             // Assigned sequentially from 1 in seed order when omitted, the way
             // `nextMilestoneNumber` hands them out. Honored when given, so a
             // seed that pins `PATCH /milestones/2` addresses the milestone it
@@ -111,7 +113,7 @@ export const seedSchema = z.object({
       // than minting a second one: `createRelease` looks the tag up first.
       tags: z
         .array(
-          z.object({
+          z.strictObject({
             name: z.string().min(1),
             target: z.string().min(1).optional()
           })
@@ -119,7 +121,7 @@ export const seedSchema = z.object({
         .default([]),
       releases: z
         .array(
-          z.object({
+          z.strictObject({
             tag_name: z.string().min(1),
             // Nullable upstream, so an absent `name` means `null` — not `""`.
             name: z.string().optional(),
@@ -133,7 +135,7 @@ export const seedSchema = z.object({
         .default([]),
       issues: z
         .array(
-          z.object({
+          z.strictObject({
             number: z.number().int().positive().optional(),
             title: z.string().min(1),
             body: z.string().default(""),
@@ -148,7 +150,7 @@ export const seedSchema = z.object({
             // read is not one worth testing against.
             comments: z
               .array(
-                z.object({
+                z.strictObject({
                   body: z.string().min(1),
                   author: z.string().min(1).optional()
                 })
@@ -159,7 +161,7 @@ export const seedSchema = z.object({
         .default([]),
       pull_requests: z
         .array(
-          z.object({
+          z.strictObject({
             number: z.number().int().positive().optional(),
             title: z.string().min(1),
             body: z.string().default(""),
@@ -171,7 +173,7 @@ export const seedSchema = z.object({
             // state enum; `author` must exist in the user/collaborator set.
             reviews: z
               .array(
-                z.object({
+                z.strictObject({
                   author: z.string().min(1),
                   state: z.enum(["APPROVED", "CHANGES_REQUESTED", "COMMENTED"]).default("APPROVED"),
                   body: z.string().default("")
@@ -183,7 +185,7 @@ export const seedSchema = z.object({
             // path see them without needing a separate setup call.
             statuses: z
               .array(
-                z.object({
+                z.strictObject({
                   context: z.string().min(1).default("ci/build"),
                   state: z.enum(["error", "failure", "pending", "success"]).default("success"),
                   description: z.string().default("")
@@ -199,7 +201,7 @@ export const seedSchema = z.object({
             // line, and THIS one is the timeline.
             comments: z
               .array(
-                z.object({
+                z.strictObject({
                   body: z.string().min(1),
                   author: z.string().min(1).optional()
                 })
@@ -213,7 +215,7 @@ export const seedSchema = z.object({
             // seeder can make.
             review_comments: z
               .array(
-                z.object({
+                z.strictObject({
                   body: z.string().min(1),
                   path: z.string().min(1),
                   line: z.number().int().positive().default(1),
@@ -231,8 +233,31 @@ export const seedSchema = z.object({
 
 export type ParsedGitHubStateSeed = z.output<typeof seedSchema>;
 
+/**
+ * `_meta` is Pome's own provenance block — `pome compile-seeds` stamps
+ * `{ version, source_hash, model, compiled_at }` on every `<task>.seed.json` it
+ * writes — and it is NOT a seed field. It is dropped here, in the twin's own
+ * door, rather than declared in `seedSchema`: `seedFields()` derives the list of
+ * things a seed may say from that schema's shape, and Pome's provenance block
+ * does not belong in a reader's vocabulary.
+ *
+ * Here rather than at each caller because there are four callers and one door.
+ * `parseTask` and `pome twin start --seed` each strip their own already; the
+ * `POME_SEED_JSON` env and the hosted `seed` field never did, and survived only
+ * because these schemas were non-strict. In the envelope sidecars the block sits
+ * INSIDE the twin's own arm (`{ github: { _meta, … } }`), where no top-level
+ * strip reaches it at all.
+ */
+function withoutSidecarMeta(input: unknown): unknown {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return input;
+  if (!("_meta" in (input as Record<string, unknown>))) return input;
+  const { _meta, ...rest } = input as Record<string, unknown>;
+  void _meta;
+  return rest;
+}
+
 export function parseSeed(input: unknown): ParsedGitHubStateSeed {
-  const seed = seedSchema.parse(normalizeLegacyGitHubSeed(input));
+  const seed = seedSchema.parse(normalizeLegacyGitHubSeed(withoutSidecarMeta(input)));
   if (seed.repositories.length === 0) {
     throw new Error("GitHub seed must contain at least one repository");
   }

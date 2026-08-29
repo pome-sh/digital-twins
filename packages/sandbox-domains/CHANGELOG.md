@@ -1,6 +1,14 @@
 # @pome-sh/sandbox-domains
 
 
+## Unreleased (minor)
+
+**Every twin's `parseSeed` refuses a key no seed field matches** (F-1689), and
+all five drop the `_meta` provenance block a compiled `<task>.seed.json` carries.
+Same schemas as `@pome-sh/checks`, reached through this package's domain runtime;
+see that changelog for what moved and why. `applySeed` is unchanged — what moves
+is which seeds reach it.
+
 ## 0.2.17 — 2026-08-29
 
 **Comment only.** A `//` comment in `twin-stripe`'s refund checks asserted that

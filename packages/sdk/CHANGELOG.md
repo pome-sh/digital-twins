@@ -9,6 +9,11 @@
 and the per-twin missing-tool envelope it carried; a body naming no tool answers
 the twin's own projection of the strict-parse error (F-1580).
 
+`failureInjectionRuleSchema` is `z.strictObject` (F-1689). A rule is carried by a
+twin's seed, so under the old `z.object()` a misspelled `atempt` was not an error
+— it was a rule that quietly never fired, on a twin whose whole job at that
+moment is to fail on cue.
+
 ## 0.11.6 — 2026-08-09
 
 New `lintFidelityRestRoutes`, reachable from `@pome-sh/sdk/parity`, plus the
