@@ -1,0 +1,108 @@
+name: showcase-verify
+# Runs each showcase's `verify.sh` — the regression test that keeps its
+# walkthrough's claims true. Both scripts boot their own LOCAL twins, mint their
+# own bearers and assert the property unattended: no account, no login, no
+# ANTHROPIC_API_KEY, no hosted sandbox, no meter. Nothing here finalizes, so
+# there is nothing to spend.
+#
+# Until this file landed, `showcases/{cross-call-state,permission-denial}` shipped
+# their assertions and NOTHING ran them. ci.yml cannot be that runner: its
+# heavy-suite path filter does not list `showcases/`, so a showcase-only PR is
+# classified docs-only and the heavy block is skipped — the gate would be absent
+# from exactly the PR that edits a showcase — and the always-on block above it is
+# dependency-free by contract, running before `npm ci`. This needs a built CLI.
+#
+# WHY THE LOCAL BUILD, NOT `npx @pome-sh/cli@latest`. Each script defaults
+# `POME_CLI` to the published CLI, which is right for a reader on their own
+# machine and wrong for a gate: the published tarball is blind to this PR's diff,
+# so a `packages/twin-github/` change that breaks the property would leave this
+# job green while proving nothing about the code under review. `POME_CLI` is set
+# to the CLI built from this checkout, which is what makes a twin regression red
+# the PR that caused it.
+on:
+  pull_request:
+    paths:
+      - 'showcases/**'
+      # Both showcases boot the github twin today. The glob covers every twin on
+      # purpose: a showcase that later boots a second one is then covered with no
+      # edit here, and the failure this avoids is silent — an uncovered twin's
+      # change simply would not run the showcase that asserts against it.
+      - 'packages/twin-*/**'
+      # The twins' shared substrate: the recorder behind `_pome/events`, the
+      # `state_delta` column and the redaction both scripts assert on.
+      - 'packages/sdk/**'
+      - 'packages/wire/**'
+      # `twin start` itself — the front door both scripts drive.
+      - 'cli/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/showcase-verify.yml'
+  push:
+    branches: [main]
+    # Match the PR paths — do not pay the build cost on unrelated main merges.
+    paths:
+      - 'showcases/**'
+      - 'packages/twin-*/**'
+      - 'packages/sdk/**'
+      - 'packages/wire/**'
+      - 'cli/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/showcase-verify.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: showcase-verify-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  # Deliberately NOT fork-guarded, unlike quickstart-smoke.yml. That job's guard
+  # exists to keep fork PRs off a build this repo pays for; this one reads no
+  # secret, touches no registry and mints nothing that outlives the runner, and a
+  # contributed twin change is precisely the diff a showcase should be asserted
+  # against. Nothing here is reachable from `secrets`.
+  verify:
+    runs-on: ubuntu-latest
+    # A twin that boots but never answers /healthz leaves each script in its
+    # 120s wait, not a hang — but a wedged `npm ci` or build has no such bound.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      # `cli/` is a root workspace member, so the install above already linked
+      # the @pome-sh/twin-* packages out of packages/*. The root build runs them
+      # in dependency order and ends with the CLI, producing the entry point the
+      # POME_CLI below names.
+      - name: Build the CLI and twins from this checkout
+        run: npm run build
+
+      # Both scripts word-split `$CLI` unquoted (`exec $CLI twin start …`), which
+      # is what lets a two-word interpreter+path value work here.
+      - name: Resolve the CLI built above
+        run: |
+          set -euo pipefail
+          entry="$GITHUB_WORKSPACE/cli/dist/src/cli/main.js"
+          test -f "$entry" || { echo "::error::$entry missing after npm run build"; exit 1; }
+          echo "POME_CLI=node $entry" >> "$GITHUB_ENV"
+
+      # One step per showcase so a failure names which property broke. Each
+      # script boots its own twins on the first free port at or above its
+      # default, asserts, prints a per-assertion pass/fail table and exits
+      # non-zero on any FAIL.
+      - name: 'Showcase: cross-call-state'
+        run: bash showcases/cross-call-state/verify.sh
+
+      # `!cancelled()` rather than the default: a red cross-call-state must not
+      # hide a second, independent regression here. The job still fails on the
+      # first step's failure — this only makes both verdicts visible in one run.
+      - name: 'Showcase: permission-denial'
+        if: ${{ !cancelled() }}
+        run: bash showcases/permission-denial/verify.sh
