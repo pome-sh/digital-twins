@@ -1,5 +1,49 @@
 # @pome-sh/adapter-claude-sdk — CHANGELOG
 
+## Unreleased (minor)
+
+**Behavioural default change — `query()` now seals the examinee.**
+`options.settingSources` defaults to `[]`, the SDK's documented isolation mode,
+when the caller does not choose one. Every other option is still forwarded
+verbatim.
+
+Before this, an agent driven through this wrapper inherited the filesystem
+settings of whatever machine it ran on — user (`~/.claude/settings.json`),
+project and local — **including the Claude Code plugin MCP servers configured
+there**. Measured 2026-08-05: a `claude-haiku-4-5` trial of the
+`support-triage` exam, launched from a developer shell with `tools: []` already
+set, called `mcp__plugin_slack_slack__slack_search_channels`,
+`…__slack_search_public` and `…__slack_list_channel_members`. It searched the
+developer's real Slack workspace, made zero twin calls, and would have scored
+as *the agent failed to triage* — a verdict about the wrong workspace entirely.
+`tools` and `settingSources` are different doors; shutting one says nothing
+about the other, and `allowedTools` only auto-approves rather than restricts.
+
+**Who is affected.** Any consumer that called `query()` without passing
+`settingSources` and *relied* on the host's `~/.claude/settings.json`,
+`.claude/settings.json` or `.claude/settings.local.json` reaching the agent —
+permissions, `enabledPlugins`, `mcpServers`, and `CLAUDE.md` (which the SDK
+loads only when `'project'` is among the sources). Consumers that already pass
+`settingSources`, and consumers that never wanted host settings, see no change.
+
+**Opting out**, by naming what you want rather than by omission:
+
+```ts
+// The pre-0.4.0 behaviour, exactly.
+query({ prompt, options: { settingSources: ["user", "project", "local"] } });
+// Narrower, and usually the real intent — 'project' is what loads CLAUDE.md.
+query({ prompt, options: { settingSources: ["project"] } });
+```
+
+An explicit `settingSources: undefined` counts as *not chosen* and is sealed,
+matching the SDK's own `!== undefined` branch.
+
+`options.tools` is deliberately **not** defaulted. `settingSources: []` removes
+configuration the host supplied and the caller never asked for; `tools: []`
+would remove the agent's own hands from every consumer of a drop-in wrapper.
+Only the first is the adapter's to shut. An exam that wants the closed sandbox
+passes `tools: []` itself, as the bundled examples do.
+
 ## 0.3.14 — 2026-08-28
 
 **No consumer-visible change.** A comment in `wrapQuery.ts` described a step-
