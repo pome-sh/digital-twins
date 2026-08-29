@@ -1,7 +1,7 @@
 {
   "name": "pome-coach",
   "description": "The Pome coach skill set — register an agent, author and verify graded tasks, run them against the digital twins, and read the scored report.",
-  "homepage": "https://docs.pome.sh/quickstart/claude-code",
+  "homepage": "https://docs.pome.sh/quickstart/coding-agent",
   "skills": [
     "./skills/pome",
     "./skills/pome-intake",

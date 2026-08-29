@@ -24,7 +24,7 @@ export const DOCS_TOPICS: DocsTopic[] = [
   {
     id: "getting-started",
     title: "Quickstart",
-    path: "/quickstart/claude-code",
+    path: "/quickstart/coding-agent",
     keywords: ["install", "quickstart", "setup", "begin"],
   },
   {

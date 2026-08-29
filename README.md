@@ -69,15 +69,15 @@ file seeds a hosted sandbox: `pome sandbox create --seed seed.json`.
 
 For a persistent `pome` command: `npm install -g @pome-sh/cli`.
 
-<!-- One generic quickstart above; the per-twin walkthroughs live on the docs
-     site and are LINKED, never copied — one source per walkthrough. -->
+<!-- One generic quickstart above; the walkthrough lives on the docs site and
+     is LINKED, never copied. The five per-twin pages this block used to list
+     merged into ONE page, and all five old paths now 308 to it — so this is
+     one link, not five. Re-point it here rather than leaning on the redirect. -->
 
-Per-twin walkthroughs — one twin end to end on a hosted sandbox, five
-minutes each: [GitHub](https://docs.pome.sh/quickstart/twins/github) ·
-[Stripe](https://docs.pome.sh/quickstart/twins/stripe) ·
-[Slack](https://docs.pome.sh/quickstart/twins/slack) ·
-[Gmail](https://docs.pome.sh/quickstart/twins/gmail) ·
-[Linear](https://docs.pome.sh/quickstart/twins/linear).
+The walkthrough — all five twins end to end, each started on your own machine
+and driven by your own coding agent, with the twin's recorded tape read back at
+the end: [Get started](https://docs.pome.sh/quickstart/twins). No account and no
+API key on that path.
 
 ## Running an agent
 
