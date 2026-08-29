@@ -5,9 +5,9 @@ import type { SlackStateSeed } from "./types.js";
 // Slack seed schema. Matches `slackSeedStateSchema` in `cli/src/contract`
 // shape-for-shape. Minimum bootstrap is `{}` — every nested field has defaults
 // and every top-level list defaults to `[]`.
-export const seedSchema = z.object({
+export const seedSchema = z.strictObject({
   team: z
-    .object({
+    .strictObject({
       id: z.string().regex(/^T[A-Z0-9_]+$/).optional(),
       name: z.string().default("Pome Twin Workspace"),
       domain: z.string().default("pome-twin"),
@@ -15,7 +15,7 @@ export const seedSchema = z.object({
     .prefault({}),
   users: z
     .array(
-      z.object({
+      z.strictObject({
         id: z.string().regex(/^[UB][A-Z0-9_]+$/).optional(),
         name: z.string().min(1),
         real_name: z.string().default(""),
@@ -29,7 +29,7 @@ export const seedSchema = z.object({
     .default([]),
   channels: z
     .array(
-      z.object({
+      z.strictObject({
         id: z.string().regex(/^[CGDM][A-Z0-9_]+$/).optional(),
         name: z.string().regex(/^[a-z0-9_-]{1,80}$/),
         is_private: z.boolean().default(false),
@@ -39,13 +39,13 @@ export const seedSchema = z.object({
         members: z.array(z.string()).default([]),
         messages: z
           .array(
-            z.object({
+            z.strictObject({
               ts: z.string().optional(),
               user: z.string(),
               text: z.string(),
               thread_ts: z.string().optional(),
               reactions: z
-                .array(z.object({ name: z.string(), user: z.string() }))
+                .array(z.strictObject({ name: z.string(), user: z.string() }))
                 .default([]),
             })
           )
@@ -58,7 +58,7 @@ export const seedSchema = z.object({
   // currency `channels[].members` and `channels[].messages[].user` already use.
   files: z
     .array(
-      z.object({
+      z.strictObject({
         id: z.string().regex(/^F[A-Z0-9_]+$/).optional(),
         name: z.string().min(1),
         title: z.string().optional(),
@@ -71,7 +71,7 @@ export const seedSchema = z.object({
     .default([]),
   emoji: z
     .array(
-      z.object({
+      z.strictObject({
         name: z.string().regex(/^[a-z0-9_+-]{1,100}$/),
         url: z.string().url().optional(),
         alias: z.string().regex(/^[a-z0-9_+-]{1,100}$/).optional(),
@@ -80,8 +80,20 @@ export const seedSchema = z.object({
     .default([]),
 });
 
+/** See `withoutSidecarMeta` in `@pome-sh/twin-github`'s seed module: `_meta` is
+ *  the provenance block `pome compile-seeds` stamps on a sidecar, dropped at the
+ *  twin's own door so all four seed channels agree, and deliberately not a
+ *  declared seed field. */
+function withoutSidecarMeta(input: unknown): unknown {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return input;
+  if (!("_meta" in (input as Record<string, unknown>))) return input;
+  const { _meta, ...rest } = input as Record<string, unknown>;
+  void _meta;
+  return rest;
+}
+
 export function parseSeed(input: unknown): SlackStateSeed {
-  return seedSchema.parse(input) as SlackStateSeed;
+  return seedSchema.parse(withoutSidecarMeta(input)) as SlackStateSeed;
 }
 
 /**

@@ -1,5 +1,30 @@
 # @pome-sh/twin-github — CHANGELOG
 
+## Unreleased (minor)
+
+**A seed key no field matches is refused, naming the key** (F-1689). `seedSchema`
+is `z.strictObject` at every level, so a misspelled field is an error rather than
+an absence. Before this,
+`parseSeed({repositories:[{owner,name,isuses:[…]}]})` was ACCEPTED and
+`repositories[0].issues` came back `[]`: the author asked for a world with an
+issue in it, got a world with no issue, a green boot, and nothing anywhere saying
+so. The refusal reaches every door at once, because all four are this one
+function — `createGitHubCloneApp({seed})`, `loadSeedFromEnv` from
+`POME_SEED_JSON`, `POST /admin/seed` and the CLI's `--seed <file>`.
+
+`parseSeed` now drops a top-level `_meta` before validating. It is Pome's own
+provenance block (`pome compile-seeds` stamps `{version, source_hash, model,
+compiled_at}` on every `<task>.seed.json`), not a seed field, and it is dropped
+rather than declared so it stays out of `seedFields()` and out of the starter
+`pome twin seed` generates. Twelve of the twenty envelope sidecars in
+`agent-examples/` carry it INSIDE the twin's own arm, where no caller-side strip
+reaches it.
+
+Not a change: `POST /admin/seed` with a garbage body was already 422 `Validation
+Failed` here — github was the twin that validated. The legacy singular
+`assignee` still normalises to `assignees[]`; it is migrated before the schema
+sees it.
+
 ## 0.12.0 — 2026-08-14
 
 `TAPE_ASSERTABLE_TOOLS` gains `add_issue_comment` (F-1521) — the first name added

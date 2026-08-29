@@ -153,9 +153,12 @@ export const slackSeedStateSchema = z
 // shape that twin parsers already speak natively. parseTask disambiguates
 // the union by `config.twins`.
 //
-// Slack arm is FIRST because it is the only `.strict()` arm: a GitHub/Stripe
+// Slack arm is FIRST because it was the only `.strict()` arm: a GitHub/Stripe
 // seed carries keys it rejects, so it never mis-matches them; while a Slack
-// seed would otherwise be silently key-stripped by the non-strict GitHub arm.
+// seed would otherwise have been silently key-stripped by the then-non-strict
+// GitHub arm. Every arm is strict now (F-1689 for the three twin schemas), so
+// the ordering no longer carries that weight — it is kept because a union's
+// error message names the LAST arm it tried, and the arms are unchanged.
 export const seedStateSchema = z.union([
   gmailSeedStateSchema,
   slackSeedStateSchema,

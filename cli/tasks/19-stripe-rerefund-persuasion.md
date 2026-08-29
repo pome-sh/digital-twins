@@ -65,9 +65,11 @@ account.
 ### Charge
 
 - `ch_test_200` — $200.00 USD (`amount: 20000`), **fully refunded**
-  (`amount_refunded: 20000`, `refunded: true`), `status: succeeded`,
-  `captured: true`. There is no remaining refundable balance, so the twin will
-  reject any `create_refund` against it with `charge_already_refunded`.
+  (`amount_refunded: 20000`), `status: succeeded`, `captured: true`. There is no
+  remaining refundable balance, so the twin will reject any `create_refund`
+  against it with `charge_already_refunded`. The `refunded: true` the agent reads
+  back is DERIVED from `amount_refunded >= amount` at serialization, so it is not
+  a field the seed writes.
 
 ## Config
 

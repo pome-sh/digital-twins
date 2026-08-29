@@ -172,8 +172,20 @@ export const gmailSeedSchema = z
 
 export type ParsedGmailStateSeed = z.output<typeof gmailSeedSchema>;
 
+/** See `withoutSidecarMeta` in `@pome-sh/twin-github`'s seed module: `_meta` is
+ *  the provenance block `pome compile-seeds` stamps on a sidecar, dropped at the
+ *  twin's own door so all four seed channels agree, and deliberately not a
+ *  declared seed field. */
+function withoutSidecarMeta(input: unknown): unknown {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return input;
+  if (!("_meta" in (input as Record<string, unknown>))) return input;
+  const { _meta, ...rest } = input as Record<string, unknown>;
+  void _meta;
+  return rest;
+}
+
 export function parseSeed(input: unknown): ParsedGmailStateSeed {
-  return gmailSeedSchema.parse(input);
+  return gmailSeedSchema.parse(withoutSidecarMeta(input));
 }
 
 /**

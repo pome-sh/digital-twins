@@ -40,7 +40,6 @@
       "status": "succeeded",
       "currency": "usd",
       "captured": true,
-      "refunded": true,
       "created": 1700000000
     }
   ]

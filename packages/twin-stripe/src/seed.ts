@@ -52,7 +52,7 @@ const CHARGE_STATUSES = ["pending", "succeeded", "failed"] as const;
 const REFUND_STATUSES = ["succeeded", "pending", "failed", "canceled"] as const;
 const BALANCE_TX_STATUSES = ["pending", "available"] as const;
 
-const paymentIntentSeedSchema = z.object({
+const paymentIntentSeedSchema = z.strictObject({
   id: z.string().min(1),
   account_id: z.string().min(1),
   amount: z.number().int(),
@@ -73,7 +73,7 @@ const paymentIntentSeedSchema = z.object({
   captured_at: z.number().int().nullable().optional(),
 });
 
-const chargeSeedSchema = z.object({
+const chargeSeedSchema = z.strictObject({
   id: z.string().min(1),
   account_id: z.string().min(1),
   payment_intent_id: z.string().min(1),
@@ -87,7 +87,7 @@ const chargeSeedSchema = z.object({
   created: z.number().int(),
 });
 
-const refundSeedSchema = z.object({
+const refundSeedSchema = z.strictObject({
   id: z.string().min(1),
   account_id: z.string().min(1),
   charge_id: z.string().min(1),
@@ -101,7 +101,7 @@ const refundSeedSchema = z.object({
   created: z.number().int(),
 });
 
-const balanceTransactionSeedSchema = z.object({
+const balanceTransactionSeedSchema = z.strictObject({
   id: z.string().min(1),
   account_id: z.string().min(1),
   type: z.string().min(1),
@@ -121,10 +121,10 @@ export type ChargeSeed = z.infer<typeof chargeSeedSchema>;
 export type RefundSeed = z.infer<typeof refundSeedSchema>;
 export type BalanceTransactionSeed = z.infer<typeof balanceTransactionSeedSchema>;
 
-export const seedSchema = z.object({
+export const seedSchema = z.strictObject({
   api_keys: z
     .array(
-      z.object({
+      z.strictObject({
         key: z.string().min(1),
         sid: z.string().min(1),
         account_id: z.string().min(1).optional()
@@ -138,8 +138,20 @@ export const seedSchema = z.object({
   balance_transactions: z.array(balanceTransactionSeedSchema).default([]),
 });
 
+/** See `withoutSidecarMeta` in `@pome-sh/twin-github`'s seed module: `_meta` is
+ *  the provenance block `pome compile-seeds` stamps on a sidecar, dropped at the
+ *  twin's own door so all four seed channels agree, and deliberately not a
+ *  declared seed field. */
+function withoutSidecarMeta(input: unknown): unknown {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return input;
+  if (!("_meta" in (input as Record<string, unknown>))) return input;
+  const { _meta, ...rest } = input as Record<string, unknown>;
+  void _meta;
+  return rest;
+}
+
 export function parseSeed(input: unknown): SeedState {
-  return seedSchema.parse(input);
+  return seedSchema.parse(withoutSidecarMeta(input));
 }
 
 /**

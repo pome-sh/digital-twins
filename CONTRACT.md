@@ -72,7 +72,7 @@ Several rows are under active ruling. They are frozen **as-is**: changing them l
 | `/healthz` `fidelity` field | `"semantic"` | absent | `"semantic"` |
 | `/healthz` extras | `access_control` | — | `tthw_seconds` |
 | `GET /s/:sid/healthz` | 200 `{ok, sid}` | 200 `{ok, sid}` | **501** (route absent) |
-| `/admin/seed` with garbage body | **422** validation error | 200 accepted | 200 accepted |
+| `/admin/seed` with garbage body | **422** validation error | **500** `internal_error` (message names the key; the admin envelope is 500 for every throw — same row as form-encoded below) | **400** `parameter_invalid` (message names the key) |
 | **no** bearer | 401 `{message:"Requires authentication", documentation_url, status}` | 401 `{ok:false, error:"not_authed"}` | 401 `{error:{code:"unauthorized", message:"You did not provide an API key. …"}}` |
 | **invalid** bearer | 401 `{message:"Bad credentials", documentation_url, status}` | 401 `{ok:false, error:"invalid_auth"}` | 401 `{error:{code:"unauthorized"}}` |
 | expired JWT | 401 `"Bad credentials"` | 401 `error:"token_expired"` | 401 `unauthorized` |

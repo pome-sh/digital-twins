@@ -36,7 +36,12 @@ export type FailureInjectionRule = {
   body: unknown;
 };
 
-export const failureInjectionRuleSchema = z.object({
+// `strictObject`, not `object`: a rule is carried by a twin's SEED
+// (`packages/twin-stripe/src/seed.ts`), so a misspelled `atempt` under a plain
+// `z.object()` was not an error — it was a rule that quietly never fired, on a
+// twin whose whole job at that moment is to fail on cue. Same argument as the
+// seed schemas that hold it (F-1689).
+export const failureInjectionRuleSchema = z.strictObject({
   method: z.string().min(1).transform((s) => s.toUpperCase()),
   path: z.string().min(1),
   attempt: z.number().int().positive(),

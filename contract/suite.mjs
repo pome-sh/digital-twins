@@ -65,8 +65,17 @@ export const PER_TWIN = {
     // slack's /healthz carries no fidelity field today.
     healthzFidelity: undefined,
     sessionHealthz: { status: 200 },
-    // slack accepts arbitrary seed bodies with 200 {ok:true} (no validation).
-    adminSeedGarbage: { status: 200, check: (b) => b.ok === true },
+    // CONTRACT CHANGE (F-1689): slack's seed schema refuses an unrecognised
+    // key now, so a garbage body is no longer accepted. The STATUS is the
+    // pre-existing frozen one — `admin.errorEnvelope` answers 500
+    // `internal_error` for every thrown error, which is the same row the
+    // form-encoded case below has always been. What moved is which bodies
+    // throw, not what a throw looks like. The zod message rides in `warning`,
+    // so the refusal names the key.
+    adminSeedGarbage: {
+      status: 500,
+      check: (b) => b.ok === false && b.error === "internal_error" && /definitely/.test(b.warning ?? ""),
+    },
     noAuth: { status: 401, check: (b) => b.ok === false && b.error === "not_authed" },
     wrongSid: { status: 401, check: (b) => b.error === "invalid_auth" },
     // slack is the only twin distinguishing token_expired from invalid_auth.
@@ -93,7 +102,15 @@ export const PER_TWIN = {
     healthzExtras: ["tthw_seconds"],
     // stripe has no per-session /healthz; the path falls to the 501 catch-all.
     sessionHealthz: { status: 501 },
-    adminSeedGarbage: { status: 200, check: (b) => b.ok === true },
+    // CONTRACT CHANGE (F-1689): stripe's seed schema refuses an unrecognised
+    // key now. The envelope is stripe's own `parameter_invalid`, the same one
+    // any zod rejection on this twin already produced — so it lands in the
+    // 400 family gmail and linear were already in, not on a 5xx.
+    adminSeedGarbage: {
+      status: 400,
+      check: (b) =>
+        b.error?.code === "parameter_invalid" && /definitely/.test(b.error?.message ?? ""),
+    },
     noAuth: { status: 401, check: (b) => b.error?.code === "unauthorized" },
     // stripe is the only twin answering a sid mismatch with 403 (not 401).
     wrongSid: { status: 403, check: (b) => b.error?.code === "forbidden" },

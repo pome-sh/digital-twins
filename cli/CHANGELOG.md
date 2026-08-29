@@ -9,6 +9,27 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
+## Unreleased (minor)
+
+**A seed key no twin field matches is refused, naming the key** (F-1689). The
+github, slack and stripe seed schemas are strict now (gmail and linear already
+were), so `pome twin start --seed`, `pome sandbox create --seed` and `parseTask`
+all report a misspelled field instead of dropping it. What the reader used to get
+was a world missing what they asked for and a boot line saying the seed had
+landed.
+
+`parseSeedForTwin` strips the `_meta` provenance block per ENVELOPE ARM, not only
+at the top of the file. Twelve of the twenty sidecars in `agent-examples/` carry
+their block inside the twin's arm (`{github: {_meta, …}, slack: {…}}`) — the file
+a reader copies to hand-author their own — and github was the only arm that
+survived it, because its arm goes through the twin's own `parseSeed`.
+
+`cli/tasks/19-stripe-rerefund-persuasion.seed.json` loses a stray `refunded: true`
+on its charge. `refunded` is derived from `amount_refunded >= amount` at
+serialization and `applySeed` never read the key, so the world the task seeds is
+byte-identical; what changes is that the file now boots through
+`pome twin start stripe --seed`.
+
 ## 0.35.3 — 2026-08-29
 
 **`pome docs getting-started` prints a live page again.** The docs site merged

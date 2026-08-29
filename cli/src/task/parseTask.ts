@@ -237,7 +237,17 @@ function buildSeedEnvelope(raw: unknown | undefined, twins: string[]): SeedEnvel
 // Parse one twin's flat seed with its own schema — the same schemas the
 // single-twin flat path uses, keyed by twin id. Unknown twins fall back to the
 // GitHub parse (mirrors the single-twin default).
-function parseSeedForTwin(twin: string, input: unknown): SeedState {
+//
+// `stripSidecarMeta` AGAIN, per arm: the caller already stripped the block at
+// the top of the file, but twelve of the twenty envelope sidecars in
+// `agent-examples/` carry their own INSIDE the twin's arm
+// (`{ github: { _meta, … }, slack: { … } }`), and that is the file a reader
+// copies to hand-author their own. Under the strict seed schemas (F-1689) an
+// unstripped block is `Unrecognized key: "_meta"`. github never showed it
+// because its arm goes through the twin's `parseSeed`, which drops it at the
+// door; the other four parse with a schema directly and have no such door.
+function parseSeedForTwin(twin: string, raw: unknown): SeedState {
+  const input = stripSidecarMeta(raw);
   if (twin === "stripe") return stripeSeedStateSchema.parse(input);
   if (twin === "slack") return slackSeedStateSchema.parse(input);
   if (twin === "gmail") return gmailSeedSchema.parse(input);
