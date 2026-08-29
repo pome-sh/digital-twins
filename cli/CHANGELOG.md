@@ -9,6 +9,19 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
+## Unreleased (patch)
+
+**`pome init minimal-viktor` now copies a sixth test file.** The bundled
+minimal-viktor example gained `test/seed-inline-parity.test.ts`, and the file
+list `pome init` copies from is generated, so the catalog carries the new row.
+Nothing about the command changes; an existing scaffold is unaffected.
+
+The test exists because that example's six tasks moved their `## Seed State`
+from prose to inline fenced JSON. A prose seed parses locally — where
+`<task>.seed.json` is on disk and wins — and is refused by the hosted surface,
+which receives the task as `scenario_source` and never sees the sidecar. Both
+copies now ship, and the new test pins them to the same bytes.
+
 ## 0.36.0 — 2026-08-29
 
 **A seed key no twin field matches is refused, naming the key** (F-1689). The
