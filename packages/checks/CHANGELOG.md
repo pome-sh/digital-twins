@@ -27,6 +27,12 @@ hand-copying the stripe seed shape.
 
 `slack` gains the `SlackStateSeed` type, matching the other four twins.
 
+`github.parseSeed` refuses a seed that claims one number for two entities in a
+repository (F-1153) — an issue and a pull request, two pull requests, or two
+issues. Issues and pull requests share one per-repo counter, so a number names
+one entity or the other. This is a NEW refusal on a seed that parsed clean
+before, and it is what makes the applier's renumber unambiguous.
+
 ## 0.3.10 — 2026-08-29
 
 **Comment only.** The `stripe.refund-count` / `stripe.refund-exists` source file

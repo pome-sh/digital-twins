@@ -15,6 +15,10 @@ and the write half lives in the twin's `apply-seed.ts`. **This package's exporte
 names, types and shapes are unchanged** — `applySeed` and `applyStripeSeed` both
 still export the same function. Only the specifier one line reads it from moves.
 
+A seeded pull request's `number` is honoured by `applySeed`'s github half
+(F-1153), and a seed claiming one number for two entities in a repository is
+refused at parse. See `@pome-sh/twin-github`'s changelog for the mechanism.
+
 ## 0.2.17 — 2026-08-29
 
 **Comment only.** A `//` comment in `twin-stripe`'s refund checks asserted that

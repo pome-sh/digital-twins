@@ -228,6 +228,39 @@ export const seedSchema = z.strictObject({
         )
         .default([])
     })
+      // Issues and pull requests share ONE per-repo counter — GitHub's own
+      // model, and this twin's (`repositories.entity_counter`). Within a repo a
+      // number therefore names an issue OR a pull request, never both, and there
+      // is no correct SILENT resolution for a seed that claims one twice: honour
+      // the first and the second entity is unreachable; honour the last and the
+      // first is. So it is refused here, where the author is still looking at
+      // their own file, with both claimants named by path (F-1153).
+      .superRefine((repo, ctx) => {
+        const claimed = new Map<number, string>();
+        const entries: Array<[string, ReadonlyArray<{ number?: number }>]> = [
+          ["issues", repo.issues ?? []],
+          ["pull_requests", repo.pull_requests ?? []]
+        ];
+        for (const [field, rows] of entries) {
+          for (const [index, row] of rows.entries()) {
+            if (row.number === undefined) continue;
+            const where = `${field}[${index}]`;
+            const first = claimed.get(row.number);
+            if (first === undefined) {
+              claimed.set(row.number, where);
+              continue;
+            }
+            ctx.addIssue({
+              code: "custom",
+              path: [field, index, "number"],
+              message:
+                `number ${row.number} is claimed by both ${first} and ${where} in ` +
+                `${repo.owner}/${repo.name}. Issues and pull requests share one ` +
+                `per-repo counter, so a number names one entity or the other.`
+            });
+          }
+        }
+      })
   )
 });
 
