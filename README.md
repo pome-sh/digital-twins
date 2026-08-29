@@ -96,7 +96,8 @@ The bundled task library includes GitHub, Stripe, Slack, Gmail, and Linear flows
 several **adversarial** (identity spoofing, prompt injection, merging a backdoored
 PR, fabricating green CI). Browse with `pome tasks`. Ten worked example agents
 live under [`agent-examples/`](./agent-examples/).
-Ungraded showcases of one twin property — no agent, no key — live under [`showcases/`](./showcases/).
+Ungraded showcases of one twin property, on a twin you boot yourself — no agent,
+no key, no account — live under [`showcases/`](./showcases/).
 
 ## How it works
 
