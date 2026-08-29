@@ -21,6 +21,29 @@ answered 200 `{ok:true}` and now answers 400 `parameter_invalid` naming the key 
 stripe's own zod projection, the same 400 family gmail and linear were already
 in. CONTRACT.md's per-twin table and `contract/suite.mjs` move in the same commit.
 
+**`@pome-sh/twin-stripe/seed` is the zod-only leaf it was already documented as**
+(F-584). `applySeed` and its four raw row inserts move to `src/apply-seed.ts`;
+`seed.ts` keeps the schemas, `parseSeed`, `loadSeedFromEnv` and `defaultSeed` and
+imports nothing but `zod`, `@pome-sh/sdk/failure-injection-rules` and types.
+
+The claim was false and load-bearing. `registry.ts`'s header and
+`scripts/lint/rules/twin-chunks.mjs`'s own hint both told readers "if all you
+need is a seed schema or a default world, import the twin's `/seed` subpath — it
+is a zod-only leaf", and for stripe it reached `./domain/schema.js` for
+`ensureStripeTables`. So a CLI import put stripe's domain in the graph
+`pome --version` loads, the lint refused it, and the CLI hand-copied stripe's
+seed shape instead — which then drifted for two releases. That rule now ASSERTS
+the leaf claim for all five twins, from each seed module as its own entry.
+
+**`applySeed` keeps its name and moves door, not surface.** It is exported from
+the package ROOT (`@pome-sh/twin-stripe`), beside `StripeDomain` and
+`openTwinStripeDatabase` — which is where `@pome-sh/sandbox-domains/stripe`
+already reaches those two, so that package's published surface is unchanged. Only
+`@pome-sh/twin-stripe/seed` loses the symbol.
+
+`SeedState` continues to be exported from `/seed`.
+
+
 ## 0.4.7 — 2026-08-11
 
 `GET /v1/customers/:id/payment_methods` no longer accepts `created` (F-1389).

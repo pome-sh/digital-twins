@@ -11,11 +11,15 @@
 // runtime, so it is exactly where the write side belongs — stripe is the one
 // twin whose seed is applied as a separate step from parsing it.
 export { StripeDomain } from "@pome-sh/twin-stripe";
+// `applySeed` comes through the package ROOT, beside the domain and the opener,
+// rather than through `/seed`: that subpath is a zod-only leaf and the write
+// half lives in `apply-seed.ts` (F-584). The NAME this package exports has not
+// moved — only where it reads it from.
+export { applySeed } from "@pome-sh/twin-stripe";
 export { openTwinStripeDatabase, migrate, resetDatabase } from "@pome-sh/twin-stripe";
 export type { Recorder, ResolvedSession, TwinStripeDatabase } from "@pome-sh/twin-stripe";
 
 export {
-  applySeed,
   DEFAULT_API_KEY,
   DEFAULT_SID,
   defaultSeed,

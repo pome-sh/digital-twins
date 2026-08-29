@@ -17,7 +17,8 @@
 import { describe, expect, it } from "vitest";
 import { openTwinStripeDatabase } from "../src/db.js";
 import { StripeDomain } from "../src/domain/index.js";
-import { applySeed, loadSeedFromEnv, parseSeed } from "../src/seed.js";
+import { loadSeedFromEnv, parseSeed } from "../src/seed.js";
+import { applySeed } from "../src/apply-seed.js";
 import type { SeedState } from "../src/types.js";
 
 const SETTLED = {

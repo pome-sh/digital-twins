@@ -12,7 +12,8 @@ import {
 import { stripeToolFixture } from "../src/tools.js";
 import { openTwinStripeDatabase } from "../src/db.js";
 import { StripeDomain } from "../src/domain/index.js";
-import { applySeed, parseSeed } from "../src/seed.js";
+import { parseSeed } from "../src/seed.js";
+import { applySeed } from "../src/apply-seed.js";
 
 const root = resolve(import.meta.dirname, "..");
 const inventory = loadFidelityInventory(resolve(root, "fidelity.inventory.json"));

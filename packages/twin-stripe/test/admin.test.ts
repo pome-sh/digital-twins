@@ -4,7 +4,8 @@ import { Hono } from "hono";
 import { createTwinStripeApp } from "../src/twin.js";
 import { setClientIp } from "@pome-sh/sdk/server";
 import { openTwinStripeDatabase } from "../src/db.js";
-import { DEFAULT_API_KEY, applySeed, defaultSeed } from "../src/seed.js";
+import { DEFAULT_API_KEY, defaultSeed } from "../src/seed.js";
+import { applySeed } from "../src/apply-seed.js";
 
 describe("/admin/* — localhost-only state controls", () => {
   it("POST /admin/reset returns 200 in-process and re-seeds the default api key", async () => {

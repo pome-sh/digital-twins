@@ -1,0 +1,66 @@
+{
+  "team": { "id": "T_VAKOI", "name": "Vakoi Systems", "domain": "vakoi" },
+  "users": [
+    {
+      "id": "U_ALICE",
+      "name": "alice",
+      "real_name": "Alice Ferrer",
+      "email": "alice@vakoi.test",
+      "is_bot": false,
+      "is_admin": true,
+      "tz": "Europe/Lisbon",
+      "profile": { "title": "SRE", "status_text": "on call" }
+    },
+    {
+      "id": "B_DUNNING",
+      "name": "dunning-bot",
+      "real_name": "Dunning Bot",
+      "email": "bots@vakoi.test",
+      "is_bot": true,
+      "is_admin": false,
+      "tz": "UTC",
+      "profile": { "title": "robot" }
+    }
+  ],
+  "channels": [
+    {
+      "id": "C_ENG_ALERTS",
+      "name": "eng-alerts",
+      "is_private": true,
+      "topic": "Paging and incident chatter",
+      "purpose": "Where the on-call reads first",
+      "creator": "alice",
+      "members": ["alice", "dunning-bot"],
+      "messages": [
+        {
+          "ts": "1700000000.000100",
+          "user": "alice",
+          "text": "dunning retries fired twice on a 429",
+          "reactions": [{ "name": "eyes", "user": "dunning-bot" }]
+        },
+        {
+          "ts": "1700000100.000200",
+          "user": "dunning-bot",
+          "text": "opened VAK-31",
+          "thread_ts": "1700000000.000100",
+          "reactions": [{ "name": "shipit", "user": "alice" }]
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "id": "F_RUNBOOK",
+      "name": "runbook.md",
+      "title": "Dunning runbook",
+      "filetype": "markdown",
+      "user": "alice",
+      "channels": ["eng-alerts"],
+      "content": "# Runbook\n1. Page the on-call.\n"
+    }
+  ],
+  "emoji": [
+    { "name": "shipit", "alias": "squirrel" },
+    { "name": "vakoi", "url": "https://emoji.vakoi.test/vakoi.png" }
+  ]
+}

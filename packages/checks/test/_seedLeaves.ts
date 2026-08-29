@@ -38,9 +38,18 @@ function unwrap(schema: unknown): Def | undefined {
       node = def.innerType as typeof node;
       continue;
     }
-    if (def.type === "pipe" && def.out) {
-      node = def.out as typeof node;
-      continue;
+    if (def.type === "pipe") {
+      // A pipe is `.transform()` (in: the real schema, out: the transform) or
+      // `z.preprocess()` (in: the transform, out: the real schema). Take
+      // whichever SIDE is not the transform — that is the side carrying the
+      // shape an author writes and a walker can read. Taking `out`
+      // unconditionally dropped `failure_injection[].method`
+      // (`z.string().transform(toUpperCase)`) from the declared field set
+      // entirely, which is a field silently uncovered by the coverage half.
+      const out = (def.out as { _zod?: { def?: { type?: string } } } | undefined)?._zod?.def;
+      node = (out && out.type !== "transform" ? def.out : def.in) as typeof node;
+      if (node) continue;
+      return def as Def;
     }
     return def as Def;
   }

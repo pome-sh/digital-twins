@@ -2,7 +2,8 @@
 import { describe, expect, it } from "vitest";
 import { createTwinStripeApp } from "../src/twin.js";
 import { openTwinStripeDatabase } from "../src/db.js";
-import { applySeed, defaultSeed, DEFAULT_API_KEY, DEFAULT_SID } from "../src/seed.js";
+import { defaultSeed, DEFAULT_API_KEY, DEFAULT_SID } from "../src/seed.js";
+import { applySeed } from "../src/apply-seed.js";
 import { mintTestApiKey } from "./_authHelper.js";
 
 describe("api key auth (Stripe SDK shape)", () => {

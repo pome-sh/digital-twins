@@ -52,6 +52,37 @@ No exported name changes and no runtime behaviour moves. `GithubSeedState` is
 `ParsedGitHubStateSeed` under its old name, which is a WIDER type: it gains the
 eight fields above and `issues[].assignee` becomes `issues[].assignees`.
 
+**A stripe or slack task seed the parser accepts is now a seed the twin boots**
+(F-584). `taskSchema`'s slack and stripe arms were hand-written mirrors — the
+last two of five — because both had to be `.strict()` and the twins' schemas were
+not. F-1689 removed that reason, and F-584 removed the other one: stripe's
+`/seed` subpath is a zod-only leaf now, so the CLI can import it.
+
+#488 fixed the mirrors' top-level KEY SETS. What it could not fix is what the
+rows under those keys said: `z.record(z.string(), z.unknown())`, an open map
+validating nothing. Measured 2026-08-29, that let `parseTask` bless a world the
+twin then refused —
+
+    { charges: [{ id: "ch_1" }] }                  parsed here, refused there
+    { charges: [{ …, amount_refunfed: 20000 }] }   parsed here, refused there
+    { channels: [{ name: "eng", mesages: [] }] }   parsed here, refused there
+
+— which reads to the author as `pome eval` blessing their task and the run
+failing anyway. Both arms are the twin's own object now, so the two cannot
+disagree, and a stripe row's `status`/`capture_method` defaults are filled by the
+schema that owns them rather than passed through as an unvalidated blob.
+
+`cli/src/contract/seed-state.ts`'s stripe and slack arms move the same way. The
+stripe one had drifted badly: it declared five collections the twin has NEVER had
+(`customers`, `products`, `prices`, `events`, `balances`) and was missing three
+it does (`failure_injection`, `refunds`, `balance_transactions`).
+
+`cli/test/unit/task-seed-mirror.test.ts` is deleted — it compared the mirrors'
+key sets to the twins', and an object cannot drift from itself. What it pinned
+BESIDES the key sets (the legacy `{ <twin>: { seed } }` wrapper failing loudly,
+the union not greedily mis-matching, the empty-seed defaults) moves to
+`cli/test/unit/task-seed-is-the-twins.test.ts` intact.
+
 ## 0.35.3 — 2026-08-29
 
 **`pome docs getting-started` prints a live page again.** The docs site merged

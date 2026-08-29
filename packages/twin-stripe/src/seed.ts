@@ -19,13 +19,16 @@ import { z } from "zod";
 // driver inside a package whose entire job is to hand out zod schemas and
 // check declarations. `twin.ts` and `routes/_helpers.ts` still use `/server`,
 // which is correct: they ARE the server.
-import {
-  failureInjectionRuleSchema,
-  type FailureInjectionStore,
-} from "@pome-sh/sdk/failure-injection-rules";
-import { mintApiKey } from "./api-keys.js";
-import { ensureStripeTables } from "./domain/schema.js";
-import type { SeedState, TwinStripeDatabase } from "./types.js";
+import { failureInjectionRuleSchema } from "@pome-sh/sdk/failure-injection-rules";
+import type { SeedState } from "./types.js";
+
+// ⚠️ THIS MODULE IS A ZOD-ONLY LEAF, AND `twin-chunks` NOW ENFORCES IT.
+// It may import `zod`, type-only modules, and other leaves — nothing that
+// reaches `./domain/`, `./db.ts` or the package root. The write half
+// (`applySeed` and its row inserts) lives in `./apply-seed.ts` for that reason;
+// before the split, `@pome-sh/twin-stripe/seed` was the one twin subpath whose
+// documented "zod-only leaf" claim was false, and it is what stopped the CLI
+// importing this schema instead of hand-copying it (F-584).
 
 // `parseSeed` RETURNS a `SeedState`, so a consumer reaching this module through
 // `@pome-sh/twin-stripe/seed` could not name its own variable's type: the symbol
@@ -218,149 +221,3 @@ export function defaultSeed(): SeedState {
   };
 }
 
-export function applySeed(
-  db: TwinStripeDatabase,
-  seed: SeedState,
-  failureInjection?: FailureInjectionStore
-): void {
-  // Ensure Stripe domain tables exist before inserting prerequisite rows.
-  // Mirrors what each Domain class does in its constructor; harmless when
-  // already migrated.
-  ensureStripeTables(db);
-
-  for (const entry of seed.api_keys ?? []) {
-    mintApiKey(db, {
-      sid: entry.sid,
-      account_id: entry.account_id,
-      key: entry.key
-    });
-  }
-  for (const row of seed.payment_intents ?? []) {
-    insertSeedPaymentIntent(db, row);
-  }
-  for (const row of seed.charges ?? []) {
-    insertSeedCharge(db, row);
-  }
-  for (const row of seed.balance_transactions ?? []) {
-    insertSeedBalanceTransaction(db, row);
-  }
-  for (const row of seed.refunds ?? []) {
-    insertSeedRefund(db, row);
-  }
-  if (failureInjection) {
-    failureInjection.setRules(seed.failure_injection ?? []);
-  }
-}
-
-// ---------- raw row inserts ----------
-//
-// These bypass the domain classes' business rules (PI state machine, charge
-// minting invariants, refund atomic transaction, etc.) and write directly to
-// the tables defined in `domain/schema.ts`. The point is that the rows must
-// be read back via the same domain helpers and serializers the live handlers
-// use, with no observable difference from agent-created rows.
-
-function insertSeedPaymentIntent(
-  db: TwinStripeDatabase,
-  row: PaymentIntentSeed
-): void {
-  db.prepare(
-    `INSERT INTO payment_intents (
-      id, account_id, amount, currency, status,
-      payment_method_types_json, next_action_json,
-      latest_charge_id, capture_method, confirmation_method,
-      idempotency_key, metadata_json, crypto_deposit_json,
-      client_secret, created, updated, canceled_at, captured_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(
-    row.id,
-    row.account_id,
-    row.amount,
-    row.currency,
-    row.status,
-    JSON.stringify(row.payment_method_types),
-    row.next_action === undefined || row.next_action === null
-      ? null
-      : JSON.stringify(row.next_action),
-    row.latest_charge_id ?? null,
-    row.capture_method,
-    row.confirmation_method,
-    row.idempotency_key ?? null,
-    JSON.stringify(row.metadata),
-    row.crypto_deposit === undefined || row.crypto_deposit === null
-      ? null
-      : JSON.stringify(row.crypto_deposit),
-    row.client_secret,
-    row.created,
-    row.updated,
-    row.canceled_at ?? null,
-    row.captured_at ?? null
-  );
-}
-
-function insertSeedCharge(db: TwinStripeDatabase, row: ChargeSeed): void {
-  db.prepare(
-    `INSERT INTO charges (
-      id, account_id, payment_intent_id, amount, amount_captured, amount_refunded,
-      status, balance_transaction_id, captured, currency, created
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(
-    row.id,
-    row.account_id,
-    row.payment_intent_id,
-    row.amount,
-    row.amount_captured,
-    row.amount_refunded,
-    row.status,
-    row.balance_transaction_id ?? null,
-    row.captured ? 1 : 0,
-    row.currency,
-    row.created
-  );
-}
-
-function insertSeedRefund(db: TwinStripeDatabase, row: RefundSeed): void {
-  db.prepare(
-    `INSERT INTO refunds (
-      id, account_id, charge_id, payment_intent_id, amount, currency,
-      status, reason, balance_transaction_id, idempotency_key, created
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(
-    row.id,
-    row.account_id,
-    row.charge_id,
-    row.payment_intent_id,
-    row.amount,
-    row.currency,
-    row.status,
-    row.reason ?? null,
-    row.balance_transaction_id ?? null,
-    row.idempotency_key ?? null,
-    row.created
-  );
-}
-
-function insertSeedBalanceTransaction(
-  db: TwinStripeDatabase,
-  row: BalanceTransactionSeed
-): void {
-  db.prepare(
-    `INSERT INTO balance_transactions (
-      id, account_id, type, amount, fee, net, currency, source_id, source_type,
-      available_on, status, created
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(
-    row.id,
-    row.account_id,
-    row.type,
-    row.amount,
-    row.fee,
-    row.net,
-    row.currency,
-    row.source_id ?? null,
-    row.source_type ?? null,
-    row.available_on,
-    row.status,
-    row.created
-  );
-}

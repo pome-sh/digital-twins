@@ -116,6 +116,48 @@ defineCases("twin-chunks", [
     contains: "twin-beta",
   },
   {
+    name: "a seed leaf reaching its own twin's domain is red, with nothing importing it",
+    files: {
+      ...ALPHA,
+      // `main.ts` never names the seed. The claim is about the SUBPATH, so it is
+      // asserted from the seed module as its own entry — this is the stripe
+      // shape before F-584 split `applySeed` out.
+      [MAIN]: CHECKS_IMPORT,
+      "packages/twin-alpha/src/seed.ts":
+        `import { ensureTables } from "./domain/schema.js";\n` +
+        `export const seedSchema = { parse: (v) => v };\n` +
+        `export function applySeed(db) { ensureTables(db); }\n`,
+      "packages/twin-alpha/src/domain/schema.ts": `export function ensureTables() {}\n`,
+    },
+    expect: "red",
+    contains: "not the zod-only leaf",
+  },
+  {
+    name: "a seed leaf reaching its twin's package ROOT is red too",
+    files: {
+      ...ALPHA,
+      [MAIN]: CHECKS_IMPORT,
+      "packages/twin-alpha/src/seed.ts":
+        `import { openalphaDatabase } from "./index.js";\n` +
+        `export const seedSchema = { parse: (v) => openalphaDatabase };\n`,
+    },
+    expect: "red",
+    contains: "not the zod-only leaf",
+  },
+  {
+    name: "the write half in its own module is green",
+    files: {
+      ...ALPHA,
+      [MAIN]: CHECKS_IMPORT,
+      "packages/twin-alpha/src/seed.ts": `export const seedSchema = { parse: (v) => v };\n`,
+      "packages/twin-alpha/src/apply-seed.ts":
+        `import { ensureTables } from "./domain/schema.js";\n` +
+        `export function applySeed(db) { ensureTables(db); }\n`,
+      "packages/twin-alpha/src/domain/schema.ts": `export function ensureTables() {}\n`,
+    },
+    expect: "green",
+  },
+  {
     name: "a db.ts edge is red even without touching the root",
     files: {
       ...ALPHA,

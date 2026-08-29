@@ -5,7 +5,8 @@
 import { describe, expect, it } from "vitest";
 import { openTwinStripeDatabase } from "../src/db.js";
 import { StripeDomain } from "../src/domain/index.js";
-import { applySeed, parseSeed } from "../src/seed.js";
+import { parseSeed } from "../src/seed.js";
+import { applySeed } from "../src/apply-seed.js";
 
 // Scenario 14 prerequisite state: one settled PI + its charge + the
 // matching balance transaction. No refunds yet — the agent flow is what

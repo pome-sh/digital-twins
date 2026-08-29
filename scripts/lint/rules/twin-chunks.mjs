@@ -36,8 +36,37 @@ export default {
     if (twinDirs.length === 0) throw new Error(`No packages/twin-* found under ${ctx.root}.`);
     if (!ctx.exists(CLI_ENTRY)) throw new Error(`CLI entry not found: ${CLI_ENTRY}.`);
 
-    const { importedBy } = reachable([ctx.abs(CLI_ENTRY)], buildSpecifierMap(ctx.root));
+    const specifiers = buildSpecifierMap(ctx.root);
+    const { importedBy } = reachable([ctx.abs(CLI_ENTRY)], specifiers);
     const violations = [];
+
+    // A twin's `/seed` subpath is documented as a zod-only leaf — by this
+    // rule's own hint below, and by `cli/src/twin/registry.ts`'s header. For
+    // stripe that was FALSE until F-584: `seed.ts` imported `./domain/schema.js`
+    // for `ensureStripeTables`, so naming `@pome-sh/twin-stripe/seed` from CLI
+    // source put stripe's domain in the graph `pome --version` loads. The cost
+    // was not the lint failing; it was the CLI hand-copying stripe's seed shape
+    // instead, which then drifted for two releases.
+    //
+    // Asserted from each seed module as its OWN entry, not from the CLI's graph,
+    // so the claim holds whether or not anything imports it today.
+    for (const dir of twinDirs) {
+      const seed = join(packagesDir, dir, "src/seed.ts");
+      if (!existsSync(seed)) continue;
+      const { importedBy: fromSeed } = reachable([seed], specifiers);
+      for (const file of fromSeed.keys()) {
+        const hit = domainViolation(ctx.rel(file), twinDirs);
+        if (!hit) continue;
+        const chain = chainFor(file, fromSeed, (path) => relative(ctx.root, path));
+        violations.push(
+          `${ctx.rel(file)} — ${hit.twin}'s ${hit.what}; statically reachable from ` +
+            `packages/${dir}/src/seed.ts, so \`@pome-sh/twin-${dir.slice("twin-".length)}/seed\` is ` +
+            `not the zod-only leaf this rule's hint and registry.ts both call it. Move the write ` +
+            `half beside \`applySeed\` in \`src/apply-seed.ts\` and export it from the package root:\n` +
+            chain.map((step, index) => `  ${index === 0 ? "" : "-> "}${step}`).join("\n"),
+        );
+      }
+    }
 
     for (const file of importedBy.keys()) {
       const hit = domainViolation(ctx.rel(file), twinDirs);
@@ -63,7 +92,9 @@ export default {
 
     return {
       violations,
-      summary: `${twinDirs.length} twins, ${importedBy.size} files in the CLI's static graph`,
+      summary:
+        `${twinDirs.length} twins, ${importedBy.size} files in the CLI's static graph, ` +
+        `${twinDirs.length} zod-only /seed leaves`,
       detail: perPackageCounts(importedBy, ctx),
       hint:
         "Reach a twin's domain through `import()` inside its `TWIN_REGISTRY` entry\n" +
