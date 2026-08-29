@@ -2,15 +2,57 @@
 // `pome demo` end-to-end against a STUB cloud: real runTask (in-process github twin +
 // real capture-server child), the REAL bundled demo agent spawned as.
 import { createServer, type Server } from "node:http";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
 import { afterAll, describe, expect, it } from "vitest";
+import { parseCheck } from "@pome-sh/sdk/checks";
+import { checksFor } from "../../src/cli/checks.js";
 import { runDemo } from "../../src/demo/runDemo.js";
+import { DEMO_TASK_NAME, demoTaskPath } from "../../src/demo/task.js";
+import { parseTask } from "../../src/task/parseTask.js";
 import { captureServerForTests } from "../fixtures/captureServerForTests.js";
 import { demoLlmRequestSchema } from "../fixtures/demo/demoLlmSchema.js";
 import { inCli } from "../fixtures/cliDir.js";
+
+/**
+ * Evaluate the packaged demo task's `[code]` criteria against one captured
+ * state blob, through the SAME declarations the cloud grades with.
+ *
+ * F-1749: the markdown-level test proves those criteria bind. It cannot prove
+ * the bundled agent's walk SATISFIES them — that needs the twin's exported
+ * state, which only a real run produces. Hence here, off the bytes the CLI
+ * actually uploaded.
+ */
+async function gradeCodeCriteria(
+  stateJson: string,
+): Promise<Array<{ text: string; passed: boolean; reason: string }>> {
+  const markdown = await readFile(demoTaskPath(), "utf8");
+  const sidecar = JSON.parse(
+    await readFile(demoTaskPath().replace(/\.md$/, ".seed.json"), "utf8"),
+  ) as unknown;
+  const task = parseTask(markdown, DEMO_TASK_NAME, sidecar);
+  const final: unknown = JSON.parse(stateJson);
+  // Args-erased, the way every uniform consumer of the declarations takes them
+  // (`checksFor`'s own note) — the tuple is heterogeneous in its slot types.
+  const declared = checksFor("github");
+
+  return task.criteria
+    .filter((criterion) => criterion.type === "code")
+    .map((criterion) => {
+      for (const check of declared) {
+        const args = parseCheck(check, criterion.text);
+        if (args === null) continue;
+        // `seed`/`tape` are null: both declarations read `final` only, and a
+        // predicate handed a substrate it did not ask for is a different test
+        // from the one the cloud runs.
+        const outcome = check.evaluate(args, { seed: null, final, tape: null });
+        return { text: criterion.text, passed: outcome.passed, reason: outcome.reason };
+      }
+      throw new Error(`packaged demo criterion binds no check: ${criterion.text}`);
+    });
+}
 
 interface StubCloud {
   server: Server;
@@ -263,6 +305,31 @@ describe("pome demo end-to-end against a stub cloud", () => {
       expect(body).toContain("TwinHttpEvent");
       expect(body).toContain("/repos/acme/api/issues/1/labels");
       expect(body).toContain("/repos/acme/api/issues/1/comments");
+    }
+
+    // F-1749 — the demo's deterministic denominator, measured rather than
+    // asserted about the markdown: the bundled agent's correct walk satisfies
+    // every `[code]` criterion against the state the twin actually exported,
+    // and NONE of them was already true of the seed. A criterion the seed
+    // satisfies is dropped from the denominator cloud-side
+    // (`pre-satisfied.ts`), so a seed-true `[code]` row would put the demo
+    // straight back to "no trials were evaluated".
+    const stateUploads = (suffix: string): string[] =>
+      [...cloud!.putBodies.entries()].filter(([key]) => key.endsWith(suffix)).map(([, body]) => body);
+
+    const finalStates = stateUploads("/state_final.json");
+    const seedStates = stateUploads("/state_initial.json");
+    expect(finalStates).toHaveLength(2);
+    expect(seedStates).toHaveLength(2);
+
+    for (const stateJson of finalStates) {
+      const graded = await gradeCodeCriteria(stateJson);
+      expect(graded.length).toBeGreaterThan(0);
+      expect(graded.filter((row) => !row.passed)).toEqual([]);
+    }
+    for (const stateJson of seedStates) {
+      const graded = await gradeCodeCriteria(stateJson);
+      expect(graded.filter((row) => row.passed)).toEqual([]);
     }
 
     // Finalize: bearer demo_token, criteria [] (server-owned judge content),
