@@ -9,7 +9,7 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
-## Unreleased (patch)
+## 0.35.3 — 2026-08-29
 
 **`pome docs getting-started` prints a live page again.** The docs site merged
 its per-client capstones into one client-neutral page, so `/quickstart/claude-code`
