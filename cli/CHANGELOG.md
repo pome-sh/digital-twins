@@ -9,7 +9,7 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
-## Unreleased (minor)
+## 0.36.0 — 2026-08-29
 
 **A seed key no twin field matches is refused, naming the key** (F-1689). The
 github, slack and stripe seed schemas are strict now (gmail and linear already

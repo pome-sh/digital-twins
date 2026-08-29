@@ -1,7 +1,7 @@
 # @pome-sh/sandbox-domains
 
 
-## Unreleased (minor)
+## 0.3.0 — 2026-08-29
 
 **Every twin's `parseSeed` refuses a key no seed field matches** (F-1689), and
 all five drop the `_meta` provenance block a compiled `<task>.seed.json` carries.

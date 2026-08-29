@@ -1,6 +1,6 @@
 # @pome-sh/checks
 
-## Unreleased (minor)
+## 0.4.0 — 2026-08-29
 
 **Every twin's `parseSeed` refuses a key no seed field matches** (F-1689). The
 github, slack and stripe schemas this package re-exports are `z.strictObject` at
