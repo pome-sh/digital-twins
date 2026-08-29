@@ -59,6 +59,13 @@ import {
   writeSdkScaffold,
 } from "./init-sdk.js";
 import {
+  ExampleScaffoldError,
+  exampleIds,
+  scaffoldExample,
+  scaffoldSummary,
+  unknownExampleMessage,
+} from "./init-example.js";
+import {
   DEFAULT_CONTROL_PLANE_URL,
   DEFAULT_DASHBOARD_URL,
 } from "./defaults.js";
@@ -143,7 +150,9 @@ export function createProgram() {
   program
     .command("init")
     .summary("Set up Pome in this project")
-    .description("Create pome.json, plus starter files in a new project")
+    .description(
+      "Create pome.json, plus starter files in a new project — or, with --example <id>, fetch a complete runnable example into ./<id>",
+    )
     .option(
       "--sdk <name>",
       "Scaffold for a specific agent SDK (claude | claude-managed). Adds the SDK-specific example file and pre-fills agent.framework so the dashboard badges runs correctly.",
@@ -156,8 +165,47 @@ export function createProgram() {
       "--starter",
       "Force the full starter library even in an existing project.",
     )
-    .action(async (opts: { sdk?: string; bare?: boolean; starter?: boolean }) => {
+    .option(
+      "--example <id>",
+      `Scaffold a complete bundled example into ./<id> instead of a starter project. Ids: ${exampleIds().join(", ")}.`,
+    )
+    .action(async (opts: { sdk?: string; bare?: boolean; starter?: boolean; example?: string }) => {
       const sdk = opts.sdk?.trim();
+
+      // `--example` fetches a whole standalone package — its own pome.json,
+      // lockfile, tasks and agent. Combining it with a flag that shapes the
+      // starter scaffold would write a competing manifest in the cwd next to
+      // the one the example brings, so the two modes are exclusive rather than
+      // layered.
+      const exampleId = opts.example?.trim();
+      if (exampleId !== undefined) {
+        const conflicting = (["sdk", "bare", "starter"] as const).filter(
+          (flag) => opts[flag] !== undefined && opts[flag] !== false,
+        );
+        if (conflicting.length > 0) {
+          console.error(
+            `\`--example\` scaffolds a complete example and cannot be combined with ` +
+              `${conflicting.map((flag) => `--${flag}`).join(", ")}.`,
+          );
+          process.exitCode = 2;
+          return;
+        }
+        if (exampleId === "") {
+          console.error(unknownExampleMessage(""));
+          process.exitCode = 2;
+          return;
+        }
+        try {
+          const result = await scaffoldExample({ id: exampleId, cwd: process.cwd() });
+          console.error(scaffoldSummary(result));
+        } catch (err) {
+          if (!(err instanceof ExampleScaffoldError)) throw err;
+          console.error(err.message);
+          process.exitCode = 2;
+        }
+        return;
+      }
+
       if (
         sdk !== undefined &&
         sdk !== "claude" &&

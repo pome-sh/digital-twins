@@ -108,6 +108,17 @@ jobs:
       # node:path only, so it runs before `npm ci`.
       - run: node scripts/lib/example-roots.test.mjs
 
+      # `pome init --example <id>`'s id set is DERIVED from the example
+      # directories, so this is what makes "a directory that disappears takes
+      # its id with it" true rather than aspirational. Always-on for the same
+      # reason as the rule above it: the diff that drifts the catalog is a diff
+      # that adds or deletes an example, and an `agent-examples/`-only PR is
+      # exactly the shape the scope step can rule out of the heavy suite.
+      # Reads the directories, their package.json and `git ls-files`, so it runs
+      # before `npm ci`.
+      - run: npm run gate:example-catalog
+      - run: node scripts/emit-example-catalog.test.mjs
+
       # Versions are written on main after the merge by allocate-version.yml, so
       # what this demands of a PR is the WORDS and not the number: an
       # `## Unreleased (patch|minor)` entry for every artifact the PR moves, no

@@ -436,12 +436,17 @@ bug.
 This example is built to be spawned as a **local subprocess** by the coach
 (the agent driving the Pome control MCP at `mcp.pome.sh`):
 
-1. **Fetch just this folder** onto the builder's machine:
+1. **Fetch just this folder** onto the builder's machine, by id:
 
    ```bash
-   npx degit pome-sh/digital-twins/agent-examples/support-triage support-triage-local
-   cd support-triage-local && npm install
+   npx @pome-sh/cli init --example support-triage
+   cd support-triage && npm install
    ```
+
+   The id is derived from this directory's name, so a rename breaks the command
+   loudly — with the valid ids printed — rather than the way a typed
+   `pome-sh/digital-twins/agent-examples/support-triage` path breaks, which is
+   silently, months later, as a 404.
 
 2. **Mint the run** — `run_task(task_id, agent_id, agent_version="v1")` seeds
    live twin sandboxes and returns `examinee_task` (the kickoff prompt) and

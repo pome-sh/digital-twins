@@ -9,6 +9,35 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
+## Unreleased (minor)
+
+**`pome init --example <id>` scaffolds a complete bundled example.** It fetches
+the example's whole tree — agent, tasks, `pome.json`, lockfile — into `./<id>`,
+and prints the next steps for what it actually is: `pome run` for the eight
+examinees under `agent-examples/`, and "read the README, your own eval runner
+starts it" for the two harnesses under `integration-examples/`, whose
+`pome.json` carries no `command` on purpose.
+
+The point is the **id**. Examples used to be reached by writing their path — a
+GitHub URL in the docs, an `npx degit pome-sh/digital-twins/agent-examples/…`
+line in a README — and a path in prose survives a rename by going 404: when
+`examples/` became `agent-examples/`, three published links broke and nothing
+said so. The id set is derived from the example directories
+(`cli/src/cli/example-catalog.ts`, generated, with `npm run
+gate:example-catalog` red on a stale copy), so a renamed or deleted example
+stops answering to the old id on the next command, with every valid id and what
+it teaches printed underneath.
+
+An unknown id is answered offline and instantly — only the file contents cross
+the wire, from `raw.githubusercontent.com` at the commit that built this CLI
+rather than at `main`, so an example is the one this version was released with
+and not one written against a newer one. `POME_EXAMPLE_REF` overrides the ref.
+The fetch completes into memory before anything touches disk: a 404 partway
+through leaves no directory rather than one that looks scaffolded and fails
+somewhere unrelated. A non-empty `./<id>` is refused, and `--example` cannot be
+combined with `--sdk` / `--bare` / `--starter`, which would write a manifest in
+the cwd competing with the one the example brings.
+
 ## 0.34.3 — 2026-08-29
 
 **Comment only, and nothing a consumer can observe.** A `//` comment in

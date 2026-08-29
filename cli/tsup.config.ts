@@ -29,6 +29,7 @@
 // conditional exports and duplicate zod's schema identity — which is the bug
 // this whole restructure exists to remove. `scripts/lint/rules/bundled-deps.mjs`
 // asserts every specifier the inlined packages import is declared here.
+import { execSync } from "node:child_process";
 import { chmodSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { defineConfig } from "tsup";
@@ -39,6 +40,30 @@ const pkg = JSON.parse(readFileSync(resolve(CLI_ROOT, "package.json"), "utf8")) 
 };
 
 const BIN_ENTRY = resolve(CLI_ROOT, "dist/src/cli/main.js");
+
+/**
+ * The commit `pome init --example` fetches example files from. Same resolution
+ * order as `scripts/write-build-info.mjs` (which stamps the identical SHA into
+ * `dist/build-info.json`), so the tarball and the fetch agree by construction.
+ *
+ * Falls back to "" rather than "dev": `src/cli/init-example.ts` only accepts a
+ * 40-hex value and uses `main` otherwise, and a contributor build with no `.git`
+ * should scaffold from `main` rather than 404 on a ref named "dev".
+ */
+function resolveGitSha(): string {
+  if (process.env.POME_GIT_SHA) return process.env.POME_GIT_SHA;
+  if (process.env.GITHUB_SHA) return process.env.GITHUB_SHA;
+  try {
+    return execSync("git rev-parse HEAD", {
+      cwd: CLI_ROOT,
+      stdio: ["ignore", "pipe", "ignore"],
+    })
+      .toString()
+      .trim();
+  } catch {
+    return "";
+  }
+}
 
 /**
  * `npm pack` preserves file modes straight from disk and a global
@@ -79,6 +104,11 @@ export default defineConfig({
     // Read by src/cli/main.ts for `pome --version`. Baked in so the published
     // CLI never has to locate its own package.json at runtime.
     PKG_VERSION: JSON.stringify(pkg.version),
+    // Read by src/cli/init-example.ts: `pome init --example` fetches the
+    // example as it stood at the commit that built THIS CLI, not as `main` has
+    // it now. Without the pin an old CLI quietly scaffolds an example written
+    // against a newer one.
+    PKG_GIT_SHA: JSON.stringify(resolveGitSha()),
   },
   async onSuccess() {
     ensureExecutableBin();
