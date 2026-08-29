@@ -12,6 +12,7 @@
 // encoded, with the sandbox's `agent_token` as the bearer. There is no Stripe
 // SDK here on purpose: a reader should be able to see every byte the agent sends.
 
+import type { Tracer } from "@opentelemetry/api";
 import { anthropic } from "@ai-sdk/anthropic";
 import { generateText, stepCountIs, tool } from "ai";
 import { z } from "zod";
@@ -103,6 +104,12 @@ export async function runAgent(input: {
   policy: RetryPolicy;
   prompt: string;
   model?: string;
+  /** When present, the AI SDK emits gen_ai.* spans through it. Absent means no
+   *  endpoint was configured and telemetry stays entirely off. */
+  tracer?: Tracer;
+  /** Names the row in the trace, so a span in Braintrust says which world and
+   *  which retry policy produced it. */
+  traceName?: string;
 }): Promise<AgentRun> {
   const call = async (req: TwinRequest | Omit<TwinRequest, "body">) => {
     const res = await fetch(req.url, {
@@ -127,6 +134,18 @@ export async function runAgent(input: {
     system: buildSystemPrompt(input.policy),
     prompt: input.prompt,
     stopWhen: stepCountIs(12),
+    // Off unless a tracer was built. `isEnabled: false` would still install the
+    // AI SDK's instrumentation and emit into whatever global provider happens to
+    // be registered; omitting the option entirely is the only real off.
+    ...(input.tracer
+      ? {
+          experimental_telemetry: {
+            isEnabled: true,
+            tracer: input.tracer,
+            ...(input.traceName ? { functionId: input.traceName } : {}),
+          },
+        }
+      : {}),
     tools: {
       get_charge: tool({
         description:

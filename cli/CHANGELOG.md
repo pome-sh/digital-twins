@@ -9,6 +9,18 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
+## Unreleased (patch)
+
+**Comment only, and nothing a consumer can observe.** A `//` comment in
+`packages/twin-stripe/src/check-refunds.ts` asserted that an `Idempotency-Key` on
+a retry does not separate one refund row from two. It did not, when it was
+written; `setHandlerResult` in that twin's `idempotency.ts` since taught the
+middleware to cache the handler's status rather than the wire's, so an
+`after_handler` injection no longer drops the record real Stripe writes in that
+situation. Measured: with the key, one refund row; without it, two. No check id,
+template, param, description or behaviour moved — the corrected text is not a
+published string.
+
 ## 0.34.2 — 2026-08-28
 
 `SECURITY.md` states the `pome-sh` package on npm as what it is: not this

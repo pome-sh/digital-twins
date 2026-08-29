@@ -1,9 +1,9 @@
 {
-  "name": "@pome-sh/langsmith-eval-example",
+  "name": "@pome-sh/braintrust-integration-example",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Bundled Pome example: LangSmith's evaluate() gives every dataset row its own hosted Pome sandbox, and each Pome criterion comes back as its own LangSmith feedback key.",
+  "description": "Bundled Pome example: Braintrust Eval() gives every dataset row its own hosted Pome sandbox, and each Pome criterion comes back as its own Braintrust score column.",
   "scripts": {
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
@@ -12,8 +12,12 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.105",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.221.0",
+    "@opentelemetry/resources": "^2.10.0",
+    "@opentelemetry/sdk-trace-node": "^2.10.0",
     "ai": "^6.0.241",
-    "langsmith": "^0.9.0",
+    "braintrust": "^3.29.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

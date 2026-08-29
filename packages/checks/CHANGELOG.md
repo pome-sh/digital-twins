@@ -1,5 +1,14 @@
 # @pome-sh/checks
 
+## Unreleased (patch)
+
+**Comment only.** The `stripe.refund-count` / `stripe.refund-exists` source file
+carried a `//` comment claiming that an `Idempotency-Key` on a retry does not
+separate one refund row from two. Measured false: with the key one row lands,
+without it two. Unlike 0.3.9, the corrected text is **not** a published string —
+no `description`, `template`, `params` or id moved, so nothing this package
+serves changes and no consumer needs to act.
+
 ## 0.3.9 — 2026-08-27
 
 **Prose only.** Two Linear declared-check descriptions (`linear.issue-has-label`,

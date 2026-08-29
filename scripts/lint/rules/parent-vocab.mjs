@@ -5,6 +5,7 @@
 
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
+import { EXAMPLE_ROOTS } from "../../lib/example-roots.mjs";
 
 const ALLOWED = new Map([
   [
@@ -35,7 +36,7 @@ function emitterDirs(root) {
   const dirs = ["cli/src"];
   for (const [parent, child] of [
     ["packages", "src"],
-    ["agent-examples", "src"],
+    ...EXAMPLE_ROOTS.map((root) => [root, "src"]),
   ]) {
     let entries;
     try {

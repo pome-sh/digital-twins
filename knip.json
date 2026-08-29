@@ -137,6 +137,16 @@
         "src/**/*.ts",
         "test/**/*.ts"
       ]
+    },
+    "integration-examples/*": {
+      "entry": [
+        "src/index.ts",
+        "test/**/*.ts"
+      ],
+      "project": [
+        "src/**/*.ts",
+        "test/**/*.ts"
+      ]
     }
   }
 }

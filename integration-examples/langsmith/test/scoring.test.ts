@@ -4,7 +4,7 @@
 // feedback key. Both fixtures are VERBATIM `POST /v1/sandboxes/:id/finalize`
 // responses captured from api.pome.sh on 2026-08-27 — the double-refund arm and
 // the careful arm of the demo — so these cases move when the wire moves. They
-// are the same two fixtures `agent-examples/braintrust-eval` pins, which is what
+// are the same two fixtures `integration-examples/braintrust` pins, which is what
 // makes the two examples' verdict rendering comparable at all.
 
 import { describe, expect, it } from "vitest";

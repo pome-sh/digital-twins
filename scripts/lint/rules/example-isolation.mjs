@@ -6,6 +6,7 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, extname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { EXAMPLE_ROOTS } from "../../lib/example-roots.mjs";
 
 import ts from "typescript";
 
@@ -33,16 +34,20 @@ const SCRIPT_KINDS = new Map([
 export const MIN_QUERY_CALL_SITES = 4;
 
 export function discoverSdkExamples(repoRoot = REPO_ROOT) {
-  const examplesDir = join(repoRoot, "agent-examples");
-  let entries;
-  try {
-    entries = readdirSync(examplesDir, { withFileTypes: true });
-  } catch (err) {
-    if (err.code === "ENOENT") return [];
-    throw err;
+  const entries = [];
+  for (const root of EXAMPLE_ROOTS) {
+    const examplesDir = join(repoRoot, root);
+    try {
+      for (const entry of readdirSync(examplesDir, { withFileTypes: true })) {
+        entries.push({ entry, examplesDir });
+      }
+    } catch (err) {
+      if (err.code === "ENOENT") continue;
+      throw err;
+    }
   }
   const found = [];
-  for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+  for (const { entry, examplesDir } of entries.sort((a, b) => a.entry.name.localeCompare(b.entry.name))) {
     const dir = join(examplesDir, entry.name);
     let stat;
     try {
@@ -302,7 +307,8 @@ export default {
 
     if (examples.length === 0) {
       throw new Error(
-        `No agent-examples/* package declares ${SDK_PACKAGE}, so this rule scanned nothing — refusing ` +
+        `No package under ${EXAMPLE_ROOTS.map((r) => `${r}/*`).join(" or ")} declares ${SDK_PACKAGE}, so ` +
+          `this rule scanned nothing — refusing ` +
           `to report a pass. If the examples moved, move this rule's discovery with them.`,
       );
     }

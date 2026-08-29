@@ -9,6 +9,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { EXAMPLE_ROOTS } from "../../lib/example-roots.mjs";
 
 import {
   discoverSourceFiles,
@@ -28,7 +29,11 @@ function assert(cond, msg) {
   console.error(`FAIL  ${msg}`);
 }
 
-const REQUIRED_ROOTS = ["scripts", "contract", "cli/src", "cli/scripts", "packages", "agent-examples"];
+// The independent control for `discoverSourceFiles`. Derived from EXAMPLE_ROOTS
+// rather than re-typed, because the whole point of this arm is that the two
+// derivations are independent in HOW they walk, not in WHICH roots they walk —
+// a hand-copied root list here would make the arm pass by agreeing to be wrong.
+const REQUIRED_ROOTS = ["scripts", "contract", "cli/src", "cli/scripts", "packages", ...EXAMPLE_ROOTS];
 
 const REAL_SHAPES = {
   "bare member access": "if (import.meta.main) { run(); }",

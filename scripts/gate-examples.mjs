@@ -4,28 +4,24 @@
 // deliberately NOT behind the typecheck exit: a check that stops running behind
 // another check's failure is the shape this file exists to avoid.
 import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { reportExamplePinParity } from "./check-example-pins-published.mjs";
+import { EXAMPLE_ROOTS, listExamples } from "./lib/example-roots.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const examplesDir = join(repoRoot, "agent-examples");
 
 function run(cmd, args, cwd) {
   execFileSync(cmd, args, { cwd, stdio: "inherit" });
 }
 
 function discoverExamples() {
-  const found = [];
-  for (const name of readdirSync(examplesDir).sort()) {
-    const pkgPath = join(examplesDir, name, "package.json");
-    if (!existsSync(pkgPath)) continue;
-    const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
-    if (pkg.scripts?.typecheck || pkg.scripts?.test) found.push(name);
-  }
-  return found;
+  return listExamples(repoRoot).filter((example) => {
+    const pkg = JSON.parse(readFileSync(join(example.dir, "package.json"), "utf8"));
+    return Boolean(pkg.scripts?.typecheck || pkg.scripts?.test);
+  });
 }
 
 const examples = discoverExamples();
@@ -45,14 +41,13 @@ try {
 }
 
 const failures = [];
-for (const name of examples) {
-  const cwd = join(examplesDir, name);
-  console.log(`\n=== agent-examples/${name} ===`);
+for (const { rel, dir: cwd } of examples) {
+  console.log(`\n=== ${rel} ===`);
   try {
     run("npm", ["ci"], cwd);
   } catch {
-    failures.push(`${name} (install)`);
-    console.error(`agent-examples/${name}: FAILED (install)`);
+    failures.push(`${rel} (install)`);
+    console.error(`${rel}: FAILED (install)`);
     continue;
   }
   const broke = [];
@@ -67,10 +62,10 @@ for (const name of examples) {
     }
   }
   if (broke.length === 0) {
-    console.log(`agent-examples/${name}: OK`);
+    console.log(`${rel}: OK`);
   } else {
-    failures.push(`${name} (${broke.join(" + ")})`);
-    console.error(`agent-examples/${name}: FAILED (${broke.join(" + ")})`);
+    failures.push(`${rel} (${broke.join(" + ")})`);
+    console.error(`${rel}: FAILED (${broke.join(" + ")})`);
   }
 }
 
@@ -80,7 +75,7 @@ if (failures.length > 0) {
   console.log(`\nAll ${examples.length} examples typechecked and tested clean.`);
 }
 
-console.log("\n=== agent-examples/* pin↔registry parity ===");
+console.log(`\n=== ${EXAMPLE_ROOTS.map((r) => `${r}/*`).join(" + ")} pin↔registry parity ===`);
 const parityOk = reportExamplePinParity(repoRoot);
 if (!parityOk) {
   console.error(

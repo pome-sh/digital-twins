@@ -1,4 +1,4 @@
-# `braintrust-eval` — bundled Pome example
+# `integration-examples/braintrust` — bundled Pome example
 
 Braintrust's `Eval()` gives every dataset row **its own world**.
 
@@ -49,6 +49,32 @@ That is *trace* versus *tape*. A span is the client's record of what the agent
 meant to do. The tape is the twin's record of what it actually received. An
 agent can emit a perfect span for a call that never happened; it cannot produce
 a refund row.
+
+### "Why not just send an Idempotency-Key?"
+
+It is the first thing anyone who knows Stripe asks, and the answer is that it
+**works** — this twin implements the real idempotency semantics, including under
+the injected lost response. Measured against `api.pome.sh` on 2026-08-28: one
+seeded world, two sandboxes, the only difference being the header on the retry.
+
+| Retry | Refund rows | `amount_refunded` |
+| --- | --- | --- |
+| with the same `Idempotency-Key` | 1 | 5000 ✅ |
+| without it | 2 | 10000 ❌ |
+
+That is what makes this a fair exam rather than a rigged one. There are **two**
+correct ways out of this world — send an idempotency key on the write, or read
+the charge back before retrying — and only an agent that does neither lands the
+second row. The `retry-on-5xx` arm does neither, and nothing in its instructions
+tells it not to; it is following a rule a real team would have written down.
+
+The rule is subtle enough to be worth stating: the middleware caches the
+**handler's** status, not the wire's. An `after_handler` injection substitutes
+the response after the row is committed, so a naive cache would see the 5xx,
+decline to store it, and let the retry re-execute — which is exactly the case
+`Idempotency-Key` exists for. `setHandlerResult` in the twin's
+`idempotency.ts` is what keeps that straight.
+
 
 ## The dataset
 
@@ -124,12 +150,12 @@ for anyone who signed up with a personal address.
 ## Install and run
 
 ```bash
-cd agent-examples/braintrust-eval
+cd integration-examples/braintrust
 npm install
 npm start
 ```
 
-Like the other examples, this package is deliberately **not** part of the root
+Like every bundled example, this package is deliberately **not** part of the root
 npm workspace — that keeps the Braintrust and AI SDK trees out of the monorepo
 install for everyone who is not running it.
 

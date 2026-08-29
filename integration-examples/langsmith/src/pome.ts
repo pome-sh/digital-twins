@@ -8,7 +8,7 @@
 //
 // ── This file is a COPY, and the copy is the convention ─────────────────────
 //
-// `agent-examples/braintrust-eval/src/pome.ts` is the same file. Every example
+// `integration-examples/braintrust/src/pome.ts` is the same file. Every example
 // here is a standalone npm package outside the root workspace, with its own
 // lockfile and its own install, so a shared module across that boundary would not
 // resolve and would break `gate:examples`' per-example typecheck.
@@ -403,7 +403,7 @@ export async function stopSandbox(env: Env, sessionId: string): Promise<void> {
  * This is the whole Pome half of the recipe, and it is deliberately the only
  * thing in this file that knows the order. `drive` is the seam: everything above
  * it is the same whichever eval framework or agent framework you brought, which
- * is why `agent-examples/braintrust-eval` runs these same six worlds through the
+ * is why `integration-examples/braintrust` runs these same six worlds through the
  * same four calls and differs only in its caller.
  *
  * What is NOT in here, and must not be: anything that knows LangSmith exists.

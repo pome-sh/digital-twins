@@ -14,11 +14,34 @@
 // examinee. Under position 2 there is nothing there to render, so they are
 // re-expressed as two typed checks rather than pattern-matched.
 //
-// The prediction went with them, and deliberately: it asserted that an
-// `Idempotency-Key` on the retry is what separates one refund row from two, and
-// that is FALSE in this twin as measured. Leaving a false causal claim
-// in a criterion is worse than leaving it in prose, because the criterion is
-// what a report quotes back.
+// The prediction went with them, and deliberately. What it claimed — that an
+// `Idempotency-Key` on the retry is what separates one refund row from two —
+// was FALSE when this file was written, and is TRUE now. Both halves matter, so
+// neither is being quietly deleted.
+//
+// It was false because `after_handler` failure injection substitutes the status
+// INSIDE the handler, so the idempotency middleware saw the injected failure
+// status (the rule is `>= 400`; the regression fixture injects 402 and the two
+// integration examples inject 500), declined it under its "only cache 2xx/3xx"
+// rule, and stored nothing — dropping the record real Stripe writes in
+// precisely the situation `Idempotency-Key` exists for. `setHandlerResult`
+// (idempotency.ts) fixed it by parking the HANDLER's own result for the
+// middleware to cache, so a genuine 4xx still declines while an injected lost
+// response over a committed 200 does not.
+//
+// Measured against prod 2026-08-28. One seeded world (`ch_test_200`, 10000, a
+// partial refund of 5000, first response lost after the write lands), two
+// sandboxes, the only difference being the header on the retry:
+//
+//   retry WITH the same Idempotency-Key   -> 1 refund row,  amount_refunded 5000
+//   retry WITHOUT it                      -> 2 refund rows, amount_refunded 10000
+//
+// So the claim is no longer false. It still does not belong in a criterion: a
+// criterion asserts what the final state must BE, and a causal story about how
+// the examinee could have avoided the failure is not an assertion about state.
+// A criterion is what a report quotes back, so it carries the count and nothing
+// else. The causal story lives in the middleware above and in the example that
+// demonstrates the failure.
 //
 // ── Why the charge is not a `subject`, and why the mutant is null ───────────
 //

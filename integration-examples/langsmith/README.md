@@ -1,4 +1,4 @@
-# `langsmith-eval` — bundled Pome example
+# `integration-examples/langsmith` — bundled Pome example
 
 LangSmith's `evaluate()` gives every dataset row **its own world**.
 
@@ -15,7 +15,7 @@ Every Pome criterion comes back as **its own LangSmith feedback key**.
 > the agent calls during it.
 
 This is the **second framework over the same recipe**.
-[`agent-examples/braintrust-eval`](../braintrust-eval) runs these same six worlds
+[`integration-examples/braintrust`](../braintrust) runs these same six worlds
 through the same four Pome calls under Braintrust's `Eval()`. The Pome half —
 [`src/pome.ts`](./src/pome.ts) — is that example's file, copied; the framework
 half is [`src/langsmith.ts`](./src/langsmith.ts). The *handoff* between the two
@@ -191,7 +191,7 @@ built around it. (Verified against LangSmith's docs 2026-08-27.)
 ## Install and run
 
 ```bash
-cd agent-examples/langsmith-eval
+cd integration-examples/langsmith
 npm install
 npm start
 ```
@@ -231,7 +231,7 @@ its `[model]` reading `abstained` — no refund call failed there, so there is
 nothing for the narrator to read.
 
 > **What has and has not been run.** The Pome half is
-> [`braintrust-eval`](../braintrust-eval)'s code, which was verified end to end
+> [`braintrust`](../braintrust)'s code, which was verified end to end
 > against `api.pome.sh` on 2026-08-27, three times, same split each run. The
 > LangSmith half is verified against the real SDK by
 > `test/langsmith-seam.test.ts`, which drives an actual `evaluate()` — real target

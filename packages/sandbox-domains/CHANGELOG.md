@@ -1,6 +1,15 @@
 # @pome-sh/sandbox-domains
 
 
+## Unreleased (patch)
+
+**Comment only.** A `//` comment in `twin-stripe`'s refund checks asserted that
+an `Idempotency-Key` on a retry does not separate one refund row from two.
+Measured false, and the fix it predates is already in this package:
+`setHandlerResult` caches the handler's status rather than the wire's, so an
+`after_handler` injection keeps the idempotency record. No runtime behaviour and
+no exported symbol changes.
+
 ## 0.2.16 — 2026-08-28
 
 Carries the sdk change that leaves `POST /s/:sid/mcp/call` with one body shape,

@@ -36,7 +36,7 @@ jobs:
           fi
           # Paths that can affect package build/test/parity or the CI contract.
           if git diff --name-only "${BASE_SHA}" HEAD | grep -qE \
-            '^(packages/|cli/|agent-examples/|scripts/|contract/|config/|knip\.json|package(-lock)?\.json$|\.github/workflows/ci\.yml$)'; then
+            '^(packages/|cli/|agent-examples/|integration-examples/|scripts/|contract/|config/|knip\.json|package(-lock)?\.json$|\.github/workflows/ci\.yml$)'; then
             echo "heavy=true" >> "$GITHUB_OUTPUT"
             echo "Running heavy suite (package/cli/script/lockfile/ci changes)."
           else
@@ -99,6 +99,14 @@ jobs:
       # Locks the smoke:examples classifier so an exit inside SETTLE_MS cannot go
       # back to reading as success. Pure functions, no install needed.
       - run: node scripts/smoke-examples.test.mjs
+
+      # Keeps the two consumers that CANNOT import EXAMPLE_ROOTS — the
+      # heavy-suite path filter below and knip.json — in step with it. Belongs
+      # here rather than in the heavy block precisely because a root missing
+      # from that filter is what makes the heavy block not run at all: the gate
+      # has to survive a PR the scope step misclassifies. Imports node:fs and
+      # node:path only, so it runs before `npm ci`.
+      - run: node scripts/lib/example-roots.test.mjs
 
       # Versions are written on main after the merge by allocate-version.yml, so
       # what this demands of a PR is the WORDS and not the number: an

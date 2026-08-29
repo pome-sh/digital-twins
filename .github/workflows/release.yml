@@ -388,7 +388,7 @@ jobs:
           echo "::error::${PKG}@${version} published, but registry.npmjs.org did not serve it within 18 attempts over ~3 minutes."
           echo "The publish itself succeeded — do not re-run it. What this costs is the re-pin:"
           echo "dispatch-allocate-version either does not run at all, or dispatches a run that"
-          echo "cannot see this version, so agent-examples/* keep the previous pin and"
+          echo "cannot see this version, so the bundled examples keep the previous pin and"
           echo "check-example-pins-published.mjs reds on main. Once the version is visible, run"
           echo "  gh workflow run allocate-version.yml --ref main"
           echo "to land the re-pin by hand."

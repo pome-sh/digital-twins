@@ -167,7 +167,7 @@ function commitMessage(allocations, repins, head) {
     subject,
     "",
     ...allocations.map((a) => `- ${a.name} ${a.from} → ${a.to} (${a.level}, ${a.reason})`),
-    ...repins.map((r) => `- agent-examples/${r.example} ${r.dep} ${r.from} → ${r.to} (published pin re-pin)`),
+    ...repins.map((r) => `- ${r.root}/${r.example} ${r.dep} ${r.from} → ${r.to} (published pin re-pin)`),
     "",
     `Allocated from ${head.slice(0, 8)} by .github/workflows/allocate-version.yml.`,
     "The version number is written here, after the merge, and never in a PR.",
@@ -212,7 +212,7 @@ export function main(argv = process.argv.slice(2)) {
     if (a.relevantFiles.length > 10) console.log(`    … ${a.relevantFiles.length - 10} more`);
   }
   for (const r of plan.repins) {
-    console.log(`agent-examples/${r.example}: ${r.dep} ${r.from} → ${r.to}  (published pin drift)`);
+    console.log(`${r.root}/${r.example}: ${r.dep} ${r.from} → ${r.to}  (published pin drift)`);
   }
 
   const planOut = flagValue("--plan-out");
