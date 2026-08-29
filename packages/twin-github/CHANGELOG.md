@@ -25,6 +25,44 @@ Failed` here — github was the twin that validated. The legacy singular
 `assignee` still normalises to `assignees[]`; it is migrated before the schema
 sees it.
 
+**A seeded pull request gets the number the seed asked for** (F-1153).
+`seedSchema` has accepted `number` on a pull request since the field existed and
+the applier kept whatever `nextNumber()` handed out: a repo seeded with issue
+`number: 1` and pull request `number: 7` exported issues `[1]` and pulls `[2]`.
+
+That is not a missing check. Criteria resolve a pull request BY number, so a
+criterion naming #7 either failed at lookup with `pull request #7 not found` —
+which reads like an agent defect — or resolved to whatever #7 happened to be and
+graded the wrong pull request confidently. `createIssue`'s renumber right beside
+it was already correct; this is that path, for pull requests.
+
+`renumberPullRequest` runs IMMEDIATELY after create, the position the issue
+renumber already sits in, so the only child that exists yet is
+`pull_request_files`. Reviews, statuses, conversation comments and review
+comments are seeded afterwards against the returned number, so no table is ever
+written to a number that then moves — the "a missed table is a silent orphan"
+hazard is removed rather than enumerated. `bumpEntityCounter` moves with it, so a
+pull request or issue created after a seeded #7 gets #8.
+
+⚠️ `PRAGMA foreign_keys` is the wrong lever for this and silently so: SQLite makes
+it a no-op inside a transaction, and `seed()` runs entirely inside one. The
+PR-child FKs declare `ON DELETE CASCADE` and not `ON UPDATE CASCADE` (unlike
+`issue_labels` / `issue_assignees`, which is why the issue path needs no such
+dance), so `defer_foreign_keys` is what holds enforcement to COMMIT — by which
+point parent and child agree.
+
+**A number claimed twice in one repository is refused at parse, naming both
+claimants by path.** Issues and pull requests share one per-repo counter, so
+within a repo a number names one entity or the other and there is no correct
+silent resolution: honour the first and the second entity is unreachable, honour
+the last and the first is. The refinement covers issue-vs-pull-request,
+pull-request-vs-pull-request and issue-vs-issue, since all three are the same
+shared counter. The same number in two different repositories is still fine.
+
+No bundled task, example or showcase seed changes number: all 22 seeded
+repositories with pull requests already got the numbers they asked for, by the
+ascending-order accident this replaces with a guarantee.
+
 ## 0.12.0 — 2026-08-14
 
 `TAPE_ASSERTABLE_TOOLS` gains `add_issue_comment` (F-1521) — the first name added

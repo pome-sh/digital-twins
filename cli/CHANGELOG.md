@@ -83,6 +83,12 @@ BESIDES the key sets (the legacy `{ <twin>: { seed } }` wrapper failing loudly,
 the union not greedily mis-matching, the empty-seed defaults) moves to
 `cli/test/unit/task-seed-is-the-twins.test.ts` intact.
 
+A seeded pull request's `number` is honoured (F-1153, in `@pome-sh/twin-github`).
+No bundled task's seed changes number — all of them already got the numbers they
+asked for by the ascending-order accident that is now a guarantee — but a task
+seed claiming one number for both an issue and a pull request is refused at parse
+now, naming both claimants.
+
 ## 0.35.3 — 2026-08-29
 
 **`pome docs getting-started` prints a live page again.** The docs site merged

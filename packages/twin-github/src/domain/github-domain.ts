@@ -179,7 +179,7 @@ export class GitHubDomain {
         }
         for (const pull of repoSeed.pull_requests ?? []) {
           const createdPr = this.createPullRequest({ owner: repo.owner, repo: repo.name, title: pull.title, body: pull.body ?? "", head: pull.head, base: pull.base ?? repo.default_branch, actor: pull.author });
-          const prNumber = (createdPr as { number: number }).number;
+          const prNumber = this.renumberPullRequest(repo.id, (createdPr as { number: number }).number, pull.number);
           // The PR row and its head branch don't change across seeded reviews /
           // statuses, so resolve the head SHA once rather than re-querying it on
           // every iteration (and in both blocks below).
@@ -1451,6 +1451,49 @@ export class GitHubDomain {
 
   bumpEntityCounter(repoId: number, number: number) {
     this.db.prepare("UPDATE repositories SET entity_counter = CASE WHEN entity_counter < ? THEN ? ELSE entity_counter END WHERE id = ?").run(number, number, repoId);
+  }
+
+  /**
+   * Move a just-created pull request onto the number its seed asked for, and
+   * return the number it ends up with (F-1153).
+   *
+   * `createPullRequest` takes `nextNumber()` and the seed's `number` was simply
+   * kept out of it: a repo seeded with issue #1 and pull request #7 exported
+   * issues `[1]` and pulls `[2]`. Criteria resolve a pull request BY number, so
+   * that is not a missing check — it is a check grading whichever pull request
+   * happens to occupy the number the criterion names.
+   *
+   * CALLED IMMEDIATELY AFTER CREATE, before any child is seeded, which is the
+   * same position `createIssue`'s renumber sits in. That ordering is what keeps
+   * the table list short and honest: at this moment the only child that exists is
+   * `pull_request_files`, written by `createPullRequest` itself. Reviews,
+   * statuses, conversation comments and review comments are all seeded AFTER,
+   * against the returned number, so they are never written to a number that then
+   * moves — the "missed table is a silent orphan" hazard is removed rather than
+   * enumerated.
+   *
+   * `defer_foreign_keys` is what makes the pair of updates possible at all. The
+   * PR-child FKs declare `ON DELETE CASCADE` and NOT `ON UPDATE CASCADE` — unlike
+   * `issue_labels` / `issue_assignees`, which is exactly why the issue path needs
+   * no such dance — so with immediate enforcement there is no order that works:
+   * updating the parent first strands `pull_request_files` on a key that no
+   * longer exists, and updating the child first points it at a parent that does
+   * not exist yet.
+   *
+   * `PRAGMA foreign_keys` is the WRONG lever here and silently so: SQLite makes
+   * it a no-op inside a transaction, and `seed()` runs entirely inside one, so
+   * toggling it changes nothing and the FK still fails. `defer_foreign_keys`
+   * IS settable inside a transaction, holds enforcement until COMMIT — by which
+   * point both rows agree — and resets itself when the transaction ends, so it
+   * cannot leak into the rest of the seed.
+   */
+  renumberPullRequest(repoId: number, from: number, requested: number | undefined): number {
+    if (!requested || requested === from) return from;
+    this.db.pragma("defer_foreign_keys = ON");
+    this.db.prepare("UPDATE pull_requests SET number = ? WHERE repo_id = ? AND number = ?").run(requested, repoId, from);
+    this.db.prepare("UPDATE pull_request_files SET pull_number = ? WHERE repo_id = ? AND pull_number = ?").run(requested, repoId, from);
+    this.bumpEntityCounter(repoId, requested);
+    return requested;
   }
 
 
