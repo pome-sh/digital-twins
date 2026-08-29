@@ -40,9 +40,13 @@ import { dirname } from "node:path";
 import { createHostedClient, type HostedClient } from "../hosted/client.js";
 import { HostedQuotaError, HostedTrialError } from "../hosted/errors.js";
 import { newGroupId } from "../demo/ids.js";
-import { criterionPhrase } from "../demo/render.js";
 import { parseTaskFile } from "../task/parseTask.js";
-import { outcomeOf } from "../hosted/evalResultView.js";
+import {
+  criterionPhrase,
+  isNarrated,
+  outcomeOf,
+  type CriterionResult,
+} from "../hosted/evalResultView.js";
 import { resolveRunAgentIdentity } from "../cli/agent-identity.js";
 import { runTaskHosted } from "./runTaskHosted.js";
 import {
@@ -219,6 +223,16 @@ export async function runTrialGroup(
   // earlier trial's line.
   const rows: TrialRow[] = new Array<TrialRow>(options.trials);
   const failedCriteria: string[] = [];
+  // The narrator's rows across the GRADED trials, for the reading block in the
+  // summary. Collected exactly the way `failedCriteria` is, and for the same
+  // reason: it is a statement about the TASK's criteria, so it belongs to the
+  // set and not to a trial line that would repeat it k times.
+  //
+  // A trial that could not be graded contributes nothing — same rule
+  // `runDemo` applies to the same block. A reader looking at "no trials could
+  // be graded" is asking what went ungraded, and three readings printed under
+  // that question answer a different one.
+  const narrated: CriterionResult[] = [];
   let printedRows = 0;
   const flushRows = () => {
     while (printedRows < options.trials && rows[printedRows] !== undefined) {
@@ -247,6 +261,9 @@ export async function runTrialGroup(
         (r) => outcomeOf(r) === "failed",
       );
       for (const r of failing) failedCriteria.push(r.criterion.text);
+      if (result.verdict !== "incomplete") {
+        narrated.push(...result.score.results.filter(isNarrated));
+      }
       row = {
         kind: "completed",
         score: result.score.satisfaction,
@@ -312,6 +329,7 @@ export async function runTrialGroup(
     rows,
     failingCriterionPhrase: failing?.phrase,
     failingCriterionCount: failing?.count,
+    narrated,
     reliabilityUrl,
   })) {
     out(line);

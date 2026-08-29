@@ -22,6 +22,7 @@ import type {
   RunTaskHostedResult,
 } from "../../../src/runner/runTaskHosted.js";
 import type { Score, ScoreStatus } from "../../../src/hosted/evalResultView.js";
+import { scoreFromFinalizeResponse } from "../../../src/hosted/uploadAndFinalize.js";
 
 vi.mock("../../../src/hosted/client.js", async (importOriginal) => {
   const original = await importOriginal<typeof import("../../../src/hosted/client.js")>();
@@ -173,6 +174,34 @@ function scoreOf(satisfaction: number, failedTexts: string[] = []): Score {
   };
 }
 
+/** F-1754 — a mixed-criteria trial: the `[code]` rows carry the score and the
+ *  narrator's `[model]` rows ride beside it, `passed: false, skipped: true` plus
+ *  a `score_state`. Built off the shipped producer so the counts cannot drift
+ *  from what a real /finalize response would make of the same rows. */
+function mixedScore(): Score {
+  return scoreFromFinalizeResponse({
+    run_id: "run_mixed",
+    score: 100,
+    judge_model: "test-judge",
+    dashboard_url: "https://app.example/runs/run_mixed",
+    criteria_results: [
+      {
+        criterion: { type: "code", text: "No unsupported endpoint was called" },
+        passed: true,
+        skipped: false,
+        reason: "no unsupported endpoint",
+      },
+      {
+        criterion: { type: "model", text: "The `bug` label went to the 500-error issue." },
+        passed: false,
+        skipped: true,
+        reason: "1. The trace shows one POST to /issues/1/labels. 2. Therefore …",
+        score_state: "advisory",
+      },
+    ],
+  });
+}
+
 function trialResult(input: {
   sessionId: string;
   satisfaction: number;
@@ -182,12 +211,16 @@ function trialResult(input: {
   /** The run's three-state verdict. Defaults from `exitCode` so every existing call
    *  site keeps meaning what it meant; pass it explicitly to simulate a trial. */
   verdict?: ScoreStatus;
+  /** Swap in the narrator-carrying score. */
+  mixed?: boolean;
 }): RunTaskHostedResult {
   return {
     runId: input.sessionId,
     cloudRunId: `run_${input.sessionId}`,
     cloudDashboardUrl: `https://app.example/runs/run_${input.sessionId}`,
-    score: scoreOf(input.satisfaction, input.failedTexts ?? []),
+    score: input.mixed
+      ? mixedScore()
+      : scoreOf(input.satisfaction, input.failedTexts ?? []),
     verdict: input.verdict ?? (input.exitCode === 0 ? "pass" : "fail"),
     exitCode: input.exitCode,
     durationMs: input.durationMs,
@@ -872,5 +905,73 @@ describe("runTrialGroup — dashboard link + client construction", () => {
       apiKey: "pme_k",
       timeoutMs: 60_000,
     });
+  });
+});
+
+describe("runTrialGroup — the narrator's readings in the summary", () => {
+  it("prints them once for the set, off the graded trials only", async () => {
+    const taskPath = await scenarioFixture();
+    const cloud = makeFakeClient();
+    const out: string[] = [];
+
+    await runTrialGroup({
+      taskPath,
+      agentCommand: "node agent.js",
+      trials: 3,
+      hosted: { baseUrl: "https://api.example", apiKey: "pme_k" },
+      dashboardBaseUrl: "https://app.pome.sh",
+      out: (line) => out.push(line),
+      client: cloud.client,
+      runTaskHostedFn: async (options) =>
+        trialResult({
+          sessionId: options.premintedSession!.session_id,
+          satisfaction: 100,
+          exitCode: 0,
+          durationMs: 1000,
+          mixed: true,
+        }),
+    });
+
+    const readings = out.filter((line) => line.trimStart().startsWith("~ "));
+    // ONE line for three trials: the criterion belongs to the task.
+    expect(readings).toEqual([
+      "  ~ advisory · the `bug` label went to the 500-error issue",
+    ]);
+    expect(out).toContain("the narrator also read these, and scored none of them:");
+    // Never a verdict marker, and never the instrument-gap glyph.
+    expect(readings[0]).not.toMatch(/[✓✗⚠]/);
+    // The narrator's prose belongs on the reliability page the summary links to.
+    expect(out.join("\n")).not.toContain("The trace shows one POST");
+  });
+
+  it("says nothing about the narrator when no trial could be graded", async () => {
+    const taskPath = await scenarioFixture();
+    const cloud = makeFakeClient();
+    const out: string[] = [];
+
+    await runTrialGroup({
+      taskPath,
+      agentCommand: "node agent.js",
+      trials: 2,
+      hosted: { baseUrl: "https://api.example", apiKey: "pme_k" },
+      dashboardBaseUrl: "https://app.pome.sh",
+      out: (line) => out.push(line),
+      client: cloud.client,
+      runTaskHostedFn: async (options) =>
+        trialResult({
+          sessionId: options.premintedSession!.session_id,
+          satisfaction: 100,
+          exitCode: 1,
+          durationMs: 1000,
+          verdict: "incomplete",
+          mixed: true,
+        }),
+    });
+
+    const text = out.join("\n");
+    expect(text).toContain("no trials could be graded");
+    // A reader asking what went ungraded is not helped by three readings under
+    // the question.
+    expect(text).not.toContain("narrator");
   });
 });

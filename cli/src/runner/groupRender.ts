@@ -12,6 +12,8 @@
 //   trial 5  ⚠  errored         <reason> — excluded
 //   ─────
 //   2 of 4 passed · 1 errored, excluded from the fraction
+//   the narrator also read these, and scored none of them:
+//     ~ advisory · <criterion phrase>
 //   <failing-criterion phrase> failed in 2 of 4 — start there
 //   full trace, per-criterion diffs, and the trial spread:
 //   → <reliability page url>
@@ -20,8 +22,12 @@
 // vocabulary belongs to `pome demo`, moment 01). Errored rows show no
 // duration and are EXCLUDED from the fraction's denominator.
 
-import { criterionPhrase } from "../demo/render.js";
-import type { ScoreStatus } from "../hosted/evalResultView.js";
+import {
+  criterionPhrase,
+  narratorReadingLines,
+  type CriterionResult,
+  type ScoreStatus,
+} from "../hosted/evalResultView.js";
 
 export type TrialRow =
   | {
@@ -92,6 +98,11 @@ export interface GroupSummaryInput {
   failingCriterionPhrase?: string;
   /** How many completed trials failed that criterion. */
   failingCriterionCount?: number;
+  /** Every narrated row the completed trials carried. Deduped into one block
+   *  by `narratorReadingLines`: the criteria belong to the TASK, so k trials
+   *  repeat them k times and a per-trial line would print the same sentence
+   *  once per trial. */
+  narrated?: CriterionResult[];
   /** The task's reliability page (dashboard /runs/task/<taskName>). */
   reliabilityUrl: string;
 }
@@ -130,6 +141,11 @@ export function groupSummaryLines(input: GroupSummaryInput): string[] {
     fraction += ` · ${errored} errored, excluded from the fraction`;
   }
   lines.push(fraction);
+
+  // Same block, same glyph and same words as `pome demo`'s summary and a
+  // single hosted run's verdict — one renderer, so this state cannot come to
+  // mean three things across the three surfaces that print it.
+  lines.push(...narratorReadingLines(input.narrated ?? []));
 
   if (
     input.failingCriterionPhrase &&

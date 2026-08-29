@@ -94,11 +94,13 @@ export type Score = {
   // `runScoreLine` subtract this count back out of the "not evaluated" tally.
   preSatisfied: number;
   // The two narrator subsets of `skipped`, on the same footing as
-  // `preSatisfied` above: still counted in `skipped`, still rendered with the
-  // `-` marker, but not abstentions — so `can_pass` and `runScoreLine` subtract
-  // them back out of the "not evaluated" tally. Named separately because the
-  // two read differently to a human: an advisory row has a reading to show, an
-  // abstain has a missing subject to name.
+  // `preSatisfied` above: still counted in `skipped`, but not abstentions — so
+  // `can_pass` and `runScoreLine` subtract them back out of the "not evaluated"
+  // tally. Named separately because the two read differently to a human: an
+  // advisory row has a reading to show, an abstain has a missing subject to
+  // name. Unlike `preSatisfied` they do NOT render with the `-` marker —
+  // `criterionMarker` gives them `NARRATED_MARKER` and `narratorSuffix` names
+  // which of the two they are.
   advisory: number;
   abstained: number;
   // = passed + failed. The satisfaction denominator.
@@ -185,6 +187,26 @@ export function isNarrated(
   );
 }
 
+/**
+ * `advisory` / `abstained` as the word to PRINT beside a narrated row, or null
+ * on every row the narrator did not name.
+ *
+ * Goes through `isNarrated`, so the closed vocabulary is applied in exactly one
+ * place: an unrecognised `score_state` spelling (the tolerant reader's whole
+ * point — see `criterionResultSchema`'s note on why this field is not an enum
+ * on this side) prints nothing rather than a fabricated state, and a
+ * `score_state` on a row that was not skipped is ignored the way the wire
+ * reduction ignores it.
+ */
+export function narratorStateLabel(
+  result: Pick<CriterionResult, "skipped" | "score_state">,
+): string | null {
+  if (!isNarrated(result)) return null;
+  return result.score_state === ADVISORY_SCORE_STATE
+    ? ADVISORY_SCORE_STATE
+    : ABSTAINED_SCORE_STATE;
+}
+
 export type ScoreStatus = "pass" | "fail" | "incomplete";
 
 // Single source of truth for "did this run pass?", applied to a CLOUD score.
@@ -257,6 +279,90 @@ export function markerFor(outcome: CriterionOutcome): string {
   }
 }
 
+// The narrator's marker, and a FIFTH glyph rather than a reuse of one of
+// `markerFor`'s four. Those four are already two disjoint claims — ✓/✗ are
+// verdicts about the CRITERION, `-`/`!` are statements about the GRADER — and a
+// narrated row is neither: the grader reached the row and reported that it had
+// no score authority over it.
+//
+// `-` in particular is the one that has to go. Its sentence is "the cloud could
+// not evaluate this criterion", which is exactly the claim the narrator states
+// exist to stop making about a `[model]` row, and it is the glyph a narrated row
+// lands on by default because `outcomeOf` maps it to `skipped`. That mapping is
+// deliberate and stays: the three exemptions are SUBTRACTED from the `skipped`
+// tally, so a row that left the tally would be subtracted from a count it was
+// never in. The marker is therefore chosen BESIDE `outcomeOf`, off
+// `isNarrated`, and never by widening the four-state union — which is also what
+// keeps `outcome` reserved for the cloud to fill.
+export const NARRATED_MARKER = "~";
+
+/** The marker to print beside one cloud criterion row. */
+export function criterionMarker(result: CriterionResult): string {
+  return isNarrated(result) ? NARRATED_MARKER : markerFor(outcomeOf(result));
+}
+
+/**
+ * The trailing clause that says what a narrated row IS, so the marker never has
+ * to carry the meaning alone. Empty on every row that is not narrated.
+ *
+ * Says "never scored" rather than "not evaluated": the row WAS read, and the
+ * distinction between those two sentences is the whole of this ticket.
+ */
+export function narratorSuffix(result: CriterionResult): string {
+  const label = narratorStateLabel(result);
+  if (label === null) return "";
+  return label === ADVISORY_SCORE_STATE
+    ? " — advisory: read by the narrator, never scored"
+    : " — abstained: nothing in this run to read";
+}
+
+/** One criterion row as a terminal prints it: marker, lane label, the criterion
+ *  itself, then whichever trailing clause applies. ONE renderer, because the
+ *  surfaces that print rows (`pome eval`'s full list, a hosted run's narrative
+ *  block) have to agree on the marker or the state means two things. */
+export function criterionRowLine(result: CriterionResult): string {
+  return `${criterionMarker(result)} ${criterionMarkerLabel(result.criterion)} ${result.criterion.text}${narratorSuffix(result)}${twinSkipSuffix(result)}`;
+}
+
+/**
+ * The narrative block a verdict prints beside its score: a header sentence and
+ * one `~` line per narrated row, or `[]` when the run has none.
+ *
+ * DEDUPED by state + phrase, and that is what makes it a run-level block rather
+ * than a per-trial one. Every trial of a task is graded against the SAME
+ * criteria, and this prints the criterion rather than the narrator's per-trial
+ * prose — so a 5-trial set would otherwise print the same three sentences five
+ * times. The prose itself stays on the dashboard, where a reader who wants the
+ * walk through the trace can have it in full instead of truncated to a terminal
+ * width.
+ */
+export function narratorReadingLines(results: CriterionResult[]): string[] {
+  const seen = new Set<string>();
+  const rows: string[] = [];
+  for (const result of results) {
+    const state = narratorStateLabel(result);
+    if (state === null) continue;
+    const line = `  ${NARRATED_MARKER} ${state} · ${criterionPhrase(result.criterion.text)}`;
+    if (seen.has(line)) continue;
+    seen.add(line);
+    rows.push(line);
+  }
+  if (rows.length === 0) return [];
+  // Says what the block IS before the reader meets an unfamiliar glyph, so `~`
+  // never has to read as a fourth verdict on its own.
+  return ["the narrator also read these, and scored none of them:", ...rows];
+}
+
+/** Compress a criterion's text for a one-line display: first clause,
+ *  lower-cased lead, ~60 chars. Shared by the narrative block above, the demo's
+ *  "start there" line and the trial group's failing-criteria note — one
+ *  compression, so a criterion reads the same wherever it is abbreviated. */
+export function criterionPhrase(text: string): string {
+  const clause = text.split(/[.;]/)[0]?.trim() ?? text.trim();
+  const lowered = clause.length > 0 ? clause[0]!.toLowerCase() + clause.slice(1) : clause;
+  return lowered.length > 64 ? `${lowered.slice(0, 61).trimEnd()}…` : lowered;
+}
+
 // Multi-twin (M3): the per-criterion bracket for terminal display —
 // `[code]` / `[model]`, plus the `:<twin>` suffix when the criterion attributes
 // to a specific twin (so a `[code:slack]`/`[model:github]` marker survives into the
@@ -270,9 +376,15 @@ export function criterionMarkerLabel(criterion: WireCriterion): string {
 // twin-related reason (a twin-tagged criterion, or a `no_matching_predicate`
 // skip), name the twin inline so the INCOMPLETE line explains WHICH twin's timeline
 // came up empty. Returns "" when there's nothing twin-specific to add.
+//
+// A NARRATED ROW GETS NOTHING, because nothing came up empty on it. The suffix
+// is an instrument-gap explanation, and `outcomeOf` maps a narrated row to
+// `skipped` — so without this guard a twin-tagged advisory row would carry the
+// gap claim a second time, in the twin's name, right beside the clause saying
+// it was read.
 export function twinSkipSuffix(result: CriterionResult): string {
   const twin = result.criterion.twin;
-  if (!twin) return "";
+  if (!twin || isNarrated(result)) return "";
   const outcome = outcomeOf(result);
   const twinRelated =
     outcome === "skipped" ||
@@ -325,8 +437,25 @@ export function evaluationCounts(score: Score): EvaluationCounts {
   };
 }
 
+// The narrator's rows are named APART from the skips rather than folded into
+// them, for the reason `runScoreLine` names `preSatisfied` apart: `skipped` in
+// this sentence means "the grader never reached it", and a run that passes with
+// three readings beside it printing "3 skipped" says the opposite of the state
+// those three rows are actually in. They are subtracted from the printed
+// `skipped` and re-stated under their own words, so the numbers still sum to
+// the rows the run recorded.
+//
+// `preSatisfied` stays inside `skipped` here — `runScoreLine` already says
+// "(N already true in the seed)" beside this string, and saying it twice in one
+// line would be the drift this factoring exists to prevent.
 export function scoreCountsSummary(score: Score): string {
-  return `${score.passed ?? 0} passed, ${score.failed ?? 0} failed, ${score.skipped ?? 0} skipped, ${score.errored ?? 0} errored`;
+  const advisory = score.advisory ?? 0;
+  const abstained = score.abstained ?? 0;
+  const narrated =
+    (advisory > 0 ? `, ${advisory} advisory` : "") +
+    (abstained > 0 ? `, ${abstained} abstained` : "");
+  const skipped = (score.skipped ?? 0) - advisory - abstained;
+  return `${score.passed ?? 0} passed, ${score.failed ?? 0} failed, ${skipped} skipped, ${score.errored ?? 0} errored${narrated}`;
 }
 
 export function runScoreLine(
