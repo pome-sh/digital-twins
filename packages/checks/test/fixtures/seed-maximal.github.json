@@ -1,0 +1,84 @@
+{
+  "users": [
+    { "login": "vakoi", "type": "Organization", "name": "Vakoi Systems" },
+    { "login": "alice", "type": "User", "name": "Alice Ferrer" },
+    { "login": "bob", "type": "User", "name": "Bob Ochieng" }
+  ],
+  "repositories": [
+    {
+      "owner": "vakoi",
+      "name": "billing",
+      "description": "Invoice and dunning service",
+      "private": true,
+      "default_branch": "trunk",
+      "collaborators": ["alice", "bob"],
+      "labels": [
+        { "name": "bug", "color": "d73a4a", "description": "Something is not working" }
+      ],
+      "files": [
+        { "path": "README.md", "content": "# Billing\n", "branch": "trunk" },
+        { "path": "src/dunning.ts", "content": "export const retries = 3;\n", "branch": "retry-window" },
+        { "path": "src/renamed.ts", "branch": "retry-window", "renamed_from": "src/dunning.ts" }
+      ],
+      "milestones": [
+        {
+          "number": 4,
+          "title": "v2.1 — dunning hardening",
+          "description": "Everything blocking the next tag.",
+          "state": "open",
+          "due_on": "2026-09-30T00:00:00Z"
+        }
+      ],
+      "tags": [{ "name": "v2.0.0", "target": "trunk" }],
+      "releases": [
+        {
+          "tag_name": "v2.0.0",
+          "name": "Billing 2.0",
+          "body": "First cut of the dunning path.",
+          "target_commitish": "trunk",
+          "draft": true,
+          "prerelease": true,
+          "author": "alice"
+        }
+      ],
+      "issues": [
+        {
+          "number": 3,
+          "title": "Dunning retries fire twice on a 429",
+          "body": "Reproduced on staging at 14:07.",
+          "state": "closed",
+          "labels": ["bug"],
+          "assignees": ["alice"],
+          "comments": [{ "body": "Only reproduces under the read replica.", "author": "bob" }]
+        }
+      ],
+      "pull_requests": [
+        {
+          "number": 9,
+          "title": "Cap the dunning retry window",
+          "body": "Closes #3.",
+          "head": "retry-window",
+          "base": "trunk",
+          "state": "closed",
+          "author": "alice",
+          "reviews": [
+            { "author": "bob", "state": "CHANGES_REQUESTED", "body": "One blocker before this lands." }
+          ],
+          "statuses": [
+            { "context": "ci/dunning", "state": "failure", "description": "2 of 41 failing" }
+          ],
+          "comments": [{ "body": "Rebased on trunk.", "author": "alice" }],
+          "review_comments": [
+            {
+              "body": "Drop the sleep, it hides the race.",
+              "path": "src/dunning.ts",
+              "line": 1,
+              "side": "RIGHT",
+              "author": "bob"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

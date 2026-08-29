@@ -30,6 +30,28 @@ serialization and `applySeed` never read the key, so the world the task seeds is
 byte-identical; what changes is that the file now boots through
 `pome twin start stripe --seed`.
 
+**The `/v1` seed declaration is the twin's schema, not a copy of it** (F-581).
+`cli/src/contract/seed-state.ts` hand-wrote the github seed shape and nothing
+compared it to `packages/twin-github/src/seed.ts`. Measured against a maximal
+github seed, the copy silently dropped eight fields the twin models:
+
+    repositories[].private, .milestones, .tags, .releases
+    issues[].assignees        (replaced by a fabricated `assignee: null`)
+    issues[].comments
+    pull_requests[].comments, .review_comments
+
+Nothing in this repo `.parse()`s that declaration — the create-session boundary
+is a permissive `z.record` on purpose (F-580) — which is why the drift was
+invisible. What it cost was every reader and type-checker that trusted it:
+`GithubSeedState` is `z.infer` of the schema, so the TYPE said a seeded milestone
+did not exist. The arm is now `export { seedSchema as githubSeedStateSchema }
+from "@pome-sh/twin-github/seed"` — the move `cli/src/task/taskSchema.ts` made
+when it was written. Two schemas that are the same object cannot drift.
+
+No exported name changes and no runtime behaviour moves. `GithubSeedState` is
+`ParsedGitHubStateSeed` under its old name, which is a WIDER type: it gains the
+eight fields above and `issues[].assignee` becomes `issues[].assignees`.
+
 ## 0.35.3 — 2026-08-29
 
 **`pome docs getting-started` prints a live page again.** The docs site merged

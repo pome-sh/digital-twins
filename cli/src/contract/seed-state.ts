@@ -1,4 +1,3 @@
-// file-size: Shared seed-state Zod schemas across twins — kept together so seed contracts stay one module.
 // SPDX-License-Identifier: Apache-2.0
 //
 // contract — provider seed-state schemas (part of §3 TASKS). The
@@ -7,112 +6,40 @@
 // `taskSchema`. Re-exported through the `cli/src/contract` barrel.
 
 import { z } from "zod";
+// The github seed shape is the TWIN's — see the block below. Imported as well
+// as re-exported because `providerScopedSeedStateSchema` needs the value.
+import { seedSchema as githubSeedSchema } from "@pome-sh/twin-github/seed";
 
-// SeedState — adopted as-is from oslo (nested shape; matches OSS code).
-// Future twins (Linear, Slack) will add their own seed shapes; we union those
-// in here as the family grows.
+// ── GITHUB: THE TWIN'S OWN SCHEMA, NOT A DECLARATION OF IT ─────────────────
 //
-// Ported from pome-cloud: this schema used to model only the
-// issue-triage subset (repositories[].{issues,labels,collaborators}). Anywhere
-// it is used as a narrowing boundary, a field MISSING here is silently
-// zod-stripped before it reaches the twin pod's own parseSeed — which is
-// exactly how PR-based scenarios lost their `users`, `pull_requests`, and
-// `files` and booted into an empty repo (the agent saw `GET /pulls → []`).
-// The full GitHub world (top-level users, default_branch, files,
-// pull_requests with reviews/statuses) is modeled below, matching the
-// canonical twin-github seed shape.
-export const githubSeedStateSchema = z.object({
-  users: z
-    .array(
-      z.object({
-        login: z.string().min(1),
-        type: z.enum(["User", "Organization"]).default("User"),
-        name: z.string().default(""),
-      })
-    )
-    .optional(),
-  repositories: z
-    .array(
-      z.object({
-        owner: z.string().min(1),
-        name: z.string().min(1),
-        description: z.string().optional(),
-        default_branch: z.string().min(1).optional(),
-        labels: z
-          .array(
-            z.object({
-              name: z.string().min(1),
-              color: z.string().default("ededed"),
-              description: z.string().default(""),
-            })
-          )
-          .default([]),
-        collaborators: z.array(z.string().min(1)).default([]),
-        files: z
-          .array(
-            z.object({
-              path: z.string().min(1),
-              content: z.string(),
-              branch: z.string().optional(),
-            })
-          )
-          .optional(),
-        issues: z
-          .array(
-            z.object({
-              number: z.number().int().positive(),
-              title: z.string().min(1),
-              body: z.string().default(""),
-              state: z.enum(["open", "closed"]).default("open"),
-              labels: z.array(z.string().min(1)).default([]),
-              assignee: z.string().nullable().default(null),
-            })
-          )
-          .default([]),
-        pull_requests: z
-          .array(
-            z.object({
-              number: z.number().int().positive().optional(),
-              title: z.string().min(1),
-              body: z.string().default(""),
-              head: z.string().min(1),
-              base: z.string().min(1).default("main"),
-              state: z.enum(["open", "closed"]).default("open"),
-              author: z.string().min(1).optional(),
-              // Reviews seeded on this PR. State mirrors GitHub's review state
-              // enum; author must exist in users or collaborators.
-              reviews: z
-                .array(
-                  z.object({
-                    author: z.string().min(1),
-                    state: z
-                      .enum(["APPROVED", "CHANGES_REQUESTED", "COMMENTED"])
-                      .default("APPROVED"),
-                    body: z.string().default(""),
-                  })
-                )
-                .default([]),
-              // Commit statuses on the PR head SHA, wired into commit_statuses
-              // so get_pull_request_status and merge_pull_request see them.
-              statuses: z
-                .array(
-                  z.object({
-                    context: z.string().min(1).default("ci/build"),
-                    state: z
-                      .enum(["error", "failure", "pending", "success"])
-                      .default("success"),
-                    description: z.string().default(""),
-                  })
-                )
-                .default([]),
-            })
-          )
-          .optional(),
-      })
-    )
-    .min(1),
-});
-export type GithubSeedState = z.infer<typeof githubSeedStateSchema>;
+// This arm was hand-written, and nothing compared it to
+// `packages/twin-github/src/seed.ts`. Measured 2026-08-29 against a maximal
+// github seed, the copy silently dropped EIGHT fields the twin models:
+//
+//     repositories[].private, .milestones, .tags, .releases
+//     issues[].assignees        (replaced by a fabricated `assignee: null`)
+//     issues[].comments
+//     pull_requests[].comments, .review_comments
+//
+// The visible cost is not a type error. `GithubSeedState` is `z.infer` of this
+// schema, so the TYPE said a seeded milestone did not exist — and its own header
+// claimed to be "matching the canonical twin-github seed shape" while four of
+// those five entities had landed in the twin since it was written. Nothing in
+// this repo `.parse()`s it (the create-session boundary is a permissive
+// `z.record` on purpose, F-580), which is why the drift was invisible: a
+// declaration no test runs is a claim nothing checks.
+//
+// So it is the twin's object, re-exported under this module's name —
+// `cli/src/task/taskSchema.ts` has done exactly this since it was written, and
+// two schemas that are the SAME schema cannot drift. The seed shape is the
+// twin's to own (ADR-015): this file declares the /v1 surface, and for a seed
+// the /v1 surface IS whatever the twin boots.
+//
+// `@pome-sh/twin-github/seed` is a zod-only leaf — it imports nothing but `zod`
+// and its own types — so naming it here costs the CLI startup graph nothing.
+// `taskSchema.ts` and `parseTask.ts` already reach it the same way.
+export { seedSchema as githubSeedStateSchema } from "@pome-sh/twin-github/seed";
+export type { ParsedGitHubStateSeed as GithubSeedState } from "@pome-sh/twin-github/seed";
 
 export const stripeSeedStateSchema = z.object({
   api_keys: z
@@ -535,7 +462,7 @@ export type LinearSeedState = z.infer<typeof linearSeedStateSchema>;
 
 export const providerScopedSeedStateSchema = z
   .object({
-    github: z.object({ seed: githubSeedStateSchema }).optional(),
+    github: z.object({ seed: githubSeedSchema }).optional(),
     stripe: z.object({ seed: stripeSeedStateSchema }).optional(),
     slack: z.object({ seed: slackSeedStateSchema }).optional(),
     gmail: z.object({ seed: gmailSeedStateSchema }).optional(),
@@ -551,5 +478,5 @@ export const providerScopedSeedStateSchema = z
 
 // SeedState accepts the legacy GitHub shape and the provider-scoped shape
 // used by GitHub + Stripe scenario templates.
-export const seedStateSchema = z.union([githubSeedStateSchema, providerScopedSeedStateSchema]);
+export const seedStateSchema = z.union([githubSeedSchema, providerScopedSeedStateSchema]);
 export type SeedState = z.infer<typeof seedStateSchema>;

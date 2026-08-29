@@ -457,6 +457,37 @@ FDRS-398 — unified `events.jsonl` discriminated-union schema for Agent Trace v
 - OtelSpanEvent dropped from the v1 union (FDRS-400 cancelled by the 2026-05-26 `/plan-eng-review`). Adding it in v2 is a non-breaking extension via the `kind` discriminator.
 - No version bump — `@pome-sh/shared-types` is held off npm until OSS Stage 1; consumers pick this up via workspace dep.
 
+---
+
+F-581 — the github seed arm of `seed-state.ts` is `@pome-sh/twin-github`'s own
+`seedSchema`, re-exported, rather than a hand-written declaration of it.
+
+### Changed
+
+- `githubSeedStateSchema` is the twin's object. The declared shape gains
+  `repositories[].private`, `.milestones[]`, `.tags[]`, `.releases[]`,
+  `issues[].comments[]`, `pull_requests[].comments[]`,
+  `pull_requests[].review_comments[]` and `files[].renamed_from`, and
+  `issues[].assignee` becomes `issues[].assignees[]` (F-577/F-578 settled
+  `assignees` as canonical and added a normalizer; this declaration never caught
+  up). Every one of those was already what the twin booted.
+- `GithubSeedState` is `ParsedGitHubStateSeed` under its old name — a wider type,
+  same name, same import site.
+
+### Notes
+
+- **Nothing in digital-twins parses this schema.** `contract/task.ts`'s
+  `taskSchema` is a declaration; the create-session boundary is a permissive
+  `z.record` by design (F-580), and pome-cloud's `parse-scenario-seed.ts` is
+  `JSON.parse` plus an object check. So this is a declaration correction, not a
+  behaviour change — but it is the declaration pome-cloud reads, which is why it
+  is recorded here.
+- Consequence of F-1689: the twin's schema is `z.strictObject`, so a consumer
+  that copies this shape inherits strictness. The boundary is deliberately not
+  the place to narrow (F-580), so nothing in the create-session path changes.
+- The stripe, slack, gmail and linear arms are still hand-written here. stripe
+  and slack are F-584; gmail and linear are covered by neither ticket.
+
 ## 0.3.0 — 2026-05-11
 
 FDRS-318 — file split + correlator/state-inspector field surface for M1+M2.
