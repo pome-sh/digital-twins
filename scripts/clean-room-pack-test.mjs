@@ -324,6 +324,8 @@ writeFileSync(
   join(checksInstall, "package.json"),
   JSON.stringify({ name: "checks-room", private: true, type: "module" }, null, 2),
 );
+// The range, not the workspace lockfile's pin: a fresh consumer resolves the
+// newest zod satisfying `^4.x`, and this room exists to be that consumer.
 const zodRange = JSON.parse(
   readFileSync(join(ROOT, "packages", "checks", "package.json"), "utf8"),
 ).peerDependencies.zod;
@@ -334,6 +336,7 @@ run(
     checksTarball,
     `zod@${zodRange}`,
     "typescript",
+    "@types/node",
     "--no-audit",
     "--no-fund",
     "--ignore-scripts",
@@ -416,13 +419,23 @@ export function main(): void {
 }
 `,
 );
+// `skipLibCheck: false` is the whole point — it is what makes a shipped `.d.ts`
+// that names an unresolvable specifier a failure instead of a warning. The price
+// is that the peer's declarations are checked too, so the room needs the ambient
+// libs a real consumer has. `lib: ["ES2022"]` alone declares no `URL`, and zod
+// 4.5 types `parseURLObject` as returning one: the gate reddened on zod's own
+// `schemas.d.cts`, naming @pome-sh/checks. The two other rooms below and above
+// carried DOM + node types already and were unaffected; this one was the outlier.
+// Do NOT "fix" a future recurrence by turning `skipLibCheck` on or by pinning zod
+// here — either mutes the failure class this gate exists to catch.
 writeFileSync(
   join(checksInstall, "tsconfig.json"),
   JSON.stringify(
     {
       compilerOptions: {
         target: "ES2022",
-        lib: ["ES2022"],
+        lib: ["ES2022", "DOM"],
+        types: ["node"],
         module: "NodeNext",
         moduleResolution: "NodeNext",
         strict: true,
