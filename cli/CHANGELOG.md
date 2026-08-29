@@ -9,6 +9,34 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
+## Unreleased (patch)
+
+**`pome demo` reports a verdict again.** Every trial of the zero-auth door was
+printing `⚠ errored · cloud could not evaluate the trace` in production, and the
+demo share page read `0 of 0`. Nothing errored: the packaged `first-run-demo`
+task declared three `[model]` criteria and zero `[code]`, and since `[model]`
+left the score denominator there was simply nothing to grade — `total_required`
+0, so the CLI's `scoreStatus` returned neither `pass` nor `fail` and `runDemo`
+fell through to its errored branch. Every trial, every time; no input produced a
+different outcome.
+
+The task now declares two `[code]` criteria alongside the three `[model]` ones —
+`github.issue-exactly-one-label` and `github.issue-comment-contains`, both
+already-published check sentences, no new vocabulary. Neither is true of the
+seed, which is what keeps them in the denominator: the cloud drops a criterion
+the seed already satisfied, so a prohibition would have left again and taken the
+fraction with it. The `[model]` rows stay, as the advisory reading beside the
+fraction, and they still carry the two clauses no declared check can state — "and
+to no other issue", and "exactly one comment".
+
+The same markdown is what a bare `pome run` copies to `tasks/first-run-demo.md`,
+so the "run yours" default now scores a deterministic fraction too. An existing
+copy is not rewritten; delete it and the next bare `pome run` re-copies.
+
+The judge scores the cloud's own mirror of this file, so the fraction only
+reaches `npx @pome-sh/cli demo` once pome-cloud deploys the matching definition.
+
+
 ## 0.35.0 — 2026-08-29
 
 **`pome init --example <id>` scaffolds a complete bundled example.** It fetches
