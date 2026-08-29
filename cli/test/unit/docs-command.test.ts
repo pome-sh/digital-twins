@@ -55,14 +55,14 @@ describe("pome docs helpers", () => {
   it("prints the canonical URL for a topic", async () => {
     await runDocsCommand("getting-started", {});
 
-    expect(stdout).toEqual(["https://docs.pome.sh/quickstart/claude-code"]);
+    expect(stdout).toEqual(["https://docs.pome.sh/quickstart/coding-agent"]);
     expect(stderr).toEqual([]);
   });
 
   it("prints topic URL rows without requiring bundled docs", async () => {
     await runDocsCommand(undefined, { urlOnly: true });
 
-    expect(stdout).toContain("getting-started\thttps://docs.pome.sh/quickstart/claude-code");
+    expect(stdout).toContain("getting-started\thttps://docs.pome.sh/quickstart/coding-agent");
     expect(stdout.some((line) => line.includes("docs/cli/run"))).toBe(true);
   });
 });

@@ -9,6 +9,21 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
+## Unreleased (patch)
+
+**`pome docs getting-started` prints a live page again.** The docs site merged
+its per-client capstones into one client-neutral page, so `/quickstart/claude-code`
+is now a 308 to `/quickstart/coding-agent`. The topic table names the new path.
+
+This is a patch and not a fix to a broken command — the old path redirects, so
+every published CLI still lands a reader somewhere real. What it protects is the
+table's own rule, stated at the top of `docs-topics.ts`: every `path` must be a
+page `docs.json` actually serves, because the table is a static index rather than
+something that follows redirects. A path kept alive only by a redirect reads as
+compliant while the invariant behind it has already gone. pome-cloud's
+`check-cli-docs-topics.ts` says the same thing from the other side, verbatim:
+"Fix the path in digital-twins, or add the page here. Do not add a redirect."
+
 ## 0.35.2 — 2026-08-29
 
 **A `[model]` criterion the narrator read now prints as a reading, not as a
