@@ -82,6 +82,55 @@ function failedResult(): FinalizeResponse["criteria_results"] {
   ];
 }
 
+// The wire shape prod actually returns for the packaged demo task, measured on
+// 2026-08-29 by replaying a captured trial's own blobs through mint → upload →
+// finalize (evaluator f1643-narrator-abstain.1): two `[code]` rows carry the
+// score, three `[model]` rows ride beside it as the narrator's readings. Every
+// one of those five is `passed`/`skipped` only — `outcome` is never on the
+// wire, which is why the CLI reads `score_state`.
+function mixedResult(): FinalizeResponse["criteria_results"] {
+  return [
+    {
+      criterion: {
+        type: "code" as const,
+        text: "Issue #1 in `acme/api` has exactly one classification label, and it is `bug`",
+      },
+      passed: true,
+      skipped: false,
+      reason: 'issue #1 has exactly one label ("bug")',
+    },
+    {
+      criterion: {
+        type: "code" as const,
+        text: 'A comment containing "POST /orders" exists on issue #1 in `acme/api`',
+      },
+      passed: true,
+      skipped: false,
+      reason: 'issue #1 has a comment containing "POST /orders"',
+    },
+    advisoryRow(
+      "The existing `bug` label was applied to the issue reporting the 500 error on POST /orders, and to no other issue.",
+    ),
+    advisoryRow(
+      "Exactly one comment was left on that issue, and it names the failing endpoint (POST /orders).",
+    ),
+    advisoryRow("No other issue was modified and no new label was created."),
+  ];
+}
+
+function advisoryRow(text: string) {
+  return {
+    criterion: { type: "model" as const, text },
+    passed: false,
+    skipped: true,
+    // The narrator's own numbered walk through the trace. Long on purpose:
+    // the terminal must not print it.
+    reason:
+      "1. The scenario requires applying the 'bug' label. 2. The trace shows a POST to /repos/acme/api/issues/1/labels. 3. Therefore the label was applied correctly.",
+    score_state: "advisory",
+  };
+}
+
 function criterion(text: string, outcome: "passed" | "failed") {
   return {
     criterion: { type: "model" as const, text },
@@ -227,7 +276,7 @@ describe("runDemo", () => {
     expect(text).toContain("No signup. No API keys.");
     expect(text).toContain("running 5 isolated trials of first-run-demo …");
     expect(text).toMatch(/trial 1 {2}✓ {2}passed {3}\d+\.\ds/);
-    expect(text).toMatch(/trial 3 {2}✗ {2}failed {3}\d+\.\ds {2}exactly one comment/);
+    expect(text).toMatch(/trial 3 {2}✗ {2}failed {3}\d+\.\ds {2}1 of 2 checks {2}exactly one comment/);
     expect(text).toContain("trial 5  ⚠  errored         trial timed out — excluded");
     expect(text).toContain(
       "2 of 4 passed · 1 trial errored on trial timed out, excluded from the fraction",
@@ -567,5 +616,96 @@ describe("runDemo", () => {
     });
     expect(result.exitCode).toBe(0);
     expect(out.join("\n")).toMatch(/spinning up github twin … ready \(\d+\.\ds\)/);
+  });
+  // F-1754 — the mixed-criteria trial, which is EVERY trial of the packaged
+  // demo task since 0.35.1 gave it a `[code]` denominator. The arithmetic half
+  // already stopped calling this run unevaluable; the terminal printed a bare
+  // verdict word and said nothing about either the fraction or the three rows
+  // the demo exists to show.
+  it("renders the deterministic fraction and the narrator's readings on a mixed trial", async () => {
+    const out: string[] = [];
+    const seenOptions: RunTaskOpts[] = [];
+    const finalizeCalls: Array<{ sessionId: string; input: unknown }> = [];
+
+    const result = await runDemo({
+      apiBase: "https://api.example.com",
+      dashboardBase: "https://app.pome.sh",
+      trials: 1,
+      out: (line) => out.push(line),
+      agentCommand: "unused-in-test",
+      runTaskFn: fakeRunTask([{ exitCode: 0 }], seenOptions),
+      mintFn: (async (opts: { count: number }) =>
+        sessionsFixture(opts.count)) as never,
+      trialClientFactory: fakeClient(
+        () => finalizeResponse(100, mixedResult()),
+        finalizeCalls,
+      ),
+      skipTwinWarmup: true,
+    });
+
+    const text = out.join("\n");
+    // The trial passes off the two `[code]` rows, and says so.
+    expect(text).toMatch(/trial 1 {2}✓ {2}passed {3}\d+\.\ds {2}2 of 2 checks/);
+    expect(result.exitCode).toBe(0);
+    expect(result.verdicts[0]!.kind).toBe("passed");
+
+    // Three readings, one line each, beside the fraction.
+    const readings = out.filter((line) => line.includes("~ advisory · "));
+    expect(readings).toHaveLength(3);
+    expect(readings[0]).toContain("the existing `bug` label was applied");
+    expect(readings[2]).toContain("no other issue was modified and no new label was created");
+    // …under the header that stops `~` reading as a fourth verdict.
+    expect(text).toContain("the narrator also read these, and scored none of them:");
+
+    // The narrator's prose stays on the share page. It is an eight-sentence
+    // walk through the trace; the front door prints the criterion, not the walk.
+    expect(text).not.toContain("The trace shows a POST to");
+    // Not a shortfall, not a gap: none of the three verdict words appears on a
+    // reading line.
+    for (const line of readings) expect(line).not.toMatch(/passed|failed|errored/);
+    expect(text).not.toContain("cloud could not evaluate the trace");
+  });
+
+  // The negative control the fix is defined against: on `passed`/`skipped`
+  // alone this row is identical to the three above, and the whole difference is
+  // the absent `score_state`. A grader that never reached a criterion still
+  // disqualifies the pass.
+  it("still reports a bare skipped row as an unevaluable trial", async () => {
+    const out: string[] = [];
+    const seenOptions: RunTaskOpts[] = [];
+    const finalizeCalls: Array<{ sessionId: string; input: unknown }> = [];
+
+    const result = await runDemo({
+      apiBase: "https://api.example.com",
+      dashboardBase: "https://app.pome.sh",
+      trials: 1,
+      out: (line) => out.push(line),
+      agentCommand: "unused-in-test",
+      runTaskFn: fakeRunTask([{ exitCode: 0 }], seenOptions),
+      mintFn: (async (opts: { count: number }) =>
+        sessionsFixture(opts.count)) as never,
+      trialClientFactory: fakeClient(
+        () =>
+          finalizeResponse(100, [
+            ...(mixedResult() ?? []),
+            {
+              criterion: { type: "model" as const, text: "The tool call was recorded." },
+              passed: false,
+              skipped: true,
+              reason: "tool_not_recorded",
+            },
+          ]),
+        finalizeCalls,
+      ),
+      skipTwinWarmup: true,
+    });
+
+    const text = out.join("\n");
+    expect(text).toContain("trial 1  ⚠  errored         cloud could not evaluate the trace — excluded");
+    expect(text).toContain("no trials were evaluated");
+    // An errored trial has no fraction and no readings to show.
+    expect(text).not.toContain("checks");
+    expect(text).not.toContain("~ advisory");
+    expect(result.exitCode).toBe(1);
   });
 });

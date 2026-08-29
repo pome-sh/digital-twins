@@ -22,7 +22,12 @@ import {
 import { runTask } from "../runner/runTask.js";
 import { runTaskHosted } from "../runner/runTaskHosted.js";
 import { effectiveTrialCount, parseTrialsFlag } from "../runner/trialCount.js";
-import { outcomeOf, runScoreLine, scoreStatus } from "../hosted/evalResultView.js";
+import {
+  narratorReadingLines,
+  outcomeOf,
+  runScoreLine,
+  scoreStatus,
+} from "../hosted/evalResultView.js";
 import { HostedUsageError, exitCodeFor } from "../hosted/errors.js";
 import { resolveCredentials, clearLocalCredentials } from "./credentials.js";
 import { loginWithClerk } from "./login.js";
@@ -998,6 +1003,13 @@ export function createProgram() {
                 status === "pass" ? "PASS" : status === "fail" ? "FAIL" : "INCOMPLETE";
               console.error(`${label} ${result.scenario.title}`);
               console.error(`  ${runScoreLine(result.score, result.scenario.config.passThreshold, "cloud score")}`);
+              // The narrator's rows, beside the score and never inside it. A
+              // mixed task's `[model]` rows are the reading the run produced;
+              // printing only the fraction drops them, and printing them
+              // through the criteria list's `-` would call each one a gap.
+              for (const line of narratorReadingLines(result.score.results)) {
+                console.error(`  ${line}`);
+              }
               console.error(`  local: ${result.artifacts.runDir}`);
               console.error(`  cloud: ${result.cloudDashboardUrl}`);
               if (result.exitCode !== 0) worstExit = result.exitCode;

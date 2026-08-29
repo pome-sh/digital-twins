@@ -3,14 +3,36 @@
 // scores, errored rows show no duration, the summary fraction excludes errored.
 import { describe, expect, it } from "vitest";
 import {
-  criterionPhrase,
   reassuranceBox,
   summaryLines,
   trialLine,
   trialsHeaderLine,
   twinReadyLine,
+  type TrialVerdict,
 } from "../../../src/demo/render.js";
 import { capacityLabel } from "../../../src/demo/capacity.js";
+import {
+  criterionPhrase,
+  type CriterionResult,
+} from "../../../src/hosted/evalResultView.js";
+
+/** A scored trial — the shape every fraction-only assertion below needs and
+ *  nothing more. */
+const scored = (kind: "passed" | "failed", seconds: number): TrialVerdict =>
+  ({
+    kind,
+    seconds,
+    checks: { passed: kind === "passed" ? 2 : 1, total: 2 },
+    ...(kind === "failed" ? { note: "n" } : {}),
+  }) as TrialVerdict;
+
+const advisoryRow = (text: string): CriterionResult => ({
+  criterion: { type: "model", text },
+  passed: false,
+  skipped: true,
+  reason: "1. The trace shows one POST to /issues/1/labels. 2. Therefore …",
+  score_state: "advisory",
+});
 
 describe("reassurance box", () => {
   it("keeps the copy of record verbatim and names all three surfaces honestly", () => {
@@ -49,17 +71,34 @@ describe("progress lines", () => {
 });
 
 describe("trial verdict lines", () => {
-  it("passed / failed use words + duration", () => {
-    expect(trialLine(1, { kind: "passed", seconds: 14.31 })).toBe(
-      "trial 1  ✓  passed   14.3s",
-    );
+  it("passed / failed use words + duration + the deterministic denominator", () => {
+    // The fraction is the `[code]` denominator, and naming it is what makes
+    // the narrator lines beneath legible as something other than a shortfall:
+    // 2 of 2 checks passed, and three rows nobody scored sit beside them.
+    expect(
+      trialLine(1, { kind: "passed", seconds: 14.31, checks: { passed: 2, total: 2 } }),
+    ).toBe("trial 1  ✓  passed   14.3s  2 of 2 checks");
     expect(
       trialLine(3, {
         kind: "failed",
         seconds: 15.94,
         note: "the comment never names the failing endpoint",
+        checks: { passed: 1, total: 2 },
       }),
-    ).toBe("trial 3  ✗  failed   15.9s  the comment never names the failing endpoint");
+    ).toBe(
+      "trial 3  ✗  failed   15.9s  1 of 2 checks  the comment never names the failing endpoint",
+    );
+  });
+
+  it("counts checks, never a score", () => {
+    // `2 of 2 checks` is a count of `[code]` criteria, not the 0-100 the
+    // demo's design of record keeps off this surface.
+    const line = trialLine(1, {
+      kind: "passed",
+      seconds: 14.31,
+      checks: { passed: 2, total: 2 },
+    });
+    expect(line).not.toMatch(/\/100|\d+%/);
   });
 
   it("errored shows no duration and is marked excluded", () => {
@@ -69,10 +108,9 @@ describe("trial verdict lines", () => {
   });
 
   it("never renders a numeric score", () => {
-    for (const line of [
-      trialLine(1, { kind: "passed", seconds: 2 }),
-      trialLine(2, { kind: "failed", seconds: 2, note: "x" }),
-    ]) {
+    for (const line of [scored("passed", 2), scored("failed", 2)].map((v, i) =>
+      trialLine(i + 1, v),
+    )) {
       expect(line).not.toMatch(/\/100|\d+%/);
     }
   });
@@ -82,10 +120,10 @@ describe("summary", () => {
   it("excludes errored trials from the fraction and names the errored reason", () => {
     const lines = summaryLines({
       verdicts: [
-        { kind: "passed", seconds: 14.3 },
-        { kind: "passed", seconds: 12.1 },
-        { kind: "failed", seconds: 15.9, note: "n" },
-        { kind: "failed", seconds: 13.5, note: "n" },
+        scored("passed", 14.3),
+        scored("passed", 12.1),
+        scored("failed", 15.9),
+        scored("failed", 13.5),
         { kind: "errored", reason: "gateway timeout" },
       ],
       failingCriterionPhrase: "the comment never names the failing endpoint",
@@ -106,11 +144,11 @@ describe("summary", () => {
   it("renders a clean fraction when nothing errored", () => {
     const lines = summaryLines({
       verdicts: [
-        { kind: "passed", seconds: 1 },
-        { kind: "passed", seconds: 1 },
-        { kind: "passed", seconds: 1 },
-        { kind: "failed", seconds: 1, note: "n" },
-        { kind: "passed", seconds: 1 },
+        scored("passed", 1),
+        scored("passed", 1),
+        scored("passed", 1),
+        scored("failed", 1),
+        scored("passed", 1),
       ],
       previewUrl: "https://app.pome.sh/demo/grp_x",
     });
@@ -120,10 +158,7 @@ describe("summary", () => {
 
   it("omits the start-there line when nothing failed", () => {
     const lines = summaryLines({
-      verdicts: [
-        { kind: "passed", seconds: 1 },
-        { kind: "passed", seconds: 1 },
-      ],
+      verdicts: [scored("passed", 1), scored("passed", 1)],
       previewUrl: "https://app.pome.sh/demo/grp_x",
     });
     expect(lines.join("\n")).not.toContain("start there");
@@ -141,6 +176,48 @@ describe("summary", () => {
       "no trials were evaluated · 2 trials errored on trial timed out, excluded from the fraction",
     );
     expect(lines.join("\n")).not.toContain("app.pome.sh/demo");
+  });
+
+  // F-1754 — the narrator's rows are what the demo exists to SHOW: an advisory
+  // reading beside a deterministic fraction. This surface printed neither.
+  it("prints the narrator's readings once, beside the fraction", () => {
+    const lines = summaryLines({
+      verdicts: [scored("passed", 1), scored("passed", 1)],
+      // Two trials of the same task — the same three criteria, twice.
+      narrated: [
+        advisoryRow("The `bug` label went to the 500-error issue and no other."),
+        advisoryRow("No other issue was modified and no new label was created."),
+        advisoryRow("The `bug` label went to the 500-error issue and no other."),
+        advisoryRow("No other issue was modified and no new label was created."),
+      ],
+      previewUrl: "https://app.pome.sh/demo/grp_x",
+    });
+    expect(lines[1]).toBe("2 of 2 passed");
+    // Deduped: the criteria belong to the task, not to a trial.
+    expect(lines[2]).toBe("the narrator also read these, and scored none of them:");
+    expect(lines[3]).toBe(
+      "  ~ advisory · the `bug` label went to the 500-error issue and no other",
+    );
+    expect(lines[4]).toBe(
+      "  ~ advisory · no other issue was modified and no new label was created",
+    );
+    expect(lines[5]).toBe("see the full breakdown — read-only, still no account:");
+    // Not a shortfall and not a gap.
+    for (const line of lines.slice(2, 5)) {
+      expect(line).not.toMatch(/[✓✗⚠]/);
+      expect(line).not.toMatch(/^\s*- /);
+    }
+    // The narrator's prose belongs on the share page.
+    expect(lines.join("\n")).not.toContain("The trace shows one POST");
+  });
+
+  it("says nothing about the narrator when a run has no narrated rows", () => {
+    const lines = summaryLines({
+      verdicts: [scored("passed", 1)],
+      previewUrl: "https://app.pome.sh/demo/grp_x",
+    });
+    expect(lines.join("\n")).not.toContain("narrator");
+    expect(lines.join("\n")).not.toContain("~");
   });
 });
 

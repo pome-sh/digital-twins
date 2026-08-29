@@ -32,7 +32,13 @@ import {
   scoreFromFinalizeResponse,
   uploadRunBlobs,
 } from "../hosted/uploadAndFinalize.js";
-import { outcomeOf, scoreStatus } from "../hosted/evalResultView.js";
+import {
+  criterionPhrase,
+  isNarrated,
+  outcomeOf,
+  scoreStatus,
+  type CriterionResult,
+} from "../hosted/evalResultView.js";
 import { HostedQuotaError } from "../hosted/errors.js";
 import {
   DemoCapacityError,
@@ -43,7 +49,6 @@ import {
 import { newGroupId } from "./ids.js";
 import { mintDemoSessions, type DemoSession } from "./mint.js";
 import {
-  criterionPhrase,
   evaluatingLine,
   reassuranceBox,
   summaryLines,
@@ -164,6 +169,12 @@ export async function runDemo(options: RunDemoOptions): Promise<RunDemoResult> {
   const verdicts: TrialVerdict[] = [];
   // Failed-criterion texts across evaluated trials, for the "start there" line.
   const collectedFailures: string[] = [];
+  // The narrator's rows across the GRADED trials, for the reading block beside
+  // the fraction. Collected the same way `collectedFailures` is and for the
+  // same reason: it is a statement about the TASK, so it belongs to the run and
+  // not to a trial line that would repeat it k times. An ungradable trial
+  // contributes nothing — same rule `runTrialGroup` applies to the same block.
+  const collectedReadings: CriterionResult[] = [];
   let capacityAbort: string | null = null;
 
   for (let i = 0; i < trials; i += 1) {
@@ -190,6 +201,7 @@ export async function runDemo(options: RunDemoOptions): Promise<RunDemoResult> {
         captureServerCommand: options.captureServerCommand,
         out,
         collectedFailures,
+        collectedReadings,
         progress,
       });
     } catch (err) {
@@ -242,6 +254,7 @@ export async function runDemo(options: RunDemoOptions): Promise<RunDemoResult> {
     verdicts,
     failingCriterionPhrase: failing?.phrase,
     failingCriterionCount: failing?.count,
+    narrated: collectedReadings,
     previewUrl: `${options.dashboardBase.replace(/\/$/, "")}/demo/${groupId}`,
   })) {
     out(line);
@@ -264,6 +277,8 @@ interface RunOneTrialInput {
   captureServerCommand?: RunTaskOptions["captureServerCommand"];
   out: (line: string) => void;
   collectedFailures: string[];
+  /** Appended to, not read: the caller renders the run-level reading block. */
+  collectedReadings: CriterionResult[];
   /** Set once finalize succeeds, so the caller's error handling
    *  never abandons a session that already has a judged run row. */
   progress: { finalized: boolean };
@@ -344,8 +359,15 @@ async function runOneTrial(input: RunOneTrialInput): Promise<TrialVerdict> {
 
   const score = scoreFromFinalizeResponse(finalized);
   const status = scoreStatus(score, 100);
+  // The deterministic denominator behind the trial's word, off the SAME cloud
+  // score the word comes from — so the fraction can never disagree with the
+  // verdict printed next to it.
+  const checks = { passed: score.passed, total: score.total_required };
+  if (status !== "incomplete") {
+    input.collectedReadings.push(...score.results.filter(isNarrated));
+  }
   if (status === "pass") {
-    return { kind: "passed", seconds: agentSeconds };
+    return { kind: "passed", seconds: agentSeconds, checks };
   }
   if (status === "fail") {
     const failedResults = score.results.filter((r) => outcomeOf(r) === "failed");
@@ -353,7 +375,7 @@ async function runOneTrial(input: RunOneTrialInput): Promise<TrialVerdict> {
     const note = failedResults[0]
       ? criterionPhrase(failedResults[0].criterion.text)
       : "criterion not met";
-    return { kind: "failed", seconds: agentSeconds, note };
+    return { kind: "failed", seconds: agentSeconds, note, checks };
   }
   // Un-evaluated: the judge could not produce a verdict for this trace —
   // honest exclusion, not a fabricated word.

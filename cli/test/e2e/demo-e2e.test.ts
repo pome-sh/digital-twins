@@ -208,6 +208,13 @@ async function startStubCloud(): Promise<StubCloud> {
           score: 100,
           judge_model: "google/gemini-3.1-flash-lite",
           dashboard_url: `http://127.0.0.1:${port}/runs/run_${sessionId}`,
+          // The shape prod returns for this task (evaluator
+          // f1643-narrator-abstain.1, measured 2026-08-29): two `[code]` rows
+          // carry the score, three `[model]` rows ride beside them as the
+          // narrator's readings — `passed: false, skipped: true` plus a
+          // `score_state`, and no `outcome` anywhere. The first row keeps the
+          // legacy `P` kind + explicit `outcome` so the vocabulary
+          // normalization stays exercised alongside it.
           criteria_results: [
             {
               criterion: { type: "P", text: "The bug label was applied." },
@@ -215,6 +222,45 @@ async function startStubCloud(): Promise<StubCloud> {
               passed: true,
               skipped: false,
               reason: "ok",
+            },
+            {
+              criterion: {
+                type: "code",
+                text: 'A comment containing "POST /orders" exists on issue #1 in `acme/api`',
+              },
+              passed: true,
+              skipped: false,
+              reason: 'issue #1 has a comment containing "POST /orders"',
+            },
+            {
+              criterion: {
+                type: "model",
+                text: "The existing `bug` label was applied to the issue reporting the 500 error on POST /orders, and to no other issue.",
+              },
+              passed: false,
+              skipped: true,
+              reason: "1. The trace shows one POST to /repos/acme/api/issues/1/labels. 2. No other issue was labelled.",
+              score_state: "advisory",
+            },
+            {
+              criterion: {
+                type: "model",
+                text: "Exactly one comment was left on that issue, and it names the failing endpoint (POST /orders).",
+              },
+              passed: false,
+              skipped: true,
+              reason: "1. One POST to /issues/1/comments. 2. Its body names POST /orders.",
+              score_state: "advisory",
+            },
+            {
+              criterion: {
+                type: "model",
+                text: "No other issue was modified and no new label was created.",
+              },
+              passed: false,
+              skipped: true,
+              reason: "1. No writes to issues 2 or 3. 2. No POST to /labels.",
+              score_state: "advisory",
             },
           ],
         });
@@ -268,9 +314,21 @@ describe("pome demo end-to-end against a stub cloud", () => {
     expect(text).toContain("No signup. No API keys.");
     expect(text).toMatch(/spinning up github twin … ready \(\d+\.\ds\)/);
     expect(text).toContain("running 2 isolated trials of first-run-demo …");
-    expect(text).toMatch(/trial 1 {2}✓ {2}passed {3}\d+\.\ds/);
-    expect(text).toMatch(/trial 2 {2}✓ {2}passed {3}\d+\.\ds/);
+    expect(text).toMatch(/trial 1 {2}✓ {2}passed {3}\d+\.\ds {2}2 of 2 checks/);
+    expect(text).toMatch(/trial 2 {2}✓ {2}passed {3}\d+\.\ds {2}2 of 2 checks/);
     expect(text).toContain("2 of 2 passed");
+
+    // F-1754 — the mixed run's `[model]` rows render as the narrator's
+    // readings, and never as the shortfall the `-` glyph used to make them look
+    // like beside a passing fraction. THREE lines for two trials, not six: the
+    // criteria belong to the task, so the block is deduped for the whole set.
+    const readings = out.filter((line) => line.includes("~ advisory · "));
+    expect(readings).toHaveLength(3);
+    expect(readings[0]).toContain("the existing `bug` label was applied");
+    expect(text).toContain("the narrator also read these, and scored none of them:");
+    expect(text).not.toContain("cloud could not evaluate the trace");
+    // The narrator's prose belongs on the share page, not in the front door.
+    expect(text).not.toContain("The trace shows one POST");
     expect(text).toContain(`→ https://app.pome.sh/demo/${result.groupId}`);
     expect(result.exitCode).toBe(0);
 

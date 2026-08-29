@@ -9,6 +9,44 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
+## Unreleased (patch)
+
+**A `[model]` criterion the narrator read now prints as a reading, not as a
+gap.** `scoreFromFinalizeResponse` already stopped counting an advisory row as
+an abstention, so a mixed-criteria run scores off its `[code]` denominator and
+passes. Every surface that PRINTS those rows still called them something else.
+`outcomeOf` maps a narrated row to `skipped` — deliberately, since the three
+exemptions are subtracted from that tally — and `markerFor` renders `skipped`
+with `-`, whose sentence is "the cloud could not evaluate this criterion". So
+`pome eval` listed the demo task's three `[model]` rows as three instrument gaps
+beside a `PASS`, and `pome run` and `pome demo` printed a verdict with no
+mention of them at all.
+
+`criterionMarker` now gives a narrated row `~`, a fifth glyph chosen off
+`score_state` BESIDE `outcomeOf` rather than by widening it — so `outcome` stays
+reserved for the cloud's four-state vocabulary — and `narratorSuffix` names
+which of the two states it is and what that state means. A hosted `pome run`, a
+trial group's summary and `pome demo`'s summary print the same block beside
+their fraction:
+
+```
+the narrator also read these, and scored none of them:
+  ~ advisory · the existing `bug` label was applied to the issue reporting t…
+```
+
+Deduped and run-level rather than per-trial: the criteria belong to the task, so
+k trials would otherwise print the same sentences k times. The narrator's own
+prose stays on the dashboard the verdict already links to — on the packaged demo
+task it is an eight-sentence walk through the trace.
+
+`pome demo`'s trial line also names the denominator its word came from
+(`trial 1  ✓  passed   7.3s  2 of 2 checks`), and the criteria counts state the
+narrator's rows apart from the skips instead of folding them in, so a run that
+passes with three readings beside it no longer reports "3 skipped".
+
+A bare `skipped: true` with no `score_state` is untouched — still an instrument
+gap, still the `-` marker, still disqualifying for `can_pass`.
+
 ## 0.35.1 — 2026-08-29
 
 **`pome demo` reports a verdict again.** Every trial of the zero-auth door was
