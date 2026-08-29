@@ -9,6 +9,12 @@ Same schemas as `@pome-sh/checks`, reached through this package's domain runtime
 see that changelog for what moved and why. `applySeed` is unchanged — what moves
 is which seeds reach it.
 
+`applySeed` is read from `@pome-sh/twin-stripe` rather than
+`@pome-sh/twin-stripe/seed` (F-584), because that subpath is a zod-only leaf now
+and the write half lives in the twin's `apply-seed.ts`. **This package's exported
+names, types and shapes are unchanged** — `applySeed` and `applyStripeSeed` both
+still export the same function. Only the specifier one line reads it from moves.
+
 ## 0.2.17 — 2026-08-29
 
 **Comment only.** A `//` comment in `twin-stripe`'s refund checks asserted that

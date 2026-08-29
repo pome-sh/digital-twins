@@ -17,6 +17,16 @@ All five `parseSeed`s drop a top-level `_meta` before validating — Pome's own
 provenance block, dropped rather than declared so it stays out of each schema's
 declared field set.
 
+`@pome-sh/twin-stripe/seed` is a zod-only leaf now (F-584): `applySeed` and its
+row inserts moved to that twin's `apply-seed.ts`, so the module this package
+bundles for `stripe.seedSchema` no longer reaches `./domain/schema.js`. This
+package never re-exported `applySeed` — `surface.test.ts` asserts it does not —
+so nothing it serves changes. What changes is that the declaration it bundles is
+now reachable from a consumer with no SQLite, which is what let the CLI stop
+hand-copying the stripe seed shape.
+
+`slack` gains the `SlackStateSeed` type, matching the other four twins.
+
 ## 0.3.10 — 2026-08-29
 
 **Comment only.** The `stripe.refund-count` / `stripe.refund-exists` source file

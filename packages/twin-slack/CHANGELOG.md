@@ -28,6 +28,12 @@ form-encoded case was already frozen at. What moved is which bodies throw.
 CONTRACT.md's per-twin table and `contract/suite.mjs` move in the same commit.
 
 
+`seed.ts` exports its parsed-seed type, `SlackStateSeed` (F-584). github, gmail,
+linear and stripe all export theirs from `seed.ts` beside `parseSeed`; a consumer
+reaching slack through `@pome-sh/twin-slack/seed` could not name the type
+`parseSeed` returns, because the symbol is declared in `./types.js`, which is not
+a subpath export. No runtime value moves.
+
 ## 0.4.1 — 2026-08-11
 
 `files.upload` takes `channels` only (F-1389).

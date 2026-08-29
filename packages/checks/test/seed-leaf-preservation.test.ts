@@ -36,19 +36,34 @@ import { describe, expect, it } from "vitest";
 import type { $ZodType } from "zod/v4/core";
 
 import * as github from "../src/github.js";
+import * as slack from "../src/slack.js";
+import * as stripe from "../src/stripe.js";
 import { at, coveredBy, covers, generic, leafFieldsOf, leavesOf } from "./_seedLeaves.js";
 
 const fixture = (name: string): unknown =>
   JSON.parse(readFileSync(new URL(`./fixtures/seed-maximal.${name}.json`, import.meta.url), "utf8"));
 
-/** One row per twin. F-584 adds stripe and slack here; the helper takes
- *  `(schema, fixture)` for exactly that reason. */
+/** One row per twin. The helper takes `(schema, fixture)` so a twin is a row
+ *  here and a JSON file beside it — nothing else. gmail and linear have no
+ *  fixture yet; neither F-581 nor F-584 covers them. */
 const TWINS = [
   {
     twin: "github",
     schema: github.seedSchema as unknown as $ZodType,
     parseSeed: github.parseSeed as (input: unknown) => unknown,
     fixture: fixture("github"),
+  },
+  {
+    twin: "stripe",
+    schema: stripe.seedSchema as unknown as $ZodType,
+    parseSeed: stripe.parseSeed as (input: unknown) => unknown,
+    fixture: fixture("stripe"),
+  },
+  {
+    twin: "slack",
+    schema: slack.seedSchema as unknown as $ZodType,
+    parseSeed: slack.parseSeed as (input: unknown) => unknown,
+    fixture: fixture("slack"),
   },
 ] as const;
 
@@ -57,7 +72,7 @@ describe("a maximal seed survives its twin's own schema, leaf by leaf", () => {
     const parsed = parseSeed(input);
     const leaves = leavesOf(input);
     // A walk that found nothing would pass every assertion below.
-    expect(leaves.length).toBeGreaterThan(40);
+    expect(leaves.length).toBeGreaterThan(30);
 
     const altered: Array<{ path: string; wrote: unknown; got: unknown }> = [];
     for (const leaf of leaves) {

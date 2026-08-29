@@ -2,6 +2,13 @@
 import { z } from "zod";
 import type { SlackStateSeed } from "./types.js";
 
+// `parseSeed` RETURNS a `SlackStateSeed`, so a consumer reaching this module
+// through `@pome-sh/twin-slack/seed` could not name its own variable's type: the
+// symbol is declared in `./types.js`, which is not a subpath export. github,
+// gmail, linear and (since F-1585) stripe all export their parsed-seed type from
+// `seed.ts` beside `parseSeed`; this is slack catching up, not a new surface.
+export type { SlackStateSeed } from "./types.js";
+
 // Slack seed schema. Matches `slackSeedStateSchema` in `cli/src/contract`
 // shape-for-shape. Minimum bootstrap is `{}` — every nested field has defaults
 // and every top-level list defaults to `[]`.

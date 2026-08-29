@@ -40,7 +40,8 @@ import { TwinError, forbidden, stripeError, unauthorized, unsupported } from "./
 import { looksLikeApiKey } from "./api-keys.js";
 import { idempotencyMiddleware } from "./idempotency.js";
 import { registerStripeRoutes } from "./routes/index.js";
-import { applySeed, defaultSeed, seedSchema } from "./seed.js";
+import { defaultSeed, seedSchema } from "./seed.js";
+import { applySeed } from "./apply-seed.js";
 import { registerX402Routes } from "./session.js";
 import { executeTool, isMutatingTool, stripeToolFixture, toolArgumentSchemas } from "./tools.js";
 import type { SeedState, TwinStripeDatabase } from "./types.js";

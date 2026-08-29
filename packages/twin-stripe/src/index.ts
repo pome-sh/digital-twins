@@ -8,7 +8,11 @@ export { createStripeTwinDefinition, createTwinStripeApp, tthwSeconds } from "./
 export type { CreateStripeTwinDefinitionOptions, CreateTwinStripeAppOptions } from "./twin.js";
 export { openTwinStripeDatabase, migrate, resetDatabase } from "./db.js";
 export { StripeDomain } from "./domain/index.js";
-export { applySeed, defaultSeed, parseSeed, loadSeedFromEnv, seedSchema, DEFAULT_API_KEY, DEFAULT_SID } from "./seed.js";
+export { defaultSeed, parseSeed, loadSeedFromEnv, seedSchema, DEFAULT_API_KEY, DEFAULT_SID } from "./seed.js";
+// The seed's WRITE half. Beside the schemas on this root export, apart from them
+// on the `/seed` subpath — that subpath is a zod-only leaf and `applySeed`
+// reaches `./domain/schema.js` (F-584).
+export { applySeed } from "./apply-seed.js";
 export { registerStripeRoutes } from "./routes/index.js";
 export { registerX402Routes } from "./session.js";
 export { paymentMiddleware } from "./x402.js";

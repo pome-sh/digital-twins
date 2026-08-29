@@ -8,7 +8,8 @@ import { describe, expect, it } from "vitest";
 import type { Hono } from "hono";
 import { createTwinStripeApp } from "../src/twin.js";
 import { openTwinStripeDatabase } from "../src/db.js";
-import { applySeed, defaultSeed, DEFAULT_API_KEY, DEFAULT_SID } from "../src/seed.js";
+import { defaultSeed, DEFAULT_API_KEY, DEFAULT_SID } from "../src/seed.js";
+import { applySeed } from "../src/apply-seed.js";
 import { createStripeApp, rest, type StripeTestApp } from "./_appHelper.js";
 
 function buildApp() {

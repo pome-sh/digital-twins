@@ -488,6 +488,34 @@ F-581 — the github seed arm of `seed-state.ts` is `@pome-sh/twin-github`'s own
 - The stripe, slack, gmail and linear arms are still hand-written here. stripe
   and slack are F-584; gmail and linear are covered by neither ticket.
 
+---
+
+F-584 — the stripe and slack seed arms of `seed-state.ts` are the twins' own
+`seedSchema`s, re-exported, the way F-581 did for github.
+
+### Changed
+
+- `stripeSeedStateSchema` is `@pome-sh/twin-stripe`'s. The declared shape LOSES
+  five collections the twin has never had — `customers`, `products`, `prices`,
+  `events`, `balances` — and GAINS the three it does: `failure_injection`,
+  `refunds`, `balance_transactions`. Every row is fully typed now rather than
+  `z.array(z.record(z.string(), z.unknown()))`.
+- `slackSeedStateSchema` is `@pome-sh/twin-slack`'s. Its top-level key set already
+  agreed; the rows underneath were hand-copies with their own leaves to drift.
+- `StripeSeedState` is stripe's `SeedState` under its old name; `SlackSeedState`
+  is slack's `SlackStateSeed`. Both are wider, same names, same import sites.
+
+### Notes
+
+- Same standing as F-581's entry: nothing in digital-twins `.parse()`s this
+  schema, so it is a declaration correction. It is the declaration pome-cloud
+  reads, which is why it is recorded here.
+- ⚠️ A reader following the old stripe declaration would have written a
+  `customers` array. The stripe twin has no `customers` collection and never
+  had; that array landed nowhere then and is refused now (F-1689).
+- gmail and linear are the two arms still hand-written in this file. Neither
+  F-581 nor F-584 covers them.
+
 ## 0.3.0 — 2026-05-11
 
 FDRS-318 — file split + correlator/state-inspector field surface for M1+M2.

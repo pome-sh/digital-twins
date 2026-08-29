@@ -1,0 +1,83 @@
+{
+  "api_keys": [
+    { "key": "sk_test_pome_vakoi", "sid": "vakoi", "account_id": "acct_vakoi" }
+  ],
+  "failure_injection": [
+    {
+      "method": "POST",
+      "path": "/v1/refunds",
+      "attempt": 2,
+      "mode": "before_handler",
+      "status": 503,
+      "body": { "error": { "type": "api_error", "code": "lock_timeout" } }
+    }
+  ],
+  "payment_intents": [
+    {
+      "id": "pi_vakoi_200",
+      "account_id": "acct_vakoi",
+      "amount": 20000,
+      "currency": "usd",
+      "status": "succeeded",
+      "payment_method_types": ["crypto"],
+      "next_action": { "type": "crypto_deposit", "crypto_deposit": { "network": "base" } },
+      "latest_charge_id": "ch_vakoi_200",
+      "capture_method": "manual",
+      "confirmation_method": "manual",
+      "idempotency_key": "idem_vakoi_200",
+      "metadata": { "order_id": "ord_88" },
+      "crypto_deposit": { "address": "0xfeed", "network": "base" },
+      "client_secret": "pi_vakoi_200_secret_test",
+      "created": 1700000000,
+      "updated": 1700000600,
+      "canceled_at": 1700000900,
+      "captured_at": 1700000300
+    }
+  ],
+  "charges": [
+    {
+      "id": "ch_vakoi_200",
+      "account_id": "acct_vakoi",
+      "payment_intent_id": "pi_vakoi_200",
+      "amount": 20000,
+      "amount_captured": 20000,
+      "amount_refunded": 20000,
+      "status": "succeeded",
+      "balance_transaction_id": "txn_vakoi_200",
+      "captured": true,
+      "currency": "usd",
+      "created": 1700000300
+    }
+  ],
+  "refunds": [
+    {
+      "id": "re_vakoi_200",
+      "account_id": "acct_vakoi",
+      "charge_id": "ch_vakoi_200",
+      "payment_intent_id": "pi_vakoi_200",
+      "amount": 20000,
+      "currency": "usd",
+      "status": "succeeded",
+      "reason": "requested_by_customer",
+      "balance_transaction_id": "txn_vakoi_refund",
+      "idempotency_key": "idem_vakoi_refund",
+      "created": 1700000700
+    }
+  ],
+  "balance_transactions": [
+    {
+      "id": "txn_vakoi_200",
+      "account_id": "acct_vakoi",
+      "type": "charge",
+      "amount": 20000,
+      "fee": 620,
+      "net": 19380,
+      "currency": "usd",
+      "source_id": "ch_vakoi_200",
+      "source_type": "charge",
+      "available_on": 1700086400,
+      "status": "pending",
+      "created": 1700000300
+    }
+  ]
+}

@@ -2,6 +2,11 @@
 // The `/seed` subpath, not the package root: a schema is data, and the
 // roots carry each twin's domain + server. See `parseTask.ts`'s note.
 import { seedSchema as githubSeedStateSchema } from "@pome-sh/twin-github/seed";
+// slack and stripe are imported as well as re-exported: `seedStateSchema`
+// below needs the values. See the block above for why they stopped being
+// hand-written mirrors.
+import { seedSchema as slackSeedSchema } from "@pome-sh/twin-slack/seed";
+import { seedSchema as stripeSeedSchema } from "@pome-sh/twin-stripe/seed";
 import { gmailSeedSchema as gmailSeedStateSchema } from "@pome-sh/twin-gmail/seed";
 import { linearSeedSchema as linearSeedStateSchema } from "@pome-sh/twin-linear/seed";
 // Criterion kinds are owned by the published contract. The markdown marker
@@ -59,93 +64,40 @@ export const taskConfigSchema = z.preprocess(
   })
 );
 
-// ── THE SLACK AND STRIPE ARMS ARE HAND-WRITTEN MIRRORS, AND THEY DRIFT ──────
+// ── EVERY ARM IS THE TWIN'S OWN SCHEMA NOW ─────────────────────────────────
 //
-// Three of the five arms below import the twin's own schema and so cannot
-// drift. slack and stripe cannot: both must be `.strict()` and the twins'
-// schemas are not, and that strictness is load-bearing twice over — it makes the
-// legacy `{ <twin>: { seed: … } }` wrapper fail loudly instead of parsing to an
-// empty seed, and it stops the slack arm greedily matching a github or stripe
-// seed inside `seedStateSchema`'s union.
+// slack and stripe were the two hand-written mirrors, for one reason: both had
+// to be `.strict()` and the twins' schemas were not. That strictness was
+// load-bearing twice over — it makes the legacy `{ <twin>: { seed: … } }`
+// wrapper fail loudly instead of parsing to an empty seed, and it stops the
+// slack arm greedily matching a github or stripe seed inside
+// `seedStateSchema`'s union below. F-1689 made all five twin schemas strict at
+// every level, which removed the reason.
 //
-// Both had drifted, measured 2026-08-27. slack's had never carried `emoji` (in
-// the twin since #190), so a slack task seed using it was refused with
-// `Unrecognized key`. stripe's lacked `refunds` and `balance_transactions` while
-// carrying five fields the twin's seed schema does not have, so a task declaring
-// `customers` parsed clean here and was dropped at boot. It had been fixed once
-// before, for `files` (#432) — that fixed the instance.
+// The mirrors drifted at BOTH layers while they lived. #488 fixed the top-level
+// key sets (slack had never carried `emoji`, in the twin since #190; stripe
+// lacked `refunds`/`balance_transactions` and carried five keys the twin has
+// never had). What #488 could not fix is what the rows UNDER those keys said:
+// they stayed `z.record(z.string(), z.unknown())`, an open map validating
+// nothing. Measured 2026-08-29, that let this parser bless a world the twin then
+// refused to boot —
 //
-// ⚠️ DERIVING THE KEY SET AT RUNTIME IS NOT AVAILABLE HERE. It was the first
-// fix, and `scripts/lint/rules/twin-chunks.mjs` refused it: `@pome-sh/twin-stripe/seed`
-// statically imports `./domain/schema.js` for `applySeed`, so it is NOT the
-// zod-only leaf `registry.ts`'s header and that rule's own advice both call it,
-// and a static import from this module puts stripe's domain in the graph
-// `pome --version` loads. So the field LISTS stay written out here, in the
-// TWIN's field order, and `cli/test/unit/task-seed-mirror.test.ts` is the gate:
-// it imports both twins and fails the moment either key set moves. Tests are not
-// in the CLI's runtime graph, so the derivation is free there.
-
-// Scenario-level failure injection. Mirrors the packaged
-// twin-stripe `failureInjectionRuleSchema` without importing it into the
-// parser, so scenario validation stays decoupled from twin boot/runtime code.
-export const stripeFailureInjectionRuleSchema = z.object({
-  method: z.string().min(1),
-  path: z.string().min(1),
-  attempt: z.number().int().positive(),
-  mode: z.enum(["before_handler", "after_handler"]).default("after_handler"),
-  status: z.number().int().min(100).max(599),
-  body: z.unknown()
-});
-
-// `.strict()` at the top level: unknown keys (notably the legacy
-// `stripe: { seed: ... }` wrapper) fail parsing loudly
-// instead of silently being stripped to an empty seed.
+//     { charges: [{ id: "ch_1" }] }                  parsed here, refused there
+//     { charges: [{ …, amount_refunfed: 20000 }] }   parsed here, refused there
+//     { channels: [{ name: "eng", mesages: [] }] }   parsed here, refused there
 //
-// `customers` / `products` / `prices` / `events` / `balances` used to be listed
-// here and are gone: the stripe twin's seed schema has never had them, so a task
-// declaring one parsed clean here and then reached a twin that dropped it. No
-// task in this repo used any of the five.
-export const stripeSeedStateSchema = z
-  .object({
-    api_keys: z
-      .array(
-        z.object({
-          key: z.string().min(1).default("sk_test_pome_default"),
-          sid: z.string().min(1).default("default"),
-          account_id: z.string().min(1).optional()
-        })
-      )
-      .default([]),
-    failure_injection: z.array(stripeFailureInjectionRuleSchema).default([]),
-    payment_intents: z.array(z.record(z.string(), z.unknown())).default([]),
-    charges: z.array(z.record(z.string(), z.unknown())).default([]),
-    refunds: z.array(z.record(z.string(), z.unknown())).default([]),
-    balance_transactions: z.array(z.record(z.string(), z.unknown())).default([])
-  })
-  .strict();
-
-// Slack seed shape (`{ team?, users: [...], channels: [...] }`).
-// Kept LOCAL and permissive (arrays of records) for the same reason the Stripe
-// schema is — the scenario parser shouldn't take a structural dep on twin
-// internals; the vendored `cli/src/twin-slack` `parseSeed` does the strict,
-// regex-level validation at boot. `.strict()` is load-bearing: it makes this
-// arm reject any object carrying a GitHub (`repositories`) or Stripe
-// (`api_keys`, `charges`, …) discriminator, so placing it FIRST in the union
-// (below) can't greedily mis-match a non-Slack seed.
+// — which reads to the author as `pome eval` blessing their task and the run
+// failing anyway.
 //
-// `files` and `emoji` are the reason the key set is derived. Both are fields the
-// twin declares; `files` was added by hand after a slack seed that used it
-// failed to parse (#432), and `emoji` never was — so it kept failing, for two
-// releases, with `Unrecognized key: "emoji"`.
-export const slackSeedStateSchema = z
-  .object({
-    team: z.record(z.string(), z.unknown()).optional(),
-    users: z.array(z.record(z.string(), z.unknown())).default([]),
-    channels: z.array(z.record(z.string(), z.unknown())).default([]),
-    files: z.array(z.record(z.string(), z.unknown())).default([]),
-    emoji: z.array(z.record(z.string(), z.unknown())).default([])
-  })
-  .strict();
+// STRIPE COULD NOT BE IMPORTED UNTIL F-584 SPLIT ITS SEED MODULE. Deriving the
+// key set here was tried first and `scripts/lint/rules/twin-chunks.mjs` refused
+// it: `@pome-sh/twin-stripe/seed` statically imported `./domain/schema.js` for
+// `applySeed`, so it was NOT the zod-only leaf `registry.ts`'s header and that
+// rule's own advice both called it. The write half now lives in
+// `packages/twin-stripe/src/apply-seed.ts` and the rule ASSERTS the leaf claim
+// for all five twins, so this import is checked rather than merely allowed.
+export { seedSchema as slackSeedStateSchema } from "@pome-sh/twin-slack/seed";
+export { seedSchema as stripeSeedStateSchema } from "@pome-sh/twin-stripe/seed";
 
 // Slack scenarios use the Slack seed shape (`{ users, channels, ... }`).
 // Multi-twin scenarios are not a current requirement; the wrapped
@@ -161,10 +113,10 @@ export const slackSeedStateSchema = z
 // error message names the LAST arm it tried, and the arms are unchanged.
 export const seedStateSchema = z.union([
   gmailSeedStateSchema,
-  slackSeedStateSchema,
+  slackSeedSchema,
   linearSeedStateSchema,
   githubSeedStateSchema,
-  stripeSeedStateSchema
+  stripeSeedSchema
 ]);
 
 // Multi-twin (M3): a per-twin seed envelope `{ <twin>: <flat seed> }`, produced
@@ -193,11 +145,10 @@ export const taskSchema = z.object({
 export type Criterion = z.infer<typeof taskCriterionSchema>;
 export type TaskConfig = z.infer<typeof taskConfigSchema>;
 export type GithubSeedState = z.infer<typeof githubSeedStateSchema>;
-export type StripeSeedState = z.infer<typeof stripeSeedStateSchema>;
-export type SlackSeedState = z.infer<typeof slackSeedStateSchema>;
+export type StripeSeedState = z.infer<typeof stripeSeedSchema>;
+export type SlackSeedState = z.infer<typeof slackSeedSchema>;
 export type GmailSeedState = z.infer<typeof gmailSeedStateSchema>;
 export type LinearSeedState = z.infer<typeof linearSeedStateSchema>;
-export type StripeFailureInjectionRule = z.infer<typeof stripeFailureInjectionRuleSchema>;
 export type SeedState = z.infer<typeof seedStateSchema>;
 export type SeedEnvelope = z.infer<typeof seedEnvelopeSchema>;
 export type Task = z.infer<typeof taskSchema>;

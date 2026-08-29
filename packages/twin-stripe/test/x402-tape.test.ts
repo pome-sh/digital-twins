@@ -10,7 +10,8 @@ import { serve } from "@hono/node-server";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createTwinStripeApp } from "../src/twin.js";
 import { openTwinStripeDatabase } from "../src/db.js";
-import { applySeed, defaultSeed, DEFAULT_API_KEY, DEFAULT_SID } from "../src/seed.js";
+import { defaultSeed, DEFAULT_API_KEY, DEFAULT_SID } from "../src/seed.js";
+import { applySeed } from "../src/apply-seed.js";
 
 type TapeEvent = {
   method: string;

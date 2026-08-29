@@ -9,6 +9,8 @@ import { z } from "zod";
 // The github seed shape is the TWIN's — see the block below. Imported as well
 // as re-exported because `providerScopedSeedStateSchema` needs the value.
 import { seedSchema as githubSeedSchema } from "@pome-sh/twin-github/seed";
+import { seedSchema as slackSeedSchema } from "@pome-sh/twin-slack/seed";
+import { seedSchema as stripeSeedSchema } from "@pome-sh/twin-stripe/seed";
 
 // ── GITHUB: THE TWIN'S OWN SCHEMA, NOT A DECLARATION OF IT ─────────────────
 //
@@ -41,100 +43,30 @@ import { seedSchema as githubSeedSchema } from "@pome-sh/twin-github/seed";
 export { seedSchema as githubSeedStateSchema } from "@pome-sh/twin-github/seed";
 export type { ParsedGitHubStateSeed as GithubSeedState } from "@pome-sh/twin-github/seed";
 
-export const stripeSeedStateSchema = z.object({
-  api_keys: z
-    .array(
-      z.object({
-        key: z.string().min(1).default("sk_test_pome_default"),
-        sid: z.string().min(1).default("default"),
-        account_id: z.string().min(1).optional(),
-      })
-    )
-    .default([]),
-  customers: z.array(z.record(z.string(), z.unknown())).default([]),
-  products: z.array(z.record(z.string(), z.unknown())).default([]),
-  prices: z.array(z.record(z.string(), z.unknown())).default([]),
-  payment_intents: z.array(z.record(z.string(), z.unknown())).default([]),
-  charges: z.array(z.record(z.string(), z.unknown())).default([]),
-  events: z.array(z.record(z.string(), z.unknown())).default([]),
-  balances: z.array(z.record(z.string(), z.unknown())).default([]),
-});
-export type StripeSeedState = z.infer<typeof stripeSeedStateSchema>;
-
-export const slackSeedStateSchema = z.object({
-  team: z
-    .object({
-      id: z.string().regex(/^T[A-Z0-9_]+$/).optional(),
-      name: z.string().default("Pome Twin Workspace"),
-      domain: z.string().default("pome-twin"),
-    })
-    .prefault({}),
-  users: z
-    .array(
-      z.object({
-        id: z.string().regex(/^[UB][A-Z0-9_]+$/).optional(),
-        name: z.string().min(1),
-        real_name: z.string().default(""),
-        email: z.string().email().optional(),
-        is_bot: z.boolean().default(false),
-        is_admin: z.boolean().default(false),
-        tz: z.string().default("America/Los_Angeles"),
-        profile: z.record(z.string(), z.unknown()).default({}),
-      })
-    )
-    .default([]),
-  channels: z
-    .array(
-      z.object({
-        id: z.string().regex(/^[CGDM][A-Z0-9_]+$/).optional(),
-        name: z.string().regex(/^[a-z0-9_-]{1,80}$/),
-        is_private: z.boolean().default(false),
-        topic: z.string().default(""),
-        purpose: z.string().default(""),
-        creator: z.string().optional(),
-        members: z.array(z.string()).default([]),
-        messages: z
-          .array(
-            z.object({
-              ts: z.string().optional(),
-              user: z.string(),
-              text: z.string(),
-              thread_ts: z.string().optional(),
-              reactions: z
-                .array(z.object({ name: z.string(), user: z.string() }))
-                .default([]),
-            })
-          )
-          .default([]),
-      })
-    )
-    .default([]),
-  // Same shape as `seedSchema.files` in `@pome-sh/twin-slack`. `user` and
-  // `channels` are seed HANDLES (a user/channel `name`) or ids.
-  files: z
-    .array(
-      z.object({
-        id: z.string().regex(/^F[A-Z0-9_]+$/).optional(),
-        name: z.string().min(1),
-        title: z.string().optional(),
-        filetype: z.string().min(1).default("text"),
-        user: z.string().optional(),
-        channels: z.array(z.string()).default([]),
-        content: z.string().optional(),
-      })
-    )
-    .default([]),
-  emoji: z
-    .array(
-      z.object({
-        name: z.string().regex(/^[a-z0-9_+-]{1,100}$/),
-        url: z.string().url().optional(),
-        alias: z.string().regex(/^[a-z0-9_+-]{1,100}$/).optional(),
-      })
-    )
-    .default([]),
-});
-export type SlackSeedState = z.infer<typeof slackSeedStateSchema>;
+// ── STRIPE AND SLACK: THE TWINS' OWN SCHEMAS, FOR THE SAME REASON AS GITHUB ──
+//
+// Both arms were hand-written, and only the stripe one had visibly drifted.
+// Measured 2026-08-29 against `packages/twin-stripe/src/seed.ts`, this file
+// declared FIVE collections the twin has never had —
+//
+//     customers, products, prices, events, balances
+//
+// — and modelled each as `z.array(z.record(z.string(), z.unknown()))`, so a
+// reader following this declaration wrote a `customers` array that landed
+// nowhere. It was also missing three the twin does have: `failure_injection`,
+// `refunds` and `balance_transactions`. slack's key set agreed, but its rows
+// were hand-copies with their own leaves to drift.
+//
+// stripe could not simply be imported until the write half moved out of
+// `packages/twin-stripe/src/seed.ts` into `apply-seed.ts` (F-584): that module
+// reached `./domain/schema.js`, so naming it here would have put stripe's domain
+// in the graph `pome --version` loads. `scripts/lint/rules/twin-chunks.mjs`
+// asserts the zod-only-leaf claim for all five twins now, so this import is
+// checked rather than merely permitted.
+export { seedSchema as stripeSeedStateSchema } from "@pome-sh/twin-stripe/seed";
+export type { SeedState as StripeSeedState } from "@pome-sh/twin-stripe/seed";
+export { seedSchema as slackSeedStateSchema } from "@pome-sh/twin-slack/seed";
+export type { SlackStateSeed as SlackSeedState } from "@pome-sh/twin-slack/seed";
 
 const gmailEmailSchema = z.string().trim().email().transform((value) => value.toLowerCase());
 const gmailIdSchema = z.string().min(1).max(128).regex(/^[A-Za-z0-9_-]+$/);
@@ -463,8 +395,8 @@ export type LinearSeedState = z.infer<typeof linearSeedStateSchema>;
 export const providerScopedSeedStateSchema = z
   .object({
     github: z.object({ seed: githubSeedSchema }).optional(),
-    stripe: z.object({ seed: stripeSeedStateSchema }).optional(),
-    slack: z.object({ seed: slackSeedStateSchema }).optional(),
+    stripe: z.object({ seed: stripeSeedSchema }).optional(),
+    slack: z.object({ seed: slackSeedSchema }).optional(),
     gmail: z.object({ seed: gmailSeedStateSchema }).optional(),
     linear: z.object({ seed: linearSeedStateSchema }).optional(),
   })
