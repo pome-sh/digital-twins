@@ -1,6 +1,6 @@
 # @pome-sh/adapter-claude-sdk — CHANGELOG
 
-## Unreleased (minor)
+## 0.4.0 — 2026-08-29
 
 **Behavioural default change — `query()` now seals the examinee.**
 `options.settingSources` defaults to `[]`, the SDK's documented isolation mode,
