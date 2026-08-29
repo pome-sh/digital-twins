@@ -9,7 +9,7 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
-## Unreleased (patch)
+## 0.35.1 — 2026-08-29
 
 **`pome demo` reports a verdict again.** Every trial of the zero-auth door was
 printing `⚠ errored · cloud could not evaluate the trace` in production, and the
@@ -35,7 +35,6 @@ copy is not rewritten; delete it and the next bare `pome run` re-copies.
 
 The judge scores the cloud's own mirror of this file, so the fraction only
 reaches `npx @pome-sh/cli demo` once pome-cloud deploys the matching definition.
-
 
 ## 0.35.0 — 2026-08-29
 
