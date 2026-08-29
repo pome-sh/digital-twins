@@ -9,7 +9,7 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
-## Unreleased (patch)
+## 0.34.3 — 2026-08-29
 
 **Comment only, and nothing a consumer can observe.** A `//` comment in
 `packages/twin-stripe/src/check-refunds.ts` asserted that an `Idempotency-Key` on

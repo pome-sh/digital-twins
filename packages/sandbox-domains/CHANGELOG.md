@@ -1,7 +1,7 @@
 # @pome-sh/sandbox-domains
 
 
-## Unreleased (patch)
+## 0.2.17 — 2026-08-29
 
 **Comment only.** A `//` comment in `twin-stripe`'s refund checks asserted that
 an `Idempotency-Key` on a retry does not separate one refund row from two.

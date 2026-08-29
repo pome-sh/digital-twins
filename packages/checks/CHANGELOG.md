@@ -1,6 +1,6 @@
 # @pome-sh/checks
 
-## Unreleased (patch)
+## 0.3.10 — 2026-08-29
 
 **Comment only.** The `stripe.refund-count` / `stripe.refund-exists` source file
 carried a `//` comment claiming that an `Idempotency-Key` on a retry does not
