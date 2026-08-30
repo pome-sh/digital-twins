@@ -9,7 +9,7 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
-## Unreleased (minor)
+## 0.39.0 — 2026-08-30
 
 **`pome twin reset` and `pome endpoints` are gone** (F-1728, F-1721).
 
@@ -23,7 +23,6 @@ re-applies its seed on each boot, so a reset never decided what the next
 twins, and stamped every row `semantic` — wrong for the github routes the
 twin's own inventory tiers otherwise. For a twin's real surface, read its
 generated reference page, or `curl <base>/healthz` on a running twin.
-
 
 ## 0.38.0 — 2026-08-30
 
