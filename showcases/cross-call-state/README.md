@@ -81,7 +81,7 @@ GITHUB_CLONE_DB=.pome/github.db \
 
 ```text
 Pome github twin listening at http://127.0.0.1:3333/s/standalone
-Seed: the github twin's default (pass --seed <path>, or write one with `pome twin seed github`).
+Seed: the github twin's default (pass --seed <path>, or write one with `pome twin new-seed github`).
 POME_GITHUB_REST_URL=http://127.0.0.1:3333/s/standalone
 POME_GITHUB_MCP_URL=http://127.0.0.1:3333/s/standalone/mcp
 POME_AUTH_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzaWQiOiJzdGFuZGFsb25lIiwidGVhbV9pZCI6InRtX2xvY2FsIiwibG9naW4iOiJwb21lLWFnZW50IiwiZXhwIjoxNzg4MDk5NzA5fQ._R5jttuezYifeRdilZh7q2_K-1jVgGW-CcAn_FvVoOc

@@ -59,13 +59,16 @@ To start it from your own world rather than the twin's, generate a seed file and
 edit it. It is generated from the twin, so it always parses:
 
 ```bash
-npx @pome-sh/cli twin seed github --out seed.json   # the github twin's starting state
-npx @pome-sh/cli twin start --seed seed.json        # the file names the twin
+npx @pome-sh/cli twin new-seed github --out seed.json  # the github twin's starting state
+npx @pome-sh/cli twin start github --seed seed.json    # the twin is named here, not in the file
 ```
 
 A seed **replaces** the twin's default state; it does not merge into it. One file
-covers one twin or several — `{ "github": { … }, "slack": { … } }` — and the same
-file seeds a hosted sandbox: `pome sandbox create --seed seed.json`.
+covers one twin — that twin's own fields — or several, as a per-twin envelope
+`{ "github": { … }, "slack": { … } }`. The same file seeds a hosted sandbox
+(`pome sandbox create --twin github --seed seed.json`) or a graded task, dropped
+beside it as `<task>.seed.json` — the twin is named on the command line at both
+of the first two doors, and by the task's `## Config` at the third.
 
 For a persistent `pome` command: `npm install -g @pome-sh/cli`.
 

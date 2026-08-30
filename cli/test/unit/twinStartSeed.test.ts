@@ -76,7 +76,7 @@ describe("resolveStandaloneSeed", () => {
     // The registry answers this for every twin now, github included: its entry
     // used to return `undefined` and let `boot` reach for defaultSeedState(),
     // which left "what does this twin start with" unanswerable without booting
-    // — the question `pome twin seed` has to answer.
+    // — the question `pome twin new-seed` has to answer.
     expect(repoNames(resolved.seedState)).toContain("acme/api");
   });
 

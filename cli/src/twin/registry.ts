@@ -103,7 +103,7 @@ export type TwinEntry = {
    * Always a value. github's entry used to return `undefined` and let `boot`
    * reach for `defaultSeedState()` itself, which left "what does this twin start
    * with" unanswerable without booting one — and that is the question
-   * `pome twin seed` exists to answer, so it is answered here for every twin.
+   * `pome twin new-seed` exists to answer, so it is answered here for every twin.
    * `boot` still applies its own default when handed `undefined`, so the boot
    * path is unchanged either way.
    */

@@ -286,7 +286,7 @@ export async function runTwinStartCommand(
     );
   } else {
     console.log(
-      `Seed: the ${name} twin's default (pass --seed <path>, or write one with \`pome twin seed ${name}\`).`,
+      `Seed: the ${name} twin's default (pass --seed <path>, or write one with \`pome twin new-seed ${name}\`).`,
     );
   }
   if (resolved.source === "persisted") {

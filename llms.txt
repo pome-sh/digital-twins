@@ -27,5 +27,5 @@
 
 - Run an agent task with no install: `npx @pome-sh/cli init && npx @pome-sh/cli run --local tasks/01-bug-happy-path.md`
 - Start a standalone twin: `npx @pome-sh/cli twin start github`
-- Start one from your own world: `npx @pome-sh/cli twin seed github --out seed.json` then `npx @pome-sh/cli twin start --seed seed.json`. The seed file is `{ "<twin>": { … } }`, one twin or several, and it REPLACES the twin's default state rather than merging into it. The same file seeds a hosted sandbox via `pome sandbox create --seed`.
+- Start one from your own world: `npx @pome-sh/cli twin new-seed github --out seed.json` then `npx @pome-sh/cli twin start github --seed seed.json` — the twin is named on the command line, not in the file. The seed file is one twin's own fields, or `{ "<twin>": { … } }` for several, and it REPLACES the twin's default state rather than merging into it. The same file seeds a hosted sandbox via `pome sandbox create --twin github --seed seed.json`, or a graded task, dropped beside it as `<task>.seed.json`. A flat single-twin file names no twin, so `twin start` and `sandbox create` both need it named on the command line.
 - The hosted platform (hosted twins, grading, observability): https://pome.sh

@@ -11,6 +11,7 @@ import {
   readSeedFileText,
   seedsForTwins,
   soleTwinOf,
+  twinsNamedBy,
 } from "../twin/seedFile.js";
 import type { CreateSessionResponse } from "../types/shared.js";
 import {
@@ -174,8 +175,22 @@ export async function resolveSessionSeed(
 
   // An envelope naming exactly one twin already says which twin the sandbox is
   // for, so `--twin` becomes optional rather than a second place to say it.
+  const sole = soleTwinOf(file);
+  if (requestedTwins.length === 0 && sole === undefined) {
+    // `normalizeSessionTwins`'s "No twin specified" never mentions the seed, so
+    // it reads as if `--twin` were simply forgotten. Same two sentences
+    // `resolveStandaloneTwin` prints for `twin start`, with `--twin` in place of
+    // the positional: `pome twin new-seed <twin>` writes a FLAT file for one
+    // twin, and a flat seed names no twin by design.
+    const named = twinsNamedBy(file);
+    throw new Error(
+      named.length === 0
+        ? `${origin} is a flat seed, so it does not name a twin. Pass the name: pome sandbox create --twin <${SESSION_TWIN_NAMES.join("|")}> --seed ${seedPath}`
+        : `${origin} names ${named.length} twins (${named.join(", ")}), so it does not say which the sandbox is for. Pass the name: ${named.map((twin) => `--twin ${twin}`).join(" ")} --seed ${seedPath}`,
+    );
+  }
   const twins = normalizeSessionTwins(
-    requestedTwins.length > 0 ? requestedTwins : [soleTwinOf(file) ?? ""].filter(Boolean),
+    requestedTwins.length > 0 ? requestedTwins : [sole!],
   );
 
   // `normalizeSessionTwins` has already rejected anything outside MOUNTED_TWINS,

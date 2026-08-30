@@ -581,7 +581,7 @@ export function createProgram() {
     )
     .option(
       "--seed <path>",
-      "Start the sandbox from a JSON or YAML seed file instead of each twin's default. A seed REPLACES the default; it does not merge. Same file `pome twin start --seed` takes; write one with `pome twin seed <name>`.",
+      "Start the sandbox from a JSON or YAML seed file instead of each twin's default. A seed REPLACES the default; it does not merge. Same file `pome twin start --seed` takes; write one with `pome twin new-seed <name>`.",
     )
     .option(
       "--secrets-file <path>",
@@ -1343,17 +1343,16 @@ export function createProgram() {
     });
 
   twin
-    .command("seed")
+    .command("new-seed")
     .argument("<name...>", `Twin name (${TWIN_NAME_LIST.join(" | ")}). Repeat for one file covering several.`)
     .option("--out <path>", "Write to this file instead of stdout. Refuses to overwrite.")
-    .option(
-      "--for-task",
-      "Emit the shape a `<task>.seed.json` sidecar takes — flat for one twin, the per-twin envelope for more, the rule the task's `## Config` twins already set. Without it you get a seed file for `--seed`, which is always the envelope.",
-    )
+    // Summary as well as description, like `twin status`: the round trip below is
+    // four extra lines in `pome twin --help`'s command list without one.
+    .summary("Print a new starter seed file for a twin")
     .description(
-      "Print a starter seed file for a twin, generated from the twin's own starting state",
+      "Print a new starter seed file for a twin, generated from the twin's own starting state. One twin is flat, several are the per-twin envelope. Boot it with `twin start <twin> --seed`, seed a sandbox with `sandbox create --twin <twin> --seed`, or drop it beside a task as <task>.seed.json",
     )
-    .action(async (names: string[], options: { out?: string; forTask?: boolean }) => {
+    .action(async (names: string[], options: { out?: string }) => {
       const { runTwinSeedCommand } = await import("../twin/twinSeed.js");
       await runTwinSeedCommand(names, options);
     });

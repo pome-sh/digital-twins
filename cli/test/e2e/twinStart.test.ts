@@ -4,7 +4,7 @@
 // and boots a USER-AUTHORED seed from `--seed`, read back through the twin's
 // own REST surface.
 //
-// The generated-starter round trip (`pome twin seed` → `--seed` → read back, all
+// The generated-starter round trip (`pome twin new-seed` → `--seed` → read back, all
 // five twins) is `twinSeedRoundTrip.test.ts`.
 
 import { spawn, type ChildProcess } from "node:child_process";
