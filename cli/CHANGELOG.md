@@ -9,7 +9,7 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
-## Unreleased (minor)
+## 0.38.0 — 2026-08-30
 
 **`pome compile-seeds --hosted` is gone, along with `--api-url`.** It POSTed a
 control-plane route deleted in M5, so every hosted compile 404ed; its test
@@ -31,7 +31,6 @@ identically to fresh copies, so a destroyed local edit was invisible.
 
 **`pome tasks <twin> --force` and `--dest` without `--copy` now exit 2**
 instead of printing the listing as if the flags had not been typed.
-
 
 ## 0.37.0 — 2026-08-30
 
