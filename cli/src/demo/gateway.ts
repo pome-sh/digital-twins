@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Client for the anonymous demo model-call gateway:
-// POST {POME_API_BASE}/v1/demo/sessions/:id/llm, Authorization: Bearer
+// POST {api-base}/v1/demo/sessions/:id/llm, Authorization: Bearer
 // <demo_token>.
 //
 // The wire shape is a STRICT ModelMessage subset (pome-cloud

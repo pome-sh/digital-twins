@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Anonymous demo session minting.
 //
-// POST {POME_API_BASE}/v1/demo/sessions with
+// POST {api-base}/v1/demo/sessions with
 //   { task_name: "first-run-demo", task_hash: "", group_id: "grp_…" }
 // → { session_id, demo_token, expires_at }. No auth: the response's
 // demo_token (a sid-scoped JWT) is the credential for everything that

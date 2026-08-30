@@ -53,7 +53,7 @@ export type RunTaskOptions = {
   // BEFORE the proxy vars — the capture path is not overridable.
   extraAgentEnv?: Record<string, string>;
   // Extra egress-floor allowlist patterns for this run (demo mode
-  // adds the POME_API_BASE host so gateway CONNECTs aren't refused).
+  // adds the control-plane host so gateway CONNECTs aren't refused).
   egressExtraHosts?: readonly string[];
 };
 
