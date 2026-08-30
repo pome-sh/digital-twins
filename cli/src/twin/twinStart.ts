@@ -189,8 +189,8 @@ export async function runTwinStartCommand(
       ? undefined
       : readSeedFileText(options.seed, "pome twin start --seed");
   const name = resolveStandaloneTwin(nameArg, options.seed, seedText);
-  // `PORT` wins when set (contract suite / packaged entries). Gmail defaults
-  // to 3336 via GMAIL_TWIN_PORT; other twins keep 3333.
+  // `PORT` wins when set (contract suite / packaged entries); gmail and linear
+  // then honor their own override (`defaultPortFor`), other twins keep 3333.
   const portRaw = options.port ?? defaultPortFor(name, process.env);
   const port = Number(portRaw);
   // Port 0 (ephemeral) is rejected: every printed URL and the status-file
@@ -235,6 +235,29 @@ export async function runTwinStartCommand(
   const server = serve({ fetch: harness.app.fetch, port, hostname: "127.0.0.1" });
 
   try {
+    // `serve()` calls listen() and attaches no `error` listener, and listen is
+    // async: without this await, an EADDRINUSE lands as an uncaught `error`
+    // event AFTER the status file and the whole banner have been written, so
+    // the reader gets a stack trace under a token that never worked.
+    await new Promise<void>((resolve, reject) => {
+      const onError = (err: NodeJS.ErrnoException) => {
+        reject(
+          err.code === "EADDRINUSE"
+            ? new Error(
+                `pome twin start: port ${port} is already in use — pass --port <port>, or stop the twin using it.`,
+              )
+            : err,
+        );
+      };
+      server.once("error", onError);
+      server.once("listening", () => {
+        server.off("error", onError);
+        // With no `error` listener at all, a post-bind server error is a fatal
+        // uncaught exception with a stack trace. Log it and keep serving.
+        server.on("error", (err) => console.error(`pome twin start: server error: ${err}`));
+        resolve();
+      });
+    });
     await mkdir(".pome", { recursive: true });
     await writeFile(
       ".pome/twin-status.json",
