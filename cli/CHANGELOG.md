@@ -9,6 +9,15 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
+## Unreleased (minor)
+
+**`pome eval` refuses an `events.jsonl` row with no `kind`** rather than wrapping it
+into a `TwinHttpEvent` nothing recorded; the control plane refuses it with 426 anyway.
+**`pome inspect` names the file, line and fix** for an unreadable row — 0.30.0's
+"the parse error says so" was untrue. A `verdict.json` from an older CLI is counted
+and path-named with the unreadable ones, one remedy for both, correcting 0.23.2's
+"every skipped file and its version" and 0.23.11's "kept separate". Dead fixture gone.
+
 ## 0.40.0 — 2026-08-30
 
 **`--api-url` and `--artifacts-dir` are program-level flags** (F-1723). Declared
