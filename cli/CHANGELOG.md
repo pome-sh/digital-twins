@@ -9,7 +9,7 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
-## Unreleased (patch)
+## 0.42.2 — 2026-08-30
 
 **`pome init --example support-triage` no longer forks the capstone reader off
 the documented path.** Its next steps said `pome login` then `pome run` — the
