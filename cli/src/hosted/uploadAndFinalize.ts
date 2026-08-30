@@ -412,10 +412,16 @@ export function scoreFromFinalizeResponse(finalized: FinalizeResponse): Score {
 export function redactJsonl(body: string): string {
   const lines = body.split("\n");
   const redacted = lines
-    // Whitespace-only lines are dropped (not just empty ones) so validation
-    // (`validateJsonl`, which trims) and upload agree on what counts as a
-    // row — a " " line must never reach cloud as a non-JSON record.
-    .filter((line) => line.trim().length > 0)
+    // Trimmed BEFORE the parse, not just for the emptiness test: `trim()`
+    // strips all of Unicode whitespace but `JSON.parse` accepts only
+    // space/tab/CR/LF, so a row whose sole defect is a leading BOM, NBSP or
+    // U+2028 parses for `validateJsonl` (which trims) and NOT here — and the
+    // catch below would then upload the raw text as a row, which cloud drops
+    // silently. Trimming here is what keeps validation and upload agreed on
+    // what a row is; it also drops whitespace-only lines, which must never
+    // reach cloud as non-JSON records.
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
     .map((line) => {
       try {
         return JSON.stringify(redactSecrets(JSON.parse(line)));
