@@ -163,6 +163,35 @@ describe("pome checks add — the flags path", () => {
     expect(captured.error.join("\n")).toContain("repo");
   });
 
+  it("refuses a parameter given twice instead of silently taking the last", async () => {
+    const path = await taskFile();
+    await runChecksAddCommand(path, {
+      check: "github.no-new-labels",
+      arg: ["repo=acme/api", "repo=evil/repo"],
+      stdinIsTTY: false,
+      fetchRemote: agreeing,
+    });
+    expect(process.exitCode).toBe(2);
+    expect(captured.error.join("\n")).toContain("repo");
+    expect(await readFile(path, "utf8")).toBe(TASK);
+  });
+
+  // A parameter literally named `error` used to be indistinguishable from a
+  // failure, so its VALUE was printed as the message.
+  it("names an undeclared parameter called `error`, not its value", async () => {
+    const path = await taskFile();
+    await runChecksAddCommand(path, {
+      check: "github.no-new-labels",
+      arg: ["error=x"],
+      stdinIsTTY: false,
+      fetchRemote: agreeing,
+    });
+    expect(process.exitCode).toBe(2);
+    const err = captured.error.join("\n");
+    expect(err).toContain('does not declare: "error"');
+    expect(err).not.toBe("x");
+  });
+
   it("lists the declared ids when the check is unknown", async () => {
     const path = await taskFile();
     await runChecksAddCommand(path, {
@@ -331,6 +360,23 @@ describe("pome checks add — interactive", () => {
     // The parameter prompt carries the declared example, not the regex.
     expect(asked[1]).toContain("acme/api");
     expect(asked[1]).not.toContain("[A-Za-z0-9");
+    expect(await readFile(path, "utf8")).toContain("No new labels were created in `acme/api`");
+  });
+
+  it("does not re-ask for a parameter already given on the command line", async () => {
+    const path = await taskFile();
+    const asked: string[] = [];
+    await runChecksAddCommand(path, {
+      arg: ["repo=acme/api"],
+      stdinIsTTY: true,
+      ask: async (question: string) => {
+        asked.push(question);
+        return PICK;
+      },
+      confirm: async () => true,
+      fetchRemote: agreeing,
+    });
+    expect(asked).toEqual(["> "]);
     expect(await readFile(path, "utf8")).toContain("No new labels were created in `acme/api`");
   });
 

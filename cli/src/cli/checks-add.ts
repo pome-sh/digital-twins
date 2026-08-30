@@ -50,12 +50,24 @@ export type HandshakeResult =
   | { kind: "skew"; message: string }
   | { kind: "unverified"; note: string };
 
-export function parseArgFlags(pairs: string[]): Record<string, string> | { error: string } {
-  const args: Record<string, string> = {};
+/**
+ * `null` on refusal, having named it on stderr itself. An `{ error }` sentinel
+ * cannot be told apart from a check that declares a parameter called `error`.
+ */
+export function parseArgFlags(pairs: string[]): Record<string, string> | null {
+  const args: Record<string, string> = Object.create(null);
   for (const pair of pairs) {
     const eq = pair.indexOf("=");
-    if (eq <= 0) return { error: `--arg must be key=value, got ${JSON.stringify(pair)}` };
-    args[pair.slice(0, eq)] = pair.slice(eq + 1);
+    if (eq <= 0) {
+      console.error(`--arg must be key=value, got ${JSON.stringify(pair)}`);
+      return null;
+    }
+    const key = pair.slice(0, eq);
+    if (Object.hasOwn(args, key)) {
+      console.error(`--arg ${key} given twice. Pass each parameter once.`);
+      return null;
+    }
+    args[key] = pair.slice(eq + 1);
   }
   return args;
 }
@@ -152,9 +164,11 @@ async function pickInteractively(
 async function promptArgs(
   def: DeclaredCheck,
   seams: Required<InteractiveSeams>,
-): Promise<Record<string, string> | { error: string }> {
-  const args: Record<string, string> = {};
+  known: Record<string, string>,
+): Promise<Record<string, string> | null> {
+  const args: Record<string, string> = { ...known };
   for (const name of templateSlots(def.template).params) {
+    if (args[name] !== undefined) continue;
     const type = def.params[name]!;
     // The example, never the pattern. A regex source is not a prompt.
     const valid = new RegExp(`^${type.pattern}$`);
@@ -166,7 +180,10 @@ async function promptArgs(
       }
       console.error(`  not a valid ${name} — it should look like ${type.example}`);
     }
-    if (args[name] === undefined) return { error: `Gave up on \`${name}\` after three tries.` };
+    if (args[name] === undefined) {
+      console.error(`Gave up on \`${name}\` after three tries.`);
+      return null;
+    }
   }
   return args;
 }
@@ -187,11 +204,11 @@ export async function runChecksAddCommand(file: string, opts: ChecksAddOptions):
   if (opts.check) {
     picked = findCheck(opts.check);
     if (!picked) {
+      const twins = readConfigTwins(source);
+      const declared = twins.flatMap((twin) => [...checksFor(twin)]).map((c) => c.id);
       console.error(
         `Unknown check "${opts.check}". Run \`pome checks <twin>\` to see the declared set; ` +
-          `github declares: ${checksFor("github")
-            .map((c) => c.id)
-            .join(", ")}.`,
+          `this task's twins (${twins.join(", ")}) declare: ${declared.join(", ") || "none"}.`,
       );
       process.exitCode = 2;
       return;
@@ -201,15 +218,27 @@ export async function runChecksAddCommand(file: string, opts: ChecksAddOptions):
     if (!picked) return; // already reported why
   }
 
-  const parsed = opts.check ? parseArgFlags(opts.arg) : await promptArgs(picked, seams);
-  if ("error" in parsed) {
-    console.error(parsed.error);
+  const fromFlags = parseArgFlags(opts.arg);
+  if (!fromFlags) {
     process.exitCode = 2;
     return;
   }
-  const args = parsed as Record<string, string>;
+  const args = opts.check ? fromFlags : await promptArgs(picked, seams, fromFlags);
+  if (!args) {
+    process.exitCode = 2;
+    return;
+  }
 
   const slots = templateSlots(picked.template).params;
+  const extra = Object.keys(args).filter((key) => !slots.includes(key));
+  if (extra.length > 0) {
+    console.error(
+      `${picked.id} does not declare: ${extra.map((k) => JSON.stringify(k)).join(", ")}. ` +
+        `It takes: ${slots.join(", ")}.`,
+    );
+    process.exitCode = 2;
+    return;
+  }
   for (const name of slots) {
     const type = picked.params[name]!;
     const value = args[name];
@@ -226,14 +255,6 @@ export async function runChecksAddCommand(file: string, opts: ChecksAddOptions):
       process.exitCode = 2;
       return;
     }
-  }
-  const extra = Object.keys(args).filter((key) => !slots.includes(key));
-  if (extra.length > 0) {
-    console.error(
-      `${picked.id} does not declare: ${extra.join(", ")}. It takes: ${slots.join(", ")}.`,
-    );
-    process.exitCode = 2;
-    return;
   }
 
   const twin = twinOf(picked.id)!;

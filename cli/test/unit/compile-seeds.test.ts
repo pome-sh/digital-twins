@@ -44,7 +44,7 @@ vi.mock("../../src/task/seed-compiler.js", async (importOriginal) => {
 import { runCompileSeeds } from "../../src/cli/compile-seeds.js";
 import { compileSeed, COMPILER_MODEL } from "../../src/task/seed-compiler.js";
 
-const OPTS = { force: false, hosted: false, apiBaseUrl: "https://api.pome.sh" };
+const OPTS = { force: false };
 
 function taskMarkdown(prose: string, twins = "[github]"): string {
   return `# Fixture task
@@ -105,12 +105,12 @@ async function fixture(sidecar: string, prose = "One repo, acme/api, with a sing
 }
 
 describe("compile-seeds hand-authored protection", () => {
-  let stderr: string[];
+  let stdout: string[];
 
   beforeEach(() => {
-    stderr = [];
-    vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
-      stderr.push(args.map(String).join(" "));
+    stdout = [];
+    vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      stdout.push(args.map(String).join(" "));
     });
     vi.mocked(compileSeed).mockClear();
   });
@@ -141,7 +141,7 @@ describe("compile-seeds hand-authored protection", () => {
 
     await runCompileSeeds(dir, OPTS);
 
-    expect(stderr.join("\n")).toMatch(/hand-authored/);
+    expect(stdout.join("\n")).toMatch(/hand-authored/);
   });
 
   it("still refuses to overwrite a hand-authored sidecar under --force", async () => {
@@ -176,6 +176,51 @@ describe("compile-seeds hand-authored protection", () => {
 
     expect(await readFile(sidecarPath, "utf8")).toBe(envelope);
     expect(compileSeed).not.toHaveBeenCalled();
+  });
+});
+
+// `compile-seeds > out.txt` used to capture nothing at all, because every row
+// including the successes went to stderr. The split has to hold in both
+// directions: a job that pipes stdout keeps the results, and a job that surfaces
+// only stderr on failure still sees WHICH file failed and why, not a bare count.
+describe("compile-seeds stream split", () => {
+  let stdout: string[];
+  let stderr: string[];
+
+  beforeEach(() => {
+    stdout = [];
+    stderr = [];
+    vi.spyOn(console, "log").mockImplementation((...a: unknown[]) => {
+      stdout.push(a.map(String).join(" "));
+    });
+    vi.spyOn(console, "error").mockImplementation((...a: unknown[]) => {
+      stderr.push(a.map(String).join(" "));
+    });
+    vi.mocked(compileSeed).mockClear();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("puts success rows on stdout and failure rows plus the count on stderr", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "pome-compile-seeds-"));
+    await writeFile(join(dir, "a-fails.md"), taskMarkdown("One repo, acme/api."));
+    await writeFile(join(dir, "b-works.md"), taskMarkdown("One repo, acme/web."));
+    // Files are compiled in sorted order, so this rejects a-fails.md only.
+    vi.mocked(compileSeed).mockRejectedValueOnce(new Error("no ANTHROPIC_API_KEY"));
+
+    const code = await runCompileSeeds(dir, OPTS);
+
+    expect(code).toBe(1);
+    const out = stdout.join("\n");
+    const err = stderr.join("\n");
+    expect(out).toContain("b-works.md");
+    expect(out).not.toContain("FAIL");
+    expect(err).toContain("FAIL");
+    expect(err).toContain("a-fails.md");
+    expect(err).toContain("no ANTHROPIC_API_KEY");
+    expect(err).toContain("1 error(s).");
   });
 });
 

@@ -9,6 +9,30 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
+## Unreleased (minor)
+
+**`pome compile-seeds --hosted` is gone, along with `--api-url`.** It POSTed a
+control-plane route deleted in M5, so every hosted compile 404ed; its test
+mocked `fetch` and stayed green throughout. Compiling is local only, and the
+`pome --help` summary now says it calls a model.
+
+**`compile-seeds` prints success rows on stdout**, so `> out.txt` captures them.
+`FAIL` rows and the error count stay on stderr.
+
+**`pome checks add --arg` is fixed three ways.** It was discarded entirely
+without `--check`; a repeated key silently kept the last value; and `--arg
+error=x` was indistinguishable from a parser failure.
+
+**`pome checks add --check <typo>` suggests the ids this task's twins declare**,
+not always github's.
+
+**`pome tasks --copy --force` names the files it overwrote.** They printed
+identically to fresh copies, so a destroyed local edit was invisible.
+
+**`pome tasks <twin> --force` and `--dest` without `--copy` now exit 2**
+instead of printing the listing as if the flags had not been typed.
+
+
 ## 0.37.0 — 2026-08-30
 
 **Machine-readable output is `--json` everywhere.** `pome sandbox create` and

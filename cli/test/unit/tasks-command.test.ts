@@ -188,7 +188,7 @@ describe("pome tasks", () => {
 
   it("--copy --force overwrites existing files", async () => {
     const dir = await inTempDir();
-    captureConsole();
+    const captured = captureConsole();
 
     const tasksDir = join(dir, "tasks");
     await mkdir(tasksDir, { recursive: true });
@@ -212,6 +212,25 @@ describe("pome tasks", () => {
     );
     expect(written).not.toBe("# stale local copy\n");
     expect(written).toContain("Task 01");
+    // The destroyed local edit has to be named as such — a bare `+ file` reads
+    // exactly like a fresh copy.
+    const out = captured.log.join("\n");
+    expect(out).toContain("01-bug-happy-path.md");
+    expect(out).toContain("overwritten");
+    // On this partial overlap `copied[0]` is a sidecar, so a positional pick
+    // across the buckets told the user to run a .seed.json.
+    expect(out).toContain("Next: `pome run tasks/01-bug-happy-path.md`.");
+  });
+
+  it("--force without --copy refuses instead of printing the listing", async () => {
+    await inTempDir();
+    const captured = captureConsole();
+
+    await createProgram().parseAsync(["node", "pome", "tasks", "github", "--force"]);
+
+    expect(process.exitCode).toBe(2);
+    expect(captured.error.join("\n")).toContain("--copy");
+    expect(captured.log).toEqual([]);
   });
 
   it("--copy --dest writes into a custom directory", async () => {

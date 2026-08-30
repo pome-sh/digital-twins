@@ -44,8 +44,13 @@ export async function runTasksCommand(
   twinArg: string | undefined,
   opts: TasksCommandOptions,
 ): Promise<void> {
+  if (!opts.copy && (opts.force || opts.dest)) {
+    console.error("`--force` and `--dest` only do anything with `--copy`.");
+    process.exitCode = 2;
+    return;
+  }
   if (!twinArg) {
-    if (opts.copy || opts.force || opts.dest) {
+    if (opts.copy) {
       console.error("Specify a twin to copy from, e.g. `pome tasks github --copy`.");
       process.exitCode = 2;
       return;
@@ -105,11 +110,9 @@ function printTwinTasks(twin: TaskTwin): void {
       `Copy locally: \`pome tasks ${twin.id} --copy\` (or \`--copy --dest <dir>\`).`,
     ),
   );
-  console.log(
-    dim(
-      `Run one: \`pome run tasks/${runnable[0]?.filename ?? "01-bug-happy-path.md"}\`.`,
-    ),
-  );
+  if (runnable[0]) {
+    console.log(dim(`Run one: \`pome run tasks/${runnable[0].filename}\`.`));
+  }
 }
 
 interface CopyOptions {
@@ -119,6 +122,7 @@ interface CopyOptions {
 
 interface CopyOutcome {
   copied: string[];
+  overwritten: string[];
   skipped: string[];
   missingSources: string[];
 }
@@ -147,13 +151,19 @@ export async function copyTwinTasks(
     force: opts.force,
   });
 
+  const written = outcome.copied.length + outcome.overwritten.length;
   console.log(
     bold(
-      `Copied ${outcome.copied.length} ${twin.label} task${outcome.copied.length === 1 ? "" : "s"} into ${opts.destDir}/.`,
+      `Copied ${written} ${twin.label} task${written === 1 ? "" : "s"} into ${opts.destDir}/.`,
     ),
   );
   for (const file of outcome.copied) {
     console.log(`  ${dim("+")} ${file}`);
+  }
+  // A destroyed local edit printed as `+ file`, indistinguishable from a fresh
+  // copy, so `--force` never said what it had cost.
+  for (const file of outcome.overwritten) {
+    console.log(`  ${dim("~")} ${file} ${dim("(overwritten)")}`);
   }
   for (const file of outcome.skipped) {
     console.log(
@@ -170,7 +180,11 @@ export async function copyTwinTasks(
     return;
   }
   console.log("");
-  const first = outcome.copied[0] ?? outcome.skipped[0];
+  // From the catalog, not from a bucket. The buckets interleave `.md` with
+  // `.seed.json` and split on whether a file already existed, so any positional
+  // pick across them can name a sidecar or a task the author did not start with.
+  // `missingSources` already returned above, so this file is on disk.
+  const first = runnableTasks(twin)[0]?.filename;
   if (first) {
     console.log(
       dim(`Next: \`pome run ${opts.destDir}/${first}\`.`),
@@ -184,7 +198,7 @@ async function copyTaskFiles(input: {
   destDir: string;
   force: boolean;
 }): Promise<CopyOutcome> {
-  const outcome: CopyOutcome = { copied: [], skipped: [], missingSources: [] };
+  const outcome: CopyOutcome = { copied: [], overwritten: [], skipped: [], missingSources: [] };
   for (const task of input.tasks) {
     const src = join(input.sourceDir, task.filename);
     const dest = join(input.destDir, task.filename);
@@ -192,11 +206,12 @@ async function copyTaskFiles(input: {
       outcome.missingSources.push(task.filename);
       continue;
     }
-    if (existsSync(dest) && !input.force) {
+    const destExists = existsSync(dest);
+    if (destExists && !input.force) {
       outcome.skipped.push(task.filename);
     } else {
       await copyFile(src, dest);
-      outcome.copied.push(task.filename);
+      (destExists ? outcome.overwritten : outcome.copied).push(task.filename);
     }
 
     // Sidecar seeds (`<name>.seed.json`) are optional — tasks that use
@@ -206,12 +221,13 @@ async function copyTaskFiles(input: {
     const sidecarSrc = join(input.sourceDir, sidecar);
     const sidecarDest = join(input.destDir, sidecar);
     if (!existsSync(sidecarSrc)) continue;
-    if (existsSync(sidecarDest) && !input.force) {
+    const sidecarExists = existsSync(sidecarDest);
+    if (sidecarExists && !input.force) {
       outcome.skipped.push(sidecar);
       continue;
     }
     await copyFile(sidecarSrc, sidecarDest);
-    outcome.copied.push(sidecar);
+    (sidecarExists ? outcome.overwritten : outcome.copied).push(sidecar);
   }
   return outcome;
 }
