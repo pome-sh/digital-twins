@@ -33,6 +33,7 @@ jobs:
   #
   # FIRST_PARTY_TWINS: github, slack, stripe, gmail, linear
   detect-twins:
+    name: twin image (select matrix)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -103,13 +104,20 @@ jobs:
   # publishes a `<twin>-<sha>` tag: `Push scanned image` below is only
   # `event_name != 'pull_request'`, so write access is the whole gate there.
   wait-gates:
+    name: twin image (wait for gates)
     runs-on: ubuntu-latest
     permissions:
       actions: read
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Non-PR only. The wait exists so an image cannot be PUSHED ahead of the
+      # gates that vet it, and `Push scanned image` below is itself
+      # `event_name != 'pull_request'` — so on a PR this step held a runner open
+      # for the full ci.yml duration (~7 min) to order a push that never
+      # happens. The PR arm still builds, scans and signs nothing.
       - name: Wait for the ci workflow on this SHA
+        if: ${{ github.event_name != 'pull_request' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # PRs use the merge commit as github.sha; workflow runs are keyed by the
@@ -128,7 +136,7 @@ jobs:
         run: bash scripts/ci/wait-for-workflow.sh secret-scan.yml "$SHA"
 
   publish:
-    name: ${{ matrix.twin }}
+    name: twin image (${{ matrix.twin }})
     needs: [wait-gates, detect-twins]
     runs-on: ubuntu-latest
     strategy:

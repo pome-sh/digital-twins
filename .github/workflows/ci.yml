@@ -36,7 +36,7 @@ jobs:
           fi
           # Paths that can affect package build/test/parity or the CI contract.
           if git diff --name-only "${BASE_SHA}" HEAD | grep -qE \
-            '^(packages/|cli/|agent-examples/|integration-examples/|scripts/|contract/|config/|knip\.json|package(-lock)?\.json$|\.github/workflows/ci\.yml$)'; then
+            '^(packages/|cli/|agent-examples/|integration-examples/|scripts/|contract/|config/|showcases/|knip\.json|README\.md$|package(-lock)?\.json$|\.github/workflows/ci\.yml$)'; then
             echo "heavy=true" >> "$GITHUB_OUTPUT"
             echo "Running heavy suite (package/cli/script/lockfile/ci changes)."
           else
@@ -82,11 +82,14 @@ jobs:
 
       # Every dependency-free lint rule, plus each rule's case table. `--offline`
       # skips the three rules that need node_modules (two TypeScript-AST walks
-      # and the lockfile scan) and names them rather than dropping them silently;
-      # the heavy block below runs the same runner with no flag, so this is a
-      # subset and never the only run.
-      - run: npm run lint -- --offline
-      - run: npm run lint:test -- --offline
+      # and the lockfile scan) and names them rather than dropping them silently.
+      # Gated on the heavy block NOT running: the heavy block runs the same
+      # runner with no flag, which is a strict superset, so on a heavy PR this
+      # pair was running the same rules and the same case tables a second time.
+      - if: steps.scope.outputs.heavy != 'true'
+        run: npm run lint -- --offline
+      - if: steps.scope.outputs.heavy != 'true'
+        run: npm run lint:test -- --offline
 
       # Catches a `packages/*` script that produces no verdict because nothing
       # reaches it — no verdict reads exactly like a pass. Every such script is
@@ -506,6 +509,106 @@ jobs:
       - name: Golden scenario gate
         if: steps.scope.outputs.heavy == 'true'
         run: npm run gate:golden
+
+      # ── Absorbed from showcase-verify.yml (deleted) ──────────────────────
+      # Each showcase's verify.sh is the regression test that keeps its
+      # walkthrough's claims true. They boot their own LOCAL twins, mint their
+      # own bearers and assert unattended: no account, no key, no sandbox,
+      # nothing to spend. They ran in a separate workflow only because the heavy
+      # path filter above did not list `showcases/`; it does now, so the build
+      # this needs is the one already standing three steps up instead of a
+      # second `npm ci` + `npm run build` on a second runner.
+      #
+      # POME_CLI overrides each script's default of the PUBLISHED CLI, which is
+      # right for a reader on their own machine and wrong for a gate: the
+      # published tarball is blind to this PR's diff. Both scripts word-split
+      # `$CLI` unquoted, which is what lets a two-word interpreter+path work.
+      - name: Resolve the CLI built above
+        if: steps.scope.outputs.heavy == 'true'
+        run: |
+          set -euo pipefail
+          entry="$GITHUB_WORKSPACE/cli/dist/src/cli/main.js"
+          test -f "$entry" || { echo "::error::$entry missing after npm run build"; exit 1; }
+          echo "POME_CLI=node $entry" >> "$GITHUB_ENV"
+
+      # One step per showcase so a failure names which property broke.
+      - name: 'Showcase: cross-call-state'
+        if: steps.scope.outputs.heavy == 'true'
+        run: bash showcases/cross-call-state/verify.sh
+
+      # `!cancelled()` rather than the default: a red cross-call-state must not
+      # hide a second, independent regression here. The job still fails on the
+      # first script's failure — this only makes both verdicts visible in one run.
+      - name: 'Showcase: permission-denial'
+        if: ${{ !cancelled() && steps.scope.outputs.heavy == 'true' }}
+        run: bash showcases/permission-denial/verify.sh
+
+      # ── Absorbed from quickstart-smoke.yml (deleted) ─────────────────────
+      # The README's clean-machine flow: `pome twin start github`, then the
+      # bundled triage agent reaches it with ENV-ONLY auth. Env-only is the
+      # property — the agent must not probe the twin's disk for a secret, which
+      # couples the two to a shared filesystem and breaks the moment they are
+      # not on one.
+      #
+      # The old workflow's first two steps are gone rather than moved: its
+      # `npm ci && npm test` inside agent-examples/triage-agent is exactly what
+      # `gate:examples` above already does in every example, and its
+      # adapter/wire builds are a subset of `npm run build`. What is left is the
+      # part nothing else covers — a real CLI-started twin, reached with a JWT
+      # minted from the shared env secret.
+      #
+      # One secret, shared via env by the twin and the agent. Not a real
+      # credential: generated per run, loopback twin, torn down with the job.
+      - name: Generate the shared twin auth secret
+        if: steps.scope.outputs.heavy == 'true'
+        run: echo "TWIN_AUTH_SECRET=$(node -e 'console.log(require("crypto").randomBytes(32).toString("hex"))')" >> "$GITHUB_ENV"
+      - name: Start the GitHub twin via the CLI
+        if: steps.scope.outputs.heavy == 'true'
+        run: nohup node cli/dist/src/cli/main.js twin start github > twin.log 2>&1 &
+      - name: Wait for twin health
+        if: steps.scope.outputs.heavy == 'true'
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3333/healthz >/dev/null 2>&1; then
+              echo "twin ready after ${i} tries"; exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::twin health not ready within 120s"
+          cat twin.log
+          exit 1
+      # gate:examples above already installed this example, so `npm start` runs
+      # against the same node_modules rather than a second lockfile install.
+      # Preflight probes the twin only; it never calls Claude in this mode, but
+      # index.ts asserts the key is present, so a placeholder suffices.
+      - name: Quickstart preflight (env-secret JWT mint + reach twin)
+        if: steps.scope.outputs.heavy == 'true'
+        working-directory: agent-examples/triage-agent
+        env:
+          POME_PREFLIGHT: "1"
+          ANTHROPIC_API_KEY: "sk-ant-preflight-not-used"
+        run: npm start
+      - name: Gmail quickstart boot and token alias
+        if: steps.scope.outputs.heavy == 'true'
+        run: |
+          nohup node cli/dist/src/cli/main.js twin start gmail --port 3336 > gmail-twin.log 2>&1 &
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3336/healthz >/dev/null 2>&1; then
+              grep -q '^POME_GMAIL_REST_URL=' gmail-twin.log
+              grep -q '^POME_GMAIL_MCP_URL=' gmail-twin.log
+              grep -q '^POME_GMAIL_TOKEN=' gmail-twin.log
+              exit 0
+            fi
+            sleep 1
+          done
+          cat gmail-twin.log
+          exit 1
+      # Heavy-guarded as well as failure-guarded: without it, a red lint step on
+      # a docs-only PR would end the job by printing two files that were never
+      # written.
+      - name: Twin logs on failure
+        if: ${{ failure() && steps.scope.outputs.heavy == 'true' }}
+        run: cat twin.log gmail-twin.log 2>/dev/null || true
 
       - name: Heavy suite skipped (docs/chore-only)
         if: steps.scope.outputs.heavy != 'true'
