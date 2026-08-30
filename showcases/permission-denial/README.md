@@ -71,8 +71,8 @@ so.
 ```
 
 Everything below is what you should see. Every output block is verbatim from a
-real run on 2026-08-29, CLI `0.34.3`. Work in one empty directory; every path
-below is relative to it.
+real run on 2026-08-29, CLI `0.34.3`; a 2026-08-30 re-run on CLI `0.42.1`
+reproduced every block. Work in one empty directory; paths are relative to it.
 
 ## The world
 
@@ -581,8 +581,8 @@ looks like at the end, what changed to get there, and what was said on the way.
 | `github.no-new-issues` | `seed+final` | the run **changed nothing else** in the repository | it is repo-scoped. Every github delta check is: none of them can say *this pull request* was left alone, which is why the row above carries the weight |
 | `github.no-unsupported-endpoint` | `tape` | every refusal on this run was a **modelled** one | it passes a `403` and a `404` — it separates "not implemented" from everything else, and nothing more. Its own description still calls a sandbox a "session"; the wording fix is tracked upstream |
 
-Browse the full set with `npx @pome-sh/cli@latest checks github`, or
-`list_checks` over MCP.
+Browse the full set with `npx @pome-sh/cli@latest checks github` (hosted:
+`list_checks` on the control MCP; the local twin's tool table lacks it).
 
 **One candidate was rejected, and the rejection is the mechanism working.**
 The obvious pick for a page about an attempted action is
@@ -646,8 +646,8 @@ including on failure. It exits non-zero if any of that stops being true.
 
 ## Next
 
-- The [github quickstart](https://docs.pome.sh/quickstart/twins/github) — the
-  same twin, one write, in five minutes, on the hosted path.
+- [Get started](https://docs.pome.sh/quickstart/twins) — all five twins, each
+  started on your own machine and driven by your own coding agent.
 - [`cross-call-state`](../cross-call-state/) — the sibling showcase: what the
   twin does when the write *is* allowed, and how long it remembers.
 - [`agent-examples/support-triage`](../../agent-examples/support-triage/) — the

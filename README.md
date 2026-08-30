@@ -7,7 +7,7 @@
 **Testing infrastructure for AI agents.**
 Stateful, local digital twins of the APIs your agent calls — GitHub, Stripe, Slack, Gmail, and Linear.
 
-[![CI](https://github.com/pome-sh/pome-twins/actions/workflows/ci.yml/badge.svg)](https://github.com/pome-sh/pome-twins/actions/workflows/ci.yml)
+[![CI](https://github.com/pome-sh/digital-twins/actions/workflows/ci.yml/badge.svg)](https://github.com/pome-sh/digital-twins/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/%40pome-sh%2Fcli?label=%40pome-sh%2Fcli)](https://www.npmjs.com/package/@pome-sh/cli)
 [![node](https://img.shields.io/badge/node-%E2%89%A5%2024-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
@@ -21,7 +21,7 @@ Stateful, local digital twins of the APIs your agent calls — GitHub, Stripe, S
 A **digital twin** is a local emulation of a production API. It answers the exact
 same **REST, GraphQL, and MCP calls** your AI agent makes in production, backed by a
 real SQLite database — so every run is stateful, deterministic, and resettable.
-Use it to test and evaluate agents against 137 MCP tools without touching live
+Use it to test and evaluate agents against 115 MCP tools without touching live
 infrastructure, rate limits, or shared sandbox accounts.
 
 Every route and tool is tiered — `semantic` (real, tested behavior), `shape`
@@ -29,13 +29,13 @@ Every route and tool is tiered — `semantic` (real, tested behavior), `shape`
 
 ## The twins
 
-Five twins, **137 MCP tools** in total. Each documents its surface route-by-route in its `FIDELITY.md`.
+Five twins, **115 MCP tools** in total. Each documents its surface route-by-route in its `FIDELITY.md`.
 
 | Twin | MCP tools | API surface | |
 | --- | --- | --- | --- |
-| ![GitHub](https://img.shields.io/badge/GitHub-181717?logo=github&logoColor=white) [`twin-github`](./packages/twin-github/) | 65 (63 semantic) | 62 REST routes — repos, issues, PRs, reviews, merges (push-access gated) | [FIDELITY](./packages/twin-github/FIDELITY.md) |
+| ![GitHub](https://img.shields.io/badge/GitHub-181717?logo=github&logoColor=white) [`twin-github`](./packages/twin-github/) | 36 (all semantic) | 73 REST routes — repos, issues, PRs, reviews, merges (push-access gated) | [FIDELITY](./packages/twin-github/FIDELITY.md) |
 | ![Stripe](https://img.shields.io/badge/Stripe-635BFF?logo=stripe&logoColor=white) [`twin-stripe`](./packages/twin-stripe/) | 26 (all semantic) | 43 REST routes — card + x402 crypto PaymentIntents, refunds, charges, balance, events | [FIDELITY](./packages/twin-stripe/FIDELITY.md) |
-| ![Slack](https://img.shields.io/badge/Slack-4A154B?logo=slack&logoColor=white) [`twin-slack`](./packages/twin-slack/) | 11 (all semantic) | 50 REST routes — channels, messages, threads, reactions, search | [FIDELITY](./packages/twin-slack/FIDELITY.md) |
+| ![Slack](https://img.shields.io/badge/Slack-4A154B?logo=slack&logoColor=white) [`twin-slack`](./packages/twin-slack/) | 18 (14 semantic) | 50 REST routes — channels, messages, threads, reactions, search | [FIDELITY](./packages/twin-slack/FIDELITY.md) |
 | ![Gmail](https://img.shields.io/badge/Gmail-EA4335?logo=gmail&logoColor=white) [`twin-gmail`](./packages/twin-gmail/) | 13 | Frozen Gmail v1 REST — messages, drafts, threads, labels, uploads | [FIDELITY](./packages/twin-gmail/FIDELITY.md) |
 | ![Linear](https://img.shields.io/badge/Linear-5E6AD2?logo=linear&logoColor=white) [`twin-linear`](./packages/twin-linear/) | 22 | GraphQL + OAuth (PKCE) + signed webhooks — the first GraphQL twin | [FIDELITY](./packages/twin-linear/FIDELITY.md) |
 
@@ -110,7 +110,7 @@ Everything ships inside `@pome-sh/cli` — one install, one entry point. The fiv
 twins are thin domain plugins on an internal twin engine that supplies HTTP
 mounting, bearer auth, the trace recorder, MCP dispatch, SQLite state, and the
 admin reset/seed gate. Those internals (`packages/sdk`, `packages/twin-*`) are
-implementation detail of the CLI, not separately installable packages.
+implementation detail of the CLI; their standalone npm packages are deprecated.
 
 Every twin honors the frozen [`CONTRACT.md`](./CONTRACT.md) runtime contract —
 entry point, env surface, `/healthz` shape, auth, and MCP surfaces. See
