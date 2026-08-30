@@ -9,7 +9,7 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
-## Unreleased (minor)
+## 0.37.0 — 2026-08-30
 
 **Machine-readable output is `--json` everywhere.** `pome sandbox create` and
 `pome sandbox list` take `--json` instead of `--format <fmt>`, matching `pome
@@ -18,7 +18,6 @@ way to silence the summary while `--secrets-file` did the work. `--secrets-file`
 still writes the shell exports at mode 0600, and now always prints the
 connection summary on stderr — previously `--format env --secrets-file X` was
 silent.
-
 
 ## 0.36.1 — 2026-08-30
 
