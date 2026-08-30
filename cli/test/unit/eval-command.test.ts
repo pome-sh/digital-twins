@@ -847,7 +847,7 @@ describe("pome eval review fixes (review)", () => {
     expect(calls2.finalize[0]!.input.exitCode).toBe(-1);
   });
 
-  it("legacy event rows (no kind) are wrapped to TwinHttpEvent before upload", async () => {
+  it("an un-kinded event row is refused, naming the line", async () => {
     const legacyRow = JSON.stringify({
       ts: "2026-06-30T10:00:02.000Z",
       run_id: "ses_original_run",
@@ -858,34 +858,23 @@ describe("pome eval review fixes (review)", () => {
       status: 200,
     });
     const runDir = await writeRunDir(tmp, { eventsJsonl: `${legacyRow}\n` });
-
-    const bodies: Record<string, string> = {};
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
-      const urlStr = String(url);
-      if ((init as RequestInit | undefined)?.method === "PUT") {
-        bodies[urlStr] = decodePutBody(init as RequestInit);
-        return new Response(null, { status: 200 });
-      }
-      throw new Error(`Unexpected fetch call to ${urlStr}`);
-    });
     const { client } = makeEvalClient();
 
-    await runEval({
-      runDir,
-      agent: "triage-bot",
-      hosted: { baseUrl: "http://no-cloud.invalid", apiKey: "pme_test" },
-      client,
-      projectConfig: null,
-    });
-
-    const uploaded = JSON.parse(bodies[EVENTS_URL]!.trimEnd());
-    expect(uploaded.kind).toBe("TwinHttpEvent");
-    expect(uploaded.event_id).toBe("req_legacy");
+    await expect(
+      runEval({
+        runDir,
+        agent: "triage-bot",
+        hosted: { baseUrl: "http://no-cloud.invalid", apiKey: "pme_test" },
+        client,
+        projectConfig: null,
+      }),
+    ).rejects.toThrow(/events\.jsonl line 1/);
   });
 
   it("already-kinded rows (LlmTurnEvent) survive eval upload unchanged", async () => {
-    // A non-TwinHttpEvent row must not go through toTwinHttpEvent, which would
-    // clobber `kind` to "TwinHttpEvent" and overwrite `event_id`.
+    // Asserts the FIELDS, not the bytes (the body is `trimEnd`ed and
+    // re-parsed): eval must not rewrite `kind` or `event_id` on a row that
+    // already carries them.
     const turnRow = JSON.stringify({
       kind: "LlmTurnEvent",
       ts: "2026-06-30T10:00:02.000Z",
@@ -930,6 +919,58 @@ describe("pome eval review fixes (review)", () => {
     expect(uploaded.cache_read_input_tokens).toBe(900);
     expect(uploaded.cache_creation_input_tokens).toBe(128);
     expect(uploaded.finish_reasons).toEqual(["end_turn"]);
+  });
+
+  it("a BOM-prefixed row is uploaded as parsed JSON, not as raw text", async () => {
+    // `validateJsonl` trims before parsing and `trim()` strips all of Unicode
+    // whitespace, so a BOM/NBSP/U+2028-prefixed row is accepted. If the upload
+    // path parsed the UNtrimmed line it would fall into `redactJsonl`'s
+    // raw-string catch and PUT non-JSON text as a row — which cloud drops
+    // silently (correlate-trace counts it and moves on), so the row would
+    // vanish from the trace the judge scores with a zero exit code.
+    const turnRow = JSON.stringify({
+      kind: "LlmTurnEvent",
+      ts: "2026-06-30T10:00:02.000Z",
+      event_id: "evt_bom_1",
+      parent_id: null,
+      turn_index: 0,
+      model: "claude-opus-4-8",
+      input_tokens: 1200,
+      output_tokens: 340,
+      cache_read_input_tokens: 900,
+      cache_creation_input_tokens: 128,
+      finish_reasons: ["end_turn"],
+      latency_ms: 2150,
+      latency_ms_estimated: true,
+      session_id: null,
+    });
+    const runDir = await writeRunDir(tmp, { eventsJsonl: `\uFEFF${turnRow}\n` });
+
+    const bodies: Record<string, string> = {};
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
+      const urlStr = String(url);
+      if ((init as RequestInit | undefined)?.method === "PUT") {
+        bodies[urlStr] = decodePutBody(init as RequestInit);
+        return new Response(null, { status: 200 });
+      }
+      throw new Error(`Unexpected fetch call to ${urlStr}`);
+    });
+    const { client } = makeEvalClient();
+
+    await runEval({
+      runDir,
+      agent: "triage-bot",
+      hosted: { baseUrl: "http://no-cloud.invalid", apiKey: "pme_test" },
+      client,
+      projectConfig: null,
+    });
+
+    const body = bodies[EVENTS_URL]!;
+    expect(body).not.toContain("\uFEFF");
+    expect(JSON.parse(body.trimEnd())).toMatchObject({
+      kind: "LlmTurnEvent",
+      event_id: "evt_bom_1",
+    });
   });
 
   it("corrupt latest.json → named usage error with exit 5", async () => {

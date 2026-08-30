@@ -155,7 +155,7 @@ describe("readEventsJsonl", () => {
     // row without `kind` is a corrupt file. There is no tolerant path for it.
     const unkinded = { ts: "2026-05-01T00:00:00.000Z", run_id: "r", twin: "github", request_id: "q" };
     await writeFile(join(tmp, "events.jsonl"), JSON.stringify(unkinded) + "\n");
-    await expect(readEventsJsonl(tmp)).rejects.toThrow();
+    await expect(readEventsJsonl(tmp)).rejects.toThrow(/events\.jsonl line 1/);
   });
 
   it("ignores blank lines", async () => {

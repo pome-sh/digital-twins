@@ -33,17 +33,9 @@ import {
   type RunSet,
 } from "./runSets.js";
 
-// Bumped 1 → 2: the artifact gained `state` (the run's three-state
-// verdict, by name) and the `evaluated`/`not_evaluated`/`pre_satisfied`/
-// `total` counts `score` is computed over. Before this, a CI script reading
-// `score >= pass_threshold` on an incomplete run read `true`, because
-// `verdict.json` carried no denominator and no name for the third state —
-// `passed: false` was the only signal, and it carries no reason. A v1 file
-// on disk is a RECOGNIZABLE prior version, not garbage: `readVerdictArtifact`
-// refuses it (the new fields are required, not optional-with-a-default — zero
-// customers, no dual-format reader) but `scanVerdictArtifactsDetailed` /
-// `discoverRunSet` name the skip instead of making it indistinguishable from
-// "no run happened here" (see `looksLikeVerdictArtifactBase` below).
+// Bumped 1 → 2 for the denominator bug: a CI script reading `score >=
+// pass_threshold` on an incomplete run read `true`, because v1 carried no
+// denominator and no name for the third state.
 export const VERDICT_ARTIFACT_VERSION = 2;
 
 export const VERDICT_FILENAME = "verdict.json";
@@ -160,21 +152,14 @@ export async function writeVerdictArtifact(
   }
 }
 
-/** Read one trial's verdict.json. Returns null when absent or when the file
- *  isn't a recognizable verdict artifact (foreign/corrupt files are skipped,
- *  never thrown on — fix-prompt discovery must survive a messy runs/). */
 /** Every field the fix-prompt pipeline dereferences must hold its declared
- *  shape, or the FILE is rejected — discovery treats a half-recognizable
- *  verdict.json as foreign rather than crashing downstream on it.
- *
- *  This is RECOGNITION, not reading: the shape shared by every
- *  artifact version this repo has ever written, so a prior-version file can
- *  be told apart from a foreign/corrupt one and its skip NAMED rather than
- *  folded into "not a verdict file". Deliberately more generous than
- *  `isVerdictArtifact` below, so a prior-version file's skip can be named. */
-function looksLikeVerdictArtifactBase(parsed: unknown): parsed is Record<string, unknown> {
+ *  shape at `VERDICT_ARTIFACT_VERSION`, or the FILE is rejected — discovery
+ *  treats a half-recognizable verdict.json as foreign rather than crashing
+ *  downstream on it. */
+function isVerdictArtifact(parsed: unknown): parsed is VerdictArtifact {
   if (typeof parsed !== "object" || parsed === null) return false;
   const v = parsed as Record<string, unknown>;
+  if (v.version !== VERDICT_ARTIFACT_VERSION) return false;
   if (v.source !== "cloud-finalize") return false;
   if (typeof v.session_id !== "string") return false;
   if (typeof v.task_name !== "string") return false;
@@ -183,6 +168,11 @@ function looksLikeVerdictArtifactBase(parsed: unknown): parsed is Record<string,
   if (typeof v.finalized_at !== "string") return false;
   if (typeof v.passed !== "boolean") return false;
   if (typeof v.score !== "number") return false;
+  if (typeof v.state !== "string" || !VALID_STATES.has(v.state)) return false;
+  if (typeof v.evaluated !== "number") return false;
+  if (typeof v.not_evaluated !== "number") return false;
+  if (typeof v.pre_satisfied !== "number") return false;
+  if (typeof v.total !== "number") return false;
   if (!Array.isArray(v.criteria_results)) return false;
   return v.criteria_results.every((r) => {
     if (typeof r !== "object" || r === null) return false;
@@ -199,47 +189,18 @@ function looksLikeVerdictArtifactBase(parsed: unknown): parsed is Record<string,
   });
 }
 
-/** The CURRENT version's shape: the base fields plus `version ===
- *  VERDICT_ARTIFACT_VERSION`, the named `state`, and the four counts. A file
- *  that passes `looksLikeVerdictArtifactBase` but fails this is a prior
- *  version or a corrupt current one — `readVerdictArtifactDetailed` tells
- *  those two apart. */
-function isVerdictArtifact(parsed: unknown): parsed is VerdictArtifact {
-  if (!looksLikeVerdictArtifactBase(parsed)) return false;
-  const v = parsed;
-  if (v.version !== VERDICT_ARTIFACT_VERSION) return false;
-  if (typeof v.task_path !== "string") return false;
-  if (typeof v.state !== "string" || !VALID_STATES.has(v.state)) return false;
-  if (typeof v.evaluated !== "number") return false;
-  if (typeof v.not_evaluated !== "number") return false;
-  if (typeof v.pre_satisfied !== "number") return false;
-  if (typeof v.total !== "number") return false;
-  return true;
-}
-
 /** The detailed read: distinguishes "current-version artifact",
- *  "recognizable, but written at a DIFFERENT artifact version" (a real trial
- *  this CLI can no longer read), and "not a verdict file at all"
- *  (foreign/corrupt/missing). Callers that only care about usable trials
- *  (`readVerdictArtifact`, `scanVerdictArtifacts`) collapse the last two
- *  together, same as at version 1; discovery callers that need to NAME a
- *  version skip instead of silently reporting "no runs" use this directly.
+ *  "unreadable" (foreign, corrupt, or written by an older CLI — all one fact:
+ *  something is at that path and this CLI cannot read it), and "missing" (no
+ *  verdict.json at this path at all — no run finished here yet, or the caller
+ *  pointed at an artifacts root rather than a trial dir).
  *
- *  `stale-version` is keyed on the version NUMBER differing, never on the
- *  new fields being absent, so the status never claims more than it checked:
- *  a file that says `version: 2` and is malformed is a corrupt CURRENT file
- *  (`unreadable`), not a prior version. `version` is null when the file
- *  carries no numeric `version` at all.
- *
- *  `missing` is the fourth: no verdict.json at this path at all (no
- *  run finished here yet, or the caller pointed at an artifacts root rather
- *  than a trial dir). It used to collapse into `unreadable`, which is why both
- *  callers below re-`existsSync`'d the file they had just failed to read — a
- *  second stat answering what the read already knew, and its own
- *  check-then-read window. */
+ *  `missing` is its own status rather than collapsing into `unreadable`,
+ *  which is why neither caller below re-`existsSync`'s the file it just
+ *  failed to read — a second stat answering what the read already knew, and
+ *  its own check-then-read window. */
 export type VerdictReadResult =
   | { status: "ok"; trial: TrialVerdict }
-  | { status: "stale-version"; version: number | null }
   | { status: "unreadable" }
   | { status: "missing" };
 
@@ -276,13 +237,13 @@ export async function readVerdictArtifactDetailed(
   } catch {
     return { status: "unreadable" };
   }
-  if (!looksLikeVerdictArtifactBase(parsed)) return { status: "unreadable" };
-  const version = typeof parsed.version === "number" ? parsed.version : null;
-  if (version !== VERDICT_ARTIFACT_VERSION) return { status: "stale-version", version };
   if (!isVerdictArtifact(parsed)) return { status: "unreadable" };
   return { status: "ok", trial: { runDir, verdict: parsed } };
 }
 
+/** Read one trial's verdict.json. Returns null when absent or unreadable —
+ *  foreign/corrupt files are skipped, never thrown on, because fix-prompt
+ *  discovery must survive a messy runs/. */
 export async function readVerdictArtifact(
   runDir: string,
 ): Promise<TrialVerdict | null> {
@@ -290,27 +251,21 @@ export async function readVerdictArtifact(
   return result.status === "ok" ? result.trial : null;
 }
 
-/** The detailed scan behind `scanVerdictArtifacts`: also collects
- *  the dirs whose verdict.json was recognizable but a prior artifact version,
- *  so `discoverRunSet` can name that skip instead of it looking identical to
- *  "no run happened here".
- *
- *  Likewise for `unreadableDirs`: a verdict.json that EXISTS but is
- *  truncated, hand-edited, or otherwise damaged. Kept out of `staleVersionDirs`
- *  on purpose — a prior-version file and a corrupt one are different facts
- *  (upgrade vs. damage) and want different fixes. A run dir with no
- *  verdict.json at all is neither (no run finished there yet), and that
+/** The detailed scan behind `scanVerdictArtifacts`: also collects the dirs
+ *  whose verdict.json EXISTS but could not be read (truncated, hand-edited,
+ *  written by an older CLI, or not a verdict artifact), so `discoverRunSet`
+ *  can name that skip instead of it looking identical to "no run happened
+ *  here". A run dir with no verdict.json at all is a different fact, and that
  *  distinction lives in the read's `missing` status, not a re-stat here.
  *
- *  `unreadableDirs` is SORTED, unlike the other two: it is the only one whose
- *  order reaches a user, via the path list `pome fix-prompt` prints and trims
- *  to the first few. `readdir` promises no order — APFS hands back names
- *  sorted, ext4 hands back hash order — so without this the WHICH of "kept
- *  first 5" would differ between a dev's machine and CI, and a test pinning
- *  the trim would pass locally and flake on Linux. */
+ *  `unreadableDirs` is SORTED: its order reaches a user, via the path list
+ *  `pome fix-prompt` prints and trims to the first few. `readdir` promises no
+ *  order — APFS hands back names sorted, ext4 hands back hash order — so
+ *  without this the WHICH of "kept first 5" would differ between a dev's
+ *  machine and CI, and a test pinning the trim would pass locally and flake
+ *  on Linux. */
 export interface VerdictScanResult {
   trials: TrialVerdict[];
-  staleVersionDirs: string[];
   unreadableDirs: string[];
 }
 
@@ -318,13 +273,12 @@ export async function scanVerdictArtifactsDetailed(
   artifactsRoot: string,
 ): Promise<VerdictScanResult> {
   const trials: TrialVerdict[] = [];
-  const staleVersionDirs: string[] = [];
   const unreadableDirs: string[] = [];
   let slugs: string[];
   try {
     slugs = await readdir(artifactsRoot);
   } catch {
-    return { trials, staleVersionDirs, unreadableDirs };
+    return { trials, unreadableDirs };
   }
   for (const slug of slugs) {
     const slugDir = join(artifactsRoot, slug);
@@ -338,18 +292,16 @@ export async function scanVerdictArtifactsDetailed(
       const runDir = join(slugDir, runId);
       const result = await readVerdictArtifactDetailed(runDir);
       if (result.status === "ok") trials.push(result.trial);
-      else if (result.status === "stale-version") staleVersionDirs.push(runDir);
       else if (result.status === "unreadable") unreadableDirs.push(runDir);
     }
   }
   unreadableDirs.sort();
-  return { trials, staleVersionDirs, unreadableDirs };
+  return { trials, unreadableDirs };
 }
 
 /** Scan an artifacts root for finalized trials — exactly the two-level
  *  layout `<root>/<task-slug>/<session-id>/verdict.json`. Anything
- *  unreadable (including a prior artifact version — see
- *  `scanVerdictArtifactsDetailed`) is skipped. */
+ *  unreadable (see `scanVerdictArtifactsDetailed`) is skipped. */
 export async function scanVerdictArtifacts(
   artifactsRoot: string,
 ): Promise<TrialVerdict[]> {
@@ -374,20 +326,13 @@ export interface RunSetDiscovery {
   /** Total finalized run sets seen — lets the caller distinguish "no runs
    *  at all" from "runs exist but none failed". */
   totalSets: number;
-  /** Verdict.json files recognized as a PRIOR artifact version under
-   *  the scanned root (or, for `kind: "trial-dir"`, at the target itself).
-   *  Named so a stale-version skip never renders identically to "no runs
-   *  happened here" — a v1 file dropped silently is the exact shape this
-   *  milestone exists to remove. */
-  staleVersionCount: number;
   /** Verdict.json files that EXIST under the scanned root (or, for
    *  `kind: "trial-dir"`, at the target itself) but could not be read: a
-   *  truncated file, one hand-edited into an unexpected `state`, or valid
-   *  JSON that isn't a verdict artifact at all. Never folded into
-   *  `staleVersionCount` (an older CLI wrote that file; nothing wrote this
-   *  one correctly) or `totalSets` — a damaged current-version file is not a
-   *  usable run set. Reported even when other sets under the same root
-   *  parsed fine, same lesson as `staleVersionCount`. */
+   *  truncated file, one hand-edited into an unexpected `state`, one written
+   *  by an older CLI, or valid JSON that isn't a verdict artifact at all.
+   *  Never folded into `totalSets` — an unreadable file is not a usable run
+   *  set. Named and reported even when other sets under the same root parsed
+   *  fine, so a skip never renders identically to "no runs happened here". */
   unreadableCount: number;
   /** The paths behind `unreadableCount`, so the caller can name them instead
    *  of only counting them. Sorted (see `scanVerdictArtifactsDetailed`) —
@@ -407,35 +352,19 @@ export interface RunSetDiscovery {
  */
 export async function discoverRunSet(target: string): Promise<RunSetDiscovery> {
   const anchorResult = await readVerdictArtifactDetailed(target);
-  if (anchorResult.status === "stale-version") {
-    // The user pointed fix-prompt directly at a trial dir whose verdict.json
-    // is a prior version — name it rather than falling through to the "root"
-    // branch below, which would scan `target` as if it were an artifacts
-    // root (two levels too shallow) and report a plain "no runs".
-    return {
-      kind: "trial-dir",
-      set: null,
-      incompleteSet: null,
-      totalSets: 0,
-      staleVersionCount: 1,
-      unreadableCount: 0,
-      unreadablePaths: [],
-    };
-  }
-  // Same reasoning as the stale-version branch above, for a target
-  // whose verdict.json exists but is damaged: name it as a trial-dir skip
-  // rather than falling through to the "root" branch, which would scan
-  // `target` itself (two levels too shallow) and find nothing. What
-  // tells this apart from a target that IS an artifacts root (no verdict.json
-  // of its own either, and must fall through) is the read's own `missing`
-  // status, not a second `existsSync` of the path the read just failed on.
+  // The user pointed fix-prompt directly at a trial dir whose verdict.json
+  // exists but cannot be read: name it as a trial-dir skip rather than
+  // falling through to the "root" branch, which would scan `target` itself
+  // (two levels too shallow) and report a plain "no runs". What tells this
+  // apart from a target that IS an artifacts root (no verdict.json of its own
+  // either, and must fall through) is the read's own `missing` status, not a
+  // second `existsSync` of the path the read just failed on.
   if (anchorResult.status === "unreadable") {
     return {
       kind: "trial-dir",
       set: null,
       incompleteSet: null,
       totalSets: 0,
-      staleVersionCount: 0,
       unreadableCount: 1,
       unreadablePaths: [target],
     };
@@ -445,8 +374,7 @@ export async function discoverRunSet(target: string): Promise<RunSetDiscovery> {
     // Trial dir → its set. Layout is <root>/<slug>/<runId>, so the root is
     // two levels up; a moved/isolated dir degrades to a set of one.
     const root = join(target, "..", "..");
-    const { trials, staleVersionDirs, unreadableDirs } =
-      await scanVerdictArtifactsDetailed(root);
+    const { trials, unreadableDirs } = await scanVerdictArtifactsDetailed(root);
     const sets = groupRunSets(trials);
     const own =
       sets.find(
@@ -462,7 +390,6 @@ export async function discoverRunSet(target: string): Promise<RunSetDiscovery> {
       set: own,
       incompleteSet: null,
       totalSets: Math.max(sets.length, 1),
-      staleVersionCount: staleVersionDirs.length,
       unreadableCount: unreadableDirs.length,
       unreadablePaths: unreadableDirs,
     };
@@ -473,8 +400,7 @@ export async function discoverRunSet(target: string): Promise<RunSetDiscovery> {
   // return that sat here: on a root that isn't there `readdir` throws and is
   // caught, and the three empty arrays give the same nulls and zeros through
   // `groupRunSets` / `latestFailedRunSet` / `latestIncompleteRunSet`.
-  const { trials, staleVersionDirs, unreadableDirs } =
-    await scanVerdictArtifactsDetailed(target);
+  const { trials, unreadableDirs } = await scanVerdictArtifactsDetailed(target);
   const sets = groupRunSets(trials);
   const failedSet = latestFailedRunSet(sets);
   return {
@@ -482,7 +408,6 @@ export async function discoverRunSet(target: string): Promise<RunSetDiscovery> {
     set: failedSet,
     incompleteSet: failedSet ? null : latestIncompleteRunSet(sets),
     totalSets: sets.length,
-    staleVersionCount: staleVersionDirs.length,
     unreadableCount: unreadableDirs.length,
     unreadablePaths: unreadableDirs,
   };

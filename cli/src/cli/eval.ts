@@ -41,8 +41,8 @@ import {
   uploadRunBlobs,
   type UploadClient,
 } from "../hosted/uploadAndFinalize.js";
-import { readLatestRun, toTwinHttpEvent } from "../recorder/artifacts.js";
-import { redactEvent, redactSecrets } from "../recorder/redaction.js";
+import { readLatestRun } from "../recorder/artifacts.js";
+import { redactSecrets } from "../recorder/redaction.js";
 import {
   criterionRowLine,
   runScoreLine,
@@ -52,7 +52,6 @@ import {
 } from "../hosted/evalResultView.js";
 import { resolveCredentials } from "./credentials.js";
 import { readManifest } from "./project-config.js";
-import type { RecorderEvent as LegacyGithubRecorderEvent } from "@pome-sh/wire";
 import { isLegacyEventRow, type FinalizeResponse } from "../types/shared.js";
 
 const EVAL_SESSION_FILE = "eval-session.json";
@@ -158,11 +157,22 @@ function validateJsonl(name: string, raw: string): void {
     const line = lines[i]!.trim();
     if (line.length === 0) continue;
     nonEmpty += 1;
+    let parsed: unknown;
     try {
-      JSON.parse(line);
+      parsed = JSON.parse(line);
     } catch {
       throw new HostedUsageError(
         `pome eval: ${name} is corrupt — line ${i + 1} is not valid JSON.`,
+      );
+    }
+    // The control plane refuses an un-kinded row with 426 using this same
+    // predicate, so refusing here only saves the round trip — it can never
+    // reject something cloud would have accepted. Deliberately NOT
+    // `eventSchema.parse`: strict parsing would also reject the terse
+    // hand-assembled dirs `pome eval` accepts.
+    if (name === "events.jsonl" && isLegacyEventRow(parsed)) {
+      throw new HostedUsageError(
+        `pome eval: events.jsonl line ${i + 1} has no "kind" — it was recorded before the unified event shape, and the control plane refuses it. Re-run the task to record the trace again.`,
       );
     }
   }
@@ -418,36 +428,10 @@ export async function runEval(options: RunEvalOptions): Promise<RunEvalResult> {
       apiKey: options.hosted.apiKey,
     });
 
-  // Re-apply wrapping + redaction before anything leaves the machine.
-  // events.jsonl and the state blobs are written pre-redacted (and
-  // pre-wrapped) by artifacts.ts, but `pome eval` also accepts hand-assembled
-  // dirs — redaction is idempotent, so this is cheap insurance that mirrors
-  // what the hosted runner uploads (cloud's schema gate rejects raw
-  // legacy rows).
-  //
-  // Only LEGACY rows (no `kind` discriminator) get wrapped into
-  // a TwinHttpEvent. Rows that already carry a `kind` (any union member —
-  // LlmTurnEvent, ToolUseEvent, LlmCallEvent, …) are preserved as-is: routing
-  // them through toTwinHttpEvent re-wraps every non-TwinHttpEvent kind,
-  // clobbering `kind` to "TwinHttpEvent" and setting event_id to an absent
-  // `request_id` (an old corruption bug).
-  const eventsJsonl =
-    artifacts.eventsJsonl
-      .split("\n")
-      .filter((line) => line.trim().length > 0)
-      .map((line) => {
-        const parsed = JSON.parse(line) as unknown;
-        // Already-kinded rows pass through unchanged (redacted). Only legacy
-        // rows are wrapped — and we do NOT re-validate kinded rows here: the
-        // original path never did, cloud's schema gate is the arbiter, and
-        // strict parsing would reject the intentionally-terse hand-assembled
-        // dirs `pome eval` also accepts.
-        const event = isLegacyEventRow(parsed)
-          ? toTwinHttpEvent(parsed as LegacyGithubRecorderEvent)
-          : parsed;
-        return JSON.stringify(redactEvent(event));
-      })
-      .join("\n") + "\n";
+  // Redaction is re-applied before anything leaves the machine: artifacts.ts
+  // writes events.jsonl pre-redacted, but `pome eval` also accepts
+  // hand-assembled dirs, and redaction is idempotent.
+  const eventsJsonl = redactJsonl(artifacts.eventsJsonl);
   const blobs = {
     eventsJsonl,
     stateInitialJson: JSON.stringify(

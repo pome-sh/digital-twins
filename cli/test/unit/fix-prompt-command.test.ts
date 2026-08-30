@@ -268,8 +268,9 @@ describe("pome fix-prompt command", () => {
     expect(stderr.join("\n")).toContain("No finalized run sets");
   });
 
-  // A verdict.json this CLI can't read must never render as an absence.
-  describe("a verdict.json at another artifact version is a named skip", () => {
+  // A verdict.json this CLI can't read must never render as an absence — a
+  // prior-version file lands in the unreadable line like any other.
+  describe("a verdict.json an older CLI wrote is a named skip", () => {
     async function writeStaleTrial(root: string, sid: string): Promise<void> {
       const runDir = join(root, "runs", "scn", sid);
       await mkdir(runDir, { recursive: true });
@@ -289,7 +290,7 @@ describe("pome fix-prompt command", () => {
       await writeFile(join(runDir, "events.jsonl"), EVENT, "utf8");
     }
 
-    it("a root holding only stale trials names the version, not 'no runs'", async () => {
+    it("a root holding only prior-version trials names the skip, not 'no runs'", async () => {
       const dir = await mkdtemp(join(tmpdir(), "fixcmd-stale-only-"));
       await writeStaleTrial(dir, "ses_v1");
       process.chdir(dir);
@@ -298,13 +299,13 @@ describe("pome fix-prompt command", () => {
       expect(process.exitCode).toBe(5);
       const err = stderr.join("\n");
       expect(err).toContain("1 verdict.json file(s)");
-      expect(err).toContain(`artifact version ${VERDICT_ARTIFACT_VERSION}`);
+      expect(err).toContain("written by an older CLI");
       // The distinct-state requirement: this must NOT be the message a truly
       // empty runs/ gets.
       expect(err).not.toContain("No finalized run sets");
     });
 
-    it("a root holding stale trials beside readable ones still names the skip AND prints the prompt", async () => {
+    it("a root holding prior-version trials beside readable ones still names the skip AND prints the prompt", async () => {
       const dir = await mkdtemp(join(tmpdir(), "fixcmd-stale-mixed-"));
       await writeStaleTrial(dir, "ses_v1");
       await writeTrial(dir, "ses_2", {
@@ -330,7 +331,7 @@ describe("pome fix-prompt command", () => {
   });
 
   // A verdict.json that EXISTS but is damaged (truncated, hand-edited, or an
-  // unexpected `state`) is a different fact from a stale-version file (an older CLI.
+  // unexpected `state`) is named with its path, not just counted.
   describe("a corrupt current-version verdict.json is a named skip that points at the path", () => {
     async function writeCorruptTrial(root: string, sid: string): Promise<string> {
       const runDir = join(root, "runs", "scn", sid);
@@ -343,7 +344,7 @@ describe("pome fix-prompt command", () => {
       return runDir;
     }
 
-    it("a root holding only a corrupt trial names the path, not 'no runs', and not the stale-version wording", async () => {
+    it("a root holding only a corrupt trial names the path, not 'no runs'", async () => {
       const dir = await mkdtemp(join(tmpdir(), "fixcmd-unreadable-only-"));
       const runDir = await writeCorruptTrial(dir, "ses_bad");
       process.chdir(dir);
@@ -355,7 +356,6 @@ describe("pome fix-prompt command", () => {
       expect(err).toContain("could not be read");
       expect(err).toContain(runDir);
       expect(err).not.toContain("No finalized run sets");
-      expect(err).not.toContain("artifact version");
     });
 
     it("a root holding a corrupt trial beside a readable failed one still names the corrupt path AND prints the prompt", async () => {
