@@ -7,7 +7,7 @@
 // is added, and a hand-picked list of "control-plane talkers" is the same
 // hand-maintained list this deletes.
 
-import type { Command } from "commander";
+import { Command } from "commander";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createProgram } from "../../src/cli/main.js";
@@ -25,6 +25,13 @@ function path(cmd: Command): string {
 
 const GLOBAL_FLAGS = ["--api-url", "--artifacts-dir"];
 
+/** Every command in the tree that declares `flag` itself. */
+function declaredBy(root: Command, flag: string): string[] {
+  return allCommands(root)
+    .filter((cmd) => cmd.options.some((opt) => opt.long === flag))
+    .map(path);
+}
+
 describe("program-level flags", () => {
   const saved = process.env.POME_API_URL;
 
@@ -34,10 +41,15 @@ describe("program-level flags", () => {
   });
 
   it.each(GLOBAL_FLAGS)("%s is declared exactly once, on the root", (flag) => {
-    const declaredBy = allCommands(createProgram())
-      .filter((cmd) => cmd.options.some((opt) => opt.long === flag))
-      .map(path);
-    expect(declaredBy).toEqual(["pome"]);
+    expect(declaredBy(createProgram(), flag)).toEqual(["pome"]);
+  });
+
+  // Green on today's tree proves nothing: the defect this gate exists for is a
+  // subcommand re-declaring the flag, so declare one and see it named.
+  it.each(GLOBAL_FLAGS)("%s: a subcommand re-declaring it is caught", (flag) => {
+    const program = new Command("pome").option(`${flag} <value>`, "Root copy");
+    program.command("run").option(`${flag} <value>`, "Second copy");
+    expect(declaredBy(program, flag)).toEqual(["pome", "pome run"]);
   });
 
   // `program.configureHelp({ showGlobalOptions: true })` is the only reason these
