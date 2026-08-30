@@ -33,7 +33,7 @@ import {
   displaySentence,
   findCheck,
   localDigest,
-  pinnedVersion,
+  pinLabel,
   twinOf,
   type DeclaredCheck,
 } from "./checks.js";
@@ -76,7 +76,6 @@ export async function handshake(
   twin: string,
   fetchRemote: (twin: string) => Promise<RemoteChecks>,
 ): Promise<HandshakeResult> {
-  const pin = pinnedVersion(`@pome-sh/twin-${twin}`);
   let remote: RemoteChecks;
   try {
     remote = await fetchRemote(twin);
@@ -85,7 +84,7 @@ export async function handshake(
       kind: "unverified",
       note:
         `Not verified against the cloud (${err instanceof Error ? err.message : "unreachable"}). ` +
-        `Writing from the local pin: @pome-sh/twin-${twin} ${pin}.`,
+        `Writing from the local pin: ${pinLabel(`@pome-sh/twin-${twin}`)}.`,
     };
   }
 

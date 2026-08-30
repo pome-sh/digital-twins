@@ -38,7 +38,8 @@
     "./failure-injection-rules": {
       "types": "./dist/failure-injection-rules.d.ts",
       "default": "./dist/failure-injection-rules.js"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "repository": {
     "type": "git",

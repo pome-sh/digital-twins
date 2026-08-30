@@ -27,7 +27,7 @@
  */
 import { checkPattern, templateSlots } from "@pome-sh/sdk/checks";
 
-import { checksFor, localDigest, pinnedVersion, type DeclaredCheck } from "./checks.js";
+import { checksFor, localDigest, pinLabel, type DeclaredCheck } from "./checks.js";
 
 /** One check as `GET /v1/checks` publishes it. */
 export interface RemoteCheck {
@@ -226,8 +226,8 @@ export function formatSkewRefusal(twin: string, findings: readonly SkewFinding[]
       `sentence written here might not be graded there.`,
     ...findings.flatMap(bullet),
     "",
-    `  local @pome-sh/twin-${twin} ${pinnedVersion(`@pome-sh/twin-${twin}`)}` +
-      (sdkImplicated ? `, @pome-sh/sdk ${pinnedVersion("@pome-sh/sdk")}` : ""),
+    `  local ${pinLabel(`@pome-sh/twin-${twin}`)}` +
+      (sdkImplicated ? `, ${pinLabel("@pome-sh/sdk")}` : ""),
     ...(sdkImplicated
       ? [`  The cloud publishes no sdk version here, so that is the only pin this CLI can name.`]
       : []),

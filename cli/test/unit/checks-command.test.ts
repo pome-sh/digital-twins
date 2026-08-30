@@ -1,8 +1,24 @@
 // SPDX-License-Identifier: Apache-2.0
+import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MOUNTED_TWINS } from "../../src/contract/index.js";
 import { createProgram } from "../../src/cli/main.js";
-import { checksFor, twinsWithoutChecks } from "../../src/cli/checks.js";
+import {
+  checksFor,
+  checksHeader,
+  pinLabel,
+  pinnedVersion,
+  twinsWithoutChecks,
+} from "../../src/cli/checks.js";
+
+// Read straight from the workspace tree, on purpose: the assertion must not
+// share a resolution mechanism with the code under test.
+function workspaceVersion(dir: string): string {
+  const manifest = JSON.parse(
+    readFileSync(new URL(`../../../packages/${dir}/package.json`, import.meta.url), "utf8"),
+  ) as { version: string };
+  return manifest.version;
+}
 
 interface CapturedConsole {
   log: string[];
@@ -64,6 +80,56 @@ describe("pome checks", () => {
     await createProgram().parseAsync(["node", "pome", "checks", "gitbub"]);
     expect(process.exitCode).toBe(2);
     expect(captured.error.join("\n")).toContain("github");
+  });
+
+  // F-1791: the header printed "(@pome-sh/twin-github unknown)" on every
+  // install. The old lookup read the CLI's own `dependencies`, but tsup INLINES
+  // the twins now — they are devDependency workspace links, so that manifest
+  // key can never name them again. The version that belongs here is the one of
+  // the twin code actually riding in this process.
+  it("names the inlined twin version in the header, never 'unknown'", async () => {
+    const captured = captureConsole();
+    await createProgram().parseAsync(["node", "pome", "checks", "github"]);
+    const header = captured.log[0]!;
+    expect(header).toContain(`(@pome-sh/twin-github ${workspaceVersion("twin-github")})`);
+    expect(header).not.toContain("unknown");
+  });
+
+  it("resolves an inlined package's version from the workspace link in dev", () => {
+    expect(pinnedVersion("@pome-sh/twin-github")).toBe(workspaceVersion("twin-github"));
+    expect(pinnedVersion("@pome-sh/sdk")).toBe(workspaceVersion("sdk"));
+  });
+
+  // The honest branch: when no version is resolvable the parenthetical is
+  // OMITTED — a word like "unknown" in the first line of the vocabulary
+  // listing reads as a defect, which is exactly how F-1791 was filed.
+  it("omits the version parenthetical entirely when it cannot be resolved", () => {
+    expect(pinnedVersion("@pome-sh/no-such-package")).toBeUndefined();
+    expect(checksHeader("github", 16, undefined)).toBe("github — 16 declared checks");
+    expect(pinLabel("@pome-sh/no-such-package")).toBe("@pome-sh/no-such-package");
+  });
+
+  // The published tarball has no workspace to fall back to, so the build must
+  // bake the versions in. Assert the map the tsup config defines, not the
+  // bundling itself: every inlined @pome-sh package, each with a real version.
+  it("bakes a version for every inlined @pome-sh package into the bundle", async () => {
+    const config = (await import("../../tsup.config.js")).default as {
+      define?: Record<string, string>;
+    };
+    const baked = JSON.parse(JSON.parse(config.define!.POME_INLINED_PKG_VERSIONS!)) as Record<
+      string,
+      string
+    >;
+    const manifest = JSON.parse(
+      readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
+    ) as { devDependencies: Record<string, string> };
+    const inlined = Object.keys(manifest.devDependencies).filter((dep) =>
+      dep.startsWith("@pome-sh/"),
+    );
+    expect(inlined.length).toBeGreaterThan(0);
+    for (const dep of inlined) {
+      expect(baked[dep], `${dep} has no baked version`).toMatch(/^\d+\.\d+\.\d+/);
+    }
   });
 
   it("--json emits the declaration plus a digest, for skills and agents", async () => {
