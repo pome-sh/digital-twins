@@ -20,23 +20,20 @@
 //   - It carries no `_meta`. A generated starter is a seed file, not a compiled
 //     task sidecar.
 //
-// TWO DESTINATIONS, ONE RULE EACH — and `--for-task` picks the destination, not
-// the shape.
+// ONE SHAPE PER TWIN COUNT, AND EVERY DOOR TAKES IT: flat for exactly one twin,
+// the per-twin envelope `{ <twin>: <flat seed> }` for two or more. That is
+// `parseTask`'s rule for a `<task>.seed.json` sidecar since 2026-05-12, and
+// `seedFile.ts` — the one door `twin start --seed` and `sandbox create --seed`
+// both read — accepts both shapes. So the generated file needs no destination
+// flag: it works at all three, unchanged.
 //
-//   a DOOR file (`twin start --seed`, `sandbox create --seed`) is always the
-//   per-twin envelope, one twin or five. It is handed around on its own, so it
-//   has to say which twin it is for, and it must not change shape the moment its
-//   author adds a second twin ([DECISION] on F-1685, 2026-08-26).
+// The cost is that a flat file names no twin, so a single-twin seed needs the
+// name at two of the three doors: the `<name>` argument on `twin start`, and
+// `--twin` on `sandbox create`. That is `seedFile.ts`'s standing rule for every
+// flat seed, not something this generator introduces — the stderr hint below
+// spells both commands out with the name already in them.
 //
-//   a SIDECAR (`<task>.seed.json`) is flat for one twin and the envelope for
-//   more, because the `<task>.md` beside it already names its twins in
-//   `## Config`. That is `parseTask`'s rule since 2026-05-12 and this does not
-//   change it — `--for-task` just emits what that rule asks for.
-//
-// So the two outputs are identical from two twins up, and `twinSeedForTask.test.ts`
-// asserts that convergence so `--for-task` cannot drift into a second format.
-//
-// The sidecar half closes a real hole: `pome compile-seeds` emits one only for a
+// This also closes a real hole: `pome compile-seeds` emits a sidecar only for a
 // single-twin GITHUB task, so slack, stripe, gmail and linear task seeds have
 // always been hand-written — the same standing invitation to drift that left
 // three documented examples unable to boot.
@@ -51,10 +48,7 @@ import { isTwinName, TWIN_NAMES, TWIN_REGISTRY, type TwinName } from "./registry
  * docs page and a CI gate hold the generated content to equality rather than to
  * "looks about right".
  */
-export async function generateSeedFile(
-  twins: readonly TwinName[],
-  opts: { forTask?: boolean } = {},
-): Promise<string> {
+export async function generateSeedFile(twins: readonly TwinName[]): Promise<string> {
   if (twins.length === 0) {
     throw new Error(`No twin specified. Pass at least one of: ${TWIN_NAMES.join(", ")}.`);
   }
@@ -75,9 +69,11 @@ export async function generateSeedFile(
     const entry = TWIN_REGISTRY[twin];
     envelope[twin] = await entry.parseSeed(await entry.defaultSeed());
   }
-  // The one place the two destinations differ. Everywhere else — two twins or
-  // five, door or sidecar — the bytes are the same.
-  const body = opts.forTask && twins.length === 1 ? envelope[twins[0]!] : envelope;
+  // Flat for one, envelope for several. One twin's seed needs no key to say
+  // which twin it is: everything that reads it was already told, by the `<name>`
+  // argument on `twin start`, by `--twin` on `sandbox create`, or by `## Config`
+  // in the task beside the sidecar.
+  const body = twins.length === 1 ? envelope[twins[0]!] : envelope;
   return `${JSON.stringify(body, null, 2)}\n`;
 }
 
@@ -101,9 +97,9 @@ export async function writeSeedFile(path: string, text: string): Promise<void> {
 
 export async function runTwinSeedCommand(
   names: string[],
-  options: { out?: string; forTask?: boolean } = {},
+  options: { out?: string } = {},
 ): Promise<void> {
-  const text = await generateSeedFile(names as TwinName[], { forTask: options.forTask });
+  const text = await generateSeedFile(names as TwinName[]);
   if (options.out === undefined) {
     process.stdout.write(text);
     return;
@@ -111,11 +107,19 @@ export async function runTwinSeedCommand(
   await writeSeedFile(options.out, text);
   // stderr, so `pome twin seed github --out seed.json` says what it did without
   // that line landing in a file when someone also redirects stdout.
-  const what = options.forTask ? "task seed" : "starting seed";
-  console.error(`Wrote ${options.out} — the ${names.join(" + ")} ${what}.`);
+  console.error(`Wrote ${options.out} — the ${names.join(" + ")} starting seed.`);
+  // All three doors, because this is the one place a reminder lands for free —
+  // and both commands carry the twin name, which a flat single-twin file does not.
+  // `twin start` boots one twin, so it names one even when the file covers five.
   console.error(
-    options.forTask
-      ? `Put it next to a task whose \`## Config\` reads twins: [${names.join(", ")}], named <task>.seed.json.`
-      : `Boot it: pome twin start ${names[0]} --seed ${options.out}`,
+    `Boot ${names.length === 1 ? "it" : "one"} locally: pome twin start ${names[0]} --seed ${options.out}`,
+  );
+  console.error(
+    `Hosted: pome sandbox create ${names.map((twin) => `--twin ${twin}`).join(" ")} --seed ${options.out}`,
+  );
+  console.error(
+    names.length === 1
+      ? `As a task seed: drop it beside a ${names[0]} task as <task>.seed.json.`
+      : `As a task seed: drop it beside a task whose \`## Config\` reads twins: [${names.join(", ")}], named <task>.seed.json.`,
   );
 }

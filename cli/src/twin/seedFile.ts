@@ -10,8 +10,9 @@
 //   flat      { "repositories": [ … ] }              one twin's seed
 //   envelope  { "github": { "repositories": [ … ] }} twin id → that twin's seed
 //
-// The envelope is the shape to write and the shape `pome twin seed` generates.
-// Flat is kept because F-1686 shipped it and eight of the twenty
+// `pome twin seed` generates flat for one twin and the envelope for several, and
+// both shapes are equally first-class here.
+// Flat is also load-bearing because F-1686 shipped it and eight of the twenty
 // `<task>.seed.json` files in agent-examples/ are one; the other twelve are
 // already envelopes, and before this module `twin start github --seed <one of
 // those>` failed on `repositories: expected array, received undefined`.

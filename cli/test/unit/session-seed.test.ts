@@ -167,7 +167,11 @@ describe("pome sandbox create --seed", () => {
     expect(mocks.createSession).not.toHaveBeenCalled();
   });
 
-  it("still needs --twin when the file is flat and names nothing", async () => {
+  // `pome twin new-seed <twin>` writes a FLAT file, so this is the path a reader
+  // who copied the README takes. The generic "No twin specified" never mentioned
+  // the seed, which reads as if `--twin` had simply been forgotten — so the
+  // message says the file is flat and spells the fix out (F-1762).
+  it("still needs --twin when the file is flat, and says so naming the seed", async () => {
     await expect(
       runSessionCreate({
         apiBaseUrl: "https://api.example.com",
@@ -175,7 +179,9 @@ describe("pome sandbox create --seed", () => {
         json: false,
         seedPath: await seedFile(GITHUB_SEED),
       }),
-    ).rejects.toThrow(/No twin specified/);
+    ).rejects.toThrow(
+      /is a flat seed, so it does not name a twin\. Pass the name: pome sandbox create --twin </,
+    );
   });
 
   // F-1688: a seed the pod refuses reports as `503 Failed to spawn twin pod`

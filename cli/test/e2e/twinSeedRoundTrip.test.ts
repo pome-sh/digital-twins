@@ -3,12 +3,12 @@
 // processes: generate → `--seed` it → the twin SERVES what the file declares.
 //
 //     pome twin seed <twin> --out seed.json
-//     pome twin start --seed seed.json          <- name omitted on purpose
+//     pome twin start <twin> --seed seed.json   <- name given, because the file is flat
 //     GET /s/standalone/_pome/state             <- read back
 //
-// The `<name>` argument is left off deliberately: a generated file is a one-twin
-// envelope, so it already says which twin it is for, and that is the path a
-// reader who copied the two commands out of the docs actually takes.
+// The `<name>` argument is passed because a one-twin generated file is FLAT and a
+// flat seed names no twin (F-1762). This is verbatim the pair of commands the
+// README prints, so a reader who copies them out takes exactly this path.
 //
 // WHAT THE ASSERTION IS PULLED FROM. Every expected value is read out of the
 // GENERATED FILE, never typed here. A hard-coded `acme/api` would turn any
@@ -89,15 +89,15 @@ describe("pome twin seed → pome twin start --seed (e2e)", () => {
       expect(generated.code, generated.output).toBe(0);
 
       const file = JSON.parse(await readFile(seedPath, "utf8")) as Record<string, unknown>;
-      // One twin, one envelope key: the shape the reader is told to write.
-      expect(Object.keys(file)).toEqual([twin]);
-      const declared = DECLARED[twin](file[twin] as never);
+      // One twin, so the file is that twin's flat seed — its own fields, no key
+      // naming the twin.
+      expect(Object.keys(file)).not.toContain(twin);
+      const declared = DECLARED[twin](file as never);
 
       const port = await freePort();
-      // No `<name>`: the envelope names exactly one twin, so the file supplies it.
       child = spawn(
         TSX_BIN,
-        [MAIN_TS, "twin", "start", "--port", String(port), "--seed", seedPath],
+        [MAIN_TS, "twin", "start", twin, "--port", String(port), "--seed", seedPath],
         { cwd, env: { ...process.env }, stdio: ["ignore", "pipe", "pipe"] },
       );
       let output = "";
@@ -140,7 +140,7 @@ describe("pome twin seed → pome twin start --seed (e2e)", () => {
         // declare is not. 401 is "no such credential" — the seeded key gets past
         // that, an invented one does not, and that difference is the only place
         // stripe's seeded `api_keys` is observable from outside the twin.
-        const declaredKey = (file.stripe as { api_keys: { key: string }[] }).api_keys[0]!.key;
+        const declaredKey = (file as unknown as { api_keys: { key: string }[] }).api_keys[0]!.key;
         const withSeeded = await fetch(`${base}/s/standalone/v1/customers`, {
           headers: { Authorization: `Bearer ${declaredKey}` },
         });
@@ -164,9 +164,11 @@ describe("pome twin seed → pome twin start --seed (e2e)", () => {
       const second = await runCli(["twin", "seed", "github", "--out", seedPath], cwd);
       expect(second.code).not.toBe(0);
       expect(second.output).toContain("already exists");
-      // The stripe seed is still there, unedited.
+      // The stripe seed is still there, unedited: `api_keys` is a stripe seed
+      // field and no github one, so this fails if the second call overwrote it.
       const kept = JSON.parse(await readFile(seedPath, "utf8")) as Record<string, unknown>;
-      expect(Object.keys(kept)).toEqual(["stripe"]);
+      expect(Object.keys(kept)).toContain("api_keys");
+      expect(Object.keys(kept)).not.toContain("repositories");
     },
     120_000,
   );
