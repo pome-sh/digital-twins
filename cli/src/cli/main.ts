@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// file-size: the whole CLI command surface — 31 `.command()` registrations plus their
+// file-size: the whole CLI command surface — 29 `.command()` registrations plus their
 // options, in one file so `pome --help` and this module list the same commands in the
 // same order. Splitting per command moves a registration away from its siblings, which
 // is how two commands end up disagreeing about a shared flag's name or default.
 // SPDX-License-Identifier: Apache-2.0
 import { Command } from "commander";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
-import { cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -80,7 +80,7 @@ import {
   readManifest,
   writeManifest,
 } from "./project-config.js";
-import { createGitHubSmokeApp, isTwinName, TWIN_NAME_LIST } from "../twin/registry.js";
+import { createGitHubSmokeApp, TWIN_NAME_LIST } from "../twin/registry.js";
 import {
   buildFixPrompt,
   buildGroupFixPrompt,
@@ -1342,7 +1342,7 @@ export function createProgram() {
   const twin = program
     .command("twin")
     .summary("Run a twin on this machine")
-    .description("Start and reset a twin on this machine, print its status or a starter seed file");
+    .description("Start a twin on this machine, print its status or a starter seed file");
   twin
     .command("start")
     .argument(
@@ -1382,37 +1382,6 @@ export function createProgram() {
     });
 
   twin
-    .command("reset")
-    // The name defaults rather than being required, matching `twin start`, and
-    // the success line names the twin it acted on.
-    //
-    // The description names the paths rather than promising an outcome: `twin
-    // start` boots the twin in process, every twin opens an in-memory database
-    // unless a `*_DB` path is set, and it re-seeds on every boot. So a reset
-    // does not decide what the next start begins from.
-    .argument("[name]", "Twin name", "github")
-    .summary("Reset a twin's saved state")
-    .description(
-      "Delete the twin's database under `.pome/` or `.pome-data/`, and `.pome/twin-status.json`, the one file `pome twin status` reads for every twin. A twin holding its state in memory has nothing to delete.",
-    )
-    .action(async (name: string) => {
-      if (!isTwinName(name)) {
-        throw new Error(`Unknown twin '${name}'. Supported: ${TWIN_NAME_LIST.join(", ")}.`);
-      }
-      const dbPaths =
-        name === "gmail"
-          ? [".pome/gmail.db", ".pome-data/gmail/gmail.db"]
-          : [`.pome/${name}.db`, `.pome-data/${name}/${name}.db`];
-      for (const dbPath of dbPaths) {
-        await rm(dbPath, { force: true });
-        await rm(`${dbPath}-wal`, { force: true });
-        await rm(`${dbPath}-shm`, { force: true });
-      }
-      await rm(".pome/twin-status.json", { force: true });
-      console.log(`Standalone ${name} twin state reset.`);
-    });
-
-  twin
     .command("status")
     .description("Print standalone twin status")
     .action(async () => {
@@ -1421,26 +1390,6 @@ export function createProgram() {
         return;
       }
       console.log(await import("node:fs/promises").then((fs) => fs.readFile(".pome/twin-status.json", "utf8")));
-    });
-
-  program
-    .command("endpoints")
-    .summary("List a twin's endpoints")
-    .argument("<name>", "Twin name")
-    .description("List the endpoints the github or gmail twin serves")
-    .action((name: string) => {
-      const endpoints =
-        name === "github"
-          ? SUPPORTED_GITHUB_ENDPOINTS
-          : name === "gmail"
-            ? SUPPORTED_GMAIL_ENDPOINTS
-            : null;
-      if (!endpoints) {
-        throw new Error("Endpoint listing is available for: github, gmail.");
-      }
-      for (const endpoint of endpoints) {
-        console.log(`${endpoint}  semantic`);
-      }
     });
 
   program
@@ -1501,45 +1450,6 @@ export function createProgram() {
 
   return program;
 }
-
-const SUPPORTED_GITHUB_ENDPOINTS = [
-  "GET /repos/:owner/:repo",
-  "GET /repos/:owner/:repo/issues",
-  "GET /repos/:owner/:repo/issues/:number",
-  "PATCH /repos/:owner/:repo/issues/:number",
-  "POST /repos/:owner/:repo/issues/:number/comments",
-  "GET /repos/:owner/:repo/labels",
-  "POST /repos/:owner/:repo/labels",
-  "GET /repos/:owner/:repo/issues/:number/labels",
-  "POST /repos/:owner/:repo/issues/:number/labels",
-  "DELETE /repos/:owner/:repo/issues/:number/labels/:name",
-  "GET /repos/:owner/:repo/collaborators",
-  "POST /repos/:owner/:repo/issues/:number/assignees"
-];
-
-const SUPPORTED_GMAIL_ENDPOINTS = [
-  "GET /gmail/v1/users/:userId/profile",
-  "GET|POST /gmail/v1/users/:userId/messages",
-  "GET|DELETE /gmail/v1/users/:userId/messages/:id",
-  "POST /gmail/v1/users/:userId/messages/{send,import,batchModify,batchDelete}",
-  "POST /gmail/v1/users/:userId/messages/:id/{modify,trash,untrash}",
-  "GET /gmail/v1/users/:userId/messages/:messageId/attachments/:id",
-  "GET|POST /gmail/v1/users/:userId/drafts",
-  "GET|PUT|DELETE /gmail/v1/users/:userId/drafts/:id",
-  "POST /gmail/v1/users/:userId/drafts/send",
-  "GET /gmail/v1/users/:userId/threads",
-  "GET|DELETE /gmail/v1/users/:userId/threads/:id",
-  "POST /gmail/v1/users/:userId/threads/:id/{modify,trash,untrash}",
-  "GET|POST /gmail/v1/users/:userId/labels",
-  "GET|PUT|PATCH|DELETE /gmail/v1/users/:userId/labels/:id",
-  "GET /gmail/v1/users/:userId/history",
-  "GET|POST /gmail/v1/users/:userId/settings/filters",
-  "GET|DELETE /gmail/v1/users/:userId/settings/filters/:id",
-  "GET /gmail/v1/users/:userId/settings/{forwardingAddresses,sendAs}",
-  "GET /gmail/v1/users/:userId/settings/forwardingAddresses/:email",
-  "GET /gmail/v1/users/:userId/settings/sendAs/:email",
-  "POST /upload/gmail/v1/users/:userId/{messages,drafts} (media|multipart)",
-];
 
 async function taskFiles(target: string) {
   const resolved = resolve(target);

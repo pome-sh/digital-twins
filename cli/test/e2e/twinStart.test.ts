@@ -16,6 +16,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { sign } from "hono/jwt";
 import { afterEach, describe, expect, it } from "vitest";
+import { TWIN_NAME_LIST } from "../../src/twin/registry.js";
 import { resolveTsxBin } from "../../scripts/lib/resolve-tsx.js";
 
 const CLI_ROOT = fileURLToPath(new URL("../..", import.meta.url));
@@ -30,6 +31,23 @@ async function freePort(): Promise<number> {
   const { port } = srv.address() as { port: number };
   await new Promise((resolve) => srv.close(resolve));
   return port;
+}
+
+/** One-shot run for the cases that only read the command's output. */
+async function runCli(args: string[]): Promise<{ code: number | null; output: string }> {
+  const cwd = await mkdtemp(join(tmpdir(), "pome-twin-start-cli-e2e-"));
+  return await new Promise((resolve, reject) => {
+    const proc = spawn(TSX_BIN, [MAIN_TS, ...args], {
+      cwd,
+      env: process.env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let output = "";
+    proc.stdout?.on("data", (chunk) => { output += chunk; });
+    proc.stderr?.on("data", (chunk) => { output += chunk; });
+    proc.once("error", reject);
+    proc.once("exit", (code) => resolve({ code, output }));
+  });
 }
 
 let child: ChildProcess | undefined;
@@ -216,4 +234,21 @@ describe("pome twin start (e2e)", () => {
     },
     90_000,
   );
+});
+
+describe("pome twin start — unknown-twin error (e2e)", () => {
+  it("lists all five supported names, not just a subset", async () => {
+    const { code, output } = await runCli(["twin", "start", "nonexistent-twin-name"]);
+    expect(code).not.toBe(0);
+    for (const name of TWIN_NAME_LIST) {
+      expect(output).toContain(name);
+    }
+  });
+
+  it("--help documents every first-party twin in the <name> argument", async () => {
+    const { output } = await runCli(["twin", "start", "--help"]);
+    for (const name of TWIN_NAME_LIST) {
+      expect(output).toContain(name);
+    }
+  });
 });
