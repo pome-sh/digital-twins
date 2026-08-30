@@ -19,6 +19,9 @@ export interface CatalogExample {
   rel: string;
   /** The example's own package.json `description`. */
   description: string;
+  /** The example's own package.json `homepage`, set when a docs page walks it
+   *  end to end — `pome init --example` names it in the next steps. */
+  homepage?: string;
   /** Every file git tracks, relative to `rel`, sorted. */
   files: string[];
 }
@@ -181,6 +184,7 @@ export const CATALOG_EXAMPLES: CatalogExample[] = [
     rel: "agent-examples/support-triage",
     description:
       "Pome hero example: the support-triage examinee as a local Claude Agent SDK subprocess, wired to the GitHub + Slack twins over MCP.",
+    homepage: "https://docs.pome.sh/quickstart/coding-agent",
     files: [
       "README.md",
       "VERIFICATION.md",

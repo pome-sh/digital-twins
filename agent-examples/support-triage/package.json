@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Pome hero example: the support-triage examinee as a local Claude Agent SDK subprocess, wired to the GitHub + Slack twins over MCP.",
+  "homepage": "https://docs.pome.sh/quickstart/coding-agent",
   "scripts": {
     "start": "tsx src/index.ts",
     "test": "vitest run",

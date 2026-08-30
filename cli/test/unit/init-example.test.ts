@@ -215,6 +215,29 @@ describe("pome init --example <id>", () => {
     ).toMatch(/^\s*\d+\.\s*pome run tasks\//m);
   });
 
+  it("names the documented walk for an example a docs page drives — and keeps the CLI route", () => {
+    // support-triage is the capstone: the reader lands on `init --example`
+    // from the docs walk (coach skills → MCP → paste-prompt), so a next-steps
+    // that says only `pome login` + `pome run` forks them off it. Both routes
+    // print; the walk comes first.
+    const example = findExample("support-triage")!;
+    expect(example.homepage).toBe("https://docs.pome.sh/quickstart/coding-agent");
+
+    const summary = scaffoldSummary({ dir: example.id, example, ref: "main", fileCount: 12 });
+    const walkStep = summary.split("\n").findIndex((line) => line.includes(example.homepage!));
+    const cliStep = summary.split("\n").findIndex((line) => /pome login.*pome run tasks\//.test(line));
+    expect(walkStep).toBeGreaterThan(-1);
+    expect(cliStep).toBeGreaterThan(walkStep);
+
+    // An example no docs page walks keeps the plain CLI next-steps: no
+    // homepage, no walk line.
+    const plain = findExample("gmail-retry-notify")!;
+    expect(plain.homepage).toBeUndefined();
+    expect(
+      scaffoldSummary({ dir: plain.id, example: plain, ref: "main", fileCount: 10 }),
+    ).not.toContain("documented walk");
+  });
+
   it("refuses a target directory that already holds something", async () => {
     const dir = await tempProject();
     await mkdir(join(dir, "merge-agent"), { recursive: true });

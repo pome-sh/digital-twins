@@ -36,14 +36,15 @@ function threw(fn) {
   }
 }
 
-/** A repo root holding `{ "<root>/<name>": { description, files } }`. */
+/** A repo root holding `{ "<root>/<name>": { description, homepage, files } }`. */
 function fixture(spec) {
   const root = mkdtempSync(join(tmpdir(), "example-catalog-"));
   const tracked = new Map();
-  for (const [rel, { description, files }] of Object.entries(spec)) {
+  for (const [rel, { description, homepage, files }] of Object.entries(spec)) {
     mkdirSync(join(root, rel), { recursive: true });
     const manifest = { name: `@pome-sh/${rel.split("/").at(-1)}-example` };
     if (description !== undefined) manifest.description = description;
+    if (homepage !== undefined) manifest.homepage = homepage;
     writeFileSync(join(root, rel, "package.json"), JSON.stringify(manifest));
     tracked.set(rel, files.map((file) => `${rel}/${file}`));
   }
@@ -140,6 +141,42 @@ const OK_FILES = ["package.json", "src/index.ts"];
     "9. files render sorted, so a readdir order change is not a diff",
     rendered.indexOf('"README.md"') < rendered.indexOf('"package.json"'),
     rendered,
+  );
+}
+
+{
+  const { root, listTrackedFiles } = fixture({
+    "agent-examples/walked": {
+      description: "Walked in the docs.",
+      homepage: "https://docs.pome.sh/quickstart/coding-agent",
+      files: OK_FILES,
+    },
+    "integration-examples/plain": { description: "No docs walk.", files: OK_FILES },
+  });
+  const entries = buildCatalog(root, listTrackedFiles);
+  const rendered = renderCatalog(entries);
+  check(
+    "13. a package.json homepage reaches the catalog; its absence emits no field",
+    entries[0].homepage === "https://docs.pome.sh/quickstart/coding-agent" &&
+      entries[1].homepage === undefined &&
+      rendered.includes('homepage: "https://docs.pome.sh/quickstart/coding-agent",') &&
+      !rendered.includes("homepage: undefined"),
+    JSON.stringify(entries.map((e) => e.homepage)),
+  );
+}
+
+{
+  const { root, listTrackedFiles } = fixture({
+    "agent-examples/walked": {
+      description: "Walked in the docs.",
+      homepage: "/quickstart/coding-agent",
+      files: OK_FILES,
+    },
+  });
+  check(
+    "14. a homepage that is not an absolute https URL is RED — it prints as a next step",
+    /not an absolute https URL/.test(threw(() => buildCatalog(root, listTrackedFiles)) ?? ""),
+    "buildCatalog emitted a homepage nobody can follow from a terminal",
   );
 }
 

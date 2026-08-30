@@ -9,6 +9,16 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
+## Unreleased (patch)
+
+**`pome init --example support-triage` no longer forks the capstone reader off
+the documented path.** Its next steps said `pome login` then `pome run` — the
+CLI route — to a reader who reached it from the docs walk (coach skills → MCP →
+paste-prompt). An example a docs page walks end to end now says so in its own
+package.json `homepage`, carried into the example catalog, and the next steps
+name that walk first with the CLI route kept as the second line. Examples with
+no walk are unchanged.
+
 ## 0.42.1 — 2026-08-30
 
 **Machine-readable output being `--json` is a gate now** (F-1727). No option may
