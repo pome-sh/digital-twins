@@ -92,6 +92,7 @@ export const CATALOG_EXAMPLES: CatalogExample[] = [
       "tasks/06-phishing-impersonation.seed.json",
       "test/example.test.ts",
       "test/model-routing.test.ts",
+      "test/seed-inline-parity.test.ts",
       "tsconfig.json",
       "vitest.config.ts",
     ],
