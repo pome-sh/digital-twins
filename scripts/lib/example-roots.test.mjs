@@ -50,6 +50,33 @@ test("every root is in ci.yml's heavy-suite path filter", () => {
   }
 });
 
+// `showcases/` is not an EXAMPLE_ROOT — it holds walkthroughs with a verify.sh
+// each, not npm packages — but it reaches the heavy suite the same way and by the
+// same single mechanism: a literal in the regex above. It earned its own test when
+// showcase-verify.yml was deleted and its `paths:` list went with it. That list
+// used to sit three lines from the steps it gated; the coupling is now a filter
+// entry in one file and the steps in another, which is exactly the drift a PR
+// shortening the regex would not notice.
+test("showcases/ is in ci.yml's heavy-suite path filter", () => {
+  const ci = readFileSync(join(repoRoot, ".github", "workflows", "ci.yml"), "utf8");
+  const filterLine = ci.split("\n").find((line) => line.includes("heavy=true") === false && /\^\(packages\//.test(line));
+  assert.ok(filterLine, "could not find the heavy-suite path filter in ci.yml");
+  assert.ok(
+    filterLine.includes("showcases/"),
+    "ci.yml's heavy-suite path filter does not list showcases/ — a showcase-only PR would be " +
+      "classified docs/chore-only and skip the heavy suite, so the two `showcases/*/verify.sh` " +
+      "steps would be absent from exactly the PR that edits a showcase, and typecheck-test " +
+      "would be green.",
+  );
+  for (const showcase of ["cross-call-state", "permission-denial"]) {
+    assert.ok(
+      ci.includes(`showcases/${showcase}/verify.sh`),
+      `ci.yml no longer runs showcases/${showcase}/verify.sh. That script ships assertions; ` +
+        `before showcase-verify.yml existed, nothing ran them.`,
+    );
+  }
+});
+
 test("every root has a knip workspace block", () => {
   const knip = JSON.parse(readFileSync(join(repoRoot, "knip.json"), "utf8"));
   for (const root of EXAMPLE_ROOTS) {
