@@ -67,9 +67,12 @@ describe("minimal-viktor task seeds", () => {
       });
 
       // Envelope-iff-multi-twin: every one of these declares `twins: [github, slack]`,
-      // so the seed must be the per-twin envelope. A top-level `_meta` would be read
-      // as a twin key and rejected — inline seeds are NOT `_meta`-stripped the way
-      // sidecars are, which is exactly the kind of thing that only bites hosted.
+      // so the seed must be the per-twin envelope, and its keys must be exactly the
+      // declared twins. `_meta` belongs INSIDE an arm, never at the top: only the
+      // sidecar path strips a top-level block, so an inline one is read as a twin
+      // key and refused by name. (Inside an arm it is stripped for both paths --
+      // `parseSeedForTwin` does it per arm since F-1689 made the seed schemas
+      // strict, which is what lets these six keep their provenance block.)
       it("is a per-twin envelope keyed github + slack", () => {
         const seed = JSON.parse(fencedJson(section!)!);
         expect(Object.keys(seed).sort()).toEqual(["github", "slack"]);
