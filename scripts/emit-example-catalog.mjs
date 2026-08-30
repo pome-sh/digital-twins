@@ -88,6 +88,18 @@ export function buildCatalog(repoRoot, listTrackedFiles = defaultListTrackedFile
       );
     }
 
+    // `homepage` is optional and means: a docs page walks THIS example end to
+    // end, and `pome init --example` should name it in the next steps. It must
+    // be an absolute https URL — a relative docs path printed in a terminal is
+    // a link nobody can follow.
+    const homepage = typeof pkg.homepage === "string" ? pkg.homepage.trim() : "";
+    if (homepage !== "" && !homepage.startsWith("https://")) {
+      throw new Error(
+        `${rel}/package.json has homepage "${homepage}", which is not an absolute https URL. ` +
+          "`pome init --example` prints it as a next step, so it has to be followable as printed.",
+      );
+    }
+
     const prefix = `${rel}/`;
     const files = listTrackedFiles(repoRoot, rel)
       .filter((path) => path.startsWith(prefix))
@@ -100,7 +112,7 @@ export function buildCatalog(repoRoot, listTrackedFiles = defaultListTrackedFile
       );
     }
 
-    entries.push({ id: name, root, rel, description, files });
+    entries.push({ id: name, root, rel, description, homepage: homepage || undefined, files });
   }
   return entries;
 }
@@ -117,6 +129,7 @@ export function renderCatalog(entries) {
         `    rel: ${JSON.stringify(entry.rel)},`,
         `    description:`,
         `      ${JSON.stringify(entry.description)},`,
+        ...(entry.homepage ? [`    homepage: ${JSON.stringify(entry.homepage)},`] : []),
         "    files: [",
         files,
         "    ],",
@@ -146,6 +159,9 @@ export interface CatalogExample {
   rel: string;
   /** The example's own package.json \`description\`. */
   description: string;
+  /** The example's own package.json \`homepage\`, set when a docs page walks it
+   *  end to end — \`pome init --example\` names it in the next steps. */
+  homepage?: string;
   /** Every file git tracks, relative to \`rel\`, sorted. */
   files: string[];
 }

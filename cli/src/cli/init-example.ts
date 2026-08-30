@@ -222,12 +222,31 @@ export function scaffoldSummary(result: ScaffoldResult): string {
   }
 
   const task = firstTaskFile(example);
+  const run = `pome run ${task ?? "<task>.md"}`;
+
+  // An example a docs page walks end to end (its package.json `homepage`,
+  // carried into the catalog) names that page first. The capstone reader
+  // arrives here MID-WALK — coach skills → MCP → paste-prompt — and a
+  // next-steps that says only `pome login` + `pome run` forks them onto the
+  // other route at the exact moment they are following the documented one.
+  // Both routes are real, so print both.
+  if (example.homepage) {
+    return (
+      `${header}\n` +
+      "Next steps:\n" +
+      `  1. cd ${dir}\n` +
+      "  2. npm install\n" +
+      `  3. Follow the documented walk: ${example.homepage}\n` +
+      `  4. Or from the CLI: pome login, then ${run}`
+    );
+  }
+
   return (
     `${header}\n` +
     "Next steps:\n" +
     `  1. cd ${dir}\n` +
     "  2. npm install\n" +
     "  3. pome login                    # one-time, opens the dashboard to sign in\n" +
-    `  4. pome run ${task ?? "<task>.md"}`
+    `  4. ${run}`
   );
 }
