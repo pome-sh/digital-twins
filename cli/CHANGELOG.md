@@ -9,6 +9,17 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
+## Unreleased (minor)
+
+**`pome twin seed` is now `pome twin new-seed`, and `--for-task` is gone**
+(F-1762). Producer and consumer shared a noun; the flag stays, the producer
+moved. A generated seed is flat for one twin and the per-twin envelope for
+several — one file for all three doors, naming the twin at two of them:
+`twin start <twin> --seed`, `sandbox create --twin <twin> --seed`, or a
+`<task>.seed.json` sidecar. Supersedes F-1685, which made a `--seed` file always
+an envelope so it could name its own twin.
+
+
 ## 0.41.0 — 2026-08-30
 
 **`pome eval` refuses an `events.jsonl` row with no `kind`** rather than wrapping it
