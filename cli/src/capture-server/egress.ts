@@ -101,7 +101,7 @@ export function parseAllowCsv(csv: string | undefined): string[] {
 // about to inject (loopback in self-host; hosted twin domains future-proof).
 //
 // `extraHosts` is the demo-mode valve: `pome demo` adds the
-// POME_API_BASE host so the bundled agent's anonymous-gateway calls
+// control-plane host so the bundled agent's anonymous-gateway calls
 // (POST /v1/demo/sessions/:id/llm) survive the deny-by-default floor. Same
 // pattern rules as everything else (exact host or `*.suffix`).
 export function buildEgressAllowlist(

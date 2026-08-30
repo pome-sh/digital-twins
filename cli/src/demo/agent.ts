@@ -10,7 +10,7 @@
 // LlmCallEvent rows.
 //
 // Env contract (beyond runTask's standard POME_* set):
-//   POME_DEMO_LLM_URL    — {POME_API_BASE}/v1/demo/sessions/{sid}/llm
+//   POME_DEMO_LLM_URL    — {api-base}/v1/demo/sessions/{sid}/llm
 //   POME_DEMO_TOKEN      — the trial session's demo_token (Bearer)
 //   POME_DEMO_TASK_NAME  — server-allowlisted task name ("first-run-demo")
 //   POME_DEMO_REPO       — "owner/name" the packaged seed created

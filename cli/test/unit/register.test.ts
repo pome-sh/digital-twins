@@ -204,13 +204,13 @@ describe("runRegisterAgent", () => {
     ).rejects.toBeInstanceOf(HostedOrchError);
   });
 
-  it("explains /v1/agents 404 as route/version skew", async () => {
+  it("points a /v1/agents 404 at the --api-url the caller passed", async () => {
     await writeManifest({ agent: { slug: "triage-bot" } });
     vi.spyOn(globalThis, "fetch").mockResolvedValue(response({}, { status: 404 }));
 
     await expect(
       runRegisterAgent({ apiBaseUrl: "https://api.example.com", dashboardBaseUrl: "https://app.example.com", name: "Triage Bot", force: false }),
-    ).rejects.toThrow(/not available|version/);
+    ).rejects.toThrow(/--api-url\/POME_API_URL/);
   });
 
   it("POSTs {name, twins} and prints the cloud's enabled services", async () => {

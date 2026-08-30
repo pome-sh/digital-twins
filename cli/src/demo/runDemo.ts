@@ -74,7 +74,7 @@ export type DemoTrialClient = Pick<
 >;
 
 export interface RunDemoOptions {
-  /** Control-plane base URL (POME_API_BASE, default https://api.pome.sh). */
+  /** Control-plane base URL (--api-url / POME_API_URL, default https://api.pome.sh). */
   apiBase: string;
   /** Dashboard base for the preview link (default https://app.pome.sh). */
   dashboardBase: string;

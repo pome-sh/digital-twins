@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// file-size: the whole CLI command surface — 29 `.command()` registrations plus their
+// file-size: the whole CLI command surface — 28 `.command()` registrations plus their
 // options, in one file so `pome --help` and this module list the same commands in the
 // same order. Splitting per command moves a registration away from its siblings, which
 // is how two commands end up disagreeing about a shared flag's name or default.
@@ -145,8 +145,26 @@ function readPackageVersion(): string {
   return "0.0.0";
 }
 
+/** `--api-url` and `--artifacts-dir` are declared once, on the root, so every
+ *  command inherits one default. A subcommand's own `opts()` is empty for an
+ *  inherited option, so every action that reads them goes through here. */
+function globals(cmd: Command): { apiUrl: string; artifactsDir: string } {
+  return cmd.optsWithGlobals() as { apiUrl: string; artifactsDir: string };
+}
+
 export function createProgram() {
   const program = new Command();
+
+  // Precedence, stated once: `--api-url` is flag > POME_API_URL > built-in
+  // default; `--artifacts-dir` is flag > "runs", with no env input.
+  program
+    .configureHelp({ showGlobalOptions: true })
+    .option(
+      "--api-url <url>",
+      "Control-plane base URL.",
+      process.env.POME_API_URL ?? DEFAULT_CONTROL_PLANE_URL,
+    )
+    .option("--artifacts-dir <dir>", "Directory for run artifacts", "runs");
 
   program
     .name("pome")
@@ -338,11 +356,6 @@ export function createProgram() {
     .summary("Sign in and save an API key")
     .description("Sign in with Clerk and store a hosted team API key (macOS Keychain or ~/.pome/credentials.json)")
     .option(
-      "--api-url <url>",
-      "Control-plane base URL.",
-      process.env.POME_API_URL ?? DEFAULT_CONTROL_PLANE_URL,
-    )
-    .option(
       "--dashboard-url <url>",
       "App URL for Clerk sign-in (must serve /cli/login).",
       process.env.POME_DASHBOARD_URL ?? DEFAULT_DASHBOARD_URL,
@@ -353,8 +366,11 @@ export function createProgram() {
       "pome login",
     )
     .action(
-      async (options: { apiUrl: string; dashboardUrl: string; keyName: string }) => {
-        await loginWithClerk(options);
+      async (
+        options: { dashboardUrl: string; keyName: string },
+        cmd: Command,
+      ) => {
+        await loginWithClerk({ ...options, apiUrl: globals(cmd).apiUrl });
       },
     );
 
@@ -453,19 +469,14 @@ export function createProgram() {
       (value: string, previous: string[] = []) => [...previous, value],
       [],
     )
-    .option(
-      "--api-url <url>",
-      "Control-plane URL",
-      process.env.POME_API_URL ?? DEFAULT_CONTROL_PLANE_URL,
-    )
     .description(
       "Add one [code] criterion by picking a declared check — pome writes the English",
     )
-    .action(async (file: string, opts: { check?: string; arg: string[]; apiUrl: string }) => {
+    .action(async (file: string, opts: { check?: string; arg: string[] }, cmd: Command) => {
       await runChecksAddCommand(file, {
         check: opts.check,
         arg: opts.arg,
-        apiBaseUrl: opts.apiUrl,
+        apiBaseUrl: globals(cmd).apiUrl,
       });
     });
 
@@ -505,11 +516,6 @@ export function createProgram() {
     .command("agent")
     .argument("<name>", "Human-readable agent name (e.g. \"triage-bot\")")
     .option(
-      "--api-url <url>",
-      "Control-plane URL",
-      process.env.POME_API_URL ?? DEFAULT_CONTROL_PLANE_URL,
-    )
-    .option(
       "--force",
       "Re-resolve the agent even when .pome/link.json already links one",
       false,
@@ -522,10 +528,14 @@ export function createProgram() {
       "Create a cloud agent under the current team and write agent.slug to pome.json",
     )
     .action(
-      async (name: string, opts: { apiUrl: string; force: boolean; twins?: string }) => {
+      async (
+        name: string,
+        opts: { force: boolean; twins?: string },
+        cmd: Command,
+      ) => {
         try {
           await runRegisterAgent({
-            apiBaseUrl: opts.apiUrl,
+            apiBaseUrl: globals(cmd).apiUrl,
             dashboardBaseUrl:
               process.env.POME_DASHBOARD_URL ?? DEFAULT_DASHBOARD_URL,
             name,
@@ -577,26 +587,23 @@ export function createProgram() {
       "Start the sandbox from a JSON or YAML seed file instead of each twin's default. A seed REPLACES the default; it does not merge. Same file `pome twin start --seed` takes; write one with `pome twin seed <name>`.",
     )
     .option(
-      "--api-url <url>",
-      "Control-plane URL",
-      process.env.POME_API_URL ?? DEFAULT_CONTROL_PLANE_URL,
-    )
-    .option(
       "--secrets-file <path>",
       "Write shell exports containing session secrets to a local file with mode 0600",
     )
     .option("--json", "Print the sandbox as JSON instead of the human summary.", false)
     .action(
-      async (opts: {
-        twin?: string[];
-        apiUrl: string;
-        secretsFile?: string;
-        json: boolean;
-        seed?: string;
-      }) => {
+      async (
+        opts: {
+          twin?: string[];
+          secretsFile?: string;
+          json: boolean;
+          seed?: string;
+        },
+        cmd: Command,
+      ) => {
         try {
           await runSessionCreate({
-            apiBaseUrl: opts.apiUrl,
+            apiBaseUrl: globals(cmd).apiUrl,
             twins: opts.twin ?? [],
             json: opts.json,
             secretsFile: opts.secretsFile,
@@ -612,11 +619,6 @@ export function createProgram() {
   session
     .command("list")
     .description("List hosted sandboxes (defaults to --state running, like the dashboard)")
-    .option(
-      "--api-url <url>",
-      "Control-plane URL",
-      process.env.POME_API_URL ?? DEFAULT_CONTROL_PLANE_URL,
-    )
     .option("--limit <n>", "Max rows", "20")
     .option(
       "--state <state>",
@@ -625,7 +627,10 @@ export function createProgram() {
     )
     .option("--json", "Print the sandboxes as JSON.", false)
     .action(
-      async (opts: { apiUrl: string; limit: string; state: string; json: boolean }) => {
+      async (
+        opts: { limit: string; state: string; json: boolean },
+        cmd: Command,
+      ) => {
         const validStates: SessionListStateFilter[] = [
           "running",
           "ready",
@@ -642,7 +647,7 @@ export function createProgram() {
         }
         try {
           await runSessionList({
-            apiBaseUrl: opts.apiUrl,
+            apiBaseUrl: globals(cmd).apiUrl,
             limit: Number.parseInt(opts.limit, 10) || 20,
             state: opts.state as SessionListStateFilter,
             json: opts.json,
@@ -659,11 +664,6 @@ export function createProgram() {
     .description("Stop a hosted sandbox")
     .argument("<session-id>", "Sandbox id (ses_…)")
     .option(
-      "--api-url <url>",
-      "Control-plane URL",
-      process.env.POME_API_URL ?? DEFAULT_CONTROL_PLANE_URL,
-    )
-    .option(
       "--discard",
       "Confirm destroying a session whose run has not been graded",
       false,
@@ -671,11 +671,12 @@ export function createProgram() {
     .action(
       async (
         sessionId: string,
-        opts: { apiUrl: string; discard?: boolean },
+        opts: { discard?: boolean },
+        cmd: Command,
       ) => {
         try {
           await runSessionStop({
-            apiBaseUrl: opts.apiUrl,
+            apiBaseUrl: globals(cmd).apiUrl,
             sessionId,
             discard: opts.discard === true,
           });
@@ -702,12 +703,6 @@ export function createProgram() {
       "-n, --trials <count>",
       "Number of trials to run as one group, 1 to 20. Hosted only; defaults to the task's `runs` field.",
     )
-    .option("--artifacts-dir <dir>", "Directory for run artifacts", "runs")
-    .option(
-      "--api-url <url>",
-      "Control-plane base URL.",
-      process.env.POME_API_URL ?? DEFAULT_CONTROL_PLANE_URL,
-    )
     .option("--agent-model <name>", "Informational; model name recorded on the run.", "unknown")
     .option(
       "--agent-version <version>",
@@ -730,14 +725,15 @@ export function createProgram() {
         options: {
           agent?: string;
           trials?: string;
-          artifactsDir: string;
           local?: boolean;
-          apiUrl: string;
           agentModel: string;
           agentVersion?: string;
           capture: boolean;
-        }
+        },
+        cmd: Command,
       ) => {
+        const { apiUrl, artifactsDir } = globals(cmd);
+
         // F0-5 — `pome run`'s pre-flight (resolving files, reading config,
         // resolving credentials) used to propagate plain `Error`s to
         // Commander's top-level catch, which always demoted to exit 2.
@@ -890,7 +886,7 @@ export function createProgram() {
         try {
           hostedCreds = useLocal
             ? null
-            : await resolveCredentials({ apiBaseUrl: options.apiUrl });
+            : await resolveCredentials({ apiBaseUrl: apiUrl });
         } catch (err) {
           const code = exitCodeFor(err);
           console.error(err instanceof Error ? err.message : String(err));
@@ -950,7 +946,7 @@ export function createProgram() {
                       ? "pome.json"
                       : "built-in default",
                   trials: k,
-                  artifactsDir: options.artifactsDir,
+                  artifactsDir,
                   hosted: {
                     baseUrl: hostedCreds.apiBaseUrl,
                     apiKey: hostedCreds.apiKey,
@@ -970,7 +966,7 @@ export function createProgram() {
               const result = await runTaskHosted({
                 taskPath: file,
                 agentCommand,
-                artifactsDir: options.artifactsDir,
+                artifactsDir,
                 hosted: { baseUrl: hostedCreds.apiBaseUrl, apiKey: hostedCreds.apiKey },
                 agentModel: options.agentModel,
                 agentVersion: options.agentVersion,
@@ -1007,7 +1003,7 @@ export function createProgram() {
             const result = await runTask({
               taskPath: file,
               agentCommand,
-              artifactsDir: options.artifactsDir,
+              artifactsDir,
               // Commander negates --no-* flags: `--no-capture` → `capture: false`.
               noCapture: options.capture === false,
             });
@@ -1045,20 +1041,12 @@ export function createProgram() {
       "Zero-auth first-run demo: boots a local GitHub twin, runs the bundled demo agent for 5 isolated trials (model calls via pome's anonymous demo gateway), and prints per-trial verdicts evaluated in Pome cloud. No signup, no API keys; ends with a no-login preview link.",
     )
     .option(
-      "--api-url <url>",
-      "Control-plane base URL.",
-      process.env.POME_API_BASE ??
-        process.env.POME_API_URL ??
-        DEFAULT_CONTROL_PLANE_URL,
-    )
-    .option(
       "--trials <n>",
       "Number of trials to run, 1 to 10",
       "5",
     )
-    .option("--artifacts-dir <dir>", "Directory for run artifacts", "runs")
     .action(
-      async (opts: { apiUrl: string; trials: string; artifactsDir: string }) => {
+      async (opts: { trials: string }, cmd: Command) => {
         const trials = Number.parseInt(opts.trials, 10);
         if (!Number.isInteger(trials) || trials < 1 || trials > 10) {
           console.error(`Invalid --trials "${opts.trials}" (expected 1-10).`);
@@ -1069,11 +1057,11 @@ export function createProgram() {
         // graph out of every other command's startup path.
         const { runDemo } = await import("../demo/runDemo.js");
         const result = await runDemo({
-          apiBase: opts.apiUrl.replace(/\/$/, ""),
+          apiBase: globals(cmd).apiUrl.replace(/\/$/, ""),
           dashboardBase:
             process.env.POME_DASHBOARD_URL ?? DEFAULT_DASHBOARD_URL,
           trials,
-          artifactsDir: opts.artifactsDir,
+          artifactsDir: globals(cmd).artifactsDir,
         });
         process.exitCode = result.exitCode;
       },
@@ -1113,11 +1101,6 @@ export function createProgram() {
       "Existing run directory (runs/<task>/<run-id>). Omit to use <artifacts-dir>/latest.json.",
     )
     .option(
-      "--artifacts-dir <dir>",
-      "Directory whose latest.json picks the run when no run dir is given.",
-      "runs",
-    )
-    .option(
       "--agent <slug>",
       "Agent identity for the eval session. Defaults to agent.slug from pome.json.",
     )
@@ -1125,30 +1108,26 @@ export function createProgram() {
       "--task <name>",
       "Task name recorded on the eval session. Defaults to meta.json's `scenario` slug (a legacy key name; then title).",
     )
-    .option(
-      "--api-url <url>",
-      "Control-plane base URL.",
-      process.env.POME_API_URL ?? DEFAULT_CONTROL_PLANE_URL,
-    )
     .description(
       "Upload an existing raw trace directory to Pome cloud for evaluation and print the authoritative score (capture/eval split — no local scoring; requires a control plane with POST /v1/eval-sessions)",
     )
     .action(
       async (
         runDir: string | undefined,
-        opts: { artifactsDir: string; agent?: string; task?: string; apiUrl: string },
+        opts: { agent?: string; task?: string },
+        cmd: Command,
       ) => {
-        await runEvalCommand(runDir, opts);
+        await runEvalCommand(runDir, { ...opts, ...globals(cmd) });
       },
     );
 
   program
     .command("inspect")
     .argument("<run>", "Run id, run directory, or latest")
-    .option("--artifacts-dir <dir>", "Directory for run artifacts", "runs")
     .description("Print a human-readable run report")
-    .action(async (run: string, options: { artifactsDir: string }) => {
-      const latest = run === "latest" ? await readLatestRun(options.artifactsDir) : undefined;
+    .action(async (run: string, _options: unknown, cmd: Command) => {
+      const latest =
+        run === "latest" ? await readLatestRun(globals(cmd).artifactsDir) : undefined;
       const runDir = latest?.run_dir ?? resolve(run);
 
       const eventsResult = await readEventsJsonl(runDir);

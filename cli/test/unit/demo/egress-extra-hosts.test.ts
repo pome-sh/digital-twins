@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Demo-mode egress valve: the POME_API_BASE host joins the deny-by-default floor's
+// Demo-mode egress valve: the control-plane host joins the deny-by-default floor's
 // allowlist so the bundled agent's gateway CONNECTs aren't refused, without.
 import { describe, expect, it } from "vitest";
 import {
