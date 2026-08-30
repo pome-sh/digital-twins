@@ -9,7 +9,7 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
-## Unreleased (patch)
+## 0.42.4 — 2026-08-30
 
 **`pome checks <twin>` names the twin's real version instead of "unknown"**
 (F-1791). The header — the first grading-vocabulary output the docs send a
