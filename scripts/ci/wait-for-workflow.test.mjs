@@ -124,6 +124,26 @@ function main() {
     const y = readFileSync(join(ROOT, ".github/workflows/twin-image.yml"), "utf8");
     assert(/wait-for-workflow\.sh ci\.yml/.test(y), "twin-image must wait for ci.yml");
     const steps = y.split(/\n      - /);
+
+    // The substring assertion above cannot tell "waits before every push" from
+    // "never waits": it would accept `if: false` on the step just as happily.
+    // The wait may be skipped on pull_request — nothing is pushed there, so
+    // there is no push to order — and must run on EVERY other event, since a
+    // push is reachable from all of them. So the condition, if present, has to
+    // be exactly that exclusion.
+    const ciStep = steps.find((b) => /wait-for-workflow\.sh ci\.yml/.test(b));
+    assert(ciStep, "the ci.yml wait must be its own step");
+    const ciIf = /^\s*if:\s*(.+)$/m.exec(ciStep);
+    if (ciIf) {
+      const cond = ciIf[1].replace(/^\$\{\{\s*/, "").replace(/\s*\}\}$/, "").trim();
+      assert(
+        cond === "github.event_name != 'pull_request'",
+        "the ci.yml wait may only be narrowed to non-pull_request events, and the " +
+          "condition must say exactly that — any other `if:` (a typo, a stricter " +
+          "ref test, `false`) silently stops ordering the push it exists to order. " +
+          `Got: ${cond}`,
+      );
+    }
     const secretStep = steps.find((b) => /wait-for-workflow\.sh secret-scan\.yml/.test(b));
     assert(secretStep, "twin-image must wait for secret-scan.yml");
     assert(

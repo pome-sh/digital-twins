@@ -16,6 +16,14 @@ jobs:
   # and skip everything gated on `steps.scope.outputs.heavy`.
   typecheck-test:
     runs-on: ubuntu-latest
+    # Inherited from showcase-verify.yml, whose job carried `timeout-minutes: 20`
+    # for the two verify.sh steps now absorbed below: a twin that boots but never
+    # answers /healthz leaves each script in its own 120s wait, but a wedged
+    # `npm ci`, build or twin subprocess has no such bound. Without this the
+    # REQUIRED check inherits GitHub's 360-minute default and a wedge blocks the
+    # merge for six hours. 45 rather than 20 because this job is the whole heavy
+    # suite, whose slowest observed run is ~11 minutes.
+    timeout-minutes: 45
     permissions:
       contents: read
     steps:
@@ -36,7 +44,7 @@ jobs:
           fi
           # Paths that can affect package build/test/parity or the CI contract.
           if git diff --name-only "${BASE_SHA}" HEAD | grep -qE \
-            '^(packages/|cli/|agent-examples/|integration-examples/|scripts/|contract/|config/|showcases/|knip\.json|README\.md$|package(-lock)?\.json$|\.github/workflows/ci\.yml$)'; then
+            '^(packages/|cli/|agent-examples/|integration-examples/|scripts/|contract/|config/|showcases/|knip\.json|package(-lock)?\.json$|\.github/workflows/ci\.yml$)'; then
             echo "heavy=true" >> "$GITHUB_OUTPUT"
             echo "Running heavy suite (package/cli/script/lockfile/ci changes)."
           else
@@ -536,11 +544,18 @@ jobs:
         if: steps.scope.outputs.heavy == 'true'
         run: bash showcases/cross-call-state/verify.sh
 
-      # `!cancelled()` rather than the default: a red cross-call-state must not
-      # hide a second, independent regression here. The job still fails on the
-      # first script's failure — this only makes both verdicts visible in one run.
+      # Plain `success()` (the default), NOT the `!cancelled()` this step carried
+      # in showcase-verify.yml. There it bought both showcase verdicts in one run
+      # at no risk, because only five steps preceded it. Here ~45 do, and an
+      # explicit `if:` drops the implicit success check — so ANY earlier red (a
+      # flaky twin-slack coverage run, say) would skip `Resolve the CLI above`
+      # while still running this, leaving POME_CLI unset. Both scripts default
+      # `CLI` to `npx -y @pome-sh/cli@latest`, so the step would assert against
+      # the PUBLISHED CLI — blind to this PR's diff — and report that as a
+      # verdict on the PR. Losing the second showcase's verdict on a red run is
+      # the cheaper failure.
       - name: 'Showcase: permission-denial'
-        if: ${{ !cancelled() && steps.scope.outputs.heavy == 'true' }}
+        if: steps.scope.outputs.heavy == 'true'
         run: bash showcases/permission-denial/verify.sh
 
       # ── Absorbed from quickstart-smoke.yml (deleted) ─────────────────────
@@ -603,9 +618,9 @@ jobs:
           done
           cat gmail-twin.log
           exit 1
-      # Heavy-guarded as well as failure-guarded: without it, a red lint step on
-      # a docs-only PR would end the job by printing two files that were never
-      # written.
+      # Heavy-guarded as well as failure-guarded. Not for safety — `cat … || true`
+      # cannot fail — but so a docs-only PR's red does not end its log with an
+      # empty step named after twins it never started.
       - name: Twin logs on failure
         if: ${{ failure() && steps.scope.outputs.heavy == 'true' }}
         run: cat twin.log gmail-twin.log 2>/dev/null || true

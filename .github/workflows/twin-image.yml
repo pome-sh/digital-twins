@@ -10,6 +10,14 @@ on:
       - 'packages/twin-slack/**'
       - 'packages/twin-stripe/**'
       - 'packages/wire/**'
+      # `packages/sdk/**` for the same reason as wire, and it was missing: every
+      # Dockerfile's runtime stage carries `COPY --from=build
+      # /repo/packages/sdk/dist`, and all five twins declare `@pome-sh/sdk`. A
+      # PR touching only `packages/sdk/src/` therefore changed the shipped bytes
+      # of all five images and ran no build and no Trivy scan — the regression
+      # surfaced on main, after the merge, where it blocks a publish instead of
+      # a PR. `packages/*/package.json` below covers only the manifest.
+      - 'packages/sdk/**'
       - 'packages/*/package.json'
       - 'package.json'
       - 'package-lock.json'
@@ -66,7 +74,7 @@ jobs:
           shared=false
           for f in "${files[@]}"; do
             case "$f" in
-              packages/wire/*|package.json|package-lock.json|cli/package.json|.dockerignore|.trivyignore|scripts/ci/*|.github/workflows/*|packages/*/package.json)
+              packages/wire/*|packages/sdk/*|package.json|package-lock.json|cli/package.json|.dockerignore|.trivyignore|scripts/ci/*|.github/workflows/twin-image.yml|packages/*/package.json)
                 shared=true
                 break
                 ;;
@@ -87,8 +95,8 @@ jobs:
             done
           done
           if [[ "${#selected[@]}" -eq 0 ]]; then
-            # Path filter admitted the PR but no twin package matched — keep
-            # wait-gates meaningful with a full verify.
+            # Path filter admitted the PR but no twin package matched — a
+            # shared or ambiguous input, so verify all five rather than none.
             echo "twins=${all}" >> "$GITHUB_OUTPUT"
             echo "Full twin matrix (fallback)."
             exit 0
@@ -98,8 +106,9 @@ jobs:
           echo "PR twin matrix: [${joined%,}]"
 
   # Package typecheck/test live in `ci`; secret scanning is a parallel gate.
-  # Wait for both on this SHA before building/scanning/pushing so a red twin
-  # cannot still ship a rolling tag to GHCR.
+  # Wait for both on this SHA before pushing, so a red twin cannot ship a
+  # rolling tag to GHCR. Both waits are now off-PR (see each step's `if:`):
+  # nothing is pushed from a pull request, so there was no push to order.
   #
   # The secret-scan wait carries its own `if:`, because secret-scan.yml does not
   # run for every event this workflow does: it triggers on `pull_request` and
@@ -121,7 +130,12 @@ jobs:
       # gates that vet it, and `Push scanned image` below is itself
       # `event_name != 'pull_request'` — so on a PR this step held a runner open
       # for the full ci.yml duration (~7 min) to order a push that never
-      # happens. The PR arm still builds, scans and signs nothing.
+      # happens. The PR arm still builds and Trivy-scans; what it does NOT do is
+      # write to a registry, sign or attest — `Push scanned image`, the three
+      # cosign installs and the signing step are each already
+      # `event_name != 'pull_request'`. Its one outward effect is the SBOM
+      # build artifact, which nothing in the trust path reads (pome-cloud
+      # verifies the cosign signature on the GHCR digest, never a CI artifact).
       - name: Wait for the ci workflow on this SHA
         if: ${{ github.event_name != 'pull_request' }}
         env:
