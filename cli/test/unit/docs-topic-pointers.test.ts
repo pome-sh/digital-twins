@@ -12,6 +12,8 @@ import { describe, expect, it } from "vitest";
 
 import { createProgram } from "../../src/cli/main.js";
 import { DOCS_TOPICS } from "../../src/cli/docs-topics.js";
+import { findTopic } from "../../src/cli/docs.js";
+import { TWIN_NAME_LIST } from "../../src/twin/registry.js";
 
 /** Every `pome docs <id>` reference in any command's help, at any depth. */
 function referencedTopics(cmd: Command, path: string[] = []): { where: string; id: string }[] {
@@ -42,5 +44,14 @@ describe("`pome docs <topic>` pointers in help text", () => {
       expect(ids.has(id), `\`${where}\` points at \`pome docs ${id}\`, which is not a topic`)
         .toBe(true);
     }
+  });
+});
+
+// `pome docs linear` printed the topic list and exited non-zero for four months
+// while /docs/twins/linear shipped, because the topic was simply never added.
+// Twin six would reintroduce that verbatim; the twin list is the registry's.
+describe("`pome docs <twin>`", () => {
+  it.each(TWIN_NAME_LIST)("resolves for %s", (twin) => {
+    expect(findTopic(twin, DOCS_TOPICS)?.id).toBe(twin);
   });
 });

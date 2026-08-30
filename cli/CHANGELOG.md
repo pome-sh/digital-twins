@@ -9,6 +9,21 @@ write a version number here or in `package.json`. Released entries are insertion
 only: a correction is the next entry, naming the one it corrects.
 
 
+## Unreleased (patch)
+
+**Machine-readable output being `--json` is a gate now** (F-1727). No option may
+be named `--format`, `--output-format` or `--fmt`, and `--json` may not take an
+argument, so the enum cannot come back under the surviving name. The
+index-line, doubled-default and declared-once tests gained a self-test that
+builds a broken command and proves the check goes red.
+
+**`pome docs linear` resolves**, where it was the only twin name that printed
+the topic list and exited non-zero; every twin the CLI ships is now asserted to
+have one. `pome twin status`'s summary says it reports whether the twin is
+running. Correcting 0.37.0: `--secrets-file` does not *always* print the
+connection summary — with `--json` it prints only the line naming the file.
+
+
 ## 0.42.0 — 2026-08-30
 
 **`pome twin seed` is now `pome twin new-seed`, and `--for-task` is gone**

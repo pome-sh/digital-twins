@@ -1359,7 +1359,7 @@ export function createProgram() {
 
   twin
     .command("status")
-    .summary("Print the local twin's status")
+    .summary("Say whether the local twin is running")
     .description(
       "Say whether the twin `pome twin start` last booted here is still running, and print its paste-able env lines",
     )

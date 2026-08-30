@@ -11,7 +11,7 @@
 // typo. Prose like `twin start --port`'s "(default: $PORT, else …)" is fine,
 // since that option has no Commander default to duplicate.
 
-import type { Command } from "commander";
+import { Command } from "commander";
 import { describe, expect, it } from "vitest";
 
 import { createProgram } from "../../src/cli/main.js";
@@ -32,30 +32,42 @@ function path(cmd: Command): string {
  *  default" stays legal, and has to: `sandbox create --seed` needs it. */
 const PARENTHESIZED_DEFAULT = /\(default[: )]/i;
 
-describe("help text never renders a default twice", () => {
-  it("holds for every argument in the command tree", () => {
-    for (const cmd of allCommands(createProgram())) {
-      for (const arg of cmd.registeredArguments) {
-        const named = PARENTHESIZED_DEFAULT.test(arg.description);
-        const hasDefault = arg.defaultValue !== undefined;
-        expect(
-          named && hasDefault,
-          `${path(cmd)} <${arg.name()}> carries a default value and names one in its text: "${arg.description}"`,
-        ).toBe(false);
+/** Every declaration that carries a default AND names one in its own text. */
+function duplicatedDefaults(root: Command): string[] {
+  const violations: string[] = [];
+  for (const cmd of allCommands(root)) {
+    const declarations = [
+      ...cmd.registeredArguments.map((arg) => ({
+        term: `<${arg.name()}>`,
+        description: arg.description,
+        defaultValue: arg.defaultValue,
+      })),
+      ...cmd.options.map((opt) => ({
+        term: opt.flags,
+        description: opt.description,
+        defaultValue: opt.defaultValue,
+      })),
+    ];
+    for (const { term, description, defaultValue } of declarations) {
+      if (PARENTHESIZED_DEFAULT.test(description) && defaultValue !== undefined) {
+        violations.push(`${path(cmd)} ${term} carries a default and names one: "${description}"`);
       }
     }
+  }
+  return violations;
+}
+
+describe("help text never renders a default twice", () => {
+  it("holds for every argument and option in the command tree", () => {
+    expect(duplicatedDefaults(createProgram())).toEqual([]);
   });
 
-  it("holds for every option in the command tree", () => {
-    for (const cmd of allCommands(createProgram())) {
-      for (const opt of cmd.options) {
-        const named = PARENTHESIZED_DEFAULT.test(opt.description);
-        const hasDefault = opt.defaultValue !== undefined;
-        expect(
-          named && hasDefault,
-          `${path(cmd)} ${opt.flags} carries a default value and names one in its text: "${opt.description}"`,
-        ).toBe(false);
-      }
-    }
+  // Green on today's tree proves nothing, so break it here instead of in
+  // main.ts: one argument and one option, each doubling its own default.
+  it("fails on a declaration that names the default it already carries", () => {
+    const program = new Command("pome")
+      .argument("[name]", "Twin name (default: github)", "github")
+      .option("--limit <n>", "Max rows (default: 20)", "20");
+    expect(duplicatedDefaults(program)).toHaveLength(2);
   });
 });
